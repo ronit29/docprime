@@ -1491,6 +1491,9 @@ class DoctorOpdAppointmentForm(RefundableAppointmentForm):
                 'cancellation_reason') or cleaned_data.get('cancellation_comments')):
             raise forms.ValidationError(
                 "Reason/Comment for cancellation can only be entered on cancelled appointment")
+        
+        if cleaned_data.get('status') is OpdAppointment.CREATED and cleaned_data.get('status_change_comments'):
+            raise forms.ValidationError("Comment for status change can only be entered when changing status from created to other.")
 
         if cleaned_data.get('status') is OpdAppointment.CANCELLED and not cleaned_data.get('cancellation_reason'):
             raise forms.ValidationError("Reason for Cancelled appointment should be set.")
@@ -1499,6 +1502,10 @@ class DoctorOpdAppointmentForm(RefundableAppointmentForm):
                 'cancellation_reason') and cleaned_data.get('cancellation_reason').is_comment_needed and not cleaned_data.get('cancellation_comments'):
             raise forms.ValidationError(
                 "Cancellation comments must be mentioned for selected cancellation reason.")
+
+        if cleaned_data.get('status') and cleaned_data.get('status') != OpdAppointment.CREATED and self.instance and self.instance.status == OpdAppointment.CREATED and not cleaned_data.get('status_change_comments'):
+            raise forms.ValidationError(
+                "Status change comments must be mentioned when changing status from created to other.")
 
         if cleaned_data.get('status') not in [OpdAppointment.CANCELLED, OpdAppointment.COMPLETED, None]:
             if not DoctorClinicTiming.objects.filter(doctor_clinic__doctor=doctor,
@@ -1599,7 +1606,7 @@ class DoctorOpdAppointmentAdmin(admin.ModelAdmin):
                 'fees', 'effective_price', 'mrp', 'deal_price', 'payment_status',
                 'payment_type', 'admin_information', 'insurance', 'outstanding',
                 'status', 'cancel_type', 'cancellation_reason', 'cancellation_comments',
-                'start_date', 'start_time', 'invoice_urls', 'payment_type', 'payout_info', 'refund_initiated')
+                'start_date', 'start_time', 'invoice_urls', 'payment_type', 'payout_info', 'refund_initiated', 'status_change_comments')
         if request.user.groups.filter(name=constants['APPOINTMENT_OTP_TEAM']).exists() or request.user.is_superuser:
             all_fields = all_fields + ('otp',)
 
@@ -1629,6 +1636,10 @@ class DoctorOpdAppointmentAdmin(admin.ModelAdmin):
             read_only += ('status',)
         if request.user.groups.filter(name=constants['APPOINTMENT_OTP_TEAM']).exists() or request.user.is_superuser:
             read_only = read_only + ('otp',)
+
+        if obj.status is not OpdAppointment.CREATED:
+            read_only = read_only + ('status_change_comments',)
+
         return read_only
         # else:
         #     return ('invoice_urls')

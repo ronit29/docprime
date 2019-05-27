@@ -257,10 +257,23 @@ class Hospital(auth_model.TimeStampedModel, auth_model.CreatedByModel, auth_mode
     #         return self.city
     #     return None
 
+
     @classmethod
     def update_hosp_google_avg_rating(cls):
         update_hosp_google_ratings = RawSql('''update hospital h set google_avg_rating = (select (reviews->>'user_avg_rating')::float from hospital_place_details 
                                          where hospital_id=h.id limit 1)''', [] ).execute()
+
+    def get_active_opd_appointments(self, user=None, user_insurance=None):
+
+        appointments = OpdAppointment.objects.filter(hospital_id=self.id)\
+                           .exclude(status__in=[OpdAppointment.COMPLETED, OpdAppointment.CANCELLED])
+        if user and user.is_authenticated:
+            appointments = appointments.filter(user=user)
+        if user_insurance:
+            appointments = appointments.filter(insurance=user_insurance)
+
+        return appointments
+
 
     @classmethod
     def get_hosp_and_locality_dict(cls, temp_hospital_ids, required_identifier):
@@ -1245,7 +1258,7 @@ class DoctorClinic(auth_model.TimeStampedModel, auth_model.WelcomeCallingDone):
     # def __str__(self):
     #     return '{}-{}'.format(self.doctor, self.hospital)
 
-    def get_timings(self):
+    def get_timings(self, blocks=[]):
         from ondoc.api.v2.doctor import serializers as v2_serializers
         from ondoc.api.v1.common import serializers as common_serializers
         clinic_timings= self.availability.order_by("start")
@@ -1266,6 +1279,10 @@ class DoctorClinic(auth_model.TimeStampedModel, auth_model.WelcomeCallingDone):
         date = datetime.datetime.today().strftime('%Y-%m-%d')
         booking_details = {"type": "doctor"}
         slots = obj.get_timing_slots(date, total_leaves, booking_details)
+        if slots:
+            for b in blocks:
+                slots.pop(b, None)
+
         upcoming_slots = obj.get_upcoming_slots(time_slots=slots)
         res_data = {"time_slots": slots, "upcoming_slots": upcoming_slots}
         return res_data
@@ -2020,13 +2037,20 @@ class OpdAppointment(auth_model.TimeStampedModel, CouponsMixin, OpdAppointmentIn
     auto_ivr_data = JSONField(default=list(), null=True)
     synced_analytics = GenericRelation(SyncBookingAnalytics, related_name="opd_booking_analytics")
     refund_details = GenericRelation(RefundDetails, related_query_name="opd_appointment_detail")
+    appointment_prescriptions = GenericRelation("prescription.AppointmentPrescription", related_query_name="appointment_prescriptions")
     coupon_data = JSONField(blank=True, null=True)
+    status_change_comments = models.CharField(max_length=5000, null=True, blank=True)
 
     def __str__(self):
         return self.profile.name + " (" + self.doctor.name + ")"
 
     def allowed_action(self, user_type, request):
         allowed = []
+        if self.status == self.CREATED:
+            if user_type == auth_model.User.CONSUMER:
+                return [self.CANCELLED]
+            return []
+
         current_datetime = timezone.now()
         today = datetime.date.today()
         if user_type == auth_model.User.DOCTOR and self.time_slot_start.date() >= today:
@@ -2145,9 +2169,19 @@ class OpdAppointment(auth_model.TimeStampedModel, CouponsMixin, OpdAppointmentIn
 
     @classmethod
     def create_appointment(cls, appointment_data):
+
+        insurance = appointment_data.get('insurance')
+        appointment_status = OpdAppointment.BOOKED
+
+        # if insurance and insurance.is_valid():
+        #     mrp = appointment_data.get('fees')
+        #     insurance_limit_usage_data = insurance.validate_limit_usages(mrp)
+        #     if insurance_limit_usage_data.get('created_state'):
+        #         appointment_status = OpdAppointment.CREATED
+
         otp = random.randint(1000, 9999)
         appointment_data["payment_status"] = OpdAppointment.PAYMENT_ACCEPTED
-        appointment_data["status"] = OpdAppointment.BOOKED
+        appointment_data["status"] = appointment_status
         appointment_data["otp"] = otp
         # if appointment_data["insurance_id"] :
         #     appointment_data["insurance"] = insurance_model.UserInsurance.objects.get(id=appointment_data["insurance_id"].id)
@@ -2776,6 +2810,18 @@ class OpdAppointment(auth_model.TimeStampedModel, CouponsMixin, OpdAppointmentIn
         appointments = cls.objects.filter(~Q(status=cls.COMPLETED), ~Q(status=cls.CANCELLED), user=insurance_obj.user,
                                           insurance=insurance_obj)
         return appointments
+
+    @classmethod
+    def get_insurance_usage(cls, insurance_obj, date=None):
+        appointments = cls.objects.filter(user=insurance_obj.user, insurance=insurance_obj).exclude(status=cls.CANCELLED)
+        if date:
+            appointments = appointments.filter(created_at__date=date)
+
+        count = appointments.count()
+        data = appointments.aggregate(sum_amount=Sum('fees'))
+        sum = data.get('sum_amount', 0)
+        sum = sum if sum else 0
+        return {'count': count, 'sum': sum}
 
     def convert_ipd_lead_data(self):
         result = {}

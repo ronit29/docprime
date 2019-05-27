@@ -344,6 +344,9 @@ class IpdProcedureLeadAdmin(VersionAdmin):
     readonly_fields = ['phone_number', 'id', 'matrix_lead_id', 'comments', 'data', 'ipd_procedure', 'source', 'current_age',
                        'related_speciality', 'is_insured', 'insurance_details', 'opd_appointments', 'lab_appointments']
 
+
+
+
     fieldsets = (
         (None, {
             'fields': (
@@ -352,8 +355,8 @@ class IpdProcedureLeadAdmin(VersionAdmin):
         ('Lead Info', {
             # 'classes': ('collapse',),
             'fields': ('matrix_lead_id', 'comments', 'data', 'ipd_procedure', 'related_speciality',
-                       'hospital', 'hospital_reference_id', 'source', 'status', 'planned_date', 'payment_type', 'payment_amount',
-                       'insurer', 'tpa', 'num_of_chats'),
+                       'hospital', 'hospital_reference_id', 'source', 'referer_doctor', 'status', 'planned_date',
+                       'payment_type', 'payment_amount', 'insurer', 'tpa', 'num_of_chats', 'remarks'),
         }),
         ('History', {
             # 'classes': ('collapse',),
