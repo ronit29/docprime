@@ -502,6 +502,11 @@ class UserProfile(TimeStampedModel):
     def __str__(self):
         return "{}-{}".format(self.name, self.id)
 
+    @cached_property
+    def is_insured_profile(self):
+        response = True if self.insurance.filter().order_by('-id').first() else False
+        return response
+
     def get_thumbnail(self):
         if self.profile_image:
             return self.profile_image.url

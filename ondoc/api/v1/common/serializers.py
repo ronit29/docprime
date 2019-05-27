@@ -1,5 +1,6 @@
 from rest_framework import serializers
 
+from ondoc.authentication.models import UserProfile
 from ondoc.common.models import GlobalNonBookable
 from ondoc.diagnostic.models import Lab
 from ondoc.lead.models import SearchLead
@@ -51,4 +52,5 @@ class GlobalNonBookableSerializer(serializers.ModelSerializer):
 class AppointmentPrerequisiteSerializer(serializers.Serializer):
     lab_test = serializers.ListField(child=serializers.IntegerField(), required=True)
     lab = serializers.PrimaryKeyRelatedField(queryset=Lab.objects.all(), required=True)
+    profile = serializers.PrimaryKeyRelatedField(queryset=UserProfile.objects.all(), required=False)
     # start_date = serializers.DateTimeField(required=True)
