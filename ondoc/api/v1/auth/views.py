@@ -1350,9 +1350,10 @@ class TransactionViewSet(viewsets.GenericViewSet):
         return amount, obj
 
     def send_failure_ops_email(self, order_obj):
-        html_body = "Payment failed for user with " \
+        booking_type = "Insurance " if order_obj.product_id == Order.INSURANCE_PRODUCT_ID else ""
+        html_body = "{}Payment failed for user with " \
                     "user id - {} and phone number - {}" \
-                    ", order id - {}.".format(order_obj.user.id, order_obj.user.phone_number, order_obj.id)
+                    ", order id - {}.".format(booking_type, order_obj.user.id, order_obj.user.phone_number, order_obj.id)
 
         # Push the order failure case to matrix.
 
