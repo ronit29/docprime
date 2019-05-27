@@ -238,7 +238,7 @@ class LabList(viewsets.ReadOnlyModelViewSet):
                 valid_package_ids = []
             valid_package_ids.extend(list(
                 LabTest.objects.filter(test__recommended_categories__id__in=category_ids).annotate(
-                category_ids_len=Count(F('test__recommended_categories__id'))).filter(category_ids_len=len(category_ids)).distinct().values_list('id',
+                category_ids_len=Count('test__recommended_categories__id', distinct=True)).filter(category_ids_len=len(category_ids)).distinct().values_list('id',
                                                                                                                  flat=True)))
 
         if package_category_ids:
@@ -424,7 +424,9 @@ class LabList(viewsets.ReadOnlyModelViewSet):
                                                              'package_free_or_not_dict': package_free_or_not_dict})
 
         category_to_be_shown_in_filter_ids = set()
-        category_queryset = LabTestCategory.objects.filter(is_package_category=True, is_live=True, id__in=categories_ids).order_by('-priority')
+        category_queryset = []
+        if categories_ids:
+            category_queryset = LabTestCategory.objects.filter(is_package_category=True, is_live=True, id__in=categories_ids).order_by('-priority')
         category_result = []
         for category in category_queryset:
             name = category.name
