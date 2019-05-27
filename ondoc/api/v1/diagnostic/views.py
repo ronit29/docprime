@@ -69,6 +69,7 @@ from django.db.models.functions import RowNumber
 from django.db.models import Avg
 from django.db.models.expressions import RawSQL
 from ondoc.doctor.v1.serializers import ArticleAuthorSerializer
+from decimal import Decimal
 User = get_user_model()
 
 
@@ -208,6 +209,10 @@ class LabList(viewsets.ReadOnlyModelViewSet):
         pnt = GEOSGeometry(point_string, srid=4326)
         max_distance = max_distance*1000 if max_distance is not None else 10000
         min_distance = min_distance*1000 if min_distance is not None else 0
+
+        if request.user and request.user.is_authenticated and not hasattr(request, 'agent') and request.user.active_insurance and request.user.active_insurance.insurance_plan and request.user.active_insurance.insurance_plan.plan_usages:
+            if request.user.active_insurance.insurance_plan.plan_usages.get('package_disabled'):
+                return Response({"result": [], "result_count": 0})
 
         package_free_or_not_dict = get_package_free_or_not_dict(request)
         page_size = 30
@@ -1791,9 +1796,23 @@ class LabList(viewsets.ReadOnlyModelViewSet):
         #     lab_serializable_data['url'] = entity.first()['url'] if len(entity) == 1 else None
         temp_data = dict()
 
+        test_serializer_data = test_serializer.data
+        is_prescription_needed = False
+        if request.user and request.user.is_authenticated:
+            insurance = request.user.active_insurance
+            if insurance and test_serializer_data:
+                agreed_price = Decimal(0)
+                for single_test_serializer_data in test_serializer_data:
+                    agreed_price = agreed_price + Decimal(single_test_serializer_data.get('agreed_price', 0))
+
+                limit_data = insurance.validate_limit_usages(agreed_price)
+                is_prescription_needed = limit_data.get('prescription_needed')
+
+        lab_serializable_data['is_prescription_needed'] = is_prescription_needed
+
         temp_data['lab'] = lab_serializable_data
         temp_data['distance_related_charges'] = distance_related_charges
-        temp_data['tests'] = test_serializer.data
+        temp_data['tests'] = test_serializer_data
         temp_data['lab_tests'] = lab_test_serializer.data
         temp_data['lab_timing'], temp_data["lab_timing_data"] = lab_timing, lab_timing_data
         temp_data['total_test_count'] = total_test_count
@@ -2124,6 +2143,7 @@ class LabAppointmentView(mixins.CreateModelMixin,
         request = self.request
         if request.user.user_type == User.DOCTOR:
             return models.LabAppointment.objects.filter(
+                ~Q(status=models.LabAppointment.CREATED),
                 Q(lab__manageable_lab_admins__user=request.user,
                   lab__manageable_lab_admins__is_disabled=False) |
                 Q(lab__network__manageable_lab_network_admins__user=request.user,
@@ -2703,6 +2723,8 @@ class DoctorLabAppointmentsViewSet(viewsets.GenericViewSet):
         serializer.is_valid(raise_exception=True)
         validated_data = serializer.validated_data
         lab_appointment = validated_data.get('lab_appointment')
+        if lab_appointment.status == LabAppointment.CREATED:
+            return Response(status=status.HTTP_404_NOT_FOUND)
 
         lab_appointment = LabAppointment.objects.select_for_update().get(id=lab_appointment.id)
 
@@ -2733,6 +2755,9 @@ class DoctorLabAppointmentsNoAuthViewSet(viewsets.GenericViewSet):
         serializer.is_valid(raise_exception=True)
         validated_data = serializer.validated_data
         lab_appointment = validated_data.get('lab_appointment')
+
+        if lab_appointment.status == LabAppointment.CREATED:
+            return Response(status=status.HTTP_404_NOT_FOUND)
 
         lab_appointment = LabAppointment.objects.select_for_update().get(id=lab_appointment.id)
         source = validated_data.get('source') if validated_data.get('source') else request.query_params.get('source', '')
