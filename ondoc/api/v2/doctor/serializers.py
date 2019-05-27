@@ -212,7 +212,7 @@ class ConsentIsDocprimeSerializer(serializers.Serializer):
 class ConsentIsEncryptSerializer(serializers.Serializer):
     is_encrypted = serializers.BooleanField(required=False)
     hospital_id = serializers.IntegerField()
-    encrypted_hospital_id = serializers.CharField()
+    encrypted_hospital_id = serializers.CharField(required=False)
     hint = serializers.CharField(required=False, allow_blank=True)
     encryption_key = serializers.CharField(required=False, allow_blank=True)
     decrypt = serializers.BooleanField(required=False)

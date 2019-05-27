@@ -819,7 +819,7 @@ class ProviderSignupDataViewset(viewsets.GenericViewSet):
 
     def decrypt_and_save_provider_data(self, hospital_id, key):
         passphrase = hashlib.md5(key.encode())
-        passphrase = passphrase[:16]
+        passphrase = passphrase.hexdigest()[:16]
         patient_queryset = doc_models.OfflinePatients.objects.prefetch_related('patient_mobiles').filter(hospital_id=hospital_id)
         for patient in patient_queryset:
             if patient.encrypted_name:
