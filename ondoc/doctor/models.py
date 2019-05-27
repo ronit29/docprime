@@ -272,7 +272,7 @@ class Hospital(auth_model.TimeStampedModel, auth_model.CreatedByModel, auth_mode
         if not active_appointments:
             return False
         for appointment in active_appointments:
-            if appointment.time_slot_start == appointment_date.date():
+            if appointment.time_slot_start.date() == appointment_date.date():
                 return True
         return False
 
