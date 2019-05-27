@@ -1229,7 +1229,7 @@ class DoctorTimeSlotSerializer(serializers.Serializer):
 class AppointmentRetrieveDoctorSerializer(DoctorProfileSerializer):
     class Meta:
         model = Doctor
-        fields = ('id', 'name', 'gender', 'about', 'practicing_since',
+        fields = ('id', 'name', 'gender', 'about', 'practicing_since', 'license',
                   'qualifications', 'general_specialization', 'display_name')
 
 

@@ -1322,7 +1322,8 @@ def get_opd_pem_queryset(user, model):
         .prefetch_related('doctor__manageable_doctors', 'hospital__manageable_hospitals', 'doctor__images',
                           'doctor__qualifications', 'doctor__qualifications__qualification',
                           'doctor__qualifications__specialization', 'doctor__qualifications__college',
-                          'doctor__doctorpracticespecializations', 'doctor__doctorpracticespecializations__specialization') \
+                          'doctor__doctorpracticespecializations', 'doctor__doctorpracticespecializations__specialization',
+                          'doctor__doctor_number', 'doctor__doctor_number__hospital') \
         .filter(hospital_id__in=list(manageable_hosp_list))\
         .annotate(pem_type=Case(When(Q(hospital__manageable_hospitals__user=user) &
                                Q(hospital__manageable_hospitals__super_user_permission=True) &

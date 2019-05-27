@@ -3519,6 +3519,11 @@ class OfflineCustomerViewSet(viewsets.GenericViewSet):
 
                 payout_amount = app.merchant_payout.payable_amount if app.merchant_payout else app.fees
                 prescription = app.get_prescriptions(request)
+            doc_number = None
+            for number in app.doctor.doctor_number.all():
+                if number.hospital == app.hospital:
+                    doc_number = number.phone_number
+                    break
             ret_obj = {}
             ret_obj['id'] = app.id
             ret_obj['deal_price'] = deal_price
@@ -3530,6 +3535,7 @@ class OfflineCustomerViewSet(viewsets.GenericViewSet):
             ret_obj['created_at'] = app.created_at
             ret_obj['doctor_name'] = app.doctor.name
             ret_obj['doctor_id'] = app.doctor.id
+            ret_obj['doctor_number'] = doc_number
             ret_obj['doctor_thumbnail'] = request.build_absolute_uri(app.doctor.get_thumbnail()) if app.doctor.get_thumbnail() else None
             ret_obj['hospital_id'] = app.hospital.id
             ret_obj['hospital_name'] = app.hospital.name
