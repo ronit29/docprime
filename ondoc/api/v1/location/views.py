@@ -274,7 +274,7 @@ class SpecialityCityFooter(Footer):
             speciality_in_popular_localities = self.specialist_in_popular_localities()
             if speciality_in_popular_localities:
                 response['menu'].append(
-                    {'sub_heading': '%s in Popular Localities in %s' % (self.specialization, self.locality),
+                    {'sub_heading': '%s in Popular Localities in %s' % (self.specialization + 's', self.locality),
                      'url_list': speciality_in_popular_localities})
 
         # if self.specialization_id and self.locality_id:
@@ -284,7 +284,7 @@ class SpecialityCityFooter(Footer):
         #             {'sub_heading': '%s in Top Cities' % self.specialization, 'url_list': speciality_in_top_cities})
 
         if response['menu']:
-            response['heading'] = '%s in %s Search Page' % (self.specialization, self.locality)
+            response['heading'] = '%s in %s Search Page' % (self.specialization+'s', self.locality)
 
         return response
 
@@ -335,7 +335,7 @@ class SpecialityLocalityFooter(Footer):
 
         specialist_in_nearby_localities = self.specialist_in_popular_localities()
         if specialist_in_nearby_localities:
-            response['menu'].append({'sub_heading': '%s in nearby localities' % self.specialization,
+            response['menu'].append({'sub_heading': '%s in nearby localities' % (self.specialization + 's'),
                                      'url_list': specialist_in_nearby_localities})
 
         top_specialities_in_locality = self.specialist_in_locality()
@@ -346,9 +346,8 @@ class SpecialityLocalityFooter(Footer):
         # if speciality_in_top_cities:
         #         response['menu'].append({'sub_heading': '%s in Top Cities' % self.specialization, 'url_list': speciality_in_top_cities})
 
-
         if response['menu']:
-            response['heading'] = '%s in %s Search Page' % (self.specialization, self.locality)
+            response['heading'] = '%s  in %s Search Page' % ((self.specialization + 's'), self.locality)
 
         return response
 
@@ -662,7 +661,7 @@ class DoctorsCitySearchViewSet(viewsets.GenericViewSet):
             title[5] = 'Find ' + spec_city_entity.specialization + ' near you'
             title_url = {'title': title[int(page)], 'url': spec_city_entity.url}
             if response and response.get('menu'):
-                response.get('menu').insert(0, {'sub_heading': spec_city_entity.specialization + ' in ' + spec_city_entity.locality_value, 'url_list': [title_url]})
+                response.get('menu').insert(0, {'sub_heading': spec_city_entity.specialization+'s' + ' in ' + spec_city_entity.locality_value, 'url_list': [title_url]})
 
         if entity.sitemap_identifier == 'DOCTORS_LOCALITY_CITY':
             city_entity = EntityUrls.objects.filter(is_valid=True, locality_value=entity.locality_value, sitemap_identifier='DOCTORS_CITY').first()
