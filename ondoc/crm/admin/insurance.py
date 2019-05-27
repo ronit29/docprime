@@ -10,7 +10,8 @@ from ondoc.doctor.models import OpdAppointment, DoctorPracticeSpecialization, Pr
 from ondoc.diagnostic.models import LabAppointment, LabTest, Lab
 from ondoc.insurance.models import InsurancePlanContent, InsurancePlans, InsuredMembers, UserInsurance, StateGSTCode, \
      ThirdPartyAdministrator, InsuranceEligibleCities, InsuranceCity, InsuranceDistrict, InsuranceDeal, \
-    InsurerPolicyNumber, InsuranceLead, EndorsementRequest, InsuredMemberDocument, InsuranceEligibleCities
+    InsurerPolicyNumber, InsuranceLead, EndorsementRequest, InsuredMemberDocument, InsuranceEligibleCities,\
+    InsuranceThreshold
 from import_export.admin import ImportExportMixin, ImportExportModelAdmin, base_formats
 import nested_admin
 from import_export import fields, resources
@@ -42,6 +43,12 @@ class InsurancePlanContentInline(admin.TabularInline):
     # readonly_fields = ("first_name", 'last_name', 'relation', 'dob', 'gender', )
 
 
+class InsurerPolicyNumberInline(admin.TabularInline):
+    model = InsurerPolicyNumber
+    fields = ('insurer', 'insurer_policy_number')
+    extra = 0
+
+
 class InsurancePlanAdminForm(forms.ModelForm):
 
     is_selected = forms.BooleanField(required=False)
@@ -60,10 +67,16 @@ class InsurancePlanAdminForm(forms.ModelForm):
         return is_selected
 
 
+class InsuranceThresholdInline(admin.TabularInline):
+    model = InsuranceThreshold
+    #fields = ('__all__',)
+    extra = 0
+
+
 class InsurancePlansAdmin(admin.ModelAdmin):
 
-    list_display = ['insurer', 'name', 'amount', 'is_selected']
-    inlines = [InsurancePlanContentInline]
+    list_display = ['insurer', 'name','internal_name', 'amount', 'is_selected','get_policy_prefix']
+    inlines = [InsurancePlanContentInline, InsurerPolicyNumberInline,InsuranceThresholdInline]
     search_fields = ['name']
     form = InsurancePlanAdminForm
 

@@ -1583,6 +1583,13 @@ class LabAppointment(TimeStampedModel, CouponsMixin, LabAppointmentInvoiceMixin,
     status_change_comments = models.CharField(max_length=5000, null=True, blank=True)
     appointment_prescriptions = GenericRelation("prescription.AppointmentPrescription", related_query_name="appointment_prescriptions")
 
+
+    def get_all_uploaded_prescriptions(self, date=None):
+        from ondoc.prescription.models import AppointmentPrescription
+        qs = LabAppointment.objects.filter(user=self.user).values_list('id', flat=True)
+        prescriptions = AppointmentPrescription.objects.filter(content_type=ContentType.objects.get_for_model(self), object_id__in=qs)
+        return prescriptions
+
     def get_corporate_deal_id(self):
         coupon = self.coupon.first()
         if coupon and coupon.corporate_deal:

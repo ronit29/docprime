@@ -1242,7 +1242,7 @@ class DoctorClinic(auth_model.TimeStampedModel, auth_model.WelcomeCallingDone):
     # def __str__(self):
     #     return '{}-{}'.format(self.doctor, self.hospital)
 
-    def get_timings(self):
+    def get_timings(self, blocks=[]):
         from ondoc.api.v2.doctor import serializers as v2_serializers
         from ondoc.api.v1.common import serializers as common_serializers
         clinic_timings= self.availability.order_by("start")
@@ -1263,6 +1263,10 @@ class DoctorClinic(auth_model.TimeStampedModel, auth_model.WelcomeCallingDone):
         date = datetime.datetime.today().strftime('%Y-%m-%d')
         booking_details = {"type": "doctor"}
         slots = obj.get_timing_slots(date, total_leaves, booking_details)
+        if slots:
+            for b in blocks:
+                slots.pop(b, None)
+
         upcoming_slots = obj.get_upcoming_slots(time_slots=slots)
         res_data = {"time_slots": slots, "upcoming_slots": upcoming_slots}
         return res_data
@@ -2153,11 +2157,11 @@ class OpdAppointment(auth_model.TimeStampedModel, CouponsMixin, OpdAppointmentIn
         insurance = appointment_data.get('insurance')
         appointment_status = OpdAppointment.BOOKED
 
-        if insurance and insurance.is_valid():
-            mrp = appointment_data.get('fees')
-            insurance_limit_usage_data = insurance.validate_limit_usages(mrp)
-            if insurance_limit_usage_data.get('created_state'):
-                appointment_status = OpdAppointment.CREATED
+        # if insurance and insurance.is_valid():
+        #     mrp = appointment_data.get('fees')
+        #     insurance_limit_usage_data = insurance.validate_limit_usages(mrp)
+        #     if insurance_limit_usage_data.get('created_state'):
+        #         appointment_status = OpdAppointment.CREATED
 
         otp = random.randint(1000, 9999)
         appointment_data["payment_status"] = OpdAppointment.PAYMENT_ACCEPTED

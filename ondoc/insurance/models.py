@@ -38,7 +38,7 @@ from decimal import  *
 logger = logging.getLogger(__name__)
 from django.utils.functional import cached_property
 from ondoc.notification import tasks as notification_tasks
-
+from dateutil.relativedelta import relativedelta
 
 
 def generate_insurance_policy_number():
@@ -347,6 +347,7 @@ class InsurerAccount(auth_model.TimeStampedModel):
 class InsurancePlans(auth_model.TimeStampedModel, LiveMixin):
     insurer = models.ForeignKey(Insurer,related_name="plans", on_delete=models.CASCADE)
     name = models.CharField(max_length=100)
+    internal_name = models.CharField(max_length=200, null=True)
     amount = models.PositiveIntegerField(default=0)
     policy_tenure = models.PositiveIntegerField(default=1)
     adult_count = models.SmallIntegerField(default=0)
@@ -355,17 +356,31 @@ class InsurancePlans(auth_model.TimeStampedModel, LiveMixin):
     is_live = models.BooleanField(default=False)
     total_allowed_members = models.PositiveSmallIntegerField(default=0)
     is_selected = models.BooleanField(default=False)
-    plan_usages = JSONField(default=dict, null=True)
+    plan_usages = JSONField(default=dict, null=True, blank=True)
 
     @property
     def get_active_threshold(self):
         return self.threshold.filter(is_live=True)
 
+    def get_policy_prefix(self):
+        insurer_policy_number = None
+        if self.plan_policy_number.first():
+            insurer_policy_number = self.plan_policy_number.first().insurer_policy_number
+        else :
+            insurer_policy_number_obj = InsurerPolicyNumber.objects.filter(insurer=self.insurer, insurance_plan__isnull=True).order_by(
+                '-id').first()
+            if insurer_policy_number_obj:
+                insurer_policy_number = insurer_policy_number_obj.insurer_policy_number
+
+        return insurer_policy_number
+
     def get_people_covered(self):
         return "%d adult, %d childs" % (self.adult_count, self.child_count)
 
     def __str__(self):
-        return self.name
+        if self.internal_name:            
+            return self.name+'('+self.internal_name+')'
+        return self.name    
 
     class Meta:
         db_table = "insurance_plans"
@@ -405,12 +420,16 @@ class InsuranceThreshold(auth_model.TimeStampedModel, LiveMixin):
         message = {}
         is_dob_valid = False
         # Calculate day difference between dob and current date
-        # current_date = datetime.datetime.now().date()
+
         current_date = timezone.now().date()
+        # days_diff = current_date - member['dob']
+        # days_diff = days_diff.days
+        # years_diff = days_diff / 365
+        # years_diff = math.ceil(years_diff)
+
+        years_diff = relativedelta(current_date, member['dob']).years
         days_diff = current_date - member['dob']
         days_diff = days_diff.days
-        years_diff = days_diff / 365
-        years_diff = math.ceil(years_diff)
         adult_max_age = self.max_age
         adult_min_age = self.min_age
         child_min_age = self.child_min_age
@@ -1239,8 +1258,8 @@ class UserInsurance(auth_model.TimeStampedModel):
         from ondoc.doctor.models import OpdAppointment
         from ondoc.diagnostic.models import LabAppointment
 
-        total_opd_stats = OpdAppointment.get_insurance_usage(self)
-        today_opd_stats = OpdAppointment.get_insurance_usage(self, timezone.now().date())
+        total_opd_stats = {'count': 0, 'sum': 0} #OpdAppointment.get_insurance_usage(self)
+        today_opd_stats = {'count': 0, 'sum': 0} #OpdAppointment.get_insurance_usage(self, timezone.now().date())
 
         total_lab_stats = LabAppointment.get_insurance_usage(self)
         today_lab_stats = LabAppointment.get_insurance_usage(self, timezone.now().date())

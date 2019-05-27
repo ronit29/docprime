@@ -873,6 +873,15 @@ class LabAppointmentAdmin(nested_admin.NestedModelAdmin):
     #         temp_autocomplete_fields = super().get_autocomplete_fields(request)
     #     return temp_autocomplete_fields
 
+    def uploaded_prescriptions(self, obj):
+        prescriptions = obj.get_all_uploaded_prescriptions()
+
+        prescription_string = ""
+        for p in prescriptions:
+            prescription_string+="<div><a target='_blank' href={}>{}</a></div>".format(\
+                util_absolute_url(p.prescription_file.url), util_absolute_url(p.prescription_file.url))
+        return mark_safe(prescription_string)
+
     def get_search_results(self, request, queryset, search_term):
         queryset, use_distinct = super().get_search_results(request, queryset, None)
 
@@ -966,7 +975,7 @@ class LabAppointmentAdmin(nested_admin.NestedModelAdmin):
                     'get_pickup_address', 'get_lab_address', 'outstanding', 'status', 'cancel_type',
                     'cancellation_reason', 'cancellation_comments', 'start_date', 'start_time',
                     'send_email_sms_report', 'invoice_urls', 'reports_uploaded', 'email_notification_timestamp', 'payment_type',
-                     'payout_info', 'refund_initiated', 'status_change_comments')
+                     'payout_info', 'refund_initiated', 'status_change_comments','uploaded_prescriptions')
         if request.user.groups.filter(name=constants['APPOINTMENT_OTP_TEAM']).exists() or request.user.is_superuser:
             all_fields = all_fields + ('otp',)
 
@@ -989,7 +998,8 @@ class LabAppointmentAdmin(nested_admin.NestedModelAdmin):
                      'agreed_price',
                      'deal_price', 'effective_price', 'payment_status',
                      'payment_type', 'insurance', 'is_home_pickup', 'get_pickup_address', 'get_lab_address',
-                     'outstanding', 'reports_uploaded', 'email_notification_timestamp', 'payment_type', 'payout_info', 'refund_initiated']
+                     'outstanding', 'reports_uploaded', 'email_notification_timestamp', 'payment_type', 'payout_info', 'refund_initiated',
+                     'uploaded_prescriptions']
         # else:
         #     read_only = []
         if obj and (obj.status == LabAppointment.COMPLETED or obj.status == LabAppointment.CANCELLED):
