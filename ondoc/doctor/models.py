@@ -2306,11 +2306,9 @@ class OpdAppointment(auth_model.TimeStampedModel, CouponsMixin, OpdAppointmentIn
 
         if not old_instance:
             try:
-                # notification_tasks.send_capture_payment_request.apply_async(
-                #     (Order.DOCTOR_PRODUCT_ID, self.id), eta=timezone.localtime() + datetime.timedelta(
-                #         hours=int(settings.PAYMENT_AUTO_CAPTURE_DURATION)), )
                 notification_tasks.send_capture_payment_request.apply_async(
-                    (Order.DOCTOR_PRODUCT_ID, self.id), eta=timezone.localtime() + datetime.timedelta(hours=0.04), )
+                    (Order.DOCTOR_PRODUCT_ID, self.id), eta=timezone.localtime() + datetime.timedelta(
+                        hours=int(settings.PAYMENT_AUTO_CAPTURE_DURATION)), )
             except Exception as e:
                 logger.error(str(e))
 

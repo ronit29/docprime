@@ -1844,6 +1844,12 @@ class LabAppointment(TimeStampedModel, CouponsMixin, LabAppointmentInvoiceMixin,
             except Exception as e:
                 logger.error(str(e))
 
+        if not old_instance:
+            try:
+                notification_tasks.send_capture_payment_request.apply_async(
+                    (Order.LAB_PRODUCT_ID, self.id), eta=timezone.localtime() + datetime.timedelta(hours=int(settings.PAYMENT_AUTO_CAPTURE_DURATION)), )
+            except Exception as e:
+                logger.error(str(e))
 
         # Do not delete below commented code
         # try:
@@ -2083,6 +2089,12 @@ class LabAppointment(TimeStampedModel, CouponsMixin, LabAppointmentInvoiceMixin,
                 out_obj = self.outstanding_create()
                 self.outstanding = out_obj
         self.save()
+
+        try:
+            notification_tasks.send_capture_payment_request.apply_async(
+                Order.LAB_PRODUCT_ID, self.id, eta=datetime.datetime.now(), )
+        except Exception as e:
+            logger.error(str(e))
 
     def outstanding_create(self):
         admin_obj, out_level = self.get_billable_admin_level()

@@ -1025,7 +1025,7 @@ def send_capture_payment_request(self, product_id, appointment_id):
 
         req_data = {
             "orderNo": txn_obj.order_no,
-            "orderId": order.id,
+            "orderId": str(order.id),
             "hash": pg_seamless_hash(order, txn_obj.order_no)
         }
 
@@ -1040,7 +1040,7 @@ def send_capture_payment_request(self, product_id, appointment_id):
                     "Content-Type": "application/json"
                 }
 
-                response = requests.post(url, data=req_data, headers=headers)
+                response = requests.post(url, data=json.dumps(req_data), headers=headers)
                 if response.status_code == status.HTTP_200_OK:
                     resp_data = response.json()
                     if resp_data.get("ok") is not None and resp_data.get("ok") == 1:
@@ -1082,7 +1082,7 @@ def send_release_payment_request(self, product_id, appointment_id):
 
         req_data = {
             "orderNo": txn_obj.order_no,
-            "orderId": order.id,
+            "orderId": str(order.id),
             "hash": pg_seamless_hash(order, txn_obj.order_no)
         }
 
@@ -1097,7 +1097,7 @@ def send_release_payment_request(self, product_id, appointment_id):
                         "Content-Type": "application/json"
                     }
 
-                    response = requests.post(url, data=req_data, headers=headers)
+                    response = requests.post(url, data=json.dumps(req_data), headers=headers)
                     if response.status_code == status.HTTP_200_OK:
                         resp_data = response.json()
                         if resp_data.get("ok") is not None and resp_data.get("ok") == 1:
