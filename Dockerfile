@@ -2,6 +2,7 @@ FROM python:3.6
 
 ENV PYTHONUNBUFFERED 1
 ARG ENV_CG
+ARG JOB
 ARG BIT_ENV_URL
 ARG COLLECTSTATIC
 ARG SMS_AUTH_KEY
@@ -41,9 +42,8 @@ COPY / home/docprime/workspace/backend/
 
 #GET ENVIRONEMENT AND CONFIGURATIONS
 RUN git clone $BIT_ENV_URL /env
-RUN cp /env/django/gunicorn_config.py /home/docprime/workspace/backend/
-RUN cp /env/django/django_env /home/docprime/workspace/backend/.env
-RUN cp /env/django/entrypoint /home/docprime/workspace/entrypoint
+RUN cp /env/$JOB/django/gunicorn_config.py /home/docprime/workspace/backend/
+RUN cp /env/$JOB/django/entrypoint /home/docprime/workspace/entrypoint
 RUN chmod +x /home/docprime/workspace/entrypoint/entrypoint
 
 
@@ -55,7 +55,12 @@ RUN chmod +x /home/docprime/workspace/entrypoint/entrypoint
 
 #DJANGO MANAGEMENT COMMANDS
 WORKDIR /home/docprime/workspace/backend
-#RUN sed  -e "s/\${ENV_CG}/$ENV_CG/" -e "s/\${SMS_AUTH_KEY}/$SMS_AUTH_KEY/" -e "s/\${EMAIL_HOST_PASSWORD}/$EMAIL_HOST_PASSWORD/" -e "s/\${AWS_ACCESS_KEY_ID}/$AWS_ACCESS_KEY_ID/" -e "s~\${AWS_SECRET_ACCESS_KEY}~$AWS_SECRET_ACCESS_KEY~" -e "s/\${DBUSER}/$DBUSER/" -e "s/\${DBPASS}/$DBPASS/" -e "s/\${DATABASE}/$DATABASE/" -e "s/\${QA_SERVER}/$JOB/" env.example > .env
+RUN if [ "$ENV_CG" = "staging" ] ; then\
+    sed  -e "s/\${ENV_CG}/$ENV_CG/" -e "s/\${SMS_AUTH_KEY}/$SMS_AUTH_KEY/" -e "s/\${EMAIL_HOST_PASSWORD}/$EMAIL_HOST_PASSWORD/" -e "s/\${AWS_ACCESS_KEY_ID}/$AWS_ACCESS_KEY_ID/" -e "s~\${AWS_SECRET_ACCESS_KEY}~$AWS_SECRET_ACCESS_KEY~" -e "s/\${DBUSER}/$DBUSER/" -e "s/\${DBPASS}/$DBPASS/" -e "s/\${DATABASE}/$DATABASE/" -e "s/\${QA_SERVER}/$JOB/" env.example > .env
+fi
+RUN if [ "$ENV_CG" = "production" ] ; then\
+    RUN cp /env/$JOB/django/django_env /home/docprime/workspace/backend/.env
+fi
 RUN pip install -r requirements/$ENV_CG.txt
 ENV DJANGO_SETTINGS_MODULE=config.settings.$ENV_CG
 RUN if [ "$COLLECTSTATIC" = "true" ] ; then\
