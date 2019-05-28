@@ -25,6 +25,10 @@ import requests
 from rest_framework import status
 from django.utils.safestring import mark_safe
 from ondoc.notification.models import NotificationAction
+import random
+import string
+from ondoc.api.v1.utils import RawSql
+
 
 logger = logging.getLogger(__name__)
 
@@ -58,25 +62,27 @@ def send_lab_notifications_refactored(appointment_id):
 
 
 @task
-def send_ipd_procedure_lead_mail(obj_id):
+def send_ipd_procedure_lead_mail(data):
+    obj_id = data.get('obj_id')
+    send_email = data.get('send_email')
     from ondoc.communications.models import EMAILNotification
     from ondoc.procedure.models import IpdProcedureLead
     from ondoc.matrix.tasks import create_or_update_lead_on_matrix
     instance = IpdProcedureLead.objects.filter(id=obj_id).first()
     if not instance:
         return
+    if instance.matrix_lead_id:
+        return
     try:
-        if not instance.source or instance.source != 'docprimechat':
+        if send_email:
             emails = settings.IPD_PROCEDURE_CONTACT_DETAILS
             user_and_email = [{'user': None, 'email': email} for email in emails]
             email_notification = EMAILNotification(notification_type=NotificationAction.IPD_PROCEDURE_MAIL,
                                                    context={'instance': instance})
             email_notification.send(user_and_email)
-        else:
-            create_or_update_lead_on_matrix.apply_async(
-                ({'obj_type': instance.__class__.__name__, 'obj_id': instance.id}
-                 ,), countdown=5)
 
+        create_or_update_lead_on_matrix.apply_async(
+            ({'obj_type': instance.__class__.__name__, 'obj_id': instance.id},), countdown=5)
 
     except Exception as e:
         logger.error(str(e))
@@ -609,6 +615,50 @@ def send_insurance_notifications(self, data):
     except Exception as e:
         logger.error(str(e))
 
+
+@task(bind=True, max_retries=3)
+def send_insurance_endorsment_notifications(self, data):
+    from ondoc.authentication import models as auth_model
+    from ondoc.communications.models import InsuranceNotification
+    from ondoc.insurance.models import UserInsurance, EndorsementRequest
+    try:
+        user_id = int(data.get('user_id', 0))
+        user = auth_model.User.objects.filter(id=user_id).last()
+        if not user:
+            raise Exception("Invalid user id passed for insurance email notification. Userid %s" % str(user_id))
+
+        user_insurance = user.active_insurance
+        if not user_insurance:
+            raise Exception("Invalid or None user insurance found for email notification. User id %s" % str(user_id))
+
+        endorsment_status = data.get('endorsment_status', 0)
+        notification = None
+
+        if endorsment_status == EndorsementRequest.PENDING:
+            notification = NotificationAction.INSURANCE_ENDORSMENT_PENDING
+        elif endorsment_status == EndorsementRequest.REJECT:
+            notification = NotificationAction.INSURANCE_ENDORSMENT_REJECTED
+        elif endorsment_status == EndorsementRequest.APPROVED:
+            notification = NotificationAction.INSURANCE_ENDORSMENT_APPROVED
+
+            if not user_insurance.coi:
+                try:
+                    user_insurance.generate_pdf()
+                except Exception as e:
+                    logger.error('Insurance coi pdf cannot be generated. %s' % str(e))
+
+                    countdown_time = (2 ** self.request.retries) * 60 * 10
+                    print(countdown_time)
+                    self.retry([data], countdown=countdown_time)
+
+        if notification and user_insurance:
+            insurance_notification = InsuranceNotification(user_insurance, notification)
+            insurance_notification.send()
+
+    except Exception as e:
+        logger.error(str(e))
+
+
 @task(bind=True, max_retries=3)
 def send_insurance_float_limit_notifications(self, data):
     from ondoc.notification.models import EmailNotification
@@ -951,3 +1001,47 @@ def push_insurance_banner_lead_to_matrix(self, data):
 
     except Exception as e:
         logger.error("Error in Celery. Failed pushing insurance banner lead to the matrix- " + str(e))
+
+
+@task
+def generate_random_coupons(total_count, coupon_id):
+    from ondoc.coupon.models import RandomGeneratedCoupon, Coupon
+    try:
+        coupon_obj = Coupon.objects.filter(id=coupon_id).first()
+        if not coupon_obj:
+            return
+
+        while total_count:
+            curr_count = 0
+            batch_data = []
+            while curr_count < 10000 and total_count:
+                rc = RandomGeneratedCoupon()
+                rc.random_coupon = ''.join(random.choice(string.ascii_uppercase + string.digits) for _ in range(12))
+                rc.coupon = coupon_obj
+                rc.validity = 90
+                rc.sent_at = datetime.datetime.utcnow()
+
+                batch_data.append(rc)
+                curr_count += 1
+                total_count -= 1
+
+            if batch_data:
+                RandomGeneratedCoupon.objects.bulk_create(batch_data)
+            else:
+                return
+
+    except Exception as e:
+        logger.error(str(e))
+
+
+@task
+def update_coupon_used_count():
+    RawSql('''  update coupon set total_used_count= usage_count from
+                (select coupon_id, sum(usage_count) usage_count from
+                (select oac.coupon_id, count(*) usage_count from opd_appointment oa inner join opd_appointment_coupon oac on oa.id = oac.opdappointment_id
+                 where oa.status in (2,3,4,5,7) group by oac.coupon_id
+                union
+                select oac.coupon_id, count(*) usage_count from lab_appointment oa inner join lab_appointment_coupon oac on oa.id = oac.labappointment_id
+                 where oa.status in (2,3,4,5,7) group by oac.coupon_id
+                ) x group by coupon_id
+                ) y where coupon.id = y.coupon_id ''', []).execute()

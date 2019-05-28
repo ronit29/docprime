@@ -17,7 +17,7 @@ import random, string
 from django.contrib.contenttypes.fields import GenericForeignKey, GenericRelation
 from django.contrib.contenttypes.models import ContentType
 from django.utils.functional import cached_property
-from datetime import date, timedelta, datetime
+from datetime import date, datetime
 from safedelete import SOFT_DELETE
 from safedelete.models import SafeDeleteModel
 import reversion
@@ -338,6 +338,14 @@ class User(AbstractBaseUser, PermissionsMixin):
         active_insurance = self.purchased_insurance.filter().order_by('id').last()
         return active_insurance if active_insurance and active_insurance.is_valid() else None
 
+    @cached_property
+    def recent_opd_appointment(self):
+        return self.appointments.filter(created_at__gt=timezone.now() - timezone.timedelta(days=90)).order_by('-id')
+
+    @cached_property
+    def recent_lab_appointment(self):
+        return self.lab_appointments.filter(created_at__gt=timezone.now() - timezone.timedelta(days=90)).order_by('-id')
+
     def get_phone_number_for_communication(self):
         from ondoc.communications.models import unique_phone_numbers
         receivers = []
@@ -536,6 +544,22 @@ class UserProfile(TimeStampedModel):
                                                       new_image_io.tell(), None)
         super().save(*args, **kwargs)
 
+    def update_profile_post_endorsement(self, endorsed_data):
+        self.name = endorsed_data.first_name + " " + endorsed_data.middle_name + " " + endorsed_data.last_name
+        self.email = endorsed_data.email
+        if endorsed_data.gender == 'f':
+            self.gender = UserProfile.FEMALE
+        elif endorsed_data.gender == 'm':
+            self.gender = UserProfile.MALE
+        else:
+            self.gender = UserProfile.OTHER
+        if endorsed_data.phone_number:
+            self.phone_number = endorsed_data.phone_number
+        else:
+            self.phone_number = self.user.phone_number
+        self.dob = endorsed_data.dob
+        self.save()
+
     class Meta:
         db_table = "user_profile"
 
@@ -546,6 +570,9 @@ class OtpVerifications(TimeStampedModel):
     code = models.CharField(max_length=10)
     country_code = models.CharField(max_length=10)
     is_expired = models.BooleanField(default=False)
+    otp_request_source = models.CharField(null=True, max_length=200, blank=True)
+    via_whatsapp = models.NullBooleanField(null=True)
+    via_sms = models.NullBooleanField(null=True)
 
     def __str__(self):
         return self.phone_number

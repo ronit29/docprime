@@ -281,7 +281,7 @@ class Thyrocare(BaseIntegrator):
                             if response.get('RES_ID') == 'RES0000':
                                 result[format] = response["URL"]
                             else:
-                                logger.error("[ERROR] %s" % response.get('RESPONSE'))
+                                logger.info("[ERROR] %s" % response.get('RESPONSE'))
 
                         if result:
                             cls.save_reports(booking, result)

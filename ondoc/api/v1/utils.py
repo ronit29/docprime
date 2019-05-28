@@ -352,6 +352,14 @@ def labappointment_transform(app_data):
     app_data["user"] = app_data["user"].id
     app_data["profile"] = app_data["profile"].id
     app_data["home_pickup_charges"] = str(app_data.get("home_pickup_charges",0))
+    prescription_objects = app_data.get("prescription_list", [])
+    if prescription_objects:
+        prescription_id_list = []
+        for prescription_data in prescription_objects:
+            prescription_id_list.append({'prescription': prescription_data.get('prescription').id})
+        app_data["prescription_list"] = prescription_id_list
+
+
     if app_data.get("coupon"):
         app_data["coupon"] = list(app_data["coupon"])
     if app_data.get("user_plan"):
@@ -635,6 +643,7 @@ class CouponsMixin(object):
         from ondoc.coupon.models import Coupon
         from ondoc.doctor.models import OpdAppointment
         from ondoc.diagnostic.models import LabAppointment
+        from ondoc.subscription_plan.models import UserPlanMapping
 
         user = kwargs.get("user")
         coupon_obj = kwargs.get("coupon_obj")
@@ -648,6 +657,8 @@ class CouponsMixin(object):
             if isinstance(self, OpdAppointment) and coupon_obj.type not in [Coupon.DOCTOR, Coupon.ALL]:
                 return {"is_valid": False, "used_count": None}
             elif isinstance(self, LabAppointment) and coupon_obj.type not in [Coupon.LAB, Coupon.ALL]:
+                return {"is_valid": False, "used_count": None}
+            elif isinstance(self, UserPlanMapping) and coupon_obj.type not in [Coupon.SUBSCRIPTION_PLAN, Coupon.ALL]:
                 return {"is_valid": False, "used_count": None}
 
             diff_days = (timezone.now() - (coupon_obj.start_date or coupon_obj.created_at)).days
@@ -704,6 +715,14 @@ class CouponsMixin(object):
                 if user_specefic and count >= user_specefic.count:
                     return {"is_valid": False, "used_count": count}
 
+            # if coupon is random coupon
+            if hasattr(coupon_obj, 'is_random') and coupon_obj.is_random:
+                random_count = coupon_obj.random_coupon_used_count(None, coupon_obj.random_coupon_code, cart_item)
+                if random_count > 0:
+                    return {"is_valid": False, "used_count": random_count}
+                else:
+                    return {"is_valid": True, "used_count": random_count}
+
             if (coupon_obj.count is None or count < coupon_obj.count) and (coupon_obj.total_count is None or total_used_count < coupon_obj.total_count):
                 return {"is_valid": True, "used_count": count}
             else:
@@ -714,6 +733,8 @@ class CouponsMixin(object):
     def validate_product_coupon(self, **kwargs):
         from ondoc.diagnostic.models import Lab
         from ondoc.account.models import Order
+        from ondoc.coupon.models import Coupon
+
         import re
 
         coupon_obj = kwargs.get("coupon_obj")
@@ -731,6 +752,14 @@ class CouponsMixin(object):
         doctor = kwargs.get("doctor")
         hospital = kwargs.get("hospital")
         procedures = kwargs.get("procedures", [])
+        plan = kwargs.get("plan")
+
+        if plan:
+            if coupon_obj.type in [Coupon.ALL, Coupon.SUBSCRIPTION_PLAN] \
+                and coupon_obj.plan.filter(id=plan.id).exists():
+                    return True
+            return False
+
 
         if coupon_obj.lab and coupon_obj.lab != lab:
             return False
@@ -1461,6 +1490,7 @@ def get_opd_pem_queryset(user, model):
     #                              super_user_permission=false AND is_disabled=false AND permission_type=1) > 0) THEN 1  ELSE 0 END'''
     # billing_query = '''CASE WHEN ((SELECT COUNT(id) FROM generic_admin WHERE user_id=%s AND hospital_id=hospital.id AND
     #                                super_user_permission=false AND is_disabled=false AND permission_type=2) > 0) THEN 1  ELSE 0 END'''
+    from ondoc.doctor.models import OpdAppointment
     queryset = model.objects \
         .select_related('doctor', 'hospital', 'user') \
         .prefetch_related('doctor__manageable_doctors', 'hospital__manageable_hospitals', 'doctor__images',
@@ -1468,6 +1498,7 @@ def get_opd_pem_queryset(user, model):
                           'doctor__qualifications__specialization', 'doctor__qualifications__college',
                           'doctor__doctorpracticespecializations', 'doctor__doctorpracticespecializations__specialization') \
         .filter(
+        ~Q(status=OpdAppointment.CREATED),
         Q(
             Q(doctor__manageable_doctors__user=user,
               doctor__manageable_doctors__hospital=F('hospital'),
