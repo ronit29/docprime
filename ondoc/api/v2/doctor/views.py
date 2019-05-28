@@ -580,6 +580,10 @@ class ProviderSignupDataViewset(viewsets.GenericViewSet):
             hospital.encrypted_hospital_id = valid_data.get('encrypted_hospital_id')
         try:
             hospital.save()
+            if valid_data("email") and valid_data.get("phone_numbers"):
+                doc_models.ProviderEncrypt.objects.create(hospital=hospital,
+                                                          email=valid_data.get("email"),
+                                                          phone_numbers=valid_data.get("phone_numbers"))
             return Response({"status": 1, "message": "consent updated"})
         except Exception as e:
             logger.error('Error updating consent: ' + str(e))

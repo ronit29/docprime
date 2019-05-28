@@ -1,5 +1,6 @@
 from rest_framework import serializers
 from django.contrib.auth import get_user_model
+from django.core.validators import MaxValueValidator, MinValueValidator
 from django.db.models import Q
 import logging
 from django.conf import settings
@@ -216,17 +217,18 @@ class ConsentIsEncryptSerializer(serializers.Serializer):
     hint = serializers.CharField(required=False, allow_blank=True)
     encryption_key = serializers.CharField(required=False, allow_blank=True)
     decrypt = serializers.BooleanField(required=False)
+    email = serializers.EmailField(required=False, allow_blank=True, max_length=100)
+    phone_numbers = serializers.ListField(child=serializers.IntegerField(validators=[MaxValueValidator(9999999999), MinValueValidator(1000000000)], required=False), allow_empty=True)
 
     def validate(self, attrs):
+        if attrs and attrs.get('decrypt') and not attrs['encryption_key']:
+            raise serializers.ValidationError('Encryption Key Not Found!')
         if attrs and attrs['hospital_id']:
             queryset = doc_models.Hospital.objects.filter(id=attrs['hospital_id']).first()
             if not queryset:
                 raise serializers.ValidationError('Hospital Not Found!')
             attrs['hosp'] = queryset
-            return attrs
-        if attrs and attrs.get('decrypt') and not attrs['encryption_key']:
-            raise serializers.ValidationError('Encryption Key Not Found!')
-
+        return attrs
 
 class BulkCreateDoctorSerializer(serializers.Serializer):
     name = serializers.CharField(max_length=200)
