@@ -256,7 +256,7 @@ class Hospital(auth_model.TimeStampedModel, auth_model.CreatedByModel, auth_mode
     #         return self.city
     #     return None
 
-    def get_active_opd_appointments(self, user=None, user_insurance=None):
+    def get_active_opd_appointments(self, user=None, user_insurance=None, appointment_date=None):
 
         appointments = OpdAppointment.objects.filter(hospital_id=self.id)\
                            .exclude(status__in=[OpdAppointment.CANCELLED])
@@ -264,17 +264,19 @@ class Hospital(auth_model.TimeStampedModel, auth_model.CreatedByModel, auth_mode
             appointments = appointments.filter(user=user)
         if user_insurance:
             appointments = appointments.filter(insurance=user_insurance)
+        if appointment_date and appointments:
+            appointments = appointments.filter(time_slot_start__date=appointment_date)
 
         return appointments
 
-    def is_appointment_exist_for_date(self, insurance, appointment_date):
-        active_appointments = self.get_active_opd_appointments(None, insurance)
-        if not active_appointments:
-            return False
-        for appointment in active_appointments:
-            if appointment.time_slot_start.date() == appointment_date.date():
-                return True
-        return False
+    # def is_appointment_exist_for_date(self, insurance, appointment_date):
+    #     active_appointments = self.get_active_opd_appointments(None, insurance)
+    #     if not active_appointments:
+    #         return False
+    #     for appointment in active_appointments:
+    #         if appointment.time_slot_start.date() == appointment_date.date():
+    #             return True
+    #     return False
 
 
     @classmethod
@@ -2170,9 +2172,9 @@ class OpdAppointment(auth_model.TimeStampedModel, CouponsMixin, OpdAppointmentIn
         if insurance and insurance.is_valid():
             hospital = appointment_data.get('hospital')
             if hospital:
-               is_appointment_exist = hospital.is_appointment_exist_for_date(insurance, appointment_data.get('time_slot_start'))
+               is_appointment_exist = hospital.get_active_opd_appointments(insurance.user, insurance, appointment_data.get('time_slot_start').date())
                if is_appointment_exist:
-                   raise Exception('Appointment for selected hospital have been already booked for give date')
+                   raise Exception('Some error occurred. Please try after some time')
         #     mrp = appointment_data.get('fees')
         #     insurance_limit_usage_data = insurance.validate_limit_usages(mrp)
         #     if insurance_limit_usage_data.get('created_state'):

@@ -2249,7 +2249,7 @@ class LabAppointmentView(mixins.CreateModelMixin,
                 data['payment_type'] = OpdAppointment.INSURANCE
                 appointment_test_ids = validated_data.get('test_ids', [])
                 if len(appointment_test_ids) > 1:
-                    return Response(status=status.HTTP_400_BAD_REQUEST, data={'error': 'Multiple Appointments can not be created under insurance.'})
+                    return Response(status=status.HTTP_400_BAD_REQUEST, data={'error': 'Some error occured. Please try again after some time.'})
 
         else:
             data['is_appointment_insured'], data['insurance_id'], data[

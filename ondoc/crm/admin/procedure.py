@@ -336,7 +336,7 @@ class IpdProcedureLeadAdminForm(forms.ModelForm):
 
 class IpdProcedureLeadAdmin(VersionAdmin):
     form = IpdProcedureLeadAdminForm
-    list_filter = ['created_at', 'source', 'ipd_procedure']
+    list_filter = ['created_at', 'source', 'ipd_procedure', 'planned_date']
     search_fields = ['phone_number', 'matrix_lead_id']
     list_display = ['id', 'phone_number', 'name', 'matrix_lead_id']
     autocomplete_fields = ['hospital', 'insurer', 'tpa', 'ipd_procedure']
