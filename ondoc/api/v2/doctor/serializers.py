@@ -210,24 +210,41 @@ class ConsentIsDocprimeSerializer(serializers.Serializer):
         return attrs
 
 
+class EncryptedHospitalsSerializer(serializers.Serializer):
+    hospital_id = serializers.PrimaryKeyRelatedField(queryset=doc_models.Hospital.objects.all())
+    encrypted_hospital_id = serializers.CharField(required=False, allow_blank=True)
+
+
 class ConsentIsEncryptSerializer(serializers.Serializer):
     is_encrypted = serializers.BooleanField(required=False)
-    hospital_id = serializers.IntegerField()
-    encrypted_hospital_id = serializers.CharField(required=False)
+    hospitals = serializers.ListField(child=EncryptedHospitalsSerializer(many=False))
     hint = serializers.CharField(required=False, allow_blank=True)
     encryption_key = serializers.CharField(required=False, allow_blank=True)
     decrypt = serializers.BooleanField(required=False)
     email = serializers.EmailField(required=False, allow_blank=True, max_length=100)
-    phone_numbers = serializers.ListField(child=serializers.IntegerField(validators=[MaxValueValidator(9999999999), MinValueValidator(1000000000)], required=False), allow_empty=True)
+    phone_numbers = serializers.ListField(child=serializers.IntegerField(validators=[MaxValueValidator(9999999999), MinValueValidator(1000000000)]), allow_empty=True, required=False)
+    is_consent_received = serializers.BooleanField()
 
     def validate(self, attrs):
-        if attrs and attrs.get('decrypt') and not attrs['encryption_key']:
-            raise serializers.ValidationError('Encryption Key Not Found!')
-        if attrs and attrs['hospital_id']:
-            queryset = doc_models.Hospital.objects.filter(id=attrs['hospital_id']).first()
-            if not queryset:
-                raise serializers.ValidationError('Hospital Not Found!')
-            attrs['hosp'] = queryset
+        if attrs:
+            if attrs.get('decrypt'):
+                if not attrs['encryption_key']:
+                    raise serializers.ValidationError('Encryption Key Not Found!')
+                else:
+                    for hospital in attrs['hospitals']:
+                        if not (hasattr(hospital['hospital_id'], 'encrypt_details') and hospital['hospital_id'].encrypt_details.is_valid):
+                            raise serializers.ValidationError('decrypt called for unencrypted hospital')
+            else:
+                for hospital in attrs['hospitals']:
+                    if hasattr(hospital['hospital_id'], 'encrypt_details') and hospital['hospital_id'].encrypt_details.is_valid:
+                        raise serializers.ValidationError('encrypted data already present for given hospitals')
+        # if attrs and attrs.get('decrypt') and not attrs['encryption_key']:
+        #     raise serializers.ValidationError('Encryption Key Not Found!')
+        # if attrs and attrs['hospital_id']:
+        #     queryset = doc_models.Hospital.objects.filter(id=attrs['hospital_id']).first()
+        #     if not queryset:
+        #         raise serializers.ValidationError('Hospital Not Found!')
+        #     attrs['hosp'] = queryset
         return attrs
 
 class BulkCreateDoctorSerializer(serializers.Serializer):

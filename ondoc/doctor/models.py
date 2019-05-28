@@ -240,10 +240,10 @@ class Hospital(auth_model.TimeStampedModel, auth_model.CreatedByModel, auth_mode
     is_location_verified = models.BooleanField(verbose_name='Location Verified', default=False)
     auto_ivr_enabled = models.BooleanField(default=True)
     priority_score = models.IntegerField(default=0, null=False, blank=False)
-    provider_encrypt = models.NullBooleanField(null=True, blank=True)
-    provider_encrypted_by = models.ForeignKey(auth_model.User, null=True, blank=True, on_delete=models.SET_NULL, related_name='encrypted_hospitals')
-    encryption_hint = models.CharField(max_length=128, null=True, blank=True)
-    encrypted_hospital_id = models.CharField(max_length=128, null=True, blank=True)
+    # provider_encrypt = models.NullBooleanField(null=True, blank=True)
+    # provider_encrypted_by = models.ForeignKey(auth_model.User, null=True, blank=True, on_delete=models.SET_NULL, related_name='encrypted_hospitals')
+    # encryption_hint = models.CharField(max_length=128, null=True, blank=True)
+    # encrypted_hospital_id = models.CharField(max_length=128, null=True, blank=True)
 
     def __str__(self):
         return self.name
@@ -3707,9 +3707,16 @@ class SelectedInvoiceItems(auth_model.TimeStampedModel):
 
 
 class ProviderEncrypt(auth_model.TimeStampedModel):
+    is_encrypted = models.BooleanField(default=False)
+    encrypted_by = models.ForeignKey(auth_model.User, null=True, blank=True, on_delete=models.SET_NULL,
+                                     related_name='encrypted_hospitals')
+    hint = models.CharField(max_length=128, null=True, blank=True)
+    encrypted_hospital_id = models.CharField(max_length=128, null=True, blank=True)
     email = models.EmailField(max_length=100, null=True, blank=True)
-    phone_numbers = ArrayField(models.CharField(max_length=10, blank=True))
+    phone_numbers = ArrayField(models.CharField(max_length=10, blank=True), null=True)
     hospital = models.OneToOneField(Hospital, on_delete=models.CASCADE, related_name='encrypt_details')
+    is_valid = models.BooleanField(default=True)
+    is_consent_received = models.BooleanField(default=True)
 
     def __str__(self):
         return self.hospital
