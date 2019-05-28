@@ -259,7 +259,7 @@ class Hospital(auth_model.TimeStampedModel, auth_model.CreatedByModel, auth_mode
     def get_active_opd_appointments(self, user=None, user_insurance=None):
 
         appointments = OpdAppointment.objects.filter(hospital_id=self.id)\
-                           .exclude(status__in=[OpdAppointment.COMPLETED, OpdAppointment.CANCELLED])
+                           .exclude(status__in=[OpdAppointment.CANCELLED])
         if user and user.is_authenticated:
             appointments = appointments.filter(user=user)
         if user_insurance:
