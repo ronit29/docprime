@@ -987,7 +987,7 @@ class AppointmentPrerequisiteViewSet(viewsets.GenericViewSet):
         user = request.user
         insurance = user.active_insurance
         if not insurance:
-            return Response(status=status.HTTP_400_BAD_REQUEST)
+            return Response({'prescription_needed': False})
 
         serializer = serializers.AppointmentPrerequisiteSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
