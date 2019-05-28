@@ -2163,7 +2163,15 @@ class DoctorAvailabilityTimingViewSet(viewsets.ViewSet):
         global_non_bookables = cached_property(GlobalNonBookable.get_non_bookables(), name='global_non_bookables')
         total_leaves = doctor_leaves + global_non_bookables.func
 
-        clinic_timings = dc_obj.get_timings_v2(total_leaves)
+        blocks = []
+        if request.user and request.user.is_authenticated and \
+                not hasattr(request, 'agent') and request.user.active_insurance:
+            active_appointments = dc_obj.hospital. \
+                get_active_opd_appointments(request.user, request.user.active_insurance)
+            for apt in active_appointments:
+                blocks.append(str(apt.time_slot_start.date()))
+
+        clinic_timings = dc_obj.get_timings_v2(total_leaves, blocks)
 
         resp_data = {"timeslots": clinic_timings.get('timeslots', []),
                      "upcoming_slots": clinic_timings.get('upcoming_slots', []),

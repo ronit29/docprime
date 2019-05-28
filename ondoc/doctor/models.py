@@ -1285,12 +1285,17 @@ class DoctorClinic(auth_model.TimeStampedModel, auth_model.WelcomeCallingDone):
 
 
 
-    def get_timings_v2(self, total_leaves):
+    def get_timings_v2(self, total_leaves, blocks=[]):
         clinic_timings = self.availability.order_by("start")
         booking_details = dict()
         booking_details['type'] = 'doctor'
         timeslot_object = TimeSlotExtraction()
         clinic_timings = timeslot_object.format_timing_to_datetime_v2(clinic_timings, total_leaves, booking_details)
+
+        if clinic_timings:
+            for b in blocks:
+                clinic_timings.pop(b, None)
+
         upcoming_slots = timeslot_object.get_upcoming_slots(time_slots=clinic_timings)
         timing_response = {"timeslots": clinic_timings, "upcoming_slots": upcoming_slots}
         return timing_response

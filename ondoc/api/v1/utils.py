@@ -915,6 +915,7 @@ class TimeSlotExtraction(object):
     DOCTOR_BOOK_AFTER = 1
     LAB_BOOK_AFTER = 2
     LAB_HOMEPICKUP_BOOK_AFTER = 4
+    NO_OF_UPCOMING_SLOTS = 3
     timing = dict()
     price_available = dict()
     time_division = list()
@@ -1233,7 +1234,7 @@ class TimeSlotExtraction(object):
         return today_min, tomorrow_min, today_max
 
     def get_upcoming_slots(self, time_slots):
-        no_of_slots = 3
+        no_of_slots = TimeSlotExtraction.NO_OF_UPCOMING_SLOTS
         next_day_slot = 0
         upcoming = OrderedDict()
         for key, value in time_slots.items():
@@ -1306,7 +1307,8 @@ class TimeSlotExtraction(object):
                         if i == day:
                             start_hour = float(self.get_key_or_field_value(data, 'start', 0.0))
                             end_hour = float(self.get_key_or_field_value(data, 'end', 23.75))
-                            while start_hour <= end_hour:
+                            time_before_end_hour = end_hour - TimeSlotExtraction.TIME_SPAN_NUM
+                            while start_hour <= time_before_end_hour:
                                 time_formatted = self.form_dc_time_v2(start_hour)
                                 clinic_datetime = datetime.datetime.combine(next_slot_date, time_formatted[0])
 
@@ -1420,7 +1422,7 @@ class TimeSlotExtraction(object):
                     pass
 
             if will_doctor_data_append:
-                data_list = {"value": start_hour, "text": start_hour_text, "price": price, "mrp": mrp, 'deal_price': deal_price,
+                data_list = {"value": start_hour, "text": start_hour_text, "price": price, "is_price_zero": True if price is not None and price == 0 else False, "mrp": mrp, 'deal_price': deal_price,
                              "is_available": is_available, "on_call": on_call}
         else:
             will_lab_data_append = False
