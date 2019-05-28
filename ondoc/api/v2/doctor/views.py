@@ -206,7 +206,7 @@ class HospitalProviderDataViewSet(viewsets.GenericViewSet):
 
     def list(self, request):
         queryset = auth_models.GenericAdmin.objects.filter(is_disabled=False, user=request.user)\
-                                                   .select_related('hospital')
+                                                   .select_related('hospital').prefetch_related('hospital__encrypt_details')
         all_data = {}
         for admin in queryset.all():
             if admin.hospital and (admin.hospital.id not in all_data):
@@ -222,6 +222,8 @@ class HospitalProviderDataViewSet(viewsets.GenericViewSet):
                     admin_data["encrypted_by"] = admin.hospital.provider_encrypted_by.phone_number
                     admin_data["encrypted_hospital_id"] = admin.hospital.encrypted_hospital_id
                     admin_data["encryption_hint"] = admin.hospital.encryption_hint
+                    admin_data["email"] = admin.hospital.encrypt_details.email if hasattr(admin.hospital, 'encrypt_details') else None
+                    admin_data["phone_numbers"] = admin.hospital.encrypt_details.phone_numbers if hasattr(admin.hospital, 'encrypt_details') else None
                 all_data[hosp_id] = admin_data
             elif admin.hospital and (hosp_id in all_data):
                 if not all_data[hosp_id]['pem_type'] == auth_models.GenericAdmin.ALL:
@@ -580,7 +582,7 @@ class ProviderSignupDataViewset(viewsets.GenericViewSet):
             hospital.encrypted_hospital_id = valid_data.get('encrypted_hospital_id')
         try:
             hospital.save()
-            if valid_data("email") and valid_data.get("phone_numbers"):
+            if valid_data.get("email") and valid_data.get("phone_numbers"):
                 doc_models.ProviderEncrypt.objects.create(hospital=hospital,
                                                           email=valid_data.get("email"),
                                                           phone_numbers=valid_data.get("phone_numbers"))

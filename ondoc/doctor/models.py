@@ -3709,7 +3709,7 @@ class SelectedInvoiceItems(auth_model.TimeStampedModel):
 class ProviderEncrypt(auth_model.TimeStampedModel):
     email = models.EmailField(max_length=100, null=True, blank=True)
     phone_numbers = ArrayField(models.CharField(max_length=10, blank=True))
-    hospital = models.ForeignKey(Hospital, on_delete=models.CASCADE, related_name='encrypt_details')
+    hospital = models.OneToOneField(Hospital, on_delete=models.CASCADE, related_name='encrypt_details')
 
     def __str__(self):
         return self.hospital
