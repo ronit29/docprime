@@ -1192,34 +1192,35 @@ class TransactionViewSet(viewsets.GenericViewSet):
             response = None
             coded_response = None
             data = request.data
+            response = data
             # Commenting below for testing
-            try:
-                coded_response = data.get("response")
-                if isinstance(coded_response, list):
-                    coded_response = coded_response[0]
-                coded_response += "=="
-                decoded_response = base64.b64decode(coded_response).decode()
-                response = json.loads(decoded_response)
-            except Exception as e:
-                logger.error("Cannot decode pg data - " + str(e))
+            # try:
+            #     coded_response = data.get("response")
+            #     if isinstance(coded_response, list):
+            #         coded_response = coded_response[0]
+            #     coded_response += "=="
+            #     decoded_response = base64.b64decode(coded_response).decode()
+            #     response = json.loads(decoded_response)
+            # except Exception as e:
+            #     logger.error("Cannot decode pg data - " + str(e))
+            #
+            # # log pg data
+            # try:
+            #     PgLogs.objects.create(decoded_response=response, coded_response=coded_response)
+            # except Exception as e:
+            #     logger.error("Cannot log pg response - " + str(e))
 
-            # log pg data
-            try:
-                PgLogs.objects.create(decoded_response=response, coded_response=coded_response)
-            except Exception as e:
-                logger.error("Cannot log pg response - " + str(e))
-
-
+            # TODO : SHASHANK_SINGH do something here.
             ## Check if already processes
-            try:
-                if response and response.get("orderNo"):
-                    pg_txn = PgTransaction.objects.filter(order_no__iexact=response.get("orderNo")).first()
-                    if pg_txn:
-                        send_pg_acknowledge.apply_async((pg_txn.order_id, pg_txn.order_no,), countdown=1)
-                        REDIRECT_URL = (SUCCESS_REDIRECT_URL % pg_txn.order_id) + "?payment_success=true"
-                        return HttpResponseRedirect(redirect_to=REDIRECT_URL)
-            except Exception as e:
-               logger.error("Error in sending pg acknowledge - " + str(e))
+            # try:
+            #     if response and response.get("orderNo"):
+            #         pg_txn = PgTransaction.objects.filter(order_no__iexact=response.get("orderNo")).first()
+            #         if pg_txn:
+            #             send_pg_acknowledge.apply_async((pg_txn.order_id, pg_txn.order_no,), countdown=1)
+            #             REDIRECT_URL = (SUCCESS_REDIRECT_URL % pg_txn.order_id) + "?payment_success=true"
+            #             return HttpResponseRedirect(redirect_to=REDIRECT_URL)
+            # except Exception as e:
+            #    logger.error("Error in sending pg acknowledge - " + str(e))
 
 
             # For testing only
@@ -1227,22 +1228,30 @@ class TransactionViewSet(viewsets.GenericViewSet):
             success_in_process = False
             processed_data = {}
 
-            try:
-                pg_resp_code = int(response.get('statusCode'))
-            except:
-                logger.error("ValueError : statusCode is not type integer")
-                pg_resp_code = None
+            # try:
+            #     pg_resp_code = int(response.get('statusCode'))
+            # except:
+            #     logger.error("ValueError : statusCode is not type integer")
+            #     pg_resp_code = None
 
             order_obj = Order.objects.select_for_update().filter(pk=response.get("orderId")).first()
-            if pg_resp_code == 1 and order_obj:
+
+            # TODO : SHASHANK_SINGH correct amount
+            if order_obj and response and order_obj.amount != Decimal(
+                    response.get('txAmount')) and order_obj.is_cod_order():
+                order_obj.amount = 0
+                order_obj.save()
+
+            # if pg_resp_code == 1 and order_obj:
+            if order_obj:
                 response_data = None
                 resp_serializer = serializers.TransactionSerializer(data=response)
                 if resp_serializer.is_valid():
                     response_data = self.form_pg_transaction_data(resp_serializer.validated_data, order_obj)
                     # For Testing
-                    if PgTransaction.is_valid_hash(response, product_id=order_obj.product_id):
-                        pg_tx_queryset = None
-                    # if True:
+                    # if PgTransaction.is_valid_hash(response, product_id=order_obj.product_id):
+                    #     pg_tx_queryset = None
+                    if True:
                         try:
                             with transaction.atomic():
                                 pg_tx_queryset = PgTransaction.objects.create(**response_data)

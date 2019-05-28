@@ -148,25 +148,34 @@ class Order(TimeStampedModel):
                 action=action,
             ).update(is_viewable=False)
 
-    def upgrade_to_prepaid(self):
+    def is_cod_order(self):
+        if self.orders.exists():
+            orders_to_process = self.orders.all()
+        else:
+            orders_to_process = [self]
+        return any([child_order.get_cod_to_prepaid_appointment() for child_order in orders_to_process])
+
+    def get_cod_to_prepaid_appointment(self):
         from ondoc.doctor.models import OpdAppointment
         if self.product_id != self.DOCTOR_PRODUCT_ID:
-            return False
+            return None
         if not self.reference_id:
-            return False
+            return None
         opd_obj = OpdAppointment.objects.filter(id=self.reference_id).first()
         if not opd_obj:
-            return False
+            return None
         if opd_obj.payment_type != OpdAppointment.COD:
-            return False
-        self.payment_type = OpdAppointment.COD
-        self.action_data['appointment_id'] = self.reference_id
-        self.action_data['payment_type'] = OpdAppointment.PREPAID
+            return None
+        self.payment_type = OpdAppointment.PREPAID
+        opd_obj.payment_type = OpdAppointment.PREPAID
+        # self.action_data['appointment_id'] = self.reference_id
+        # self.action_data['payment_type'] = OpdAppointment.PREPAID  # TODO : SHASHANK_SINGH let it be COD ??
         self.action_data['effective_price'] = self.action_data['deal_price']  # TODO : SHASHANK_SINGH set to correct price
-        return True
+        opd_obj.effective_price = Decimal(self.action_data['deal_price'])
+        return opd_obj
 
     @transaction.atomic
-    def process_order(self, upgrade_to):
+    def process_order(self):
         from ondoc.doctor.models import OpdAppointment
         from ondoc.diagnostic.models import LabAppointment
         from ondoc.api.v1.doctor.serializers import OpdAppTransactionModelSerializer
@@ -176,11 +185,10 @@ class Order(TimeStampedModel):
         from ondoc.subscription_plan.models import UserPlanMapping
         from ondoc.insurance.models import UserInsurance, InsuranceTransaction
 
-        # skip if order already processed
+        # skip if order already processed, except if appointment is COD and can be converted to prepaid
         if self.reference_id:
-            if self.upgrade_to_prepaid():
-                pass
-            else:
+            cod_to_prepaid_app = self.get_cod_to_prepaid_appointment()
+            if not cod_to_prepaid_app:
                 raise Exception("Order already processed - " + str(self.id))
 
         # Initial validations for appointment data
@@ -193,7 +201,10 @@ class Order(TimeStampedModel):
             serializer.is_valid(raise_exception=True)
             appointment_data = serializer.validated_data
             if appointment_data['payment_type'] == OpdAppointment.COD:
-                payment_not_required = True
+                if self.reference_id and cod_to_prepaid_app:
+                    payment_not_required = False
+                else:
+                    payment_not_required = True
             elif appointment_data['payment_type'] == OpdAppointment.INSURANCE:
                 payment_not_required = True
         elif self.product_id == self.LAB_PRODUCT_ID:
@@ -228,7 +239,10 @@ class Order(TimeStampedModel):
 
         if self.action == Order.OPD_APPOINTMENT_CREATE:
             if total_balance >= appointment_data["effective_price"] or payment_not_required:
-                appointment_obj = OpdAppointment.create_appointment(appointment_data)
+                if self.reference_id:
+                    appointment_obj = cod_to_prepaid_app
+                else:
+                    appointment_obj = OpdAppointment.create_appointment(appointment_data)
                 order_dict = {
                     "reference_id": appointment_obj.id,
                     "payment_status": Order.PAYMENT_ACCEPTED
