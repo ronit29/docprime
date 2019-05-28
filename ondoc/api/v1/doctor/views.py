@@ -23,7 +23,7 @@ from ondoc.doctor.models import DoctorClinic, OpdAppointment, DoctorAssociation,
     HealthInsuranceProvider, ProviderSignupLead, HospitalImage
 from ondoc.notification.models import EmailNotification
 from django.utils.safestring import mark_safe
-from ondoc.coupon.models import Coupon
+from ondoc.coupon.models import Coupon, CouponRecommender
 from ondoc.api.v1.diagnostic import serializers as diagnostic_serializer
 from ondoc.account import models as account_models
 from ondoc.location.models import EntityUrls, EntityAddress, DefaultRating
@@ -86,6 +86,7 @@ logger = logging.getLogger(__name__)
 import random
 from ondoc.prescription import models as pres_models
 from ondoc.api.v1.prescription import serializers as pres_serializers
+from django.template.defaultfilters import slugify
 
 class CreateAppointmentPermission(permissions.BasePermission):
     message = 'creating appointment is not allowed.'
@@ -193,9 +194,11 @@ class DoctorAppointmentsViewSet(OndocViewSet):
         serializer = serializers.OTPFieldSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         validated_data = serializer.validated_data
+        if validated_data.get('source'):
+            source = validated_data.get('source')
         opd_appointment = models.OpdAppointment.objects.select_for_update().filter(pk=validated_data.get('id')).first()
 
-        if not opd_appointment:
+        if not opd_appointment or opd_appointment.status==opd_appointment.CREATED:
             return Response({"message": "Invalid appointment id"}, status.HTTP_404_NOT_FOUND)
         opd_appointment._source = source if source in [x[0] for x in AppointmentHistory.SOURCE_CHOICES] else ''
         opd_appointment._responsible_user = responsible_user
@@ -287,12 +290,14 @@ class DoctorAppointmentsViewSet(OndocViewSet):
         opd_appointment = models.OpdAppointment.objects.filter(id=pk).first()
         if not opd_appointment:
             return Response({'error': 'Appointment Not Found'}, status=status.HTTP_404_NOT_FOUND)
-        opd_appointment._source = source if source in [x[0] for x in AppointmentHistory.SOURCE_CHOICES] else ''
-        opd_appointment._responsible_user = responsible_user
         serializer = serializers.UpdateStatusSerializer(data=request.data,
                                             context={'request': request, 'opd_appointment': opd_appointment})
         serializer.is_valid(raise_exception=True)
         validated_data = serializer.validated_data
+        if validated_data.get('source'):
+            source = validated_data.get('source')
+        opd_appointment._source = source if source in [x[0] for x in AppointmentHistory.SOURCE_CHOICES] else ''
+        opd_appointment._responsible_user = responsible_user
         allowed = opd_appointment.allowed_action(request.user.user_type, request)
         appt_status = validated_data['status']
         if appt_status not in allowed:
@@ -595,7 +600,7 @@ class DoctorProfileView(viewsets.GenericViewSet):
 
 class DoctorProfileUserViewSet(viewsets.GenericViewSet):
 
-    def prepare_response(self, response_data, selected_hospital):
+    def prepare_response(self, response_data, selected_hospital, profile=None, product_id=None, coupon_code=None):
         import operator 
         # hospitals = sorted(response_data.get('hospitals'), key=itemgetter("hospital_id"))
         # [d['value'] for d in l if 'value' in d]
@@ -610,6 +615,8 @@ class DoctorProfileUserViewSet(viewsets.GenericViewSet):
 
         procedures = response_data.pop('procedures')
         availability = []
+        coupon_recommender = CouponRecommender(self.request.user, profile, 'doctor', product_id, coupon_code, None)
+        filters = dict()
         for key, group in groupby(sorted_by_enable_booking, lambda x: x['hospital_id']):
             hospital_groups = list(group)
             hospital_groups = sorted(hospital_groups, key=itemgetter("discounted_fees"))
@@ -624,6 +631,20 @@ class DoctorProfileUserViewSet(viewsets.GenericViewSet):
             hospital.pop("count", None)
             hospital.pop("discounted_fees", None)
             hospital['procedure_categories'] = procedures.get(key) if procedures else []
+
+            filters['deal_price'] = hospital['deal_price']
+            filters['doctor_id'] = response_data.get('id')
+            filters['doctor_specializations_ids'] = response_data.get('doctor_specializations_ids', [])
+            filters['hospital'] = dict()
+            hospital_obj = filters['hospital']
+            hospital_obj['id'] = hospital.get('hospital_id')
+            hospital_obj['city'] = hospital.get('hospital_city')
+
+            search_coupon = coupon_recommender.best_coupon(**filters)
+
+            hospital['discounted_price'] = hospital['deal_price'] if not search_coupon else search_coupon.get_search_coupon_discounted_price(
+            hospital['deal_price'])
+
             if key == selected_hospital:
                 availability.insert(0, hospital)
             else:
@@ -792,6 +813,9 @@ class DoctorProfileUserViewSet(viewsets.GenericViewSet):
         category_ids = validated_data.get('procedure_category_ids', None)
         procedure_ids = validated_data.get('procedure_ids', None)
         selected_hospital = validated_data.get('hospital_id', None)
+        profile_id = request.query_params.get('profile_id', None)
+        product_id = request.query_params.get('product_id', None)
+        coupon_code = request.query_params.get('coupon_code', None)
         doctor = (models.Doctor.objects
                   .prefetch_related('languages__language',
                                     'doctor_clinics__hospital',
@@ -848,7 +872,7 @@ class DoctorProfileUserViewSet(viewsets.GenericViewSet):
                                                                          ,  "spec_url_dict":spec_url_dict
                                                                               })
 
-        response_data = self.prepare_response(serializer.data, selected_hospital)
+        response_data = self.prepare_response(serializer.data, selected_hospital, profile_id, product_id, coupon_code)
 
         hospital = None
         response_data['about_web'] = None
@@ -1259,18 +1283,22 @@ class SearchedItemsViewSet(viewsets.GenericViewSet):
         count = int(count)
         if count <= 0:
             count = 10
-        medical_conditions = models.CommonMedicalCondition.objects.select_related('condition').all().order_by(
+        medical_conditions = models.CommonMedicalCondition.objects.select_related('condition').prefetch_related('condition__specialization').all().order_by(
             "-priority")[:count]
         conditions_serializer = serializers.MedicalConditionSerializer(medical_conditions, many=True,
                                                                        context={'request': request})
 
         common_specializations = models.CommonSpecialization.get_specializations(count)
+        common_spec_urls = list()
+
         if city:
+            for data in common_specializations:
+                if data.specialization and data.specialization.name:
+                    common_spec_urls.append(slugify(data.specialization.name + '-in-' + city + '-sptcit'))
+
             entity_urls = EntityUrls.objects.filter(sitemap_identifier='SPECIALIZATION_CITY',
-                                                    locality_value__iexact=city,
-                                                    is_valid=True,
-                                                    specialization_id__in=common_specializations.values_list(
-                                                        'specialization_id', flat=True))
+                                                    is_valid=True, url__in=common_spec_urls)
+
             for data in entity_urls:
                 spec_urls[data.specialization_id] = data.url
 
@@ -1295,8 +1323,7 @@ class SearchedItemsViewSet(viewsets.GenericViewSet):
         ipd_entity_dict = {}
         if city:
             ipd_entity_qs = EntityUrls.objects.filter(ipd_procedure_id__in=common_ipd_procedure_ids,
-                                                      url_type=EntityUrls.UrlType.PAGEURL,
-                                                      entity_type='IpdProcedure',
+                                                      sitemap_identifier='IPD_PROCEDURE_CITY',
                                                       is_valid=True,
                                                       locality_value__iexact=city).annotate(
                 ipd_id=F('ipd_procedure_id')).values('ipd_id', 'url')
@@ -1439,6 +1466,7 @@ class DoctorListViewSet(viewsets.GenericViewSet):
                     insurance_data_dict['is_user_insured'] = True
 
         validated_data['insurance_threshold_amount'] = insurance_data_dict['insurance_threshold_amount']
+        validated_data['is_user_insured'] = insurance_data_dict['is_user_insured']
 
         doctor_search_helper = DoctorSearchHelper(validated_data)
         if not validated_data.get("search_id"):
@@ -2053,8 +2081,17 @@ class DoctorAvailabilityTimingViewSet(viewsets.ViewSet):
         dc_obj = models.DoctorClinic.objects.filter(doctor_id=validated_data.get('doctor_id'),
                                                             hospital_id=validated_data.get(
                                                                 'hospital_id')).first()
+        blocks = []
+        if request.user and request.user.is_authenticated and \
+                not hasattr(request, 'agent') and request.user.active_insurance:
+            active_appointments = dc_obj.hospital.\
+                get_active_opd_appointments(request.user, request.user.active_insurance)
+            for apt in active_appointments:
+                blocks.append(str(apt.time_slot_start.date()))
+
+
         if dc_obj:
-            timeslots = dc_obj.get_timings()
+            timeslots = dc_obj.get_timings(blocks)
         else:
             res_data = OrderedDict()
             for i in range(30):
@@ -2063,9 +2100,25 @@ class DoctorAvailabilityTimingViewSet(viewsets.ViewSet):
                 res_data[readable_date] = list()
 
             timeslots = {"time_slots": res_data, "upcoming_slots": []}
+
+        # if request.user and request.user.is_authenticated and request.user.active_insurance:
+        #     active_appointments = dc_obj.hospital.\
+        #         get_active_opd_appointments(request.user, request.user.active_insurance)
+        #     for apt in active_appointments:
+        #         timeslots.get('time_slots', {}).pop(str(apt.time_slot_start.date()), None)
+
         # queryset = models.DoctorClinicTiming.objects.filter(doctor_clinic__doctor=validated_data.get('doctor_id'),
         #                                                     doctor_clinic__hospital=validated_data.get(
         #                                                         'hospital_id')).order_by("start")
+        # temp_slots = slots.copy()
+        # active_appointments = None
+        # if user.active_insurance:
+        #     active_appointments = OpdAppointment.get_insured_active_appointment(user.active_insurance)
+        #     for appointment in active_appointments:
+        #         for slot in temp_slots:
+        #             if str(appointment.time_slot_start.date()) == slot and clinic_timings.first().doctor_clinic.hospital_id == appointment.hospital_id:
+        #                 del slots[slot]
+
         doctor_queryset = (models.Doctor
                            .objects.prefetch_related("qualifications__qualification",
                                                      "qualifications__specialization")
@@ -2122,16 +2175,19 @@ class DoctorAppointmentNoAuthViewSet(viewsets.GenericViewSet):
         validated_data = serializer.validated_data
         # opd_appointment = get_object_or_404(models.OpdAppointment, pk=validated_data.get('opd_appointment'))
         opd_appointment = models.OpdAppointment.objects.select_for_update().filter(pk=validated_data.get('opd_appointment')).first()
-        if not opd_appointment:
+        if not opd_appointment or opd_appointment.status==models.OpdAppointment.CREATED:
             return Response({"message": "Invalid appointment id"}, status.HTTP_404_NOT_FOUND)
-        source = request.query_params.get('source', '')
+        source = validated_data.get('source') if validated_data.get('source') else request.query_params.get('source', '')
         responsible_user = request.user if request.user.is_authenticated else None
         opd_appointment._source = source if source in [x[0] for x in AppointmentHistory.SOURCE_CHOICES] else ''
         opd_appointment._responsible_user = responsible_user
         if opd_appointment:
             opd_appointment.action_completed()
 
-            resp = {'success': 'Appointment Completed Successfully!'}
+            resp = {'success': 'Appointment Completed Successfully!',
+                    'mrp': opd_appointment.mrp,
+                    'payment_type': opd_appointment.payment_type,
+                    'payment_status': opd_appointment.payment_status}
         return Response(resp)
 
 
@@ -3987,9 +4043,13 @@ class IpdProcedureViewSet(viewsets.GenericViewSet):
              'breadcrumb': breadcrumb})
 
     def create_lead(self, request):
+        from ondoc.procedure.models import IpdProcedureLead
         serializer = serializers.IpdProcedureLeadSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
-        obj_created = serializer.save()
+        validated_data = serializer.validated_data
+        validated_data['status'] = IpdProcedureLead.NEW
+        obj_created = IpdProcedureLead(**validated_data)
+        obj_created.save()
         return Response(serializers.IpdProcedureLeadSerializer(obj_created).data)
 
     def list_by_alphabet(self, request):

@@ -380,6 +380,32 @@ class HospitalForm(FormCleanMixin):
         # if '_mark_in_progress' in self.data and data.get('enabled'):
         #     raise forms.ValidationError("Must be disabled before rejecting.")
 
+        if data.get('enabled_for_online_booking'):
+            if self.instance and self.instance.data_status == QCModel.QC_APPROVED:
+                pass
+            elif self.instance and self.instance.data_status != QCModel.QC_APPROVED and '_qc_approve' in self.data:
+                pass
+            else:
+                raise forms.ValidationError("Must be QC Approved for enable online booking")
+
+        if '_mark_in_progress' in self.request.POST:
+            if data.get('enabled_for_online_booking'):
+                raise forms.ValidationError("Enable for online booking should be disabled for QC Reject/Reopen")
+            else:
+                pass
+
+        if data.get('is_live'):
+            if self.instance and self.instance.source == 'pr':
+                pass
+            else:
+                history_obj = self.instance.history.filter(status=QCModel.QC_APPROVED).first()
+                if self.instance and self.instance.enabled and history_obj:
+                    pass
+                elif self.instance and not self.instance.enabled and data.get('enabled') and history_obj:
+                    pass
+                else:
+                    raise forms.ValidationError("Should be enabled and QC Approved once for is_live")
+
 
 class HospCityFilter(SimpleListFilter):
     title = 'city'
@@ -426,7 +452,7 @@ class HospitalAdmin(admin.GeoModelAdmin, VersionAdmin, ActionAdmin, QCPemAdmin):
     map_width = 200
     map_template = 'admin/gis/gmap.html'
     extra_js = ['js/admin/GoogleMap.js',
-                'https://maps.googleapis.com/maps/api/js?key=AIzaSyDJ06gynqhKmoEQc9tLf60_irFdrXwq_p4&callback=initGoogleMap']
+                'https://maps.googleapis.com/maps/api/js?key=AIzaSyBqDAVDFBQzI5JMgaXcqJq431QPpJtNiZE&callback=initGoogleMap']
 
     # def get_inline_instances(self, request, obj=None):
     #     res = super().get_inline_instances(request, obj)

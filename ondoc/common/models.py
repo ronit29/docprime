@@ -101,7 +101,7 @@ class AppointmentHistory(TimeStampedModel):
     content_object = GenericForeignKey()
     status = models.PositiveSmallIntegerField(null=False)
     user = models.ForeignKey(User, null=True, default=None, on_delete=models.CASCADE)
-    source = models.CharField(max_length=10, blank=True, choices=SOURCE_CHOICES, default='')
+    source = models.CharField(max_length=50, blank=True, choices=SOURCE_CHOICES, default='')
 
     @classmethod
     def create(cls, *args, **kwargs):

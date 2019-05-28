@@ -15,7 +15,7 @@ from ondoc.bookinganalytics.models import DP_OpdConsultsAndTests
 from ondoc.doctor.models import Hospital, SearchKey, CancellationReason, Doctor
 from ondoc.crm.constants import constants
 from ondoc.coupon.models import Coupon
-from ondoc.location.models import EntityUrls
+from ondoc.location.models import EntityUrls, UrlsModel
 from ondoc.notification import models as notification_models
 from ondoc.notification import tasks as notification_tasks
 from ondoc.notification.labnotificationaction import LabNotificationAction
@@ -154,7 +154,7 @@ class HomePickupCharges(models.Model):
     content_object = GenericForeignKey()
 
 
-class Lab(TimeStampedModel, CreatedByModel, QCModel, SearchKey, WelcomeCallingDone):
+class Lab(TimeStampedModel, CreatedByModel, QCModel, SearchKey, WelcomeCallingDone, UrlsModel):
     NOT_ONBOARDED = 1
     REQUEST_SENT = 2
     ONBOARDED = 3
@@ -263,6 +263,17 @@ class Lab(TimeStampedModel, CreatedByModel, QCModel, SearchKey, WelcomeCallingDo
 
     class Meta:
         db_table = "lab"
+
+    @classmethod
+    def update_labs_seo_urls(cls):
+        from ondoc.location.management.commands import lab_page_urls, map_lab_search_urls
+
+        # create lab page urls
+        lab_page_urls.map_lab_location_urls()
+
+        # create lab search urls
+        map_lab_search_urls.map_lab_search_urls()
+
 
     @cached_property
     def is_enabled_for_insurance(self):
@@ -486,6 +497,31 @@ class Lab(TimeStampedModel, CreatedByModel, QCModel, SearchKey, WelcomeCallingDo
             return True
         return False
 
+    def create_entity_url(self):
+        if not self.is_live:
+            return
+
+        entity = EntityUrls.objects.filter(entity_id=self.id, is_valid=True, sitemap_identifier='LAB_PAGE')
+        if not entity:
+            url = self.name
+            url = slugify(url)
+            new_url = url
+
+            exists = EntityUrls.objects.filter(url=new_url+'-lpp', sitemap_identifier='LAB_PAGE').first()
+            if exists:
+                if exists.id == self.id:
+                    exists.is_valid = True
+                    exists.save()
+                    new_url = new_url + '-lpp'
+                    return
+                else:
+                    new_url = url+'-'+str(self.id)
+
+            new_url = new_url + '-lpp'
+            EntityUrls.objects.create(url=new_url, sitemap_identifier='LAB_PAGE', entity_type='Lab', url_type='PAGEURL',
+                                  is_valid=True, sequence=0, entity_id=self.id)
+            self.url = new_url
+
     def save(self, *args, **kwargs):
         self.clean()
 
@@ -505,6 +541,7 @@ class Lab(TimeStampedModel, CreatedByModel, QCModel, SearchKey, WelcomeCallingDo
                 # Push to matrix
                 push_to_matrix = True
 
+        self.create_entity_url()
         super(Lab, self).save(*args, **kwargs)
 
         if edit_instance is not None:
@@ -1543,6 +1580,23 @@ class LabAppointment(TimeStampedModel, CouponsMixin, LabAppointmentInvoiceMixin,
     auto_ivr_data = JSONField(default=list(), null=True)
     history = GenericRelation(AppointmentHistory)
     refund_details = GenericRelation(RefundDetails, related_query_name="lab_appointment_detail")
+    coupon_data = JSONField(blank=True, null=True)
+    status_change_comments = models.CharField(max_length=5000, null=True, blank=True)
+    appointment_prescriptions = GenericRelation("prescription.AppointmentPrescription", related_query_name="appointment_prescriptions")
+
+
+    def get_all_uploaded_prescriptions(self, date=None):
+        from ondoc.prescription.models import AppointmentPrescription
+        qs = LabAppointment.objects.filter(user=self.user).values_list('id', flat=True)
+        prescriptions = AppointmentPrescription.objects.filter(content_type=ContentType.objects.get_for_model(self), object_id__in=qs)
+        return prescriptions
+
+    def get_corporate_deal_id(self):
+        coupon = self.coupon.first()
+        if coupon and coupon.corporate_deal:
+            return coupon.corporate_deal.id
+
+        return None
 
     def get_city(self):
         if self.lab and self.lab.matrix_city:
@@ -1579,6 +1633,7 @@ class LabAppointment(TimeStampedModel, CouponsMixin, LabAppointmentInvoiceMixin,
             obj.PaymentType = self.payment_type if self.payment_type else None
             obj.Payout = self.agreed_price
             obj.BookingDate = self.created_at
+        obj.CorporateDealId = self.get_corporate_deal_id()
         obj.PromoCost = max(0, promo_cost)
         obj.GMValue = self.deal_price
         obj.Category = category
@@ -1658,7 +1713,7 @@ class LabAppointment(TimeStampedModel, CouponsMixin, LabAppointmentInvoiceMixin,
         report_file_links = set()
         for report in reports:
             report_file_links = report_file_links.union(
-                set([report_file.name.url for report_file in report.files.all()]))
+                set([report_file.name.url for report_file in report.files.all() if report_file.name.url.rsplit('.',1)[1].lower() != 'xml']))
         report_file_links = [util_absolute_url(report_file_link) for report_file_link in report_file_links]
         return list(report_file_links)
 
@@ -1667,6 +1722,11 @@ class LabAppointment(TimeStampedModel, CouponsMixin, LabAppointmentInvoiceMixin,
 
     def allowed_action(self, user_type, request):
         allowed = []
+        if self.status == self.CREATED:
+            if user_type == User.CONSUMER:
+                return [self.CANCELLED]
+            return []
+
         current_datetime = timezone.now()
         if user_type == User.CONSUMER and current_datetime <= self.time_slot_start:
             if self.status in (self.BOOKED, self.ACCEPTED, self.RESCHEDULED_LAB, self.RESCHEDULED_PATIENT):
@@ -1750,9 +1810,7 @@ class LabAppointment(TimeStampedModel, CouponsMixin, LabAppointmentInvoiceMixin,
                             if old_instance.status != self.CANCELLED and self.status == self.CANCELLED:
                                 push_lab_appointment_to_integrator.apply_async(({'appointment_id': self.id},), countdown=5)
                         else:
-                            push_lab_appointment_to_integrator.apply_async(({'appointment_id': self.id},),
-                                                                           link=get_integrator_order_status.s(
-                                                                               appointment_id=self.id),countdown=5)
+                            push_lab_appointment_to_integrator.apply_async(({'appointment_id': self.id},), countdown=5)
                 except Exception as e:
                     logger.error(str(e))
 
@@ -1777,6 +1835,12 @@ class LabAppointment(TimeStampedModel, CouponsMixin, LabAppointmentInvoiceMixin,
                 notification_models.EmailNotification.ops_notification_alert(self, email_list=settings.OPS_EMAIL_ID,
                                                                              product=account_model.Order.LAB_PRODUCT_ID,
                                                                              alert_type=notification_models.EmailNotification.OPS_APPOINTMENT_NOTIFICATION)
+            except Exception as e:
+                logger.error(str(e))
+
+        if not old_instance or self.status == self.CANCELLED:
+            try:
+                notification_tasks.update_coupon_used_count.apply_async()
             except Exception as e:
                 logger.error(str(e))
 
@@ -1940,15 +2004,41 @@ class LabAppointment(TimeStampedModel, CouponsMixin, LabAppointmentInvoiceMixin,
 
     @classmethod
     def create_appointment(cls, appointment_data):
+        from ondoc.prescription.models import AppointmentPrescription
+        insurance = appointment_data.get('insurance')
+        appointment_status = OpdAppointment.BOOKED
+
+        if insurance and insurance.is_valid():
+            mrp = Decimal(0)
+
+            for extras in appointment_data.get('extra_details',[]):
+                agreed_price = extras.get('custom_agreed_price') if extras.get('custom_agreed_price') != 'None' else extras.get('computed_agreed_price', 0)
+                if agreed_price == 'None':
+                    agreed_price = 0
+                mrp = mrp + Decimal(agreed_price)
+
+            insurance_limit_usage_data = insurance.validate_limit_usages(mrp)
+            if insurance_limit_usage_data.get('created_state'):
+                appointment_status = OpdAppointment.CREATED
+
         otp = random.randint(1000, 9999)
         appointment_data["payment_status"] = OpdAppointment.PAYMENT_ACCEPTED
-        appointment_data["status"] = OpdAppointment.BOOKED
+        appointment_data["status"] = appointment_status
         appointment_data["otp"] = otp
         appointment_data["user_plan_used"] = appointment_data.pop("user_plan", None)
         lab_ids = appointment_data.pop("lab_test")
         coupon_list = appointment_data.pop("coupon", None)
+        coupon_data = {
+            "random_coupons": appointment_data.pop("coupon_data", [])
+        }
         extra_details = deepcopy(appointment_data.pop("extra_details", None))
+        prescription_objects = deepcopy(appointment_data.pop("prescription_list", []))
+        prescription_id_list = []
+        for prescription in prescription_objects:
+            prescription_id_list.append(prescription.get('prescription').id)
+
         app_obj = cls.objects.create(**appointment_data)
+        AppointmentPrescription.update_with_appointment(app_obj, prescription_id_list)
         test_mappings = []
         for test in extra_details:
             test.pop('name', None)
@@ -1964,6 +2054,7 @@ class LabAppointment(TimeStampedModel, CouponsMixin, LabAppointmentInvoiceMixin,
         app_obj.lab_test.add(*lab_ids)
         if coupon_list:
             app_obj.coupon.add(*coupon_list)
+        app_obj.coupon_data = coupon_data
         return app_obj
 
     def action_rescheduled_lab(self):
@@ -2184,7 +2275,7 @@ class LabAppointment(TimeStampedModel, CouponsMixin, LabAppointmentInvoiceMixin,
                 effective_price += data["lab"].home_pickup_charges
                 home_pickup_charges = data["lab"].home_pickup_charges
 
-        coupon_discount, coupon_cashback, coupon_list = Coupon.get_total_deduction(data, effective_price)
+        coupon_discount, coupon_cashback, coupon_list, random_coupon_list = Coupon.get_total_deduction(data, effective_price)
 
         if data.get("payment_type") in [OpdAppointment.PREPAID]:
             if coupon_discount >= effective_price:
@@ -2194,11 +2285,11 @@ class LabAppointment(TimeStampedModel, CouponsMixin, LabAppointmentInvoiceMixin,
 
         if data.get("payment_type") in [OpdAppointment.COD, OpdAppointment.PLAN]:
             effective_price = 0
-            coupon_discount, coupon_cashback, coupon_list = 0, 0, []
+            coupon_discount, coupon_cashback, coupon_list, random_coupon_list = 0, 0, [], []
 
         if data.get("payment_type") in [OpdAppointment.INSURANCE]:
             effective_price = effective_price
-            coupon_discount, coupon_cashback, coupon_list = 0, 0, []
+            coupon_discount, coupon_cashback, coupon_list, random_coupon_list = 0, 0, [], []
 
         return {
             "deal_price" : total_deal_price,
@@ -2208,7 +2299,8 @@ class LabAppointment(TimeStampedModel, CouponsMixin, LabAppointmentInvoiceMixin,
             "coupon_discount" : coupon_discount,
             "coupon_cashback" : coupon_cashback,
             "coupon_list" : coupon_list,
-            "home_pickup_charges" : home_pickup_charges
+            "home_pickup_charges" : home_pickup_charges,
+            "coupon_data" : { "random_coupon_list" : random_coupon_list }
         }
 
     @classmethod
@@ -2275,7 +2367,9 @@ class LabAppointment(TimeStampedModel, CouponsMixin, LabAppointmentInvoiceMixin,
             "discount": int(price_data.get("coupon_discount")),
             "cashback": int(price_data.get("coupon_cashback")),
             "is_appointment_insured": is_appointment_insured,
-            "insurance": insurance_id
+            "insurance": insurance_id,
+            "coupon_data": price_data.get("coupon_data"),
+            "prescription_list": data.get('prescription_list', [])
         }
 
         if data.get('included_in_user_plan', False):
@@ -2297,7 +2391,7 @@ class LabAppointment(TimeStampedModel, CouponsMixin, LabAppointmentInvoiceMixin,
         from ondoc.tracking.mongo_models import TrackingEvent as MongoTrackingEvent
         try:
             with transaction.atomic():
-                event_data = TrackingEvent.build_event_data(self.user, TrackingEvent.LabAppointmentBooked, appointmentId=self.id)
+                event_data = TrackingEvent.build_event_data(self.user, TrackingEvent.LabAppointmentBooked, appointmentId=self.id, visitor_info=visitor_info)
                 if event_data and visitor_info:
                     TrackingEvent.save_event(event_name=event_data.get('event'), data=event_data, visit_id=visitor_info.get('visit_id'),
                                              user=self.user, triggered_at=datetime.datetime.utcnow())
@@ -2513,6 +2607,18 @@ class LabAppointment(TimeStampedModel, CouponsMixin, LabAppointmentInvoiceMixin,
                                           insurance=insurance_obj)
         return appointments
 
+    @classmethod
+    def get_insurance_usage(cls, insurance_obj, date=None):
+        appointments = cls.objects.filter(user=insurance_obj.user, insurance=insurance_obj).exclude(status=cls.CANCELLED)
+        if date:
+            appointments = appointments.filter(created_at__date=date)
+
+        count = appointments.count()
+        data = appointments.aggregate(sum_amount=Sum('agreed_price'))
+        sum = data.get('sum_amount', 0)
+        sum = sum if sum else 0
+        return {'count': count, 'sum': sum}
+
     class Meta:
         db_table = "lab_appointment"
 
@@ -2544,7 +2650,7 @@ class CommonPackage(TimeStampedModel):
 
     @classmethod
     def get_packages(cls, count):
-        packages = cls.objects.prefetch_related('package').filter(package__enable_for_retail=True, package__searchable=True).order_by('-priority')[:count]
+        packages = cls.objects.prefetch_related('package', 'lab__lab_documents').filter(package__enable_for_retail=True, package__searchable=True).order_by('-priority')[:count]
         return packages
 
 class CommonDiagnosticCondition(TimeStampedModel):
