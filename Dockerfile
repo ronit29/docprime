@@ -59,7 +59,7 @@ RUN if [ "$ENV_CG" = "staging" ] ; then\
     sed  -e "s/\${ENV_CG}/$ENV_CG/" -e "s/\${SMS_AUTH_KEY}/$SMS_AUTH_KEY/" -e "s/\${EMAIL_HOST_PASSWORD}/$EMAIL_HOST_PASSWORD/" -e "s/\${AWS_ACCESS_KEY_ID}/$AWS_ACCESS_KEY_ID/" -e "s~\${AWS_SECRET_ACCESS_KEY}~$AWS_SECRET_ACCESS_KEY~" -e "s/\${DBUSER}/$DBUSER/" -e "s/\${DBPASS}/$DBPASS/" -e "s/\${DATABASE}/$DATABASE/" -e "s/\${QA_SERVER}/$JOB/" env.example > .env ; \
 fi
 RUN if [ "$ENV_CG" = "production" ] ; then\
-    RUN cp /env/$JOB/django/django_env /home/docprime/workspace/backend/.env ; \
+    cp /env/$JOB/django/django_env /home/docprime/workspace/backend/.env ; \
 fi
 RUN pip install -r requirements/$ENV_CG.txt
 ENV DJANGO_SETTINGS_MODULE=config.settings.$ENV_CG
