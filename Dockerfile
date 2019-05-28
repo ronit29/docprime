@@ -13,6 +13,8 @@ ARG DATABASE
 ARG DBUSER
 ARG DBPASS
 
+ENV DEBIAN_FRONTEND noninteractive
+
 RUN apt-get update && apt-get install binutils libproj-dev gdal-bin nano apt-utils -y
 RUN apt-get update
 # install chrome libraries
