@@ -525,7 +525,7 @@ class UserInsuranceLabResource(resources.ModelResource):
         return str(appointment.time_slot_start)
 
     def dehydrate_name_of_diagnostic_center(self, appointment):
-        return str(appointment.lab.name)
+        return appointment.lab.name if appointment.lab else ""
 
     def dehydrate_provider_code_of_the_center(self, appointment):
         return str(appointment.lab.id)
