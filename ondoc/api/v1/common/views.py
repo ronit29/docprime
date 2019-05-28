@@ -994,7 +994,7 @@ class AppointmentPrerequisiteViewSet(viewsets.GenericViewSet):
         valid_data = serializer.validated_data
 
         user_profile = valid_data.get('profile', None)
-        if user_profile and not user_profile.is_insured_profile:
+        if not user_profile.is_insured_profile:
             return Response({'prescription_needed': False})
 
         lab = valid_data.get('lab')

@@ -52,5 +52,5 @@ class GlobalNonBookableSerializer(serializers.ModelSerializer):
 class AppointmentPrerequisiteSerializer(serializers.Serializer):
     lab_test = serializers.ListField(child=serializers.IntegerField(), required=True)
     lab = serializers.PrimaryKeyRelatedField(queryset=Lab.objects.all(), required=True)
-    profile = serializers.PrimaryKeyRelatedField(queryset=UserProfile.objects.all(), required=False)
+    profile = serializers.PrimaryKeyRelatedField(queryset=UserProfile.objects.all(), required=True)
     # start_date = serializers.DateTimeField(required=True)
