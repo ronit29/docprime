@@ -2,16 +2,14 @@
 {% if instance.cancellation_type == 3 %}
     The appointment for {{patient_name|capfirst}} with Dr. {{doctor_name|capfirst}} on {{instance.time_slot_start|date:"d/m/y"}} at {{instance.time_slot_start|date:"h:i a"}} has been cancelled.
 {% else %}
-    The appointment for {{patient_name|capfirst}} with Dr. {{doctor_name|capfirst}} on {{instance.time_slot_start|date:"d/m/y"}} at {{instance.time_slot_start|date:"h:i a"}} has been cancelled as per your request.
+    Your appointment with Dr. {{doctor_name|capfirst}} has been cancelled as per your request. Below are the details:
 {% endif %}
 
-Booking ID : {{instance.id}}
+Appointment ID : {{instance.id}}
 Patient Name : {{patient_name|capfirst}}
-Doctor Name : {{doctor_name|capfirst}}
+Date and Time : {{instance.time_slot_start|date:"D jS F Y"}} || {{instance.time_slot_start|date:"h:i A"}}
+{{clinic_or_hospital}} : {{instance.hospital.name|capfirst}}
 
-Refund if applicable will be credited within 5-7 working days.
-
-In case of any queries please contact us at customercare@docprime.com .
-
-Thanks for choosing docprime.com
+Thanks,
+Team Docprime.com
 {% endspaceless %}

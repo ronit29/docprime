@@ -1,12 +1,10 @@
 Dear {{patient_name|capfirst}},
 
-We still await your confirmation.
+We still haven't received any response from you!
 
-Your appointment ID - {{instance.id}} with Dr. {{doctor_name|capfirst}} was scheduled on {{instance.time_slot_start|date:"D jS F Y"}} at {{instance.time_slot_start|date:"h:i A"}}.
+Please click link {{opd_appointment_complete_url}} to complete your appointment with ID - {{instance.id}} with Dr. {{doctor_name|capfirst}}, scheduled on {{instance.time_slot_start|date:"D jS F Y"}} at {{instance.time_slot_start|date:"h:i A"}}.
 
-If completed, please click on {{opd_appointment_complete_url}}
-
-If you want to reschedule the appointment please click on {{reschdule_appointment_bypass_url}}
+Click link {{reschdule_appointment_bypass_url}} to reschedule the appointment.
 
 Thanks,
 Team Docprime.com

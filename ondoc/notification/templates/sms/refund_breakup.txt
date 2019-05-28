@@ -1,11 +1,10 @@
 Hi,
 
-We have initiated the refund of Rs {{amount}}{% if booking_id %} for your booking id ‘{{booking_id}}’{% endif %}.
+We have initiated the refund of Rs {{amount}}{% if booking_id %} against the appointment id ‘{{booking_id}}’{% endif %}.
 {% if ctrnx_id %}
 The transaction ID for this refund is : DPRF{{ctrnx_id}}
 {% endif %}
-The amount should reflect in your account within 5-7 working days.
+The amount will be credited in your account within 5-7 working days.
 
-Please contact us at customercare@docprime.com in case of any assistance.
-
-Thanks for choosing docprime.com
+Thanks,
+Team Docprime.com

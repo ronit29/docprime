@@ -1,1 +1,5 @@
-We have received a reschedule request for your appointment from Dr. {{doctor_name|capfirst}} at {{instance.time_slot_start|date:"h:i a"}} {{instance.time_slot_start|date:"d/m/y"}}.
+This is regarding your doctor appointment {{instance.id}}. We regret to infrom you, that Dr.{{doctor_name|capfirst}} is unavailable at time {{instance.time_slot_start|date:"h:i a"}} on date {{instance.time_slot_start|date:"d/m/y"}}.
+Our customer service executive will get in touch with you shortly to confirm the new time.
+
+Thanks,
+Team Docprime.com
