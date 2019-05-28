@@ -55,7 +55,7 @@ from ondoc.matrix.tasks import push_appointment_to_matrix, push_onboarding_qcsta
 from ondoc.integrations.task import push_lab_appointment_to_integrator, get_integrator_order_status
 from ondoc.location import models as location_models
 from ondoc.ratings_review import models as ratings_models
-from ondoc.api.v1.common import serializers as common_serializers
+# from ondoc.api.v1.common import serializers as common_serializers
 from ondoc.common.models import AppointmentHistory, AppointmentMaskNumber, Remark, GlobalNonBookable, \
     SyncBookingAnalytics, CompletedBreakupMixin, RefundDetails, MatrixMappedState, \
     MatrixMappedCity, MatrixDataMixin
@@ -2483,6 +2483,7 @@ class LabAppointment(TimeStampedModel, CouponsMixin, LabAppointmentInvoiceMixin,
         settlement_date = None
         payment_URN = ''
         amount = None
+        is_ipd_hospital = '0'
         service_name = ','.join([test_obj.test.name for test_obj in self.test_mappings.all()])
         location_verified = self.lab.is_location_verified
         provider_id = self.lab.id
@@ -2522,6 +2523,7 @@ class LabAppointment(TimeStampedModel, CouponsMixin, LabAppointmentInvoiceMixin,
         mobile_list = self.get_matrix_spoc_data()
 
         appointment_details = {
+            'IPDHospital': is_ipd_hospital,
             'IsInsured': 'yes' if user_insurance else 'no',
             'InsurancePolicyNumber': str(user_insurance.policy_number) if user_insurance else None,
             'AppointmentStatus': self.status,
