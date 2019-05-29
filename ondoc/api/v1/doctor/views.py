@@ -8,10 +8,11 @@ from django.contrib.gis.measure import D
 from ondoc.api.v1.auth.serializers import UserProfileSerializer
 from ondoc.api.v1.doctor.city_match import city_match
 from ondoc.api.v1.doctor.serializers import HospitalModelSerializer, AppointmentRetrieveDoctorSerializer, \
-    OfflinePatientSerializer
+    OfflinePatientSerializer, CommonConditionsSerializer
 from ondoc.api.v1.doctor.DoctorSearchByHospitalHelper import DoctorSearchByHospitalHelper
 from ondoc.api.v1.procedure.serializers import CommonProcedureCategorySerializer, ProcedureInSerializer, \
-    ProcedureSerializer, DoctorClinicProcedureSerializer, CommonProcedureSerializer, CommonIpdProcedureSerializer
+    ProcedureSerializer, DoctorClinicProcedureSerializer, CommonProcedureSerializer, CommonIpdProcedureSerializer, \
+    CommonHospitalSerializer
 from ondoc.cart.models import Cart
 from ondoc.doctor import models
 from ondoc.authentication import models as auth_models
@@ -20,7 +21,7 @@ from ondoc.insurance.models import UserInsurance
 from ondoc.notification import tasks as notification_tasks
 #from ondoc.doctor.models import Hospital, DoctorClinic,Doctor,  OpdAppointment
 from ondoc.doctor.models import DoctorClinic, OpdAppointment, DoctorAssociation, DoctorQualification, Doctor, Hospital, \
-    HealthInsuranceProvider, ProviderSignupLead, HospitalImage
+    HealthInsuranceProvider, ProviderSignupLead, HospitalImage, CommonHospital
 from ondoc.notification.models import EmailNotification
 from django.utils.safestring import mark_safe
 from ondoc.coupon.models import Coupon, CouponRecommender
@@ -1280,9 +1281,10 @@ class SearchedItemsViewSet(viewsets.GenericViewSet):
     @transaction.non_atomic_requests
     def common_conditions(self, request):
         city = None
-        if request.query_params and request.query_params.get('city'):
-            city = city_match(request.query_params.get('city'))
-
+        serializer = CommonConditionsSerializer(data=request.query_params)
+        serializer.is_valid(raise_exception=True)
+        validated_data = serializer.validated_data
+        city = city_match(validated_data.get('city'))
         spec_urls = dict()
         count = request.query_params.get('count', 10)
         count = int(count)
@@ -1334,12 +1336,16 @@ class SearchedItemsViewSet(viewsets.GenericViewSet):
                 ipd_id=F('ipd_procedure_id')).values('ipd_id', 'url')
             ipd_entity_dict = {x.get('ipd_id'): x.get('url') for x in ipd_entity_qs}
         common_ipd_procedures_serializer = CommonIpdProcedureSerializer(common_ipd_procedures, many=True,
-                                                                        context={'entity_dict': ipd_entity_dict})
+                                                                        context={'entity_dict': ipd_entity_dict,
+                                                                                 'request': request})
+
+        top_hospitals_data = Hospital.get_top_hospitals_data(request, validated_data.get('lat'), validated_data.get('long'))
 
         return Response({"conditions": conditions_serializer.data, "specializations": specializations_serializer.data,
                          "procedure_categories": common_procedure_categories_serializer.data,
                          "procedures": common_procedures_serializer.data,
-                         "ipd_procedures": common_ipd_procedures_serializer.data})
+                         "ipd_procedures": common_ipd_procedures_serializer.data,
+                         "top_hospitals": top_hospitals_data})
 
 
 class DoctorListViewSet(viewsets.GenericViewSet):
