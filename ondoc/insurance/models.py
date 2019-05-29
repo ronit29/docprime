@@ -1832,3 +1832,24 @@ class ThirdPartyAdministrator(auth_model.TimeStampedModel):
 
     class Meta:
         db_table = "third_party_administrator"
+
+
+class UserBank(auth_model.TimeStampedModel):
+    insurance = models.ForeignKey(UserInsurance, related_name='user_bank', on_delete=models.DO_NOTHING)
+    bank_name = models.CharField(max_length=250)
+    account_number = models.CharField(max_length=50)
+    account_holder_name = models.CharField(max_length=150)
+    ifsc_code = models.CharField(max_length=20)
+    bank_address = models.CharField(max_length=300, blank=True, null=True)
+
+    class Meta:
+        db_table = "user_bank"
+
+
+class UserBankDocument(auth_model.TimeStampedModel):
+    insurance = models.ForeignKey(UserInsurance, related_name='user_bank_document', on_delete=models.DO_NOTHING)
+    document_image = models.FileField(upload_to='users/images', blank=False, null=False, validators=[
+        FileExtensionValidator(allowed_extensions=['pdf', 'jpg', 'jpeg', 'png'])])
+
+    class Meta:
+        db_table = "user_bank_document"

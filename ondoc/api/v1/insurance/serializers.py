@@ -6,7 +6,8 @@ from ondoc.diagnostic.models import Lab
 from ondoc.doctor.models import Doctor
 from ondoc.insurance.models import (Insurer, InsurancePlans, InsuranceThreshold, InsurerAccount, InsuredMembers,
                                     InsuranceTransaction, UserInsurance, InsuranceDisease, InsurancePlanContent,
-                                    StateGSTCode, InsuranceCity, InsuranceDistrict, InsuredMemberDocument)
+                                    StateGSTCode, InsuranceCity, InsuranceDistrict, InsuredMemberDocument,
+                                    UserBankDocument)
 from ondoc.authentication.models import (User, UserProfile)
 from ondoc.account import models as account_models
 from ondoc.account.models import (Order)
@@ -59,6 +60,12 @@ class UploadMemberDocumentSerializer(serializers.ModelSerializer):
     class Meta:
         model = InsuredMemberDocument
         fields = ('document_image', 'member')
+
+
+class UploadUserBankDocumentSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = UserBankDocument
+        fields = ('insurance', 'document_image')
 
 
 class MemberListSerializer(serializers.Serializer):

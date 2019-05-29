@@ -750,3 +750,24 @@ class InsuranceEndorsementViewSet(viewsets.GenericViewSet):
         document_data['data'] = serializer.data
         return Response(document_data)
 
+
+class UserBankViewSet(viewsets.GenericViewSet):
+    authentication_classes = (JWTAuthentication,)
+    permission_classes = (IsAuthenticated,)
+
+    def upload(self, request):
+        data = dict()
+        document_data = {}
+        data['document_image'] = request.data['document_image']
+        data['insurance'] = request.user.active_insurance
+        serializer = serializers.UploadUserBankDocumentSerializer(data=data, context={'request':request})
+        serializer.is_valid(raise_exception=True)
+        doc_obj = serializer.save()
+        document_data['id'] = doc_obj.id
+        document_data['data'] = serializer.data
+        return Response(document_data)
+
+    def create(self, request):
+        data = request.data
+
+
