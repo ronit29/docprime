@@ -1,1 +1,10 @@
-We have received a reschedule request for your appointment from Lab - {{lab_name|capfirst}} at {{instance.time_slot_start|date:"h:i a"}} {{instance.time_slot_start|date:"d/m/y"}}.
+This is regarding your lab appointment - {{instance.id}}.
+{% if instance.is_home_pickup %}
+The home sample facility is not available at {{instance.time_slot_start|date:"h:i a"}} on {{instance.time_slot_start|date:"d/m/y"}}.
+Our customer service executive will get in touch with you shortly to confirm the new time.
+{% else %}
+We regret to inform you that {{lab_name|capfirst}} is currently unavailable to confirm your appointment at {{instance.time_slot_start|date:"h:i a"}} on {{instance.time_slot_start|date:"d/m/y"}}.
+Our customer service executive will get in touch with you shortly to confrim the new time.
+{% endif %}
+Thanks,
+Team Docprime.com

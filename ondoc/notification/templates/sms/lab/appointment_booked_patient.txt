@@ -1,5 +1,4 @@
-We have received an appointment request. Below are the details:
-
+We have received your lab appointment request. Below are the details:
 
 Booking ID : {{instance.id}}
 Patient Name : {{patient_name|capfirst}}
@@ -8,4 +7,4 @@ Lab Name : {{lab_name|capfirst}}
 Appointment Date and Time : {{instance.time_slot_start|date:"D jS F Y"}} || {{instance.time_slot_start|date:"h:i A"}}
 You will receive a confirmation email and sms once the appointment is confirmed.
 
-Thanks for choosing docprime.com
+Thanks for choosing Docprime.com

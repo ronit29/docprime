@@ -319,6 +319,12 @@ class SMSNotification:
             body_template = "sms/appointment_confirmation_second_check.txt"
         elif notification_type == NotificationAction.OPD_FEEDBACK_AFTER_APPOINTMENT:
             body_template = "sms/appointment_feedback.txt"
+        elif notification_type == NotificationAction.LAB_CONFIRMATION_CHECK_AFTER_APPOINTMENT:
+            body_template = "sms/lab/lab_confirmation_check.txt"
+        elif notification_type == NotificationAction.LAB_CONFIRMATION_SECOND_CHECK_AFTER_APPOINTMENT:
+            body_template = "sms/lab/lab_confirmation_second_check.txt"
+        elif notification_type == NotificationAction.LAB_FEEDBACK_AFTER_APPOINTMENT:
+            body_template = "sms/lab/lab_feedback.txt"
         return body_template
 
     def trigger(self, receiver, template, context):
@@ -1270,6 +1276,11 @@ class LabNotification(Notification):
         time_slot_start = self.appointment.time_slot_start.astimezone(est)
         tests = self.appointment.get_tests_and_prices()
         report_file_links = instance.get_report_urls()
+        token_object = JWTAuthentication.generate_token(self.appointment.user)
+        booking_url = settings.BASE_URL + '/sms/booking?token={}'.format(token_object['token'].decode("utf-8"))
+        lab_appointment_complete_url = booking_url + "&callbackurl=lab/appointment/{}?complete=true".format(self.appointment.id)
+        lab_appointment_feedback_url = booking_url + "&callbackurl=lab/appointment/{}".format(self.appointment.id)
+        reschedule_appointment_bypass_url = booking_url + "&callbackurl=lab/{}/timeslots?reschedule=true".format(self.appointment.lab.id)
 
         email_banners_html = EmailBanner.get_banner(instance, self.notification_type)
         # email_banners_html = UserConfig.objects.filter(key__iexact="email_banners") \
@@ -1302,7 +1313,10 @@ class LabNotification(Notification):
             "screen": "appointment",
             "type": "lab",
             "mask_number": mask_number,
-            "email_banners": email_banners_html if email_banners_html is not None else ""
+            "email_banners": email_banners_html if email_banners_html is not None else "",
+            "lab_appointment_complete_url": generate_short_url(lab_appointment_complete_url),
+            "lab_appointment_feedback_url": generate_short_url(lab_appointment_feedback_url),
+            "reschedule_appointment_bypass_url": generate_short_url(reschedule_appointment_bypass_url),
         }
         return context
 
@@ -1357,6 +1371,9 @@ class LabNotification(Notification):
                                  NotificationAction.LAB_REPORT_UPLOADED,
                                  NotificationAction.LAB_INVOICE,
                                  NotificationAction.LAB_OTP_BEFORE_APPOINTMENT,
+                                 NotificationAction.LAB_CONFIRMATION_CHECK_AFTER_APPOINTMENT,
+                                 NotificationAction.LAB_CONFIRMATION_SECOND_CHECK_AFTER_APPOINTMENT,
+                                 NotificationAction.LAB_FEEDBACK_AFTER_APPOINTMENT,
                                  NotificationAction.LAB_REPORT_SEND_VIA_CRM]:
             receivers.append(instance.user)
         elif notification_type in [NotificationAction.LAB_APPOINTMENT_RESCHEDULED_BY_PATIENT,

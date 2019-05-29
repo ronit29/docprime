@@ -1,5 +1,6 @@
 We have received a reschedule request for your appointment with {{lab_name|capfirst}}. Below are detals:
-Booking ID : {{instance.id}}
+
+Appointment ID : {{instance.id}}
 Patient Name : {{patient_name|capfirst}}
 Requested Date and Time : {{instance.time_slot_start|date:"D jS F Y"}} || {{instance.time_slot_start|date:"h:i A"}}
 
