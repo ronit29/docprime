@@ -776,7 +776,7 @@ class WHTSAPPNotification:
 
             undesired_params = list(filter(lambda param: not param, data))
             if not template:
-                logger.error('[ERROR] Could not send Whtsapp message to user as suitable template not found for the '
+                logger.info('[ERROR] Could not send Whtsapp message to user as suitable template not found for the '
                              'case. Notification type %s for appointment id %d'
                              % (self.notification_type, self.context.get('instance').id))
 
