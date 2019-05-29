@@ -769,5 +769,13 @@ class UserBankViewSet(viewsets.GenericViewSet):
 
     def create(self, request):
         data = request.data
+        user = request.user
+        insurance = user.active_insurance
+        if not insurance:
+            return Response(data="Insurance not found for the user", status=status.HTTP_400_BAD_REQUEST)
+        data['insurance'] = insurance.id
+        serializer = serializers.UserBankSerializer(data=data, context={'request':request})
+        serializer.is_valid(raise_exception=True)
+        serializer.save()
 
 

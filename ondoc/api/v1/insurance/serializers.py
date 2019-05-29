@@ -279,3 +279,12 @@ class InsuranceCityEligibilitySerializer(serializers.Serializer):
     longitude = serializers.DecimalField(allow_null=False, max_digits=11, decimal_places=8)
 
 
+class UserBankSerializer(serializers.Serializer):
+    insurance = serializers.PrimaryKeyRelatedField(UserInsurance.objects.all())
+    bank_name = serializers.CharField(max_length=250)
+    account_number = serializers.CharField(max_length=50)
+    account_holder_name = serializers.CharField(max_length=150)
+    ifsc_code = serializers.CharField(max_length=20)
+    bank_address = serializers.CharField(max_length=300, allow_blank=True, allow_null=True)
+
+
