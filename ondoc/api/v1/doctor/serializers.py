@@ -1812,14 +1812,15 @@ class TopHospitalForIpdProcedureSerializer(serializers.ModelSerializer):
 
     def get_logo(self, obj):
         request = self.context.get('request')
-        if obj.network:
-            for document in obj.network.hospital_network_documents.all():
-                if document.document_type == HospitalNetworkDocument.LOGO:
-                    return request.build_absolute_uri(document.name.url) if document.name else None
-        else:
-            for document in obj.hospital_documents.all():
-                if document.document_type == HospitalDocument.LOGO:
-                    return request.build_absolute_uri(document.name.url) if document.name else None
+        if request:
+            if obj.network:
+                for document in obj.network.hospital_network_documents.all():
+                    if document.document_type == HospitalNetworkDocument.LOGO:
+                        return request.build_absolute_uri(document.name.url) if document.name else None
+            else:
+                for document in obj.hospital_documents.all():
+                    if document.document_type == HospitalDocument.LOGO:
+                        return request.build_absolute_uri(document.name.url) if document.name else None
         return None
 
     def get_open_today(self, obj):
@@ -2094,3 +2095,9 @@ class DoctorLicenceBodySerializer(serializers.Serializer):
         if attrs['doctor_id'].license:
             raise serializers.ValidationError('Licence Exists')
         return attrs
+
+
+class CommonConditionsSerializer(serializers.Serializer):
+    long = serializers.FloatField(default=77.071848)
+    lat = serializers.FloatField(default=28.450367)
+    city = serializers.CharField(required=False, allow_blank=True, allow_null=True)
