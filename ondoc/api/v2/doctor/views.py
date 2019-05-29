@@ -566,7 +566,7 @@ class ProviderSignupDataViewset(viewsets.GenericViewSet):
             return Response({"status": 0, "message": "Error updating consent - " + str(e)}, status.HTTP_500_INTERNAL_SERVER_ERROR)
 
     def encrypt_consent(self, request):
-        from bulk_update.helper import bulk_update
+        # from bulk_update.helper import bulk_update
         serializer = serializers.ConsentIsEncryptSerializer(data=request.data, context={'request': request})
         serializer.is_valid(raise_exception=True)
         valid_data = serializer.validated_data
