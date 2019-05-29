@@ -280,7 +280,7 @@ class InsuranceCityEligibilitySerializer(serializers.Serializer):
 
 
 class UserBankSerializer(serializers.Serializer):
-    insurance = serializers.PrimaryKeyRelatedField(UserInsurance.objects.all())
+    insurance = serializers.PrimaryKeyRelatedField(queryset=UserInsurance.objects.all())
     bank_name = serializers.CharField(max_length=250)
     account_number = serializers.CharField(max_length=50)
     account_holder_name = serializers.CharField(max_length=150)
