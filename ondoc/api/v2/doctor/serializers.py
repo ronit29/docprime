@@ -220,15 +220,15 @@ class ConsentIsEncryptSerializer(serializers.Serializer):
     hospitals = serializers.ListField(child=EncryptedHospitalsSerializer(many=False))
     hint = serializers.CharField(required=False, allow_blank=True)
     encryption_key = serializers.CharField(required=False, allow_blank=True)
-    decrypt = serializers.BooleanField(required=False)
+    # decrypt = serializers.BooleanField(required=False)
     email = serializers.EmailField(required=False, allow_blank=True, max_length=100)
     phone_numbers = serializers.ListField(child=serializers.IntegerField(validators=[MaxValueValidator(9999999999), MinValueValidator(1000000000)]), allow_empty=True, required=False)
     is_consent_received = serializers.BooleanField()
 
     def validate(self, attrs):
         if attrs:
-            if attrs.get('decrypt'):
-                if not attrs['encryption_key']:
+            if 'is_encrypted' in attrs and not attrs.get('is_encrypted'):
+                if not attrs.get('encryption_key'):
                     raise serializers.ValidationError('Encryption Key Not Found!')
                 else:
                     for hospital in attrs['hospitals']:
@@ -243,13 +243,6 @@ class ConsentIsEncryptSerializer(serializers.Serializer):
                     del attrs['hospitals'][index]
                 if not attrs['hospitals']:
                     raise serializers.ValidationError('encrypted data already present for given hospitals')
-        # if attrs and attrs.get('decrypt') and not attrs['encryption_key']:
-        #     raise serializers.ValidationError('Encryption Key Not Found!')
-        # if attrs and attrs['hospital_id']:
-        #     queryset = doc_models.Hospital.objects.filter(id=attrs['hospital_id']).first()
-        #     if not queryset:
-        #         raise serializers.ValidationError('Hospital Not Found!')
-        #     attrs['hosp'] = queryset
         return attrs
 
 class BulkCreateDoctorSerializer(serializers.Serializer):
