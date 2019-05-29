@@ -1503,9 +1503,18 @@ class DoctorOpdAppointmentForm(RefundableAppointmentForm):
             raise forms.ValidationError(
                 "Cancellation comments must be mentioned for selected cancellation reason.")
 
-        if cleaned_data.get('status') and cleaned_data.get('status') != OpdAppointment.CREATED and self.instance and self.instance.status == OpdAppointment.CREATED and not cleaned_data.get('status_change_comments'):
-            raise forms.ValidationError(
-                "Status change comments must be mentioned when changing status from created to other.")
+        if cleaned_data.get('status') and self.instance and self.instance.status == OpdAppointment.CREATED:
+            if cleaned_data.get('status') not in [OpdAppointment.BOOKED, OpdAppointment.CANCELLED, OpdAppointment.CREATED]:
+                raise forms.ValidationError(
+                    "Created status can only be changed to Booked or cancelled.")
+
+            if cleaned_data.get('status') != OpdAppointment.CREATED and not cleaned_data.get('status_change_comments'):
+                raise forms.ValidationError(
+                    "Status change comments must be mentioned when changing status from created to other.")
+
+        # if cleaned_data.get('status') and self.instance and self.instance.status == OpdAppointment.CREATED and cleaned_data.get('status') in [OpdAppointment.BOOKED, OpdAppointment.CANCELLED] and not
+        #     raise forms.ValidationError(
+        #         "Status change comments must be mentioned when changing status from created to other.")
 
         if cleaned_data.get('status') not in [OpdAppointment.CANCELLED, OpdAppointment.COMPLETED, None]:
             if not DoctorClinicTiming.objects.filter(doctor_clinic__doctor=doctor,
