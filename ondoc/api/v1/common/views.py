@@ -1,4 +1,5 @@
 # from hardcopy import bytestring_to_pdf
+from rest_framework.permissions import IsAuthenticated
 from rest_framework import mixins, viewsets, status
 from rest_framework.response import Response
 from django.contrib.gis.geos import Point, GEOSGeometry
@@ -40,6 +41,7 @@ import requests
 from PIL import Image as Img
 import os
 import math
+from decimal import Decimal
 
 logger = logging.getLogger(__name__)
 
@@ -974,3 +976,37 @@ class AllUrlsViewset(viewsets.GenericViewSet):
         c_urls = list(CompareSEOUrls.objects.filter(url__icontains=key).values_list('url', flat=True))[:5]
         result = e_urls + c_urls
         return Response(dict(enumerate(result)))
+
+
+class AppointmentPrerequisiteViewSet(viewsets.GenericViewSet):
+
+    authentication_classes = (JWTAuthentication,)
+    permission_classes = (IsAuthenticated, )
+
+    def pre_booking(self, request):
+        user = request.user
+        insurance = user.active_insurance
+        if not insurance:
+            return Response({'prescription_needed': False})
+
+        serializer = serializers.AppointmentPrerequisiteSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        valid_data = serializer.validated_data
+
+        user_profile = valid_data.get('profile', None)
+        if not user_profile.is_insured_profile:
+            return Response({'prescription_needed': False})
+
+        lab = valid_data.get('lab')
+        lab_pricing_group = lab.lab_pricing_group
+        available_lab_test_qs = lab_pricing_group.available_lab_tests.all().filter(test__in=valid_data.get('lab_test'))
+        tests_amount = Decimal(0)
+        for available_lab_test in available_lab_test_qs:
+            agreed_price = available_lab_test.custom_agreed_price if available_lab_test.custom_agreed_price else available_lab_test.computed_agreed_price
+            tests_amount = tests_amount + agreed_price
+
+        # start_date = valid_data.get('start_date').date()
+
+        resp = insurance.validate_limit_usages(tests_amount)
+
+        return Response(resp)

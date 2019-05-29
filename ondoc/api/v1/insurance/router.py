@@ -1,6 +1,7 @@
 from django.urls import path
 from .views import (ListInsuranceViewSet, InsuredMemberViewSet, InsuranceProfileViewSet, InsuranceOrderViewSet,
-                    InsuranceValidationViewSet, InsuranceDummyDataViewSet, InsuranceCancelViewSet, InsuranceNetworkViewSet)
+                    InsuranceValidationViewSet, InsuranceDummyDataViewSet, InsuranceCancelViewSet, InsuranceNetworkViewSet,
+                    InsuranceEndorsementViewSet)
 
 
 urlpatterns = [
@@ -17,5 +18,11 @@ urlpatterns = [
     path('check_insurance', InsuranceValidationViewSet.as_view({'post': 'validation'}), name='insurance-validation'),
     path('cancel', InsuranceCancelViewSet.as_view({'get': 'insurance_cancel'}), name='insurance-cancel'),
     path('cancel-master', InsuranceCancelViewSet.as_view({'get': 'cancel_master'}), name='insurance-cancel-master'),
-    path('network/search', InsuranceNetworkViewSet.as_view({'get': 'list'}), name='insurance-network')
+    path('network/search', InsuranceNetworkViewSet.as_view({'get': 'list'}), name='insurance-network'),
+    path('endorsement', InsuranceEndorsementViewSet.as_view({'get':'get_endorsement_data'}), name='insurance-endorsement'),
+    path('push_endorsement_data', InsuranceDummyDataViewSet.as_view({'post': 'push_endorsement_data'}), name='push-endorsement-data'),
+    path('show_endorsement_data', InsuranceDummyDataViewSet.as_view({'get': 'show_endorsement_data'}), name='show-endorsement-data'),
+    path('endorsement/create', InsuranceEndorsementViewSet.as_view({'post': 'create'}), name='create-endorsement'),
+    path('member/<int:pk>/upload', InsuranceEndorsementViewSet.as_view({'post': 'upload'}), name='Insuredmember-document-upload'),
 ]
+

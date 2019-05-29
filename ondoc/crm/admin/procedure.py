@@ -14,7 +14,8 @@ from ondoc.common.models import Feature, Service, AppointmentHistory
 from ondoc.crm.admin.doctor import AutoComplete
 from ondoc.procedure.models import Procedure, ProcedureCategory, ProcedureCategoryMapping, ProcedureToCategoryMapping, \
     IpdProcedure, IpdProcedureFeatureMapping, IpdProcedureCategoryMapping, IpdProcedureCategory, IpdProcedureDetail, \
-    IpdProcedureSynonym, IpdProcedureSynonymMapping, SimilarIpdProcedureMapping, IpdProcedurePracticeSpecialization
+    IpdProcedureSynonym, IpdProcedureSynonymMapping, SimilarIpdProcedureMapping, IpdProcedurePracticeSpecialization, \
+    IpdProcedureLead
 from django import forms
 
 
@@ -319,31 +320,48 @@ class IpdProcedurePracticeSpecializationAdmin(ImportExportMixin, VersionAdmin):
     # change_list_template = 'superuser_import_export.html'
 
 
+class IpdProcedureLeadAdminForm(forms.ModelForm):
+    def clean(self):
+        super().clean()
+        if any(self.errors):
+            return
+        cleaned_data = self.cleaned_data
+        curr_status = cleaned_data.get('status')
+        planned_date = cleaned_data.get('planned_date')
+        if curr_status and curr_status in [IpdProcedureLead.PLANNED]:
+            if not planned_date:
+                raise forms.ValidationError("Planned Date is mandatory for {} status.".format(
+                    dict(IpdProcedureLead.STATUS_CHOICES)[curr_status]))
+
+
 class IpdProcedureLeadAdmin(VersionAdmin):
-    search_fields = ['phone_number']
+    form = IpdProcedureLeadAdminForm
+    list_filter = ['created_at', 'source', 'ipd_procedure', 'planned_date']
+    search_fields = ['phone_number', 'matrix_lead_id']
     list_display = ['id', 'phone_number', 'name', 'matrix_lead_id']
-    autocomplete_fields = ['hospital', 'insurer', 'tpa']
-    exclude = ['user', 'dob', 'lat', 'long']
-    readonly_fields = ['phone_number', 'id', 'matrix_lead_id', 'ipd_procedure', 'hospital', 'source', 'age', 'specialty',
-                       'comments', 'data'
-                       # 'insurance_details', 'opd_appointments', 'lab_appointments'
-                       ]
+    autocomplete_fields = ['hospital', 'insurer', 'tpa', 'ipd_procedure']
+    exclude = ['user', 'lat', 'long']
+    readonly_fields = ['phone_number', 'id', 'matrix_lead_id', 'comments', 'data', 'source', 'current_age',
+                       'related_speciality', 'is_insured', 'insurance_details', 'opd_appointments', 'lab_appointments']
+
+
+
 
     fieldsets = (
         (None, {
             'fields': (
-                'id', 'name', 'gender', 'phone_number', 'alternate_number', 'age', 'city', 'email')
+                'id', 'name', 'gender', 'phone_number', 'is_insured', 'alternate_number', 'dob', 'current_age', 'city', 'email')
         }),
         ('Lead Info', {
             # 'classes': ('collapse',),
-            'fields': ('matrix_lead_id', 'ipd_procedure',
-                       'hospital', 'hospital_reference_id', 'source', 'status', 'payment_type', 'payment_amount',
-                       'insurer', 'tpa', 'num_of_chats', 'comments', 'data'),
+            'fields': ('matrix_lead_id', 'comments', 'data', 'ipd_procedure', 'related_speciality',
+                       'hospital', 'hospital_reference_id', 'source', 'referer_doctor', 'status', 'planned_date',
+                       'payment_type', 'payment_amount', 'insurer', 'tpa', 'num_of_chats', 'remarks'),
         }),
-        # ('History', {
-        #     # 'classes': ('collapse',),
-        #     'fields': ('insurance_details', 'opd_appointments', 'lab_appointments'),
-        # }),
+        ('History', {
+            # 'classes': ('collapse',),
+            'fields': ('insurance_details', 'opd_appointments', 'lab_appointments'),
+        }),
     )
 
     @transaction.atomic
@@ -353,3 +371,59 @@ class IpdProcedureLeadAdmin(VersionAdmin):
         if obj and obj.id:
             obj._source = AppointmentHistory.CRM
         super().save_model(request, obj, form, change)
+
+    def related_speciality(self, obj):
+        result = []
+        if obj and obj.id and obj.ipd_procedure:
+            result = IpdProcedurePracticeSpecialization.objects.filter(ipd_procedure=obj.ipd_procedure).values_list(
+                'practice_specialization__name', flat=True)
+        return ', '.join(result)
+
+    def is_insured(self, obj):
+        result = False
+        if obj and obj.user:
+            return bool(obj.user.active_insurance)
+        return result
+
+    def insurance_details(self, obj):
+        result = None
+        if obj and obj.user:
+            t_obj = obj.user.active_insurance
+            if t_obj:
+                exit_point_url = settings.ADMIN_BASE_URL + reverse(
+                    'admin:{}_{}_change'.format(t_obj.__class__._meta.app_label, t_obj.__class__._meta.model_name),
+                    kwargs={"object_id": t_obj.id})
+                result = mark_safe('<a href="{}">Active Insurance</a>'.format(exit_point_url))
+        return result
+
+    def opd_appointments(self, obj):
+        result = []
+        if obj and obj.user:
+            qs = obj.user.recent_opd_appointment
+            for t_obj in qs:
+                exit_point_url = reverse(
+                    'admin:{}_{}_change'.format(t_obj.__class__._meta.app_label, t_obj.__class__._meta.model_name),
+                    kwargs={"object_id": t_obj.id})
+                result.append(mark_safe('<a href="{}" target="_blank">{}</a>'.format(exit_point_url, t_obj.id)))
+        return mark_safe(', '.join(result))
+
+    def lab_appointments(self, obj):
+        result = []
+        if obj and obj.user:
+            qs = obj.user.recent_lab_appointment
+            for t_obj in qs:
+                exit_point_url = reverse(
+                    'admin:{}_{}_change'.format(t_obj.__class__._meta.app_label, t_obj.__class__._meta.model_name),
+                    kwargs={"object_id": t_obj.id})
+                result.append(mark_safe('<a href="{}" target="_blank">{}</a>'.format(exit_point_url, t_obj.id)))
+        return mark_safe(', '.join(result))
+
+    def current_age(self, obj):
+        from django.utils import timezone
+        from math import ceil
+        result = None
+        if obj and obj.dob:
+            result = str(ceil(((timezone.now() - obj.dob).days / (365.25))))
+        if not result and obj.age:
+            result = str(obj.age)
+        return result

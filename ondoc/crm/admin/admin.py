@@ -67,12 +67,13 @@ from ondoc.geoip.models import AdwordLocationCriteria
 from .geoip import AdwordLocationCriteriaAdmin
 from ondoc.insurance.models import Insurer, InsurerAccount, InsurancePlans, InsuranceThreshold, UserInsurance, \
     InsuredMembers, InsuranceTransaction, InsurancePlanContent, InsuranceDisease, StateGSTCode, InsuranceCity, \
-    InsuranceDistrict, InsuranceDeal, InsurerPolicyNumber, InsuranceLead, InsuranceCancelMaster, \
-    InsuranceEligibleCities, ThirdPartyAdministrator
+    InsuranceDistrict, InsuranceDeal, InsurerPolicyNumber, InsuranceLead, InsuranceCancelMaster, EndorsementRequest, InsuredMemberDocument, \
+    InsuredMemberHistory, InsuranceEligibleCities, ThirdPartyAdministrator
 from ondoc.crm.admin.insurance import InsurerAdmin, InsurancePlansAdmin, InsuranceThresholdAdmin, InsurerFloatAdmin, \
     UserInsuranceAdmin, InsuredMembersAdmin, InsuranceDiseaseAdmin, StateGSTCodeAdmin, InsuranceCityAdmin, \
-    InsuranceDistrictAdmin, InsuranceDealAdmin, InsurerPolicyNumberAdmin, InsuranceLeadAdmin, \
-    InsuranceCancelMasterAdmin, InsuranceEligibleCitiesAdmin, ThirdPartyAdministratorAdmin
+    InsuranceDistrictAdmin, InsuranceDealAdmin, InsurerPolicyNumberAdmin, InsuranceLeadAdmin, InsuranceCancelMasterAdmin, \
+    EndorsementRequestAdmin, InsuredMemberDocumentAdmin, InsuredMemberHistoryAdmin, InsuranceEligibleCitiesAdmin, ThirdPartyAdministratorAdmin
+
 from ondoc.insurance import models as insurance_model
 from ondoc.ratings_review.models import RatingsReview, ReviewCompliments, AppRatings, AppCompliments
 from ondoc.crm.admin.ratings import RatingsReviewAdmin, ReviewComplimentsAdmin, AppRatingsAdmin, AppComplimentsAdmin
@@ -179,6 +180,9 @@ admin.site.register(InsuranceDistrict, InsuranceDistrictAdmin)
 admin.site.register(InsuranceDeal, InsuranceDealAdmin)
 admin.site.register(InsuranceLead, InsuranceLeadAdmin)
 admin.site.register(InsuranceCancelMaster, InsuranceCancelMasterAdmin)
+admin.site.register(EndorsementRequest, EndorsementRequestAdmin)
+admin.site.register(InsuredMemberDocument, InsuredMemberDocumentAdmin)
+admin.site.register(InsuredMemberHistory, InsuredMemberHistoryAdmin)
 admin.site.register(InsuranceEligibleCities, InsuranceEligibleCitiesAdmin)
 # admin.site.register(InsuranceReport, InsuranceReportAdmin)
 # admin.site.register(InsurancePlanContent, InsurancePlanContentAdmin)

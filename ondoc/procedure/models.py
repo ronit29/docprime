@@ -99,6 +99,10 @@ class IpdProcedureLead(auth_model.TimeStampedModel):
     OPD = 4
     NOT_INTERESTED = 5
     COMPLETED = 6
+    VALID = 7
+    CONTACTED = 8
+    PLANNED = 9
+
 
     CASH = 1
     INSURANCE = 2
@@ -112,10 +116,9 @@ class IpdProcedureLead(auth_model.TimeStampedModel):
                       (CRM, 'CRM'),
                       (DOCPRIMEWEB, "DocPrime Web")]
 
-
     STATUS_CHOICES = [(None, "--Select--"), (NEW, 'NEW'), (COST_REQUESTED, 'COST_REQUESTED'),
-                      (COST_SHARED, 'COST_SHARED'), (OPD, 'OPD'),
-                      (NOT_INTERESTED, 'NOT_INTERESTED'), (COMPLETED, 'COMPLETED')]
+                      (COST_SHARED, 'COST_SHARED'), (OPD, 'OPD'), (VALID, 'VALID'), (CONTACTED, 'CONTACTED'),
+                      (PLANNED, 'PLANNED'), (NOT_INTERESTED, 'NOT_INTERESTED'), (COMPLETED, 'COMPLETED')]
 
     PAYMENT_TYPE_CHOICES = [(None, "--Select--"), (CASH, 'CASH'), (INSURANCE, 'INSURANCE'),
                             (GOVERNMENT_PANEL, 'GOVERNMENT_PANEL')]
@@ -148,6 +151,9 @@ class IpdProcedureLead(auth_model.TimeStampedModel):
     num_of_chats = models.PositiveIntegerField(null=True, blank=True)
     comments = models.TextField(null=True, blank=True)
     data = JSONField(blank=True, null=True)
+    planned_date = models.DateField(null=True, blank=True)
+    referer_doctor = models.CharField(max_length=500, null=True, blank=True)
+    remarks = models.TextField(null=True, blank=True)
 
     # ADMIN :Is_OpDInsured, Specialization List, appointment list
     # DEFAULTS??
@@ -156,23 +162,37 @@ class IpdProcedureLead(auth_model.TimeStampedModel):
         db_table = "ipd_procedure_lead"
 
     def save(self, *args, **kwargs):
+        if self.phone_number and not self.user:
+            self.user = User.objects.filter(phone_number=self.phone_number).first()
         send_lead_email = False
+        update_status_in_matrix = False
+        push_to_history = False
         if not self.id:
             send_lead_email = True
-        push_to_history = False
-        if self.id and self.status != self.__class__.objects.get(pk=self.id).status:
             push_to_history = True
-        elif self.id is None:
-            push_to_history = True
+        else:
+            database_obj = self.__class__.objects.filter(id=self.id).first()
+            if database_obj and self.status != database_obj.status:
+                update_status_in_matrix = True
+                push_to_history = True
         super().save(*args, **kwargs)
         if push_to_history:
             AppointmentHistory.create(content_object=self)
         super().save(*args, **kwargs)
-        transaction.on_commit(lambda: self.app_commit_tasks(send_lead_email=send_lead_email))
+        transaction.on_commit(lambda: self.app_commit_tasks(send_lead_email=send_lead_email,
+                                                            update_status_in_matrix=update_status_in_matrix))
 
-    def app_commit_tasks(self, send_lead_email):
+    def app_commit_tasks(self, send_lead_email, update_status_in_matrix=False):
         from ondoc.notification.tasks import send_ipd_procedure_lead_mail
+        from ondoc.matrix.tasks import update_onboarding_qcstatus_to_matrix
         send_ipd_procedure_lead_mail({'obj_id': self.id, 'send_email': send_lead_email})
+        if update_status_in_matrix:
+            update_onboarding_qcstatus_to_matrix.apply_async(({'obj_type': self.__class__.__name__, 'obj_id': self.id}
+                                                              ,), countdown=5)
+
+    @staticmethod
+    def is_valid_hospital_for_lead(hospital):
+        return hospital.has_ipd_doctors()
 
 
 class IpdProcedureDetailType(auth_model.TimeStampedModel):

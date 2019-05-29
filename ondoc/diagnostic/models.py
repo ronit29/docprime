@@ -54,7 +54,7 @@ from ondoc.matrix.tasks import push_appointment_to_matrix, push_onboarding_qcsta
 from ondoc.integrations.task import push_lab_appointment_to_integrator, get_integrator_order_status
 from ondoc.location import models as location_models
 from ondoc.ratings_review import models as ratings_models
-from ondoc.api.v1.common import serializers as common_serializers
+# from ondoc.api.v1.common import serializers as common_serializers
 from ondoc.common.models import AppointmentHistory, AppointmentMaskNumber, Remark, GlobalNonBookable, \
     SyncBookingAnalytics, CompletedBreakupMixin, RefundDetails, MatrixMappedState, \
     MatrixMappedCity
@@ -1580,6 +1580,15 @@ class LabAppointment(TimeStampedModel, CouponsMixin, LabAppointmentInvoiceMixin,
     history = GenericRelation(AppointmentHistory)
     refund_details = GenericRelation(RefundDetails, related_query_name="lab_appointment_detail")
     coupon_data = JSONField(blank=True, null=True)
+    status_change_comments = models.CharField(max_length=5000, null=True, blank=True)
+    appointment_prescriptions = GenericRelation("prescription.AppointmentPrescription", related_query_name="appointment_prescriptions")
+
+
+    def get_all_uploaded_prescriptions(self, date=None):
+        from ondoc.prescription.models import AppointmentPrescription
+        qs = LabAppointment.objects.filter(user=self.user).values_list('id', flat=True)
+        prescriptions = AppointmentPrescription.objects.filter(content_type=ContentType.objects.get_for_model(self), object_id__in=qs)
+        return prescriptions
 
     def get_corporate_deal_id(self):
         coupon = self.coupon.first()
@@ -1713,6 +1722,11 @@ class LabAppointment(TimeStampedModel, CouponsMixin, LabAppointmentInvoiceMixin,
 
     def allowed_action(self, user_type, request):
         allowed = []
+        if self.status == self.CREATED:
+            if user_type == User.CONSUMER:
+                return [self.CANCELLED]
+            return []
+
         current_datetime = timezone.now()
         if user_type == User.CONSUMER and current_datetime <= self.time_slot_start:
             if self.status in (self.BOOKED, self.ACCEPTED, self.RESCHEDULED_LAB, self.RESCHEDULED_PATIENT):
@@ -2002,9 +2016,26 @@ class LabAppointment(TimeStampedModel, CouponsMixin, LabAppointmentInvoiceMixin,
 
     @classmethod
     def create_appointment(cls, appointment_data):
+        from ondoc.prescription.models import AppointmentPrescription
+        insurance = appointment_data.get('insurance')
+        appointment_status = OpdAppointment.BOOKED
+
+        if insurance and insurance.is_valid():
+            mrp = Decimal(0)
+
+            for extras in appointment_data.get('extra_details',[]):
+                agreed_price = extras.get('custom_agreed_price') if extras.get('custom_agreed_price') != 'None' else extras.get('computed_agreed_price', 0)
+                if agreed_price == 'None':
+                    agreed_price = 0
+                mrp = mrp + Decimal(agreed_price)
+
+            insurance_limit_usage_data = insurance.validate_limit_usages(mrp)
+            if insurance_limit_usage_data.get('created_state'):
+                appointment_status = OpdAppointment.CREATED
+
         otp = random.randint(1000, 9999)
         appointment_data["payment_status"] = OpdAppointment.PAYMENT_ACCEPTED
-        appointment_data["status"] = OpdAppointment.BOOKED
+        appointment_data["status"] = appointment_status
         appointment_data["otp"] = otp
         appointment_data["user_plan_used"] = appointment_data.pop("user_plan", None)
         lab_ids = appointment_data.pop("lab_test")
@@ -2013,7 +2044,13 @@ class LabAppointment(TimeStampedModel, CouponsMixin, LabAppointmentInvoiceMixin,
             "random_coupons": appointment_data.pop("coupon_data", [])
         }
         extra_details = deepcopy(appointment_data.pop("extra_details", None))
+        prescription_objects = deepcopy(appointment_data.pop("prescription_list", []))
+        prescription_id_list = []
+        for prescription in prescription_objects:
+            prescription_id_list.append(prescription.get('prescription').id)
+
         app_obj = cls.objects.create(**appointment_data)
+        AppointmentPrescription.update_with_appointment(app_obj, prescription_id_list)
         test_mappings = []
         for test in extra_details:
             test.pop('name', None)
@@ -2343,7 +2380,8 @@ class LabAppointment(TimeStampedModel, CouponsMixin, LabAppointmentInvoiceMixin,
             "cashback": int(price_data.get("coupon_cashback")),
             "is_appointment_insured": is_appointment_insured,
             "insurance": insurance_id,
-            "coupon_data": price_data.get("coupon_data")
+            "coupon_data": price_data.get("coupon_data"),
+            "prescription_list": data.get('prescription_list', [])
         }
 
         if data.get('included_in_user_plan', False):
@@ -2426,6 +2464,18 @@ class LabAppointment(TimeStampedModel, CouponsMixin, LabAppointmentInvoiceMixin,
         appointments = cls.objects.filter(~Q(status=cls.COMPLETED), ~Q(status=cls.CANCELLED), user=insurance_obj.user,
                                           insurance=insurance_obj)
         return appointments
+
+    @classmethod
+    def get_insurance_usage(cls, insurance_obj, date=None):
+        appointments = cls.objects.filter(user=insurance_obj.user, insurance=insurance_obj).exclude(status=cls.CANCELLED)
+        if date:
+            appointments = appointments.filter(created_at__date=date)
+
+        count = appointments.count()
+        data = appointments.aggregate(sum_amount=Sum('agreed_price'))
+        sum = data.get('sum_amount', 0)
+        sum = sum if sum else 0
+        return {'count': count, 'sum': sum}
 
     class Meta:
         db_table = "lab_appointment"
