@@ -566,31 +566,19 @@ class ProviderSignupDataViewset(viewsets.GenericViewSet):
             return Response({"status": 0, "message": "Error updating consent - " + str(e)}, status.HTTP_500_INTERNAL_SERVER_ERROR)
 
     def encrypt_consent(self, request):
-        # from bulk_update.helper import bulk_update
         serializer = serializers.ConsentIsEncryptSerializer(data=request.data, context={'request': request})
         serializer.is_valid(raise_exception=True)
         valid_data = serializer.validated_data
         user = request.user
-        # hospital = valid_data.get("hosp")
-        # hospitals = [hospital['hospital_id'] for hospital in valid_data.get("hospitals")]
         if valid_data.get('decrypt'):
             doc_models.ProviderEncrypt.objects.filter(hospital__in=[hospital['hospital_id'] for hospital in valid_data.get("hospitals")])\
                                               .update(is_encrypted=False, encrypted_by=None, hint=None, encrypted_hospital_id=None, is_valid=False)
-        # else:
-        #     existing_objects = doc_models.ProviderEncrypt.objects.filter(hospital__in=[hospital['hospital_id'] for hospital in valid_data.get("hospitals")])
         objects_to_be_created = list()
+        hospital_ids_to_be_created = list()
         for hospital in valid_data.get("hospitals"):
             if valid_data.get('decrypt'):
-                # hospital.provider_encrypt = False
-                # hospital.provider_encrypted_by = None
-                # hospital.encryption_hint = None
-                # hospital.encrypted_hospital_id = None
                 self.decrypt_and_save_provider_data(hospital['hospital_id'].id, valid_data['encryption_key'])
             elif valid_data.get('is_encrypted'):
-                # hospital.provider_encrypt = True
-                # hospital.provider_encrypted_by = user
-                # hospital.encryption_hint = valid_data.get('hint')
-                # hospital.encrypted_hospital_id = valid_data.get('encrypted_hospital_id')
                 if hasattr(hospital['hospital_id'], 'encrypt_details'):
                     encrypt_object = doc_models.ProviderEncrypt.objects.filter(hospital_id=hospital['hospital_id']).first()
                     encrypt_object.is_encrypted = True
@@ -610,18 +598,25 @@ class ProviderSignupDataViewset(viewsets.GenericViewSet):
                                                                             email=valid_data.get("email"),
                                                                             phone_numbers=valid_data.get("phone_numbers"),
                                                                             is_valid=True))
+                    hospital_ids_to_be_created.append(hospital['hospital_id'].id)
             else:
-                objects_to_be_created.append(doc_models.ProviderEncrypt(hospital=hospital['hospital_id'],
-                                                                                is_valid=False))
+                if hasattr(hospital['hospital_id'], 'encrypt_details'):
+                    encrypt_object = doc_models.ProviderEncrypt.objects.filter(hospital_id=hospital['hospital_id']).first()
+                    encrypt_object.is_encrypted = False
+                    encrypt_object.encrypted_by = None
+                    encrypt_object.hint = None
+                    encrypt_object.encrypted_hospital_id = None
+                    encrypt_object.email = None
+                    encrypt_object.phone_numbers = None
+                    encrypt_object.is_valid = False
+                    encrypt_object.save()
+                else:
+                    objects_to_be_created.append(doc_models.ProviderEncrypt(hospital=hospital['hospital_id'],
+                                                                            is_valid=False))
+                    hospital_ids_to_be_created.append(hospital['hospital_id'].id)
         try:
-            # hospital.save()
-            if not valid_data.get('decrypt'):
+            if not valid_data.get('decrypt') and objects_to_be_created and not doc_models.ProviderEncrypt.objects.filter(hospital_id__in=hospital_ids_to_be_created):
                 doc_models.ProviderEncrypt.objects.bulk_create(objects_to_be_created)
-                # bulk_update(existing_objects)
-            # if valid_data.get("email") and valid_data.get("phone_numbers"):
-            #     objects_to_be_created.append(doc_models.ProviderEncrypt(hospital=hospital,
-            #                                                                     email=valid_data.get("email"),
-            #                                                                     phone_numbers=valid_data.get("phone_numbers")))
             return Response({"status": 1, "message": "consent updated"})
         except Exception as e:
             logger.error('Error updating consent: ' + str(e))
