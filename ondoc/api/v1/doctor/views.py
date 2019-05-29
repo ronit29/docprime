@@ -8,7 +8,7 @@ from django.contrib.gis.measure import D
 from ondoc.api.v1.auth.serializers import UserProfileSerializer
 from ondoc.api.v1.doctor.city_match import city_match
 from ondoc.api.v1.doctor.serializers import HospitalModelSerializer, AppointmentRetrieveDoctorSerializer, \
-    OfflinePatientSerializer
+    OfflinePatientSerializer, CommonConditionsSerializer
 from ondoc.api.v1.doctor.DoctorSearchByHospitalHelper import DoctorSearchByHospitalHelper
 from ondoc.api.v1.procedure.serializers import CommonProcedureCategorySerializer, ProcedureInSerializer, \
     ProcedureSerializer, DoctorClinicProcedureSerializer, CommonProcedureSerializer, CommonIpdProcedureSerializer, \
@@ -1276,9 +1276,10 @@ class SearchedItemsViewSet(viewsets.GenericViewSet):
     @transaction.non_atomic_requests
     def common_conditions(self, request):
         city = None
-        if request.query_params and request.query_params.get('city'):
-            city = city_match(request.query_params.get('city'))
-
+        serializer = CommonConditionsSerializer(data=request.query_params)
+        serializer.is_valid(raise_exception=True)
+        validated_data = serializer.validated_data
+        city = city_match(validated_data.get('city'))
         spec_urls = dict()
         count = request.query_params.get('count', 10)
         count = int(count)
@@ -1333,7 +1334,7 @@ class SearchedItemsViewSet(viewsets.GenericViewSet):
                                                                         context={'entity_dict': ipd_entity_dict,
                                                                                  'request': request})
 
-        top_hospitals_data = Hospital.get_top_hospitals_data(request)
+        top_hospitals_data = Hospital.get_top_hospitals_data(request, validated_data.get('lat'), validated_data.get('long'))
 
         return Response({"conditions": conditions_serializer.data, "specializations": specializations_serializer.data,
                          "procedure_categories": common_procedure_categories_serializer.data,

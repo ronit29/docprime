@@ -289,8 +289,6 @@ class Hospital(auth_model.TimeStampedModel, auth_model.CreatedByModel, auth_mode
         hosp_entity_dict, hosp_locality_entity_dict = Hospital.get_hosp_and_locality_dict(temp_hospital_ids,
                                                                                           EntityUrls.SitemapIdentifier.HOSPITALS_LOCALITY_CITY)
 
-        # if lat and long:
-        #     hosp_queryset = hosp_queryset.filter()
         result = TopHospitalForIpdProcedureSerializer(hosp_queryset, many=True, context={'request': request,
                                                                                          'hosp_entity_dict': hosp_entity_dict,
                                                                                          'hosp_locality_entity_dict': hosp_locality_entity_dict}).data
