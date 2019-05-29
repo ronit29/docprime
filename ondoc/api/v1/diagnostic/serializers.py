@@ -26,6 +26,7 @@ import logging
 import json
 
 from ondoc.insurance.models import UserInsurance, InsuranceThreshold
+from ondoc.prescription.models import AppointmentPrescription
 from ondoc.ratings_review.models import RatingsReview
 from django.db.models import Avg
 from django.db.models import Q
@@ -198,9 +199,10 @@ class LabModelSerializer(serializers.ModelSerializer):
         if self.context.get('entity'):
             entity = self.context.get('entity')
         # if entity.exists():
-            breadcrums = entity.additional_info.get('breadcrums')
-            if breadcrums:
-                return breadcrums
+            if entity and entity.additional_info:
+                breadcrums = entity.additional_info.get('breadcrums')
+                if breadcrums:
+                    return breadcrums
         return breadcrums
 
     def get_lab_thumbnail(self, obj):
@@ -226,7 +228,7 @@ class LabModelSerializer(serializers.ModelSerializer):
         fields = ('id', 'lat', 'long', 'lab_thumbnail', 'name', 'operational_since', 'locality', 'address',
                   'sublocality', 'city', 'state', 'country', 'always_open', 'about', 'home_pickup_charges',
                   'is_home_collection_enabled', 'seo', 'breadcrumb', 'rating', 'rating_graph', 'unrated_appointment',
-                  'center_visit_enabled', 'display_rating_widget', 'is_thyrocare')
+                  'center_visit_enabled', 'display_rating_widget', 'is_thyrocare', 'network_id')
 
 
 class LabProfileSerializer(LabModelSerializer):
@@ -254,6 +256,7 @@ class AvailableLabTestPackageSerializer(serializers.ModelSerializer):
     hide_price = serializers.ReadOnlyField(source='test.hide_price')
     included_in_user_plan = serializers.SerializerMethodField()
     is_price_zero = serializers.SerializerMethodField()
+    # is_prescription_needed = serializers.SerializerMethodField()
 
     def get_is_price_zero(self, obj):
         agreed_price = obj.computed_agreed_price if obj.custom_agreed_price is None else obj.custom_agreed_price
@@ -265,6 +268,23 @@ class AvailableLabTestPackageSerializer(serializers.ModelSerializer):
     def get_included_in_user_plan(self, obj):
         package_free_or_not_dict = self.context.get('package_free_or_not_dict', {})
         return package_free_or_not_dict.get(obj.test.id, False)
+
+    # def get_is_prescription_needed(self, obj):
+    #     request = self.context.get("request")
+    #     if not request:
+    #         return False
+    #
+    #     data = None
+    #     logged_in_user = request.user
+    #     agreed_price = self.get_agreed_price(obj)
+    #     if logged_in_user.is_authenticated and not logged_in_user.is_anonymous and agreed_price:
+    #         user_insurance = request.user.active_insurance
+    #         data = user_insurance.validate_limit_usages(agreed_price) if user_insurance else None
+    #
+    #     if not data:
+    #         return False
+    #
+    #   return data.get('prescription_needed', False)
 
     def get_insurance(self, obj):
         request = self.context.get("request")
@@ -541,17 +561,22 @@ class CommonPackageSerializer(serializers.ModelSerializer):
 
     def __init__(self, instance=None, data=None, **kwargs):
         super().__init__(instance, data, **kwargs)
-        queryset = AvailableLabTest.objects.all()
+        queryset = AvailableLabTest.objects
         filters = Q()  # Create an empty Q object to start with
 
         for ins in instance:
-            q = Q(lab_pricing_group_id=ins.lab.lab_pricing_group_id,test_id = ins.package_id)
-            filters |= q
-        queryset = queryset.filter(filters)
+            if ins.lab and ins.lab.lab_pricing_group_id and ins.package_id:
+                q = Q(lab_pricing_group_id=ins.lab.lab_pricing_group_id,test_id = ins.package_id)
+                filters |= q
+
+        if filters:
+            queryset = queryset.filter(filters)
+        else:
+            queryset = queryset.none()
         for ins in instance:
             ins._selected_test = None
             for x in queryset:
-                if ins.lab.lab_pricing_group_id == x.lab_pricing_group_id and ins.package_id == x.test_id:
+                if ins.lab and ins.lab.lab_pricing_group_id == x.lab_pricing_group_id and ins.package_id == x.test_id:
                     ins._selected_test = x
                     break
 
@@ -642,11 +667,11 @@ class LabAppointmentModelSerializer(serializers.ModelSerializer):
 
     def get_lab_thumbnail(self, obj):
         request = self.context.get("request")
-        return request.build_absolute_uri(obj.lab.get_thumbnail()) if obj.lab.get_thumbnail() else None
+        return request.build_absolute_uri(obj.lab.get_thumbnail()) if obj.lab and obj.lab.get_thumbnail() else None
 
     def get_patient_thumbnail(self, obj):
         request = self.context.get("request")
-        return request.build_absolute_uri(obj.profile.get_thumbnail()) if obj.profile.get_thumbnail() else None
+        return request.build_absolute_uri(obj.profile.get_thumbnail()) if obj.profile and obj.profile.get_thumbnail() else None
 
     def get_patient_name(self, obj):
         if obj.profile_detail:
@@ -708,6 +733,10 @@ class PlanTransactionModelSerializer(serializers.Serializer):
     coupon_data = serializers.JSONField(required=False)
 
 
+class PrescriptionDocumentSerializer(serializers.Serializer):
+    prescription = serializers.PrimaryKeyRelatedField(queryset=AppointmentPrescription.objects.all())
+
+
 class LabAppTransactionModelSerializer(serializers.Serializer):
     id = serializers.IntegerField(required=False)
     lab = serializers.PrimaryKeyRelatedField(queryset=Lab.objects.filter(is_live=True))
@@ -733,6 +762,8 @@ class LabAppTransactionModelSerializer(serializers.Serializer):
     extra_details = serializers.JSONField(required=False)
     user_plan = serializers.PrimaryKeyRelatedField(queryset=UserPlanMapping.objects.all(), allow_null=True)
     coupon_data = serializers.JSONField(required=False)
+    prescription_list = serializers.ListSerializer(child=PrescriptionDocumentSerializer(), required=False)
+
 
 class LabAppRescheduleModelSerializer(serializers.ModelSerializer):
     class Meta:
@@ -806,6 +837,7 @@ class LabAppointmentCreateSerializer(serializers.Serializer):
     user_plan = serializers.PrimaryKeyRelatedField(queryset=UserPlanMapping.objects.all(), required=False, allow_null=True, default=None)
     included_in_user_plan = serializers.BooleanField(required=False, default=False)
     app_version = serializers.CharField(required=False, allow_null=True, allow_blank=True)
+    prescription_list = serializers.ListSerializer(child=PrescriptionDocumentSerializer(), required=False)
 
     def validate(self, data):
         MAX_APPOINTMENTS_ALLOWED = 10
@@ -1319,6 +1351,7 @@ class DoctorLabAppointmentRetrieveSerializer(LabAppointmentModelSerializer):
 class AppointmentCompleteBodySerializer(serializers.Serializer):
     lab_appointment = serializers.PrimaryKeyRelatedField(queryset=LabAppointment.objects.all())
     otp = serializers.IntegerField(max_value=9999)
+    source = serializers.CharField(required=False, allow_blank=True)
 
     def validate(self, attrs):
         appointment = attrs.get('lab_appointment')

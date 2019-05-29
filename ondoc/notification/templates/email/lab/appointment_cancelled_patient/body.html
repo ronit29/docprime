@@ -124,7 +124,9 @@
                 {% if instance.effective_price > 0 %}
                 <tr>
                     <td style="color:#3f3f3f;font-size:16px;font-weight:500;padding-top: 16px;">
+                        {% if instance.payment_type is not 3 %}
                         Refund if applicable will be credited within 5-7 working days.
+                        {% endif %}
                     </td>
                 </tr>
                 {% endif %}

@@ -1,3 +1,5 @@
+from typing import Any
+
 from django.utils.safestring import mark_safe
 from rest_framework import serializers
 from rest_framework.fields import CharField
@@ -14,7 +16,8 @@ from ondoc.doctor.models import (OpdAppointment, Doctor, Hospital, DoctorHospita
                                  Prescription, PrescriptionFile, Specialization, DoctorSearchResult, HealthTip,
                                  CommonMedicalCondition, CommonSpecialization,
                                  DoctorPracticeSpecialization, DoctorClinic, OfflineOPDAppointments, OfflinePatients,
-                                 CancellationReason, HealthInsuranceProvider, HospitalDocument, HospitalNetworkDocument)
+                                 CancellationReason, HealthInsuranceProvider, HospitalDocument, HospitalNetworkDocument,
+                                 AppointmentHistory)
 from ondoc.diagnostic import models as lab_models
 from ondoc.authentication.models import UserProfile, DoctorNumber, GenericAdmin, GenericLabAdmin
 from django.db.models import Avg
@@ -376,6 +379,7 @@ class SetAppointmentSerializer(serializers.Serializer):
 class OTPFieldSerializer(serializers.Serializer):
     id = serializers.IntegerField()
     otp = serializers.IntegerField(max_value=9999)
+    source = serializers.CharField(required=False, allow_blank=True)
 
 
 class OTPConfirmationSerializer(serializers.Serializer):
@@ -398,6 +402,7 @@ class UpdateStatusSerializer(serializers.Serializer):
     cancellation_reason = serializers.PrimaryKeyRelatedField(
         queryset=CancellationReason.objects.filter(visible_on_front_end=True), required=False)
     cancellation_comment = serializers.CharField(required=False, allow_blank=True)
+    source = serializers.ChoiceField(required=False, choices=AppointmentHistory.SOURCE_CHOICES)
 
 
 class DoctorImageSerializer(serializers.ModelSerializer):
@@ -1136,9 +1141,10 @@ class DoctorProfileUserViewSerializer(DoctorProfileSerializer):
         breadcrums = None
         if self.context.get('entity'):
             entity = self.context.get('entity')
-            breadcrums = entity.additional_info.get('breadcrums')
-            if breadcrums:
-                return breadcrums
+            if entity and entity.additional_info:
+                breadcrums = entity.additional_info.get('breadcrums')
+                if breadcrums:
+                    return breadcrums
         return breadcrums
 
     def get_procedures(self, obj):
@@ -1395,6 +1401,7 @@ class OpdAppointmentCompleteTempSerializer(serializers.Serializer):
 
     opd_appointment = serializers.IntegerField()
     otp = serializers.IntegerField(max_value=9999)
+    source = serializers.CharField(required=False, allow_blank=True)
 
     def validate(self, attrs):
         appointment_id = attrs.get('opd_appointment')
@@ -2015,18 +2022,22 @@ class HospitalRequestSerializer(serializers.Serializer):
 class IpdProcedureLeadSerializer(serializers.ModelSerializer):
     ipd_procedure = serializers.PrimaryKeyRelatedField(queryset=IpdProcedure.objects.filter(is_enabled=True),
                                                        required=False, allow_null=True)
-    hospital = serializers.PrimaryKeyRelatedField(queryset=Hospital.objects.filter(is_live=True), required=False)
-    name = serializers.CharField(max_length=100, required=False, allow_null=True)
+    hospital = serializers.PrimaryKeyRelatedField(queryset=Hospital.objects.filter(is_live=True), required=False, allow_null=True)
+    name = serializers.CharField(max_length=100, required=False, allow_null=True, allow_blank=True)
     phone_number = serializers.IntegerField(min_value=1000000000, max_value=9999999999, required=False)
     email = serializers.EmailField(max_length=256, required=False)
-    gender = serializers.ChoiceField(choices=UserProfile.GENDER_CHOICES, required=False)
-    age = serializers.IntegerField(min_value=1, max_value=120, required=False, default=None)
-    dob = serializers.DateField(required=False, default=None)
+    gender = serializers.ChoiceField(choices=UserProfile.GENDER_CHOICES, required=False, allow_null=True, allow_blank=True)
+    age = serializers.IntegerField(min_value=1, max_value=120, required=False, default=None, allow_null=True)
+    dob = serializers.DateField(required=False, default=None, allow_null=True)
     lat = serializers.FloatField(required=False, allow_null=True)
     long = serializers.FloatField(required=False, allow_null=True)
     city = serializers.CharField(required=False, allow_null=True, allow_blank=True)
-    source = serializers.CharField(required=False, default='docprimeweb')
-    specialty = serializers.CharField(required=False, default=None)
+    source = serializers.ChoiceField(required=False, default=IpdProcedureLead.DOCPRIMEWEB,
+                                     choices=IpdProcedureLead.SOURCE_CHOICES, allow_null=True, allow_blank=True)
+    specialty = serializers.CharField(required=False, default=None, allow_blank=True, allow_null=True)
+    num_of_chats = serializers.IntegerField(min_value=0, required=False, default=None, allow_null=True)
+    comments = serializers.CharField(required=False, default=None, allow_blank=True, allow_null=True)
+    data = serializers.JSONField(required=False, default=None, allow_null=True)
 
     class Meta:
         model = IpdProcedureLead
@@ -2046,6 +2057,7 @@ class IpdProcedureLeadSerializer(serializers.ModelSerializer):
                                                            doctor_clinic__hospital=hospital):
                 raise serializers.ValidationError('IPD procedure is not available in the hospital.')
         return super().validate(attrs)
+
 
 
 class HospitalDetailRequestSerializer(serializers.Serializer):

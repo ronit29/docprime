@@ -69,6 +69,7 @@ from django.db.models.functions import RowNumber
 from django.db.models import Avg
 from django.db.models.expressions import RawSQL
 from ondoc.doctor.v1.serializers import ArticleAuthorSerializer
+from decimal import Decimal
 User = get_user_model()
 
 
@@ -209,6 +210,10 @@ class LabList(viewsets.ReadOnlyModelViewSet):
         max_distance = max_distance*1000 if max_distance is not None else 10000
         min_distance = min_distance*1000 if min_distance is not None else 0
 
+        if request.user and request.user.is_authenticated and not hasattr(request, 'agent') and request.user.active_insurance and request.user.active_insurance.insurance_plan and request.user.active_insurance.insurance_plan.plan_usages:
+            if request.user.active_insurance.insurance_plan.plan_usages.get('package_disabled'):
+                return Response({"result": [], "result_count": 0})
+
         package_free_or_not_dict = get_package_free_or_not_dict(request)
         page_size = 30
         if not request.query_params.get('page') or int(request.query_params.get('page')) < 1:
@@ -332,6 +337,7 @@ class LabList(viewsets.ReadOnlyModelViewSet):
             entity_url_dict[item.get('lab_id')].append(item.get('url'))
         lab_data = Lab.objects.prefetch_related('lab_documents', 'lab_timings', 'network',
                                                 'home_collection_charges').in_bulk(lab_ids)
+
         category_data = {}
         test_package_queryset = []
         cache = {}
@@ -398,6 +404,21 @@ class LabList(viewsets.ReadOnlyModelViewSet):
         filters = dict()
 
         result = serializer.data
+
+        # disable home pickup for insured customers if lab charges home collection
+        if request.user and request.user.is_authenticated and result:
+            active_insurance = request.user.active_insurance
+            threshold = None
+            if active_insurance and active_insurance.insurance_plan:
+                threshold = active_insurance.insurance_plan.threshold.first()
+
+            if active_insurance and threshold:
+                for data in result:
+                    if data.get('lab') and data.get('lab').get('home_pickup_charges', 0) > 0:
+                        if float(data.get('mrp', 0)) <= threshold.lab_amount_limit:
+                            data.get('lab')['is_home_collection_enabled'] = False
+                            data['pickup_available'] = 0
+
         if result:
             from ondoc.coupon.models import Coupon
             # search_coupon = Coupon.get_search_coupon(request.user)
@@ -1537,6 +1558,8 @@ class LabList(viewsets.ReadOnlyModelViewSet):
         lab = dict()
 
         for obj in labs:
+            if  insurance_data_dict and insurance_data_dict['is_user_insured'] and obj.home_pickup_charges > 0:
+                obj.is_home_collection_enabled = False
             temp_var[obj.id] = obj
             tests[obj.id] = list()
             if test_ids and obj.selected_group and obj.selected_group.selected_tests:
@@ -1772,12 +1795,67 @@ class LabList(viewsets.ReadOnlyModelViewSet):
         # if entity.exists():
         #     lab_serializable_data['url'] = entity.first()['url'] if len(entity) == 1 else None
         temp_data = dict()
+
+        test_serializer_data = test_serializer.data
+        is_prescription_needed = False
+        if request.user and request.user.is_authenticated:
+            insurance = request.user.active_insurance
+            if insurance and test_serializer_data:
+                agreed_price = Decimal(0)
+                for single_test_serializer_data in test_serializer_data:
+                    agreed_price = agreed_price + Decimal(single_test_serializer_data.get('agreed_price', 0))
+
+                limit_data = insurance.validate_limit_usages(agreed_price)
+                is_prescription_needed = limit_data.get('prescription_needed')
+
+        lab_serializable_data['is_prescription_needed'] = is_prescription_needed
+
         temp_data['lab'] = lab_serializable_data
         temp_data['distance_related_charges'] = distance_related_charges
-        temp_data['tests'] = test_serializer.data
+        temp_data['tests'] = test_serializer_data
         temp_data['lab_tests'] = lab_test_serializer.data
         temp_data['lab_timing'], temp_data["lab_timing_data"] = lab_timing, lab_timing_data
         temp_data['total_test_count'] = total_test_count
+
+        #disable home pickup for insured customers if lab charges home collection
+        if request.user and request.user.is_authenticated and temp_data.get('lab'):
+            active_insurance = request.user.active_insurance
+            threshold = None
+            if active_insurance and active_insurance.insurance_plan:
+                threshold = active_insurance.insurance_plan.threshold.first()
+
+            if active_insurance and threshold:
+                turn_off_home_collection = False                
+                if temp_data.get('lab').get('home_pickup_charges', 0) > 0:
+                    if not temp_data.get('tests',[]):
+                        turn_off_home_collection = True
+                    for x in temp_data.get('tests', []):
+                        if float(x.get('mrp', 0)) <= threshold.lab_amount_limit:
+                            turn_off_home_collection = True
+                    if turn_off_home_collection:
+                        temp_data.get('lab')['is_home_collection_enabled'] = False
+                        for x in temp_data.get('tests', []):
+                            x['is_home_collection_enabled'] = False
+                                
+                #         temp_data.get('lab')['is_home_collection_enabled'] = False
+
+
+                # if not temp_data.get('tests',[]):
+                #     temp_data.get('lab')['is_home_collection_enabled'] = False
+                # elif temp_data.get('lab').get('home_pickup_charges', 0) > 0:
+                #     temp_data.get('lab')['is_home_collection_enabled'] = False
+                #     temp_data.get('tests')[0]['is_home_collection_enabled'] = False
+                #     return Response(temp_data)
+                # else:
+                #     for x in temp_data.get('tests', []):
+                #         threshold = active_insurance.insurance_plan.threshold.all()
+                #         if threshold and threshold.first() and threshold.first().lab_amount_limit:
+                #             lab_amount_limit = threshold.first().lab_amount_limit
+                #             if float(x.get('mrp', 0)) <= lab_amount_limit:
+                #                 x['is_home_collection_enabled'] = False
+                #                 temp_data.get('lab')['is_home_collection_enabled'] = False
+                #                 break
+
 
         # temp_data['url'] = entity.first()['url'] if len(entity) == 1 else None
 
@@ -2065,6 +2143,7 @@ class LabAppointmentView(mixins.CreateModelMixin,
         request = self.request
         if request.user.user_type == User.DOCTOR:
             return models.LabAppointment.objects.filter(
+                ~Q(status=models.LabAppointment.CREATED),
                 Q(lab__manageable_lab_admins__user=request.user,
                   lab__manageable_lab_admins__is_disabled=False) |
                 Q(lab__network__manageable_lab_network_admins__user=request.user,
@@ -2168,6 +2247,10 @@ class LabAppointmentView(mixins.CreateModelMixin,
 
             if data['is_appointment_insured']:
                 data['payment_type'] = OpdAppointment.INSURANCE
+                appointment_test_ids = validated_data.get('test_ids', [])
+                if request.user and request.user.is_authenticated and not hasattr(request, 'agent') and len(appointment_test_ids) > 1:
+                    return Response(status=status.HTTP_400_BAD_REQUEST, data={'error': 'Some error occured. Please try again after some time.'})
+
         else:
             data['is_appointment_insured'], data['insurance_id'], data[
                 'insurance_message'] = False, None, ""
@@ -2644,6 +2727,8 @@ class DoctorLabAppointmentsViewSet(viewsets.GenericViewSet):
         serializer.is_valid(raise_exception=True)
         validated_data = serializer.validated_data
         lab_appointment = validated_data.get('lab_appointment')
+        if lab_appointment.status == LabAppointment.CREATED:
+            return Response(status=status.HTTP_404_NOT_FOUND)
 
         lab_appointment = LabAppointment.objects.select_for_update().get(id=lab_appointment.id)
 
@@ -2675,8 +2760,11 @@ class DoctorLabAppointmentsNoAuthViewSet(viewsets.GenericViewSet):
         validated_data = serializer.validated_data
         lab_appointment = validated_data.get('lab_appointment')
 
+        if lab_appointment.status == LabAppointment.CREATED:
+            return Response(status=status.HTTP_404_NOT_FOUND)
+
         lab_appointment = LabAppointment.objects.select_for_update().get(id=lab_appointment.id)
-        source = request.query_params.get('source', '')
+        source = validated_data.get('source') if validated_data.get('source') else request.query_params.get('source', '')
         responsible_user = request.user if request.user.is_authenticated else None
         lab_appointment._source = source if source in [x[0] for x in AppointmentHistory.SOURCE_CHOICES] else ''
         lab_appointment._responsible_user = responsible_user
@@ -2685,7 +2773,10 @@ class DoctorLabAppointmentsNoAuthViewSet(viewsets.GenericViewSet):
             # lab_appointment_serializer = diagnostic_serializer.LabAppointmentRetrieveSerializer(lab_appointment,
             #                                                                                         context={
             #                                                                                             'request': request})
-            resp = {'success':'LabAppointment Updated Successfully!'}
+            resp = {'success':'LabAppointment Updated Successfully!',
+                    'mrp': lab_appointment.price,
+                    'payment_status': lab_appointment.payment_status,
+                    'payment_type': lab_appointment.payment_type}
         return Response(resp)
 
 

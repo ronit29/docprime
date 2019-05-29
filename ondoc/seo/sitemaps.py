@@ -1,5 +1,6 @@
 from ondoc.articles.models import ArticleCategory
-from ondoc.doctor.models import Doctor
+from ondoc.diagnostic.models import Lab
+from ondoc.doctor.models import Doctor, Hospital
 from ondoc.location.models import EntityUrls
 from django.contrib.sitemaps import Sitemap
 from ondoc.seo.models import SitemapManger
@@ -133,7 +134,8 @@ class LabPageSitemap(Sitemap):
     priority = 1
 
     def items(self):
-        return EntityUrls.objects.filter(is_valid=True, sitemap_identifier=EntityUrls.SitemapIdentifier.LAB_PAGE).order_by('created_at')
+        lab_ids = Lab.objects.filter(is_live=True).values_list('id', flat=True)
+        return EntityUrls.objects.filter(is_valid=True, sitemap_identifier=EntityUrls.SitemapIdentifier.LAB_PAGE, entity_id__in=lab_ids).order_by('created_at')
 
     def location(self, obj):
         return "/%s" % obj.url
@@ -179,7 +181,8 @@ class HospitalPageSitemap(Sitemap):
     priority = 1
 
     def items(self):
-        return EntityUrls.objects.filter(is_valid=True, sitemap_identifier=EntityUrls.SitemapIdentifier.HOSPITAL_PAGE).order_by('created_at')
+        hosp_ids = Hospital.objects.filter(is_live=True).values_list('id', flat=True)
+        return EntityUrls.objects.filter(is_valid=True, sitemap_identifier=EntityUrls.SitemapIdentifier.HOSPITAL_PAGE, entity_id__in=hosp_ids).order_by('created_at')
 
     def location(self, obj):
         return "/%s" % obj.url

@@ -29,6 +29,7 @@ from weasyprint import HTML
 from ondoc.account.models import Invoice, Order
 from ondoc.authentication.models import UserProfile, GenericAdmin, NotificationEndpoint, AgentToken, UserSecretKey, \
     ClickLoginToken
+from ondoc.insurance.models import EndorsementRequest
 
 from ondoc.notification.models import NotificationAction, SmsNotification, EmailNotification, AppNotification, \
     PushNotification, WhtsappNotification
@@ -300,6 +301,12 @@ class SMSNotification:
             body_template = "sms/lab/lab_report_uploaded.txt"
         elif notification_type == NotificationAction.INSURANCE_CONFIRMED:
             body_template = "sms/insurance/insurance_confirmed.txt"
+        elif notification_type == NotificationAction.INSURANCE_ENDORSMENT_APPROVED:
+            body_template = "sms/insurance/insurance_endorsment_approved.txt"
+        elif notification_type == NotificationAction.INSURANCE_ENDORSMENT_PENDING:
+            body_template = "sms/insurance/insurance_endorsment_pending.txt"
+        elif notification_type == NotificationAction.INSURANCE_ENDORSMENT_REJECTED:
+            body_template = "sms/insurance/insurance_endorsment_rejected.txt"
         elif notification_type == NotificationAction.INSURANCE_CANCEL_INITIATE:
             body_template = "sms/insurance/insurance_cancellation.txt"
         elif notification_type == NotificationAction.LAB_REPORT_SEND_VIA_CRM:
@@ -578,22 +585,22 @@ class WHTSAPPNotification:
             data.append(pickup_address)
             data.append(datetime.strftime(aware_time_zone(self.context.get('instance').time_slot_start), '%d-%m-%Y %H:%M'))
 
-        elif notification_type == NotificationAction.LAB_APPOINTMENT_BOOKED and user and user.user_type == User.CONSUMER:
-            body_template = "appointment_booked_patient"
-
-            data.append(self.context.get('patient_name'))
-            data.append(self.context.get('lab_name'))
-            data.append(datetime.strftime(aware_time_zone(self.context.get('instance').time_slot_start), '%d-%m-%Y'))
-            data.append(datetime.strftime(aware_time_zone(self.context.get('instance').time_slot_start), '%H:%M'))
-            data.append(self.context.get('instance').id)
-            data.append(self.context.get('patient_name'))
-            data.append(self.context.get('lab_name'))
-            pickup_address = 'NA'
-            if self.context.get('pickup_address'):
-                pickup_address = self.context.get('pickup_address')
-
-            data.append(pickup_address)
-            data.append(datetime.strftime(aware_time_zone(self.context.get('instance').time_slot_start), '%d-%m-%Y %H:%M'))
+        # elif notification_type == NotificationAction.LAB_APPOINTMENT_BOOKED and user and user.user_type == User.CONSUMER:
+        #     body_template = "appointment_booked_patient"
+        #
+        #     data.append(self.context.get('patient_name'))
+        #     data.append(self.context.get('lab_name'))
+        #     data.append(datetime.strftime(aware_time_zone(self.context.get('instance').time_slot_start), '%d-%m-%Y'))
+        #     data.append(datetime.strftime(aware_time_zone(self.context.get('instance').time_slot_start), '%H:%M'))
+        #     data.append(self.context.get('instance').id)
+        #     data.append(self.context.get('patient_name'))
+        #     data.append(self.context.get('lab_name'))
+        #     pickup_address = 'NA'
+        #     if self.context.get('pickup_address'):
+        #         pickup_address = self.context.get('pickup_address')
+        #
+        #     data.append(pickup_address)
+        #     data.append(datetime.strftime(aware_time_zone(self.context.get('instance').time_slot_start), '%d-%m-%Y %H:%M'))
 
         elif notification_type == NotificationAction.LAB_APPOINTMENT_BOOKED and (not user or user.user_type == User.DOCTOR):
             body_template = "appointment_booked_lab"
@@ -765,7 +772,7 @@ class WHTSAPPNotification:
 
             undesired_params = list(filter(lambda param: not param, data))
             if not template:
-                logger.error('[ERROR] Could not send Whtsapp message to user as suitable template not found for the '
+                logger.info('[ERROR] Could not send Whtsapp message to user as suitable template not found for the '
                              'case. Notification type %s for appointment id %d'
                              % (self.notification_type, self.context.get('instance').id))
 
@@ -896,6 +903,30 @@ class EMAILNotification:
 
             body_template = "email/insurance_confirmed/body.html"
             subject_template = "email/insurance_confirmed/subject.txt"
+
+        elif notification_type == NotificationAction.INSURANCE_ENDORSMENT_APPROVED:
+
+            coi = context.get("instance").coi
+            if not coi:
+                logger.error("Got error while creating pdf after endorsment for opd invoice")
+                return '', ''
+            context.update({"coi": coi})
+            context.update({"coi_url": coi.url})
+            context.update(
+                {"attachments": [
+                    {"filename": util_file_name(coi.url),
+                     "path": util_absolute_url(coi.url)}]})
+
+            body_template = "email/insurance_endorsment_approved/body.html"
+            subject_template = "email/insurance_endorsment_approved/subject.txt"
+
+        elif notification_type == NotificationAction.INSURANCE_ENDORSMENT_PENDING:
+            body_template = "email/insurance_endorsment_pending/body.html"
+            subject_template = "email/insurance_endorsment_pending/subject.txt"
+
+        elif notification_type == NotificationAction.INSURANCE_ENDORSMENT_REJECTED:
+            body_template = "email/insurance_endorsment_rejected/body.html"
+            subject_template = "email/insurance_endorsment_rejected/subject.txt"
 
         elif notification_type == NotificationAction.LAB_REPORT_SEND_VIA_CRM:
             attachments = []
@@ -1463,6 +1494,26 @@ class InsuranceNotification(Notification):
             'insurer_name': instance.insurance_plan.insurer.name
         }
 
+        if self.notification_type == NotificationAction.INSURANCE_ENDORSMENT_APPROVED:
+            endorsement_list = list()
+            rejected = 0
+            endorsed_members = instance.endorse_members.filter(~Q(status=EndorsementRequest.PENDING))
+            for mem in endorsed_members:
+                if mem.status == 3:
+                    rejected = rejected + 1
+
+                mem_data = {
+                    'name': mem.member.get_full_name().title(),
+                    'relation': mem.member.relation,
+                    'status': EndorsementRequest.STATUS_CHOICES[mem.status-1][1]
+                }
+
+                endorsement_list.append(mem_data)
+
+            context['endorsement_list'] = endorsement_list
+            context['few_rejected'] = True if rejected > 0 else False
+
+
         return context
 
     def get_receivers(self):
@@ -1492,7 +1543,10 @@ class InsuranceNotification(Notification):
         notification_type = self.notification_type
         all_receivers = self.get_receivers()
 
-        if notification_type in [NotificationAction.INSURANCE_CONFIRMED, NotificationAction.INSURANCE_CANCEL_INITIATE]:
+        if notification_type in [NotificationAction.INSURANCE_CONFIRMED, NotificationAction.INSURANCE_CANCEL_INITIATE,
+                                 NotificationAction.INSURANCE_ENDORSMENT_APPROVED,
+                                 NotificationAction.INSURANCE_ENDORSMENT_PENDING,
+                                 NotificationAction.INSURANCE_ENDORSMENT_REJECTED]:
             email_notification = EMAILNotification(notification_type, context)
             email_notification.send(all_receivers.get('email_receivers', []))
 
