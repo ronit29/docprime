@@ -35,6 +35,7 @@ import logging
 from datetime import timedelta
 import os
 import tempfile
+import decimal
 
 logger = logging.getLogger(__name__)
 
@@ -405,8 +406,6 @@ def payment_details(request, order):
     base_url = "https://{}".format(request.get_host())
     surl = base_url + '/api/v1/user/transaction/save'
     furl = base_url + '/api/v1/user/transaction/save'
-    # surl = 'https://bitter-fish-11.localtunnel.me/api/v1/user/transaction/save'
-    # furl = 'https://bitter-fish-11.localtunnel.me/api/v1/user/transaction/save'
     profile = user.get_default_profile()
     profile_name = ""
     if profile:
@@ -436,7 +435,7 @@ def payment_details(request, order):
         'referenceId': "",
         'orderId': order.id,
         'name': profile_name,
-        'txAmount': str(order.amount),
+        'txAmount': str(round(decimal.Decimal(order.amount), 2)),
         'holdPayment': 0,
     }
 
