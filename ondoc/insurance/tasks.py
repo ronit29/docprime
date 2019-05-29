@@ -190,10 +190,15 @@ def push_mis():
 
     from_date = str(datetime.now().date() - timedelta(days=1))
     to_date = from_date
-    arguments = {
-        'from_date': from_date,
-        'to_date': to_date,
-    }
+    # arguments = {
+    #     'from_date': from_date,
+    #     'to_date': to_date,
+    # }
+
+    earliest_date =str(datetime.now().date() - timedelta(days=365*100))
+    future_date = str(datetime.now().date() + timedelta(days=1))
+
+    date_tuple = ((from_date, to_date), (earliest_date, future_date))
 
     email_attachments = []
     mis_temporary_file = []
@@ -201,15 +206,20 @@ def push_mis():
 
     for resource in resources:
         resource_obj = resource[0]()
-        dataset = resource_obj.export(**arguments)
-        filename = "%s_%s_%s.xls" % (resource_obj.__class__.__name__, from_date, to_date)
-        filename_prefix = "%s_%s_%s_" % (resource_obj.__class__.__name__, from_date, to_date)
-        filename_suffix = ".xls"
-        mis_temporary_file.append(CustomTemporaryUploadedFile(filename, 'byte', 1000, 'utf-8', filename_prefix, filename_suffix))
-        f = open(mis_temporary_file[len(mis_temporary_file)-1].temporary_file_path(), 'wb')
-        f.write(dataset.xls)
-        f.seek(0)
-        mis_temporary_file_paths.append(mis_temporary_file[len(mis_temporary_file)-1].temporary_file_path())
+        for date in date_tuple:
+            arguments = {
+                'from_date': date[0],
+                'to_date': date[1],
+            }
+            dataset = resource_obj.export(**arguments)
+            filename = "%s_%s_%s.xls" % (resource_obj.__class__.__name__, date[0], date[1])
+            filename_prefix = "%s_%s_%s_" % (resource_obj.__class__.__name__, date[0], date[1])
+            filename_suffix = ".xls"
+            mis_temporary_file.append(CustomTemporaryUploadedFile(filename, 'byte', 1000, 'utf-8', filename_prefix, filename_suffix))
+            f = open(mis_temporary_file[len(mis_temporary_file)-1].temporary_file_path(), 'wb')
+            f.write(dataset.xls)
+            f.seek(0)
+            mis_temporary_file_paths.append(mis_temporary_file[len(mis_temporary_file)-1].temporary_file_path())
 
     zipfilename = "All_MIS_%s.zip" % from_date
     zipfile = TemporaryUploadedFile(zipfilename, 'byte', 1000, 'utf-8')
