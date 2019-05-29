@@ -220,7 +220,7 @@ class HospitalProviderDataViewSet(viewsets.GenericViewSet):
                 # if admin.hospital.provider_encrypt:
                 if hasattr(admin.hospital, 'encrypt_details'):
                     admin_data['is_encrypted'] = admin.hospital.encrypt_details.is_encrypted
-                    admin_data["encrypted_by"] = admin.hospital.encrypt_details.encrypted_by.phone_number
+                    admin_data["encrypted_by"] = admin.hospital.encrypt_details.encrypted_by.phone_number if admin.hospital.encrypt_details.encrypted_by else None
                     admin_data["encrypted_hospital_id"] = admin.hospital.encrypt_details.encrypted_hospital_id
                     admin_data["encryption_hint"] = admin.hospital.encrypt_details.hint
                     admin_data["email"] = admin.hospital.encrypt_details.email
