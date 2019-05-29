@@ -2169,12 +2169,12 @@ class OpdAppointment(auth_model.TimeStampedModel, CouponsMixin, OpdAppointmentIn
         insurance = appointment_data.get('insurance')
         appointment_status = OpdAppointment.BOOKED
 
-        if insurance and insurance.is_valid():
-            hospital = appointment_data.get('hospital')
-            if hospital:
-               is_appointment_exist = hospital.get_active_opd_appointments(insurance.user, insurance, appointment_data.get('time_slot_start').date())
-               if is_appointment_exist:
-                   raise Exception('Some error occurred. Please try after some time')
+        # if insurance and insurance.is_valid():
+        #     hospital = appointment_data.get('hospital')
+        #     if hospital:
+        #        is_appointment_exist = hospital.get_active_opd_appointments(insurance.user, insurance, appointment_data.get('time_slot_start').date())
+        #        if is_appointment_exist:
+        #            raise Exception('Some error occurred. Please try after some time')
         #     mrp = appointment_data.get('fees')
         #     insurance_limit_usage_data = insurance.validate_limit_usages(mrp)
         #     if insurance_limit_usage_data.get('created_state'):
