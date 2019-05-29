@@ -11,7 +11,8 @@ from ondoc.api.v1.doctor.serializers import HospitalModelSerializer, Appointment
     OfflinePatientSerializer
 from ondoc.api.v1.doctor.DoctorSearchByHospitalHelper import DoctorSearchByHospitalHelper
 from ondoc.api.v1.procedure.serializers import CommonProcedureCategorySerializer, ProcedureInSerializer, \
-    ProcedureSerializer, DoctorClinicProcedureSerializer, CommonProcedureSerializer, CommonIpdProcedureSerializer
+    ProcedureSerializer, DoctorClinicProcedureSerializer, CommonProcedureSerializer, CommonIpdProcedureSerializer, \
+    CommonHospitalSerializer
 from ondoc.cart.models import Cart
 from ondoc.doctor import models
 from ondoc.authentication import models as auth_models
@@ -20,7 +21,7 @@ from ondoc.insurance.models import UserInsurance
 from ondoc.notification import tasks as notification_tasks
 #from ondoc.doctor.models import Hospital, DoctorClinic,Doctor,  OpdAppointment
 from ondoc.doctor.models import DoctorClinic, OpdAppointment, DoctorAssociation, DoctorQualification, Doctor, Hospital, \
-    HealthInsuranceProvider, ProviderSignupLead, HospitalImage
+    HealthInsuranceProvider, ProviderSignupLead, HospitalImage, CommonHospital
 from ondoc.notification.models import EmailNotification
 from django.utils.safestring import mark_safe
 from ondoc.coupon.models import Coupon, CouponRecommender
@@ -1329,12 +1330,16 @@ class SearchedItemsViewSet(viewsets.GenericViewSet):
                 ipd_id=F('ipd_procedure_id')).values('ipd_id', 'url')
             ipd_entity_dict = {x.get('ipd_id'): x.get('url') for x in ipd_entity_qs}
         common_ipd_procedures_serializer = CommonIpdProcedureSerializer(common_ipd_procedures, many=True,
-                                                                        context={'entity_dict': ipd_entity_dict})
+                                                                        context={'entity_dict': ipd_entity_dict,
+                                                                                 'request': request})
+
+        top_hospitals_data = Hospital.get_top_hospitals_data(request)
 
         return Response({"conditions": conditions_serializer.data, "specializations": specializations_serializer.data,
                          "procedure_categories": common_procedure_categories_serializer.data,
                          "procedures": common_procedures_serializer.data,
-                         "ipd_procedures": common_ipd_procedures_serializer.data})
+                         "ipd_procedures": common_ipd_procedures_serializer.data,
+                         "top_hospitals": top_hospitals_data})
 
 
 class DoctorListViewSet(viewsets.GenericViewSet):

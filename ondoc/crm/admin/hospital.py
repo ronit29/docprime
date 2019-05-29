@@ -9,7 +9,7 @@ from ondoc.crm.admin.doctor import CreatedByFilter
 from ondoc.doctor.models import (HospitalImage, HospitalDocument, HospitalAward, Doctor,
                                  HospitalAccreditation, HospitalCertification, HospitalSpeciality, HospitalNetwork,
                                  Hospital, HospitalServiceMapping, HealthInsuranceProviderHospitalMapping,
-                                 HospitalHelpline, HospitalTiming, DoctorClinic)
+                                 HospitalHelpline, HospitalTiming, DoctorClinic, CommonHospital)
 from .common import *
 from ondoc.crm.constants import constants
 from django.utils.safestring import mark_safe
@@ -613,3 +613,28 @@ class HospitalAdmin(admin.GeoModelAdmin, VersionAdmin, ActionAdmin, QCPemAdmin):
             add_network_link += '?AgentId={}'.format(self.matrix_agent_id)
         html = '''<a href='%s' target=_blank>%s</a><br>''' % (add_network_link, "Add Network")
         return mark_safe(html)
+
+
+class CommonHospitalForm(forms.ModelForm):
+    def clean(self):
+        super().clean()
+        if any(self.errors):
+            return
+        network = self.cleaned_data.get('network')
+        hospital = self.cleaned_data.get('hospital')
+        if all([network, hospital]) or not any([network, hospital]):
+            raise forms.ValidationError('One and only of network and hospital.')
+        # if hospital and not hospital.is_live:
+        #     raise forms.ValidationError('Hospital must be live.')
+        # if network and not network.assoc_hospitals.filter(is_live=True).exists():
+        #     raise forms.ValidationError('Network must have live hospital(s).')
+
+
+class CommonHospitalAdmin(admin.ModelAdmin):
+    autocomplete_fields = ['hospital', 'network']
+    form = CommonHospitalForm
+    list_display = ['id', 'hospital', 'network']
+
+    class Meta:
+        model = CommonHospital
+        fields = '__all__'
