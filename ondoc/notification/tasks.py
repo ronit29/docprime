@@ -9,6 +9,7 @@ import traceback
 from collections import OrderedDict
 from io import BytesIO
 
+import pytz
 from django.db import transaction
 from django.forms import model_to_dict
 from django.utils import timezone
@@ -1088,8 +1089,9 @@ def send_release_payment_request(self, product_id, appointment_id):
 
         if appointment.status == obj.CANCELLED:
             if txn_obj and txn_obj.is_preauth():
-                if datetime.datetime.now() < txn_obj.transaction_date + datetime.timedelta(
-                        hours=int(settings.PAYMENT_AUTO_CAPTURE_DURATION)):
+                tz = pytz.timezone(settings.TIME_ZONE)
+                if datetime.datetime.now(tz) < (txn_obj.transaction_date + datetime.timedelta(
+                        hours=int(settings.PAYMENT_AUTO_CAPTURE_DURATION))).astimezone(tz):
                     url = settings.PG_RELEASE_PAYMENT_URL
                     token = settings.PG_SEAMLESS_RELEASE_AUTH_TOKEN
                     headers = {
