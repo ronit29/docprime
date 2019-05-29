@@ -17,7 +17,8 @@ from ondoc.doctor.models import (Doctor, Language, MedicalService, Specializatio
                                  SpecializationDepartment, SpecializationField, PracticeSpecialization,
                                  VisitReason, CancellationReason, PracticeSpecializationContent, OfflinePatients,
                                  OfflineOPDAppointments,
-                                 DoctorMobileOtp, UploadDoctorData, DoctorLeave, HealthInsuranceProvider)
+                                 DoctorMobileOtp, UploadDoctorData, DoctorLeave, HealthInsuranceProvider,
+                                 CommonHospital)
 
 from ondoc.diagnostic.models import (Lab, LabNetwork, LabTest, LabTestType, LabService,
                                      AvailableLabTest, LabAppointment, CommonTest, CommonDiagnosticCondition,
@@ -45,7 +46,7 @@ from .doctor import (DoctorAdmin, MedicalServiceAdmin, SpecializationAdmin, Qual
                      OfflinePatientAdmin,
                      UploadDoctorDataAdmin, DoctorLeaveAdmin)
 from .aboutdoctor import AboutDoctorAdmin
-from .hospital import HospitalAdmin
+from .hospital import HospitalAdmin, CommonHospitalAdmin
 from .user import CustomUserAdmin
 from .hospital_network import HospitalNetworkAdmin
 from .lab import LabAdmin, LabTestAdmin, LabTestTypeAdmin, AvailableLabTestAdmin, CommonDiagnosticConditionAdmin, \
@@ -117,6 +118,7 @@ admin.site.register(DoctorImage, DoctorImageAdmin)
 admin.site.register(Qualification, QualificationAdmin)
 admin.site.register(DoctorMapping, DoctorMappingAdmin)
 admin.site.register(Hospital, HospitalAdmin)
+admin.site.register(CommonHospital, CommonHospitalAdmin)
 admin.site.register(User, CustomUserAdmin)
 admin.site.register(Language, LanguageAdmin)
 admin.site.register(MedicalService, MedicalServiceAdmin)
