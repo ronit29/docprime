@@ -126,7 +126,7 @@ class JWTAuthentication(authentication.BaseAuthentication):
         }
 
     @classmethod
-    def appointment_agent_payload_handler(cls, request, created_user):
+    def appointment_agent_payload_handler(cls, request, created_user, can_book=False):
         return {
             'agent_id': request.user.id,
             'user_id': created_user.pk,
@@ -134,7 +134,8 @@ class JWTAuthentication(authentication.BaseAuthentication):
             'orig_iat': calendar.timegm(
                 datetime.datetime.utcnow().utctimetuple()
             ),
-            'refresh': False
+            'refresh': False,
+            'can_book': can_book
         }
 
     @staticmethod

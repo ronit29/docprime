@@ -1237,10 +1237,13 @@ class TransactionViewSet(viewsets.GenericViewSet):
             order_obj = Order.objects.select_for_update().filter(pk=response.get("orderId")).first()
 
             # TODO : SHASHANK_SINGH correct amount
-            if order_obj and response and order_obj.amount != Decimal(
-                    response.get('txAmount')) and order_obj.is_cod_order():
-                order_obj.amount = 0
-                order_obj.save()
+            try:
+                if order_obj and response and order_obj.amount != Decimal(
+                        response.get('txAmount')) and order_obj.is_cod_order():
+                    order_obj.amount = Decimal(response.get('txAmount'))
+                    order_obj.save()
+            except:
+                pass
 
             # if pg_resp_code == 1 and order_obj:
             if order_obj:

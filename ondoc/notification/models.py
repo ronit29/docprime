@@ -86,6 +86,9 @@ class NotificationAction:
     APPOINTMENT_REMINDER_PROVIDER_SMS = 77
     LOGIN_OTP = 80
 
+    COD_TO_PREPAID = 91
+
+
     NOTIFICATION_TYPE_CHOICES = (
         (APPOINTMENT_ACCEPTED, "Appointment Accepted"),
         (APPOINTMENT_CANCELLED, "Appointment Cancelled"),
@@ -118,7 +121,8 @@ class NotificationAction:
         (PRICING_ALERT_EMAIL, 'Pricing Change Mail'),
         (LAB_LOGO_CHANGE_MAIL, 'Lab Logo Change Mail'),
         (APPOINTMENT_REMINDER_PROVIDER_SMS, 'Appointment Reminder Provider SMS'),
-        (LOGIN_OTP, 'Login OTP')
+        (LOGIN_OTP, 'Login OTP'),
+        (COD_TO_PREPAID, 'COD to Prepaid')
     )
 
     OPD_APPOINTMENT = "opd_appointment"

@@ -20,7 +20,7 @@ constants = {
     'ELASTIC_TEAM': 'elastic_team',
     'PROCEDURE_TEAM': 'procedure_team',
     'COUPON_MANAGEMENT_GROUP': 'coupon_group',
-    'LAB_TEST_TEAM' : 'lab_test_team',
+    'LAB_TEST_TEAM': 'lab_test_team',
     'MERCHANT_TEAM': 'merchant_team',
     'COMMENT_TEAM': 'comment_team',
     'PRODUCT_TEAM': 'product_team',
@@ -29,9 +29,10 @@ constants = {
     'DOC_AVAILABILITY_TEAM_GROUP': 'doctor_availability_team',
     'APPOINTMENT_OTP_TEAM': 'appointment_otp_team',
     'INSURANCE_GROUP': 'insurance_group',
-    'APPOINTMENT_REFUND_TEAM' : 'appointment_refund_team',
-    'SUPER_INSURANCE_GROUP' : 'super_insurance_group',
-    'IPD_TEAM': 'ipd_team'
+    'APPOINTMENT_REFUND_TEAM': 'appointment_refund_team',
+    'SUPER_INSURANCE_GROUP': 'super_insurance_group',
+    'IPD_TEAM': 'ipd_team',
+    'APPOINTMENT_OTP_BYPASS_AGENT_TEAM': 'appointment_otp_bypass_agent_team'
 }
 matrix_product_ids = {
     'opd_products': 1,

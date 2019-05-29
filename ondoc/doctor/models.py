@@ -2024,6 +2024,7 @@ class OpdAppointment(auth_model.TimeStampedModel, CouponsMixin, OpdAppointmentIn
     appointment_prescriptions = GenericRelation("prescription.AppointmentPrescription", related_query_name="appointment_prescriptions")
     coupon_data = JSONField(blank=True, null=True)
     status_change_comments = models.CharField(max_length=5000, null=True, blank=True)
+    is_cod_to_prepaid = models.NullBooleanField(default=False, null=True, blank=True)
 
     def __str__(self):
         return self.profile.name + " (" + self.doctor.name + ")"
@@ -2327,6 +2328,13 @@ class OpdAppointment(auth_model.TimeStampedModel, CouponsMixin, OpdAppointmentIn
         if not old_instance or self.status == self.CANCELLED:
             try:
                 notification_tasks.update_coupon_used_count.apply_async()
+            except Exception as e:
+                logger.error(str(e))
+
+        if old_instance and old_instance.is_cod_to_prepaid != self.is_cod_to_prepaid:
+            try:
+
+                notification_tasks.send_opd_notifications_refactored.apply_async((self.id, ), countdown=1)
             except Exception as e:
                 logger.error(str(e))
 

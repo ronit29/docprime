@@ -153,25 +153,29 @@ class Order(TimeStampedModel):
             orders_to_process = self.orders.all()
         else:
             orders_to_process = [self]
-        return any([child_order.get_cod_to_prepaid_appointment() for child_order in orders_to_process])
+        return all([child_order.get_cod_to_prepaid_appointment() for child_order in orders_to_process])
 
-    def get_cod_to_prepaid_appointment(self):
+    def get_cod_to_prepaid_appointment(self, update_order_and_appointment=False):
         from ondoc.doctor.models import OpdAppointment
         if self.product_id != self.DOCTOR_PRODUCT_ID:
             return None
         if not self.reference_id:
             return None
-        opd_obj = OpdAppointment.objects.filter(id=self.reference_id).first()
+        opd_obj = OpdAppointment.objects.exclude(
+            status__in=[OpdAppointment.CANCELLED, OpdAppointment.COMPLETED]).filter(id=self.reference_id).first()
         if not opd_obj:
             return None
         if opd_obj.payment_type != OpdAppointment.COD:
             return None
-        self.payment_type = OpdAppointment.PREPAID
-        opd_obj.payment_type = OpdAppointment.PREPAID
-        # self.action_data['appointment_id'] = self.reference_id
-        # self.action_data['payment_type'] = OpdAppointment.PREPAID  # TODO : SHASHANK_SINGH let it be COD ??
-        self.action_data['effective_price'] = self.action_data['deal_price']  # TODO : SHASHANK_SINGH set to correct price
-        opd_obj.effective_price = Decimal(self.action_data['deal_price'])
+        if update_order_and_appointment:
+            self.payment_type = OpdAppointment.PREPAID
+            opd_obj.payment_type = OpdAppointment.PREPAID
+            # self.action_data['appointment_id'] = self.reference_id
+            # self.action_data['payment_type'] = OpdAppointment.PREPAID  # TODO : SHASHANK_SINGH let it be COD ??
+            self.action_data['effective_price'] = self.action_data['deal_price']  # TODO : SHASHANK_SINGH set to correct price
+            opd_obj.effective_price = Decimal(self.action_data['deal_price'])
+            opd_obj.is_cod_to_prepaid = True
+            opd_obj.save()
         return opd_obj
 
     @transaction.atomic
@@ -187,7 +191,7 @@ class Order(TimeStampedModel):
 
         # skip if order already processed, except if appointment is COD and can be converted to prepaid
         if self.reference_id:
-            cod_to_prepaid_app = self.get_cod_to_prepaid_appointment()
+            cod_to_prepaid_app = self.get_cod_to_prepaid_appointment(True)
             if not cod_to_prepaid_app:
                 raise Exception("Order already processed - " + str(self.id))
 
