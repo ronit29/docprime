@@ -19,6 +19,7 @@ class IpdProcedure(auth_model.TimeStampedModel, SearchKey, auth_model.SoftDelete
     features = models.ManyToManyField(Feature, through='IpdProcedureFeatureMapping',
                                       through_fields=('ipd_procedure', 'feature'), related_name='of_ipd_procedures')
     show_about = models.BooleanField(default=False)
+    icon = models.ImageField(upload_to='ipd_procedure/images', null=True, blank=False)
 
     def __str__(self):
         return '{}'.format(self.name)
