@@ -502,6 +502,12 @@ class UserProfile(TimeStampedModel):
     def __str__(self):
         return "{}-{}".format(self.name, self.id)
 
+    @cached_property
+    def is_insured_profile(self):
+        insured_member_profile = self.insurance.filter().order_by('-id').first()
+        response = True if insured_member_profile and insured_member_profile.user_insurance.is_valid() else False
+        return response
+
     def get_thumbnail(self):
         if self.profile_image:
             return self.profile_image.url
@@ -586,9 +592,9 @@ class OtpVerifications(TimeStampedModel):
         result = "OTP for login is {}.\nDon't share this code with others."
         if platform == "android" and version:
             if (user_type == 'doctor' or is_doc) and parse(version) > parse("2.100.4"):
-                result = "<#>\n" + result + "\n" + settings.PROVIDER_ANDROID_MESSAGE_HASH
+                result = "<#> " + result + "\nMessage ID: " + settings.PROVIDER_ANDROID_MESSAGE_HASH
             elif parse(version) > parse("1.1"):
-                result = "<#>\n" + result + "\n" + settings.CONSUMER_ANDROID_MESSAGE_HASH
+                result = "<#> " + result + "\nMessage ID: " + settings.CONSUMER_ANDROID_MESSAGE_HASH
         return result
 
 
