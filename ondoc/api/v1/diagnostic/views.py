@@ -2248,7 +2248,7 @@ class LabAppointmentView(mixins.CreateModelMixin,
             if data['is_appointment_insured']:
                 data['payment_type'] = OpdAppointment.INSURANCE
                 appointment_test_ids = validated_data.get('test_ids', [])
-                if len(appointment_test_ids) > 1:
+                if request.user and request.user.is_authenticated and not hasattr(request, 'agent') and len(appointment_test_ids) > 1:
                     return Response(status=status.HTTP_400_BAD_REQUEST, data={'error': 'Some error occured. Please try again after some time.'})
 
         else:
