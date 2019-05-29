@@ -235,9 +235,14 @@ class ConsentIsEncryptSerializer(serializers.Serializer):
                         if not (hasattr(hospital['hospital_id'], 'encrypt_details') and hospital['hospital_id'].encrypt_details.is_valid):
                             raise serializers.ValidationError('decrypt called for unencrypted hospital')
             else:
-                for hospital in attrs['hospitals']:
+                existing_valid_details_indexes = list()
+                for index, hospital in enumerate(attrs['hospitals']):
                     if hasattr(hospital['hospital_id'], 'encrypt_details') and hospital['hospital_id'].encrypt_details.is_valid:
-                        raise serializers.ValidationError('encrypted data already present for given hospitals')
+                        existing_valid_details_indexes.append(index)
+                for index in sorted(existing_valid_details_indexes, reverse=True):
+                    del attrs['hospitals'][index]
+                if not attrs['hospitals']:
+                    raise serializers.ValidationError('encrypted data already present for given hospitals')
         # if attrs and attrs.get('decrypt') and not attrs['encryption_key']:
         #     raise serializers.ValidationError('Encryption Key Not Found!')
         # if attrs and attrs['hospital_id']:
