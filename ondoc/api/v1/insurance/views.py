@@ -166,7 +166,10 @@ class ListInsuranceViewSet(viewsets.GenericViewSet):
                     return Response(data={'certificate': True}, status=status.HTTP_200_OK)
 
             insurer_data = self.get_queryset()
-            body_serializer = serializers.InsurerSerializer(insurer_data, context={'request': request}, many=True)
+            if self.strtobool(request.query_params.get("is_endorsement")):
+                body_serializer = serializers.EndorseEnableInsurerSerializer(insurer_data, context={'request': request}, many=True)
+            else:
+                body_serializer = serializers.InsurerSerializer(insurer_data, context={'request': request}, many=True)
             state_code = StateGSTCode.objects.filter(is_live=True)
             state_code_serializer = serializers.StateGSTCodeSerializer(state_code, context={'request': request}, many=True)
             resp['insurance'] = body_serializer.data
