@@ -221,7 +221,7 @@ def push_mis():
             f.seek(0)
             mis_temporary_file_paths.append(mis_temporary_file[len(mis_temporary_file)-1].temporary_file_path())
 
-    zipfilename = "All_MIS_%s_%s.zip" % (from_date, to_date)
+    zipfilename = "All_MIS_%s.zip" % from_date
     zipfile = TemporaryUploadedFile(zipfilename, 'byte', 1000, 'utf-8')
     zf = open(zipfile.temporary_file_path(), 'wb')
 
