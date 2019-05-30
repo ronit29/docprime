@@ -284,7 +284,9 @@ class Hospital(auth_model.TimeStampedModel, auth_model.CreatedByModel, auth_mode
                                                           'hosp_availability',
                                                           'health_insurance_providers',
                                                           'network__hospital_network_documents',
-                                                          'hospitalspeciality_set').filter(id__in=top_hospital_ids)
+                                                          'hospitalspeciality_set').filter(
+            id__in=top_hospital_ids).annotate(
+            distance=Distance('location', pnt)).order_by('distance')
         temp_hospital_ids = hosp_queryset.values_list('id', flat=True)
         hosp_entity_dict, hosp_locality_entity_dict = Hospital.get_hosp_and_locality_dict(temp_hospital_ids,
                                                                                           EntityUrls.SitemapIdentifier.HOSPITALS_LOCALITY_CITY)
