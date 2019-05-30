@@ -2117,6 +2117,19 @@ class OpdAppointment(auth_model.TimeStampedModel, CouponsMixin, OpdAppointmentIn
 
         return None
 
+    def get_all_prescriptions(self):
+        from ondoc.common.utils import get_file_mime_type
+
+        resp = []
+        for pres in self.prescriptions.all():
+            for pf in pres.prescription_file.all():
+                file = pf.name
+                mime_type = get_file_mime_type(file)
+                file_url = pf.name.url
+                resp.append({"url": file_url, "type": mime_type})
+        return resp
+
+
     def get_city(self):
         if self.hospital and self.hospital.matrix_city:
             return self.hospital.matrix_city.id

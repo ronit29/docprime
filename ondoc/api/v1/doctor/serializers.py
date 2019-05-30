@@ -122,6 +122,15 @@ class OpdAppointmentSerializer(serializers.ModelSerializer):
     type = serializers.ReadOnlyField(default='doctor')
     allowed_action = serializers.SerializerMethodField()
     reports = serializers.SerializerMethodField()
+    prescription = serializers.SerializerMethodField()
+    report_files = serializers.SerializerMethodField()
+
+    def get_report_files(self, obj):
+        return []
+
+    def get_prescription(self, obj):
+        if obj:
+            return obj.get_all_prescriptions()
 
     def get_allowed_action(self, obj):
         request = self.context.get('request')
@@ -131,7 +140,7 @@ class OpdAppointmentSerializer(serializers.ModelSerializer):
         model = OpdAppointment
         fields = ('id', 'doctor_name', 'hospital_name', 'patient_name', 'patient_image', 'type',
                   'allowed_action', 'effective_price', 'deal_price', 'status', 'time_slot_start',
-                  'time_slot_end', 'doctor_thumbnail', 'patient_thumbnail', 'display_name', 'invoices', 'reports')
+                  'time_slot_end', 'doctor_thumbnail', 'patient_thumbnail', 'display_name', 'invoices', 'reports', 'prescription', 'report_files')
 
     def get_patient_image(self, obj):
         if obj.profile and obj.profile.profile_image:
@@ -1270,7 +1279,8 @@ class AppointmentRetrieveSerializer(OpdAppointmentSerializer):
         fields = ('id', 'patient_image', 'patient_name', 'type', 'profile', 'otp', 'is_rated', 'rating_declined',
                   'allowed_action', 'effective_price', 'deal_price', 'status', 'time_slot_start', 'time_slot_end',
                   'doctor', 'hospital', 'allowed_action', 'doctor_thumbnail', 'patient_thumbnail', 'procedures', 'mrp',
-                  'insurance', 'invoices', 'cancellation_reason', 'payment_type', 'display_name')
+                  'insurance', 'invoices', 'cancellation_reason', 'payment_type', 'display_name', 'reports', 'prescription',
+                  'report_files')
 
     def get_insurance(self, obj):
         request = self.context.get("request")
