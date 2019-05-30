@@ -22,7 +22,7 @@ from ondoc.insurance.models import (Insurer, InsuredMembers, InsuranceThreshold,
                                     InsuranceLead,
                                     InsuranceTransaction, InsuranceDisease, InsuranceDiseaseResponse, StateGSTCode,
                                     InsuranceDummyData, InsuranceCancelMaster, InsuranceCity, InsuranceDistrict,
-                                    EndorsementRequest, InsuredMemberDocument, InsuranceEligibleCities)
+                                    EndorsementRequest, InsuredMemberDocument, InsuranceEligibleCities, UserBank)
 
 from ondoc.authentication.models import UserProfile
 from ondoc.authentication.backends import JWTAuthentication
@@ -605,20 +605,11 @@ class InsuranceCancelViewSet(viewsets.GenericViewSet):
         data['insurance'] = user_insurance.id
         serializer = serializers.UserBankSerializer(data=data, context={'request': request})
         serializer.is_valid(raise_exception=True)
-        serializer.save()
-        user = request.user
-        # user_insurance = UserInsurance.objects.filter(user=user).last()
-
-        # if not user_insurance:
-        #     res['error'] = "Insurance not found"
-        #     return Response(data=res, status=status.HTTP_400_BAD_REQUEST)
-        # if not user.active_insurance:
-        #     res['error'] = "Insurance is not active"
-        #     return Response(data=res, status=status.HTTP_400_BAD_REQUEST)
-
-        # responsible_user = request.user
+        user_data = serializer.validated_data
+        UserBank.objects.create(bank_name=user_data.get('bank_name'), account_number=user_data.get('account_number'),
+                                account_holder_name=user_data.get('account_holder_name'), ifsc_code=user_data.get('ifsc_code'),
+                                bank_address=user_data.get('bank_address'), insurance=user_insurance)
         user_insurance._user = user if user and not user.is_anonymous else None
-
         opd_appointment_count = OpdAppointment.get_insured_completed_appointment(user_insurance)
         lab_appointment_count = LabAppointment.get_insured_completed_appointment(user_insurance)
         if opd_appointment_count > 0 or lab_appointment_count > 0:

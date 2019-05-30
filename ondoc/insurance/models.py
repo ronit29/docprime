@@ -1247,7 +1247,7 @@ class UserInsurance(auth_model.TimeStampedModel):
 
         transaction.on_commit(lambda: self.after_commit_task(send_cancellation_notification))
         res['success'] = "Cancellation request received, refund will be credited in your account in 10-15 working days"
-        res['id'] = self.user.active_insurance.id
+        res['policy_number'] = self.user.active_insurance.policy_number
         return res
 
     def after_commit_task(self, send_cancellation_notification):
