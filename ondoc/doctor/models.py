@@ -284,7 +284,9 @@ class Hospital(auth_model.TimeStampedModel, auth_model.CreatedByModel, auth_mode
                                                           'hosp_availability',
                                                           'health_insurance_providers',
                                                           'network__hospital_network_documents',
-                                                          'hospitalspeciality_set').filter(id__in=top_hospital_ids)
+                                                          'hospitalspeciality_set').filter(
+            id__in=top_hospital_ids).annotate(
+            distance=Distance('location', pnt)).order_by('distance')
         temp_hospital_ids = hosp_queryset.values_list('id', flat=True)
         hosp_entity_dict, hosp_locality_entity_dict = Hospital.get_hosp_and_locality_dict(temp_hospital_ids,
                                                                                           EntityUrls.SitemapIdentifier.HOSPITALS_LOCALITY_CITY)
@@ -2114,6 +2116,19 @@ class OpdAppointment(auth_model.TimeStampedModel, CouponsMixin, OpdAppointmentIn
             return coupon.corporate_deal.id
 
         return None
+
+    def get_all_prescriptions(self):
+        from ondoc.common.utils import get_file_mime_type
+
+        resp = []
+        for pres in self.prescriptions.all():
+            for pf in pres.prescription_file.all():
+                file = pf.name
+                mime_type = get_file_mime_type(file)
+                file_url = pf.name.url
+                resp.append({"url": file_url, "type": mime_type})
+        return resp
+
 
     def get_city(self):
         if self.hospital and self.hospital.matrix_city:
