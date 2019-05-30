@@ -762,7 +762,9 @@ class UserBankViewSet(viewsets.GenericViewSet):
         data = dict()
         document_data = {}
         data['document_image'] = request.data['document_image']
-        data['insurance'] = request.user.active_insurance
+        if not request.user.active_insurance:
+            return Response(data="User is not cover under insurance", status=status.HTTP_400_BAD_REQUEST)
+        data['insurance'] = request.user.active_insurance.id
         serializer = serializers.UploadUserBankDocumentSerializer(data=data, context={'request':request})
         serializer.is_valid(raise_exception=True)
         doc_obj = serializer.save()
@@ -780,5 +782,7 @@ class UserBankViewSet(viewsets.GenericViewSet):
         serializer = serializers.UserBankSerializer(data=data, context={'request':request})
         serializer.is_valid(raise_exception=True)
         serializer.save()
+        return Response(data="Successfully uploaded!!", status=status.HTTP_200_OK)
+
 
 

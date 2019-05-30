@@ -300,5 +300,5 @@ class UserBankSerializer(serializers.Serializer):
     account_holder_name = serializers.CharField(max_length=150)
     ifsc_code = serializers.CharField(max_length=20)
     bank_address = serializers.CharField(max_length=300, allow_blank=True, allow_null=True)
-
+    image_ids = serializers.ListSerializer(child=UploadUserBankDocumentSerializer())
 
