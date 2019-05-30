@@ -864,7 +864,6 @@ class ProviderSignupDataViewset(viewsets.GenericViewSet):
                     mobile.save()
 
 
-
 class PartnersAppInvoice(viewsets.GenericViewSet):
     authentication_classes = (JWTAuthentication,)
     permission_classes = (IsAuthenticated, DoctorPermission,)
