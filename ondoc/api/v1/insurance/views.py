@@ -783,19 +783,19 @@ class UserBankViewSet(viewsets.GenericViewSet):
         document_data['data'] = serializer.data
         return Response(document_data)
 
-    def create(self, request):
-        res = {}
-        data = request.data
-        user = request.user
-        user_insurance = user.active_insurance
-        if not user_insurance:
-            res["error"] = "Insurance not found for the user"
-            return Response(data=res, status=status.HTTP_400_BAD_REQUEST)
-        data['insurance'] = user_insurance.id
-        serializer = serializers.UserBankSerializer(data=data, context={'request': request})
-        serializer.is_valid(raise_exception=True)
-        serializer.save()
-        return Response(data="Successfully uploaded!!", status=status.HTTP_200_OK)
+    # def create(self, request):
+    #     res = {}
+    #     data = request.data
+    #     user = request.user
+    #     user_insurance = user.active_insurance
+    #     if not user_insurance:
+    #         res["error"] = "Insurance not found for the user"
+    #         return Response(data=res, status=status.HTTP_400_BAD_REQUEST)
+    #     data['insurance'] = user_insurance.id
+    #     serializer = serializers.UserBankSerializer(data=data, context={'request': request})
+    #     serializer.is_valid(raise_exception=True)
+    #     serializer.save()
+    #     return Response(data="Successfully uploaded!!", status=status.HTTP_200_OK)
 
 
 
