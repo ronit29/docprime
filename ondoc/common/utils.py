@@ -83,9 +83,22 @@ def get_file_mime_type(file):
     if file and file.url:
         try:
             file_url = file.url
-            type = mimetypes.MimeTypes().guess_type(file_url)[0]
+            if file_url.rsplit('.', 1)[1].lower() != 'xml':
+                type = mimetypes.MimeTypes().guess_type(file_url)[0]
+
+            else:
+                pass
 
         except:
             pass
 
     return type
+
+def remove_xml(file):
+
+    if file:
+        if file.url:
+            if file.url.rsplit('.', 1)[1].lower() != 'xml':
+                file_type = file.url
+
+                return file_type
