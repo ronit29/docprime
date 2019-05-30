@@ -143,6 +143,7 @@ class InsuranceOncologist:
                                                   user=user).count()
         if count >= int(settings.INSURANCE_ONCOLOGIST_LIMIT):
             error = "Oncologist limit exceeded of limit {}".format(settings.INSURANCE_ONCOLOGIST_LIMIT)
+        return count, error
 
 
 

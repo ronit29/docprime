@@ -547,6 +547,29 @@ class Hospital(auth_model.TimeStampedModel, auth_model.CreatedByModel, auth_mode
                 break
         return result
 
+    def get_specialization_insured_appointments(self, doctor, insurance):
+        plan_limits = insurance.insurance_plan.plan_usages
+        days = plan_limits.get('required_days_durations', 14)
+        last_allowed_date = timezone.now() - timedelta(days=days)
+
+        limit_specialization_ids = json.loads(settings.INSURANCE_SPECIALIZATION_WITH_DAYS_LIMIT)
+        limit_specialization_ids_set = set(limit_specialization_ids)
+        doctor_specialization_ids = set([x.specialization_id for x in doctor.doctorpracticespecializations.all()])
+
+        if not limit_specialization_ids_set.intersection(doctor_specialization_ids):
+            return []
+
+        doctor_with_specialization = DoctorPracticeSpecialization.objects. \
+            filter(specialization_id__in=limit_specialization_ids).values_list('doctor_id', flat=True)
+
+        appointments = self.hospital_appointments.filter(~Q(status=OpdAppointment.CANCELLED),
+                                          insurance=insurance,
+                                          user=insurance.user,
+                                          time_slot_start__gte=last_allowed_date,
+                                          doctor_id__in=doctor_with_specialization).order_by('-time_slot_start')
+
+        return appointments
+
 
 class HospitalPlaceDetails(auth_model.TimeStampedModel):
     hospital = models.ForeignKey(Hospital, on_delete=models.CASCADE, related_name='hospital_place_details')

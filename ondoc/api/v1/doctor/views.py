@@ -249,6 +249,11 @@ class DoctorAppointmentsViewSet(OndocViewSet):
             if data['is_appointment_insured']:
                 data['payment_type'] = OpdAppointment.INSURANCE
                 hospital = validated_data.get('hospital')
+                doctor = validated_data.get('doctor')
+
+                if hospital.get_specialization_insured_appointments(doctor, user_insurance):
+                    return Response(status=status.HTTP_400_BAD_REQUEST, data={'error': 'Some error occured. Please try again after some time.'})
+
                 appointment_date = validated_data.get('start_date')
                 is_appointment_exist = hospital.get_active_opd_appointments(request.user, user_insurance, appointment_date.date())
                 if request.user and request.user.is_authenticated and not hasattr(request, 'agent') and is_appointment_exist :
@@ -2093,6 +2098,7 @@ class DoctorAvailabilityTimingViewSet(viewsets.ViewSet):
                                                             hospital_id=validated_data.get(
                                                                 'hospital_id')).first()
         blocks = []
+        blockeds_timeslot_set = set()
         if request.user and request.user.is_authenticated and \
                 not hasattr(request, 'agent') and request.user.active_insurance:
             active_appointments = dc_obj.hospital.\
@@ -2100,6 +2106,19 @@ class DoctorAvailabilityTimingViewSet(viewsets.ViewSet):
             for apt in active_appointments:
                 blocks.append(str(apt.time_slot_start.date()))
 
+            if dc_obj and not hasattr(request, 'agent'):
+                hospital = dc_obj.hospital
+                appointments = hospital.get_specialization_insured_appointments(dc_obj.doctor, request.user.active_insurance)
+                if appointments:
+                    for appointment in appointments:
+                        plan_limits = request.user.active_insurance.insurance_plan.plan_usages
+                        days = plan_limits.get('required_days_durations', 14)
+                        for i in range(days):
+                            blockeds_timeslot_set.add(str(appointment.time_slot_start.date() + datetime.timedelta(days=i)))
+                            if (appointment.time_slot_start - datetime.timedelta(days=i)) >= timezone.now():
+                                blockeds_timeslot_set.add(str(appointment.time_slot_start.date() - datetime.timedelta(days=i)))
+
+        blocks.extend(list(blockeds_timeslot_set))
 
         if dc_obj:
             timeslots = dc_obj.get_timings(blocks)
