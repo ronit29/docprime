@@ -76,12 +76,6 @@ class UploadMemberDocumentSerializer(serializers.ModelSerializer):
         fields = ('document_image', 'member')
 
 
-class UploadUserBankDocumentSerializer(serializers.ModelSerializer):
-    class Meta:
-        model = UserBankDocument
-        fields = ('insurance', 'document_image')
-
-
 class MemberListSerializer(serializers.Serializer):
     title = serializers.ChoiceField(choices=InsuredMembers.TITLE_TYPE_CHOICES)
     first_name = serializers.CharField(max_length=50)
@@ -291,6 +285,12 @@ class StateGSTCodeSerializer(serializers.ModelSerializer):
 class InsuranceCityEligibilitySerializer(serializers.Serializer):
     latitude = serializers.DecimalField(allow_null=False, max_digits=11, decimal_places=8)
     longitude = serializers.DecimalField(allow_null=False, max_digits=11, decimal_places=8)
+
+
+class UploadUserBankDocumentSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = UserBankDocument
+        fields = ('insurance', 'document_image')
 
 
 class UserBankSerializer(serializers.Serializer):
