@@ -303,7 +303,7 @@ class SpecialityCityFooter(Footer):
 
     def specialist_in_city(self):
 
-        query = ''' select eu.url, concat(eu.specialization,'s in ',eu.locality_value) title 
+        query = ''' select eu.url, concat(eu.specialization,'s near me') title 
                     from seo_specialization ss inner join entity_urls eu on ss.specialization_id = eu.specialization_id 
                     and lower(eu.locality_value) = lower(%s) and eu.sitemap_identifier='SPECIALIZATION_CITY' 
                     and eu.is_valid=True and eu.specialization_id!=%s order by count desc limit 20'''
