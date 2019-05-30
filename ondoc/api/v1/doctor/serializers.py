@@ -2111,3 +2111,13 @@ class CommonConditionsSerializer(serializers.Serializer):
     long = serializers.FloatField(default=77.071848)
     lat = serializers.FloatField(default=28.450367)
     city = serializers.CharField(required=False, allow_blank=True, allow_null=True)
+
+
+class IpdLeadUpdateSerializer(serializers.Serializer):
+    status = serializers.ChoiceField(choices=IpdProcedureLead.STATUS_CHOICES)
+    matrix_lead_id = serializers.IntegerField()
+
+    def validate(self, attrs):
+        if not IpdProcedureLead.objects.filter(matrix_lead_id=attrs.get('matrix_lead_id')).exists():
+            raise serializers.ValidationError('Invalid Lead ID.')
+        return attrs
