@@ -46,7 +46,7 @@ from ondoc.doctor.models import (Doctor, DoctorQualification,
                                  DoctorPracticeSpecialization, CompetitorMonthlyVisit,
                                  GoogleDetailing, VisitReason, VisitReasonMapping, PracticeSpecializationContent,
                                  PatientMobile, DoctorMobileOtp,
-                                 UploadDoctorData, CancellationReason)
+                                 UploadDoctorData, CancellationReason, Prescription, PrescriptionFile)
 
 from ondoc.authentication.models import User
 from .common import *
@@ -1462,8 +1462,9 @@ class DoctorOpdAppointmentForm(RefundableAppointmentForm):
     def clean(self):
         super().clean()
         cleaned_data = self.cleaned_data
-        if self.request.user.groups.filter(name=constants['OPD_APPOINTMENT_MANAGEMENT_TEAM']).exists() and cleaned_data.get('status') == OpdAppointment.BOOKED:
-            raise forms.ValidationError("Form cant be Saved with Booked Status.")
+        # Appointments are now made with CREATED status.
+        # if self.request.user.groups.filter(name=constants['OPD_APPOINTMENT_MANAGEMENT_TEAM']).exists() and cleaned_data.get('status') == OpdAppointment.BOOKED:
+        #     raise forms.ValidationError("Form cant be Saved with Booked Status.")
         if cleaned_data.get('start_date') and cleaned_data.get('start_time'):
                 date_time_field = str(cleaned_data.get('start_date')) + " " + str(cleaned_data.get('start_time'))
                 dt_field = parse_datetime(date_time_field)
@@ -1547,12 +1548,30 @@ class DoctorOpdAppointmentForm(RefundableAppointmentForm):
         return cleaned_data
 
 
+
+class PrescriptionFileInline(nested_admin.NestedTabularInline):
+    model = PrescriptionFile
+    extra = 0
+    can_delete = True
+    show_change_link = True
+
+
+class PrescriptionInline(nested_admin.NestedTabularInline):
+    model = Prescription
+    extra = 0
+    can_delete = True
+    show_change_link = True
+    inlines = [PrescriptionFileInline]
+
+
+
 class DoctorOpdAppointmentAdmin(admin.ModelAdmin):
     form = DoctorOpdAppointmentForm
     search_fields = ['id', 'profile__name', 'profile__phone_number', 'doctor__name', 'hospital__name']
     list_display = ('booking_id', 'get_doctor', 'get_profile', 'status', 'time_slot_start', 'effective_price', 'created_at', 'updated_at')
     list_filter = ('status', 'payment_type')
     date_hierarchy = 'created_at'
+    inlines = [PrescriptionInline]
 
     def get_queryset(self, request):
         return super(DoctorOpdAppointmentAdmin, self).get_queryset(request).select_related('doctor', 'hospital', 'hospital__network')
