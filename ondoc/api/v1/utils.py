@@ -352,6 +352,14 @@ def labappointment_transform(app_data):
     app_data["user"] = app_data["user"].id
     app_data["profile"] = app_data["profile"].id
     app_data["home_pickup_charges"] = str(app_data.get("home_pickup_charges",0))
+    prescription_objects = app_data.get("prescription_list", [])
+    if prescription_objects:
+        prescription_id_list = []
+        for prescription_data in prescription_objects:
+            prescription_id_list.append({'prescription': prescription_data.get('prescription').id})
+        app_data["prescription_list"] = prescription_id_list
+
+
     if app_data.get("coupon"):
         app_data["coupon"] = list(app_data["coupon"])
     if app_data.get("user_plan"):
@@ -585,7 +593,8 @@ def doctor_query_parameters(entity, req_params):
         params_dict["longitude"] = entity.sublocality_longitude
     elif entity.locality_longitude:
         params_dict["longitude"] = entity.locality_longitude
-
+    if entity.ipd_procedure_id:
+        params_dict["ipd_procedure_ids"] = str(entity.ipd_procedure_id)
 
     # if entity_params.get("location_json"):
     #     if entity_params["location_json"].get("sublocality_latitude"):
@@ -634,6 +643,7 @@ class CouponsMixin(object):
         from ondoc.coupon.models import Coupon
         from ondoc.doctor.models import OpdAppointment
         from ondoc.diagnostic.models import LabAppointment
+        from ondoc.subscription_plan.models import UserPlanMapping
 
         user = kwargs.get("user")
         coupon_obj = kwargs.get("coupon_obj")
@@ -647,6 +657,8 @@ class CouponsMixin(object):
             if isinstance(self, OpdAppointment) and coupon_obj.type not in [Coupon.DOCTOR, Coupon.ALL]:
                 return {"is_valid": False, "used_count": None}
             elif isinstance(self, LabAppointment) and coupon_obj.type not in [Coupon.LAB, Coupon.ALL]:
+                return {"is_valid": False, "used_count": None}
+            elif isinstance(self, UserPlanMapping) and coupon_obj.type not in [Coupon.SUBSCRIPTION_PLAN, Coupon.ALL]:
                 return {"is_valid": False, "used_count": None}
 
             diff_days = (timezone.now() - (coupon_obj.start_date or coupon_obj.created_at)).days
@@ -696,12 +708,20 @@ class CouponsMixin(object):
                     return {"is_valid": False, "used_count": 0}
 
             count = coupon_obj.used_coupon_count(user, cart_item)
-            total_used_count = coupon_obj.total_used_coupon_count()
+            total_used_count = coupon_obj.total_used_count
 
             if coupon_obj.is_user_specific and user:
                 user_specefic = UserSpecificCoupon.objects.filter(user=user, coupon=coupon_obj).first()
                 if user_specefic and count >= user_specefic.count:
                     return {"is_valid": False, "used_count": count}
+
+            # if coupon is random coupon
+            if hasattr(coupon_obj, 'is_random') and coupon_obj.is_random:
+                random_count = coupon_obj.random_coupon_used_count(None, coupon_obj.random_coupon_code, cart_item)
+                if random_count > 0:
+                    return {"is_valid": False, "used_count": random_count}
+                else:
+                    return {"is_valid": True, "used_count": random_count}
 
             if (coupon_obj.count is None or count < coupon_obj.count) and (coupon_obj.total_count is None or total_used_count < coupon_obj.total_count):
                 return {"is_valid": True, "used_count": count}
@@ -713,6 +733,8 @@ class CouponsMixin(object):
     def validate_product_coupon(self, **kwargs):
         from ondoc.diagnostic.models import Lab
         from ondoc.account.models import Order
+        from ondoc.coupon.models import Coupon
+
         import re
 
         coupon_obj = kwargs.get("coupon_obj")
@@ -730,6 +752,14 @@ class CouponsMixin(object):
         doctor = kwargs.get("doctor")
         hospital = kwargs.get("hospital")
         procedures = kwargs.get("procedures", [])
+        plan = kwargs.get("plan")
+
+        if plan:
+            if coupon_obj.type in [Coupon.ALL, Coupon.SUBSCRIPTION_PLAN] \
+                and coupon_obj.plan.filter(id=plan.id).exists():
+                    return True
+            return False
+
 
         if coupon_obj.lab and coupon_obj.lab != lab:
             return False
@@ -846,6 +876,23 @@ class CouponsMixin(object):
 
         return {"total_price": total_price}
 
+    def get_applicable_tests_with_total_price_v2(self, **kwargs):
+        from ondoc.diagnostic.models import AvailableLabTest
+
+        lab = kwargs.get("lab")
+        test_ids = kwargs.get("test_ids")
+
+        queryset = AvailableLabTest.objects.filter(lab_pricing_group__labs=lab, test__in=test_ids)
+
+        total_price = 0
+        for test in queryset:
+            if test.custom_deal_price is not None:
+                total_price += test.custom_deal_price
+            else:
+                total_price += test.computed_deal_price
+
+        return {"total_price": total_price}
+
     def get_applicable_procedures_with_total_price(self, **kwargs):
         from ondoc.procedure.models import DoctorClinicProcedure
 
@@ -857,6 +904,21 @@ class CouponsMixin(object):
         queryset = DoctorClinicProcedure.objects.filter(doctor_clinic__doctor=doctor, doctor_clinic__hospital=hospital, procedure__in=procedures)
         if coupon_obj.procedures.exists():
             queryset = queryset.filter(procedure__in=coupon_obj.procedures.all())
+
+        total_price = 0
+        for procedure in queryset:
+            total_price += procedure.deal_price
+
+        return {"total_price": total_price}
+
+    def get_applicable_procedures_with_total_price_v2(self, **kwargs):
+        from ondoc.procedure.models import DoctorClinicProcedure
+
+        doctor = kwargs.get("doctor")
+        hospital = kwargs.get("hospital")
+        procedures = kwargs.get("procedures")
+
+        queryset = DoctorClinicProcedure.objects.filter(doctor_clinic__doctor=doctor, doctor_clinic__hospital=hospital, procedure__in=procedures)
 
         total_price = 0
         for procedure in queryset:
@@ -1280,6 +1342,7 @@ def get_opd_pem_queryset(user, model):
     #                              super_user_permission=false AND is_disabled=false AND permission_type=1) > 0) THEN 1  ELSE 0 END'''
     # billing_query = '''CASE WHEN ((SELECT COUNT(id) FROM generic_admin WHERE user_id=%s AND hospital_id=hospital.id AND
     #                                super_user_permission=false AND is_disabled=false AND permission_type=2) > 0) THEN 1  ELSE 0 END'''
+    from ondoc.doctor.models import OpdAppointment
     queryset = model.objects \
         .select_related('doctor', 'hospital', 'user') \
         .prefetch_related('doctor__manageable_doctors', 'hospital__manageable_hospitals', 'doctor__images',
@@ -1287,6 +1350,7 @@ def get_opd_pem_queryset(user, model):
                           'doctor__qualifications__specialization', 'doctor__qualifications__college',
                           'doctor__doctorpracticespecializations', 'doctor__doctorpracticespecializations__specialization') \
         .filter(
+        ~Q(status=OpdAppointment.CREATED),
         Q(
             Q(doctor__manageable_doctors__user=user,
               doctor__manageable_doctors__hospital=F('hospital'),
@@ -1520,3 +1584,21 @@ def update_physical_agreement_timestamp(obj):
         obj.physical_agreement_signed_at = time_to_be_set
         if isinstance(obj, HospitalNetwork):
             update_physical_agreement_value(obj, obj.physical_agreement_signed, time_to_be_set)
+
+
+def ipd_query_parameters(entity, req_params):
+    params_dict = copy.deepcopy(req_params)
+    params_dict["max_distance"] = None
+    if entity.sublocality_latitude:
+        params_dict["lat"] = entity.sublocality_latitude
+        params_dict["max_distance"] = 5  # In KMs
+    elif entity.locality_latitude:
+        params_dict["lat"] = entity.locality_latitude
+        params_dict["max_distance"] = 15  # In KMs
+    if entity.sublocality_longitude:
+        params_dict["long"] = entity.sublocality_longitude
+    elif entity.locality_longitude:
+        params_dict["long"] = entity.locality_longitude
+    if entity.locality_value:
+        params_dict['city'] = entity.locality_value
+    return params_dict

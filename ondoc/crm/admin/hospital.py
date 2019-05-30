@@ -9,7 +9,7 @@ from ondoc.crm.admin.doctor import CreatedByFilter
 from ondoc.doctor.models import (HospitalImage, HospitalDocument, HospitalAward, Doctor,
                                  HospitalAccreditation, HospitalCertification, HospitalSpeciality, HospitalNetwork,
                                  Hospital, HospitalServiceMapping, HealthInsuranceProviderHospitalMapping,
-                                 HospitalHelpline, HospitalTiming, DoctorClinic)
+                                 HospitalHelpline, HospitalTiming, DoctorClinic, CommonHospital)
 from .common import *
 from ondoc.crm.constants import constants
 from django.utils.safestring import mark_safe
@@ -26,9 +26,12 @@ from django.http import HttpResponseRedirect
 import logging
 logger = logging.getLogger(__name__)
 
+
 class HospitalImageInline(admin.TabularInline):
     model = HospitalImage
     # template = 'imageinline.html'
+    # exclude = ['cropped_image']
+    readonly_fields = ['cropped_image']
     extra = 0
     can_delete = True
     show_change_link = False
@@ -377,6 +380,32 @@ class HospitalForm(FormCleanMixin):
         # if '_mark_in_progress' in self.data and data.get('enabled'):
         #     raise forms.ValidationError("Must be disabled before rejecting.")
 
+        if data.get('enabled_for_online_booking'):
+            if self.instance and self.instance.data_status == QCModel.QC_APPROVED:
+                pass
+            elif self.instance and self.instance.data_status != QCModel.QC_APPROVED and '_qc_approve' in self.data:
+                pass
+            else:
+                raise forms.ValidationError("Must be QC Approved for enable online booking")
+
+        if '_mark_in_progress' in self.request.POST:
+            if data.get('enabled_for_online_booking'):
+                raise forms.ValidationError("Enable for online booking should be disabled for QC Reject/Reopen")
+            else:
+                pass
+
+        if data.get('is_live'):
+            if self.instance and self.instance.source == 'pr':
+                pass
+            else:
+                history_obj = self.instance.history.filter(status=QCModel.QC_APPROVED).first()
+                if self.instance and self.instance.enabled and history_obj:
+                    pass
+                elif self.instance and not self.instance.enabled and data.get('enabled') and history_obj:
+                    pass
+                else:
+                    raise forms.ValidationError("Should be enabled and QC Approved once for is_live")
+
 
 class HospCityFilter(SimpleListFilter):
     title = 'city'
@@ -393,7 +422,7 @@ class HospCityFilter(SimpleListFilter):
 
 
 class HospitalAdmin(admin.GeoModelAdmin, VersionAdmin, ActionAdmin, QCPemAdmin):
-    list_filter = ('data_status', 'welcome_calling_done', HospCityFilter, CreatedByFilter)
+    list_filter = ('data_status', 'welcome_calling_done', HospCityFilter, CreatedByFilter, 'enabled_for_online_booking', 'enabled')
     readonly_fields = ('source', 'batch', 'associated_doctors', 'is_live', 'matrix_lead_id', 'city', 'state',)
     exclude = ('search_key', 'live_at', 'qc_approved_at', 'disabled_at', 'physical_agreement_signed_at',
                'welcome_calling_done_at',)
@@ -423,7 +452,7 @@ class HospitalAdmin(admin.GeoModelAdmin, VersionAdmin, ActionAdmin, QCPemAdmin):
     map_width = 200
     map_template = 'admin/gis/gmap.html'
     extra_js = ['js/admin/GoogleMap.js',
-                'https://maps.googleapis.com/maps/api/js?key=AIzaSyCFtb27PooaG0yujuykgvPtxi6tvS04Ek0&callback=initGoogleMap']
+                'https://maps.googleapis.com/maps/api/js?key=AIzaSyBqDAVDFBQzI5JMgaXcqJq431QPpJtNiZE&callback=initGoogleMap']
 
     # def get_inline_instances(self, request, obj=None):
     #     res = super().get_inline_instances(request, obj)
@@ -584,3 +613,28 @@ class HospitalAdmin(admin.GeoModelAdmin, VersionAdmin, ActionAdmin, QCPemAdmin):
             add_network_link += '?AgentId={}'.format(self.matrix_agent_id)
         html = '''<a href='%s' target=_blank>%s</a><br>''' % (add_network_link, "Add Network")
         return mark_safe(html)
+
+
+class CommonHospitalForm(forms.ModelForm):
+    def clean(self):
+        super().clean()
+        if any(self.errors):
+            return
+        network = self.cleaned_data.get('network')
+        hospital = self.cleaned_data.get('hospital')
+        if all([network, hospital]) or not any([network, hospital]):
+            raise forms.ValidationError('One and only of network and hospital.')
+        # if hospital and not hospital.is_live:
+        #     raise forms.ValidationError('Hospital must be live.')
+        # if network and not network.assoc_hospitals.filter(is_live=True).exists():
+        #     raise forms.ValidationError('Network must have live hospital(s).')
+
+
+class CommonHospitalAdmin(admin.ModelAdmin):
+    autocomplete_fields = ['hospital', 'network']
+    form = CommonHospitalForm
+    list_display = ['id', 'hospital', 'network']
+
+    class Meta:
+        model = CommonHospital
+        fields = '__all__'

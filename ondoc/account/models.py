@@ -244,6 +244,10 @@ class Order(TimeStampedModel):
 
         elif self.action == Order.INSURANCE_CREATE:
             user = User.objects.get(id=self.action_data.get('user'))
+            if not user:
+                raise Exception('User Not Found for Order' + str(self.id))
+            if user.active_insurance:
+                raise Exception('User Insurance already purchased for user' + str(user.id))
             if consumer_account.balance >= user_insurance_data['premium_amount']:
                 appointment_obj = UserInsurance.create_user_insurance(user_insurance_data, user)
                 amount = appointment_obj.premium_amount
@@ -256,11 +260,19 @@ class Order(TimeStampedModel):
                                                     account=insurer.float.all().first(),
                                                     transaction_type=InsuranceTransaction.DEBIT, amount=amount)
         elif self.action == Order.SUBSCRIPTION_PLAN_BUY:
-            amount = Decimal(appointment_data.get('extra_details').get('deal_price', float('inf')))
+            amount = Decimal(appointment_data.get('extra_details').get('payable_amount', float('inf')))
             if consumer_account.balance >= amount:
                 new_appointment_data = appointment_data
+                coupon = appointment_data.pop('coupon', [])
+                coupon_data = {
+                    "random_coupons": new_appointment_data.pop("coupon_data", [])
+                }
                 appointment_obj = UserPlanMapping(**new_appointment_data)
+                appointment_obj.coupon_data = coupon_data
                 appointment_obj.save()
+
+                if coupon:
+                    appointment_obj.coupon.add(*coupon)
                 order_dict = {
                     "reference_id": appointment_obj.id,
                     "payment_status": Order.PAYMENT_ACCEPTED

@@ -7,7 +7,8 @@ import django_tables2 as tables
 from django_tables2 import RequestConfig
 from django_tables2.export.export import TableExport
 import datetime
-
+from django.db import connection
+from collections import namedtuple, OrderedDict
 
 def get_table_class(keys):
     def get_table_column(field, value):
@@ -50,11 +51,11 @@ class ReportAdmin(admin.ModelAdmin):
         if not object:
             return render(request, 'access_denied.html')
         query_string = object.sql
-        result = RawSql(query_string,[]).fetch_all()
+        result = self.__execute_query(query_string)
         if result:
             table_class = get_table_class(result[0])
             table = table_class(result)
-            table.export_formats = ['csv']
+            table.export_formats = ['xls']
             RequestConfig(request).configure(table)
             export_format = request.GET.get('_export', None)
             if TableExport.is_valid_format(export_format):
@@ -64,3 +65,13 @@ class ReportAdmin(admin.ModelAdmin):
 
             extra_context = {'result': table, 'form': form, 'id': object_id, 'request': request, 'report': object}
             return super().change_view(request, object_id, extra_context=extra_context)
+    def __execute_query(self, query):
+        with connection.cursor() as cursor:
+            cursor.execute(query, [])
+            columns = [col[0] for col in cursor.description]
+            print(columns)
+            result = [
+                OrderedDict(zip(columns, row))
+                for row in cursor.fetchall()
+            ]
+            return result

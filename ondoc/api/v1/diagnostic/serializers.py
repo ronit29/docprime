@@ -12,7 +12,7 @@ from ondoc.api.v1.auth.serializers import AddressSerializer, UserProfileSerializ
 from ondoc.api.v1.utils import form_time_slot, GenericAdminEntity, util_absolute_url
 from ondoc.doctor.models import OpdAppointment, CancellationReason
 from ondoc.account.models import Order, Invoice
-from ondoc.coupon.models import Coupon, RandomGeneratedCoupon
+from ondoc.coupon.models import Coupon, RandomGeneratedCoupon, CouponRecommender
 from django.db.models import Count, Sum, When, Case, Q, F, ExpressionWrapper, DateTimeField
 from django.contrib.auth import get_user_model
 from collections import OrderedDict
@@ -26,6 +26,7 @@ import logging
 import json
 
 from ondoc.insurance.models import UserInsurance, InsuranceThreshold
+from ondoc.prescription.models import AppointmentPrescription
 from ondoc.ratings_review.models import RatingsReview
 from django.db.models import Avg
 from django.db.models import Q
@@ -198,9 +199,10 @@ class LabModelSerializer(serializers.ModelSerializer):
         if self.context.get('entity'):
             entity = self.context.get('entity')
         # if entity.exists():
-            breadcrums = entity.additional_info.get('breadcrums')
-            if breadcrums:
-                return breadcrums
+            if entity and entity.additional_info:
+                breadcrums = entity.additional_info.get('breadcrums')
+                if breadcrums:
+                    return breadcrums
         return breadcrums
 
     def get_lab_thumbnail(self, obj):
@@ -226,7 +228,7 @@ class LabModelSerializer(serializers.ModelSerializer):
         fields = ('id', 'lat', 'long', 'lab_thumbnail', 'name', 'operational_since', 'locality', 'address',
                   'sublocality', 'city', 'state', 'country', 'always_open', 'about', 'home_pickup_charges',
                   'is_home_collection_enabled', 'seo', 'breadcrumb', 'rating', 'rating_graph', 'unrated_appointment',
-                  'center_visit_enabled', 'display_rating_widget', 'is_thyrocare')
+                  'center_visit_enabled', 'display_rating_widget', 'is_thyrocare', 'network_id')
 
 
 class LabProfileSerializer(LabModelSerializer):
@@ -254,6 +256,7 @@ class AvailableLabTestPackageSerializer(serializers.ModelSerializer):
     hide_price = serializers.ReadOnlyField(source='test.hide_price')
     included_in_user_plan = serializers.SerializerMethodField()
     is_price_zero = serializers.SerializerMethodField()
+    # is_prescription_needed = serializers.SerializerMethodField()
 
     def get_is_price_zero(self, obj):
         agreed_price = obj.computed_agreed_price if obj.custom_agreed_price is None else obj.custom_agreed_price
@@ -265,6 +268,23 @@ class AvailableLabTestPackageSerializer(serializers.ModelSerializer):
     def get_included_in_user_plan(self, obj):
         package_free_or_not_dict = self.context.get('package_free_or_not_dict', {})
         return package_free_or_not_dict.get(obj.test.id, False)
+
+    # def get_is_prescription_needed(self, obj):
+    #     request = self.context.get("request")
+    #     if not request:
+    #         return False
+    #
+    #     data = None
+    #     logged_in_user = request.user
+    #     agreed_price = self.get_agreed_price(obj)
+    #     if logged_in_user.is_authenticated and not logged_in_user.is_anonymous and agreed_price:
+    #         user_insurance = request.user.active_insurance
+    #         data = user_insurance.validate_limit_usages(agreed_price) if user_insurance else None
+    #
+    #     if not data:
+    #         return False
+    #
+    #   return data.get('prescription_needed', False)
 
     def get_insurance(self, obj):
         request = self.context.get("request")
@@ -537,30 +557,70 @@ class CommonPackageSerializer(serializers.ModelSerializer):
     agreed_price = serializers.SerializerMethodField()
     mrp = serializers.SerializerMethodField()
     lab = LabModelSerializer()
+    discounted_price = serializers.SerializerMethodField()
+
+    def __init__(self, instance=None, data=None, **kwargs):
+        super().__init__(instance, data, **kwargs)
+        queryset = AvailableLabTest.objects
+        filters = Q()  # Create an empty Q object to start with
+
+        for ins in instance:
+            if ins.lab and ins.lab.lab_pricing_group_id and ins.package_id:
+                q = Q(lab_pricing_group_id=ins.lab.lab_pricing_group_id,test_id = ins.package_id)
+                filters |= q
+
+        if filters:
+            queryset = queryset.filter(filters)
+        else:
+            queryset = queryset.none()
+        for ins in instance:
+            ins._selected_test = None
+            for x in queryset:
+                if ins.lab and ins.lab.lab_pricing_group_id == x.lab_pricing_group_id and ins.package_id == x.test_id:
+                    ins._selected_test = x
+                    break
 
     def get_icon(self, obj):
         request = self.context.get('request')
         return request.build_absolute_uri(obj.icon.url) if obj.icon else None
 
     def get_agreed_price(self, obj):
-        agreed_price = None
-        if obj.package.availablelabs:
-            available_test = obj.package.availablelabs.filter(lab_pricing_group__labs__id=obj.lab_id).first()
-            if available_test:
-                agreed_price = available_test.get_deal_price()
-        return agreed_price
+        if obj._selected_test:
+            return obj._selected_test.get_deal_price()
+        return None
 
     def get_mrp(self, obj):
-        mrp = None
-        if obj.package.availablelabs:
-            available_test = obj.package.availablelabs.filter(lab_pricing_group__labs__id=obj.lab_id).first()
-            if available_test:
-                mrp = available_test.mrp
-        return mrp
+        if obj._selected_test:
+            return obj._selected_test.mrp
+        return None
+
+    def get_discounted_price(self, obj):
+        discounted_price = None
+        coupon_recommender = self.context.get('coupon_recommender')
+        filters = dict()
+
+        if obj._selected_test:
+            deal_price = obj._selected_test.get_deal_price()
+            if coupon_recommender:
+                filters['deal_price'] = deal_price
+                filters['tests'] = [obj._selected_test.test]
+
+                package_result_lab = getattr(obj, 'lab') if hasattr(obj, 'lab') else None
+                if package_result_lab and isinstance(package_result_lab, Lab):
+                    filters['lab'] = dict()
+                    lab_obj = filters['lab']
+                    lab_obj['id'] = package_result_lab.id
+                    lab_obj['network_id'] = package_result_lab.network_id
+                    lab_obj['city'] = package_result_lab.city
+            search_coupon = coupon_recommender.best_coupon(**filters) if coupon_recommender else None
+
+            discounted_price = deal_price if not search_coupon else search_coupon.get_search_coupon_discounted_price(deal_price)
+
+        return discounted_price
 
     class Meta:
         model = CommonPackage
-        fields = ('id', 'name', 'icon', 'show_details', 'url', 'no_of_tests', 'mrp', 'agreed_price', 'lab')
+        fields = ('id', 'name', 'icon', 'show_details', 'url', 'no_of_tests', 'mrp', 'agreed_price', 'discounted_price', 'lab')
 
 
 class CommonConditionsSerializer(serializers.ModelSerializer):
@@ -616,11 +676,11 @@ class LabAppointmentModelSerializer(serializers.ModelSerializer):
 
     def get_lab_thumbnail(self, obj):
         request = self.context.get("request")
-        return request.build_absolute_uri(obj.lab.get_thumbnail()) if obj.lab.get_thumbnail() else None
+        return request.build_absolute_uri(obj.lab.get_thumbnail()) if obj.lab and obj.lab.get_thumbnail() else None
 
     def get_patient_thumbnail(self, obj):
         request = self.context.get("request")
-        return request.build_absolute_uri(obj.profile.get_thumbnail()) if obj.profile.get_thumbnail() else None
+        return request.build_absolute_uri(obj.profile.get_thumbnail()) if obj.profile and obj.profile.get_thumbnail() else None
 
     def get_patient_name(self, obj):
         if obj.profile_detail:
@@ -679,6 +739,12 @@ class PlanTransactionModelSerializer(serializers.Serializer):
     plan = serializers.PrimaryKeyRelatedField(queryset=Plan.objects.all())
     user = serializers.PrimaryKeyRelatedField(queryset=User.objects.all())
     extra_details = serializers.JSONField(required=False)
+    coupon = serializers.ListField(child=serializers.IntegerField(), required=False, default=[])
+    coupon_data = serializers.JSONField(required=False)
+
+
+class PrescriptionDocumentSerializer(serializers.Serializer):
+    prescription = serializers.PrimaryKeyRelatedField(queryset=AppointmentPrescription.objects.all())
 
 
 class LabAppTransactionModelSerializer(serializers.Serializer):
@@ -705,6 +771,8 @@ class LabAppTransactionModelSerializer(serializers.Serializer):
     cashback = serializers.DecimalField(max_digits=10, decimal_places=2)
     extra_details = serializers.JSONField(required=False)
     user_plan = serializers.PrimaryKeyRelatedField(queryset=UserPlanMapping.objects.all(), allow_null=True)
+    coupon_data = serializers.JSONField(required=False)
+    prescription_list = serializers.ListSerializer(child=PrescriptionDocumentSerializer(), required=False)
 
 
 class LabAppRescheduleModelSerializer(serializers.ModelSerializer):
@@ -779,6 +847,7 @@ class LabAppointmentCreateSerializer(serializers.Serializer):
     user_plan = serializers.PrimaryKeyRelatedField(queryset=UserPlanMapping.objects.all(), required=False, allow_null=True, default=None)
     included_in_user_plan = serializers.BooleanField(required=False, default=False)
     app_version = serializers.CharField(required=False, allow_null=True, allow_blank=True)
+    prescription_list = serializers.ListSerializer(child=PrescriptionDocumentSerializer(), required=False)
 
     def validate(self, data):
         MAX_APPOINTMENTS_ALLOWED = 10
@@ -811,27 +880,8 @@ class LabAppointmentCreateSerializer(serializers.Serializer):
 
         if data.get("coupon_code"):
             profile = data.get("profile")
-            # coupon_code = data.get("coupon_code")
             coupon_codes = data.get("coupon_code", [])
-            coupon_obj = None
-            if RandomGeneratedCoupon.objects.filter(random_coupon__in=coupon_codes).exists():
-                expression = F('sent_at') + datetime.timedelta(days=1) * F('validity')
-                annotate_expression = ExpressionWrapper(expression, DateTimeField())
-                random_coupons = RandomGeneratedCoupon.objects.annotate(last_date=annotate_expression
-                                                                       ).filter(random_coupon__in=coupon_codes,
-                                                                                sent_at__isnull=False,
-                                                                                consumed_at__isnull=True,
-                                                                                last_date__gte=datetime.datetime.now()
-                                                                                ).all()
-                if random_coupons:
-                    coupon_obj = Coupon.objects.filter(id__in=random_coupons.values_list('coupon', flat=True))
-                else:
-                    raise serializers.ValidationError('Invalid coupon codes')
-
-            if coupon_obj:
-                coupon_obj = Coupon.objects.filter(code__in=coupon_codes) | coupon_obj
-            else:
-                coupon_obj = Coupon.objects.filter(code__in=coupon_codes)
+            coupon_obj = RandomGeneratedCoupon.get_coupons(coupon_codes)
 
             # if len(coupon_code) == len(coupon_obj):
             if coupon_obj:
@@ -1311,6 +1361,7 @@ class DoctorLabAppointmentRetrieveSerializer(LabAppointmentModelSerializer):
 class AppointmentCompleteBodySerializer(serializers.Serializer):
     lab_appointment = serializers.PrimaryKeyRelatedField(queryset=LabAppointment.objects.all())
     otp = serializers.IntegerField(max_value=9999)
+    source = serializers.CharField(required=False, allow_blank=True)
 
     def validate(self, attrs):
         appointment = attrs.get('lab_appointment')
@@ -1388,7 +1439,8 @@ class CustomPackageLabSerializer(LabModelSerializer):
         model = Lab
         fields = ('id', 'lat', 'long', 'lab_thumbnail', 'name', 'operational_since', 'locality', 'address',
                   'sublocality', 'city', 'state', 'country', 'always_open', 'about', 'home_pickup_charges',
-                  'is_home_collection_enabled', 'seo', 'breadcrumb', 'center_visit_enabled', 'avg_rating', 'url')
+                  'is_home_collection_enabled', 'seo', 'breadcrumb', 'center_visit_enabled', 'avg_rating', 'url',
+                  'city', 'network_id')
 
     def get_url(self, obj):
         entity_url_dict = self.context.get('entity_url_dict', {})
@@ -1449,7 +1501,8 @@ class CustomLabTestPackageSerializer(serializers.ModelSerializer):
             parameter_count = len(temp_test.parameter.all()) or 1
             name = temp_test.name
             test_id = temp_test.id
-            return_data.append({'id': test_id, 'name': name, 'parameter_count': parameter_count})
+            categories_count = len(temp_test.categories.all())
+            return_data.append({'id': test_id, 'name': name, 'parameter_count': parameter_count, 'categories': categories_count})
         return return_data
 
     def get_categories(self, obj):
