@@ -595,18 +595,29 @@ class InsuranceCancelViewSet(viewsets.GenericViewSet):
 
     @transaction.atomic()
     def insurance_cancel(self, request):
-        user = request.user
-        user_insurance = UserInsurance.objects.filter(user=user).last()
         res = {}
+        data = request.data
+        user = request.user
+        user_insurance = user.active_insurance
         if not user_insurance:
-            res['error'] = "Insurance not found"
+            res["error"] = "Insurance not found for the user"
             return Response(data=res, status=status.HTTP_400_BAD_REQUEST)
-        if not user.active_insurance:
-            res['error'] = "Insurance is not active"
-            return Response(data=res, status=status.HTTP_400_BAD_REQUEST)
+        data['insurance'] = user_insurance.id
+        serializer = serializers.UserBankSerializer(data=data, context={'request': request})
+        serializer.is_valid(raise_exception=True)
+        serializer.save()
+        user = request.user
+        # user_insurance = UserInsurance.objects.filter(user=user).last()
 
-        responsible_user = request.user
-        user_insurance._responsible_user = responsible_user if responsible_user and not responsible_user.is_anonymous else None
+        # if not user_insurance:
+        #     res['error'] = "Insurance not found"
+        #     return Response(data=res, status=status.HTTP_400_BAD_REQUEST)
+        # if not user.active_insurance:
+        #     res['error'] = "Insurance is not active"
+        #     return Response(data=res, status=status.HTTP_400_BAD_REQUEST)
+
+        # responsible_user = request.user
+        user_insurance._user = user if user and not user.is_anonymous else None
 
         opd_appointment_count = OpdAppointment.get_insured_completed_appointment(user_insurance)
         lab_appointment_count = LabAppointment.get_insured_completed_appointment(user_insurance)
@@ -773,13 +784,15 @@ class UserBankViewSet(viewsets.GenericViewSet):
         return Response(document_data)
 
     def create(self, request):
+        res = {}
         data = request.data
         user = request.user
-        insurance = user.active_insurance
-        if not insurance:
-            return Response(data="Insurance not found for the user", status=status.HTTP_400_BAD_REQUEST)
-        data['insurance'] = insurance.id
-        serializer = serializers.UserBankSerializer(data=data, context={'request':request})
+        user_insurance = user.active_insurance
+        if not user_insurance:
+            res["error"] = "Insurance not found for the user"
+            return Response(data=res, status=status.HTTP_400_BAD_REQUEST)
+        data['insurance'] = user_insurance.id
+        serializer = serializers.UserBankSerializer(data=data, context={'request': request})
         serializer.is_valid(raise_exception=True)
         serializer.save()
         return Response(data="Successfully uploaded!!", status=status.HTTP_200_OK)
