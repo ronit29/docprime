@@ -1719,13 +1719,15 @@ class LabAppointment(TimeStampedModel, CouponsMixin, LabAppointmentInvoiceMixin,
 
     def get_report_type(self):
         from ondoc.common.utils import get_file_mime_type
+        from ondoc.common.utils import remove_xml
         resp = []
         for pres in self.reports.all():
             for pf in pres.files.all():
                 file = pf.name
                 mime_type = get_file_mime_type(file)
-                file_url = pf.name.url
-                resp.append({"url": file_url, "type": mime_type})
+                if not mime_type == None:
+                    file_url = pf.name.url
+                    resp.append({"url": file_url, "type": mime_type})
         return resp
 
 
