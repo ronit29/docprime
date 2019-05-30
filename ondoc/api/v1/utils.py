@@ -911,6 +911,7 @@ class TimeSlotExtraction(object):
     EVENING = "PM"
     TIME_SPAN = 30  # In minutes
     TIME_SPAN_NUM = 0.5
+    LAST_TIME_SPAN = 0.25  # must not be more than TIME_SPAN
     DOCTOR_MAX_TIMING = 20.0
     DOCTOR_BOOK_AFTER = 1
     LAB_BOOK_AFTER = 2
@@ -1307,8 +1308,7 @@ class TimeSlotExtraction(object):
                         if i == day:
                             start_hour = float(self.get_key_or_field_value(data, 'start', 0.0))
                             end_hour = float(self.get_key_or_field_value(data, 'end', 23.75))
-                            time_before_end_hour = end_hour - TimeSlotExtraction.TIME_SPAN_NUM
-                            while start_hour <= time_before_end_hour:
+                            while start_hour <= end_hour:
                                 time_formatted = self.form_dc_time_v2(start_hour)
                                 clinic_datetime = datetime.datetime.combine(next_slot_date, time_formatted[0])
 
@@ -1327,6 +1327,11 @@ class TimeSlotExtraction(object):
                                             timing_objects[next_slot_date_str].append(time_json)
                                     self.format_data_new_v2(timing_objects[next_slot_date_str], clinic_datetime, data, start_hour, time_formatted[1], booking_details, is_thyrocare)
                                 start_hour += TimeSlotExtraction.TIME_SPAN_NUM
+                                if start_hour == end_hour:
+                                    if TimeSlotExtraction.TIME_SPAN_NUM > TimeSlotExtraction.LAST_TIME_SPAN:
+                                        start_hour -= TimeSlotExtraction.LAST_TIME_SPAN
+                                    else:
+                                        start_hour -= TimeSlotExtraction.TIME_SPAN_NUM
 
         return timing_objects
 
