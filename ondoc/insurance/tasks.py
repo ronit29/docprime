@@ -195,7 +195,7 @@ def push_mis():
     #     'to_date': to_date,
     # }
 
-    earliest_date =str(datetime.now().date() - timedelta(days=365*100))
+    earliest_date = str(datetime(2019, 1, 1).date())
     future_date = str(datetime.now().date() + timedelta(days=1))
 
     date_tuple = ((from_date, to_date), (earliest_date, future_date))
