@@ -1,7 +1,10 @@
+
 def city_match(city):
-    if isinstance(city, str) and city.lower() in ('bengaluru', 'bengalooru'):
+    if not city:
+        return city
+    if city.lower() in ('bengaluru', 'bengalooru'):
         city = 'bangalore'
-    elif isinstance(city, str) and city.lower() in ('gurugram', 'gurugram rural'):
+    elif city.lower() in ('gurugram', 'gurugram rural'):
         city = 'gurgaon'
     else:
         city = city
