@@ -226,6 +226,8 @@ class HospitalProviderDataViewSet(viewsets.GenericViewSet):
                     admin_data["email"] = admin.hospital.encrypt_details.email
                     admin_data["phone_numbers"] = admin.hospital.encrypt_details.phone_numbers
                     admin_data["is_consent_received"] = admin.hospital.encrypt_details.is_consent_received
+                    admin_data["updated_at"] = admin.hospital.encrypt_details.updated_at
+                    admin_data["created_at"] = admin.hospital.encrypt_details.created_at
                 all_data[hosp_id] = admin_data
             elif admin.hospital and (hosp_id in all_data):
                 if not all_data[hosp_id]['pem_type'] == auth_models.GenericAdmin.ALL:
