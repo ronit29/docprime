@@ -1,3 +1,8 @@
+from django.contrib.gis.db.models.functions import Distance
+from django.contrib.gis.geos import GEOSGeometry
+from django.db.models import Window
+from django.db.models.functions import RowNumber
+from django.db.models.expressions import RawSQL
 from copy import deepcopy
 import json
 import requests
@@ -259,17 +264,64 @@ class Hospital(auth_model.TimeStampedModel, auth_model.CreatedByModel, auth_mode
     #         self.city_search_key = search_city
     #         return self.city
     #     return None
+    @staticmethod
+    def get_top_hospitals_data(request, lat=28.450367, long=77.071848):
+        from ondoc.api.v1.doctor.serializers import TopHospitalForIpdProcedureSerializer
+        result = []
+        queryset = CommonHospital.objects.all().values_list('hospital', 'network')
+        top_hospital_ids = list(set([x[0] for x in queryset if x[0] is not None]))
+        top_network_ids = list(set([x[1] for x in queryset if x[1] is not None]))
+        point_string = 'POINT(' + str(long) + ' ' + str(lat) + ')'
+        pnt = GEOSGeometry(point_string, srid=4326)
+        temp_hosp_queryset = Hospital.objects.filter(is_live=True)
+        if top_network_ids:
+            network_hospital_queryset = temp_hosp_queryset.filter(network__in=top_network_ids)
+            network_hospitals = network_hospital_queryset.annotate(
+                distance=Distance('location', pnt)).annotate(rank=Window(expression=RowNumber(), order_by=F('distance').asc(),
+                            partition_by=[RawSQL('Coalesce(network_id, random())', [])])
+            )
+            for x in network_hospitals:
+                if x.rank == 1:
+                    top_hospital_ids.append(x.id)
+        hosp_queryset = Hospital.objects.prefetch_related('hospitalcertification_set',
+                                                          'hospital_documents',
+                                                          'hosp_availability',
+                                                          'health_insurance_providers',
+                                                          'network__hospital_network_documents',
+                                                          'hospitalspeciality_set').filter(
+            id__in=top_hospital_ids).annotate(
+            distance=Distance('location', pnt)).order_by('distance')
+        temp_hospital_ids = hosp_queryset.values_list('id', flat=True)
+        hosp_entity_dict, hosp_locality_entity_dict = Hospital.get_hosp_and_locality_dict(temp_hospital_ids,
+                                                                                          EntityUrls.SitemapIdentifier.HOSPITALS_LOCALITY_CITY)
 
-    def get_active_opd_appointments(self, user=None, user_insurance=None):
+        result = TopHospitalForIpdProcedureSerializer(hosp_queryset, many=True, context={'request': request,
+                                                                                         'hosp_entity_dict': hosp_entity_dict,
+                                                                                         'hosp_locality_entity_dict': hosp_locality_entity_dict}).data
+        return result
+
+    def get_active_opd_appointments(self, user=None, user_insurance=None, appointment_date=None):
 
         appointments = OpdAppointment.objects.filter(hospital_id=self.id)\
-                           .exclude(status__in=[OpdAppointment.COMPLETED, OpdAppointment.CANCELLED])
+                           .exclude(status__in=[OpdAppointment.CANCELLED])
         if user and user.is_authenticated:
             appointments = appointments.filter(user=user)
         if user_insurance:
             appointments = appointments.filter(insurance=user_insurance)
+        if appointment_date and appointments:
+            appointments = appointments.filter(time_slot_start__date=appointment_date)
 
         return appointments
+
+    # def is_appointment_exist_for_date(self, insurance, appointment_date):
+    #     active_appointments = self.get_active_opd_appointments(None, insurance)
+    #     if not active_appointments:
+    #         return False
+    #     for appointment in active_appointments:
+    #         if appointment.time_slot_start.date() == appointment_date.date():
+    #             return True
+    #     return False
+
 
     @classmethod
     def get_hosp_and_locality_dict(cls, temp_hospital_ids, required_identifier):
@@ -1246,7 +1298,7 @@ class DoctorClinic(auth_model.TimeStampedModel, auth_model.WelcomeCallingDone):
     # def __str__(self):
     #     return '{}-{}'.format(self.doctor, self.hospital)
 
-    def get_timings(self):
+    def get_timings(self, blocks=[]):
         from ondoc.api.v2.doctor import serializers as v2_serializers
         from ondoc.api.v1.common import serializers as common_serializers
         clinic_timings= self.availability.order_by("start")
@@ -1267,6 +1319,10 @@ class DoctorClinic(auth_model.TimeStampedModel, auth_model.WelcomeCallingDone):
         date = datetime.datetime.today().strftime('%Y-%m-%d')
         booking_details = {"type": "doctor"}
         slots = obj.get_timing_slots(date, total_leaves, booking_details)
+        if slots:
+            for b in blocks:
+                slots.pop(b, None)
+
         upcoming_slots = obj.get_upcoming_slots(time_slots=slots)
         res_data = {"time_slots": slots, "upcoming_slots": upcoming_slots}
         return res_data
@@ -2065,6 +2121,19 @@ class OpdAppointment(auth_model.TimeStampedModel, CouponsMixin, OpdAppointmentIn
 
         return None
 
+    def get_all_prescriptions(self):
+        from ondoc.common.utils import get_file_mime_type
+
+        resp = []
+        for pres in self.prescriptions.all():
+            for pf in pres.prescription_file.all():
+                file = pf.name
+                mime_type = get_file_mime_type(file)
+                file_url = pf.name.url
+                resp.append({"url": file_url, "type": mime_type})
+        return resp
+
+
     def get_city(self):
         if self.hospital and self.hospital.matrix_city:
             return self.hospital.matrix_city.id
@@ -2157,11 +2226,16 @@ class OpdAppointment(auth_model.TimeStampedModel, CouponsMixin, OpdAppointmentIn
         insurance = appointment_data.get('insurance')
         appointment_status = OpdAppointment.BOOKED
 
-        if insurance and insurance.is_valid():
-            mrp = appointment_data.get('fees')
-            insurance_limit_usage_data = insurance.validate_limit_usages(mrp)
-            if insurance_limit_usage_data.get('created_state'):
-                appointment_status = OpdAppointment.CREATED
+        # if insurance and insurance.is_valid():
+        #     hospital = appointment_data.get('hospital')
+        #     if hospital:
+        #        is_appointment_exist = hospital.get_active_opd_appointments(insurance.user, insurance, appointment_data.get('time_slot_start').date())
+        #        if is_appointment_exist:
+        #            raise Exception('Some error occurred. Please try after some time')
+        #     mrp = appointment_data.get('fees')
+        #     insurance_limit_usage_data = insurance.validate_limit_usages(mrp)
+        #     if insurance_limit_usage_data.get('created_state'):
+        #         appointment_status = OpdAppointment.CREATED
 
         otp = random.randint(1000, 9999)
         appointment_data["payment_status"] = OpdAppointment.PAYMENT_ACCEPTED
@@ -3723,3 +3797,13 @@ class ProviderEncrypt(auth_model.TimeStampedModel):
 
     class Meta:
         db_table = "provider_encrypt"
+
+
+class CommonHospital(auth_model.TimeStampedModel):
+    hospital = models.ForeignKey(Hospital, on_delete=models.CASCADE, null=True, blank=True)
+    network = models.ForeignKey(HospitalNetwork, on_delete=models.CASCADE, null=True, blank=True)
+    priority = models.PositiveIntegerField(default=0)
+
+    class Meta:
+        db_table = "common_hospital"
+

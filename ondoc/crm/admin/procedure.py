@@ -182,6 +182,7 @@ class IpdProcedurePracticeSpecializationInline(AutoComplete, TabularInline):
 class IpdProcedureAdminForm(forms.ModelForm):
     about = forms.CharField(widget=forms.Textarea, required=False)
     details = forms.CharField(widget=forms.Textarea, required=False)
+    icon = forms.ImageField(required=False)
 
     class Media:
         extend = False
@@ -336,12 +337,12 @@ class IpdProcedureLeadAdminForm(forms.ModelForm):
 
 class IpdProcedureLeadAdmin(VersionAdmin):
     form = IpdProcedureLeadAdminForm
-    list_filter = ['created_at', 'ipd_procedure']
+    list_filter = ['created_at', 'source', 'ipd_procedure', 'planned_date']
     search_fields = ['phone_number', 'matrix_lead_id']
     list_display = ['id', 'phone_number', 'name', 'matrix_lead_id']
-    autocomplete_fields = ['hospital', 'insurer', 'tpa']
+    autocomplete_fields = ['hospital', 'insurer', 'tpa', 'ipd_procedure']
     exclude = ['user', 'lat', 'long']
-    readonly_fields = ['phone_number', 'id', 'matrix_lead_id', 'comments', 'data', 'ipd_procedure', 'source', 'current_age',
+    readonly_fields = ['phone_number', 'id', 'matrix_lead_id', 'comments', 'data', 'source', 'current_age',
                        'related_speciality', 'is_insured', 'insurance_details', 'opd_appointments', 'lab_appointments']
 
 

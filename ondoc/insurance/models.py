@@ -325,6 +325,10 @@ class Insurer(auth_model.TimeStampedModel, LiveMixin):
     def get_active_plans(self):
         return self.plans.filter(is_live=True).order_by('total_allowed_members')
 
+    @property
+    def get_all_plans(self):
+        return self.plans.all().order_by('total_allowed_members')
+
     def __str__(self):
         return self.name
 
@@ -347,6 +351,7 @@ class InsurerAccount(auth_model.TimeStampedModel):
 class InsurancePlans(auth_model.TimeStampedModel, LiveMixin):
     insurer = models.ForeignKey(Insurer,related_name="plans", on_delete=models.CASCADE)
     name = models.CharField(max_length=100)
+    internal_name = models.CharField(max_length=200, null=True)
     amount = models.PositiveIntegerField(default=0)
     policy_tenure = models.PositiveIntegerField(default=1)
     adult_count = models.SmallIntegerField(default=0)
@@ -355,17 +360,31 @@ class InsurancePlans(auth_model.TimeStampedModel, LiveMixin):
     is_live = models.BooleanField(default=False)
     total_allowed_members = models.PositiveSmallIntegerField(default=0)
     is_selected = models.BooleanField(default=False)
-    plan_usages = JSONField(default=dict, null=True)
+    plan_usages = JSONField(default=dict, null=True, blank=True)
 
     @property
     def get_active_threshold(self):
         return self.threshold.filter(is_live=True)
 
+    def get_policy_prefix(self):
+        insurer_policy_number = None
+        if self.plan_policy_number.first():
+            insurer_policy_number = self.plan_policy_number.first().insurer_policy_number
+        else :
+            insurer_policy_number_obj = InsurerPolicyNumber.objects.filter(insurer=self.insurer, insurance_plan__isnull=True).order_by(
+                '-id').first()
+            if insurer_policy_number_obj:
+                insurer_policy_number = insurer_policy_number_obj.insurer_policy_number
+
+        return insurer_policy_number
+
     def get_people_covered(self):
         return "%d adult, %d childs" % (self.adult_count, self.child_count)
 
     def __str__(self):
-        return self.name
+        if self.internal_name:            
+            return self.name+'('+self.internal_name+')'
+        return self.name    
 
     class Meta:
         db_table = "insurance_plans"
@@ -1243,8 +1262,8 @@ class UserInsurance(auth_model.TimeStampedModel):
         from ondoc.doctor.models import OpdAppointment
         from ondoc.diagnostic.models import LabAppointment
 
-        total_opd_stats = OpdAppointment.get_insurance_usage(self)
-        today_opd_stats = OpdAppointment.get_insurance_usage(self, timezone.now().date())
+        total_opd_stats = {'count': 0, 'sum': 0} #OpdAppointment.get_insurance_usage(self)
+        today_opd_stats = {'count': 0, 'sum': 0} #OpdAppointment.get_insurance_usage(self, timezone.now().date())
 
         total_lab_stats = LabAppointment.get_insurance_usage(self)
         today_lab_stats = LabAppointment.get_insurance_usage(self, timezone.now().date())
@@ -1258,7 +1277,7 @@ class UserInsurance(auth_model.TimeStampedModel):
 
         return data
 
-    def validate_limit_usages(self, appointment_mrp):
+    def validate_limit_usages(self, tests_amount):
         from ondoc.prescription.models import AppointmentPrescription
         response = {
             'prescription_needed': False,
@@ -1274,14 +1293,14 @@ class UserInsurance(auth_model.TimeStampedModel):
 
         if ytd_count and insurance_appointment_stats['used_ytd_count'] + 1 > ytd_count:
             response['created_state'] = True
-        elif ytd_amount and insurance_appointment_stats['used_ytd_amount'] + appointment_mrp > ytd_amount:
+        elif ytd_amount and insurance_appointment_stats['used_ytd_amount'] + tests_amount > ytd_amount:
             response['created_state'] = True
-        elif daily_amount and insurance_appointment_stats['used_daily_amount'] + appointment_mrp > daily_amount:
+        elif daily_amount and insurance_appointment_stats['used_daily_amount'] + tests_amount > daily_amount:
             response['created_state'] = True
         elif daily_count and insurance_appointment_stats['used_daily_count'] + 1 > daily_count:
             response['created_state'] = True
 
-        if response['created_state'] and not AppointmentPrescription.prescription_exist_for_user_current_date(self.user, timezone.now().date()):
+        if response['created_state'] and not AppointmentPrescription.prescription_exist_for_date(self.user, timezone.now().date()):
             response['prescription_needed'] = True
 
         return response

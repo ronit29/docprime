@@ -10,7 +10,8 @@ from ondoc.doctor.models import OpdAppointment, DoctorPracticeSpecialization, Pr
 from ondoc.diagnostic.models import LabAppointment, LabTest, Lab
 from ondoc.insurance.models import InsurancePlanContent, InsurancePlans, InsuredMembers, UserInsurance, StateGSTCode, \
      ThirdPartyAdministrator, InsuranceEligibleCities, InsuranceCity, InsuranceDistrict, InsuranceDeal, \
-    InsurerPolicyNumber, InsuranceLead, EndorsementRequest, InsuredMemberDocument, InsuranceEligibleCities
+    InsurerPolicyNumber, InsuranceLead, EndorsementRequest, InsuredMemberDocument, InsuranceEligibleCities,\
+    InsuranceThreshold
 from import_export.admin import ImportExportMixin, ImportExportModelAdmin, base_formats
 import nested_admin
 from import_export import fields, resources
@@ -42,6 +43,12 @@ class InsurancePlanContentInline(admin.TabularInline):
     # readonly_fields = ("first_name", 'last_name', 'relation', 'dob', 'gender', )
 
 
+class InsurerPolicyNumberInline(admin.TabularInline):
+    model = InsurerPolicyNumber
+    fields = ('insurer', 'insurer_policy_number')
+    extra = 0
+
+
 class InsurancePlanAdminForm(forms.ModelForm):
 
     is_selected = forms.BooleanField(required=False)
@@ -60,10 +67,16 @@ class InsurancePlanAdminForm(forms.ModelForm):
         return is_selected
 
 
+class InsuranceThresholdInline(admin.TabularInline):
+    model = InsuranceThreshold
+    #fields = ('__all__',)
+    extra = 0
+
+
 class InsurancePlansAdmin(admin.ModelAdmin):
 
-    list_display = ['insurer', 'name', 'amount', 'is_selected']
-    inlines = [InsurancePlanContentInline]
+    list_display = ['insurer', 'name','internal_name', 'amount', 'is_selected','get_policy_prefix']
+    inlines = [InsurancePlanContentInline, InsurerPolicyNumberInline,InsuranceThresholdInline]
     search_fields = ['name']
     form = InsurancePlanAdminForm
 
@@ -512,10 +525,10 @@ class UserInsuranceLabResource(resources.ModelResource):
         return str(appointment.time_slot_start)
 
     def dehydrate_name_of_diagnostic_center(self, appointment):
-        return str(appointment.lab.name)
+        return appointment.lab.name if appointment.lab else ""
 
     def dehydrate_provider_code_of_the_center(self, appointment):
-        return str(appointment.lab.id)
+        return str(appointment.lab.id) if appointment.lab else ""
 
     def dehydrate_name_of_tests(self, appointment):
         return ", ".join(list(map(lambda test: test.name, appointment.tests.all())))
@@ -524,6 +537,8 @@ class UserInsuranceLabResource(resources.ModelResource):
         return str(appointment.tests.all().count())
 
     def dehydrate_address_of_center(self, appointment):
+        if not appointment.lab:
+            return ''
         building = str(appointment.lab.building)
         sublocality = str(appointment.lab.sublocality)
         locality = str(appointment.lab.locality)

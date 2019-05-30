@@ -210,7 +210,7 @@ class LabList(viewsets.ReadOnlyModelViewSet):
         max_distance = max_distance*1000 if max_distance is not None else 10000
         min_distance = min_distance*1000 if min_distance is not None else 0
 
-        if request.user and request.user.is_authenticated and request.user.active_insurance and request.user.active_insurance.insurance_plan and request.user.active_insurance.insurance_plan.plan_usages:
+        if request.user and request.user.is_authenticated and not hasattr(request, 'agent') and request.user.active_insurance and request.user.active_insurance.insurance_plan and request.user.active_insurance.insurance_plan.plan_usages:
             if request.user.active_insurance.insurance_plan.plan_usages.get('package_disabled'):
                 return Response({"result": [], "result_count": 0})
 
@@ -2247,6 +2247,10 @@ class LabAppointmentView(mixins.CreateModelMixin,
 
             if data['is_appointment_insured']:
                 data['payment_type'] = OpdAppointment.INSURANCE
+                appointment_test_ids = validated_data.get('test_ids', [])
+                if request.user and request.user.is_authenticated and not hasattr(request, 'agent') and len(appointment_test_ids) > 1:
+                    return Response(status=status.HTTP_400_BAD_REQUEST, data={'error': 'Some error occured. Please try again after some time.'})
+
         else:
             data['is_appointment_insured'], data['insurance_id'], data[
                 'insurance_message'] = False, None, ""
