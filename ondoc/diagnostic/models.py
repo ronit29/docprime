@@ -54,7 +54,7 @@ from ondoc.matrix.tasks import push_appointment_to_matrix, push_onboarding_qcsta
 from ondoc.integrations.task import push_lab_appointment_to_integrator, get_integrator_order_status
 from ondoc.location import models as location_models
 from ondoc.ratings_review import models as ratings_models
-from ondoc.api.v1.common import serializers as common_serializers
+# from ondoc.api.v1.common import serializers as common_serializers
 from ondoc.common.models import AppointmentHistory, AppointmentMaskNumber, Remark, GlobalNonBookable, \
     SyncBookingAnalytics, CompletedBreakupMixin, RefundDetails, MatrixMappedState, \
     MatrixMappedCity
@@ -1716,6 +1716,18 @@ class LabAppointment(TimeStampedModel, CouponsMixin, LabAppointmentInvoiceMixin,
                 set([report_file.name.url for report_file in report.files.all() if report_file.name.url.rsplit('.',1)[1].lower() != 'xml']))
         report_file_links = [util_absolute_url(report_file_link) for report_file_link in report_file_links]
         return list(report_file_links)
+
+    def get_report_type(self):
+        from ondoc.common.utils import get_file_mime_type
+        resp = []
+        for pres in self.reports.all():
+            for pf in pres.files.all():
+                file = pf.name
+                mime_type = get_file_mime_type(file)
+                file_url = pf.name.url
+                resp.append({"url": file_url, "type": mime_type})
+        return resp
+
 
     def get_reports(self):
         return self.reports.all()

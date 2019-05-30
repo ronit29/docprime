@@ -122,6 +122,15 @@ class OpdAppointmentSerializer(serializers.ModelSerializer):
     type = serializers.ReadOnlyField(default='doctor')
     allowed_action = serializers.SerializerMethodField()
     reports = serializers.SerializerMethodField()
+    prescription = serializers.SerializerMethodField()
+    report_files = serializers.SerializerMethodField()
+
+    def get_report_files(self, obj):
+        return []
+
+    def get_prescription(self, obj):
+        if obj:
+            return obj.get_all_prescriptions()
 
     def get_allowed_action(self, obj):
         request = self.context.get('request')
@@ -131,7 +140,7 @@ class OpdAppointmentSerializer(serializers.ModelSerializer):
         model = OpdAppointment
         fields = ('id', 'doctor_name', 'hospital_name', 'patient_name', 'patient_image', 'type',
                   'allowed_action', 'effective_price', 'deal_price', 'status', 'time_slot_start',
-                  'time_slot_end', 'doctor_thumbnail', 'patient_thumbnail', 'display_name', 'invoices', 'reports')
+                  'time_slot_end', 'doctor_thumbnail', 'patient_thumbnail', 'display_name', 'invoices', 'reports', 'prescription', 'report_files')
 
     def get_patient_image(self, obj):
         if obj.profile and obj.profile.profile_image:
@@ -1270,7 +1279,8 @@ class AppointmentRetrieveSerializer(OpdAppointmentSerializer):
         fields = ('id', 'patient_image', 'patient_name', 'type', 'profile', 'otp', 'is_rated', 'rating_declined',
                   'allowed_action', 'effective_price', 'deal_price', 'status', 'time_slot_start', 'time_slot_end',
                   'doctor', 'hospital', 'allowed_action', 'doctor_thumbnail', 'patient_thumbnail', 'procedures', 'mrp',
-                  'insurance', 'invoices', 'cancellation_reason', 'payment_type', 'display_name')
+                  'insurance', 'invoices', 'cancellation_reason', 'payment_type', 'display_name', 'reports', 'prescription',
+                  'report_files')
 
     def get_insurance(self, obj):
         request = self.context.get("request")
@@ -1812,14 +1822,15 @@ class TopHospitalForIpdProcedureSerializer(serializers.ModelSerializer):
 
     def get_logo(self, obj):
         request = self.context.get('request')
-        if obj.network:
-            for document in obj.network.hospital_network_documents.all():
-                if document.document_type == HospitalNetworkDocument.LOGO:
-                    return request.build_absolute_uri(document.name.url) if document.name else None
-        else:
-            for document in obj.hospital_documents.all():
-                if document.document_type == HospitalDocument.LOGO:
-                    return request.build_absolute_uri(document.name.url) if document.name else None
+        if request:
+            if obj.network:
+                for document in obj.network.hospital_network_documents.all():
+                    if document.document_type == HospitalNetworkDocument.LOGO:
+                        return request.build_absolute_uri(document.name.url) if document.name else None
+            else:
+                for document in obj.hospital_documents.all():
+                    if document.document_type == HospitalDocument.LOGO:
+                        return request.build_absolute_uri(document.name.url) if document.name else None
         return None
 
     def get_open_today(self, obj):
@@ -2094,3 +2105,9 @@ class DoctorLicenceBodySerializer(serializers.Serializer):
         if attrs['doctor_id'].license:
             raise serializers.ValidationError('Licence Exists')
         return attrs
+
+
+class CommonConditionsSerializer(serializers.Serializer):
+    long = serializers.FloatField(default=77.071848)
+    lat = serializers.FloatField(default=28.450367)
+    city = serializers.CharField(required=False, allow_blank=True, allow_null=True)
