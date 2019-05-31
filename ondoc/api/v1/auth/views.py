@@ -1834,6 +1834,9 @@ class SendBookingUrlViewSet(GenericViewSet):
         if purchase_type == 'insurance':
             SmsNotification.send_insurance_booking_url(token=token, phone_number=str(user_profile.phone_number))
             EmailNotification.send_insurance_booking_url(token=token, email=user_profile.email)
+        elif purchase_type == 'endorsement':
+            SmsNotification.send_endorsement_request_url(token=token, phone_number=str(user_profile.phone_number))
+            EmailNotification.send_endorsement_request_url(token=token, email=user_profile.email)
         else:
             booking_url = SmsNotification.send_booking_url(token=token, phone_number=str(user_profile.phone_number))
             EmailNotification.send_booking_url(token=token, email=user_profile.email)
