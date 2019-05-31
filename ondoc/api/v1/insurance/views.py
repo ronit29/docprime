@@ -461,6 +461,9 @@ class InsuranceProfileViewSet(viewsets.GenericViewSet):
                         resp['is_endorsement_allowed'] = False
                         break
                 resp['is_endorsement_exist'] = is_endorsement_exist
+                if user_insurance.status != UserInsurance.ACTIVE:
+                    resp['is_endorsement_exist'] = False
+                    resp['is_endorsement_allowed'] = False
             else:
                 return Response({"message": "User is not valid"},
                                 status.HTTP_404_NOT_FOUND)
