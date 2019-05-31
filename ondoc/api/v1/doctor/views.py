@@ -3146,7 +3146,7 @@ class OfflineCustomerViewSet(viewsets.GenericViewSet):
         if encrypt_number:
             for num in encrypt_number:
                 models.PatientMobile.objects.create(patient=patient,
-                                                    encrypted_number=num.get('phone_number'),
+                                                    encrypted_number=num.get('encrypted_number'),
                                                     is_default=num.get('is_default', False)
                                                     )
                 sms_number = None
@@ -3497,11 +3497,13 @@ class OfflineCustomerViewSet(viewsets.GenericViewSet):
                             phone_number.append({"phone_number": mob.phone_number, "is_default": mob.is_default})
                             if mob.is_default:
                                 patient_profile['phone_number'] = mob.phone_number
+                                patient_profile['patient_numbers'] = phone_number
                         else:
                             phone_number.append({"phone_number": mob.encrypted_number, "is_default": mob.is_default})
                             if mob.is_default:
-                                patient_profile['phone_number'] = mob.encrypted_number
-                patient_profile['patient_numbers'] = phone_number
+                                patient_profile['encrypted_phone_number'] = mob.encrypted_number
+                                patient_profile['encrypt_number'] = phone_number
+                # patient_profile['patient_numbers'] = phone_number
                 error_flag = app.error if app.error else False
                 error_message = app.error_message if app.error_message else ''
                 prescription = app.get_prescriptions(request)
