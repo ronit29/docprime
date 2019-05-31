@@ -2112,7 +2112,7 @@ class DoctorAvailabilityTimingViewSet(viewsets.ViewSet):
                 appointments = hospital.get_specialization_insured_appointments(dc_obj.doctor, request.user.active_insurance)
                 if appointments:
                     plan_limits = request.user.active_insurance.insurance_plan.plan_usages
-                    days = plan_limits.get('required_days_durations', 14)
+                    days = plan_limits.get('specialization_days_limit', 14)
                     for appointment in appointments:
                         for i in range(days):
                             blockeds_timeslot_set.add(str(appointment.time_slot_start.date() + datetime.timedelta(days=i)))
