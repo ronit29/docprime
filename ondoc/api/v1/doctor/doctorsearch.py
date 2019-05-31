@@ -414,7 +414,7 @@ class DoctorSearchHelper:
             return
         for doctor_clinic_timing in doctor_clinic.availability.all():
             if doctor_clinic_timing.id == doctor_availability_mapping[doctor_clinic.doctor.id]:
-                return doctor_clinic_timing.cod_deal_price, doctor_clinic_timing.deal_price, doctor_clinic_timing.mrp
+                return doctor_clinic_timing.cod_deal_price(), doctor_clinic_timing.deal_price, doctor_clinic_timing.mrp
                 # return doctor_hospital.deal_price
         return None
 
@@ -512,7 +512,7 @@ class DoctorSearchHelper:
                     "doctor": doctor.name,
                     # "enabled_for_cod": doctor_clinic.hospital.enabled_for_cod,
                     # "enabled_for_prepaid": doctor_clinic.hospital.enabled_for_prepaid,
-                    "enabled_for_cod": doctor_clinic.hospital.enable_for_cod(),
+                    "enabled_for_cod": doctor_clinic.is_enabled_for_cod(),
                     "display_name": doctor.get_display_name(),
                     "hospital_id": doctor_clinic.hospital.id,
                     "mrp": min_price["mrp"],
@@ -604,7 +604,7 @@ class DoctorSearchHelper:
                 "id": doctor.id,
                 "deal_price": filtered_deal_price,
                 "cod_deal_price": filtered_cod_deal_price,
-                "enabled_for_cod": doctor_clinic.hospital.enable_for_cod(),
+                "enabled_for_cod": doctor_clinic.is_enabled_for_cod(),
                 "mrp": filtered_mrp,
                 "is_live": doctor.is_live,
                 "is_gold": is_gold,

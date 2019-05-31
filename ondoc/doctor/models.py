@@ -368,7 +368,7 @@ class Hospital(auth_model.TimeStampedModel, auth_model.CreatedByModel, auth_mode
         # update search and profile urls
         hospital_urls.hospital_urls()
 
-    def enable_for_cod(self):
+    def is_enabled_for_cod(self):
         if self.enabled_for_cod:
             return True
         else:
@@ -1300,6 +1300,9 @@ class DoctorClinic(auth_model.TimeStampedModel, auth_model.WelcomeCallingDone):
     # def __str__(self):
     #     return '{}-{}'.format(self.doctor, self.hospital)
 
+    def is_enabled_for_cod(self):
+        return self.hospital.is_enabled_for_cod()
+
     def get_timings(self, blocks=[]):
         from ondoc.api.v2.doctor import serializers as v2_serializers
         from ondoc.api.v1.common import serializers as common_serializers
@@ -1316,7 +1319,7 @@ class DoctorClinic(auth_model.TimeStampedModel, auth_model.WelcomeCallingDone):
 
         for data in clinic_timings:
             obj.form_time_slots( data.day, data.start, data.end, self.hospital.enable_for_cod() if self.hospital else False, data.fees, True,
-                                data.deal_price, data.mrp, data.cod_deal_price, True, on_call=data.type)
+                                data.deal_price, data.mrp, data.cod_deal_price(), True, on_call=data.type)
 
         date = datetime.datetime.today().strftime('%Y-%m-%d')
         booking_details = {"type": "doctor"}
@@ -1372,6 +1375,18 @@ class DoctorClinicTiming(auth_model.TimeStampedModel):
     class Meta:
         db_table = "doctor_clinic_timing"
         # unique_together = (("start", "end", "day", "doctor_clinic",),)
+
+    def is_enabled_for_cod(self):
+        return self.doctor_clinic.is_enabled_for_cod()
+
+    def cod_deal_price(self):
+        if self.is_enabled_for_cod():
+            if self.cod_deal_price:
+                return self.cod_deal_price
+            else:
+                return self.mrp
+
+        return None
 
     def save(self, *args, **kwargs):
         if self.fees != None:

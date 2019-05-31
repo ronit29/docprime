@@ -950,7 +950,7 @@ class TimeSlotExtraction(object):
             self.timing[i] = dict()
             self.price_available[i] = dict()
 
-    def form_time_slots(self, day, start, end, enable_for_cod, price=None, is_available=True,
+    def form_time_slots(self, day, start, end, price=None, is_available=True,
                         deal_price=None, mrp=None, cod_deal_price=None, is_doctor=False, on_call=1):
         start = Decimal(str(start))
         end = Decimal(str(end))
@@ -974,9 +974,7 @@ class TimeSlotExtraction(object):
                 price_available.update({
                     "mrp": mrp,
                     "deal_price": deal_price,
-                    "cod_deal_price": cod_deal_price,
-                    "enabled_for_cod": enable_for_cod
-
+                    "cod_deal_price": cod_deal_price
                 })
             price_available.update({
                 "on_call": bool(on_call==2)
@@ -1169,7 +1167,6 @@ class TimeSlotExtraction(object):
                         if k >= float(doc_minimum_time) and k <= doctor_maximum_timing:
                             data_list.append({"value": k, "text": v, "price": pa[k]["price"], "is_price_zero": True if pa[k]["price"] is not None and pa[k]["price"] == 0 else False,
                                               "mrp": pa[k]['mrp'], 'deal_price': pa[k]['deal_price'], "cod_deal_price": pa[k]['cod_deal_price'],
-                                              "enabled_for_cod": pa[k]['enabled_for_cod'],
                                               "is_available": pa[k]["is_available"], "on_call": pa[k].get("on_call", False)})
                         else:
                             pass
@@ -1179,7 +1176,6 @@ class TimeSlotExtraction(object):
                     if k <= doctor_maximum_timing:
                         data_list.append({"value": k, "text": v, "price": pa[k]["price"], "is_price_zero": True if pa[k]["price"] is not None and pa[k]["price"] == 0 else False,
                                           "mrp": pa[k]['mrp'], 'deal_price': pa[k]['deal_price'], "cod_deal_price": pa[k]['cod_deal_price'],
-                                          "enabled_for_cod": pa[k]['enabled_for_cod'],
                                           "is_available": pa[k]["is_available"],
                                           "on_call": pa[k].get("on_call", False)})
                     else:
