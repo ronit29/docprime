@@ -548,10 +548,6 @@ class Hospital(auth_model.TimeStampedModel, auth_model.CreatedByModel, auth_mode
         return result
 
     def get_specialization_insured_appointments(self, doctor, insurance):
-        plan_limits = insurance.insurance_plan.plan_usages
-        days = plan_limits.get('required_days_durations', 14)
-        last_allowed_date = timezone.now() - timedelta(days=days)
-
         limit_specialization_ids = json.loads(settings.INSURANCE_SPECIALIZATION_WITH_DAYS_LIMIT)
         limit_specialization_ids_set = set(limit_specialization_ids)
         doctor_specialization_ids = set([x.specialization_id for x in doctor.doctorpracticespecializations.all()])
@@ -565,7 +561,7 @@ class Hospital(auth_model.TimeStampedModel, auth_model.CreatedByModel, auth_mode
         appointments = self.hospital_appointments.filter(~Q(status=OpdAppointment.CANCELLED),
                                           insurance=insurance,
                                           user=insurance.user,
-                                          time_slot_start__gte=last_allowed_date,
+                                          time_slot_start__gte=timezone.now(),
                                           doctor_id__in=doctor_with_specialization).order_by('-time_slot_start')
 
         return appointments
