@@ -461,6 +461,9 @@ class InsuranceProfileViewSet(viewsets.GenericViewSet):
                         resp['is_endorsement_allowed'] = False
                         break
                 resp['is_endorsement_exist'] = is_endorsement_exist
+                if user_insurance.status != UserInsurance.ACTIVE:
+                    resp['is_endorsement_exist'] = False
+                    resp['is_endorsement_allowed'] = False
             else:
                 return Response({"message": "User is not valid"},
                                 status.HTTP_404_NOT_FOUND)
@@ -542,22 +545,22 @@ class InsuranceDummyDataViewSet(viewsets.GenericViewSet):
             return Response(data="save successfully!!", status=status.HTTP_200_OK )
         except Exception as e:
             logger.error(str(e))
-            return Response(data="could not save data", status=status.HTTP_200_OK)
+            return Response(data="could not save data", status=status.HTTP_400_BAD_REQUEST)
 
     def show_dummy_data(self, request):
         user = request.user
         res = {}
         if not user:
             res['error'] = "user not found"
-            return Response(error=res, status=status.HTTP_200_OK)
+            return Response(error=res, status=status.HTTP_400_BAD_REQUEST)
         dummy_data = InsuranceDummyData.objects.filter(user=user, type=InsuranceDummyData.BOOKING).order_by('-id').first()
         if not dummy_data:
             res['error'] = "data not found"
-            return Response(error=res, status=status.HTTP_200_OK)
+            return Response(error=res, status=status.HTTP_400_BAD_REQUEST)
         member_data = dummy_data.data
         if not member_data:
             res['error'] = "data not found"
-            return Response(error=res, status=status.HTTP_200_OK)
+            return Response(error=res, status=status.HTTP_400_BAD_REQUEST)
         res['data'] = member_data
         return Response(data=res, status=status.HTTP_200_OK)
 
@@ -569,22 +572,22 @@ class InsuranceDummyDataViewSet(viewsets.GenericViewSet):
             return Response(data="save successfully!!", status=status.HTTP_200_OK )
         except Exception as e:
             logger.error(str(e))
-            return Response(data="could not save data", status=status.HTTP_200_OK)
+            return Response(data="could not save data", status=status.HTTP_400_BAD_REQUEST)
 
     def show_endorsement_data(self, request):
         user = request.user
         res = {}
         if not user:
             res['error'] = "user not found"
-            return Response(error=res, status=status.HTTP_200_OK)
+            return Response(error=res, status=status.HTTP_400_BAD_REQUEST)
         rendorsement_data = InsuranceDummyData.objects.filter(user=user, type=InsuranceDummyData.ENDORSEMENT).order_by('-id').first()
         if not rendorsement_data:
             res['error'] = "data not found"
-            return Response(error=res, status=status.HTTP_200_OK)
+            return Response(error=res, status=status.HTTP_400_BAD_REQUEST)
         member_data = rendorsement_data.data
         if not member_data:
             res['error'] = "data not found"
-            return Response(error=res, status=status.HTTP_200_OK)
+            return Response(error=res, status=status.HTTP_400_BAD_REQUEST)
         res['data'] = member_data
         return Response(data=res, status=status.HTTP_200_OK)
 
@@ -684,7 +687,7 @@ class InsuranceEndorsementViewSet(viewsets.GenericViewSet):
         # appointment should not be completed in insurance mode for endorsement!!
         opd_completed_appointments = OpdAppointment.get_insured_completed_appointment(user.active_insurance)
         lab_completed_appointments = LabAppointment.get_insured_completed_appointment(user.active_insurance)
-        if opd_completed_appointments > 0 or lab_completed_appointments > 0:
+        if not hasattr(request, 'agent') and (opd_completed_appointments > 0 or lab_completed_appointments > 0):
             res['error'] = "One of the OPD or LAB Appointment have been completed, could not process endorsement!!"
             return Response(data=res, status=status.HTTP_400_BAD_REQUEST)
 
