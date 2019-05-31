@@ -771,7 +771,7 @@ class LabAppointmentForm(RefundableAppointmentForm):
         else:
             raise forms.ValidationError("Invalid start date and time.")
 
-        if time_slot_start < timezone.now():
+        if time_slot_start != self.instance.time_slot_start and time_slot_start < timezone.now():
             raise forms.ValidationError("Time slot can never be in past. Please add time slot in future.")
 
         if self.instance.id:
