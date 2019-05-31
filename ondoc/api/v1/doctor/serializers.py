@@ -563,7 +563,8 @@ class DoctorHospitalSerializer(serializers.ModelSerializer):
         fields = ('doctor', 'hospital_name', 'address','short_address', 'hospital_id', 'start', 'end', 'day', 'deal_price',
                   'discounted_fees', 'hospital_thumbnail', 'mrp', 'lat', 'long', 'id','enabled_for_online_booking',
 
-                  'insurance', 'show_contact', 'enabled_for_cod', 'is_price_zero', 'cod_deal_price', 'hospital_city')
+                  'insurance', 'show_contact', 'enabled_for_cod', 'is_price_zero', 'cod_deal_price', 'hospital_city',
+                  'url')
 
         # fields = ('doctor', 'hospital_name', 'address', 'hospital_id', 'start', 'end', 'day', 'deal_price', 'fees',
         #           'discounted_fees', 'hospital_thumbnail', 'mrp',)
