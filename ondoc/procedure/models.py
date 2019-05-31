@@ -561,6 +561,5 @@ class Offer(auth_model.TimeStampedModel):
     hospital = models.ForeignKey(Hospital, null=True, blank=True, on_delete=models.CASCADE, related_name='hospital_offers')
     network = models.ForeignKey(HospitalNetwork, null=True, blank=True, on_delete=models.CASCADE, related_name='network_offers')
 
-
     class Meta:
         db_table = 'offer'
