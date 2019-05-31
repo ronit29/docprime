@@ -2104,15 +2104,16 @@ class DoctorAvailabilityTimingViewSet(viewsets.ViewSet):
             active_appointments = dc_obj.hospital.\
                 get_active_opd_appointments(request.user, request.user.active_insurance)
             for apt in active_appointments:
-                blocks.append(str(apt.time_slot_start.date()))
+                # blocks.append(str(apt.time_slot_start.date()))
+                blockeds_timeslot_set.add(str(apt.time_slot_start.date()))
 
             if dc_obj and not hasattr(request, 'agent'):
                 hospital = dc_obj.hospital
                 appointments = hospital.get_specialization_insured_appointments(dc_obj.doctor, request.user.active_insurance)
                 if appointments:
+                    plan_limits = request.user.active_insurance.insurance_plan.plan_usages
+                    days = plan_limits.get('required_days_durations', 14)
                     for appointment in appointments:
-                        plan_limits = request.user.active_insurance.insurance_plan.plan_usages
-                        days = plan_limits.get('required_days_durations', 14)
                         for i in range(days):
                             blockeds_timeslot_set.add(str(appointment.time_slot_start.date() + datetime.timedelta(days=i)))
                             if (appointment.time_slot_start - datetime.timedelta(days=i)) >= timezone.now():
