@@ -9,10 +9,11 @@ from django.utils.functional import cached_property
 from ondoc.api.v1.auth.serializers import UserProfileSerializer
 from ondoc.api.v1.doctor.city_match import city_match
 from ondoc.api.v1.doctor.serializers import HospitalModelSerializer, AppointmentRetrieveDoctorSerializer, \
-    OfflinePatientSerializer
+    OfflinePatientSerializer, CommonConditionsSerializer
 from ondoc.api.v1.doctor.DoctorSearchByHospitalHelper import DoctorSearchByHospitalHelper
 from ondoc.api.v1.procedure.serializers import CommonProcedureCategorySerializer, ProcedureInSerializer, \
-    ProcedureSerializer, DoctorClinicProcedureSerializer, CommonProcedureSerializer, CommonIpdProcedureSerializer
+    ProcedureSerializer, DoctorClinicProcedureSerializer, CommonProcedureSerializer, CommonIpdProcedureSerializer, \
+    CommonHospitalSerializer
 from ondoc.cart.models import Cart
 from ondoc.doctor import models
 from ondoc.authentication import models as auth_models
@@ -21,7 +22,7 @@ from ondoc.insurance.models import UserInsurance
 from ondoc.notification import tasks as notification_tasks
 #from ondoc.doctor.models import Hospital, DoctorClinic,Doctor,  OpdAppointment
 from ondoc.doctor.models import DoctorClinic, OpdAppointment, DoctorAssociation, DoctorQualification, Doctor, Hospital, \
-    HealthInsuranceProvider, ProviderSignupLead, HospitalImage
+    HealthInsuranceProvider, ProviderSignupLead, HospitalImage, CommonHospital
 from ondoc.notification.models import EmailNotification
 from django.utils.safestring import mark_safe
 from ondoc.coupon.models import Coupon, CouponRecommender
@@ -30,7 +31,7 @@ from ondoc.account import models as account_models
 from ondoc.location.models import EntityUrls, EntityAddress, DefaultRating
 from ondoc.procedure.models import Procedure, ProcedureCategory, CommonProcedureCategory, ProcedureToCategoryMapping, \
     get_selected_and_other_procedures, CommonProcedure, CommonIpdProcedure, IpdProcedure, DoctorClinicIpdProcedure, \
-    IpdProcedureFeatureMapping, IpdProcedureDetail, SimilarIpdProcedureMapping
+    IpdProcedureFeatureMapping, IpdProcedureDetail, SimilarIpdProcedureMapping, IpdProcedureLead
 from ondoc.seo.models import NewDynamic
 from . import serializers
 from ondoc.api.v2.doctor import serializers as v2_serializers
@@ -248,6 +249,11 @@ class DoctorAppointmentsViewSet(OndocViewSet):
 
             if data['is_appointment_insured']:
                 data['payment_type'] = OpdAppointment.INSURANCE
+                hospital = validated_data.get('hospital')
+                appointment_date = validated_data.get('start_date')
+                is_appointment_exist = hospital.get_active_opd_appointments(request.user, user_insurance, appointment_date.date())
+                if request.user and request.user.is_authenticated and not hasattr(request, 'agent') and is_appointment_exist :
+                    return Response(status=status.HTTP_400_BAD_REQUEST, data={'error': 'Some error occured. Please try again after some time.'})
         else:
             data['is_appointment_insured'], data['insurance_id'], data[
                 'insurance_message'] = False, None, ""
@@ -1276,9 +1282,10 @@ class SearchedItemsViewSet(viewsets.GenericViewSet):
     @transaction.non_atomic_requests
     def common_conditions(self, request):
         city = None
-        if request.query_params and request.query_params.get('city'):
-            city = city_match(request.query_params.get('city'))
-
+        serializer = CommonConditionsSerializer(data=request.query_params)
+        serializer.is_valid(raise_exception=True)
+        validated_data = serializer.validated_data
+        city = city_match(validated_data.get('city'))
         spec_urls = dict()
         count = request.query_params.get('count', 10)
         count = int(count)
@@ -1330,12 +1337,16 @@ class SearchedItemsViewSet(viewsets.GenericViewSet):
                 ipd_id=F('ipd_procedure_id')).values('ipd_id', 'url')
             ipd_entity_dict = {x.get('ipd_id'): x.get('url') for x in ipd_entity_qs}
         common_ipd_procedures_serializer = CommonIpdProcedureSerializer(common_ipd_procedures, many=True,
-                                                                        context={'entity_dict': ipd_entity_dict})
+                                                                        context={'entity_dict': ipd_entity_dict,
+                                                                                 'request': request})
+
+        top_hospitals_data = Hospital.get_top_hospitals_data(request, validated_data.get('lat'), validated_data.get('long'))
 
         return Response({"conditions": conditions_serializer.data, "specializations": specializations_serializer.data,
                          "procedure_categories": common_procedure_categories_serializer.data,
                          "procedures": common_procedures_serializer.data,
-                         "ipd_procedures": common_ipd_procedures_serializer.data})
+                         "ipd_procedures": common_ipd_procedures_serializer.data,
+                         "top_hospitals": top_hospitals_data})
 
 
 class DoctorListViewSet(viewsets.GenericViewSet):
@@ -4115,3 +4126,11 @@ class IpdProcedureViewSet(viewsets.GenericViewSet):
         response['ipd_procedures'] = ipd_procedures
 
         return Response(response)
+
+    def sync_lead(self, request):
+        serializer = serializers.IpdLeadUpdateSerializer(data=request.query_params)
+        serializer.is_valid(raise_exception=True)
+        validated_data = serializer.validated_data
+        status = validated_data.get('status')
+        IpdProcedureLead.objects.filter(matrix_lead_id=validated_data.get('matrix_lead_id')).update(status=status)
+        return Response({'message': 'Success'})

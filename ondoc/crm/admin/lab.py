@@ -757,8 +757,9 @@ class LabAppointmentForm(RefundableAppointmentForm):
     def clean(self):
         super().clean()
         cleaned_data = self.cleaned_data
-        if self.request.user.groups.filter(name=constants['OPD_APPOINTMENT_MANAGEMENT_TEAM']).exists() and cleaned_data.get('status') == LabAppointment.BOOKED:
-            raise forms.ValidationError("Form cant be Saved with Booked Status.")
+        # Appointments are now made with CREATED status.
+        # if self.request.user.groups.filter(name=constants['OPD_APPOINTMENT_MANAGEMENT_TEAM']).exists() and cleaned_data.get('status') == LabAppointment.BOOKED:
+        #     raise forms.ValidationError("Form cant be Saved with Booked Status.")
         if cleaned_data.get('start_date') and cleaned_data.get('start_time'):
             date_time_field = str(cleaned_data.get('start_date')) + " " + str(cleaned_data.get('start_time'))
             dt_field = parse_datetime(date_time_field)
@@ -802,9 +803,14 @@ class LabAppointmentForm(RefundableAppointmentForm):
             raise forms.ValidationError(
                 "Cancellation comments must be mentioned for selected cancellation reason.")
 
-        if cleaned_data.get('status') and cleaned_data.get('status') != LabAppointment.CREATED and self.instance and self.instance.status == LabAppointment.CREATED and not cleaned_data.get('status_change_comments'):
-            raise forms.ValidationError(
-                "Status change comments must be mentioned when changing status from created to other.")
+        if cleaned_data.get('status') and self.instance and self.instance.status == LabAppointment.CREATED:
+            if cleaned_data.get('status') not in [LabAppointment.BOOKED, LabAppointment.CANCELLED, LabAppointment.CREATED]:
+                raise forms.ValidationError(
+                    "Created status can only be changed to Booked or cancelled.")
+
+            if cleaned_data.get('status') != LabAppointment.CREATED and not cleaned_data.get('status_change_comments'):
+                raise forms.ValidationError(
+                    "Status change comments must be mentioned when changing status from created to other.")
 
         if not lab.lab_pricing_group:
             raise forms.ValidationError("Lab is not in any lab pricing group.")
