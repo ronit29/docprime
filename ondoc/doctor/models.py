@@ -548,9 +548,8 @@ class Hospital(auth_model.TimeStampedModel, auth_model.CreatedByModel, auth_mode
         return result
 
     def get_specialization_insured_appointments(self, doctor, insurance):
-        plan_limits = insurance.insurance_plan.plan_usages
-        days = plan_limits.get('specialization_days_limit', 14)
-        last_allowed_date = timezone.now() - datetime.timedelta(days=days)
+        days = insurance.specialization_days_limit
+        n_days_back_datetime = timezone.now() - datetime.timedelta(days=days)
 
         limit_specialization_ids = json.loads(settings.INSURANCE_SPECIALIZATION_WITH_DAYS_LIMIT)
         limit_specialization_ids_set = set(limit_specialization_ids)
@@ -564,7 +563,7 @@ class Hospital(auth_model.TimeStampedModel, auth_model.CreatedByModel, auth_mode
 
         appointments = self.hospital_appointments.filter(insurance=insurance,
                                                          user=insurance.user,
-                                                         time_slot_start__gte=last_allowed_date,
+                                                         time_slot_start__gte=n_days_back_datetime,
                                                          doctor_id__in=doctor_with_specialization).\
             exclude(status__in=[OpdAppointment.CANCELLED, OpdAppointment.COMPLETED]).order_by('-time_slot_start')
 
@@ -575,12 +574,11 @@ class Hospital(auth_model.TimeStampedModel, auth_model.CreatedByModel, auth_mode
         if not appointments:
             return True
 
-        appointment_time_slot = kwargs.get('time_slot')
-        if appointment_time_slot:
+        appointment_time_slot = kwargs.get('start_date')
+        if not appointment_time_slot:
             return True
 
-        plan_limits = insurance.insurance_plan.plan_usages
-        days = plan_limits.get('specialization_days_limit', 14)
+        days = insurance.specialization_days_limit
 
         for appointment in appointments:
             previous_datetime = appointment.time_slot_start - timedelta(days=days)

@@ -251,7 +251,7 @@ class DoctorAppointmentsViewSet(OndocViewSet):
                 hospital = validated_data.get('hospital')
                 doctor = validated_data.get('doctor')
 
-                if hospital.can_insurance_specialization_appointment_book(doctor, user_insurance, time_slot=validated_data.get('time_slot_start')):
+                if not hospital.can_insurance_specialization_appointment_book(doctor, user_insurance, start_date=validated_data.get('start_date')):
                     return Response(status=status.HTTP_400_BAD_REQUEST, data={'error': 'Some error occured. Please try again after some time.'})
 
                 appointment_date = validated_data.get('start_date')
@@ -2111,14 +2111,13 @@ class DoctorAvailabilityTimingViewSet(viewsets.ViewSet):
                 hospital = dc_obj.hospital
                 appointments = hospital.get_specialization_insured_appointments(dc_obj.doctor, request.user.active_insurance)
                 if appointments:
-                    plan_limits = request.user.active_insurance.insurance_plan.plan_usages
-                    days = plan_limits.get('specialization_days_limit', 14)
+                    days = request.user.active_insurance.specialization_days_limit
                     for appointment in appointments:
-                        for i in range(days):
-                            nth_day_future_timeslot = appointment.time_slot_start.date() + datetime.timedelta(days=i)
-                            nth_day_past_timeslot = appointment.time_slot_start.date() - datetime.timedelta(days=i)
+                        for n in range(days):
+                            nth_day_future_timeslot = appointment.time_slot_start.date() + datetime.timedelta(days=n)
+                            nth_day_past_timeslot = appointment.time_slot_start.date() - datetime.timedelta(days=n)
                             blockeds_timeslot_set.add(str(nth_day_future_timeslot))
-                            if nth_day_past_timeslot >= timezone.now():
+                            if nth_day_past_timeslot >= timezone.now().date():
                                 blockeds_timeslot_set.add(str(nth_day_past_timeslot))
 
         blocks.extend(list(blockeds_timeslot_set))
