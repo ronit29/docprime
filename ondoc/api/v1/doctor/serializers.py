@@ -1691,6 +1691,24 @@ class OfflineAppointmentFilterSerializer(serializers.Serializer):
 
 
 class OfflinePatientSerializer(serializers.ModelSerializer):
+
+    name = serializers.SerializerMethodField()
+    encrypted_name = serializers.SerializerMethodField()
+
+    def get_name(self, obj):
+        name = None
+        if obj:
+            if obj.name and not obj.encrypted_name:
+                name = obj.name
+        return name
+
+    def get_encrypted_name(self, obj):
+        encrypted_name = None
+        if obj:
+            if obj.encrypted_name:
+                encrypted_name = obj.encrypted_name
+        return encrypted_name
+
     class Meta:
         model = OfflinePatients
         fields = ('id', 'name', 'encrypted_name', 'dob', 'calculated_dob', 'gender', 'age','referred_by', 'display_welcome_message',

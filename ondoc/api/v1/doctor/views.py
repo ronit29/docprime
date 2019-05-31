@@ -3157,9 +3157,9 @@ class OfflineCustomerViewSet(viewsets.GenericViewSet):
             logger.error('PROVIDER_REQUEST - Hospital Not Given when Shared with Hospital Set'+ str(data))
         hosp = hospital if data.get('share_with_hospital') and hospital else None
         encrypt_number = encrypted_name = None
-        if hosp and hosp.provider_encrypt:
-            encrypt_number = data.get('encrypt_number')
-            encrypted_name = data.get('encrypted_name')
+        # if hosp and hosp.provider_encrypt:
+        #     encrypt_number = data.get('encrypt_number')
+        #     encrypted_name = data.get('encrypted_name')
         patient = models.OfflinePatients.objects.filter(id=data.get('id')).first()
         if patient:
             if data.get('gender'):
@@ -3182,10 +3182,10 @@ class OfflineCustomerViewSet(viewsets.GenericViewSet):
                 patient.hospital = hosp
             if doctor:
                 patient.doctor = doctor
-            if encrypted_name:
-                patient.encrypted_name = encrypted_name
+            if data.get('encrypted_name'):
+                patient.encrypted_name = data.get('encrypted_name')
                 patient.name = None
-            if not encrypted_name:
+            if not data.get('encrypted_name'):
                 patient.encrypted_name = None
                 if data.get('name'):
                     patient.name = data.get('name')
@@ -3195,7 +3195,7 @@ class OfflineCustomerViewSet(viewsets.GenericViewSet):
 
             del_queryset = models.PatientMobile.objects.filter(patient=patient)
 
-            if data.get('phone_number') and not encrypt_number:
+            if data.get('phone_number') and not data.get('encrypt_number'):
                 del_queryset.delete()
                 for num in data.get('phone_number'):
                     models.PatientMobile.objects.create(patient=patient,
@@ -3209,9 +3209,9 @@ class OfflineCustomerViewSet(viewsets.GenericViewSet):
                                   'name': patient.name}
                     sms_number['welcome_message'] = data.get('welcome_message')
                     sms_number['display_welcome_message'] = False
-            if encrypt_number:
+            if data.get('encrypt_number'):
                 del_queryset.delete()
-                for num in encrypt_number:
+                for num in data.get('encrypt_number'):
                     models.PatientMobile.objects.create(patient=patient,
                                                         encrypted_number=num.get('phone_number'),
                                                         is_default=num.get('is_default', False)
