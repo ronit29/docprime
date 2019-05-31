@@ -1602,3 +1602,17 @@ def ipd_query_parameters(entity, req_params):
     if entity.locality_value:
         params_dict['city'] = entity.locality_value
     return params_dict
+
+
+def convert_datetime_str_to_iso_str(datetime_string_to_be_converted):
+    try:
+        from dateutil import parser
+        datetime_obj = parser.parse(datetime_string_to_be_converted)
+        datetime_str = datetime_obj.isoformat()
+        if datetime_str.endswith('+00:00'):
+            datetime_str = datetime_str[:-6] + 'Z'
+        result = datetime_str
+    except Exception as e:
+        print(e)
+        result = datetime_string_to_be_converted
+    return result
