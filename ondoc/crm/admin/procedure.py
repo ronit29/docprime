@@ -15,7 +15,8 @@ from ondoc.crm.admin.doctor import AutoComplete
 from ondoc.procedure.models import Procedure, ProcedureCategory, ProcedureCategoryMapping, ProcedureToCategoryMapping, \
     IpdProcedure, IpdProcedureFeatureMapping, IpdProcedureCategoryMapping, IpdProcedureCategory, IpdProcedureDetail, \
     IpdProcedureSynonym, IpdProcedureSynonymMapping, SimilarIpdProcedureMapping, IpdProcedurePracticeSpecialization, \
-    IpdProcedureLead
+    IpdProcedureLead, IpdProcedureCostEstimate, IpdProcedureLeadCostEstimateMapping, IpdCostEstimateRoomType, \
+    IpdCostEstimateRoomTypeMapping
 from django import forms
 
 
@@ -321,6 +322,15 @@ class IpdProcedurePracticeSpecializationAdmin(ImportExportMixin, VersionAdmin):
     # change_list_template = 'superuser_import_export.html'
 
 
+class IpdProcedureLeadCostEstimateMappingInline(TabularInline):
+    model = IpdProcedureLeadCostEstimateMapping
+    extra = 0
+    can_delete = False
+    verbose_name = "Procedure Cost Estimates"
+    verbose_name_plural = "Procedure Cost Estimates"
+    autocomplete_fields = ['cost_estimate']
+
+
 class IpdProcedureLeadAdminForm(forms.ModelForm):
     def clean(self):
         super().clean()
@@ -344,9 +354,7 @@ class IpdProcedureLeadAdmin(VersionAdmin):
     exclude = ['user', 'lat', 'long']
     readonly_fields = ['phone_number', 'id', 'matrix_lead_id', 'comments', 'data', 'source', 'current_age',
                        'related_speciality', 'is_insured', 'insurance_details', 'opd_appointments', 'lab_appointments']
-
-
-
+    inlines = [IpdProcedureLeadCostEstimateMappingInline]
 
     fieldsets = (
         (None, {
@@ -428,3 +436,28 @@ class IpdProcedureLeadAdmin(VersionAdmin):
         if not result and obj.age:
             result = str(obj.age)
         return result
+
+
+class IpdCostEstimateRoomTypeAdmin(VersionAdmin):
+    model = IpdCostEstimateRoomType
+    list_display = ['room_type']
+    search_fields = ('room_type',)
+
+
+
+class IpdCostEstimateRoomTypeMappingInline(TabularInline):
+    model = IpdCostEstimateRoomTypeMapping
+    extra = 0
+    can_delete = True
+    verbose_name = "Room Type Cost"
+    verbose_name_plural = "Room Type Costs"
+    autocomplete_fields = ['room_type']
+
+
+class IpdProcedureCostEstimateAdmin(VersionAdmin):
+    model = IpdProcedureCostEstimate
+    list_display = ['ipd_procedure', 'hospital', 'stay_duration']
+    autocomplete_fields = ['ipd_procedure', 'hospital']
+    inlines = [IpdCostEstimateRoomTypeMappingInline]
+    search_fields = ('cost_estimate', )
+
