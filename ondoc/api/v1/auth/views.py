@@ -1882,10 +1882,14 @@ class OrderDetailViewSet(GenericViewSet):
     @transaction.non_atomic_requests
     def summary(self, request, order_id):
         from ondoc.api.v1.cart import serializers as cart_serializers
+        from ondoc.api.v1.utils import convert_datetime_str_to_iso_str
 
         if not order_id:
             return Response(status=status.HTTP_400_BAD_REQUEST)
         order_data = Order.objects.filter(id=order_id).first()
+
+        if not order_data:
+            return Response({"message": "Invalid order ID"}, status.HTTP_404_NOT_FOUND)
 
         if not order_data.validate_user(request.user):
             return Response({"status": 0}, status.HTTP_404_NOT_FOUND)
@@ -1903,14 +1907,15 @@ class OrderDetailViewSet(GenericViewSet):
 
         for order in child_orders:
             item = OrderCartItemMapper(order)
+            temp_time_slot_start = convert_datetime_str_to_iso_str(order.action_data["time_slot_start"])
             curr = {
-                "mrp" : order.action_data["mrp"] if "mrp" in order.action_data else order.action_data["agreed_price"],
+                "mrp": order.action_data["mrp"] if "mrp" in order.action_data else order.action_data["agreed_price"],
                 "deal_price": order.action_data["deal_price"],
                 "effective_price": order.action_data["effective_price"],
-                "data" : cart_serializers.CartItemSerializer(item, context={"validated_data" : None}).data,
-                "booking_id" : order.reference_id,
-                "time_slot_start" : order.action_data["time_slot_start"],
-                "payment_type" : order.action_data["payment_type"]
+                "data": cart_serializers.CartItemSerializer(item, context={"validated_data": None}).data,
+                "booking_id": order.reference_id,
+                "time_slot_start": temp_time_slot_start,
+                "payment_type": order.action_data["payment_type"]
             }
             processed_order_data.append(curr)
 
