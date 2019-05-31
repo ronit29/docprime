@@ -1319,7 +1319,7 @@ class DoctorClinic(auth_model.TimeStampedModel, auth_model.WelcomeCallingDone):
 
         for data in clinic_timings:
             obj.form_time_slots( data.day, data.start, data.end, data.fees, True,
-                                data.deal_price, data.mrp, data.cod_deal_price(), True, on_call=data.type)
+                                data.deal_price, data.mrp, data.dct_cod_deal_price(), True, on_call=data.type)
 
         date = datetime.datetime.today().strftime('%Y-%m-%d')
         booking_details = {"type": "doctor"}
@@ -1379,7 +1379,7 @@ class DoctorClinicTiming(auth_model.TimeStampedModel):
     def is_enabled_for_cod(self):
         return self.doctor_clinic.is_enabled_for_cod()
 
-    def cod_deal_price(self):
+    def dct_cod_deal_price(self):
         if self.is_enabled_for_cod():
             if self.cod_deal_price:
                 return self.cod_deal_price

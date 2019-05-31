@@ -414,7 +414,7 @@ class DoctorSearchHelper:
             return
         for doctor_clinic_timing in doctor_clinic.availability.all():
             if doctor_clinic_timing.id == doctor_availability_mapping[doctor_clinic.doctor.id]:
-                return doctor_clinic_timing.cod_deal_price(), doctor_clinic_timing.deal_price, doctor_clinic_timing.mrp
+                return doctor_clinic_timing.dct_cod_deal_price(), doctor_clinic_timing.deal_price, doctor_clinic_timing.mrp
                 # return doctor_hospital.deal_price
         return None
 
