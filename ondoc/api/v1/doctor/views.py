@@ -3146,7 +3146,7 @@ class OfflineCustomerViewSet(viewsets.GenericViewSet):
         if encrypt_number:
             for num in encrypt_number:
                 models.PatientMobile.objects.create(patient=patient,
-                                                    encrypted_number=num.get('encrypted_number'),
+                                                    encrypted_number=num.get('phone_number'),
                                                     is_default=num.get('is_default', False)
                                                     )
                 sms_number = None
