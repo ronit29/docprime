@@ -914,7 +914,7 @@ class Command(BaseCommand):
                                                            UserInsurance, InsuranceDeal, InsuranceLead,
                                                            InsuranceTransaction, InsuranceDiseaseResponse,
                                                            InsuredMembers, InsurerPolicyNumber, InsuranceCancelMaster,
-                                                           EndorsementRequest)
+                                                           EndorsementRequest, InsuredMemberDocument, InsuredMemberHistory)
 
         for cl, ct in content_types.items():
             permissions = Permission.objects.filter(
