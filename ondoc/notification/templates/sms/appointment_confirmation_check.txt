@@ -1,10 +1,4 @@
-Dear {{patient_name|capfirst}},
-
-Your appointment with Dr. {{doctor_name|capfirst}} against the appointment ID - {{instance.id}}, scheduled on {{instance.time_slot_start|date:"D jS F Y"}} at {{instance.time_slot_start|date:"h:i A"}} is still in progress status.
-
-Please click link {{opd_appointment_complete_url}} to compete your appointment if you have visited the doctor.
-
-Did not make it to the appointment? click on {{reschdule_appointment_bypass_url}} to reschedule.
-
-Thanks,
-Team Docprime.com
+Appointment ID <<{{instance.id}}>>:
+Please click on the link to complete your appointment with Dr.{{doctor_name|capfirst}}.
+{{opd_appointment_complete_url}}
+Did not make it to the appointment? Click to reschedule {{reschdule_appointment_bypass_url}}.

@@ -1,9 +1,7 @@
-We have received a reschedule request for your appointment with Dr. {{doctor_name|capfirst}}. Below are the details:
-Booking ID : {{instance.id}}
+Appointment ID : {{instance.id}}
+Reschedule request has been received for:
 Patient Name : {{patient_name|capfirst}}
+Appointment with Doctor : {{doctor_name|capfirst}}
 Requested Date and Time : {{instance.time_slot_start|date:"D jS F Y"}} || {{instance.time_slot_start|date:"h:i A"}}
 
-You will receive a confirmation email and message once the appointment is confirmed.
-
-Thanks,
-Team Docprime.com
+You will receive a confirmation email and message once the appointment is confirmed by the doctor.
