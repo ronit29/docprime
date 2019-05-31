@@ -460,12 +460,6 @@ class DoctorHospitalSerializer(serializers.ModelSerializer):
     enabled_for_cod = serializers.BooleanField(source='doctor_clinic.is_enabled_for_cod')
     enabled_for_prepaid = serializers.BooleanField(source='doctor_clinic.hospital.enabled_for_prepaid')
     is_price_zero = serializers.SerializerMethodField()
-    #enabled_for_cod = serializers.SerializerMethodField()
-
-    #def get_enabled_for_cod(self, obj):
-    #    if obj.doctor_clinic and obj.doctor_clinic.hospital:
-    #        return obj.doctor_clinic.hospital.enable_for_cod()
-    #    return False
 
     def get_show_contact(self, obj):
         if obj.doctor_clinic and obj.doctor_clinic.hospital and obj.doctor_clinic.hospital.spoc_details.all():

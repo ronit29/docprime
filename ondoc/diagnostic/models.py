@@ -633,11 +633,13 @@ class Lab(TimeStampedModel, CreatedByModel, QCModel, SearchKey, WelcomeCallingDo
 
         if not is_home_pickup and lab_timing_queryset[0].lab.always_open:
             for day in range(0, 7):
-                obj.form_time_slots(day, 0.0, 23.75, None, True)
+                obj.form_time_slots(day=day, start=0.0, end=23.75, price=None, is_available=True,
+                                    deal_price=None, mrp=None, cod_deal_price=None, is_doctor=False, on_call=0)
 
         else:
             for data in lab_timing_queryset:
-                obj.form_time_slots(data.day, data.start, data.end, None, True)
+                obj.form_time_slots(day=data.day, start=data.start, end=data.end, price=None, is_available=True,
+                                    deal_price=None, mrp=None, cod_deal_price=None, is_doctor=False, on_call=0)
 
         global_leave_serializer = common_serializers.GlobalNonBookableSerializer(
             GlobalNonBookable.objects.filter(deleted_at__isnull=True,
@@ -849,11 +851,14 @@ class LabBookingClosingManager(models.Manager):
 
             if not is_home_pickup and lab_timing_queryset[0].lab.always_open:
                 for day in range(0, 7):
-                    obj.form_time_slots(day, 0.0, 23.75, None, True)
+                    obj.form_time_slots(day=day, start=0.0, end=23.75, price=None, is_available=True,
+                                        deal_price=None, mrp=None, cod_deal_price=None, is_doctor=False, on_call=0)
 
             else:
                 for data in lab_timing_queryset:
-                    obj.form_time_slots(data.day, data.start, data.end, None, True)
+                    obj.form_time_slots(day=data.day, start=data.start, end=data.end, price=None, is_available=True,
+                                        deal_price=None, mrp=None, cod_deal_price=None, is_doctor=False, on_call=0)
+
                 # daywise_data_array = sorted(lab_timing_queryset, key=lambda k: [k.day, k.start], reverse=True)
                 # day, end = daywise_data_array[0].day, daywise_data_array[0].end
                 # end = end - threshold

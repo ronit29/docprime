@@ -3396,7 +3396,7 @@ class OfflineCustomerViewSet(viewsets.GenericViewSet):
 
                 for data in queryset:
                     obj.form_time_slots(data.day, data.start, data.end, data.fees, True,
-                                        data.deal_price, data.mrp, dct.cod_deal_price(), True)
+                                        data.deal_price, data.mrp, data.cod_deal_price(), True)
 
                 timeslots = obj.get_timing_list()
                 for day, slots in timeslots.items():
