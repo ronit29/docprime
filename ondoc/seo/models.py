@@ -1,5 +1,6 @@
 from django.db import models
 from django.utils.html import strip_tags
+from django.db import transaction
 
 from ondoc.authentication.models import TimeStampedModel
 from django.core.validators import FileExtensionValidator
@@ -87,8 +88,12 @@ class NewDynamic(TimeStampedModel):
             if ps_content:
                 self.top_content = ps_content.content
 
-        if self.url:
-            self.url_value = self.url.url
+        with transaction.atomic():
+            try:
+                if self.url:
+                    self.url_value = self.url.url
+            except Exception as e:
+                pass
 
         super().save(force_insert, force_update, using, update_fields)
 
