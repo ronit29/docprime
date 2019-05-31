@@ -548,6 +548,10 @@ class Hospital(auth_model.TimeStampedModel, auth_model.CreatedByModel, auth_mode
         return result
 
     def get_specialization_insured_appointments(self, doctor, insurance):
+        plan_limits = insurance.insurance_plan.plan_usages
+        days = plan_limits.get('specialization_days_limit', 14)
+        last_allowed_date = timezone.now() - datetime.timedelta(days=days)
+
         limit_specialization_ids = json.loads(settings.INSURANCE_SPECIALIZATION_WITH_DAYS_LIMIT)
         limit_specialization_ids_set = set(limit_specialization_ids)
         doctor_specialization_ids = set([x.specialization_id for x in doctor.doctorpracticespecializations.all()])
@@ -558,13 +562,35 @@ class Hospital(auth_model.TimeStampedModel, auth_model.CreatedByModel, auth_mode
         doctor_with_specialization = DoctorPracticeSpecialization.objects. \
             filter(specialization_id__in=limit_specialization_ids).values_list('doctor_id', flat=True)
 
-        appointments = self.hospital_appointments.filter(~Q(status=OpdAppointment.CANCELLED),
-                                          insurance=insurance,
-                                          user=insurance.user,
-                                          time_slot_start__gte=timezone.now(),
-                                          doctor_id__in=doctor_with_specialization).order_by('-time_slot_start')
+        appointments = self.hospital_appointments.filter(insurance=insurance,
+                                                         user=insurance.user,
+                                                         time_slot_start__gte=last_allowed_date,
+                                                         doctor_id__in=doctor_with_specialization).\
+            exclude(status__in=[OpdAppointment.CANCELLED, OpdAppointment.COMPLETED]).order_by('-time_slot_start')
 
         return appointments
+
+    def can_insurance_specialization_appointment_book(self, doctor, insurance, **kwargs):
+        appointments = self.get_specialization_insured_appointments(doctor, insurance)
+        if not appointments:
+            return True
+
+        appointment_time_slot = kwargs.get('time_slot')
+        if appointment_time_slot:
+            return True
+
+        plan_limits = insurance.insurance_plan.plan_usages
+        days = plan_limits.get('specialization_days_limit', 14)
+
+        for appointment in appointments:
+            previous_datetime = appointment.time_slot_start - timedelta(days=days)
+            future_datetime = appointment.time_slot_start + timedelta(days=days)
+
+            if previous_datetime <= appointment_time_slot <= future_datetime:
+                return False
+
+        return True
+
 
 
 class HospitalPlaceDetails(auth_model.TimeStampedModel):
