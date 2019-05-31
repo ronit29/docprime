@@ -198,7 +198,7 @@ def push_mis():
     earliest_date = str(datetime(2019, 1, 1).date())
     future_date = str(datetime.now().date() + timedelta(days=1))
 
-    date_tuple = ((from_date, to_date), (earliest_date, future_date))
+    date_tuple = ((from_date, to_date), (earliest_date, to_date))
 
     email_attachments = []
     mis_temporary_file = []
