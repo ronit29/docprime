@@ -565,30 +565,27 @@ class Hospital(auth_model.TimeStampedModel, auth_model.CreatedByModel, auth_mode
                                                          user=insurance.user,
                                                          time_slot_start__gte=n_days_back_datetime,
                                                          doctor_id__in=doctor_with_specialization).\
-            exclude(status__in=[OpdAppointment.CANCELLED, OpdAppointment.COMPLETED]).order_by('-time_slot_start')
+            exclude(status__in=[OpdAppointment.CANCELLED]).order_by('-time_slot_start')
 
         return appointments
 
-    def can_insurance_specialization_appointment_book(self, doctor, insurance, **kwargs):
+    def get_blocked_specialization_appointments_slots(self, doctor, insurance):
+        blockeds_timeslots = []
         appointments = self.get_specialization_insured_appointments(doctor, insurance)
-        if not appointments:
-            return True
 
-        appointment_time_slot = kwargs.get('start_date')
-        if not appointment_time_slot:
-            return True
+        if not appointments:
+            return blockeds_timeslots
 
         days = insurance.specialization_days_limit
-
         for appointment in appointments:
-            previous_datetime = appointment.time_slot_start - timedelta(days=days)
-            future_datetime = appointment.time_slot_start + timedelta(days=days)
+            for n in range(days):
+                nth_day_future_timeslot = appointment.time_slot_start.date() + datetime.timedelta(days=n)
+                nth_day_past_timeslot = appointment.time_slot_start.date() - datetime.timedelta(days=n)
+                blockeds_timeslots.append(str(nth_day_future_timeslot))
+                if nth_day_past_timeslot >= timezone.now().date():
+                    blockeds_timeslots.append(str(nth_day_past_timeslot))
 
-            if previous_datetime <= appointment_time_slot <= future_datetime:
-                return False
-
-        return True
-
+        return blockeds_timeslots
 
 
 class HospitalPlaceDetails(auth_model.TimeStampedModel):
