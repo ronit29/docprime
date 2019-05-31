@@ -768,7 +768,8 @@ class EmailNotification(TimeStampedModel, EmailNotificationOpdMixin, EmailNotifi
     @classmethod
     def send_endorsement_request_url(cls, token, email):
         booking_url = "{}/agent/booking?token={}".format(settings.CONSUMER_APP_DOMAIN, token)
-        booking_url = booking_url + "&callbackurl=insurance/insurance-user-details-review?is_endorsement=true&isAgent=true"
+        is_agent = "&isAgent=true"
+        booking_url = booking_url + "&callbackurl=insurance/insurance-user-details-review?is_endorsement=true{}".format(is_agent)
         short_url = generate_short_url(booking_url)
         html_body = "Your Endorsement Request url is - {} . Please confirm to process".format(short_url)
         email_subject = "Insurance Endorsement Request"
@@ -971,7 +972,8 @@ class SmsNotification(TimeStampedModel, SmsNotificationOpdMixin, SmsNotification
     @classmethod
     def send_endorsement_request_url(cls, token, phone_number):
         booking_url = "{}/agent/booking?token={}".format(settings.CONSUMER_APP_DOMAIN, token)
-        booking_url = booking_url + "&callbackurl=insurance/insurance-user-details-review?is_endorsement=true&isAgent=true"
+        is_agent = "&isAgent=true"
+        booking_url = booking_url + "&callbackurl=insurance/insurance-user-details-review?is_endorsement=true{}".format(is_agent)
         short_url = generate_short_url(booking_url)
         html_body = "Your Insurance Endorsement request url is - {} . Please confirm to process".format(short_url)
         if phone_number:
