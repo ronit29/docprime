@@ -767,6 +767,27 @@ class EmailNotification(TimeStampedModel, EmailNotificationOpdMixin, EmailNotifi
         return booking_url
 
     @classmethod
+    def send_endorsement_request_url(cls, token, email):
+        booking_url = "{}/agent/booking?token={}".format(settings.CONSUMER_APP_DOMAIN, token)
+        booking_url = booking_url + "&callbackurl=insurance/insurance-user-details-review?is_endorsement=true"
+        short_url = generate_short_url(booking_url)
+        html_body = "Your Endorsement Request url is - {} . Please confirm to process".format(short_url)
+        email_subject = "Insurance Endorsement Request"
+        if email:
+            email_noti = {
+                "email": email,
+                "content": html_body,
+                "email_subject": email_subject
+            }
+            message = {
+                "data": email_noti,
+                "type": "email"
+            }
+            message = json.dumps(message)
+            publish_message(message)
+        return booking_url
+
+    @classmethod
     def send_insurance_float_alert_email(cls, email, html_body):
         email_subject = 'ALERT!!! Insurance Float amount is on the limit.'
         if email:
@@ -947,6 +968,26 @@ class SmsNotification(TimeStampedModel, SmsNotificationOpdMixin, SmsNotification
             message = json.dumps(message)
             publish_message(message)
         return booking_url
+
+    @classmethod
+    def send_endorsement_request_url(cls, token, phone_number):
+        booking_url = "{}/agent/booking?token={}".format(settings.CONSUMER_APP_DOMAIN, token)
+        booking_url = booking_url + "&callbackurl=insurance/insurance-user-details-review?is_endorsement=true"
+        short_url = generate_short_url(booking_url)
+        html_body = "Your Insurance Endorsement request url is - {} . Please confirm to process".format(short_url)
+        if phone_number:
+            sms_notification = {
+                "phone_number": phone_number,
+                "content": html_body,
+            }
+            message = {
+                "data": sms_notification,
+                "type": "sms"
+            }
+            message = json.dumps(message)
+            publish_message(message)
+        return booking_url
+
 
     @classmethod
     def send_app_download_link(cls, phone_number, context):

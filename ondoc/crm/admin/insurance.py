@@ -686,6 +686,8 @@ class UserInsuranceResource(resources.ModelResource):
     def dehydrate_pg_order_no(self, insurance):
         from ondoc.account.models import Order
         order = Order.objects.filter(reference_id=insurance.id).first()
+        if not order:
+            return ""
         transaction = order.getTransactions()
         if not transaction:
             return ""

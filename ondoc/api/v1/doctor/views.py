@@ -249,6 +249,13 @@ class DoctorAppointmentsViewSet(OndocViewSet):
             if data['is_appointment_insured']:
                 data['payment_type'] = OpdAppointment.INSURANCE
                 hospital = validated_data.get('hospital')
+                doctor = validated_data.get('doctor')
+
+                blocked_slots = hospital.get_blocked_specialization_appointments_slots(doctor, user_insurance)
+                start_date = validated_data.get('start_date').date()
+                if str(start_date) in blocked_slots:
+                    return Response(status=status.HTTP_400_BAD_REQUEST, data={'error': 'Some error occured. Please try again after some time.'})
+
                 appointment_date = validated_data.get('start_date')
                 is_appointment_exist = hospital.get_active_opd_appointments(request.user, user_insurance, appointment_date.date())
                 if request.user and request.user.is_authenticated and not hasattr(request, 'agent') and is_appointment_exist :
@@ -2093,13 +2100,21 @@ class DoctorAvailabilityTimingViewSet(viewsets.ViewSet):
                                                             hospital_id=validated_data.get(
                                                                 'hospital_id')).first()
         blocks = []
+        blockeds_timeslot_set = set()
         if request.user and request.user.is_authenticated and \
                 not hasattr(request, 'agent') and request.user.active_insurance:
             active_appointments = dc_obj.hospital.\
                 get_active_opd_appointments(request.user, request.user.active_insurance)
             for apt in active_appointments:
-                blocks.append(str(apt.time_slot_start.date()))
+                # blocks.append(str(apt.time_slot_start.date()))
+                blockeds_timeslot_set.add(str(apt.time_slot_start.date()))
 
+            if dc_obj and not hasattr(request, 'agent'):
+                hospital = dc_obj.hospital
+                appointment_slot_blocks = hospital.get_blocked_specialization_appointments_slots(dc_obj.doctor, request.user.active_insurance)
+                blockeds_timeslot_set = blockeds_timeslot_set.union(set(appointment_slot_blocks))
+
+        blocks.extend(list(blockeds_timeslot_set))
 
         if dc_obj:
             timeslots = dc_obj.get_timings(blocks)

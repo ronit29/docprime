@@ -453,6 +453,7 @@ class DoctorHospitalSerializer(serializers.ModelSerializer):
     lat = serializers.SerializerMethodField(read_only=True)
     long = serializers.SerializerMethodField(read_only=True)
     insurance = serializers.SerializerMethodField(read_only=True)
+    url = serializers.SerializerMethodField(read_only=True)
 
     enabled_for_online_booking = serializers.SerializerMethodField(read_only=True)
     show_contact = serializers.SerializerMethodField(read_only=True)
@@ -546,11 +547,17 @@ class DoctorHospitalSerializer(serializers.ModelSerializer):
         else:
             return False
 
+    def get_url(self, obj):
+        entity_url = self.context.get('hosp_entity_dict', {})
+        return entity_url.get(
+            obj.doctor_clinic.hospital.id if obj and obj.doctor_clinic and obj.doctor_clinic.hospital else -1)
+
     class Meta:
         model = DoctorClinicTiming
         fields = ('doctor', 'hospital_name', 'address','short_address', 'hospital_id', 'start', 'end', 'day', 'deal_price',
                   'discounted_fees', 'hospital_thumbnail', 'mrp', 'lat', 'long', 'id','enabled_for_online_booking',
-                  'insurance', 'show_contact', 'enabled_for_cod', 'enabled_for_prepaid', 'is_price_zero', 'hospital_city')
+                  'insurance', 'show_contact', 'enabled_for_cod', 'enabled_for_prepaid', 'is_price_zero', 'hospital_city',
+                  'url')
         # fields = ('doctor', 'hospital_name', 'address', 'hospital_id', 'start', 'end', 'day', 'deal_price', 'fees',
         #           'discounted_fees', 'hospital_thumbnail', 'mrp',)
 
@@ -1193,7 +1200,14 @@ class DoctorProfileUserViewSerializer(DoctorProfileSerializer):
         data = DoctorClinicTiming.objects.filter(doctor_clinic__doctor=obj,
                                                  doctor_clinic__enabled=True,
                                                  doctor_clinic__hospital__is_live=True).select_related(
-            "doctor_clinic__doctor", "doctor_clinic__hospital").prefetch_related("doctor_clinic__hospital__spoc_details","doctor_clinic__doctor__mobiles","doctor_clinic__doctor__doctorpracticespecializations","doctor_clinic__doctor__doctorpracticespecializations__specialization")
+            "doctor_clinic__doctor", "doctor_clinic__hospital").prefetch_related(
+            "doctor_clinic__hospital__spoc_details", "doctor_clinic__doctor__mobiles",
+            "doctor_clinic__doctor__doctorpracticespecializations",
+            "doctor_clinic__doctor__doctorpracticespecializations__specialization")
+        all_hospital_ids = data.values_list('doctor_clinic__hospital_id', flat=True).distinct()
+        hosp_entity_dict, hosp_locality_entity_dict = Hospital.get_hosp_and_locality_dict(all_hospital_ids, EntityUrls.SitemapIdentifier.DOCTORS_LOCALITY_CITY)
+        self.context['hosp_entity_dict']=hosp_entity_dict
+        self.context['hosp_locality_entity_dict']=hosp_locality_entity_dict
         if obj:
             doctor_specialization = InsuranceDoctorSpecializations.get_doctor_insurance_specializations(obj)
             if doctor_specialization:
