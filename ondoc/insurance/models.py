@@ -143,6 +143,7 @@ class InsuranceOncologist:
                                                   user=user).count()
         if count >= int(settings.INSURANCE_ONCOLOGIST_LIMIT):
             error = "Oncologist limit exceeded of limit {}".format(settings.INSURANCE_ONCOLOGIST_LIMIT)
+        return count, error
 
 
 
@@ -325,6 +326,10 @@ class Insurer(auth_model.TimeStampedModel, LiveMixin):
     def get_active_plans(self):
         return self.plans.filter(is_live=True).order_by('total_allowed_members')
 
+    @property
+    def get_all_plans(self):
+        return self.plans.all().order_by('total_allowed_members')
+
     def __str__(self):
         return self.name
 
@@ -495,6 +500,12 @@ class UserInsurance(auth_model.TimeStampedModel):
 
     def __str__(self):
         return str(self.user)
+
+    @cached_property
+    def specialization_days_limit(self):
+        plan_limits = self.insurance_plan.plan_usages
+        days = plan_limits.get('specialization_days_limit', 0)
+        return days
 
     def save(self, *args, **kwargs):
         if not self.merchant_payout:
@@ -1243,6 +1254,7 @@ class UserInsurance(auth_model.TimeStampedModel):
 
         transaction.on_commit(lambda: self.after_commit_task(send_cancellation_notification))
         res['success'] = "Cancellation request received, refund will be credited in your account in 10-15 working days"
+        res['policy_number'] = self.user.active_insurance.policy_number
         return res
 
     def after_commit_task(self, send_cancellation_notification):
@@ -1832,3 +1844,24 @@ class ThirdPartyAdministrator(auth_model.TimeStampedModel):
 
     class Meta:
         db_table = "third_party_administrator"
+
+
+class UserBank(auth_model.TimeStampedModel):
+    insurance = models.ForeignKey(UserInsurance, related_name='user_bank', on_delete=models.DO_NOTHING)
+    bank_name = models.CharField(max_length=250)
+    account_number = models.CharField(max_length=50)
+    account_holder_name = models.CharField(max_length=150)
+    ifsc_code = models.CharField(max_length=20)
+    bank_address = models.CharField(max_length=300, blank=True, null=True)
+
+    class Meta:
+        db_table = "user_bank"
+
+
+class UserBankDocument(auth_model.TimeStampedModel):
+    insurance = models.ForeignKey(UserInsurance, related_name='user_bank_document', on_delete=models.DO_NOTHING)
+    document_image = models.FileField(upload_to='users/images', blank=False, null=False, validators=[
+        FileExtensionValidator(allowed_extensions=['pdf', 'jpg', 'jpeg', 'png'])])
+
+    class Meta:
+        db_table = "user_bank_document"
