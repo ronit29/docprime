@@ -86,6 +86,14 @@
                             </tr>
                             <tr>
                                 <td style="color:#000000;font-size:14px;font-weight:700;padding-top:16px;width:40%">
+                                    Appointment Type
+                                </td>
+                                <td style="color:#000000;font-size:14px;font-weight:700;padding-top:16px;width:40%">
+                                    Pay-At-Hospital(Cash)
+                                </td>
+                            </tr>
+                            <tr>
+                                <td style="color:#000000;font-size:14px;font-weight:700;padding-top:16px;width:40%">
                                     Patient
                                 </td>
                                 <td style="color:#3f3f3f;font-size:16px;font-weight:500;padding-top:16px">
@@ -123,6 +131,14 @@
                                 <td style="color:#3f3f3f;font-size:16px;font-weight:500;padding-top:16px">
                                     {{instance.time_slot_start|date:"D jS F Y"}} ||
                                     {{instance.time_slot_start|date:"h:i A"}}
+                                </td>
+                            </tr>
+                            <tr>
+                                <td style="color:#3f3f3f;font-size:16px;font-weight:500;padding-top:16px">
+                                    Amount to be collected from patient
+                                </td>
+                                <td style="color:#3f3f3f;font-size:16px;font-weight:500;padding-top:16px">
+                                    {{instance.amount_to_be_paid}}
                                 </td>
                             </tr>
                             </tbody>
