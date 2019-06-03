@@ -120,6 +120,11 @@ class InsuredMemberSerializer(serializers.Serializer):
         member_list = attrs.get('members', [])
         name_set = set(map(lambda member: "%s-%s-%s" % (member['first_name'], member['middle_name'], member['last_name']), member_list))
 
+        adult_members = list(filter(lambda mem: mem.get('member_type') == InsuredMembers.ADULT, member_list))
+
+        if len(adult_members) == 2 and adult_members[0]['gender'] == adult_members[1]['gender']:
+            raise serializers.ValidationError({'name': 'Two adults cannot have same gender as per Insurance Plan.'})
+
         if len(name_set) != len(member_list):
             raise serializers.ValidationError({'name': 'Multiple members cannot have same name'})
 
