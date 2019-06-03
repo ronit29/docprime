@@ -572,15 +572,14 @@ class ProviderSignupDataViewset(viewsets.GenericViewSet):
         serializer.is_valid(raise_exception=True)
         valid_data = serializer.validated_data
         user = request.user
-        if 'is_encrypted' in valid_data and not valid_data.get('is_encrypted'):
-            doc_models.ProviderEncrypt.objects.filter(hospital__in=[hospital['hospital_id'] for hospital in valid_data.get("hospitals")])\
-                                              .update(is_encrypted=False, encrypted_by=None, hint=None, encrypted_hospital_id=None, is_valid=False)
         objects_to_be_created = list()
         hospital_ids_to_be_created = list()
         for hospital in valid_data.get("hospitals"):
             if 'is_encrypted' in valid_data:
                 if not valid_data.get('is_encrypted'):
-                    self.decrypt_and_save_provider_data(hospital['hospital_id'].id, valid_data['encryption_key'])
+                    exception = self.decrypt_and_save_provider_data(hospital['hospital_id'].id, valid_data['encryption_key'])
+                    if exception:
+                        return Response("Error while decrypting - " + str(exception), status=status.HTTP_400_BAD_REQUEST)
                 else:
                     if hasattr(hospital['hospital_id'], 'encrypt_details'):
                         encrypt_object = doc_models.ProviderEncrypt.objects.filter(hospital_id=hospital['hospital_id']).first()
@@ -606,6 +605,9 @@ class ProviderSignupDataViewset(viewsets.GenericViewSet):
                 objects_to_be_created.append(doc_models.ProviderEncrypt(hospital=hospital['hospital_id'],
                                                                         is_valid=False))
                 hospital_ids_to_be_created.append(hospital['hospital_id'].id)
+        if 'is_encrypted' in valid_data and not valid_data.get('is_encrypted'):
+            doc_models.ProviderEncrypt.objects.filter(hospital__in=[hospital['hospital_id'] for hospital in valid_data.get("hospitals")])\
+                                              .update(is_encrypted=False, encrypted_by=None, hint=None, encrypted_hospital_id=None, is_valid=False)
         try:
             if 'is_encrypted' in valid_data and valid_data.get('is_encrypted') and objects_to_be_created and not doc_models.ProviderEncrypt.objects.filter(hospital_id__in=hospital_ids_to_be_created):
                 doc_models.ProviderEncrypt.objects.bulk_create(objects_to_be_created)
@@ -852,14 +854,18 @@ class ProviderSignupDataViewset(viewsets.GenericViewSet):
         patient_queryset = doc_models.OfflinePatients.objects.prefetch_related('patient_mobiles').filter(hospital_id=hospital_id)
         for patient in patient_queryset:
             if patient.encrypted_name:
-                name = v1_utils.AES_encryption.decrypt(patient.encrypted_name, passphrase)
+                name, exception = v1_utils.AES_encryption.decrypt(patient.encrypted_name, passphrase)
+                if exception:
+                    return exception
                 patient.name = name
                 patient.encrypted_name = None
                 patient.save()
             for mobile in patient.patient_mobiles.all():
                 if mobile.encrypted_number:
-                    number = v1_utils.AES_encryption.decrypt(mobile.encrypted_number, passphrase)
-                    mobile.phone_number = number
+                    number, exception = v1_utils.AES_encryption.decrypt(mobile.encrypted_number, passphrase)
+                    if exception:
+                        return exception
+                    mobile.phone_number = ''.join(e for e in number if e.isalnum())
                     mobile.encrypted_number = None
                     mobile.save()
 
