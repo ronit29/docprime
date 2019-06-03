@@ -813,7 +813,7 @@ class EmailNotification(TimeStampedModel, EmailNotificationOpdMixin, EmailNotifi
         emails = settings.INSURANCE_MIS_EMAILS
         to_email = emails[0]
         cc_emails = emails[1:]
-        email_obj = cls.objects.create(attachments=attachment, email=to_email, notification_type=NotificationAction.INSURANCE_FLOAT_LIMIT,
+        email_obj = cls.objects.create(attachments=attachment, email=to_email, notification_type=NotificationAction.INSURANCE_MIS,
                                        content=html_body, email_subject=email_subject, cc=cc_emails, bcc=[])
         email_obj.save()
 
