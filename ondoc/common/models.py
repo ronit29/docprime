@@ -437,7 +437,7 @@ class RefundDetails(TimeStampedModel):
 class DeviceDetails(TimeStampedModel):
     device_id = models.CharField(max_length=200)
     app_version = models.CharField(max_length=20, null=True, blank=True)
-    os = models.PositiveSmallIntegerField(null=True, blank=True)
+    os = models.CharField(max_length=40, null=True, blank=True)
     os_version = models.CharField(max_length=20, null=True, blank=True)
     make = models.CharField(max_length=100, null=True, blank=True)
     model = models.CharField(max_length=100, null=True, blank=True)
