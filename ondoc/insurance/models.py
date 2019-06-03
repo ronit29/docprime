@@ -1262,7 +1262,8 @@ class UserInsurance(auth_model.TimeStampedModel):
             try:
                 # notification_tasks.send_insurance_cancellation.apply_async(self.id)
                 if send_cancellation_notification:
-                    send_insurance_notifications.apply_async(({'user_id': self.user.id, 'status': UserInsurance.CANCEL_INITIATE}, ))
+                    pass
+                    # send_insurance_notifications.apply_async(({'user_id': self.user.id, 'status': UserInsurance.CANCEL_INITIATE}, ))
             except Exception as e:
                 logger.error(str(e))
 
