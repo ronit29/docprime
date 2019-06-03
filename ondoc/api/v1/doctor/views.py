@@ -4120,7 +4120,7 @@ class IpdProcedureViewSet(viewsets.GenericViewSet):
         return Response(response)
 
     def sync_lead(self, request):
-        serializer = serializers.IpdLeadUpdateSerializer(data=request.query_params)
+        serializer = serializers.IpdLeadUpdateSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         validated_data = serializer.validated_data
         status = validated_data.get('status')
