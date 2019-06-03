@@ -8,6 +8,7 @@ from django.urls import reverse
 from django.utils.safestring import mark_safe
 from import_export import resources, fields, widgets
 from import_export.admin import ImportExportMixin
+from ondoc.notification import tasks as notification_tasks
 from reversion.admin import VersionAdmin
 
 from ondoc.common.models import Feature, Service, AppointmentHistory
@@ -325,13 +326,15 @@ class IpdProcedurePracticeSpecializationAdmin(ImportExportMixin, VersionAdmin):
 class IpdProcedureLeadCostEstimateMappingInline(TabularInline):
     model = IpdProcedureLeadCostEstimateMapping
     extra = 0
-    can_delete = False
+    can_delete = True
     verbose_name = "Procedure Cost Estimates"
     verbose_name_plural = "Procedure Cost Estimates"
     autocomplete_fields = ['cost_estimate']
 
 
 class IpdProcedureLeadAdminForm(forms.ModelForm):
+    send_estimate = forms.BooleanField(label='Send estimate', initial=False, required=False)
+
     def clean(self):
         super().clean()
         if any(self.errors):
@@ -343,6 +346,13 @@ class IpdProcedureLeadAdminForm(forms.ModelForm):
             if not planned_date:
                 raise forms.ValidationError("Planned Date is mandatory for {} status.".format(
                     dict(IpdProcedureLead.STATUS_CHOICES)[curr_status]))
+        if cleaned_data.get('send_estimate'):
+            if not int(self.data.get('lead-TOTAL_FORMS', '0')) > 0:
+                raise forms.ValidationError("Procedure Cost Estimate not found.")
+            if self.instance.email or self.instance.phone_number:
+                notification_tasks.send_ipd_procedure_cost_estimate(self.instance.pk)
+            else:
+                raise forms.ValidationError("Phone number or Email is required to send estimate.")
 
 
 class IpdProcedureLeadAdmin(VersionAdmin):
@@ -370,6 +380,9 @@ class IpdProcedureLeadAdmin(VersionAdmin):
         ('History', {
             # 'classes': ('collapse',),
             'fields': ('insurance_details', 'opd_appointments', 'lab_appointments'),
+        }),
+        ('Communication', {
+            'fields': ('send_estimate',),
         }),
     )
 

@@ -1045,3 +1045,15 @@ def update_coupon_used_count():
                  where oa.status in (2,3,4,5,7) group by oac.coupon_id
                 ) x group by coupon_id
                 ) y where coupon.id = y.coupon_id ''', []).execute()
+
+
+@task
+def send_ipd_procedure_cost_estimate(ipd_procedure_lead_id=None):
+    from ondoc.procedure.models import IpdProcedureLead
+    from ondoc.communications.models import IpdLeadNotification
+    try:
+        instance = IpdProcedureLead.objects.filter(id=ipd_procedure_lead_id).first()
+        ipd_lead_notification = IpdLeadNotification(ipd_procedure_lead=instance, notification_type=NotificationAction.IPD_PROCEDURE_COST_ESTIMATE)
+        ipd_lead_notification.send()
+    except Exception as e:
+        logger.error(str(e))

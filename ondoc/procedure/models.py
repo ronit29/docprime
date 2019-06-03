@@ -92,6 +92,36 @@ class IpdProcedureCategoryMapping(models.Model):
         unique_together = (('ipd_procedure', 'category'),)
 
 
+class IpdCostEstimateRoomType(models.Model):
+    room_type = models.CharField(max_length=200, unique=True)
+
+    def __str__(self):
+        return '{}'.format(self.room_type)
+
+    class Meta:
+        db_table = "ipd_cost_estimate_room_type"
+        verbose_name = "Ipd Cost Estimate Room Type"
+        verbose_name_plural = "Ipd Cost Estimate Room Types"
+
+
+class IpdProcedureCostEstimate(auth_model.TimeStampedModel):
+    ipd_procedure = models.ForeignKey(IpdProcedure, on_delete=models.CASCADE)
+    hospital = models.ForeignKey(Hospital, on_delete=models.CASCADE)
+    stay_duration = models.IntegerField(null=True, blank=True)
+    costs = models.ManyToManyField(IpdCostEstimateRoomType, through='IpdCostEstimateRoomTypeMapping',
+                                      through_fields=('cost_estimate', 'room_type'), related_name='of_ipd_procedures')
+
+    def __str__(self):
+        return '{} - {} - {} day(s)'.format(self.ipd_procedure.name, self.hospital.name, self.stay_duration)
+
+    class Meta:
+        db_table = "ipd_procedure_cost_estimate"
+        unique_together = (('ipd_procedure', 'hospital'),)
+        verbose_name = "Ipd Cost Estimate"
+        verbose_name_plural = "Ipd Cost Estimate"
+
+
+
 class IpdProcedureLead(auth_model.TimeStampedModel):
 
     NEW = 1
@@ -155,6 +185,9 @@ class IpdProcedureLead(auth_model.TimeStampedModel):
     planned_date = models.DateField(null=True, blank=True)
     referer_doctor = models.CharField(max_length=500, null=True, blank=True)
     remarks = models.TextField(null=True, blank=True)
+    procedure_cost_estimates = models.ManyToManyField(IpdProcedureCostEstimate,
+                                                     through='IpdProcedureLeadCostEstimateMapping',
+                                                     related_name='hospital_cost_estimates')
 
     # ADMIN :Is_OpDInsured, Specialization List, appointment list
     # DEFAULTS??
@@ -548,49 +581,17 @@ class SimilarIpdProcedureMapping(auth_model.TimeStampedModel):
         unique_together = (('ipd_procedure', 'similar_ipd_procedure'),)
 
 
-class IpdCostEstimateRoomType(models.Model):
-    room_type = models.CharField(max_length=200, unique=True)
-
-    def __str__(self):
-        return '{}'.format(self.room_type)
-
-    class Meta:
-        db_table = "ipd_cost_estimate_room_type"
-        verbose_name = "Ipd Cost Estimate Room Type"
-        verbose_name_plural = "Ipd Cost Estimate Room Types"
-
-
-class IpdProcedureCostEstimate(auth_model.TimeStampedModel):
-    ipd_procedure = models.ForeignKey(IpdProcedure, on_delete=models.CASCADE)
-    hospital = models.ForeignKey(Hospital, on_delete=models.CASCADE)
-    stay_duration = models.IntegerField(null=True, blank=True)
-    costs = models.ManyToManyField(IpdCostEstimateRoomType, through='IpdCostEstimateRoomTypeMapping',
-                                      through_fields=('cost_estimate', 'room_type'), related_name='of_ipd_procedures')
-
-    def __str__(self):
-        return '{} - {} - {} day(s)'.format(self.ipd_procedure.name, self.hospital.name, self.stay_duration)
-
-    class Meta:
-        db_table = "ipd_procedure_cost_estimate"
-        unique_together = (('ipd_procedure', 'hospital'),)
-        verbose_name = "Ipd Cost Estimate"
-        verbose_name_plural = "Ipd Cost Estimate"
-
-
 class IpdProcedureLeadCostEstimateMapping(models.Model):
-    ipd_procedure_lead = models.ForeignKey(IpdProcedureLead, on_delete=models.CASCADE,
-                                      related_name='lead')
-    cost_estimate = models.ForeignKey(IpdProcedureCostEstimate, on_delete=models.CASCADE,
-                                related_name='cost_estimate')
+    ipd_procedure_lead = models.ForeignKey(IpdProcedureLead, on_delete=models.CASCADE, related_name="lead")
+    cost_estimate = models.ForeignKey(IpdProcedureCostEstimate, on_delete=models.CASCADE)
 
     class Meta:
         db_table = "ipd_procedure_lead_cost_estimate"
 
 
-
 class IpdCostEstimateRoomTypeMapping(models.Model):
-    room_type = models.ForeignKey(IpdCostEstimateRoomType, on_delete=models.CASCADE)
-    cost_estimate = models.ForeignKey(IpdProcedureCostEstimate, on_delete=models.CASCADE)
+    room_type = models.ForeignKey(IpdCostEstimateRoomType, on_delete=models.CASCADE, related_name='room')
+    cost_estimate = models.ForeignKey(IpdProcedureCostEstimate, on_delete=models.CASCADE, related_name='room_type_costs')
     cost = models.CharField(max_length=200, blank=True, null=True)
 
     class Meta:
