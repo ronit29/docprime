@@ -827,18 +827,18 @@ class UserInsuranceAdmin(ImportExportMixin, admin.ModelAdmin):
     def save_model(self, request, obj, form, change):
         responsible_user = request.user
         obj._responsible_user = responsible_user if responsible_user and not responsible_user.is_anonymous else None
-        # if request.user.is_member_of(constants['SUPER_INSURANCE_GROUP']):
-        if obj.status == UserInsurance.ACTIVE:
-            super(UserInsuranceAdmin, self).save_model(request, obj, form, change)
-        # elif obj.status == UserInsurance.ONHOLD:
-        #     if obj.onhold_reason:
-        #         super(UserInsuranceAdmin, self).save_model(request, obj, form, change)
-        elif obj.status == UserInsurance.CANCEL_INITIATE:
-            response = obj.process_cancellation()
-            if response.get('success', None):
+        if request.user.is_member_of(constants['SUPER_INSURANCE_GROUP']):
+            if obj.status == UserInsurance.ACTIVE:
                 super(UserInsuranceAdmin, self).save_model(request, obj, form, change)
-        elif obj.status == UserInsurance.CANCELLED:
-            super(UserInsuranceAdmin, self).save_model(request, obj, form, change)
+            # elif obj.status == UserInsurance.ONHOLD:
+            #     if obj.onhold_reason:
+            #         super(UserInsuranceAdmin, self).save_model(request, obj, form, change)
+            elif obj.status == UserInsurance.CANCEL_INITIATE:
+                response = obj.process_cancellation()
+                if response.get('success', None):
+                    super(UserInsuranceAdmin, self).save_model(request, obj, form, change)
+            elif obj.status == UserInsurance.CANCELLED:
+                super(UserInsuranceAdmin, self).save_model(request, obj, form, change)
 
 
 class InsuranceDiseaseAdmin(admin.ModelAdmin):
