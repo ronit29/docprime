@@ -1248,7 +1248,7 @@ class UserInsurance(auth_model.TimeStampedModel):
 
         transaction.on_commit(lambda: self.after_commit_task(send_cancellation_notification))
         res['success'] = "Cancellation request received, refund will be credited in your account in 10-15 working days"
-        res['policy_number'] = self.user.active_insurance.policy_number
+        res['policy_number'] = self.policy_number
         return res
 
     def after_commit_task(self, send_cancellation_notification):
@@ -1306,6 +1306,14 @@ class UserInsurance(auth_model.TimeStampedModel):
             response['prescription_needed'] = True
 
         return response
+
+    def is_bank_details_exist(self):
+        bank_obj = UserBank.objects.filter(insurance=self).order_by('-id').first()
+        bank_document_obj = UserBankDocument.objects.filter(insurance=self).order_by('-id').first()
+        if bank_obj and bank_document_obj:
+            return True
+        else:
+            return False
 
 
 class InsuranceTransaction(auth_model.TimeStampedModel):

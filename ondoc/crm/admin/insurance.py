@@ -11,7 +11,7 @@ from ondoc.diagnostic.models import LabAppointment, LabTest, Lab
 from ondoc.insurance.models import InsurancePlanContent, InsurancePlans, InsuredMembers, UserInsurance, StateGSTCode, \
      ThirdPartyAdministrator, InsuranceEligibleCities, InsuranceCity, InsuranceDistrict, InsuranceDeal, \
     InsurerPolicyNumber, InsuranceLead, EndorsementRequest, InsuredMemberDocument, InsuranceEligibleCities,\
-    InsuranceThreshold
+    InsuranceThreshold, UserBank
 from import_export.admin import ImportExportMixin, ImportExportModelAdmin, base_formats
 import nested_admin
 from import_export import fields, resources
@@ -90,12 +90,22 @@ class InsuranceThresholdAdmin(admin.ModelAdmin):
 
 class InsuredMembersInline(admin.TabularInline):
     model = InsuredMembers
-    fields = ('first_name', 'last_name', 'relation', 'dob', 'gender',)
+    fields = ("first_name", 'last_name', 'relation', 'dob', 'gender', )
     extra = 0
     can_delete = False
     show_change_link = False
     can_add = False
     readonly_fields = ("first_name", 'last_name', 'relation', 'dob', 'gender', )
+
+
+class UserBankInline(admin.TabularInline):
+    model = UserBank
+    fields = ('insurance', 'bank_name', 'account_number', 'account_holder_name', 'ifsc_code', 'bank_address',)
+    extra = 0
+    can_delete = False
+    show_change_link = False
+    can_add = False
+    readonly_fields = ('insurance', 'bank_name', 'account_number', 'account_holder_name', 'ifsc_code', 'bank_address',)
 
 
 class InsuredMemberResource(resources.ModelResource):
@@ -731,6 +741,8 @@ class UserInsuranceForm(forms.ModelForm):
         if case_type=="NO" and (int(status) == UserInsurance.CANCEL_INITIATE or int(status) == UserInsurance.CANCELLED):
             if not cancel_reason:
                 raise forms.ValidationError('For Cancel Initiation, Cancel reason is mandatory')
+            if not UserInsurance.is_bank_details_exist(self.instance):
+                raise forms.ValidationError('For Cancel Initiation, Bank details is mandatory')
             insured_opd_completed_app_count = OpdAppointment.get_insured_completed_appointment(self.instance)
             insured_lab_completed_app_count = LabAppointment.get_insured_completed_appointment(self.instance)
             if insured_lab_completed_app_count > 0:
@@ -771,7 +783,7 @@ class UserInsuranceAdmin(ImportExportMixin, admin.ModelAdmin):
     fields = ['insurance_plan', 'user', 'purchase_date', 'expiry_date', 'policy_number', 'premium_amount',
               'merchant_payout', 'status', 'cancel_reason', 'cancel_after_utilize_insurance', 'cancel_case_type']
     readonly_fields = ('insurance_plan', 'user', 'purchase_date', 'expiry_date', 'policy_number', 'premium_amount', 'merchant_payout')
-    inlines = [InsuredMembersInline]
+    inlines = [InsuredMembersInline, UserBankInline]
     form = UserInsuranceForm
     search_fields = ['id']
 
@@ -815,18 +827,18 @@ class UserInsuranceAdmin(ImportExportMixin, admin.ModelAdmin):
     def save_model(self, request, obj, form, change):
         responsible_user = request.user
         obj._responsible_user = responsible_user if responsible_user and not responsible_user.is_anonymous else None
-        if request.user.is_member_of(constants['SUPER_INSURANCE_GROUP']):
-            if obj.status == UserInsurance.ACTIVE:
+        # if request.user.is_member_of(constants['SUPER_INSURANCE_GROUP']):
+        if obj.status == UserInsurance.ACTIVE:
+            super(UserInsuranceAdmin, self).save_model(request, obj, form, change)
+        # elif obj.status == UserInsurance.ONHOLD:
+        #     if obj.onhold_reason:
+        #         super(UserInsuranceAdmin, self).save_model(request, obj, form, change)
+        elif obj.status == UserInsurance.CANCEL_INITIATE:
+            response = obj.process_cancellation()
+            if response.get('success', None):
                 super(UserInsuranceAdmin, self).save_model(request, obj, form, change)
-            # elif obj.status == UserInsurance.ONHOLD:
-            #     if obj.onhold_reason:
-            #         super(UserInsuranceAdmin, self).save_model(request, obj, form, change)
-            elif obj.status == UserInsurance.CANCEL_INITIATE:
-                response = obj.process_cancellation()
-                if response.get('success', None):
-                    super(UserInsuranceAdmin, self).save_model(request, obj, form, change)
-            elif obj.status == UserInsurance.CANCELLED:
-                super(UserInsuranceAdmin, self).save_model(request, obj, form, change)
+        elif obj.status == UserInsurance.CANCELLED:
+            super(UserInsuranceAdmin, self).save_model(request, obj, form, change)
 
 
 class InsuranceDiseaseAdmin(admin.ModelAdmin):
