@@ -30,7 +30,7 @@ from ondoc.account import models as account_models
 from ondoc.location.models import EntityUrls, EntityAddress, DefaultRating
 from ondoc.procedure.models import Procedure, ProcedureCategory, CommonProcedureCategory, ProcedureToCategoryMapping, \
     get_selected_and_other_procedures, CommonProcedure, CommonIpdProcedure, IpdProcedure, DoctorClinicIpdProcedure, \
-    IpdProcedureFeatureMapping, IpdProcedureDetail, SimilarIpdProcedureMapping, IpdProcedureLead
+    IpdProcedureFeatureMapping, IpdProcedureDetail, SimilarIpdProcedureMapping, IpdProcedureLead, Offer
 from ondoc.seo.models import NewDynamic
 from . import serializers
 from ondoc.api.v2.doctor import serializers as v2_serializers
@@ -1872,6 +1872,9 @@ class DoctorListViewSet(viewsets.GenericViewSet):
             ratings = validated_data.get('ratings')
         if validated_data.get('reviews'):
             reviews = validated_data.get('reviews')
+        hospital_req_data = {}
+        if validated_data.get('hospital_id'):
+            hospital_req_data = Hospital.objects.filter(id=validated_data.get('hospital_id')).values('id', 'name').first()
 
         return Response({"result": response, "count": result_count,
                          'specializations': specializations, 'conditions': conditions, "seo": seo,
@@ -1879,7 +1882,7 @@ class DoctorListViewSet(viewsets.GenericViewSet):
                          'procedures': procedures, 'procedure_categories': procedure_categories,
                          'ratings': ratings, 'reviews': reviews, 'ratings_title': ratings_title,
                          'bottom_content': bottom_content, 'canonical_url': canonical_url,
-                         'ipd_procedures': ipd_procedures})
+                         'ipd_procedures': ipd_procedures, 'hospital': hospital_req_data})
 
     def get_schema(self, request, response):
 
@@ -4001,6 +4004,7 @@ class IpdProcedureViewSet(viewsets.GenericViewSet):
             Prefetch('feature_mappings', IpdProcedureFeatureMapping.objects.select_related('feature').all().order_by('-feature__priority')),
             Prefetch('ipdproceduredetail_set', IpdProcedureDetail.objects.select_related('detail_type').all().order_by('-detail_type__priority')),
             Prefetch('similar_ipds', SimilarIpdProcedureMapping.objects.select_related('similar_ipd_procedure').all().order_by('-order')),
+            Prefetch('ipd_offers', Offer.objects.select_related('coupon', 'hospital', 'network').filter(is_live=True)),
         ).filter(is_enabled=True, id=pk).first()
         if ipd_procedure is None:
             return Response(status=status.HTTP_404_NOT_FOUND)
