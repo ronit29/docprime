@@ -47,7 +47,7 @@ from rest_framework import mixins
 from rest_framework.response import Response
 from rest_framework import status, permissions
 from rest_framework.permissions import IsAuthenticated
-from ondoc.authentication.backends import JWTAuthentication
+from ondoc.authentication.backends import JWTAuthentication, MatrixAuthentication
 from django.utils import timezone
 from django.db import transaction
 from django.http import Http404
@@ -3756,6 +3756,7 @@ class HospitalViewSet(viewsets.GenericViewSet):
         serializer = serializers.HospitalRequestSerializer(data=request_data)
         serializer.is_valid(raise_exception=True)
         validated_data = serializer.validated_data
+        required_network = validated_data.get('network')
         ipd_procedure_obj = ipd_procedure_obj_id = ipd_procedure_obj_name = None
         if ipd_pk:
             ipd_procedure_obj = IpdProcedure.objects.filter(id=ipd_pk, is_enabled=True).first()
@@ -3826,6 +3827,8 @@ class HospitalViewSet(viewsets.GenericViewSet):
         max_distance = validated_data.get('max_distance')
         max_distance = max_distance * 1000 if max_distance is not None else 10000
         min_distance = min_distance * 1000 if min_distance is not None else -1
+        if required_network:
+            max_distance = 2600000
         provider_ids = validated_data.get('provider_ids')
         point_string = 'POINT(' + str(long) + ' ' + str(lat) + ')'
         pnt = GEOSGeometry(point_string, srid=4326)
@@ -3851,6 +3854,8 @@ class HospitalViewSet(viewsets.GenericViewSet):
             hospital_queryset = hospital_queryset.filter(
                 hospital_doctors__ipd_procedure_clinic_mappings__ipd_procedure_id=ipd_pk,
                 hospital_doctors__ipd_procedure_clinic_mappings__enabled=True)
+        if required_network:
+            hospital_queryset = hospital_queryset.filter(network=required_network)
 
         hospital_queryset = hospital_queryset.distinct()
         result_count = hospital_queryset.count()
@@ -3865,13 +3870,17 @@ class HospitalViewSet(viewsets.GenericViewSet):
                                                                                    context={'request': request,
                                                                                             'hosp_entity_dict': hosp_entity_dict,
                                                                                             'hosp_locality_entity_dict': hosp_locality_entity_dict})
+        network_info = {}
+        if required_network:
+            network_info = {'id': required_network.id, 'name': required_network.name}
+
         return Response({'count': result_count, 'result': top_hospital_serializer.data,
                          'ipd_procedure': {'id': ipd_procedure_obj_id, 'name': ipd_procedure_obj_name},
                          'health_insurance_providers': [{'id': x.id, 'name': x.name} for x in
                                                         HealthInsuranceProvider.objects.all()],
                          'seo': {'url': url, 'title': title, 'description': description, 'location': city},
                          'search_content': top_content, 'bottom_content': bottom_content,
-                         'canonical_url': canonical_url, 'breadcrumb': breadcrumb})
+                         'canonical_url': canonical_url, 'breadcrumb': breadcrumb, 'network': network_info})
 
     @transaction.non_atomic_requests
     def retrieve_by_url(self, request):
@@ -4110,8 +4119,13 @@ class IpdProcedureViewSet(viewsets.GenericViewSet):
 
         return Response(response)
 
+
+class IpdProcedureSyncViewSet(viewsets.GenericViewSet):
+
+    authentication_classes = (MatrixAuthentication,)
+
     def sync_lead(self, request):
-        serializer = serializers.IpdLeadUpdateSerializer(data=request.query_params)
+        serializer = serializers.IpdLeadUpdateSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         validated_data = serializer.validated_data
         status = validated_data.get('status')
