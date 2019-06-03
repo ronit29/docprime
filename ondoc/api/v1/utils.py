@@ -1607,10 +1607,14 @@ class AES_encryption:
 
     @staticmethod
     def decrypt(encrypted, passphrase):
-        encrypted = base64.b64decode(encrypted)
-        IV = encrypted[:AES_encryption.BLOCK_SIZE]
-        aes = AES.new(passphrase, AES.MODE_CBC, IV)
-        return aes.decrypt(encrypted[AES_encryption.BLOCK_SIZE:]).decode("utf-8")
+        try:
+            encrypted = base64.b64decode(encrypted)
+            IV = encrypted[:AES_encryption.BLOCK_SIZE]
+            aes = AES.new(passphrase, AES.MODE_CBC, IV)
+            return aes.decrypt(encrypted[AES_encryption.BLOCK_SIZE:]).decode("utf-8"), None
+        except Exception as e:
+            logger.error("Error while decrypting - " + str(e))
+            return None, e
 
 
 
