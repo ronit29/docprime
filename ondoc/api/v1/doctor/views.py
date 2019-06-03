@@ -1872,6 +1872,9 @@ class DoctorListViewSet(viewsets.GenericViewSet):
             ratings = validated_data.get('ratings')
         if validated_data.get('reviews'):
             reviews = validated_data.get('reviews')
+        hospital_req_data = {}
+        if validated_data.get('hospital_id'):
+            hospital_req_data = Hospital.objects.filter(id=validated_data.get('hospital_id')).values('id', 'name').first()
 
         return Response({"result": response, "count": result_count,
                          'specializations': specializations, 'conditions': conditions, "seo": seo,
@@ -1879,7 +1882,7 @@ class DoctorListViewSet(viewsets.GenericViewSet):
                          'procedures': procedures, 'procedure_categories': procedure_categories,
                          'ratings': ratings, 'reviews': reviews, 'ratings_title': ratings_title,
                          'bottom_content': bottom_content, 'canonical_url': canonical_url,
-                         'ipd_procedures': ipd_procedures})
+                         'ipd_procedures': ipd_procedures, 'hospital': hospital_req_data})
 
     def get_schema(self, request, response):
 
