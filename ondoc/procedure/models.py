@@ -187,7 +187,7 @@ class IpdProcedureLead(auth_model.TimeStampedModel):
     remarks = models.TextField(null=True, blank=True)
     procedure_cost_estimates = models.ManyToManyField(IpdProcedureCostEstimate,
                                                      through='IpdProcedureLeadCostEstimateMapping',
-                                                     related_name='hospital_cost_estimates')
+                                                     related_name='procedure_cost_estimates')
 
     # ADMIN :Is_OpDInsured, Specialization List, appointment list
     # DEFAULTS??
