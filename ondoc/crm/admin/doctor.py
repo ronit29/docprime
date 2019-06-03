@@ -1476,6 +1476,9 @@ class DoctorOpdAppointmentForm(RefundableAppointmentForm):
         else:
             raise forms.ValidationError("Invalid start date and time.")
 
+        if time_slot_start != self.instance.time_slot_start and time_slot_start < timezone.now():
+            raise forms.ValidationError("Time slot can never be in past. Please add time slot in future.")
+
         if cleaned_data.get('doctor') and cleaned_data.get('hospital'):
             doctor = cleaned_data.get('doctor')
             hospital = cleaned_data.get('hospital')

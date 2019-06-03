@@ -6,7 +6,8 @@ from ondoc.diagnostic.models import Lab
 from ondoc.doctor.models import Doctor
 from ondoc.insurance.models import (Insurer, InsurancePlans, InsuranceThreshold, InsurerAccount, InsuredMembers,
                                     InsuranceTransaction, UserInsurance, InsuranceDisease, InsurancePlanContent,
-                                    StateGSTCode, InsuranceCity, InsuranceDistrict, InsuredMemberDocument)
+                                    StateGSTCode, InsuranceCity, InsuranceDistrict, InsuredMemberDocument,
+                                    UserBankDocument, UserBank)
 from ondoc.authentication.models import (User, UserProfile)
 from ondoc.account import models as account_models
 from ondoc.account.models import (Order)
@@ -284,5 +285,29 @@ class StateGSTCodeSerializer(serializers.ModelSerializer):
 class InsuranceCityEligibilitySerializer(serializers.Serializer):
     latitude = serializers.DecimalField(allow_null=False, max_digits=11, decimal_places=8)
     longitude = serializers.DecimalField(allow_null=False, max_digits=11, decimal_places=8)
+
+
+class UserBankDocumentSerializer(serializers.Serializer):
+    document_image = serializers.PrimaryKeyRelatedField(queryset=UserBankDocument.objects.all())
+
+
+class UploadUserBankDocumentSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = UserBankDocument
+        fields = ('insurance', 'document_image')
+
+
+class UserBankSerializer(serializers.ModelSerializer):
+    insurance = serializers.PrimaryKeyRelatedField(queryset=UserInsurance.objects.all())
+    bank_name = serializers.CharField(max_length=250)
+    account_number = serializers.CharField(max_length=50)
+    account_holder_name = serializers.CharField(max_length=150)
+    ifsc_code = serializers.CharField(max_length=20)
+    bank_address = serializers.CharField(max_length=300, allow_blank=True, allow_null=True)
+    image_ids = serializers.ListSerializer(child=UserBankDocumentSerializer())
+
+    class Meta:
+        model = UserBank
+        fields = ('__all__')
 
 

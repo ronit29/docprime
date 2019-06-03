@@ -177,15 +177,17 @@
                     <th style="border: 1px solid black;">
                         Particulars
                     </th>
-                    <th style="border: 1px solid black;">
-                        MRP
-                    </th>
-                    <th style="border: 1px solid black;">
-                        Discount
-                    </th>
-                    <th style="border: 1px solid black;">
-                        Grand Total
-                    </th>
+                    {% if show_amounts %}
+                        <th style="border: 1px solid black;">
+                            MRP
+                        </th>
+                        <th style="border: 1px solid black;">
+                            Discount
+                        </th>
+                        <th style="border: 1px solid black;">
+                            Grand Total
+                        </th>
+                    {% endif %}
                 </tr>
                 </thead>
                 <tbody>
@@ -197,37 +199,41 @@
                     <td style="border: 1px solid black;text-align: center;color:#3f3f3f;font-size:16px;font-weight:500;">
                         {{test.name|capfirst}}
                     </td>
-                    <td style="border: 1px solid black;text-align: center;color:#3f3f3f;font-size:16px;font-weight:500;">
-                        {{test.mrp}}
-                    </td>
-                    <td style="border: 1px solid black;text-align: center;color:#3f3f3f;font-size:16px;font-weight:500;">
-                        {{test.discount}}
-                    </td>
-                    <td style="border: 1px solid black;text-align: center;color:#3f3f3f;font-size:16px;font-weight:500;">
-                        {{test.deal_price}}
-                    </td>
+                    {% if show_amounts %}
+                        <td style="border: 1px solid black;text-align: center;color:#3f3f3f;font-size:16px;font-weight:500;">
+                            {{test.mrp}}
+                        </td>
+                        <td style="border: 1px solid black;text-align: center;color:#3f3f3f;font-size:16px;font-weight:500;">
+                            {{test.discount}}
+                        </td>
+                        <td style="border: 1px solid black;text-align: center;color:#3f3f3f;font-size:16px;font-weight:500;">
+                            {{test.deal_price}}
+                        </td>
+                    {% endif %}
                 </tr>
                 {% endfor %}
-                {% if coupon_discount %}
-                <tr>
-                    <td colspan="4"
-                        style="border: 1px solid black;text-align: center;color:#000000;font-size:16px;font-weight:700;">
-                        Coupon Discount
-                    </td>
-                    <td style="border: 1px solid black;text-align: center;color:#3f3f3f;font-size:16px;font-weight:500;">
-                        {{coupon_discount}}
-                    </td>
-                </tr>
+                {% if show_amounts %}
+                    {% if coupon_discount %}
+                    <tr>
+                        <td colspan="4"
+                            style="border: 1px solid black;text-align: center;color:#000000;font-size:16px;font-weight:700;">
+                            Coupon Discount
+                        </td>
+                        <td style="border: 1px solid black;text-align: center;color:#3f3f3f;font-size:16px;font-weight:500;">
+                            {{coupon_discount}}
+                        </td>
+                    </tr>
+                    {% endif %}
+                    <tr>
+                        <td colspan="4"
+                            style="border: 1px solid black;text-align: center;color:#000000;font-size:16px;font-weight:700;">
+                            Amount Paid
+                        </td>
+                        <td style="border: 1px solid black;text-align: center;color:#3f3f3f;font-size:16px;font-weight:500;">
+                            {{instance.effective_price}}
+                        </td>
+                    </tr>
                 {% endif %}
-                <tr>
-                    <td colspan="4"
-                        style="border: 1px solid black;text-align: center;color:#000000;font-size:16px;font-weight:700;">
-                        Amount Paid
-                    </td>
-                    <td style="border: 1px solid black;text-align: center;color:#3f3f3f;font-size:16px;font-weight:500;">
-                        {{instance.effective_price}}
-                    </td>
-                </tr>
                 </tbody>
             </table>
         </td>
