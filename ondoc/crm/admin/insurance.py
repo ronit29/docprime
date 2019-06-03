@@ -11,7 +11,7 @@ from ondoc.diagnostic.models import LabAppointment, LabTest, Lab
 from ondoc.insurance.models import InsurancePlanContent, InsurancePlans, InsuredMembers, UserInsurance, StateGSTCode, \
      ThirdPartyAdministrator, InsuranceEligibleCities, InsuranceCity, InsuranceDistrict, InsuranceDeal, \
     InsurerPolicyNumber, InsuranceLead, EndorsementRequest, InsuredMemberDocument, InsuranceEligibleCities,\
-    InsuranceThreshold, UserBank
+    InsuranceThreshold, UserBank, InsuredMemberHistory
 from import_export.admin import ImportExportMixin, ImportExportModelAdmin, base_formats
 import nested_admin
 from import_export import fields, resources
@@ -1104,10 +1104,53 @@ class EndorsementRequestAdmin(admin.ModelAdmin):
     def insurance_id(self, obj):
         return obj.insurance.id
 
+    def old_first_name(self, obj):
+        return obj.member.first_name
+        # old_member_obj.first_name
+
+    def old_last_name(self, obj):
+        return obj.member.last_name
+
+    def old_dob(self, obj):
+        return obj.member.dob
+
+    def old_email(self, obj):
+        return obj.member.email
+
+    def old_address(self, obj):
+        return obj.member.address
+
+    def old_pincode(self, obj):
+        return obj.member.pincode
+
+    def old_gender(self, obj):
+        return obj.member.gender
+
+    def old_relation(self, obj):
+        return obj.member.relation
+
+    def old_town(self,obj):
+        return obj.member.town
+
+    def old_district(self, obj):
+        return obj.member.district
+
+    def old_state(self, obj):
+        return obj.member.state
+
+    def old_middle_name(self, obj):
+        return obj.member.middle_name
+
+    def old_title(self, obj):
+        return obj.member.title
+
     list_display = ['member_name', 'insurance_id']
-    readonly_fields = ['first_name', 'last_name', 'dob', 'email', 'address', 'pincode', 'gender', 'phone_number',
-                       'relation', 'profile', 'town', 'district', 'state', 'state_code', 'city_code', 'district_code',
-                       'middle_name']
+    readonly_fields = ['member', 'insurance', 'member_type', 'title', 'old_title', 'first_name', 'old_first_name',
+                       'middle_name', 'old_middle_name', 'last_name', 'old_last_name', 'dob', 'old_dob', 'email',
+                       'old_email',  'address', 'old_address', 'pincode', 'old_pincode', 'gender', 'old_gender',
+                       'phone_number', 'relation', 'old_relation', 'profile', 'town', 'old_town',
+                       'district', 'old_district', 'state', 'old_state', 'state_code', 'city_code',
+                       'district_code']
     inlines = [InsuredMemberDocumentInline]
 
     def has_add_permission(self, request, obj=None):
@@ -1130,7 +1173,6 @@ class EndorsementRequestAdmin(admin.ModelAdmin):
                 obj.reject_endorsement()
             if obj.mail_coi_to_customer:
                 obj.process_coi()
-
 
 
 class InsuredMemberHistoryAdmin(admin.ModelAdmin):
