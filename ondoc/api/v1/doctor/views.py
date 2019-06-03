@@ -2967,10 +2967,17 @@ class OfflineCustomerViewSet(viewsets.GenericViewSet):
             patient_dict['phone_number'] = None
             if hasattr(data, 'patient_mobiles'):
                 for mob in data.patient_mobiles.all():
-                    patient_numbers.append({"phone_number": mob.phone_number, "is_default": mob.is_default})
-                    if mob.is_default:
-                        patient_dict['phone_number'] = mob.phone_number
-            patient_dict['patient_numbers'] = patient_numbers
+                    if mob.encrypted_number:
+                        patient_numbers.append({"phone_number": mob.encrypted_number, "is_default": mob.is_default})
+                        if mob.is_default:
+                            patient_dict['encrypted_phone_number'] = mob.encrypted_number
+                            patient_dict['encrypted_numbers'] = patient_numbers
+                    else:
+                        patient_numbers.append({"phone_number": mob.phone_number, "is_default": mob.is_default})
+                        if mob.is_default:
+                            patient_dict['phone_number'] = mob.phone_number
+                            patient_dict['patient_numbers'] = patient_numbers
+            # patient_dict['patient_numbers'] = patient_numbers
             response.append(patient_dict)
         return Response(response)
 
