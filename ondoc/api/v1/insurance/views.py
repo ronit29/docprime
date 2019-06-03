@@ -256,7 +256,7 @@ class InsuranceOrderViewSet(viewsets.GenericViewSet):
             user_insurance = user.purchased_insurance.filter().order_by('id').last()
 
             if user.active_insurance:
-                return Response({'success': True})
+                return Response({'success': True, "is_insured": True})
 
             if not user_insurance_lead:
                 user_insurance_lead = InsuranceLead(user=user)
@@ -270,13 +270,13 @@ class InsuranceOrderViewSet(viewsets.GenericViewSet):
             user_insurance_lead.extras = request.data
             user_insurance_lead.save()
 
-            return Response({'success': True})
+            return Response({'success': True, 'is_insured': False})
         else:
             lead = InsuranceLead.create_lead_by_phone_number(request)
             if not lead:
-                return Response({'success': False})
+                return Response({'success': False, 'is_insured': False})
 
-            return Response({'success': True})
+            return Response({'success': True, 'is_insured': False})
 
 
     @transaction.atomic

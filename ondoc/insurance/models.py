@@ -501,6 +501,12 @@ class UserInsurance(auth_model.TimeStampedModel):
     def __str__(self):
         return str(self.user)
 
+    @cached_property
+    def specialization_days_limit(self):
+        plan_limits = self.insurance_plan.plan_usages
+        days = plan_limits.get('specialization_days_limit', 0)
+        return days
+
     def save(self, *args, **kwargs):
         if not self.merchant_payout:
             self.create_payout()
@@ -1256,7 +1262,8 @@ class UserInsurance(auth_model.TimeStampedModel):
             try:
                 # notification_tasks.send_insurance_cancellation.apply_async(self.id)
                 if send_cancellation_notification:
-                    send_insurance_notifications.apply_async(({'user_id': self.user.id, 'status': UserInsurance.CANCEL_INITIATE}, ))
+                    pass
+                    # send_insurance_notifications.apply_async(({'user_id': self.user.id, 'status': UserInsurance.CANCEL_INITIATE}, ))
             except Exception as e:
                 logger.error(str(e))
 
