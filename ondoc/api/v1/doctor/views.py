@@ -47,7 +47,7 @@ from rest_framework import mixins
 from rest_framework.response import Response
 from rest_framework import status, permissions
 from rest_framework.permissions import IsAuthenticated
-from ondoc.authentication.backends import JWTAuthentication
+from ondoc.authentication.backends import JWTAuthentication, MatrixAuthentication
 from django.utils import timezone
 from django.db import transaction
 from django.http import Http404
@@ -4119,8 +4119,13 @@ class IpdProcedureViewSet(viewsets.GenericViewSet):
 
         return Response(response)
 
+
+class IpdProcedureSyncViewSet(viewsets.GenericViewSet):
+
+    authentication_classes = (MatrixAuthentication,)
+
     def sync_lead(self, request):
-        serializer = serializers.IpdLeadUpdateSerializer(data=request.query_params)
+        serializer = serializers.IpdLeadUpdateSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         validated_data = serializer.validated_data
         status = validated_data.get('status')
