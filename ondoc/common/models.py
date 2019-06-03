@@ -468,3 +468,29 @@ class MatrixDataMixin(object):
         dob = self.profile.dob
         today = date.today()
         return today.year - dob.year - ((today.month, today.day) < (dob.month, dob.day))
+
+    def appointment_accepted_history(self):
+        source = ""
+        accepted_phone = ""
+        history_obj = self.history.filter(status=5).first()
+        if history_obj:
+            source = history_obj.source
+            user = history_obj.user
+            if user:
+                accepted_phone = user.phone_number
+
+        return {'source': source, 'accepted_phone': accepted_phone}
+
+    def merchant_payout_data(self):
+        provider_payment_status = ''
+        settlement_date = None
+        payment_URN = ''
+        amount = None
+        merchant_payout = self.merchant_payout
+        if merchant_payout:
+            provider_payment_status = dict(merchant_payout.STATUS_CHOICES)[merchant_payout.status]
+            settlement_date = int(merchant_payout.payout_time.timestamp()) if merchant_payout.payout_time else None
+            payment_URN = merchant_payout.utr_no
+            amount = merchant_payout.payable_amount
+
+        return {'provider_payment_status': provider_payment_status, 'settlement_date': settlement_date, 'payment_URN': payment_URN, 'amount': amount}

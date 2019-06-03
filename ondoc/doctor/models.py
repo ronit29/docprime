@@ -2915,6 +2915,8 @@ class OpdAppointment(auth_model.TimeStampedModel, CouponsMixin, OpdAppointmentIn
 
     def get_matrix_appointment_data(self, order):
         is_home_pickup = 0
+        report_uploaded = 0
+        report_sent = None
         home_pickup_address = None
         appointment_type = ''
         location = ''
@@ -2940,10 +2942,6 @@ class OpdAppointment(auth_model.TimeStampedModel, CouponsMixin, OpdAppointmentIn
 
         provider_booking_id = ''
         merchant_code = ''
-        provider_payment_status = ''
-        settlement_date = None
-        payment_URN = ''
-        amount = None
         is_ipd_hospital = '1' if self.hospital and self.hospital.has_ipd_doctors() else '0'
         location_verified = self.hospital.is_location_verified
         provider_id = self.doctor.id
@@ -2959,13 +2957,8 @@ class OpdAppointment(auth_model.TimeStampedModel, CouponsMixin, OpdAppointmentIn
         except Exception as e:
             pass
 
-        merchant_payout = self.merchant_payout
-        if merchant_payout:
-            provider_payment_status = dict(merchant_payout.STATUS_CHOICES)[merchant_payout.status]
-            settlement_date = int(merchant_payout.payout_time.timestamp()) if merchant_payout.payout_time else None
-            payment_URN = merchant_payout.utr_no
-            amount = merchant_payout.payable_amount
-
+        merchant_payout = self.merchant_payout_data()
+        accepted_history = self.appointment_accepted_history()
         user_insurance = self.insurance
         mobile_list = self.get_matrix_spoc_data()
 
@@ -3007,11 +3000,15 @@ class OpdAppointment(auth_model.TimeStampedModel, CouponsMixin, OpdAppointmentIn
             'ProviderID': provider_id,
             'ProviderBookingID': provider_booking_id,
             'MerchantCode': merchant_code,
-            'ProviderPaymentStatus': provider_payment_status,
-            'PaymentURN': payment_URN,
-            'Amount': float(amount) if amount else None,
-            'SettlementDate': settlement_date,
-            'LocationVerified': location_verified
+            'ProviderPaymentStatus': merchant_payout['provider_payment_status'],
+            'PaymentURN': merchant_payout['payment_URN'],
+            'Amount': float(merchant_payout['amount']) if merchant_payout['amount'] else None,
+            'SettlementDate': merchant_payout['settlement_date'],
+            'LocationVerified': location_verified,
+            'ReportUploaded': report_uploaded,
+            'Reportsent': report_sent,
+            'AcceptedBy': accepted_history['source'],
+            'AcceptedPhone': accepted_history['accepted_phone']
         }
         return appointment_details
 
