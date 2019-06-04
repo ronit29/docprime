@@ -5,6 +5,7 @@ from django.db.models import F
 from rest_framework import serializers
 from dal import autocomplete
 from ondoc.api.v1.insurance.serializers import InsuranceTransactionSerializer
+from ondoc.common.models import GenericNotes
 from ondoc.crm.constants import constants
 from ondoc.doctor.models import OpdAppointment, DoctorPracticeSpecialization, PracticeSpecialization, Hospital
 from ondoc.diagnostic.models import LabAppointment, LabTest, Lab
@@ -19,6 +20,7 @@ from datetime import datetime
 from ondoc.insurance.models import InsuranceDisease
 from django.db import transaction
 from django.conf import settings
+from django.contrib.contenttypes.admin import GenericTabularInline
 
 
 class InsurerAdmin(admin.ModelAdmin):
@@ -790,6 +792,26 @@ class UserBankDocumentAdmin(admin.ModelAdmin):
     list_display = ['insurance']
 
 
+class GenericNotesInline(GenericTabularInline):
+    model = GenericNotes
+    fields = ('notes', 'created_by')
+    extra = 0
+    can_delete = False
+    show_change_link = False
+    can_add = True
+    readonly_fields = ('created_by',)
+
+
+# class GenericNotesAdmin(admin.ModelAdmin):
+#     model = GenericNotes
+#     fields = ['notes', 'created_by']
+#
+#     def save_model(self, request, obj, form, change):
+#         if not obj.pk:
+#             obj.created_by = request.user
+#         super().save_model(request, obj, form, change)
+
+
 class UserInsuranceAdmin(ImportExportMixin, admin.ModelAdmin):
     resource_class = (UserInsuranceDoctorResource, UserInsuranceLabResource, UserInsuranceResource)
     export_template_name = "export_insurance_report.html"
@@ -810,9 +832,18 @@ class UserInsuranceAdmin(ImportExportMixin, admin.ModelAdmin):
     fields = ['insurance_plan', 'user', 'purchase_date', 'expiry_date', 'policy_number', 'premium_amount',
               'merchant_payout', 'status', 'cancel_reason', 'cancel_after_utilize_insurance', 'cancel_case_type']
     readonly_fields = ('insurance_plan', 'user', 'purchase_date', 'expiry_date', 'policy_number', 'premium_amount', 'merchant_payout')
-    inlines = [InsuredMembersInline, UserBankInline, UserBankDocumentInline]
+    inlines = [InsuredMembersInline, UserBankInline, UserBankDocumentInline, GenericNotesInline]
     form = UserInsuranceForm
     search_fields = ['id']
+
+    def save_formset(self, request, form, formset, change):
+        formset.save()
+        # if not change:
+        for f in formset.forms:
+            obj = f.instance
+            if obj.__class__ == "GenericNotes":
+                obj.created_by = request.user
+                obj.save()
 
     def get_search_results(self, request, queryset, search_term):
         queryset, use_distinct = super().get_search_results(request, queryset, None)

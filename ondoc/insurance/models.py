@@ -1,7 +1,10 @@
 import datetime
+
+from django.contrib.contenttypes.fields import GenericRelation
 from django.contrib.gis.geos import Point
 from django.core.validators import FileExtensionValidator
 
+from ondoc.common.models import GenericNotes
 from ondoc.notification.models import EmailNotification
 from ondoc.notification.tasks import send_insurance_notifications, send_insurance_float_limit_notifications, send_insurance_endorsment_notifications
 from ondoc.insurance.tasks import push_insurance_buy_to_matrix
@@ -497,6 +500,7 @@ class UserInsurance(auth_model.TimeStampedModel):
     merchant_payout = models.ForeignKey(MerchantPayout, related_name="user_insurance", on_delete=models.DO_NOTHING, null=True)
     cancel_reason = models.CharField(max_length=200, blank=True, null=True, default=None)
     cancel_case_type = models.PositiveIntegerField(choices=CANCEL_CASE_CHOICES, default=REFUND)
+    notes = GenericRelation(GenericNotes)
 
     def __str__(self):
         return str(self.user)

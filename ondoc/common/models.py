@@ -439,6 +439,7 @@ class GenericNotes(TimeStampedModel):
     object_id = models.PositiveIntegerField()
     content_object = GenericForeignKey()
     notes = models.TextField()
+    created_by = models.ForeignKey(User, on_delete=models.DO_NOTHING, blank=True, null=True)
 
     class Meta:
         db_table = 'generic_notes'
