@@ -1238,7 +1238,7 @@ class TransactionViewSet(viewsets.GenericViewSet):
             # TODO : SHASHANK_SINGH correct amount
             try:
                 if order_obj and response and order_obj.amount != Decimal(
-                        response.get('txAmount')) and order_obj.is_cod_order():
+                        response.get('txAmount')) and order_obj.is_cod_order:
                     order_obj.amount = Decimal(response.get('txAmount'))
                     order_obj.save()
             except:
@@ -1733,8 +1733,10 @@ class OrderViewSet(GenericViewSet):
         from_app = params.get("from_app", False)
         app_version = params.get("app_version", "1.0")
 
-        order_obj = Order.objects.filter(pk=pk, payment_status=Order.PAYMENT_PENDING).first()
-        if not order_obj.validate_user(user):
+        order_obj = Order.objects.filter(pk=pk).first()
+
+        if not (order_obj and order_obj.validate_user(user) and (
+                order_obj.payment_status == Order.PAYMENT_PENDING or order_obj.is_cod_order)):
             return Response({"status": 0}, status.HTTP_404_NOT_FOUND)
 
         resp = dict()
@@ -1911,7 +1913,7 @@ class OrderDetailViewSet(GenericViewSet):
             return Response(status=status.HTTP_404_NOT_FOUND)
 
         processed_order_data = []
-        valid_for_cod_to_prepaid = order_data.is_cod_order()
+        valid_for_cod_to_prepaid = order_data.is_cod_order
         child_orders = order_data.orders.all()
 
         class OrderCartItemMapper():

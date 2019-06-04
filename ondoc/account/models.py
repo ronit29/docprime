@@ -148,6 +148,7 @@ class Order(TimeStampedModel):
                 action=action,
             ).update(is_viewable=False)
 
+    @cached_property
     def is_cod_order(self):
         if self.orders.exists():
             orders_to_process = self.orders.all()
@@ -788,6 +789,17 @@ class Order(TimeStampedModel):
 
     class Meta:
         db_table = "order"
+
+    @cached_property
+    def get_deal_price_without_coupon(self):
+        deal_price = 0
+
+        if self.is_parent():
+            for order in self.orders.all():
+                deal_price += Decimal(order.action_data.get('deal_price'))
+        else:
+            deal_price = self.amount
+        return deal_price
 
 
 class PgTransaction(TimeStampedModel):

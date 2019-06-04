@@ -442,7 +442,7 @@ def payment_details(request, order):
         'referenceId': "",
         'orderId': order.id,
         'name': profile_name,
-        'txAmount': str(order.amount),
+        'txAmount': str(order.amount) if not order.is_cod_order else str(round(order.get_deal_price_without_coupon, 2)),
     }
 
     if insurer_code:
