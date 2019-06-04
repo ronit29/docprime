@@ -472,12 +472,18 @@ class MatrixDataMixin(object):
     def appointment_accepted_history(self):
         source = ""
         accepted_phone = ""
-        history_obj = self.history.filter(status=5).first()
+        history_obj = self.history.filter(status=self.ACCEPTED).first()
         if history_obj:
             source = history_obj.source
-            user = history_obj.user
-            if user:
-                accepted_phone = user.phone_number
+            if source == 'ivr':
+                auto_ivr_data = history_obj.content_object.auto_ivr_data
+                for data in auto_ivr_data:
+                    if data.get('status') == self.ACCEPTED:
+                        accepted_phone = data.get('phone_number')
+            else:
+                user = history_obj.user
+                if user:
+                    accepted_phone = user.phone_number
 
         return {'source': source, 'accepted_phone': accepted_phone}
 
