@@ -4125,9 +4125,13 @@ class IpdProcedureSyncViewSet(viewsets.GenericViewSet):
     authentication_classes = (MatrixAuthentication,)
 
     def sync_lead(self, request):
+        from ondoc.crm.constants import matrix_status_to_ipd_lead_status_mapping
         serializer = serializers.IpdLeadUpdateSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         validated_data = serializer.validated_data
-        status = validated_data.get('status')
-        IpdProcedureLead.objects.filter(matrix_lead_id=validated_data.get('matrix_lead_id')).update(status=status)
+        temp_status = validated_data.get('status')
+        temp_status = matrix_status_to_ipd_lead_status_mapping.get(temp_status)
+        if not temp_status:
+            return Response({'message': 'Invalid status'}, status=status.HTTP_400_BAD_REQUEST)
+        IpdProcedureLead.objects.filter(matrix_lead_id=validated_data.get('matrix_lead_id')).update(status=temp_status)
         return Response({'message': 'Success'})
