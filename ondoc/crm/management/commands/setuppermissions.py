@@ -23,7 +23,7 @@ from ondoc.doctor.models import (Doctor, Hospital, DoctorClinicTiming, DoctorCli
                                  MedicalConditionSpecialization, CompetitorInfo, CompetitorMonthlyVisit,
                                  SpecializationDepartmentMapping, CancellationReason, UploadDoctorData,
                                  HospitalServiceMapping, HealthInsuranceProviderHospitalMapping,
-                                 HealthInsuranceProvider, HospitalHelpline, HospitalTiming)
+                                 HealthInsuranceProvider, HospitalHelpline, HospitalTiming, CommonHospital)
 
 from ondoc.diagnostic.models import (Lab, LabTiming, LabImage, GenericLabAdmin,
                                      LabManager, LabAccreditation, LabAward, LabCertification,
@@ -42,13 +42,14 @@ from ondoc.insurance.models import (Insurer, InsurancePlans, InsuranceThreshold,
                                     InsuranceDistrict, InsuranceTransaction, InsuranceDeal, InsuranceDisease,
                                     UserInsurance, InsurancePlanContent, InsuredMembers, InsurerAccount, InsuranceLead,
                                     InsuranceDiseaseResponse, InsurerPolicyNumber, InsuranceCancelMaster,
-                                    EndorsementRequest, InsuredMemberDocument, InsuredMemberHistory, ThirdPartyAdministrator)
+                                    EndorsementRequest, InsuredMemberDocument, InsuredMemberHistory, ThirdPartyAdministrator,
+                                    UserBank, UserBankDocument)
 
 from ondoc.procedure.models import Procedure, ProcedureCategory, CommonProcedureCategory, DoctorClinicProcedure, \
     ProcedureCategoryMapping, ProcedureToCategoryMapping, CommonProcedure, IpdProcedure, IpdProcedureFeatureMapping, \
     DoctorClinicIpdProcedure, IpdProcedureCategoryMapping, IpdProcedureCategory, CommonIpdProcedure, \
     IpdProcedureDetailType, IpdProcedureDetail, IpdProcedureSynonym, IpdProcedureSynonymMapping, \
-    IpdProcedurePracticeSpecialization, IpdProcedureLead
+    IpdProcedurePracticeSpecialization, IpdProcedureLead, Offer
 from ondoc.reports import models as report_models
 
 from ondoc.diagnostic.models import LabPricing
@@ -551,7 +552,7 @@ class Command(BaseCommand):
                                                            HospitalHelpline, IpdProcedure, HospitalTiming,
                                                            IpdProcedureDetailType, IpdProcedureDetail, IpdProcedureSynonym, IpdProcedureSynonymMapping,
                                                            EmailBanner, RecommenderThrough, Recommender,
-                                                           IpdProcedurePracticeSpecialization, CityLatLong)
+                                                           IpdProcedurePracticeSpecialization, CityLatLong, CommonHospital)
         for cl, ct in content_types.items():
             permissions = Permission.objects.filter(
                 Q(content_type=ct),
@@ -563,12 +564,22 @@ class Command(BaseCommand):
 
         content_types = ContentType.objects.get_for_models(PaymentOptions, EntityUrls, Feature, Service, Doctor,
                                                            HealthInsuranceProvider, IpdProcedureCategory, Plan,
-                                                           PlanFeature, PlanFeatureMapping, UserPlanMapping, UploadImage)
+                                                           PlanFeature, PlanFeatureMapping, UserPlanMapping, UploadImage,
+                                                           Offer)
 
         for cl, ct in content_types.items():
             permissions = Permission.objects.filter(
                 Q(content_type=ct),
                 Q(codename='add_' + ct.model) |
+                Q(codename='change_' + ct.model))
+
+            group.permissions.add(*permissions)
+
+        content_types = ContentType.objects.get_for_models(Coupon, UserSpecificCoupon, Hospital, HospitalNetwork)
+
+        for cl, ct in content_types.items():
+            permissions = Permission.objects.filter(
+                Q(content_type=ct),
                 Q(codename='change_' + ct.model))
 
             group.permissions.add(*permissions)
@@ -914,7 +925,8 @@ class Command(BaseCommand):
                                                            UserInsurance, InsuranceDeal, InsuranceLead,
                                                            InsuranceTransaction, InsuranceDiseaseResponse,
                                                            InsuredMembers, InsurerPolicyNumber, InsuranceCancelMaster,
-                                                           EndorsementRequest, InsuredMemberDocument, InsuredMemberHistory)
+                                                           EndorsementRequest, InsuredMemberDocument,
+                                                           InsuredMemberHistory, UserBank, UserBankDocument)
 
         for cl, ct in content_types.items():
             permissions = Permission.objects.filter(
@@ -943,7 +955,8 @@ class Command(BaseCommand):
                                                            UserInsurance, InsuranceDeal, InsuranceLead,
                                                            InsuranceTransaction, InsuranceDiseaseResponse,
                                                            InsuredMembers, InsurerPolicyNumber, InsuranceCancelMaster,
-                                                           EndorsementRequest, InsuredMemberDocument, InsuredMemberHistory)
+                                                           EndorsementRequest, InsuredMemberDocument,
+                                                           InsuredMemberHistory, UserBank, UserBankDocument)
 
         for cl, ct in content_types.items():
             permissions = Permission.objects.filter(

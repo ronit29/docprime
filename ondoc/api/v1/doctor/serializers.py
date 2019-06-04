@@ -17,7 +17,7 @@ from ondoc.doctor.models import (OpdAppointment, Doctor, Hospital, DoctorHospita
                                  CommonMedicalCondition, CommonSpecialization,
                                  DoctorPracticeSpecialization, DoctorClinic, OfflineOPDAppointments, OfflinePatients,
                                  CancellationReason, HealthInsuranceProvider, HospitalDocument, HospitalNetworkDocument,
-                                 AppointmentHistory)
+                                 AppointmentHistory, HospitalNetwork)
 from ondoc.diagnostic import models as lab_models
 from ondoc.authentication.models import UserProfile, DoctorNumber, GenericAdmin, GenericLabAdmin
 from django.db.models import Avg
@@ -2044,6 +2044,7 @@ class HospitalRequestSerializer(serializers.Serializer):
     max_distance = serializers.IntegerField(required=False)
     provider_ids = CommaSepratedToListField(required=False, max_length=500, typecast_to=int)
     city = serializers.CharField(required=False, allow_blank=True, allow_null=True)
+    network = serializers.PrimaryKeyRelatedField(allow_null=True, queryset=HospitalNetwork.objects.all(), required=False)
 
 
     def validate_provider_ids(self, attrs):
@@ -2140,7 +2141,7 @@ class CommonConditionsSerializer(serializers.Serializer):
 
 
 class IpdLeadUpdateSerializer(serializers.Serializer):
-    status = serializers.ChoiceField(choices=IpdProcedureLead.STATUS_CHOICES)
+    status = serializers.IntegerField()
     matrix_lead_id = serializers.IntegerField()
 
     def validate(self, attrs):
