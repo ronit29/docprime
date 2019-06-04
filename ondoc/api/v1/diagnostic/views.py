@@ -340,7 +340,7 @@ class LabList(viewsets.ReadOnlyModelViewSet):
                             "( (rating_data ->> 'avg_rating')::float >= (%(avg_ratings)s) and (rating_data ->> 'rating_count') is not null and " \
                             "(rating_data ->> 'rating_count')::int >5) then (rating_data ->> 'avg_rating')::float >= (%(avg_ratings)s) end)"
             #filter_query += " and (case when (rating_data is not null and (rating_data->> 'avg_rating') is not null) or ( (rating_data ->> 'rating_count') is not null and (rating_data ->> 'rating_count')::int >5) then (rating_data->> 'avg_rating')::float > (%(avg_ratings)s) end) "
-            params['avg_ratings'] = max(avg_ratings)
+            params['avg_ratings'] = min(avg_ratings)
 
         if valid_package_ids is not None:
             filter_query += ' and lab_test.id IN('
