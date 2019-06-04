@@ -2444,7 +2444,7 @@ class OpdAppointment(auth_model.TimeStampedModel, CouponsMixin, OpdAppointmentIn
         if old_instance and old_instance.is_cod_to_prepaid != self.is_cod_to_prepaid:
             try:
 
-                notification_tasks.send_opd_notifications_refactored.apply_async((self.id, ), countdown=1)
+                notification_tasks.send_opd_notifications_refactored.apply_async((self.id, NotificationAction.COD_TO_PREPAID), countdown=1)
             except Exception as e:
                 logger.error(str(e))
 

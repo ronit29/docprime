@@ -1913,6 +1913,7 @@ class OrderDetailViewSet(GenericViewSet):
             return Response(status=status.HTTP_404_NOT_FOUND)
 
         processed_order_data = []
+        valid_for_cod_to_prepaid = order_data.is_cod_order()
         child_orders = order_data.orders.all()
 
         class OrderCartItemMapper():
@@ -1930,11 +1931,12 @@ class OrderDetailViewSet(GenericViewSet):
                 "data": cart_serializers.CartItemSerializer(item, context={"validated_data": None}).data,
                 "booking_id": order.reference_id,
                 "time_slot_start": temp_time_slot_start,
-                "payment_type": order.action_data["payment_type"]
+                "payment_type": order.action_data["payment_type"],
+
             }
             processed_order_data.append(curr)
 
-        return Response({"data": processed_order_data})
+        return Response({"data": processed_order_data, "valid_for_cod_to_prepaid": valid_for_cod_to_prepaid})
 
 
 class UserTokenViewSet(GenericViewSet):
