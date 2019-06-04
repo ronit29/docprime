@@ -84,7 +84,7 @@
                                     {{instance.id}}
                                 </td>
                             </tr>
-                            {% if instance.payment_type == 2}
+                            {% if instance.COD}
                             <tr>
                                 <td style="color:#000000;font-size:14px;font-weight:700;padding-top:16px;width:40%">
                                     Appointment Type
@@ -135,13 +135,13 @@
                                     {{instance.time_slot_start|date:"h:i A"}}
                                 </td>
                             </tr>
-                            {% if instance.payment_type == 2 %}
+                            {% if instance.COD %}
                             <tr>
                                 <td style="color:#3f3f3f;font-size:16px;font-weight:500;padding-top:16px">
                                     Amount to be collected from patient
                                 </td>
                                 <td style="color:#3f3f3f;font-size:16px;font-weight:500;padding-top:16px">
-                                    {{instance.amount_to_be_paid}}
+                                    Rs.{{cod_amount}}
                                 </td>
                             </tr>
                             {% endif %}
