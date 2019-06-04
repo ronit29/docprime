@@ -1168,10 +1168,16 @@ class EndorsementRequestAdmin(admin.ModelAdmin):
             obj.member.pincode + "(edited)"
 
     def old_gender(self, obj):
-        return obj.member.gender
+        if obj.gender == obj.member.gender:
+            return ""
+        else:
+            return obj.member.gender + "(edited)"
 
     def old_relation(self, obj):
-        return obj.member.relation
+        if obj.relation == obj.member.relation:
+            return ""
+        else:
+            return obj.member.relation + "(edited)"
 
     def old_town(self,obj):
         if obj.town == obj.member.town:
