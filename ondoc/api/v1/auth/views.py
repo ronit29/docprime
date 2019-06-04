@@ -449,6 +449,13 @@ class UserProfileViewSet(mixins.CreateModelMixin, mixins.ListModelMixin,
             insured_member_profile = insured_member_obj.profile
             insured_member_status = insured_member_obj.user_insurance.status
         # if obj and hasattr(obj, 'id') and obj.id and insured_member_profile:
+
+        if request.user and request.user.active_insurance and data.get('is_default_user') and data.get('is_default_user') != obj.is_default_user:
+            return Response({
+                "request_errors": {"code": "invalid",
+                                   "message": "Any Profile or user associated with the insurance cannot change default user."
+                                   }})
+
         if obj and hasattr(obj, 'id') and obj.id and insured_member_profile and not (insured_member_status == UserInsurance.CANCELLED or
                                                               insured_member_status == UserInsurance.EXPIRED):
 
