@@ -1,9 +1,11 @@
 from django.db import models
 from django.contrib.postgres.fields import JSONField
 from django.forms import model_to_dict
+from django.utils.functional import cached_property
 
 from ondoc.authentication.models import TimeStampedModel, User, UserProfile, Merchant
 from ondoc.account.tasks import refund_curl_task
+from ondoc.coupon.models import Coupon
 from ondoc.notification.models import AppNotification, NotificationAction
 from ondoc.notification.tasks import process_payout
 # from ondoc.diagnostic.models import LabAppointment
@@ -23,6 +25,7 @@ import json
 import logging
 import requests
 import datetime
+import itertools
 from decimal import Decimal
 from ondoc.notification.tasks import set_order_dummy_transaction
 from django.contrib.contenttypes.fields import GenericForeignKey
@@ -747,6 +750,33 @@ class Order(TimeStampedModel):
 
     class Meta:
         db_table = "order"
+
+
+    @cached_property
+    def get_deal_price_without_coupon(self):
+        deal_price = 0
+        if self.is_parent():
+            for order in self.orders.all():
+                deal_price += Decimal(order.action_data.get('deal_price', '0.00'))
+        else:
+            if self.product_id == Order.INSURANCE_PRODUCT_ID:
+                deal_price = self.amount
+            else:
+                deal_price = Decimal(self.action_data.get('deal_price', '0.00'))
+        return deal_price
+
+    @cached_property
+    def used_coupons(self):
+        coupons_ids = []
+        if self.is_parent():
+            for order in self.orders.all():
+                coupons_ids.append(order.action_data.get('coupon'))
+        else:
+            coupons_ids.append(self.action_data.get('coupon'))
+
+        coupons_ids = list(itertools.chain(*coupons_ids))
+        coupons = Coupon.objects.filter(pk__in=coupons_ids)
+        return coupons
 
 
 class PgTransaction(TimeStampedModel):

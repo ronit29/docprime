@@ -15,7 +15,7 @@ import calendar
 from django.contrib.auth import get_user_model
 from django.contrib.gis.geos import GEOSGeometry
 from ondoc.account.tasks import refund_curl_task
-from ondoc.coupon.models import UserSpecificCoupon
+from ondoc.coupon.models import UserSpecificCoupon, Coupon
 from ondoc.crm.constants import constants
 import copy
 import requests
@@ -406,6 +406,7 @@ def payment_details(request, order):
     base_url = "https://{}".format(request.get_host())
     surl = base_url + '/api/v1/user/transaction/save'
     furl = base_url + '/api/v1/user/transaction/save'
+    isPreAuth = '1'
     profile = user.get_default_profile()
     profile_name = ""
     if profile:
@@ -416,6 +417,7 @@ def payment_details(request, order):
 
     insurer_code = None
     if order.product_id == Order.INSURANCE_PRODUCT_ID:
+        isPreAuth = '0'
         insurance_plan_id = order.action_data.get('insurance_plan')
         insurance_plan = InsurancePlans.objects.filter(id=insurance_plan_id).first()
         if not insurance_plan:
@@ -424,6 +426,18 @@ def payment_details(request, order):
         insurer_code = insurer.insurer_merchant_code
 
     temp_product_id = order.product_id
+
+    couponCode = ''
+    couponPgMode = ''
+    discountedAmnt = ''
+    usedCoupons = order.used_coupons        # used pg specific coupons will be same for single transaction
+    if usedCoupons and usedCoupons[0].payment_option:
+        couponCode = usedCoupons[0].code
+        couponPgMode = get_coupon_pg_mode(usedCoupons[0])
+        discountedAmnt = str(round(decimal.Decimal(order.amount), 2))
+        txAmount = str(round(decimal.Decimal(order.get_deal_price_without_coupon), 2))
+    else:
+        txAmount = str(round(decimal.Decimal(order.amount), 2))
 
     pgdata = {
         'custId': user.id,
@@ -435,8 +449,13 @@ def payment_details(request, order):
         'referenceId': "",
         'orderId': order.id,
         'name': profile_name,
-        'txAmount': str(round(decimal.Decimal(order.amount), 2)),
+        'txAmount': txAmount,
         'holdPayment': 0,
+        'couponCode': couponCode,
+        'couponPgMode': couponPgMode,
+        'discountedAmnt': discountedAmnt,
+        'isPreAuth': isPreAuth,
+        'paytmMsg': ''
     }
 
     if insurer_code:
@@ -472,6 +491,26 @@ def get_pg_secret_client_key(order):
         client_key = settings.PG_CLIENT_KEY_P3
 
     return [secret_key, client_key]
+
+def get_coupon_pg_mode(coupon):
+    couponPgMode = None
+    payment_option = coupon.payment_option
+    if payment_option.action == 'DC' and payment_option.payment_gateway == 'paytm':
+        couponPgMode = 'dcpt'
+    elif payment_option.action == 'CC' and payment_option.payment_gateway == 'paytm':
+        couponPgMode = 'ccp'
+    elif payment_option.action == 'NB' and payment_option.payment_gateway == 'paytm':
+        couponPgMode = 'nbpt'
+    elif payment_option.action == 'UPI' and payment_option.payment_gateway == 'payu':
+        couponPgMode = 'puUPI'
+    elif payment_option.action == 'PPI' and payment_option.payment_gateway == 'payu':
+        couponPgMode = 'puAmz'
+    elif payment_option.action == 'PPI' and payment_option.payment_gateway == 'paytm':
+        couponPgMode = 'papt'
+    elif payment_option.action == 'PPI' and payment_option.payment_gateway == 'olamoney':
+        couponPgMode = 'ola'
+
+    return couponPgMode
 
 def get_location(lat, long):
     pnt = None
