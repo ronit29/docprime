@@ -2141,7 +2141,7 @@ class CommonConditionsSerializer(serializers.Serializer):
 
 
 class IpdLeadUpdateSerializer(serializers.Serializer):
-    status = serializers.ChoiceField(choices=IpdProcedureLead.STATUS_CHOICES)
+    status = serializers.IntegerField()
     matrix_lead_id = serializers.IntegerField()
 
     def validate(self, attrs):
