@@ -793,12 +793,14 @@ class Order(TimeStampedModel):
     @cached_property
     def get_deal_price_without_coupon(self):
         deal_price = 0
-
         if self.is_parent():
             for order in self.orders.all():
-                deal_price += Decimal(order.action_data.get('deal_price'))
+                deal_price += Decimal(order.action_data.get('deal_price', '0.00'))
         else:
-            deal_price = self.amount
+            if self.product_id == Order.INSURANCE_PRODUCT_ID:
+                deal_price = self.amount
+            else:
+                deal_price = Decimal(self.action_data.get('deal_price', '0.00'))
         return deal_price
 
 
