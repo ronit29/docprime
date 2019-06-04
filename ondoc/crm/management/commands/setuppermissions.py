@@ -23,7 +23,7 @@ from ondoc.doctor.models import (Doctor, Hospital, DoctorClinicTiming, DoctorCli
                                  MedicalConditionSpecialization, CompetitorInfo, CompetitorMonthlyVisit,
                                  SpecializationDepartmentMapping, CancellationReason, UploadDoctorData,
                                  HospitalServiceMapping, HealthInsuranceProviderHospitalMapping,
-                                 HealthInsuranceProvider, HospitalHelpline, HospitalTiming)
+                                 HealthInsuranceProvider, HospitalHelpline, HospitalTiming, CommonHospital)
 
 from ondoc.diagnostic.models import (Lab, LabTiming, LabImage, GenericLabAdmin,
                                      LabManager, LabAccreditation, LabAward, LabCertification,
@@ -551,7 +551,7 @@ class Command(BaseCommand):
                                                            HospitalHelpline, IpdProcedure, HospitalTiming,
                                                            IpdProcedureDetailType, IpdProcedureDetail, IpdProcedureSynonym, IpdProcedureSynonymMapping,
                                                            EmailBanner, RecommenderThrough, Recommender,
-                                                           IpdProcedurePracticeSpecialization, CityLatLong)
+                                                           IpdProcedurePracticeSpecialization, CityLatLong, CommonHospital)
         for cl, ct in content_types.items():
             permissions = Permission.objects.filter(
                 Q(content_type=ct),
