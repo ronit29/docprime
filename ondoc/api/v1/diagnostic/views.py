@@ -1211,7 +1211,6 @@ class LabList(viewsets.ReadOnlyModelViewSet):
 
     @transaction.non_atomic_requests
     def search(self, request, **kwargs):
-        # request.user = User.objects.filter(id=1417).first()
         tests = []
         parameters = request.query_params
         if kwargs.get('parameters'):
