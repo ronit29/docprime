@@ -1159,7 +1159,7 @@ class EndorsementRequestAdmin(admin.ModelAdmin):
         if obj.address == obj.member.address:
             return ""
         else:
-            obj.member.address + "(edited)"
+            return obj.member.address + "(edited)"
 
     def old_pincode(self, obj):
         if obj.pincode == obj.member.pincode:
@@ -1195,19 +1195,19 @@ class EndorsementRequestAdmin(admin.ModelAdmin):
         if obj.state == obj.member.state:
             return ""
         else:
-            obj.member.state + "(edited)"
+            return obj.member.state + "(edited)"
 
     def old_middle_name(self, obj):
         if obj.middle_name == obj.member.middle_name:
             return ""
         else:
-            obj.member.middle_name + "(edited)"
+            return obj.member.middle_name + "(edited)"
 
     def old_title(self, obj):
         if obj.title == obj.member.title:
             return ""
         else:
-            obj.member.title + "(edited)"
+            return obj.member.title + "(edited)"
 
     list_display = ['member_name', 'insurance_id']
     readonly_fields = ['member', 'insurance', 'member_type', 'title', 'old_title', 'first_name', 'old_first_name',
