@@ -1305,11 +1305,28 @@ class LabList(viewsets.ReadOnlyModelViewSet):
                         'url': parameters.get('url')
                     }]
 
+        if tests:
+            final_tests = {}
+            tests = sorted(tests, key=lambda x: x['id'])
+            for k, g in groupby(tests, key=lambda x: x['id']):
+                temp_categories = []
+                for x in g:
+                    t_x = dict(x)
+                    cat = t_x.pop('categories', None)
+                    if cat:
+                        temp_categories.append(cat)
+                    if k not in final_tests:
+                        final_tests[k] = t_x
+                final_tests[k]['categories'] = temp_categories[0] if len(temp_categories) > 0 else None
+                final_tests[k]['categories_list'] = temp_categories
+            tests = list(final_tests.values())
+
+
         if kwargs.get('test_flag') == 1:
             result = list(result)
-            return {"result": result[0:3] if len(result)>0 else result,
-                             "count": count, 'tests': tests,
-                             "seo": seo, 'breadcrumb': breadcrumb}
+            return {"result": result[0:3] if len(result) > 0 else result,
+                    "count": count, 'tests': tests,
+                    "seo": seo, 'breadcrumb': breadcrumb}
 
 
         return Response({"result": result,
@@ -2247,6 +2264,10 @@ class LabAppointmentView(mixins.CreateModelMixin,
 
             if data['is_appointment_insured']:
                 data['payment_type'] = OpdAppointment.INSURANCE
+                appointment_test_ids = validated_data.get('test_ids', [])
+                if request.user and request.user.is_authenticated and not hasattr(request, 'agent') and len(appointment_test_ids) > 1:
+                    return Response(status=status.HTTP_400_BAD_REQUEST, data={'error': 'Some error occured. Please try again after some time.'})
+
         else:
             data['is_appointment_insured'], data['insurance_id'], data[
                 'insurance_message'] = False, None, ""

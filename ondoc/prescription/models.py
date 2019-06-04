@@ -243,7 +243,7 @@ class AppointmentPrescription(auth_models.TimeStampedModel):
     prescription_file = models.FileField(null=False, upload_to='user_prescriptions', validators=[FileExtensionValidator(allowed_extensions=['pdf', 'jpg', 'jpeg', 'png'])])
 
     @classmethod
-    def prescription_exist_for_user_current_date(cls, user, date):
+    def prescription_exist_for_date(cls, user, date):
         return cls.objects.filter(created_at__date=date, user=user, object_id__isnull=False).exists()
 
     @classmethod

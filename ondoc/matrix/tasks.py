@@ -87,7 +87,9 @@ def prepare_and_hit(self, data):
     settlement_date = None
     payment_URN = ''
     amount = None
+    is_ipd_hospital = '0'
     if task_data.get('type') == 'LAB_APPOINTMENT':
+        is_ipd_hospital = '0'
         location_verified = appointment.lab.is_location_verified
         provider_id = appointment.lab.id
         merchant = appointment.lab.merchant.all().last()
@@ -99,6 +101,7 @@ def prepare_and_hit(self, data):
             if integrator_obj:
                 provider_booking_id = integrator_obj.integrator_order_id
     elif task_data.get('type') == 'OPD_APPOINTMENT':
+        is_ipd_hospital = '1' if appointment.hospital and appointment.hospital.has_ipd_doctors() else '0'
         location_verified = appointment.hospital.is_location_verified
         provider_id = appointment.doctor.id
         merchant = appointment.doctor.merchant.all().last()
@@ -140,6 +143,7 @@ def prepare_and_hit(self, data):
     # }
 
     appointment_details = {
+        'IPDHospital': is_ipd_hospital,
         'IsInsured': 'yes' if user_insurance else 'no',
         'InsurancePolicyNumber': str(user_insurance.policy_number) if user_insurance else None,
         'AppointmentStatus': appointment.status,
@@ -597,6 +601,7 @@ def create_or_update_lead_on_matrix(self, data):
         gender = 0
         name = obj.name if hasattr(obj, 'name') and obj.name else ''
         lead_source = None
+        request_data = {}
         if obj_type == Doctor.__name__:
             lead_source = 'referral'
             if obj.gender and obj.gender == 'm':
@@ -634,12 +639,15 @@ def create_or_update_lead_on_matrix(self, data):
             mobile = obj.phone_number
             email = obj.email if obj.email else ''
             name = obj.name
+            concerned_opd_appointment_id = obj.data.get('opd_appointment_id', None) if obj and isinstance(obj.data, dict) else None
+            if concerned_opd_appointment_id:
+                request_data.update({'IPDBookingId': concerned_opd_appointment_id})
         mobile = int(mobile)
         # if not mobile:
         #     return
         if not lead_source:
             return
-        request_data = {
+        request_data.update({
             'LeadSource': lead_source,
             'LeadID': obj.matrix_lead_id if hasattr(obj, 'matrix_lead_id') and obj.matrix_lead_id else 0,
             'PrimaryNo': mobile,
@@ -652,7 +660,7 @@ def create_or_update_lead_on_matrix(self, data):
             'Name': name,
             'ExitPointUrl': exit_point_url,
             'CityId': obj.matrix_city.id if hasattr(obj, 'matrix_city') and obj.matrix_city and obj.matrix_city.id else 0
-        }
+        })
         url = settings.MATRIX_API_URL
         matrix_api_token = settings.MATRIX_API_TOKEN
 

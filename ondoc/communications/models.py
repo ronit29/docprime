@@ -772,7 +772,7 @@ class WHTSAPPNotification:
 
             undesired_params = list(filter(lambda param: not param, data))
             if not template:
-                logger.error('[ERROR] Could not send Whtsapp message to user as suitable template not found for the '
+                logger.info('[ERROR] Could not send Whtsapp message to user as suitable template not found for the '
                              'case. Notification type %s for appointment id %d'
                              % (self.notification_type, self.context.get('instance').id))
 
@@ -1162,7 +1162,8 @@ class OpdNotification(Notification):
             "email_banners": email_banners_html if email_banners_html is not None else "",
             "opd_appointment_complete_url": generate_short_url(opd_appointment_complete_url),
             "opd_appointment_feedback_url": generate_short_url(opd_appointment_feedback_url),
-            "reschdule_appointment_bypass_url": generate_short_url(reschdule_appointment_bypass_url)
+            "reschdule_appointment_bypass_url": generate_short_url(reschdule_appointment_bypass_url),
+            "show_amounts": bool(self.appointment.payment_type != OpdAppointment.INSURANCE)
         }
         return context
 
@@ -1329,7 +1330,8 @@ class LabNotification(Notification):
             "screen": "appointment",
             "type": "lab",
             "mask_number": mask_number,
-            "email_banners": email_banners_html if email_banners_html is not None else ""
+            "email_banners": email_banners_html if email_banners_html is not None else "",
+            "show_amounts": bool(self.appointment.payment_type != OpdAppointment.INSURANCE)
         }
         return context
 

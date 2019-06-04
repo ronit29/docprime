@@ -525,10 +525,10 @@ class UserInsuranceLabResource(resources.ModelResource):
         return str(appointment.time_slot_start)
 
     def dehydrate_name_of_diagnostic_center(self, appointment):
-        return str(appointment.lab.name)
+        return appointment.lab.name if appointment.lab else ""
 
     def dehydrate_provider_code_of_the_center(self, appointment):
-        return str(appointment.lab.id)
+        return str(appointment.lab.id) if appointment.lab else ""
 
     def dehydrate_name_of_tests(self, appointment):
         return ", ".join(list(map(lambda test: test.name, appointment.tests.all())))
@@ -537,6 +537,8 @@ class UserInsuranceLabResource(resources.ModelResource):
         return str(appointment.tests.all().count())
 
     def dehydrate_address_of_center(self, appointment):
+        if not appointment.lab:
+            return ''
         building = str(appointment.lab.building)
         sublocality = str(appointment.lab.sublocality)
         locality = str(appointment.lab.locality)
@@ -684,6 +686,8 @@ class UserInsuranceResource(resources.ModelResource):
     def dehydrate_pg_order_no(self, insurance):
         from ondoc.account.models import Order
         order = Order.objects.filter(reference_id=insurance.id).first()
+        if not order:
+            return ""
         transaction = order.getTransactions()
         if not transaction:
             return ""
