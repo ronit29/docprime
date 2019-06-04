@@ -987,7 +987,7 @@ class DeviceDetailsSave(viewsets.GenericViewSet):
         device_details = device_details_queryset.first()
         try:
             if device_details:
-                device_details_queryset.update(**validated_data, user=user)
+                device_details_queryset.update(**validated_data, user=user, updated_at=datetime.datetime.now())
             else:
                 DeviceDetails.objects.create(**validated_data, user=user)
         except Exception as e:
