@@ -39,7 +39,7 @@ class MatrixAuthentication(authentication.BaseAuthentication):
         auth_header_prefix = self.authentication_header_prefix
 
         if not auth_header:
-            return None
+            raise exceptions.AuthenticationFailed('UnAuthorized')
 
         if (len(auth_header) == 1) or (len(auth_header) > 2):
             raise exceptions.AuthenticationFailed('UnAuthorized')

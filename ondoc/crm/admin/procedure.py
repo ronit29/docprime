@@ -182,6 +182,7 @@ class IpdProcedurePracticeSpecializationInline(AutoComplete, TabularInline):
 class IpdProcedureAdminForm(forms.ModelForm):
     about = forms.CharField(widget=forms.Textarea, required=False)
     details = forms.CharField(widget=forms.Textarea, required=False)
+    icon = forms.ImageField(required=False)
 
     class Media:
         extend = False
@@ -427,3 +428,18 @@ class IpdProcedureLeadAdmin(VersionAdmin):
         if not result and obj.age:
             result = str(obj.age)
         return result
+
+
+class OfferAdminForm(forms.ModelForm):
+    tnc = forms.CharField(widget=forms.Textarea, required=False)
+
+    class Media:
+        js = ('https://cdn.ckeditor.com/ckeditor5/10.1.0/classic/ckeditor.js', 'offer/js/init.js')
+        css = {'all': ('offer/css/style.css',)}
+
+
+class OfferAdmin(VersionAdmin):
+    autocomplete_fields = ['coupon', 'ipd_procedure', 'hospital', 'network']
+    list_display = ['id', 'title', 'is_live']
+    list_filter = ['is_live']
+    form = OfferAdminForm

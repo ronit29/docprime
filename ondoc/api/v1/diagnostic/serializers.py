@@ -661,6 +661,15 @@ class LabAppointmentModelSerializer(serializers.ModelSerializer):
     lab_test = serializers.SerializerMethodField()
     invoices = serializers.SerializerMethodField()
     reports = serializers.SerializerMethodField()
+    report_files = serializers.SerializerMethodField()
+    prescription = serializers.SerializerMethodField()
+
+    def get_prescription(self, obj):
+        return []
+
+    def get_report_files(self, obj):
+        if obj:
+            return obj.get_report_type()
 
     def get_lab_test(self, obj):
         return list(obj.test_mappings.values_list('test_id', flat=True))
@@ -694,7 +703,8 @@ class LabAppointmentModelSerializer(serializers.ModelSerializer):
     class Meta:
         model = LabAppointment
         fields = ('id', 'lab', 'lab_test', 'profile', 'type', 'lab_name', 'status', 'deal_price', 'effective_price', 'time_slot_start', 'time_slot_end',
-                   'is_home_pickup', 'lab_thumbnail', 'lab_image', 'patient_thumbnail', 'patient_name', 'allowed_action', 'address', 'invoices', 'reports')
+                   'is_home_pickup', 'lab_thumbnail', 'lab_image', 'patient_thumbnail', 'patient_name', 'allowed_action', 'address', 'invoices', 'reports', 'report_files',
+                  'prescription')
 
 
 class LabAppointmentBillingSerializer(serializers.ModelSerializer):
@@ -1349,8 +1359,12 @@ class LabAppointmentRetrieveSerializer(LabAppointmentModelSerializer):
 
     class Meta:
         model = LabAppointment
-        fields = ('id', 'type', 'lab_name', 'status', 'deal_price', 'effective_price', 'time_slot_start', 'time_slot_end','is_rated', 'rating_declined',
-                   'is_home_pickup', 'lab_thumbnail', 'lab_image', 'profile', 'allowed_action', 'lab_test', 'lab', 'otp', 'address', 'type', 'reports', 'invoices', 'cancellation_reason', 'mask_data', 'payment_type', 'price')
+        fields = ('id', 'type', 'lab_name', 'status', 'deal_price', 'effective_price',
+                  'time_slot_start', 'time_slot_end', 'is_rated', 'rating_declined', 'is_home_pickup', 'lab_thumbnail',
+                  'lab_image', 'profile', 'allowed_action', 'lab_test', 'lab', 'otp', 'address', 'type', 'reports',
+                  'report_files', 'invoices', 'prescription', 'cancellation_reason', 'mask_data', 'payment_type',
+                  'price')
+
 
 
 class DoctorLabAppointmentRetrieveSerializer(LabAppointmentModelSerializer):

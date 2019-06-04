@@ -11,7 +11,7 @@ from ondoc.diagnostic.models import LabAppointment, LabTest, Lab
 from ondoc.insurance.models import InsurancePlanContent, InsurancePlans, InsuredMembers, UserInsurance, StateGSTCode, \
      ThirdPartyAdministrator, InsuranceEligibleCities, InsuranceCity, InsuranceDistrict, InsuranceDeal, \
     InsurerPolicyNumber, InsuranceLead, EndorsementRequest, InsuredMemberDocument, InsuranceEligibleCities,\
-    InsuranceThreshold
+    InsuranceThreshold, UserBank, InsuredMemberHistory, UserBankDocument
 from import_export.admin import ImportExportMixin, ImportExportModelAdmin, base_formats
 import nested_admin
 from import_export import fields, resources
@@ -90,12 +90,32 @@ class InsuranceThresholdAdmin(admin.ModelAdmin):
 
 class InsuredMembersInline(admin.TabularInline):
     model = InsuredMembers
-    fields = ('first_name', 'last_name', 'relation', 'dob', 'gender',)
+    fields = ("first_name", 'last_name', 'relation', 'dob', 'gender', )
     extra = 0
     can_delete = False
     show_change_link = False
     can_add = False
     readonly_fields = ("first_name", 'last_name', 'relation', 'dob', 'gender', )
+
+
+class UserBankInline(admin.TabularInline):
+    model = UserBank
+    fields = ('insurance', 'bank_name', 'account_number', 'account_holder_name', 'ifsc_code', 'bank_address',)
+    extra = 0
+    can_delete = False
+    show_change_link = False
+    can_add = True
+    readonly_fields = ('insurance',)
+
+
+class UserBankDocumentInline(admin.TabularInline):
+    model = UserBankDocument
+    fields = ('insurance', 'document_image',)
+    extra = 0
+    can_delete = False
+    show_change_link = False
+    can_add = True
+    readonly_fields = ('insurance',)
 
 
 class InsuredMemberResource(resources.ModelResource):
@@ -686,10 +706,13 @@ class UserInsuranceResource(resources.ModelResource):
     def dehydrate_pg_order_no(self, insurance):
         from ondoc.account.models import Order
         order = Order.objects.filter(reference_id=insurance.id).first()
+        if not order:
+            return ""
         transaction = order.getTransactions()
         if not transaction:
             return ""
         return str(transaction.first().order_no)
+
 
 class CustomDateInput(forms.DateInput):
     input_type = 'date'
@@ -731,6 +754,8 @@ class UserInsuranceForm(forms.ModelForm):
         if case_type=="NO" and (int(status) == UserInsurance.CANCEL_INITIATE or int(status) == UserInsurance.CANCELLED):
             if not cancel_reason:
                 raise forms.ValidationError('For Cancel Initiation, Cancel reason is mandatory')
+            if not self.instance.is_bank_details_exist():
+                raise forms.ValidationError('For Cancel Initiation, Bank details is mandatory')
             insured_opd_completed_app_count = OpdAppointment.get_insured_completed_appointment(self.instance)
             insured_lab_completed_app_count = LabAppointment.get_insured_completed_appointment(self.instance)
             if insured_lab_completed_app_count > 0:
@@ -742,6 +767,8 @@ class UserInsuranceForm(forms.ModelForm):
         if case_type == "YES" and (int(status) == UserInsurance.CANCEL_INITIATE or int(status) == UserInsurance.CANCELLED):
             if not cancel_reason:
                 raise forms.ValidationError('For Cancel Initiation, Cancel reason is mandatory')
+            if int(cancel_case_type) == UserInsurance.REFUND and not self.instance.is_bank_details_exist():
+                raise forms.ValidationError('In Case of Refundable Bank details are mandatory, please upload bank details')
         if int(status) == UserInsurance.CANCELLED and not self.instance.status == UserInsurance.CANCEL_INITIATE:
             raise forms.ValidationError('Cancellation is only allowed for cancel initiate status')
         if self.instance.status == UserInsurance.CANCELLED:
@@ -749,6 +776,18 @@ class UserInsuranceForm(forms.ModelForm):
 
     class Meta:
         fields = '__all__'
+
+
+class UserBankAdmin(admin.ModelAdmin):
+    model = UserBank
+    fields = ['bank_name', 'account_holder_name', 'account_number', 'ifsc_code', 'bank_address']
+    list_display = ['id', 'account_holder_name', 'account_number']
+
+
+class UserBankDocumentAdmin(admin.ModelAdmin):
+    model = UserBankDocument
+    fields = ['insurance']
+    list_display = ['insurance']
 
 
 class UserInsuranceAdmin(ImportExportMixin, admin.ModelAdmin):
@@ -771,7 +810,7 @@ class UserInsuranceAdmin(ImportExportMixin, admin.ModelAdmin):
     fields = ['insurance_plan', 'user', 'purchase_date', 'expiry_date', 'policy_number', 'premium_amount',
               'merchant_payout', 'status', 'cancel_reason', 'cancel_after_utilize_insurance', 'cancel_case_type']
     readonly_fields = ('insurance_plan', 'user', 'purchase_date', 'expiry_date', 'policy_number', 'premium_amount', 'merchant_payout')
-    inlines = [InsuredMembersInline]
+    inlines = [InsuredMembersInline, UserBankInline, UserBankDocumentInline]
     form = UserInsuranceForm
     search_fields = ['id']
 
@@ -1090,10 +1129,93 @@ class EndorsementRequestAdmin(admin.ModelAdmin):
     def insurance_id(self, obj):
         return obj.insurance.id
 
+    def old_first_name(self, obj):
+        if obj.first_name == obj.member.first_name:
+            return ""
+        else:
+            return obj.member.first_name + "(edited)"
+        # return obj.member.first_name
+        # old_member_obj.first_name
+
+    def old_last_name(self, obj):
+        if obj.last_name == obj.member.last_name:
+            return ""
+        else:
+            return obj.member.last_name + "(edited)"
+
+    def old_dob(self, obj):
+        if obj.dob.date() == obj.member.dob.date():
+            return ""
+        else:
+            return obj.member.dob + "(edited)"
+
+    def old_email(self, obj):
+        if obj.email == obj.member.email:
+            return ""
+        else:
+            return obj.member.email + "(edited)"
+
+    def old_address(self, obj):
+        if obj.address == obj.member.address:
+            return ""
+        else:
+            return obj.member.address + "(edited)"
+
+    def old_pincode(self, obj):
+        if obj.pincode == obj.member.pincode:
+            return ""
+        else:
+            obj.member.pincode + "(edited)"
+
+    def old_gender(self, obj):
+        if obj.gender == obj.member.gender:
+            return ""
+        else:
+            return obj.member.gender + "(edited)"
+
+    def old_relation(self, obj):
+        if obj.relation == obj.member.relation:
+            return ""
+        else:
+            return obj.member.relation + "(edited)"
+
+    def old_town(self,obj):
+        if obj.town == obj.member.town:
+            return ""
+        else:
+            return obj.member.town + "(edited)"
+
+    def old_district(self, obj):
+        if obj.district == obj.member.district:
+            return ""
+        else:
+            return obj.member.district + "(edited)"
+
+    def old_state(self, obj):
+        if obj.state == obj.member.state:
+            return ""
+        else:
+            return obj.member.state + "(edited)"
+
+    def old_middle_name(self, obj):
+        if obj.middle_name == obj.member.middle_name:
+            return ""
+        else:
+            return obj.member.middle_name + "(edited)"
+
+    def old_title(self, obj):
+        if obj.title == obj.member.title:
+            return ""
+        else:
+            return obj.member.title + "(edited)"
+
     list_display = ['member_name', 'insurance_id']
-    readonly_fields = ['first_name', 'last_name', 'dob', 'email', 'address', 'pincode', 'gender', 'phone_number',
-                       'relation', 'profile', 'town', 'district', 'state', 'state_code', 'city_code', 'district_code',
-                       'middle_name']
+    readonly_fields = ['member', 'insurance', 'member_type', 'title', 'old_title', 'first_name', 'old_first_name',
+                       'middle_name', 'old_middle_name', 'last_name', 'old_last_name', 'dob', 'old_dob', 'email',
+                       'old_email',  'address', 'old_address', 'pincode', 'old_pincode', 'gender', 'old_gender',
+                       'phone_number', 'relation', 'old_relation', 'profile', 'town', 'old_town',
+                       'district', 'old_district', 'state', 'old_state', 'state_code', 'city_code',
+                       'district_code']
     inlines = [InsuredMemberDocumentInline]
 
     def has_add_permission(self, request, obj=None):
@@ -1116,7 +1238,6 @@ class EndorsementRequestAdmin(admin.ModelAdmin):
                 obj.reject_endorsement()
             if obj.mail_coi_to_customer:
                 obj.process_coi()
-
 
 
 class InsuredMemberHistoryAdmin(admin.ModelAdmin):
