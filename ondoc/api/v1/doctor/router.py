@@ -4,7 +4,7 @@ from .views import (DoctorAppointmentsViewSet, DoctorProfileView, DoctorHospital
                     DoctorProfileUserViewSet, DoctorAvailabilityTimingViewSet, HealthTipView, ConfigView,
                     DoctorAppointmentNoAuthViewSet, DoctorContactNumberViewSet, DoctorFeedbackViewSet,
                     HospitalAutocomplete, CreateAdminViewSet, OfflineCustomerViewSet, HospitalNetworkListViewset,
-                    AppointmentMessageViewset, IpdProcedureViewSet, HospitalViewSet)
+                    AppointmentMessageViewset, IpdProcedureViewSet, HospitalViewSet, IpdProcedureSyncViewSet)
 
 urlpatterns = [
     path('appointment', DoctorAppointmentsViewSet.as_view({'get': 'list'}), name='appointment-list'),
@@ -65,7 +65,9 @@ urlpatterns = [
     path('hospitalsearch_by_url/<str:url>', HospitalViewSet.as_view({'get': 'list_by_url'}), name='hospitals_by_url'),
     path('ipd_procedure/<int:ipd_pk>/hospitals', HospitalViewSet.as_view({'get': 'list'}), name='ipd_procedure_hospitals'),
     path('hospital/<int:pk>', HospitalViewSet.as_view({'get': 'retrive'}), name='hospital_detail'),
+    path('hospitals', HospitalViewSet.as_view({'get': 'list'}), name='hospitals_list'),
     path('hospital_by_url', HospitalViewSet.as_view({'get': 'retrieve_by_url'}), name='hospital_detail_by_url'),
     path('ipd_procedure/create_lead', IpdProcedureViewSet.as_view({'post': 'create_lead'}), name='ipd_procedure_lead'),
+    path('ipd_procedure/sync_lead', IpdProcedureSyncViewSet.as_view({'post': 'sync_lead'}), name='ipd_procedure_sync_lead'),
     path('licence/update', DoctorProfileView.as_view({'post': 'licence_update'}), name='licence_update'),
 ]
