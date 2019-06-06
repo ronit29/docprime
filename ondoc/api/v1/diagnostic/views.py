@@ -2236,7 +2236,7 @@ class LabAppointmentView(mixins.CreateModelMixin,
             data.update(
                 {'included_in_user_plan': included_in_user_plan, 'user_plan': user_plan_id})
 
-        # TODO: SHASHANK_SINGH not sure ask shubham
+
         if data.get('cart_item'):
             old_cart_obj = Cart.objects.filter(id=data.get('cart_item').id).first()
             payment_type = old_cart_obj.data.get('payment_type')

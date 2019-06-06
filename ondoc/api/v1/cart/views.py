@@ -79,7 +79,7 @@ class CartViewSet(viewsets.GenericViewSet):
                 valid_data.get('data').update(
                     {'included_in_user_plan': included_in_user_plan, 'user_plan': user_plan_id})
                 valid_data.get('data')['payment_type'] = OpdAppointment.PLAN
-        # TODO: SHASHANK_SINGH dont do this
+
         if not included_in_user_plan:
             valid_data.get('data').update(
                 {'included_in_user_plan': included_in_user_plan, 'user_plan': user_plan_id})
