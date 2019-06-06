@@ -295,6 +295,12 @@ class UserInsuranceDoctorResource(resources.ModelResource):
     gst_number_of_center = fields.Field()
     booking_date = fields.Field()
     status = fields.Field()
+    building = fields.Field()
+    sublocality = fields.Field()
+    locality = fields.Field()
+    city = fields.Field()
+    state = fields.Field()
+    pincode = fields.Field()
 
     def export(self, queryset=None, *args, **kwargs):
         queryset = self.get_queryset(**kwargs)
@@ -322,7 +328,8 @@ class UserInsuranceDoctorResource(resources.ModelResource):
                         'name_of_doctor', 'provider_code_of_doctor', 'speciality_of_doctor', 'diagnosis',
                         'icd_code_of_diagnosis', 'name_of_clinic', 'address_of_clinic', 'amount_to_be_paid',
                         'booking_date', 'status', 'pan_card_of_clinic',
-                        'existing_condition', 'bank_detail_of_center', 'gst_number_of_center')
+                        'existing_condition', 'bank_detail_of_center', 'gst_number_of_center',
+                        'building', 'sublocality', 'locality', 'city', 'state', 'pincode')
 
     def get_insured_member(self, profile):
         insured_member = InsuredMembers.objects.filter(profile_id=profile).first()
@@ -413,6 +420,24 @@ class UserInsuranceDoctorResource(resources.ModelResource):
         pincode = str(appointment.hospital.pin_code)
         return building + " " + sublocality + " " + locality + " " + city + " " + state + " " + pincode
 
+    def dehydrate_building(self, appointment):
+        return appointment.hospital.building if appointment.hospital.building  else ''
+
+    def dehydrate_sublocality(self, appointment):
+        return appointment.hospital.sublocality if appointment.hospital.sublocality  else ''
+
+    def dehydrate_locality(self, appointment):
+        return appointment.hospital.locality if appointment.hospital.locality  else ''
+
+    def dehydrate_city(self, appointment):
+        return appointment.hospital.city if appointment.hospital.city  else ''
+
+    def dehydrate_state(self, appointment):
+        return appointment.hospital.state if appointment.hospital.state  else ''
+
+    def dehydrate_pincode(self, appointment):
+        return appointment.hospital.pincode if appointment.hospital.pincode  else ''
+
     def dehydrate_pan_card_of_clinic(self, appointment):
         return ""
 
@@ -475,6 +500,12 @@ class UserInsuranceLabResource(resources.ModelResource):
     booking_date = fields.Field()
     status = fields.Field()
     number_of_tests = fields.Field()
+    building = fields.Field()
+    sublocality = fields.Field()
+    locality = fields.Field()
+    city = fields.Field()
+    state = fields.Field()
+    pincode = fields.Field()
 
     def export(self, queryset=None, *args, **kwargs):
         queryset = self.get_queryset(**kwargs)
@@ -502,7 +533,8 @@ class UserInsuranceLabResource(resources.ModelResource):
         export_order = ('appointment_id', 'policy_number', 'member_id', 'name', 'relationship_with_proposer',
                         'date_of_consultation', 'name_of_diagnostic_center', 'provider_code_of_the_center',
                         'name_of_tests', 'number_of_tests', 'address_of_center', 'amount_to_be_paid', 'booking_date', 'status',
-                        'bank_detail_of_center', 'gst_number_of_center', 'pan_card_of_center', 'existing_condition')
+                        'bank_detail_of_center', 'gst_number_of_center', 'pan_card_of_center', 'existing_condition',
+                        'building', 'sublocality', 'locality', 'city', 'state', 'pincode')
 
     def get_insured_member(self, profile):
         insured_member = InsuredMembers.objects.filter(profile_id=profile).first()
@@ -566,6 +598,24 @@ class UserInsuranceLabResource(resources.ModelResource):
         state = str(appointment.lab.state)
         pincode = str(appointment.lab.pin_code)
         return building + " " + sublocality + " " + locality + " " + city + " " + state + " " + pincode
+
+    def dehydrate_building(self, appointment):
+        return appointment.lab.building if appointment.lab.building  else ''
+
+    def dehydrate_sublocality(self, appointment):
+        return appointment.lab.sublocality if appointment.lab.sublocality  else ''
+
+    def dehydrate_locality(self, appointment):
+        return appointment.lab.locality if appointment.lab.locality  else ''
+
+    def dehydrate_city(self, appointment):
+        return appointment.lab.city if appointment.lab.city  else ''
+
+    def dehydrate_state(self, appointment):
+        return appointment.lab.state if appointment.lab.state  else ''
+
+    def dehydrate_pincode(self, appointment):
+        return appointment.lab.pincode if appointment.lab.pincode  else ''
 
     def dehydrate_pan_card_of_center(self, appointment):
         # from django.contrib.contenttypes.models import ContentType
