@@ -1236,6 +1236,9 @@ class TransactionViewSet(viewsets.GenericViewSet):
 
             order_obj = Order.objects.select_for_update().filter(pk=response.get("orderId")).first()
             if pg_resp_code == 1 and order_obj:
+                if response.get("couponUsed") and response.get("couponUsed") == "false":
+                    order_obj.update_fields_after_coupon_remove()
+
                 response_data = None
                 resp_serializer = serializers.TransactionSerializer(data=response)
                 if resp_serializer.is_valid():

@@ -778,6 +778,23 @@ class Order(TimeStampedModel):
         coupons = Coupon.objects.filter(pk__in=coupons_ids)
         return coupons
 
+    def update_fields_after_coupon_remove(self):
+        def update_records(obj):
+            if obj.product_id == Order.DOCTOR_PRODUCT_ID or obj.product_id == Order.LAB_PRODUCT_ID:
+                if order.action_data:
+                    obj.action_data['effective_price'] = obj.action_data['deal_price']
+                    obj.action_data['discount'] = '0'
+                    obj.action_data['amount'] = obj.action_data['deal_price']
+                    obj.action_data['coupon'] = []
+                    obj.save()
+
+        if self.is_parent():
+            for order in self.orders.all():
+                update_records(order)
+        else:
+            update_records(self)
+        return True
+
 
 class PgTransaction(TimeStampedModel):
     PG_REFUND_SUCCESS_OK_STATUS = '1'

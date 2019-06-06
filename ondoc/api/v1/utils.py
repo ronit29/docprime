@@ -425,6 +425,9 @@ def payment_details(request, order):
         insurer = insurance_plan.insurer
         insurer_code = insurer.insurer_merchant_code
 
+    if order.product_id == Order.SUBSCRIPTION_PLAN_PRODUCT_ID:
+        isPreAuth = '0'
+
     temp_product_id = order.product_id
 
     couponCode = ''
