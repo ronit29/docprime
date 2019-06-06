@@ -799,17 +799,8 @@ class GenericNotesInline(GenericTabularInline):
     can_delete = False
     show_change_link = False
     can_add = True
+    editable = False
     readonly_fields = ('created_by',)
-
-
-# class GenericNotesAdmin(admin.ModelAdmin):
-#     model = GenericNotes
-#     fields = ['notes', 'created_by']
-#
-#     def save_model(self, request, obj, form, change):
-#         if not obj.pk:
-#             obj.created_by = request.user
-#         super().save_model(request, obj, form, change)
 
 
 class UserInsuranceAdmin(ImportExportMixin, admin.ModelAdmin):
@@ -837,13 +828,14 @@ class UserInsuranceAdmin(ImportExportMixin, admin.ModelAdmin):
     search_fields = ['id']
 
     def save_formset(self, request, form, formset, change):
-        formset.save()
-        # if not change:
-        for f in formset.forms:
-            obj = f.instance
-            if obj.__class__ == "GenericNotes":
-                obj.created_by = request.user
-                obj.save()
+        if formset.model != GenericNotes:
+            return super(UserInsuranceAdmin, self).save_formset(request, form, formset, change)
+        instances = formset.save(commit=False)
+        for instance in instances:
+            if not instance.pk:
+                instance.created_by = request.user
+                instance.save()
+        formset.save_m2m()
 
     def get_search_results(self, request, queryset, search_term):
         queryset, use_distinct = super().get_search_results(request, queryset, None)
