@@ -114,15 +114,17 @@
                     <th style="border: 1px solid black;">
                         Particulars
                     </th>
-                    <th style="border: 1px solid black;">
-                        MRP
-                    </th>
-                    <th style="border: 1px solid black;">
-                        Discount
-                    </th>
-                    <th style="border: 1px solid black;">
-                        Grand Total
-                    </th>
+                    {% if show_amounts %}
+                        <th style="border: 1px solid black;">
+                            MRP
+                        </th>
+                        <th style="border: 1px solid black;">
+                            Discount
+                        </th>
+                        <th style="border: 1px solid black;">
+                            Grand Total
+                        </th>
+                    {% endif %}
                 </tr>
                 </thead>
                 <tbody>
@@ -134,35 +136,39 @@
                     <td style="border: 1px solid black;text-align: center;">
                         {{test.name|capfirst}}
                     </td>
-                    <td style="border: 1px solid black;text-align: center;">
-                        {{test.mrp}}
-                    </td>
-                    <td style="border: 1px solid black;text-align: center;">
-                        {{test.discount}}
-                    </td>
-                    <td style="border: 1px solid black;text-align: center;">
-                        {{test.deal_price}}
-                    </td>
+                    {% if show_amounts %}
+                        <td style="border: 1px solid black;text-align: center;">
+                            {{test.mrp}}
+                        </td>
+                        <td style="border: 1px solid black;text-align: center;">
+                            {{test.discount}}
+                        </td>
+                        <td style="border: 1px solid black;text-align: center;">
+                            {{test.deal_price}}
+                        </td>
+                    {% endif %}
                 </tr>
                 {% endfor %}
-                {% if coupon_discount %}
-                <tr>
-                    <td colspan="4" style="border: 1px solid black;text-align: center;">
-                        Coupon Discount
-                    </td>
-                    <td style="border: 1px solid black;text-align: center;">
-                        {{coupon_discount}}
-                    </td>
-                </tr>
+                {% if show_amounts %}
+                    {% if coupon_discount %}
+                    <tr>
+                        <td colspan="4" style="border: 1px solid black;text-align: center;">
+                            Coupon Discount
+                        </td>
+                        <td style="border: 1px solid black;text-align: center;">
+                            {{coupon_discount}}
+                        </td>
+                    </tr>
+                    {% endif %}
+                    <tr>
+                        <td colspan="4" style="border: 1px solid black;text-align: center;">
+                            Amount Paid
+                        </td>
+                        <td style="border: 1px solid black;text-align: center;">
+                            {{instance.effective_price}}
+                        </td>
+                    </tr>
                 {% endif %}
-                <tr>
-                    <td colspan="4" style="border: 1px solid black;text-align: center;">
-                        Amount Paid
-                    </td>
-                    <td style="border: 1px solid black;text-align: center;">
-                        {{instance.effective_price}}
-                    </td>
-                </tr>
                 </tbody>
             </table>
         </td>

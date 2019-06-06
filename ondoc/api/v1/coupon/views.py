@@ -432,6 +432,7 @@ class CouponDiscountViewSet(viewsets.GenericViewSet):
         input_data = serializer.validated_data
 
         coupons_data = input_data.get("coupons_data")
+        coupon_code = coupons_data[0] if coupons_data else None
         deal_price = input_data.get("deal_price")
         product_id = input_data.get("product_id")
         lab = input_data.get("lab")
@@ -442,24 +443,49 @@ class CouponDiscountViewSet(viewsets.GenericViewSet):
         profile = input_data.get("profile")
         cart_item_id = input_data.get('cart_item').id if input_data.get('cart_item') else None
 
+        coupon_type = 'both'
         if str(product_id) == str(Order.DOCTOR_PRODUCT_ID):
             obj = OpdAppointment()
+            coupon_type = 'doctor'
         elif str(product_id) == str(Order.LAB_PRODUCT_ID):
             obj = LabAppointment()
+            coupon_type = 'lab'
+
+        coupon_recommender = CouponRecommender(request.user, profile, coupon_type, product_id, coupon_code,
+                                               cart_item_id)
+        filters = dict()
+
+        if lab:
+            filters['lab'] = dict()
+            lab_obj = filters['lab']
+            lab_obj['id'] = lab.id
+            lab_obj['network_id'] = lab.network_id
+            lab_obj['city'] = lab.city
+        if doctor:
+            doctor_specializations = []
+            for dps in doctor.doctorpracticespecializations.all():
+                doctor_specializations.append(dps.specialization_id)
+            filters['doctor_id'] = doctor.id
+            filters['doctor_specializations_ids'] = doctor_specializations
+        filters['tests'] = tests
+        filters['hospital'] = hospital
+        filters['deal_price'] = deal_price
+        filters['procedures_ids'] = procedures
+
+        applicable_coupons = coupon_recommender.applicable_coupons(**filters)
 
         discount = 0
 
         for coupon in coupons_data:
-            if obj.validate_user_coupon(cart_item=cart_item_id, user=request.user, coupon_obj=coupon,
-                                        profile=profile).get("is_valid"):
+            if coupon in applicable_coupons:
                 if lab and tests:
-                    total_price = obj.get_applicable_tests_with_total_price(coupon_obj=coupon,
-                                                                            test_ids=tests, lab=lab).get("total_price")
+                    total_price = obj.get_applicable_tests_with_total_price_v2(test_ids=tests, lab=lab).get("total_price")
                     discount += obj.get_discount(coupon, total_price)
                     continue
                 if doctor and hospital and procedures:
-                    total_price = obj.get_applicable_procedures_with_total_price(coupon_obj=coupon, doctor=doctor,
-                                                                                 hospital=hospital, procedures=procedures).get("total_price")
+                    total_price = obj.get_applicable_procedures_with_total_price_v2(doctor=doctor,
+                                                                                    hospital=hospital,
+                                                                                    procedures=procedures).get("total_price")
                     discount += obj.get_discount(coupon, total_price)
                     continue
                 discount += obj.get_discount(coupon, deal_price)

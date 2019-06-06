@@ -248,6 +248,10 @@ class Order(TimeStampedModel):
 
         elif self.action == Order.INSURANCE_CREATE:
             user = User.objects.get(id=self.action_data.get('user'))
+            if not user:
+                raise Exception('User Not Found for Order' + str(self.id))
+            if user.active_insurance:
+                raise Exception('User Insurance already purchased for user' + str(user.id))
             if consumer_account.balance >= user_insurance_data['premium_amount']:
                 appointment_obj = UserInsurance.create_user_insurance(user_insurance_data, user)
                 amount = appointment_obj.premium_amount

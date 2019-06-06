@@ -46,7 +46,7 @@ from ondoc.doctor.models import (Doctor, DoctorQualification,
                                  DoctorPracticeSpecialization, CompetitorMonthlyVisit,
                                  GoogleDetailing, VisitReason, VisitReasonMapping, PracticeSpecializationContent,
                                  PatientMobile, DoctorMobileOtp,
-                                 UploadDoctorData, CancellationReason)
+                                 UploadDoctorData, CancellationReason, Prescription, PrescriptionFile)
 
 from ondoc.authentication.models import User
 from .common import *
@@ -1462,8 +1462,9 @@ class DoctorOpdAppointmentForm(RefundableAppointmentForm):
     def clean(self):
         super().clean()
         cleaned_data = self.cleaned_data
-        if self.request.user.groups.filter(name=constants['OPD_APPOINTMENT_MANAGEMENT_TEAM']).exists() and cleaned_data.get('status') == OpdAppointment.BOOKED:
-            raise forms.ValidationError("Form cant be Saved with Booked Status.")
+        # Appointments are now made with CREATED status.
+        # if self.request.user.groups.filter(name=constants['OPD_APPOINTMENT_MANAGEMENT_TEAM']).exists() and cleaned_data.get('status') == OpdAppointment.BOOKED:
+        #     raise forms.ValidationError("Form cant be Saved with Booked Status.")
         if cleaned_data.get('start_date') and cleaned_data.get('start_time'):
                 date_time_field = str(cleaned_data.get('start_date')) + " " + str(cleaned_data.get('start_time'))
                 dt_field = parse_datetime(date_time_field)
@@ -1474,6 +1475,9 @@ class DoctorOpdAppointmentForm(RefundableAppointmentForm):
             hour = round(float(time_slot_start.hour) + (float(time_slot_start.minute) * 1 / 60), 2)
         else:
             raise forms.ValidationError("Invalid start date and time.")
+
+        if time_slot_start != self.instance.time_slot_start and time_slot_start < timezone.now():
+            raise forms.ValidationError("Time slot can never be in past. Please add time slot in future.")
 
         if cleaned_data.get('doctor') and cleaned_data.get('hospital'):
             doctor = cleaned_data.get('doctor')
@@ -1491,6 +1495,9 @@ class DoctorOpdAppointmentForm(RefundableAppointmentForm):
                 'cancellation_reason') or cleaned_data.get('cancellation_comments')):
             raise forms.ValidationError(
                 "Reason/Comment for cancellation can only be entered on cancelled appointment")
+        
+        if cleaned_data.get('status') is OpdAppointment.CREATED and cleaned_data.get('status_change_comments'):
+            raise forms.ValidationError("Comment for status change can only be entered when changing status from created to other.")
 
         if cleaned_data.get('status') is OpdAppointment.CANCELLED and not cleaned_data.get('cancellation_reason'):
             raise forms.ValidationError("Reason for Cancelled appointment should be set.")
@@ -1499,6 +1506,19 @@ class DoctorOpdAppointmentForm(RefundableAppointmentForm):
                 'cancellation_reason') and cleaned_data.get('cancellation_reason').is_comment_needed and not cleaned_data.get('cancellation_comments'):
             raise forms.ValidationError(
                 "Cancellation comments must be mentioned for selected cancellation reason.")
+
+        if cleaned_data.get('status') and self.instance and self.instance.status == OpdAppointment.CREATED:
+            if cleaned_data.get('status') not in [OpdAppointment.BOOKED, OpdAppointment.CANCELLED, OpdAppointment.CREATED]:
+                raise forms.ValidationError(
+                    "Created status can only be changed to Booked or cancelled.")
+
+            if cleaned_data.get('status') != OpdAppointment.CREATED and not cleaned_data.get('status_change_comments'):
+                raise forms.ValidationError(
+                    "Status change comments must be mentioned when changing status from created to other.")
+
+        # if cleaned_data.get('status') and self.instance and self.instance.status == OpdAppointment.CREATED and cleaned_data.get('status') in [OpdAppointment.BOOKED, OpdAppointment.CANCELLED] and not
+        #     raise forms.ValidationError(
+        #         "Status change comments must be mentioned when changing status from created to other.")
 
         if cleaned_data.get('status') not in [OpdAppointment.CANCELLED, OpdAppointment.COMPLETED, None]:
             if not DoctorClinicTiming.objects.filter(doctor_clinic__doctor=doctor,
@@ -1531,12 +1551,30 @@ class DoctorOpdAppointmentForm(RefundableAppointmentForm):
         return cleaned_data
 
 
+
+class PrescriptionFileInline(nested_admin.NestedTabularInline):
+    model = PrescriptionFile
+    extra = 0
+    can_delete = True
+    show_change_link = True
+
+
+class PrescriptionInline(nested_admin.NestedTabularInline):
+    model = Prescription
+    extra = 0
+    can_delete = True
+    show_change_link = True
+    inlines = [PrescriptionFileInline]
+
+
+
 class DoctorOpdAppointmentAdmin(admin.ModelAdmin):
     form = DoctorOpdAppointmentForm
     search_fields = ['id', 'profile__name', 'profile__phone_number', 'doctor__name', 'hospital__name']
     list_display = ('booking_id', 'get_doctor', 'get_profile', 'status', 'time_slot_start', 'effective_price', 'created_at', 'updated_at')
     list_filter = ('status', 'payment_type')
     date_hierarchy = 'created_at'
+    inlines = [PrescriptionInline]
 
     def get_queryset(self, request):
         return super(DoctorOpdAppointmentAdmin, self).get_queryset(request).select_related('doctor', 'hospital', 'hospital__network')
@@ -1599,7 +1637,7 @@ class DoctorOpdAppointmentAdmin(admin.ModelAdmin):
                 'fees', 'effective_price', 'mrp', 'deal_price', 'payment_status',
                 'payment_type', 'admin_information', 'insurance', 'outstanding',
                 'status', 'cancel_type', 'cancellation_reason', 'cancellation_comments',
-                'start_date', 'start_time', 'invoice_urls', 'payment_type', 'payout_info', 'refund_initiated')
+                'start_date', 'start_time', 'invoice_urls', 'payment_type', 'payout_info', 'refund_initiated', 'status_change_comments')
         if request.user.groups.filter(name=constants['APPOINTMENT_OTP_TEAM']).exists() or request.user.is_superuser:
             all_fields = all_fields + ('otp',)
 
@@ -1629,6 +1667,10 @@ class DoctorOpdAppointmentAdmin(admin.ModelAdmin):
             read_only += ('status',)
         if request.user.groups.filter(name=constants['APPOINTMENT_OTP_TEAM']).exists() or request.user.is_superuser:
             read_only = read_only + ('otp',)
+
+        if obj.status is not OpdAppointment.CREATED:
+            read_only = read_only + ('status_change_comments',)
+
         return read_only
         # else:
         #     return ('invoice_urls')

@@ -1,3 +1,8 @@
+from django.contrib.gis.db.models.functions import Distance
+from django.contrib.gis.geos import GEOSGeometry
+from django.db.models import Window
+from django.db.models.functions import RowNumber
+from django.db.models.expressions import RawSQL
 from copy import deepcopy
 import json
 import requests
@@ -30,7 +35,7 @@ from ondoc.bookinganalytics.models import DP_OpdConsultsAndTests
 from ondoc.location import models as location_models
 from ondoc.account.models import Order, ConsumerAccount, ConsumerTransaction, PgTransaction, ConsumerRefund, \
     MerchantPayout, UserReferred, MoneyPool, Invoice
-from ondoc.location.models import EntityUrls
+from ondoc.location.models import EntityUrls, UrlsModel
 from ondoc.notification.models import NotificationAction, EmailNotification
 from ondoc.payout.models import Outstanding
 from ondoc.coupon.models import Coupon
@@ -62,7 +67,8 @@ from django.contrib.contenttypes.fields import GenericRelation
 from django.contrib.contenttypes.fields import GenericForeignKey
 from django.contrib.contenttypes.models import ContentType
 from ondoc.matrix.tasks import push_appointment_to_matrix, push_onboarding_qcstatus_to_matrix, \
-    update_onboarding_qcstatus_to_matrix, create_or_update_lead_on_matrix, push_signup_lead_to_matrix
+    update_onboarding_qcstatus_to_matrix, create_or_update_lead_on_matrix, push_signup_lead_to_matrix, \
+    create_ipd_lead_from_opd_appointment
 # from ondoc.procedure.models import Procedure
 from ondoc.ratings_review import models as ratings_models
 from django.utils import timezone
@@ -90,7 +96,6 @@ class Migration(migrations.Migration):
     operations = [
         CreateExtension('postgis')
     ]
-
 
 class UniqueNameModel(models.Model):
 
@@ -144,7 +149,7 @@ class MedicalService(auth_model.TimeStampedModel, UniqueNameModel):
         db_table = "medical_service"
 
 
-class Hospital(auth_model.TimeStampedModel, auth_model.CreatedByModel, auth_model.QCModel, SearchKey, auth_model.SoftDelete, auth_model.WelcomeCallingDone):
+class Hospital(auth_model.TimeStampedModel, auth_model.CreatedByModel, auth_model.QCModel, SearchKey, auth_model.SoftDelete, auth_model.WelcomeCallingDone, UrlsModel):
     PRIVATE = 1
     CLINIC = 2
     HOSPITAL = 3
@@ -255,6 +260,65 @@ class Hospital(auth_model.TimeStampedModel, auth_model.CreatedByModel, auth_mode
     #         self.city_search_key = search_city
     #         return self.city
     #     return None
+    @staticmethod
+    def get_top_hospitals_data(request, lat=28.450367, long=77.071848):
+        from ondoc.api.v1.doctor.serializers import TopHospitalForIpdProcedureSerializer
+        result = []
+        queryset = CommonHospital.objects.all().values_list('hospital', 'network')
+        top_hospital_ids = list(set([x[0] for x in queryset if x[0] is not None]))
+        top_network_ids = list(set([x[1] for x in queryset if x[1] is not None]))
+        point_string = 'POINT(' + str(long) + ' ' + str(lat) + ')'
+        pnt = GEOSGeometry(point_string, srid=4326)
+        temp_hosp_queryset = Hospital.objects.filter(is_live=True)
+        if top_network_ids:
+            network_hospital_queryset = temp_hosp_queryset.filter(network__in=top_network_ids)
+            network_hospitals = network_hospital_queryset.annotate(
+                distance=Distance('location', pnt)).annotate(rank=Window(expression=RowNumber(), order_by=F('distance').asc(),
+                            partition_by=[RawSQL('Coalesce(network_id, random())', [])])
+            )
+            for x in network_hospitals:
+                if x.rank == 1:
+                    top_hospital_ids.append(x.id)
+        hosp_queryset = Hospital.objects.prefetch_related('hospitalcertification_set',
+                                                          'hospital_documents',
+                                                          'hosp_availability',
+                                                          'health_insurance_providers',
+                                                          'network__hospital_network_documents',
+                                                          'hospitalspeciality_set').filter(
+            id__in=top_hospital_ids).annotate(
+            distance=Distance('location', pnt)).order_by('distance')
+        temp_hospital_ids = hosp_queryset.values_list('id', flat=True)
+        hosp_entity_dict, hosp_locality_entity_dict = Hospital.get_hosp_and_locality_dict(temp_hospital_ids,
+                                                                                          EntityUrls.SitemapIdentifier.HOSPITALS_LOCALITY_CITY)
+
+        result = TopHospitalForIpdProcedureSerializer(hosp_queryset, many=True, context={'request': request,
+                                                                                         'hosp_entity_dict': hosp_entity_dict,
+                                                                                         'hosp_locality_entity_dict': hosp_locality_entity_dict}).data
+        return result
+
+    def get_active_opd_appointments(self, user=None, user_insurance=None, appointment_date=None):
+
+        appointments = OpdAppointment.objects.filter(hospital_id=self.id)\
+                           .exclude(status__in=[OpdAppointment.CANCELLED])
+        if user and user.is_authenticated:
+            appointments = appointments.filter(user=user)
+        if user_insurance:
+            appointments = appointments.filter(insurance=user_insurance)
+        if appointment_date and appointments:
+            appointments = appointments.filter(time_slot_start__date=appointment_date)
+
+        return appointments
+
+    # def is_appointment_exist_for_date(self, insurance, appointment_date):
+    #     active_appointments = self.get_active_opd_appointments(None, insurance)
+    #     if not active_appointments:
+    #         return False
+    #     for appointment in active_appointments:
+    #         if appointment.time_slot_start.date() == appointment_date.date():
+    #             return True
+    #     return False
+
+
     @classmethod
     def get_hosp_and_locality_dict(cls, temp_hospital_ids, required_identifier):
         if not temp_hospital_ids:
@@ -404,6 +468,31 @@ class Hospital(auth_model.TimeStampedModel, auth_model.CreatedByModel, auth_mode
         elif self.enabled and self.disabled_at:
             self.disabled_at = None
 
+    def create_entity_url(self):
+        if not self.is_live:
+            return
+
+        entity = EntityUrls.objects.filter(entity_id=self.id, is_valid=True, sitemap_identifier='HOSPITAL_PAGE')
+        if not entity:
+            url = self.name
+            url = slugify(url)
+            new_url = url
+
+            exists = EntityUrls.objects.filter(url=new_url + '-hpp', sitemap_identifier='HOSPITAL_PAGE').first()
+            if exists:
+                if exists.id == self.id:
+                    exists.is_valid = True
+                    exists.save()
+                    self.url = new_url+'-hpp'
+                    return
+                else:
+                    new_url = url + '-' + str(self.id)
+
+            new_url = new_url + '-hpp'
+            EntityUrls.objects.create(url=new_url, sitemap_identifier='HOSPITAL_PAGE', entity_type='Hospital', url_type='PAGEURL',
+                                      is_valid=True, sequence=0, entity_id=self.id)
+            self.url = new_url
+
     def save(self, *args, **kwargs):
         self.update_time_stamps()
         self.update_live_status()
@@ -420,6 +509,8 @@ class Hospital(auth_model.TimeStampedModel, auth_model.CreatedByModel, auth_mode
                 update_status_in_matrix = True
         if not self.matrix_lead_id and (self.is_listed_on_docprime is None or self.is_listed_on_docprime is True):
             push_to_matrix = True
+
+        self.create_entity_url()
         super(Hospital, self).save(*args, **kwargs)
         if self.is_appointment_manager:
             auth_model.GenericAdmin.objects.filter(hospital=self, entity_type=auth_model.GenericAdmin.DOCTOR, permission_type=auth_model.GenericAdmin.APPOINTMENT)\
@@ -447,6 +538,54 @@ class Hospital(auth_model.TimeStampedModel, auth_model.CreatedByModel, auth_mode
         if not result:
             result.extend(list(self.spoc_details.filter(contact_type=SPOCDetails.OWNER)))
         return result
+
+    def has_ipd_doctors(self):
+        result = False
+        for doctor_clinic in self.hospital_doctors.filter(enabled=True):
+            if doctor_clinic.ipd_procedure_clinic_mappings.filter(enabled=True).exists():
+                result = True
+                break
+        return result
+
+    def get_specialization_insured_appointments(self, doctor, insurance):
+        days = insurance.specialization_days_limit
+        n_days_back_datetime = timezone.now() - datetime.timedelta(days=days)
+
+        limit_specialization_ids = json.loads(settings.INSURANCE_SPECIALIZATION_WITH_DAYS_LIMIT)
+        limit_specialization_ids_set = set(limit_specialization_ids)
+        doctor_specialization_ids = set([x.specialization_id for x in doctor.doctorpracticespecializations.all()])
+
+        if not limit_specialization_ids_set.intersection(doctor_specialization_ids):
+            return []
+
+        doctor_with_specialization = DoctorPracticeSpecialization.objects. \
+            filter(specialization_id__in=limit_specialization_ids).values_list('doctor_id', flat=True)
+
+        appointments = self.hospital_appointments.filter(insurance=insurance,
+                                                         user=insurance.user,
+                                                         time_slot_start__gte=n_days_back_datetime,
+                                                         doctor_id__in=doctor_with_specialization).\
+            exclude(status__in=[OpdAppointment.CANCELLED]).order_by('-time_slot_start')
+
+        return appointments
+
+    def get_blocked_specialization_appointments_slots(self, doctor, insurance):
+        blockeds_timeslots = []
+        appointments = self.get_specialization_insured_appointments(doctor, insurance)
+
+        if not appointments:
+            return blockeds_timeslots
+
+        days = insurance.specialization_days_limit
+        for appointment in appointments:
+            for n in range(days):
+                nth_day_future_timeslot = appointment.time_slot_start.date() + datetime.timedelta(days=n)
+                nth_day_past_timeslot = appointment.time_slot_start.date() - datetime.timedelta(days=n)
+                blockeds_timeslots.append(str(nth_day_future_timeslot))
+                if nth_day_past_timeslot >= timezone.now().date():
+                    blockeds_timeslots.append(str(nth_day_past_timeslot))
+
+        return blockeds_timeslots
 
 
 class HospitalPlaceDetails(auth_model.TimeStampedModel):
@@ -579,7 +718,7 @@ class College(auth_model.TimeStampedModel):
         db_table = "college"
 
 
-class Doctor(auth_model.TimeStampedModel, auth_model.QCModel, SearchKey, auth_model.SoftDelete):
+class Doctor(auth_model.TimeStampedModel, auth_model.QCModel, SearchKey, auth_model.SoftDelete, UrlsModel):
     SOURCE_PRACTO = "pr"
     SOURCE_CRM = 'crm'
 
@@ -698,9 +837,9 @@ class Doctor(auth_model.TimeStampedModel, auth_model.QCModel, SearchKey, auth_mo
         query =   '''insert into insurance_covered_entity(entity_id,name ,location, type, search_key, data,specialization_search_key, created_at,updated_at)
                  
                  select doc_id as entity_id, doctor_name as name, location ,'doctor' as type,search_key,
-                        json_build_object('id',doc_id, 'type','doctor','name', doctor_name,'city', city,'url', url,'hospital_name',hospital_name, 'specializations', specializations),specialization_search_key,  now(), now() from(
-                select doc_id ,doctor_name, h.location, doc_search_key as search_key, h.city, h.name as hospital_name , url, specialization_search_key, specializations from 
-                (select d.id doc_id, d.name doctor_name,d.search_key as doc_search_key, max(eu.url) as url,
+                        json_build_object('id',doc_id, 'type','doctor','name', doctor_name,'city', city,'url', entity_url,'hospital_name',hospital_name, 'specializations', specializations),specialization_search_key,  now(), now() from(
+                select doc_id ,doctor_name, h.location, doc_search_key as search_key, h.city, h.name as hospital_name , entity_url , specialization_search_key, specializations from 
+                (select d.id doc_id, d.name doctor_name,d.search_key as doc_search_key, max(eu.url) as entity_url,
                 string_agg(distinct lower(ps.name), ',') specialization_search_key,
                 array_agg(distinct ps.name) specializations
                 from doctor d 
@@ -885,13 +1024,14 @@ class Doctor(auth_model.TimeStampedModel, auth_model.QCModel, SearchKey, auth_mo
                 if exists.id == self.id:
                     exists.is_valid=True
                     exists.save()
+                    self.url = new_url + '-dpp'
                     return
                 else:
                     new_url = url+'-'+str(self.id)
             
             EntityUrls.objects.create(url=new_url+'-dpp', sitemap_identifier='DOCTOR_PAGE', entity_type='Doctor', url_type='PAGEURL',
                                   is_valid=True, sequence=0, entity_id=self.id)
-
+            self.url = new_url + '-dpp'
 
     def save(self, *args, **kwargs):
         self.update_time_stamps()
@@ -908,8 +1048,8 @@ class Doctor(auth_model.TimeStampedModel, auth_model.QCModel, SearchKey, auth_mo
         else:
             push_to_matrix = True
 
-        super(Doctor, self).save(*args, **kwargs)
         self.create_entity_url()
+        super(Doctor, self).save(*args, **kwargs)
 
         transaction.on_commit(lambda: self.app_commit_tasks(push_to_matrix=push_to_matrix,
                                                             update_status_in_matrix=update_status_in_matrix))
@@ -1194,7 +1334,7 @@ class DoctorClinic(auth_model.TimeStampedModel, auth_model.WelcomeCallingDone):
     # def __str__(self):
     #     return '{}-{}'.format(self.doctor, self.hospital)
 
-    def get_timings(self):
+    def get_timings(self, blocks=[]):
         from ondoc.api.v2.doctor import serializers as v2_serializers
         from ondoc.api.v1.common import serializers as common_serializers
         clinic_timings= self.availability.order_by("start")
@@ -1215,6 +1355,10 @@ class DoctorClinic(auth_model.TimeStampedModel, auth_model.WelcomeCallingDone):
         date = datetime.datetime.today().strftime('%Y-%m-%d')
         booking_details = {"type": "doctor"}
         slots = obj.get_timing_slots(date, total_leaves, booking_details)
+        if slots:
+            for b in blocks:
+                slots.pop(b, None)
+
         upcoming_slots = obj.get_upcoming_slots(time_slots=slots)
         res_data = {"time_slots": slots, "upcoming_slots": upcoming_slots}
         return res_data
@@ -1969,13 +2113,20 @@ class OpdAppointment(auth_model.TimeStampedModel, CouponsMixin, OpdAppointmentIn
     auto_ivr_data = JSONField(default=list(), null=True)
     synced_analytics = GenericRelation(SyncBookingAnalytics, related_name="opd_booking_analytics")
     refund_details = GenericRelation(RefundDetails, related_query_name="opd_appointment_detail")
+    appointment_prescriptions = GenericRelation("prescription.AppointmentPrescription", related_query_name="appointment_prescriptions")
     coupon_data = JSONField(blank=True, null=True)
+    status_change_comments = models.CharField(max_length=5000, null=True, blank=True)
 
     def __str__(self):
         return self.profile.name + " (" + self.doctor.name + ")"
 
     def allowed_action(self, user_type, request):
         allowed = []
+        if self.status == self.CREATED:
+            if user_type == auth_model.User.CONSUMER:
+                return [self.CANCELLED]
+            return []
+
         current_datetime = timezone.now()
         today = datetime.date.today()
         if user_type == auth_model.User.DOCTOR and self.time_slot_start.date() >= today:
@@ -2005,6 +2156,19 @@ class OpdAppointment(auth_model.TimeStampedModel, CouponsMixin, OpdAppointmentIn
             return coupon.corporate_deal.id
 
         return None
+
+    def get_all_prescriptions(self):
+        from ondoc.common.utils import get_file_mime_type
+
+        resp = []
+        for pres in self.prescriptions.all():
+            for pf in pres.prescription_file.all():
+                file = pf.name
+                mime_type = get_file_mime_type(file)
+                file_url = pf.name.url
+                resp.append({"url": file_url, "type": mime_type})
+        return resp
+
 
     def get_city(self):
         if self.hospital and self.hospital.matrix_city:
@@ -2094,9 +2258,24 @@ class OpdAppointment(auth_model.TimeStampedModel, CouponsMixin, OpdAppointmentIn
 
     @classmethod
     def create_appointment(cls, appointment_data):
+
+        insurance = appointment_data.get('insurance')
+        appointment_status = OpdAppointment.BOOKED
+
+        # if insurance and insurance.is_valid():
+        #     hospital = appointment_data.get('hospital')
+        #     if hospital:
+        #        is_appointment_exist = hospital.get_active_opd_appointments(insurance.user, insurance, appointment_data.get('time_slot_start').date())
+        #        if is_appointment_exist:
+        #            raise Exception('Some error occurred. Please try after some time')
+        #     mrp = appointment_data.get('fees')
+        #     insurance_limit_usage_data = insurance.validate_limit_usages(mrp)
+        #     if insurance_limit_usage_data.get('created_state'):
+        #         appointment_status = OpdAppointment.CREATED
+
         otp = random.randint(1000, 9999)
         appointment_data["payment_status"] = OpdAppointment.PAYMENT_ACCEPTED
-        appointment_data["status"] = OpdAppointment.BOOKED
+        appointment_data["status"] = appointment_status
         appointment_data["otp"] = otp
         # if appointment_data["insurance_id"] :
         #     appointment_data["insurance"] = insurance_model.UserInsurance.objects.get(id=appointment_data["insurance_id"].id)
@@ -2233,6 +2412,13 @@ class OpdAppointment(auth_model.TimeStampedModel, CouponsMixin, OpdAppointmentIn
         return False
 
     def after_commit_tasks(self, old_instance, push_to_matrix):
+        if old_instance is None:
+            try:
+                create_ipd_lead_from_opd_appointment.apply_async(({'obj_id': self.id},),)
+                                                                 # eta=timezone.now() + timezone.timedelta(hours=1))
+
+            except Exception as e:
+                logger.error(str(e))
         if push_to_matrix:
         # Push the appointment data to the matrix .
             try:
@@ -2322,7 +2508,6 @@ class OpdAppointment(auth_model.TimeStampedModel, CouponsMixin, OpdAppointmentIn
             raise Exception('Cancelled or Completed appointment cannot be saved')
         # if not self.is_doctor_available():
         #     raise RestFrameworkValidationError("Doctor is on leave.")
-
         # push_to_matrix = kwargs.get('push_again_to_matrix', True)
         # if 'push_again_to_matrix' in kwargs.keys():
         #     kwargs.pop('push_again_to_matrix')
@@ -2734,6 +2919,34 @@ class OpdAppointment(auth_model.TimeStampedModel, CouponsMixin, OpdAppointmentIn
         appointments = cls.objects.filter(~Q(status=cls.COMPLETED), ~Q(status=cls.CANCELLED), user=insurance_obj.user,
                                           insurance=insurance_obj)
         return appointments
+
+    @classmethod
+    def get_insurance_usage(cls, insurance_obj, date=None):
+        appointments = cls.objects.filter(user=insurance_obj.user, insurance=insurance_obj).exclude(status=cls.CANCELLED)
+        if date:
+            appointments = appointments.filter(created_at__date=date)
+
+        count = appointments.count()
+        data = appointments.aggregate(sum_amount=Sum('fees'))
+        sum = data.get('sum_amount', 0)
+        sum = sum if sum else 0
+        return {'count': count, 'sum': sum}
+
+    def convert_ipd_lead_data(self):
+        result = {}
+        result['hospital'] = self.hospital
+        result['user'] = self.user
+        result['payment_amount'] = self.deal_price  # To be confirmed
+        if self.user:
+            result['name'] = self.user.full_name
+            result['phone_number'] = self.user.phone_number
+            result['email'] = self.user.email
+            default_user_profile = self.user.get_default_profile()
+            if default_user_profile:
+                result['gender'] = default_user_profile.gender
+                result['dob'] = default_user_profile.dob
+        result['data'] = {'opd_appointment_id': self.id}
+        return result
 
 
 class OpdAppointmentProcedureMapping(models.Model):
@@ -3614,3 +3827,12 @@ class SelectedInvoiceItems(auth_model.TimeStampedModel):
 
     class Meta:
         db_table = "selected_invoice_items"
+
+
+class CommonHospital(auth_model.TimeStampedModel):
+    hospital = models.ForeignKey(Hospital, on_delete=models.CASCADE, null=True, blank=True)
+    network = models.ForeignKey(HospitalNetwork, on_delete=models.CASCADE, null=True, blank=True)
+    priority = models.PositiveIntegerField(default=0)
+
+    class Meta:
+        db_table = "common_hospital"

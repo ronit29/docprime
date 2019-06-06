@@ -3,6 +3,8 @@ from django.db import transaction
 from django.db.models import Q
 from rest_framework.response import Response
 from rest_framework import viewsets, mixins, status
+
+# from ondoc.api.v1.prescription.serializers import AppointmentPrescriptionSerializer
 from ondoc.authentication.backends import JWTAuthentication
 from rest_framework.permissions import IsAuthenticated
 from ondoc.api.v1.utils import IsConsumer, IsNotAgent, IsDoctor
@@ -12,6 +14,7 @@ from ondoc.prescription import models as prescription_models
 from ondoc.diagnostic import models as diagnostic_models
 from ondoc.api.v1 import utils
 from django.utils import timezone
+from decimal import Decimal
 import logging, random
 logger = logging.getLogger(__name__)
 from datetime import datetime
@@ -129,5 +132,50 @@ class PrescriptionComponentsViewSet(viewsets.GenericViewSet):
         return Response(resp)
 
 
+class AppointmentPrescriptionViewSet(viewsets.GenericViewSet):
+
+    authentication_classes = (JWTAuthentication,)
+    permission_classes = (IsAuthenticated, )
+
+    # def ask_prescription(self, request):
+    #     user = request.user
+    #     insurance = user.active_insurance
+    #     if not insurance:
+    #         return Response(status=status.HTTP_400_BAD_REQUEST)
+    #
+    #     serializer = AppointmentPrescriptionSerializer(data=request.data)
+    #     serializer.is_valid(raise_exception=True)
+    #     valid_data = serializer.validated_data
+    #
+    #     lab = valid_data.get('lab')
+    #     lab_pricing_group = lab.lab_pricing_group
+    #     available_lab_test_qs = lab_pricing_group.available_lab_tests.all().filter(test__in=valid_data.get('lab_test'))
+    #     mrp = Decimal(0)
+    #     for available_lab_test in available_lab_test_qs:
+    #         agreed_price = available_lab_test.custom_agreed_price if available_lab_test.custom_agreed_price else available_lab_test.computed_agreed_price
+    #         mrp = mrp + agreed_price
+    #
+    #     start_date = valid_data.get('start_date').date()
+    #
+    #     resp = insurance.validate_limit_usages(mrp)
+    #
+    #     return Response(resp)
+
+    def upload_prescription(self, request, *args, **kwargs):
+        user = request.user
+        insurance = user.active_insurance
+        if not insurance:
+            return Response(status=status.HTTP_400_BAD_REQUEST, data={'error': 'User do not have active insurance.'})
+
+        data = dict()
+        document_data = {}
+        data['user'] = user.id
+        data['prescription_file'] = request.data['prescription_file']
+        serializer = serializers.AppointmentPrescriptionUploadSerializer(data=data, context={'request':request})
+        serializer.is_valid(raise_exception=True)
+        prescription_obj = serializer.save()
+        document_data['id'] = prescription_obj.id
+        document_data['data'] = serializer.data
+        return Response(document_data)
 
 

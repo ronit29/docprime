@@ -353,6 +353,14 @@ def labappointment_transform(app_data):
     app_data["user"] = app_data["user"].id
     app_data["profile"] = app_data["profile"].id
     app_data["home_pickup_charges"] = str(app_data.get("home_pickup_charges",0))
+    prescription_objects = app_data.get("prescription_list", [])
+    if prescription_objects:
+        prescription_id_list = []
+        for prescription_data in prescription_objects:
+            prescription_id_list.append({'prescription': prescription_data.get('prescription').id})
+        app_data["prescription_list"] = prescription_id_list
+
+
     if app_data.get("coupon"):
         app_data["coupon"] = list(app_data["coupon"])
     if app_data.get("user_plan"):
@@ -758,7 +766,7 @@ class CouponsMixin(object):
                     return {"is_valid": False, "used_count": 0}
 
             count = coupon_obj.used_coupon_count(user, cart_item)
-            total_used_count = coupon_obj.total_used_coupon_count()
+            total_used_count = coupon_obj.total_used_count
 
             if coupon_obj.is_user_specific and user:
                 user_specefic = UserSpecificCoupon.objects.filter(user=user, coupon=coupon_obj).first()
@@ -926,6 +934,23 @@ class CouponsMixin(object):
 
         return {"total_price": total_price}
 
+    def get_applicable_tests_with_total_price_v2(self, **kwargs):
+        from ondoc.diagnostic.models import AvailableLabTest
+
+        lab = kwargs.get("lab")
+        test_ids = kwargs.get("test_ids")
+
+        queryset = AvailableLabTest.objects.filter(lab_pricing_group__labs=lab, test__in=test_ids)
+
+        total_price = 0
+        for test in queryset:
+            if test.custom_deal_price is not None:
+                total_price += test.custom_deal_price
+            else:
+                total_price += test.computed_deal_price
+
+        return {"total_price": total_price}
+
     def get_applicable_procedures_with_total_price(self, **kwargs):
         from ondoc.procedure.models import DoctorClinicProcedure
 
@@ -937,6 +962,21 @@ class CouponsMixin(object):
         queryset = DoctorClinicProcedure.objects.filter(doctor_clinic__doctor=doctor, doctor_clinic__hospital=hospital, procedure__in=procedures)
         if coupon_obj.procedures.exists():
             queryset = queryset.filter(procedure__in=coupon_obj.procedures.all())
+
+        total_price = 0
+        for procedure in queryset:
+            total_price += procedure.deal_price
+
+        return {"total_price": total_price}
+
+    def get_applicable_procedures_with_total_price_v2(self, **kwargs):
+        from ondoc.procedure.models import DoctorClinicProcedure
+
+        doctor = kwargs.get("doctor")
+        hospital = kwargs.get("hospital")
+        procedures = kwargs.get("procedures")
+
+        queryset = DoctorClinicProcedure.objects.filter(doctor_clinic__doctor=doctor, doctor_clinic__hospital=hospital, procedure__in=procedures)
 
         total_price = 0
         for procedure in queryset:
@@ -1360,6 +1400,7 @@ def get_opd_pem_queryset(user, model):
     #                              super_user_permission=false AND is_disabled=false AND permission_type=1) > 0) THEN 1  ELSE 0 END'''
     # billing_query = '''CASE WHEN ((SELECT COUNT(id) FROM generic_admin WHERE user_id=%s AND hospital_id=hospital.id AND
     #                                super_user_permission=false AND is_disabled=false AND permission_type=2) > 0) THEN 1  ELSE 0 END'''
+    from ondoc.doctor.models import OpdAppointment
     queryset = model.objects \
         .select_related('doctor', 'hospital', 'user') \
         .prefetch_related('doctor__manageable_doctors', 'hospital__manageable_hospitals', 'doctor__images',
@@ -1367,6 +1408,7 @@ def get_opd_pem_queryset(user, model):
                           'doctor__qualifications__specialization', 'doctor__qualifications__college',
                           'doctor__doctorpracticespecializations', 'doctor__doctorpracticespecializations__specialization') \
         .filter(
+        ~Q(status=OpdAppointment.CREATED),
         Q(
             Q(doctor__manageable_doctors__user=user,
               doctor__manageable_doctors__hospital=F('hospital'),
@@ -1618,3 +1660,17 @@ def ipd_query_parameters(entity, req_params):
     if entity.locality_value:
         params_dict['city'] = entity.locality_value
     return params_dict
+
+
+def convert_datetime_str_to_iso_str(datetime_string_to_be_converted):
+    try:
+        from dateutil import parser
+        datetime_obj = parser.parse(datetime_string_to_be_converted)
+        datetime_str = datetime_obj.isoformat()
+        if datetime_str.endswith('+00:00'):
+            datetime_str = datetime_str[:-6] + 'Z'
+        result = datetime_str
+    except Exception as e:
+        print(e)
+        result = datetime_string_to_be_converted
+    return result

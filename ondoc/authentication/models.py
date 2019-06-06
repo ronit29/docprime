@@ -338,6 +338,14 @@ class User(AbstractBaseUser, PermissionsMixin):
         active_insurance = self.purchased_insurance.filter().order_by('id').last()
         return active_insurance if active_insurance and active_insurance.is_valid() else None
 
+    @cached_property
+    def recent_opd_appointment(self):
+        return self.appointments.filter(created_at__gt=timezone.now() - timezone.timedelta(days=90)).order_by('-id')
+
+    @cached_property
+    def recent_lab_appointment(self):
+        return self.lab_appointments.filter(created_at__gt=timezone.now() - timezone.timedelta(days=90)).order_by('-id')
+
     def get_phone_number_for_communication(self):
         from ondoc.communications.models import unique_phone_numbers
         receivers = []
@@ -494,6 +502,12 @@ class UserProfile(TimeStampedModel):
     def __str__(self):
         return "{}-{}".format(self.name, self.id)
 
+    @cached_property
+    def is_insured_profile(self):
+        insured_member_profile = self.insurance.filter().order_by('-id').first()
+        response = True if insured_member_profile and insured_member_profile.user_insurance.is_valid() else False
+        return response
+
     def get_thumbnail(self):
         if self.profile_image:
             return self.profile_image.url
@@ -536,6 +550,22 @@ class UserProfile(TimeStampedModel):
                                                       new_image_io.tell(), None)
         super().save(*args, **kwargs)
 
+    def update_profile_post_endorsement(self, endorsed_data):
+        self.name = endorsed_data.first_name + " " + endorsed_data.middle_name + " " + endorsed_data.last_name
+        self.email = endorsed_data.email
+        if endorsed_data.gender == 'f':
+            self.gender = UserProfile.FEMALE
+        elif endorsed_data.gender == 'm':
+            self.gender = UserProfile.MALE
+        else:
+            self.gender = UserProfile.OTHER
+        if endorsed_data.phone_number:
+            self.phone_number = endorsed_data.phone_number
+        else:
+            self.phone_number = self.user.phone_number
+        self.dob = endorsed_data.dob
+        self.save()
+
     class Meta:
         db_table = "user_profile"
 
@@ -562,9 +592,9 @@ class OtpVerifications(TimeStampedModel):
         result = "OTP for login is {}.\nDon't share this code with others."
         if platform == "android" and version:
             if (user_type == 'doctor' or is_doc) and parse(version) > parse("2.100.4"):
-                result = "<#>\n" + result + "\n" + settings.PROVIDER_ANDROID_MESSAGE_HASH
+                result = "<#> " + result + "\nMessage ID: " + settings.PROVIDER_ANDROID_MESSAGE_HASH
             elif parse(version) > parse("1.1"):
-                result = "<#>\n" + result + "\n" + settings.CONSUMER_ANDROID_MESSAGE_HASH
+                result = "<#> " + result + "\nMessage ID: " + settings.CONSUMER_ANDROID_MESSAGE_HASH
         return result
 
 

@@ -540,7 +540,7 @@ class LabAdmin(ImportExportMixin, admin.GeoModelAdmin, VersionAdmin, ActionAdmin
     list_display = ('name', 'lab_logo', 'updated_at', 'onboarding_status', 'data_status', 'welcome_calling_done',
                     'list_created_by', 'list_assigned_to', 'get_onboard_link',)
     # readonly_fields=('onboarding_status', )
-    list_filter = ('data_status', 'welcome_calling_done', 'onboarding_status', 'is_insurance_enabled',
+    list_filter = ('data_status', 'enabled', 'welcome_calling_done', 'onboarding_status', 'is_insurance_enabled',
                    LabCityFilter, CreatedByFilter)
     exclude = ('search_key', 'pathology_agreed_price_percentage', 'pathology_deal_price_percentage',
                'radiology_agreed_price_percentage', 'radiology_deal_price_percentage', 'live_at',
@@ -757,8 +757,9 @@ class LabAppointmentForm(RefundableAppointmentForm):
     def clean(self):
         super().clean()
         cleaned_data = self.cleaned_data
-        if self.request.user.groups.filter(name=constants['OPD_APPOINTMENT_MANAGEMENT_TEAM']).exists() and cleaned_data.get('status') == LabAppointment.BOOKED:
-            raise forms.ValidationError("Form cant be Saved with Booked Status.")
+        # Appointments are now made with CREATED status.
+        # if self.request.user.groups.filter(name=constants['OPD_APPOINTMENT_MANAGEMENT_TEAM']).exists() and cleaned_data.get('status') == LabAppointment.BOOKED:
+        #     raise forms.ValidationError("Form cant be Saved with Booked Status.")
         if cleaned_data.get('start_date') and cleaned_data.get('start_time'):
             date_time_field = str(cleaned_data.get('start_date')) + " " + str(cleaned_data.get('start_time'))
             dt_field = parse_datetime(date_time_field)
@@ -769,6 +770,9 @@ class LabAppointmentForm(RefundableAppointmentForm):
             hour = round(float(time_slot_start.hour) + (float(time_slot_start.minute) * 1 / 60), 2)
         else:
             raise forms.ValidationError("Invalid start date and time.")
+
+        if time_slot_start != self.instance.time_slot_start and time_slot_start < timezone.now():
+            raise forms.ValidationError("Time slot can never be in past. Please add time slot in future.")
 
         if self.instance.id:
             lab_test = self.instance.test_mappings.all()
@@ -791,6 +795,9 @@ class LabAppointmentForm(RefundableAppointmentForm):
             raise forms.ValidationError(
                 "Reason/Comment for cancellation can only be entered on cancelled appointment")
 
+        if cleaned_data.get('status') is LabAppointment.CREATED and cleaned_data.get('status_change_comments'):
+            raise forms.ValidationError("Comment for status change can only be entered when changing status from created to other.")
+
         if cleaned_data.get('status') is LabAppointment.CANCELLED and not cleaned_data.get('cancellation_reason'):
             raise forms.ValidationError("Reason for Cancelled appointment should be set.")
 
@@ -798,6 +805,15 @@ class LabAppointmentForm(RefundableAppointmentForm):
                 'cancellation_reason', None) and cleaned_data.get('cancellation_reason').is_comment_needed and not cleaned_data.get('cancellation_comments'):
             raise forms.ValidationError(
                 "Cancellation comments must be mentioned for selected cancellation reason.")
+
+        if cleaned_data.get('status') and self.instance and self.instance.status == LabAppointment.CREATED:
+            if cleaned_data.get('status') not in [LabAppointment.BOOKED, LabAppointment.CANCELLED, LabAppointment.CREATED]:
+                raise forms.ValidationError(
+                    "Created status can only be changed to Booked or cancelled.")
+
+            if cleaned_data.get('status') != LabAppointment.CREATED and not cleaned_data.get('status_change_comments'):
+                raise forms.ValidationError(
+                    "Status change comments must be mentioned when changing status from created to other.")
 
         if not lab.lab_pricing_group:
             raise forms.ValidationError("Lab is not in any lab pricing group.")
@@ -865,6 +881,15 @@ class LabAppointmentAdmin(nested_admin.NestedModelAdmin):
     #     else:
     #         temp_autocomplete_fields = super().get_autocomplete_fields(request)
     #     return temp_autocomplete_fields
+
+    def uploaded_prescriptions(self, obj):
+        prescriptions = obj.get_all_uploaded_prescriptions()
+
+        prescription_string = ""
+        for p in prescriptions:
+            prescription_string+="<div><a target='_blank' href={}>{}</a></div>".format(\
+                util_absolute_url(p.prescription_file.url), util_absolute_url(p.prescription_file.url))
+        return mark_safe(prescription_string)
 
     def get_search_results(self, request, queryset, search_term):
         queryset, use_distinct = super().get_search_results(request, queryset, None)
@@ -959,7 +984,7 @@ class LabAppointmentAdmin(nested_admin.NestedModelAdmin):
                     'get_pickup_address', 'get_lab_address', 'outstanding', 'status', 'cancel_type',
                     'cancellation_reason', 'cancellation_comments', 'start_date', 'start_time',
                     'send_email_sms_report', 'invoice_urls', 'reports_uploaded', 'email_notification_timestamp', 'payment_type',
-                     'payout_info', 'refund_initiated')
+                     'payout_info', 'refund_initiated', 'status_change_comments','uploaded_prescriptions')
         if request.user.groups.filter(name=constants['APPOINTMENT_OTP_TEAM']).exists() or request.user.is_superuser:
             all_fields = all_fields + ('otp',)
 
@@ -982,13 +1007,17 @@ class LabAppointmentAdmin(nested_admin.NestedModelAdmin):
                      'agreed_price',
                      'deal_price', 'effective_price', 'payment_status',
                      'payment_type', 'insurance', 'is_home_pickup', 'get_pickup_address', 'get_lab_address',
-                     'outstanding', 'reports_uploaded', 'email_notification_timestamp', 'payment_type', 'payout_info', 'refund_initiated']
+                     'outstanding', 'reports_uploaded', 'email_notification_timestamp', 'payment_type', 'payout_info', 'refund_initiated',
+                     'uploaded_prescriptions']
         # else:
         #     read_only = []
         if obj and (obj.status == LabAppointment.COMPLETED or obj.status == LabAppointment.CANCELLED):
             read_only.extend(['status'])
         if request.user.groups.filter(name=constants['APPOINTMENT_OTP_TEAM']).exists() or request.user.is_superuser:
             read_only = read_only + ['otp']
+
+        if obj.status is not LabAppointment.CREATED:
+            read_only = read_only + ['status_change_comments']
         return read_only
 
     def refund_initiated(self, obj):
