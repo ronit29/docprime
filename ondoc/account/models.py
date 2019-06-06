@@ -125,7 +125,6 @@ class Order(TimeStampedModel):
     def is_parent(self):
         return self.parent_id is None
 
-
     @classmethod
     def disable_pending_orders(cls, appointment_details, product_id, action):
         if product_id == Order.DOCTOR_PRODUCT_ID:
@@ -788,7 +787,7 @@ class Order(TimeStampedModel):
                 if order.action_data:
                     obj.action_data['effective_price'] = obj.action_data['deal_price']
                     obj.action_data['discount'] = '0'
-                    obj.action_data['amount'] = obj.action_data['deal_price']
+                    obj.amount = obj.action_data['deal_price']
                     obj.action_data['coupon'] = []
                     obj.save()
 
