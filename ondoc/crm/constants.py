@@ -32,6 +32,7 @@ constants = {
     'APPOINTMENT_REFUND_TEAM': 'appointment_refund_team',
     'SUPER_INSURANCE_GROUP': 'super_insurance_group',
     'IPD_TEAM': 'ipd_team',
+    'CORPORATE_GROUP' : 'corporate_group',
     'APPOINTMENT_OTP_BYPASS_AGENT_TEAM': 'appointment_otp_bypass_agent_team'
 }
 matrix_product_ids = {

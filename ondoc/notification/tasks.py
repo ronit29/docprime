@@ -942,13 +942,21 @@ def push_insurance_banner_lead_to_matrix(self, data):
 
         extras = banner_obj.extras
         plan_id = extras.get('plan_id', None)
+
+        lead_source = "InsuranceOPD"
+        lead_data = extras.get('lead_data')
+        if lead_data:
+            provided_lead_source = lead_data.get('source')
+            if type(provided_lead_source).__name__ == 'str' and provided_lead_source.lower() == 'docprimechat':
+                lead_source = 'docprimechat'
+
         plan = None
         if plan_id and type(plan_id).__name__ == 'int':
             plan = InsurancePlans.objects.filter(id=plan_id).first()
 
         request_data = {
             'LeadID': banner_obj.matrix_lead_id if banner_obj.matrix_lead_id else 0,
-            'LeadSource': 'InsuranceOPD',
+            'LeadSource': lead_source,
             'Name': 'none',
             'BookedBy': phone_number,
             'PrimaryNo': phone_number,
