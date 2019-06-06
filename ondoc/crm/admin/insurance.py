@@ -436,7 +436,7 @@ class UserInsuranceDoctorResource(resources.ModelResource):
         return appointment.hospital.state if appointment.hospital.state  else ''
 
     def dehydrate_pincode(self, appointment):
-        return appointment.hospital.pincode if appointment.hospital.pincode  else ''
+        return appointment.hospital.pin_code if appointment.hospital.pin_code  else ''
 
     def dehydrate_pan_card_of_clinic(self, appointment):
         return ""
@@ -615,7 +615,7 @@ class UserInsuranceLabResource(resources.ModelResource):
         return appointment.lab.state if appointment.lab.state  else ''
 
     def dehydrate_pincode(self, appointment):
-        return appointment.lab.pincode if appointment.lab.pincode  else ''
+        return appointment.lab.pin_code if appointment.lab.pin_code  else ''
 
     def dehydrate_pan_card_of_center(self, appointment):
         # from django.contrib.contenttypes.models import ContentType
