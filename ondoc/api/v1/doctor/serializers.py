@@ -2168,6 +2168,7 @@ class IpdLeadUpdateSerializer(serializers.Serializer):
 
 class OfferSerializer(serializers.ModelSerializer):
     coupon = serializers.CharField(source='coupon.code', read_only=True, default=None)
+    hospital = serializers.CharField(source='hospital.name', read_only=True, default=None)
 
     class Meta:
         model = Offer
