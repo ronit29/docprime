@@ -55,7 +55,7 @@ class InsurancePlanContentInline(admin.TabularInline):
 
 class InsurerPolicyNumberInline(admin.TabularInline):
     model = InsurerPolicyNumber
-    fields = ('insurer', 'insurer_policy_number')
+    fields = ('insurer', 'apd_account', 'insurer_policy_number')
     extra = 0
 
 
@@ -85,7 +85,7 @@ class InsuranceThresholdInline(admin.TabularInline):
 
 class InsurancePlansAdmin(admin.ModelAdmin):
 
-    list_display = ['insurer', 'name','internal_name', 'amount', 'is_selected','get_policy_prefix']
+    list_display = ['insurer', 'name', 'internal_name', 'amount', 'is_selected','get_policy_prefix']
     inlines = [InsurancePlanContentInline, InsurerPolicyNumberInline, InsuranceThresholdInline]
     search_fields = ['name']
     form = InsurancePlanAdminForm

@@ -468,7 +468,7 @@ class InsurerPolicyNumber(auth_model.TimeStampedModel):
     insurer = models.ForeignKey(Insurer, related_name='policy_number_history', on_delete=models.DO_NOTHING, null=True, blank=True)
     insurer_policy_number = models.CharField(max_length=50)
     insurance_plan = models.ForeignKey(InsurancePlans, related_name='plan_policy_number', on_delete=models.DO_NOTHING, null=True, blank=True)
-    apd_account = models.ForeignKey(InsurerAccount, related_name='apd_account', on_delete=models.DO_NOTHING, null=True, blank=True)
+    apd_account = models.ForeignKey(InsurerAccount, related_name='policy_apd_account', on_delete=models.DO_NOTHING, null=True, blank=True)
 
     class Meta:
         db_table = 'insurer_policy_numbers'
@@ -1387,7 +1387,10 @@ class InsuranceTransaction(auth_model.TimeStampedModel):
         if self.transaction_type == self.DEBIT:
             transaction_amount = -1*transaction_amount
 
-        insurer_account = InsurerAccount.objects.select_for_update().get(insurer=self.user_insurance.insurance_plan.insurer)
+        master_policy_obj = self.user_insurance.master_policy_reference
+        account_id = master_policy_obj.apd_account.id
+        # insurer_account = InsurerAccount.objects.select_for_update().get(insurer=self.user_insurance.insurance_plan.insurer)
+        insurer_account = InsurerAccount.objects.select_for_update().get(id=account_id)
         insurer_account.current_float += transaction_amount        
         insurer_account.save()
 
