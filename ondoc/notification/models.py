@@ -87,6 +87,7 @@ class NotificationAction:
     LOGIN_OTP = 80
 
     COD_TO_PREPAID = 91
+    COD_TO_PREPAID_REQUEST = 92
 
 
     NOTIFICATION_TYPE_CHOICES = (

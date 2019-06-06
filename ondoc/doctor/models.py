@@ -2411,7 +2411,9 @@ class OpdAppointment(auth_model.TimeStampedModel, CouponsMixin, OpdAppointmentIn
             try:
                 create_ipd_lead_from_opd_appointment.apply_async(({'obj_id': self.id},),)
                                                                  # eta=timezone.now() + timezone.timedelta(hours=1))
-
+                if self.payment_type == self.COD:
+                    notification_tasks.send_opd_notifications_refactored.apply_async(
+                        (self.id, NotificationAction.COD_TO_PREPAID_REQUEST), countdown=5)
             except Exception as e:
                 logger.error(str(e))
         if push_to_matrix:
@@ -2939,6 +2941,20 @@ class OpdAppointment(auth_model.TimeStampedModel, CouponsMixin, OpdAppointmentIn
                 result['gender'] = default_user_profile.gender
                 result['dob'] = default_user_profile.dob
         result['data'] = {'opd_appointment_id': self.id}
+        return result
+
+    def get_master_order_id(self):
+        result = None
+        order_obj = Order.objects.filter(reference_id=self.id).first()
+        if order_obj:
+            result = order_obj.parent_id
+        return result
+
+    def get_cod_to_prepaid_url(self, token):
+        result = None
+        order_id = self.get_master_order_id()
+        if order_id:
+            result = settings.BASE_URL + '/order/paymentSummary?order_id={}&token={}'.format(order_id, token)
         return result
 
 
