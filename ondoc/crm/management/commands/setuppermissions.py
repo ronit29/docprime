@@ -474,6 +474,13 @@ class Command(BaseCommand):
 
             group.permissions.add(*permissions)
 
+        content_types = ContentType.objects.get_for_models(Hospital)
+        for cl, ct in content_types.items():
+            permissions = Permission.objects.filter(
+                Q(content_type=ct),
+                Q(codename='change_' + ct.model))
+
+            group.permissions.add(*permissions)
 
         #Review team Group
         group, created = Group.objects.get_or_create(name=constants['REVIEW_TEAM_GROUP'])
