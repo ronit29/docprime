@@ -1317,7 +1317,7 @@ class LabList(viewsets.ReadOnlyModelViewSet):
                         temp_categories.append(cat)
                     if k not in final_tests:
                         final_tests[k] = t_x
-                final_tests[k]['categories'] = temp_categories[0]
+                final_tests[k]['categories'] = temp_categories[0] if len(temp_categories) > 0 else None
                 final_tests[k]['categories_list'] = temp_categories
             tests = list(final_tests.values())
 
@@ -2868,6 +2868,7 @@ class TestDetailsViewset(viewsets.GenericViewSet):
             result = {}
             result['name'] = data.name
             result['id'] = data.id
+            result['is_package'] = data.is_package
             result['about_test'] = {'title': 'About the test', 'value': data.about_test}
             result['preparations'] = {'title': 'Preparations', 'value': data.preparations}
             result['why_get_tested'] = {'title': 'Why get tested?', 'value': data.why}

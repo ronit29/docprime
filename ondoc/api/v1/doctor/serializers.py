@@ -2141,7 +2141,7 @@ class CommonConditionsSerializer(serializers.Serializer):
 
 
 class IpdLeadUpdateSerializer(serializers.Serializer):
-    status = serializers.ChoiceField(choices=IpdProcedureLead.STATUS_CHOICES)
+    status = serializers.IntegerField()
     matrix_lead_id = serializers.IntegerField()
 
     def validate(self, attrs):
@@ -2152,6 +2152,7 @@ class IpdLeadUpdateSerializer(serializers.Serializer):
 
 class OfferSerializer(serializers.ModelSerializer):
     coupon = serializers.CharField(source='coupon.code', read_only=True, default=None)
+    hospital = serializers.CharField(source='hospital.name', read_only=True, default=None)
 
     class Meta:
         model = Offer
