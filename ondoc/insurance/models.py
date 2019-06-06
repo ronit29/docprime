@@ -1330,16 +1330,19 @@ class UserInsurance(auth_model.TimeStampedModel):
             wallet_amount = order.wallet_amount
             premium_amount = ins.premium_amount
             pg_transactions = PgTransaction.objects.filter(product_id=Order.INSURANCE_PRODUCT_ID, user=ins.user)
-            if  wallet_amount>0 and wallet_amount!=premium_amount:
+            if wallet_amount>0 and wallet_amount!=premium_amount:
                 pg_amount = ins.premium_amount - wallet_amount
 
                 if len(pg_transactions) == 1 and pg_transactions.first().amount == pg_amount:
+
+                    #paid_to nodal2 merchant
+                    paid_to = None
                     payout_data = {
                         "charged_amount": wallet_amount,
                         "payable_amount": wallet_amount,
                         "content_object": ins.insurance_plan.insurer,
                         "type": MerchantPayout.AUTOMATIC,
-                        "paid_to": ins.insurance_plan.insurer.merchant,
+                        "paid_to": paid_to,
                         "booking_type": Order.INSURANCE_PRODUCT_ID
                     }
 
