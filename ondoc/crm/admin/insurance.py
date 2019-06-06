@@ -28,9 +28,19 @@ class InsurerAdmin(admin.ModelAdmin):
     search_fields = ['name']
 
 
+class InsurerFloatForm(forms.ModelForm):
+
+    def clean(self):
+        super().clean()
+        # data = self.cleaned_data
+        if self.instance.id:
+            raise forms.ValidationError('Insurer Account can not be editable')
+
+
 class InsurerFloatAdmin(admin.ModelAdmin):
-    list_display = ['insurer']
-    readonly_fields = ['insurer', 'current_float']
+    list_display = ['apd_account_name', 'insurer']
+    form = InsurerFloatForm
+    # readonly_fields = ['insurer', 'current_float']
 
 
 class InsurancePlanContentInline(admin.TabularInline):
@@ -76,7 +86,7 @@ class InsuranceThresholdInline(admin.TabularInline):
 class InsurancePlansAdmin(admin.ModelAdmin):
 
     list_display = ['insurer', 'name','internal_name', 'amount', 'is_selected','get_policy_prefix']
-    inlines = [InsurancePlanContentInline, InsurerPolicyNumberInline,InsuranceThresholdInline]
+    inlines = [InsurancePlanContentInline, InsurerPolicyNumberInline, InsuranceThresholdInline]
     search_fields = ['name']
     form = InsurancePlanAdminForm
 
@@ -85,8 +95,6 @@ class InsuranceThresholdAdmin(admin.ModelAdmin):
 
     list_display = ['insurance_plan']
 
-
-# class InsuranceTransaction
 
 class InsuredMembersInline(admin.TabularInline):
     model = InsuredMembers
@@ -911,20 +919,21 @@ class InsuranceDistrictAdmin(ImportExportModelAdmin):
     list_display = ('id', 'district_code', 'district_name', 'state')
 
 
-# class InsurerPolicyNumberForm(forms.ModelForm):
-#
-#     class Meta:
-#         widgets = {
-#             'insurer': autocomplete.ModelSelect2(url='insurer-autocomplete'),
-#             'insurance_plan': autocomplete.ModelSelect2(url='insurance-plan-autocomplete', forward=['insurer'])
-#         }
+class InsurerPolicyNumberForm(forms.ModelForm):
+    def clean(self):
+        super().clean()
+        if any(self.errors):
+            return
+        data = self.cleaned_data
+        if not data.get('apd_account'):
+            raise forms.ValidationError('Apd Account is mandatory for Policy Number')
 
 
 class InsurerPolicyNumberAdmin(admin.ModelAdmin):
     model = InsurerPolicyNumber
-    fields = ('insurer', 'insurance_plan', 'insurer_policy_number')
-    list_display = ('insurer', 'insurance_plan', 'insurer_policy_number', 'created_at')
-    # form = InsurerPolicyNumberForm
+    fields = ('insurer', 'insurance_plan', 'insurer_policy_number', 'apd_account')
+    list_display = ('insurer', 'insurance_plan', 'insurer_policy_number', 'apd_account', 'created_at')
+    form = InsurerPolicyNumberForm
     # search_fields = ['insurer']
     # autocomplete_fields = ['insurer', 'insurance_plan']
 

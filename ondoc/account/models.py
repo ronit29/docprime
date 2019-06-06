@@ -1495,11 +1495,12 @@ class MerchantPayout(TimeStampedModel):
         from ondoc.insurance.models import UserInsurance, InsuranceTransaction
         if not self.get_insurance_transaction():
             user_insurance = self.get_user_insurance()
-            InsuranceTransaction.objects.create(user_insurance = user_insurance,
-                account = user_insurance.insurance_plan.insurer.float.first(),
-                transaction_type = InsuranceTransaction.CREDIT,
-                amount = self.payable_amount,
-                reason = InsuranceTransaction.PREMIUM_PAYOUT)
+            InsuranceTransaction.objects.create(user_insurance=user_insurance,
+                # account = user_insurance.insurance_plan.insurer.float.first(),
+                account=user_insurance.master_policy_reference.apd_account.first(),
+                transaction_type=InsuranceTransaction.CREDIT,
+                amount=self.payable_amount,
+                reason=InsuranceTransaction.PREMIUM_PAYOUT)
 
     def get_insurance_transaction(self):
         from ondoc.insurance.models import UserInsurance, InsuranceTransaction

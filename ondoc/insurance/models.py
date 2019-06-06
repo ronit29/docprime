@@ -340,10 +340,11 @@ class Insurer(auth_model.TimeStampedModel, LiveMixin):
 class InsurerAccount(auth_model.TimeStampedModel):
 
     insurer = models.ForeignKey(Insurer, related_name="float", on_delete=models.CASCADE)
+    apd_account_name = models.CharField(max_length=200, blank=True, null=True)
     current_float = models.PositiveIntegerField(default=None)
 
     def __str__(self):
-        return str(self.insurer)
+        return str(self.apd_account_name)
 
     class Meta:
         db_table = "insurer_account"
@@ -463,6 +464,16 @@ class InsuranceThreshold(auth_model.TimeStampedModel, LiveMixin):
         db_table = "insurance_threshold"
 
 
+class InsurerPolicyNumber(auth_model.TimeStampedModel):
+    insurer = models.ForeignKey(Insurer, related_name='policy_number_history', on_delete=models.DO_NOTHING, null=True, blank=True)
+    insurer_policy_number = models.CharField(max_length=50)
+    insurance_plan = models.ForeignKey(InsurancePlans, related_name='plan_policy_number', on_delete=models.DO_NOTHING, null=True, blank=True)
+    apd_account = models.ForeignKey(InsurerAccount, related_name='apd_account', on_delete=models.DO_NOTHING, null=True, blank=True)
+
+    class Meta:
+        db_table = 'insurer_policy_numbers'
+
+
 class UserInsurance(auth_model.TimeStampedModel):
     from ondoc.account.models import MoneyPool
 
@@ -497,6 +508,7 @@ class UserInsurance(auth_model.TimeStampedModel):
     merchant_payout = models.ForeignKey(MerchantPayout, related_name="user_insurance", on_delete=models.DO_NOTHING, null=True)
     cancel_reason = models.CharField(max_length=200, blank=True, null=True, default=None)
     cancel_case_type = models.PositiveIntegerField(choices=CANCEL_CASE_CHOICES, default=REFUND)
+    master_policy_reference = models.ForeignKey(InsurerPolicyNumber, related_name='policy_reference', on_delete=models.DO_NOTHING, null=True)
 
     def __str__(self):
         return str(self.user)
@@ -950,10 +962,18 @@ class UserInsurance(auth_model.TimeStampedModel):
                                                             expiry_date=insurance_data['expiry_date'],
                                                             premium_amount=insurance_data['premium_amount'],
                                                             order=insurance_data['order'],
-                                                            policy_number=generate_insurance_insurer_policy_number(insurance_data['insurance_plan']))
+                                                            policy_number=generate_insurance_insurer_policy_number(insurance_data['insurance_plan']),
+                                                            master_policy_reference=cls.get_master_policy_reference(insurance_data['insurance_plan']))
 
         insured_members = InsuredMembers.create_insured_members(user_insurance_obj)
         return user_insurance_obj
+
+    @classmethod
+    def get_master_policy_reference(cls, plan):
+        policy_number_obj = InsurerPolicyNumber.objects.filter(insurance_plan=plan).order_by('-id').first()
+        if not policy_number_obj:
+            return None
+        return policy_number_obj
 
     def validate_insurance(self, appointment_data):
         from ondoc.doctor.models import OpdAppointment
@@ -1572,15 +1592,6 @@ class InsuranceDeal(auth_model.TimeStampedModel):
 
     class Meta:
         db_table = 'insurance_deals'
-
-
-class InsurerPolicyNumber(auth_model.TimeStampedModel):
-    insurer = models.ForeignKey(Insurer, related_name='policy_number_history', on_delete=models.DO_NOTHING, null=True, blank=True)
-    insurer_policy_number = models.CharField(max_length=50)
-    insurance_plan = models.ForeignKey(InsurancePlans, related_name='plan_policy_number', on_delete=models.DO_NOTHING, null=True, blank=True)
-
-    class Meta:
-        db_table = 'insurer_policy_numbers'
 
 
 class InsuranceDummyData(auth_model.TimeStampedModel):
