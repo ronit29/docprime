@@ -970,10 +970,15 @@ class AllUrlsViewset(viewsets.GenericViewSet):
         key = parameters.get('query')
         if not key:
             return Response(status=status.HTTP_400_BAD_REQUEST)
+        key = key.lower()
+        if len(key)<3:
+            return Response(dict())
+
+
         from ondoc.location.models import EntityUrls
         from ondoc.location.models import CompareSEOUrls
-        e_urls = list(EntityUrls.objects.filter(url__icontains=key, is_valid=True).values_list('url', flat=True))[:5]
-        c_urls = list(CompareSEOUrls.objects.filter(url__icontains=key).values_list('url', flat=True))[:5]
+        e_urls = list(EntityUrls.objects.filter(url__startswith=key, is_valid=True).values_list('url', flat=True))[:5]
+        c_urls = list(CompareSEOUrls.objects.filter(url__startswith=key).values_list('url', flat=True))[:5]
         result = e_urls + c_urls
         return Response(dict(enumerate(result)))
 
