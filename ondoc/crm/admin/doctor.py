@@ -2168,7 +2168,7 @@ class OfflinePatientAdmin(VersionAdmin):
 
 
 class DoctorLeaveAdmin(VersionAdmin):
-
+    search_fields = ['doctor__name', 'doctor__id']
     autocomplete_fields = ('doctor', 'hospital')
     exclude = ('deleted_at',)
 
