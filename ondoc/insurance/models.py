@@ -1700,7 +1700,6 @@ class EndorsementRequest(auth_model.TimeStampedModel):
     def create(cls, endorsed_member):
         del endorsed_member['is_change']
         del endorsed_member['image_ids']
-        del endorsed_member['id']
         end_obj = EndorsementRequest.objects.create(**endorsed_member)
         return end_obj
 
