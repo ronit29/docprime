@@ -792,8 +792,12 @@ class Order(TimeStampedModel):
                     obj.save()
 
         if self.is_parent():
+            sum_amount = Decimal.decimal(0.00)
             for order in self.orders.all():
                 update_records(order)
+                sum_amount += order.amount
+            self.amount = sum_amount
+            self.save()
         else:
             update_records(self)
         return True
