@@ -1,4 +1,5 @@
 from dal import autocomplete
+from django.db import transaction
 from django.contrib.contenttypes.admin import GenericTabularInline
 from django.contrib.gis import admin
 import datetime
@@ -12,7 +13,7 @@ from django.utils.dateparse import parse_datetime
 from ondoc.authentication.models import Merchant, AssociatedMerchant, QCModel
 from ondoc.account.models import MerchantPayout
 from ondoc.common.models import Cities, MatrixCityMapping, PaymentOptions, Remark, MatrixMappedCity, MatrixMappedState, \
-    GlobalNonBookable, UserConfig, BlacklistUser
+    GlobalNonBookable, UserConfig, BlacklistUser, BlockedStates
 from import_export import resources, fields
 from import_export.admin import ImportMixin, base_formats, ImportExportMixin, ImportExportModelAdmin, ExportMixin
 from reversion.admin import VersionAdmin
@@ -699,4 +700,19 @@ class LabPricingAutocomplete(autocomplete.Select2QuerySetView):
 class BlacklistUserAdmin(admin.ModelAdmin):
     model = BlacklistUser
     list_display = ('user', 'type')
-    fields = ('user', 'type')
+    fields = ('user', 'type', 'reason')
+    autocomplete_fields = ['user']
+
+    @transaction.atomic
+    def save_model(self, request, obj, form, change):
+        responsible_user = request.user
+        obj.blocked_by = responsible_user if responsible_user and not responsible_user.is_anonymous else None
+
+        super().save_model(request, obj, form, change)
+
+
+class BlockedStatesAdmin(admin.ModelAdmin):
+    model = BlockedStates
+    list_display = ('state_name', 'message')
+    fields = ('state_name', 'message')
+
