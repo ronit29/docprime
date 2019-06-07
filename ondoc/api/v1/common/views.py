@@ -1025,8 +1025,8 @@ class SiteSettingsViewSet(viewsets.GenericViewSet):
     def get_settings(self, request):
         params = request.query_params
 
-        lat = params.get('lat', None)
-        long = params.get('long', None)
+        lat = params.get('latitude', None)
+        long = params.get('longitude', None)
 
         insurance_availability = False
 
