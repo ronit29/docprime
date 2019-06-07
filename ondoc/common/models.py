@@ -432,3 +432,12 @@ class RefundDetails(TimeStampedModel):
             if not refund_initiated_by:
                 raise Exception("Must have a responsible user.")
             cls .objects.create(refund_reason=refund_reason, refund_initiated_by=refund_initiated_by, content_object=appointment)
+
+
+class BlacklistUser(TimeStampedModel):
+    LOGIN = 'Login'
+    INSURANCE = 'Insurance'
+    BLACKLIST_TYPE_CHOICES = ((LOGIN, 'Login'), (INSURANCE, 'Insurance'))
+    user = models.ForeignKey(User, related_name='blacklist_user', on_delete=models.DO_NOTHING)
+    type = models.CharField(max_length=100, choices=BLACKLIST_TYPE_CHOICES)
+    blocked_by = models.ForeignKey(User, on_delete=models.DO_NOTHING)
