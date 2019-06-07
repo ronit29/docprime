@@ -3968,8 +3968,13 @@ class HospitalViewSet(viewsets.GenericViewSet):
             canonical_url = entity.url
         else:
             response['breadcrumb'] = None
+        new_dynamic = NewDynamic.objects.filter(url_value=canonical_url, is_enabled=True).first()
+        if new_dynamic:
+            if new_dynamic.meta_title:
+                title = new_dynamic.meta_title
+            if new_dynamic.meta_description:
+                description = new_dynamic.meta_description
         response['seo'] = {'title': title, "description": description}
-
         response['canonical_url'] = canonical_url
 
         return Response(response)

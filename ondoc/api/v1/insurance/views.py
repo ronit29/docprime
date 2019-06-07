@@ -150,7 +150,7 @@ class ListInsuranceViewSet(viewsets.GenericViewSet):
         serializer.is_valid(raise_exception=True)
         data = serializer.validated_data
 
-        city_name = InsuranceEligibleCities.check_eligibility(data.get('latitude'), data.get('longitude'))
+        city_name = InsuranceEligibleCities.get_nearest_city(data.get('latitude'), data.get('longitude'))
         if not city_name:
             return Response({'available': False})
 
