@@ -1818,7 +1818,7 @@ class InsuredMemberHistory(auth_model.TimeStampedModel):
 
 class InsuranceEligibleCities(auth_model.TimeStampedModel):
 
-    Radius = 15
+    Radius = 50
 
     name = models.CharField(max_length=100, blank=False, null=False)
     latitude = models.DecimalField(null=False, max_digits=11, decimal_places=8)
