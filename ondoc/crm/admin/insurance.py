@@ -7,6 +7,7 @@ from dal import autocomplete
 from ondoc.api.v1.insurance.serializers import InsuranceTransactionSerializer
 from ondoc.common.models import GenericNotes
 from ondoc.crm.constants import constants
+from ondoc.authentication.models import User
 from ondoc.doctor.models import OpdAppointment, DoctorPracticeSpecialization, PracticeSpecialization, Hospital
 from ondoc.diagnostic.models import LabAppointment, LabTest, Lab
 from ondoc.insurance.models import InsurancePlanContent, InsurancePlans, InsuredMembers, UserInsurance, StateGSTCode, \
