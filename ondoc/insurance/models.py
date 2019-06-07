@@ -1,4 +1,5 @@
 import datetime
+from django.utils.timezone import utc
 
 from django.contrib.contenttypes.fields import GenericRelation
 from django.contrib.gis.geos import Point
@@ -1538,7 +1539,36 @@ class InsuranceLead(auth_model.TimeStampedModel):
 
         city_name = InsuranceEligibleCities.get_nearest_city(lat, long)
         if not lat or not long or city_name:
-            push_insurance_banner_lead_to_matrix.apply_async(({'id': self.id}, ))
+            countdown = self.get_lead_creation_wait_time()
+            #print(str(countdown))
+            push_insurance_banner_lead_to_matrix.apply_async(({'id': self.id}, ),countdown=countdown)
+
+    # get seconds elapsed since creation time
+    def get_creation_time_diff(self):
+        now = datetime.datetime.utcnow().replace(tzinfo=utc)
+        timediff = now - self.created_at
+        return timediff.total_seconds()
+
+    def get_lead_creation_wait_time(self):
+        source = self.get_source()
+        if source!='docprimechat':
+            return 0
+        tdiff = self.get_creation_time_diff()
+        wait = 86400 - tdiff
+        if wait<0:
+            wait=0
+        return wait
+
+    def get_source(self):
+        extras = self.extras
+        lead_source = "InsuranceOPD"
+        lead_data = extras.get('lead_data')
+        if lead_data:
+            provided_lead_source = lead_data.get('source')
+            if type(provided_lead_source).__name__ == 'str' and provided_lead_source.lower() == 'docprimechat':
+                lead_source = 'docprimechat'
+
+        return lead_source
 
     @classmethod
     def get_latest_lead_id(cls, user):
