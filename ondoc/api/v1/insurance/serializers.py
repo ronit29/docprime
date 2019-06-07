@@ -156,7 +156,8 @@ class EndorseMemberListSerializer(serializers.Serializer):
     city_code = serializers.CharField(allow_null=True, allow_blank=True)
     district_code = serializers.CharField(allow_null=True, allow_blank=True)
     is_change = serializers.BooleanField(required=False)
-    id = serializers.IntegerField()
+    # id = serializers.IntegerField()
+    member = serializers.PrimaryKeyRelatedField(queryset=InsuredMembers.objects.all())
     image_ids = serializers.ListSerializer(child=InsuredMemberDocumentIdsSerializer(), required=False)
 
     def validate(self, attrs):

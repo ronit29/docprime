@@ -4,8 +4,9 @@ from django.contrib.contenttypes.models import ContentType
 from django.db.models import Q
 
 from ondoc.banner.models import Banner, SliderLocation, BannerLocation, EmailBanner, RecommenderThrough, Recommender
-from ondoc.common.models import PaymentOptions, UserConfig, Feature, Service, Remark, MatrixMappedCity, MatrixMappedState, \
-    GenericNotes
+from ondoc.common.models import PaymentOptions, UserConfig, Feature, Service, Remark, MatrixMappedCity, \
+    MatrixMappedState, GenericNotes
+from ondoc.corporate_booking.models import CorporateDeal, Corporates, CorporateDocument
 from ondoc.coupon.models import Coupon, UserSpecificCoupon, RandomGeneratedCoupon
 from ondoc.crm.constants import constants
 from ondoc.doctor.models import (Doctor, Hospital, DoctorClinicTiming, DoctorClinic,
@@ -447,6 +448,9 @@ class Command(BaseCommand):
         #creating super insurance group
         self.create_super_insurance_group()
 
+        #creating corporate_group
+        self.create_corporate_group()
+
         #Create XL Data Export Group
         Group.objects.get_or_create(name=constants['DATA_EXPORT_GROUP'])
 
@@ -475,6 +479,13 @@ class Command(BaseCommand):
 
             group.permissions.add(*permissions)
 
+        content_types = ContentType.objects.get_for_models(Hospital)
+        for cl, ct in content_types.items():
+            permissions = Permission.objects.filter(
+                Q(content_type=ct),
+                Q(codename='change_' + ct.model))
+
+            group.permissions.add(*permissions)
 
         #Review team Group
         group, created = Group.objects.get_or_create(name=constants['REVIEW_TEAM_GROUP'])
@@ -967,4 +978,19 @@ class Command(BaseCommand):
                 Q(codename='add_' + ct.model) |
                 Q(codename='change_' + ct.model))
 
+            group.permissions.add(*permissions)
+
+
+    def create_corporate_group(self):
+        group, created = Group.objects.get_or_create(name=constants['CORPORATE_GROUP'])
+        group.permissions.clear()
+
+        content_types = ContentType.objects.get_for_models(Corporates, CorporateDeal, Coupon, CorporateDocument,
+                                                           MatrixMappedCity, MatrixMappedState)
+
+        for cl, ct in content_types.items():
+            permissions = Permission.objects.filter(
+                Q(content_type=ct),
+                Q(codename='add_' + ct.model) |
+                Q(codename='change_' + ct.model))
             group.permissions.add(*permissions)

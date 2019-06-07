@@ -2868,6 +2868,7 @@ class TestDetailsViewset(viewsets.GenericViewSet):
             result = {}
             result['name'] = data.name
             result['id'] = data.id
+            result['is_package'] = data.is_package
             result['about_test'] = {'title': 'About the test', 'value': data.about_test}
             result['preparations'] = {'title': 'Preparations', 'value': data.preparations}
             result['why_get_tested'] = {'title': 'Why get tested?', 'value': data.why}
