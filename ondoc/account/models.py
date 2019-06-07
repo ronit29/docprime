@@ -807,27 +807,28 @@ class Order(TimeStampedModel):
         amount = self.amount
         if self.is_parent():
             used_pgspecific_coupons = self.used_pgspecific_coupons
-            used_pgspecific_coupons_ids = list(map(lambda x: x.id, used_pgspecific_coupons)) if used_pgspecific_coupons else []
-            for order in self.orders.all():
-                if order.product_id == Order.DOCTOR_PRODUCT_ID or order.product_id == Order.LAB_PRODUCT_ID:
-                    if order.action_data:
-                        if self.product_id == Order.DOCTOR_PRODUCT_ID:
-                            obj = OpdAppointment()
-                        elif self.product_id == Order.LAB_PRODUCT_ID:
-                            obj = LabAppointment()
-                        order_coupons_ids = order.action_data['coupon']
-                        for coupon_id in order_coupons_ids:
-                            if coupon_id in used_pgspecific_coupons_ids:
-                                coupon = Coupon.objects.filter(pk=coupon_id).first()
-                                if coupon:
-                                    pg_coupon_discount = obj.get_discount(coupon, Decimal(order.action_data['deal_price']))
-                                    amount += pg_coupon_discount
-                                    order.action_data['effective_price'] = str(Decimal(order.action_data['effective_price']) + pg_coupon_discount)
-                                    order.action_data['discount'] = str(Decimal(order.action_data['discount']) - pg_coupon_discount)
-                                    order.action_data['coupon'].remove(coupon_id)
-                                    order.save()
-            self.amount = amount
-            self.save()
+            if used_pgspecific_coupons:
+                used_pgspecific_coupons_ids = list(map(lambda x: x.id, used_pgspecific_coupons))
+                for order in self.orders.all():
+                    if order.product_id == Order.DOCTOR_PRODUCT_ID or order.product_id == Order.LAB_PRODUCT_ID:
+                        if order.action_data:
+                            if self.product_id == Order.DOCTOR_PRODUCT_ID:
+                                obj = OpdAppointment()
+                            elif self.product_id == Order.LAB_PRODUCT_ID:
+                                obj = LabAppointment()
+                            order_coupons_ids = order.action_data['coupon']
+                            for coupon_id in order_coupons_ids:
+                                if coupon_id in used_pgspecific_coupons_ids:
+                                    coupon = Coupon.objects.filter(pk=coupon_id).first()
+                                    if coupon:
+                                        pg_coupon_discount = obj.get_discount(coupon, Decimal(order.action_data['deal_price']))
+                                        amount += pg_coupon_discount
+                                        order.action_data['effective_price'] = str(Decimal(order.action_data['effective_price']) + pg_coupon_discount)
+                                        order.action_data['discount'] = str(Decimal(order.action_data['discount']) - pg_coupon_discount)
+                                        order.action_data['coupon'].remove(coupon_id)
+                                        order.save()
+                self.amount = amount
+                self.save()
 
         return True
 
@@ -872,12 +873,13 @@ class PgTransaction(TimeStampedModel):
         """
             Save PG transaction and credit consumer account, with amount paid at PaymentGateway.
         """
-        super(PgTransaction, self).save(*args, **kwargs)
-        consumer_account = ConsumerAccount.objects.get_or_create(user=self.user)
-        consumer_account = ConsumerAccount.objects.select_for_update().get(user=self.user)
-        pg_data = vars(self)
-        pg_data['user'] = self.user
-        consumer_account.credit_payment(pg_data, pg_data['amount'])
+        if self.id is None:
+            super(PgTransaction, self).save(*args, **kwargs)
+            consumer_account = ConsumerAccount.objects.get_or_create(user=self.user)
+            consumer_account = ConsumerAccount.objects.select_for_update().get(user=self.user)
+            pg_data = vars(self)
+            pg_data['user'] = self.user
+            consumer_account.credit_payment(pg_data, pg_data['amount'])
 
     @classmethod
     def get_transactions(cls, user, amount):
