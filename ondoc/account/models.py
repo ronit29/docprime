@@ -756,19 +756,29 @@ class Order(TimeStampedModel):
 
 
     @cached_property
-    def get_deal_price_without_coupon(self):
-        deal_price = 0
+    def get_amount_without_pg_coupon(self):
+        from ondoc.doctor.models import OpdAppointment
+        from ondoc.diagnostic.models import LabAppointment
+
+        amount = self.amount
+        used_pgspecific_coupons = self.used_pgspecific_coupons
+        used_pgspecific_coupons_ids = list(map(lambda x: x.id, used_pgspecific_coupons)) if used_pgspecific_coupons else []
         if self.is_parent():
             for order in self.orders.all():
-                deal_price += Decimal(order.action_data.get('deal_price', '0.00'))
-        else:
-            if self.product_id == Order.INSURANCE_PRODUCT_ID:
-                deal_price = self.amount
-            else:
-                deal_price = Decimal(self.action_data.get('deal_price', '0.00'))
-        return deal_price
+                if self.product_id == Order.DOCTOR_PRODUCT_ID or self.product_id == Order.LAB_PRODUCT_ID:
+                    if self.product_id == Order.DOCTOR_PRODUCT_ID:
+                        obj = OpdAppointment()
+                    elif self.product_id == Order.LAB_PRODUCT_ID:
+                        obj = LabAppointment()
+                    order_coupons_ids = order.action_data['coupon']
+                    for coupon_id in order_coupons_ids:
+                        if coupon_id in used_pgspecific_coupons_ids:
+                            coupon = Coupon.objects.filter(pk=coupon_id).first()
+                            if coupon:
+                                amount += obj.get_discount(coupon, Decimal(order.action_data['deal_price']))
+        return amount
 
-    @cached_property
+
     def used_coupons(self):
         coupons_ids = []
         if self.is_parent():
@@ -781,25 +791,44 @@ class Order(TimeStampedModel):
         coupons = Coupon.objects.filter(pk__in=coupons_ids)
         return coupons
 
-    def update_fields_after_coupon_remove(self):
-        def update_records(obj):
-            if obj.product_id == Order.DOCTOR_PRODUCT_ID or obj.product_id == Order.LAB_PRODUCT_ID:
-                if order.action_data:
-                    obj.action_data['effective_price'] = obj.action_data['deal_price']
-                    obj.action_data['discount'] = '0'
-                    obj.amount = obj.action_data['deal_price']
-                    obj.action_data['coupon'] = []
-                    obj.save()
+    @cached_property
+    def used_pgspecific_coupons(self):
+        used_pgspecific_coupons = None
+        used_coupons = self.used_coupons()
+        if used_coupons:
+            used_pgspecific_coupons = list(filter(lambda x: x.payment_option, used_coupons))
 
+        return used_pgspecific_coupons
+
+    def update_fields_after_coupon_remove(self):
+        from ondoc.doctor.models import OpdAppointment
+        from ondoc.diagnostic.models import LabAppointment
+
+        amount = self.amount
         if self.is_parent():
-            sum_amount = Decimal(0)
+            used_pgspecific_coupons = self.used_pgspecific_coupons
+            used_pgspecific_coupons_ids = list(map(lambda x: x.id, used_pgspecific_coupons)) if used_pgspecific_coupons else []
             for order in self.orders.all():
-                update_records(order)
-                sum_amount += Decimal(order.amount)
-            self.amount = sum_amount
+                if order.product_id == Order.DOCTOR_PRODUCT_ID or order.product_id == Order.LAB_PRODUCT_ID:
+                    if order.action_data:
+                        if self.product_id == Order.DOCTOR_PRODUCT_ID:
+                            obj = OpdAppointment()
+                        elif self.product_id == Order.LAB_PRODUCT_ID:
+                            obj = LabAppointment()
+                        order_coupons_ids = order.action_data['coupon']
+                        for coupon_id in order_coupons_ids:
+                            if coupon_id in used_pgspecific_coupons_ids:
+                                coupon = Coupon.objects.filter(pk=coupon_id).first()
+                                if coupon:
+                                    pg_coupon_discount = obj.get_discount(coupon, Decimal(order.action_data['deal_price']))
+                                    amount += pg_coupon_discount
+                                    order.action_data['effective_price'] = str(Decimal(order.action_data['effective_price']) + pg_coupon_discount)
+                                    order.action_data['discount'] = str(Decimal(order.action_data['discount']) - pg_coupon_discount)
+                                    order.action_data['coupon'].remove(coupon_id)
+                                    order.save()
+            self.amount = amount
             self.save()
-        else:
-            update_records(self)
+
         return True
 
 

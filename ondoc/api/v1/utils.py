@@ -441,12 +441,12 @@ def payment_details(request, order):
     couponCode = ''
     couponPgMode = ''
     discountedAmnt = ''
-    usedCoupons = order.used_coupons        # used pg specific coupons will be same for single transaction
-    if usedCoupons and usedCoupons[0].payment_option:
-        couponCode = usedCoupons[0].code
-        couponPgMode = get_coupon_pg_mode(usedCoupons[0])
+    usedPgCoupons = order.used_pgspecific_coupons
+    if usedPgCoupons and usedPgCoupons[0].payment_option:
+        couponCode = usedPgCoupons[0].code
+        couponPgMode = get_coupon_pg_mode(usedPgCoupons[0])
         discountedAmnt = str(round(decimal.Decimal(order.amount), 2))
-        txAmount = str(round(decimal.Decimal(order.get_deal_price_without_coupon), 2))
+        txAmount = str(round(decimal.Decimal(order.get_amount_without_pg_coupon), 2))
     else:
         txAmount = str(round(decimal.Decimal(order.amount), 2))
 
