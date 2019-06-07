@@ -12,7 +12,7 @@ from django.utils.dateparse import parse_datetime
 from ondoc.authentication.models import Merchant, AssociatedMerchant, QCModel
 from ondoc.account.models import MerchantPayout
 from ondoc.common.models import Cities, MatrixCityMapping, PaymentOptions, Remark, MatrixMappedCity, MatrixMappedState, \
-    GlobalNonBookable, UserConfig
+    GlobalNonBookable, UserConfig, BlacklistUser
 from import_export import resources, fields
 from import_export.admin import ImportMixin, base_formats, ImportExportMixin, ImportExportModelAdmin, ExportMixin
 from reversion.admin import VersionAdmin
@@ -695,3 +695,9 @@ class LabPricingAutocomplete(autocomplete.Select2QuerySetView):
             queryset = queryset.filter(group_name__istartswith=self.q)
 
         return queryset
+
+
+class BlacklistUserAdmin(admin.ModelAdmin):
+    model = BlacklistUser
+    list_display = ('user', 'type')
+    fields = ('user', 'type')
