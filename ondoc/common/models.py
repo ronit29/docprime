@@ -26,6 +26,9 @@ from ondoc.bookinganalytics.models import DP_StateMaster, DP_CityMaster
 import datetime
 from django.utils import timezone
 
+from ondoc.common.helper import Choices
+
+
 class Cities(models.Model):
     name = models.CharField(max_length=48, db_index=True)
 
@@ -435,10 +438,13 @@ class RefundDetails(TimeStampedModel):
 
 
 class BlockedStates(TimeStampedModel):
-    state_name = models.CharField(max_length=50, null=False, blank=False)
+
+    class States(Choices):
+        LOGIN = 'LOGIN'
+        INSURANCE = 'INSURANCE'
+
+    state_name = models.CharField(max_length=50, null=False, blank=False, choices=States.as_choices(), unique=True)
     message = models.TextField()
-
-
 
     def __str__(self):
         return self.state_name
@@ -453,5 +459,15 @@ class BlacklistUser(TimeStampedModel):
     reason = models.TextField(null=True)
     blocked_by = models.ForeignKey(User, on_delete=models.DO_NOTHING)
 
+    @classmethod
+    def get_state_by_number(cls, phone_number, blocked_state):
+        blacklist_user = cls.objects.filter(user__phone_number=phone_number, type__state_name=blocked_state).first()
+        if blacklist_user:
+            return blacklist_user.type
+
+        return None
+
+
     class Meta:
         db_table = 'blacklist_users'
+        unique_together = (("user", "type"), )
