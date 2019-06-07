@@ -1,3 +1,5 @@
+from decimal import Decimal
+
 from django.contrib.gis.db.models.functions import Distance
 from django.contrib.gis.geos import GEOSGeometry
 from django.db.models import Window
@@ -2943,18 +2945,26 @@ class OpdAppointment(auth_model.TimeStampedModel, CouponsMixin, OpdAppointmentIn
         result['data'] = {'opd_appointment_id': self.id}
         return result
 
-    def get_master_order_id(self):
-        result = None
+    def get_master_order_id_and_discount(self):
+        result = None, None
         order_obj = Order.objects.filter(reference_id=self.id).first()
         if order_obj:
-            result = order_obj.parent_id
+            try:
+                patent_id = order_obj.parent_id
+                discount = (Decimal(order_obj.action_data.get('mrp')) - Decimal(order_obj.action_data.get(
+                    'deal_price'))) / Decimal(order_obj.action_data.get('mrp'))
+                discount = str(round(discount, 2))
+                result = patent_id, discount
+            except Exception as e:
+                result = None, None
         return result
 
-    def get_cod_to_prepaid_url(self, token):
-        result = None
-        order_id = self.get_master_order_id()
+    def get_cod_to_prepaid_url_and_discount(self, token):
+        result = None, None
+        order_id, discount = self.get_master_order_id_and_discount()
         if order_id:
-            result = settings.BASE_URL + '/order/paymentSummary?order_id={}&token={}'.format(order_id, token)
+            url = settings.BASE_URL + '/order/paymentSummary?order_id={}&token={}'.format(order_id, token)
+            result = url, discount
         return result
 
 

@@ -1153,7 +1153,7 @@ class OpdNotification(Notification):
         # auth_token = AgentToken.objects.create_token(user=self.appointment.user)
         token_object = JWTAuthentication.generate_token(self.appointment.user)
         booking_url = settings.BASE_URL + '/sms/booking?token={}'.format(token_object['token'].decode("utf-8"))
-        opd_appointment_cod_to_prepaid_url = self.appointment.get_cod_to_prepaid_url(token_object['token'].decode("utf-8"))
+        opd_appointment_cod_to_prepaid_url, cod_to_prepaid_discount = self.appointment.get_cod_to_prepaid_url_and_discount(token_object['token'].decode("utf-8"))
         opd_appointment_complete_url = booking_url + "&callbackurl=opd/appointment/{}?complete=true".format(self.appointment.id)
         opd_appointment_feedback_url = booking_url + "&callbackurl=opd/appointment/{}".format(self.appointment.id)
         reschdule_appointment_bypass_url = booking_url + "&callbackurl=opd/doctor/{}/{}/book?reschedule={}".format(self.appointment.doctor.id, self.appointment.hospital.id, self.appointment.id)
@@ -1180,7 +1180,8 @@ class OpdNotification(Notification):
             "opd_appointment_feedback_url": generate_short_url(opd_appointment_feedback_url),
             "reschdule_appointment_bypass_url": generate_short_url(reschdule_appointment_bypass_url),
             "show_amounts": bool(self.appointment.payment_type != OpdAppointment.INSURANCE),
-            "opd_appointment_cod_to_prepaid_url": generate_short_url(opd_appointment_cod_to_prepaid_url),
+            "opd_appointment_cod_to_prepaid_url": generate_short_url(opd_appointment_cod_to_prepaid_url) if opd_appointment_cod_to_prepaid_url else None,
+            "cod_to_prepaid_discount": cod_to_prepaid_discount
         }
         return context
 

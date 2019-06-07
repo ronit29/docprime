@@ -123,7 +123,8 @@ class NotificationAction:
         (LAB_LOGO_CHANGE_MAIL, 'Lab Logo Change Mail'),
         (APPOINTMENT_REMINDER_PROVIDER_SMS, 'Appointment Reminder Provider SMS'),
         (LOGIN_OTP, 'Login OTP'),
-        (COD_TO_PREPAID, 'COD to Prepaid')
+        (COD_TO_PREPAID, 'COD to Prepaid'),
+        (COD_TO_PREPAID_REQUEST, 'COD To Prepaid Request')
     )
 
     OPD_APPOINTMENT = "opd_appointment"
