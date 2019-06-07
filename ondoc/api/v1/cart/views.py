@@ -30,6 +30,7 @@ class CartViewSet(viewsets.GenericViewSet):
         serialized_data = None
 
         product_id = valid_data.get('product_id')
+        enabled_for_cod = False
         if product_id == Order.DOCTOR_PRODUCT_ID:
             opd_app_serializer = CreateAppointmentSerializer(data=valid_data.get('data'), context={'request': request, 'data' : valid_data.get('data')})
             opd_app_serializer.is_valid(raise_exception=True)
@@ -40,6 +41,8 @@ class CartViewSet(viewsets.GenericViewSet):
                                                     "message": "Only {} active free bookings allowed per customer".format(
                                                         OpdAppointment.MAX_FREE_BOOKINGS_ALLOWED)}},
                                 status.HTTP_400_BAD_REQUEST)
+            enabled_for_cod = serialized_data.get('hospital').enabled_for_cod
+
         elif product_id == Order.LAB_PRODUCT_ID:
             lab_app_serializer = LabAppointmentCreateSerializer(data=valid_data.get('data'), context={'request': request, 'data' : valid_data.get('data')})
             lab_app_serializer.is_valid(raise_exception=True)
@@ -49,7 +52,7 @@ class CartViewSet(viewsets.GenericViewSet):
 
         valid_data['data']['is_appointment_insured'], valid_data['data']['insurance_id'], valid_data['data'][
             'insurance_message'] = Cart.check_for_insurance(serialized_data, request)
-
+        valid_data['data']['enabled_for_cod'] = enabled_for_cod
         if valid_data['data']['is_appointment_insured']:
             valid_data['data']['payment_type'] = OpdAppointment.INSURANCE
         if serialized_data.get('cart_item'):
