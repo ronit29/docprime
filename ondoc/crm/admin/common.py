@@ -135,7 +135,6 @@ class FormCleanMixin(forms.ModelForm):
 
     def clean(self):
         self.pin_code_qc_submit()
-
         if (not self.request.user.is_superuser and not self.request.user.groups.filter(name=constants['SUPER_QC_GROUP']).exists()):
             # and (not '_reopen' in self.data and not self.request.user.groups.filter(name__in=[constants['QC_GROUP_NAME'], constants['WELCOME_CALLING_TEAM']]).exists()):
             if isinstance(self.instance, Hospital) or isinstance(self.instance, HospitalNetwork):
@@ -146,7 +145,7 @@ class FormCleanMixin(forms.ModelForm):
                     raise forms.ValidationError("There is not state mapped with selected city")
             if self.instance.data_status == QCModel.QC_APPROVED:
                 # allow welcome_calling_team to modify qc_approved data
-                if not self.request.user.groups.filter(name=constants['WELCOME_CALLING_TEAM']).exists():
+                if not self.request.user.groups.filter(name__in=[constants['WELCOME_CALLING_TEAM'], constants['ARTICLE_TEAM']]).exists():
                     raise forms.ValidationError("Cannot modify QC approved Data")
             if not self.request.user.groups.filter(name=constants['QC_GROUP_NAME']).exists():
                 if self.instance.data_status == QCModel.SUBMITTED_FOR_QC:

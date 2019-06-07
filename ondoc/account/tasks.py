@@ -92,7 +92,7 @@ def dump_to_elastic():
                 return str(obj)
             raise TypeError("Object of type '%s' is not JSON serializable" % type(obj).__name__)
 
-        batch_size = 10000
+        batch_size = 5000
         with transaction.atomic():
             with connection.connection.cursor(name='elasticdata', cursor_factory=psycopg2.extras.RealDictCursor) as cursor:
                 cursor.itersize = batch_size

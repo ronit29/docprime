@@ -1532,7 +1532,7 @@ class InsuranceLead(auth_model.TimeStampedModel):
         lat = self.extras.get('latitude', None)
         long = self.extras.get('longitude', None)
 
-        city_name = InsuranceEligibleCities.check_eligibility(lat, long)
+        city_name = InsuranceEligibleCities.get_nearest_city(lat, long)
         if not lat or not long or city_name:
             push_insurance_banner_lead_to_matrix.apply_async(({'id': self.id}, ))
 
@@ -1825,7 +1825,7 @@ class InsuranceEligibleCities(auth_model.TimeStampedModel):
     longitude = models.DecimalField(null=False, max_digits=11, decimal_places=8)
 
     @classmethod
-    def check_eligibility(cls, latitude, longitude):
+    def get_nearest_city(cls, latitude, longitude):
         if not latitude or not longitude:
             return None
 
