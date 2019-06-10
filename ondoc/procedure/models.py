@@ -107,7 +107,7 @@ class IpdCostEstimateRoomType(models.Model):
 class IpdProcedureCostEstimate(auth_model.TimeStampedModel):
     ipd_procedure = models.ForeignKey(IpdProcedure, on_delete=models.CASCADE)
     hospital = models.ForeignKey(Hospital, on_delete=models.CASCADE)
-    stay_duration = models.IntegerField(null=True, blank=True)
+    stay_duration = models.IntegerField(default=1)
     costs = models.ManyToManyField(IpdCostEstimateRoomType, through='IpdCostEstimateRoomTypeMapping',
                                       through_fields=('cost_estimate', 'room_type'), related_name='of_ipd_procedures')
 

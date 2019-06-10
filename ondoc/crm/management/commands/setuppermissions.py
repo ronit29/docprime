@@ -48,7 +48,8 @@ from ondoc.procedure.models import Procedure, ProcedureCategory, CommonProcedure
     ProcedureCategoryMapping, ProcedureToCategoryMapping, CommonProcedure, IpdProcedure, IpdProcedureFeatureMapping, \
     DoctorClinicIpdProcedure, IpdProcedureCategoryMapping, IpdProcedureCategory, CommonIpdProcedure, \
     IpdProcedureDetailType, IpdProcedureDetail, IpdProcedureSynonym, IpdProcedureSynonymMapping, \
-    IpdProcedurePracticeSpecialization, IpdProcedureLead
+    IpdProcedurePracticeSpecialization, IpdProcedureLead, IpdCostEstimateRoomType, IpdProcedureCostEstimate, \
+    IpdCostEstimateRoomTypeMapping, IpdProcedureLeadCostEstimateMapping
 from ondoc.reports import models as report_models
 
 from ondoc.diagnostic.models import LabPricing
@@ -692,6 +693,15 @@ class Command(BaseCommand):
         for cl, ct in content_types.items():
             permissions = Permission.objects.filter(
                 Q(content_type=ct), Q(codename='change_' + ct.model))
+            group.permissions.add(*permissions)
+
+        content_types = ContentType.objects.get_for_models(IpdCostEstimateRoomType, IpdProcedureCostEstimate,
+                                                           IpdCostEstimateRoomTypeMapping, IpdProcedureLeadCostEstimateMapping)
+        for cl, ct in content_types.items():
+            permissions = Permission.objects.filter(
+                Q(content_type=ct),
+                Q(codename='add_' + ct.model) |
+                Q(codename='change_' + ct.model))
             group.permissions.add(*permissions)
 
         self.stdout.write('Successfully created groups and permissions')

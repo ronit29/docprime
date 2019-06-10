@@ -11,3 +11,6 @@ As discussed, please find below the cost estimate{% if instance.ipd_procedure %}
 
 
 {% endfor %}
+
+Thanks
+Team docprime

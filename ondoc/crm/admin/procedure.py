@@ -472,5 +472,5 @@ class IpdProcedureCostEstimateAdmin(VersionAdmin):
     list_display = ['ipd_procedure', 'hospital', 'stay_duration']
     autocomplete_fields = ['ipd_procedure', 'hospital']
     inlines = [IpdCostEstimateRoomTypeMappingInline]
-    search_fields = ('cost_estimate', )
+    search_fields = ('hospital__name', 'ipd_procedure__name')
 
