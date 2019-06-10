@@ -31,7 +31,8 @@ constants = {
     'INSURANCE_GROUP': 'insurance_group',
     'APPOINTMENT_REFUND_TEAM' : 'appointment_refund_team',
     'SUPER_INSURANCE_GROUP' : 'super_insurance_group',
-    'IPD_TEAM': 'ipd_team'
+    'IPD_TEAM': 'ipd_team',
+    'CORPORATE_GROUP' : 'corporate_group'
 }
 matrix_product_ids = {
     'opd_products': 1,
@@ -47,4 +48,26 @@ matrix_subproduct_ids = {
     "doctor": 8,
     "hospital": 7,
     "hospitalnetwork": 6
+}
+matrix_status = {
+    'NEW': 1,
+    'COST_REQUESTED': 28,
+    'COST_SHARED': 29,
+    'OPD': 30,
+    'NOT_INTERESTED': 4,
+    'COMPLETED': 19,
+    'VALID': 2,
+    'CONTACTED': 3,
+    'PLANNED': 31,
+}
+matrix_status_to_ipd_lead_status_mapping = {
+    matrix_status['NEW']: 1,
+    matrix_status['COST_REQUESTED']: 2,
+    matrix_status['COST_SHARED']: 3,
+    matrix_status['OPD']: 4,
+    matrix_status['NOT_INTERESTED']: 5,
+    matrix_status['COMPLETED']: 6,
+    matrix_status['VALID']: 7,
+    matrix_status['CONTACTED']: 8,
+    matrix_status['PLANNED']: 9,
 }

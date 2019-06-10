@@ -9,6 +9,8 @@ from ondoc.api.v1.common.serializers import SearchLeadSerializer
 from django.utils.dateparse import parse_datetime
 from weasyprint import HTML
 from django.http import HttpResponse
+
+from ondoc.api.v1.insurance.serializers import InsuranceCityEligibilitySerializer
 from ondoc.api.v1.utils import html_to_pdf, generate_short_url
 from ondoc.diagnostic.models import Lab
 from ondoc.doctor.models import (Doctor, DoctorPracticeSpecialization, PracticeSpecialization, DoctorMobile, Qualification,
@@ -16,6 +18,7 @@ from ondoc.doctor.models import (Doctor, DoctorPracticeSpecialization, PracticeS
                                  DoctorClinicTiming, DoctorClinic, Hospital, SourceIdentifier, DoctorAssociation)
 
 from ondoc.chat.models import ChatPrescription
+from ondoc.insurance.models import InsuranceEligibleCities
 from ondoc.lead.models import SearchLead
 from ondoc.notification.models import EmailNotification
 from ondoc.notification.rabbitmq_client import publish_message
@@ -970,10 +973,15 @@ class AllUrlsViewset(viewsets.GenericViewSet):
         key = parameters.get('query')
         if not key:
             return Response(status=status.HTTP_400_BAD_REQUEST)
+        key = key.lower()
+        if len(key)<3:
+            return Response(dict())
+
+
         from ondoc.location.models import EntityUrls
         from ondoc.location.models import CompareSEOUrls
-        e_urls = list(EntityUrls.objects.filter(url__icontains=key, is_valid=True).values_list('url', flat=True))[:5]
-        c_urls = list(CompareSEOUrls.objects.filter(url__icontains=key).values_list('url', flat=True))[:5]
+        e_urls = list(EntityUrls.objects.filter(url__startswith=key, is_valid=True).values_list('url', flat=True))[:5]
+        c_urls = list(CompareSEOUrls.objects.filter(url__startswith=key).values_list('url', flat=True))[:5]
         result = e_urls + c_urls
         return Response(dict(enumerate(result)))
 
@@ -1030,3 +1038,33 @@ class AppointmentPrerequisiteViewSet(viewsets.GenericViewSet):
         resp = insurance.validate_limit_usages(tests_amount)
 
         return Response(resp)
+
+
+class SiteSettingsViewSet(viewsets.GenericViewSet):
+
+    def get_settings(self, request):
+        params = request.query_params
+
+        lat = params.get('latitude', None)
+        long = params.get('longitude', None)
+
+        insurance_availability = False
+
+        if lat and long:
+            data = {
+                'latitude': lat,
+                'longitude': long
+            }
+
+            serializer = InsuranceCityEligibilitySerializer(data=data)
+            serializer.is_valid(raise_exception=True)
+            data = serializer.validated_data
+            city_name = InsuranceEligibleCities.get_nearest_city(data.get('latitude'), data.get('longitude'))
+            if city_name:
+                insurance_availability = True
+
+        settings = {
+            'insurance_availability': insurance_availability
+        }
+
+        return Response(data=settings)

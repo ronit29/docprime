@@ -540,7 +540,7 @@ class LabAdmin(ImportExportMixin, admin.GeoModelAdmin, VersionAdmin, ActionAdmin
     list_display = ('name', 'lab_logo', 'updated_at', 'onboarding_status', 'data_status', 'welcome_calling_done',
                     'list_created_by', 'list_assigned_to', 'get_onboard_link',)
     # readonly_fields=('onboarding_status', )
-    list_filter = ('data_status', 'welcome_calling_done', 'onboarding_status', 'is_insurance_enabled',
+    list_filter = ('data_status', 'enabled', 'welcome_calling_done', 'onboarding_status', 'is_insurance_enabled',
                    LabCityFilter, CreatedByFilter)
     exclude = ('search_key', 'pathology_agreed_price_percentage', 'pathology_deal_price_percentage',
                'radiology_agreed_price_percentage', 'radiology_deal_price_percentage', 'live_at',
@@ -770,6 +770,9 @@ class LabAppointmentForm(RefundableAppointmentForm):
             hour = round(float(time_slot_start.hour) + (float(time_slot_start.minute) * 1 / 60), 2)
         else:
             raise forms.ValidationError("Invalid start date and time.")
+
+        if time_slot_start != self.instance.time_slot_start and time_slot_start < timezone.now():
+            raise forms.ValidationError("Time slot can never be in past. Please add time slot in future.")
 
         if self.instance.id:
             lab_test = self.instance.test_mappings.all()

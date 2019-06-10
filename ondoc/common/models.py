@@ -459,3 +459,15 @@ class DeviceDetails(TimeStampedModel):
 
     class Meta:
         db_table = "device_details"
+
+
+class GenericNotes(TimeStampedModel):
+    content_type = models.ForeignKey(ContentType, on_delete=models.DO_NOTHING)
+    object_id = models.BigIntegerField()
+    content_object = GenericForeignKey()
+    notes = models.TextField()
+    created_by = models.ForeignKey(User, on_delete=models.DO_NOTHING, blank=True, null=True)
+
+    class Meta:
+        db_table = 'generic_notes'
+
