@@ -2824,11 +2824,13 @@ class OfflineCustomerViewSet(viewsets.GenericViewSet):
                     phone_number.append({"phone_number": mob.phone_number, "is_default": mob.is_default})
                     if mob.is_default:
                         patient_profile['phone_number'] = mob.phone_number
+                    patient_profile['patient_numbers'] = phone_number
                 elif mob.encrypted_number:
-                    phone_number.append({"encrypt_number": mob.encrypted_number, "is_default": mob.is_default})
+                    phone_number.append({"phone_number": mob.encrypted_number, "is_default": mob.is_default})
                     if mob.is_default:
                         patient_profile['encrypt_phone_number'] = mob.encrypted_number
-        patient_profile['patient_numbers'] = phone_number
+                    patient_profile['encrypt_numbers'] = phone_number
+        # patient_profile['patient_numbers'] = phone_number
 
         ret_obj = {}
         ret_obj['patient_name'] = patient_name
