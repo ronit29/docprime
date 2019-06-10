@@ -4,7 +4,8 @@ from django.contrib.contenttypes.models import ContentType
 from django.db.models import Q
 
 from ondoc.banner.models import Banner, SliderLocation, BannerLocation, EmailBanner, RecommenderThrough, Recommender
-from ondoc.common.models import PaymentOptions, UserConfig, Feature, Service, Remark, MatrixMappedCity, MatrixMappedState
+from ondoc.common.models import PaymentOptions, UserConfig, Feature, Service, Remark, MatrixMappedCity, \
+    MatrixMappedState, GenericNotes
 from ondoc.corporate_booking.models import CorporateDeal, Corporates, CorporateDocument
 from ondoc.coupon.models import Coupon, UserSpecificCoupon, RandomGeneratedCoupon
 from ondoc.crm.constants import constants
@@ -937,7 +938,8 @@ class Command(BaseCommand):
                                                            InsuranceTransaction, InsuranceDiseaseResponse,
                                                            InsuredMembers, InsurerPolicyNumber, InsuranceCancelMaster,
                                                            EndorsementRequest, InsuredMemberDocument,
-                                                           InsuredMemberHistory, UserBank, UserBankDocument)
+                                                           InsuredMemberHistory, UserBank, UserBankDocument,
+                                                           GenericNotes)
 
         for cl, ct in content_types.items():
             permissions = Permission.objects.filter(
@@ -967,7 +969,8 @@ class Command(BaseCommand):
                                                            InsuranceTransaction, InsuranceDiseaseResponse,
                                                            InsuredMembers, InsurerPolicyNumber, InsuranceCancelMaster,
                                                            EndorsementRequest, InsuredMemberDocument,
-                                                           InsuredMemberHistory, UserBank, UserBankDocument)
+                                                           InsuredMemberHistory, UserBank, UserBankDocument,
+                                                           GenericNotes)
 
         for cl, ct in content_types.items():
             permissions = Permission.objects.filter(
