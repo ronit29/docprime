@@ -5,7 +5,9 @@ from django.db.models import F
 from rest_framework import serializers
 from dal import autocomplete
 from ondoc.api.v1.insurance.serializers import InsuranceTransactionSerializer
+from ondoc.common.models import GenericNotes
 from ondoc.crm.constants import constants
+from ondoc.authentication.models import User
 from ondoc.doctor.models import OpdAppointment, DoctorPracticeSpecialization, PracticeSpecialization, Hospital
 from ondoc.diagnostic.models import LabAppointment, LabTest, Lab
 from ondoc.insurance.models import InsurancePlanContent, InsurancePlans, InsuredMembers, UserInsurance, StateGSTCode, \
@@ -19,6 +21,7 @@ from datetime import datetime
 from ondoc.insurance.models import InsuranceDisease
 from django.db import transaction
 from django.conf import settings
+from django.contrib.contenttypes.admin import GenericTabularInline
 
 
 class InsurerAdmin(admin.ModelAdmin):
@@ -421,22 +424,22 @@ class UserInsuranceDoctorResource(resources.ModelResource):
         return building + " " + sublocality + " " + locality + " " + city + " " + state + " " + pincode
 
     def dehydrate_building(self, appointment):
-        return appointment.hospital.building if appointment.hospital.building  else ''
+        return appointment.hospital.building if appointment.hospital and appointment.hospital.building  else ''
 
     def dehydrate_sublocality(self, appointment):
-        return appointment.hospital.sublocality if appointment.hospital.sublocality  else ''
+        return appointment.hospital.sublocality if appointment.hospital and appointment.hospital.sublocality  else ''
 
     def dehydrate_locality(self, appointment):
-        return appointment.hospital.locality if appointment.hospital.locality  else ''
+        return appointment.hospital.locality if appointment.hospital and appointment.hospital.locality  else ''
 
     def dehydrate_city(self, appointment):
-        return appointment.hospital.city if appointment.hospital.city  else ''
+        return appointment.hospital.city if appointment.hospital and appointment.hospital.city  else ''
 
     def dehydrate_state(self, appointment):
-        return appointment.hospital.state if appointment.hospital.state  else ''
+        return appointment.hospital.state if appointment.hospital and appointment.hospital.state  else ''
 
     def dehydrate_pincode(self, appointment):
-        return appointment.hospital.pin_code if appointment.hospital.pin_code  else ''
+        return appointment.hospital.pin_code if appointment.hospital and appointment.hospital.pin_code  else ''
 
     def dehydrate_pan_card_of_clinic(self, appointment):
         return ""
@@ -600,22 +603,22 @@ class UserInsuranceLabResource(resources.ModelResource):
         return building + " " + sublocality + " " + locality + " " + city + " " + state + " " + pincode
 
     def dehydrate_building(self, appointment):
-        return appointment.lab.building if appointment.lab.building  else ''
+        return appointment.lab.building if appointment.lab and appointment.lab.building else ''
 
     def dehydrate_sublocality(self, appointment):
-        return appointment.lab.sublocality if appointment.lab.sublocality  else ''
+        return appointment.lab.sublocality if appointment.lab and appointment.lab.sublocality else ''
 
     def dehydrate_locality(self, appointment):
-        return appointment.lab.locality if appointment.lab.locality  else ''
+        return appointment.lab.locality if appointment.lab and appointment.lab.locality else ''
 
     def dehydrate_city(self, appointment):
-        return appointment.lab.city if appointment.lab.city  else ''
+        return appointment.lab.city if appointment.lab and appointment.lab.city else ''
 
     def dehydrate_state(self, appointment):
-        return appointment.lab.state if appointment.lab.state  else ''
+        return appointment.lab.state if appointment.lab and appointment.lab.state else ''
 
     def dehydrate_pincode(self, appointment):
-        return appointment.lab.pin_code if appointment.lab.pin_code  else ''
+        return appointment.lab.pin_code if appointment.lab and appointment.lab.pin_code else ''
 
     def dehydrate_pan_card_of_center(self, appointment):
         # from django.contrib.contenttypes.models import ContentType
@@ -840,6 +843,17 @@ class UserBankDocumentAdmin(admin.ModelAdmin):
     list_display = ['insurance']
 
 
+class GenericNotesInline(GenericTabularInline):
+    model = GenericNotes
+    fields = ('notes', 'created_by')
+    extra = 0
+    can_delete = False
+    show_change_link = False
+    can_add = True
+    editable = False
+    readonly_fields = ('created_by',)
+
+
 class UserInsuranceAdmin(ImportExportMixin, admin.ModelAdmin):
     resource_class = (UserInsuranceDoctorResource, UserInsuranceLabResource, UserInsuranceResource)
     export_template_name = "export_insurance_report.html"
@@ -860,9 +874,19 @@ class UserInsuranceAdmin(ImportExportMixin, admin.ModelAdmin):
     fields = ['insurance_plan', 'user', 'purchase_date', 'expiry_date', 'policy_number', 'premium_amount',
               'merchant_payout', 'status', 'cancel_reason', 'cancel_after_utilize_insurance', 'cancel_case_type']
     readonly_fields = ('insurance_plan', 'user', 'purchase_date', 'expiry_date', 'policy_number', 'premium_amount', 'merchant_payout')
-    inlines = [InsuredMembersInline, UserBankInline, UserBankDocumentInline]
+    inlines = [InsuredMembersInline, UserBankInline, UserBankDocumentInline, GenericNotesInline]
     form = UserInsuranceForm
     search_fields = ['id']
+
+    def save_formset(self, request, form, formset, change):
+        if formset.model != GenericNotes:
+            return super(UserInsuranceAdmin, self).save_formset(request, form, formset, change)
+        instances = formset.save(commit=False)
+        for instance in instances:
+            if not instance.pk:
+                instance.created_by = request.user
+                instance.save()
+        formset.save_m2m()
 
     def get_search_results(self, request, queryset, search_term):
         queryset, use_distinct = super().get_search_results(request, queryset, None)

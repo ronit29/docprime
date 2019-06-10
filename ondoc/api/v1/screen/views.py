@@ -60,7 +60,7 @@ class ScreenViewSet(viewsets.GenericViewSet):
             serializer = InsuranceCityEligibilitySerializer(data=data)
             serializer.is_valid(raise_exception=True)
             data = serializer.validated_data
-            city_name = InsuranceEligibleCities.check_eligibility(data.get('latitude'), data.get('longitude'))
+            city_name = InsuranceEligibleCities.get_nearest_city(data.get('latitude'), data.get('longitude'))
             if city_name:
                 insurance_availability = True
 
