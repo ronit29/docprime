@@ -56,7 +56,24 @@ class InsurancePlanContentInline(admin.TabularInline):
     # readonly_fields = ("first_name", 'last_name', 'relation', 'dob', 'gender', )
 
 
+class PolicyNumberFormset(forms.models.BaseInlineFormSet):
+    def clean(self):
+        if not self.forms:
+            raise forms.ValidationError('Master Policy Number must have at least one Policy Number')
+        for form in self.forms:
+            data = form.cleaned_data
+            if not data.get('insurer'):
+                raise forms.ValidationError('Master Policy Number must have at least one insurer')
+            if not data.get('insurance_plan'):
+                raise forms.ValidationError('Master Policy Number must have at least one insurance plan')
+            if not data.get('apd_account'):
+                raise forms.ValidationError('Master Policy Number must have at least one APD account')
+            if not data.get('insurer_policy_number'):
+                raise forms.ValidationError('Master Policy Number must have at least one Policy Number')
+
+
 class InsurerPolicyNumberInline(admin.TabularInline):
+    formset = PolicyNumberFormset
     model = InsurerPolicyNumber
     fields = ('insurer', 'apd_account', 'insurer_policy_number')
     extra = 0
