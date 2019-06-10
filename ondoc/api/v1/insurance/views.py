@@ -150,7 +150,7 @@ class ListInsuranceViewSet(viewsets.GenericViewSet):
         serializer.is_valid(raise_exception=True)
         data = serializer.validated_data
 
-        city_name = InsuranceEligibleCities.check_eligibility(data.get('latitude'), data.get('longitude'))
+        city_name = InsuranceEligibleCities.get_nearest_city(data.get('latitude'), data.get('longitude'))
         if not city_name:
             return Response({'available': False})
 
@@ -697,7 +697,7 @@ class InsuranceEndorsementViewSet(viewsets.GenericViewSet):
         serializer.is_valid(raise_exception=True)
         valid_data = serializer.validated_data
         for member in valid_data.get('members'):
-            insured_member_obj = InsuredMembers.objects.filter(id=member.get('id')).first()
+            insured_member_obj = InsuredMembers.objects.filter(id=member.get('member').id).first()
             if not insured_member_obj:
                 res['error'] = "Insured Member details not found for member"
                 return Response(data=res, status=status.HTTP_400_BAD_REQUEST)
@@ -741,8 +741,7 @@ class InsuranceEndorsementViewSet(viewsets.GenericViewSet):
         user_insurance = user.active_insurance
         EndorsementRequest.process_endorsment_notifications(EndorsementRequest.PENDING, user_insurance.user)
 
-        res['success'] = 'Request for endorsement have been consider,' \
-                         'will update once insurer verified the details'
+        res['success'] = 'Your endorsement request has been successfully submitted.'
         return Response(data=res, status=status.HTTP_200_OK)
 
     def upload(self, request, *args, **kwargs):
