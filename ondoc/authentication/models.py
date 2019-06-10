@@ -1815,7 +1815,7 @@ class PaymentMixin(object):
         notification_tasks.send_release_payment_request.apply_async(
             (self.PRODUCT_ID, self.id), eta=timezone.localtime(), )
 
-    def preauth_process(self, request):
+    def preauth_process(self, refund_flag=1):
         from ondoc.account.models import Order
         from ondoc.account.models import PgTransaction
         initiate_refund = 1
@@ -1826,7 +1826,7 @@ class PaymentMixin(object):
             txn_obj = PgTransaction.objects.filter(order=order_parent).first() if order_parent else None
 
             if txn_obj and txn_obj.is_preauth():
-                if request.data.get("refund"):
+                if refund_flag:
                     if order_parent.orders.count() > 1:
                         self.capture_payment()
                     else:

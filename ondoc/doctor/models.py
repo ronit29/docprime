@@ -2337,11 +2337,12 @@ class OpdAppointment(auth_model.TimeStampedModel, CouponsMixin, OpdAppointmentIn
         return True, ""
 
     @transaction.atomic
-    def action_cancelled(self, refund_flag=1, initiate_refund=1):
+    def action_cancelled(self, refund_flag=1):
         old_instance = OpdAppointment.objects.get(pk=self.id)
         if old_instance.status != self.CANCELLED:
             self.status = self.CANCELLED
             self.save()
+            initiate_refund = old_instance.preauth_process(refund_flag)
             self.action_refund(refund_flag, initiate_refund)
 
     def get_cancellation_breakup(self):

@@ -678,8 +678,7 @@ class UserAppointmentsViewSet(OndocViewSet):
                 lab_appointment.cancellation_type = LabAppointment.PATIENT_CANCELLED
                 lab_appointment.cancellation_reason = validated_data.get('cancellation_reason', None)
                 lab_appointment.cancellation_comments = validated_data.get('cancellation_comment', '')
-                initiate_refund = lab_appointment.preauth_process(request)
-                lab_appointment.action_cancelled(request.data.get('refund', 1), initiate_refund)
+                lab_appointment.action_cancelled(request.data.get('refund', 1))
                 resp = LabAppointmentRetrieveSerializer(lab_appointment, context={"request": request}).data
             elif validated_data.get('status') == LabAppointment.RESCHEDULED_PATIENT:
                 if validated_data.get("start_date") and validated_data.get('start_time'):
@@ -763,8 +762,7 @@ class UserAppointmentsViewSet(OndocViewSet):
                 opd_appointment.cancellation_type = OpdAppointment.PATIENT_CANCELLED
                 opd_appointment.cancellation_reason = validated_data.get('cancellation_reason', None)
                 opd_appointment.cancellation_comments = validated_data.get('cancellation_comment', '')
-                initiate_refund = opd_appointment.preauth_process(request)
-                opd_appointment.action_cancelled(request.data.get("refund", 1), initiate_refund)
+                opd_appointment.action_cancelled(request.data.get("refund", 1))
                 logger.warning(
                     "Ending for id - " + str(opd_appointment.id) + " timezone - " + str(timezone.now()))
                 resp = AppointmentRetrieveSerializer(opd_appointment, context={"request": request}).data
