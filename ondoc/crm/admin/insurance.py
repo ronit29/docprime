@@ -424,22 +424,22 @@ class UserInsuranceDoctorResource(resources.ModelResource):
         return building + " " + sublocality + " " + locality + " " + city + " " + state + " " + pincode
 
     def dehydrate_building(self, appointment):
-        return appointment.hospital.building if appointment.hospital.building  else ''
+        return appointment.hospital.building if appointment.hospital and appointment.hospital.building  else ''
 
     def dehydrate_sublocality(self, appointment):
-        return appointment.hospital.sublocality if appointment.hospital.sublocality  else ''
+        return appointment.hospital.sublocality if appointment.hospital and appointment.hospital.sublocality  else ''
 
     def dehydrate_locality(self, appointment):
-        return appointment.hospital.locality if appointment.hospital.locality  else ''
+        return appointment.hospital.locality if appointment.hospital and appointment.hospital.locality  else ''
 
     def dehydrate_city(self, appointment):
-        return appointment.hospital.city if appointment.hospital.city  else ''
+        return appointment.hospital.city if appointment.hospital and appointment.hospital.city  else ''
 
     def dehydrate_state(self, appointment):
-        return appointment.hospital.state if appointment.hospital.state  else ''
+        return appointment.hospital.state if appointment.hospital and appointment.hospital.state  else ''
 
     def dehydrate_pincode(self, appointment):
-        return appointment.hospital.pin_code if appointment.hospital.pin_code  else ''
+        return appointment.hospital.pin_code if appointment.hospital and appointment.hospital.pin_code  else ''
 
     def dehydrate_pan_card_of_clinic(self, appointment):
         return ""
@@ -603,22 +603,22 @@ class UserInsuranceLabResource(resources.ModelResource):
         return building + " " + sublocality + " " + locality + " " + city + " " + state + " " + pincode
 
     def dehydrate_building(self, appointment):
-        return appointment.lab.building if appointment.lab.building  else ''
+        return appointment.lab.building if appointment.lab and appointment.lab.building else ''
 
     def dehydrate_sublocality(self, appointment):
-        return appointment.lab.sublocality if appointment.lab.sublocality  else ''
+        return appointment.lab.sublocality if appointment.lab and appointment.lab.sublocality else ''
 
     def dehydrate_locality(self, appointment):
-        return appointment.lab.locality if appointment.lab.locality  else ''
+        return appointment.lab.locality if appointment.lab and appointment.lab.locality else ''
 
     def dehydrate_city(self, appointment):
-        return appointment.lab.city if appointment.lab.city  else ''
+        return appointment.lab.city if appointment.lab and appointment.lab.city else ''
 
     def dehydrate_state(self, appointment):
-        return appointment.lab.state if appointment.lab.state  else ''
+        return appointment.lab.state if appointment.lab and appointment.lab.state else ''
 
     def dehydrate_pincode(self, appointment):
-        return appointment.lab.pin_code if appointment.lab.pin_code  else ''
+        return appointment.lab.pin_code if appointment.lab and appointment.lab.pin_code else ''
 
     def dehydrate_pan_card_of_center(self, appointment):
         # from django.contrib.contenttypes.models import ContentType
