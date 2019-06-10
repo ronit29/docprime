@@ -700,7 +700,7 @@ class LabPricingAutocomplete(autocomplete.Select2QuerySetView):
 class BlacklistUserForm(forms.ModelForm):
     def __init__(self, *args, **kwargs):
         super(BlacklistUserForm, self).__init__(*args, **kwargs)
-        if self.instance and self.instance.user:
+        if self.instance and self.instance.id:
             self.fields['phone_number'].initial = self.instance.user.phone_number
 
     phone_number = forms.CharField(required=True)
