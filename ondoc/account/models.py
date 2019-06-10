@@ -873,8 +873,12 @@ class PgTransaction(TimeStampedModel):
         """
             Save PG transaction and credit consumer account, with amount paid at PaymentGateway.
         """
-        super(PgTransaction, self).save(*args, **kwargs)
+        update_consumer_account = False
         if self.id is None:
+            update_consumer_account = True
+
+        super(PgTransaction, self).save(*args, **kwargs)
+        if update_consumer_account:
             consumer_account = ConsumerAccount.objects.get_or_create(user=self.user)
             consumer_account = ConsumerAccount.objects.select_for_update().get(user=self.user)
             pg_data = vars(self)
