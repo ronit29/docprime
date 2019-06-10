@@ -286,7 +286,7 @@ class InsuranceOrderViewSet(viewsets.GenericViewSet):
         phone_number = user.phone_number
         blocked_state = BlacklistUser.get_state_by_number(phone_number, BlockedStates.States.INSURANCE)
         if blocked_state:
-            return Response({'error': blocked_state.message})
+            return Response({'error': blocked_state.message}, status=status.HTTP_400_BAD_REQUEST)
 
 
         if settings.IS_INSURANCE_ACTIVE:

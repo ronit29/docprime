@@ -98,7 +98,7 @@ class LoginOTP(GenericViewSet):
 
         blocked_state = BlacklistUser.get_state_by_number(phone_number, BlockedStates.States.LOGIN)
         if blocked_state:
-            return Response({'error': blocked_state.message})
+            return Response({'error': blocked_state.message}, status=status.HTTP_400_BAD_REQUEST)
 
 
         req_type = request.query_params.get('type')
