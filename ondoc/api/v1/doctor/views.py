@@ -3957,14 +3957,15 @@ class HospitalViewSet(viewsets.GenericViewSet):
                 response['breadcrumb'] = breadcrumb
 
             if hospital_obj.name and entity.locality_value:
-                title = hospital_obj.name + ' in '
-                description = hospital_obj.name + ' in '
+                title = hospital_obj.name
+                description = hospital_obj.name
                 if entity.sublocality_value:
-                    title += entity.sublocality_value + ', '
-                    description += entity.sublocality_value + ', '
-                title += entity.locality_value + ' | Contact Info & Other Details '
+                    title += " " + entity.sublocality_value
+                    description += " " + entity.sublocality_value
 
-                description += entity.locality_value + ': Check ' + hospital_obj.name + " address, doctor's list, contact number and more to book appointment."
+                title += ' | Book Appointment, Check Doctors List, Reviews, Contact Number'
+                description += """: Get free booking on first appointment.\
+                 Check {} Doctors List, Reviews, Contact Number, Address, Procedures and more.""".format(hospital_obj.name)
             canonical_url = entity.url
         else:
             response['breadcrumb'] = None
