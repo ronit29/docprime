@@ -697,11 +697,34 @@ class LabPricingAutocomplete(autocomplete.Select2QuerySetView):
         return queryset
 
 
-class BlacklistUserAdmin(admin.ModelAdmin):
+class BlacklistUserForm(forms.ModelForm):
+    def __init__(self, *args, **kwargs):
+        super(BlacklistUserForm, self).__init__(*args, **kwargs)
+        if self.instance and self.instance.user:
+            self.fields['phone_number'].initial = self.instance.user.phone_number
+
+    phone_number = forms.CharField(required=True)
+
+    def clean(self):
+        super().clean()
+        cleaned_data = self.cleaned_data
+        from ondoc.authentication.models import User
+        phone_number = cleaned_data['phone_number']
+        user = User.objects.filter(user_type=User.CONSUMER, phone_number=phone_number).first()
+        if user:
+            self.instance.user = user
+        else:
+            raise forms.ValidationError('User with given number does not exists.')
+
+        return cleaned_data
+
+
+class BlacklistUserAdmin(VersionAdmin):
     model = BlacklistUser
+    form = BlacklistUserForm
     list_display = ('user', 'type')
-    fields = ('user', 'type', 'reason')
-    autocomplete_fields = ['user']
+    fields = ('phone_number', 'type', 'reason', 'enabled')
+    # autocomplete_fields = ['user']
 
     @transaction.atomic
     def save_model(self, request, obj, form, change):
@@ -711,7 +734,7 @@ class BlacklistUserAdmin(admin.ModelAdmin):
         super().save_model(request, obj, form, change)
 
 
-class BlockedStatesAdmin(admin.ModelAdmin):
+class BlockedStatesAdmin(VersionAdmin):
     model = BlockedStates
     list_display = ('state_name', 'message')
     fields = ('state_name', 'message')

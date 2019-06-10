@@ -458,10 +458,11 @@ class BlacklistUser(TimeStampedModel):
     type = models.ForeignKey(BlockedStates, on_delete=models.DO_NOTHING)
     reason = models.TextField(null=True)
     blocked_by = models.ForeignKey(User, on_delete=models.DO_NOTHING)
+    enabled = models.BooleanField(default=True)
 
     @classmethod
     def get_state_by_number(cls, phone_number, blocked_state):
-        blacklist_user = cls.objects.filter(user__phone_number=phone_number, type__state_name=blocked_state).first()
+        blacklist_user = cls.objects.filter(user__phone_number=phone_number, type__state_name=blocked_state, enabled=True).first()
         if blacklist_user:
             return blacklist_user.type
 
