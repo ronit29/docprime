@@ -463,7 +463,7 @@ class BlacklistUser(TimeStampedModel):
     @classmethod
     def get_state_by_number(cls, phone_number, blocked_state):
         blacklist_user = cls.objects.filter(user__phone_number=phone_number, type__state_name=blocked_state,
-                                            enabled=True, user__type=User.CONSUMER).first()
+                                            enabled=True, user__user_type=User.CONSUMER).first()
         if blacklist_user:
             return blacklist_user.type
 
