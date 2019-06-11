@@ -245,6 +245,7 @@ class Hospital(auth_model.TimeStampedModel, auth_model.CreatedByModel, auth_mode
     is_location_verified = models.BooleanField(verbose_name='Location Verified', default=False)
     auto_ivr_enabled = models.BooleanField(default=True)
     priority_score = models.IntegerField(default=0, null=False, blank=False)
+    google_avg_rating = models.DecimalField(max_digits=5, decimal_places=2, null=True, editable=False)
 
     def __str__(self):
         return self.name
@@ -295,6 +296,12 @@ class Hospital(auth_model.TimeStampedModel, auth_model.CreatedByModel, auth_mode
                                                                                          'hosp_entity_dict': hosp_entity_dict,
                                                                                          'hosp_locality_entity_dict': hosp_locality_entity_dict}).data
         return result
+
+
+    @classmethod
+    def update_hosp_google_avg_rating(cls):
+        update_hosp_google_ratings = RawSql('''update hospital h set google_avg_rating = (select (reviews->>'user_avg_rating')::float from hospital_place_details 
+                                         where hospital_id=h.id limit 1)''', [] ).execute()
 
     def get_active_opd_appointments(self, user=None, user_insurance=None, appointment_date=None):
 
@@ -599,6 +606,14 @@ class HospitalPlaceDetails(auth_model.TimeStampedModel):
 
     def save(self, *args, **kwargs):
         super().save(*args, **kwargs)
+
+    @classmethod
+    def update_hosp_place_with_google_api_details(cls):
+        query = RawSql(''' insert into hospital_place_details(place_id, hospital_id, place_details,reviews, created_at,updated_at)
+                select (json_array_elements(clinic_place_search::json ->'candidates')->>'place_id') as place_id, hospital_id , clinic_detail::json as place_details,
+                json_build_object('user_ratings_total',clinic_detail::json->'result'->'user_ratings_total', 'user_avg_rating',
+                clinic_detail::json->'result'->'rating', 'user_reviews', clinic_detail::json->'result'->'reviews' ) as reviews, now(), now() 
+                from google_api_details where hospital_id is not null ''', []).execute()
 
     @classmethod
     def update_place_details(cls):
