@@ -15,7 +15,5 @@ Link(s):
 {% endfor %}
 {% endif %}
 
-If you wish to get your reports reviewed by our in-house doctors, please send an email to customercare@docprime.com .
-
 Pending reports, if any, will be shared once received from the lab.
 Thank you for choosing docprime.com

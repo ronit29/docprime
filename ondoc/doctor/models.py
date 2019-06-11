@@ -549,6 +549,46 @@ class Hospital(auth_model.TimeStampedModel, auth_model.CreatedByModel, auth_mode
                 break
         return result
 
+    def get_specialization_insured_appointments(self, doctor, insurance):
+        days = insurance.specialization_days_limit
+        n_days_back_datetime = timezone.now() - datetime.timedelta(days=days)
+
+        limit_specialization_ids = json.loads(settings.INSURANCE_SPECIALIZATION_WITH_DAYS_LIMIT)
+        limit_specialization_ids_set = set(limit_specialization_ids)
+        doctor_specialization_ids = set([x.specialization_id for x in doctor.doctorpracticespecializations.all()])
+
+        if not limit_specialization_ids_set.intersection(doctor_specialization_ids):
+            return []
+
+        doctor_with_specialization = DoctorPracticeSpecialization.objects. \
+            filter(specialization_id__in=limit_specialization_ids).values_list('doctor_id', flat=True)
+
+        appointments = self.hospital_appointments.filter(insurance=insurance,
+                                                         user=insurance.user,
+                                                         time_slot_start__gte=n_days_back_datetime,
+                                                         doctor_id__in=doctor_with_specialization).\
+            exclude(status__in=[OpdAppointment.CANCELLED]).order_by('-time_slot_start')
+
+        return appointments
+
+    def get_blocked_specialization_appointments_slots(self, doctor, insurance):
+        blockeds_timeslots = []
+        appointments = self.get_specialization_insured_appointments(doctor, insurance)
+
+        if not appointments:
+            return blockeds_timeslots
+
+        days = insurance.specialization_days_limit
+        for appointment in appointments:
+            for n in range(days):
+                nth_day_future_timeslot = appointment.time_slot_start.date() + datetime.timedelta(days=n)
+                nth_day_past_timeslot = appointment.time_slot_start.date() - datetime.timedelta(days=n)
+                blockeds_timeslots.append(str(nth_day_future_timeslot))
+                if nth_day_past_timeslot >= timezone.now().date():
+                    blockeds_timeslots.append(str(nth_day_past_timeslot))
+
+        return blockeds_timeslots
+
 
 class HospitalPlaceDetails(auth_model.TimeStampedModel):
     hospital = models.ForeignKey(Hospital, on_delete=models.CASCADE, related_name='hospital_place_details')
