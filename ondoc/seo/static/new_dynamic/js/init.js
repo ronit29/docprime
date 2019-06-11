@@ -11,7 +11,9 @@ $( document ).ready(function() {
         document.getElementById('custom_dropdown').innerHTML = '';
     });
 
-    $("#id_url_value").on('keypress', function(e){
+    //$("#id_url_value").on('change', function(e){
+    $(document).on('change keyup paste', "#id_url_value", function(e) {
+    
     var query = $(this).val();
         $.ajax({
                     type: "GET",
