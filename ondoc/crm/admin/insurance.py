@@ -13,7 +13,7 @@ from ondoc.diagnostic.models import LabAppointment, LabTest, Lab
 from ondoc.insurance.models import InsurancePlanContent, InsurancePlans, InsuredMembers, UserInsurance, StateGSTCode, \
      ThirdPartyAdministrator, InsuranceEligibleCities, InsuranceCity, InsuranceDistrict, InsuranceDeal, \
     InsurerPolicyNumber, InsuranceLead, EndorsementRequest, InsuredMemberDocument, InsuranceEligibleCities,\
-    InsuranceThreshold, UserBank, InsuredMemberHistory, UserBankDocument
+    InsuranceThreshold, UserBank, InsuredMemberHistory, UserBankDocument, InsurerAccountTransfer
 from import_export.admin import ImportExportMixin, ImportExportModelAdmin, base_formats
 import nested_admin
 from import_export import fields, resources
@@ -1365,3 +1365,7 @@ class ThirdPartyAdministratorAdmin(ImportExportMixin, admin.ModelAdmin):
     resource_class = ThirdPartyAdministratorResource
     search_fields = ['name']
     list_display = ['id', 'name']
+
+
+class InsurerAccountTransferAdmin(admin.ModelAdmin):
+    model = InsurerAccountTransfer
