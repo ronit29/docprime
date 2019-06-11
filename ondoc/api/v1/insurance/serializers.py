@@ -156,7 +156,8 @@ class EndorseMemberListSerializer(serializers.Serializer):
     city_code = serializers.CharField(allow_null=True, allow_blank=True)
     district_code = serializers.CharField(allow_null=True, allow_blank=True)
     is_change = serializers.BooleanField(required=False)
-    id = serializers.IntegerField()
+    # id = serializers.IntegerField()
+    member = serializers.PrimaryKeyRelatedField(queryset=InsuredMembers.objects.all())
     image_ids = serializers.ListSerializer(child=InsuredMemberDocumentIdsSerializer(), required=False)
 
     def validate(self, attrs):
@@ -288,8 +289,8 @@ class StateGSTCodeSerializer(serializers.ModelSerializer):
     # id = serializers.PrimaryKeyRelatedField(queryset=InsuredMemberDocument.objects.all())
 
 class InsuranceCityEligibilitySerializer(serializers.Serializer):
-    latitude = serializers.DecimalField(allow_null=False, max_digits=11, decimal_places=8)
-    longitude = serializers.DecimalField(allow_null=False, max_digits=11, decimal_places=8)
+    latitude = serializers.DecimalField(allow_null=False, max_digits=20, decimal_places=15)
+    longitude = serializers.DecimalField(allow_null=False, max_digits=20, decimal_places=15)
 
 
 class UserBankDocumentSerializer(serializers.Serializer):
