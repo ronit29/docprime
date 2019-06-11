@@ -88,7 +88,7 @@ class DoctorSearchHelper:
             sits_at_str = 'hospital_type IN('
             for hosp_type in sits_at_hosp_types:
 
-                if not counter == 1:
+                if counter != 1:
                     sits_at_str += ', '
                 sits_at_str = sits_at_str + '%(' + 'sits_at' + str(counter) + ')s'
                 params['sits_at' + str(counter)] = hospital_type_mapping.get(hosp_type)
