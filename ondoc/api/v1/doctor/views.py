@@ -4,7 +4,6 @@ from uuid import UUID
 
 from django.contrib.gis.db.models.functions import Distance
 from django.contrib.gis.measure import D
-from django.utils.functional import cached_property
 
 from ondoc.api.v1.auth.serializers import UserProfileSerializer
 from ondoc.api.v1.doctor.city_match import city_match

@@ -9,7 +9,6 @@ import requests
 from PIL.Image import NEAREST, BICUBIC
 from django.contrib.staticfiles.storage import staticfiles_storage
 from django.core.files.storage import default_storage
-from django.utils.functional import cached_property
 from PIL import Image, ImageFont, ImageOps
 # from bookinganalytics.models import DP_OpdConsultsAndTests
 
@@ -52,7 +51,6 @@ from ondoc.api.v1.utils import get_start_end_datetime, custom_form_datetime, Cou
 from ondoc.common.models import AppointmentHistory, AppointmentMaskNumber, Service, Remark, MatrixMappedState, \
     MatrixMappedCity, GlobalNonBookable, SyncBookingAnalytics, CompletedBreakupMixin, RefundDetails
 from ondoc.common.models import QRCode
-
 
 from functools import reduce
 from operator import or_

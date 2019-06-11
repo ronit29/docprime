@@ -25,8 +25,6 @@ from ondoc.authentication import models as auth_model
 from ondoc.bookinganalytics.models import DP_StateMaster, DP_CityMaster
 import datetime
 from django.utils import timezone
-from django.utils.functional import cached_property
-
 
 from ondoc.common.helper import Choices
 
