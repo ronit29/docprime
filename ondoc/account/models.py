@@ -914,6 +914,8 @@ class DummyTransactions(TimeStampedModel):
     DEBIT = 1
     TYPE_CHOICES = [(CREDIT, "Credit"), (DEBIT, "Debit")]
 
+    INSURANCE_NODAL_TRANSFER = 'insurance_nodal_transfer'
+
     user = models.ForeignKey(User, on_delete=models.DO_NOTHING)
     product_id = models.SmallIntegerField(choices=Order.PRODUCT_IDS)
     reference_id = models.BigIntegerField(blank=True, null=True)
@@ -933,6 +935,7 @@ class DummyTransactions(TimeStampedModel):
     status_type = models.CharField(max_length=50, null=True, blank=True)
     transaction_id = models.CharField(max_length=100, null=True, blank=True)
     pb_gateway_name = models.CharField(max_length=100, null=True, blank=True)
+    transaction_type = models.CharField(max_length=100, null=True, blank=True)
 
     class Meta:
         db_table = "dummy_transaction"
@@ -1388,6 +1391,11 @@ class OrderLog(TimeStampedModel):
     class Meta:
         db_table = "order_log"
 
+class PayoutMapping(TimeStampedModel):
+    content_type = models.ForeignKey(ContentType, on_delete=models.SET_NULL)
+    object_id = models.PositiveIntegerField()
+    content_object = GenericForeignKey()
+    payout = models.ForeignKey(MerchantPayout, on_delete=models.SET_NULL)
 
 class MerchantPayout(TimeStampedModel):    
 

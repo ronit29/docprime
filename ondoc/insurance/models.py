@@ -36,7 +36,7 @@ from hardcopy import bytestring_to_pdf
 import math
 import reversion
 import numbers
-from ondoc.account.models import Order, Merchant, MerchantPayout
+from ondoc.account.models import Order, Merchant, MerchantPayout, PgTransaction
 from decimal import  *
 
 logger = logging.getLogger(__name__)
@@ -1326,32 +1326,69 @@ class UserInsurance(auth_model.TimeStampedModel):
         for insurance in insurance_list:
             insurance.process_insurance_obj_payouts()
 
-    @classmethod
-    def trasnfer_insurance_amount(cls):
-        from ondoc.account.models import PgTransaction
-        insurances = UserInsurance.objects.all()
-        for ins in insurances:
-            order = ins.order
-            wallet_amount = order.wallet_amount
-            premium_amount = ins.premium_amount
-            pg_transactions = PgTransaction.objects.filter(product_id=Order.INSURANCE_PRODUCT_ID, user=ins.user)
-            if wallet_amount>0 and wallet_amount!=premium_amount:
-                pg_amount = ins.premium_amount - wallet_amount
+    def transfer_to_insurance_nodal(self):
+        if self.needs_transfer_to_insurance_nodal():
+            merchant = Merchant.objects.filter(id=settings.DOCPRIME_NODAL2_MERCHANT).first()
+            payout_data = {
+            "charged_amount": self.order.wallet_amount,
+            "payable_amount": self.order.wallet_amount,
+            #"content_object": self.insurance_plan.insurer,
+            "type": MerchantPayout.AUTOMATIC,
+            "paid_to": merchant,
+            "booking_type": Order.INSURANCE_PRODUCT_ID
+            }
 
-                if len(pg_transactions) == 1 and pg_transactions.first().amount == pg_amount:
+            merchant_payout_obj = MerchantPayout.objects.create(**payout_data)
+            PayoutMapping.objects.create(**{'content_object':self,'payout':merchant_payout_obj})
 
-                    #paid_to nodal2 merchant
-                    paid_to = None
-                    payout_data = {
-                        "charged_amount": wallet_amount,
-                        "payable_amount": wallet_amount,
-                        "content_object": ins.insurance_plan.insurer,
-                        "type": MerchantPayout.AUTOMATIC,
-                        "paid_to": paid_to,
-                        "booking_type": Order.INSURANCE_PRODUCT_ID
-                    }
+    def needs_transfer_to_insurance_nodal(self):
+        order = self.order
+        wallet_amount = order.wallet_amount
+        premium_amount = self.premium_amount
+        response = None
+        pg_transactions = PgTransaction.objects.filter(product_id=Order.INSURANCE_PRODUCT_ID, user=self.user)
+        if not wallet_amount:
+            response = False
+        elif wallet_amount == premium_amount:
+            if len(pg_transactions) == 1 and pg_transactions.first().amount == wallet_amount:
+                response = False
+        elif wallet_amount != premium_amount:
+            pg_amount = premium_amount - wallet_amount
+            if len(pg_transactions) == 1 and pg_transactions.first().amount == pg_amount:
+                response = True
+        if response==None:
+            raise Exception('transfer not possible. Handle manually')
 
-                    merchant_payout_obj = MerchantPayout.objects.create(**payout_data)
+        return response
+        # DummyTransactions.objects.filter(reference_id = self.id,product_id=3, transaction_type=DummyTransactions.INSURANCE_NODAL_TRANSFER)
+        #     response=Fa
+
+    # @classmethod
+    # def transfer_insurance_amount(cls):
+    #     from ondoc.account.models import PgTransaction
+    #     insurances = UserInsurance.objects.all()
+    #     for ins in insurances:
+    #         order = ins.order
+    #         wallet_amount = order.wallet_amount
+    #         premium_amount = ins.premium_amount
+    #         pg_transactions = PgTransaction.objects.filter(product_id=Order.INSURANCE_PRODUCT_ID, user=ins.user)
+    #         if wallet_amount>0 and wallet_amount!=premium_amount:
+    #             pg_amount = ins.premium_amount - wallet_amount
+
+    #             if len(pg_transactions) == 1 and pg_transactions.first().amount == pg_amount:
+
+    #                 #paid_to nodal2 merchant
+    #                 paid_to = None
+    #                 payout_data = {
+    #                     "charged_amount": wallet_amount,
+    #                     "payable_amount": wallet_amount,
+    #                     "content_object": ins.insurance_plan.insurer,
+    #                     "type": MerchantPayout.AUTOMATIC,
+    #                     "paid_to": paid_to,
+    #                     "booking_type": Order.INSURANCE_PRODUCT_ID
+    #                 }
+
+    #                 merchant_payout_obj = MerchantPayout.objects.create(**payout_data)
 
 
     def process_insurance_obj_payouts(self):
