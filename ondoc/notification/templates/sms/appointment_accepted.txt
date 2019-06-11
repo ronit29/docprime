@@ -4,4 +4,4 @@ Please share unique confirmation code and appointment id while availing the serv
 
 Unique Confirmation Code : {{instance.otp}}
 
-PS: This is a cashless appointment. Therefore, you are not required to pay for the service booked through us.
+*This is a cashless appointment. Therefore, you are not required to pay for the service booked through us.

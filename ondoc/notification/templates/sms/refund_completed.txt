@@ -1,12 +1,4 @@
-The refund of Rs {{amount}}{% if booking_id %} against the appointment id ‘{{booking_id}}’{% endif %} has been successfully credited to your account.
-
-Below are the refund details:
-
-Original Payment Mode: {% if original_payment_mode %}{{original_payment_mode}}{% endif %}
-Promotional Balance: {% if promotional_balance %}{{promotional_balance}}{% endif %}
-Refund Initiation Date:{% if refund_initiation_date %}{{refund_initiation_date}}{% endif %}
-Unique Reference No:{% if unique_reference_no %}{{unique_reference_no}}{% endif %}
+Appointment ID <<{{booking_id}}>>:The refund of Rs {{amount}} has been successfully credited to your account.
 
 We look forward to serving your again.
 
-Thanks for choosing Docprime.com

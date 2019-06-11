@@ -1,4 +1,4 @@
-Appointment ID : {{instance.id}}
+Appointment ID <<{{instance.id}}>>
 Reschedule request has been received for:
 Patient Name : {{patient_name|capfirst}}
 Appointment with Doctor : {{doctor_name|capfirst}}

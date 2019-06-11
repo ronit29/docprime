@@ -1,10 +1,3 @@
-Hi,
-
-We have initiated the refund of Rs {{amount}}{% if booking_id %} against the appointment id ‘{{booking_id}}’{% endif %}.
-{% if ctrnx_id %}
-The transaction ID for this refund is : DPRF{{ctrnx_id}}
-{% endif %}
-The amount will be credited in your account within 5-7 working days.
-
-Thanks,
-Team Docprime.com
+Appointment ID<<{{booking_id}}>>:
+The refund of Rs {{amount}} is initiated VIA {% if ctrnx_id %} transaction id <<DPRF{{ctrnx_id}}>> {% endif %}.
+The amount will be credited into your account within 7 working days.
