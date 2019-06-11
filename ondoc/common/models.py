@@ -504,6 +504,30 @@ class MatrixDataMixin(object):
 
         return {'provider_payment_status': provider_payment_status, 'settlement_date': settlement_date, 'payment_URN': payment_URN, 'amount': amount}
 
+    def refund_details_data(self):
+        from ondoc.account.models import ConsumerTransaction
+        from ondoc.account.models import PgTransaction
+        customer_status = ""
+        refund_urn = ""
+        refund_initiated_at = None
+        original_payment_mode_refund = ""
+        promotional_wallet_refund = ""
+
+        product_id = self.PRODUCT_ID
+        ct = ConsumerTransaction.objects.filter(type=PgTransaction.CREDIT, reference_id=self.id, product_id=product_id,
+                                                action=ConsumerTransaction.CANCELLATION)
+
+        wallet_ct = ct.filter(source=ConsumerTransaction.WALLET_SOURCE).first()
+        cashback_ct = ct.filter(source=ConsumerTransaction.CASHBACK_SOURCE).first()
+
+        if wallet_ct:
+            original_payment_mode_refund = wallet_ct.amount
+        if cashback_ct:
+            promotional_wallet_refund = cashback_ct.amount
+
+        return {'original_payment_mode_refund': original_payment_mode_refund, 'promotional_wallet_refund': promotional_wallet_refund,
+                'customer_status': customer_status, 'refund_urn': refund_urn, 'refund_initiated_at': refund_initiated_at}
+
 
 class BlockedStates(TimeStampedModel):
 

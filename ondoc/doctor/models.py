@@ -2961,6 +2961,7 @@ class OpdAppointment(auth_model.TimeStampedModel, CouponsMixin, OpdAppointmentIn
         accepted_history = self.appointment_accepted_history()
         user_insurance = self.insurance
         mobile_list = self.get_matrix_spoc_data()
+        refund_data = self.refund_details_data()
 
         appointment_details = {
             'IPDHospital': is_ipd_hospital,
@@ -3008,7 +3009,12 @@ class OpdAppointment(auth_model.TimeStampedModel, CouponsMixin, OpdAppointmentIn
             'ReportUploaded': report_uploaded,
             'Reportsent': report_sent,
             'AcceptedBy': accepted_history['source'],
-            'AcceptedPhone': accepted_history['accepted_phone']
+            'AcceptedPhone': accepted_history['accepted_phone'],
+            "CustomerStatus": refund_data['customer_status'],
+            "RefundPaymentMode": refund_data['original_payment_mode_refund'],
+            "RefundToWallet": refund_data['promotional_wallet_refund'],
+            "RefundInitiationDate": refund_data['refund_initiated_at'],
+            "RefundURN": refund_data['refund_urn']
         }
         return appointment_details
 
