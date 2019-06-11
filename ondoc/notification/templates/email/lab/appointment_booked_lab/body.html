@@ -77,6 +77,16 @@
                     <td>
                         <table cellpadding="0" cellspacing="0" style="width:100%;">
                             <tbody>
+                            {% if instance.lab.network.id == 19518 %}
+                            <tr>
+                                <td style="color:#000000;font-size:16px;font-weight:700;padding-top:16px;width:40%">
+                                    Provider ID
+                                </td>
+                                <td style="color:#3f3f3f;font-size:16px;font-weight:500;padding-top:16px">
+                                    CH343
+                                </td>
+                            </tr>
+                            {% endif %}
                             <tr>
                                 <td style="color:#000000;font-size:16px;font-weight:700;padding-top:16px;width:40%">
                                     Booking ID
