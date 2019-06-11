@@ -3,6 +3,7 @@ from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 
 from ondoc.api.v1.auth.views import AppointmentViewSet
+from ondoc.api.v1.insurance.serializers import InsuranceCityEligibilitySerializer
 from ondoc.authentication.backends import JWTAuthentication
 from ondoc.common.utils import get_all_upcoming_appointments
 from ondoc.coupon.models import CouponRecommender
@@ -11,6 +12,7 @@ from ondoc.diagnostic.models import CommonTest
 from ondoc.diagnostic.models import CommonPackage
 from ondoc.banner.models import Banner
 from ondoc.common.models import PaymentOptions, UserConfig
+from ondoc.insurance.models import InsuranceEligibleCities
 from ondoc.tracking.models import TrackingEvent
 from ondoc.common.models import UserConfig
 from ondoc.ratings_review.models import AppRatings
@@ -46,6 +48,22 @@ class ScreenViewSet(viewsets.GenericViewSet):
         app_version = params.get("app_version", "1.0")
         lat = params.get('lat', None)
         long = params.get('long', None)
+
+        insurance_availability = False
+
+        if lat and long:
+            data = {
+                'latitude': lat,
+                'longitude': long
+            }
+
+            serializer = InsuranceCityEligibilitySerializer(data=data)
+            serializer.is_valid(raise_exception=True)
+            data = serializer.validated_data
+            city_name = InsuranceEligibleCities.get_nearest_city(data.get('latitude'), data.get('longitude'))
+            if city_name:
+                insurance_availability = True
+
         if UserConfig.objects.filter(key="app_update").exists():
             app_update = UserConfig.objects.filter(key="app_update").values_list('data', flat=True).first()
             if app_update:
@@ -134,7 +152,10 @@ class ScreenViewSet(viewsets.GenericViewSet):
                 "app_custom_data": app_custom_data,
                 "app_force_update": app_version < force_update_version,
                 "app_update": app_version < update_version,
-                "ask_for_app_rating": self.ask_for_app_rating(request)
+                "ask_for_app_rating": self.ask_for_app_rating(request),
+                "settings": {
+                    "is_insurance_available": insurance_availability
+                }
         }
 
         return Response(resp)

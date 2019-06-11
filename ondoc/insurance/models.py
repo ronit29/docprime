@@ -1,7 +1,11 @@
 import datetime
+from django.utils.timezone import utc
+
+from django.contrib.contenttypes.fields import GenericRelation
 from django.contrib.gis.geos import Point
 from django.core.validators import FileExtensionValidator
 
+from ondoc.common.models import GenericNotes
 from ondoc.notification.models import EmailNotification
 from ondoc.notification.tasks import send_insurance_notifications, send_insurance_float_limit_notifications, send_insurance_endorsment_notifications
 from ondoc.insurance.tasks import push_insurance_buy_to_matrix
@@ -497,6 +501,7 @@ class UserInsurance(auth_model.TimeStampedModel):
     merchant_payout = models.ForeignKey(MerchantPayout, related_name="user_insurance", on_delete=models.DO_NOTHING, null=True)
     cancel_reason = models.CharField(max_length=200, blank=True, null=True, default=None)
     cancel_case_type = models.PositiveIntegerField(choices=CANCEL_CASE_CHOICES, default=REFUND)
+    notes = GenericRelation(GenericNotes)
 
     def __str__(self):
         return str(self.user)
@@ -1254,7 +1259,7 @@ class UserInsurance(auth_model.TimeStampedModel):
 
         transaction.on_commit(lambda: self.after_commit_task(send_cancellation_notification))
         res['success'] = "Cancellation request received, refund will be credited in your account in 10-15 working days"
-        res['policy_number'] = self.user.active_insurance.policy_number
+        res['policy_number'] = self.policy_number
         return res
 
     def after_commit_task(self, send_cancellation_notification):
@@ -1313,6 +1318,14 @@ class UserInsurance(auth_model.TimeStampedModel):
             response['prescription_needed'] = True
 
         return response
+
+    def is_bank_details_exist(self):
+        bank_obj = UserBank.objects.filter(insurance=self).order_by('-id').first()
+        bank_document_obj = UserBankDocument.objects.filter(insurance=self).order_by('-id').first()
+        if bank_obj and bank_document_obj:
+            return True
+        else:
+            return False
 
 
 class InsuranceTransaction(auth_model.TimeStampedModel):
@@ -1524,9 +1537,38 @@ class InsuranceLead(auth_model.TimeStampedModel):
         lat = self.extras.get('latitude', None)
         long = self.extras.get('longitude', None)
 
-        city_name = InsuranceEligibleCities.check_eligibility(lat, long)
+        city_name = InsuranceEligibleCities.get_nearest_city(lat, long)
         if not lat or not long or city_name:
-            push_insurance_banner_lead_to_matrix.apply_async(({'id': self.id}, ))
+            countdown = self.get_lead_creation_wait_time()
+            #print(str(countdown))
+            push_insurance_banner_lead_to_matrix.apply_async(({'id': self.id}, ),countdown=countdown)
+
+    # get seconds elapsed since creation time
+    def get_creation_time_diff(self):
+        now = datetime.datetime.utcnow().replace(tzinfo=utc)
+        timediff = now - self.created_at
+        return timediff.total_seconds()
+
+    def get_lead_creation_wait_time(self):
+        source = self.get_source()
+        if source!='docprimechat':
+            return 0
+        tdiff = self.get_creation_time_diff()
+        wait = 86400 - tdiff
+        if wait<0:
+            wait=0
+        return wait
+
+    def get_source(self):
+        extras = self.extras
+        lead_source = "InsuranceOPD"
+        lead_data = extras.get('lead_data')
+        if lead_data:
+            provided_lead_source = lead_data.get('source')
+            if type(provided_lead_source).__name__ == 'str' and provided_lead_source.lower() == 'docprimechat':
+                lead_source = 'docprimechat'
+
+        return lead_source
 
     @classmethod
     def get_latest_lead_id(cls, user):
@@ -1810,14 +1852,14 @@ class InsuredMemberHistory(auth_model.TimeStampedModel):
 
 class InsuranceEligibleCities(auth_model.TimeStampedModel):
 
-    Radius = 15
+    Radius = 50
 
     name = models.CharField(max_length=100, blank=False, null=False)
     latitude = models.DecimalField(null=False, max_digits=11, decimal_places=8)
     longitude = models.DecimalField(null=False, max_digits=11, decimal_places=8)
 
     @classmethod
-    def check_eligibility(cls, latitude, longitude):
+    def get_nearest_city(cls, latitude, longitude):
         if not latitude or not longitude:
             return None
 

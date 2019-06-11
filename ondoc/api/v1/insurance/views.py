@@ -12,6 +12,7 @@ from django.core import serializers as core_serializer
 import math
 
 from ondoc.api.v1.utils import payment_details
+from ondoc.common.models import BlacklistUser, BlockedStates
 from ondoc.diagnostic.models import LabAppointment, Lab
 from ondoc.doctor.models import OpdAppointment
 from . import serializers
@@ -150,7 +151,7 @@ class ListInsuranceViewSet(viewsets.GenericViewSet):
         serializer.is_valid(raise_exception=True)
         data = serializer.validated_data
 
-        city_name = InsuranceEligibleCities.check_eligibility(data.get('latitude'), data.get('longitude'))
+        city_name = InsuranceEligibleCities.get_nearest_city(data.get('latitude'), data.get('longitude'))
         if not city_name:
             return Response({'available': False})
 
@@ -281,6 +282,13 @@ class InsuranceOrderViewSet(viewsets.GenericViewSet):
 
     @transaction.atomic
     def create_order(self, request):
+        user = request.user
+        phone_number = user.phone_number
+        blocked_state = BlacklistUser.get_state_by_number(phone_number, BlockedStates.States.INSURANCE)
+        if blocked_state:
+            return Response({'error': blocked_state.message}, status=status.HTTP_400_BAD_REQUEST)
+
+
         if settings.IS_INSURANCE_ACTIVE:
             user = request.user
             user_insurance = UserInsurance.get_user_insurance(user)
@@ -697,7 +705,7 @@ class InsuranceEndorsementViewSet(viewsets.GenericViewSet):
         serializer.is_valid(raise_exception=True)
         valid_data = serializer.validated_data
         for member in valid_data.get('members'):
-            insured_member_obj = InsuredMembers.objects.filter(id=member.get('id')).first()
+            insured_member_obj = InsuredMembers.objects.filter(id=member.get('member').id).first()
             if not insured_member_obj:
                 res['error'] = "Insured Member details not found for member"
                 return Response(data=res, status=status.HTTP_400_BAD_REQUEST)
@@ -741,8 +749,7 @@ class InsuranceEndorsementViewSet(viewsets.GenericViewSet):
         user_insurance = user.active_insurance
         EndorsementRequest.process_endorsment_notifications(EndorsementRequest.PENDING, user_insurance.user)
 
-        res['success'] = 'Request for endorsement have been consider,' \
-                         'will update once insurer verified the details'
+        res['success'] = 'Your endorsement request has been successfully submitted.'
         return Response(data=res, status=status.HTTP_200_OK)
 
     def upload(self, request, *args, **kwargs):

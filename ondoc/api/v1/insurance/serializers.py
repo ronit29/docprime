@@ -120,6 +120,11 @@ class InsuredMemberSerializer(serializers.Serializer):
         member_list = attrs.get('members', [])
         name_set = set(map(lambda member: "%s-%s-%s" % (member['first_name'], member['middle_name'], member['last_name']), member_list))
 
+        adult_members = list(filter(lambda mem: mem.get('member_type') == InsuredMembers.ADULT, member_list))
+
+        if len(adult_members) == 2 and adult_members[0]['gender'] == adult_members[1]['gender']:
+            raise serializers.ValidationError({'name': 'Two adults cannot have same gender as per Insurance Plan.'})
+
         if len(name_set) != len(member_list):
             raise serializers.ValidationError({'name': 'Multiple members cannot have same name'})
 
@@ -151,7 +156,8 @@ class EndorseMemberListSerializer(serializers.Serializer):
     city_code = serializers.CharField(allow_null=True, allow_blank=True)
     district_code = serializers.CharField(allow_null=True, allow_blank=True)
     is_change = serializers.BooleanField(required=False)
-    id = serializers.IntegerField()
+    # id = serializers.IntegerField()
+    member = serializers.PrimaryKeyRelatedField(queryset=InsuredMembers.objects.all())
     image_ids = serializers.ListSerializer(child=InsuredMemberDocumentIdsSerializer(), required=False)
 
     def validate(self, attrs):
@@ -283,8 +289,8 @@ class StateGSTCodeSerializer(serializers.ModelSerializer):
     # id = serializers.PrimaryKeyRelatedField(queryset=InsuredMemberDocument.objects.all())
 
 class InsuranceCityEligibilitySerializer(serializers.Serializer):
-    latitude = serializers.DecimalField(allow_null=False, max_digits=11, decimal_places=8)
-    longitude = serializers.DecimalField(allow_null=False, max_digits=11, decimal_places=8)
+    latitude = serializers.DecimalField(allow_null=False, max_digits=20, decimal_places=15)
+    longitude = serializers.DecimalField(allow_null=False, max_digits=20, decimal_places=15)
 
 
 class UserBankDocumentSerializer(serializers.Serializer):
