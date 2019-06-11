@@ -2408,12 +2408,23 @@ class OpdAppointment(auth_model.TimeStampedModel, CouponsMixin, OpdAppointmentIn
             return True
         return False
 
+    def send_cod_to_prepaid_request(self):
+        result = False
+        if self.payment_type != self.COD:
+            return result
+        order_obj = Order.objects.filter(reference_id=self.id).first()
+        if order_obj:
+                parent = order_obj.parent
+                if parent:
+                    result = parent.is_cod_order
+        return result
+
     def after_commit_tasks(self, old_instance, push_to_matrix):
         if old_instance is None:
             try:
                 create_ipd_lead_from_opd_appointment.apply_async(({'obj_id': self.id},),)
                                                                  # eta=timezone.now() + timezone.timedelta(hours=1))
-                if self.payment_type == self.COD:
+                if self.send_cod_to_prepaid_request():
                     notification_tasks.send_opd_notifications_refactored.apply_async(
                         (self.id, NotificationAction.COD_TO_PREPAID_REQUEST), countdown=5)
             except Exception as e:
