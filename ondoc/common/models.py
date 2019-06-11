@@ -26,6 +26,9 @@ from ondoc.bookinganalytics.models import DP_StateMaster, DP_CityMaster
 import datetime
 from django.utils import timezone
 
+from ondoc.common.helper import Choices
+
+
 class Cities(models.Model):
     name = models.CharField(max_length=48, db_index=True)
 
@@ -247,6 +250,16 @@ class GlobalNonBookable(TimeStampedModel):
         end_time = round(float(end_time.hour) + (float(end_time.minute) * 1 / 60), 2)
         return end_time
 
+    @classmethod
+    def get_non_bookables(self, booking_type=DOCTOR):
+        non_bookables_range = list()
+        non_bookables = self.objects.filter(deleted_at__isnull=True, booking_type=booking_type)
+        for nb in non_bookables:
+            start_datetime = datetime.datetime.combine(nb.start_date, nb.start_time)
+            end_datetime = datetime.datetime.combine(nb.end_date, nb.end_time)
+            non_bookables_range.append({'start_datetime': start_datetime, 'end_datetime': end_datetime})
+        return non_bookables_range
+
     class Meta:
         db_table = 'global_non_bookable_timing'
 
@@ -432,3 +445,52 @@ class RefundDetails(TimeStampedModel):
             if not refund_initiated_by:
                 raise Exception("Must have a responsible user.")
             cls .objects.create(refund_reason=refund_reason, refund_initiated_by=refund_initiated_by, content_object=appointment)
+
+
+class BlockedStates(TimeStampedModel):
+
+    class States(Choices):
+        LOGIN = 'LOGIN'
+        INSURANCE = 'INSURANCE'
+
+    state_name = models.CharField(max_length=50, null=False, blank=False, choices=States.as_choices(), unique=True)
+    message = models.TextField()
+
+    def __str__(self):
+        return self.state_name
+
+    class Meta:
+        db_table = 'blocked_states'
+
+
+class BlacklistUser(TimeStampedModel):
+    user = models.ForeignKey(User, related_name='blacklist_user', on_delete=models.DO_NOTHING)
+    type = models.ForeignKey(BlockedStates, on_delete=models.DO_NOTHING)
+    reason = models.TextField(null=True)
+    blocked_by = models.ForeignKey(User, on_delete=models.DO_NOTHING)
+    enabled = models.BooleanField(default=True)
+
+    @classmethod
+    def get_state_by_number(cls, phone_number, blocked_state):
+        blacklist_user = cls.objects.filter(user__phone_number=phone_number, type__state_name=blocked_state,
+                                            enabled=True, user__user_type=User.CONSUMER).first()
+        if blacklist_user:
+            return blacklist_user.type
+
+        return None
+
+
+    class Meta:
+        db_table = 'blacklist_users'
+        unique_together = (("user", "type"), )
+
+
+class GenericNotes(TimeStampedModel):
+    content_type = models.ForeignKey(ContentType, on_delete=models.DO_NOTHING)
+    object_id = models.BigIntegerField()
+    content_object = GenericForeignKey()
+    notes = models.TextField()
+    created_by = models.ForeignKey(User, on_delete=models.DO_NOTHING, blank=True, null=True)
+
+    class Meta:
+        db_table = 'generic_notes'

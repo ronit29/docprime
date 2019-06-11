@@ -17,6 +17,8 @@ class CorporatesAdmin(admin.ModelAdmin):
     model = Corporates
     list_display = ['corporate_name']
     inlines = [CorporateDocumentInline]
+    autocomplete_fields = ['matrix_city', 'matrix_state']
+    search_fields = ['matrix_city__name', 'matrix_state__name']
 
 
 class CorporateDealAdmin(admin.ModelAdmin):

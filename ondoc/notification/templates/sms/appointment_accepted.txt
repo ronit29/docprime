@@ -5,10 +5,12 @@ The booking details are as below :
 Booking ID : {{instance.id}}
 Patient Name : {{patient_name|capfirst}}
 Doctor Name : Dr. {{doctor_name|capfirst}}
+{% if show_amounts %}
 {% if instance.payment_type == 2 %}
 Amount To Be Paid :Rs {{cod_amount}}
 {% else %}
 Amount Paid : Rs {{instance.effective_price}}
+{% endif %}
 {% endif %}
 Clinic : {{instance.hospital.name|capfirst}}
 Clinic Address : {{instance.hospital.get_hos_address}}

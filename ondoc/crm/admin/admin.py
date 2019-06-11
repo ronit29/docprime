@@ -1,6 +1,6 @@
 from django.contrib.gis import admin
 from ondoc.common.models import PaymentOptions, UserConfig, Feature, Service, MatrixMappedState, MatrixMappedCity, \
-    GlobalNonBookable, QRCode
+    GlobalNonBookable, QRCode, BlacklistUser, BlockedStates
 from ondoc.corporate_booking.models import Corporates, CorporateDeal, CorporateDocument
 from ondoc.crm.admin.banner import BannerAdmin, SliderLocationAdmin, RecommenderAdmin, EmailBannerAdmin
 from ondoc.crm.admin.location import ComparePackagesSEOUrlsAdmin
@@ -8,7 +8,7 @@ from ondoc.crm.admin.corporate_booking import CorporateDealAdmin, CorporatesAdmi
 from ondoc.crm.admin.procedure import ProcedureCategoryAdmin, ProcedureAdmin, IpdProcedureAdmin, FeatureAdmin, \
     ServiceAdmin, HealthInsuranceProviderAdmin, IpdProcedureCategoryAdmin, IpdProcedureDetailAdmin, \
     IpdProcedureDetailTypeAdmin, IpdProcedureSynonymAdmin, IpdProcedureSynonymMappingAdmin, \
-    IpdProcedurePracticeSpecializationAdmin, IpdProcedureLeadAdmin
+    IpdProcedurePracticeSpecializationAdmin, IpdProcedureLeadAdmin, OfferAdmin
 from ondoc.crm.admin.subscription_plan import SubscriptionPlanAdmin, SubscriptionPlanFeatureAdmin, UserPlanMappingAdmin
 from ondoc.doctor.models import (Doctor, Language, MedicalService, Specialization, College, Qualification, Hospital,
                                  HospitalNetwork, DoctorOnboardingToken, OpdAppointment,
@@ -33,10 +33,10 @@ from ondoc.location.models import EntityUrls, CompareSEOUrls
 from ondoc.notification import models as notifcation_model
 from ondoc.procedure.models import Procedure, ProcedureCategory, CommonProcedureCategory, CommonProcedure, IpdProcedure, \
     IpdProcedureCategory, CommonIpdProcedure, IpdProcedureDetail, IpdProcedureDetailType, IpdProcedureSynonym, \
-    IpdProcedureSynonymMapping, IpdProcedurePracticeSpecialization, IpdProcedureLead
+    IpdProcedureSynonymMapping, IpdProcedurePracticeSpecialization, IpdProcedureLead, Offer
 from ondoc.subscription_plan.models import Plan, PlanFeature, UserPlanMapping
 from .common import Cities, CitiesAdmin, MatrixCityMapping, MatrixCityAdmin, MerchantAdmin, MerchantPayoutAdmin, \
-    PaymentOptionsAdmin, MatrixMappedStateAdmin, MatrixMappedCityAdmin, GlobalNonBookableAdmin, UserConfigAdmin
+    PaymentOptionsAdmin, MatrixMappedStateAdmin, MatrixMappedCityAdmin, GlobalNonBookableAdmin, UserConfigAdmin, BlacklistUserAdmin, BlockedStatesAdmin
 from .lead import HospitalLeadAdmin, DoctorLeadAdmin, SearchLeadAdmin
 from .doctor import (DoctorAdmin, MedicalServiceAdmin, SpecializationAdmin, QualificationAdmin, LanguageAdmin,
                      CollegeAdmin, MedicalConditionAdmin, HealthTipAdmin, DoctorClinicAdmin,
@@ -68,12 +68,14 @@ from ondoc.geoip.models import AdwordLocationCriteria
 from .geoip import AdwordLocationCriteriaAdmin
 from ondoc.insurance.models import Insurer, InsurerAccount, InsurancePlans, InsuranceThreshold, UserInsurance, \
     InsuredMembers, InsuranceTransaction, InsurancePlanContent, InsuranceDisease, StateGSTCode, InsuranceCity, \
-    InsuranceDistrict, InsuranceDeal, InsurerPolicyNumber, InsuranceLead, InsuranceCancelMaster, EndorsementRequest, InsuredMemberDocument, \
-    InsuredMemberHistory, InsuranceEligibleCities, ThirdPartyAdministrator
+    InsuranceDistrict, InsuranceDeal, InsurerPolicyNumber, InsuranceLead, InsuranceCancelMaster, EndorsementRequest, \
+    InsuredMemberDocument, InsuredMemberHistory, InsuranceEligibleCities, ThirdPartyAdministrator, \
+    UserBank, UserBankDocument
 from ondoc.crm.admin.insurance import InsurerAdmin, InsurancePlansAdmin, InsuranceThresholdAdmin, InsurerFloatAdmin, \
     UserInsuranceAdmin, InsuredMembersAdmin, InsuranceDiseaseAdmin, StateGSTCodeAdmin, InsuranceCityAdmin, \
     InsuranceDistrictAdmin, InsuranceDealAdmin, InsurerPolicyNumberAdmin, InsuranceLeadAdmin, InsuranceCancelMasterAdmin, \
-    EndorsementRequestAdmin, InsuredMemberDocumentAdmin, InsuredMemberHistoryAdmin, InsuranceEligibleCitiesAdmin, ThirdPartyAdministratorAdmin
+    EndorsementRequestAdmin, InsuredMemberDocumentAdmin, InsuredMemberHistoryAdmin, InsuranceEligibleCitiesAdmin, \
+    ThirdPartyAdministratorAdmin
 
 from ondoc.insurance import models as insurance_model
 from ondoc.ratings_review.models import RatingsReview, ReviewCompliments, AppRatings, AppCompliments
@@ -191,6 +193,8 @@ admin.site.register(InsuranceEligibleCities, InsuranceEligibleCitiesAdmin)
 
 admin.site.register(InsuranceTransaction)
 admin.site.register(InsurerPolicyNumber, InsurerPolicyNumberAdmin)
+admin.site.register(UserBank)
+admin.site.register(UserBankDocument)
 admin.site.register(Order)
 admin.site.register(AdwordLocationCriteria, AdwordLocationCriteriaAdmin)
 admin.site.register(ProcedureCategory, ProcedureCategoryAdmin)
@@ -229,6 +233,7 @@ admin.site.register(IpdProcedureDetailType, IpdProcedureDetailTypeAdmin)
 admin.site.register(IpdProcedureDetail, IpdProcedureDetailAdmin)
 admin.site.register(IpdProcedurePracticeSpecialization, IpdProcedurePracticeSpecializationAdmin)
 admin.site.register(IpdProcedureLead, IpdProcedureLeadAdmin)
+admin.site.register(Offer, OfferAdmin)
 admin.site.register(Feature, FeatureAdmin)
 admin.site.register(Service, ServiceAdmin)
 admin.site.register(HealthInsuranceProvider, HealthInsuranceProviderAdmin)
@@ -251,3 +256,5 @@ admin.site.register(BannerLocation)
 admin.site.register(EmailBanner, EmailBannerAdmin)
 admin.site.register(Recommender, RecommenderAdmin)
 admin.site.register(ThirdPartyAdministrator, ThirdPartyAdministratorAdmin)
+admin.site.register(BlacklistUser, BlacklistUserAdmin)
+admin.site.register(BlockedStates, BlockedStatesAdmin )
