@@ -106,7 +106,7 @@ class Thyrocare(BaseIntegrator):
             resp_list = dict()
             resp_list[date] = list()
 
-            res_data = {"time_slots": resp_list, "upcoming_slots": [], "is_thyrocare": True}
+            res_data = {"timeslots": resp_list, "upcoming_slots": [], "is_thyrocare": True}
             return res_data
 
         url = '%s/ORDER.svc/%s/%s/GetAppointmentSlots' % (settings.THYROCARE_BASE_URL, pincode, date)
@@ -132,7 +132,7 @@ class Thyrocare(BaseIntegrator):
             resp_list = dict()
             resp_list[date] = list()
 
-        res_data = {"time_slots": resp_list, "upcoming_slots": [], "is_thyrocare": True}
+        res_data = {"timeslots": resp_list, "upcoming_slots": [], "is_thyrocare": True}
         return res_data
 
     def _get_is_user_area_serviceable(self, pincode):
