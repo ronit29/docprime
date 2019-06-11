@@ -507,6 +507,7 @@ class MatrixDataMixin(object):
     def refund_details_data(self):
         from ondoc.account.models import ConsumerTransaction
         from ondoc.account.models import PgTransaction
+        from ondoc.account.models import ConsumerRefund
         customer_status = ""
         refund_urn = ""
         refund_initiated_at = None
@@ -522,6 +523,11 @@ class MatrixDataMixin(object):
 
         if wallet_ct:
             original_payment_mode_refund = wallet_ct.amount
+            consumer_refund = ConsumerRefund.objects.filter(consumer_transaction_id=wallet_ct.id).first()
+            if consumer_refund:
+                refund_initiated_at = consumer_refund.refund_initiated_at
+                customer_status = consumer_refund.refund_state
+
         if cashback_ct:
             promotional_wallet_refund = cashback_ct.amount
 

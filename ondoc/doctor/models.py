@@ -3011,9 +3011,9 @@ class OpdAppointment(auth_model.TimeStampedModel, CouponsMixin, OpdAppointmentIn
             'AcceptedBy': accepted_history['source'],
             'AcceptedPhone': accepted_history['accepted_phone'],
             "CustomerStatus": refund_data['customer_status'],
-            "RefundPaymentMode": refund_data['original_payment_mode_refund'],
-            "RefundToWallet": refund_data['promotional_wallet_refund'],
-            "RefundInitiationDate": refund_data['refund_initiated_at'],
+            "RefundPaymentMode": refund_data['original_payment_mode_refund'] if refund_data['original_payment_mode_refund'] else None,
+            "RefundToWallet": refund_data['promotional_wallet_refund'] if refund_data['promotional_wallet_refund'] else None,
+            "RefundInitiationDate": int(refund_data['refund_initiated_at']) if refund_data['refund_initiated_at'] else None,
             "RefundURN": refund_data['refund_urn']
         }
         return appointment_details
