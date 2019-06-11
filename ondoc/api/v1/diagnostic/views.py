@@ -1863,8 +1863,7 @@ class LabList(viewsets.ReadOnlyModelViewSet):
             lab_pricing_group__labs__is_test_lab=False,
             lab_pricing_group__labs__is_live=True,
             enabled=True,
-            test__enable_for_retail=True,
-            test__searchable=True)
+            test__enable_for_retail=True)
 
         total_test_count = queryset.count() if queryset else 0
         #if test_ids:
