@@ -43,7 +43,7 @@ SECURE_BROWSER_XSS_FILTER = True
 # https://docs.djangoproject.com/en/dev/ref/settings/#x-frame-options
 X_FRAME_OPTIONS = 'DENY'
 
-if env('ENABLE_DATADOG', default=False):
+if env.bool('ENABLE_DATADOG', default=False):
     INSTALLED_APPS = DJANGO_APPS + THIRD_PARTY_APPS + ('ddtrace.contrib.django',) + LOCAL_APPS 
 
 INSTALLED_APPS += ('gunicorn',)
