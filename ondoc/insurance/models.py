@@ -362,7 +362,7 @@ class InsurerAccountTransfer(auth_model.TimeStampedModel):
         db_table = "insurer_account_transfer"
 
     def save(self, *args, **kwargs):
-        exists = true
+        exists = True
 
         if not self.id:
             exists = False
@@ -371,10 +371,10 @@ class InsurerAccountTransfer(auth_model.TimeStampedModel):
         if not exists:
             from_account = InsurerAccount.objects.select_for_update().get(id=self.from_account.id)
             to_account = InsurerAccount.objects.select_for_update().get(id=self.to_account.id)
-            if from_account.float<self.amount:
+            if from_account.current_float<self.amount:
                 raise Exception('amount cannot be greater then amount in source account')
-            from_account.amount -= self.amount
-            to_account.amount += self.amount
+            from_account.current_float -= self.amount
+            to_account.current_float += self.amount
             from_account.save()
             to_account.save()
 
