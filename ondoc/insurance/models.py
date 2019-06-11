@@ -2,6 +2,7 @@ import datetime
 from django.utils.timezone import utc
 
 from django.contrib.contenttypes.fields import GenericRelation
+from django.contrib.contenttypes.models import ContentType
 from django.contrib.gis.geos import Point
 from django.core.validators import FileExtensionValidator
 
@@ -36,7 +37,7 @@ from hardcopy import bytestring_to_pdf
 import math
 import reversion
 import numbers
-from ondoc.account.models import Order, Merchant, MerchantPayout, PgTransaction
+from ondoc.account.models import Order, Merchant, MerchantPayout, PgTransaction, PayoutMapping
 from decimal import  *
 
 logger = logging.getLogger(__name__)
@@ -1327,7 +1328,7 @@ class UserInsurance(auth_model.TimeStampedModel):
             insurance.process_insurance_obj_payouts()
 
     def transfer_to_insurance_nodal(self):
-        if self.needs_transfer_to_insurance_nodal():
+        if self.needs_transfer_to_insurance_nodal() and not self.nodal_transfer_payouts():
             merchant = Merchant.objects.filter(id=settings.DOCPRIME_NODAL2_MERCHANT).first()
             payout_data = {
             "charged_amount": self.order.wallet_amount,
@@ -1340,6 +1341,16 @@ class UserInsurance(auth_model.TimeStampedModel):
 
             merchant_payout_obj = MerchantPayout.objects.create(**payout_data)
             PayoutMapping.objects.create(**{'content_object':self,'payout':merchant_payout_obj})
+
+    def nodal_transfer_payouts(self):
+        docprime_merchant = Merchant.objects.filter(id=settings.DOCPRIME_NODAL2_MERCHANT).first()
+        results = []
+        pms = PayoutMapping.objects.filter(object_id=self.id, content_type_id=ContentType.objects.get_for_model(self).id)
+        for pm in pms:
+            if pm.payout.paid_to == docprime_merchant:
+                results.append(pm)
+
+        return results
 
     def needs_transfer_to_insurance_nodal(self):
         order = self.order
