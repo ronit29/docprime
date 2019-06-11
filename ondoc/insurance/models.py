@@ -353,6 +353,31 @@ class InsurerAccount(auth_model.TimeStampedModel):
     class Meta:
         db_table = "insurer_account"
 
+class InsurerAccountTransfer(auth_model.TimeStampedModel):
+    from_account = models.ForeignKey(InsurerAccount, related_name="from_account", on_delete=models.CASCADE)
+    to_account = models.ForeignKey(InsurerAccount, related_name="to_account", on_delete=models.CASCADE)
+    amount = models.PositiveIntegerField(default=None)
+
+    class Meta:
+        db_table = "insurer_account_transfer"
+
+    def save(self, *args, **kwargs):
+        exists = true
+
+        if not self.id:
+            exists = False
+        super().save(*args, **kwargs)     
+
+        if not exists:
+            from_account = InsurerAccount.objects.select_for_update().get(id=self.from_account.id)
+            to_account = InsurerAccount.objects.select_for_update().get(id=self.to_account.id)
+            if from_account.float<self.amount:
+                raise Exception('amount cannot be greater then amount in source account')
+            from_account.amount -= self.amount
+            to_account.amount += self.amount
+            from_account.save()
+            to_account.save()
+
 
 class InsurancePlans(auth_model.TimeStampedModel, LiveMixin):
     insurer = models.ForeignKey(Insurer,related_name="plans", on_delete=models.CASCADE)
@@ -477,6 +502,12 @@ class InsurerPolicyNumber(auth_model.TimeStampedModel):
     class Meta:
         db_table = 'insurer_policy_numbers'
 
+    @cached_property
+    def insurer_account(self):
+        if self.apd_account:
+            return self.apd_account
+        return InsurerAccount.objects.order_by('id').first()
+
 
 class UserInsurance(auth_model.TimeStampedModel):
     from ondoc.account.models import MoneyPool
@@ -517,6 +548,20 @@ class UserInsurance(auth_model.TimeStampedModel):
 
     def __str__(self):
         return str(self.user)
+
+    @cached_property
+    def master_policy(self):
+
+        if self.master_policy_reference:
+            return master_policy_reference
+
+        policy = InsurerPolicyNumber.objects.\
+            filter(insurance_plan=self.insurance_plan,insurer=self.plan.insurer).order_by('-id').first()
+        if not policy:
+            policy = InsurerPolicyNumber.objects.\
+            filter(insurance_plan__isnull=True,insurer=self.plan.insurer).order_by('-id').first()
+
+        return policy
 
     @cached_property
     def specialization_days_limit(self):
