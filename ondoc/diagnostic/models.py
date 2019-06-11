@@ -675,8 +675,8 @@ class Lab(TimeStampedModel, CreatedByModel, QCModel, SearchKey, WelcomeCallingDo
         else:
             lab_timing_queryset = self.lab_timings.filter(for_home_pickup=is_home_pickup)
 
-        global_non_bookables = cached_property(GlobalNonBookable.get_non_bookables(GlobalNonBookable.LAB), name='global_non_bookables')
-        total_leaves = global_non_bookables.func
+        global_non_bookables = GlobalNonBookable.get_non_bookables(GlobalNonBookable.LAB)
+        total_leaves = global_non_bookables
 
         booking_details = {"type": "lab", "is_home_pickup": is_home_pickup}
         timeslot_object = TimeSlotExtraction()

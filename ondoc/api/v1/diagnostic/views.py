@@ -6,7 +6,7 @@ from ondoc.api.v1.doctor.serializers import CommaSepratedToListField
 from ondoc.authentication.backends import JWTAuthentication
 from ondoc.api.v1.diagnostic import serializers as diagnostic_serializer
 from ondoc.api.v1.auth.serializers import AddressSerializer
-from ondoc.integrations.models import IntegratorTestMapping, IntegratorReport
+from ondoc.integrations.models import IntegratorTestMapping, IntegratorReport, IntegratorMapping
 from ondoc.cart.models import Cart
 from ondoc.common.models import UserConfig, GlobalNonBookable, AppointmentHistory
 from ondoc.ratings_review import models as rating_models

@@ -2189,8 +2189,8 @@ class DoctorAvailabilityTimingViewSet(viewsets.ViewSet):
             return HttpResponse(status=404)
 
         doctor_leaves = doctor.get_leaves()
-        global_non_bookables = cached_property(GlobalNonBookable.get_non_bookables(), name='global_non_bookables')
-        total_leaves = doctor_leaves + global_non_bookables.func
+        global_non_bookables = GlobalNonBookable.get_non_bookables()
+        total_leaves = doctor_leaves + global_non_bookables
 
         blocks = []
         if request.user and request.user.is_authenticated and \
