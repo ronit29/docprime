@@ -344,7 +344,7 @@ class Insurer(auth_model.TimeStampedModel, LiveMixin):
 class InsurerAccount(auth_model.TimeStampedModel):
 
     insurer = models.ForeignKey(Insurer, related_name="float", on_delete=models.CASCADE)
-    apd_account_name = models.CharField(max_length=200, blank=True, null=True)
+    apd_account_name = models.CharField(max_length=200, null=True, unique=True)
     current_float = models.PositiveIntegerField(default=None)
 
     def __str__(self):
@@ -553,7 +553,7 @@ class UserInsurance(auth_model.TimeStampedModel):
     def master_policy(self):
 
         if self.master_policy_reference:
-            return master_policy_reference
+            return self.master_policy_reference
 
         policy = InsurerPolicyNumber.objects.\
             filter(insurance_plan=self.insurance_plan,insurer=self.plan.insurer).order_by('-id').first()
@@ -1437,8 +1437,10 @@ class InsuranceTransaction(auth_model.TimeStampedModel):
         if self.transaction_type == self.DEBIT:
             transaction_amount = -1*transaction_amount
 
-        master_policy_obj = self.user_insurance.master_policy_reference
-        account_id = master_policy_obj.apd_account.id
+        # master_policy_obj = self.user_insurance.master_policy_reference
+        # account_id = master_policy_obj.apd_account.id
+        master_policy_obj = self.user_insurance.master_policy
+        account_id = master_policy_obj.insurer_account.id
         # insurer_account = InsurerAccount.objects.select_for_update().get(insurer=self.user_insurance.insurance_plan.insurer)
         insurer_account = InsurerAccount.objects.select_for_update().get(id=account_id)
         insurer_account.current_float += transaction_amount        
