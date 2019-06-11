@@ -154,7 +154,7 @@ class Order(TimeStampedModel):
             orders_to_process = self.orders.all()
         else:
             orders_to_process = [self]
-        return all([child_order.get_cod_to_prepaid_appointment() for child_order in orders_to_process])
+        return all([child_order.get_cod_to_prepaid_appointment() for child_order in orders_to_process]) and len(orders_to_process) == 1
 
     def get_cod_to_prepaid_appointment(self, update_order_and_appointment=False):
         from ondoc.doctor.models import OpdAppointment
