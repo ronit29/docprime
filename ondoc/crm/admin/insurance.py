@@ -1018,6 +1018,12 @@ class InsurerPolicyNumberForm(forms.ModelForm):
         data = self.cleaned_data
         if not data.get('apd_account'):
             raise forms.ValidationError('Apd Account is mandatory for Policy Number')
+        if not data.get('insurance_plan'):
+            raise forms.ValidationError('Insurance Plan is mandatory for Policy Number')
+        if not data.get('insurer_policy_number'):
+            raise forms.ValidationError('Insurance Policy number is mandatory for Policy Number')
+        if not data.get('insurer'):
+            raise forms.ValidationError('Insurer is mandatory for Policy Number')
 
 
 class InsurerPolicyNumberAdmin(admin.ModelAdmin):
