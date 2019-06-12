@@ -245,6 +245,8 @@ class Hospital(auth_model.TimeStampedModel, auth_model.CreatedByModel, auth_mode
     is_location_verified = models.BooleanField(verbose_name='Location Verified', default=False)
     auto_ivr_enabled = models.BooleanField(default=True)
     priority_score = models.IntegerField(default=0, null=False, blank=False)
+    search_distance = models.FloatField(default=15000)
+    google_avg_rating = models.DecimalField(max_digits=5, decimal_places=2, null=True, editable=False)
 
     def __str__(self):
         return self.name
@@ -295,6 +297,12 @@ class Hospital(auth_model.TimeStampedModel, auth_model.CreatedByModel, auth_mode
                                                                                          'hosp_entity_dict': hosp_entity_dict,
                                                                                          'hosp_locality_entity_dict': hosp_locality_entity_dict}).data
         return result
+
+
+    @classmethod
+    def update_hosp_google_avg_rating(cls):
+        update_hosp_google_ratings = RawSql('''update hospital h set google_avg_rating = (select (reviews->>'user_avg_rating')::float from hospital_place_details 
+                                         where hospital_id=h.id limit 1)''', [] ).execute()
 
     def get_active_opd_appointments(self, user=None, user_insurance=None, appointment_date=None):
 
@@ -599,6 +607,14 @@ class HospitalPlaceDetails(auth_model.TimeStampedModel):
 
     def save(self, *args, **kwargs):
         super().save(*args, **kwargs)
+
+    @classmethod
+    def update_hosp_place_with_google_api_details(cls):
+        query = RawSql(''' insert into hospital_place_details(place_id, hospital_id, place_details,reviews, created_at,updated_at)
+                select (json_array_elements(clinic_place_search::json ->'candidates')->>'place_id') as place_id, hospital_id , clinic_detail::json as place_details,
+                json_build_object('user_ratings_total',clinic_detail::json->'result'->'user_ratings_total', 'user_avg_rating',
+                clinic_detail::json->'result'->'rating', 'user_reviews', clinic_detail::json->'result'->'reviews' ) as reviews, now(), now() 
+                from google_api_details where hospital_id is not null ''', []).execute()
 
     @classmethod
     def update_place_details(cls):
@@ -1203,6 +1219,16 @@ class Doctor(auth_model.TimeStampedModel, auth_model.QCModel, SearchKey, auth_mo
         sticker.save()
         return sticker
 
+    def get_leaves(self):
+        leave_range = list()
+        doctor_leaves = self.leaves.filter(deleted_at__isnull=True)
+        for dl in doctor_leaves:
+            start_datetime = datetime.datetime.combine(dl.start_date, dl.start_time)
+            end_datetime = datetime.datetime.combine(dl.end_date, dl.end_time)
+            leave_range.append({'start_datetime': start_datetime, 'end_datetime': end_datetime})
+        return leave_range
+
+
     def is_doctor_specialization_insured(self):
         dps = self.doctorpracticespecializations.all()
         if len(dps) == 0:
@@ -1362,6 +1388,24 @@ class DoctorClinic(auth_model.TimeStampedModel, auth_model.WelcomeCallingDone):
         upcoming_slots = obj.get_upcoming_slots(time_slots=slots)
         res_data = {"time_slots": slots, "upcoming_slots": upcoming_slots}
         return res_data
+
+
+
+    def get_timings_v2(self, total_leaves, blocks=[]):
+        clinic_timings = self.availability.order_by("start")
+        booking_details = dict()
+        booking_details['type'] = 'doctor'
+        timeslot_object = TimeSlotExtraction()
+        clinic_timings = timeslot_object.format_timing_to_datetime_v2(clinic_timings, total_leaves, booking_details)
+
+        if clinic_timings:
+            for b in blocks:
+                clinic_timings.pop(b, None)
+
+        upcoming_slots = timeslot_object.get_upcoming_slots(time_slots=clinic_timings)
+        timing_response = {"timeslots": clinic_timings, "upcoming_slots": upcoming_slots}
+        return timing_response
+
 
 
 class DoctorClinicTiming(auth_model.TimeStampedModel):

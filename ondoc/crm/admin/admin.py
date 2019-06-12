@@ -1,6 +1,6 @@
 from django.contrib.gis import admin
 from ondoc.common.models import PaymentOptions, UserConfig, Feature, Service, MatrixMappedState, MatrixMappedCity, \
-    GlobalNonBookable, QRCode
+    GlobalNonBookable, QRCode, BlacklistUser, BlockedStates
 from ondoc.corporate_booking.models import Corporates, CorporateDeal, CorporateDocument
 from ondoc.crm.admin.banner import BannerAdmin, SliderLocationAdmin, RecommenderAdmin, EmailBannerAdmin
 from ondoc.crm.admin.location import ComparePackagesSEOUrlsAdmin
@@ -36,7 +36,7 @@ from ondoc.procedure.models import Procedure, ProcedureCategory, CommonProcedure
     IpdProcedureSynonymMapping, IpdProcedurePracticeSpecialization, IpdProcedureLead, Offer
 from ondoc.subscription_plan.models import Plan, PlanFeature, UserPlanMapping
 from .common import Cities, CitiesAdmin, MatrixCityMapping, MatrixCityAdmin, MerchantAdmin, MerchantPayoutAdmin, \
-    PaymentOptionsAdmin, MatrixMappedStateAdmin, MatrixMappedCityAdmin, GlobalNonBookableAdmin, UserConfigAdmin
+    PaymentOptionsAdmin, MatrixMappedStateAdmin, MatrixMappedCityAdmin, GlobalNonBookableAdmin, UserConfigAdmin, BlacklistUserAdmin, BlockedStatesAdmin
 from .lead import HospitalLeadAdmin, DoctorLeadAdmin, SearchLeadAdmin
 from .doctor import (DoctorAdmin, MedicalServiceAdmin, SpecializationAdmin, QualificationAdmin, LanguageAdmin,
                      CollegeAdmin, MedicalConditionAdmin, HealthTipAdmin, DoctorClinicAdmin,
@@ -256,3 +256,5 @@ admin.site.register(BannerLocation)
 admin.site.register(EmailBanner, EmailBannerAdmin)
 admin.site.register(Recommender, RecommenderAdmin)
 admin.site.register(ThirdPartyAdministrator, ThirdPartyAdministratorAdmin)
+admin.site.register(BlacklistUser, BlacklistUserAdmin)
+admin.site.register(BlockedStates, BlockedStatesAdmin )
