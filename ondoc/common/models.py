@@ -533,7 +533,7 @@ class MatrixDataMixin(object):
 
         if wallet_ct:
             original_payment_mode_refund = wallet_ct.amount
-            refund_initiated_at = wallet_ct.created_at
+            refund_initiated_at = wallet_ct.created_at.timestamp()
             # consumer_refund = ConsumerRefund.objects.filter(consumer_transaction_id=wallet_ct.id).first()
             # if consumer_refund:
             #     refund_initiated_at = consumer_refund.refund_initiated_at
@@ -541,7 +541,7 @@ class MatrixDataMixin(object):
 
         if cashback_ct:
             promotional_wallet_refund = cashback_ct.amount
-            refund_initiated_at = cashback_ct.created_at
+            refund_initiated_at = cashback_ct.created_at.timestamp()
 
         return {'original_payment_mode_refund': original_payment_mode_refund, 'promotional_wallet_refund': promotional_wallet_refund,
                 'customer_status': customer_status, 'refund_urn': refund_urn, 'refund_initiated_at': refund_initiated_at}
