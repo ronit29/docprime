@@ -1,16 +1,13 @@
-Dear {{instance.name}},
+Dear {{instance.name}}, <br/><br/>
 
-As discussed, please find below the cost estimate{% if instance.ipd_procedure %} of {{instance.ipd_procedure}}{% endif %} for the requested hospital(s):
+As discussed, please find below the cost estimate{% if instance.ipd_procedure %} of {{instance.ipd_procedure}}{% endif %} for the requested hospital(s): <br/>
 {% for ipd_cost_estimate in instance.procedure_cost_estimates.all %}
-    Hospital : {{ipd_cost_estimate.hospital.name}}
-    Stay Duration : {{ipd_cost_estimate.stay_duration}}
-
-    {% for room_type_cost in ipd_cost_estimate.room_type_costs.all %}
-        {{room_type_cost.room_type.room_type}} : {{room_type_cost.cost}}
+<strong>Hospital</strong> : {{ipd_cost_estimate.hospital.name}} <br/>
+<strong>Stay Duration</strong> : {{ipd_cost_estimate.stay_duration}} <br/>
+    {% for room_type_cost in ipd_cost_estimate.room_type_costs.all|dictsort:"id" %}
+        <strong>{{room_type_cost.room_type.room_type}}</strong> : {{room_type_cost.cost}} <br/>
     {% endfor %}
+{% endfor %} <br/><br/>
 
-
-{% endfor %}
-
-Thanks
+Thanks <br/>
 Team docprime
