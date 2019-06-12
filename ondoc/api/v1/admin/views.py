@@ -53,7 +53,7 @@ def userlogin_via_agent(request):
     from ondoc.authentication.backends import JWTAuthentication
     response = {'login': 0}
     if request.method != 'GET':
-        return Response(status=405)
+        return JsonResponse(response, status=405)
 
     serializer = serializers.AgentVerificationSerializer(data=request.GET)
     serializer.is_valid(raise_exception=True)
@@ -61,11 +61,11 @@ def userlogin_via_agent(request):
     user_type = data["user_type"]
 
     if user_type == User.DOCTOR and not (request.user.is_superuser or request.user.groups.filter(name='provider_group').exists()):
-        return Response(status=403)
+        return JsonResponse(response, status=403)
 
     if user_type == User.CONSUMER and not request.user.groups.filter(name=constants['LAB_APPOINTMENT_MANAGEMENT_TEAM']).exists()  and \
            not request.user.groups.filter(name=constants['OPD_APPOINTMENT_MANAGEMENT_TEAM']).exists():
-        return Response(status=403)
+        return JsonResponse(response, status=403)
 
     user = User.objects.filter(phone_number=data['phone_number'], user_type=user_type).first()
     if not user and user_type==User.CONSUMER:
@@ -74,7 +74,7 @@ def userlogin_via_agent(request):
                                           user_type=User.CONSUMER, auto_created=True)
 
     if not user:
-        return Response(status=400)
+        return JsonResponse(response, status=400)
 
     user_key = UserSecretKey.objects.get_or_create(user=user)
     payload = JWTAuthentication.appointment_agent_payload_handler(request, user)
