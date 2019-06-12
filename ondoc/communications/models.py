@@ -77,6 +77,8 @@ def get_spoc_email_and_number_hospital(spocs, appointment):
                             user_and_email.append({'user': created_user, 'email': spoc.email})
             else:
                 user_and_number.append({'user': None, 'phone_number': spoc.number})
+                if spoc.email:
+                    user_and_email.append({'user': None, 'email': spoc.email})
         elif spoc.email:
             user_and_email.append({'user': None, 'email': spoc.email})
     return user_and_email, user_and_number

@@ -298,8 +298,11 @@ class Order(TimeStampedModel):
                     "payment_status": Order.PAYMENT_ACCEPTED
                 }
                 insurer = appointment_obj.insurance_plan.insurer
+                # InsuranceTransaction.objects.create(user_insurance=appointment_obj,
+                #                                     account=appointment_obj.master_policy_reference.apd_account,
+                #                                     transaction_type=InsuranceTransaction.DEBIT, amount=amount)
                 InsuranceTransaction.objects.create(user_insurance=appointment_obj,
-                                                    account=insurer.float.all().first(),
+                                                    account=appointment_obj.master_policy.insurer_account,
                                                     transaction_type=InsuranceTransaction.DEBIT, amount=amount)
         elif self.action == Order.SUBSCRIPTION_PLAN_BUY:
             amount = Decimal(appointment_data.get('extra_details').get('payable_amount', float('inf')))
@@ -1551,11 +1554,17 @@ class MerchantPayout(TimeStampedModel):
         from ondoc.insurance.models import UserInsurance, InsuranceTransaction
         if not self.get_insurance_transaction():
             user_insurance = self.get_user_insurance()
-            InsuranceTransaction.objects.create(user_insurance = user_insurance,
-                account = user_insurance.insurance_plan.insurer.float.first(),
-                transaction_type = InsuranceTransaction.CREDIT,
-                amount = self.payable_amount,
-                reason = InsuranceTransaction.PREMIUM_PAYOUT)
+            # InsuranceTransaction.objects.create(user_insurance=user_insurance,
+            #     # account = user_insurance.insurance_plan.insurer.float.first(),
+            #     account=user_insurance.master_policy_reference.apd_account,
+            #     transaction_type=InsuranceTransaction.CREDIT,
+            #     amount=self.payable_amount,
+            #     reason=InsuranceTransaction.PREMIUM_PAYOUT)
+            InsuranceTransaction.objects.create(user_insurance=user_insurance,
+                                                account=user_insurance.master_policy.insurer_account,
+                                                transaction_type=InsuranceTransaction.CREDIT,
+                                                amount=self.payable_amount,
+                                                reason=InsuranceTransaction.PREMIUM_PAYOUT)
 
     def get_insurance_transaction(self):
         from ondoc.insurance.models import UserInsurance, InsuranceTransaction
