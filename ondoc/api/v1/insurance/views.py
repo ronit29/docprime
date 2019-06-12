@@ -12,6 +12,7 @@ from django.core import serializers as core_serializer
 import math
 
 from ondoc.api.v1.utils import payment_details
+from ondoc.common.models import BlacklistUser, BlockedStates
 from ondoc.diagnostic.models import LabAppointment, Lab
 from ondoc.doctor.models import OpdAppointment
 from . import serializers
@@ -281,6 +282,13 @@ class InsuranceOrderViewSet(viewsets.GenericViewSet):
 
     @transaction.atomic
     def create_order(self, request):
+        user = request.user
+        phone_number = user.phone_number
+        blocked_state = BlacklistUser.get_state_by_number(phone_number, BlockedStates.States.INSURANCE)
+        if blocked_state:
+            return Response({'error': blocked_state.message}, status=status.HTTP_400_BAD_REQUEST)
+
+
         if settings.IS_INSURANCE_ACTIVE:
             user = request.user
             user_insurance = UserInsurance.get_user_insurance(user)

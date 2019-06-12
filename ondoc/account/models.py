@@ -966,6 +966,8 @@ class DummyTransactions(TimeStampedModel):
     DEBIT = 1
     TYPE_CHOICES = [(CREDIT, "Credit"), (DEBIT, "Debit")]
 
+    INSURANCE_NODAL_TRANSFER = 'insurance_nodal_transfer'
+
     user = models.ForeignKey(User, on_delete=models.DO_NOTHING)
     product_id = models.SmallIntegerField(choices=Order.PRODUCT_IDS)
     reference_id = models.BigIntegerField(blank=True, null=True)
@@ -985,6 +987,7 @@ class DummyTransactions(TimeStampedModel):
     status_type = models.CharField(max_length=50, null=True, blank=True)
     transaction_id = models.CharField(max_length=100, null=True, blank=True)
     pb_gateway_name = models.CharField(max_length=100, null=True, blank=True)
+    transaction_type = models.CharField(max_length=100, null=True, blank=True)
 
     class Meta:
         db_table = "dummy_transaction"
@@ -1440,7 +1443,6 @@ class OrderLog(TimeStampedModel):
     class Meta:
         db_table = "order_log"
 
-
 class MerchantPayout(TimeStampedModel):    
 
     PENDING = 1
@@ -1591,6 +1593,176 @@ class MerchantPayout(TimeStampedModel):
             return self.user_insurance.all()[0]
         return None
 
+    def is_nodal_transfer(self):
+        merchant = Merchant.objects.filter(id=settings.DOCPRIME_NODAL2_MERCHANT).first()
+        if self.paid_to == merchant:
+            return True
+
+    def get_nodal_transfer_transaction(self):
+        pms = PayoutMapping.objects.filter(payout=self).first()
+        user_insurance = pms.content_object
+        trans = DummyTransactions.objects.filter(transaction_type=DummyTransactions.INSURANCE_NODAL_TRANSFER,reference_id=user_insurance.id,product_id=Order.INSURANCE_PRODUCT_ID)
+        return trans
+
+    def get_user_insurance(self):
+        pms = PayoutMapping.objects.filter(payout=self).first()
+        user_insurance = pms.content_object
+        return user_insurance
+
+    def create_nodal_dummy_transaction(self):
+        user_insurance = self.get_user_insurance()
+
+        req_data = dict()
+        try:
+            #order_row = Order.objects.filter(id=order_id).first()
+            user = user_insurance.user
+
+            if not user:
+                raise Exception('user is required')
+            if self.get_nodal_transfer_transaction():
+                return
+
+            token = settings.PG_DUMMY_TRANSACTION_TOKEN
+            headers = {
+                "auth": token,
+                "Content-Type": "application/json"
+            }
+            url = settings.PG_DUMMY_TRANSACTION_URL
+            #insurance_data = order_row.get_insurance_data_for_pg()
+
+            name = user_insurance.get_primary_member_profile().get_full_name()
+
+
+            req_data = {
+                "customerId": user.id,
+                "mobile": user.phone_number,
+                "email": user.email or "dummyemail@docprime.com",
+                "productId": user_insurance.order.INSURANCE_PRODUCT_ID,
+                "orderId": user_insurance.order.id,
+                "name": name,
+                "txAmount": 0,
+                "couponCode": "",
+                "couponAmt": str(self.payable_amount),
+                "paymentMode": "DC",
+                "AppointmentId": user_insurance.id,
+                "buCallbackSuccessUrl": "",
+                "buCallbackFailureUrl": ""
+            }
+
+            response = requests.post(url, data=json.dumps(req_data), headers=headers)
+            if response.status_code == status.HTTP_200_OK:
+                resp_data = response.json()
+                #logger.error(resp_data)
+                if resp_data.get("ok") is not None and resp_data.get("ok") == 1:
+                    tx_data = {}
+                    tx_data['user'] = user
+                    tx_data['product_id'] = user_insurance.order.INSURANCE_PRODUCT_ID
+                    tx_data['order_no'] = resp_data.get('orderNo')
+                    tx_data['order_id'] = user_insurance.order.id
+                    tx_data['reference_id'] = user_insurance.id
+                    tx_data['type'] = DummyTransactions.CREDIT
+                    tx_data['amount'] = self.payable_amount
+                    tx_data['payment_mode'] = "DC"
+                    tx_data['transaction_type'] = DummyTransactions.INSURANCE_NODAL_TRANSFER
+
+                    DummyTransactions.objects.create(**tx_data)
+                    #print("SAVED DUMMY TRANSACTION")
+            else:
+                raise Exception("Retry on invalid Http response status - " + str(response.content))
+
+        except Exception as e:
+            logger.error("Error in Setting Dummy Transaction of payout - " + str(self.id) + " with exception - " + str(e))
+
+    def execute_nodal_transfer(self):
+        from ondoc.api.v1.utils import create_payout_checksum
+        from collections import OrderedDict
+        try:
+            if not self.is_nodal_transfer():
+                raise Exception('Incorrect method called for payout')
+
+            if self.status == self.PAID:
+                return
+
+            transaction = self.get_nodal_transfer_transaction()
+            if not transaction:
+                return
+
+            if len(transaction)>1:
+                raise Exception("nodal transfer cannot have multiple transactions")
+
+            default_payment_mode = self.get_default_payment_mode()        
+            merchant = self.get_merchant()
+            user_insurance = self.get_user_insurance()
+
+            if not merchant or not user_insurance:
+                raise Exception("Insufficient Data " + str(self))
+
+            if not merchant.verified_by_finance or not merchant.enabled:
+                raise Exception("Merchant is not verified or is not enabled. " + str(self))
+
+            req_data = { "payload" : [], "checkSum" : "" }
+
+            txn = transaction[0]
+                
+            curr_txn = OrderedDict()
+            curr_txn["idx"] = 0
+            curr_txn["orderNo"] = txn.order_no
+            curr_txn["orderId"] = txn.order.id
+            #curr_txn["txnAmount"] = str(self.payable_amount)
+            curr_txn["settledAmount"] = str(self.payable_amount)
+            curr_txn["merchantCode"] = self.paid_to.id
+            curr_txn["refNo"] = self.payout_ref_id
+            curr_txn["bookingId"] = user_insurance.id
+            curr_txn["paymentType"] = default_payment_mode
+            curr_txn["txnAmount"] = str(0)
+
+            req_data["payload"].append(curr_txn)
+
+            payout_status = None
+
+            self.request_data = req_data
+
+            req_data["checkSum"] = create_payout_checksum(req_data["payload"], Order.INSURANCE_PRODUCT_ID)
+            headers = {
+                "auth": settings.PG_REFUND_AUTH_TOKEN,
+                "Content-Type": "application/json"
+            }
+            url = settings.PG_SETTLEMENT_URL
+            resp_data = None
+
+            response = requests.post(url, data=json.dumps(req_data), headers=headers)
+            resp_data = response.json()
+
+            if response.status_code == status.HTTP_200_OK:
+                if resp_data.get("ok") is not None and resp_data.get("ok") == '1':
+                    success_payout = False
+                    result = resp_data.get('result')
+                    if result:
+                        for res_txn in result:
+                            success_payout = res_txn['status'] == "SUCCESSFULLY_INSERTED"
+
+                    if success_payout:
+                        payout_status = {"status": 1, "response": resp_data}
+                    else:            
+                        logger.error("payout failed for request data - " + str(req_data))
+                        payout_status =  {"status" : 0, "response" : resp_data}
+
+
+            if payout_status:            
+                self.api_response = payout_status.get("response")
+                if payout_status.get("status"):
+                    self.payout_time = datetime.datetime.now()
+                    self.status = self.PAID
+                else:
+                    self.retry_count += 1
+
+                self.save()
+
+        except Exception as e:
+            logger.error("Error in processing payout - with exception - " + str(e))
+
+
+
     def get_billed_to(self):
         if self.content_object:
             return self.content_object
@@ -1695,6 +1867,15 @@ class MerchantPayout(TimeStampedModel):
     class Meta:
         db_table = "merchant_payout"
 
+
+class PayoutMapping(TimeStampedModel):
+    content_type = models.ForeignKey(ContentType, on_delete=models.SET_NULL, null=True)
+    object_id = models.BigIntegerField()
+    content_object = GenericForeignKey()
+    payout = models.ForeignKey(MerchantPayout, on_delete=models.SET_NULL, null=True)
+
+    class Meta:
+        db_table = "payout_mapping"
 
 class UserReferrals(TimeStampedModel):
     SIGNUP_CASHBACK = 50
