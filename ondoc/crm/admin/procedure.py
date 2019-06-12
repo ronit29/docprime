@@ -182,6 +182,7 @@ class IpdProcedurePracticeSpecializationInline(AutoComplete, TabularInline):
 class IpdProcedureAdminForm(forms.ModelForm):
     about = forms.CharField(widget=forms.Textarea, required=False)
     details = forms.CharField(widget=forms.Textarea, required=False)
+    icon = forms.ImageField(required=False)
 
     class Media:
         extend = False
@@ -336,13 +337,16 @@ class IpdProcedureLeadAdminForm(forms.ModelForm):
 
 class IpdProcedureLeadAdmin(VersionAdmin):
     form = IpdProcedureLeadAdminForm
-    list_filter = ['created_at', 'ipd_procedure']
+    list_filter = ['created_at', 'source', 'ipd_procedure', 'planned_date']
     search_fields = ['phone_number', 'matrix_lead_id']
     list_display = ['id', 'phone_number', 'name', 'matrix_lead_id']
-    autocomplete_fields = ['hospital', 'insurer', 'tpa']
+    autocomplete_fields = ['hospital', 'insurer', 'tpa', 'ipd_procedure']
     exclude = ['user', 'lat', 'long']
-    readonly_fields = ['phone_number', 'id', 'matrix_lead_id', 'comments', 'data', 'ipd_procedure', 'source', 'current_age',
+    readonly_fields = ['phone_number', 'id', 'matrix_lead_id', 'comments', 'data', 'source', 'current_age',
                        'related_speciality', 'is_insured', 'insurance_details', 'opd_appointments', 'lab_appointments']
+
+
+
 
     fieldsets = (
         (None, {
@@ -352,8 +356,8 @@ class IpdProcedureLeadAdmin(VersionAdmin):
         ('Lead Info', {
             # 'classes': ('collapse',),
             'fields': ('matrix_lead_id', 'comments', 'data', 'ipd_procedure', 'related_speciality',
-                       'hospital', 'hospital_reference_id', 'source', 'status', 'planned_date', 'payment_type', 'payment_amount',
-                       'insurer', 'tpa', 'num_of_chats'),
+                       'hospital', 'hospital_reference_id', 'source', 'referer_doctor', 'status', 'planned_date',
+                       'payment_type', 'payment_amount', 'insurer', 'tpa', 'num_of_chats', 'remarks'),
         }),
         ('History', {
             # 'classes': ('collapse',),
@@ -424,3 +428,18 @@ class IpdProcedureLeadAdmin(VersionAdmin):
         if not result and obj.age:
             result = str(obj.age)
         return result
+
+
+class OfferAdminForm(forms.ModelForm):
+    tnc = forms.CharField(widget=forms.Textarea, required=False)
+
+    class Media:
+        js = ('https://cdn.ckeditor.com/ckeditor5/10.1.0/classic/ckeditor.js', 'offer/js/init.js')
+        css = {'all': ('offer/css/style.css',)}
+
+
+class OfferAdmin(VersionAdmin):
+    autocomplete_fields = ['coupon', 'ipd_procedure', 'hospital', 'network']
+    list_display = ['id', 'title', 'is_live']
+    list_filter = ['is_live']
+    form = OfferAdminForm

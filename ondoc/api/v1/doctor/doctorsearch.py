@@ -1,21 +1,22 @@
 import operator
+from pyodbc import Date
 
 from django.contrib.gis.geos import Point
-from django.db.models import F
+from django.utils import timezone
 
 from ondoc.api.v1.doctor.serializers import DoctorProfileUserViewSerializer
 from ondoc.api.v1.procedure.serializers import DoctorClinicProcedureSerializer
 from ondoc.api.v1.ratings.serializers import GoogleRatingsGraphSerializer
 from ondoc.coupon.models import CouponRecommender
 from ondoc.doctor import models
-from ondoc.api.v1.utils import clinic_convert_timings
+from ondoc.api.v1.utils import clinic_convert_timings, aware_time_zone
 from ondoc.api.v1.doctor import serializers
 from ondoc.authentication.models import QCModel
 from ondoc.doctor.models import Doctor, PracticeSpecialization
 from ondoc.procedure.models import DoctorClinicProcedure, ProcedureCategory, ProcedureToCategoryMapping, \
     get_selected_and_other_procedures, get_included_doctor_clinic_procedure, \
     get_procedure_categories_with_procedures
-from datetime import datetime
+from datetime import datetime, timedelta
 import re
 import json
 from django.contrib.staticfiles.templatetags.staticfiles import static
@@ -24,6 +25,7 @@ from ondoc.location.models import EntityAddress
 from collections import OrderedDict
 from ondoc.insurance.models import UserInsurance
 from collections import defaultdict
+from ondoc.api.v1.doctor.serializers import DoctorListSerializer
 
 
 class DoctorSearchHelper:
@@ -47,6 +49,8 @@ class DoctorSearchHelper:
         procedure_ids = self.query_params.get("procedure_ids", [])# NEW_LOGIC
         ipd_procedure_ids = self.query_params.get("ipd_procedure_ids", [])
         procedure_category_ids = self.query_params.get("procedure_category_ids", [])  # NEW_LOGIC
+        sits_at_hosp_types = self.query_params.get("sits_at", [])
+
 
         if self.query_params.get('hospital_id') is not None:
             filtering_params.append(
@@ -79,13 +83,24 @@ class DoctorSearchHelper:
                 sp_str+')'
             )
 
+        counter = 1
         if self.query_params.get("sits_at"):
-            filtering_params.append(
-                "hospital_type IN(%(sits_at)s)"
-            )
-            params['sits_at'] = ", ".join(
-                [str(hospital_type_mapping.get(sits_at)) for sits_at in self.query_params.get("sits_at")])
+            sits_at_str = 'hospital_type IN('
+            for hosp_type in sits_at_hosp_types:
 
+                if counter != 1:
+                    sits_at_str += ', '
+                sits_at_str = sits_at_str + '%(' + 'sits_at' + str(counter) + ')s'
+                params['sits_at' + str(counter)] = hospital_type_mapping.get(hosp_type)
+                counter += 1
+
+            filtering_params.append(
+                sits_at_str + ')'
+            )
+            # filtering_params.append(
+            #     "hospital_type IN (%(sits_at)s)"
+            # )
+            # params['sits_at'] =  ", ".join([str(hospital_type_mapping.get(sits_at)) for sits_at in self.query_params.get("sits_at")])
 
         if procedure_category_ids and not procedure_ids:  # NEW_LOGIC
             preferred_procedure_ids = list(
@@ -131,11 +146,13 @@ class DoctorSearchHelper:
                 # "deal_price>={}".format(str(self.query_params.get("min_fees")))
                 "deal_price>=(%(min_fees)s)")
             params['min_fees'] = str(self.query_params.get("min_fees"))
+
         if len(procedure_ids) == 0 and self.query_params.get("max_fees") is not None:
             filtering_params.append(
                 # "deal_price<={}".format(str(self.query_params.get("max_fees"))))
                 "deal_price<=(%(max_fees)s)")
             params['max_fees'] = str(self.query_params.get("max_fees"))
+
         if self.query_params.get("is_female"):
             filtering_params.append(
                 "gender='f'"
@@ -148,6 +165,52 @@ class DoctorSearchHelper:
                 'dl.id is NULL and dct.day=(%(current_time)s) and dct.end>=(%(current_hour)s)')
             params['current_time'] = str(current_time.weekday())
             params['current_hour'] = str(current_hour)
+
+        if self.query_params.get('avg_ratings'):
+
+            filtering_params.append(" ((case when (d.rating_data is not null and (d.rating_data ->> 'avg_rating')::float > 4 ) or " \
+                            "( (d.rating_data ->> 'avg_rating')::float >= (%(avg_ratings)s) and (d.rating_data ->> 'rating_count') is not null and " \
+                            "(d.rating_data ->> 'rating_count')::int >5) then (d.rating_data ->> 'avg_rating')::float >= (%(avg_ratings)s) end) "
+                            " or  (case when h.google_avg_rating is not null and (h.google_avg_rating)::float >= (%(avg_ratings)s) then "
+                            "(h.google_avg_rating)::float >= (%(avg_ratings)s) end ))")
+
+            params['avg_ratings'] = min(self.query_params.get('avg_ratings'))
+
+        if self.query_params.get('availability'):
+            aval_query = "( "
+            availability = self.query_params.get('availability')
+            today = Date.today().weekday()
+            currentDT = timezone.now()
+            today_time = aware_time_zone(currentDT).strftime("%H.%M")
+            avail_days =list(map(int, availability))
+            if DoctorListSerializer.TODAY in avail_days:
+                aval_query += ' (dct.day = (%(today)s) and  (%(today_time)s) <= dct."end" ) '
+                params['today'] = today
+                params['today_time'] = today_time
+
+            if DoctorListSerializer.TOMORROW in avail_days and not DoctorListSerializer.NEXT_3_DAYS in avail_days:
+                if len(avail_days) > 1:
+                    aval_query += ' or '
+                aval_query += ' dct.day = (%(tomorrow)s) '
+                today += 1
+                params['tomorrow'] = (0 if today == 6 else today + 1)
+
+            if DoctorListSerializer.NEXT_3_DAYS in avail_days:
+                for day in range(1, 4):
+                    if not aval_query == "( ":
+                        aval_query += ' or '
+                    if today == 6:
+                        today = 0
+
+                        aval_query += ' dct.day =' + '%(' + 'next_day' + str(day) + ')s'
+                        params['next_day' + str(day)] = today
+
+                    else:
+                        today += 1
+                        aval_query += ' dct.day =' + '%(' + 'next_day' + str(day) + ')s'
+                        params['next_day' + str(day)] = today
+
+            filtering_params.append(aval_query + ')')
 
         if self.query_params.get("doctor_name"):
             name = self.query_params.get("doctor_name").lower().strip()
@@ -178,6 +241,10 @@ class DoctorSearchHelper:
             params['doctor_name1'] = search_key + ' %'
             params['doctor_name2'] = '% ' + search_key + ' %'
             params['doctor_name3'] = '% ' + search_key
+
+        if self.query_params.get('gender'):
+            filtering_params.append("d.gender=(%(gender)s)")
+            params['gender'] = self.query_params.get('gender')
 
         if self.query_params.get("hospital_name"):
             search_key = re.findall(r'[a-z0-9A-Z.]+', self.query_params.get("hospital_name"))
@@ -229,7 +296,10 @@ class DoctorSearchHelper:
                     order_by_field = ' practicing_since ASC, distance ASC '
                     rank_by = "rnk=1"
                 elif self.query_params.get('sort_on') == 'fees':
-                    order_by_field = " total_price ASC, distance ASC "
+                    if self.query_params.get('sort_order') and self.query_params.get('sort_order') == 'desc':
+                        order_by_field = " total_price DESC, distance ASC "
+                    else:
+                        order_by_field = " total_price ASC, distance ASC "
                     rank_by = "rnk=1"
                 elif self.query_params.get('sort_on') == 'distance':
                     order_by_field = " distance ASC, total_price ASC "
@@ -244,7 +314,10 @@ class DoctorSearchHelper:
                     order_by_field = ' practicing_since ASC, distance ASC, priority desc '
                     rank_by = " rnk=1 "
                 elif self.query_params.get('sort_on') == 'fees':
-                    order_by_field = " deal_price ASC, distance ASC, priority desc "
+                    if self.query_params.get('sort_order') and self.query_params.get('sort_order') == 'desc':
+                        order_by_field = " deal_price DESC, distance ASC, priority desc "
+                    else:
+                        order_by_field = " deal_price ASC, distance ASC, priority desc "
                     rank_by = " rnk=1 "
                 elif self.query_params.get('sort_on') == 'distance':
                     order_by_field = " distance ASC, deal_price ASC, priority desc "

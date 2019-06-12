@@ -1,4 +1,5 @@
 # from hardcopy import bytestring_to_pdf
+from rest_framework.permissions import IsAuthenticated
 from rest_framework import mixins, viewsets, status
 from rest_framework.response import Response
 from django.contrib.gis.geos import Point, GEOSGeometry
@@ -8,6 +9,8 @@ from ondoc.api.v1.common.serializers import SearchLeadSerializer
 from django.utils.dateparse import parse_datetime
 from weasyprint import HTML
 from django.http import HttpResponse
+
+from ondoc.api.v1.insurance.serializers import InsuranceCityEligibilitySerializer
 from ondoc.api.v1.utils import html_to_pdf, generate_short_url
 from ondoc.diagnostic.models import Lab
 from ondoc.doctor.models import (Doctor, DoctorPracticeSpecialization, PracticeSpecialization, DoctorMobile, Qualification,
@@ -15,6 +18,7 @@ from ondoc.doctor.models import (Doctor, DoctorPracticeSpecialization, PracticeS
                                  DoctorClinicTiming, DoctorClinic, Hospital, SourceIdentifier, DoctorAssociation)
 
 from ondoc.chat.models import ChatPrescription
+from ondoc.insurance.models import InsuranceEligibleCities
 from ondoc.lead.models import SearchLead
 from ondoc.notification.models import EmailNotification
 from ondoc.notification.rabbitmq_client import publish_message
@@ -40,6 +44,7 @@ import requests
 from PIL import Image as Img
 import os
 import math
+from decimal import Decimal
 
 logger = logging.getLogger(__name__)
 
@@ -968,9 +973,82 @@ class AllUrlsViewset(viewsets.GenericViewSet):
         key = parameters.get('query')
         if not key:
             return Response(status=status.HTTP_400_BAD_REQUEST)
+        key = key.lower()
+        if len(key)<3:
+            return Response(dict())
+
+
         from ondoc.location.models import EntityUrls
         from ondoc.location.models import CompareSEOUrls
-        e_urls = list(EntityUrls.objects.filter(url__icontains=key, is_valid=True).values_list('url', flat=True))[:5]
-        c_urls = list(CompareSEOUrls.objects.filter(url__icontains=key).values_list('url', flat=True))[:5]
+        e_urls = list(EntityUrls.objects.filter(url__startswith=key, is_valid=True).values_list('url', flat=True))[:5]
+        c_urls = list(CompareSEOUrls.objects.filter(url__startswith=key).values_list('url', flat=True))[:5]
         result = e_urls + c_urls
         return Response(dict(enumerate(result)))
+
+
+class AppointmentPrerequisiteViewSet(viewsets.GenericViewSet):
+
+    authentication_classes = (JWTAuthentication,)
+    permission_classes = (IsAuthenticated, )
+
+    def pre_booking(self, request):
+        user = request.user
+        insurance = user.active_insurance
+        if not insurance:
+            return Response({'prescription_needed': False})
+
+        serializer = serializers.AppointmentPrerequisiteSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        valid_data = serializer.validated_data
+
+        user_profile = valid_data.get('profile', None)
+        if not user_profile.is_insured_profile:
+            return Response({'prescription_needed': False})
+
+        lab = valid_data.get('lab')
+        lab_pricing_group = lab.lab_pricing_group
+        available_lab_test_qs = lab_pricing_group.available_lab_tests.all().filter(test__in=valid_data.get('lab_test'))
+        tests_amount = Decimal(0)
+        for available_lab_test in available_lab_test_qs:
+            agreed_price = available_lab_test.custom_agreed_price if available_lab_test.custom_agreed_price else available_lab_test.computed_agreed_price
+            tests_amount = tests_amount + agreed_price
+
+        # start_date = valid_data.get('start_date').date()
+
+        resp = insurance.validate_limit_usages(tests_amount)
+
+        return Response(resp)
+
+
+class SiteSettingsViewSet(viewsets.GenericViewSet):
+    authentication_classes = (JWTAuthentication,)
+
+    def get_settings(self, request):
+        params = request.query_params
+
+        lat = params.get('latitude', None)
+        long = params.get('longitude', None)
+
+        insurance_availability = False
+
+        if request.user and request.user.is_authenticated and request.user.active_insurance:
+            insurance_availability = True
+
+        if lat and long and not insurance_availability:
+            data = {
+                'latitude': lat,
+                'longitude': long
+            }
+
+            serializer = InsuranceCityEligibilitySerializer(data=data)
+            serializer.is_valid(raise_exception=True)
+            data = serializer.validated_data
+            city_name = InsuranceEligibleCities.get_nearest_city(data.get('latitude'), data.get('longitude'))
+            if city_name:
+                insurance_availability = True
+
+        settings = {
+            'insurance_availability': insurance_availability
+        }
+
+        return Response(data=settings)

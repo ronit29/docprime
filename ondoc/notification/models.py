@@ -766,6 +766,27 @@ class EmailNotification(TimeStampedModel, EmailNotificationOpdMixin, EmailNotifi
         return booking_url
 
     @classmethod
+    def send_endorsement_request_url(cls, token, email):
+        booking_url = "{}/agent/booking?token={}".format(settings.CONSUMER_APP_DOMAIN, token)
+        booking_url = booking_url + "&callbackurl=insurance/insurance-user-details-review?is_endorsement=true"
+        short_url = generate_short_url(booking_url)
+        html_body = "Your Endorsement Request url is - {} . Please confirm to process".format(short_url)
+        email_subject = "Insurance Endorsement Request"
+        if email:
+            email_noti = {
+                "email": email,
+                "content": html_body,
+                "email_subject": email_subject
+            }
+            message = {
+                "data": email_noti,
+                "type": "email"
+            }
+            message = json.dumps(message)
+            publish_message(message)
+        return booking_url
+
+    @classmethod
     def send_insurance_float_alert_email(cls, email, html_body):
         email_subject = 'ALERT!!! Insurance Float amount is on the limit.'
         if email:
@@ -792,7 +813,7 @@ class EmailNotification(TimeStampedModel, EmailNotificationOpdMixin, EmailNotifi
         emails = settings.INSURANCE_MIS_EMAILS
         to_email = emails[0]
         cc_emails = emails[1:]
-        email_obj = cls.objects.create(attachments=attachment, email=to_email, notification_type=NotificationAction.INSURANCE_FLOAT_LIMIT,
+        email_obj = cls.objects.create(attachments=attachment, email=to_email, notification_type=NotificationAction.INSURANCE_MIS,
                                        content=html_body, email_subject=email_subject, cc=cc_emails, bcc=[])
         email_obj.save()
 
@@ -948,6 +969,26 @@ class SmsNotification(TimeStampedModel, SmsNotificationOpdMixin, SmsNotification
         return booking_url
 
     @classmethod
+    def send_endorsement_request_url(cls, token, phone_number):
+        booking_url = "{}/agent/booking?token={}".format(settings.CONSUMER_APP_DOMAIN, token)
+        booking_url = booking_url + "&callbackurl=insurance/insurance-user-details-review?is_endorsement=true"
+        short_url = generate_short_url(booking_url)
+        html_body = "Your Insurance Endorsement request url is - {} . Please confirm to process".format(short_url)
+        if phone_number:
+            sms_notification = {
+                "phone_number": phone_number,
+                "content": html_body,
+            }
+            message = {
+                "data": sms_notification,
+                "type": "sms"
+            }
+            message = json.dumps(message)
+            publish_message(message)
+        return booking_url
+
+
+    @classmethod
     def send_app_download_link(cls, phone_number, context):
         sms_body = render_to_string('sms/doctor_onboarding.txt', context=context)
         if phone_number:
@@ -995,10 +1036,14 @@ class WhtsappNotification(TimeStampedModel):
         via_whatsapp = kwargs.get('via_whatsapp')
         otp = create_otp(phone_number, "{}", call_source=request_source, return_otp=True, via_sms=via_sms, via_whatsapp=via_whatsapp)
 
+        template_name = 'docprime_otp_web'
+        if request_source == 'docprimechat':
+            template_name = 'docprime_otp_verification'
+
         whatsapp_message = {"media": {},
                             "message": "",
                             "template": {
-                                "name": "docprime_otp_verification",
+                                "name": template_name,
                                 "params": [otp]
                             },
                             "message_type": "HSM",

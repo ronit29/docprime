@@ -17,7 +17,7 @@ from ondoc.doctor.models import (OpdAppointment, Doctor, Hospital, DoctorHospita
                                  CommonMedicalCondition, CommonSpecialization,
                                  DoctorPracticeSpecialization, DoctorClinic, OfflineOPDAppointments, OfflinePatients,
                                  CancellationReason, HealthInsuranceProvider, HospitalDocument, HospitalNetworkDocument,
-                                 AppointmentHistory)
+                                 AppointmentHistory, HospitalNetwork)
 from ondoc.diagnostic import models as lab_models
 from ondoc.authentication.models import UserProfile, DoctorNumber, GenericAdmin, GenericLabAdmin
 from django.db.models import Avg
@@ -48,7 +48,7 @@ from ondoc.authentication import models as auth_models
 from ondoc.location.models import EntityUrls, EntityAddress
 from ondoc.procedure.models import DoctorClinicProcedure, Procedure, ProcedureCategory, \
     get_included_doctor_clinic_procedure, get_procedure_categories_with_procedures, IpdProcedure, \
-    IpdProcedureFeatureMapping, IpdProcedureLead, DoctorClinicIpdProcedure, IpdProcedureDetail
+    IpdProcedureFeatureMapping, IpdProcedureLead, DoctorClinicIpdProcedure, IpdProcedureDetail, Offer
 from ondoc.seo.models import NewDynamic
 from ondoc.ratings_review import models as rate_models
 from rest_framework.response import Response
@@ -122,6 +122,15 @@ class OpdAppointmentSerializer(serializers.ModelSerializer):
     type = serializers.ReadOnlyField(default='doctor')
     allowed_action = serializers.SerializerMethodField()
     reports = serializers.SerializerMethodField()
+    prescription = serializers.SerializerMethodField()
+    report_files = serializers.SerializerMethodField()
+
+    def get_report_files(self, obj):
+        return []
+
+    def get_prescription(self, obj):
+        if obj:
+            return obj.get_all_prescriptions()
 
     def get_allowed_action(self, obj):
         request = self.context.get('request')
@@ -131,7 +140,7 @@ class OpdAppointmentSerializer(serializers.ModelSerializer):
         model = OpdAppointment
         fields = ('id', 'doctor_name', 'hospital_name', 'patient_name', 'patient_image', 'type',
                   'allowed_action', 'effective_price', 'deal_price', 'status', 'time_slot_start',
-                  'time_slot_end', 'doctor_thumbnail', 'patient_thumbnail', 'display_name', 'invoices', 'reports')
+                  'time_slot_end', 'doctor_thumbnail', 'patient_thumbnail', 'display_name', 'invoices', 'reports', 'prescription', 'report_files')
 
     def get_patient_image(self, obj):
         if obj.profile and obj.profile.profile_image:
@@ -444,6 +453,7 @@ class DoctorHospitalSerializer(serializers.ModelSerializer):
     lat = serializers.SerializerMethodField(read_only=True)
     long = serializers.SerializerMethodField(read_only=True)
     insurance = serializers.SerializerMethodField(read_only=True)
+    url = serializers.SerializerMethodField(read_only=True)
 
     enabled_for_online_booking = serializers.SerializerMethodField(read_only=True)
     show_contact = serializers.SerializerMethodField(read_only=True)
@@ -537,11 +547,17 @@ class DoctorHospitalSerializer(serializers.ModelSerializer):
         else:
             return False
 
+    def get_url(self, obj):
+        entity_url = self.context.get('hosp_entity_dict', {})
+        return entity_url.get(
+            obj.doctor_clinic.hospital.id if obj and obj.doctor_clinic and obj.doctor_clinic.hospital else -1)
+
     class Meta:
         model = DoctorClinicTiming
         fields = ('doctor', 'hospital_name', 'address','short_address', 'hospital_id', 'start', 'end', 'day', 'deal_price',
                   'discounted_fees', 'hospital_thumbnail', 'mrp', 'lat', 'long', 'id','enabled_for_online_booking',
-                  'insurance', 'show_contact', 'enabled_for_cod', 'enabled_for_prepaid', 'is_price_zero', 'hospital_city')
+                  'insurance', 'show_contact', 'enabled_for_cod', 'enabled_for_prepaid', 'is_price_zero', 'hospital_city',
+                  'url')
         # fields = ('doctor', 'hospital_name', 'address', 'hospital_id', 'start', 'end', 'day', 'deal_price', 'fees',
         #           'discounted_fees', 'hospital_thumbnail', 'mrp',)
 
@@ -800,6 +816,13 @@ class PrescriptionSerializer(serializers.Serializer):
 
 class DoctorListSerializer(serializers.Serializer):
     SORT_CHOICES = ('fees', 'experience', 'distance', )
+    SORT_ORDER = ('asc', 'desc')
+    GENDER_CHOICES = [("m", "Male"), ("f", "Female")]
+    TODAY = 1
+    TOMORROW = 2
+    NEXT_3_DAYS = 3
+    AVAILABILITY_CHOICES = ((TODAY, 'Today'), (TOMORROW, "Tomorrow"), (NEXT_3_DAYS, "Next 3 days"),)
+
     SITTING_CHOICES = [type_choice[1] for type_choice in Hospital.HOSPITAL_TYPE_CHOICES]
     specialization_ids = CommaSepratedToListField(required=False, max_length=500, typecast_to=str, allow_blank=True)
     condition_ids = CommaSepratedToListField(required=False, max_length=500, typecast_to=str)
@@ -823,6 +846,10 @@ class DoctorListSerializer(serializers.Serializer):
     locality = serializers.CharField(required=False)
     city = serializers.CharField(required=False, allow_null=True)
     ipd_procedure_ids = CommaSepratedToListField(required=False, max_length=500, typecast_to=str)
+    sort_order = serializers.ChoiceField(choices=SORT_ORDER, required=False)
+    gender = serializers.ChoiceField(choices=GENDER_CHOICES, required=False)
+    availability = CommaSepratedToListField(required=False,  max_length=50, typecast_to=str)
+    avg_ratings = CommaSepratedToListField(required=False,  max_length=50, typecast_to=str)
 
     def validate_ipd_procedure_ids(self, attrs):
         try:
@@ -866,6 +893,11 @@ class DoctorListSerializer(serializers.Serializer):
     def validate_sits_at(self, value):
         if not set(value).issubset(set(self.SITTING_CHOICES)):
             raise serializers.ValidationError("Not a Valid Choice")
+        return value
+
+    def validate_availability(self, value):
+        if not set(value).issubset(set([str(avl_choice[0]) for avl_choice in self.AVAILABILITY_CHOICES])):
+            raise serializers.ValidationError("Not a Valid Availability Choice")
         return value
 
 
@@ -1184,7 +1216,14 @@ class DoctorProfileUserViewSerializer(DoctorProfileSerializer):
         data = DoctorClinicTiming.objects.filter(doctor_clinic__doctor=obj,
                                                  doctor_clinic__enabled=True,
                                                  doctor_clinic__hospital__is_live=True).select_related(
-            "doctor_clinic__doctor", "doctor_clinic__hospital").prefetch_related("doctor_clinic__hospital__spoc_details","doctor_clinic__doctor__mobiles","doctor_clinic__doctor__doctorpracticespecializations","doctor_clinic__doctor__doctorpracticespecializations__specialization")
+            "doctor_clinic__doctor", "doctor_clinic__hospital").prefetch_related(
+            "doctor_clinic__hospital__spoc_details", "doctor_clinic__doctor__mobiles",
+            "doctor_clinic__doctor__doctorpracticespecializations",
+            "doctor_clinic__doctor__doctorpracticespecializations__specialization")
+        all_hospital_ids = data.values_list('doctor_clinic__hospital_id', flat=True).distinct()
+        hosp_entity_dict, hosp_locality_entity_dict = Hospital.get_hosp_and_locality_dict(all_hospital_ids, EntityUrls.SitemapIdentifier.DOCTORS_LOCALITY_CITY)
+        self.context['hosp_entity_dict']=hosp_entity_dict
+        self.context['hosp_locality_entity_dict']=hosp_locality_entity_dict
         if obj:
             doctor_specialization = InsuranceDoctorSpecializations.get_doctor_insurance_specializations(obj)
             if doctor_specialization:
@@ -1270,7 +1309,8 @@ class AppointmentRetrieveSerializer(OpdAppointmentSerializer):
         fields = ('id', 'patient_image', 'patient_name', 'type', 'profile', 'otp', 'is_rated', 'rating_declined',
                   'allowed_action', 'effective_price', 'deal_price', 'status', 'time_slot_start', 'time_slot_end',
                   'doctor', 'hospital', 'allowed_action', 'doctor_thumbnail', 'patient_thumbnail', 'procedures', 'mrp',
-                  'insurance', 'invoices', 'cancellation_reason', 'payment_type', 'display_name')
+                  'insurance', 'invoices', 'cancellation_reason', 'payment_type', 'display_name', 'reports', 'prescription',
+                  'report_files')
 
     def get_insurance(self, obj):
         request = self.context.get("request")
@@ -1729,14 +1769,18 @@ class IpdProcedureDetailSerializer(serializers.ModelSerializer):
     all_details = serializers.SerializerMethodField()
     # all_details = IpdProcedureAllDetailsSerializer(source='ipdproceduredetail_set', read_only=True, many=True)
     similar_ipd_procedures = serializers.SerializerMethodField()
+    offers = serializers.SerializerMethodField()
 
     class Meta:
         model = IpdProcedure
         fields = ('id', 'name', 'details', 'is_enabled', 'features', 'about', 'all_details', 'show_about',
-                  'similar_ipd_procedures')
+                  'similar_ipd_procedures', 'offers')
 
     def get_all_details(self, obj):
         return IpdProcedureAllDetailsSerializer(obj.ipdproceduredetail_set.all(), many=True, context=self.context).data
+
+    def get_offers(self, obj):
+        return OfferSerializer(obj.ipd_offers.all(), many=True, context=self.context).data
 
     def get_similar_ipd_procedures(self, obj):
         similar_ipds_entity_dict = self.context.get('similar_ipds_entity_dict', {})
@@ -1812,14 +1856,15 @@ class TopHospitalForIpdProcedureSerializer(serializers.ModelSerializer):
 
     def get_logo(self, obj):
         request = self.context.get('request')
-        if obj.network:
-            for document in obj.network.hospital_network_documents.all():
-                if document.document_type == HospitalNetworkDocument.LOGO:
-                    return request.build_absolute_uri(document.name.url) if document.name else None
-        else:
-            for document in obj.hospital_documents.all():
-                if document.document_type == HospitalDocument.LOGO:
-                    return request.build_absolute_uri(document.name.url) if document.name else None
+        if request:
+            if obj.network:
+                for document in obj.network.hospital_network_documents.all():
+                    if document.document_type == HospitalNetworkDocument.LOGO:
+                        return request.build_absolute_uri(document.name.url) if document.name else None
+            else:
+                for document in obj.hospital_documents.all():
+                    if document.document_type == HospitalDocument.LOGO:
+                        return request.build_absolute_uri(document.name.url) if document.name else None
         return None
 
     def get_open_today(self, obj):
@@ -1847,6 +1892,7 @@ class HospitalDetailIpdProcedureSerializer(TopHospitalForIpdProcedureSerializer)
     opd_timings = serializers.SerializerMethodField()
     contact_number = serializers.SerializerMethodField()
     specialization_doctors = serializers.SerializerMethodField()
+    offers = serializers.SerializerMethodField()
 
     class Meta(TopHospitalForIpdProcedureSerializer.Meta):
         model = Hospital
@@ -1855,8 +1901,8 @@ class HospitalDetailIpdProcedureSerializer(TopHospitalForIpdProcedureSerializer)
                                                                      'other_network_hospitals',
                                                                      'doctors', 'rating_graph', 'rating',
                                                                      'display_rating_widget', 'opd_timings',
-                                                                     'contact_number', 'specialization_doctors'
-                                                                     )
+                                                                     'contact_number', 'specialization_doctors',
+                                                                     'offers')
 
     def get_specialization_doctors(self, obj):
         validated_data = self.context.get('validated_data')
@@ -1999,6 +2045,13 @@ class HospitalDetailIpdProcedureSerializer(TopHospitalForIpdProcedureSerializer)
             return True
         return False
 
+    def get_offers(self, obj):
+        if obj.network:
+            query_set = Offer.objects.filter(is_live=True, network=obj.network)
+        else:
+            query_set = Offer.objects.filter(is_live=True, hospital=obj)
+        return OfferSerializer(query_set, many=True).data
+
 
 class HospitalRequestSerializer(serializers.Serializer):
     long = serializers.FloatField(default=77.071848)
@@ -2007,6 +2060,7 @@ class HospitalRequestSerializer(serializers.Serializer):
     max_distance = serializers.IntegerField(required=False)
     provider_ids = CommaSepratedToListField(required=False, max_length=500, typecast_to=int)
     city = serializers.CharField(required=False, allow_blank=True, allow_null=True)
+    network = serializers.PrimaryKeyRelatedField(allow_null=True, queryset=HospitalNetwork.objects.all(), required=False)
 
 
     def validate_provider_ids(self, attrs):
@@ -2022,22 +2076,22 @@ class HospitalRequestSerializer(serializers.Serializer):
 class IpdProcedureLeadSerializer(serializers.ModelSerializer):
     ipd_procedure = serializers.PrimaryKeyRelatedField(queryset=IpdProcedure.objects.filter(is_enabled=True),
                                                        required=False, allow_null=True)
-    hospital = serializers.PrimaryKeyRelatedField(queryset=Hospital.objects.filter(is_live=True), required=False)
-    name = serializers.CharField(max_length=100, required=False, allow_null=True)
+    hospital = serializers.PrimaryKeyRelatedField(queryset=Hospital.objects.filter(is_live=True), required=False, allow_null=True)
+    name = serializers.CharField(max_length=100, required=False, allow_null=True, allow_blank=True)
     phone_number = serializers.IntegerField(min_value=1000000000, max_value=9999999999, required=False)
     email = serializers.EmailField(max_length=256, required=False)
-    gender = serializers.ChoiceField(choices=UserProfile.GENDER_CHOICES, required=False)
-    age = serializers.IntegerField(min_value=1, max_value=120, required=False, default=None)
-    dob = serializers.DateField(required=False, default=None)
+    gender = serializers.ChoiceField(choices=UserProfile.GENDER_CHOICES, required=False, allow_null=True, allow_blank=True)
+    age = serializers.IntegerField(min_value=1, max_value=120, required=False, default=None, allow_null=True)
+    dob = serializers.DateField(required=False, default=None, allow_null=True)
     lat = serializers.FloatField(required=False, allow_null=True)
     long = serializers.FloatField(required=False, allow_null=True)
     city = serializers.CharField(required=False, allow_null=True, allow_blank=True)
     source = serializers.ChoiceField(required=False, default=IpdProcedureLead.DOCPRIMEWEB,
-                                     choices=IpdProcedureLead.SOURCE_CHOICES)
-    specialty = serializers.CharField(required=False, default=None)
-    num_of_chats = serializers.IntegerField(min_value=0, required=False, default=None)
-    comments = serializers.CharField(required=False, default=None)
-    data = serializers.JSONField(required=False, default=None)
+                                     choices=IpdProcedureLead.SOURCE_CHOICES, allow_null=True, allow_blank=True)
+    specialty = serializers.CharField(required=False, default=None, allow_blank=True, allow_null=True)
+    num_of_chats = serializers.IntegerField(min_value=0, required=False, default=None, allow_null=True)
+    comments = serializers.CharField(required=False, default=None, allow_blank=True, allow_null=True)
+    data = serializers.JSONField(required=False, default=None, allow_null=True)
 
     class Meta:
         model = IpdProcedureLead
@@ -2094,3 +2148,28 @@ class DoctorLicenceBodySerializer(serializers.Serializer):
         if attrs['doctor_id'].license:
             raise serializers.ValidationError('Licence Exists')
         return attrs
+
+
+class CommonConditionsSerializer(serializers.Serializer):
+    long = serializers.FloatField(default=77.071848)
+    lat = serializers.FloatField(default=28.450367)
+    city = serializers.CharField(required=False, allow_blank=True, allow_null=True)
+
+
+class IpdLeadUpdateSerializer(serializers.Serializer):
+    status = serializers.IntegerField()
+    matrix_lead_id = serializers.IntegerField()
+
+    def validate(self, attrs):
+        if not IpdProcedureLead.objects.filter(matrix_lead_id=attrs.get('matrix_lead_id')).exists():
+            raise serializers.ValidationError('Invalid Lead ID.')
+        return attrs
+
+
+class OfferSerializer(serializers.ModelSerializer):
+    coupon = serializers.CharField(source='coupon.code', read_only=True, default=None)
+    hospital = serializers.CharField(source='hospital.name', read_only=True, default=None)
+
+    class Meta:
+        model = Offer
+        fields = '__all__'

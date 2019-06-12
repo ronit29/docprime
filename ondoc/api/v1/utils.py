@@ -352,6 +352,14 @@ def labappointment_transform(app_data):
     app_data["user"] = app_data["user"].id
     app_data["profile"] = app_data["profile"].id
     app_data["home_pickup_charges"] = str(app_data.get("home_pickup_charges",0))
+    prescription_objects = app_data.get("prescription_list", [])
+    if prescription_objects:
+        prescription_id_list = []
+        for prescription_data in prescription_objects:
+            prescription_id_list.append({'prescription': prescription_data.get('prescription').id})
+        app_data["prescription_list"] = prescription_id_list
+
+
     if app_data.get("coupon"):
         app_data["coupon"] = list(app_data["coupon"])
     if app_data.get("user_plan"):
@@ -700,7 +708,7 @@ class CouponsMixin(object):
                     return {"is_valid": False, "used_count": 0}
 
             count = coupon_obj.used_coupon_count(user, cart_item)
-            total_used_count = coupon_obj.total_used_coupon_count()
+            total_used_count = coupon_obj.total_used_count
 
             if coupon_obj.is_user_specific and user:
                 user_specefic = UserSpecificCoupon.objects.filter(user=user, coupon=coupon_obj).first()
@@ -822,7 +830,7 @@ class CouponsMixin(object):
             else:
                 return False
 
-        return is_valid    
+        return is_valid
 
 
     def get_discount(self, coupon_obj, price):
@@ -868,6 +876,23 @@ class CouponsMixin(object):
 
         return {"total_price": total_price}
 
+    def get_applicable_tests_with_total_price_v2(self, **kwargs):
+        from ondoc.diagnostic.models import AvailableLabTest
+
+        lab = kwargs.get("lab")
+        test_ids = kwargs.get("test_ids")
+
+        queryset = AvailableLabTest.objects.filter(lab_pricing_group__labs=lab, test__in=test_ids)
+
+        total_price = 0
+        for test in queryset:
+            if test.custom_deal_price is not None:
+                total_price += test.custom_deal_price
+            else:
+                total_price += test.computed_deal_price
+
+        return {"total_price": total_price}
+
     def get_applicable_procedures_with_total_price(self, **kwargs):
         from ondoc.procedure.models import DoctorClinicProcedure
 
@@ -879,6 +904,21 @@ class CouponsMixin(object):
         queryset = DoctorClinicProcedure.objects.filter(doctor_clinic__doctor=doctor, doctor_clinic__hospital=hospital, procedure__in=procedures)
         if coupon_obj.procedures.exists():
             queryset = queryset.filter(procedure__in=coupon_obj.procedures.all())
+
+        total_price = 0
+        for procedure in queryset:
+            total_price += procedure.deal_price
+
+        return {"total_price": total_price}
+
+    def get_applicable_procedures_with_total_price_v2(self, **kwargs):
+        from ondoc.procedure.models import DoctorClinicProcedure
+
+        doctor = kwargs.get("doctor")
+        hospital = kwargs.get("hospital")
+        procedures = kwargs.get("procedures")
+
+        queryset = DoctorClinicProcedure.objects.filter(doctor_clinic__doctor=doctor, doctor_clinic__hospital=hospital, procedure__in=procedures)
 
         total_price = 0
         for procedure in queryset:
@@ -902,8 +942,17 @@ class TimeSlotExtraction(object):
     # AFTERNOON = "Afternoon"
     EVENING = "PM"
     TIME_SPAN = 30  # In minutes
+    TIME_SPAN_NUM = 0.5
+    DOCTOR_MAX_TIMING = 20.0
+    DOCTOR_BOOK_AFTER = 1
+    LAB_BOOK_AFTER = 2
+    LAB_HOMEPICKUP_BOOK_AFTER = 4
+    NO_OF_UPCOMING_SLOTS = 3
     timing = dict()
     price_available = dict()
+    time_division = list()
+    time_division.append(MORNING)
+    time_division.append(EVENING)
 
     def __init__(self):
         for i in range(7):
@@ -1217,7 +1266,7 @@ class TimeSlotExtraction(object):
         return today_min, tomorrow_min, today_max
 
     def get_upcoming_slots(self, time_slots):
-        no_of_slots = 3
+        no_of_slots = TimeSlotExtraction.NO_OF_UPCOMING_SLOTS
         next_day_slot = 0
         upcoming = OrderedDict()
         for key, value in time_slots.items():
@@ -1273,6 +1322,179 @@ class TimeSlotExtraction(object):
                 else:
                     return upcoming
 
+
+    def format_timing_to_datetime_v2(self, timings, total_leaves, booking_details, is_thyrocare=False):
+        timing_objects = OrderedDict()
+        today_date = datetime.date.today()
+        today_day = today_date.weekday()
+        for k in range(int(settings.NO_OF_WEEKS_FOR_TIME_SLOTS)):
+            for i in range(7):
+                if not (k == 0 and i < today_day):
+                    j = i + (k * 7) - today_day
+                    next_slot_date = today_date + datetime.timedelta(j)
+                    next_slot_date_str = str(next_slot_date)
+                    timing_objects[next_slot_date_str] = list()
+                    for data in timings:
+                        day = self.get_key_or_field_value(data, 'day')
+                        if i == day:
+                            start_hour = float(self.get_key_or_field_value(data, 'start', 0.0))
+                            end_hour = float(self.get_key_or_field_value(data, 'end', 23.75))
+                            time_before_end_hour = end_hour - TimeSlotExtraction.TIME_SPAN_NUM
+                            while start_hour <= time_before_end_hour:
+                                time_formatted = self.form_dc_time_v2(start_hour)
+                                clinic_datetime = datetime.datetime.combine(next_slot_date, time_formatted[0])
+
+                                leave_at_timeslot = False
+                                for leave in total_leaves:
+                                    if leave.get('start_datetime') <= clinic_datetime <= leave.get('end_datetime'):
+                                        leave_at_timeslot = True
+                                        break
+                                if not leave_at_timeslot:
+                                    if len(timing_objects[next_slot_date_str]) < len(self.time_division):
+                                        for division in self.time_division:
+                                            time_json = dict()
+                                            time_json['type'] = division
+                                            time_json['title'] = division
+                                            time_json['timing'] = list()
+                                            timing_objects[next_slot_date_str].append(time_json)
+                                    self.format_data_new_v2(timing_objects[next_slot_date_str], clinic_datetime, data, start_hour, time_formatted[1], booking_details, is_thyrocare)
+                                start_hour += TimeSlotExtraction.TIME_SPAN_NUM
+
+        return timing_objects
+
+    def form_dc_time_v2(self, time):
+        day_time_hour = int(time)
+        day_time_min = (time - day_time_hour) * 60
+
+        day_time_hour_am_pm = day_time_hour
+        if day_time_hour > 12:
+            day_time_hour_am_pm -= 12
+
+        day_time_hour_str_am_pm = str(int(day_time_hour_am_pm))
+        if int(day_time_hour_str_am_pm) < 10:
+            day_time_hour_str_am_pm = '0' + str(int(day_time_hour_str_am_pm))
+
+        day_time_min_str = str(int(day_time_min))
+        if int(day_time_min) < 10:
+            day_time_min_str = '0' + str(int(day_time_min))
+
+        time_str_am_pm = day_time_hour_str_am_pm + ":" + day_time_min_str
+        time_str = str(day_time_hour) + ":" + day_time_min_str
+        time_datetime = datetime.datetime.strptime(time_str, '%H:%M').time()
+
+        return [time_datetime, time_str_am_pm]
+
+
+    def format_data_new_v2(self, timing_date_obj, clinic_datetime, data, start_hour, start_hour_text, booking_details, is_thyrocare):
+        price = self.get_key_or_field_value(data, 'fees')
+        mrp = self.get_key_or_field_value(data, 'mrp')
+        deal_price = self.get_key_or_field_value(data, 'deal_price')
+        data_type = self.get_key_or_field_value(data, 'type', 1)
+        on_call = bool(data_type==2)
+        is_available = True
+        is_doctor = booking_details.get('type') == "doctor"
+        current_date_time = datetime.datetime.now()
+        booking_date = clinic_datetime
+        lab_tomorrow_time = 0.0
+        lab_minimum_time = None
+        doc_minimum_time = None
+        doctor_maximum_timing = TimeSlotExtraction.DOCTOR_MAX_TIMING
+        doc_booking_minimum_time = current_date_time
+        lab_booking_minimum_time = current_date_time
+
+        if is_doctor:
+            if current_date_time.date() == booking_date.date():
+                doc_booking_minimum_time = current_date_time + datetime.timedelta(hours=TimeSlotExtraction.DOCTOR_BOOK_AFTER)
+                doc_booking_hours = doc_booking_minimum_time.strftime('%H:%M')
+                hours, minutes = doc_booking_hours.split(':')
+                mins = int(hours) * 60 + int(minutes)
+                doc_minimum_time = mins / 60
+        else:
+            if is_thyrocare:
+                pass
+            else:
+                is_home_pickup = booking_details.get('is_home_pickup')
+                if is_home_pickup:
+                    if current_date_time.weekday() == 6:
+                        lab_minimum_time = 24.0
+                    if current_date_time.hour < 13:
+                        lab_booking_minimum_time = current_date_time + datetime.timedelta(hours=TimeSlotExtraction.LAB_HOMEPICKUP_BOOK_AFTER)
+                        lab_booking_hours = lab_booking_minimum_time.strftime('%H:%M')
+                        hours, minutes = lab_booking_hours.split(':')
+                        mins = int(hours) * 60 + int(minutes)
+                        lab_minimum_time = mins / 60
+                    elif current_date_time.hour >= 13 and current_date_time.hour < 17:
+                        lab_minimum_time = 24.0
+                    if current_date_time.hour >= 17:
+                        lab_minimum_time = 24.0
+                        lab_tomorrow_time = 12.0
+                else:
+                    lab_booking_minimum_time = current_date_time + datetime.timedelta(hours=TimeSlotExtraction.LAB_BOOK_AFTER)
+                    lab_booking_hours = lab_booking_minimum_time.strftime('%H:%M')
+                    hours, minutes = lab_booking_hours.split(':')
+                    mins = int(hours) * 60 + int(minutes)
+                    lab_minimum_time = mins / 60
+
+        data_list = dict()
+        if is_doctor:
+            will_doctor_data_append = False
+            if current_date_time.date() == booking_date.date():
+                if doc_booking_minimum_time.date() == booking_date.date():
+                    if on_call == False:
+                        if start_hour >= float(doc_minimum_time) and start_hour <= doctor_maximum_timing:
+                            will_doctor_data_append = True
+                        else:
+                            pass
+                    else:
+                        pass
+            else:
+                if start_hour <= doctor_maximum_timing:
+                    will_doctor_data_append = True
+                else:
+                    pass
+
+            if will_doctor_data_append:
+                data_list = {"value": start_hour, "text": start_hour_text, "price": price, "is_price_zero": True if price is not None and price == 0 else False, "mrp": mrp, 'deal_price': deal_price,
+                             "is_available": is_available, "on_call": on_call}
+        else:
+            will_lab_data_append = False
+            next_date = current_date_time + datetime.timedelta(days=1)
+            if current_date_time.date() == booking_date.date():
+                if lab_booking_minimum_time.date() == booking_date.date():
+                    if start_hour >= float(lab_minimum_time):
+                        will_lab_data_append = True
+                    else:
+                        pass
+            elif next_date.date() == booking_date.date():
+                if lab_tomorrow_time:
+                    if start_hour >= float(lab_tomorrow_time):
+                        will_lab_data_append = True
+                    else:
+                        pass
+                else:
+                    will_lab_data_append = True
+
+            else:
+                will_lab_data_append = True
+
+            if will_lab_data_append:
+                data_list = {"value": start_hour, "text": start_hour_text, "price": price, "is_available": is_available, "on_call": on_call}
+
+        time_type = self.time_division.index(self.get_day_slot(start_hour))
+        if not timing_date_obj[time_type].get('timing'):
+            timing_date_obj[time_type]['timing'] = list()
+
+        timing_date_obj[time_type]['timing'].append(data_list) if data_list else None;
+
+    def get_key_or_field_value(self, obj, key, default_value=None):
+        if hasattr(obj, key):
+            return getattr(obj, key)
+        else:
+            if type(obj) is dict and obj.get(key):
+                return obj[key]
+            else:
+                return default_value
+
 def consumers_balance_refund():
     from ondoc.account.models import ConsumerAccount, ConsumerRefund
     refund_time = timezone.now() - timezone.timedelta(hours=settings.REFUND_INACTIVE_TIME)
@@ -1302,6 +1524,7 @@ def get_opd_pem_queryset(user, model):
     #                              super_user_permission=false AND is_disabled=false AND permission_type=1) > 0) THEN 1  ELSE 0 END'''
     # billing_query = '''CASE WHEN ((SELECT COUNT(id) FROM generic_admin WHERE user_id=%s AND hospital_id=hospital.id AND
     #                                super_user_permission=false AND is_disabled=false AND permission_type=2) > 0) THEN 1  ELSE 0 END'''
+    from ondoc.doctor.models import OpdAppointment
     queryset = model.objects \
         .select_related('doctor', 'hospital', 'user') \
         .prefetch_related('doctor__manageable_doctors', 'hospital__manageable_hospitals', 'doctor__images',
@@ -1309,6 +1532,7 @@ def get_opd_pem_queryset(user, model):
                           'doctor__qualifications__specialization', 'doctor__qualifications__college',
                           'doctor__doctorpracticespecializations', 'doctor__doctorpracticespecializations__specialization') \
         .filter(
+        ~Q(status=OpdAppointment.CREATED),
         Q(
             Q(doctor__manageable_doctors__user=user,
               doctor__manageable_doctors__hospital=F('hospital'),
@@ -1560,3 +1784,17 @@ def ipd_query_parameters(entity, req_params):
     if entity.locality_value:
         params_dict['city'] = entity.locality_value
     return params_dict
+
+
+def convert_datetime_str_to_iso_str(datetime_string_to_be_converted):
+    try:
+        from dateutil import parser
+        datetime_obj = parser.parse(datetime_string_to_be_converted)
+        datetime_str = datetime_obj.isoformat()
+        if datetime_str.endswith('+00:00'):
+            datetime_str = datetime_str[:-6] + 'Z'
+        result = datetime_str
+    except Exception as e:
+        print(e)
+        result = datetime_string_to_be_converted
+    return result
