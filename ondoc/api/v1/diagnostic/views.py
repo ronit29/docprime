@@ -2768,7 +2768,7 @@ class LabTimingListView(mixins.ListModelMixin,
                 integrator_obj = service.create_integrator_obj(class_name)
                 lab_timings = integrator_obj.get_appointment_slots(pincode, date, is_home_pickup=for_home_pickup)
 
-        resp_data = {"timeslots": lab_timings.get('timeslots', []),
+        resp_data = {"timeslots": lab_timings.get('time_slots', []),
                      "upcoming_slots": lab_timings.get('upcoming_slots', []),
                      "is_thyrocare": lab_timings.get('is_thyrocare', False)}
         if hasattr(request, "agent") and request.agent:
