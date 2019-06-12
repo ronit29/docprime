@@ -1,3 +1,8 @@
+from django.contrib.gis.db.models.functions import Distance
+from django.contrib.gis.geos import GEOSGeometry
+from django.db.models import Window
+from django.db.models.functions import RowNumber
+from django.db.models.expressions import RawSQL
 from copy import deepcopy
 import json
 import requests
@@ -240,6 +245,7 @@ class Hospital(auth_model.TimeStampedModel, auth_model.CreatedByModel, auth_mode
     is_location_verified = models.BooleanField(verbose_name='Location Verified', default=False)
     auto_ivr_enabled = models.BooleanField(default=True)
     priority_score = models.IntegerField(default=0, null=False, blank=False)
+    google_avg_rating = models.DecimalField(max_digits=5, decimal_places=2, null=True, editable=False)
 
     def __str__(self):
         return self.name
@@ -255,6 +261,47 @@ class Hospital(auth_model.TimeStampedModel, auth_model.CreatedByModel, auth_mode
     #         self.city_search_key = search_city
     #         return self.city
     #     return None
+    @staticmethod
+    def get_top_hospitals_data(request, lat=28.450367, long=77.071848):
+        from ondoc.api.v1.doctor.serializers import TopHospitalForIpdProcedureSerializer
+        result = []
+        queryset = CommonHospital.objects.all().values_list('hospital', 'network')
+        top_hospital_ids = list(set([x[0] for x in queryset if x[0] is not None]))
+        top_network_ids = list(set([x[1] for x in queryset if x[1] is not None]))
+        point_string = 'POINT(' + str(long) + ' ' + str(lat) + ')'
+        pnt = GEOSGeometry(point_string, srid=4326)
+        temp_hosp_queryset = Hospital.objects.filter(is_live=True)
+        if top_network_ids:
+            network_hospital_queryset = temp_hosp_queryset.filter(network__in=top_network_ids)
+            network_hospitals = network_hospital_queryset.annotate(
+                distance=Distance('location', pnt)).annotate(rank=Window(expression=RowNumber(), order_by=F('distance').asc(),
+                            partition_by=[RawSQL('Coalesce(network_id, random())', [])])
+            )
+            for x in network_hospitals:
+                if x.rank == 1:
+                    top_hospital_ids.append(x.id)
+        hosp_queryset = Hospital.objects.prefetch_related('hospitalcertification_set',
+                                                          'hospital_documents',
+                                                          'hosp_availability',
+                                                          'health_insurance_providers',
+                                                          'network__hospital_network_documents',
+                                                          'hospitalspeciality_set').filter(
+            id__in=top_hospital_ids).annotate(
+            distance=Distance('location', pnt)).order_by('distance')
+        temp_hospital_ids = hosp_queryset.values_list('id', flat=True)
+        hosp_entity_dict, hosp_locality_entity_dict = Hospital.get_hosp_and_locality_dict(temp_hospital_ids,
+                                                                                          EntityUrls.SitemapIdentifier.HOSPITALS_LOCALITY_CITY)
+
+        result = TopHospitalForIpdProcedureSerializer(hosp_queryset, many=True, context={'request': request,
+                                                                                         'hosp_entity_dict': hosp_entity_dict,
+                                                                                         'hosp_locality_entity_dict': hosp_locality_entity_dict}).data
+        return result
+
+
+    @classmethod
+    def update_hosp_google_avg_rating(cls):
+        update_hosp_google_ratings = RawSql('''update hospital h set google_avg_rating = (select (reviews->>'user_avg_rating')::float from hospital_place_details 
+                                         where hospital_id=h.id limit 1)''', [] ).execute()
 
     def get_active_opd_appointments(self, user=None, user_insurance=None, appointment_date=None):
 
@@ -507,6 +554,46 @@ class Hospital(auth_model.TimeStampedModel, auth_model.CreatedByModel, auth_mode
                 break
         return result
 
+    def get_specialization_insured_appointments(self, doctor, insurance):
+        days = insurance.specialization_days_limit
+        n_days_back_datetime = timezone.now() - datetime.timedelta(days=days)
+
+        limit_specialization_ids = json.loads(settings.INSURANCE_SPECIALIZATION_WITH_DAYS_LIMIT)
+        limit_specialization_ids_set = set(limit_specialization_ids)
+        doctor_specialization_ids = set([x.specialization_id for x in doctor.doctorpracticespecializations.all()])
+
+        if not limit_specialization_ids_set.intersection(doctor_specialization_ids):
+            return []
+
+        doctor_with_specialization = DoctorPracticeSpecialization.objects. \
+            filter(specialization_id__in=limit_specialization_ids).values_list('doctor_id', flat=True)
+
+        appointments = self.hospital_appointments.filter(insurance=insurance,
+                                                         user=insurance.user,
+                                                         time_slot_start__gte=n_days_back_datetime,
+                                                         doctor_id__in=doctor_with_specialization).\
+            exclude(status__in=[OpdAppointment.CANCELLED]).order_by('-time_slot_start')
+
+        return appointments
+
+    def get_blocked_specialization_appointments_slots(self, doctor, insurance):
+        blockeds_timeslots = []
+        appointments = self.get_specialization_insured_appointments(doctor, insurance)
+
+        if not appointments:
+            return blockeds_timeslots
+
+        days = insurance.specialization_days_limit
+        for appointment in appointments:
+            for n in range(days):
+                nth_day_future_timeslot = appointment.time_slot_start.date() + datetime.timedelta(days=n)
+                nth_day_past_timeslot = appointment.time_slot_start.date() - datetime.timedelta(days=n)
+                blockeds_timeslots.append(str(nth_day_future_timeslot))
+                if nth_day_past_timeslot >= timezone.now().date():
+                    blockeds_timeslots.append(str(nth_day_past_timeslot))
+
+        return blockeds_timeslots
+
 
 class HospitalPlaceDetails(auth_model.TimeStampedModel):
     hospital = models.ForeignKey(Hospital, on_delete=models.CASCADE, related_name='hospital_place_details')
@@ -519,6 +606,14 @@ class HospitalPlaceDetails(auth_model.TimeStampedModel):
 
     def save(self, *args, **kwargs):
         super().save(*args, **kwargs)
+
+    @classmethod
+    def update_hosp_place_with_google_api_details(cls):
+        query = RawSql(''' insert into hospital_place_details(place_id, hospital_id, place_details,reviews, created_at,updated_at)
+                select (json_array_elements(clinic_place_search::json ->'candidates')->>'place_id') as place_id, hospital_id , clinic_detail::json as place_details,
+                json_build_object('user_ratings_total',clinic_detail::json->'result'->'user_ratings_total', 'user_avg_rating',
+                clinic_detail::json->'result'->'rating', 'user_reviews', clinic_detail::json->'result'->'reviews' ) as reviews, now(), now() 
+                from google_api_details where hospital_id is not null ''', []).execute()
 
     @classmethod
     def update_place_details(cls):
@@ -1123,6 +1218,16 @@ class Doctor(auth_model.TimeStampedModel, auth_model.QCModel, SearchKey, auth_mo
         sticker.save()
         return sticker
 
+    def get_leaves(self):
+        leave_range = list()
+        doctor_leaves = self.leaves.filter(deleted_at__isnull=True)
+        for dl in doctor_leaves:
+            start_datetime = datetime.datetime.combine(dl.start_date, dl.start_time)
+            end_datetime = datetime.datetime.combine(dl.end_date, dl.end_time)
+            leave_range.append({'start_datetime': start_datetime, 'end_datetime': end_datetime})
+        return leave_range
+
+
     def is_doctor_specialization_insured(self):
         dps = self.doctorpracticespecializations.all()
         if len(dps) == 0:
@@ -1282,6 +1387,24 @@ class DoctorClinic(auth_model.TimeStampedModel, auth_model.WelcomeCallingDone):
         upcoming_slots = obj.get_upcoming_slots(time_slots=slots)
         res_data = {"time_slots": slots, "upcoming_slots": upcoming_slots}
         return res_data
+
+
+
+    def get_timings_v2(self, total_leaves, blocks=[]):
+        clinic_timings = self.availability.order_by("start")
+        booking_details = dict()
+        booking_details['type'] = 'doctor'
+        timeslot_object = TimeSlotExtraction()
+        clinic_timings = timeslot_object.format_timing_to_datetime_v2(clinic_timings, total_leaves, booking_details)
+
+        if clinic_timings:
+            for b in blocks:
+                clinic_timings.pop(b, None)
+
+        upcoming_slots = timeslot_object.get_upcoming_slots(time_slots=clinic_timings)
+        timing_response = {"timeslots": clinic_timings, "upcoming_slots": upcoming_slots}
+        return timing_response
+
 
 
 class DoctorClinicTiming(auth_model.TimeStampedModel):
@@ -2076,6 +2199,19 @@ class OpdAppointment(auth_model.TimeStampedModel, CouponsMixin, OpdAppointmentIn
             return coupon.corporate_deal.id
 
         return None
+
+    def get_all_prescriptions(self):
+        from ondoc.common.utils import get_file_mime_type
+
+        resp = []
+        for pres in self.prescriptions.all():
+            for pf in pres.prescription_file.all():
+                file = pf.name
+                mime_type = get_file_mime_type(file)
+                file_url = pf.name.url
+                resp.append({"url": file_url, "type": mime_type})
+        return resp
+
 
     def get_city(self):
         if self.hospital and self.hospital.matrix_city:
@@ -3719,3 +3855,12 @@ class SelectedInvoiceItems(auth_model.TimeStampedModel):
 
     class Meta:
         db_table = "selected_invoice_items"
+
+
+class CommonHospital(auth_model.TimeStampedModel):
+    hospital = models.ForeignKey(Hospital, on_delete=models.CASCADE, null=True, blank=True)
+    network = models.ForeignKey(HospitalNetwork, on_delete=models.CASCADE, null=True, blank=True)
+    priority = models.PositiveIntegerField(default=0)
+
+    class Meta:
+        db_table = "common_hospital"

@@ -6,5 +6,9 @@ Doctor Name : Dr. {{doctor_name|capfirst}}
 {{clinic_or_hospital}} : {{instance.hospital.name|capfirst}}
 {{clinic_or_hospital}} Address : {{instance.hospital.get_hos_address}}
 Appointment Date and Time : {{instance.time_slot_start|date:"D jS F Y"}} || {{instance.time_slot_start|date:"h:i A"}}
+{% if instance.payment_type == 2 %}
+Please pay Rs {{cod_amount}} at the center at the time of appointment.
+{% endif %}
+
 
 You will receive a confirmation email and message once the appointment is confirmed.

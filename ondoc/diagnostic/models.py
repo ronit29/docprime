@@ -153,7 +153,7 @@ class HomePickupCharges(models.Model):
     content_object = GenericForeignKey()
 
 
-class Lab(TimeStampedModel, CreatedByModel, QCModel, SearchKey, WelcomeCallingDone, UrlsModel):
+class Lab(TimeStampedModel, CreatedByModel, QCModel, SearchKey, WelcomeCallingDone, auth_model.SoftDelete, UrlsModel):
     NOT_ONBOARDED = 1
     REQUEST_SENT = 2
     ONBOARDED = 3
@@ -664,6 +664,29 @@ class Lab(TimeStampedModel, CreatedByModel, QCModel, SearchKey, WelcomeCallingDo
         upcoming_slots = obj.get_upcoming_slots(time_slots=resp_list)
         res_data = {"time_slots": resp_list, "upcoming_slots": upcoming_slots, "is_thyrocare": False}
         return res_data
+
+    def get_timing_v2(self, is_home_pickup):
+        if not is_home_pickup and self.always_open:
+            lab_timing_queryset = list()
+            for day in range(0, 7):
+                lab_timing = {'day': day, 'start': 0.0, 'end': 23.75}
+                lab_timing_queryset.append(lab_timing)
+        else:
+            lab_timing_queryset = self.lab_timings.filter(for_home_pickup=is_home_pickup)
+
+        global_non_bookables = GlobalNonBookable.get_non_bookables(GlobalNonBookable.LAB)
+        total_leaves = global_non_bookables
+
+        booking_details = {"type": "lab", "is_home_pickup": is_home_pickup}
+        timeslot_object = TimeSlotExtraction()
+        is_thyrocare = False
+        if self.id and settings.THYROCARE_NETWORK_ID:
+            if Lab.objects.filter(id=self.id, network_id=settings.THYROCARE_NETWORK_ID).exists():
+                is_thyrocare = True
+        timeslots = timeslot_object.format_timing_to_datetime_v2(lab_timing_queryset, total_leaves, booking_details, is_thyrocare)
+        upcoming_slots = timeslot_object.get_upcoming_slots(time_slots=timeslots)
+        timing_response = {"timeslots": timeslots, "upcoming_slots": upcoming_slots, "is_thyrocare": is_thyrocare}
+        return timing_response
 
     def get_available_slots(self, is_home_pickup, pincode, date):
         from ondoc.integrations.models import IntegratorTestMapping
@@ -1716,6 +1739,19 @@ class LabAppointment(TimeStampedModel, CouponsMixin, LabAppointmentInvoiceMixin,
                 set([report_file.name.url for report_file in report.files.all() if report_file.name.url.rsplit('.',1)[1].lower() != 'xml']))
         report_file_links = [util_absolute_url(report_file_link) for report_file_link in report_file_links]
         return list(report_file_links)
+
+    def get_report_type(self):
+        from ondoc.common.utils import get_file_mime_type
+        resp = []
+        for pres in self.reports.all():
+            for pf in pres.files.all():
+                file = pf.name
+                mime_type = get_file_mime_type(file)
+                if not mime_type == None:
+                    file_url = pf.name.url
+                    resp.append({"url": file_url, "type": mime_type})
+        return resp
+
 
     def get_reports(self):
         return self.reports.all()

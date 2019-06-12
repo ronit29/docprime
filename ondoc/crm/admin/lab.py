@@ -19,7 +19,7 @@ from django.utils import timezone
 from django.utils.timezone import make_aware
 from django.utils.html import format_html_join
 import pytz
-
+from django.contrib import messages
 from ondoc.account.models import Order, Invoice
 from ondoc.api.v1.utils import util_absolute_url, util_file_name, datetime_to_formated_string
 from ondoc.common.models import AppointmentHistory
@@ -540,11 +540,41 @@ class LabAdmin(ImportExportMixin, admin.GeoModelAdmin, VersionAdmin, ActionAdmin
     list_display = ('name', 'lab_logo', 'updated_at', 'onboarding_status', 'data_status', 'welcome_calling_done',
                     'list_created_by', 'list_assigned_to', 'get_onboard_link',)
     # readonly_fields=('onboarding_status', )
-    list_filter = ('data_status', 'welcome_calling_done', 'onboarding_status', 'is_insurance_enabled',
+    list_filter = ('data_status', 'enabled', 'welcome_calling_done', 'onboarding_status', 'is_insurance_enabled',
                    LabCityFilter, CreatedByFilter)
     exclude = ('search_key', 'pathology_agreed_price_percentage', 'pathology_deal_price_percentage',
                'radiology_agreed_price_percentage', 'radiology_deal_price_percentage', 'live_at',
                'onboarded_at', 'qc_approved_at', 'disabled_at', 'welcome_calling_done_at')
+
+    def has_delete_permission(self, request, obj=None):
+        return super().has_delete_permission(request, obj)
+
+    def delete_view(self, request, object_id, extra_context=None):
+        obj = self.model.objects.filter(id=object_id).first()
+        lab_appointment = LabAppointment.objects.filter(lab_id=object_id).first()
+        content_type = ContentType.objects.get_for_model(obj)
+        if lab_appointment:
+            messages.set_level(request, messages.ERROR)
+            messages.error(request, '{} could not deleted, as {} is present in appointment history'.format(content_type.model, content_type.model))
+            return HttpResponseRedirect(reverse('admin:{}_{}_change'.format(content_type.app_label,
+                                                                     content_type.model), args=[object_id]))
+        if not obj:
+            pass
+        elif obj.enabled == False:
+            pass
+        else:
+            messages.set_level(request, messages.ERROR)
+            messages.error(request, '{} should be disable before delete'.format(content_type.model))
+            return HttpResponseRedirect(reverse('admin:{}_{}_change'.format(content_type.app_label,
+                                                                            content_type.model), args=[object_id]))
+        return super().delete_view(request, object_id, extra_context)
+
+    def get_actions(self, request):
+        actions = super().get_actions(request)
+        if 'delete_selected' in actions:
+            del actions['delete_selected']
+        return actions
+
     form = LabForm
     search_fields = ['name', 'lab_pricing_group__group_name', ]
     inlines = [LabDoctorInline, LabServiceInline, LabDoctorAvailabilityInline, LabCertificationInline, LabAwardInline,
@@ -757,8 +787,9 @@ class LabAppointmentForm(RefundableAppointmentForm):
     def clean(self):
         super().clean()
         cleaned_data = self.cleaned_data
-        if self.request.user.groups.filter(name=constants['OPD_APPOINTMENT_MANAGEMENT_TEAM']).exists() and cleaned_data.get('status') == LabAppointment.BOOKED:
-            raise forms.ValidationError("Form cant be Saved with Booked Status.")
+        # Appointments are now made with CREATED status.
+        # if self.request.user.groups.filter(name=constants['OPD_APPOINTMENT_MANAGEMENT_TEAM']).exists() and cleaned_data.get('status') == LabAppointment.BOOKED:
+        #     raise forms.ValidationError("Form cant be Saved with Booked Status.")
         if cleaned_data.get('start_date') and cleaned_data.get('start_time'):
             date_time_field = str(cleaned_data.get('start_date')) + " " + str(cleaned_data.get('start_time'))
             dt_field = parse_datetime(date_time_field)
@@ -769,6 +800,9 @@ class LabAppointmentForm(RefundableAppointmentForm):
             hour = round(float(time_slot_start.hour) + (float(time_slot_start.minute) * 1 / 60), 2)
         else:
             raise forms.ValidationError("Invalid start date and time.")
+
+        if time_slot_start != self.instance.time_slot_start and time_slot_start < timezone.now():
+            raise forms.ValidationError("Time slot can never be in past. Please add time slot in future.")
 
         if self.instance.id:
             lab_test = self.instance.test_mappings.all()

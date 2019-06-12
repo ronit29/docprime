@@ -1172,7 +1172,8 @@ class OpdNotification(Notification):
             "email_banners": email_banners_html if email_banners_html is not None else "",
             "opd_appointment_complete_url": generate_short_url(opd_appointment_complete_url),
             "opd_appointment_feedback_url": generate_short_url(opd_appointment_feedback_url),
-            "reschdule_appointment_bypass_url": generate_short_url(reschdule_appointment_bypass_url)
+            "reschdule_appointment_bypass_url": generate_short_url(reschdule_appointment_bypass_url),
+            "show_amounts": bool(self.appointment.payment_type != OpdAppointment.INSURANCE)
         }
         return context
 
@@ -1348,6 +1349,7 @@ class LabNotification(Notification):
             "lab_appointment_complete_url": generate_short_url(lab_appointment_complete_url),
             "lab_appointment_feedback_url": generate_short_url(lab_appointment_feedback_url),
             "reschedule_appointment_bypass_url": generate_short_url(reschedule_appointment_bypass_url),
+            "show_amounts": bool(self.appointment.payment_type != OpdAppointment.INSURANCE)
         }
         return context
 
