@@ -251,6 +251,16 @@ class GlobalNonBookable(TimeStampedModel):
         end_time = round(float(end_time.hour) + (float(end_time.minute) * 1 / 60), 2)
         return end_time
 
+    @classmethod
+    def get_non_bookables(self, booking_type=DOCTOR):
+        non_bookables_range = list()
+        non_bookables = self.objects.filter(deleted_at__isnull=True, booking_type=booking_type)
+        for nb in non_bookables:
+            start_datetime = datetime.datetime.combine(nb.start_date, nb.start_time)
+            end_datetime = datetime.datetime.combine(nb.end_date, nb.end_time)
+            non_bookables_range.append({'start_datetime': start_datetime, 'end_datetime': end_datetime})
+        return non_bookables_range
+
     class Meta:
         db_table = 'global_non_bookable_timing'
 
