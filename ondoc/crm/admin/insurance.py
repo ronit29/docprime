@@ -13,7 +13,7 @@ from ondoc.diagnostic.models import LabAppointment, LabTest, Lab
 from ondoc.insurance.models import InsurancePlanContent, InsurancePlans, InsuredMembers, UserInsurance, StateGSTCode, \
      ThirdPartyAdministrator, InsuranceEligibleCities, InsuranceCity, InsuranceDistrict, InsuranceDeal, \
     InsurerPolicyNumber, InsuranceLead, EndorsementRequest, InsuredMemberDocument, InsuranceEligibleCities,\
-    InsuranceThreshold, UserBank, InsuredMemberHistory, UserBankDocument
+    InsuranceThreshold, UserBank, InsuredMemberHistory, UserBankDocument, InsurerAccountTransfer
 from import_export.admin import ImportExportMixin, ImportExportModelAdmin, base_formats
 import nested_admin
 from import_export import fields, resources
@@ -31,9 +31,19 @@ class InsurerAdmin(admin.ModelAdmin):
     search_fields = ['name']
 
 
+class InsurerFloatForm(forms.ModelForm):
+
+    def clean(self):
+        super().clean()
+        # data = self.cleaned_data
+        if self.instance.id:
+            raise forms.ValidationError('Insurer Account can not be editable')
+
+
 class InsurerFloatAdmin(admin.ModelAdmin):
-    list_display = ['insurer']
-    readonly_fields = ['insurer', 'current_float']
+    list_display = ['apd_account_name', 'insurer']
+    form = InsurerFloatForm
+    # readonly_fields = ['insurer', 'current_float']
 
 
 class InsurancePlanContentInline(admin.TabularInline):
@@ -46,9 +56,26 @@ class InsurancePlanContentInline(admin.TabularInline):
     # readonly_fields = ("first_name", 'last_name', 'relation', 'dob', 'gender', )
 
 
+class PolicyNumberFormset(forms.models.BaseInlineFormSet):
+    def clean(self):
+        if not self.forms:
+            raise forms.ValidationError('Master Policy Number must have at least one Policy Number')
+        for form in self.forms:
+            data = form.cleaned_data
+            if not data.get('insurer'):
+                raise forms.ValidationError('Master Policy Number must have at least one insurer')
+            if not data.get('insurance_plan'):
+                raise forms.ValidationError('Master Policy Number must have at least one insurance plan')
+            if not data.get('apd_account'):
+                raise forms.ValidationError('Master Policy Number must have at least one APD account')
+            if not data.get('insurer_policy_number'):
+                raise forms.ValidationError('Master Policy Number must have at least one Policy Number')
+
+
 class InsurerPolicyNumberInline(admin.TabularInline):
+    formset = PolicyNumberFormset
     model = InsurerPolicyNumber
-    fields = ('insurer', 'insurer_policy_number')
+    fields = ('insurer', 'apd_account', 'insurer_policy_number')
     extra = 0
 
 
@@ -78,8 +105,8 @@ class InsuranceThresholdInline(admin.TabularInline):
 
 class InsurancePlansAdmin(admin.ModelAdmin):
 
-    list_display = ['insurer', 'name','internal_name', 'amount', 'is_selected','get_policy_prefix']
-    inlines = [InsurancePlanContentInline, InsurerPolicyNumberInline,InsuranceThresholdInline]
+    list_display = ['insurer', 'name', 'internal_name', 'amount', 'is_selected','get_policy_prefix']
+    inlines = [InsurancePlanContentInline, InsurerPolicyNumberInline, InsuranceThresholdInline]
     search_fields = ['name']
     form = InsurancePlanAdminForm
 
@@ -88,8 +115,6 @@ class InsuranceThresholdAdmin(admin.ModelAdmin):
 
     list_display = ['insurance_plan']
 
-
-# class InsuranceTransaction
 
 class InsuredMembersInline(admin.TabularInline):
     model = InsuredMembers
@@ -793,7 +818,6 @@ class UserInsuranceForm(forms.ModelForm):
     cancel_reason = forms.CharField(max_length=400, required=False)
     cancel_case_type = forms.ChoiceField(choices=case_choices, initial=UserInsurance.REFUND)
 
-
     def clean(self):
         super().clean()
         data = self.cleaned_data
@@ -985,20 +1009,27 @@ class InsuranceDistrictAdmin(ImportExportModelAdmin):
     list_display = ('id', 'district_code', 'district_name', 'state')
 
 
-# class InsurerPolicyNumberForm(forms.ModelForm):
-#
-#     class Meta:
-#         widgets = {
-#             'insurer': autocomplete.ModelSelect2(url='insurer-autocomplete'),
-#             'insurance_plan': autocomplete.ModelSelect2(url='insurance-plan-autocomplete', forward=['insurer'])
-#         }
+class InsurerPolicyNumberForm(forms.ModelForm):
+    def clean(self):
+        super().clean()
+        if any(self.errors):
+            return
+        data = self.cleaned_data
+        if not data.get('apd_account'):
+            raise forms.ValidationError('Apd Account is mandatory for Policy Number')
+        if not data.get('insurance_plan'):
+            raise forms.ValidationError('Insurance Plan is mandatory for Policy Number')
+        if not data.get('insurer_policy_number'):
+            raise forms.ValidationError('Insurance Policy number is mandatory for Policy Number')
+        if not data.get('insurer'):
+            raise forms.ValidationError('Insurer is mandatory for Policy Number')
 
 
 class InsurerPolicyNumberAdmin(admin.ModelAdmin):
     model = InsurerPolicyNumber
-    fields = ('insurer', 'insurance_plan', 'insurer_policy_number')
-    list_display = ('insurer', 'insurance_plan', 'insurer_policy_number', 'created_at')
-    # form = InsurerPolicyNumberForm
+    fields = ('insurer', 'insurance_plan', 'insurer_policy_number', 'apd_account')
+    list_display = ('insurer', 'insurance_plan', 'insurer_policy_number', 'apd_account', 'created_at')
+    form = InsurerPolicyNumberForm
     # search_fields = ['insurer']
     # autocomplete_fields = ['insurer', 'insurance_plan']
 
@@ -1339,3 +1370,7 @@ class ThirdPartyAdministratorAdmin(ImportExportMixin, admin.ModelAdmin):
     resource_class = ThirdPartyAdministratorResource
     search_fields = ['name']
     list_display = ['id', 'name']
+
+
+class InsurerAccountTransferAdmin(admin.ModelAdmin):
+    model = InsurerAccountTransfer
