@@ -4,7 +4,9 @@ from django.db import models, transaction
 from ondoc.authentication import models as auth_model
 from ondoc.authentication.models import User, UserProfile
 from ondoc.common.models import Feature, AppointmentHistory
-from ondoc.doctor.models import DoctorClinic, SearchKey, Hospital, PracticeSpecialization, HealthInsuranceProvider
+from ondoc.coupon.models import Coupon
+from ondoc.doctor.models import DoctorClinic, SearchKey, Hospital, PracticeSpecialization, HealthInsuranceProvider, \
+    HospitalNetwork
 from collections import deque, OrderedDict
 
 from ondoc.insurance.models import ThirdPartyAdministrator
@@ -142,10 +144,12 @@ class IpdProcedureLead(auth_model.TimeStampedModel):
     DOCPRIMECHAT = 'docprimechat'
     CRM = 'crm'
     DOCPRIMEWEB = "docprimeweb"
+    COST_ESTIMATE = "Costestimate"
 
     SOURCE_CHOICES = [(DOCPRIMECHAT, 'DocPrime Chat'),
                       (CRM, 'CRM'),
-                      (DOCPRIMEWEB, "DocPrime Web")]
+                      (DOCPRIMEWEB, "DocPrime Web"),
+                      (COST_ESTIMATE, "Cost Estimate")]
 
     STATUS_CHOICES = [(None, "--Select--"), (NEW, 'NEW'), (COST_REQUESTED, 'COST_REQUESTED'),
                       (COST_SHARED, 'COST_SHARED'), (OPD, 'OPD'), (VALID, 'VALID'), (CONTACTED, 'CONTACTED'),
@@ -579,6 +583,21 @@ class SimilarIpdProcedureMapping(auth_model.TimeStampedModel):
     class Meta:
         db_table = "similar_ipd_procedure_mapping"
         unique_together = (('ipd_procedure', 'similar_ipd_procedure'),)
+
+
+class Offer(auth_model.TimeStampedModel):
+    title = models.CharField(max_length=500)
+    is_live = models.BooleanField(default=False)
+    coupon = models.ForeignKey(Coupon, null=True, blank=True, on_delete=models.SET_NULL)
+    description = models.CharField(max_length=5000, null=True, blank=True)
+    show_tnc = models.BooleanField(default=False)
+    tnc = models.TextField(null=True, blank=True)
+    ipd_procedure = models.ForeignKey(IpdProcedure, null=True, blank=True, on_delete=models.CASCADE, related_name='ipd_offers')
+    hospital = models.ForeignKey(Hospital, null=True, blank=True, on_delete=models.CASCADE, related_name='hospital_offers')
+    network = models.ForeignKey(HospitalNetwork, null=True, blank=True, on_delete=models.CASCADE, related_name='network_offers')
+
+    class Meta:
+        db_table = 'offer'
 
 
 class IpdProcedureLeadCostEstimateMapping(models.Model):

@@ -451,6 +451,21 @@ class IpdProcedureLeadAdmin(VersionAdmin):
         return result
 
 
+class OfferAdminForm(forms.ModelForm):
+    tnc = forms.CharField(widget=forms.Textarea, required=False)
+
+    class Media:
+        js = ('https://cdn.ckeditor.com/ckeditor5/10.1.0/classic/ckeditor.js', 'offer/js/init.js')
+        css = {'all': ('offer/css/style.css',)}
+
+
+class OfferAdmin(VersionAdmin):
+    autocomplete_fields = ['coupon', 'ipd_procedure', 'hospital', 'network']
+    list_display = ['id', 'title', 'is_live']
+    list_filter = ['is_live']
+    form = OfferAdminForm
+
+
 class IpdCostEstimateRoomTypeAdmin(VersionAdmin):
     model = IpdCostEstimateRoomType
     list_display = ['room_type']

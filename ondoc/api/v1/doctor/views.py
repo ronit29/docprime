@@ -30,7 +30,7 @@ from ondoc.account import models as account_models
 from ondoc.location.models import EntityUrls, EntityAddress, DefaultRating
 from ondoc.procedure.models import Procedure, ProcedureCategory, CommonProcedureCategory, ProcedureToCategoryMapping, \
     get_selected_and_other_procedures, CommonProcedure, CommonIpdProcedure, IpdProcedure, DoctorClinicIpdProcedure, \
-    IpdProcedureFeatureMapping, IpdProcedureDetail, SimilarIpdProcedureMapping, IpdProcedureLead
+    IpdProcedureFeatureMapping, IpdProcedureDetail, SimilarIpdProcedureMapping, IpdProcedureLead, Offer
 from ondoc.seo.models import NewDynamic
 from . import serializers
 from ondoc.api.v2.doctor import serializers as v2_serializers
@@ -47,10 +47,10 @@ from rest_framework import mixins
 from rest_framework.response import Response
 from rest_framework import status, permissions
 from rest_framework.permissions import IsAuthenticated
-from ondoc.authentication.backends import JWTAuthentication
+from ondoc.authentication.backends import JWTAuthentication, MatrixAuthentication
 from django.utils import timezone
 from django.db import transaction
-from django.http import Http404
+from django.http import Http404, HttpResponse
 from django.db.models import Q, Value, Case, When
 from operator import itemgetter
 from itertools import groupby,chain
@@ -1872,6 +1872,9 @@ class DoctorListViewSet(viewsets.GenericViewSet):
             ratings = validated_data.get('ratings')
         if validated_data.get('reviews'):
             reviews = validated_data.get('reviews')
+        hospital_req_data = {}
+        if validated_data.get('hospital_id'):
+            hospital_req_data = Hospital.objects.filter(id=validated_data.get('hospital_id')).values('id', 'name').first()
 
         return Response({"result": response, "count": result_count,
                          'specializations': specializations, 'conditions': conditions, "seo": seo,
@@ -1879,7 +1882,7 @@ class DoctorListViewSet(viewsets.GenericViewSet):
                          'procedures': procedures, 'procedure_categories': procedure_categories,
                          'ratings': ratings, 'reviews': reviews, 'ratings_title': ratings_title,
                          'bottom_content': bottom_content, 'canonical_url': canonical_url,
-                         'ipd_procedures': ipd_procedures})
+                         'ipd_procedures': ipd_procedures, 'hospital': hospital_req_data})
 
     def get_schema(self, request, response):
 
@@ -2168,6 +2171,41 @@ class DoctorAvailabilityTimingViewSet(viewsets.ViewSet):
         # # timeslots = obj.get_timing_list()
         # timeslots = obj.get_doctor_timing_slots(date, total_leaves, "doctor")
         return Response({"timeslots": timeslots["time_slots"], "upcoming_slots": timeslots["upcoming_slots"], "doctor_data": doctor_serializer.data})
+
+    @transaction.non_atomic_requests
+    def list_v2(self, request, *args, **kwargs):
+        doctor_id = request.query_params.get('doctor_id')
+        hospital_id = request.query_params.get('hospital_id')
+
+        doctor_queryset = models.Doctor.objects.prefetch_related("qualifications__qualification", "qualifications__specialization")\
+                                      .filter(pk=doctor_id)
+        doctor_serializer = serializers.DoctorTimeSlotSerializer(doctor_queryset, many=True)
+        doctor = doctor_queryset.first()
+
+        dc_obj = models.DoctorClinic.objects.filter(doctor_id=doctor_id,
+                                                    hospital_id=hospital_id).first()
+        if not dc_obj:
+            return HttpResponse(status=404)
+
+        doctor_leaves = doctor.get_leaves()
+        global_non_bookables = GlobalNonBookable.get_non_bookables()
+        total_leaves = doctor_leaves + global_non_bookables
+
+        blocks = []
+        if request.user and request.user.is_authenticated and \
+                not hasattr(request, 'agent') and request.user.active_insurance:
+            active_appointments = dc_obj.hospital. \
+                get_active_opd_appointments(request.user, request.user.active_insurance)
+            for apt in active_appointments:
+                blocks.append(str(apt.time_slot_start.date()))
+
+        clinic_timings = dc_obj.get_timings_v2(total_leaves, blocks)
+
+        resp_data = {"timeslots": clinic_timings.get('timeslots', []),
+                     "upcoming_slots": clinic_timings.get('upcoming_slots', []),
+                     "doctor_data": doctor_serializer.data}
+
+        return Response(resp_data)
 
 
 class HealthTipView(viewsets.GenericViewSet):
@@ -3753,6 +3791,7 @@ class HospitalViewSet(viewsets.GenericViewSet):
         serializer = serializers.HospitalRequestSerializer(data=request_data)
         serializer.is_valid(raise_exception=True)
         validated_data = serializer.validated_data
+        required_network = validated_data.get('network')
         ipd_procedure_obj = ipd_procedure_obj_id = ipd_procedure_obj_name = None
         if ipd_pk:
             ipd_procedure_obj = IpdProcedure.objects.filter(id=ipd_pk, is_enabled=True).first()
@@ -3823,6 +3862,8 @@ class HospitalViewSet(viewsets.GenericViewSet):
         max_distance = validated_data.get('max_distance')
         max_distance = max_distance * 1000 if max_distance is not None else 10000
         min_distance = min_distance * 1000 if min_distance is not None else -1
+        if required_network:
+            max_distance = 2600000
         provider_ids = validated_data.get('provider_ids')
         point_string = 'POINT(' + str(long) + ' ' + str(lat) + ')'
         pnt = GEOSGeometry(point_string, srid=4326)
@@ -3848,6 +3889,8 @@ class HospitalViewSet(viewsets.GenericViewSet):
             hospital_queryset = hospital_queryset.filter(
                 hospital_doctors__ipd_procedure_clinic_mappings__ipd_procedure_id=ipd_pk,
                 hospital_doctors__ipd_procedure_clinic_mappings__enabled=True)
+        if required_network:
+            hospital_queryset = hospital_queryset.filter(network=required_network)
 
         hospital_queryset = hospital_queryset.distinct()
         result_count = hospital_queryset.count()
@@ -3862,13 +3905,17 @@ class HospitalViewSet(viewsets.GenericViewSet):
                                                                                    context={'request': request,
                                                                                             'hosp_entity_dict': hosp_entity_dict,
                                                                                             'hosp_locality_entity_dict': hosp_locality_entity_dict})
+        network_info = {}
+        if required_network:
+            network_info = {'id': required_network.id, 'name': required_network.name}
+
         return Response({'count': result_count, 'result': top_hospital_serializer.data,
                          'ipd_procedure': {'id': ipd_procedure_obj_id, 'name': ipd_procedure_obj_name},
                          'health_insurance_providers': [{'id': x.id, 'name': x.name} for x in
                                                         HealthInsuranceProvider.objects.all()],
                          'seo': {'url': url, 'title': title, 'description': description, 'location': city},
                          'search_content': top_content, 'bottom_content': bottom_content,
-                         'canonical_url': canonical_url, 'breadcrumb': breadcrumb})
+                         'canonical_url': canonical_url, 'breadcrumb': breadcrumb, 'network': network_info})
 
     @transaction.non_atomic_requests
     def retrieve_by_url(self, request):
@@ -3956,8 +4003,13 @@ class HospitalViewSet(viewsets.GenericViewSet):
             canonical_url = entity.url
         else:
             response['breadcrumb'] = None
+        new_dynamic = NewDynamic.objects.filter(url_value=canonical_url, is_enabled=True).first()
+        if new_dynamic:
+            if new_dynamic.meta_title:
+                title = new_dynamic.meta_title
+            if new_dynamic.meta_description:
+                description = new_dynamic.meta_description
         response['seo'] = {'title': title, "description": description}
-
         response['canonical_url'] = canonical_url
 
         return Response(response)
@@ -4001,6 +4053,7 @@ class IpdProcedureViewSet(viewsets.GenericViewSet):
             Prefetch('feature_mappings', IpdProcedureFeatureMapping.objects.select_related('feature').all().order_by('-feature__priority')),
             Prefetch('ipdproceduredetail_set', IpdProcedureDetail.objects.select_related('detail_type').all().order_by('-detail_type__priority')),
             Prefetch('similar_ipds', SimilarIpdProcedureMapping.objects.select_related('similar_ipd_procedure').all().order_by('-order')),
+            Prefetch('ipd_offers', Offer.objects.select_related('coupon', 'hospital', 'network').filter(is_live=True)),
         ).filter(is_enabled=True, id=pk).first()
         if ipd_procedure is None:
             return Response(status=status.HTTP_404_NOT_FOUND)
@@ -4106,10 +4159,19 @@ class IpdProcedureViewSet(viewsets.GenericViewSet):
 
         return Response(response)
 
+
+class IpdProcedureSyncViewSet(viewsets.GenericViewSet):
+
+    authentication_classes = (MatrixAuthentication,)
+
     def sync_lead(self, request):
-        serializer = serializers.IpdLeadUpdateSerializer(data=request.query_params)
+        from ondoc.crm.constants import matrix_status_to_ipd_lead_status_mapping
+        serializer = serializers.IpdLeadUpdateSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         validated_data = serializer.validated_data
-        status = validated_data.get('status')
-        IpdProcedureLead.objects.filter(matrix_lead_id=validated_data.get('matrix_lead_id')).update(status=status)
+        temp_status = validated_data.get('status')
+        temp_status = matrix_status_to_ipd_lead_status_mapping.get(temp_status)
+        if not temp_status:
+            return Response({'message': 'Invalid status'}, status=status.HTTP_400_BAD_REQUEST)
+        IpdProcedureLead.objects.filter(matrix_lead_id=validated_data.get('matrix_lead_id')).update(status=temp_status)
         return Response({'message': 'Success'})
