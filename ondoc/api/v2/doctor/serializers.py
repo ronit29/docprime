@@ -1,4 +1,5 @@
 from rest_framework import serializers
+from rest_framework.fields import UUIDField
 from django.contrib.auth import get_user_model
 from django.core.validators import MaxValueValidator, MinValueValidator
 from django.db.models import Q
@@ -472,6 +473,8 @@ class PartnersAppInvoiceSerialier(serializers.Serializer):
                                                    min_value=0, max_value=100)
     total_amount = serializers.DecimalField(max_digits=10, decimal_places=2)
     generate_invoice = serializers.BooleanField(default=False)
+    is_encrypted = serializers.BooleanField(required=False, default=False)
+    invoice_serial_id = serializers.CharField(required=False, max_length=100)
 
     def validate(self, attrs):
         selected_invoice_items = attrs.get('selected_invoice_items')
@@ -486,6 +489,10 @@ class PartnersAppInvoiceSerialier(serializers.Serializer):
             raise serializers.ValidationError('due date is required for payment status - pending')
         if attrs.get('generate_invoice') and not attrs.get('invoice_title'):
             raise serializers.ValidationError('invoice title is missing for invoice generation')
+        if ( attrs.get("is_encrypted") or attrs.get("invoice_serial_id") ) and not ( attrs.get("is_encrypted") and attrs.get("invoice_serial_id") ):
+            raise serializers.ValidationError("is_encrypted and invoice_serial_id both are required together.")
+        if attrs.get('is_encrypted') and attrs.get('generate_invoice'):
+            raise serializers.ValidationError('generate_invoice not possible for encrypted_data')
         if attrs.get('appointment_id'):
             attrs['appointment'] = attrs.pop('appointment_id')
 
@@ -523,13 +530,14 @@ class PartnersAppInvoiceSerialier(serializers.Serializer):
 
 
 class PartnersAppInvoiceModelSerialier(serializers.ModelSerializer):
+    appointment_id = serializers.PrimaryKeyRelatedField(read_only=True, pk_field=UUIDField(format='hex_verbose'))
 
     class Meta:
         model = doc_models.PartnersAppInvoice
         fields = ('id', 'created_at', 'updated_at', 'invoice_serial_id', 'consultation_fees', 'selected_invoice_items',
                   'payment_status', 'payment_type', 'due_date', 'invoice_title', 'sub_total_amount', 'tax_amount',
                   'tax_percentage', 'discount_amount', 'discount_percentage', 'total_amount', 'is_invoice_generated',
-                  'is_valid', 'is_edited', 'edited_by', 'appointment_id', 'encoded_url')
+                  'is_valid', 'is_edited', 'edited_by', 'appointment_id', 'encoded_url', 'is_encrypted')
 
 
 class ListInvoiceItemsSerializer(serializers.Serializer):

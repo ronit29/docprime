@@ -3742,6 +3742,7 @@ class PartnersAppInvoice(auth_model.TimeStampedModel):
     is_valid = models.BooleanField(default=True)
     is_edited = models.BooleanField(default=False)
     edited_by = models.ForeignKey(auth_model.User, on_delete=models.SET_NULL, null=True, blank=True, related_name='patners_app_invoices')
+    is_encrypted = models.BooleanField(default=False)
 
     def __str__(self):
         return str(self.appointment)
@@ -3817,14 +3818,11 @@ class PartnersAppInvoice(auth_model.TimeStampedModel):
         db_table = "partners_app_invoice"
 
 
-# class GeneralInvoiceItems(auth_model.TimeStampedModel, UniqueNameModel, SearchKey):
-#     item = models.CharField(max_length=200)
-#
-#     def __str__(self):
-#         return self.item
-#
-#     class Meta:
-#         db_table = "general_invoice_items"
+class EncryptedPartnersAppInvoiceLogs(auth_model.TimeStampedModel):
+    invoice = JSONField()
+
+    class Meta:
+        db_table = "encrypted_partners_app_invoice_logs"
 
 
 class GeneralInvoiceItems(auth_model.TimeStampedModel):

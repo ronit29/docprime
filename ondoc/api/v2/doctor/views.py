@@ -938,14 +938,17 @@ class PartnersAppInvoice(viewsets.GenericViewSet):
             selected_invoice_items, many=True).data
         if task == self.CREATE:
             invoice_obj = doc_models.PartnersAppInvoice(**invoice_data)
-            last_serial = doc_models.PartnersAppInvoice.last_serial(appointment)
-            serial = last_serial + 1 if version == '01' else last_serial
-            invoice_obj.invoice_serial_id = 'INV-' + str(appointment.hospital.id) + '-' + \
-                                            str(appointment.doctor.id) + '-' + str(serial) + '-' + version
+            if not invoice_data.get('is_encrypted'):
+                last_serial = doc_models.PartnersAppInvoice.last_serial(appointment)
+                serial = last_serial + 1 if version == '01' else last_serial
+                invoice_obj.invoice_serial_id = 'INV-' + str(appointment.hospital.id) + '-' + \
+                                                str(appointment.doctor.id) + '-' + str(serial) + '-' + version
         else:
             if not id:
                 raise Exception("invoice_id is required")
             invoice_queryset = doc_models.PartnersAppInvoice.objects.filter(id=id)
+            if invoice_data.get('is_encrypted'):
+                doc_models.EncryptedPartnersAppInvoiceLogs.objects.create(invoice=serializers.PartnersAppInvoiceModelSerialier(invoice_queryset.first()).data)
             invoice_queryset.update(**invoice_data)
             invoice_obj = invoice_queryset.first()
 
@@ -1015,7 +1018,7 @@ class PartnersAppInvoice(viewsets.GenericViewSet):
                 invoice.is_edited = True
                 invoice.edited_by = request.user
                 invoice.save()
-                version = invoice.invoice_serial_id[-2:]
+                version = invoice.invoice_serial_id[-2:] if not data.get('is_encrypted') else None
                 data['task'] = self.UPDATE
                 invoice_data, selected_invoice_items_created, exception = self.create_or_update_invoice(data, version, invoice.id)
 
