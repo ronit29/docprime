@@ -246,6 +246,9 @@ class Hospital(auth_model.TimeStampedModel, auth_model.CreatedByModel, auth_mode
     auto_ivr_enabled = models.BooleanField(default=True)
     priority_score = models.IntegerField(default=0, null=False, blank=False)
     google_avg_rating = models.DecimalField(max_digits=5, decimal_places=2, null=True, editable=False)
+    is_ipd_hospital = models.BooleanField(default=False)
+    is_big_hospital = models.BooleanField(default=False)
+    has_proper_hospital_page = models.BooleanField(default=False)
 
     def __str__(self):
         return self.name
@@ -450,6 +453,13 @@ class Hospital(auth_model.TimeStampedModel, auth_model.CreatedByModel, auth_mode
             query = """update hospital h set avg_rating=(select avg(ratings) from ratings_review rr left join opd_appointment oa on rr.appointment_id = oa.id where appointment_type = 2 group by hospital_id having oa.hospital_id = h.id)"""
             cursor.execute(query)
 
+    @classmethod
+    def update_is_big_hospital(cls):
+        big_hospitals = Hospital.objects.filter(is_live=True, hospital_doctors__enabled=True,
+                                                hospital_doctors__doctor__is_live=True).values_list('id', flat=True)
+        if big_hospitals:
+            Hospital.objects.filter(id__in=big_hospitals).update(is_big_hospital=True)
+
     def ad_str(self, string):
         return str(string).strip().replace(',', '')
 
@@ -548,10 +558,11 @@ class Hospital(auth_model.TimeStampedModel, auth_model.CreatedByModel, auth_mode
 
     def has_ipd_doctors(self):
         result = False
-        for doctor_clinic in self.hospital_doctors.filter(enabled=True):
-            if doctor_clinic.ipd_procedure_clinic_mappings.filter(enabled=True).exists():
-                result = True
-                break
+        # for doctor_clinic in self.hospital_doctors.filter(enabled=True):
+        #     if doctor_clinic.ipd_procedure_clinic_mappings.filter(enabled=True).exists():
+        #         result = True
+        #         break
+        result = self.is_ipd_hospital
         return result
 
     def get_specialization_insured_appointments(self, doctor, insurance):
