@@ -818,7 +818,6 @@ class UserInsuranceForm(forms.ModelForm):
     cancel_reason = forms.CharField(max_length=400, required=False)
     cancel_case_type = forms.ChoiceField(choices=case_choices, initial=UserInsurance.REFUND)
 
-
     def clean(self):
         super().clean()
         data = self.cleaned_data

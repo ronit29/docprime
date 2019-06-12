@@ -1492,8 +1492,9 @@ class UserInsurance(auth_model.TimeStampedModel):
 
     def is_bank_details_exist(self):
         bank_obj = UserBank.objects.filter(insurance=self).order_by('-id').first()
-        bank_document_obj = UserBankDocument.objects.filter(insurance=self).order_by('-id').first()
-        if bank_obj and bank_document_obj:
+        # bank_document_obj = UserBankDocument.objects.filter(insurance=self).order_by('-id').first()
+        # if bank_obj and bank_document_obj:
+        if bank_obj:
             return True
         else:
             return False
