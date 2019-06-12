@@ -245,6 +245,7 @@ class Hospital(auth_model.TimeStampedModel, auth_model.CreatedByModel, auth_mode
     is_location_verified = models.BooleanField(verbose_name='Location Verified', default=False)
     auto_ivr_enabled = models.BooleanField(default=True)
     priority_score = models.IntegerField(default=0, null=False, blank=False)
+    search_distance = models.FloatField(default=15000)
     google_avg_rating = models.DecimalField(max_digits=5, decimal_places=2, null=True, editable=False)
 
     def __str__(self):
