@@ -1247,11 +1247,12 @@ class TransactionViewSet(viewsets.GenericViewSet):
                 pg_resp_code = None
 
             order_obj = Order.objects.select_for_update().filter(pk=response.get("orderId")).first()
-
+            convert_cod_to_prepaid = False
             # TODO : SHASHANK_SINGH correct amount
             try:
                 if order_obj and response and order_obj.amount != Decimal(
-                        response.get('txAmount')) and order_obj.is_cod_order:
+                        response.get('txAmount')) and order_obj.is_cod_order and order_obj.get_deal_price_without_coupon <= Decimal(response.get('txAmount')):
+                    convert_cod_to_prepaid = True
                     order_obj.amount = Decimal(response.get('txAmount'))
                     order_obj.save()
             except:
@@ -1274,7 +1275,7 @@ class TransactionViewSet(viewsets.GenericViewSet):
 
                         try:
                             with transaction.atomic():
-                                processed_data = order_obj.process_pg_order()
+                                processed_data = order_obj.process_pg_order(convert_cod_to_prepaid)
                                 success_in_process = True
                         except Exception as e:
                             logger.error("Error in processing order - " + str(e))
