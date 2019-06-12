@@ -2469,7 +2469,6 @@ class OpdAppointment(auth_model.TimeStampedModel, CouponsMixin, OpdAppointmentIn
         if self.is_to_send_notification(old_instance):
             try:
                 notification_tasks.send_opd_notifications_refactored.apply_async((self.id,), countdown=1)
-                # notification_tasks.send_opd_notifications_refactored(self.id)
             except Exception as e:
                 logger.error(str(e))
             # notification_tasks.send_opd_notifications_refactored(self.id)
