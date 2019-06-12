@@ -345,13 +345,39 @@ class Insurer(auth_model.TimeStampedModel, LiveMixin):
 class InsurerAccount(auth_model.TimeStampedModel):
 
     insurer = models.ForeignKey(Insurer, related_name="float", on_delete=models.CASCADE)
+    apd_account_name = models.CharField(max_length=200, null=True, unique=True)
     current_float = models.PositiveIntegerField(default=None)
 
     def __str__(self):
-        return str(self.insurer)
+        return str(self.apd_account_name)
 
     class Meta:
         db_table = "insurer_account"
+
+class InsurerAccountTransfer(auth_model.TimeStampedModel):
+    from_account = models.ForeignKey(InsurerAccount, related_name="from_account", on_delete=models.CASCADE)
+    to_account = models.ForeignKey(InsurerAccount, related_name="to_account", on_delete=models.CASCADE)
+    amount = models.PositiveIntegerField(default=None)
+
+    class Meta:
+        db_table = "insurer_account_transfer"
+
+    def save(self, *args, **kwargs):
+        exists = True
+
+        if not self.id:
+            exists = False
+        super().save(*args, **kwargs)     
+
+        if not exists:
+            from_account = InsurerAccount.objects.select_for_update().get(id=self.from_account.id)
+            to_account = InsurerAccount.objects.select_for_update().get(id=self.to_account.id)
+            if from_account.current_float<self.amount:
+                raise Exception('amount cannot be greater then amount in source account')
+            from_account.current_float -= self.amount
+            to_account.current_float += self.amount
+            from_account.save()
+            to_account.save()
 
 
 class InsurancePlans(auth_model.TimeStampedModel, LiveMixin):
@@ -468,6 +494,22 @@ class InsuranceThreshold(auth_model.TimeStampedModel, LiveMixin):
         db_table = "insurance_threshold"
 
 
+class InsurerPolicyNumber(auth_model.TimeStampedModel):
+    insurer = models.ForeignKey(Insurer, related_name='policy_number_history', on_delete=models.DO_NOTHING, null=True, blank=True)
+    insurer_policy_number = models.CharField(max_length=50)
+    insurance_plan = models.ForeignKey(InsurancePlans, related_name='plan_policy_number', on_delete=models.DO_NOTHING, null=True, blank=True)
+    apd_account = models.ForeignKey(InsurerAccount, related_name='policy_apd_account', on_delete=models.DO_NOTHING, null=True, blank=True)
+
+    class Meta:
+        db_table = 'insurer_policy_numbers'
+
+    @cached_property
+    def insurer_account(self):
+        if self.apd_account:
+            return self.apd_account
+        return InsurerAccount.objects.order_by('id').first()
+
+
 class UserInsurance(auth_model.TimeStampedModel):
     from ondoc.account.models import MoneyPool
 
@@ -502,10 +544,25 @@ class UserInsurance(auth_model.TimeStampedModel):
     merchant_payout = models.ForeignKey(MerchantPayout, related_name="user_insurance", on_delete=models.DO_NOTHING, null=True)
     cancel_reason = models.CharField(max_length=200, blank=True, null=True, default=None)
     cancel_case_type = models.PositiveIntegerField(choices=CANCEL_CASE_CHOICES, default=REFUND)
+    master_policy_reference = models.ForeignKey(InsurerPolicyNumber, related_name='policy_reference', on_delete=models.DO_NOTHING, null=True)
     notes = GenericRelation(GenericNotes)
 
     def __str__(self):
         return str(self.user)
+
+    @cached_property
+    def master_policy(self):
+
+        if self.master_policy_reference:
+            return self.master_policy_reference
+
+        policy = InsurerPolicyNumber.objects.\
+            filter(insurance_plan=self.insurance_plan,insurer=self.plan.insurer).order_by('-id').first()
+        if not policy:
+            policy = InsurerPolicyNumber.objects.\
+            filter(insurance_plan__isnull=True,insurer=self.plan.insurer).order_by('-id').first()
+
+        return policy
 
     @cached_property
     def specialization_days_limit(self):
@@ -956,10 +1013,18 @@ class UserInsurance(auth_model.TimeStampedModel):
                                                             expiry_date=insurance_data['expiry_date'],
                                                             premium_amount=insurance_data['premium_amount'],
                                                             order=insurance_data['order'],
-                                                            policy_number=generate_insurance_insurer_policy_number(insurance_data['insurance_plan']))
+                                                            policy_number=generate_insurance_insurer_policy_number(insurance_data['insurance_plan']),
+                                                            master_policy_reference=cls.get_master_policy_reference(insurance_data['insurance_plan']))
 
         insured_members = InsuredMembers.create_insured_members(user_insurance_obj)
         return user_insurance_obj
+
+    @classmethod
+    def get_master_policy_reference(cls, plan):
+        policy_number_obj = InsurerPolicyNumber.objects.filter(insurance_plan=plan).order_by('-id').first()
+        if not policy_number_obj:
+            return None
+        return policy_number_obj
 
     def validate_insurance(self, appointment_data):
         from ondoc.doctor.models import OpdAppointment
@@ -1427,8 +1492,9 @@ class UserInsurance(auth_model.TimeStampedModel):
 
     def is_bank_details_exist(self):
         bank_obj = UserBank.objects.filter(insurance=self).order_by('-id').first()
-        bank_document_obj = UserBankDocument.objects.filter(insurance=self).order_by('-id').first()
-        if bank_obj and bank_document_obj:
+        # bank_document_obj = UserBankDocument.objects.filter(insurance=self).order_by('-id').first()
+        # if bank_obj and bank_document_obj:
+        if bank_obj:
             return True
         else:
             return False
@@ -1478,7 +1544,12 @@ class InsuranceTransaction(auth_model.TimeStampedModel):
         if self.transaction_type == self.DEBIT:
             transaction_amount = -1*transaction_amount
 
-        insurer_account = InsurerAccount.objects.select_for_update().get(insurer=self.user_insurance.insurance_plan.insurer)
+        # master_policy_obj = self.user_insurance.master_policy_reference
+        # account_id = master_policy_obj.apd_account.id
+        master_policy_obj = self.user_insurance.master_policy
+        account_id = master_policy_obj.insurer_account.id
+        # insurer_account = InsurerAccount.objects.select_for_update().get(insurer=self.user_insurance.insurance_plan.insurer)
+        insurer_account = InsurerAccount.objects.select_for_update().get(id=account_id)
         insurer_account.current_float += transaction_amount        
         insurer_account.save()
 
@@ -1712,15 +1783,6 @@ class InsuranceDeal(auth_model.TimeStampedModel):
 
     class Meta:
         db_table = 'insurance_deals'
-
-
-class InsurerPolicyNumber(auth_model.TimeStampedModel):
-    insurer = models.ForeignKey(Insurer, related_name='policy_number_history', on_delete=models.DO_NOTHING, null=True, blank=True)
-    insurer_policy_number = models.CharField(max_length=50)
-    insurance_plan = models.ForeignKey(InsurancePlans, related_name='plan_policy_number', on_delete=models.DO_NOTHING, null=True, blank=True)
-
-    class Meta:
-        db_table = 'insurer_policy_numbers'
 
 
 class InsuranceDummyData(auth_model.TimeStampedModel):
