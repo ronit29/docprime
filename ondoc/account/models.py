@@ -1665,13 +1665,14 @@ class MerchantPayout(TimeStampedModel):
             curr_txn["idx"] = 0
             curr_txn["orderNo"] = txn.order_no
             curr_txn["orderId"] = txn.order.id
+            curr_txn["txnAmount"] = str(0)
+
             #curr_txn["txnAmount"] = str(self.payable_amount)
             curr_txn["settledAmount"] = str(self.payable_amount)
             curr_txn["merchantCode"] = self.paid_to.id
             curr_txn["refNo"] = self.payout_ref_id
             curr_txn["bookingId"] = user_insurance.id
             curr_txn["paymentType"] = default_payment_mode
-            curr_txn["txnAmount"] = str(0)
 
             req_data["payload"].append(curr_txn)
 
