@@ -511,8 +511,8 @@ class MatrixDataMixin(object):
         customer_status = ""
         refund_urn = ""
         refund_initiated_at = None
-        original_payment_mode_refund = ""
-        promotional_wallet_refund = ""
+        original_payment_mode_refund = 0.0
+        promotional_wallet_refund = 0.0
 
         product_id = self.PRODUCT_ID
         ct = ConsumerTransaction.objects.filter(type=PgTransaction.CREDIT, reference_id=self.id, product_id=product_id,
@@ -523,13 +523,15 @@ class MatrixDataMixin(object):
 
         if wallet_ct:
             original_payment_mode_refund = wallet_ct.amount
-            consumer_refund = ConsumerRefund.objects.filter(consumer_transaction_id=wallet_ct.id).first()
-            if consumer_refund:
-                refund_initiated_at = consumer_refund.refund_initiated_at
-                customer_status = consumer_refund.refund_state
+            refund_initiated_at = wallet_ct.created_at
+            # consumer_refund = ConsumerRefund.objects.filter(consumer_transaction_id=wallet_ct.id).first()
+            # if consumer_refund:
+            #     refund_initiated_at = consumer_refund.refund_initiated_at
+            #     customer_status = consumer_refund.refund_state
 
         if cashback_ct:
             promotional_wallet_refund = cashback_ct.amount
+            refund_initiated_at = cashback_ct.created_at
 
         return {'original_payment_mode_refund': original_payment_mode_refund, 'promotional_wallet_refund': promotional_wallet_refund,
                 'customer_status': customer_status, 'refund_urn': refund_urn, 'refund_initiated_at': refund_initiated_at}
