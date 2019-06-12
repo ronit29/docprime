@@ -474,7 +474,7 @@ class MatrixDataMixin(object):
 
     def appointment_accepted_history(self):
         source = ""
-        accepted_phone = ""
+        accepted_phone = None
         history_obj = self.history.filter(status=self.ACCEPTED).first()
         if history_obj:
             source = history_obj.source
