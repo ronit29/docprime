@@ -350,7 +350,7 @@ class IpdProcedureLeadAdminForm(forms.ModelForm):
             if not int(self.data.get('lead-TOTAL_FORMS', '0')) > 0:
                 raise forms.ValidationError("Procedure Cost Estimate not found.")
             if self.instance.email or self.instance.phone_number:
-                notification_tasks.send_ipd_procedure_cost_estimate.apply_async((self.instance.pk), countdown=20)
+                notification_tasks.send_ipd_procedure_cost_estimate.apply_async((self.instance.pk,), countdown=30)
             else:
                 raise forms.ValidationError("Phone number or Email is required to send estimate.")
 
