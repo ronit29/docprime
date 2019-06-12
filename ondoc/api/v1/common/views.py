@@ -1041,6 +1041,7 @@ class AppointmentPrerequisiteViewSet(viewsets.GenericViewSet):
 
 
 class SiteSettingsViewSet(viewsets.GenericViewSet):
+    authentication_classes = (JWTAuthentication,)
 
     def get_settings(self, request):
         params = request.query_params
@@ -1050,7 +1051,10 @@ class SiteSettingsViewSet(viewsets.GenericViewSet):
 
         insurance_availability = False
 
-        if lat and long:
+        if request.user and request.user.is_authenticated and request.user.active_insurance:
+            insurance_availability = True
+
+        if lat and long and not insurance_availability:
             data = {
                 'latitude': lat,
                 'longitude': long
