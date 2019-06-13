@@ -1591,7 +1591,7 @@ class ProviderAppNotification(Notification):
         all_receivers = {}
         instance = self.hospital
         receivers = []
-        admins = GenericAdmin.objects.filter(is_disabled=False, hospital=instance, entity_type=GenericAdmin.HOSPITAL)
+        admins = GenericAdmin.objects.filter(is_disabled=False, hospital=instance, entity_type=GenericAdmin.HOSPITAL).distinct()
         user_and_phone_number = list()
         for admin in admins:
             if admin.phone_number:
