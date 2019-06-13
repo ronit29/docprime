@@ -1065,3 +1065,31 @@ def send_ipd_procedure_cost_estimate(ipd_procedure_lead_id=None):
         ipd_lead_notification.send()
     except Exception as e:
         logger.error(str(e))
+
+
+@task()
+def upload_cost_estimates(obj_id):
+    from ondoc.procedure.models import UploadCostEstimateData
+    from ondoc.crm.management.commands import upload_cost_estimates as upload_command
+    instance = UploadCostEstimateData.objects.filter(id=obj_id).first()
+    errors = []
+    if not instance or not instance.status == UploadCostEstimateData.IN_PROGRESS:
+        return
+    try:
+        wb = load_workbook(instance.file)
+        sheets = wb.worksheets
+        cost_estimate = upload_command.UploadCostEstimate(errors)
+        cost_estimate.upload(sheets[0])
+        if len(errors)>0:
+            raise Exception('errors in data')
+        instance.status = UploadCostEstimateData.SUCCESS
+        instance.save()
+    except Exception as e:
+        error_message = traceback.format_exc() + str(e)
+        logger.error(error_message)
+        instance.status = UploadCostEstimateData.FAIL
+        if errors:
+            instance.error_msg = errors
+        else:
+            instance.error_msg = [{'line number': 0, 'message': error_message}]
+        instance.save(retry=False)

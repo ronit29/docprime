@@ -9,7 +9,7 @@ from ondoc.crm.admin.procedure import ProcedureCategoryAdmin, ProcedureAdmin, Ip
     ServiceAdmin, HealthInsuranceProviderAdmin, IpdProcedureCategoryAdmin, IpdProcedureDetailAdmin, \
     IpdProcedureDetailTypeAdmin, IpdProcedureSynonymAdmin, IpdProcedureSynonymMappingAdmin, \
     IpdProcedurePracticeSpecializationAdmin, IpdProcedureLeadAdmin, OfferAdmin, IpdProcedureCostEstimateAdmin, \
-    IpdCostEstimateRoomTypeAdmin
+    IpdCostEstimateRoomTypeAdmin, UploadCostEstimateDataAdmin
 from ondoc.crm.admin.subscription_plan import SubscriptionPlanAdmin, SubscriptionPlanFeatureAdmin, UserPlanMappingAdmin
 from ondoc.doctor.models import (Doctor, Language, MedicalService, Specialization, College, Qualification, Hospital,
                                  HospitalNetwork, DoctorOnboardingToken, OpdAppointment,
@@ -35,7 +35,7 @@ from ondoc.notification import models as notifcation_model
 from ondoc.procedure.models import Procedure, ProcedureCategory, CommonProcedureCategory, CommonProcedure, IpdProcedure, \
     IpdProcedureCategory, CommonIpdProcedure, IpdProcedureDetail, IpdProcedureDetailType, IpdProcedureSynonym, \
     IpdProcedureSynonymMapping, IpdProcedurePracticeSpecialization, IpdProcedureLead, Offer, IpdProcedureCostEstimate, \
-    IpdCostEstimateRoomType
+    IpdCostEstimateRoomType, UploadCostEstimateData
 from ondoc.subscription_plan.models import Plan, PlanFeature, UserPlanMapping
 from .common import Cities, CitiesAdmin, MatrixCityMapping, MatrixCityAdmin, MerchantAdmin, MerchantPayoutAdmin, \
     PaymentOptionsAdmin, MatrixMappedStateAdmin, MatrixMappedCityAdmin, GlobalNonBookableAdmin, UserConfigAdmin, BlacklistUserAdmin, BlockedStatesAdmin
@@ -222,6 +222,7 @@ admin.site.register(EntityUrls, EntityUrlsAdmin)
 admin.site.register(PaymentOptions, PaymentOptionsAdmin)
 admin.site.register(UserConfig, UserConfigAdmin)
 admin.site.register(UploadDoctorData, UploadDoctorDataAdmin)
+admin.site.register(UploadCostEstimateData, UploadCostEstimateDataAdmin)
 admin.site.register(SliderLocation, SliderLocationAdmin)
 admin.site.register(IntegratorMapping, IntegratorMappingAdmin)
 admin.site.register(IntegratorProfileMapping, IntegratorProfileMappingAdmin)

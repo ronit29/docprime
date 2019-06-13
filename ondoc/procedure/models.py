@@ -10,6 +10,7 @@ from ondoc.doctor.models import DoctorClinic, SearchKey, Hospital, PracticeSpeci
 from collections import deque, OrderedDict
 
 from ondoc.insurance.models import ThirdPartyAdministrator
+from django.conf import settings
 
 
 class IpdProcedure(auth_model.TimeStampedModel, SearchKey, auth_model.SoftDelete):
@@ -615,3 +616,35 @@ class IpdCostEstimateRoomTypeMapping(models.Model):
 
     class Meta:
         db_table = "ipd_cost_estimate_room_type_mapping"
+
+
+class UploadCostEstimateData(auth_model.TimeStampedModel):
+    CREATED = 1
+    IN_PROGRESS = 2
+    SUCCESS = 3
+    FAIL = 4
+    STATUS_CHOICES = ("", "Select"), \
+                     (CREATED, "Created"), \
+                     (IN_PROGRESS, "Upload in progress"), \
+                     (SUCCESS, "Upload successful"),\
+                     (FAIL, "Upload Failed")
+    # file, batch, status, error msg, source
+    file = models.FileField()
+    source = models.CharField(max_length=20)
+    batch = models.CharField(max_length=20)
+    status = models.PositiveSmallIntegerField(choices=STATUS_CHOICES, default=CREATED, editable=False)
+    error_msg = JSONField(editable=False, null=True, blank=True)
+    lines = models.PositiveIntegerField(null=True, blank=True)
+    user = models.ForeignKey(settings.AUTH_USER_MODEL, related_name="uploaded_cost_estimates", null=True, editable=False,
+                             on_delete=models.SET_NULL)
+
+    def save(self, *args, **kwargs):
+        retry = kwargs.pop('retry', True)
+        from ondoc.notification.tasks import upload_cost_estimates
+        super().save(*args, **kwargs)
+        if (self.status == self.CREATED or self.status == self.FAIL) and retry:
+            self.status = self.IN_PROGRESS
+            self.error_msg = None
+            super().save(*args, **kwargs)
+            upload_cost_estimates.apply_async((self.id,), countdown=1)
+            # upload_cost_estimates(self.id)
