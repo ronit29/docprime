@@ -257,6 +257,7 @@ class Lab(TimeStampedModel, CreatedByModel, QCModel, SearchKey, WelcomeCallingDo
     rating_data = JSONField(blank=True, null=True)
     is_location_verified = models.BooleanField(verbose_name='Location Verified', default=False)
     auto_ivr_enabled = models.BooleanField(default=True)
+    search_distance = models.FloatField(default=20000)
 
     def __str__(self):
         return self.name
@@ -686,7 +687,7 @@ class Lab(TimeStampedModel, CreatedByModel, QCModel, SearchKey, WelcomeCallingDo
                 is_thyrocare = True
         timeslots = timeslot_object.format_timing_to_datetime_v2(lab_timing_queryset, total_leaves, booking_details, is_thyrocare)
         upcoming_slots = timeslot_object.get_upcoming_slots(time_slots=timeslots)
-        timing_response = {"timeslots": timeslots, "upcoming_slots": upcoming_slots, "is_thyrocare": is_thyrocare}
+        timing_response = {"time_slots": timeslots, "upcoming_slots": upcoming_slots, "is_thyrocare": is_thyrocare}
         return timing_response
 
     def get_available_slots(self, is_home_pickup, pincode, date):
