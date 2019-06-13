@@ -119,8 +119,8 @@ class NotificationAction:
         (PRICING_ALERT_EMAIL, 'Pricing Change Mail'),
         (LAB_LOGO_CHANGE_MAIL, 'Lab Logo Change Mail'),
         (APPOINTMENT_REMINDER_PROVIDER_SMS, 'Appointment Reminder Provider SMS'),
-        (LOGIN_OTP, 'Login OTP')
-        (CHAT_NOTIFICATION, "Pus Notification from chat")
+        (LOGIN_OTP, 'Login OTP'),
+        (CHAT_NOTIFICATION, "Push Notification from chat")
     )
 
     OPD_APPOINTMENT = "opd_appointment"
