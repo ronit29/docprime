@@ -2977,6 +2977,31 @@ class OpdAppointment(auth_model.TimeStampedModel, CouponsMixin, OpdAppointmentIn
         result['data'] = {'opd_appointment_id': self.id}
         return result
 
+    @classmethod
+    def is_followup_appointment(cls, current_appointment):
+        if not current_appointment:
+            return False
+        doctor = current_appointment.doctor
+        hospital = current_appointment.hospital
+        profile = current_appointment.profile
+        last_completed_appointment = cls.objects.filter(doctor=doctor, profile=profile, hospital=hospital,
+                                                        status=cls.COMPLETED).order_by('-id').first()
+        if not last_completed_appointment:
+            return False
+        last_appointment_date = last_completed_appointment.time_slot_start
+        dc_obj = DoctorClinic.objects.filter(doctor=doctor, hospital=hospital, enabled=True).first()
+        if not dc_obj:
+            return False
+        followup_duration = dc_obj.followup_duration
+        if not followup_duration:
+            followup_duration = settings.DEFAULT_FOLLOWUP_DURATION
+        days_diff = current_appointment.date() - last_appointment_date.date()
+        if days_diff.days <= followup_duration:
+            return True
+        else:
+            return False
+
+
 
 class OpdAppointmentProcedureMapping(models.Model):
     opd_appointment = models.ForeignKey(OpdAppointment, on_delete=models.CASCADE, related_name='procedure_mappings')
@@ -3865,3 +3890,5 @@ class CommonHospital(auth_model.TimeStampedModel):
 
     class Meta:
         db_table = "common_hospital"
+
+

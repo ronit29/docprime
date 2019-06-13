@@ -1314,7 +1314,7 @@ class EndorsementRequestAdmin(admin.ModelAdmin):
         else:
             return obj.member.title + "(edited)"
 
-    list_display = ['member_name', 'insurance_id']
+    list_display = ['member_name', 'insurance_id', 'status', 'created_at']
     readonly_fields = ['member', 'insurance', 'member_type', 'title', 'old_title', 'first_name', 'old_first_name',
                        'middle_name', 'old_middle_name', 'last_name', 'old_last_name', 'dob', 'old_dob', 'email',
                        'old_email',  'address', 'old_address', 'pincode', 'old_pincode', 'gender', 'old_gender',
@@ -1322,6 +1322,7 @@ class EndorsementRequestAdmin(admin.ModelAdmin):
                        'district', 'old_district', 'state', 'old_state', 'state_code', 'city_code',
                        'district_code']
     inlines = [InsuredMemberDocumentInline]
+    # form = EndorsementRequestForm
 
     def has_add_permission(self, request, obj=None):
         return False
