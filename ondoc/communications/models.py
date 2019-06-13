@@ -1591,10 +1591,12 @@ class ProviderAppNotification(Notification):
         all_receivers = {}
         instance = self.hospital
         receivers = []
-        admins = GenericAdmin.objects.filter(is_disabled=False, hospital=instance, entity_type=GenericAdmin.HOSPITAL).distinct()
+        admins_phone_number = GenericAdmin.objects.filter(is_disabled=False, hospital=instance, entity_type=GenericAdmin.HOSPITAL)\
+                                                  .values_list('phone_number', flat=True)\
+                                                  .distinct()
         user_and_phone_number = list()
-        for admin in admins:
-            if admin.phone_number:
-                user_and_phone_number.append({'user': None, 'phone_number': admin.phone_number})
+        for number in admins_phone_number:
+            if number:
+                user_and_phone_number.append({'user': None, 'phone_number': number})
         all_receivers['sms_receivers'] = user_and_phone_number
         return all_receivers

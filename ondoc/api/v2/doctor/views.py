@@ -574,6 +574,7 @@ class ProviderSignupDataViewset(viewsets.GenericViewSet):
         user = request.user
         objects_to_be_created = list()
         hospital_ids_to_be_created = list()
+        hospitals = [hospital['hospital_id'] for hospital in valid_data.get('hospitals')]
         for hospital in valid_data.get("hospitals"):
             if 'is_encrypted' in valid_data:
                 if not valid_data.get('is_encrypted'):
@@ -611,6 +612,10 @@ class ProviderSignupDataViewset(viewsets.GenericViewSet):
         try:
             if 'is_encrypted' in valid_data and valid_data.get('is_encrypted') and objects_to_be_created and not doc_models.ProviderEncrypt.objects.filter(hospital_id__in=hospital_ids_to_be_created):
                 doc_models.ProviderEncrypt.objects.bulk_create(objects_to_be_created)
+            if hospitals:
+                prov_ecrypt_objects = doc_models.ProviderEncrypt.objects.filter(hospital__in=hospitals)
+                for obj in prov_ecrypt_objects:
+                    obj.send_sms()
             return Response({"status": 1, "message": "consent updated"})
         except Exception as e:
             logger.error('Error updating consent: ' + str(e))
