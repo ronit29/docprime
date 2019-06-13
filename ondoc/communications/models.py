@@ -281,9 +281,9 @@ class SMSNotification:
             body_template = "sms/appointment_reminder.txt"
 
         elif notification_type == NotificationAction.PROVIDER_ENCRYPTION_ENABLED:
-            body_template = "sms/provider_encryption_enabled.txt"
+            body_template = "sms/provider/provider_encryption_enabled.txt"
         elif notification_type == NotificationAction.PROVIDER_ENCRYPTION_DISABLED:
-            body_template = "sms/provider_encryption_disabled.txt"
+            body_template = "sms/provider/provider_encryption_disabled.txt"
 
         elif notification_type == NotificationAction.LAB_APPOINTMENT_ACCEPTED or \
                 notification_type == NotificationAction.LAB_OTP_BEFORE_APPOINTMENT:
@@ -1582,10 +1582,10 @@ class ProviderAppNotification(Notification):
 
         if notification_type == NotificationAction.PROVIDER_ENCRYPTION_ENABLED:
             sms_notification = SMSNotification(notification_type, context)
-            sms_notification.send(all_receivers.get('provider/provider_encryption_enabled', []))
+            sms_notification.send(all_receivers.get('sms_receivers', []))
         elif notification_type == NotificationAction.PROVIDER_ENCRYPTION_DISABLED:
             sms_notification = SMSNotification(notification_type, context)
-            sms_notification.send(all_receivers.get('provider/provider_encryption_disabled', []))
+            sms_notification.send(all_receivers.get('sms_receivers', []))
 
     def get_receivers(self):
         all_receivers = {}
