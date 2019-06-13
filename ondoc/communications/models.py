@@ -1595,6 +1595,6 @@ class ProviderAppNotification(Notification):
         user_and_phone_number = list()
         for admin in admins:
             if admin.phone_number:
-                user_and_phone_number.append({'user': admin.user, 'phone_number': admin.phone_number})
+                user_and_phone_number.append({'user': None, 'phone_number': admin.phone_number})
         all_receivers['sms_receivers'] = user_and_phone_number
         return all_receivers
