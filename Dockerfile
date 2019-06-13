@@ -48,6 +48,7 @@ RUN cp /env/$JOB/django/gunicorn_config.py /home/docprime/workspace/backend/
 RUN cp /env/$JOB/django/entrypoint /home/docprime/workspace/entrypoint
 RUN cp /env/$JOB/django/celery_entrypoint /home/docprime/workspace/entrypoint
 RUN chmod +x /home/docprime/workspace/entrypoint/entrypoint
+RUN chmod +x /home/docprime/workspace/entrypoint/celery_entrypoint
 
 
 #NGINX CONFIGURATION
