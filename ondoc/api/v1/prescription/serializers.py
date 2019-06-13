@@ -299,7 +299,7 @@ class PrescriptionResponseSerializer(serializers.ModelSerializer):
         model = prescription_models.PresccriptionPdf
         fields = ('medicines', 'special_instructions', 'symptoms_complaints', 'appointment_type', 'pdf_file',
                   'diagnoses', 'lab_tests', 'followup_instructions_date', 'followup_instructions_reason', 'updated_at',
-                  'appointment_id', 'id', 'serial_id')
+                  'appointment_id', 'id', 'serial_id', 'is_encrypted')
 
 
 class PrescriptionModelSerializerComponents():
