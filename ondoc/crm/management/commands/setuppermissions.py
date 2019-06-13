@@ -52,7 +52,7 @@ from ondoc.procedure.models import Procedure, ProcedureCategory, CommonProcedure
     DoctorClinicIpdProcedure, IpdProcedureCategoryMapping, IpdProcedureCategory, CommonIpdProcedure, \
     IpdProcedureDetailType, IpdProcedureDetail, IpdProcedureSynonym, IpdProcedureSynonymMapping, \
     IpdProcedurePracticeSpecialization, IpdProcedureLead, Offer, IpdCostEstimateRoomType, IpdProcedureCostEstimate, \
-    IpdCostEstimateRoomTypeMapping, IpdProcedureLeadCostEstimateMapping
+    IpdCostEstimateRoomTypeMapping, IpdProcedureLeadCostEstimateMapping, UploadCostEstimateData
 from ondoc.reports import models as report_models
 
 from ondoc.diagnostic.models import LabPricing
@@ -722,7 +722,8 @@ class Command(BaseCommand):
             group.permissions.add(*permissions)
 
         content_types = ContentType.objects.get_for_models(IpdCostEstimateRoomType, IpdProcedureCostEstimate,
-                                                           IpdCostEstimateRoomTypeMapping, IpdProcedureLeadCostEstimateMapping)
+                                                           IpdCostEstimateRoomTypeMapping, IpdProcedureLeadCostEstimateMapping,
+                                                           UploadCostEstimateData)
         for cl, ct in content_types.items():
             permissions = Permission.objects.filter(
                 Q(content_type=ct),
