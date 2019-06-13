@@ -85,6 +85,7 @@ class NotificationAction:
     PRICING_ALERT_EMAIL = 72
     APPOINTMENT_REMINDER_PROVIDER_SMS = 77
     LOGIN_OTP = 80
+    CHAT_NOTIFICATION = 87
 
     NOTIFICATION_TYPE_CHOICES = (
         (APPOINTMENT_ACCEPTED, "Appointment Accepted"),
@@ -119,6 +120,7 @@ class NotificationAction:
         (LAB_LOGO_CHANGE_MAIL, 'Lab Logo Change Mail'),
         (APPOINTMENT_REMINDER_PROVIDER_SMS, 'Appointment Reminder Provider SMS'),
         (LOGIN_OTP, 'Login OTP')
+        (CHAT_NOTIFICATION, "Pus Notification from chat")
     )
 
     OPD_APPOINTMENT = "opd_appointment"
