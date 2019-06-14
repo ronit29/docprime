@@ -1,3 +1,3 @@
-Appointment ID<<{{booking_id}}>>:
+Appointment ID<<{{instance.id}}>>:
 The refund of Rs {{amount}} is initiated VIA {% if ctrnx_id %} transaction id <<DPRF{{ctrnx_id}}>> {% endif %}.
 The amount will be credited into your account within 7 working days.

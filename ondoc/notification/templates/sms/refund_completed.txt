@@ -1,4 +1,4 @@
-Appointment ID <<{{booking_id}}>>:The refund of Rs {{amount}} has been successfully credited to your account.
+Appointment ID <<{{instance.id}}>>:The refund of Rs {{amount}} has been successfully credited to your account.
 
 We look forward to serving your again.
 
