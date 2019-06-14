@@ -1501,8 +1501,7 @@ class LabList(viewsets.ReadOnlyModelViewSet):
 
         if is_insurance and ids:
             filtering_query.append("mrp<=(%(insurance_threshold_amount)s)")
-            filtering_query.append("insurance_cutoff_price is not null")
-            group_filter.append(" agreed_price<=insurance_cutoff_price ")
+            group_filter.append("(agreed_price<=insurance_cutoff_price or insurance_cutoff_price is null )")
             filtering_params['insurance_threshold_amount'] = insurance_threshold_amount
 
         if avg_ratings:

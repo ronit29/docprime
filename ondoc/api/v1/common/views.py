@@ -1010,6 +1010,9 @@ class AppointmentPrerequisiteViewSet(viewsets.GenericViewSet):
         available_lab_test_qs = lab_pricing_group.available_lab_tests.all().filter(test__in=valid_data.get('lab_test'))
         tests_amount = Decimal(0)
         for available_lab_test in available_lab_test_qs:
+            if available_lab_test.test.is_package and insurance.insurance_plan.plan_usages.get('member_package_limit'):
+                if user_profile.is_insurance_package_limit_exceed():
+                    return Response({'prescription_needed': True})
             agreed_price = available_lab_test.custom_agreed_price if available_lab_test.custom_agreed_price else available_lab_test.computed_agreed_price
             tests_amount = tests_amount + agreed_price
 
