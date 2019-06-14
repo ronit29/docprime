@@ -109,7 +109,7 @@ class SearchPageViewSet(viewsets.ReadOnlyModelViewSet):
         temp_data['recommended_package'] = {'result': recommended_package.data,
                                             'information': {'screening': 'Screening text', 'physical': 'Physical Text'},
                                             'filters': advisor_filter}
-        if request.user.active_insurance and not hasattr(request, 'admin'):
+        if request.user and request.user.is_authenticated and request.user.active_insurance and not hasattr(request, 'agent'):
             temp_data['common_package'] = []
         else:
             temp_data['common_package'] = package_serializer.data
