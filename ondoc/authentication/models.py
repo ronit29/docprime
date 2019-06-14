@@ -570,12 +570,13 @@ class UserProfile(TimeStampedModel):
         from ondoc.diagnostic.models import LabAppointment
         from ondoc.doctor.models import OpdAppointment
         user = self.user
-        insurance = user.active_insurance
-        if not insurance:
+        insurance = None
+        if user.is_authenticated:
+            insurance = user.active_insurance
+        if not insurance or not self.is_insured_profile:
             return False
         package_count = 0
-        previous_insured_lab_bookings = LabAppointment.objects.filter(insurance=insurance,
-                                                                      status=OpdAppointment.COMPLETED)
+        previous_insured_lab_bookings = LabAppointment.objects.prefetch_related('tests').filter(insurance=insurance, profile=self).exclude(status=OpdAppointment.CANCELLED)
         for booking in previous_insured_lab_bookings:
             all_tests = booking.tests.all()
             for test in all_tests:

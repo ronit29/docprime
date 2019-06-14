@@ -1014,7 +1014,7 @@ class AppointmentPrerequisiteViewSet(viewsets.GenericViewSet):
     def pre_booking(self, request):
         user = request.user
         insurance = user.active_insurance
-        if not insurance:
+        if not insurance or (user.is_authenticated and hasattr(request,'agent')):
             return Response({'prescription_needed': False})
 
         serializer = serializers.AppointmentPrerequisiteSerializer(data=request.data)
