@@ -285,6 +285,11 @@ class SMSNotification:
         elif notification_type == NotificationAction.APPOINTMENT_REMINDER_PROVIDER_SMS:
             body_template = "sms/appointment_reminder.txt"
 
+        elif notification_type == NotificationAction.PROVIDER_ENCRYPTION_ENABLED:
+            body_template = "sms/provider/provider_encryption_enabled.txt"
+        elif notification_type == NotificationAction.PROVIDER_ENCRYPTION_DISABLED:
+            body_template = "sms/provider/provider_encryption_disabled.txt"
+
         elif notification_type == NotificationAction.LAB_APPOINTMENT_ACCEPTED or \
                 notification_type == NotificationAction.LAB_OTP_BEFORE_APPOINTMENT:
             body_template = "sms/lab/appointment_accepted.txt"
@@ -1588,3 +1593,44 @@ class InsuranceNotification(Notification):
 
             sms_notification = SMSNotification(notification_type, context)
             sms_notification.send(all_receivers.get('sms_receivers', []))
+
+
+class ProviderAppNotification(Notification):
+
+    def __init__(self, hospital, notification_type=None):
+        self.hospital = hospital
+        self.notification_type = notification_type
+
+    def get_context(self):
+        context = {
+            "id": self.hospital.id,
+            "instance": self.hospital,
+            "hospital_name": self.hospital.name,
+        }
+        return context
+
+    def send(self):
+        context = self.get_context()
+        notification_type = self.notification_type
+        all_receivers = self.get_receivers()
+
+        if notification_type == NotificationAction.PROVIDER_ENCRYPTION_ENABLED:
+            sms_notification = SMSNotification(notification_type, context)
+            sms_notification.send(all_receivers.get('sms_receivers', []))
+        elif notification_type == NotificationAction.PROVIDER_ENCRYPTION_DISABLED:
+            sms_notification = SMSNotification(notification_type, context)
+            sms_notification.send(all_receivers.get('sms_receivers', []))
+
+    def get_receivers(self):
+        all_receivers = {}
+        instance = self.hospital
+        receivers = []
+        admins_phone_number = GenericAdmin.objects.filter(is_disabled=False, hospital=instance, entity_type=GenericAdmin.HOSPITAL)\
+                                                  .values_list('phone_number', flat=True)\
+                                                  .distinct()
+        user_and_phone_number = list()
+        for number in admins_phone_number:
+            if number:
+                user_and_phone_number.append({'user': None, 'phone_number': number})
+        all_receivers['sms_receivers'] = user_and_phone_number
+        return all_receivers
