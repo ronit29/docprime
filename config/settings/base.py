@@ -127,7 +127,6 @@ DJANGO_APPS = (
     'django.contrib.sites',
     'django.contrib.sitemaps',
 )
-
 THIRD_PARTY_APPS = (
 
     'rest_framework',
@@ -147,8 +146,10 @@ THIRD_PARTY_APPS = (
     'django_comments',
     'safedelete',
     'qrcode',
+    'Crypto',
     'multiselectfield'
 )
+
 
 LOCAL_APPS = (
     'ondoc.crm',

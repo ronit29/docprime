@@ -36,6 +36,10 @@ from datetime import timedelta
 import os
 import tempfile
 
+import base64, hashlib
+from Crypto import Random
+from Crypto.Cipher import AES
+
 logger = logging.getLogger(__name__)
 
 User = get_user_model()
@@ -1529,55 +1533,33 @@ def get_opd_pem_queryset(user, model):
     #                              super_user_permission=false AND is_disabled=false AND permission_type=1) > 0) THEN 1  ELSE 0 END'''
     # billing_query = '''CASE WHEN ((SELECT COUNT(id) FROM generic_admin WHERE user_id=%s AND hospital_id=hospital.id AND
     #                                super_user_permission=false AND is_disabled=false AND permission_type=2) > 0) THEN 1  ELSE 0 END'''
-    from ondoc.doctor.models import OpdAppointment
+
+    manageable_hosp_list = auth_models.GenericAdmin.objects.filter(is_disabled=False, user=user) \
+                                                           .values_list('hospital', flat=True)
     queryset = model.objects \
         .select_related('doctor', 'hospital', 'user') \
         .prefetch_related('doctor__manageable_doctors', 'hospital__manageable_hospitals', 'doctor__images',
                           'doctor__qualifications', 'doctor__qualifications__qualification',
                           'doctor__qualifications__specialization', 'doctor__qualifications__college',
-                          'doctor__doctorpracticespecializations', 'doctor__doctorpracticespecializations__specialization') \
-        .filter(
-        ~Q(status=OpdAppointment.CREATED),
-        Q(
-            Q(doctor__manageable_doctors__user=user,
-              doctor__manageable_doctors__hospital=F('hospital'),
-              doctor__manageable_doctors__is_disabled=False,) |
-            Q(doctor__manageable_doctors__user=user,
-              doctor__manageable_doctors__hospital__isnull=True,
-              doctor__manageable_doctors__is_disabled=False,
-             )
-             |
-            Q(hospital__manageable_hospitals__doctor__isnull=True,
-              hospital__manageable_hospitals__user=user,
-              hospital__manageable_hospitals__is_disabled=False,
-              )
-        ) |
-        Q(
-            Q(doctor__manageable_doctors__user=user,
-              doctor__manageable_doctors__super_user_permission=True,
-              doctor__manageable_doctors__is_disabled=False,
-              doctor__manageable_doctors__entity_type=GenericAdminEntity.DOCTOR, ) |
-            Q(hospital__manageable_hospitals__user=user,
-              hospital__manageable_hospitals__super_user_permission=True,
-              hospital__manageable_hospitals__is_disabled=False,
-              hospital__manageable_hospitals__entity_type=GenericAdminEntity.HOSPITAL)
-        ))\
-    .annotate(pem_type=Case(When(Q(hospital__manageable_hospitals__user=user) &
-                                   Q(hospital__manageable_hospitals__super_user_permission=True) &
-                                   Q(hospital__manageable_hospitals__is_disabled=False), then=Value(3)),
-                              When(Q(hospital__manageable_hospitals__user=user) &
-                                   Q(hospital__manageable_hospitals__super_user_permission=False) &
-                                   Q(hospital__manageable_hospitals__permission_type=auth_models.GenericAdmin.BILLINNG) &
-                                   ~Q(hospital__manageable_hospitals__permission_type=auth_models.GenericAdmin.APPOINTMENT) &
-                                   Q(hospital__manageable_hospitals__is_disabled=False), then=Value(2)),
-                              When(Q(hospital__manageable_hospitals__user=user) &
-                                   Q(hospital__manageable_hospitals__super_user_permission=False) &
-                                   Q(hospital__manageable_hospitals__permission_type=auth_models.GenericAdmin.BILLINNG) &
-                                   Q(hospital__manageable_hospitals__permission_type=auth_models.GenericAdmin.APPOINTMENT) &
-                                   Q(hospital__manageable_hospitals__is_disabled=False), then=Value(3)),
-                              default=Value(1),
-                              output_field=IntegerField()
-                              )
+                          'doctor__doctorpracticespecializations', 'doctor__doctorpracticespecializations__specialization',
+                          'doctor__doctor_number', 'doctor__doctor_number__hospital') \
+        .filter(hospital_id__in=list(manageable_hosp_list))\
+        .annotate(pem_type=Case(When(Q(hospital__manageable_hospitals__user=user) &
+                               Q(hospital__manageable_hospitals__super_user_permission=True) &
+                               Q(hospital__manageable_hospitals__is_disabled=False), then=Value(3)),
+                          When(Q(hospital__manageable_hospitals__user=user) &
+                               Q(hospital__manageable_hospitals__super_user_permission=False) &
+                               Q(hospital__manageable_hospitals__permission_type=auth_models.GenericAdmin.BILLINNG) &
+                               ~Q(hospital__manageable_hospitals__permission_type=auth_models.GenericAdmin.APPOINTMENT) &
+                               Q(hospital__manageable_hospitals__is_disabled=False), then=Value(2)),
+                          When(Q(hospital__manageable_hospitals__user=user) &
+                               Q(hospital__manageable_hospitals__super_user_permission=False) &
+                               Q(hospital__manageable_hospitals__permission_type=auth_models.GenericAdmin.BILLINNG) &
+                               Q(hospital__manageable_hospitals__permission_type=auth_models.GenericAdmin.APPOINTMENT) &
+                               Q(hospital__manageable_hospitals__is_disabled=False), then=Value(3)),
+                          default=Value(1),
+                          output_field=IntegerField()
+                          )
               )
     # .extra(select={'super_user': super_user_query, 'appointment_pem': appoint_query, 'billing_pem': billing_query}, params=(user_id, user_id, user_id))
     return queryset
@@ -1791,6 +1773,37 @@ def ipd_query_parameters(entity, req_params):
     return params_dict
 
 
+class AES_encryption:
+
+    BLOCK_SIZE = 16
+
+    @staticmethod
+    def pad(data):
+        length = AES_encryption.BLOCK_SIZE - (len(data) % AES_encryption.BLOCK_SIZE)
+        return data + chr(length) * length
+
+    @staticmethod
+    def unpad(data):
+        return data[:-ord(data[-1])]
+
+    @staticmethod
+    def encrypt(message, passphrase):
+        IV = Random.new().read(AES_encryption.BLOCK_SIZE)
+        aes = AES.new(passphrase, AES.MODE_CBC, IV)
+        return base64.b64encode(IV + aes.encrypt(AES_encryption.pad(message)))
+
+    @staticmethod
+    def decrypt(encrypted, passphrase):
+        try:
+            encrypted = base64.b64decode(encrypted)
+            IV = encrypted[:AES_encryption.BLOCK_SIZE]
+            aes = AES.new(passphrase, AES.MODE_CBC, IV)
+            return aes.decrypt(encrypted[AES_encryption.BLOCK_SIZE:]).decode("utf-8"), None
+        except Exception as e:
+            logger.error("Error while decrypting - " + str(e))
+            return None, e
+
+
 def convert_datetime_str_to_iso_str(datetime_string_to_be_converted):
     try:
         from dateutil import parser
@@ -1803,3 +1816,4 @@ def convert_datetime_str_to_iso_str(datetime_string_to_be_converted):
         print(e)
         result = datetime_string_to_be_converted
     return result
+

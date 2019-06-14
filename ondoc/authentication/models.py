@@ -1205,6 +1205,15 @@ class GenericAdmin(TimeStampedModel, CreatedByModel):
                 admin_users.append(admin.user)
         return admin_users
 
+    @staticmethod
+    def get_manageable_hospitals(user):
+        manageable_hosp_list = GenericAdmin.objects.filter(Q(is_disabled=False, user=user),
+                                                           (Q(permission_type=GenericAdmin.APPOINTMENT)
+                                                            |
+                                                            Q(super_user_permission=True))) \
+                                                   .values_list('hospital', flat=True)
+        return list(manageable_hosp_list)
+
 
 class BillingAccount(models.Model):
     SAVINGS = 1

@@ -249,6 +249,10 @@ class Hospital(auth_model.TimeStampedModel, auth_model.CreatedByModel, auth_mode
     priority_score = models.IntegerField(default=0, null=False, blank=False)
     search_distance = models.FloatField(default=15000)
     google_avg_rating = models.DecimalField(max_digits=5, decimal_places=2, null=True, editable=False)
+    # provider_encrypt = models.NullBooleanField(null=True, blank=True)
+    # provider_encrypted_by = models.ForeignKey(auth_model.User, null=True, blank=True, on_delete=models.SET_NULL, related_name='encrypted_hospitals')
+    # encryption_hint = models.CharField(max_length=128, null=True, blank=True)
+    # encrypted_hospital_id = models.CharField(max_length=128, null=True, blank=True)
 
     def __str__(self):
         return self.name
@@ -3460,7 +3464,8 @@ class OfflinePatients(auth_model.TimeStampedModel):
     REFERENCE_CHOICES = [(DOCPRIME, "Docprime"), (GOOGLE, "Google"), (JUSTDIAL, "JustDial"), (FRIENDS, "Friends"),
                          (OTHERS, "Others")]
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
-    name = models.CharField(max_length=32)
+    name = models.CharField(max_length=32, null=True, blank=True)
+    encrypted_name = models.CharField(max_length=128, null=True, blank=True)
     sms_notification = models.BooleanField(default=False)
     gender = models.CharField(max_length=2, default=None, blank=True, null=True, choices=GENDER_CHOICES)
     dob = models.DateField(blank=True, null=True)
@@ -3479,6 +3484,11 @@ class OfflinePatients(auth_model.TimeStampedModel):
 
     def __str__(self):
         return self.name
+
+
+    def __repr__(self):
+        return self.name
+
 
     @staticmethod
     def welcome_message_sms(sms_obj):
@@ -3500,6 +3510,7 @@ class PatientMobile(auth_model.TimeStampedModel):
     phone_number = models.BigIntegerField(blank=True, null=True,
                                           validators=[MaxValueValidator(9999999999), MinValueValidator(6000000000)])
     is_default = models.BooleanField(verbose_name='Default Number?', default=False)
+    encrypted_number = models.CharField(max_length=64, null=True, blank=True)
 
     def __str__(self):
         return '{}'.format(self.phone_number)
@@ -3805,6 +3816,7 @@ class PartnersAppInvoice(auth_model.TimeStampedModel):
     is_valid = models.BooleanField(default=True)
     is_edited = models.BooleanField(default=False)
     edited_by = models.ForeignKey(auth_model.User, on_delete=models.SET_NULL, null=True, blank=True, related_name='patners_app_invoices')
+    is_encrypted = models.BooleanField(default=False)
 
     def __str__(self):
         return str(self.appointment)
@@ -3880,14 +3892,11 @@ class PartnersAppInvoice(auth_model.TimeStampedModel):
         db_table = "partners_app_invoice"
 
 
-# class GeneralInvoiceItems(auth_model.TimeStampedModel, UniqueNameModel, SearchKey):
-#     item = models.CharField(max_length=200)
-#
-#     def __str__(self):
-#         return self.item
-#
-#     class Meta:
-#         db_table = "general_invoice_items"
+class EncryptedPartnersAppInvoiceLogs(auth_model.TimeStampedModel):
+    invoice = JSONField()
+
+    class Meta:
+        db_table = "encrypted_partners_app_invoice_logs"
 
 
 class GeneralInvoiceItems(auth_model.TimeStampedModel):
@@ -3931,6 +3940,34 @@ class SelectedInvoiceItems(auth_model.TimeStampedModel):
         db_table = "selected_invoice_items"
 
 
+class ProviderEncrypt(auth_model.TimeStampedModel):
+    is_encrypted = models.BooleanField(default=False)
+    encrypted_by = models.ForeignKey(auth_model.User, null=True, blank=True, on_delete=models.SET_NULL,
+                                     related_name='encrypted_hospitals')
+    hint = models.CharField(max_length=128, null=True, blank=True)
+    encrypted_hospital_id = models.CharField(max_length=128, null=True, blank=True)
+    email = models.EmailField(max_length=100, null=True, blank=True)
+    phone_numbers = ArrayField(models.CharField(max_length=10, blank=True), null=True)
+    hospital = models.OneToOneField(Hospital, on_delete=models.CASCADE, related_name='encrypt_details')
+    is_valid = models.BooleanField(default=True)
+    is_consent_received = models.BooleanField(default=True)
+
+    def __str__(self):
+        return self.hospital
+
+    class Meta:
+        db_table = "provider_encrypt"
+
+    def send_sms(self):
+        from ondoc.communications.models import ProviderAppNotification
+        if self.is_encrypted:
+            sms_notification = ProviderAppNotification(self.hospital, NotificationAction.PROVIDER_ENCRYPTION_ENABLED)
+            sms_notification.send()
+        elif not self.is_encrypted:
+            sms_notification = ProviderAppNotification(self.hospital, NotificationAction.PROVIDER_ENCRYPTION_DISABLED)
+            sms_notification.send()
+
+
 class CommonHospital(auth_model.TimeStampedModel):
     hospital = models.ForeignKey(Hospital, on_delete=models.CASCADE, null=True, blank=True)
     network = models.ForeignKey(HospitalNetwork, on_delete=models.CASCADE, null=True, blank=True)
@@ -3938,5 +3975,4 @@ class CommonHospital(auth_model.TimeStampedModel):
 
     class Meta:
         db_table = "common_hospital"
-
 

@@ -26,7 +26,7 @@ from ondoc.notification.rabbitmq_client import publish_message
 # from ondoc.notification.sqs_client import publish_message
 from django.template.loader import render_to_string
 from . import serializers
-from ondoc.common.models import Cities, PaymentOptions, UserConfig
+from ondoc.common.models import Cities, PaymentOptions, UserConfig, DeviceDetails
 from ondoc.common.utils import send_email, send_sms
 from ondoc.authentication.backends import JWTAuthentication
 from django.core.files.uploadedfile import SimpleUploadedFile, TemporaryUploadedFile, InMemoryUploadedFile
@@ -984,6 +984,26 @@ class AllUrlsViewset(viewsets.GenericViewSet):
         c_urls = list(CompareSEOUrls.objects.filter(url__startswith=key).values_list('url', flat=True))[:5]
         result = e_urls + c_urls
         return Response(dict(enumerate(result)))
+
+
+class DeviceDetailsSave(viewsets.GenericViewSet):
+
+    def save(self, request):
+        serializer = serializers.DeviceDetailsSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        validated_data = serializer.validated_data
+        user = request.user if request.user and request.user.is_authenticated else None
+        device_details_queryset = DeviceDetails.objects.filter(device_id=validated_data.get('device_id'))
+        device_details = device_details_queryset.first()
+        try:
+            if device_details:
+                device_details_queryset.update(**validated_data, user=user, updated_at=datetime.datetime.now())
+            else:
+                DeviceDetails.objects.create(**validated_data, user=user)
+        except Exception as e:
+            logger.error("Something went wrong while saving device details - " + str(e))
+            return Response("Error adding device details - " + str(e), status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+        return Response({"status": 1, "message": "device details added"}, status=status.HTTP_200_OK)
 
 
 class AppointmentPrerequisiteViewSet(viewsets.GenericViewSet):

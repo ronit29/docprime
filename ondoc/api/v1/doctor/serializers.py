@@ -1269,7 +1269,7 @@ class DoctorTimeSlotSerializer(serializers.Serializer):
 class AppointmentRetrieveDoctorSerializer(DoctorProfileSerializer):
     class Meta:
         model = Doctor
-        fields = ('id', 'name', 'gender', 'about', 'practicing_since',
+        fields = ('id', 'name', 'gender', 'about', 'practicing_since', 'license',
                   'qualifications', 'general_specialization', 'display_name')
 
 
@@ -1646,7 +1646,8 @@ class DoctorDetailsRequestSerializer(serializers.Serializer):
 
 
 class OfflinePatientBodySerializer(serializers.Serializer):
-    name = serializers.CharField(max_length=24)
+    name = serializers.CharField(max_length=24, required=False, allow_blank=True)
+    encrypted_name = serializers.CharField(max_length=128, required=False, allow_blank=True)
     sms_notification = serializers.BooleanField(required=False)
     share_with_hospital = serializers.BooleanField(required=False)
     gender = serializers.ChoiceField(choices=OfflinePatients.GENDER_CHOICES, required=False, allow_null=True)
@@ -1657,6 +1658,7 @@ class OfflinePatientBodySerializer(serializers.Serializer):
     welcome_message = serializers.CharField(required=False, max_length=256)
     display_welcome_message = serializers.BooleanField(required=False)
     phone_number = serializers.ListField(required=False)
+    encrypt_number = serializers.ListField(required=False)
     id = serializers.UUIDField()
     age = serializers.IntegerField(required=False)
 
@@ -1706,9 +1708,27 @@ class OfflineAppointmentFilterSerializer(serializers.Serializer):
 
 
 class OfflinePatientSerializer(serializers.ModelSerializer):
+
+    name = serializers.SerializerMethodField()
+    encrypted_name = serializers.SerializerMethodField()
+
+    def get_name(self, obj):
+        name = None
+        if obj:
+            if obj.name and not obj.encrypted_name:
+                name = obj.name
+        return name
+
+    def get_encrypted_name(self, obj):
+        encrypted_name = None
+        if obj:
+            if obj.encrypted_name:
+                encrypted_name = obj.encrypted_name
+        return encrypted_name
+
     class Meta:
         model = OfflinePatients
-        fields = ('id', 'name', 'dob', 'calculated_dob', 'gender', 'age','referred_by', 'display_welcome_message',
+        fields = ('id', 'name', 'encrypted_name', 'dob', 'calculated_dob', 'gender', 'age','referred_by', 'display_welcome_message',
                   'share_with_hospital', 'sms_notification', 'medical_history', 'updated_at')
 
 
