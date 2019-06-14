@@ -313,9 +313,12 @@ class Lab(TimeStampedModel, CreatedByModel, QCModel, SearchKey, WelcomeCallingDo
     @classmethod
     def get_insurance_details(cls, user):
 
+        from ondoc.insurance.models import InsuranceThreshold
+        insurance_threshold_obj = InsuranceThreshold.objects.all().order_by('-lab_amount_limit').first()
+        insurance_threshold_amount = insurance_threshold_obj.lab_amount_limit if insurance_threshold_obj else 1500
         resp = {
             'is_insurance_covered': False,
-            'insurance_threshold_amount': None,
+            'insurance_threshold_amount': insurance_threshold_amount,
             'is_user_insured': False
         }
 

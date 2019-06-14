@@ -882,9 +882,12 @@ class Doctor(auth_model.TimeStampedModel, auth_model.QCModel, SearchKey, auth_mo
 
     @classmethod
     def get_insurance_details(cls, user):
+        from ondoc.insurance.models import InsuranceThreshold
+        insurance_threshold_obj = InsuranceThreshold.objects.all().order_by('-opd_amount_limit').first()
+        insurance_threshold_amount = insurance_threshold_obj.opd_amount_limit if insurance_threshold_obj else 1500
         resp = {
             'is_insurance_covered': False,
-            'insurance_threshold_amount': None,
+            'insurance_threshold_amount': insurance_threshold_amount,
             'is_user_insured': False
         }
 
@@ -3001,6 +3004,30 @@ class OpdAppointment(auth_model.TimeStampedModel, CouponsMixin, OpdAppointmentIn
         result['data'] = {'opd_appointment_id': self.id}
         return result
 
+    @classmethod
+    def is_followup_appointment(cls, current_appointment):
+        if not current_appointment:
+            return False
+        doctor = current_appointment.doctor
+        hospital = current_appointment.hospital
+        profile = current_appointment.profile
+        last_completed_appointment = cls.objects.filter(doctor=doctor, profile=profile, hospital=hospital,
+                                                        status=cls.COMPLETED).order_by('-id').first()
+        if not last_completed_appointment:
+            return False
+        last_appointment_date = last_completed_appointment.time_slot_start
+        dc_obj = DoctorClinic.objects.filter(doctor=doctor, hospital=hospital, enabled=True).first()
+        if not dc_obj:
+            return False
+        followup_duration = dc_obj.followup_duration
+        if not followup_duration:
+            followup_duration = settings.DEFAULT_FOLLOWUP_DURATION
+        days_diff = current_appointment.date() - last_appointment_date.date()
+        if days_diff.days < followup_duration:
+            return True
+        else:
+            return False
+
     def get_master_order_id_and_discount(self):
         result = None, None
         order_obj = Order.objects.filter(reference_id=self.id).first()
@@ -3911,3 +3938,5 @@ class CommonHospital(auth_model.TimeStampedModel):
 
     class Meta:
         db_table = "common_hospital"
+
+
