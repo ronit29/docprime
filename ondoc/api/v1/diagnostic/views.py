@@ -109,7 +109,7 @@ class SearchPageViewSet(viewsets.ReadOnlyModelViewSet):
         temp_data['recommended_package'] = {'result': recommended_package.data,
                                             'information': {'screening': 'Screening text', 'physical': 'Physical Text'},
                                             'filters': advisor_filter}
-        if request.user.active_insurance:
+        if request.user.active_insurance and not hasattr(request, 'admin'):
             temp_data['common_package'] = []
         else:
             temp_data['common_package'] = package_serializer.data
@@ -1504,7 +1504,8 @@ class LabList(viewsets.ReadOnlyModelViewSet):
 
         if is_insurance and ids:
             filtering_query.append("mrp<=(%(insurance_threshold_amount)s)")
-            group_filter.append("(agreed_price<=insurance_cutoff_price or insurance_cutoff_price is null )")
+            if not hasattr(self.request, 'agent'):
+                group_filter.append("(agreed_price<=insurance_cutoff_price or insurance_cutoff_price is null )")
             filtering_params['insurance_threshold_amount'] = insurance_threshold_amount
 
         if avg_ratings:
