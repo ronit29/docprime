@@ -1249,6 +1249,7 @@ class LabTest(TimeStampedModel, SearchKey):
     author = models.ForeignKey(Doctor, null=True, blank=True, related_name='published_tests',
                                on_delete=models.SET_NULL)
     is_cancellable = models.BooleanField(default=True)
+    insurance_cutoff_price = models.PositiveIntegerField(default=None, null=True, blank=True)
 
     # test_sub_type = models.ManyToManyField(
     #     LabTestSubType,

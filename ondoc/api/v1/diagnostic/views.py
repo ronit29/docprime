@@ -1501,6 +1501,8 @@ class LabList(viewsets.ReadOnlyModelViewSet):
 
         if is_insurance and ids:
             filtering_query.append("mrp<=(%(insurance_threshold_amount)s)")
+            filtering_query.append("insurance_cutoff_price is not null")
+            group_filter.append(" agreed_price<=insurance_cutoff_price ")
             filtering_params['insurance_threshold_amount'] = insurance_threshold_amount
 
         if avg_ratings:
@@ -1572,7 +1574,7 @@ class LabList(viewsets.ReadOnlyModelViewSet):
                         ROW_NUMBER () OVER (ORDER BY {order} ) order_rank,
                         max_order_priority as order_priority
                         from (
-                        select max(lt.test_type) as test_type, lb.*, sum(mrp) total_mrp, count(*) as test_count,
+                        select max(lt.insurance_cutoff_price) as insurance_cutoff_price , max(lt.test_type) as test_type, lb.*, sum(mrp) total_mrp, count(*) as test_count,
                         case when bool_and(home_collection_possible)=True and is_home_collection_enabled=True 
                         then max(home_pickup_charges) else 0
                         end as pickup_charges,
