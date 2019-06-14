@@ -571,18 +571,19 @@ class UserInsurance(auth_model.TimeStampedModel):
         return days
 
     def save(self, *args, **kwargs):
-        if not self.merchant_payout:
-            self.create_payout()
+        # if not self.merchant_payout:
+        #     self.create_payout()
         super().save(*args, **kwargs)
 
     def process_payout(self):
-        if self.can_process_payout():
-            payouts = self.get_insurance_payouts()
-            for p in payouts:
-                p.process_insurance_premium_payout()
-                pass
-        else:
-            self.init_payout()
+        with transaction.atomic():
+            if self.can_process_payout():
+                payouts = self.get_insurance_payouts()
+                for p in payouts:
+                    #p.process_insurance_premium_payout()
+                    pass
+            else:
+                self.init_payout()
 
     def can_process_payout(self):
         #do we have payouts for complete premium
@@ -1514,7 +1515,6 @@ class UserInsurance(auth_model.TimeStampedModel):
             if p.paid_to == docprime_merchant:
                 results.append(p)
         return results
-
 
     def needs_transfer_to_insurance_nodal(self):
         order = self.order
