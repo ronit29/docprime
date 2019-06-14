@@ -545,6 +545,8 @@ class UserInsurance(auth_model.TimeStampedModel):
     cancel_reason = models.CharField(max_length=200, blank=True, null=True, default=None)
     cancel_case_type = models.PositiveIntegerField(choices=CANCEL_CASE_CHOICES, default=REFUND)
     master_policy_reference = models.ForeignKey(InsurerPolicyNumber, related_name='policy_reference', on_delete=models.DO_NOTHING, null=True)
+    premium_transferred = models.BooleanField(default=False)
+
     notes = GenericRelation(GenericNotes)
 
     def __str__(self):
@@ -576,6 +578,9 @@ class UserInsurance(auth_model.TimeStampedModel):
         super().save(*args, **kwargs)
 
     def process_payout(self):
+        if self.premium_transferred:
+            return
+
         with transaction.atomic():
             if self.can_process_payout():
                 payouts = self.get_insurance_payouts()
