@@ -14,6 +14,7 @@ from ondoc.api.v1.procedure.serializers import CommonProcedureCategorySerializer
     ProcedureSerializer, DoctorClinicProcedureSerializer, CommonProcedureSerializer, CommonIpdProcedureSerializer, \
     CommonHospitalSerializer
 from ondoc.cart.models import Cart
+from ondoc.crm.constants import constants
 from ondoc.doctor import models
 from ondoc.authentication import models as auth_models
 from ondoc.diagnostic import models as lab_models
@@ -283,9 +284,12 @@ class DoctorAppointmentsViewSet(OndocViewSet):
             cart_item, is_new = Cart.objects.update_or_create(id=cart_item_id, deleted_at__isnull=True, product_id=account_models.Order.DOCTOR_PRODUCT_ID,
                                                   user=request.user,defaults={"data": data})
 
+        resp = None
         if hasattr(request, 'agent') and request.agent:
-            resp = { 'is_agent': True , "status" : 1 }
-        else:
+            user = User.objects.filter(id=request.agent).first()
+            if user and not user.groups.filter(name=constants['APPOINTMENT_OTP_BYPASS_AGENT_TEAM']).exists():
+                resp = {'is_agent': True, "status": 1}
+        if not resp:
             resp = account_models.Order.create_order(request, [cart_item], validated_data.get("use_wallet"))
 
         return Response(data=resp)
