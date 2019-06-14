@@ -11,5 +11,5 @@ class Command(BaseCommand):
     def handle(self, *args, **options):
         print('hello')
         #return
-        ui = UserInsurance.objects.filter(id=3000000063).first()
+        ui = UserInsurance.objects.filter(id=3000000838).first()
         ui.process_payout()

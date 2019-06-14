@@ -1540,8 +1540,9 @@ class MerchantPayout(TimeStampedModel):
         super().save(*args, **kwargs)
 
         if first_instance:
-            self.payout_ref_id = self.id
-            self.save()
+            MerchantPayout.objects.filter(id=self.id).update(payout_ref_id=self.id)
+            # self.payout_ref_id = self.id
+            # self.save()
 
     # @classmethod
     # def creating_pending_insurance_transactions(cls):
@@ -1636,8 +1637,11 @@ class MerchantPayout(TimeStampedModel):
             return trans
 
     def is_insurance_premium_payout(self):
-        if self.get_user_insurance():
+        if self.booking_type == Order.INSURANCE_PRODUCT_ID:
             return True
+
+        # if self.get_user_insurance():
+        #     return True
         return False
 
     def get_or_create_insurance_premium_transaction(self):
@@ -1705,7 +1709,7 @@ class MerchantPayout(TimeStampedModel):
                     tx_data['type'] = DummyTransactions.CREDIT
                     tx_data['amount'] = self.payable_amount
                     tx_data['payment_mode'] = "DC"
-                    if not self.is_nodal_transfer():
+                    if self.is_nodal_transfer():
                         tx_data['transaction_type'] = DummyTransactions.INSURANCE_NODAL_TRANSFER
 
                     transaction = DummyTransactions.objects.create(**tx_data)
@@ -1874,7 +1878,12 @@ class MerchantPayout(TimeStampedModel):
                 return
 
             url = settings.SETTLEMENT_DETAILS_API
-            order_no = self.get_pg_order_no()
+            if self.is_insurance_premium_payout():
+                txn = self.get_insurance_premium_transactions()
+                if txn:
+                    order_no = txn[0].order_no
+            else:
+                order_no = self.get_pg_order_no()
 
             if order_no:
                 req_data = {"orderNo":order_no}
@@ -1893,6 +1902,8 @@ class MerchantPayout(TimeStampedModel):
                             if d.get('refNo') == str(self.payout_ref_id):
                                 self.utr_no = d.get('utrNo','')
                                 self.pg_status = d.get('txStatus','')
+                                if self.utr_no:
+                                    self.status = self.PAID
                                 break
                     self.save()
 

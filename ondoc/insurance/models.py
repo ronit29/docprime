@@ -545,7 +545,7 @@ class UserInsurance(auth_model.TimeStampedModel):
     cancel_reason = models.CharField(max_length=200, blank=True, null=True, default=None)
     cancel_case_type = models.PositiveIntegerField(choices=CANCEL_CASE_CHOICES, default=REFUND)
     master_policy_reference = models.ForeignKey(InsurerPolicyNumber, related_name='policy_reference', on_delete=models.DO_NOTHING, null=True)
-    premium_transferred = models.BooleanField(default=False)
+    premium_transferred = models.NullBooleanField(default=False)
 
     notes = GenericRelation(GenericNotes)
 
@@ -617,7 +617,7 @@ class UserInsurance(auth_model.TimeStampedModel):
         if self.needs_transfer_to_insurance_nodal():
             transfer_status = self.transfer_to_insurance_nodal()
             if transfer_status:
-                nodal_payout = self.nodal_transfer_payouts()
+                nodal_payout = self.get_insurance_nodal_transfer_payouts()
                 if len(nodal_payout)>1:
                     raise Exception('multiple nodal transfer found')
                 elif len(nodal_payout)==0:
@@ -645,6 +645,8 @@ class UserInsurance(auth_model.TimeStampedModel):
         if order.wallet_amount==0:
             amount = order.amount        
         if amount and amount>0:
+            if PayoutMapping.objects.filter(content_object=self, payout__amount=amount).exists():
+                return
             payout = MerchantPayout()
             payout.charged_amount = amount
             payout.payable_amount = amount
