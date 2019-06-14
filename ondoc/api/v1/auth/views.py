@@ -1925,8 +1925,11 @@ class OrderDetailViewSet(GenericViewSet):
             cod_deal_price = None
             enabled_for_cod = False
             opd_appoint = OpdAppointment.objects.filter(id=order.reference_id)[0]
+            start_time = opd_appoint.time_slot_start
+            day = start_time.weekday()
+
             if opd_appoint.payment_type == OpdAppointment.COD:
-                doc_clinic_timing = DoctorClinicTiming.objects.filter(doctor_clinic__doctor=opd_appoint.doctor, doctor_clinic__hospital=opd_appoint.hospital)[0]
+                doc_clinic_timing = DoctorClinicTiming.objects.filter(day=day, doctor_clinic__doctor=opd_appoint.doctor, doctor_clinic__hospital=opd_appoint.hospital)[0]
                 cod_deal_price = doc_clinic_timing.dct_cod_deal_price()
                 enabled_for_cod = doc_clinic_timing.is_enabled_for_cod()
 
