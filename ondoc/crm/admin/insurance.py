@@ -831,8 +831,8 @@ class UserInsuranceForm(forms.ModelForm):
         if case_type=="NO" and (int(status) == UserInsurance.CANCEL_INITIATE or int(status) == UserInsurance.CANCELLED):
             if not cancel_reason:
                 raise forms.ValidationError('For Cancel Initiation, Cancel reason is mandatory')
-            if not self.instance.is_bank_details_exist():
-                raise forms.ValidationError('For Cancel Initiation, Bank details is mandatory')
+            # if not self.instance.is_bank_details_exist():
+            #     raise forms.ValidationError('For Cancel Initiation, Bank details is mandatory')
             insured_opd_completed_app_count = OpdAppointment.get_insured_completed_appointment(self.instance)
             insured_lab_completed_app_count = LabAppointment.get_insured_completed_appointment(self.instance)
             if insured_lab_completed_app_count > 0:
@@ -844,8 +844,8 @@ class UserInsuranceForm(forms.ModelForm):
         if case_type == "YES" and (int(status) == UserInsurance.CANCEL_INITIATE or int(status) == UserInsurance.CANCELLED):
             if not cancel_reason:
                 raise forms.ValidationError('For Cancel Initiation, Cancel reason is mandatory')
-            if int(cancel_case_type) == UserInsurance.REFUND and not self.instance.is_bank_details_exist():
-                raise forms.ValidationError('In Case of Refundable Bank details are mandatory, please upload bank details')
+            # if int(cancel_case_type) == UserInsurance.REFUND and not self.instance.is_bank_details_exist():
+            #     raise forms.ValidationError('In Case of Refundable Bank details are mandatory, please upload bank details')
         if int(status) == UserInsurance.CANCELLED and not self.instance.status == UserInsurance.CANCEL_INITIATE:
             raise forms.ValidationError('Cancellation is only allowed for cancel initiate status')
         if self.instance.status == UserInsurance.CANCELLED:
@@ -1199,6 +1199,7 @@ class EndorsementRequestForm(forms.ModelForm):
             raise forms.ValidationError('Without Approved COI can not be send to customer')
         if status == EndorsementRequest.REJECT and not reject_reason:
             raise forms.ValidationError('For Rejection, reject reason is mandatory')
+
 
     class Meta:
         fields = '__all__'
