@@ -575,31 +575,106 @@ class UserInsurance(auth_model.TimeStampedModel):
             self.create_payout()
         super().save(*args, **kwargs)
 
-    def create_payout(self):
-        if self.merchant_payout:
-            raise Exception("payout already created for this insurance purchase")
+    def process_payout(self):
+        if self.can_process_payout():
+            payouts = self.get_insurance_payouts()
+            for p in payouts:
+                p.process_insurance_premium_payout()
+                pass
+        else:
+            self.init_payout()
 
-        payout_data = {
-            "charged_amount" : self.premium_amount,
-            "payable_amount" : self.premium_amount,
-            "content_object" : self.insurance_plan.insurer,
-            "type"   : MerchantPayout.AUTOMATIC,
-            "paid_to"        : self.insurance_plan.insurer.merchant,
-            "booking_type"   : Order.INSURANCE_PRODUCT_ID
-        }
+    def can_process_payout(self):
+        #do we have payouts for complete premium
+        #do we have transaction for these payouts
+        premium = self.premium_amount
+        can_process = True
+        payout_premium = 0
+        payouts = self.get_insurance_payouts()
+        for p in payouts:
+            if not p.is_nodal_transfer():
+                payout_premium += p.payable_amount
+            elif not p.utr_no:
+                can_process = False
+            transactions = p.get_insurance_premium_transactions()
+            transaction = transactions[0] if transactions else None
+            if not transaction:
+                can_process = False
+        if payout_premium != premium:
+            can_process=False
 
-        merchant_payout = MerchantPayout.objects.create(**payout_data)
-        self.merchant_payout = merchant_payout
+        return can_process
 
-    def save_payout(self):
-        self.create_payout()
-        self.save()
+    def init_payout(self):
+        transfer_status = False
+        nodal_payout = None
+        if self.needs_transfer_to_insurance_nodal():
+            transfer_status = self.transfer_to_insurance_nodal()
+            if transfer_status:
+                nodal_payout = self.nodal_transfer_payouts()
+                if len(nodal_payout)>1:
+                    raise Exception('multiple nodal transfer found')
+                elif len(nodal_payout)==0:
+                    raise Exception('no transfers found')
+                nodal_payout = nodal_payout[0]
+            if nodal_payout and nodal_payout.utr_no:
+                payout = MerchantPayout()
+                payout.charged_amount = nodal_payout.charged_amount
+                payout.payable_amount = nodal_payout.payable_amount
+                payout.content_object = self.insurance_plan.insurer
+                payout.type = MerchantPayout.AUTOMATIC
+                payout.paid_to = self.insurance_plan.insurer.merchant
+                payout.booking_type = Order.INSURANCE_PRODUCT_ID
+                payout.save()
+                PayoutMapping.objects.create(**{'content_object': self, 'payout': payout})
+                transaction = payout.get_or_create_insurance_premium_transaction()
 
-    @classmethod
-    def generate_pending_payouts(cls):
-        bookings = cls.objects.filter(merchant_payout__isnull=True)
-        for booking in bookings:
-            booking.save_payout()
+        amount = None
+        order = self.order
+
+        if order.amount>0 and order.wallet_amount>0:
+            amount = order.amount
+        if order.amount==0 and not self.needs_transfer_to_insurance_nodal():
+            amount = order.wallet_amount
+        if order.wallet_amount==0:
+            amount = order.amount        
+        if amount and amount>0:
+            payout = MerchantPayout()
+            payout.charged_amount = amount
+            payout.payable_amount = amount
+            payout.content_object = self.insurance_plan.insurer
+            payout.type = MerchantPayout.AUTOMATIC
+            payout.paid_to = self.insurance_plan.insurer.merchant
+            payout.booking_type = Order.INSURANCE_PRODUCT_ID
+            payout.save()
+            PayoutMapping.objects.create(**{'content_object': self, 'payout': payout})
+
+    #
+    # def create_payout(self):
+    #     if self.merchant_payout:
+    #         raise Exception("payout already created for this insurance purchase")
+    #
+    #     payout_data = {
+    #         "charged_amount" : self.premium_amount,
+    #         "payable_amount" : self.premium_amount,
+    #         "content_object" : self.insurance_plan.insurer,
+    #         "type"   : MerchantPayout.AUTOMATIC,
+    #         "paid_to"        : self.insurance_plan.insurer.merchant,
+    #         "booking_type"   : Order.INSURANCE_PRODUCT_ID
+    #     }
+    #
+    #     merchant_payout = MerchantPayout.objects.create(**payout_data)
+    #     self.merchant_payout = merchant_payout
+
+    # def save_payout(self):
+    #     self.create_payout()
+    #     self.save()
+    #
+    # @classmethod
+    # def generate_pending_payouts(cls):
+    #     bookings = cls.objects.filter(merchant_payout__isnull=True)
+    #     for booking in bookings:
+    #         booking.save_payout()
 
     def get_primary_member_profile(self):
         insured_members = self.members.filter().order_by('id')
@@ -1385,37 +1460,61 @@ class UserInsurance(auth_model.TimeStampedModel):
 
         return response
 
-    @classmethod
-    def process_payouts(cls):
-        insurance_list = cls.objects.filter(
-            merchant_payout__status__in=[MerchantPayout.PENDING, MerchantPayout.ATTEMPTED, MerchantPayout.AUTOMATIC])
-        for insurance in insurance_list:
-            insurance.process_insurance_obj_payouts()
+    # @classmethod
+    # def process_payouts(cls):
+    #     insurance_list = cls.objects.filter(
+    #         merchant_payout__status__in=[MerchantPayout.PENDING, MerchantPayout.ATTEMPTED, MerchantPayout.AUTOMATIC])
+    #     for insurance in insurance_list:
+    #         insurance.process_insurance_obj_payouts()
 
     def transfer_to_insurance_nodal(self):
-        if self.needs_transfer_to_insurance_nodal() and not self.nodal_transfer_payouts():
-            merchant = Merchant.objects.filter(id=settings.DOCPRIME_NODAL2_MERCHANT).first()
-            payout_data = {
-            "charged_amount": self.order.wallet_amount,
-            "payable_amount": self.order.wallet_amount,
-            #"content_object": self.insurance_plan.insurer,
-            "type": MerchantPayout.AUTOMATIC,
-            "paid_to": merchant,
-            "booking_type": Order.INSURANCE_PRODUCT_ID
-            }
+        status = False
+        if self.needs_transfer_to_insurance_nodal():
+            nodal_payout = self.get_insurance_nodal_transfer_payouts()
+            if nodal_payout:
+                nodal_payout = nodal_payout[0]
+            else:
+                merchant = Merchant.objects.filter(id=settings.DOCPRIME_NODAL2_MERCHANT).first()
+                payout_data = {
+                "charged_amount": self.order.wallet_amount,
+                "payable_amount": self.order.wallet_amount,
+                #"content_object": self.insurance_plan.insurer,
+                "type": MerchantPayout.AUTOMATIC,
+                "paid_to": merchant,
+                "booking_type": Order.INSURANCE_PRODUCT_ID
+                }
 
-            merchant_payout_obj = MerchantPayout.objects.create(**payout_data)
-            PayoutMapping.objects.create(**{'content_object':self,'payout':merchant_payout_obj})
+                nodal_payout = MerchantPayout.objects.create(**payout_data)
+                PayoutMapping.objects.create(**{'content_object':self,'payout':nodal_payout})
 
-    def nodal_transfer_payouts(self):
-        docprime_merchant = Merchant.objects.filter(id=settings.DOCPRIME_NODAL2_MERCHANT).first()
+            transaction = nodal_payout.get_insurance_premium_transactions()
+            if transaction:
+                transaction = transaction[0]
+            else:
+                transaction = nodal_payout.get_or_create_insurance_premium_transaction()
+
+            if transaction:
+                status = nodal_payout.process_insurance_premium_payout()
+
+            return status
+
+    def get_insurance_payouts(self):
         results = []
         pms = PayoutMapping.objects.filter(object_id=self.id, content_type_id=ContentType.objects.get_for_model(self).id)
         for pm in pms:
-            if pm.payout.paid_to == docprime_merchant:
-                results.append(pm)
-
+            results.append(pm.payout)
         return results
+
+
+    def get_insurance_nodal_transfer_payouts(self):
+        docprime_merchant = Merchant.objects.filter(id=settings.DOCPRIME_NODAL2_MERCHANT).first()
+        results = []
+        payouts = self.get_insurance_payouts()
+        for p in payouts:
+            if p.paid_to == docprime_merchant:
+                results.append(p)
+        return results
+
 
     def needs_transfer_to_insurance_nodal(self):
         order = self.order
@@ -1467,28 +1566,28 @@ class UserInsurance(auth_model.TimeStampedModel):
     #                 merchant_payout_obj = MerchantPayout.objects.create(**payout_data)
 
 
-    def process_insurance_obj_payouts(self):
-        from ondoc.account.models import PgTransaction
+    # def process_insurance_obj_payouts(self):
+    #     from ondoc.account.models import PgTransaction
 
-        order = self.order
-        merchant_payout_obj = self.merchant_payout
-        user = self.user
+    #     order = self.order
+    #     merchant_payout_obj = self.merchant_payout
+    #     user = self.user
 
-        if merchant_payout_obj.status not in [MerchantPayout.PENDING, MerchantPayout.ATTEMPTED,
-                                              MerchantPayout.AUTOMATIC]:
-            return
+    #     if merchant_payout_obj.status not in [MerchantPayout.PENDING, MerchantPayout.ATTEMPTED,
+    #                                           MerchantPayout.AUTOMATIC]:
+    #         return
 
-        # Directly Paid from the Pg as no wallet amount is used.
-        if not order.wallet_amount or order.wallet_amount == Decimal(0):
-            merchant_payout_obj.process_payout = True
-            merchant_payout_obj.save()
+    #     # Directly Paid from the Pg as no wallet amount is used.
+    #     if not order.wallet_amount or order.wallet_amount == Decimal(0):
+    #         merchant_payout_obj.process_payout = True
+    #         merchant_payout_obj.save()
 
-        elif order.wallet_amount and order.wallet_amount == self.premium_amount:
-            pg_transactions = PgTransaction.objects.filter(product_id=Order.INSURANCE_PRODUCT_ID, user=user)
+    #     elif order.wallet_amount and order.wallet_amount == self.premium_amount:
+    #         pg_transactions = PgTransaction.objects.filter(product_id=Order.INSURANCE_PRODUCT_ID, user=user)
 
-            # Order not processed but payment sucess and same wallet amount used next time.
-            if len(pg_transactions) == 1 and pg_transactions.first():
-                pass
+    #         # Order not processed but payment sucess and same wallet amount used next time.
+    #         if len(pg_transactions) == 1 and pg_transactions.first():
+    #             pass
 
     def is_bank_details_exist(self):
         bank_obj = UserBank.objects.filter(insurance=self).order_by('-id').first()

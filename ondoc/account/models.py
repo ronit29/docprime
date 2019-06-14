@@ -1489,12 +1489,12 @@ class MerchantPayout(TimeStampedModel):
             self.payout_ref_id = self.id
             self.save()
 
-    @classmethod
-    def creating_pending_insurance_transactions(cls):
-        pending = cls.objects.filter(booking_type=cls.InsurancePremium, utr_no__isnull=False)
-        for p in pending:
-            if p.utr_no:
-                p.create_insurance_transaction()
+    # @classmethod
+    # def creating_pending_insurance_transactions(cls):
+    #     pending = cls.objects.filter(booking_type=cls.InsurancePremium, utr_no__isnull=False)
+    #     for p in pending:
+    #         if p.utr_no:
+    #             p.create_insurance_transaction()
 
     def create_insurance_transaction(self):
         from ondoc.insurance.models import UserInsurance, InsuranceTransaction
@@ -1524,9 +1524,12 @@ class MerchantPayout(TimeStampedModel):
         ui = self.user_insurance.all()
         if len(ui)>1:
             raise Exception('Multiple user insurance found for a single payout')
+        if len(ui)==1:
+            return ui.first()
 
-        return ui.first()
-
+        pms = PayoutMapping.objects.filter(payout=self).first()
+        user_insurance = pms.content_object
+        return user_insurance
 
     @staticmethod
     def get_merchant_payout_info(obj):
@@ -1555,18 +1558,58 @@ class MerchantPayout(TimeStampedModel):
         if self.paid_to == merchant:
             return True
 
-    def get_nodal_transfer_transaction(self):
-        pms = PayoutMapping.objects.filter(payout=self).first()
-        user_insurance = pms.content_object
-        trans = DummyTransactions.objects.filter(transaction_type=DummyTransactions.INSURANCE_NODAL_TRANSFER,reference_id=user_insurance.id,product_id=Order.INSURANCE_PRODUCT_ID)
-        return trans
+    def get_insurance_premium_transactions(self):
+        user_insurance = self.get_user_insurance()
+        if self.is_nodal_transfer():
+            return DummyTransactions.objects.filter(transaction_type=DummyTransactions.INSURANCE_NODAL_TRANSFER,
+                                             reference_id=user_insurance.id, product_id=Order.INSURANCE_PRODUCT_ID)
 
-    def get_user_insurance(self):
-        pms = PayoutMapping.objects.filter(payout=self).first()
-        user_insurance = pms.content_object
-        return user_insurance
+        trans = DummyTransactions.objects.filter(reference_id=user_insurance.id,\
+                    product_id=Order.INSURANCE_PRODUCT_ID).\
+                    exclude(transaction_type=DummyTransactions.INSURANCE_NODAL_TRANSFER)
 
-    def create_nodal_dummy_transaction(self):
+        if len(trans)>1:
+            raise Exception('multiple transactions found')
+
+        if trans and trans[0].amount == self.payable_amount:
+            return trans
+
+        trans = PgTransaction.objects.filter(order=user_insurance.order)
+        if len(trans)>1:
+            raise Exception('multiple transactions found')
+
+        if trans and trans[0].amount == self.payable_amount:
+            return trans
+
+    # def get_nodal_transfer_transaction(self):
+    #     pms = PayoutMapping.objects.filter(payout=self).first()
+    #     user_insurance = pms.content_object
+    #     trans = DummyTransactions.objects.filter(transaction_type=DummyTransactions.INSURANCE_NODAL_TRANSFER,reference_id=user_insurance.id,product_id=Order.INSURANCE_PRODUCT_ID)
+    #     return trans
+    #
+    # def get_dummy_premium_transfer_transaction(self):
+    #     pms = PayoutMapping.objects.filter(payout=self).first()
+    #     user_insurance = pms.content_object
+    #     trans = DummyTransactions.objects.filter(reference_id=user_insurance.id,product_id=Order.INSURANCE_PRODUCT_ID).exclude(transaction_type=DummyTransactions.INSURANCE_NODAL_TRANSFER)
+    #     return trans
+
+    def is_insurance_premium_payout(self):
+        if self.get_user_insurance():
+            return True
+        return False
+
+    def get_or_create_insurance_premium_transaction(self):
+        #transaction already created no need to proceed
+        transaction = None
+        transaction = self.get_insurance_premium_transactions()
+
+        if len(transaction)==1:
+            return transaction.first()
+        elif len(transaction)>1:
+            raise Exception('multiple nodal transfers found.')
+        else:
+            transaction = None
+
         user_insurance = self.get_user_insurance()
 
         req_data = dict()
@@ -1576,9 +1619,6 @@ class MerchantPayout(TimeStampedModel):
 
             if not user:
                 raise Exception('user is required')
-            if self.get_nodal_transfer_transaction():
-                return
-
             token = settings.PG_DUMMY_TRANSACTION_TOKEN
             headers = {
                 "auth": token,
@@ -1605,6 +1645,9 @@ class MerchantPayout(TimeStampedModel):
                 "buCallbackSuccessUrl": "",
                 "buCallbackFailureUrl": ""
             }
+            if not self.is_nodal_transfer():
+                req_data["insurerCode"] = "apolloDummy"
+
 
             response = requests.post(url, data=json.dumps(req_data), headers=headers)
             if response.status_code == status.HTTP_200_OK:
@@ -1620,34 +1663,130 @@ class MerchantPayout(TimeStampedModel):
                     tx_data['type'] = DummyTransactions.CREDIT
                     tx_data['amount'] = self.payable_amount
                     tx_data['payment_mode'] = "DC"
-                    tx_data['transaction_type'] = DummyTransactions.INSURANCE_NODAL_TRANSFER
+                    if not self.is_nodal_transfer():
+                        tx_data['transaction_type'] = DummyTransactions.INSURANCE_NODAL_TRANSFER
 
-                    DummyTransactions.objects.create(**tx_data)
+                    transaction = DummyTransactions.objects.create(**tx_data)
                     #print("SAVED DUMMY TRANSACTION")
             else:
                 raise Exception("Retry on invalid Http response status - " + str(response.content))
 
         except Exception as e:
             logger.error("Error in Setting Dummy Transaction of payout - " + str(self.id) + " with exception - " + str(e))
+        return transaction
 
-    def execute_nodal_transfer(self):
+    # def execute_nodal_transfer(self):
+    #     from ondoc.api.v1.utils import create_payout_checksum
+    #     from collections import OrderedDict
+    #     payout_status = None
+    #
+    #     try:
+    #         if not self.is_nodal_transfer():
+    #             raise Exception('Incorrect method called for payout')
+    #
+    #         if self.status == self.PAID:
+    #             return True
+    #
+    #         transaction = self.get_nodal_transfer_transaction()
+    #         if not transaction:
+    #             raise Exception('No transaction found to execute nodal transfer')
+    #
+    #         if len(transaction)>1:
+    #             raise Exception("nodal transfer cannot have multiple transactions")
+    #
+    #         default_payment_mode = self.get_default_payment_mode()
+    #         merchant = self.get_merchant()
+    #         user_insurance = self.get_user_insurance()
+    #
+    #         if not merchant or not user_insurance:
+    #             raise Exception("Insufficient Data " + str(self))
+    #
+    #         if not merchant.verified_by_finance or not merchant.enabled:
+    #             raise Exception("Merchant is not verified or is not enabled. " + str(self))
+    #
+    #         req_data = { "payload" : [], "checkSum" : "" }
+    #
+    #         txn = transaction[0]
+    #
+    #         curr_txn = OrderedDict()
+    #         curr_txn["idx"] = 0
+    #         curr_txn["orderNo"] = txn.order_no
+    #         curr_txn["orderId"] = txn.order.id
+    #         curr_txn["txnAmount"] = str(0)
+    #
+    #         #curr_txn["txnAmount"] = str(self.payable_amount)
+    #         curr_txn["settledAmount"] = str(self.payable_amount)
+    #         curr_txn["merchantCode"] = self.paid_to.id
+    #         curr_txn["refNo"] = self.payout_ref_id
+    #         curr_txn["bookingId"] = user_insurance.id
+    #         curr_txn["paymentType"] = default_payment_mode
+    #
+    #         req_data["payload"].append(curr_txn)
+    #
+    #         self.request_data = req_data
+    #
+    #         req_data["checkSum"] = create_payout_checksum(req_data["payload"], Order.INSURANCE_PRODUCT_ID)
+    #         headers = {
+    #             "auth": settings.PG_REFUND_AUTH_TOKEN,
+    #             "Content-Type": "application/json"
+    #         }
+    #         url = settings.PG_SETTLEMENT_URL
+    #         resp_data = None
+    #
+    #         response = requests.post(url, data=json.dumps(req_data), headers=headers)
+    #         resp_data = response.json()
+    #
+    #         if response.status_code == status.HTTP_200_OK:
+    #             if resp_data.get("ok") is not None and resp_data.get("ok") == '1':
+    #                 success_payout = False
+    #                 result = resp_data.get('result')
+    #                 if result:
+    #                     for res_txn in result:
+    #                         success_payout = res_txn['status'] == "SUCCESSFULLY_INSERTED"
+    #
+    #                 if success_payout:
+    #                     payout_status = {"status": 1, "response": resp_data}
+    #                 else:
+    #                     logger.error("payout failed for request data - " + str(req_data))
+    #                     payout_status =  {"status" : 0, "response" : resp_data}
+    #
+    #
+    #         if payout_status:
+    #             self.api_response = payout_status.get("response")
+    #             if payout_status.get("status"):
+    #                 self.payout_time = datetime.datetime.now()
+    #                 self.status = self.PAID
+    #             else:
+    #                 self.retry_count += 1
+    #
+    #             self.save()
+    #
+    #     except Exception as e:
+    #         logger.error("Error in processing payout - with exception - " + str(e))
+    #
+    #     if payout_status and payout_status.get("status"):
+    #         return True
+
+    def process_insurance_premium_payout(self):
         from ondoc.api.v1.utils import create_payout_checksum
         from collections import OrderedDict
+        payout_status = None
+
         try:
-            if not self.is_nodal_transfer():
-                raise Exception('Incorrect method called for payout')
+            # if not self.is_nodal_transfer():
+            #     raise Exception('Incorrect method called for payout')
 
             if self.status == self.PAID:
-                return
+                return True
 
-            transaction = self.get_nodal_transfer_transaction()
+            transaction = self.get_insurance_premium_transactions()
             if not transaction:
-                return
+                raise Exception('No transaction found for insurance premium payout')
 
-            if len(transaction)>1:
-                raise Exception("nodal transfer cannot have multiple transactions")
+            if len(transaction) > 1:
+                raise Exception("Insurance premium transfers cannot have multiple transactions")
 
-            default_payment_mode = self.get_default_payment_mode()        
+            default_payment_mode = self.get_default_payment_mode()
             merchant = self.get_merchant()
             user_insurance = self.get_user_insurance()
 
@@ -1657,26 +1796,28 @@ class MerchantPayout(TimeStampedModel):
             if not merchant.verified_by_finance or not merchant.enabled:
                 raise Exception("Merchant is not verified or is not enabled. " + str(self))
 
-            req_data = { "payload" : [], "checkSum" : "" }
+            req_data = {"payload": [], "checkSum": ""}
 
             txn = transaction[0]
-                
+
             curr_txn = OrderedDict()
             curr_txn["idx"] = 0
             curr_txn["orderNo"] = txn.order_no
             curr_txn["orderId"] = txn.order.id
-            curr_txn["txnAmount"] = str(0)
+            curr_txn["txnAmount"] = str(txn.amount)
 
-            #curr_txn["txnAmount"] = str(self.payable_amount)
+            #curr_txn["txnAmount"] = str(0)
+
+            # curr_txn["txnAmount"] = str(self.payable_amount)
             curr_txn["settledAmount"] = str(self.payable_amount)
             curr_txn["merchantCode"] = self.paid_to.id
             curr_txn["refNo"] = self.payout_ref_id
             curr_txn["bookingId"] = user_insurance.id
             curr_txn["paymentType"] = default_payment_mode
+            if isinstance(txn, DummyTransactions) and txn.amount>0:
+                curr_txn["txnAmount"] = str(0)
 
             req_data["payload"].append(curr_txn)
-
-            payout_status = None
 
             self.request_data = req_data
 
@@ -1701,12 +1842,11 @@ class MerchantPayout(TimeStampedModel):
 
                     if success_payout:
                         payout_status = {"status": 1, "response": resp_data}
-                    else:            
+                    else:
                         logger.error("payout failed for request data - " + str(req_data))
-                        payout_status =  {"status" : 0, "response" : resp_data}
+                        payout_status = {"status": 0, "response": resp_data}
 
-
-            if payout_status:            
+            if payout_status:
                 self.api_response = payout_status.get("response")
                 if payout_status.get("status"):
                     self.payout_time = datetime.datetime.now()
@@ -1719,7 +1859,8 @@ class MerchantPayout(TimeStampedModel):
         except Exception as e:
             logger.error("Error in processing payout - with exception - " + str(e))
 
-
+        if payout_status and payout_status.get("status"):
+            return True
 
     def get_billed_to(self):
         if self.content_object:
