@@ -109,7 +109,10 @@ class SearchPageViewSet(viewsets.ReadOnlyModelViewSet):
         temp_data['recommended_package'] = {'result': recommended_package.data,
                                             'information': {'screening': 'Screening text', 'physical': 'Physical Text'},
                                             'filters': advisor_filter}
-        temp_data['common_package'] = package_serializer.data
+        if request.user.active_insurance:
+            temp_data['common_package'] = []
+        else:
+            temp_data['common_package'] = package_serializer.data
         temp_data['preferred_labs'] = lab_serializer.data
         temp_data['common_conditions'] = condition_serializer.data
 
