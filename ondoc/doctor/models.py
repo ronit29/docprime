@@ -1,3 +1,5 @@
+from decimal import Decimal
+
 from django.contrib.gis.db.models.functions import Distance
 from django.contrib.gis.geos import GEOSGeometry
 from django.db.models import Window
@@ -2065,8 +2067,9 @@ class OpdAppointmentInvoiceMixin(object):
             context = deepcopy(context)
             context['invoice'] = invoice
             html_body = render_to_string("email/doctor_invoice/invoice_template.html", context=context)
-            filename = "invoice_{}_{}.pdf".format(str(timezone.now().strftime("%I%M_%d%m%Y")),
-                                                  random.randint(1111111111, 9999999999))
+            # filename = "invoice_{}_{}.pdf".format(str(timezone.now().strftime("%I%M_%d%m%Y")),
+            #                                       random.randint(1111111111, 9999999999))
+            filename = "payment_receipt_{}.pdf".format(context.get('instance').id)
             file = html_to_pdf(html_body, filename)
             if not file:
                 logger.error("Got error while creating pdf for opd invoice.")
@@ -2160,6 +2163,7 @@ class OpdAppointment(auth_model.TimeStampedModel, CouponsMixin, OpdAppointmentIn
     appointment_prescriptions = GenericRelation("prescription.AppointmentPrescription", related_query_name="appointment_prescriptions")
     coupon_data = JSONField(blank=True, null=True)
     status_change_comments = models.CharField(max_length=5000, null=True, blank=True)
+    is_cod_to_prepaid = models.NullBooleanField(default=False, null=True, blank=True)
 
     def __str__(self):
         return self.profile.name + " (" + self.doctor.name + ")"
@@ -2449,12 +2453,25 @@ class OpdAppointment(auth_model.TimeStampedModel, CouponsMixin, OpdAppointmentIn
             return True
         return False
 
+    def send_cod_to_prepaid_request(self):
+        result = False
+        if self.payment_type != self.COD:
+            return result
+        order_obj = Order.objects.filter(reference_id=self.id).first()
+        if order_obj:
+                parent = order_obj.parent
+                if parent:
+                    result = parent.is_cod_order
+        return result
+
     def after_commit_tasks(self, old_instance, push_to_matrix):
         if old_instance is None:
             try:
                 create_ipd_lead_from_opd_appointment.apply_async(({'obj_id': self.id},),)
                                                                  # eta=timezone.now() + timezone.timedelta(hours=1))
-
+                if self.send_cod_to_prepaid_request():
+                    notification_tasks.send_opd_notifications_refactored.apply_async(
+                        (self.id, NotificationAction.COD_TO_PREPAID_REQUEST), countdown=5)
             except Exception as e:
                 logger.error(str(e))
         if push_to_matrix:
@@ -2481,6 +2498,13 @@ class OpdAppointment(auth_model.TimeStampedModel, CouponsMixin, OpdAppointmentIn
         if not old_instance or self.status == self.CANCELLED:
             try:
                 notification_tasks.update_coupon_used_count.apply_async()
+            except Exception as e:
+                logger.error(str(e))
+
+        if old_instance and old_instance.is_cod_to_prepaid != self.is_cod_to_prepaid:
+            try:
+
+                notification_tasks.send_opd_notifications_refactored.apply_async((self.id, NotificationAction.COD_TO_PREPAID), countdown=1)
             except Exception as e:
                 logger.error(str(e))
 
@@ -2975,6 +2999,28 @@ class OpdAppointment(auth_model.TimeStampedModel, CouponsMixin, OpdAppointmentIn
                 result['gender'] = default_user_profile.gender
                 result['dob'] = default_user_profile.dob
         result['data'] = {'opd_appointment_id': self.id}
+        return result
+
+    def get_master_order_id_and_discount(self):
+        result = None, None
+        order_obj = Order.objects.filter(reference_id=self.id).first()
+        if order_obj:
+            try:
+                patent_id = order_obj.parent_id
+                discount = (Decimal(order_obj.action_data.get('mrp')) - Decimal(order_obj.action_data.get(
+                    'deal_price'))) / Decimal(order_obj.action_data.get('mrp'))
+                discount = str(round(discount, 2))
+                result = patent_id, discount
+            except Exception as e:
+                result = None, None
+        return result
+
+    def get_cod_to_prepaid_url_and_discount(self, token):
+        result = None, None
+        order_id, discount = self.get_master_order_id_and_discount()
+        if order_id:
+            url = settings.BASE_URL + '/order/paymentSummary?order_id={}&token={}'.format(order_id, token)
+            result = url, discount
         return result
 
 
