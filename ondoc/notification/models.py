@@ -85,6 +85,7 @@ class NotificationAction:
     PRICING_ALERT_EMAIL = 72
     APPOINTMENT_REMINDER_PROVIDER_SMS = 77
     LOGIN_OTP = 80
+    CHAT_NOTIFICATION = 87
 
     COD_TO_PREPAID = 91
     COD_TO_PREPAID_REQUEST = 92
@@ -123,6 +124,7 @@ class NotificationAction:
         (LAB_LOGO_CHANGE_MAIL, 'Lab Logo Change Mail'),
         (APPOINTMENT_REMINDER_PROVIDER_SMS, 'Appointment Reminder Provider SMS'),
         (LOGIN_OTP, 'Login OTP'),
+        (CHAT_NOTIFICATION, "Push Notification from chat"),
         (COD_TO_PREPAID, 'COD to Prepaid'),
         (COD_TO_PREPAID_REQUEST, 'COD To Prepaid Request')
     )
