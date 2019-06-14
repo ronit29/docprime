@@ -1,6 +1,7 @@
 from django.db import models
 from django.contrib.postgres.fields import JSONField
 from django.forms import model_to_dict
+from django.utils.functional import cached_property
 
 from ondoc.authentication.models import TimeStampedModel, User, UserProfile, Merchant
 from ondoc.account.tasks import refund_curl_task
@@ -147,8 +148,39 @@ class Order(TimeStampedModel):
                 action=action,
             ).update(is_viewable=False)
 
+    @cached_property
+    def is_cod_order(self):
+        if self.orders.exists():
+            orders_to_process = self.orders.all()
+        else:
+            orders_to_process = [self]
+        return len(orders_to_process) == 1 and all([child_order.get_cod_to_prepaid_appointment() for child_order in orders_to_process])
+
+    def get_cod_to_prepaid_appointment(self, update_order_and_appointment=False):
+        from ondoc.doctor.models import OpdAppointment
+        if self.product_id != self.DOCTOR_PRODUCT_ID:
+            return None
+        if not self.reference_id:
+            return None
+        opd_obj = OpdAppointment.objects.exclude(
+            status__in=[OpdAppointment.CANCELLED, OpdAppointment.COMPLETED]).filter(id=self.reference_id).first()
+        if not opd_obj:
+            return None
+        if opd_obj.payment_type != OpdAppointment.COD:
+            return None
+        if update_order_and_appointment:
+            self.payment_type = OpdAppointment.PREPAID
+            opd_obj.payment_type = OpdAppointment.PREPAID
+            # self.action_data['appointment_id'] = self.reference_id
+            self.action_data['payment_type'] = OpdAppointment.PREPAID
+            self.action_data['effective_price'] = self.action_data['deal_price']  # TODO : SHASHANK_SINGH set to correct price
+            opd_obj.effective_price = Decimal(self.action_data['deal_price'])
+            opd_obj.is_cod_to_prepaid = True
+            opd_obj.save()
+        return opd_obj
+
     @transaction.atomic
-    def process_order(self):
+    def process_order(self, convert_cod_to_prepaid=False):
         from ondoc.doctor.models import OpdAppointment
         from ondoc.diagnostic.models import LabAppointment
         from ondoc.api.v1.doctor.serializers import OpdAppTransactionModelSerializer
@@ -158,9 +190,13 @@ class Order(TimeStampedModel):
         from ondoc.subscription_plan.models import UserPlanMapping
         from ondoc.insurance.models import UserInsurance, InsuranceTransaction
 
-        # skip if order already processed
+        # skip if order already processed, except if appointment is COD and can be converted to prepaid
+        cod_to_prepaid_app = None
         if self.reference_id:
-            raise Exception("Order already processed - " + str(self.id))
+            if convert_cod_to_prepaid:
+                cod_to_prepaid_app = self.get_cod_to_prepaid_appointment(True)
+            if not cod_to_prepaid_app:
+                raise Exception("Order already processed - " + str(self.id))
 
         # Initial validations for appointment data
         appointment_data = self.action_data
@@ -172,7 +208,10 @@ class Order(TimeStampedModel):
             serializer.is_valid(raise_exception=True)
             appointment_data = serializer.validated_data
             if appointment_data['payment_type'] == OpdAppointment.COD:
-                payment_not_required = True
+                if self.reference_id and cod_to_prepaid_app:
+                    payment_not_required = False
+                else:
+                    payment_not_required = True
             elif appointment_data['payment_type'] == OpdAppointment.INSURANCE:
                 payment_not_required = True
         elif self.product_id == self.LAB_PRODUCT_ID:
@@ -207,7 +246,10 @@ class Order(TimeStampedModel):
 
         if self.action == Order.OPD_APPOINTMENT_CREATE:
             if total_balance >= appointment_data["effective_price"] or payment_not_required:
-                appointment_obj = OpdAppointment.create_appointment(appointment_data)
+                if self.reference_id:
+                    appointment_obj = cod_to_prepaid_app
+                else:
+                    appointment_obj = OpdAppointment.create_appointment(appointment_data)
                 order_dict = {
                     "reference_id": appointment_obj.id,
                     "payment_status": Order.PAYMENT_ACCEPTED
@@ -256,8 +298,11 @@ class Order(TimeStampedModel):
                     "payment_status": Order.PAYMENT_ACCEPTED
                 }
                 insurer = appointment_obj.insurance_plan.insurer
+                # InsuranceTransaction.objects.create(user_insurance=appointment_obj,
+                #                                     account=appointment_obj.master_policy_reference.apd_account,
+                #                                     transaction_type=InsuranceTransaction.DEBIT, amount=amount)
                 InsuranceTransaction.objects.create(user_insurance=appointment_obj,
-                                                    account=insurer.float.all().first(),
+                                                    account=appointment_obj.master_policy.insurer_account,
                                                     transaction_type=InsuranceTransaction.DEBIT, amount=amount)
         elif self.action == Order.SUBSCRIPTION_PLAN_BUY:
             amount = Decimal(appointment_data.get('extra_details').get('payable_amount', float('inf')))
@@ -591,13 +636,12 @@ class Order(TimeStampedModel):
         return resp
 
     @transaction.atomic()
-    def process_pg_order(self):
+    def process_pg_order(self, convert_cod_to_prepaid=False):
         from ondoc.doctor.models import OpdAppointment
         from ondoc.diagnostic.models import LabAppointment
         from ondoc.insurance.models import UserInsurance
         from ondoc.subscription_plan.models import UserPlanMapping
         from ondoc.insurance.models import InsuranceDoctorSpecializations
-
         orders_to_process = []
         if self.orders.exists():
             orders_to_process = self.orders.all()
@@ -647,7 +691,7 @@ class Order(TimeStampedModel):
                     if not is_process:
                         raise Exception("Insurance invalidate, Could not process entire order")
 
-                curr_app, curr_wallet, curr_cashback = order.process_order()
+                curr_app, curr_wallet, curr_cashback = order.process_order(convert_cod_to_prepaid)
 
                 # appointment was not created - due to insufficient balance, do not process
                 if not curr_app:
@@ -750,6 +794,19 @@ class Order(TimeStampedModel):
 
     class Meta:
         db_table = "order"
+
+    @cached_property
+    def get_deal_price_without_coupon(self):
+        deal_price = 0
+        if self.is_parent():
+            for order in self.orders.all():
+                deal_price += Decimal(order.action_data.get('deal_price', '0.00'))
+        else:
+            if self.product_id == Order.INSURANCE_PRODUCT_ID:
+                deal_price = self.amount
+            else:
+                deal_price = Decimal(self.action_data.get('deal_price', '0.00'))
+        return deal_price
 
 
 class PgTransaction(TimeStampedModel):
@@ -1372,7 +1429,7 @@ class Invoice(TimeStampedModel):
     PRODUCT_IDS = Order.PRODUCT_IDS
     reference_id = models.PositiveIntegerField()
     product_id = models.SmallIntegerField(choices=PRODUCT_IDS)
-    file = models.FileField(upload_to='invoices', null=True, blank=True)
+    file = models.FileField(upload_to='payment_receipt', null=True, blank=True)
 
 
 class OrderLog(TimeStampedModel):
@@ -1441,7 +1498,7 @@ class MerchantPayout(TimeStampedModel):
         if not self.id:
             first_instance = True
 
-        if self.id and hasattr(self,'process_payout') and self.process_payout and self.status==self.PENDING and self.type==self.AUTOMATIC:
+        if self.id and not self.is_insurance_premium_payout() and hasattr(self,'process_payout') and self.process_payout and self.status==self.PENDING and self.type==self.AUTOMATIC:
             self.type = self.AUTOMATIC
             if not self.content_object:
                 self.content_object = self.get_billed_to()
@@ -1483,25 +1540,32 @@ class MerchantPayout(TimeStampedModel):
         super().save(*args, **kwargs)
 
         if first_instance:
-            self.payout_ref_id = self.id
-            self.save()
+            MerchantPayout.objects.filter(id=self.id).update(payout_ref_id=self.id)
+            # self.payout_ref_id = self.id
+            # self.save()
 
-    @classmethod
-    def creating_pending_insurance_transactions(cls):
-        pending = cls.objects.filter(booking_type=cls.InsurancePremium, utr_no__isnull=False)
-        for p in pending:
-            if p.utr_no:
-                p.create_insurance_transaction()
+    # @classmethod
+    # def creating_pending_insurance_transactions(cls):
+    #     pending = cls.objects.filter(booking_type=cls.InsurancePremium, utr_no__isnull=False)
+    #     for p in pending:
+    #         if p.utr_no:
+    #             p.create_insurance_transaction()
 
     def create_insurance_transaction(self):
         from ondoc.insurance.models import UserInsurance, InsuranceTransaction
         if not self.get_insurance_transaction():
             user_insurance = self.get_user_insurance()
-            InsuranceTransaction.objects.create(user_insurance = user_insurance,
-                account = user_insurance.insurance_plan.insurer.float.first(),
-                transaction_type = InsuranceTransaction.CREDIT,
-                amount = self.payable_amount,
-                reason = InsuranceTransaction.PREMIUM_PAYOUT)
+            # InsuranceTransaction.objects.create(user_insurance=user_insurance,
+            #     # account = user_insurance.insurance_plan.insurer.float.first(),
+            #     account=user_insurance.master_policy_reference.apd_account,
+            #     transaction_type=InsuranceTransaction.CREDIT,
+            #     amount=self.payable_amount,
+            #     reason=InsuranceTransaction.PREMIUM_PAYOUT)
+            InsuranceTransaction.objects.create(user_insurance=user_insurance,
+                                                account=user_insurance.master_policy.insurer_account,
+                                                transaction_type=InsuranceTransaction.CREDIT,
+                                                amount=self.payable_amount,
+                                                reason=InsuranceTransaction.PREMIUM_PAYOUT)
 
     def get_insurance_transaction(self):
         from ondoc.insurance.models import UserInsurance, InsuranceTransaction
@@ -1515,9 +1579,12 @@ class MerchantPayout(TimeStampedModel):
         ui = self.user_insurance.all()
         if len(ui)>1:
             raise Exception('Multiple user insurance found for a single payout')
+        if len(ui)==1:
+            return ui.first()
 
-        return ui.first()
-
+        pms = PayoutMapping.objects.filter(payout=self).first()
+        user_insurance = pms.content_object
+        return user_insurance
 
     @staticmethod
     def get_merchant_payout_info(obj):
@@ -1546,18 +1613,49 @@ class MerchantPayout(TimeStampedModel):
         if self.paid_to == merchant:
             return True
 
-    def get_nodal_transfer_transaction(self):
-        pms = PayoutMapping.objects.filter(payout=self).first()
-        user_insurance = pms.content_object
-        trans = DummyTransactions.objects.filter(transaction_type=DummyTransactions.INSURANCE_NODAL_TRANSFER,reference_id=user_insurance.id,product_id=Order.INSURANCE_PRODUCT_ID)
-        return trans
+    def get_insurance_premium_transactions(self):
+        user_insurance = self.get_user_insurance()
+        if self.is_nodal_transfer():
+            return DummyTransactions.objects.filter(transaction_type=DummyTransactions.INSURANCE_NODAL_TRANSFER,
+                                             reference_id=user_insurance.id, product_id=Order.INSURANCE_PRODUCT_ID)
 
-    def get_user_insurance(self):
-        pms = PayoutMapping.objects.filter(payout=self).first()
-        user_insurance = pms.content_object
-        return user_insurance
+        trans = DummyTransactions.objects.filter(reference_id=user_insurance.id,\
+                    product_id=Order.INSURANCE_PRODUCT_ID).\
+                    exclude(transaction_type=DummyTransactions.INSURANCE_NODAL_TRANSFER)
 
-    def create_nodal_dummy_transaction(self):
+        if len(trans)>1:
+            raise Exception('multiple transactions found')
+
+        if trans and trans[0].amount == self.payable_amount:
+            return trans
+
+        trans = PgTransaction.objects.filter(order=user_insurance.order)
+        if len(trans)>1:
+            raise Exception('multiple transactions found')
+
+        if trans and trans[0].amount == self.payable_amount:
+            return trans
+
+    def is_insurance_premium_payout(self):
+        if self.booking_type == Order.INSURANCE_PRODUCT_ID:
+            return True
+
+        # if self.get_user_insurance():
+        #     return True
+        return False
+
+    def get_or_create_insurance_premium_transaction(self):
+        #transaction already created no need to proceed
+        transaction = None
+        transaction = self.get_insurance_premium_transactions()
+
+        if len(transaction)==1:
+            return transaction.first()
+        elif len(transaction)>1:
+            raise Exception('multiple nodal transfers found.')
+        else:
+            transaction = None
+
         user_insurance = self.get_user_insurance()
 
         req_data = dict()
@@ -1567,9 +1665,6 @@ class MerchantPayout(TimeStampedModel):
 
             if not user:
                 raise Exception('user is required')
-            if self.get_nodal_transfer_transaction():
-                return
-
             token = settings.PG_DUMMY_TRANSACTION_TOKEN
             headers = {
                 "auth": token,
@@ -1596,6 +1691,9 @@ class MerchantPayout(TimeStampedModel):
                 "buCallbackSuccessUrl": "",
                 "buCallbackFailureUrl": ""
             }
+            if not self.is_nodal_transfer():
+                req_data["insurerCode"] = "apolloDummy"
+
 
             response = requests.post(url, data=json.dumps(req_data), headers=headers)
             if response.status_code == status.HTTP_200_OK:
@@ -1611,34 +1709,38 @@ class MerchantPayout(TimeStampedModel):
                     tx_data['type'] = DummyTransactions.CREDIT
                     tx_data['amount'] = self.payable_amount
                     tx_data['payment_mode'] = "DC"
-                    tx_data['transaction_type'] = DummyTransactions.INSURANCE_NODAL_TRANSFER
+                    if self.is_nodal_transfer():
+                        tx_data['transaction_type'] = DummyTransactions.INSURANCE_NODAL_TRANSFER
 
-                    DummyTransactions.objects.create(**tx_data)
+                    transaction = DummyTransactions.objects.create(**tx_data)
                     #print("SAVED DUMMY TRANSACTION")
             else:
                 raise Exception("Retry on invalid Http response status - " + str(response.content))
 
         except Exception as e:
             logger.error("Error in Setting Dummy Transaction of payout - " + str(self.id) + " with exception - " + str(e))
+        return transaction
 
-    def execute_nodal_transfer(self):
+    def process_insurance_premium_payout(self):
         from ondoc.api.v1.utils import create_payout_checksum
         from collections import OrderedDict
+        payout_status = None
+
         try:
-            if not self.is_nodal_transfer():
-                raise Exception('Incorrect method called for payout')
+            # if not self.is_nodal_transfer():
+            #     raise Exception('Incorrect method called for payout')
 
             if self.status == self.PAID:
-                return
+                return True
 
-            transaction = self.get_nodal_transfer_transaction()
+            transaction = self.get_insurance_premium_transactions()
             if not transaction:
-                return
+                raise Exception('No transaction found for insurance premium payout')
 
-            if len(transaction)>1:
-                raise Exception("nodal transfer cannot have multiple transactions")
+            if len(transaction) > 1:
+                raise Exception("Insurance premium transfers cannot have multiple transactions")
 
-            default_payment_mode = self.get_default_payment_mode()        
+            default_payment_mode = self.get_default_payment_mode()
             merchant = self.get_merchant()
             user_insurance = self.get_user_insurance()
 
@@ -1648,25 +1750,28 @@ class MerchantPayout(TimeStampedModel):
             if not merchant.verified_by_finance or not merchant.enabled:
                 raise Exception("Merchant is not verified or is not enabled. " + str(self))
 
-            req_data = { "payload" : [], "checkSum" : "" }
+            req_data = {"payload": [], "checkSum": ""}
 
             txn = transaction[0]
-                
+
             curr_txn = OrderedDict()
             curr_txn["idx"] = 0
             curr_txn["orderNo"] = txn.order_no
             curr_txn["orderId"] = txn.order.id
-            #curr_txn["txnAmount"] = str(self.payable_amount)
+            curr_txn["txnAmount"] = str(txn.amount)
+
+            #curr_txn["txnAmount"] = str(0)
+
+            # curr_txn["txnAmount"] = str(self.payable_amount)
             curr_txn["settledAmount"] = str(self.payable_amount)
             curr_txn["merchantCode"] = self.paid_to.id
             curr_txn["refNo"] = self.payout_ref_id
             curr_txn["bookingId"] = user_insurance.id
             curr_txn["paymentType"] = default_payment_mode
-            curr_txn["txnAmount"] = str(0)
+            if isinstance(txn, DummyTransactions) and txn.amount>0:
+                curr_txn["txnAmount"] = str(0)
 
             req_data["payload"].append(curr_txn)
-
-            payout_status = None
 
             self.request_data = req_data
 
@@ -1691,12 +1796,11 @@ class MerchantPayout(TimeStampedModel):
 
                     if success_payout:
                         payout_status = {"status": 1, "response": resp_data}
-                    else:            
+                    else:
                         logger.error("payout failed for request data - " + str(req_data))
-                        payout_status =  {"status" : 0, "response" : resp_data}
+                        payout_status = {"status": 0, "response": resp_data}
 
-
-            if payout_status:            
+            if payout_status:
                 self.api_response = payout_status.get("response")
                 if payout_status.get("status"):
                     self.payout_time = datetime.datetime.now()
@@ -1709,7 +1813,8 @@ class MerchantPayout(TimeStampedModel):
         except Exception as e:
             logger.error("Error in processing payout - with exception - " + str(e))
 
-
+        if payout_status and payout_status.get("status"):
+            return True
 
     def get_billed_to(self):
         if self.content_object:
@@ -1773,7 +1878,12 @@ class MerchantPayout(TimeStampedModel):
                 return
 
             url = settings.SETTLEMENT_DETAILS_API
-            order_no = self.get_pg_order_no()
+            if self.is_insurance_premium_payout():
+                txn = self.get_insurance_premium_transactions()
+                if txn:
+                    order_no = txn[0].order_no
+            else:
+                order_no = self.get_pg_order_no()
 
             if order_no:
                 req_data = {"orderNo":order_no}
@@ -1792,6 +1902,8 @@ class MerchantPayout(TimeStampedModel):
                             if d.get('refNo') == str(self.payout_ref_id):
                                 self.utr_no = d.get('utrNo','')
                                 self.pg_status = d.get('txStatus','')
+                                if self.utr_no:
+                                    self.status = self.PAID
                                 break
                     self.save()
 
