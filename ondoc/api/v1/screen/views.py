@@ -1,18 +1,23 @@
+from django.db.models import F
 from rest_framework import viewsets
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 
 from ondoc.api.v1.auth.views import AppointmentViewSet
+from ondoc.api.v1.doctor.city_match import city_match
 from ondoc.api.v1.insurance.serializers import InsuranceCityEligibilitySerializer
+from ondoc.api.v1.procedure.serializers import CommonIpdProcedureSerializer
 from ondoc.authentication.backends import JWTAuthentication
 from ondoc.common.utils import get_all_upcoming_appointments
 from ondoc.coupon.models import CouponRecommender
-from ondoc.doctor.models import CommonSpecialization
+from ondoc.doctor.models import CommonSpecialization, Hospital
 from ondoc.diagnostic.models import CommonTest
 from ondoc.diagnostic.models import CommonPackage
 from ondoc.banner.models import Banner
 from ondoc.common.models import PaymentOptions, UserConfig
 from ondoc.insurance.models import InsuranceEligibleCities
+from ondoc.location.models import EntityUrls
+from ondoc.procedure.models import CommonIpdProcedure
 from ondoc.tracking.models import TrackingEvent
 from ondoc.common.models import UserConfig
 from ondoc.ratings_review.models import AppRatings
@@ -48,7 +53,7 @@ class ScreenViewSet(viewsets.GenericViewSet):
         app_version = params.get("app_version", "1.0")
         lat = params.get('lat', None)
         long = params.get('long', None)
-
+        city = city_match(params.get('city'))
         insurance_availability = False
 
         if lat and long:
@@ -90,6 +95,24 @@ class ScreenViewSet(viewsets.GenericViewSet):
         if request.user.is_authenticated:
             upcoming_appointment_result = get_all_upcoming_appointments(request.user.id)
 
+        top_hospitals_data = Hospital.get_top_hospitals_data(request, lat, long)
+
+        common_ipd_procedures = CommonIpdProcedure.objects.select_related('ipd_procedure').filter(
+            ipd_procedure__is_enabled=True).all().order_by("-priority")[:10]
+        common_ipd_procedures = list(common_ipd_procedures)
+        common_ipd_procedure_ids = [t.ipd_procedure.id for t in common_ipd_procedures]
+        ipd_entity_dict = {}
+        if city:
+            ipd_entity_qs = EntityUrls.objects.filter(ipd_procedure_id__in=common_ipd_procedure_ids,
+                                                      sitemap_identifier='IPD_PROCEDURE_CITY',
+                                                      is_valid=True,
+                                                      locality_value__iexact=city).annotate(
+                ipd_id=F('ipd_procedure_id')).values('ipd_id', 'url')
+            ipd_entity_dict = {x.get('ipd_id'): x.get('url') for x in ipd_entity_qs}
+        common_ipd_procedures_serializer = CommonIpdProcedureSerializer(common_ipd_procedures, many=True,
+                                                                        context={'entity_dict': ipd_entity_dict,
+                                                                                 'request': request})
+
         grid_list = [
             {
                 'priority': 2,
@@ -117,6 +140,18 @@ class ScreenViewSet(viewsets.GenericViewSet):
                 'tag': "Upto 50% off",
                 'tagColor': "#ff0000",
                 'addSearchItem': "Lab"
+            },
+            {
+              'priority': 1,
+              'title': "Top Hospitals",
+              'type': "Hospitals",
+              'items': top_hospitals_data,
+            },
+            {
+                'priority': 4,
+                'title': "Top Procedures",
+                'type': "IPD Procedures",
+                'items': common_ipd_procedures_serializer.data,
             }
         ]
 
@@ -157,7 +192,6 @@ class ScreenViewSet(viewsets.GenericViewSet):
                     "is_insurance_available": insurance_availability
                 }
         }
-
         return Response(resp)
 
     def ask_for_app_rating(self, request, *args, **kwargs):
