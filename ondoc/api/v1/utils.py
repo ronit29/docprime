@@ -1324,6 +1324,8 @@ class TimeSlotExtraction(object):
 
 
     def format_timing_to_datetime_v2(self, timings, total_leaves, booking_details, is_thyrocare=False):
+        from ondoc.doctor.models import DoctorClinicTiming
+        check_next_day_minimum_slot = True if isinstance(timings[0], DoctorClinicTiming) else False
         timing_objects = OrderedDict()
         today_date = datetime.date.today()
         today_day = today_date.weekday()
@@ -1338,6 +1340,9 @@ class TimeSlotExtraction(object):
                         day = self.get_key_or_field_value(data, 'day')
                         if i == day:
                             start_hour = float(self.get_key_or_field_value(data, 'start', 0.0))
+                            if check_next_day_minimum_slot and (today_date + datetime.timedelta(1)) == next_slot_date and datetime.datetime.today().hour >= 20:
+                                if start_hour <= 8.5:
+                                    start_hour = 8.5
                             end_hour = float(self.get_key_or_field_value(data, 'end', 23.75))
                             time_before_end_hour = end_hour - TimeSlotExtraction.TIME_SPAN_NUM
                             while start_hour <= time_before_end_hour:
