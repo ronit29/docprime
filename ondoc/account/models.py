@@ -1,6 +1,7 @@
 from django.db import models
 from django.contrib.postgres.fields import JSONField
 from django.forms import model_to_dict
+from django.utils.functional import cached_property
 
 from ondoc.authentication.models import TimeStampedModel, User, UserProfile, Merchant
 from ondoc.account.tasks import refund_curl_task
@@ -147,8 +148,39 @@ class Order(TimeStampedModel):
                 action=action,
             ).update(is_viewable=False)
 
+    @cached_property
+    def is_cod_order(self):
+        if self.orders.exists():
+            orders_to_process = self.orders.all()
+        else:
+            orders_to_process = [self]
+        return len(orders_to_process) == 1 and all([child_order.get_cod_to_prepaid_appointment() for child_order in orders_to_process])
+
+    def get_cod_to_prepaid_appointment(self, update_order_and_appointment=False):
+        from ondoc.doctor.models import OpdAppointment
+        if self.product_id != self.DOCTOR_PRODUCT_ID:
+            return None
+        if not self.reference_id:
+            return None
+        opd_obj = OpdAppointment.objects.exclude(
+            status__in=[OpdAppointment.CANCELLED, OpdAppointment.COMPLETED]).filter(id=self.reference_id).first()
+        if not opd_obj:
+            return None
+        if opd_obj.payment_type != OpdAppointment.COD:
+            return None
+        if update_order_and_appointment:
+            self.payment_type = OpdAppointment.PREPAID
+            opd_obj.payment_type = OpdAppointment.PREPAID
+            # self.action_data['appointment_id'] = self.reference_id
+            self.action_data['payment_type'] = OpdAppointment.PREPAID
+            self.action_data['effective_price'] = self.action_data['deal_price']  # TODO : SHASHANK_SINGH set to correct price
+            opd_obj.effective_price = Decimal(self.action_data['deal_price'])
+            opd_obj.is_cod_to_prepaid = True
+            opd_obj.save()
+        return opd_obj
+
     @transaction.atomic
-    def process_order(self):
+    def process_order(self, convert_cod_to_prepaid=False):
         from ondoc.doctor.models import OpdAppointment
         from ondoc.diagnostic.models import LabAppointment
         from ondoc.api.v1.doctor.serializers import OpdAppTransactionModelSerializer
@@ -158,9 +190,13 @@ class Order(TimeStampedModel):
         from ondoc.subscription_plan.models import UserPlanMapping
         from ondoc.insurance.models import UserInsurance, InsuranceTransaction
 
-        # skip if order already processed
+        # skip if order already processed, except if appointment is COD and can be converted to prepaid
+        cod_to_prepaid_app = None
         if self.reference_id:
-            raise Exception("Order already processed - " + str(self.id))
+            if convert_cod_to_prepaid:
+                cod_to_prepaid_app = self.get_cod_to_prepaid_appointment(True)
+            if not cod_to_prepaid_app:
+                raise Exception("Order already processed - " + str(self.id))
 
         # Initial validations for appointment data
         appointment_data = self.action_data
@@ -172,7 +208,10 @@ class Order(TimeStampedModel):
             serializer.is_valid(raise_exception=True)
             appointment_data = serializer.validated_data
             if appointment_data['payment_type'] == OpdAppointment.COD:
-                payment_not_required = True
+                if self.reference_id and cod_to_prepaid_app:
+                    payment_not_required = False
+                else:
+                    payment_not_required = True
             elif appointment_data['payment_type'] == OpdAppointment.INSURANCE:
                 payment_not_required = True
         elif self.product_id == self.LAB_PRODUCT_ID:
@@ -207,7 +246,10 @@ class Order(TimeStampedModel):
 
         if self.action == Order.OPD_APPOINTMENT_CREATE:
             if total_balance >= appointment_data["effective_price"] or payment_not_required:
-                appointment_obj = OpdAppointment.create_appointment(appointment_data)
+                if self.reference_id:
+                    appointment_obj = cod_to_prepaid_app
+                else:
+                    appointment_obj = OpdAppointment.create_appointment(appointment_data)
                 order_dict = {
                     "reference_id": appointment_obj.id,
                     "payment_status": Order.PAYMENT_ACCEPTED
@@ -256,8 +298,11 @@ class Order(TimeStampedModel):
                     "payment_status": Order.PAYMENT_ACCEPTED
                 }
                 insurer = appointment_obj.insurance_plan.insurer
+                # InsuranceTransaction.objects.create(user_insurance=appointment_obj,
+                #                                     account=appointment_obj.master_policy_reference.apd_account,
+                #                                     transaction_type=InsuranceTransaction.DEBIT, amount=amount)
                 InsuranceTransaction.objects.create(user_insurance=appointment_obj,
-                                                    account=insurer.float.all().first(),
+                                                    account=appointment_obj.master_policy.insurer_account,
                                                     transaction_type=InsuranceTransaction.DEBIT, amount=amount)
         elif self.action == Order.SUBSCRIPTION_PLAN_BUY:
             amount = Decimal(appointment_data.get('extra_details').get('payable_amount', float('inf')))
@@ -591,13 +636,12 @@ class Order(TimeStampedModel):
         return resp
 
     @transaction.atomic()
-    def process_pg_order(self):
+    def process_pg_order(self, convert_cod_to_prepaid=False):
         from ondoc.doctor.models import OpdAppointment
         from ondoc.diagnostic.models import LabAppointment
         from ondoc.insurance.models import UserInsurance
         from ondoc.subscription_plan.models import UserPlanMapping
         from ondoc.insurance.models import InsuranceDoctorSpecializations
-
         orders_to_process = []
         if self.orders.exists():
             orders_to_process = self.orders.all()
@@ -647,7 +691,7 @@ class Order(TimeStampedModel):
                     if not is_process:
                         raise Exception("Insurance invalidate, Could not process entire order")
 
-                curr_app, curr_wallet, curr_cashback = order.process_order()
+                curr_app, curr_wallet, curr_cashback = order.process_order(convert_cod_to_prepaid)
 
                 # appointment was not created - due to insufficient balance, do not process
                 if not curr_app:
@@ -750,6 +794,19 @@ class Order(TimeStampedModel):
 
     class Meta:
         db_table = "order"
+
+    @cached_property
+    def get_deal_price_without_coupon(self):
+        deal_price = 0
+        if self.is_parent():
+            for order in self.orders.all():
+                deal_price += Decimal(order.action_data.get('deal_price', '0.00'))
+        else:
+            if self.product_id == Order.INSURANCE_PRODUCT_ID:
+                deal_price = self.amount
+            else:
+                deal_price = Decimal(self.action_data.get('deal_price', '0.00'))
+        return deal_price
 
 
 class PgTransaction(TimeStampedModel):
@@ -1372,7 +1429,7 @@ class Invoice(TimeStampedModel):
     PRODUCT_IDS = Order.PRODUCT_IDS
     reference_id = models.PositiveIntegerField()
     product_id = models.SmallIntegerField(choices=PRODUCT_IDS)
-    file = models.FileField(upload_to='invoices', null=True, blank=True)
+    file = models.FileField(upload_to='payment_receipt', null=True, blank=True)
 
 
 class OrderLog(TimeStampedModel):
@@ -1497,11 +1554,17 @@ class MerchantPayout(TimeStampedModel):
         from ondoc.insurance.models import UserInsurance, InsuranceTransaction
         if not self.get_insurance_transaction():
             user_insurance = self.get_user_insurance()
-            InsuranceTransaction.objects.create(user_insurance = user_insurance,
-                account = user_insurance.insurance_plan.insurer.float.first(),
-                transaction_type = InsuranceTransaction.CREDIT,
-                amount = self.payable_amount,
-                reason = InsuranceTransaction.PREMIUM_PAYOUT)
+            # InsuranceTransaction.objects.create(user_insurance=user_insurance,
+            #     # account = user_insurance.insurance_plan.insurer.float.first(),
+            #     account=user_insurance.master_policy_reference.apd_account,
+            #     transaction_type=InsuranceTransaction.CREDIT,
+            #     amount=self.payable_amount,
+            #     reason=InsuranceTransaction.PREMIUM_PAYOUT)
+            InsuranceTransaction.objects.create(user_insurance=user_insurance,
+                                                account=user_insurance.master_policy.insurer_account,
+                                                transaction_type=InsuranceTransaction.CREDIT,
+                                                amount=self.payable_amount,
+                                                reason=InsuranceTransaction.PREMIUM_PAYOUT)
 
     def get_insurance_transaction(self):
         from ondoc.insurance.models import UserInsurance, InsuranceTransaction

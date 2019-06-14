@@ -1377,7 +1377,7 @@ class LabList(viewsets.ReadOnlyModelViewSet):
     def get_lab_search_list(self, parameters, page):
         # distance in meters
 
-        DEFAULT_DISTANCE = 20000
+        # DEFAULT_DISTANCE = 20000
         MAX_SEARCHABLE_DISTANCE = 50000
 
         if not page or page<1:
@@ -1385,9 +1385,13 @@ class LabList(viewsets.ReadOnlyModelViewSet):
 
         default_long = 77.071848
         default_lat = 28.450367
-        min_distance = parameters.get('min_distance')
-        max_distance = parameters.get('max_distance')*1000 if parameters.get('max_distance') else DEFAULT_DISTANCE
-        max_distance = min(max_distance, MAX_SEARCHABLE_DISTANCE)
+        min_distance = parameters.get('min_distance')*1000 if parameters.get('min_distance') else 0
+        # max_distance = parameters.get('max_distance')*1000 if parameters.get('max_distance') else DEFAULT_DISTANCE
+        if not parameters.get('max_distance') == None and parameters.get('max_distance') == 0:
+            max_distance = 0
+        else:
+            max_distance = str(parameters.get('max_distance') * 1000 if parameters.get('max_distance') else -1)
+        # max_distance = min(max_distance, MAX_SEARCHABLE_DISTANCE)
         long = parameters.get('long', default_long)
         lat = parameters.get('lat', default_lat)
         ids = parameters.get('ids', [])
@@ -1407,8 +1411,8 @@ class LabList(viewsets.ReadOnlyModelViewSet):
         filtering_query = []
         filtering_params = {}
         #params = {}
-        if not min_distance:
-            min_distance=0
+        # if not min_distance:
+        #     min_distance=0
 
         filtering_params['min_distance'] = min_distance
         filtering_params['max_distance'] = max_distance
@@ -1579,7 +1583,9 @@ class LabList(viewsets.ReadOnlyModelViewSet):
                         max(order_priority) as max_order_priority from lab lb {lab_timing_join} inner join available_lab_test avlt on
                         lb.lab_pricing_group_id = avlt.lab_pricing_group_id 
                         and lb.is_test_lab = False and lb.is_live = True and lb.lab_pricing_group_id is not null 
-                        and St_dwithin( St_setsrid(St_point((%(longitude)s), (%(latitude)s)), 4326),lb.location, (%(max_distance)s)) 
+                        and case when (%(max_distance)s) >= 0  then 
+                        St_dwithin( St_setsrid(St_point((%(longitude)s), (%(latitude)s)), 4326),lb.location, (%(max_distance)s))
+                        else St_dwithin( St_setsrid(St_point((%(longitude)s), (%(latitude)s)), 4326),lb.location, lb.search_distance ) end
                         and St_dwithin(St_setsrid(St_point((%(longitude)s), (%(latitude)s)), 4326), lb.location,  (%(min_distance)s)) = false 
                         and avlt.enabled = True 
                         inner join lab_test lt on lt.id = avlt.test_id and lt.enable_for_retail=True 
@@ -1610,8 +1616,10 @@ class LabList(viewsets.ReadOnlyModelViewSet):
                     select lb.*,
                     max(ST_Distance(location,St_setsrid(St_point((%(longitude)s), (%(latitude)s)), 4326))) as distance,
                     max(order_priority) as max_order_priority
-                    from lab lb  {lab_timing_join} where is_test_lab = False and is_live = True and lab_pricing_group_id is not null 
-                    and St_dwithin( St_setsrid(St_point((%(longitude)s), (%(latitude)s)), 4326),location, (%(max_distance)s)) 
+                    from lab lb {lab_timing_join} where is_test_lab = False and is_live = True and lab_pricing_group_id is not null 
+                    and case when (%(max_distance)s) >= 0  then 
+                    St_dwithin( St_setsrid(St_point((%(longitude)s), (%(latitude)s)), 4326),lb.location, (%(max_distance)s))
+                    else St_dwithin( St_setsrid(St_point((%(longitude)s), (%(latitude)s)), 4326),lb.location, lb.search_distance ) end
                     and St_dwithin(St_setsrid(St_point((%(longitude)s), (%(latitude)s)), 4326), location, (%(min_distance)s)) = false
                      {filter_query_string}
                     group by lb.id)a)y )x where rank<=5)z  order by {order} )r where 
@@ -2339,7 +2347,7 @@ class LabAppointmentView(mixins.CreateModelMixin,
             data.update(
                 {'included_in_user_plan': included_in_user_plan, 'user_plan': user_plan_id})
 
-        # TODO: SHASHANK_SINGH not sure ask shubham
+
         if data.get('cart_item'):
             old_cart_obj = Cart.objects.filter(id=data.get('cart_item').id).first()
             payment_type = old_cart_obj.data.get('payment_type')
@@ -2760,7 +2768,7 @@ class LabTimingListView(mixins.ListModelMixin,
                 integrator_obj = service.create_integrator_obj(class_name)
                 lab_timings = integrator_obj.get_appointment_slots(pincode, date, is_home_pickup=for_home_pickup)
 
-        resp_data = {"timeslots": lab_timings.get('timeslots', []),
+        resp_data = {"timeslots": lab_timings.get('time_slots', []),
                      "upcoming_slots": lab_timings.get('upcoming_slots', []),
                      "is_thyrocare": lab_timings.get('is_thyrocare', False)}
         if hasattr(request, "agent") and request.agent:

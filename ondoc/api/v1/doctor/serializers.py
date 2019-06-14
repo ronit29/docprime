@@ -522,6 +522,7 @@ class DoctorHospitalSerializer(serializers.ModelSerializer):
 
             user_insurance = None if not user.is_authenticated or user.is_anonymous else user.active_insurance
             if not user_insurance:
+                resp['is_insurance_covered'] = True
                 return resp
 
             doctor_specialization = self.context.get('doctor_specialization',None)

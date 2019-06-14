@@ -446,14 +446,14 @@ def payment_details(request, order):
         'referenceId': "",
         'orderId': order.id,
         'name': profile_name,
-        'txAmount': str(order.amount),
+        'txAmount': str(order.amount) if not order.is_cod_order else str(round(order.get_deal_price_without_coupon, 2)),
     }
 
     if insurer_code:
         pgdata['insurerCode'] = insurer_code
 
     secret_key = client_key = ""
-    # TODO : SHASHANK_SINGH for plan FINAL ??
+
     if order.product_id == Order.DOCTOR_PRODUCT_ID or order.product_id == Order.SUBSCRIPTION_PLAN_PRODUCT_ID:
         secret_key = settings.PG_SECRET_KEY_P1
         client_key = settings.PG_CLIENT_KEY_P1
@@ -1328,6 +1328,8 @@ class TimeSlotExtraction(object):
 
 
     def format_timing_to_datetime_v2(self, timings, total_leaves, booking_details, is_thyrocare=False):
+        from ondoc.doctor.models import DoctorClinicTiming
+        check_next_day_minimum_slot = True if isinstance(timings[0], DoctorClinicTiming) else False
         timing_objects = OrderedDict()
         today_date = datetime.date.today()
         today_day = today_date.weekday()
@@ -1342,6 +1344,9 @@ class TimeSlotExtraction(object):
                         day = self.get_key_or_field_value(data, 'day')
                         if i == day:
                             start_hour = float(self.get_key_or_field_value(data, 'start', 0.0))
+                            if check_next_day_minimum_slot and (today_date + datetime.timedelta(1)) == next_slot_date and datetime.datetime.today().hour >= 20:
+                                if start_hour <= 8.5:
+                                    start_hour = 8.5
                             end_hour = float(self.get_key_or_field_value(data, 'end', 23.75))
                             time_before_end_hour = end_hour - TimeSlotExtraction.TIME_SPAN_NUM
                             while start_hour <= time_before_end_hour:

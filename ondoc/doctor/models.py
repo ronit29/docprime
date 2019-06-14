@@ -1,3 +1,5 @@
+from decimal import Decimal
+
 from django.contrib.gis.db.models.functions import Distance
 from django.contrib.gis.geos import GEOSGeometry
 from django.db.models import Window
@@ -245,6 +247,7 @@ class Hospital(auth_model.TimeStampedModel, auth_model.CreatedByModel, auth_mode
     is_location_verified = models.BooleanField(verbose_name='Location Verified', default=False)
     auto_ivr_enabled = models.BooleanField(default=True)
     priority_score = models.IntegerField(default=0, null=False, blank=False)
+    search_distance = models.FloatField(default=15000)
     google_avg_rating = models.DecimalField(max_digits=5, decimal_places=2, null=True, editable=False)
     # provider_encrypt = models.NullBooleanField(null=True, blank=True)
     # provider_encrypted_by = models.ForeignKey(auth_model.User, null=True, blank=True, on_delete=models.SET_NULL, related_name='encrypted_hospitals')
@@ -883,9 +886,12 @@ class Doctor(auth_model.TimeStampedModel, auth_model.QCModel, SearchKey, auth_mo
 
     @classmethod
     def get_insurance_details(cls, user):
+        from ondoc.insurance.models import InsuranceThreshold
+        insurance_threshold_obj = InsuranceThreshold.objects.all().order_by('-opd_amount_limit').first()
+        insurance_threshold_amount = insurance_threshold_obj.opd_amount_limit if insurance_threshold_obj else 1500
         resp = {
             'is_insurance_covered': False,
-            'insurance_threshold_amount': None,
+            'insurance_threshold_amount': insurance_threshold_amount,
             'is_user_insured': False
         }
 
@@ -2068,8 +2074,9 @@ class OpdAppointmentInvoiceMixin(object):
             context = deepcopy(context)
             context['invoice'] = invoice
             html_body = render_to_string("email/doctor_invoice/invoice_template.html", context=context)
-            filename = "invoice_{}_{}.pdf".format(str(timezone.now().strftime("%I%M_%d%m%Y")),
-                                                  random.randint(1111111111, 9999999999))
+            # filename = "invoice_{}_{}.pdf".format(str(timezone.now().strftime("%I%M_%d%m%Y")),
+            #                                       random.randint(1111111111, 9999999999))
+            filename = "payment_receipt_{}.pdf".format(context.get('instance').id)
             file = html_to_pdf(html_body, filename)
             if not file:
                 logger.error("Got error while creating pdf for opd invoice.")
@@ -2163,6 +2170,7 @@ class OpdAppointment(auth_model.TimeStampedModel, CouponsMixin, OpdAppointmentIn
     appointment_prescriptions = GenericRelation("prescription.AppointmentPrescription", related_query_name="appointment_prescriptions")
     coupon_data = JSONField(blank=True, null=True)
     status_change_comments = models.CharField(max_length=5000, null=True, blank=True)
+    is_cod_to_prepaid = models.NullBooleanField(default=False, null=True, blank=True)
 
     def __str__(self):
         return self.profile.name + " (" + self.doctor.name + ")"
@@ -2452,12 +2460,25 @@ class OpdAppointment(auth_model.TimeStampedModel, CouponsMixin, OpdAppointmentIn
             return True
         return False
 
+    def send_cod_to_prepaid_request(self):
+        result = False
+        if self.payment_type != self.COD:
+            return result
+        order_obj = Order.objects.filter(reference_id=self.id).first()
+        if order_obj:
+                parent = order_obj.parent
+                if parent:
+                    result = parent.is_cod_order
+        return result
+
     def after_commit_tasks(self, old_instance, push_to_matrix):
         if old_instance is None:
             try:
                 create_ipd_lead_from_opd_appointment.apply_async(({'obj_id': self.id},),)
                                                                  # eta=timezone.now() + timezone.timedelta(hours=1))
-
+                if self.send_cod_to_prepaid_request():
+                    notification_tasks.send_opd_notifications_refactored.apply_async(
+                        (self.id, NotificationAction.COD_TO_PREPAID_REQUEST), countdown=5)
             except Exception as e:
                 logger.error(str(e))
         if push_to_matrix:
@@ -2484,6 +2505,13 @@ class OpdAppointment(auth_model.TimeStampedModel, CouponsMixin, OpdAppointmentIn
         if not old_instance or self.status == self.CANCELLED:
             try:
                 notification_tasks.update_coupon_used_count.apply_async()
+            except Exception as e:
+                logger.error(str(e))
+
+        if old_instance and old_instance.is_cod_to_prepaid != self.is_cod_to_prepaid:
+            try:
+
+                notification_tasks.send_opd_notifications_refactored.apply_async((self.id, NotificationAction.COD_TO_PREPAID), countdown=1)
             except Exception as e:
                 logger.error(str(e))
 
@@ -2978,6 +3006,52 @@ class OpdAppointment(auth_model.TimeStampedModel, CouponsMixin, OpdAppointmentIn
                 result['gender'] = default_user_profile.gender
                 result['dob'] = default_user_profile.dob
         result['data'] = {'opd_appointment_id': self.id}
+        return result
+
+    @classmethod
+    def is_followup_appointment(cls, current_appointment):
+        if not current_appointment:
+            return False
+        doctor = current_appointment.doctor
+        hospital = current_appointment.hospital
+        profile = current_appointment.profile
+        last_completed_appointment = cls.objects.filter(doctor=doctor, profile=profile, hospital=hospital,
+                                                        status=cls.COMPLETED).order_by('-id').first()
+        if not last_completed_appointment:
+            return False
+        last_appointment_date = last_completed_appointment.time_slot_start
+        dc_obj = DoctorClinic.objects.filter(doctor=doctor, hospital=hospital, enabled=True).first()
+        if not dc_obj:
+            return False
+        followup_duration = dc_obj.followup_duration
+        if not followup_duration:
+            followup_duration = settings.DEFAULT_FOLLOWUP_DURATION
+        days_diff = current_appointment.date() - last_appointment_date.date()
+        if days_diff.days < followup_duration:
+            return True
+        else:
+            return False
+
+    def get_master_order_id_and_discount(self):
+        result = None, None
+        order_obj = Order.objects.filter(reference_id=self.id).first()
+        if order_obj:
+            try:
+                patent_id = order_obj.parent_id
+                discount = (Decimal(order_obj.action_data.get('mrp')) - Decimal(order_obj.action_data.get(
+                    'deal_price'))) / Decimal(order_obj.action_data.get('mrp'))
+                discount = str(round(discount, 2))
+                result = patent_id, discount
+            except Exception as e:
+                result = None, None
+        return result
+
+    def get_cod_to_prepaid_url_and_discount(self, token):
+        result = None, None
+        order_id, discount = self.get_master_order_id_and_discount()
+        if order_id:
+            url = settings.BASE_URL + '/order/paymentSummary?order_id={}&token={}'.format(order_id, token)
+            result = url, discount
         return result
 
 

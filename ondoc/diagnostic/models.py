@@ -256,6 +256,7 @@ class Lab(TimeStampedModel, CreatedByModel, QCModel, SearchKey, WelcomeCallingDo
     rating_data = JSONField(blank=True, null=True)
     is_location_verified = models.BooleanField(verbose_name='Location Verified', default=False)
     auto_ivr_enabled = models.BooleanField(default=True)
+    search_distance = models.FloatField(default=20000)
 
     def __str__(self):
         return self.name
@@ -312,9 +313,12 @@ class Lab(TimeStampedModel, CreatedByModel, QCModel, SearchKey, WelcomeCallingDo
     @classmethod
     def get_insurance_details(cls, user):
 
+        from ondoc.insurance.models import InsuranceThreshold
+        insurance_threshold_obj = InsuranceThreshold.objects.all().order_by('-lab_amount_limit').first()
+        insurance_threshold_amount = insurance_threshold_obj.lab_amount_limit if insurance_threshold_obj else 1500
         resp = {
             'is_insurance_covered': False,
-            'insurance_threshold_amount': None,
+            'insurance_threshold_amount': insurance_threshold_amount,
             'is_user_insured': False
         }
 
@@ -685,7 +689,7 @@ class Lab(TimeStampedModel, CreatedByModel, QCModel, SearchKey, WelcomeCallingDo
                 is_thyrocare = True
         timeslots = timeslot_object.format_timing_to_datetime_v2(lab_timing_queryset, total_leaves, booking_details, is_thyrocare)
         upcoming_slots = timeslot_object.get_upcoming_slots(time_slots=timeslots)
-        timing_response = {"timeslots": timeslots, "upcoming_slots": upcoming_slots, "is_thyrocare": is_thyrocare}
+        timing_response = {"time_slots": timeslots, "upcoming_slots": upcoming_slots, "is_thyrocare": is_thyrocare}
         return timing_response
 
     def get_available_slots(self, is_home_pickup, pincode, date):
@@ -1522,8 +1526,9 @@ class LabAppointmentInvoiceMixin(object):
             context = deepcopy(context)
             context['invoice'] = invoice
             html_body = render_to_string("email/lab_invoice/invoice_template.html", context=context)
-            filename = "invoice_{}_{}.pdf".format(str(timezone.now().strftime("%I%M_%d%m%Y")),
-                                                  random.randint(1111111111, 9999999999))
+            # filename = "invoice_{}_{}.pdf".format(str(timezone.now().strftime("%I%M_%d%m%Y")),
+            #                                       random.randint(1111111111, 9999999999))
+            filename = "payment_receipt_{}.pdf".format(context.get('instance').id)
             file = html_to_pdf(html_body, filename)
             if not file:
                 logger.error("Got error while creating pdf for lab invoice.")

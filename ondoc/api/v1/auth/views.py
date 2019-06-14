@@ -1199,7 +1199,7 @@ class TransactionViewSet(viewsets.GenericViewSet):
         SUCCESS_REDIRECT_URL = settings.BASE_URL + "/order/summary/%s"
         LAB_REDIRECT_URL = settings.BASE_URL + "/lab/appointment"
         OPD_REDIRECT_URL = settings.BASE_URL + "/opd/appointment"
-        PLAN_REDIRECT_URL = settings.BASE_URL + "/prime/success?user_plan="  # TODO: SHASHANK_SINGH is it OK?
+        PLAN_REDIRECT_URL = settings.BASE_URL + "/prime/success?user_plan="
 
         try:
             response = None
@@ -1247,6 +1247,17 @@ class TransactionViewSet(viewsets.GenericViewSet):
                 pg_resp_code = None
 
             order_obj = Order.objects.select_for_update().filter(pk=response.get("orderId")).first()
+            convert_cod_to_prepaid = False
+            # TODO : SHASHANK_SINGH correct amount
+            try:
+                if order_obj and response and order_obj.amount != Decimal(
+                        response.get('txAmount')) and order_obj.is_cod_order and order_obj.get_deal_price_without_coupon <= Decimal(response.get('txAmount')):
+                    convert_cod_to_prepaid = True
+                    order_obj.amount = Decimal(response.get('txAmount'))
+                    order_obj.save()
+            except:
+                pass
+
             if pg_resp_code == 1 and order_obj:
                 response_data = None
                 resp_serializer = serializers.TransactionSerializer(data=response)
@@ -1264,7 +1275,7 @@ class TransactionViewSet(viewsets.GenericViewSet):
 
                         try:
                             with transaction.atomic():
-                                processed_data = order_obj.process_pg_order()
+                                processed_data = order_obj.process_pg_order(convert_cod_to_prepaid)
                                 success_in_process = True
                         except Exception as e:
                             logger.error("Error in processing order - " + str(e))
@@ -1733,8 +1744,10 @@ class OrderViewSet(GenericViewSet):
         from_app = params.get("from_app", False)
         app_version = params.get("app_version", "1.0")
 
-        order_obj = Order.objects.filter(pk=pk, payment_status=Order.PAYMENT_PENDING).first()
-        if not order_obj.validate_user(user):
+        order_obj = Order.objects.filter(pk=pk).first()
+
+        if not (order_obj and order_obj.validate_user(user) and (
+                order_obj.payment_status == Order.PAYMENT_PENDING or order_obj.is_cod_order)):
             return Response({"status": 0}, status.HTTP_404_NOT_FOUND)
 
         resp = dict()
@@ -1911,6 +1924,7 @@ class OrderDetailViewSet(GenericViewSet):
             return Response(status=status.HTTP_404_NOT_FOUND)
 
         processed_order_data = []
+        valid_for_cod_to_prepaid = order_data.is_cod_order
         child_orders = order_data.orders.all()
 
         class OrderCartItemMapper():
@@ -1928,11 +1942,12 @@ class OrderDetailViewSet(GenericViewSet):
                 "data": cart_serializers.CartItemSerializer(item, context={"validated_data": None}).data,
                 "booking_id": order.reference_id,
                 "time_slot_start": temp_time_slot_start,
-                "payment_type": order.action_data["payment_type"]
+                "payment_type": order.action_data["payment_type"],
+
             }
             processed_order_data.append(curr)
 
-        return Response({"data": processed_order_data})
+        return Response({"data": processed_order_data, "valid_for_cod_to_prepaid": valid_for_cod_to_prepaid})
 
 
 class UserTokenViewSet(GenericViewSet):
