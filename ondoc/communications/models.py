@@ -331,6 +331,12 @@ class SMSNotification:
             body_template = "sms/appointment_confirmation_second_check.txt"
         elif notification_type == NotificationAction.OPD_FEEDBACK_AFTER_APPOINTMENT:
             body_template = "sms/appointment_feedback.txt"
+        elif notification_type == NotificationAction.COD_TO_PREPAID and user and user.user_type == User.CONSUMER:
+            body_template = "sms/cod_to_prepaid_patient.txt"
+        elif notification_type == NotificationAction.COD_TO_PREPAID and (not user or user.user_type == User.DOCTOR):
+            body_template = "sms/cod_to_prepaid_doctor.txt"
+        elif notification_type == NotificationAction.COD_TO_PREPAID_REQUEST:
+            body_template = "sms/cod_to_prepaid_request.txt"
         return body_template
 
     def trigger(self, receiver, template, context):
@@ -965,7 +971,15 @@ class EMAILNotification:
 
                 body_template = "email/lab_document_logo/body.html"
                 subject_template = "email/lab_document_logo/subject.txt"
-
+        elif notification_type == NotificationAction.COD_TO_PREPAID:
+            body_template = "email/cod_to_prepaid_patient/body.html"
+            subject_template = "email/cod_to_prepaid_patient/subject.txt"
+        elif notification_type == NotificationAction.COD_TO_PREPAID and user and user.user_type == User.CONSUMER:
+            body_template = "email/cod_to_prepaid_patient/body.html"
+            subject_template = "email/cod_to_prepaid_patient/subject.txt"
+        elif notification_type == NotificationAction.COD_TO_PREPAID and (not user or user.user_type == User.DOCTOR):
+            body_template = "email/cod_to_prepaid_/body.html"
+            subject_template = "email/cod_to_prepaid_patient/subject.txt"
         return subject_template, body_template
 
     def trigger(self, receiver, template, context):
@@ -1128,6 +1142,7 @@ class OpdNotification(Notification):
         patient_name = self.appointment.profile.name if self.appointment.profile.name else ""
         doctor_name = self.appointment.doctor.name if self.appointment.doctor.name else ""
         procedures = self.appointment.get_procedures()
+
         est = pytz.timezone(settings.TIME_ZONE)
         time_slot_start = self.appointment.time_slot_start.astimezone(est)
         mask_number_instance = self.appointment.mask_number.filter(is_deleted=False).first()
@@ -1143,6 +1158,7 @@ class OpdNotification(Notification):
         # auth_token = AgentToken.objects.create_token(user=self.appointment.user)
         token_object = JWTAuthentication.generate_token(self.appointment.user)
         booking_url = settings.BASE_URL + '/sms/booking?token={}'.format(token_object['token'].decode("utf-8"))
+        opd_appointment_cod_to_prepaid_url, cod_to_prepaid_discount = self.appointment.get_cod_to_prepaid_url_and_discount(token_object['token'].decode("utf-8"))
         opd_appointment_complete_url = booking_url + "&callbackurl=opd/appointment/{}?complete=true".format(self.appointment.id)
         opd_appointment_feedback_url = booking_url + "&callbackurl=opd/appointment/{}".format(self.appointment.id)
         reschdule_appointment_bypass_url = booking_url + "&callbackurl=opd/doctor/{}/{}/book?reschedule={}".format(self.appointment.doctor.id, self.appointment.hospital.id, self.appointment.id)
@@ -1168,7 +1184,9 @@ class OpdNotification(Notification):
             "opd_appointment_complete_url": generate_short_url(opd_appointment_complete_url),
             "opd_appointment_feedback_url": generate_short_url(opd_appointment_feedback_url),
             "reschdule_appointment_bypass_url": generate_short_url(reschdule_appointment_bypass_url),
-            "show_amounts": bool(self.appointment.payment_type != OpdAppointment.INSURANCE)
+            "show_amounts": bool(self.appointment.payment_type != OpdAppointment.INSURANCE),
+            "opd_appointment_cod_to_prepaid_url": generate_short_url(opd_appointment_cod_to_prepaid_url) if opd_appointment_cod_to_prepaid_url else None,
+            "cod_to_prepaid_discount": cod_to_prepaid_discount
         }
         return context
 
@@ -1180,23 +1198,30 @@ class OpdNotification(Notification):
         if notification_type == NotificationAction.DOCTOR_INVOICE:
             email_notification = EMAILNotification(notification_type, context)
             email_notification.send(all_receivers.get('email_receivers', []))
-        elif notification_type in [NotificationAction.REFUND_BREAKUP, NotificationAction.REFUND_COMPLETED] and context.get('instance').payment_type == 3:
+        elif notification_type in [NotificationAction.REFUND_BREAKUP,
+                                   NotificationAction.REFUND_COMPLETED] and context.get('instance').payment_type == 3:
             # As no notification to be sent in case of insurance.
             pass
 
         elif notification_type == NotificationAction.OPD_OTP_BEFORE_APPOINTMENT or \
                 notification_type == NotificationAction.OPD_CONFIRMATION_CHECK_AFTER_APPOINTMENT or \
                 notification_type == NotificationAction.OPD_CONFIRMATION_SECOND_CHECK_AFTER_APPOINTMENT or \
-                notification_type == NotificationAction.OPD_FEEDBACK_AFTER_APPOINTMENT:
+                notification_type == NotificationAction.OPD_FEEDBACK_AFTER_APPOINTMENT or \
+                notification_type == NotificationAction.COD_TO_PREPAID_REQUEST:
             sms_notification = SMSNotification(notification_type, context)
             sms_notification.send(all_receivers.get('sms_receivers', []))
-
             whtsapp_notification = WHTSAPPNotification(notification_type, context)
             whtsapp_notification.send(all_receivers.get('sms_receivers', []))
-        elif notification_type== NotificationAction.APPOINTMENT_REMINDER_PROVIDER_SMS:
+        elif notification_type == NotificationAction.APPOINTMENT_REMINDER_PROVIDER_SMS:
             sms_notification = SMSNotification(notification_type, context)
             sms_notification.send(all_receivers.get('sms_receivers', []))
-
+        elif notification_type == NotificationAction.COD_TO_PREPAID:
+            email_notification = EMAILNotification(notification_type, context)
+            sms_notification = SMSNotification(notification_type, context)
+            # whtsapp_notification = WHTSAPPNotification(notification_type, context) # TODO : SHASHANK_SINGH dont know how!!
+            email_notification.send(all_receivers.get('email_receivers', []))
+            sms_notification.send(all_receivers.get('sms_receivers', []))
+            # whtsapp_notification.send(all_receivers.get('sms_receivers', []))
         else:
             email_notification = EMAILNotification(notification_type, context)
             sms_notification = SMSNotification(notification_type, context)
@@ -1227,11 +1252,15 @@ class OpdNotification(Notification):
                                  NotificationAction.OPD_OTP_BEFORE_APPOINTMENT,
                                  NotificationAction.OPD_CONFIRMATION_CHECK_AFTER_APPOINTMENT,
                                  NotificationAction.OPD_CONFIRMATION_SECOND_CHECK_AFTER_APPOINTMENT,
-                                 NotificationAction.OPD_FEEDBACK_AFTER_APPOINTMENT]:
+                                 NotificationAction.OPD_FEEDBACK_AFTER_APPOINTMENT,
+                                 NotificationAction.COD_TO_PREPAID,
+                                 NotificationAction.COD_TO_PREPAID_REQUEST,
+                                 ]:
             receivers.append(instance.user)
         elif notification_type in [NotificationAction.APPOINTMENT_RESCHEDULED_BY_PATIENT,
                                    NotificationAction.APPOINTMENT_BOOKED,
-                                   NotificationAction.APPOINTMENT_CANCELLED]:
+                                   NotificationAction.APPOINTMENT_CANCELLED,
+                                   NotificationAction.COD_TO_PREPAID]:
             spocs_to_be_communicated = doctor_spocs
             doctor_spocs_app_recievers = GenericAdmin.get_appointment_admins(instance)
             # receivers.extend(doctor_spocs)
