@@ -1668,7 +1668,7 @@ class DoctorOpdAppointmentAdmin(admin.ModelAdmin):
         if request.user.groups.filter(name=constants['APPOINTMENT_OTP_TEAM']).exists() or request.user.is_superuser:
             read_only = read_only + ('otp',)
 
-        if obj.status is not OpdAppointment.CREATED:
+        if obj and obj.status is not OpdAppointment.CREATED:
             read_only = read_only + ('status_change_comments',)
 
         return read_only
