@@ -32,7 +32,6 @@ from django.utils import timezone
 from ondoc.authentication import models as auth_model
 from ondoc.authentication.models import SPOCDetails, RefundMixin
 from ondoc.bookinganalytics.models import DP_OpdConsultsAndTests
-from ondoc.insurance.models import InsuranceThreshold
 from ondoc.location import models as location_models
 from ondoc.account.models import Order, ConsumerAccount, ConsumerTransaction, PgTransaction, ConsumerRefund, \
     MerchantPayout, UserReferred, MoneyPool, Invoice
@@ -881,6 +880,7 @@ class Doctor(auth_model.TimeStampedModel, auth_model.QCModel, SearchKey, auth_mo
 
     @classmethod
     def get_insurance_details(cls, user):
+        from ondoc.insurance.models import InsuranceThreshold
         insurance_threshold_obj = InsuranceThreshold.objects.all().order_by('-opd_amount_limit').first()
         insurance_threshold_amount = insurance_threshold_obj.opd_amount_limit if insurance_threshold_obj else 1500
         resp = {
