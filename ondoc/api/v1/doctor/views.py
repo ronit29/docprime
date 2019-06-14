@@ -2091,7 +2091,7 @@ class DoctorAvailabilityTimingViewSet(viewsets.ViewSet):
 
         for data in queryset:
             obj.form_time_slots(data.day, data.start, data.end, data.fees, True,
-                                data.deal_price, data.mrp, True, on_call=data.type)
+                                data.deal_price, data.mrp, data.dct_cod_deal_price(), True, on_call=data.type)
 
         timeslots = obj.get_timing_list()
         return Response({"timeslots": timeslots, "doctor_data": doctor_serializer.data,
@@ -3472,7 +3472,7 @@ class OfflineCustomerViewSet(viewsets.GenericViewSet):
 
                 for data in queryset:
                     obj.form_time_slots(data.day, data.start, data.end, data.fees, True,
-                                        data.deal_price, data.mrp, True)
+                                        data.deal_price, data.mrp, data.dct_cod_deal_price(), True)
 
                 timeslots = obj.get_timing_list()
                 for day, slots in timeslots.items():

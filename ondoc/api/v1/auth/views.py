@@ -1933,6 +1933,17 @@ class OrderDetailViewSet(GenericViewSet):
                 self.order = order_obj
 
         for order in child_orders:
+            cod_deal_price = None
+            enabled_for_cod = False
+            opd_appoint = OpdAppointment.objects.filter(id=order.reference_id)[0]
+            start_time = opd_appoint.time_slot_start
+            day = start_time.weekday()
+
+            if opd_appoint.payment_type == OpdAppointment.COD:
+                doc_clinic_timing = DoctorClinicTiming.objects.filter(day=day, doctor_clinic__doctor=opd_appoint.doctor, doctor_clinic__hospital=opd_appoint.hospital)[0]
+                cod_deal_price = doc_clinic_timing.dct_cod_deal_price()
+                enabled_for_cod = doc_clinic_timing.is_enabled_for_cod()
+
             item = OrderCartItemMapper(order)
             temp_time_slot_start = convert_datetime_str_to_iso_str(order.action_data["time_slot_start"])
             curr = {
@@ -1943,7 +1954,8 @@ class OrderDetailViewSet(GenericViewSet):
                 "booking_id": order.reference_id,
                 "time_slot_start": temp_time_slot_start,
                 "payment_type": order.action_data["payment_type"],
-
+                "cod_deal_price": cod_deal_price,
+                "enabled_for_cod": enabled_for_cod
             }
             processed_order_data.append(curr)
 
