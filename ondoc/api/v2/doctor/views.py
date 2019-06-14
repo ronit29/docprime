@@ -583,7 +583,7 @@ class ProviderSignupDataViewset(viewsets.GenericViewSet):
                         return Response("Error while decrypting - " + str(exception), status=status.HTTP_400_BAD_REQUEST)
                 else:
                     if hasattr(hospital['hospital_id'], 'encrypt_details'):
-                        encrypt_object = doc_models.ProviderEncrypt.objects.filter(hospital_id=hospital['hospital_id']).first()
+                        encrypt_object = hospital['hospital_id'].encrypt_details
                         encrypt_object.is_encrypted = True
                         encrypt_object.encrypted_by = user
                         encrypt_object.hint = valid_data.get('hint')
