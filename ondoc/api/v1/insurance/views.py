@@ -162,8 +162,8 @@ class ListInsuranceViewSet(viewsets.GenericViewSet):
             resp = {}
             user = request.user
             if not user.is_anonymous:
-                user_insurance = UserInsurance.get_user_insurance(request.user)
-                if user_insurance and user_insurance.is_profile_valid() and not self.strtobool(request.query_params.get("is_endorsement")):
+                user_insurance = user.active_insurance
+                if user_insurance and not self.strtobool(request.query_params.get("is_endorsement")):
                     return Response(data={'certificate': True}, status=status.HTTP_200_OK)
 
             insurer_data = self.get_queryset()
@@ -435,7 +435,7 @@ class InsuranceProfileViewSet(viewsets.GenericViewSet):
             if user_id:
 
                 user = User.objects.get(id=user_id)
-                user_insurance = UserInsurance.get_user_insurance(user)
+                user_insurance = user.active_insurance
                 if not user_insurance or not user_insurance.is_profile_valid():
                     return Response({"message": "Insurance not found or expired."})
                 insurer = user_insurance.insurance_plan.insurer
