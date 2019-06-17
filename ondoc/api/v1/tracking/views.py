@@ -20,6 +20,7 @@ from django.conf import settings
 from django.db import IntegrityError
 from django.db import transaction
 from mongoengine.errors import NotUniqueError
+from copy import deepcopy
 
 #from django.utils import timezone
 
@@ -38,6 +39,7 @@ class EventCreateViewSet(GenericViewSet):
         visitor_id, visit_id = self.get_visit(request)
         resp = {}
         data = request.data
+        data = deepcopy(data)
         data.pop('visitor_info', None)
 
         error_message = ""

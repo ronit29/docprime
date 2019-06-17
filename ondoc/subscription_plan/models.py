@@ -241,7 +241,7 @@ class UserPlanMapping(auth_model.TimeStampedModel, CouponsMixin):
             test_id=F('test_mappings__test__id')).values_list('test_id', flat=True))
         used_test_count_dict = cls.get_frequency_test(used_test_count)
         plan_test_count_dict = {x['test_id']: x['count'] for x in plan_test_count}
-        # TODO : SHASHANK_SINGH consider valid cart items only
+
         cart_queryset = Cart.objects.all()
         if cart_item_id:
             cart_queryset = cart_queryset.exclude(id=cart_item_id)

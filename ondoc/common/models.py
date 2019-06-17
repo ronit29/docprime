@@ -547,6 +547,33 @@ class MatrixDataMixin(object):
                 'customer_status': customer_status, 'refund_urn': refund_urn, 'refund_initiated_at': refund_initiated_at}
 
 
+class DeviceDetails(TimeStampedModel):
+    device_id = models.CharField(max_length=200)
+    app_version = models.CharField(max_length=20, null=True, blank=True)
+    os = models.CharField(max_length=40, null=True, blank=True)
+    os_version = models.CharField(max_length=20, null=True, blank=True)
+    make = models.CharField(max_length=100, null=True, blank=True)
+    model = models.CharField(max_length=100, null=True, blank=True)
+    # installed_date = models.DateTimeField()   # created_at is the installed_date for given d_token
+    firebase_reg_id = models.CharField(max_length=200, null=True, blank=True)
+    user = models.ForeignKey(User, null=True, blank=True, on_delete=models.SET_NULL, related_name="device_details")
+    app_name = models.CharField(max_length=200, null=True, blank=True)
+    ping_status = models.CharField(max_length=50, null=True, blank=True)
+    last_ping_time = models.DateTimeField(null=True, blank=True)
+    # last_usage = models.DateTimeField()   # updated_at is the last_usage
+    dnd = models.BooleanField(default=False)
+    res = models.CharField(max_length=100, null=True, blank=True)
+    adv_id = models.CharField(max_length=100, null=True, blank=True)
+    apps_flyer_id = models.CharField(max_length=100, null=True, blank=True)
+    data = JSONField()
+
+    def __str__(self):
+        return self.device_id
+
+    class Meta:
+        db_table = "device_details"
+
+
 class BlockedStates(TimeStampedModel):
 
     class States(Choices):
@@ -593,3 +620,4 @@ class GenericNotes(TimeStampedModel):
 
     class Meta:
         db_table = 'generic_notes'
+

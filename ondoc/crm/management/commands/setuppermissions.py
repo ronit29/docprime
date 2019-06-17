@@ -708,7 +708,7 @@ class Command(BaseCommand):
             group.permissions.add(*permissions)
 
         group, created = Group.objects.get_or_create(name=constants['APPOINTMENT_REFUND_TEAM'])
-        #group.permissions.clear()
+        # group.permissions.clear()
 
         group, created = Group.objects.get_or_create(name=constants['IPD_TEAM'])
         group.permissions.clear()
@@ -719,6 +719,9 @@ class Command(BaseCommand):
             permissions = Permission.objects.filter(
                 Q(content_type=ct), Q(codename='change_' + ct.model))
             group.permissions.add(*permissions)
+
+        group, created = Group.objects.get_or_create(name=constants['APPOINTMENT_OTP_BYPASS_AGENT_TEAM'])
+        # group.permissions.clear()
 
         self.stdout.write('Successfully created groups and permissions')
 

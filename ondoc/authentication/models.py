@@ -566,6 +566,29 @@ class UserProfile(TimeStampedModel):
         self.dob = endorsed_data.dob
         self.save()
 
+    def is_insurance_package_limit_exceed(self):
+        from ondoc.diagnostic.models import LabAppointment
+        from ondoc.doctor.models import OpdAppointment
+        user = self.user
+        insurance = None
+        if user.is_authenticated:
+            insurance = user.active_insurance
+        if not insurance or not self.is_insured_profile:
+            return False
+        package_count = 0
+        previous_insured_lab_bookings = LabAppointment.objects.prefetch_related('tests').filter(insurance=insurance, profile=self).exclude(status=OpdAppointment.CANCELLED)
+        for booking in previous_insured_lab_bookings:
+            all_tests = booking.tests.all()
+            for test in all_tests:
+                if test.is_package:
+                    package_count += 1
+
+        if package_count >= insurance.insurance_plan.plan_usages.get('member_package_limit'):
+            return True
+        else:
+            return False
+
+
     class Meta:
         db_table = "user_profile"
 
@@ -1182,6 +1205,15 @@ class GenericAdmin(TimeStampedModel, CreatedByModel):
             if admin.user:
                 admin_users.append(admin.user)
         return admin_users
+
+    @staticmethod
+    def get_manageable_hospitals(user):
+        manageable_hosp_list = GenericAdmin.objects.filter(Q(is_disabled=False, user=user),
+                                                           (Q(permission_type=GenericAdmin.APPOINTMENT)
+                                                            |
+                                                            Q(super_user_permission=True))) \
+                                                   .values_list('hospital', flat=True)
+        return list(manageable_hosp_list)
 
 
 class BillingAccount(models.Model):

@@ -712,6 +712,9 @@ class BlacklistUserForm(forms.ModelForm):
         phone_number = cleaned_data['phone_number']
         user = User.objects.filter(user_type=User.CONSUMER, phone_number=phone_number).first()
         if user:
+            if cleaned_data.get('type') and BlacklistUser.get_state_by_number(user.phone_number, cleaned_data.get('type')):
+                raise forms.ValidationError('User with given block state already exists.')
+
             self.instance.user = user
         else:
             raise forms.ValidationError('User with given number does not exists.')

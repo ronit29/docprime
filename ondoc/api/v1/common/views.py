@@ -26,7 +26,7 @@ from ondoc.notification.rabbitmq_client import publish_message
 # from ondoc.notification.sqs_client import publish_message
 from django.template.loader import render_to_string
 from . import serializers
-from ondoc.common.models import Cities, PaymentOptions, UserConfig
+from ondoc.common.models import Cities, PaymentOptions, UserConfig, DeviceDetails
 from ondoc.common.utils import send_email, send_sms
 from ondoc.authentication.backends import JWTAuthentication
 from django.core.files.uploadedfile import SimpleUploadedFile, TemporaryUploadedFile, InMemoryUploadedFile
@@ -986,6 +986,26 @@ class AllUrlsViewset(viewsets.GenericViewSet):
         return Response(dict(enumerate(result)))
 
 
+class DeviceDetailsSave(viewsets.GenericViewSet):
+
+    def save(self, request):
+        serializer = serializers.DeviceDetailsSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        validated_data = serializer.validated_data
+        user = request.user if request.user and request.user.is_authenticated else None
+        device_details_queryset = DeviceDetails.objects.filter(device_id=validated_data.get('device_id'))
+        device_details = device_details_queryset.first()
+        try:
+            if device_details:
+                device_details_queryset.update(**validated_data, user=user, updated_at=datetime.datetime.now())
+            else:
+                DeviceDetails.objects.create(**validated_data, user=user)
+        except Exception as e:
+            logger.error("Something went wrong while saving device details - " + str(e))
+            return Response("Error adding device details - " + str(e), status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+        return Response({"status": 1, "message": "device details added"}, status=status.HTTP_200_OK)
+
+
 class AppointmentPrerequisiteViewSet(viewsets.GenericViewSet):
 
     authentication_classes = (JWTAuthentication,)
@@ -994,7 +1014,7 @@ class AppointmentPrerequisiteViewSet(viewsets.GenericViewSet):
     def pre_booking(self, request):
         user = request.user
         insurance = user.active_insurance
-        if not insurance:
+        if not insurance or (user.is_authenticated and hasattr(request,'agent')):
             return Response({'prescription_needed': False})
 
         serializer = serializers.AppointmentPrerequisiteSerializer(data=request.data)
@@ -1010,6 +1030,9 @@ class AppointmentPrerequisiteViewSet(viewsets.GenericViewSet):
         available_lab_test_qs = lab_pricing_group.available_lab_tests.all().filter(test__in=valid_data.get('lab_test'))
         tests_amount = Decimal(0)
         for available_lab_test in available_lab_test_qs:
+            if available_lab_test.test.is_package and insurance.insurance_plan.plan_usages.get('member_package_limit'):
+                if user_profile.is_insurance_package_limit_exceed():
+                    return Response({'prescription_needed': True})
             agreed_price = available_lab_test.custom_agreed_price if available_lab_test.custom_agreed_price else available_lab_test.computed_agreed_price
             tests_amount = tests_amount + agreed_price
 
