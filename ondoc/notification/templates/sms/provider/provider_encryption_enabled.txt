@@ -1,4 +1,10 @@
-The encryption for Hospital - {{hospital_name|capfirst}} is enabled.
-No one from docprime will ever view/use the patient's data.
+Dear User,
 
-Thanks for choosing docprime.com
+Walk-in patient data encryption has been enabled on Hospital - {{hospital_name|capfirst}} by the user {{ action_user.phone_number }} on Docprime Partners app.
+
+By enabling Docprime encryption, sensitive patient information is concealed and can only be viewed or used by a users with the correct encryption key.
+
+Docprime will have NO ACCESS to your walk-in the patient's sensitive data (Name & Phone No.).
+{% if encrypted_by %}
+Please ask for the encryption key from {{ encrypted_by.phone_number }} & add it in accounts section on your Docprime Partners app under respective hospital/clinic to view patient data.
+{% endif %}

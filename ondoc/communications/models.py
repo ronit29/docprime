@@ -1597,15 +1597,18 @@ class InsuranceNotification(Notification):
 
 class ProviderAppNotification(Notification):
 
-    def __init__(self, hospital, notification_type=None):
+    def __init__(self, hospital, action_user, notification_type=None):
         self.hospital = hospital
         self.notification_type = notification_type
+        self.action_user = action_user
 
     def get_context(self):
         context = {
             "id": self.hospital.id,
             "instance": self.hospital,
             "hospital_name": self.hospital.name,
+            "encrypted_by": self.hospital.encrypt_details.encrypted_by if hasattr(self.hospital, 'encrypt_details') else None,
+            "action_user": self.action_user,
         }
         return context
 

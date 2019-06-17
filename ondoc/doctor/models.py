@@ -3958,13 +3958,13 @@ class ProviderEncrypt(auth_model.TimeStampedModel):
     class Meta:
         db_table = "provider_encrypt"
 
-    def send_sms(self):
+    def send_sms(self, action_user):
         from ondoc.communications.models import ProviderAppNotification
         if self.is_encrypted:
-            sms_notification = ProviderAppNotification(self.hospital, NotificationAction.PROVIDER_ENCRYPTION_ENABLED)
+            sms_notification = ProviderAppNotification(self.hospital, action_user, NotificationAction.PROVIDER_ENCRYPTION_ENABLED)
             sms_notification.send()
         elif not self.is_encrypted:
-            sms_notification = ProviderAppNotification(self.hospital, NotificationAction.PROVIDER_ENCRYPTION_DISABLED)
+            sms_notification = ProviderAppNotification(self.hospital, action_user, NotificationAction.PROVIDER_ENCRYPTION_DISABLED)
             sms_notification.send()
 
 
