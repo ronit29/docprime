@@ -607,6 +607,7 @@ class IpdProcedureLeadCostEstimateMapping(models.Model):
 
     class Meta:
         db_table = "ipd_procedure_lead_cost_estimate"
+        unique_together = (('ipd_procedure_lead', 'cost_estimate'),)
 
 
 class IpdCostEstimateRoomTypeMapping(models.Model):

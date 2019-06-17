@@ -721,11 +721,9 @@ class Command(BaseCommand):
                 Q(content_type=ct), Q(codename='change_' + ct.model))
             group.permissions.add(*permissions)
 
-        group, created = Group.objects.get_or_create(name=constants['APPOINTMENT_OTP_BYPASS_AGENT_TEAM'])
-        # group.permissions.clear()
-
         content_types = ContentType.objects.get_for_models(IpdCostEstimateRoomType, IpdProcedureCostEstimate,
-                                                           IpdCostEstimateRoomTypeMapping, IpdProcedureLeadCostEstimateMapping,
+                                                           IpdCostEstimateRoomTypeMapping,
+                                                           IpdProcedureLeadCostEstimateMapping,
                                                            UploadCostEstimateData)
         for cl, ct in content_types.items():
             permissions = Permission.objects.filter(
@@ -733,6 +731,9 @@ class Command(BaseCommand):
                 Q(codename='add_' + ct.model) |
                 Q(codename='change_' + ct.model))
             group.permissions.add(*permissions)
+
+        group, created = Group.objects.get_or_create(name=constants['APPOINTMENT_OTP_BYPASS_AGENT_TEAM'])
+        # group.permissions.clear()
 
         self.stdout.write('Successfully created groups and permissions')
 

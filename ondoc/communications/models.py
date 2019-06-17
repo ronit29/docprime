@@ -342,7 +342,7 @@ class SMSNotification:
             body_template = "sms/cod_to_prepaid_doctor.txt"
         elif notification_type == NotificationAction.COD_TO_PREPAID_REQUEST:
             body_template = "sms/cod_to_prepaid_request.txt"
-	elif notification_type == NotificationAction.IPD_PROCEDURE_COST_ESTIMATE:
+        elif notification_type == NotificationAction.IPD_PROCEDURE_COST_ESTIMATE:
             body_template = "sms/ipd/cost_estimate.txt"
         return body_template
 

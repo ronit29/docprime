@@ -7,7 +7,6 @@ As discussed, please find below the cost estimate{% if instance.ipd_procedure %}
     {% for room_type_cost in ipd_cost_estimate.room_type_costs.all|dictsort:"id" %}
         <strong>{{room_type_cost.room_type.room_type}}</strong>: {{room_type_cost.cost}} <br/>
     {% endfor %} <br/>
-{% endfor %} <br/>
-
+{% endfor %}
 Thanks <br/>
 Team docprime
