@@ -141,19 +141,23 @@ class ScreenViewSet(viewsets.GenericViewSet):
                 'tag': "Upto 50% off",
                 'tagColor': "#ff0000",
                 'addSearchItem': "Lab"
-            },
+            }
+        ]
+
+        carousel_list = [
             {
-              'priority': 0,
-              'title': "Top Hospitals",
-              'type': "Hospitals",
-              'items': top_hospitals_data,
+                'priority': 0,
+                'title': "Top Hospitals",
+                'type': "Hospitals",
+                'items': top_hospitals_data,
             },
             {
                 'priority': 1,
                 'title': "Top Procedures",
-                'type': "IPD Procedures",
+                'type': "IPD",
                 'items': common_ipd_procedures_serializer.data,
-            }
+            },
+
         ]
 
         if request.user and request.user.is_authenticated and request.user.active_insurance and not hasattr(request, 'agent'):
@@ -186,6 +190,7 @@ class ScreenViewSet(viewsets.GenericViewSet):
                     "show_search_header": show_search_header,
                     "show_footer": show_footer,
                     "grid_list": grid_list,
+                    "carousel_list": carousel_list,
                     },
                 "banner": banner,
                 "upcoming_appointments": upcoming_appointment_result,
