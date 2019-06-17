@@ -4,7 +4,10 @@ import logging
 
 SECRET_KEY = env('DJANGO_SECRET_KEY')
 
-ALLOWED_HOSTS = env.list('DJANGO_ALLOWED_HOSTS', default=['panaceatechno.com', 'docprime.com','admin.docprime.com'])
+# ALLOWED_HOSTS = env.list('DJANGO_ALLOWED_HOSTS', default=['panaceatechno.com', 'test.docprime.com', 'docprime.com','admin.docprime.com'])
+ALLOWED_HOSTS = ['panaceatechno.com', 'test.docprime.com', 'docprime.com','admin.docprime.com', 'backendprod']
+ALLOWED_HOSTS += ['10.20.{}.{}'.format(i,j) for i in range(256) for j in range(256)]
+
 DATABASES['default']['ATOMIC_REQUESTS'] = True  # noqa F405
 DATABASES['default']['CONN_MAX_AGE'] = env.int('CONN_MAX_AGE', default=60)  # noqa F405
 DEBUG = False
@@ -40,7 +43,7 @@ SECURE_BROWSER_XSS_FILTER = True
 # https://docs.djangoproject.com/en/dev/ref/settings/#x-frame-options
 X_FRAME_OPTIONS = 'DENY'
 
-if env('ENABLE_DATADOG', default=False):
+if env.bool('ENABLE_DATADOG', default=False):
     INSTALLED_APPS = DJANGO_APPS + THIRD_PARTY_APPS + ('ddtrace.contrib.django',) + LOCAL_APPS 
 
 INSTALLED_APPS += ('gunicorn',)

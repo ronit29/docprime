@@ -72,12 +72,12 @@ from ondoc.insurance.models import Insurer, InsurerAccount, InsurancePlans, Insu
     InsuredMembers, InsuranceTransaction, InsurancePlanContent, InsuranceDisease, StateGSTCode, InsuranceCity, \
     InsuranceDistrict, InsuranceDeal, InsurerPolicyNumber, InsuranceLead, InsuranceCancelMaster, EndorsementRequest, \
     InsuredMemberDocument, InsuredMemberHistory, InsuranceEligibleCities, ThirdPartyAdministrator, \
-    UserBank, UserBankDocument
+    UserBank, UserBankDocument, InsurerAccountTransfer
 from ondoc.crm.admin.insurance import InsurerAdmin, InsurancePlansAdmin, InsuranceThresholdAdmin, InsurerFloatAdmin, \
     UserInsuranceAdmin, InsuredMembersAdmin, InsuranceDiseaseAdmin, StateGSTCodeAdmin, InsuranceCityAdmin, \
     InsuranceDistrictAdmin, InsuranceDealAdmin, InsurerPolicyNumberAdmin, InsuranceLeadAdmin, InsuranceCancelMasterAdmin, \
     EndorsementRequestAdmin, InsuredMemberDocumentAdmin, InsuredMemberHistoryAdmin, InsuranceEligibleCitiesAdmin, \
-    ThirdPartyAdministratorAdmin
+    ThirdPartyAdministratorAdmin, InsurerAccountTransferAdmin
 
 from ondoc.insurance import models as insurance_model
 from ondoc.ratings_review.models import RatingsReview, ReviewCompliments, AppRatings, AppCompliments
@@ -190,6 +190,7 @@ admin.site.register(EndorsementRequest, EndorsementRequestAdmin)
 admin.site.register(InsuredMemberDocument, InsuredMemberDocumentAdmin)
 admin.site.register(InsuredMemberHistory, InsuredMemberHistoryAdmin)
 admin.site.register(InsuranceEligibleCities, InsuranceEligibleCitiesAdmin)
+admin.site.register(InsurerAccountTransfer, InsurerAccountTransferAdmin)
 # admin.site.register(InsuranceReport, InsuranceReportAdmin)
 # admin.site.register(InsurancePlanContent, InsurancePlanContentAdmin)
 

@@ -61,32 +61,34 @@
                 <tbody>
                 <tr>
                     <td style="color: #3f3f3f; font-size: 16px; font-weight: 500;">
-                        Hi<br/>We have received an appointment for {{patient_name|capfirst}} at
-                        {{instance.hospital.name|capfirst}} on {{instance.time_slot_start|date:"D jS F Y"}} at
-                        {{instance.time_slot_start|date:"h:i A"}}
-                    </td>
-                </tr>
-                <tr>
-                    <td style="color: #3f3f3f; font-size: 16px; font-weight: 500;">
-                        Please confirm the booking at the earliest by accepting the booking using docprime provider app
-                        or by replying to this email.<br/>The booking details are mentioned below :
+                        Hi,<br/><br/>We have received a new appointment request. Below are the details:
                     </td>
                 </tr>
                 <tr>
                     <td>
-                        <table>
+                        <table style="border:1px solid grey">
                             <tbody>
                             <tr>
                                 <td style="color:#000000;font-size:14px;font-weight:700;padding-top:16px;width:40%">
-                                    Booking ID
+                                    Appointment ID
                                 </td>
                                 <td style="color:#3f3f3f;font-size:16px;font-weight:500;padding-top:16px">
                                     {{instance.id}}
                                 </td>
                             </tr>
+                            {% if instance.payment_type == instance.COD %}
                             <tr>
                                 <td style="color:#000000;font-size:14px;font-weight:700;padding-top:16px;width:40%">
-                                    Patient
+                                    Appointment Type
+                                </td>
+                                <td style="color:#3f3f3f;font-size:16px;font-weight:500;padding-top:16px">
+                                    Pay-At-Hospital(Cash)
+                                </td>
+                            </tr>
+                            {% endif %}
+                            <tr>
+                                <td style="color:#000000;font-size:14px;font-weight:700;padding-top:16px;width:40%">
+                                    Patient Name
                                 </td>
                                 <td style="color:#3f3f3f;font-size:16px;font-weight:500;padding-top:16px">
                                     {{patient_name|capfirst}}
@@ -102,18 +104,10 @@
                             </tr>
                             <tr>
                                 <td style="color:#000000;font-size:14px;font-weight:700;padding-top:16px;width:40%">
-                                    Doctor
+                                    Appointment with Doctor
                                 </td>
                                 <td style="color:#3f3f3f;font-size:16px;font-weight:500;padding-top:16px">
-                                    Dr. {{doctor_name|capfirst}}
-                                </td>
-                            </tr>
-                            <tr>
-                                <td style="color:#000000;font-size:14px;font-weight:700;padding-top:16px;width:40%">
-                                    Clinic
-                                </td>
-                                <td style="color:#3f3f3f;font-size:16px;font-weight:500;padding-top:16px">
-                                    {{instance.hospital.name|capfirst}}
+                                    {{doctor_name|capfirst}}
                                 </td>
                             </tr>
                             <tr>
@@ -125,8 +119,44 @@
                                     {{instance.time_slot_start|date:"h:i A"}}
                                 </td>
                             </tr>
+                            {% if instance.payment_type == instance.COD %}
+                            <tr>
+                                <td style="color:#000000;font-size:14px;font-weight:700;padding-top:16px;width:40%">
+                                    Amount to be Collected from Patient
+                                </td>
+                                <td style="color:#3f3f3f;font-size:16px;font-weight:500;padding-top:16px">
+                                    Rs.{{cod_amount}}
+                                </td>
+                            </tr>
+                            {% endif %}
                             </tbody>
                         </table>
+                    </td>
+                </tr>
+                <tr>
+                    <td style="color: #3f3f3f; font-size: 16px; font-weight: 500; padding-top:10px;">
+                        Please confirm the appointment by using Docprime provider app. Below are the steps to complete the appointment and billing process :<br/>
+                        <ol>
+                            <li>In case you have Docprime Provider App:<br/>
+                            <ul>
+                                <li>Take 4-digit Unique Confirmation Code from the patient</li>
+                                <li>Open the appointment details</li>
+                                <li>Enter the Unique Confirmation Code</li>
+                            </ul>
+                            </li><br/>
+                            <li>In case you do not have Docprime Provider App:<br/>
+                            <ul>
+                                <li>Open the link: <a href="https://provider.docprime.com/opd/otp">https://provider.docprime.com/opd/otp</a></li>
+                                <li>Enter 4-digit Unique Confirmation Code and Appointment ID provided by the patient</li>
+                            </ul>
+                            </li>
+                        </ol>
+                    </td>
+                </tr>
+                <br/>
+                <tr>
+                    <td style="color: #3f3f3f; font-size: 16px; font-weight: 500;">
+                        Thanks,<br/>Team Docprime.com
                     </td>
                 </tr>
                 {% if instance.payment_type != instance.COD %}
@@ -137,64 +167,38 @@
                     </td>
                 </tr>
                 {% endif %}
-                {% if procedures %}
-                <tr>
-                    <td style="color:#000000;font-size:14px;font-weight:700;padding-top:16px;padding-bottom:2px">
-                        Service(s) Included
-                    </td>
-                </tr>
-                <tr>
-                    <td>
-                        <table cellpadding="0" cellspacing="0" style="width:100%">
-                            <tbody>
-                            <tr>
-                                <th style="font-size:16px;border:1px solid black">
-                                    Name
-                                </th>
-                            </tr>
-                            {% for procedure in procedures %}
+                <!--{% if procedures %}-->
+                <!--<tr>-->
+                    <!--<td style="color:#000000;font-size:14px;font-weight:700;padding-top:16px;padding-bottom:2px">-->
+                        <!--Service(s) Included-->
+                    <!--</td>-->
+                <!--</tr>-->
+                <!--<tr>-->
+                    <!--<td>-->
+                        <!--<table cellpadding="0" cellspacing="0" style="width:100%">-->
+                            <!--<tbody>-->
+                            <!--<tr>-->
+                                <!--<th style="font-size:16px;border:1px solid black">-->
+                                    <!--Name-->
+                                <!--</th>-->
+                            <!--</tr>-->
+                            <!--{% for procedure in procedures %}-->
 
-                            <tr>
-                                <td style="color:#3f3f3f;font-size:16px;font-weight:500;border:1px solid black;text-align:center;">
-                                    {{procedure.name|capfirst}}
-                                </td>
-                            </tr>
-                            {% endfor %}
-                            </tbody>
-                        </table>
-                    </td>
-                </tr>
-                {% endif %}
-                </tbody>
-            </table>
-        </td>
-    </tr>
-    <tr>
-        <td style="color: #3f3f3f; font-size: 16px; font-weight: 500;padding:0 15px">
-
-            Process to complete the appointment & billing:<br/>
-            1. In case you have the Docprime provider App installed:
-            <ul>
-                <li> Once the customer comes to avail services at your premises, obtain the 4
-                    digit Unique Confirmation Code (OTP) from the customer.
-                </li>
-                <li>Open the appointment of the customer on the Docprime provider application
-                    and enter the Unique Confirmation Code (OTP) on the "Complete Appointment" page.
-                </li>
-            </ul>
-            2. In case you don't have the Docprime provider App installed:
-            <ul>
-                <li>Please obtain the 4-digit Unique Confirmation Code and
-                    Booking ID from the customer & enter it in the below mentioned link:<br>
-                    Confirmation page - https://provider.docprime.com/opd/otp
-                </li>
-            </ul>
-            Thanks<br/>
-            Team docprime
-
-
-        </td>
-    </tr>
+                            <!--<tr>-->
+                                <!--<td style="color:#3f3f3f;font-size:16px;font-weight:500;border:1px solid black;text-align:center;">-->
+                                    <!--{{procedure.name|capfirst}}-->
+                                <!--</td>-->
+                            <!--</tr>-->
+                            <!--{% endfor %}-->
+                            <!--</tbody>-->
+                        <!--</table>-->
+                    <!--</td>-->
+                <!--</tr>-->
+                <!--{% endif %}-->
+                <!--</tbody>-->
+            <!--</table>-->
+        <!--</td>-->
+    <!--</tr>-->
     <tr>
         <td>
             <table cellpadding="0" cellspacing="0" style="width: 100%; padding: 20px 15px 40px;">
@@ -202,7 +206,7 @@
                 <tr>
                     <td style="font-size: 14px; font-weight: 500; color: #757575; text-align: center;  border-top: 1px solid #d3d3d3;">
                         This is a system-generated e-mail. Please do not reply to this e-mail. For any support
-                        please write to provider@docprime.com.
+                        please write to provider@docprime.com
                     </td>
                 </tr>
                 </tbody>

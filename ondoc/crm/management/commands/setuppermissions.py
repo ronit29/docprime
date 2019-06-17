@@ -45,7 +45,7 @@ from ondoc.insurance.models import (Insurer, InsurancePlans, InsuranceThreshold,
                                     UserInsurance, InsurancePlanContent, InsuredMembers, InsurerAccount, InsuranceLead,
                                     InsuranceDiseaseResponse, InsurerPolicyNumber, InsuranceCancelMaster,
                                     EndorsementRequest, InsuredMemberDocument, InsuredMemberHistory, ThirdPartyAdministrator,
-                                    UserBank, UserBankDocument)
+                                    UserBank, UserBankDocument, InsurerAccountTransfer)
 
 from ondoc.procedure.models import Procedure, ProcedureCategory, CommonProcedureCategory, DoctorClinicProcedure, \
     ProcedureCategoryMapping, ProcedureToCategoryMapping, CommonProcedure, IpdProcedure, IpdProcedureFeatureMapping, \
@@ -709,7 +709,7 @@ class Command(BaseCommand):
             group.permissions.add(*permissions)
 
         group, created = Group.objects.get_or_create(name=constants['APPOINTMENT_REFUND_TEAM'])
-        #group.permissions.clear()
+        # group.permissions.clear()
 
         group, created = Group.objects.get_or_create(name=constants['IPD_TEAM'])
         group.permissions.clear()
@@ -720,6 +720,9 @@ class Command(BaseCommand):
             permissions = Permission.objects.filter(
                 Q(content_type=ct), Q(codename='change_' + ct.model))
             group.permissions.add(*permissions)
+
+        group, created = Group.objects.get_or_create(name=constants['APPOINTMENT_OTP_BYPASS_AGENT_TEAM'])
+        # group.permissions.clear()
 
         content_types = ContentType.objects.get_for_models(IpdCostEstimateRoomType, IpdProcedureCostEstimate,
                                                            IpdCostEstimateRoomTypeMapping, IpdProcedureLeadCostEstimateMapping,
@@ -984,7 +987,7 @@ class Command(BaseCommand):
                                                            InsuredMembers, InsurerPolicyNumber, InsuranceCancelMaster,
                                                            EndorsementRequest, InsuredMemberDocument,
                                                            InsuredMemberHistory, UserBank, UserBankDocument,
-                                                           GenericNotes)
+                                                           GenericNotes, InsurerAccountTransfer)
 
         for cl, ct in content_types.items():
             permissions = Permission.objects.filter(
