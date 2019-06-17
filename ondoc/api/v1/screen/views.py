@@ -115,7 +115,7 @@ class ScreenViewSet(viewsets.GenericViewSet):
 
         grid_list = [
             {
-                'priority': 2,
+                'priority': 4,
                 'title': "Book Doctor Appointment",
                 'type': "Specialization",
                 'items': specializations_serializer.data,
@@ -124,7 +124,7 @@ class ScreenViewSet(viewsets.GenericViewSet):
                 'addSearchItem': "Doctor"
             },
             {
-                'priority': 0,
+                'priority': 2,
                 'title': "Health Packages",
                 'type': "CommonPackage",
                 'items': package_serializer.data,
@@ -133,7 +133,7 @@ class ScreenViewSet(viewsets.GenericViewSet):
                 'addSearchItem': "Package"
             },
             {
-                'priority': 3,
+                'priority': 5,
                 'title': "Book a Test",
                 'type': "CommonTest",
                 'items': test_serializer.data,
@@ -142,13 +142,13 @@ class ScreenViewSet(viewsets.GenericViewSet):
                 'addSearchItem': "Lab"
             },
             {
-              'priority': 1,
+              'priority': 0,
               'title': "Top Hospitals",
               'type': "Hospitals",
               'items': top_hospitals_data,
             },
             {
-                'priority': 4,
+                'priority': 1,
                 'title': "Top Procedures",
                 'type': "IPD Procedures",
                 'items': common_ipd_procedures_serializer.data,
@@ -161,7 +161,7 @@ class ScreenViewSet(viewsets.GenericViewSet):
             if banner.get('slider_location') == 'home_page':
                 banner_list_homepage.append(banner)
         banner = [{
-            'priority': 1,
+            'priority': 3,
             'type': "Banners",
             'title': "Banners",
             'items': banner_list_homepage
