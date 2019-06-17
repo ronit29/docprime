@@ -1327,10 +1327,9 @@ class TimeSlotExtraction(object):
                 else:
                     return upcoming
 
-
     def format_timing_to_datetime_v2(self, timings, total_leaves, booking_details, is_thyrocare=False):
         from ondoc.doctor.models import DoctorClinicTiming
-        check_next_day_minimum_slot = True if isinstance(timings[0], DoctorClinicTiming) else False
+        check_next_day_minimum_slot = True if timings and isinstance(timings[0], DoctorClinicTiming) else False
         timing_objects = OrderedDict()
         today_date = datetime.date.today()
         today_day = today_date.weekday()
