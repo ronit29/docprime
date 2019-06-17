@@ -298,6 +298,11 @@ class HospitalForm(FormCleanMixin):
             'matrix_city': autocomplete.ModelSelect2(url='matrix-city-autocomplete', forward=['matrix_state'])
         }
 
+    class Media:
+        extend = False
+        js = ('https://cdn.ckeditor.com/ckeditor5/10.1.0/classic/ckeditor.js', 'doctor/js/init.js')
+        css = {'all': ('doctor/css/style.css',)}
+
     def clean_location(self):
         data = self.cleaned_data['location']
         # if data == '':
