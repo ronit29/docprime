@@ -1792,11 +1792,13 @@ class IpdProcedureDetailSerializer(serializers.ModelSerializer):
     # all_details = IpdProcedureAllDetailsSerializer(source='ipdproceduredetail_set', read_only=True, many=True)
     similar_ipd_procedures = serializers.SerializerMethodField()
     offers = serializers.SerializerMethodField()
+    show_popup = serializers.SerializerMethodField()
+    force_popup = serializers.SerializerMethodField()
 
     class Meta:
         model = IpdProcedure
         fields = ('id', 'name', 'details', 'is_enabled', 'features', 'about', 'all_details', 'show_about',
-                  'similar_ipd_procedures', 'offers')
+                  'similar_ipd_procedures', 'offers', 'show_popup', 'force_popup')
 
     def get_all_details(self, obj):
         return IpdProcedureAllDetailsSerializer(obj.ipdproceduredetail_set.all(), many=True, context=self.context).data
@@ -1808,6 +1810,18 @@ class IpdProcedureDetailSerializer(serializers.ModelSerializer):
         similar_ipds_entity_dict = self.context.get('similar_ipds_entity_dict', {})
         return [{'id': x.similar_ipd_procedure.id, 'name': x.similar_ipd_procedure.name,
                  'url': similar_ipds_entity_dict.get(x.similar_ipd_procedure.id)} for x in obj.similar_ipds.all()]
+
+    def get_show_popup(self, obj):
+        request = self.context.get('request')
+        if request and request.user and request.user.is_authenticated:
+            return request.user.show_ipd_popup
+        return True
+
+    def get_force_popup(self, obj):
+        request = self.context.get('request')
+        if request and request.user and request.user.is_authenticated:
+            return request.user.force_ipd_popup
+        return True
 
 
 class TopHospitalForIpdProcedureSerializer(serializers.ModelSerializer):
@@ -1915,6 +1929,8 @@ class HospitalDetailIpdProcedureSerializer(TopHospitalForIpdProcedureSerializer)
     contact_number = serializers.SerializerMethodField()
     specialization_doctors = serializers.SerializerMethodField()
     offers = serializers.SerializerMethodField()
+    show_popup = serializers.SerializerMethodField()
+    force_popup = serializers.SerializerMethodField()
 
     class Meta(TopHospitalForIpdProcedureSerializer.Meta):
         model = Hospital
@@ -1924,7 +1940,19 @@ class HospitalDetailIpdProcedureSerializer(TopHospitalForIpdProcedureSerializer)
                                                                      'doctors', 'rating_graph', 'rating',
                                                                      'display_rating_widget', 'opd_timings',
                                                                      'contact_number', 'specialization_doctors',
-                                                                     'offers')
+                                                                     'offers', 'show_popup', 'force_popup')
+
+    def get_show_popup(self, obj):
+        request = self.context.get('request')
+        if request and request.user and request.user.is_authenticated:
+            return request.user.show_ipd_popup
+        return True
+
+    def get_force_popup(self, obj):
+        request = self.context.get('request')
+        if request and request.user and request.user.is_authenticated:
+            return request.user.force_ipd_popup
+        return True
 
     def get_specialization_doctors(self, obj):
         validated_data = self.context.get('validated_data')
