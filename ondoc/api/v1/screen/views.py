@@ -90,6 +90,9 @@ class ScreenViewSet(viewsets.GenericViewSet):
         if request.user.is_authenticated:
             upcoming_appointment_result = get_all_upcoming_appointments(request.user.id)
 
+        common_package_data = package_serializer.data
+
+
         grid_list = [
             {
                 'priority': 2,
@@ -104,7 +107,7 @@ class ScreenViewSet(viewsets.GenericViewSet):
                 'priority': 0,
                 'title': "Health Packages",
                 'type': "CommonPackage",
-                'items': package_serializer.data,
+                'items': common_package_data,
                 'tag': "Upto 50% off",
                 'tagColor': "#ff0000",
                 'addSearchItem': "Package"
@@ -119,6 +122,11 @@ class ScreenViewSet(viewsets.GenericViewSet):
                 'addSearchItem': "Lab"
             }
         ]
+
+        if request.user and request.user.is_authenticated and request.user.active_insurance and not hasattr(request, 'agent'):
+            grid_list.pop(1)
+
+
 
         banner_list = Banner.get_all_banners(request, lat, long, from_app)
         banner_list_homepage = list()

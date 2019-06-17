@@ -2181,6 +2181,9 @@ class DoctorAvailabilityTimingViewSet(viewsets.ViewSet):
         doctor_id = request.query_params.get('doctor_id')
         hospital_id = request.query_params.get('hospital_id')
 
+        if not doctor_id or not hospital_id:
+            return Response(status=status.HTTP_400_BAD_REQUEST, data={'error': 'doctor id or hospital id is undefined.'})
+
         doctor_queryset = models.Doctor.objects.prefetch_related("qualifications__qualification", "qualifications__specialization")\
                                       .filter(pk=doctor_id)
         doctor_serializer = serializers.DoctorTimeSlotSerializer(doctor_queryset, many=True)
