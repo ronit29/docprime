@@ -1,0 +1,4 @@
+The encryption for Hospital - {{hospital_name|capfirst}} is disabled.
+No one from docprime will ever view/use the patient's data.
+
+Thanks for choosing docprime.com

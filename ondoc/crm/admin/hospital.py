@@ -358,6 +358,8 @@ class HospitalForm(FormCleanMixin):
         if any(self.errors):
             return
         data = self.cleaned_data
+        if self.data.get('search_distance') and float(self.data.get('search_distance')) > float(50000):
+            raise forms.ValidationError("Search Distance should be less than 50 KM.")
         if self.instance and self.instance.id and self.instance.data_status == QCModel.QC_APPROVED:
             is_enabled = data.get('enabled', None)
             enabled_for_online_booking = data.get('enabled_for_online_booking', None)
@@ -426,7 +428,7 @@ class HospitalAdmin(admin.GeoModelAdmin, VersionAdmin, ActionAdmin, QCPemAdmin):
                    HospCityFilter)
     readonly_fields = ('source', 'batch', 'associated_doctors', 'is_live', 'matrix_lead_id', 'city', 'state',)
     exclude = ('search_key', 'live_at', 'qc_approved_at', 'disabled_at', 'physical_agreement_signed_at',
-               'welcome_calling_done_at', 'is_big_hospital')
+               'welcome_calling_done_at', 'provider_encrypt', 'provider_encrypted_by', 'encryption_hint', 'encrypted_hospital_id', 'is_big_hospital')
     list_display = ('name', 'updated_at', 'data_status', 'welcome_calling_done', 'doctor_count',
                     'list_created_by', 'list_assigned_to')
     form = HospitalForm

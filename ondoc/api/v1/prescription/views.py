@@ -35,7 +35,8 @@ class PrescriptionGenerateViewSet(viewsets.GenericViewSet):
         task = valid_data.pop("task")
         appointment = valid_data.pop("appointment")
         appointment_id = valid_data.pop("appointment_id")
-        valid_data['serial_id'] = str(appointment.hospital.id) + '-' + str(appointment.doctor.id) + '-' + valid_data["serial_id"]
+        if not valid_data.get('is_encrypted'):
+            valid_data['serial_id'] = str(appointment.hospital.id) + '-' + str(appointment.doctor.id) + '-' + valid_data["serial_id"]
         try:
             if task == prescription_models.PresccriptionPdf.CREATE:
                 prescription_pdf = prescription_models.PresccriptionPdf.objects.create(**valid_data,
@@ -62,17 +63,19 @@ class PrescriptionGenerateViewSet(viewsets.GenericViewSet):
                 prescription_pdf.appointment_type = valid_data.get('appointment_type')
                 prescription_pdf.followup_instructions_date = valid_data.get('followup_instructions_date')
                 prescription_pdf.followup_instructions_reason = valid_data.get('followup_instructions_reason')
+                prescription_pdf.is_encrypted = valid_data.get('is_encrypted')
                 prescription_pdf.save()
         except Exception as e:
             logger.error("Error Creating PDF object " + str(e))
             return Response({'error': str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
-        try:
-            file = prescription_pdf.get_pdf(appointment)
-            prescription_pdf.prescription_file = file
-            prescription_pdf.save()
-        except Exception as e:
-            logger.error("Error saving PDF object " + str(e))
-            return Response({'error': str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+        if not valid_data.get("is_encrypted"):
+            try:
+                file = prescription_pdf.get_pdf(appointment)
+                prescription_pdf.prescription_file = file
+                prescription_pdf.save()
+            except Exception as e:
+                logger.error("Error saving PDF object " + str(e))
+                return Response({'error': str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
         response = serializers.PrescriptionResponseSerializer(prescription_pdf, many=False, context={"request": request})
         return Response(response.data)
 

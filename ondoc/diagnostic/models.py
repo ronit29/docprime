@@ -256,6 +256,7 @@ class Lab(TimeStampedModel, CreatedByModel, QCModel, SearchKey, WelcomeCallingDo
     rating_data = JSONField(blank=True, null=True)
     is_location_verified = models.BooleanField(verbose_name='Location Verified', default=False)
     auto_ivr_enabled = models.BooleanField(default=True)
+    search_distance = models.FloatField(default=20000)
 
     def __str__(self):
         return self.name
@@ -312,9 +313,12 @@ class Lab(TimeStampedModel, CreatedByModel, QCModel, SearchKey, WelcomeCallingDo
     @classmethod
     def get_insurance_details(cls, user):
 
+        from ondoc.insurance.models import InsuranceThreshold
+        insurance_threshold_obj = InsuranceThreshold.objects.all().order_by('-lab_amount_limit').first()
+        insurance_threshold_amount = insurance_threshold_obj.lab_amount_limit if insurance_threshold_obj else 1500
         resp = {
             'is_insurance_covered': False,
-            'insurance_threshold_amount': None,
+            'insurance_threshold_amount': insurance_threshold_amount,
             'is_user_insured': False
         }
 
@@ -633,11 +637,13 @@ class Lab(TimeStampedModel, CreatedByModel, QCModel, SearchKey, WelcomeCallingDo
 
         if not is_home_pickup and lab_timing_queryset[0].lab.always_open:
             for day in range(0, 7):
-                obj.form_time_slots(day, 0.0, 23.75, None, True)
+                obj.form_time_slots(day=day, start=0.0, end=23.75, price=None, is_available=True,
+                                    deal_price=None, mrp=None, cod_deal_price=None, is_doctor=False, on_call=0)
 
         else:
             for data in lab_timing_queryset:
-                obj.form_time_slots(data.day, data.start, data.end, None, True)
+                obj.form_time_slots(day=data.day, start=data.start, end=data.end, price=None, is_available=True,
+                                    deal_price=None, mrp=None, cod_deal_price=None, is_doctor=False, on_call=0)
 
         global_leave_serializer = common_serializers.GlobalNonBookableSerializer(
             GlobalNonBookable.objects.filter(deleted_at__isnull=True,
@@ -685,7 +691,7 @@ class Lab(TimeStampedModel, CreatedByModel, QCModel, SearchKey, WelcomeCallingDo
                 is_thyrocare = True
         timeslots = timeslot_object.format_timing_to_datetime_v2(lab_timing_queryset, total_leaves, booking_details, is_thyrocare)
         upcoming_slots = timeslot_object.get_upcoming_slots(time_slots=timeslots)
-        timing_response = {"timeslots": timeslots, "upcoming_slots": upcoming_slots, "is_thyrocare": is_thyrocare}
+        timing_response = {"time_slots": timeslots, "upcoming_slots": upcoming_slots, "is_thyrocare": is_thyrocare}
         return timing_response
 
     def get_available_slots(self, is_home_pickup, pincode, date):
@@ -872,11 +878,14 @@ class LabBookingClosingManager(models.Manager):
 
             if not is_home_pickup and lab_timing_queryset[0].lab.always_open:
                 for day in range(0, 7):
-                    obj.form_time_slots(day, 0.0, 23.75, None, True)
+                    obj.form_time_slots(day=day, start=0.0, end=23.75, price=None, is_available=True,
+                                        deal_price=None, mrp=None, cod_deal_price=None, is_doctor=False, on_call=0)
 
             else:
                 for data in lab_timing_queryset:
-                    obj.form_time_slots(data.day, data.start, data.end, None, True)
+                    obj.form_time_slots(day=data.day, start=data.start, end=data.end, price=None, is_available=True,
+                                        deal_price=None, mrp=None, cod_deal_price=None, is_doctor=False, on_call=0)
+
                 # daywise_data_array = sorted(lab_timing_queryset, key=lambda k: [k.day, k.start], reverse=True)
                 # day, end = daywise_data_array[0].day, daywise_data_array[0].end
                 # end = end - threshold
@@ -1245,6 +1254,7 @@ class LabTest(TimeStampedModel, SearchKey):
     author = models.ForeignKey(Doctor, null=True, blank=True, related_name='published_tests',
                                on_delete=models.SET_NULL)
     is_cancellable = models.BooleanField(default=True)
+    insurance_cutoff_price = models.PositiveIntegerField(default=None, null=True, blank=True)
 
     # test_sub_type = models.ManyToManyField(
     #     LabTestSubType,
@@ -1522,8 +1532,9 @@ class LabAppointmentInvoiceMixin(object):
             context = deepcopy(context)
             context['invoice'] = invoice
             html_body = render_to_string("email/lab_invoice/invoice_template.html", context=context)
-            filename = "invoice_{}_{}.pdf".format(str(timezone.now().strftime("%I%M_%d%m%Y")),
-                                                  random.randint(1111111111, 9999999999))
+            # filename = "invoice_{}_{}.pdf".format(str(timezone.now().strftime("%I%M_%d%m%Y")),
+            #                                       random.randint(1111111111, 9999999999))
+            filename = "payment_receipt_{}.pdf".format(context.get('instance').id)
             file = html_to_pdf(html_body, filename)
             if not file:
                 logger.error("Got error while creating pdf for lab invoice.")

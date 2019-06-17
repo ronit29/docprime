@@ -1,5 +1,6 @@
 from rest_framework import serializers
 
+from ondoc.common.models import GlobalNonBookable, DeviceDetails
 from ondoc.authentication.models import UserProfile
 from ondoc.common.models import GlobalNonBookable
 from ondoc.diagnostic.models import Lab
@@ -49,8 +50,16 @@ class GlobalNonBookableSerializer(serializers.ModelSerializer):
         exclude = ('booking_type', 'created_at', 'updated_at', 'deleted_at')
 
 
+class DeviceDetailsSerializer(serializers.ModelSerializer):
+
+    class Meta:
+        model = DeviceDetails
+        exclude = ('created_at', 'updated_at', 'id', 'user')
+
+
 class AppointmentPrerequisiteSerializer(serializers.Serializer):
     lab_test = serializers.ListField(child=serializers.IntegerField(), required=True)
     lab = serializers.PrimaryKeyRelatedField(queryset=Lab.objects.all(), required=True)
     profile = serializers.PrimaryKeyRelatedField(queryset=UserProfile.objects.all(), required=True)
     # start_date = serializers.DateTimeField(required=True)
+
