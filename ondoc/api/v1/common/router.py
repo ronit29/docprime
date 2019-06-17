@@ -4,7 +4,8 @@ from ondoc.crm.admin.common import MatrixStateAutocomplete, MatrixCityAutocomple
 from .views import (CitiesViewSet, ServicesViewSet, SmsServiceViewSet, UpdateXlsViewSet, UploadDoctorViewSet,
                     UploadQualificationViewSet, UploadExperienceViewSet, UploadAwardViewSet, UploadHospitalViewSet,
                     UploadMembershipViewSet, SearchLeadViewSet, GetPaymentOptionsViewSet, GetSearchUrlViewSet,
-                    GetKeyDataViewSet, AllUrlsViewset, AppointmentPrerequisiteViewSet)
+                    GetKeyDataViewSet, AllUrlsViewset, DeviceDetailsSave, AppointmentPrerequisiteViewSet, SiteSettingsViewSet)
+
 
 urlpatterns = [
     path('cities/list', CitiesViewSet.as_view({'get': 'list'}), name='cities-list'),
@@ -28,7 +29,9 @@ urlpatterns = [
     path('get_search_url', GetSearchUrlViewSet.as_view({'get':'search_url'}), name='get-search-url'),
     path('get_key_data', GetKeyDataViewSet.as_view({'get':'list'}), name='get-key-data'),
     path('entity-compare-autocomplete', AllUrlsViewset.as_view({'get':'list'}), name='entity-compare-autocomplete'),
+    path('device-details/save', DeviceDetailsSave.as_view({'post': 'save'}), name='device-details'),
     # url(r'^insurer-autocomplete/$', InsurerAutocomplete.as_view(), name='insurer-autocomplete'),
     # url(r'^insurance-plan-autocomplete/$', InsurancePlanAutocomplete.as_view(), name='insurance-plan-autocomplete'),
-    path('pre-booking', AppointmentPrerequisiteViewSet.as_view({'post': 'pre_booking'}), name='pre-booking')
+    path('pre-booking', AppointmentPrerequisiteViewSet.as_view({'post': 'pre_booking'}), name='pre-booking'),
+    path('settings', SiteSettingsViewSet.as_view({'get': 'get_settings'}), name='pre-get_settings')
 ]

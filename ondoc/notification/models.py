@@ -84,7 +84,14 @@ class NotificationAction:
     LAB_LOGO_CHANGE_MAIL = 70
     PRICING_ALERT_EMAIL = 72
     APPOINTMENT_REMINDER_PROVIDER_SMS = 77
+    PROVIDER_ENCRYPTION_ENABLED = 78
+    PROVIDER_ENCRYPTION_DISABLED = 79
     LOGIN_OTP = 80
+    CHAT_NOTIFICATION = 87
+
+    COD_TO_PREPAID = 91
+    COD_TO_PREPAID_REQUEST = 92
+
 
     NOTIFICATION_TYPE_CHOICES = (
         (APPOINTMENT_ACCEPTED, "Appointment Accepted"),
@@ -118,7 +125,10 @@ class NotificationAction:
         (PRICING_ALERT_EMAIL, 'Pricing Change Mail'),
         (LAB_LOGO_CHANGE_MAIL, 'Lab Logo Change Mail'),
         (APPOINTMENT_REMINDER_PROVIDER_SMS, 'Appointment Reminder Provider SMS'),
-        (LOGIN_OTP, 'Login OTP')
+        (LOGIN_OTP, 'Login OTP'),
+        (CHAT_NOTIFICATION, "Push Notification from chat"),
+        (COD_TO_PREPAID, 'COD to Prepaid'),
+        (COD_TO_PREPAID_REQUEST, 'COD To Prepaid Request')
     )
 
     OPD_APPOINTMENT = "opd_appointment"
@@ -1036,10 +1046,14 @@ class WhtsappNotification(TimeStampedModel):
         via_whatsapp = kwargs.get('via_whatsapp')
         otp = create_otp(phone_number, "{}", call_source=request_source, return_otp=True, via_sms=via_sms, via_whatsapp=via_whatsapp)
 
+        template_name = 'docprime_otp_web'
+        if request_source == 'docprimechat':
+            template_name = 'docprime_otp_verification'
+
         whatsapp_message = {"media": {},
                             "message": "",
                             "template": {
-                                "name": "docprime_otp_verification",
+                                "name": template_name,
                                 "params": [otp]
                             },
                             "message_type": "HSM",

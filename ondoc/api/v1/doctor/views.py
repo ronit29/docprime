@@ -14,6 +14,7 @@ from ondoc.api.v1.procedure.serializers import CommonProcedureCategorySerializer
     ProcedureSerializer, DoctorClinicProcedureSerializer, CommonProcedureSerializer, CommonIpdProcedureSerializer, \
     CommonHospitalSerializer
 from ondoc.cart.models import Cart
+from ondoc.crm.constants import constants
 from ondoc.doctor import models
 from ondoc.authentication import models as auth_models
 from ondoc.diagnostic import models as lab_models
@@ -50,7 +51,7 @@ from rest_framework.permissions import IsAuthenticated
 from ondoc.authentication.backends import JWTAuthentication, MatrixAuthentication
 from django.utils import timezone
 from django.db import transaction
-from django.http import Http404
+from django.http import Http404, HttpResponse
 from django.db.models import Q, Value, Case, When
 from operator import itemgetter
 from itertools import groupby,chain
@@ -283,9 +284,12 @@ class DoctorAppointmentsViewSet(OndocViewSet):
             cart_item, is_new = Cart.objects.update_or_create(id=cart_item_id, deleted_at__isnull=True, product_id=account_models.Order.DOCTOR_PRODUCT_ID,
                                                   user=request.user,defaults={"data": data})
 
+        resp = None
         if hasattr(request, 'agent') and request.agent:
-            resp = { 'is_agent': True , "status" : 1 }
-        else:
+            user = User.objects.filter(id=request.agent).first()
+            if user and not user.groups.filter(name=constants['APPOINTMENT_OTP_BYPASS_AGENT_TEAM']).exists():
+                resp = {'is_agent': True, "status": 1}
+        if not resp:
             resp = account_models.Order.create_order(request, [cart_item], validated_data.get("use_wallet"))
 
         return Response(data=resp)
@@ -2087,7 +2091,7 @@ class DoctorAvailabilityTimingViewSet(viewsets.ViewSet):
 
         for data in queryset:
             obj.form_time_slots(data.day, data.start, data.end, data.fees, True,
-                                data.deal_price, data.mrp, True, on_call=data.type)
+                                data.deal_price, data.mrp, data.dct_cod_deal_price(), True, on_call=data.type)
 
         timeslots = obj.get_timing_list()
         return Response({"timeslots": timeslots, "doctor_data": doctor_serializer.data,
@@ -2171,6 +2175,44 @@ class DoctorAvailabilityTimingViewSet(viewsets.ViewSet):
         # # timeslots = obj.get_timing_list()
         # timeslots = obj.get_doctor_timing_slots(date, total_leaves, "doctor")
         return Response({"timeslots": timeslots["time_slots"], "upcoming_slots": timeslots["upcoming_slots"], "doctor_data": doctor_serializer.data})
+
+    @transaction.non_atomic_requests
+    def list_v2(self, request, *args, **kwargs):
+        doctor_id = request.query_params.get('doctor_id')
+        hospital_id = request.query_params.get('hospital_id')
+
+        if not doctor_id or not hospital_id:
+            return Response(status=status.HTTP_400_BAD_REQUEST, data={'error': 'doctor id or hospital id is undefined.'})
+
+        doctor_queryset = models.Doctor.objects.prefetch_related("qualifications__qualification", "qualifications__specialization")\
+                                      .filter(pk=doctor_id)
+        doctor_serializer = serializers.DoctorTimeSlotSerializer(doctor_queryset, many=True)
+        doctor = doctor_queryset.first()
+
+        dc_obj = models.DoctorClinic.objects.filter(doctor_id=doctor_id,
+                                                    hospital_id=hospital_id).first()
+        if not dc_obj:
+            return HttpResponse(status=404)
+
+        doctor_leaves = doctor.get_leaves()
+        global_non_bookables = GlobalNonBookable.get_non_bookables()
+        total_leaves = doctor_leaves + global_non_bookables
+
+        blocks = []
+        if request.user and request.user.is_authenticated and \
+                not hasattr(request, 'agent') and request.user.active_insurance:
+            active_appointments = dc_obj.hospital. \
+                get_active_opd_appointments(request.user, request.user.active_insurance)
+            for apt in active_appointments:
+                blocks.append(str(apt.time_slot_start.date()))
+
+        clinic_timings = dc_obj.get_timings_v2(total_leaves, blocks)
+
+        resp_data = {"timeslots": clinic_timings.get('timeslots', []),
+                     "upcoming_slots": clinic_timings.get('upcoming_slots', []),
+                     "doctor_data": doctor_serializer.data}
+
+        return Response(resp_data)
 
 
 class HealthTipView(viewsets.GenericViewSet):
@@ -2820,10 +2862,17 @@ class OfflineCustomerViewSet(viewsets.GenericViewSet):
         patient_profile['phone_number'] = None
         if hasattr(appnt.user, 'patient_mobiles'):
             for mob in appnt.user.patient_mobiles.all():
-                phone_number.append({"phone_number": mob.phone_number, "is_default": mob.is_default})
-                if mob.is_default:
-                    patient_profile['phone_number'] = mob.phone_number
-        patient_profile['patient_numbers'] = phone_number
+                if mob.phone_number and not mob.encrypted_number:
+                    phone_number.append({"phone_number": mob.phone_number, "is_default": mob.is_default})
+                    if mob.is_default:
+                        patient_profile['phone_number'] = mob.phone_number
+                    patient_profile['patient_numbers'] = phone_number
+                elif mob.encrypted_number:
+                    phone_number.append({"phone_number": mob.encrypted_number, "is_default": mob.is_default})
+                    if mob.is_default:
+                        patient_profile['encrypt_phone_number'] = mob.encrypted_number
+                    patient_profile['encrypt_numbers'] = phone_number
+        # patient_profile['patient_numbers'] = phone_number
 
         ret_obj = {}
         ret_obj['patient_name'] = patient_name
@@ -2966,6 +3015,7 @@ class OfflineCustomerViewSet(viewsets.GenericViewSet):
             patient_dict = {}
             patient_dict['id'] = data.id
             patient_dict['name'] = data.name if data.name else None
+            patient_dict['encrypted_name'] = data.encrypted_name if data.encrypted_name else None
             patient_dict['gender'] = data.gender if data.gender else None
             patient_dict['doctor'] = data.doctor.id if data.doctor else None
             patient_dict['hospital'] = data.hospital.id if data.hospital else None
@@ -2984,10 +3034,17 @@ class OfflineCustomerViewSet(viewsets.GenericViewSet):
             patient_dict['phone_number'] = None
             if hasattr(data, 'patient_mobiles'):
                 for mob in data.patient_mobiles.all():
-                    patient_numbers.append({"phone_number": mob.phone_number, "is_default": mob.is_default})
-                    if mob.is_default:
-                        patient_dict['phone_number'] = mob.phone_number
-            patient_dict['patient_numbers'] = patient_numbers
+                    if mob.encrypted_number:
+                        patient_numbers.append({"phone_number": mob.encrypted_number, "is_default": mob.is_default})
+                        if mob.is_default:
+                            patient_dict['encrypted_phone_number'] = mob.encrypted_number
+                            patient_dict['encrypted_numbers'] = patient_numbers
+                    else:
+                        patient_numbers.append({"phone_number": mob.phone_number, "is_default": mob.is_default})
+                        if mob.is_default:
+                            patient_dict['phone_number'] = mob.phone_number
+                            patient_dict['patient_numbers'] = patient_numbers
+            # patient_dict['patient_numbers'] = patient_numbers
             response.append(patient_dict)
         return Response(response)
 
@@ -3121,7 +3178,11 @@ class OfflineCustomerViewSet(viewsets.GenericViewSet):
         if data.get('share_with_hospital') and not hospital:
             logger.error('PROVIDER_REQUEST - Hospital Not Given when Shared with Hospital Set'+ str(data))
         hosp = hospital if data.get('share_with_hospital') and hospital else None
+        encrypt_number = None
+        if hosp and hasattr(hosp, 'encrypt_details') and hosp.encrypt_details.is_encrypted:
+            encrypt_number = data.get('encrypt_number')
         patient = models.OfflinePatients.objects.create(name=data.get('name'),
+                                                        encrypted_name=data.get('encrypted_name', None),
                                                         id=data.get('id'),
                                                         sms_notification=data.get('sms_notification', False),
                                                         gender=data.get('gender'),
@@ -3142,7 +3203,7 @@ class OfflineCustomerViewSet(viewsets.GenericViewSet):
                                                         )
         default_num = None
         sms_number = None
-        if data.get('phone_number'):
+        if data.get('phone_number') and not encrypt_number:
             for num in data.get('phone_number'):
                 models.PatientMobile.objects.create(patient=patient,
                                                     phone_number=num.get('phone_number'),
@@ -3156,12 +3217,23 @@ class OfflineCustomerViewSet(viewsets.GenericViewSet):
                               'name': patient.name,
                               'welcome_message': data.get('welcome_message'),
                               'display_welcome_message': data.get('display_welcome_message', False)}
+        if encrypt_number:
+            for num in encrypt_number:
+                models.PatientMobile.objects.create(patient=patient,
+                                                    encrypted_number=num.get('phone_number'),
+                                                    is_default=num.get('is_default', False)
+                                                    )
+                sms_number = None
         return {"sms_list": sms_number, "patient": patient}
 
     def update_patient(self, request, data, hospital, doctor):
         if data.get('share_with_hospital') and not hospital:
             logger.error('PROVIDER_REQUEST - Hospital Not Given when Shared with Hospital Set'+ str(data))
         hosp = hospital if data.get('share_with_hospital') and hospital else None
+        encrypt_number = encrypted_name = None
+        # if hosp and hosp.provider_encrypt:
+        #     encrypt_number = data.get('encrypt_number')
+        #     encrypted_name = data.get('encrypted_name')
         patient = models.OfflinePatients.objects.filter(id=data.get('id')).first()
         if patient:
             if data.get('gender'):
@@ -3184,14 +3256,21 @@ class OfflineCustomerViewSet(viewsets.GenericViewSet):
                 patient.hospital = hosp
             if doctor:
                 patient.doctor = doctor
+            if data.get('encrypted_name'):
+                patient.encrypted_name = data.get('encrypted_name')
+                patient.name = None
+            if not data.get('encrypted_name'):
+                patient.encrypted_name = None
+                if data.get('name'):
+                    patient.name = data.get('name')
             patient.save()
             default_num = None
             sms_number = None
 
-            if data.get('phone_number'):
-                del_queryset = models.PatientMobile.objects.filter(patient=patient)
-                if del_queryset.exists():
-                    del_queryset.delete()
+            del_queryset = models.PatientMobile.objects.filter(patient=patient)
+
+            if data.get('phone_number') and not data.get('encrypt_number'):
+                del_queryset.delete()
                 for num in data.get('phone_number'):
                     models.PatientMobile.objects.create(patient=patient,
                                                         phone_number=num.get('phone_number'),
@@ -3204,6 +3283,14 @@ class OfflineCustomerViewSet(viewsets.GenericViewSet):
                                   'name': patient.name}
                     sms_number['welcome_message'] = data.get('welcome_message')
                     sms_number['display_welcome_message'] = False
+            if data.get('encrypt_number'):
+                del_queryset.delete()
+                for num in data.get('encrypt_number'):
+                    models.PatientMobile.objects.create(patient=patient,
+                                                        encrypted_number=num.get('phone_number'),
+                                                        is_default=num.get('is_default', False)
+                                                        )
+                    sms_number = None
             return {"sms_list": sms_number, "patient": patient}
 
     def update_offline_appointments(self, request):
@@ -3330,35 +3417,9 @@ class OfflineCustomerViewSet(viewsets.GenericViewSet):
         serializer.is_valid(raise_exception=True)
         validated_data = serializer.validated_data
 
-        dc_queryset = models.DoctorClinic.objects.filter(Q(
-                                                   Q(doctor__manageable_doctors__user=user,
-                                                     doctor__manageable_doctors__entity_type=GenericAdminEntity.DOCTOR,
-                                                     doctor__manageable_doctors__is_disabled=False,
-                                                     doctor__manageable_doctors__hospital__isnull=True)
-                                                   |
-                                                   Q(doctor__manageable_doctors__user=user,
-                                                     doctor__manageable_doctors__entity_type=GenericAdminEntity.DOCTOR,
-                                                     doctor__manageable_doctors__is_disabled=False,
-                                                     doctor__manageable_doctors__hospital__isnull=False,
-                                                     doctor__manageable_doctors__hospital=F('hospital'))
-                                                   |
-                                                   Q(hospital__manageable_hospitals__user=user,
-                                                     hospital__manageable_hospitals__is_disabled=False,
-                                                     hospital__manageable_hospitals__entity_type=GenericAdminEntity.HOSPITAL)
-                                                   )
-                                                  |
-                                                  Q(
-                                                      Q(doctor__manageable_doctors__user=user,
-                                                        doctor__manageable_doctors__super_user_permission=True,
-                                                        doctor__manageable_doctors__is_disabled=False,
-                                                        doctor__manageable_doctors__entity_type=GenericAdminEntity.DOCTOR)
-                                                      |
-                                                      Q(hospital__manageable_hospitals__user=user,
-                                                        hospital__manageable_hospitals__is_disabled=False,
-                                                        hospital__manageable_hospitals__entity_type=GenericAdminEntity.HOSPITAL,
-                                                        hospital__manageable_hospitals__super_user_permission=True)
-                                                   )
-                                                  ).distinct().values('id', 'doctor', 'hospital')
+        manageable_hosp_list = auth_models.GenericAdmin.get_manageable_hospitals(user)
+
+        dc_queryset = models.DoctorClinic.objects.filter(hospital_id__in=manageable_hosp_list).distinct().values('id', 'doctor', 'hospital')
         if dc_queryset:
             dc_list = [(dc['id'], dc['doctor']) for dc in dc_queryset]
             dc_id_list, dc_doc_list = zip(*dc_list)
@@ -3414,7 +3475,7 @@ class OfflineCustomerViewSet(viewsets.GenericViewSet):
 
                 for data in queryset:
                     obj.form_time_slots(data.day, data.start, data.end, data.fees, True,
-                                        data.deal_price, data.mrp, True)
+                                        data.deal_price, data.mrp, data.dct_cod_deal_price(), True)
 
                 timeslots = obj.get_timing_list()
                 for day, slots in timeslots.items():
@@ -3506,10 +3567,17 @@ class OfflineCustomerViewSet(viewsets.GenericViewSet):
                 patient_profile['phone_number'] = None
                 if hasattr(app.user, 'patient_mobiles'):
                     for mob in app.user.patient_mobiles.all():
-                        phone_number.append({"phone_number": mob.phone_number, "is_default": mob.is_default})
-                        if mob.is_default:
-                            patient_profile['phone_number'] = mob.phone_number
-                patient_profile['patient_numbers'] = phone_number
+                        if not mob.encrypted_number:
+                            phone_number.append({"phone_number": mob.phone_number, "is_default": mob.is_default})
+                            if mob.is_default:
+                                patient_profile['phone_number'] = mob.phone_number
+                                patient_profile['patient_numbers'] = phone_number
+                        else:
+                            phone_number.append({"phone_number": mob.encrypted_number, "is_default": mob.is_default})
+                            if mob.is_default:
+                                patient_profile['encrypted_phone_number'] = mob.encrypted_number
+                                patient_profile['encrypt_number'] = phone_number
+                # patient_profile['patient_numbers'] = phone_number
                 error_flag = app.error if app.error else False
                 error_message = app.error_message if app.error_message else ''
                 prescription = app.get_prescriptions(request)
@@ -3547,6 +3615,11 @@ class OfflineCustomerViewSet(viewsets.GenericViewSet):
 
                 payout_amount = app.merchant_payout.payable_amount if app.merchant_payout else app.fees
                 prescription = app.get_prescriptions(request)
+            doc_number = None
+            for number in app.doctor.doctor_number.all():
+                if number.hospital == app.hospital:
+                    doc_number = number.phone_number
+                    break
             ret_obj = {}
             ret_obj['id'] = app.id
             ret_obj['deal_price'] = deal_price
@@ -3558,6 +3631,7 @@ class OfflineCustomerViewSet(viewsets.GenericViewSet):
             ret_obj['created_at'] = app.created_at
             ret_obj['doctor_name'] = app.doctor.name
             ret_obj['doctor_id'] = app.doctor.id
+            ret_obj['doctor_number'] = doc_number
             ret_obj['doctor_thumbnail'] = request.build_absolute_uri(app.doctor.get_thumbnail()) if app.doctor.get_thumbnail() else None
             ret_obj['hospital_id'] = app.hospital.id
             ret_obj['hospital_name'] = app.hospital.name
@@ -3968,8 +4042,13 @@ class HospitalViewSet(viewsets.GenericViewSet):
             canonical_url = entity.url
         else:
             response['breadcrumb'] = None
+        new_dynamic = NewDynamic.objects.filter(url_value=canonical_url, is_enabled=True).first()
+        if new_dynamic:
+            if new_dynamic.meta_title:
+                title = new_dynamic.meta_title
+            if new_dynamic.meta_description:
+                description = new_dynamic.meta_description
         response['seo'] = {'title': title, "description": description}
-
         response['canonical_url'] = canonical_url
 
         return Response(response)

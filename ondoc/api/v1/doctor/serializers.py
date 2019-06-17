@@ -457,7 +457,7 @@ class DoctorHospitalSerializer(serializers.ModelSerializer):
 
     enabled_for_online_booking = serializers.SerializerMethodField(read_only=True)
     show_contact = serializers.SerializerMethodField(read_only=True)
-    enabled_for_cod = serializers.BooleanField(source='doctor_clinic.hospital.enabled_for_cod')
+    enabled_for_cod = serializers.BooleanField(source='doctor_clinic.is_enabled_for_cod')
     enabled_for_prepaid = serializers.BooleanField(source='doctor_clinic.hospital.enabled_for_prepaid')
     is_price_zero = serializers.SerializerMethodField()
 
@@ -522,6 +522,7 @@ class DoctorHospitalSerializer(serializers.ModelSerializer):
 
             user_insurance = None if not user.is_authenticated or user.is_anonymous else user.active_insurance
             if not user_insurance:
+                resp['is_insurance_covered'] = True
                 return resp
 
             doctor_specialization = self.context.get('doctor_specialization',None)
@@ -556,8 +557,9 @@ class DoctorHospitalSerializer(serializers.ModelSerializer):
         model = DoctorClinicTiming
         fields = ('doctor', 'hospital_name', 'address','short_address', 'hospital_id', 'start', 'end', 'day', 'deal_price',
                   'discounted_fees', 'hospital_thumbnail', 'mrp', 'lat', 'long', 'id','enabled_for_online_booking',
-                  'insurance', 'show_contact', 'enabled_for_cod', 'enabled_for_prepaid', 'is_price_zero', 'hospital_city',
+                  'insurance', 'show_contact', 'enabled_for_cod', 'enabled_for_prepaid', 'is_price_zero', 'cod_deal_price', 'hospital_city',
                   'url')
+
         # fields = ('doctor', 'hospital_name', 'address', 'hospital_id', 'start', 'end', 'day', 'deal_price', 'fees',
         #           'discounted_fees', 'hospital_thumbnail', 'mrp',)
 
@@ -816,6 +818,13 @@ class PrescriptionSerializer(serializers.Serializer):
 
 class DoctorListSerializer(serializers.Serializer):
     SORT_CHOICES = ('fees', 'experience', 'distance', )
+    SORT_ORDER = ('asc', 'desc')
+    GENDER_CHOICES = [("m", "Male"), ("f", "Female")]
+    TODAY = 1
+    TOMORROW = 2
+    NEXT_3_DAYS = 3
+    AVAILABILITY_CHOICES = ((TODAY, 'Today'), (TOMORROW, "Tomorrow"), (NEXT_3_DAYS, "Next 3 days"),)
+
     SITTING_CHOICES = [type_choice[1] for type_choice in Hospital.HOSPITAL_TYPE_CHOICES]
     specialization_ids = CommaSepratedToListField(required=False, max_length=500, typecast_to=str, allow_blank=True)
     condition_ids = CommaSepratedToListField(required=False, max_length=500, typecast_to=str)
@@ -839,6 +848,10 @@ class DoctorListSerializer(serializers.Serializer):
     locality = serializers.CharField(required=False)
     city = serializers.CharField(required=False, allow_null=True)
     ipd_procedure_ids = CommaSepratedToListField(required=False, max_length=500, typecast_to=str)
+    sort_order = serializers.ChoiceField(choices=SORT_ORDER, required=False)
+    gender = serializers.ChoiceField(choices=GENDER_CHOICES, required=False)
+    availability = CommaSepratedToListField(required=False,  max_length=50, typecast_to=str)
+    avg_ratings = CommaSepratedToListField(required=False,  max_length=50, typecast_to=str)
 
     def validate_ipd_procedure_ids(self, attrs):
         try:
@@ -882,6 +895,11 @@ class DoctorListSerializer(serializers.Serializer):
     def validate_sits_at(self, value):
         if not set(value).issubset(set(self.SITTING_CHOICES)):
             raise serializers.ValidationError("Not a Valid Choice")
+        return value
+
+    def validate_availability(self, value):
+        if not set(value).issubset(set([str(avl_choice[0]) for avl_choice in self.AVAILABILITY_CHOICES])):
+            raise serializers.ValidationError("Not a Valid Availability Choice")
         return value
 
 
@@ -1252,7 +1270,7 @@ class DoctorTimeSlotSerializer(serializers.Serializer):
 class AppointmentRetrieveDoctorSerializer(DoctorProfileSerializer):
     class Meta:
         model = Doctor
-        fields = ('id', 'name', 'gender', 'about', 'practicing_since',
+        fields = ('id', 'name', 'gender', 'about', 'practicing_since', 'license',
                   'qualifications', 'general_specialization', 'display_name')
 
 
@@ -1629,7 +1647,8 @@ class DoctorDetailsRequestSerializer(serializers.Serializer):
 
 
 class OfflinePatientBodySerializer(serializers.Serializer):
-    name = serializers.CharField(max_length=24)
+    name = serializers.CharField(max_length=24, required=False, allow_blank=True)
+    encrypted_name = serializers.CharField(max_length=128, required=False, allow_blank=True)
     sms_notification = serializers.BooleanField(required=False)
     share_with_hospital = serializers.BooleanField(required=False)
     gender = serializers.ChoiceField(choices=OfflinePatients.GENDER_CHOICES, required=False, allow_null=True)
@@ -1640,6 +1659,7 @@ class OfflinePatientBodySerializer(serializers.Serializer):
     welcome_message = serializers.CharField(required=False, max_length=256)
     display_welcome_message = serializers.BooleanField(required=False)
     phone_number = serializers.ListField(required=False)
+    encrypt_number = serializers.ListField(required=False)
     id = serializers.UUIDField()
     age = serializers.IntegerField(required=False)
 
@@ -1689,9 +1709,27 @@ class OfflineAppointmentFilterSerializer(serializers.Serializer):
 
 
 class OfflinePatientSerializer(serializers.ModelSerializer):
+
+    name = serializers.SerializerMethodField()
+    encrypted_name = serializers.SerializerMethodField()
+
+    def get_name(self, obj):
+        name = None
+        if obj:
+            if obj.name and not obj.encrypted_name:
+                name = obj.name
+        return name
+
+    def get_encrypted_name(self, obj):
+        encrypted_name = None
+        if obj:
+            if obj.encrypted_name:
+                encrypted_name = obj.encrypted_name
+        return encrypted_name
+
     class Meta:
         model = OfflinePatients
-        fields = ('id', 'name', 'dob', 'calculated_dob', 'gender', 'age','referred_by', 'display_welcome_message',
+        fields = ('id', 'name', 'encrypted_name', 'dob', 'calculated_dob', 'gender', 'age','referred_by', 'display_welcome_message',
                   'share_with_hospital', 'sms_notification', 'medical_history', 'updated_at')
 
 

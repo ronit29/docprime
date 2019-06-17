@@ -5,13 +5,15 @@ from django.db.models import F
 from rest_framework import serializers
 from dal import autocomplete
 from ondoc.api.v1.insurance.serializers import InsuranceTransactionSerializer
+from ondoc.common.models import GenericNotes
 from ondoc.crm.constants import constants
+from ondoc.authentication.models import User
 from ondoc.doctor.models import OpdAppointment, DoctorPracticeSpecialization, PracticeSpecialization, Hospital
 from ondoc.diagnostic.models import LabAppointment, LabTest, Lab
 from ondoc.insurance.models import InsurancePlanContent, InsurancePlans, InsuredMembers, UserInsurance, StateGSTCode, \
      ThirdPartyAdministrator, InsuranceEligibleCities, InsuranceCity, InsuranceDistrict, InsuranceDeal, \
     InsurerPolicyNumber, InsuranceLead, EndorsementRequest, InsuredMemberDocument, InsuranceEligibleCities,\
-    InsuranceThreshold, UserBank, InsuredMemberHistory, UserBankDocument
+    InsuranceThreshold, UserBank, InsuredMemberHistory, UserBankDocument, InsurerAccountTransfer
 from import_export.admin import ImportExportMixin, ImportExportModelAdmin, base_formats
 import nested_admin
 from import_export import fields, resources
@@ -19,6 +21,7 @@ from datetime import datetime
 from ondoc.insurance.models import InsuranceDisease
 from django.db import transaction
 from django.conf import settings
+from django.contrib.contenttypes.admin import GenericTabularInline
 
 
 class InsurerAdmin(admin.ModelAdmin):
@@ -28,9 +31,19 @@ class InsurerAdmin(admin.ModelAdmin):
     search_fields = ['name']
 
 
+class InsurerFloatForm(forms.ModelForm):
+
+    def clean(self):
+        super().clean()
+        # data = self.cleaned_data
+        if self.instance.id:
+            raise forms.ValidationError('Insurer Account can not be editable')
+
+
 class InsurerFloatAdmin(admin.ModelAdmin):
-    list_display = ['insurer']
-    readonly_fields = ['insurer', 'current_float']
+    list_display = ['apd_account_name', 'insurer']
+    form = InsurerFloatForm
+    # readonly_fields = ['insurer', 'current_float']
 
 
 class InsurancePlanContentInline(admin.TabularInline):
@@ -43,9 +56,26 @@ class InsurancePlanContentInline(admin.TabularInline):
     # readonly_fields = ("first_name", 'last_name', 'relation', 'dob', 'gender', )
 
 
+class PolicyNumberFormset(forms.models.BaseInlineFormSet):
+    def clean(self):
+        if not self.forms:
+            raise forms.ValidationError('Master Policy Number must have at least one Policy Number')
+        for form in self.forms:
+            data = form.cleaned_data
+            if not data.get('insurer'):
+                raise forms.ValidationError('Master Policy Number must have at least one insurer')
+            if not data.get('insurance_plan'):
+                raise forms.ValidationError('Master Policy Number must have at least one insurance plan')
+            if not data.get('apd_account'):
+                raise forms.ValidationError('Master Policy Number must have at least one APD account')
+            if not data.get('insurer_policy_number'):
+                raise forms.ValidationError('Master Policy Number must have at least one Policy Number')
+
+
 class InsurerPolicyNumberInline(admin.TabularInline):
+    formset = PolicyNumberFormset
     model = InsurerPolicyNumber
-    fields = ('insurer', 'insurer_policy_number')
+    fields = ('insurer', 'apd_account', 'insurer_policy_number')
     extra = 0
 
 
@@ -75,8 +105,8 @@ class InsuranceThresholdInline(admin.TabularInline):
 
 class InsurancePlansAdmin(admin.ModelAdmin):
 
-    list_display = ['insurer', 'name','internal_name', 'amount', 'is_selected','get_policy_prefix']
-    inlines = [InsurancePlanContentInline, InsurerPolicyNumberInline,InsuranceThresholdInline]
+    list_display = ['insurer', 'name', 'internal_name', 'amount', 'is_selected','get_policy_prefix']
+    inlines = [InsurancePlanContentInline, InsurerPolicyNumberInline, InsuranceThresholdInline]
     search_fields = ['name']
     form = InsurancePlanAdminForm
 
@@ -85,8 +115,6 @@ class InsuranceThresholdAdmin(admin.ModelAdmin):
 
     list_display = ['insurance_plan']
 
-
-# class InsuranceTransaction
 
 class InsuredMembersInline(admin.TabularInline):
     model = InsuredMembers
@@ -295,6 +323,12 @@ class UserInsuranceDoctorResource(resources.ModelResource):
     gst_number_of_center = fields.Field()
     booking_date = fields.Field()
     status = fields.Field()
+    building = fields.Field()
+    sublocality = fields.Field()
+    locality = fields.Field()
+    city = fields.Field()
+    state = fields.Field()
+    pincode = fields.Field()
 
     def export(self, queryset=None, *args, **kwargs):
         queryset = self.get_queryset(**kwargs)
@@ -322,7 +356,8 @@ class UserInsuranceDoctorResource(resources.ModelResource):
                         'name_of_doctor', 'provider_code_of_doctor', 'speciality_of_doctor', 'diagnosis',
                         'icd_code_of_diagnosis', 'name_of_clinic', 'address_of_clinic', 'amount_to_be_paid',
                         'booking_date', 'status', 'pan_card_of_clinic',
-                        'existing_condition', 'bank_detail_of_center', 'gst_number_of_center')
+                        'existing_condition', 'bank_detail_of_center', 'gst_number_of_center',
+                        'building', 'sublocality', 'locality', 'city', 'state', 'pincode')
 
     def get_insured_member(self, profile):
         insured_member = InsuredMembers.objects.filter(profile_id=profile).first()
@@ -413,6 +448,24 @@ class UserInsuranceDoctorResource(resources.ModelResource):
         pincode = str(appointment.hospital.pin_code)
         return building + " " + sublocality + " " + locality + " " + city + " " + state + " " + pincode
 
+    def dehydrate_building(self, appointment):
+        return appointment.hospital.building if appointment.hospital and appointment.hospital.building  else ''
+
+    def dehydrate_sublocality(self, appointment):
+        return appointment.hospital.sublocality if appointment.hospital and appointment.hospital.sublocality  else ''
+
+    def dehydrate_locality(self, appointment):
+        return appointment.hospital.locality if appointment.hospital and appointment.hospital.locality  else ''
+
+    def dehydrate_city(self, appointment):
+        return appointment.hospital.city if appointment.hospital and appointment.hospital.city  else ''
+
+    def dehydrate_state(self, appointment):
+        return appointment.hospital.state if appointment.hospital and appointment.hospital.state  else ''
+
+    def dehydrate_pincode(self, appointment):
+        return appointment.hospital.pin_code if appointment.hospital and appointment.hospital.pin_code  else ''
+
     def dehydrate_pan_card_of_clinic(self, appointment):
         return ""
 
@@ -475,6 +528,12 @@ class UserInsuranceLabResource(resources.ModelResource):
     booking_date = fields.Field()
     status = fields.Field()
     number_of_tests = fields.Field()
+    building = fields.Field()
+    sublocality = fields.Field()
+    locality = fields.Field()
+    city = fields.Field()
+    state = fields.Field()
+    pincode = fields.Field()
 
     def export(self, queryset=None, *args, **kwargs):
         queryset = self.get_queryset(**kwargs)
@@ -502,7 +561,8 @@ class UserInsuranceLabResource(resources.ModelResource):
         export_order = ('appointment_id', 'policy_number', 'member_id', 'name', 'relationship_with_proposer',
                         'date_of_consultation', 'name_of_diagnostic_center', 'provider_code_of_the_center',
                         'name_of_tests', 'number_of_tests', 'address_of_center', 'amount_to_be_paid', 'booking_date', 'status',
-                        'bank_detail_of_center', 'gst_number_of_center', 'pan_card_of_center', 'existing_condition')
+                        'bank_detail_of_center', 'gst_number_of_center', 'pan_card_of_center', 'existing_condition',
+                        'building', 'sublocality', 'locality', 'city', 'state', 'pincode')
 
     def get_insured_member(self, profile):
         insured_member = InsuredMembers.objects.filter(profile_id=profile).first()
@@ -566,6 +626,24 @@ class UserInsuranceLabResource(resources.ModelResource):
         state = str(appointment.lab.state)
         pincode = str(appointment.lab.pin_code)
         return building + " " + sublocality + " " + locality + " " + city + " " + state + " " + pincode
+
+    def dehydrate_building(self, appointment):
+        return appointment.lab.building if appointment.lab and appointment.lab.building else ''
+
+    def dehydrate_sublocality(self, appointment):
+        return appointment.lab.sublocality if appointment.lab and appointment.lab.sublocality else ''
+
+    def dehydrate_locality(self, appointment):
+        return appointment.lab.locality if appointment.lab and appointment.lab.locality else ''
+
+    def dehydrate_city(self, appointment):
+        return appointment.lab.city if appointment.lab and appointment.lab.city else ''
+
+    def dehydrate_state(self, appointment):
+        return appointment.lab.state if appointment.lab and appointment.lab.state else ''
+
+    def dehydrate_pincode(self, appointment):
+        return appointment.lab.pin_code if appointment.lab and appointment.lab.pin_code else ''
 
     def dehydrate_pan_card_of_center(self, appointment):
         # from django.contrib.contenttypes.models import ContentType
@@ -740,7 +818,6 @@ class UserInsuranceForm(forms.ModelForm):
     cancel_reason = forms.CharField(max_length=400, required=False)
     cancel_case_type = forms.ChoiceField(choices=case_choices, initial=UserInsurance.REFUND)
 
-
     def clean(self):
         super().clean()
         data = self.cleaned_data
@@ -754,8 +831,8 @@ class UserInsuranceForm(forms.ModelForm):
         if case_type=="NO" and (int(status) == UserInsurance.CANCEL_INITIATE or int(status) == UserInsurance.CANCELLED):
             if not cancel_reason:
                 raise forms.ValidationError('For Cancel Initiation, Cancel reason is mandatory')
-            if not self.instance.is_bank_details_exist():
-                raise forms.ValidationError('For Cancel Initiation, Bank details is mandatory')
+            # if not self.instance.is_bank_details_exist():
+            #     raise forms.ValidationError('For Cancel Initiation, Bank details is mandatory')
             insured_opd_completed_app_count = OpdAppointment.get_insured_completed_appointment(self.instance)
             insured_lab_completed_app_count = LabAppointment.get_insured_completed_appointment(self.instance)
             if insured_lab_completed_app_count > 0:
@@ -767,8 +844,8 @@ class UserInsuranceForm(forms.ModelForm):
         if case_type == "YES" and (int(status) == UserInsurance.CANCEL_INITIATE or int(status) == UserInsurance.CANCELLED):
             if not cancel_reason:
                 raise forms.ValidationError('For Cancel Initiation, Cancel reason is mandatory')
-            if int(cancel_case_type) == UserInsurance.REFUND and not self.instance.is_bank_details_exist():
-                raise forms.ValidationError('In Case of Refundable Bank details are mandatory, please upload bank details')
+            # if int(cancel_case_type) == UserInsurance.REFUND and not self.instance.is_bank_details_exist():
+            #     raise forms.ValidationError('In Case of Refundable Bank details are mandatory, please upload bank details')
         if int(status) == UserInsurance.CANCELLED and not self.instance.status == UserInsurance.CANCEL_INITIATE:
             raise forms.ValidationError('Cancellation is only allowed for cancel initiate status')
         if self.instance.status == UserInsurance.CANCELLED:
@@ -788,6 +865,17 @@ class UserBankDocumentAdmin(admin.ModelAdmin):
     model = UserBankDocument
     fields = ['insurance']
     list_display = ['insurance']
+
+
+class GenericNotesInline(GenericTabularInline):
+    model = GenericNotes
+    fields = ('notes', 'created_by')
+    extra = 0
+    can_delete = False
+    show_change_link = False
+    can_add = True
+    editable = False
+    readonly_fields = ('created_by',)
 
 
 class UserInsuranceAdmin(ImportExportMixin, admin.ModelAdmin):
@@ -810,9 +898,19 @@ class UserInsuranceAdmin(ImportExportMixin, admin.ModelAdmin):
     fields = ['insurance_plan', 'user', 'purchase_date', 'expiry_date', 'policy_number', 'premium_amount',
               'merchant_payout', 'status', 'cancel_reason', 'cancel_after_utilize_insurance', 'cancel_case_type']
     readonly_fields = ('insurance_plan', 'user', 'purchase_date', 'expiry_date', 'policy_number', 'premium_amount', 'merchant_payout')
-    inlines = [InsuredMembersInline, UserBankInline, UserBankDocumentInline]
+    inlines = [InsuredMembersInline, UserBankInline, UserBankDocumentInline, GenericNotesInline]
     form = UserInsuranceForm
     search_fields = ['id']
+
+    def save_formset(self, request, form, formset, change):
+        if formset.model != GenericNotes:
+            return super(UserInsuranceAdmin, self).save_formset(request, form, formset, change)
+        instances = formset.save(commit=False)
+        for instance in instances:
+            if not instance.pk:
+                instance.created_by = request.user
+                instance.save()
+        formset.save_m2m()
 
     def get_search_results(self, request, queryset, search_term):
         queryset, use_distinct = super().get_search_results(request, queryset, None)
@@ -911,20 +1009,27 @@ class InsuranceDistrictAdmin(ImportExportModelAdmin):
     list_display = ('id', 'district_code', 'district_name', 'state')
 
 
-# class InsurerPolicyNumberForm(forms.ModelForm):
-#
-#     class Meta:
-#         widgets = {
-#             'insurer': autocomplete.ModelSelect2(url='insurer-autocomplete'),
-#             'insurance_plan': autocomplete.ModelSelect2(url='insurance-plan-autocomplete', forward=['insurer'])
-#         }
+class InsurerPolicyNumberForm(forms.ModelForm):
+    def clean(self):
+        super().clean()
+        if any(self.errors):
+            return
+        data = self.cleaned_data
+        if not data.get('apd_account'):
+            raise forms.ValidationError('Apd Account is mandatory for Policy Number')
+        if not data.get('insurance_plan'):
+            raise forms.ValidationError('Insurance Plan is mandatory for Policy Number')
+        if not data.get('insurer_policy_number'):
+            raise forms.ValidationError('Insurance Policy number is mandatory for Policy Number')
+        if not data.get('insurer'):
+            raise forms.ValidationError('Insurer is mandatory for Policy Number')
 
 
 class InsurerPolicyNumberAdmin(admin.ModelAdmin):
     model = InsurerPolicyNumber
-    fields = ('insurer', 'insurance_plan', 'insurer_policy_number')
-    list_display = ('insurer', 'insurance_plan', 'insurer_policy_number', 'created_at')
-    # form = InsurerPolicyNumberForm
+    fields = ('insurer', 'insurance_plan', 'insurer_policy_number', 'apd_account')
+    list_display = ('insurer', 'insurance_plan', 'insurer_policy_number', 'apd_account', 'created_at')
+    form = InsurerPolicyNumberForm
     # search_fields = ['insurer']
     # autocomplete_fields = ['insurer', 'insurance_plan']
 
@@ -1095,6 +1200,7 @@ class EndorsementRequestForm(forms.ModelForm):
         if status == EndorsementRequest.REJECT and not reject_reason:
             raise forms.ValidationError('For Rejection, reject reason is mandatory')
 
+
     class Meta:
         fields = '__all__'
 
@@ -1209,7 +1315,7 @@ class EndorsementRequestAdmin(admin.ModelAdmin):
         else:
             return obj.member.title + "(edited)"
 
-    list_display = ['member_name', 'insurance_id']
+    list_display = ['member_name', 'insurance_id', 'status', 'created_at']
     readonly_fields = ['member', 'insurance', 'member_type', 'title', 'old_title', 'first_name', 'old_first_name',
                        'middle_name', 'old_middle_name', 'last_name', 'old_last_name', 'dob', 'old_dob', 'email',
                        'old_email',  'address', 'old_address', 'pincode', 'old_pincode', 'gender', 'old_gender',
@@ -1217,6 +1323,7 @@ class EndorsementRequestAdmin(admin.ModelAdmin):
                        'district', 'old_district', 'state', 'old_state', 'state_code', 'city_code',
                        'district_code']
     inlines = [InsuredMemberDocumentInline]
+    # form = EndorsementRequestForm
 
     def has_add_permission(self, request, obj=None):
         return False
@@ -1265,3 +1372,7 @@ class ThirdPartyAdministratorAdmin(ImportExportMixin, admin.ModelAdmin):
     resource_class = ThirdPartyAdministratorResource
     search_fields = ['name']
     list_display = ['id', 'name']
+
+
+class InsurerAccountTransferAdmin(admin.ModelAdmin):
+    model = InsurerAccountTransfer

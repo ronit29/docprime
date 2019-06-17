@@ -4,7 +4,8 @@ from django.contrib.contenttypes.models import ContentType
 from django.db.models import Q
 
 from ondoc.banner.models import Banner, SliderLocation, BannerLocation, EmailBanner, RecommenderThrough, Recommender
-from ondoc.common.models import PaymentOptions, UserConfig, Feature, Service, Remark, MatrixMappedCity, MatrixMappedState
+from ondoc.common.models import PaymentOptions, UserConfig, Feature, Service, Remark, MatrixMappedCity, \
+    MatrixMappedState, GenericNotes, BlacklistUser, BlockedStates
 from ondoc.corporate_booking.models import CorporateDeal, Corporates, CorporateDocument
 from ondoc.coupon.models import Coupon, UserSpecificCoupon, RandomGeneratedCoupon
 from ondoc.crm.constants import constants
@@ -44,7 +45,7 @@ from ondoc.insurance.models import (Insurer, InsurancePlans, InsuranceThreshold,
                                     UserInsurance, InsurancePlanContent, InsuredMembers, InsurerAccount, InsuranceLead,
                                     InsuranceDiseaseResponse, InsurerPolicyNumber, InsuranceCancelMaster,
                                     EndorsementRequest, InsuredMemberDocument, InsuredMemberHistory, ThirdPartyAdministrator,
-                                    UserBank, UserBankDocument)
+                                    UserBank, UserBankDocument, InsurerAccountTransfer)
 
 from ondoc.procedure.models import Procedure, ProcedureCategory, CommonProcedureCategory, DoctorClinicProcedure, \
     ProcedureCategoryMapping, ProcedureToCategoryMapping, CommonProcedure, IpdProcedure, IpdProcedureFeatureMapping, \
@@ -450,6 +451,9 @@ class Command(BaseCommand):
         #creating corporate_group
         self.create_corporate_group()
 
+        # creating group for blocked state and blacklist users.
+        self.create_blocked_state_group()
+
         #Create XL Data Export Group
         Group.objects.get_or_create(name=constants['DATA_EXPORT_GROUP'])
 
@@ -704,7 +708,7 @@ class Command(BaseCommand):
             group.permissions.add(*permissions)
 
         group, created = Group.objects.get_or_create(name=constants['APPOINTMENT_REFUND_TEAM'])
-        #group.permissions.clear()
+        # group.permissions.clear()
 
         group, created = Group.objects.get_or_create(name=constants['IPD_TEAM'])
         group.permissions.clear()
@@ -715,6 +719,9 @@ class Command(BaseCommand):
             permissions = Permission.objects.filter(
                 Q(content_type=ct), Q(codename='change_' + ct.model))
             group.permissions.add(*permissions)
+
+        group, created = Group.objects.get_or_create(name=constants['APPOINTMENT_OTP_BYPASS_AGENT_TEAM'])
+        # group.permissions.clear()
 
         self.stdout.write('Successfully created groups and permissions')
 
@@ -937,7 +944,8 @@ class Command(BaseCommand):
                                                            InsuranceTransaction, InsuranceDiseaseResponse,
                                                            InsuredMembers, InsurerPolicyNumber, InsuranceCancelMaster,
                                                            EndorsementRequest, InsuredMemberDocument,
-                                                           InsuredMemberHistory, UserBank, UserBankDocument)
+                                                           InsuredMemberHistory, UserBank, UserBankDocument,
+                                                           GenericNotes)
 
         for cl, ct in content_types.items():
             permissions = Permission.objects.filter(
@@ -967,7 +975,8 @@ class Command(BaseCommand):
                                                            InsuranceTransaction, InsuranceDiseaseResponse,
                                                            InsuredMembers, InsurerPolicyNumber, InsuranceCancelMaster,
                                                            EndorsementRequest, InsuredMemberDocument,
-                                                           InsuredMemberHistory, UserBank, UserBankDocument)
+                                                           InsuredMemberHistory, UserBank, UserBankDocument,
+                                                           GenericNotes, InsurerAccountTransfer)
 
         for cl, ct in content_types.items():
             permissions = Permission.objects.filter(
@@ -990,4 +999,34 @@ class Command(BaseCommand):
                 Q(content_type=ct),
                 Q(codename='add_' + ct.model) |
                 Q(codename='change_' + ct.model))
+            group.permissions.add(*permissions)
+
+
+    def create_blocked_state_group(self):
+
+        group, created = Group.objects.get_or_create(name=constants['BLOCK_STATE_GROUP'])
+        group.permissions.clear()
+
+        content_types = ContentType.objects.get_for_models(BlacklistUser, BlockedStates)
+
+        for cl, ct in content_types.items():
+            permissions = Permission.objects.filter(
+                Q(content_type=ct),
+                Q(codename='add_' + ct.model) |
+                Q(codename='change_' + ct.model))
+
+            group.permissions.add(*permissions)
+
+
+        group, created = Group.objects.get_or_create(name=constants['BLOCK_USER_GROUP'])
+        group.permissions.clear()
+
+        content_types = ContentType.objects.get_for_models(BlacklistUser)
+
+        for cl, ct in content_types.items():
+            permissions = Permission.objects.filter(
+                Q(content_type=ct),
+                Q(codename='add_' + ct.model) |
+                Q(codename='change_' + ct.model))
+
             group.permissions.add(*permissions)

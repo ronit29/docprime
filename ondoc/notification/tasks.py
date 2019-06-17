@@ -154,7 +154,7 @@ def send_lab_notifications(appointment_id):
 
 
 @task()
-def send_opd_notifications_refactored(appointment_id):
+def send_opd_notifications_refactored(appointment_id, notification_type=None):
     from ondoc.doctor.models import OpdAppointment
     from ondoc.communications.models import OpdNotification
     try:
@@ -172,7 +172,7 @@ def send_opd_notifications_refactored(appointment_id):
                 counter = counter + 1
                 is_masking_done = generate_appointment_masknumber(
                     ({'type': 'OPD_APPOINTMENT', 'appointment': instance}))
-        opd_notification = OpdNotification(instance)
+        opd_notification = OpdNotification(instance, notification_type)
         opd_notification.send()
     except Exception as e:
         logger.error(str(e))
