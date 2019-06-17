@@ -162,8 +162,8 @@ class ListInsuranceViewSet(viewsets.GenericViewSet):
             resp = {}
             user = request.user
             if not user.is_anonymous:
-                user_insurance = user.active_insurance
-                if user_insurance and not self.strtobool(request.query_params.get("is_endorsement")):
+                user_insurance = UserInsurance.get_user_insurance(request.user)
+                if user_insurance and user_insurance.is_profile_valid() and not self.strtobool(request.query_params.get("is_endorsement")):
                     return Response(data={'certificate': True}, status=status.HTTP_200_OK)
 
             insurer_data = self.get_queryset()
