@@ -91,8 +91,6 @@ class ScreenViewSet(viewsets.GenericViewSet):
             upcoming_appointment_result = get_all_upcoming_appointments(request.user.id)
 
         common_package_data = package_serializer.data
-        if request.user and request.user.is_authenticated and request.user.active_insurance and not hasattr(request, 'agent'):
-            common_package_data = []
 
 
         grid_list = [
@@ -124,6 +122,11 @@ class ScreenViewSet(viewsets.GenericViewSet):
                 'addSearchItem': "Lab"
             }
         ]
+
+        if request.user and request.user.is_authenticated and request.user.active_insurance and not hasattr(request, 'agent'):
+            grid_list.pop(1)
+
+
 
         banner_list = Banner.get_all_banners(request, lat, long, from_app)
         banner_list_homepage = list()
