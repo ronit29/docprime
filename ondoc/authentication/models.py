@@ -1865,6 +1865,9 @@ class PaymentMixin(object):
                         self.release_payment()
                         initiate_refund = 0
                 else:
-                    raise Exception('Preauth booked appointment can not be rebooked.')
+                    if order_parent.orders.count() > 1:
+                        self.capture_payment()
+                        initiate_refund = 0
+                    # raise Exception('Preauth booked appointment can not be rebooked.')
 
         return initiate_refund

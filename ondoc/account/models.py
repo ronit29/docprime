@@ -934,6 +934,7 @@ class PgTransaction(TimeStampedModel):
             update_consumer_account = True
 
         super(PgTransaction, self).save(*args, **kwargs)
+
         if update_consumer_account:
             consumer_account = ConsumerAccount.objects.get_or_create(user=self.user)
             consumer_account = ConsumerAccount.objects.select_for_update().get(user=self.user)
@@ -1039,8 +1040,7 @@ class PgTransaction(TimeStampedModel):
         return encrypted_message_digest
 
     def is_preauth(self):
-        # todo - add more conditions here
-        return self.status_type == 'TXN_AUTHORIZE'# and self.pg_name == 'paytm'
+        return self.status_type == 'TXN_AUTHORIZE'
 
     class Meta:
         db_table = "pg_transaction"
