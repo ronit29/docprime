@@ -104,3 +104,9 @@ def update_hosp_google_avg_rating():
     from ondoc.doctor.models import HospitalPlaceDetails, Hospital
     HospitalPlaceDetails.update_hosp_place_with_google_api_details()
     Hospital.update_hosp_google_avg_rating()
+
+
+@task()
+def update_flags():
+    from ondoc.doctor.models import Hospital
+    Hospital.update_is_big_hospital()

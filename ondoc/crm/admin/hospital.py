@@ -433,7 +433,7 @@ class HospitalAdmin(admin.GeoModelAdmin, VersionAdmin, ActionAdmin, QCPemAdmin):
                    HospCityFilter)
     readonly_fields = ('source', 'batch', 'associated_doctors', 'is_live', 'matrix_lead_id', 'city', 'state',)
     exclude = ('search_key', 'live_at', 'qc_approved_at', 'disabled_at', 'physical_agreement_signed_at',
-               'welcome_calling_done_at', 'provider_encrypt', 'provider_encrypted_by', 'encryption_hint', 'encrypted_hospital_id')
+               'welcome_calling_done_at', 'provider_encrypt', 'provider_encrypted_by', 'encryption_hint', 'encrypted_hospital_id', 'is_big_hospital')
     list_display = ('name', 'updated_at', 'data_status', 'welcome_calling_done', 'doctor_count',
                     'list_created_by', 'list_assigned_to')
     form = HospitalForm
