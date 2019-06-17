@@ -1915,6 +1915,9 @@ class HospitalDetailIpdProcedureSerializer(TopHospitalForIpdProcedureSerializer)
     contact_number = serializers.SerializerMethodField()
     specialization_doctors = serializers.SerializerMethodField()
     offers = serializers.SerializerMethodField()
+    new_about = serializers.SerializerMethodField()
+    use_new_about = serializers.SerializerMethodField()
+
 
     class Meta(TopHospitalForIpdProcedureSerializer.Meta):
         model = Hospital
@@ -1924,7 +1927,8 @@ class HospitalDetailIpdProcedureSerializer(TopHospitalForIpdProcedureSerializer)
                                                                      'doctors', 'rating_graph', 'rating',
                                                                      'display_rating_widget', 'opd_timings',
                                                                      'contact_number', 'specialization_doctors',
-                                                                     'offers')
+                                                                     'offers', 'is_ipd_hospital', 'new_about',
+                                                                     'use_new_about')
 
     def get_specialization_doctors(self, obj):
         validated_data = self.context.get('validated_data')
@@ -1938,10 +1942,21 @@ class HospitalDetailIpdProcedureSerializer(TopHospitalForIpdProcedureSerializer)
                                         parameters={'hospital_id': str(obj.id), 'longitude': validated_data.get('long'),
                                                     'latitude': validated_data.get('lat'), 'sort_on': 'experience',
                                                     'restrict_result_count': 3, 'specialization_ids' : specialization_ids}).data
+
     def get_about(self, obj):
         if obj.network:
             return obj.network.about
         return obj.about
+
+    def get_new_about(self, obj):
+        if obj.network:
+            return None  # TODO: SHASHANK_SINGH correct this
+        return obj.new_about
+
+    def get_use_new_about(self, obj):
+        if obj.network:
+            return None  # TODO: SHASHANK_SINGH correct this
+        return obj.use_new_about
 
     def get_opd_timings(self, obj):
         return obj.opd_timings
