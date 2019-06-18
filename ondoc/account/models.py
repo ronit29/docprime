@@ -1877,11 +1877,13 @@ class MerchantPayout(TimeStampedModel):
             if self.pg_status=='SETTLEMENT_COMPLETED' or self.utr_no or self.type ==self.MANUAL:
                 return
 
+            order_no = None
             url = settings.SETTLEMENT_DETAILS_API
             if self.is_insurance_premium_payout():
                 txn = self.get_insurance_premium_transactions()
                 if txn:
                     order_no = txn[0].order_no
+
             else:
                 order_no = self.get_pg_order_no()
 

@@ -283,6 +283,14 @@ class Hospital(auth_model.TimeStampedModel, auth_model.CreatedByModel, auth_mode
         point_string = 'POINT(' + str(long) + ' ' + str(lat) + ')'
         pnt = GEOSGeometry(point_string, srid=4326)
         temp_hosp_queryset = Hospital.objects.filter(is_live=True)
+
+        if not request.user.is_anonymous and request.user.active_insurance:
+            for id in top_hospital_ids:
+                hosp_obj = Hospital.objects.filter(pk=id).first()
+                if hosp_obj:
+                    if not hosp_obj.is_hospital_doctor_insurance_enabled():
+                        top_hospital_ids.remove(id)
+
         if top_network_ids:
             network_hospital_queryset = temp_hosp_queryset.filter(network__in=top_network_ids)
             network_hospitals = network_hospital_queryset.annotate(
@@ -619,6 +627,16 @@ class Hospital(auth_model.TimeStampedModel, auth_model.CreatedByModel, auth_mode
                     blockeds_timeslots.append(str(nth_day_past_timeslot))
 
         return blockeds_timeslots
+
+    def is_hospital_doctor_insurance_enabled(self):
+        insured = False
+        dc_obj = DoctorClinic.objects.filter(hospital_id=self.id).first()
+        if dc_obj:
+            doctor = Doctor.objects.filter(pk=dc_obj.doctor_id).first()
+            if doctor.is_insurance_enabled:
+                insured = True
+
+        return insured
 
 
 class HospitalPlaceDetails(auth_model.TimeStampedModel):
