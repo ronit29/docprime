@@ -238,6 +238,8 @@ class Hospital(auth_model.TimeStampedModel, auth_model.CreatedByModel, auth_mode
     matrix_lead_id = models.BigIntegerField(blank=True, null=True, unique=True)
     is_listed_on_docprime = models.NullBooleanField(null=True, blank=True)
     about = models.TextField(blank=True, null=True, default="")
+    # use_new_about = models.BooleanField(default=False)
+    new_about = models.TextField(blank=True, null=True, default=None)
     opd_timings = models.CharField(max_length=150, blank=True, null=True, default="")
     always_open = models.BooleanField(verbose_name='Is hospital open 24X7', default=False)
     # ratings = GenericRelation(ratings_models.RatingsReview, related_query_name='hospital_ratings')
@@ -253,6 +255,9 @@ class Hospital(auth_model.TimeStampedModel, auth_model.CreatedByModel, auth_mode
     # provider_encrypted_by = models.ForeignKey(auth_model.User, null=True, blank=True, on_delete=models.SET_NULL, related_name='encrypted_hospitals')
     # encryption_hint = models.CharField(max_length=128, null=True, blank=True)
     # encrypted_hospital_id = models.CharField(max_length=128, null=True, blank=True)
+    is_ipd_hospital = models.BooleanField(default=False)
+    is_big_hospital = models.BooleanField(default=False)
+    has_proper_hospital_page = models.BooleanField(default=False)
 
     def __str__(self):
         return self.name
@@ -278,6 +283,14 @@ class Hospital(auth_model.TimeStampedModel, auth_model.CreatedByModel, auth_mode
         point_string = 'POINT(' + str(long) + ' ' + str(lat) + ')'
         pnt = GEOSGeometry(point_string, srid=4326)
         temp_hosp_queryset = Hospital.objects.filter(is_live=True)
+
+        if not request.user.is_anonymous and request.user.active_insurance:
+            for id in top_hospital_ids:
+                hosp_obj = Hospital.objects.filter(pk=id).first()
+                if hosp_obj:
+                    if not hosp_obj.is_hospital_doctor_insurance_enabled():
+                        top_hospital_ids.remove(id)
+
         if top_network_ids:
             network_hospital_queryset = temp_hosp_queryset.filter(network__in=top_network_ids)
             network_hospitals = network_hospital_queryset.annotate(
@@ -463,6 +476,13 @@ class Hospital(auth_model.TimeStampedModel, auth_model.CreatedByModel, auth_mode
             query = """update hospital h set avg_rating=(select avg(ratings) from ratings_review rr left join opd_appointment oa on rr.appointment_id = oa.id where appointment_type = 2 group by hospital_id having oa.hospital_id = h.id)"""
             cursor.execute(query)
 
+    @classmethod
+    def update_is_big_hospital(cls):
+        big_hospitals = Hospital.objects.filter(is_live=True, hospital_doctors__enabled=True,
+                                                hospital_doctors__doctor__is_live=True).values_list('id', flat=True)
+        if big_hospitals:
+            Hospital.objects.filter(id__in=big_hospitals).update(is_big_hospital=True)
+
     def ad_str(self, string):
         return str(string).strip().replace(',', '')
 
@@ -561,10 +581,11 @@ class Hospital(auth_model.TimeStampedModel, auth_model.CreatedByModel, auth_mode
 
     def has_ipd_doctors(self):
         result = False
-        for doctor_clinic in self.hospital_doctors.filter(enabled=True):
-            if doctor_clinic.ipd_procedure_clinic_mappings.filter(enabled=True).exists():
-                result = True
-                break
+        # for doctor_clinic in self.hospital_doctors.filter(enabled=True):
+        #     if doctor_clinic.ipd_procedure_clinic_mappings.filter(enabled=True).exists():
+        #         result = True
+        #         break
+        result = self.is_ipd_hospital
         return result
 
     def get_specialization_insured_appointments(self, doctor, insurance):
@@ -606,6 +627,16 @@ class Hospital(auth_model.TimeStampedModel, auth_model.CreatedByModel, auth_mode
                     blockeds_timeslots.append(str(nth_day_past_timeslot))
 
         return blockeds_timeslots
+
+    def is_hospital_doctor_insurance_enabled(self):
+        insured = False
+        dc_obj = DoctorClinic.objects.filter(hospital_id=self.id).first()
+        if dc_obj:
+            doctor = Doctor.objects.filter(pk=dc_obj.doctor_id).first()
+            if doctor.is_insurance_enabled:
+                insured = True
+
+        return insured
 
 
 class HospitalPlaceDetails(auth_model.TimeStampedModel):
@@ -1897,6 +1928,8 @@ class HospitalNetwork(auth_model.TimeStampedModel, auth_model.CreatedByModel, au
     name = models.CharField(max_length=100)
     operational_since = models.PositiveSmallIntegerField(blank=True, null=True, validators=[MinValueValidator(1900)])
     about = models.CharField(max_length=2000, blank=True)
+    # use_new_about = models.BooleanField(default=False)
+    new_about = models.TextField(blank=True, null=True, default=None)
     network_size = models.PositiveSmallIntegerField(blank=True, null=True)
     building = models.CharField(max_length=100, blank=True)
     sublocality = models.CharField(max_length=100, blank=True)

@@ -559,10 +559,10 @@ class UserInsurance(auth_model.TimeStampedModel):
             return self.master_policy_reference
 
         policy = InsurerPolicyNumber.objects.\
-            filter(insurance_plan=self.insurance_plan,insurer=self.plan.insurer).order_by('-id').first()
+            filter(insurance_plan=self.insurance_plan,insurer=self.insurance_plan.insurer).order_by('-id').first()
         if not policy:
             policy = InsurerPolicyNumber.objects.\
-            filter(insurance_plan__isnull=True,insurer=self.plan.insurer).order_by('-id').first()
+            filter(insurance_plan__isnull=True,insurer=self.insurance_plan.insurer).order_by('-id').first()
 
         return policy
 

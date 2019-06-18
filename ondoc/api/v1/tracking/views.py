@@ -12,7 +12,7 @@ from rest_framework.viewsets import GenericViewSet
 from rest_framework import status
 import json
 from django.http import JsonResponse
-import datetime
+import datetime, pytz
 from ondoc.api.v1.utils import get_time_delta_in_minutes, aware_time_zone
 from ipware import get_client_ip
 from uuid import UUID
@@ -60,12 +60,13 @@ class EventCreateViewSet(GenericViewSet):
         userAgent = data.get('userAgent', None)
         data.pop('userAgent', None)
         triggered_at = data.get('triggered_at', None)
+        tz = pytz.timezone(settings.TIME_ZONE)
         data.pop('created_at', None)
 
         if triggered_at:
             if len(str(triggered_at)) >= 13:
                 triggered_at = triggered_at/1000
-            triggered_at = datetime.datetime.fromtimestamp(triggered_at)
+            triggered_at = datetime.datetime.fromtimestamp(triggered_at, tz)
 
         try:
             user = None
