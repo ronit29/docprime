@@ -124,6 +124,7 @@ class PresccriptionPdf(auth_models.TimeStampedModel):
     appointment_type = models.PositiveSmallIntegerField(choices=APPOINTMENT_TYPE_CHOICES)
     prescription_file = models.FileField(upload_to=PRESCRIPTION_STORAGE_FOLDER, validators=[FileExtensionValidator(allowed_extensions=['pdf'])], null=True)
     serial_id = models.CharField(max_length=100)
+    is_encrypted = models.BooleanField(default=False)
 
     def get_medicines(self):
         if not self.medicines:

@@ -340,10 +340,13 @@ class DoctorSearchHelper:
         if not self.query_params.get('max_distance') == None and self.query_params.get('max_distance')*1000 == 0:
             max_distance = self.query_params.get('max_distance')
         else:
+            # max_distance = str(
+            #     self.query_params.get('max_distance') * 1000 if self.query_params.get(
+            #         'max_distance') and self.query_params.get(
+            #         'max_distance') * 1000 < int(DoctorSearchHelper.MAX_DISTANCE) else DoctorSearchHelper.MAX_DISTANCE)
             max_distance = str(
-                self.query_params.get('max_distance') * 1000 if self.query_params.get(
-                    'max_distance') and self.query_params.get(
-                    'max_distance') * 1000 < int(DoctorSearchHelper.MAX_DISTANCE) else DoctorSearchHelper.MAX_DISTANCE)
+                     self.query_params.get('max_distance') * 1000 if self.query_params.get(
+                        'max_distance') and self.query_params.get( 'max_distance') * 1000 else -1)
         min_distance = self.query_params.get('min_distance')*1000 if self.query_params.get('min_distance') else 0
 
         if self.query_params and self.query_params.get('sitemap_identifier') and self.query_params.get('max_distance')==None:
@@ -395,7 +398,8 @@ class DoctorSearchHelper:
                            "INNER JOIN doctor_clinic_timing dct ON dc.id = dct.doctor_clinic_id " \
                            "INNER JOIN doctor_clinic_procedure dcp ON dc.id = dcp.doctor_clinic_id " \
                            "WHERE {filtering_params} AND " \
-                           "St_dwithin(St_setsrid(St_point((%(longitude)s), (%(latitude)s)), 4326 ), h.location, (%(max_distance)s)) AND " \
+                           "case when (%(max_distance)s) >= 0  then St_dwithin( St_setsrid(St_point((%(longitude)s), (%(latitude)s)), 4326), h.location, (%(max_distance)s))" \
+                           " else St_dwithin( St_setsrid(St_point((%(longitude)s), (%(latitude)s)), 4326), h.location, h.search_distance ) end AND " \
                            "St_dwithin(St_setsrid(St_point((%(longitude)s), (%(latitude)s)), 4326 ), h.location, (%(min_distance)s)) = false " \
                            " ) " \
                            "AS tempTable WHERE count_per_clinic={count_of_procedure}) AS tempTable2) " \
@@ -444,7 +448,8 @@ class DoctorSearchHelper:
                            "AND (%(ist_time)s) BETWEEN dl.start_time and dl.end_time " \
                            "{sp_cond} " \
                            "WHERE {filtering_params} " \
-                           "and St_dwithin(St_setsrid(St_point((%(longitude)s), (%(latitude)s)), 4326 ), h.location, (%(max_distance)s)) " \
+                           "and case when (%(max_distance)s) >= 0  then St_dwithin( St_setsrid(St_point((%(longitude)s), (%(latitude)s)), 4326), h.location, (%(max_distance)s))" \
+                           " else St_dwithin( St_setsrid(St_point((%(longitude)s), (%(latitude)s)), 4326), h.location, h.search_distance ) end" \
                            "{min_dist_cond}" \
                            " )x " \
                            "where {rank_by} ORDER BY {order_by_field}".format(rank_part=rank_part, sp_cond=sp_cond, \
@@ -487,7 +492,7 @@ class DoctorSearchHelper:
             return
         for doctor_clinic_timing in doctor_clinic.availability.all():
             if doctor_clinic_timing.id == doctor_availability_mapping[doctor_clinic.doctor.id]:
-                return doctor_clinic_timing.deal_price, doctor_clinic_timing.mrp
+                return doctor_clinic_timing.dct_cod_deal_price(), doctor_clinic_timing.deal_price, doctor_clinic_timing.mrp
                 # return doctor_hospital.deal_price
         return None
 
@@ -519,7 +524,7 @@ class DoctorSearchHelper:
             doctor_clinics = [doctor_clinic for doctor_clinic in doctor.doctor_clinics.all() if
                               doctor_clinic.hospital_id == doctor_clinic_mapping[doctor_clinic.doctor_id]]
             doctor_clinic = doctor_clinics[0]
-            filtered_deal_price, filtered_mrp = self.get_doctor_fees(doctor_clinic, doctor_availability_mapping)
+            filtered_cod_deal_price, filtered_deal_price, filtered_mrp = self.get_doctor_fees(doctor_clinic, doctor_availability_mapping)
             # filtered_fees = self.get_doctor_fees(doctor, doctor_availability_mapping)
             min_deal_price = None
             min_price = dict()
@@ -583,8 +588,9 @@ class DoctorSearchHelper:
                          value]),
                     "short_address": doctor_clinic.hospital.get_short_address(),
                     "doctor": doctor.name,
-                    "enabled_for_cod": doctor_clinic.hospital.enabled_for_cod,
+                    # "enabled_for_cod": doctor_clinic.hospital.enabled_for_cod,
                     "enabled_for_prepaid": doctor_clinic.hospital.enabled_for_prepaid,
+                    "enabled_for_cod": doctor_clinic.is_enabled_for_cod(),
                     "display_name": doctor.get_display_name(),
                     "hospital_id": doctor_clinic.hospital.id,
                     "mrp": min_price["mrp"],
@@ -675,6 +681,8 @@ class DoctorSearchHelper:
                 "hospital_count": self.count_hospitals(doctor),
                 "id": doctor.id,
                 "deal_price": filtered_deal_price,
+                "cod_deal_price": filtered_cod_deal_price,
+                "enabled_for_cod": doctor_clinic.is_enabled_for_cod(),
                 "mrp": filtered_mrp,
                 "is_live": doctor.is_live,
                 "is_gold": is_gold,

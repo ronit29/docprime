@@ -1,0 +1,3 @@
+Dear {{patient_name|capfirst}}, we have received your payment amounting Rs. {{instance.effective_price}} against the Booking ID {{instance.id}}. Your appointment with Dr. {{doctor_name|capfirst}}, on {{instance.time_slot_start|date:"D jS F Y"}} at {{instance.time_slot_start|date:"h:i A"}} will now be a cashless visit. We request you to not pay for your booked service during your visit.
+
+Thank you for choosing Docprime.com!

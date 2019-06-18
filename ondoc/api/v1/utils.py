@@ -36,6 +36,10 @@ from datetime import timedelta
 import os
 import tempfile
 
+import base64, hashlib
+from Crypto import Random
+from Crypto.Cipher import AES
+
 logger = logging.getLogger(__name__)
 
 User = get_user_model()
@@ -442,14 +446,14 @@ def payment_details(request, order):
         'referenceId': "",
         'orderId': order.id,
         'name': profile_name,
-        'txAmount': str(order.amount),
+        'txAmount': str(order.amount) if not order.is_cod_order else str(round(order.get_deal_price_without_coupon, 2)),
     }
 
     if insurer_code:
         pgdata['insurerCode'] = insurer_code
 
     secret_key = client_key = ""
-    # TODO : SHASHANK_SINGH for plan FINAL ??
+
     if order.product_id == Order.DOCTOR_PRODUCT_ID or order.product_id == Order.SUBSCRIPTION_PLAN_PRODUCT_ID:
         secret_key = settings.PG_SECRET_KEY_P1
         client_key = settings.PG_CLIENT_KEY_P1
@@ -960,7 +964,7 @@ class TimeSlotExtraction(object):
             self.price_available[i] = dict()
 
     def form_time_slots(self, day, start, end, price=None, is_available=True,
-                        deal_price=None, mrp=None, is_doctor=False, on_call=1):
+                        deal_price=None, mrp=None, cod_deal_price=None, is_doctor=False, on_call=1):
         start = Decimal(str(start))
         end = Decimal(str(end))
         time_span = self.TIME_SPAN
@@ -982,7 +986,8 @@ class TimeSlotExtraction(object):
             if is_doctor:
                 price_available.update({
                     "mrp": mrp,
-                    "deal_price": deal_price
+                    "deal_price": deal_price,
+                    "cod_deal_price": cod_deal_price
                 })
             price_available.update({
                 "on_call": bool(on_call==2)
@@ -1174,7 +1179,7 @@ class TimeSlotExtraction(object):
                     if pa[k].get('on_call') == False:
                         if k >= float(doc_minimum_time) and k <= doctor_maximum_timing:
                             data_list.append({"value": k, "text": v, "price": pa[k]["price"], "is_price_zero": True if pa[k]["price"] is not None and pa[k]["price"] == 0 else False,
-                                              "mrp": pa[k]['mrp'], 'deal_price': pa[k]['deal_price'],
+                                              "mrp": pa[k]['mrp'], 'deal_price': pa[k]['deal_price'], "cod_deal_price": pa[k]['cod_deal_price'],
                                               "is_available": pa[k]["is_available"], "on_call": pa[k].get("on_call", False)})
                         else:
                             pass
@@ -1183,7 +1188,7 @@ class TimeSlotExtraction(object):
                 else:
                     if k <= doctor_maximum_timing:
                         data_list.append({"value": k, "text": v, "price": pa[k]["price"], "is_price_zero": True if pa[k]["price"] is not None and pa[k]["price"] == 0 else False,
-                                          "mrp": pa[k]['mrp'], 'deal_price': pa[k]['deal_price'],
+                                          "mrp": pa[k]['mrp'], 'deal_price': pa[k]['deal_price'], "cod_deal_price": pa[k]['cod_deal_price'],
                                           "is_available": pa[k]["is_available"],
                                           "on_call": pa[k].get("on_call", False)})
                     else:
@@ -1322,8 +1327,9 @@ class TimeSlotExtraction(object):
                 else:
                     return upcoming
 
-
     def format_timing_to_datetime_v2(self, timings, total_leaves, booking_details, is_thyrocare=False):
+        from ondoc.doctor.models import DoctorClinicTiming
+        check_next_day_minimum_slot = True if timings and isinstance(timings[0], DoctorClinicTiming) else False
         timing_objects = OrderedDict()
         today_date = datetime.date.today()
         today_day = today_date.weekday()
@@ -1338,6 +1344,9 @@ class TimeSlotExtraction(object):
                         day = self.get_key_or_field_value(data, 'day')
                         if i == day:
                             start_hour = float(self.get_key_or_field_value(data, 'start', 0.0))
+                            if check_next_day_minimum_slot and (today_date + datetime.timedelta(1)) == next_slot_date and datetime.datetime.today().hour >= 20:
+                                if start_hour <= 8.5:
+                                    start_hour = 8.5
                             end_hour = float(self.get_key_or_field_value(data, 'end', 23.75))
                             time_before_end_hour = end_hour - TimeSlotExtraction.TIME_SPAN_NUM
                             while start_hour <= time_before_end_hour:
@@ -1524,55 +1533,33 @@ def get_opd_pem_queryset(user, model):
     #                              super_user_permission=false AND is_disabled=false AND permission_type=1) > 0) THEN 1  ELSE 0 END'''
     # billing_query = '''CASE WHEN ((SELECT COUNT(id) FROM generic_admin WHERE user_id=%s AND hospital_id=hospital.id AND
     #                                super_user_permission=false AND is_disabled=false AND permission_type=2) > 0) THEN 1  ELSE 0 END'''
-    from ondoc.doctor.models import OpdAppointment
+
+    manageable_hosp_list = auth_models.GenericAdmin.objects.filter(is_disabled=False, user=user) \
+                                                           .values_list('hospital', flat=True)
     queryset = model.objects \
         .select_related('doctor', 'hospital', 'user') \
         .prefetch_related('doctor__manageable_doctors', 'hospital__manageable_hospitals', 'doctor__images',
                           'doctor__qualifications', 'doctor__qualifications__qualification',
                           'doctor__qualifications__specialization', 'doctor__qualifications__college',
-                          'doctor__doctorpracticespecializations', 'doctor__doctorpracticespecializations__specialization') \
-        .filter(
-        ~Q(status=OpdAppointment.CREATED),
-        Q(
-            Q(doctor__manageable_doctors__user=user,
-              doctor__manageable_doctors__hospital=F('hospital'),
-              doctor__manageable_doctors__is_disabled=False,) |
-            Q(doctor__manageable_doctors__user=user,
-              doctor__manageable_doctors__hospital__isnull=True,
-              doctor__manageable_doctors__is_disabled=False,
-             )
-             |
-            Q(hospital__manageable_hospitals__doctor__isnull=True,
-              hospital__manageable_hospitals__user=user,
-              hospital__manageable_hospitals__is_disabled=False,
-              )
-        ) |
-        Q(
-            Q(doctor__manageable_doctors__user=user,
-              doctor__manageable_doctors__super_user_permission=True,
-              doctor__manageable_doctors__is_disabled=False,
-              doctor__manageable_doctors__entity_type=GenericAdminEntity.DOCTOR, ) |
-            Q(hospital__manageable_hospitals__user=user,
-              hospital__manageable_hospitals__super_user_permission=True,
-              hospital__manageable_hospitals__is_disabled=False,
-              hospital__manageable_hospitals__entity_type=GenericAdminEntity.HOSPITAL)
-        ))\
-    .annotate(pem_type=Case(When(Q(hospital__manageable_hospitals__user=user) &
-                                   Q(hospital__manageable_hospitals__super_user_permission=True) &
-                                   Q(hospital__manageable_hospitals__is_disabled=False), then=Value(3)),
-                              When(Q(hospital__manageable_hospitals__user=user) &
-                                   Q(hospital__manageable_hospitals__super_user_permission=False) &
-                                   Q(hospital__manageable_hospitals__permission_type=auth_models.GenericAdmin.BILLINNG) &
-                                   ~Q(hospital__manageable_hospitals__permission_type=auth_models.GenericAdmin.APPOINTMENT) &
-                                   Q(hospital__manageable_hospitals__is_disabled=False), then=Value(2)),
-                              When(Q(hospital__manageable_hospitals__user=user) &
-                                   Q(hospital__manageable_hospitals__super_user_permission=False) &
-                                   Q(hospital__manageable_hospitals__permission_type=auth_models.GenericAdmin.BILLINNG) &
-                                   Q(hospital__manageable_hospitals__permission_type=auth_models.GenericAdmin.APPOINTMENT) &
-                                   Q(hospital__manageable_hospitals__is_disabled=False), then=Value(3)),
-                              default=Value(1),
-                              output_field=IntegerField()
-                              )
+                          'doctor__doctorpracticespecializations', 'doctor__doctorpracticespecializations__specialization',
+                          'doctor__doctor_number', 'doctor__doctor_number__hospital') \
+        .filter(hospital_id__in=list(manageable_hosp_list))\
+        .annotate(pem_type=Case(When(Q(hospital__manageable_hospitals__user=user) &
+                               Q(hospital__manageable_hospitals__super_user_permission=True) &
+                               Q(hospital__manageable_hospitals__is_disabled=False), then=Value(3)),
+                          When(Q(hospital__manageable_hospitals__user=user) &
+                               Q(hospital__manageable_hospitals__super_user_permission=False) &
+                               Q(hospital__manageable_hospitals__permission_type=auth_models.GenericAdmin.BILLINNG) &
+                               ~Q(hospital__manageable_hospitals__permission_type=auth_models.GenericAdmin.APPOINTMENT) &
+                               Q(hospital__manageable_hospitals__is_disabled=False), then=Value(2)),
+                          When(Q(hospital__manageable_hospitals__user=user) &
+                               Q(hospital__manageable_hospitals__super_user_permission=False) &
+                               Q(hospital__manageable_hospitals__permission_type=auth_models.GenericAdmin.BILLINNG) &
+                               Q(hospital__manageable_hospitals__permission_type=auth_models.GenericAdmin.APPOINTMENT) &
+                               Q(hospital__manageable_hospitals__is_disabled=False), then=Value(3)),
+                          default=Value(1),
+                          output_field=IntegerField()
+                          )
               )
     # .extra(select={'super_user': super_user_query, 'appointment_pem': appoint_query, 'billing_pem': billing_query}, params=(user_id, user_id, user_id))
     return queryset
@@ -1786,6 +1773,37 @@ def ipd_query_parameters(entity, req_params):
     return params_dict
 
 
+class AES_encryption:
+
+    BLOCK_SIZE = 16
+
+    @staticmethod
+    def pad(data):
+        length = AES_encryption.BLOCK_SIZE - (len(data) % AES_encryption.BLOCK_SIZE)
+        return data + chr(length) * length
+
+    @staticmethod
+    def unpad(data):
+        return data[:-ord(data[-1])]
+
+    @staticmethod
+    def encrypt(message, passphrase):
+        IV = Random.new().read(AES_encryption.BLOCK_SIZE)
+        aes = AES.new(passphrase, AES.MODE_CBC, IV)
+        return base64.b64encode(IV + aes.encrypt(AES_encryption.pad(message)))
+
+    @staticmethod
+    def decrypt(encrypted, passphrase):
+        try:
+            encrypted = base64.b64decode(encrypted)
+            IV = encrypted[:AES_encryption.BLOCK_SIZE]
+            aes = AES.new(passphrase, AES.MODE_CBC, IV)
+            return aes.decrypt(encrypted[AES_encryption.BLOCK_SIZE:]).decode("utf-8"), None
+        except Exception as e:
+            logger.error("Error while decrypting - " + str(e))
+            return None, e
+
+
 def convert_datetime_str_to_iso_str(datetime_string_to_be_converted):
     try:
         from dateutil import parser
@@ -1798,3 +1816,4 @@ def convert_datetime_str_to_iso_str(datetime_string_to_be_converted):
         print(e)
         result = datetime_string_to_be_converted
     return result
+
