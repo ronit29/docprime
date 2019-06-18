@@ -974,8 +974,8 @@ class AllUrlsViewset(viewsets.GenericViewSet):
         if not key:
             return Response(status=status.HTTP_400_BAD_REQUEST)
         key = key.lower()
-        # if len(key)<3:
-        #     return Response(dict())
+        if len(key)<3:
+            return Response(dict())
 
 
         from ondoc.location.models import EntityUrls

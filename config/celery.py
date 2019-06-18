@@ -9,8 +9,7 @@ from raven.contrib.celery import register_signal, register_logger_signal
 from ondoc.account.tasks import refund_status_update, consumer_refund_update, dump_to_elastic, integrator_order_summary,\
     get_thyrocare_reports, elastic_alias_switch
 from celery.schedules import crontab
-from ondoc.doctor.tasks import save_avg_rating, update_prices, update_city_search_key, update_doctors_count, \
-    update_search_score, \
+from ondoc.doctor.tasks import save_avg_rating, update_prices, update_city_search_key, update_doctors_count, update_search_score, \
     update_all_ipd_seo_urls, update_insured_labs_and_doctors, update_seo_urls, update_hosp_google_avg_rating, \
     update_flags
 from ondoc.account.tasks import update_ben_status_from_pg,update_merchant_payout_pg_status
