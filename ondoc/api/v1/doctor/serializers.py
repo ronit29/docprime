@@ -1974,7 +1974,7 @@ class HospitalDetailIpdProcedureSerializer(TopHospitalForIpdProcedureSerializer)
 
     def get_new_about(self, obj):
         if obj.network:
-            return None  # TODO: SHASHANK_SINGH correct this
+            return obj.network.new_about
         return obj.new_about
 
     def get_opd_timings(self, obj):
