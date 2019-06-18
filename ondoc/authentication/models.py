@@ -1716,8 +1716,9 @@ class MerchantNetRevenue(TimeStampedModel):
     CURRENT_FINANCIAL_YEAR = '2019-2020'
 
     merchant = models.ForeignKey("Merchant", on_delete=models.CASCADE, related_name='net_revenue')
-    totol_revenue = models.DecimalField(max_digits=10, decimal_places=2, default=None, null=True, blank=True)
+    total_revenue = models.DecimalField(max_digits=10, decimal_places=2, default=None, null=True, blank=True)
     financial_year = models.CharField(max_length=20, null=True, blank=True)
+    tds_deducted = models.DecimalField(max_digits=10, decimal_places=2, default=None, null=True, blank=True)
 
     class Meta:
         db_table = 'merchant_net_revenue'
