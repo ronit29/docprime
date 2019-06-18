@@ -819,12 +819,16 @@ class UserInsuranceForm(forms.ModelForm):
 
     status_choices = [(UserInsurance.ACTIVE, "Active"), (UserInsurance.CANCEL_INITIATE, 'Cancel Initiate'),
                       (UserInsurance.CANCELLED, "Cancelled")]
+    cancel_status_choices = [(UserInsurance.NON_REFUNDED, "Non-Refunded"), (UserInsurance.REFUND_INITIATE,
+                                                                            "Refund Initiate"), (UserInsurance.REFUNDED
+                                                                            , "Refunded")]
     case_choices = [(UserInsurance.REFUND, "Refundable"), (UserInsurance.NO_REFUND, "Non-Refundable")]
     cancel_after_utilize_choices = [('YES', 'Yes'), ('NO', 'No')]
     status = forms.ChoiceField(choices=status_choices, required=True)
     cancel_after_utilize_insurance = forms.ChoiceField(choices=cancel_after_utilize_choices, initial='NO',  widget=forms.RadioSelect())
     cancel_reason = forms.CharField(max_length=400, required=False)
     cancel_case_type = forms.ChoiceField(choices=case_choices, initial=UserInsurance.REFUND)
+    cancel_status = forms.ChoiceField(choices=cancel_status_choices, initial=UserInsurance.NON_REFUNDED)
 
     def clean(self):
         super().clean()
@@ -833,6 +837,7 @@ class UserInsuranceForm(forms.ModelForm):
         case_type = data.get('cancel_after_utilize_insurance')
         cancel_reason = data.get('cancel_reason')
         cancel_case_type = data.get('cancel_case_type')
+        cancel_status = data.get('cancel_status')
         # if int(status) == UserInsurance.ONHOLD:
         #     if not onhold_reason:
         #         raise forms.ValidationError("In Case of ONHOLD status, Onhold reason is mandatory")
@@ -858,6 +863,11 @@ class UserInsuranceForm(forms.ModelForm):
             raise forms.ValidationError('Cancellation is only allowed for cancel initiate status')
         if self.instance.status == UserInsurance.CANCELLED:
             raise forms.ValidationError('Cancelled Insurance could not be changed')
+        # if cancel_status == UserInsurance.NON_REFUNDED and cancel_case_type == UserInsurance.REFUND:
+        #     raise forms.ValidationError("Cancel Status must be Refunded in case of Refundable case type")
+        if (int(cancel_status) == UserInsurance.REFUNDED and int(cancel_case_type) == UserInsurance.NO_REFUND) or \
+            (int(cancel_status) == UserInsurance.REFUND_INITIATE and int(cancel_case_type) == UserInsurance.NO_REFUND):
+            raise forms.ValidationError("Cancel Status must be Non-Refunded in case of Non-Refundable case type")
 
     class Meta:
         fields = '__all__'
