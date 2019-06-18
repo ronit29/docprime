@@ -3793,6 +3793,25 @@ class AppointmentMessageViewset(viewsets.GenericViewSet):
             obj['message'] = "Message Sent Successfully"
         return Response(obj)
 
+    def encryption_key_request_message(self, request):
+        from ondoc.communications.models import ProviderAppNotification
+        serializer = serializers.EncryptionKeyRequestMessageSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        data = serializer.validated_data
+        obj = {"error": False}
+        try:
+            action_user = request.user
+            sms_notification = ProviderAppNotification(data.get('hospital_id'), action_user,
+                                                       notif_models.NotificationAction.REQUEST_ENCRYPTION_KEY)
+            sms_notification.send()
+        except Exception as e:
+            obj['error'] = True
+            obj['message'] = 'Error Sending Encryption Key Request Message!'
+            logger.error("Error Sending Encryption Key Request Message " + str(e))
+        if not 'message' in obj:
+            obj['message'] = "Message Sent Successfully"
+        return Response(obj)
+
 
 class HospitalViewSet(viewsets.GenericViewSet):
 
