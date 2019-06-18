@@ -35,11 +35,11 @@ import logging
 from datetime import timedelta
 import os
 import tempfile
+import decimal
 
 import base64, hashlib
 from Crypto import Random
 from Crypto.Cipher import AES
-import decimal
 
 logger = logging.getLogger(__name__)
 
@@ -445,19 +445,14 @@ def payment_details(request, order):
     couponCode = ''
     couponPgMode = ''
     discountedAmnt = ''
-
-    if order.is_cod_order:
-        txAmount = str(round(decimal.Decimal(order.get_deal_price_without_coupon), 2))
+    usedPgCoupons = order.used_pgspecific_coupons
+    if usedPgCoupons and usedPgCoupons[0].payment_option:
+        couponCode = usedPgCoupons[0].code
+        couponPgMode = get_coupon_pg_mode(usedPgCoupons[0])
+        discountedAmnt = str(round(decimal.Decimal(order.amount), 2))
+        txAmount = str(round(decimal.Decimal(order.get_amount_without_pg_coupon), 2))
     else:
-        usedPgCoupons = order.used_pgspecific_coupons
-        if usedPgCoupons and usedPgCoupons[0].payment_option:
-            couponCode = usedPgCoupons[0].code
-            couponPgMode = get_coupon_pg_mode(usedPgCoupons[0])
-            discountedAmnt = str(round(decimal.Decimal(order.amount), 2))
-            txAmount = str(round(decimal.Decimal(order.get_amount_without_pg_coupon), 2))
-        else:
-            txAmount = str(round(decimal.Decimal(order.amount), 2))
-
+        txAmount = str(round(decimal.Decimal(order.amount), 2))
 
     pgdata = {
         'custId': user.id,
@@ -469,6 +464,7 @@ def payment_details(request, order):
         'referenceId': "",
         'orderId': order.id,
         'name': profile_name,
+<<<<<<< HEAD
         'txAmount': txAmount,
         'holdPayment': 0,
         'couponCode': couponCode,
@@ -476,15 +472,15 @@ def payment_details(request, order):
         'discountedAmnt': discountedAmnt,
         'isPreAuth': isPreAuth,
         'paytmMsg': ''
+=======
+        'txAmount': str(order.amount) if not order.is_cod_order else str(round(order.get_deal_price_without_coupon, 2)),
+>>>>>>> master
     }
 
     if insurer_code:
         pgdata['insurerCode'] = insurer_code
 
     secret_key, client_key = get_pg_secret_client_key(order)
-    filtered_pgdata = {k: v for k, v in pgdata.items() if v is not None and v != ''}
-    pgdata.clear()
-    pgdata.update(filtered_pgdata)
     pgdata['hash'] = PgTransaction.create_pg_hash(pgdata, secret_key, client_key)
 
     return pgdata, payment_required
@@ -503,7 +499,10 @@ def pg_seamless_hash(order, order_no):
 def get_pg_secret_client_key(order):
     from ondoc.account.models import Order
     secret_key = client_key = ""
+<<<<<<< HEAD
+=======
 
+>>>>>>> master
     if order.product_id == Order.DOCTOR_PRODUCT_ID or order.product_id == Order.SUBSCRIPTION_PLAN_PRODUCT_ID:
         secret_key = settings.PG_SECRET_KEY_P1
         client_key = settings.PG_CLIENT_KEY_P1

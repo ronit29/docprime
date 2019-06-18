@@ -921,7 +921,7 @@ class PgTransaction(TimeStampedModel):
     status_code = models.IntegerField()
     pg_name = models.CharField(max_length=100, null=True, blank=True)
     status_type = models.CharField(max_length=50)
-    transaction_id = models.CharField(max_length=100, unique=True, blank=True)
+    transaction_id = models.CharField(max_length=100, blank=True, null=True)
     pb_gateway_name = models.CharField(max_length=100, null=True, blank=True)
 
     @transaction.atomic
