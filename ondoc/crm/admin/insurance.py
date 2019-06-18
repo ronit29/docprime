@@ -875,13 +875,13 @@ class UserBankDocumentAdmin(admin.ModelAdmin):
 
 class GenericNotesInline(GenericTabularInline):
     model = GenericNotes
-    fields = ('notes', 'created_by')
+    fields = ('notes', 'created_by', 'created_at')
     extra = 0
     can_delete = False
     show_change_link = False
     can_add = True
     editable = False
-    readonly_fields = ('created_by',)
+    readonly_fields = ('created_by', 'created_at')
 
 
 class UserInsuranceAdmin(ImportExportMixin, admin.ModelAdmin):
@@ -903,7 +903,7 @@ class UserInsuranceAdmin(ImportExportMixin, admin.ModelAdmin):
     list_display = ['id', 'insurance_plan', 'user_name', 'user', 'policy_number', 'purchase_date', 'status']
     fields = ['insurance_plan', 'user', 'purchase_date', 'expiry_date', 'policy_number', 'premium_amount',
               'merchant_payout', 'status', 'cancel_reason', 'cancel_after_utilize_insurance', 'cancel_case_type',
-              'cancel_status', 'cancel_initial_date']
+              'cancel_status', 'cancel_initial_date', 'cancel_customer_type']
     readonly_fields = ('insurance_plan', 'user', 'purchase_date', 'expiry_date', 'policy_number', 'premium_amount',
                        'merchant_payout', 'cancel_initial_date')
     inlines = [InsuredMembersInline, UserBankInline, UserBankDocumentInline, GenericNotesInline]

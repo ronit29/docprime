@@ -527,6 +527,11 @@ class UserInsurance(auth_model.TimeStampedModel):
     NON_REFUNDED = 1
     REFUND_INITIATE = 2
     REFUNDED = 3
+
+    FRAUD = 1
+    OTHER = 2
+
+    CANCEL_CUSTOMER_TYPE_CHOICES = [(FRAUD, "Fraud"), (OTHER, "Other")]
     CANCEL_CASE_CHOICES = [(REFUND, "Refund"), (NO_REFUND, "Non-Refund")]
     CANCEL_STATUS_CHOICES = [(NON_REFUNDED, "Non-Refunded"), (REFUND_INITIATE, "Refund-Initiate"), (REFUNDED, "Refunded")]
 
@@ -552,7 +557,7 @@ class UserInsurance(auth_model.TimeStampedModel):
     premium_transferred = models.NullBooleanField(default=False)
     cancel_status = models.PositiveIntegerField(choices=CANCEL_STATUS_CHOICES, default=NON_REFUNDED)
     cancel_initial_date = models.DateTimeField(blank=True, null=True)
-
+    cancel_customer_type = models.PositiveIntegerField(choices=CANCEL_CUSTOMER_TYPE_CHOICES, default=OTHER)
     notes = GenericRelation(GenericNotes)
 
     def __str__(self):
