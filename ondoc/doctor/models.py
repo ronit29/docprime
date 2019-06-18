@@ -238,6 +238,8 @@ class Hospital(auth_model.TimeStampedModel, auth_model.CreatedByModel, auth_mode
     matrix_lead_id = models.BigIntegerField(blank=True, null=True, unique=True)
     is_listed_on_docprime = models.NullBooleanField(null=True, blank=True)
     about = models.TextField(blank=True, null=True, default="")
+    use_new_about = models.BooleanField(default=False)
+    new_about = models.TextField(blank=True, null=True, default=None)
     opd_timings = models.CharField(max_length=150, blank=True, null=True, default="")
     always_open = models.BooleanField(verbose_name='Is hospital open 24X7', default=False)
     # ratings = GenericRelation(ratings_models.RatingsReview, related_query_name='hospital_ratings')
@@ -256,8 +258,6 @@ class Hospital(auth_model.TimeStampedModel, auth_model.CreatedByModel, auth_mode
     is_ipd_hospital = models.BooleanField(default=False)
     is_big_hospital = models.BooleanField(default=False)
     has_proper_hospital_page = models.BooleanField(default=False)
-    new_about = models.TextField(blank=True, null=True, default=None)
-    use_new_about = models.BooleanField(default=False)
 
     def __str__(self):
         return self.name
@@ -1910,6 +1910,8 @@ class HospitalNetwork(auth_model.TimeStampedModel, auth_model.CreatedByModel, au
     name = models.CharField(max_length=100)
     operational_since = models.PositiveSmallIntegerField(blank=True, null=True, validators=[MinValueValidator(1900)])
     about = models.CharField(max_length=2000, blank=True)
+    use_new_about = models.BooleanField(default=False)
+    new_about = models.TextField(blank=True, null=True, default=None)
     network_size = models.PositiveSmallIntegerField(blank=True, null=True)
     building = models.CharField(max_length=100, blank=True)
     sublocality = models.CharField(max_length=100, blank=True)
