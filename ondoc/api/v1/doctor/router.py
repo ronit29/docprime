@@ -65,7 +65,6 @@ urlpatterns = [
     path('ipd_procedure/<int:pk>', IpdProcedureViewSet.as_view({'get': 'ipd_procedure_detail'}), name='ipd_procedure_detail'),
     path('hospitalsearch_by_url/<str:url>', HospitalViewSet.as_view({'get': 'list_by_url'}), name='hospitals_by_url'),
     path('ipd_procedure/<int:ipd_pk>/hospitals', HospitalViewSet.as_view({'get': 'list'}), name='ipd_procedure_hospitals'),
-    path('hospitals/list_by_alphabet', HospitalViewSet.as_view({'get': 'list_by_alphabet'}), name='list_hospital_by_alphabet'),
     path('hospital/<int:pk>', HospitalViewSet.as_view({'get': 'retrive'}), name='hospital_detail'),
     path('hospitals', HospitalViewSet.as_view({'get': 'list'}), name='hospitals_list'),
     path('hospital_by_url', HospitalViewSet.as_view({'get': 'retrieve_by_url'}), name='hospital_detail_by_url'),
