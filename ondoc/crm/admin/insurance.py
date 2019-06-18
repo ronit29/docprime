@@ -886,20 +886,6 @@ class GenericNotesInline(GenericTabularInline):
     readonly_fields = ('created_by', 'created_at')
 
 
-# class CancelStatusFilter(SimpleListFilter):
-#     title = _('status')
-#     parameter_name = 'status'
-#
-#     def lookups(self, request, model_admin):
-#         # qs = model_admin.queryset(request)
-#         return [(i, i) for i in [UserInsurance.ACTIVE, UserInsurance.CANCEL_INITIATE, UserInsurance.CANCELLED,
-#                                  UserInsurance.ONHOLD, UserInsurance.EXPIRED]]
-#
-#     def queryset(self, request, queryset):
-#         if int(self.value()) == UserInsurance.CANCEL_INITIATE:
-#             return UserInsurance.objects.filter(status=self.value()).order_by('-cancel_initial_date')
-
-
 class UserInsuranceAdmin(ImportExportMixin, admin.ModelAdmin):
     resource_class = (UserInsuranceDoctorResource, UserInsuranceLabResource, UserInsuranceResource)
     export_template_name = "export_insurance_report.html"
@@ -907,7 +893,7 @@ class UserInsuranceAdmin(ImportExportMixin, admin.ModelAdmin):
     model = UserInsurance
     date_hierarchy = 'created_at'
     list_filter = ['status', 'cancel_status']
-    # list_filter = [CancelStatusFilter, 'cancel_status']
+    ordering = ['-updated_at']
 
     def user_policy_number(self, obj):
         return str(obj.policy_number)
