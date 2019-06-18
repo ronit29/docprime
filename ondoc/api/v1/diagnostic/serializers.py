@@ -1267,6 +1267,12 @@ class IdListField(serializers.Field):
 
 
 class SearchLabListSerializer(serializers.Serializer):
+    SORT_ORDER = ('asc', 'desc')
+    TODAY = 1
+    TOMORROW = 2
+    NEXT_3_DAYS = 3
+    AVAILABILITY_CHOICES = ((TODAY, 'Today'), (TOMORROW, "Tomorrow"), (NEXT_3_DAYS, "Next 3 days"),)
+
     min_distance = serializers.IntegerField(required=False)
     max_distance = serializers.IntegerField(required=False)
     min_price = serializers.IntegerField(required=False)
@@ -1278,6 +1284,16 @@ class SearchLabListSerializer(serializers.Serializer):
     name = serializers.CharField(required=False)
     network_id = serializers.IntegerField(required=False)
     is_insurance = serializers.BooleanField(required=False)
+    sort_order = serializers.ChoiceField(choices=SORT_ORDER, required=False)
+    availability = CommaSepratedToListField(required=False, max_length=50, typecast_to=str)
+    avg_ratings = CommaSepratedToListField(required=False, max_length=50, typecast_to=str)
+    lab_visit = serializers.BooleanField(required=False)
+    home_visit = serializers.BooleanField(required=False)
+
+    def validate_availability(self, value):
+        if not set(value).issubset(set([str(avl_choice[0]) for avl_choice in self.AVAILABILITY_CHOICES])):
+            raise serializers.ValidationError("Not a Valid Availability Choice")
+        return value
 
 
 class UpdateStatusSerializer(serializers.Serializer):
@@ -1597,6 +1613,7 @@ class CustomLabTestPackageSerializer(serializers.ModelSerializer):
 
 
 class LabPackageListSerializer(serializers.Serializer):
+    SORT_ORDER = ('asc', 'desc')
     long = serializers.FloatField(default=77.071848)
     lat = serializers.FloatField(default=28.450367)
     min_distance = serializers.IntegerField(required=False)
@@ -1612,6 +1629,10 @@ class LabPackageListSerializer(serializers.Serializer):
     gender = serializers.ChoiceField(choices=LabTest.GENDER_TYPE_CHOICES, required=False)
     package_type = serializers.IntegerField(required=False)
     package_ids = CommaSepratedToListField(required=False, max_length=500, typecast_to=int)
+    sort_order = serializers.ChoiceField(choices=SORT_ORDER, required=False)
+    home_visit = serializers.BooleanField(default=False)
+    lab_visit = serializers.BooleanField(default=False)
+    avg_ratings = CommaSepratedToListField(required=False, max_length=500, typecast_to=int)
 
     def validate_package_ids(self, attrs):
         try:
