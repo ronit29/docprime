@@ -43,7 +43,13 @@ class InsurerFloatForm(forms.ModelForm):
 class InsurerFloatAdmin(admin.ModelAdmin):
     list_display = ['apd_account_name', 'insurer']
     form = InsurerFloatForm
-    # readonly_fields = ['insurer', 'current_float']
+    # readonly_fields = ['current_float']
+
+    def get_readonly_fields(self, request, obj=None):
+        if obj:
+            return ["apd_account_name", "insurer", "current_float"]
+        else:
+            return []
 
 
 class InsurancePlanContentInline(admin.TabularInline):
@@ -884,7 +890,7 @@ class UserInsuranceAdmin(ImportExportMixin, admin.ModelAdmin):
     formats = (base_formats.XLS,)
     model = UserInsurance
     date_hierarchy = 'created_at'
-    list_filter = ['status']
+    list_filter = ['status', 'cancel_status']
 
     def user_policy_number(self, obj):
         return str(obj.policy_number)
@@ -896,8 +902,10 @@ class UserInsuranceAdmin(ImportExportMixin, admin.ModelAdmin):
 
     list_display = ['id', 'insurance_plan', 'user_name', 'user', 'policy_number', 'purchase_date', 'status']
     fields = ['insurance_plan', 'user', 'purchase_date', 'expiry_date', 'policy_number', 'premium_amount',
-              'merchant_payout', 'status', 'cancel_reason', 'cancel_after_utilize_insurance', 'cancel_case_type']
-    readonly_fields = ('insurance_plan', 'user', 'purchase_date', 'expiry_date', 'policy_number', 'premium_amount', 'merchant_payout')
+              'merchant_payout', 'status', 'cancel_reason', 'cancel_after_utilize_insurance', 'cancel_case_type',
+              'cancel_status', 'cancel_initial_date']
+    readonly_fields = ('insurance_plan', 'user', 'purchase_date', 'expiry_date', 'policy_number', 'premium_amount',
+                       'merchant_payout', 'cancel_initial_date')
     inlines = [InsuredMembersInline, UserBankInline, UserBankDocumentInline, GenericNotesInline]
     form = UserInsuranceForm
     search_fields = ['id']
