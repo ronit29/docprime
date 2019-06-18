@@ -93,6 +93,11 @@ class UploadCostEstimate:
             self.log_error(row, 'Room type with id {} not found.'.format(room_type_id))
             # print('Room type with ID '+ room_type_id + ' not available')
 
+        try:
+            stay_duration = int(stay_duration)
+        except ValueError:
+            self.log_error(row, 'Stay duration {} is not valid.'.format(stay_duration))
+
         data = {'ipd_procedure': ipd_procedure, 'hospital': hospital, 'stay_duration': stay_duration,
                 'room_type': room_type, 'cost': cost}
         return data
