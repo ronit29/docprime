@@ -635,9 +635,6 @@ def create_or_update_lead_on_matrix(self, data):
             elif obj.type == ProviderSignupLead.HOSPITAL_ADMIN:
                 name = obj.name + ' (Hospital Admin)'
         elif obj_type == IpdProcedureLead.__name__:
-            if obj.hospital and not obj.hospital.is_big_hospital:
-                product_id = matrix_product_ids.get('consumer', 9)
-                sub_product_id = 0
             lead_source = obj.source
             mobile = obj.phone_number
             email = obj.email if obj.email else ''
