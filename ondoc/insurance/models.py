@@ -2,6 +2,7 @@ import datetime
 from django.utils.timezone import utc
 
 from django.contrib.contenttypes.fields import GenericRelation
+from django.contrib.contenttypes.models import ContentType
 from django.contrib.gis.geos import Point
 from django.core.validators import FileExtensionValidator
 
@@ -36,7 +37,7 @@ from hardcopy import bytestring_to_pdf
 import math
 import reversion
 import numbers
-from ondoc.account.models import Order, Merchant, MerchantPayout
+from ondoc.account.models import Order, Merchant, MerchantPayout, PgTransaction, PayoutMapping
 from decimal import  *
 
 logger = logging.getLogger(__name__)
@@ -344,13 +345,39 @@ class Insurer(auth_model.TimeStampedModel, LiveMixin):
 class InsurerAccount(auth_model.TimeStampedModel):
 
     insurer = models.ForeignKey(Insurer, related_name="float", on_delete=models.CASCADE)
+    apd_account_name = models.CharField(max_length=200, null=True, unique=True)
     current_float = models.PositiveIntegerField(default=None)
 
     def __str__(self):
-        return str(self.insurer)
+        return str(self.apd_account_name)
 
     class Meta:
         db_table = "insurer_account"
+
+class InsurerAccountTransfer(auth_model.TimeStampedModel):
+    from_account = models.ForeignKey(InsurerAccount, related_name="from_account", on_delete=models.CASCADE)
+    to_account = models.ForeignKey(InsurerAccount, related_name="to_account", on_delete=models.CASCADE)
+    amount = models.PositiveIntegerField(default=None)
+
+    class Meta:
+        db_table = "insurer_account_transfer"
+
+    def save(self, *args, **kwargs):
+        exists = True
+
+        if not self.id:
+            exists = False
+        super().save(*args, **kwargs)     
+
+        if not exists:
+            from_account = InsurerAccount.objects.select_for_update().get(id=self.from_account.id)
+            to_account = InsurerAccount.objects.select_for_update().get(id=self.to_account.id)
+            if from_account.current_float<self.amount:
+                raise Exception('amount cannot be greater then amount in source account')
+            from_account.current_float -= self.amount
+            to_account.current_float += self.amount
+            from_account.save()
+            to_account.save()
 
 
 class InsurancePlans(auth_model.TimeStampedModel, LiveMixin):
@@ -467,6 +494,22 @@ class InsuranceThreshold(auth_model.TimeStampedModel, LiveMixin):
         db_table = "insurance_threshold"
 
 
+class InsurerPolicyNumber(auth_model.TimeStampedModel):
+    insurer = models.ForeignKey(Insurer, related_name='policy_number_history', on_delete=models.DO_NOTHING, null=True, blank=True)
+    insurer_policy_number = models.CharField(max_length=50)
+    insurance_plan = models.ForeignKey(InsurancePlans, related_name='plan_policy_number', on_delete=models.DO_NOTHING, null=True, blank=True)
+    apd_account = models.ForeignKey(InsurerAccount, related_name='policy_apd_account', on_delete=models.DO_NOTHING, null=True, blank=True)
+
+    class Meta:
+        db_table = 'insurer_policy_numbers'
+
+    @cached_property
+    def insurer_account(self):
+        if self.apd_account:
+            return self.apd_account
+        return InsurerAccount.objects.order_by('id').first()
+
+
 class UserInsurance(auth_model.TimeStampedModel):
     from ondoc.account.models import MoneyPool
 
@@ -481,7 +524,16 @@ class UserInsurance(auth_model.TimeStampedModel):
 
     STATUS_CHOICES = [(ACTIVE, "Active"), (CANCELLED, "Cancelled"), (EXPIRED, "Expired"), (ONHOLD, "Onhold"),
                       (CANCEL_INITIATE, 'Cancel Initiate')]
+    NON_REFUNDED = 1
+    REFUND_INITIATE = 2
+    REFUNDED = 3
+
+    FRAUD = 1
+    OTHER = 2
+
+    CANCEL_CUSTOMER_TYPE_CHOICES = [(FRAUD, "Fraud"), (OTHER, "Other")]
     CANCEL_CASE_CHOICES = [(REFUND, "Refund"), (NO_REFUND, "Non-Refund")]
+    CANCEL_STATUS_CHOICES = [(NON_REFUNDED, "Non-Refunded"), (REFUND_INITIATE, "Refund-Initiate"), (REFUNDED, "Refunded")]
 
     id = models.BigAutoField(primary_key=True)
     insurance_plan = models.ForeignKey(InsurancePlans, related_name='active_users', on_delete=models.DO_NOTHING)
@@ -501,10 +553,29 @@ class UserInsurance(auth_model.TimeStampedModel):
     merchant_payout = models.ForeignKey(MerchantPayout, related_name="user_insurance", on_delete=models.DO_NOTHING, null=True)
     cancel_reason = models.CharField(max_length=200, blank=True, null=True, default=None)
     cancel_case_type = models.PositiveIntegerField(choices=CANCEL_CASE_CHOICES, default=REFUND)
+    master_policy_reference = models.ForeignKey(InsurerPolicyNumber, related_name='policy_reference', on_delete=models.DO_NOTHING, null=True)
+    premium_transferred = models.NullBooleanField(default=False)
+    cancel_status = models.PositiveIntegerField(choices=CANCEL_STATUS_CHOICES, default=NON_REFUNDED)
+    cancel_initial_date = models.DateTimeField(blank=True, null=True)
+    cancel_customer_type = models.PositiveIntegerField(choices=CANCEL_CUSTOMER_TYPE_CHOICES, default=OTHER)
     notes = GenericRelation(GenericNotes)
 
     def __str__(self):
         return str(self.user)
+
+    @cached_property
+    def master_policy(self):
+
+        if self.master_policy_reference:
+            return self.master_policy_reference
+
+        policy = InsurerPolicyNumber.objects.\
+            filter(insurance_plan=self.insurance_plan,insurer=self.insurance_plan.insurer).order_by('-id').first()
+        if not policy:
+            policy = InsurerPolicyNumber.objects.\
+            filter(insurance_plan__isnull=True,insurer=self.insurance_plan.insurer).order_by('-id').first()
+
+        return policy
 
     @cached_property
     def specialization_days_limit(self):
@@ -513,35 +584,116 @@ class UserInsurance(auth_model.TimeStampedModel):
         return days
 
     def save(self, *args, **kwargs):
-        if not self.merchant_payout:
-            self.create_payout()
+        # if not self.merchant_payout:
+        #     self.create_payout()
         super().save(*args, **kwargs)
 
-    def create_payout(self):
-        if self.merchant_payout:
-            raise Exception("payout already created for this insurance purchase")
+    def process_payout(self):
+        if self.premium_transferred:
+            return
 
-        payout_data = {
-            "charged_amount" : self.premium_amount,
-            "payable_amount" : self.premium_amount,
-            "content_object" : self.insurance_plan.insurer,
-            "type"   : MerchantPayout.AUTOMATIC,
-            "paid_to"        : self.insurance_plan.insurer.merchant,
-            "booking_type"   : Order.INSURANCE_PRODUCT_ID
-        }
+        with transaction.atomic():
+            if self.can_process_payout():
+                payouts = self.get_insurance_payouts()
+                for p in payouts:
+                    #p.process_insurance_premium_payout()
+                    pass
+            else:
+                self.init_payout()
 
-        merchant_payout = MerchantPayout.objects.create(**payout_data)
-        self.merchant_payout = merchant_payout
+    def can_process_payout(self):
+        #do we have payouts for complete premium
+        #do we have transaction for these payouts
+        premium = self.premium_amount
+        can_process = True
+        payout_premium = 0
+        payouts = self.get_insurance_payouts()
+        for p in payouts:
+            if not p.is_nodal_transfer():
+                payout_premium += p.payable_amount
+            elif not p.utr_no:
+                can_process = False
+            transactions = p.get_insurance_premium_transactions()
+            transaction = transactions[0] if transactions else None
+            if not transaction:
+                can_process = False
+        if payout_premium != premium:
+            can_process=False
 
-    def save_payout(self):
-        self.create_payout()
-        self.save()
+        return can_process
 
-    @classmethod
-    def generate_pending_payouts(cls):
-        bookings = cls.objects.filter(merchant_payout__isnull=True)
-        for booking in bookings:
-            booking.save_payout()
+    def init_payout(self):
+        transfer_status = False
+        nodal_payout = None
+        if self.needs_transfer_to_insurance_nodal():
+            transfer_status = self.transfer_to_insurance_nodal()
+            if transfer_status:
+                nodal_payout = self.get_insurance_nodal_transfer_payouts()
+                if len(nodal_payout)>1:
+                    raise Exception('multiple nodal transfer found')
+                elif len(nodal_payout)==0:
+                    raise Exception('no transfers found')
+                nodal_payout = nodal_payout[0]
+            if nodal_payout and nodal_payout.utr_no:
+                payout = MerchantPayout()
+                payout.charged_amount = nodal_payout.charged_amount
+                payout.payable_amount = nodal_payout.payable_amount
+                payout.content_object = self.insurance_plan.insurer
+                payout.type = MerchantPayout.AUTOMATIC
+                payout.paid_to = self.insurance_plan.insurer.merchant
+                payout.booking_type = Order.INSURANCE_PRODUCT_ID
+                payout.save()
+                PayoutMapping.objects.create(**{'content_object': self, 'payout': payout})
+                transaction = payout.get_or_create_insurance_premium_transaction()
+
+        amount = None
+        order = self.order
+
+        if order.amount>0 and order.wallet_amount>0:
+            amount = order.amount
+        if order.amount==0 and not self.needs_transfer_to_insurance_nodal():
+            amount = order.wallet_amount
+        if order.wallet_amount==0:
+            amount = order.amount        
+        if amount and amount>0:
+            if PayoutMapping.objects.filter(content_object=self, payout__amount=amount).exists():
+                return
+            payout = MerchantPayout()
+            payout.charged_amount = amount
+            payout.payable_amount = amount
+            payout.content_object = self.insurance_plan.insurer
+            payout.type = MerchantPayout.AUTOMATIC
+            payout.paid_to = self.insurance_plan.insurer.merchant
+            payout.booking_type = Order.INSURANCE_PRODUCT_ID
+            payout.save()
+            PayoutMapping.objects.create(**{'content_object': self, 'payout': payout})
+
+    #
+    # def create_payout(self):
+    #     if self.merchant_payout:
+    #         raise Exception("payout already created for this insurance purchase")
+    #
+    #     payout_data = {
+    #         "charged_amount" : self.premium_amount,
+    #         "payable_amount" : self.premium_amount,
+    #         "content_object" : self.insurance_plan.insurer,
+    #         "type"   : MerchantPayout.AUTOMATIC,
+    #         "paid_to"        : self.insurance_plan.insurer.merchant,
+    #         "booking_type"   : Order.INSURANCE_PRODUCT_ID
+    #     }
+    #
+    #     merchant_payout = MerchantPayout.objects.create(**payout_data)
+    #     self.merchant_payout = merchant_payout
+
+    # def save_payout(self):
+    #     self.create_payout()
+    #     self.save()
+    #
+    # @classmethod
+    # def generate_pending_payouts(cls):
+    #     bookings = cls.objects.filter(merchant_payout__isnull=True)
+    #     for booking in bookings:
+    #         booking.save_payout()
 
     def get_primary_member_profile(self):
         insured_members = self.members.filter().order_by('id')
@@ -955,10 +1107,18 @@ class UserInsurance(auth_model.TimeStampedModel):
                                                             expiry_date=insurance_data['expiry_date'],
                                                             premium_amount=insurance_data['premium_amount'],
                                                             order=insurance_data['order'],
-                                                            policy_number=generate_insurance_insurer_policy_number(insurance_data['insurance_plan']))
+                                                            policy_number=generate_insurance_insurer_policy_number(insurance_data['insurance_plan']),
+                                                            master_policy_reference=cls.get_master_policy_reference(insurance_data['insurance_plan']))
 
         insured_members = InsuredMembers.create_insured_members(user_insurance_obj)
         return user_insurance_obj
+
+    @classmethod
+    def get_master_policy_reference(cls, plan):
+        policy_number_obj = InsurerPolicyNumber.objects.filter(insurance_plan=plan).order_by('-id').first()
+        if not policy_number_obj:
+            return None
+        return policy_number_obj
 
     def validate_insurance(self, appointment_data):
         from ondoc.doctor.models import OpdAppointment
@@ -1253,6 +1413,7 @@ class UserInsurance(auth_model.TimeStampedModel):
             appointment.status = LabAppointment.CANCELLED
             appointment.save()
         self.status = UserInsurance.CANCEL_INITIATE
+        self.cancel_initial_date = timezone.now()
         self.save()
 
         send_cancellation_notification = True if self.user and hasattr(self, '_responsible_user') and self._responsible_user == self.user else None
@@ -1319,10 +1480,139 @@ class UserInsurance(auth_model.TimeStampedModel):
 
         return response
 
+    # @classmethod
+    # def process_payouts(cls):
+    #     insurance_list = cls.objects.filter(
+    #         merchant_payout__status__in=[MerchantPayout.PENDING, MerchantPayout.ATTEMPTED, MerchantPayout.AUTOMATIC])
+    #     for insurance in insurance_list:
+    #         insurance.process_insurance_obj_payouts()
+
+    def transfer_to_insurance_nodal(self):
+        status = False
+        if self.needs_transfer_to_insurance_nodal():
+            nodal_payout = self.get_insurance_nodal_transfer_payouts()
+            if nodal_payout:
+                nodal_payout = nodal_payout[0]
+            else:
+                merchant = Merchant.objects.filter(id=settings.DOCPRIME_NODAL2_MERCHANT).first()
+                payout_data = {
+                "charged_amount": self.order.wallet_amount,
+                "payable_amount": self.order.wallet_amount,
+                #"content_object": self.insurance_plan.insurer,
+                "type": MerchantPayout.AUTOMATIC,
+                "paid_to": merchant,
+                "booking_type": Order.INSURANCE_PRODUCT_ID
+                }
+
+                nodal_payout = MerchantPayout.objects.create(**payout_data)
+                PayoutMapping.objects.create(**{'content_object':self,'payout':nodal_payout})
+
+            transaction = nodal_payout.get_insurance_premium_transactions()
+            if transaction:
+                transaction = transaction[0]
+            else:
+                transaction = nodal_payout.get_or_create_insurance_premium_transaction()
+
+            if transaction:
+                status = nodal_payout.process_insurance_premium_payout()
+
+            return status
+
+    def get_insurance_payouts(self):
+        results = []
+        pms = PayoutMapping.objects.filter(object_id=self.id, content_type_id=ContentType.objects.get_for_model(self).id)
+        for pm in pms:
+            results.append(pm.payout)
+        return results
+
+
+    def get_insurance_nodal_transfer_payouts(self):
+        docprime_merchant = Merchant.objects.filter(id=settings.DOCPRIME_NODAL2_MERCHANT).first()
+        results = []
+        payouts = self.get_insurance_payouts()
+        for p in payouts:
+            if p.paid_to == docprime_merchant:
+                results.append(p)
+        return results
+
+    def needs_transfer_to_insurance_nodal(self):
+        order = self.order
+        wallet_amount = order.wallet_amount
+        premium_amount = self.premium_amount
+        response = None
+        pg_transactions = PgTransaction.objects.filter(product_id=Order.INSURANCE_PRODUCT_ID, user=self.user)
+        if not wallet_amount:
+            response = False
+        elif wallet_amount == premium_amount:
+            if len(pg_transactions) == 1 and pg_transactions.first().amount == wallet_amount:
+                response = False
+        elif wallet_amount != premium_amount:
+            pg_amount = premium_amount - wallet_amount
+            if len(pg_transactions) == 1 and pg_transactions.first().amount == pg_amount:
+                response = True
+        if response==None:
+            raise Exception('transfer not possible. Handle manually')
+
+        return response
+        # DummyTransactions.objects.filter(reference_id = self.id,product_id=3, transaction_type=DummyTransactions.INSURANCE_NODAL_TRANSFER)
+        #     response=Fa
+
+    # @classmethod
+    # def transfer_insurance_amount(cls):
+    #     from ondoc.account.models import PgTransaction
+    #     insurances = UserInsurance.objects.all()
+    #     for ins in insurances:
+    #         order = ins.order
+    #         wallet_amount = order.wallet_amount
+    #         premium_amount = ins.premium_amount
+    #         pg_transactions = PgTransaction.objects.filter(product_id=Order.INSURANCE_PRODUCT_ID, user=ins.user)
+    #         if wallet_amount>0 and wallet_amount!=premium_amount:
+    #             pg_amount = ins.premium_amount - wallet_amount
+
+    #             if len(pg_transactions) == 1 and pg_transactions.first().amount == pg_amount:
+
+    #                 #paid_to nodal2 merchant
+    #                 paid_to = None
+    #                 payout_data = {
+    #                     "charged_amount": wallet_amount,
+    #                     "payable_amount": wallet_amount,
+    #                     "content_object": ins.insurance_plan.insurer,
+    #                     "type": MerchantPayout.AUTOMATIC,
+    #                     "paid_to": paid_to,
+    #                     "booking_type": Order.INSURANCE_PRODUCT_ID
+    #                 }
+
+    #                 merchant_payout_obj = MerchantPayout.objects.create(**payout_data)
+
+
+    # def process_insurance_obj_payouts(self):
+    #     from ondoc.account.models import PgTransaction
+
+    #     order = self.order
+    #     merchant_payout_obj = self.merchant_payout
+    #     user = self.user
+
+    #     if merchant_payout_obj.status not in [MerchantPayout.PENDING, MerchantPayout.ATTEMPTED,
+    #                                           MerchantPayout.AUTOMATIC]:
+    #         return
+
+    #     # Directly Paid from the Pg as no wallet amount is used.
+    #     if not order.wallet_amount or order.wallet_amount == Decimal(0):
+    #         merchant_payout_obj.process_payout = True
+    #         merchant_payout_obj.save()
+
+    #     elif order.wallet_amount and order.wallet_amount == self.premium_amount:
+    #         pg_transactions = PgTransaction.objects.filter(product_id=Order.INSURANCE_PRODUCT_ID, user=user)
+
+    #         # Order not processed but payment sucess and same wallet amount used next time.
+    #         if len(pg_transactions) == 1 and pg_transactions.first():
+    #             pass
+
     def is_bank_details_exist(self):
         bank_obj = UserBank.objects.filter(insurance=self).order_by('-id').first()
-        bank_document_obj = UserBankDocument.objects.filter(insurance=self).order_by('-id').first()
-        if bank_obj and bank_document_obj:
+        # bank_document_obj = UserBankDocument.objects.filter(insurance=self).order_by('-id').first()
+        # if bank_obj and bank_document_obj:
+        if bank_obj:
             return True
         else:
             return False
@@ -1372,7 +1662,12 @@ class InsuranceTransaction(auth_model.TimeStampedModel):
         if self.transaction_type == self.DEBIT:
             transaction_amount = -1*transaction_amount
 
-        insurer_account = InsurerAccount.objects.select_for_update().get(insurer=self.user_insurance.insurance_plan.insurer)
+        # master_policy_obj = self.user_insurance.master_policy_reference
+        # account_id = master_policy_obj.apd_account.id
+        master_policy_obj = self.user_insurance.master_policy
+        account_id = master_policy_obj.insurer_account.id
+        # insurer_account = InsurerAccount.objects.select_for_update().get(insurer=self.user_insurance.insurance_plan.insurer)
+        insurer_account = InsurerAccount.objects.select_for_update().get(id=account_id)
         insurer_account.current_float += transaction_amount        
         insurer_account.save()
 
@@ -1606,15 +1901,6 @@ class InsuranceDeal(auth_model.TimeStampedModel):
 
     class Meta:
         db_table = 'insurance_deals'
-
-
-class InsurerPolicyNumber(auth_model.TimeStampedModel):
-    insurer = models.ForeignKey(Insurer, related_name='policy_number_history', on_delete=models.DO_NOTHING, null=True, blank=True)
-    insurer_policy_number = models.CharField(max_length=50)
-    insurance_plan = models.ForeignKey(InsurancePlans, related_name='plan_policy_number', on_delete=models.DO_NOTHING, null=True, blank=True)
-
-    class Meta:
-        db_table = 'insurer_policy_numbers'
 
 
 class InsuranceDummyData(auth_model.TimeStampedModel):

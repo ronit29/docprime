@@ -13,7 +13,7 @@ from ondoc.diagnostic.models import LabAppointment, LabTest, Lab
 from ondoc.insurance.models import InsurancePlanContent, InsurancePlans, InsuredMembers, UserInsurance, StateGSTCode, \
      ThirdPartyAdministrator, InsuranceEligibleCities, InsuranceCity, InsuranceDistrict, InsuranceDeal, \
     InsurerPolicyNumber, InsuranceLead, EndorsementRequest, InsuredMemberDocument, InsuranceEligibleCities,\
-    InsuranceThreshold, UserBank, InsuredMemberHistory, UserBankDocument
+    InsuranceThreshold, UserBank, InsuredMemberHistory, UserBankDocument, InsurerAccountTransfer
 from import_export.admin import ImportExportMixin, ImportExportModelAdmin, base_formats
 import nested_admin
 from import_export import fields, resources
@@ -22,6 +22,8 @@ from ondoc.insurance.models import InsuranceDisease
 from django.db import transaction
 from django.conf import settings
 from django.contrib.contenttypes.admin import GenericTabularInline
+from django.contrib.admin import SimpleListFilter
+from django.utils.translation import ugettext_lazy as _
 
 
 class InsurerAdmin(admin.ModelAdmin):
@@ -31,9 +33,25 @@ class InsurerAdmin(admin.ModelAdmin):
     search_fields = ['name']
 
 
+class InsurerFloatForm(forms.ModelForm):
+
+    def clean(self):
+        super().clean()
+        # data = self.cleaned_data
+        if self.instance.id:
+            raise forms.ValidationError('Insurer Account can not be editable')
+
+
 class InsurerFloatAdmin(admin.ModelAdmin):
-    list_display = ['insurer']
-    readonly_fields = ['insurer', 'current_float']
+    list_display = ['apd_account_name', 'insurer']
+    form = InsurerFloatForm
+    # readonly_fields = ['current_float']
+
+    def get_readonly_fields(self, request, obj=None):
+        if obj:
+            return ["apd_account_name", "insurer", "current_float"]
+        else:
+            return []
 
 
 class InsurancePlanContentInline(admin.TabularInline):
@@ -46,9 +64,26 @@ class InsurancePlanContentInline(admin.TabularInline):
     # readonly_fields = ("first_name", 'last_name', 'relation', 'dob', 'gender', )
 
 
+class PolicyNumberFormset(forms.models.BaseInlineFormSet):
+    def clean(self):
+        if not self.forms:
+            raise forms.ValidationError('Master Policy Number must have at least one Policy Number')
+        for form in self.forms:
+            data = form.cleaned_data
+            if not data.get('insurer'):
+                raise forms.ValidationError('Master Policy Number must have at least one insurer')
+            if not data.get('insurance_plan'):
+                raise forms.ValidationError('Master Policy Number must have at least one insurance plan')
+            if not data.get('apd_account'):
+                raise forms.ValidationError('Master Policy Number must have at least one APD account')
+            if not data.get('insurer_policy_number'):
+                raise forms.ValidationError('Master Policy Number must have at least one Policy Number')
+
+
 class InsurerPolicyNumberInline(admin.TabularInline):
+    formset = PolicyNumberFormset
     model = InsurerPolicyNumber
-    fields = ('insurer', 'insurer_policy_number')
+    fields = ('insurer', 'apd_account', 'insurer_policy_number')
     extra = 0
 
 
@@ -78,8 +113,8 @@ class InsuranceThresholdInline(admin.TabularInline):
 
 class InsurancePlansAdmin(admin.ModelAdmin):
 
-    list_display = ['insurer', 'name','internal_name', 'amount', 'is_selected','get_policy_prefix']
-    inlines = [InsurancePlanContentInline, InsurerPolicyNumberInline,InsuranceThresholdInline]
+    list_display = ['insurer', 'name', 'internal_name', 'amount', 'is_selected','get_policy_prefix']
+    inlines = [InsurancePlanContentInline, InsurerPolicyNumberInline, InsuranceThresholdInline]
     search_fields = ['name']
     form = InsurancePlanAdminForm
 
@@ -88,8 +123,6 @@ class InsuranceThresholdAdmin(admin.ModelAdmin):
 
     list_display = ['insurance_plan']
 
-
-# class InsuranceTransaction
 
 class InsuredMembersInline(admin.TabularInline):
     model = InsuredMembers
@@ -786,13 +819,16 @@ class UserInsuranceForm(forms.ModelForm):
 
     status_choices = [(UserInsurance.ACTIVE, "Active"), (UserInsurance.CANCEL_INITIATE, 'Cancel Initiate'),
                       (UserInsurance.CANCELLED, "Cancelled")]
+    cancel_status_choices = [(UserInsurance.NON_REFUNDED, "Non-Refunded"), (UserInsurance.REFUND_INITIATE,
+                                                                            "Refund Initiate"), (UserInsurance.REFUNDED
+                                                                            , "Refunded")]
     case_choices = [(UserInsurance.REFUND, "Refundable"), (UserInsurance.NO_REFUND, "Non-Refundable")]
     cancel_after_utilize_choices = [('YES', 'Yes'), ('NO', 'No')]
     status = forms.ChoiceField(choices=status_choices, required=True)
     cancel_after_utilize_insurance = forms.ChoiceField(choices=cancel_after_utilize_choices, initial='NO',  widget=forms.RadioSelect())
     cancel_reason = forms.CharField(max_length=400, required=False)
     cancel_case_type = forms.ChoiceField(choices=case_choices, initial=UserInsurance.REFUND)
-
+    cancel_status = forms.ChoiceField(choices=cancel_status_choices, initial=UserInsurance.NON_REFUNDED)
 
     def clean(self):
         super().clean()
@@ -801,14 +837,15 @@ class UserInsuranceForm(forms.ModelForm):
         case_type = data.get('cancel_after_utilize_insurance')
         cancel_reason = data.get('cancel_reason')
         cancel_case_type = data.get('cancel_case_type')
+        cancel_status = data.get('cancel_status')
         # if int(status) == UserInsurance.ONHOLD:
         #     if not onhold_reason:
         #         raise forms.ValidationError("In Case of ONHOLD status, Onhold reason is mandatory")
         if case_type=="NO" and (int(status) == UserInsurance.CANCEL_INITIATE or int(status) == UserInsurance.CANCELLED):
             if not cancel_reason:
                 raise forms.ValidationError('For Cancel Initiation, Cancel reason is mandatory')
-            if not self.instance.is_bank_details_exist():
-                raise forms.ValidationError('For Cancel Initiation, Bank details is mandatory')
+            # if not self.instance.is_bank_details_exist():
+            #     raise forms.ValidationError('For Cancel Initiation, Bank details is mandatory')
             insured_opd_completed_app_count = OpdAppointment.get_insured_completed_appointment(self.instance)
             insured_lab_completed_app_count = LabAppointment.get_insured_completed_appointment(self.instance)
             if insured_lab_completed_app_count > 0:
@@ -820,12 +857,17 @@ class UserInsuranceForm(forms.ModelForm):
         if case_type == "YES" and (int(status) == UserInsurance.CANCEL_INITIATE or int(status) == UserInsurance.CANCELLED):
             if not cancel_reason:
                 raise forms.ValidationError('For Cancel Initiation, Cancel reason is mandatory')
-            if int(cancel_case_type) == UserInsurance.REFUND and not self.instance.is_bank_details_exist():
-                raise forms.ValidationError('In Case of Refundable Bank details are mandatory, please upload bank details')
+            # if int(cancel_case_type) == UserInsurance.REFUND and not self.instance.is_bank_details_exist():
+            #     raise forms.ValidationError('In Case of Refundable Bank details are mandatory, please upload bank details')
         if int(status) == UserInsurance.CANCELLED and not self.instance.status == UserInsurance.CANCEL_INITIATE:
             raise forms.ValidationError('Cancellation is only allowed for cancel initiate status')
         if self.instance.status == UserInsurance.CANCELLED:
             raise forms.ValidationError('Cancelled Insurance could not be changed')
+        # if cancel_status == UserInsurance.NON_REFUNDED and cancel_case_type == UserInsurance.REFUND:
+        #     raise forms.ValidationError("Cancel Status must be Refunded in case of Refundable case type")
+        if (int(cancel_status) == UserInsurance.REFUNDED and int(cancel_case_type) == UserInsurance.NO_REFUND) or \
+            (int(cancel_status) == UserInsurance.REFUND_INITIATE and int(cancel_case_type) == UserInsurance.NO_REFUND):
+            raise forms.ValidationError("Cancel Status must be Non-Refunded in case of Non-Refundable case type")
 
     class Meta:
         fields = '__all__'
@@ -845,13 +887,13 @@ class UserBankDocumentAdmin(admin.ModelAdmin):
 
 class GenericNotesInline(GenericTabularInline):
     model = GenericNotes
-    fields = ('notes', 'created_by')
+    fields = ('notes', 'created_by', 'created_at')
     extra = 0
     can_delete = False
     show_change_link = False
     can_add = True
     editable = False
-    readonly_fields = ('created_by',)
+    readonly_fields = ('created_by', 'created_at')
 
 
 class UserInsuranceAdmin(ImportExportMixin, admin.ModelAdmin):
@@ -860,7 +902,8 @@ class UserInsuranceAdmin(ImportExportMixin, admin.ModelAdmin):
     formats = (base_formats.XLS,)
     model = UserInsurance
     date_hierarchy = 'created_at'
-    list_filter = ['status']
+    list_filter = ['status', 'cancel_status']
+    ordering = ['-updated_at']
 
     def user_policy_number(self, obj):
         return str(obj.policy_number)
@@ -872,8 +915,10 @@ class UserInsuranceAdmin(ImportExportMixin, admin.ModelAdmin):
 
     list_display = ['id', 'insurance_plan', 'user_name', 'user', 'policy_number', 'purchase_date', 'status']
     fields = ['insurance_plan', 'user', 'purchase_date', 'expiry_date', 'policy_number', 'premium_amount',
-              'merchant_payout', 'status', 'cancel_reason', 'cancel_after_utilize_insurance', 'cancel_case_type']
-    readonly_fields = ('insurance_plan', 'user', 'purchase_date', 'expiry_date', 'policy_number', 'premium_amount', 'merchant_payout')
+              'merchant_payout', 'status', 'cancel_reason', 'cancel_after_utilize_insurance', 'cancel_case_type',
+              'cancel_status', 'cancel_initial_date', 'cancel_customer_type']
+    readonly_fields = ('insurance_plan', 'user', 'purchase_date', 'expiry_date', 'policy_number', 'premium_amount',
+                       'merchant_payout', 'cancel_initial_date')
     inlines = [InsuredMembersInline, UserBankInline, UserBankDocumentInline, GenericNotesInline]
     form = UserInsuranceForm
     search_fields = ['id']
@@ -985,20 +1030,27 @@ class InsuranceDistrictAdmin(ImportExportModelAdmin):
     list_display = ('id', 'district_code', 'district_name', 'state')
 
 
-# class InsurerPolicyNumberForm(forms.ModelForm):
-#
-#     class Meta:
-#         widgets = {
-#             'insurer': autocomplete.ModelSelect2(url='insurer-autocomplete'),
-#             'insurance_plan': autocomplete.ModelSelect2(url='insurance-plan-autocomplete', forward=['insurer'])
-#         }
+class InsurerPolicyNumberForm(forms.ModelForm):
+    def clean(self):
+        super().clean()
+        if any(self.errors):
+            return
+        data = self.cleaned_data
+        if not data.get('apd_account'):
+            raise forms.ValidationError('Apd Account is mandatory for Policy Number')
+        if not data.get('insurance_plan'):
+            raise forms.ValidationError('Insurance Plan is mandatory for Policy Number')
+        if not data.get('insurer_policy_number'):
+            raise forms.ValidationError('Insurance Policy number is mandatory for Policy Number')
+        if not data.get('insurer'):
+            raise forms.ValidationError('Insurer is mandatory for Policy Number')
 
 
 class InsurerPolicyNumberAdmin(admin.ModelAdmin):
     model = InsurerPolicyNumber
-    fields = ('insurer', 'insurance_plan', 'insurer_policy_number')
-    list_display = ('insurer', 'insurance_plan', 'insurer_policy_number', 'created_at')
-    # form = InsurerPolicyNumberForm
+    fields = ('insurer', 'insurance_plan', 'insurer_policy_number', 'apd_account')
+    list_display = ('insurer', 'insurance_plan', 'insurer_policy_number', 'apd_account', 'created_at')
+    form = InsurerPolicyNumberForm
     # search_fields = ['insurer']
     # autocomplete_fields = ['insurer', 'insurance_plan']
 
@@ -1154,7 +1206,6 @@ class EndorsementRequestForm(forms.ModelForm):
     status_choices = [(EndorsementRequest.PENDING, "Pending"), (EndorsementRequest.APPROVED, 'Approved'),
                       (EndorsementRequest.REJECT, "Reject")]
     status = forms.ChoiceField(choices=status_choices, required=True)
-    # coi_choices = [("YES", "Yes"), ("NO", "No")]
     mail_coi_to_customer = forms.BooleanField(initial=False)
     reject_reason = forms.CharField(max_length=150, required=False)
 
@@ -1168,6 +1219,7 @@ class EndorsementRequestForm(forms.ModelForm):
             raise forms.ValidationError('Without Approved COI can not be send to customer')
         if status == EndorsementRequest.REJECT and not reject_reason:
             raise forms.ValidationError('For Rejection, reject reason is mandatory')
+
 
     class Meta:
         fields = '__all__'
@@ -1283,7 +1335,7 @@ class EndorsementRequestAdmin(admin.ModelAdmin):
         else:
             return obj.member.title + "(edited)"
 
-    list_display = ['member_name', 'insurance_id']
+    list_display = ['member_name', 'insurance_id', 'status', 'created_at']
     readonly_fields = ['member', 'insurance', 'member_type', 'title', 'old_title', 'first_name', 'old_first_name',
                        'middle_name', 'old_middle_name', 'last_name', 'old_last_name', 'dob', 'old_dob', 'email',
                        'old_email',  'address', 'old_address', 'pincode', 'old_pincode', 'gender', 'old_gender',
@@ -1291,6 +1343,7 @@ class EndorsementRequestAdmin(admin.ModelAdmin):
                        'district', 'old_district', 'state', 'old_state', 'state_code', 'city_code',
                        'district_code']
     inlines = [InsuredMemberDocumentInline]
+    # form = EndorsementRequestForm
 
     def has_add_permission(self, request, obj=None):
         return False
@@ -1339,3 +1392,7 @@ class ThirdPartyAdministratorAdmin(ImportExportMixin, admin.ModelAdmin):
     resource_class = ThirdPartyAdministratorResource
     search_fields = ['name']
     list_display = ['id', 'name']
+
+
+class InsurerAccountTransferAdmin(admin.ModelAdmin):
+    model = InsurerAccountTransfer

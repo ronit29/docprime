@@ -127,7 +127,6 @@ DJANGO_APPS = (
     'django.contrib.sites',
     'django.contrib.sitemaps',
 )
-
 THIRD_PARTY_APPS = (
 
     'rest_framework',
@@ -147,8 +146,10 @@ THIRD_PARTY_APPS = (
     'django_comments',
     'safedelete',
     'qrcode',
+    'Crypto',
     'multiselectfield'
 )
+
 
 LOCAL_APPS = (
     'ondoc.crm',
@@ -413,6 +414,7 @@ SETTLEMENT_AUTH=env('SETTLEMENT_AUTH', default=None)
 THYROCARE_NAME_PARAM_REQUIRED_TESTS = env('THYROCARE_NAME_PARAM_REQUIRED_TESTS', default='')
 IS_INSURANCE_ACTIVE = env.bool('IS_INSURANCE_ACTIVE')
 
+
 ANYMAIL = {
     "MAILGUN_API_KEY": env('MAILGUN_API_KEY', default=None),
     "MAILGUN_SENDER_DOMAIN": 'mail.docprime.com',
@@ -467,3 +469,5 @@ LOGO_CHANGE_EMAIL_RECIPIENTS=env.list('LOGO_CHANGE_EMAIL_RECIPIENTS')
 PROVIDER_SMS_APPOINTMENT_REMINDER_TIME=env('PROVIDER_SMS_APPOINTMENT_REMINDER_TIME', default=5) # in minutes
 
 INSURANCE_SPECIALIZATION_WITH_DAYS_LIMIT=env('INSURANCE_SPECIALIZATION_WITH_DAYS_LIMIT')
+DOCPRIME_NODAL2_MERCHANT=env('DOCPRIME_NODAL2_MERCHANT',default=None)
+DEFAULT_FOLLOWUP_DURATION=7

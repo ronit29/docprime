@@ -56,7 +56,23 @@ class NewDynamicAdmin(admin.ModelAdmin):
     # search_fields = ['url__url', 'url_value__url']
     # exclude = ['url_value']
     # readonly_fields = ['url_value']
-    readonly_fields = ['url']
+    readonly_fields = ['url', 'admin_page']
 
-
+    def admin_page(self, obj):
+        from ondoc.doctor.models import Hospital
+        from django.urls import reverse
+        from django.utils.safestring import mark_safe
+        admin_link = None
+        if obj and obj.url_value:
+            entity_obj = EntityUrls.objects.filter(url=obj.url_value,
+                                                   sitemap_identifier=EntityUrls.SitemapIdentifier.HOSPITAL_PAGE,
+                                                   is_valid=True).first()
+            if not entity_obj:
+                return admin_link
+            hosp_obj = Hospital.objects.filter(id=entity_obj.entity_id).first()
+            if not hosp_obj:
+                return admin_link
+            exit_point_url = reverse('admin:{}_{}_change'.format("doctor", "hospital"), kwargs={"object_id": hosp_obj.id})
+            admin_link = mark_safe("<a href={} target='_blank'>{}</a>".format(exit_point_url, hosp_obj.name))
+        return admin_link
 

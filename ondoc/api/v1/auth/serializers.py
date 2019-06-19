@@ -199,7 +199,7 @@ class UserProfileSerializer(serializers.ModelSerializer):
             return False
         # user_insurance_obj = UserInsurance.objects.filter(id=insured_member_obj.user_insurance_id).last()
         user_insurance_obj = insured_member_obj.user_insurance
-        if user_insurance_obj and user_insurance_obj.is_profile_valid():
+        if user_insurance_obj and user_insurance_obj.is_valid():
             return True
         else:
             return False
