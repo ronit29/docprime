@@ -18,7 +18,7 @@ from ondoc.crm.constants import constants
 from ondoc.doctor import models
 from ondoc.authentication import models as auth_models
 from ondoc.diagnostic import models as lab_models
-from ondoc.insurance.models import UserInsurance
+from ondoc.insurance.models import UserInsurance, InsuredMembers
 from ondoc.notification import tasks as notification_tasks
 #from ondoc.doctor.models import Hospital, DoctorClinic,Doctor,  OpdAppointment
 from ondoc.doctor.models import DoctorClinic, OpdAppointment, DoctorAssociation, DoctorQualification, Doctor, Hospital, \
@@ -237,11 +237,21 @@ class DoctorAppointmentsViewSet(OndocViewSet):
         validated_data = serializer.validated_data
         data = request.data
 
-        user_insurance = UserInsurance.get_user_insurance(request.user)
+        user_insurance = request.user.active_insurance #UserInsurance.get_user_insurance(request.user)
 
         # data['is_appointment_insured'], data['insurance_id'], data[
         #     'insurance_message'] = Cart.check_for_insurance(validated_data,request)
         if user_insurance:
+            hospital = validated_data.get('hospital')
+            doctor = validated_data.get('doctor')
+
+            doctor_clinic = DoctorClinic.objects.filter(doctor=doctor, hospital=hospital).first()
+            profile = validated_data.get('profile')
+            payment_type = validated_data.get('payment_type')
+            if profile.is_insured_profile and doctor.is_enabled_for_insurance and doctor.enabled_for_online_booking and \
+                    payment_type == OpdAppointment.COD and doctor_clinic and doctor_clinic.enabled_for_online_booking:
+                return Response(status=status.HTTP_400_BAD_REQUEST, data={'error': 'Some error occured. Please try again after some time.'})
+
             insurance_validate_dict = user_insurance.validate_insurance(validated_data)
             data['is_appointment_insured'] = insurance_validate_dict['is_insured']
             data['insurance_id'] = insurance_validate_dict['insurance_id']
@@ -249,8 +259,6 @@ class DoctorAppointmentsViewSet(OndocViewSet):
 
             if data['is_appointment_insured']:
                 data['payment_type'] = OpdAppointment.INSURANCE
-                hospital = validated_data.get('hospital')
-                doctor = validated_data.get('doctor')
 
                 blocked_slots = hospital.get_blocked_specialization_appointments_slots(doctor, user_insurance)
                 start_date = validated_data.get('start_date').date()
@@ -2091,7 +2099,7 @@ class DoctorAvailabilityTimingViewSet(viewsets.ViewSet):
 
         for data in queryset:
             obj.form_time_slots(data.day, data.start, data.end, data.fees, True,
-                                data.deal_price, data.mrp, True, on_call=data.type)
+                                data.deal_price, data.mrp, data.dct_cod_deal_price(), True, on_call=data.type)
 
         timeslots = obj.get_timing_list()
         return Response({"timeslots": timeslots, "doctor_data": doctor_serializer.data,
@@ -2180,6 +2188,9 @@ class DoctorAvailabilityTimingViewSet(viewsets.ViewSet):
     def list_v2(self, request, *args, **kwargs):
         doctor_id = request.query_params.get('doctor_id')
         hospital_id = request.query_params.get('hospital_id')
+
+        if not doctor_id or not hospital_id:
+            return Response(status=status.HTTP_400_BAD_REQUEST, data={'error': 'doctor id or hospital id is undefined.'})
 
         doctor_queryset = models.Doctor.objects.prefetch_related("qualifications__qualification", "qualifications__specialization")\
                                       .filter(pk=doctor_id)
@@ -3472,7 +3483,7 @@ class OfflineCustomerViewSet(viewsets.GenericViewSet):
 
                 for data in queryset:
                     obj.form_time_slots(data.day, data.start, data.end, data.fees, True,
-                                        data.deal_price, data.mrp, True)
+                                        data.deal_price, data.mrp, data.dct_cod_deal_price(), True)
 
                 timeslots = obj.get_timing_list()
                 for day, slots in timeslots.items():

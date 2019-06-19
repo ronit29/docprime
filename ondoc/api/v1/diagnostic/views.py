@@ -109,7 +109,10 @@ class SearchPageViewSet(viewsets.ReadOnlyModelViewSet):
         temp_data['recommended_package'] = {'result': recommended_package.data,
                                             'information': {'screening': 'Screening text', 'physical': 'Physical Text'},
                                             'filters': advisor_filter}
-        temp_data['common_package'] = package_serializer.data
+        if request.user and request.user.is_authenticated and request.user.active_insurance and not hasattr(request, 'agent'):
+            temp_data['common_package'] = []
+        else:
+            temp_data['common_package'] = package_serializer.data
         temp_data['preferred_labs'] = lab_serializer.data
         temp_data['common_conditions'] = condition_serializer.data
 
@@ -1501,6 +1504,8 @@ class LabList(viewsets.ReadOnlyModelViewSet):
 
         if is_insurance and ids:
             filtering_query.append("mrp<=(%(insurance_threshold_amount)s)")
+            if not hasattr(self.request, 'agent'):
+                group_filter.append("(agreed_price<=insurance_cutoff_price or insurance_cutoff_price is null )")
             filtering_params['insurance_threshold_amount'] = insurance_threshold_amount
 
         if avg_ratings:
@@ -1572,7 +1577,7 @@ class LabList(viewsets.ReadOnlyModelViewSet):
                         ROW_NUMBER () OVER (ORDER BY {order} ) order_rank,
                         max_order_priority as order_priority
                         from (
-                        select max(lt.test_type) as test_type, lb.*, sum(mrp) total_mrp, count(*) as test_count,
+                        select max(lt.insurance_cutoff_price) as insurance_cutoff_price , max(lt.test_type) as test_type, lb.*, sum(mrp) total_mrp, count(*) as test_count,
                         case when bool_and(home_collection_possible)=True and is_home_collection_enabled=True 
                         then max(home_pickup_charges) else 0
                         end as pickup_charges,

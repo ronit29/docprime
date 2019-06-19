@@ -482,6 +482,7 @@ class CouponRecommender():
                 test_categories_ids = set(test_categories_ids)
 
                 # check test in coupon
+                coupons_list = list(coupons)
                 for coupon in coupons:
                     keep_coupon = False
                     if len(coupon.test.all()) == 0:
@@ -495,8 +496,9 @@ class CouponRecommender():
                                     break
 
                     if not keep_coupon:
-                        coupons.remove(coupon)
+                        coupons_list.remove(coupon)
 
+                coupons = list(coupons_list)
                 # check test categories in coupon
                 for coupon in coupons:
                     keep_coupon = False
@@ -511,7 +513,8 @@ class CouponRecommender():
                                     break
 
                     if not keep_coupon:
-                        coupons.remove(coupon)
+                        coupons_list.remove(coupon)
+                coupons = list(coupons_list)
             else:
                 coupons = list(filter(lambda x: len(x.test.all()) == 0, coupons))
                 coupons = list(filter(lambda x: len(x.test_categories.all()) == 0, coupons))
@@ -533,6 +536,7 @@ class CouponRecommender():
 
             if doctor_id:
                 coupons = list(filter(lambda x: len(x.doctors.all()) == 0 or doctor_id in list(map(lambda y: y.id, x.doctors.all())), coupons))
+                coupons_list = list(coupons)
                 for coupon in coupons:
                     keep_coupon = False
                     if len(coupon.specializations.all()) == 0:
@@ -546,7 +550,9 @@ class CouponRecommender():
                                     break
 
                     if not keep_coupon:
-                        coupons.remove(coupon)
+                        coupons_list.remove(coupon)
+
+                coupons = list(coupons_list)
             else:
                 coupons = list(filter(lambda x: len(x.doctors.all()) == 0, coupons))
                 coupons = list(filter(lambda x: len(x.specializations.all()) == 0, coupons))
@@ -563,6 +569,7 @@ class CouponRecommender():
                 coupons = list(filter(lambda x: len(x.procedures.all()) == 0, coupons))
                 coupons = list(filter(lambda x: len(x.procedure_categories.all()) == 0, coupons))
 
+        coupons_list = list(coupons)
         for coupon in coupons:
             coupon_properties = self.coupon_properties[coupon.code] = dict()
             remove_coupon = False
@@ -610,7 +617,7 @@ class CouponRecommender():
                 remove_coupon = True
 
             if remove_coupon:
-                coupons = list(filter(lambda x: x.id != coupon.id, coupons))
+                coupons_list = list(filter(lambda x: x.id != coupon.id, coupons_list))
 
             # TODO add cart_item_id
             cart_item_id = None
@@ -626,7 +633,7 @@ class CouponRecommender():
             coupon_properties['is_random_generated'] = is_random_generated
             coupon_properties['random_coupon_code'] = random_coupon_code
 
-
+        coupons = list(coupons_list)
         applicable_coupons = list(set(coupons))
 
         if applicable_coupons:

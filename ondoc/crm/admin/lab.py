@@ -1454,7 +1454,7 @@ class LabTestAdmin(ImportExportMixin, VersionAdmin):
     search_fields = ['name']
     list_filter = ('is_package', 'enable_for_ppc', 'enable_for_retail')
     exclude = ['search_key']
-    readonly_fields = ['url',]
+    #readonly_fields = ['url',]
     autocomplete_fields = ['author',]
 
     def get_fields(self, request, obj=None):
@@ -1462,6 +1462,14 @@ class LabTestAdmin(ImportExportMixin, VersionAdmin):
         if obj and not obj.is_package:
             return [value for value in fields if value != 'number_of_tests']
         return fields
+
+    def get_readonly_fields(self, request, obj=None):
+        read_only_fields = ['url']
+        if not request.user.is_member_of(constants['SUPER_INSURANCE_GROUP']) and not request.user.is_superuser:
+            read_only_fields += ['insurance_cutoff_price']
+
+        return read_only_fields
+
 
     def get_inline_instances(self, request, obj=None):
         inline_instance = super().get_inline_instances(request=request, obj=obj)

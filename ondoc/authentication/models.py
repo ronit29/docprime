@@ -333,6 +333,24 @@ class User(AbstractBaseUser, PermissionsMixin):
         # return str(self.phone_number)
 
     # @property
+
+    @cached_property
+    def show_ipd_popup(self):
+        from ondoc.procedure.models import IpdProcedureLead
+        lead = IpdProcedureLead.objects.filter(phone_number=self.phone_number,
+                                               created_at__gt=timezone.now() - timezone.timedelta(hours=1)).first()
+        if lead:
+            return False
+        return True
+
+    @cached_property
+    def force_ipd_popup(self):
+        from ondoc.procedure.models import IpdProcedureLead
+        lead = IpdProcedureLead.objects.filter(phone_number=self.phone_number).exists()
+        if lead:
+            return False
+        return True
+
     @cached_property
     def active_insurance(self):
         active_insurance = self.purchased_insurance.filter().order_by('id').last()
@@ -565,6 +583,29 @@ class UserProfile(TimeStampedModel):
             self.phone_number = self.user.phone_number
         self.dob = endorsed_data.dob
         self.save()
+
+    def is_insurance_package_limit_exceed(self):
+        from ondoc.diagnostic.models import LabAppointment
+        from ondoc.doctor.models import OpdAppointment
+        user = self.user
+        insurance = None
+        if user.is_authenticated:
+            insurance = user.active_insurance
+        if not insurance or not self.is_insured_profile:
+            return False
+        package_count = 0
+        previous_insured_lab_bookings = LabAppointment.objects.prefetch_related('tests').filter(insurance=insurance, profile=self).exclude(status=OpdAppointment.CANCELLED)
+        for booking in previous_insured_lab_bookings:
+            all_tests = booking.tests.all()
+            for test in all_tests:
+                if test.is_package:
+                    package_count += 1
+
+        if package_count >= insurance.insurance_plan.plan_usages.get('member_package_limit'):
+            return True
+        else:
+            return False
+
 
     class Meta:
         db_table = "user_profile"

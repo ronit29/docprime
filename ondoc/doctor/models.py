@@ -238,6 +238,8 @@ class Hospital(auth_model.TimeStampedModel, auth_model.CreatedByModel, auth_mode
     matrix_lead_id = models.BigIntegerField(blank=True, null=True, unique=True)
     is_listed_on_docprime = models.NullBooleanField(null=True, blank=True)
     about = models.TextField(blank=True, null=True, default="")
+    # use_new_about = models.BooleanField(default=False)
+    new_about = models.TextField(blank=True, null=True, default=None)
     opd_timings = models.CharField(max_length=150, blank=True, null=True, default="")
     always_open = models.BooleanField(verbose_name='Is hospital open 24X7', default=False)
     # ratings = GenericRelation(ratings_models.RatingsReview, related_query_name='hospital_ratings')
@@ -253,6 +255,9 @@ class Hospital(auth_model.TimeStampedModel, auth_model.CreatedByModel, auth_mode
     # provider_encrypted_by = models.ForeignKey(auth_model.User, null=True, blank=True, on_delete=models.SET_NULL, related_name='encrypted_hospitals')
     # encryption_hint = models.CharField(max_length=128, null=True, blank=True)
     # encrypted_hospital_id = models.CharField(max_length=128, null=True, blank=True)
+    is_ipd_hospital = models.BooleanField(default=False)
+    is_big_hospital = models.BooleanField(default=False)
+    has_proper_hospital_page = models.BooleanField(default=False)
 
     def __str__(self):
         return self.name
@@ -278,6 +283,14 @@ class Hospital(auth_model.TimeStampedModel, auth_model.CreatedByModel, auth_mode
         point_string = 'POINT(' + str(long) + ' ' + str(lat) + ')'
         pnt = GEOSGeometry(point_string, srid=4326)
         temp_hosp_queryset = Hospital.objects.filter(is_live=True)
+
+        if not request.user.is_anonymous and request.user.active_insurance:
+            for id in top_hospital_ids:
+                hosp_obj = Hospital.objects.filter(pk=id).first()
+                if hosp_obj:
+                    if not hosp_obj.is_hospital_doctor_insurance_enabled():
+                        top_hospital_ids.remove(id)
+
         if top_network_ids:
             network_hospital_queryset = temp_hosp_queryset.filter(network__in=top_network_ids)
             network_hospitals = network_hospital_queryset.annotate(
@@ -382,6 +395,12 @@ class Hospital(auth_model.TimeStampedModel, auth_model.CreatedByModel, auth_mode
         # update search and profile urls
         hospital_urls.hospital_urls()
 
+    def is_enabled_for_cod(self):
+        if self.enabled_for_cod:
+            return True
+        else:
+            return False
+
     @classmethod
     def update_city_search(cls):
         query = '''  update hospital set city_search_key = alternative_value
@@ -456,6 +475,13 @@ class Hospital(auth_model.TimeStampedModel, auth_model.CreatedByModel, auth_mode
             cid = content_type.id
             query = """update hospital h set avg_rating=(select avg(ratings) from ratings_review rr left join opd_appointment oa on rr.appointment_id = oa.id where appointment_type = 2 group by hospital_id having oa.hospital_id = h.id)"""
             cursor.execute(query)
+
+    @classmethod
+    def update_is_big_hospital(cls):
+        big_hospitals = Hospital.objects.filter(is_live=True, hospital_doctors__enabled=True,
+                                                hospital_doctors__doctor__is_live=True).values_list('id', flat=True)
+        if big_hospitals:
+            Hospital.objects.filter(id__in=big_hospitals).update(is_big_hospital=True)
 
     def ad_str(self, string):
         return str(string).strip().replace(',', '')
@@ -555,10 +581,11 @@ class Hospital(auth_model.TimeStampedModel, auth_model.CreatedByModel, auth_mode
 
     def has_ipd_doctors(self):
         result = False
-        for doctor_clinic in self.hospital_doctors.filter(enabled=True):
-            if doctor_clinic.ipd_procedure_clinic_mappings.filter(enabled=True).exists():
-                result = True
-                break
+        # for doctor_clinic in self.hospital_doctors.filter(enabled=True):
+        #     if doctor_clinic.ipd_procedure_clinic_mappings.filter(enabled=True).exists():
+        #         result = True
+        #         break
+        result = self.is_ipd_hospital
         return result
 
     def get_specialization_insured_appointments(self, doctor, insurance):
@@ -600,6 +627,16 @@ class Hospital(auth_model.TimeStampedModel, auth_model.CreatedByModel, auth_mode
                     blockeds_timeslots.append(str(nth_day_past_timeslot))
 
         return blockeds_timeslots
+
+    def is_hospital_doctor_insurance_enabled(self):
+        insured = False
+        dc_obj = DoctorClinic.objects.filter(hospital_id=self.id).first()
+        if dc_obj:
+            doctor = Doctor.objects.filter(pk=dc_obj.doctor_id).first()
+            if doctor.is_insurance_enabled:
+                insured = True
+
+        return insured
 
 
 class HospitalPlaceDetails(auth_model.TimeStampedModel):
@@ -1369,6 +1406,9 @@ class DoctorClinic(auth_model.TimeStampedModel, auth_model.WelcomeCallingDone):
     # def __str__(self):
     #     return '{}-{}'.format(self.doctor, self.hospital)
 
+    def is_enabled_for_cod(self):
+        return self.hospital.is_enabled_for_cod()
+
     def get_timings(self, blocks=[]):
         from ondoc.api.v2.doctor import serializers as v2_serializers
         from ondoc.api.v1.common import serializers as common_serializers
@@ -1384,8 +1424,8 @@ class DoctorClinic(auth_model.TimeStampedModel, auth_model.WelcomeCallingDone):
         obj = TimeSlotExtraction()
 
         for data in clinic_timings:
-            obj.form_time_slots(data.day, data.start, data.end, data.fees, True,
-                                data.deal_price, data.mrp, True, on_call=data.type)
+            obj.form_time_slots( data.day, data.start, data.end, data.fees, True,
+                                data.deal_price, data.mrp, data.dct_cod_deal_price(), True, on_call=data.type)
 
         date = datetime.datetime.today().strftime('%Y-%m-%d')
         booking_details = {"type": "doctor"}
@@ -1452,12 +1492,25 @@ class DoctorClinicTiming(auth_model.TimeStampedModel):
     deal_price = models.PositiveSmallIntegerField(blank=True, null=True)
     mrp = models.PositiveSmallIntegerField(blank=False, null=True)
     type = models.IntegerField(default=1, choices=TYPE_CHOICES)
+    cod_deal_price = models.PositiveSmallIntegerField(blank=True, null=True)
     # followup_duration = models.PositiveSmallIntegerField(blank=False, null=True)
     # followup_charges = models.PositiveSmallIntegerField(blank=False, null=True)
 
     class Meta:
         db_table = "doctor_clinic_timing"
         # unique_together = (("start", "end", "day", "doctor_clinic",),)
+
+    def is_enabled_for_cod(self):
+        return self.doctor_clinic.is_enabled_for_cod()
+
+    def dct_cod_deal_price(self):
+        if self.is_enabled_for_cod():
+            if self.cod_deal_price:
+                return self.cod_deal_price
+            else:
+                return self.mrp
+
+        return None
 
     def save(self, *args, **kwargs):
         if self.fees != None:
@@ -1875,6 +1928,8 @@ class HospitalNetwork(auth_model.TimeStampedModel, auth_model.CreatedByModel, au
     name = models.CharField(max_length=100)
     operational_since = models.PositiveSmallIntegerField(blank=True, null=True, validators=[MinValueValidator(1900)])
     about = models.CharField(max_length=2000, blank=True)
+    # use_new_about = models.BooleanField(default=False)
+    new_about = models.TextField(blank=True, null=True, default=None)
     network_size = models.PositiveSmallIntegerField(blank=True, null=True)
     building = models.CharField(max_length=100, blank=True)
     sublocality = models.CharField(max_length=100, blank=True)
