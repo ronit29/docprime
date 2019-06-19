@@ -2669,6 +2669,16 @@ class OpdAppointment(auth_model.TimeStampedModel, CouponsMixin, OpdAppointmentIn
 
         return amount
 
+    # # used in save_merchant_payout
+    # def payout_data(self):
+    #
+    #     payout_data = {
+    #         "charged_amount": self.effective_price,
+    #         "payable_amount": self.fees,
+    #         "booking_type": Order.DOCTOR_PRODUCT_ID
+    #     }
+    #     return payout_data
+
     @classmethod
     def get_billing_summary(cls, user, req_data):
         month = req_data.get("month")

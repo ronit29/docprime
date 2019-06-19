@@ -1715,13 +1715,26 @@ class MerchantNetRevenue(TimeStampedModel):
 
     CURRENT_FINANCIAL_YEAR = '2019-2020'
 
-    merchant = models.ForeignKey("Merchant", on_delete=models.CASCADE, related_name='net_revenue')
+    merchant = models.ForeignKey(Merchant, on_delete=models.CASCADE, related_name='net_revenue')
     total_revenue = models.DecimalField(max_digits=10, decimal_places=2, default=None, null=True, blank=True)
     financial_year = models.CharField(max_length=20, null=True, blank=True)
     tds_deducted = models.DecimalField(max_digits=10, decimal_places=2, default=None, null=True, blank=True)
 
     class Meta:
         db_table = 'merchant_net_revenue'
+
+
+class MerchantTdsDeduction(TimeStampedModel):
+
+    CURRENT_FINANCIAL_YEAR = '2019-2020'
+
+    merchant = models.ForeignKey(Merchant, on_delete=models.CASCADE, related_name='tds_deduction')
+    financial_year = models.CharField(max_length=20, null=True, blank=True)
+    tds_deducted = models.DecimalField(max_digits=10, decimal_places=2, default=None, null=True, blank=True)
+    merchant_payout = models.ForeignKey("account.MerchantPayout", on_delete=models.CASCADE, related_name='tds')
+
+    class Meta:
+        db_table = 'merchant_tds_deduction'
 
 
 class AssociatedMerchant(TimeStampedModel):
