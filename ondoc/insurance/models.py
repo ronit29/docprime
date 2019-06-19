@@ -580,13 +580,16 @@ class UserInsurance(auth_model.TimeStampedModel):
     def process_payout(self):
         if self.premium_transferred:
             return
-
+        payout_status = True
         with transaction.atomic():
             if self.can_process_payout():
                 payouts = self.get_insurance_payouts()
                 for p in payouts:
-                    #p.process_insurance_premium_payout()
+                    payout_status = payout_status and p.process_insurance_premium_payout()
                     pass
+                if payout_status:
+                    self.premium_transferred = True
+                    self.save()
             else:
                 self.init_payout()
 
@@ -645,7 +648,7 @@ class UserInsurance(auth_model.TimeStampedModel):
         if order.wallet_amount==0:
             amount = order.amount        
         if amount and amount>0:
-            if PayoutMapping.objects.filter(content_object=self, payout__amount=amount).exists():
+            if PayoutMapping.objects.filter(object_id=self.id, content_type_id=ContentType.objects.get_for_model(self).id, payout__payable_amount=amount).exists():
                 return
             payout = MerchantPayout()
             payout.charged_amount = amount

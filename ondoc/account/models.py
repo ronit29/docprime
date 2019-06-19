@@ -1636,6 +1636,8 @@ class MerchantPayout(TimeStampedModel):
         if trans and trans[0].amount == self.payable_amount:
             return trans
 
+        return []
+
     def is_insurance_premium_payout(self):
         if self.booking_type == Order.INSURANCE_PRODUCT_ID:
             return True
@@ -1730,7 +1732,7 @@ class MerchantPayout(TimeStampedModel):
             # if not self.is_nodal_transfer():
             #     raise Exception('Incorrect method called for payout')
 
-            if self.status == self.PAID:
+            if self.status == self.PAID or self.utr_no:
                 return True
 
             transaction = self.get_insurance_premium_transactions()
@@ -1765,6 +1767,9 @@ class MerchantPayout(TimeStampedModel):
             # curr_txn["txnAmount"] = str(self.payable_amount)
             curr_txn["settledAmount"] = str(self.payable_amount)
             curr_txn["merchantCode"] = self.paid_to.id
+            if txn.transaction_id:
+                curr_txn["pgtxId"] = txn.transaction_id
+
             curr_txn["refNo"] = self.payout_ref_id
             curr_txn["bookingId"] = user_insurance.id
             curr_txn["paymentType"] = default_payment_mode
