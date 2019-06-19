@@ -205,6 +205,9 @@ class Banner(auth_model.TimeStampedModel):
                             append_banner = True
                             break
 
+                if from_app == True and append_banner == False and not latitude and not longitude:
+                    append_banner = True
+
             if append_banner and data.show_to_users and data.show_to_users!='all':
                 if data.show_to_users == 'logged_in' and not user.is_authenticated:
                     append_banner = False
