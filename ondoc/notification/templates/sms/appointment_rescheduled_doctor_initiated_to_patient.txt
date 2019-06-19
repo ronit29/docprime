@@ -1,1 +1,1 @@
-Appointment ID<<{{instance.id}}>>: We regret to inform that Dr.{{doctor_name|capfirst}} is unavailable at {{instance.time_slot_start|date:"h:i A"}} on {{instance.time_slot_start|date:"D jS F Y"}}. Our customer service executive will get in touch with you shortly to confirm the new time.
+Appointment ID <<{{instance.id}}>>: We regret to inform that Dr.{{doctor_name|capfirst}} is unavailable at {{instance.time_slot_start|date:"h:i a"}} on {{instance.time_slot_start|date:"d/m/y"}}. Our customer service executive will get in touch with you shortly to confirm the new time.

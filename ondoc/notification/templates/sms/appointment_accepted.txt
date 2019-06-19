@@ -1,7 +1,1 @@
-Appointment ID <<{{instance.id}}>> : Your appointment with Dr.{{doctor_name|capfirst}} is confirmed for {{instance.time_slot_start|date:"D jS F Y"}} at {{instance.time_slot_start|date:"h:i A"}}.
-
-Please share unique confirmation code and appointment id while availing the service.
-
-Unique Confirmation Code : {{instance.otp}}
-
-*This is a cashless appointment. Therefore, you are not required to pay for the service booked through us.
+Appointment ID <<{{instance.id}}>> : Your appointment with Dr.{{doctor_name|capfirst}} is confirmed for {{instance.time_slot_start|date:"D jS F Y"}} at {{instance.time_slot_start|date:"h:i A"}}. Please share unique confirmation code and appointment id while availing the service. Unique Confirmation Code : {{instance.otp}}

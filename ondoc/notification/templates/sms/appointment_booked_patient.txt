@@ -1,5 +1,4 @@
 We have received your doctor appointment request. Below are the details:
-
 Appointment ID : {{instance.id}}
 Patient Name : {{patient_name|capfirst}}
 Doctor Name : Dr. {{doctor_name|capfirst}}
@@ -9,6 +8,5 @@ Appointment Date and Time : {{instance.time_slot_start|date:"D jS F Y"}} || {{in
 {% if instance.payment_type == 2 %}
 Please pay Rs {{cod_amount}} at the center at the time of appointment.
 {% endif %}
-
 
 You will receive a confirmation email and message once the appointment is confirmed.
