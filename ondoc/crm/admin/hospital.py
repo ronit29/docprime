@@ -299,7 +299,7 @@ class HospitalForm(FormCleanMixin):
         }
 
     class Media:
-        extend = False
+        extend = True
         js = ('https://cdn.ckeditor.com/ckeditor5/10.1.0/classic/ckeditor.js', 'doctor/js/init.js')
         css = {'all': ('doctor/css/style.css',)}
 
