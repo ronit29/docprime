@@ -10,7 +10,8 @@ from ondoc.account.tasks import refund_status_update, consumer_refund_update, du
     get_thyrocare_reports, elastic_alias_switch
 from celery.schedules import crontab
 from ondoc.doctor.tasks import save_avg_rating, update_prices, update_city_search_key, update_doctors_count, update_search_score, \
-    update_all_ipd_seo_urls, update_insured_labs_and_doctors, update_seo_urls, update_hosp_google_avg_rating
+    update_all_ipd_seo_urls, update_insured_labs_and_doctors, update_seo_urls, update_hosp_google_avg_rating, \
+    update_flags
 from ondoc.account.tasks import update_ben_status_from_pg,update_merchant_payout_pg_status
 from ondoc.insurance.tasks import push_mis
 # from ondoc.doctor.services.update_search_score import DoctorSearchScore
@@ -74,6 +75,7 @@ def setup_periodic_tasks(sender, **kwargs):
     sender.add_periodic_task(crontab(hour=19, minute=30), update_prices.s(), name='Update Lab and Doctor Prices')
     sender.add_periodic_task(update_ben_status_cron_schedule, update_ben_status_from_pg.s(), name='Update Ben Status from pg ')
     sender.add_periodic_task(update_merchant_payout_pg_status_cron_schedule, update_merchant_payout_pg_status.s(), name='Update Merchant Payout Status from pg ')
+    sender.add_periodic_task(crontab(hour=22, minute=30), update_flags.s(), name='Update is_big_hospital flag')
 
 
     order_summary_time = float(settings.ORDER_SUMMARY_CRON_TIME) * float(60.0)

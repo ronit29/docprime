@@ -333,6 +333,24 @@ class User(AbstractBaseUser, PermissionsMixin):
         # return str(self.phone_number)
 
     # @property
+
+    @cached_property
+    def show_ipd_popup(self):
+        from ondoc.procedure.models import IpdProcedureLead
+        lead = IpdProcedureLead.objects.filter(phone_number=self.phone_number,
+                                               created_at__gt=timezone.now() - timezone.timedelta(hours=1)).first()
+        if lead:
+            return False
+        return True
+
+    @cached_property
+    def force_ipd_popup(self):
+        from ondoc.procedure.models import IpdProcedureLead
+        lead = IpdProcedureLead.objects.filter(phone_number=self.phone_number).exists()
+        if lead:
+            return False
+        return True
+
     @cached_property
     def active_insurance(self):
         active_insurance = self.purchased_insurance.filter().order_by('id').last()
