@@ -1509,7 +1509,6 @@ class DoctorClinicTiming(auth_model.TimeStampedModel):
                 return self.cod_deal_price
             else:
                 return self.mrp
-
         return None
 
     def save(self, *args, **kwargs):
@@ -2229,6 +2228,22 @@ class OpdAppointment(auth_model.TimeStampedModel, CouponsMixin, OpdAppointmentIn
 
     def __str__(self):
         return self.profile.name + " (" + self.doctor.name + ")"
+
+    def get_cod_amount(self):
+        result = int(self.mrp)
+        day = self.time_slot_start.weekday()
+        if self.doctor:
+            aware_dt = timezone.localtime(self.time_slot_start)
+            hour_min = aware_dt.hour + aware_dt.minute / 60
+            doc_clinic = DoctorClinicTiming.objects.filter(day=day, doctor_clinic__doctor=self.doctor,
+                                                           doctor_clinic__hospital=self.hospital, start__lte=hour_min,
+                                                           end__gt=hour_min).first()
+            if doc_clinic:
+                try:
+                    result = doc_clinic.dct_cod_deal_price()
+                except:
+                    pass
+        return result
 
     def allowed_action(self, user_type, request):
         allowed = []
