@@ -515,7 +515,7 @@ class BankHolidays(auth_model.TimeStampedModel):
 
     @classmethod
     def is_holiday(cls, date):
-        return cls.objects.filter(date=date).exists()
+        return cls.objects.filter(date=date).exists() or date.weekday() in [5, 6]
 
     class Meta:
         db_table = "bank_holidays"
