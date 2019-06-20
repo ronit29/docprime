@@ -563,6 +563,19 @@ class UserInsurance(auth_model.TimeStampedModel):
     def __str__(self):
         return str(self.user)
 
+    @classmethod
+    def all_premiums_which_need_transfer(cls):
+        objs = cls.objects.filter(premium_transferred=False)
+        results = []
+        for obj in objs:
+            try:
+                if obj.needs_transfer_to_insurance_nodal():
+                    results.append(obj.id)
+                    print(results)
+            except Exception as e:
+                pass
+        print(results)
+
     @cached_property
     def master_policy(self):
 
