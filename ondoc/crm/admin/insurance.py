@@ -23,6 +23,8 @@ from ondoc.insurance.models import InsuranceDisease
 from django.db import transaction
 from django.conf import settings
 from django.contrib.contenttypes.admin import GenericTabularInline
+from django.contrib.admin import SimpleListFilter
+from django.utils.translation import ugettext_lazy as _
 
 
 class InsurerAdmin(admin.ModelAdmin):
@@ -44,7 +46,13 @@ class InsurerFloatForm(forms.ModelForm):
 class InsurerFloatAdmin(admin.ModelAdmin):
     list_display = ['apd_account_name', 'insurer']
     form = InsurerFloatForm
-    # readonly_fields = ['insurer', 'current_float']
+    # readonly_fields = ['current_float']
+
+    def get_readonly_fields(self, request, obj=None):
+        if obj:
+            return ["apd_account_name", "insurer", "current_float"]
+        else:
+            return []
 
 
 class InsurancePlanContentInline(admin.TabularInline):
@@ -812,12 +820,16 @@ class UserInsuranceForm(forms.ModelForm):
 
     status_choices = [(UserInsurance.ACTIVE, "Active"), (UserInsurance.CANCEL_INITIATE, 'Cancel Initiate'),
                       (UserInsurance.CANCELLED, "Cancelled")]
+    cancel_status_choices = [(UserInsurance.NON_REFUNDED, "Non-Refunded"), (UserInsurance.REFUND_INITIATE,
+                                                                            "Refund Initiate"), (UserInsurance.REFUNDED
+                                                                            , "Refunded")]
     case_choices = [(UserInsurance.REFUND, "Refundable"), (UserInsurance.NO_REFUND, "Non-Refundable")]
     cancel_after_utilize_choices = [('YES', 'Yes'), ('NO', 'No')]
     status = forms.ChoiceField(choices=status_choices, required=True)
     cancel_after_utilize_insurance = forms.ChoiceField(choices=cancel_after_utilize_choices, initial='NO',  widget=forms.RadioSelect())
     cancel_reason = forms.CharField(max_length=400, required=False)
     cancel_case_type = forms.ChoiceField(choices=case_choices, initial=UserInsurance.REFUND)
+    cancel_status = forms.ChoiceField(choices=cancel_status_choices, initial=UserInsurance.NON_REFUNDED)
 
     def clean(self):
         super().clean()
@@ -826,6 +838,7 @@ class UserInsuranceForm(forms.ModelForm):
         case_type = data.get('cancel_after_utilize_insurance')
         cancel_reason = data.get('cancel_reason')
         cancel_case_type = data.get('cancel_case_type')
+        cancel_status = data.get('cancel_status')
         # if int(status) == UserInsurance.ONHOLD:
         #     if not onhold_reason:
         #         raise forms.ValidationError("In Case of ONHOLD status, Onhold reason is mandatory")
@@ -851,6 +864,11 @@ class UserInsuranceForm(forms.ModelForm):
             raise forms.ValidationError('Cancellation is only allowed for cancel initiate status')
         if self.instance.status == UserInsurance.CANCELLED:
             raise forms.ValidationError('Cancelled Insurance could not be changed')
+        # if cancel_status == UserInsurance.NON_REFUNDED and cancel_case_type == UserInsurance.REFUND:
+        #     raise forms.ValidationError("Cancel Status must be Refunded in case of Refundable case type")
+        if (int(cancel_status) == UserInsurance.REFUNDED and int(cancel_case_type) == UserInsurance.NO_REFUND) or \
+            (int(cancel_status) == UserInsurance.REFUND_INITIATE and int(cancel_case_type) == UserInsurance.NO_REFUND):
+            raise forms.ValidationError("Cancel Status must be Non-Refunded in case of Non-Refundable case type")
 
     class Meta:
         fields = '__all__'
@@ -870,13 +888,13 @@ class UserBankDocumentAdmin(admin.ModelAdmin):
 
 class GenericNotesInline(GenericTabularInline):
     model = GenericNotes
-    fields = ('notes', 'created_by')
+    fields = ('notes', 'created_by', 'created_at')
     extra = 0
     can_delete = False
     show_change_link = False
     can_add = True
     editable = False
-    readonly_fields = ('created_by',)
+    readonly_fields = ('created_by', 'created_at')
 
 
 class UserInsuranceAdmin(ImportExportMixin, admin.ModelAdmin):
@@ -885,7 +903,8 @@ class UserInsuranceAdmin(ImportExportMixin, admin.ModelAdmin):
     formats = (base_formats.XLS,)
     model = UserInsurance
     date_hierarchy = 'created_at'
-    list_filter = ['status']
+    list_filter = ['status', 'cancel_status']
+    ordering = ['-updated_at']
 
     def user_policy_number(self, obj):
         return str(obj.policy_number)
@@ -897,8 +916,10 @@ class UserInsuranceAdmin(ImportExportMixin, admin.ModelAdmin):
 
     list_display = ['id', 'insurance_plan', 'user_name', 'user', 'policy_number', 'purchase_date', 'status']
     fields = ['insurance_plan', 'user', 'purchase_date', 'expiry_date', 'policy_number', 'premium_amount',
-              'merchant_payout', 'status', 'cancel_reason', 'cancel_after_utilize_insurance', 'cancel_case_type']
-    readonly_fields = ('insurance_plan', 'user', 'purchase_date', 'expiry_date', 'policy_number', 'premium_amount', 'merchant_payout')
+              'merchant_payout', 'status', 'cancel_reason', 'cancel_after_utilize_insurance', 'cancel_case_type',
+              'cancel_status', 'cancel_initial_date', 'cancel_customer_type']
+    readonly_fields = ('insurance_plan', 'user', 'purchase_date', 'expiry_date', 'policy_number', 'premium_amount',
+                       'merchant_payout', 'cancel_initial_date')
     inlines = [InsuredMembersInline, UserBankInline, UserBankDocumentInline, GenericNotesInline]
     form = UserInsuranceForm
     search_fields = ['id']
@@ -1186,7 +1207,6 @@ class EndorsementRequestForm(forms.ModelForm):
     status_choices = [(EndorsementRequest.PENDING, "Pending"), (EndorsementRequest.APPROVED, 'Approved'),
                       (EndorsementRequest.REJECT, "Reject")]
     status = forms.ChoiceField(choices=status_choices, required=True)
-    # coi_choices = [("YES", "Yes"), ("NO", "No")]
     mail_coi_to_customer = forms.BooleanField(initial=False)
     reject_reason = forms.CharField(max_length=150, required=False)
 

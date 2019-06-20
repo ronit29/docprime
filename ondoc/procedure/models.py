@@ -115,11 +115,13 @@ class IpdProcedureLead(auth_model.TimeStampedModel):
     CRM = 'crm'
     DOCPRIMEWEB = "docprimeweb"
     COST_ESTIMATE = "Costestimate"
+    DOCP_APP = "DocprimeApp"
 
     SOURCE_CHOICES = [(DOCPRIMECHAT, 'DocPrime Chat'),
                       (CRM, 'CRM'),
                       (DOCPRIMEWEB, "DocPrime Web"),
-                      (COST_ESTIMATE, "Cost Estimate")]
+                      (COST_ESTIMATE, "Cost Estimate"),
+                      (DOCP_APP, "Docprime Consumer App")]
 
     STATUS_CHOICES = [(None, "--Select--"), (NEW, 'NEW'), (COST_REQUESTED, 'COST_REQUESTED'),
                       (COST_SHARED, 'COST_SHARED'), (OPD, 'OPD'), (VALID, 'VALID'), (CONTACTED, 'CONTACTED'),
