@@ -574,6 +574,18 @@ class UserInsurance(auth_model.TimeStampedModel):
     def __str__(self):
         return str(self.user)
 
+    @classmethod
+    def all_premiums_which_need_transfer(cls):
+        objs = cls.objects.filter(premium_transferred=False)
+        results = []
+        for obj in objs:
+            try:
+                if obj.needs_transfer_to_insurance_nodal():
+                    results.append(obj.id)
+                    print(results)
+            except Exception as e:
+                pass
+        print(results)
 
     @property
     def hours_elapsed(self):
@@ -599,6 +611,7 @@ class UserInsurance(auth_model.TimeStampedModel):
             hours += ((current_datetime - temp_datetime).total_seconds()) // 3600
 
         return math.floor(hours)
+
 
 
     @cached_property
@@ -629,13 +642,16 @@ class UserInsurance(auth_model.TimeStampedModel):
     def process_payout(self):
         if self.premium_transferred:
             return
-
+        payout_status = True
         with transaction.atomic():
             if self.can_process_payout():
                 payouts = self.get_insurance_payouts()
                 for p in payouts:
-                    #p.process_insurance_premium_payout()
+                    payout_status = payout_status and p.process_insurance_premium_payout()
                     pass
+                if payout_status:
+                    self.premium_transferred = True
+                    self.save()
             else:
                 self.init_payout()
 
@@ -694,7 +710,7 @@ class UserInsurance(auth_model.TimeStampedModel):
         if order.wallet_amount==0:
             amount = order.amount        
         if amount and amount>0:
-            if PayoutMapping.objects.filter(content_object=self, payout__amount=amount).exists():
+            if PayoutMapping.objects.filter(object_id=self.id, content_type_id=ContentType.objects.get_for_model(self).id, payout__payable_amount=amount).exists():
                 return
             payout = MerchantPayout()
             payout.charged_amount = amount
