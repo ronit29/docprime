@@ -522,7 +522,7 @@ def get_coupon_pg_mode(coupon):
     if payment_option.action == 'DC' and payment_option.payment_gateway == 'paytm':
         couponPgMode = 'dcpt'
     elif payment_option.action == 'CC' and payment_option.payment_gateway == 'paytm':
-        couponPgMode = 'ccp'
+        couponPgMode = 'ccpt'
     elif payment_option.action == 'NB' and payment_option.payment_gateway == 'paytm':
         couponPgMode = 'nbpt'
     elif payment_option.action == 'UPI' and payment_option.payment_gateway == 'payu':
