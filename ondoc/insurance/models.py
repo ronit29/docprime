@@ -2039,18 +2039,28 @@ class EndorsementRequest(auth_model.TimeStampedModel):
         total_endorsment_members = endorsment_members.count()
         endorment_rejected_members_count = user_insurance.endorse_members.filter(status=EndorsementRequest.REJECT).count()
         if total_endorsment_members == endorment_rejected_members_count:
+            EndorsementRequest.process_endorsment_notifications(EndorsementRequest.REJECT, user_insurance.user)
             return
 
         endorsed_members_count = user_insurance.endorse_members.filter(~Q(status=EndorsementRequest.PENDING),
                                                                        mail_coi_to_customer=True).count()
+        endorsed_approved_members_count = user_insurance.endorse_members.filter(status=EndorsementRequest.APPROVED,
+                                                                       mail_coi_to_customer=True).count()
+        if total_endorsment_members == endorsed_approved_members_count:
+            try:
+                user_insurance.generate_pdf()
+                EndorsementRequest.process_endorsment_notifications(EndorsementRequest.APPROVED, user_insurance.user)
+            except Exception as e:
+                logger.error('Insurance coi pdf cannot be generated. %s' % str(e))
+
+            return
 
         if total_endorsment_members == endorsed_members_count:
             try:
                 user_insurance.generate_pdf()
+                EndorsementRequest.process_endorsment_notifications(EndorsementRequest.APPROVED, user_insurance.user)
             except Exception as e:
                 logger.error('Insurance coi pdf cannot be generated. %s' % str(e))
-
-            EndorsementRequest.process_endorsment_notifications(EndorsementRequest.APPROVED, user_insurance.user)
 
     def reject_endorsement(self):
         user_insurance = self.insurance

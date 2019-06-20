@@ -1555,9 +1555,7 @@ class InsuranceNotification(Notification):
 
         if self.notification_type == NotificationAction.INSURANCE_ENDORSMENT_PENDING:
             pending_endorsed_members = instance.endorse_members.filter(status=EndorsementRequest.PENDING)
-            # pending_member_data = dict()
             pending_member_list = list()
-            counter = 0
             scope = ['first_name', 'middle_name', 'last_name', 'dob', 'title', 'email', 'address', 'pincode', 'gender',
                      'relation', 'town', 'district', 'state']
             for end_member in pending_endorsed_members:
