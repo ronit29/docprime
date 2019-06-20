@@ -201,6 +201,16 @@ class IpdProcedureLead(auth_model.TimeStampedModel):
     def is_valid_hospital_for_lead(hospital):
         return hospital.has_ipd_doctors()
 
+    def is_potential_ipd(self):
+        # TODO: SHASHANK_SINGH correct it
+        from ondoc.procedure.models import PotentialIpdLeadPracticeSpecialization
+        result = False
+        if self.doctor:
+            result = self.doctor.doctorpracticespecializations.filter(
+                specialization__in=PotentialIpdLeadPracticeSpecialization.objects.all().values_list(
+                    'practice_specialization', flat=True)).exists()
+        return result
+
 
 class IpdProcedureDetailType(auth_model.TimeStampedModel):
     name = models.CharField(max_length=1000)
@@ -224,6 +234,16 @@ class IpdProcedureDetail(auth_model.TimeStampedModel):
 
     class Meta:
         db_table = "ipd_procedure_details"
+
+
+class PotentialIpdLeadPracticeSpecialization(models.Model):
+    practice_specialization = models.ForeignKey(PracticeSpecialization, on_delete=models.CASCADE)
+
+    def __str__(self):
+        return '{}'.format(self.practice_specialization.name)
+
+    class Meta:
+        db_table = "potential_ipd_lead_practice_specialization"
 
 
 class ProcedureCategory(auth_model.TimeStampedModel, SearchKey):

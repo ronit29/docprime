@@ -15,7 +15,7 @@ from ondoc.crm.admin.doctor import AutoComplete
 from ondoc.procedure.models import Procedure, ProcedureCategory, ProcedureCategoryMapping, ProcedureToCategoryMapping, \
     IpdProcedure, IpdProcedureFeatureMapping, IpdProcedureCategoryMapping, IpdProcedureCategory, IpdProcedureDetail, \
     IpdProcedureSynonym, IpdProcedureSynonymMapping, SimilarIpdProcedureMapping, IpdProcedurePracticeSpecialization, \
-    IpdProcedureLead
+    IpdProcedureLead, PotentialIpdLeadPracticeSpecialization
 from django import forms
 
 
@@ -443,3 +443,17 @@ class OfferAdmin(VersionAdmin):
     list_display = ['id', 'title', 'is_live']
     list_filter = ['is_live']
     form = OfferAdminForm
+
+
+class PotentialIpdLeadPracticeSpecializationResource(resources.ModelResource):
+    class Meta:
+        model = PotentialIpdLeadPracticeSpecialization
+        fields = ('id', 'practice_specialization')
+
+
+class PotentialIpdLeadPracticeSpecializationAdmin(ImportExportMixin, VersionAdmin):
+    search_fields = ['practice_specialization__name']
+    resource_class = PotentialIpdLeadPracticeSpecializationResource
+    list_display = ['id', 'practice_specialization']
+    autocomplete_fields = ['practice_specialization']
+    # change_list_template = 'superuser_import_export.html'
