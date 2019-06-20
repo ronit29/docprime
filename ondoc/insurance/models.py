@@ -1596,14 +1596,26 @@ class UserInsurance(auth_model.TimeStampedModel):
         response = None
         pg_transactions = PgTransaction.objects.filter(product_id=Order.INSURANCE_PRODUCT_ID, user=self.user)
         if not wallet_amount:
-            response = False
-        elif wallet_amount == premium_amount:
+            return False
+        if wallet_amount and not pg_transactions:
+            return True
+
+        order_ids = []
+        uis = UserInsurance.objects.filter(user = self.user).exclude(id=self.id)
+        for ui in uis:
+            order_ids.append(ui.order_id)
+        if order_ids:
+            pg_transactions = pg_transactions.exclude(order_id__in=order_ids)
+
+
+        if wallet_amount == premium_amount:
             if len(pg_transactions) == 1 and pg_transactions.first().amount == wallet_amount:
                 response = False
         elif wallet_amount != premium_amount:
             pg_amount = premium_amount - wallet_amount
             if len(pg_transactions) == 1 and pg_transactions.first().amount == pg_amount:
                 response = True
+
         if response==None:
             raise Exception('transfer not possible. Handle manually')
 
@@ -1664,9 +1676,23 @@ class UserInsurance(auth_model.TimeStampedModel):
 
     @classmethod
     def transfer_to_nodal_if_required(cls):
-        objs = cls.objects.filter(premium_transferred=False)
+        # cxn = transaction.get_connection()
+        # if cxn.in_atomic_block:
+        #     print('in transaction')
+        # return
+
+        objs = cls.objects.filter(id__in=[3000000306])
+        counter = 0
         for obj in objs:
-            obj.transfer_to_insurance_nodal()
+            with transaction.atomic():
+                try:
+                    counter+=1
+                    print(str(counter))
+                    if obj.needs_transfer_to_insurance_nodal():
+                        obj.transfer_to_insurance_nodal()
+                        print(str(obj.id))
+                except Exception as e:
+                    print(e)
 
     def is_bank_details_exist(self):
         bank_obj = UserBank.objects.filter(insurance=self).order_by('-id').first()
