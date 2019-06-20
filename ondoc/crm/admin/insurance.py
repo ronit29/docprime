@@ -1202,26 +1202,34 @@ class InsuranceCancelMasterAdmin(admin.ModelAdmin):
 
 
 class EndorsementRequestForm(forms.ModelForm):
-
     status_choices = [(EndorsementRequest.PENDING, "Pending"), (EndorsementRequest.APPROVED, 'Approved'),
                       (EndorsementRequest.REJECT, "Reject")]
     status = forms.ChoiceField(choices=status_choices, required=True)
-    mail_coi_to_customer = forms.BooleanField(initial=False)
+    mail_coi_to_customer = forms.BooleanField(initial=True, disabled=True)
     reject_reason = forms.CharField(max_length=150, required=False)
+
+    # def __init__(self, *args, **kwargs):
+    #     super(EndorsementRequestForm, self).__init__(*args, **kwargs)
+    #     instance = getattr(self, 'instance', None)
+    #     if instance and instance.pk:
+    #         self.fields['mail_coi_to_customer'].widget.attrs['readonly'] = True
 
     def clean(self):
         super().clean()
+        if any(self.errors):
+            return
         data = self.cleaned_data
         status = data.get('status')
         coi_status = data.get('mail_coi_to_customer')
         reject_reason = data.get('reject_reason')
-        if status == EndorsementRequest.PENDING and coi_status:
-            raise forms.ValidationError('Without Approved COI can not be send to customer')
-        if status == EndorsementRequest.REJECT and not reject_reason:
+        if int(status) == EndorsementRequest.REJECT and not reject_reason:
             raise forms.ValidationError('For Rejection, reject reason is mandatory')
+        if int(status) == EndorsementRequest.PENDING and coi_status:
+            raise forms.ValidationError('Without Approved COI can not be send to customer')
 
 
     class Meta:
+        readonly = 'mail_coi_to_customer'
         fields = '__all__'
 
 

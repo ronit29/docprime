@@ -1548,13 +1548,28 @@ class InsuranceNotification(Notification):
                     'relation': mem.member.relation,
                     'status': EndorsementRequest.STATUS_CHOICES[mem.status-1][1]
                 }
-
                 endorsement_list.append(mem_data)
 
             context['endorsement_list'] = endorsement_list
             context['few_rejected'] = True if rejected > 0 else False
 
-
+        if self.notification_type == NotificationAction.INSURANCE_ENDORSMENT_PENDING:
+            pending_endorsed_members = instance.endorse_members.filter(status=EndorsementRequest.PENDING)
+            # pending_member_data = dict()
+            pending_member_list = list()
+            counter = 0
+            scope = ['first_name', 'middle_name', 'last_name', 'dob', 'title', 'email', 'address', 'pincode', 'gender',
+                     'relation', 'town', 'district', 'state']
+            for end_member in pending_endorsed_members:
+                for s in scope:
+                    if not getattr(end_member, s) == getattr(end_member.member, s):
+                        pending_member_data = {
+                            'field_name' : s,
+                            'previous_name': getattr(end_member.member, s),
+                            'modified_name': getattr(end_member, s)
+                        }
+                    pending_member_list.append(pending_member_data)
+            context['pending_members'] = pending_member_list
         return context
 
     def get_receivers(self):
