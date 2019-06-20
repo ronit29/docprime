@@ -31,6 +31,7 @@ class Coupon(auth_model.TimeStampedModel):
 
     code = models.CharField(max_length=50)
     min_order_amount = models.DecimalField(max_digits=10, decimal_places=2, blank=True, null=True)
+    max_order_amount = models.DecimalField(max_digits=10, decimal_places=2, blank=True, null=True)
     percentage_discount = models.DecimalField(max_digits=10, decimal_places=2, blank=True, null=True, validators=[MaxValueValidator(100), MinValueValidator(0)])
     max_discount_amount = models.DecimalField(max_digits=10, decimal_places=2, blank=True, null=True)
     flat_discount = models.DecimalField(max_digits=10, decimal_places=2, blank=True, null=True)
@@ -62,6 +63,7 @@ class Coupon(auth_model.TimeStampedModel):
     is_user_specific = models.BooleanField(default=False)
     is_corporate = models.BooleanField(default=False)
     is_visible = models.BooleanField(default=True)
+    is_for_insurance = models.BooleanField(default=False)
     new_user_constraint = models.BooleanField(default=False)
     coupon_type = models.IntegerField(choices=COUPON_TYPE_CHOICES, default=DISCOUNT)
     payment_option = models.ForeignKey(PaymentOptions, on_delete=models.SET_NULL, blank=True, null=True)
@@ -456,6 +458,14 @@ class CouponRecommender():
 
         if deal_price:
             coupons = list(filter(lambda x: x.min_order_amount == None or x.min_order_amount <= deal_price, coupons))
+            coupons = list(filter(lambda x: x.max_order_amount == None or x.max_order_amount >= deal_price, coupons))
+
+        if user and user.is_authenticated:
+            is_user_insured = user.active_insurance
+            if is_user_insured:
+                coupons = list(filter(lambda x: x.is_for_insurance == False or (x.is_for_insurance == True and x.max_order_amount >= deal_price), coupons))
+            else:
+                coupons = list(filter(lambda x: x.is_for_insurance == False, coupons))
 
         if search_type == 'doctor' or search_type == 'lab':
             if tests:
