@@ -522,3 +522,44 @@ class GenericNotes(TimeStampedModel):
     class Meta:
         db_table = 'generic_notes'
 
+
+class TdsDeductionMixin(object):
+
+    def get_tds_amount(self):
+        from ondoc.authentication.models import Merchant
+        tds = 0
+        merchant = self.get_merchant
+        booking_net_revenue = self.get_booking_revenue()
+        if merchant.enable_for_tds_deduction:
+            merchant_net_revenue_obj = merchant.net_revenue.all().first()
+            if merchant_net_revenue_obj:
+                if merchant_net_revenue_obj.total_revenue > Merchant.TDS_THRESHOLD_AMOUNT:
+                    tds = (self.fees * Merchant.TDS_APPLICABLE_RATE) / 100
+            else:
+                if booking_net_revenue >= Merchant.TDS_THRESHOLD_AMOUNT:
+                    tds = (Merchant.TDS_THRESHOLD_AMOUNT * Merchant.TDS_APPLICABLE_RATE) / 100
+        return tds
+
+    def get_booking_revenue(self):
+        booking_net_revenue = self.deal_price - self.fees
+        if booking_net_revenue < 0:
+            booking_net_revenue = 0
+
+        return booking_net_revenue
+
+    def update_net_revenues(self, tds):
+        from ondoc.authentication.models import MerchantNetRevenue
+        merchant = self.get_merchant
+        booking_net_revenue = self.get_booking_revenue()
+        merchant_net_revenue_obj = merchant.net_revenue.all().first()
+        if merchant_net_revenue_obj:
+            total_revenue = booking_net_revenue + merchant_net_revenue_obj.total_revenue
+            total_tds = merchant_net_revenue_obj.tds_deducted + tds
+            merchant_net_revenue_obj.total_revenue = total_revenue
+            merchant_net_revenue_obj.tds_deducted = total_tds
+            merchant_net_revenue_obj.save()
+        else:
+            merchant_net_revenue_obj = MerchantNetRevenue(merchant=merchant, financial_year=MerchantNetRevenue.CURRENT_FINANCIAL_YEAR)
+            merchant_net_revenue_obj.tds = tds
+            merchant_net_revenue_obj.total_revenue = booking_net_revenue
+            merchant_net_revenue_obj.save()

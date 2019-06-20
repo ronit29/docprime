@@ -32,7 +32,7 @@ from datetime import timedelta
 from dateutil import tz
 from django.utils import timezone
 from ondoc.authentication import models as auth_model
-from ondoc.authentication.models import SPOCDetails, RefundMixin
+from ondoc.authentication.models import SPOCDetails, RefundMixin, MerchantTdsDeduction
 from ondoc.bookinganalytics.models import DP_OpdConsultsAndTests
 from ondoc.location import models as location_models
 from ondoc.account.models import Order, ConsumerAccount, ConsumerTransaction, PgTransaction, ConsumerRefund, \
@@ -51,7 +51,7 @@ from django.contrib.contenttypes.fields import GenericRelation
 from ondoc.api.v1.utils import get_start_end_datetime, custom_form_datetime, CouponsMixin, aware_time_zone, \
     form_time_slot, util_absolute_url, html_to_pdf, TimeSlotExtraction
 from ondoc.common.models import AppointmentHistory, AppointmentMaskNumber, Service, Remark, MatrixMappedState, \
-    MatrixMappedCity, GlobalNonBookable, SyncBookingAnalytics, CompletedBreakupMixin, RefundDetails
+    MatrixMappedCity, GlobalNonBookable, SyncBookingAnalytics, CompletedBreakupMixin, RefundDetails, TdsDeductionMixin
 from ondoc.common.models import QRCode
 
 from functools import reduce
@@ -2651,14 +2651,29 @@ class OpdAppointment(auth_model.TimeStampedModel, CouponsMixin, OpdAppointmentIn
         if self.payment_type in [OpdAppointment.COD]:
             raise Exception("Cannot create payout for COD appointments")
 
+        tds = self.get_tds_amount()
+        if tds > 0:
+            merchant_fees = self.fees - tds
+        else:
+            merchant_fees = self.fees
+
+        # Update Net Revenue
+        self.update_net_revenues(tds)
+
         payout_data = {
             "charged_amount" : self.effective_price,
-            "payable_amount" : self.fees,
-            "booking_type"   : Order.DOCTOR_PRODUCT_ID
+            "payable_amount" : merchant_fees,
+            "booking_type"  : Order.DOCTOR_PRODUCT_ID
         }
 
         merchant_payout = MerchantPayout.objects.create(**payout_data)
         self.merchant_payout = merchant_payout
+
+        # TDS Deduction
+        if tds > 0:
+            merchant = self.get_merchant
+            MerchantTdsDeduction.objects.create(merchant=merchant, tds_deducted=tds, financial_year=MerchantTdsDeduction.CURRENT_FINANCIAL_YEAR,
+                                                merchant_payout=merchant_payout)
 
     def doc_payout_amount(self):
         amount = 0
@@ -2669,15 +2684,42 @@ class OpdAppointment(auth_model.TimeStampedModel, CouponsMixin, OpdAppointmentIn
 
         return amount
 
-    # # used in save_merchant_payout
-    # def payout_data(self):
+    # def get_tds_amount(self):
+    #     tds = 0
+    #     merchant = self.get_merchant
+    #     booking_net_revenue = self.get_booking_revenue()
+    #     if merchant.enable_for_tds_deduction:
+    #         merchant_net_revenue_obj = merchant.net_revenue.all().first()
+    #         if merchant_net_revenue_obj:
+    #             if merchant_net_revenue_obj.total_revenue > Merchant.TDS_THRESHOLD_AMOUNT:
+    #                 tds = (self.fees * Merchant.TDS_APPLICABLE_RATE) / 100
+    #         else:
+    #             if booking_net_revenue >= Merchant.TDS_THRESHOLD_AMOUNT:
+    #                 tds = (Merchant.TDS_THRESHOLD_AMOUNT * Merchant.TDS_APPLICABLE_RATE) / 100
+    #     return tds
     #
-    #     payout_data = {
-    #         "charged_amount": self.effective_price,
-    #         "payable_amount": self.fees,
-    #         "booking_type": Order.DOCTOR_PRODUCT_ID
-    #     }
-    #     return payout_data
+    # def get_booking_revenue(self):
+    #     booking_net_revenue = self.deal_price - self.fees
+    #     if booking_net_revenue < 0:
+    #         booking_net_revenue = 0
+    #
+    #     return  booking_net_revenue
+    #
+    # def update_net_revenues(self, tds):
+    #     merchant = self.get_merchant
+    #     booking_net_revenue = self.get_booking_revenue()
+    #     merchant_net_revenue_obj = merchant.net_revenue.all().first()
+    #     if merchant_net_revenue_obj:
+    #         total_revenue = booking_net_revenue + merchant_net_revenue_obj.total_revenue
+    #         total_tds = merchant_net_revenue_obj.tds_deducted + tds
+    #         merchant_net_revenue_obj.total_revenue = total_revenue
+    #         merchant_net_revenue_obj.tds_deducted = total_tds
+    #         merchant_net_revenue_obj.save()
+    #     else:
+    #         merchant_net_revenue_obj = MerchantNetRevenue(merchant=merchant, financial_year=MerchantNetRevenue.CURRENT_FINANCIAL_YEAR)
+    #         merchant_net_revenue_obj.tds = tds
+    #         merchant_net_revenue_obj.total_revenue = booking_net_revenue
+    #         merchant_net_revenue_obj.save()
 
     @classmethod
     def get_billing_summary(cls, user, req_data):
