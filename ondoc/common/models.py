@@ -533,15 +533,26 @@ class TdsDeductionMixin(object):
         if merchant.enable_for_tds_deduction:
             merchant_net_revenue_obj = merchant.net_revenue.all().first()
             if merchant_net_revenue_obj:
-                if merchant_net_revenue_obj.total_revenue > Merchant.TDS_THRESHOLD_AMOUNT:
+                old_revenue = merchant_net_revenue_obj.total_revenue
+                new_revenue = merchant_net_revenue_obj.total_revenue + booking_net_revenue
+                if (new_revenue >= Merchant.TDS_THRESHOLD_AMOUNT) and (old_revenue < Merchant.TDS_THRESHOLD_AMOUNT):
+                    tds = (new_revenue * Merchant.TDS_APPLICABLE_RATE) / 100
+                elif old_revenue > Merchant.TDS_THRESHOLD_AMOUNT:
                     tds = (self.fees * Merchant.TDS_APPLICABLE_RATE) / 100
             else:
                 if booking_net_revenue >= Merchant.TDS_THRESHOLD_AMOUNT:
-                    tds = (Merchant.TDS_THRESHOLD_AMOUNT * Merchant.TDS_APPLICABLE_RATE) / 100
+                    tds = (booking_net_revenue * Merchant.TDS_APPLICABLE_RATE) / 100
         return tds
 
     def get_booking_revenue(self):
-        booking_net_revenue = self.deal_price - self.fees
+        wallet_amount = self.price_data['wallet_amount']
+
+        if self.__class__.__name__ == 'OpdAppointment':
+            agreed_price = self.fees
+        else:
+            agreed_price = self.agreed_price
+
+        booking_net_revenue = wallet_amount - agreed_price
         if booking_net_revenue < 0:
             booking_net_revenue = 0
 
