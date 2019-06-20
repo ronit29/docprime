@@ -513,6 +513,9 @@ class InsurerPolicyNumber(auth_model.TimeStampedModel):
 class BankHolidays(auth_model.TimeStampedModel):
     date = models.DateField(null=False, blank=False)
 
+    def __str__(self):
+        return str(self.date)
+
     @classmethod
     def is_holiday(cls, date):
         return cls.objects.filter(date=date).exists() or date.weekday() in [6]
