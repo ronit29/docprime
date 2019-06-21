@@ -530,11 +530,13 @@ class TdsDeductionMixin(object):
         tds = 0
         merchant = self.get_merchant
         booking_net_revenue = self.get_booking_revenue()
-
+        payout_amount = 0
         if self.__class__.__name__ == 'OpdAppointment':
             payout_amount = self.fees
-        else:
+        elif self.__class__.__name__ == 'LabAppointment':
             payout_amount = self.agreed_price
+            if self.is_home_pickup:
+                payout_amount += self.home_pickup_charges
 
         if merchant.enable_for_tds_deduction:
             merchant_net_revenue_obj = merchant.net_revenue.all().first()
@@ -544,7 +546,7 @@ class TdsDeductionMixin(object):
                 if (new_revenue >= Merchant.TDS_THRESHOLD_AMOUNT) and (old_revenue < Merchant.TDS_THRESHOLD_AMOUNT):
                     tds = (new_revenue * Merchant.TDS_APPLICABLE_RATE) / 100
                 elif old_revenue > Merchant.TDS_THRESHOLD_AMOUNT:
-                    tds = (self.fees * Merchant.TDS_APPLICABLE_RATE) / 100
+                    tds = (payout_amount * Merchant.TDS_APPLICABLE_RATE) / 100
             else:
                 if booking_net_revenue >= Merchant.TDS_THRESHOLD_AMOUNT:
                     tds = (booking_net_revenue * Merchant.TDS_APPLICABLE_RATE) / 100
