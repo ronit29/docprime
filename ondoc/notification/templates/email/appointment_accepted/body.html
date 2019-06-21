@@ -81,11 +81,13 @@
                             style="color: #3f3f3f; font-size: 16px; font-weight: 500;">{{instance.otp}}</span>
                     </td>
                 </tr>
+                {% if not instance.hospital.id in hospitals_not_required_unique_code %}
                 <tr>
                     <td style="color:#3f3f3f;font-size:16px;font-weight:500; padding-top: 4px;">
                         Share this code with the lab at the time of your appointment.
                     </td>
                 </tr>
+                {% endif %}
                 <tr>
                     <td style="color:#3f3f3f;font-size:16px;font-weight:500; padding-top: 14px;">
                         Your booking details are as below :
