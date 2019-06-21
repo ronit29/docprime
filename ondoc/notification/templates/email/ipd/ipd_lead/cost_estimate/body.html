@@ -1,6 +1,6 @@
 Dear {{instance.name}}, <br/><br/>
 
-As discussed, please find below the cost estimate{% if instance.ipd_procedure %} of {{instance.ipd_procedure}}{% endif %} for the requested hospital(s): <br/>
+As discussed, please find below the cost estimate{% if instance.ipd_procedure %} of {{instance.ipd_procedure}}{% endif %} for the requested hospital(s): <br/><br/>
 {% for ipd_cost_estimate in instance.procedure_cost_estimates.all %}
 <strong>Hospital</strong>: {{ipd_cost_estimate.hospital.name}} <br/>
 <strong>Stay Duration</strong>: {{ipd_cost_estimate.stay_duration}} day(s)<br/>
