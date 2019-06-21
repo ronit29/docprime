@@ -2039,7 +2039,6 @@ class EndorsementRequest(auth_model.TimeStampedModel):
         total_endorsment_members = endorsment_members.count()
         endorment_rejected_members_count = user_insurance.endorse_members.filter(status=EndorsementRequest.REJECT).count()
         if total_endorsment_members == endorment_rejected_members_count:
-            EndorsementRequest.process_endorsment_notifications(EndorsementRequest.REJECT, user_insurance.user)
             return
 
         endorsed_members_count = user_insurance.endorse_members.filter(~Q(status=EndorsementRequest.PENDING),
