@@ -705,9 +705,7 @@ def create_or_update_lead_on_matrix(self, data):
             mobile = obj.phone_number
             email = obj.email if obj.email else ''
             name = obj.name
-            concerned_opd_appointment_id = obj.data.get('opd_appointment_id', None) if obj and isinstance(obj.data, dict) else None
-            if concerned_opd_appointment_id:
-                request_data.update({'IPDBookingId': concerned_opd_appointment_id})
+            obj.update_idp_data(request_data)
         mobile = int(mobile)
         # if not mobile:
         #     return
@@ -718,6 +716,7 @@ def create_or_update_lead_on_matrix(self, data):
             'LeadID': obj.matrix_lead_id if hasattr(obj, 'matrix_lead_id') and obj.matrix_lead_id else 0,
             'PrimaryNo': mobile,
             'EmailId': email,
+            'IPDPotential': potential_ipd_lead,
             'QcStatus': obj.data_status if hasattr(obj, 'data_status') else 0,
             'OnBoarding': obj.onboarding_status if hasattr(obj, 'onboarding_status') else 0,
             'Gender': gender,

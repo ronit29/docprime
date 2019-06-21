@@ -1,3 +1,4 @@
+from dal import autocomplete
 from django.conf import settings
 from django.contrib import messages, admin
 from django.contrib.admin import TabularInline
@@ -322,6 +323,12 @@ class IpdProcedurePracticeSpecializationAdmin(ImportExportMixin, VersionAdmin):
 
 
 class IpdProcedureLeadAdminForm(forms.ModelForm):
+    # class Meta:
+    #     widgets = {
+    #         'hospital': autocomplete.ModelSelect2(url='admin:doctor_hospital_autocomplete'),
+    #         'doctor': autocomplete.ModelSelect2(url='admin:doctor_doctor_autocomplete'),
+    #     }
+
     def clean(self):
         super().clean()
         if any(self.errors):
@@ -337,10 +344,10 @@ class IpdProcedureLeadAdminForm(forms.ModelForm):
 
 class IpdProcedureLeadAdmin(VersionAdmin):
     form = IpdProcedureLeadAdminForm
-    list_filter = ['created_at', 'source', 'ipd_procedure', 'planned_date']
+    list_filter = ['created_at', 'source', 'ipd_procedure', 'planned_date', 'source']
     search_fields = ['phone_number', 'matrix_lead_id']
     list_display = ['id', 'phone_number', 'name', 'matrix_lead_id']
-    autocomplete_fields = ['hospital', 'insurer', 'tpa', 'ipd_procedure']
+    autocomplete_fields = ['doctor', 'hospital', 'insurer', 'tpa', 'ipd_procedure']
     exclude = ['user', 'lat', 'long']
     readonly_fields = ['phone_number', 'id', 'matrix_lead_id', 'comments', 'data', 'source', 'current_age',
                        'related_speciality', 'is_insured', 'insurance_details', 'opd_appointments', 'lab_appointments']
@@ -356,7 +363,7 @@ class IpdProcedureLeadAdmin(VersionAdmin):
         ('Lead Info', {
             # 'classes': ('collapse',),
             'fields': ('matrix_lead_id', 'comments', 'data', 'ipd_procedure', 'related_speciality',
-                       'hospital', 'hospital_reference_id', 'source', 'referer_doctor', 'status', 'planned_date',
+                       'hospital', 'doctor', 'hospital_reference_id', 'source', 'status', 'planned_date',
                        'payment_type', 'payment_amount', 'insurer', 'tpa', 'num_of_chats', 'remarks'),
         }),
         ('History', {
@@ -381,10 +388,9 @@ class IpdProcedureLeadAdmin(VersionAdmin):
         return ', '.join(result)
 
     def is_insured(self, obj):
-        result = False
-        if obj and obj.user:
-            return bool(obj.user.active_insurance)
-        return result
+        if obj:
+            return obj.is_user_insured()
+        return False
 
     def insurance_details(self, obj):
         result = None

@@ -3220,6 +3220,7 @@ class OpdAppointment(auth_model.TimeStampedModel, CouponsMixin, OpdAppointmentIn
     def convert_ipd_lead_data(self):
         result = {}
         result['hospital'] = self.hospital
+        result['doctor'] = self.doctor
         result['user'] = self.user
         result['payment_amount'] = self.deal_price  # To be confirmed
         if self.user:
