@@ -955,7 +955,7 @@ class EMAILNotification:
             body_template = "email/ipd_lead/body.html"
             subject_template = "email/ipd_lead/subject.txt"
         elif notification_type == NotificationAction.INSURANCE_CANCEL_INITIATE:
-            body_template = "email/insurance_cancelled/body.html"
+            body_template = "email/insurance_cancel_initiate/body.html"
             subject_template = "email/insurance_cancelled/subject.txt"
         elif notification_type == NotificationAction.PRICING_ALERT_EMAIL:
             body_template = "email/lab/lab_pricing_change/body.html"
@@ -1536,39 +1536,58 @@ class InsuranceNotification(Notification):
         }
 
         if self.notification_type == NotificationAction.INSURANCE_ENDORSMENT_APPROVED:
-            endorsement_list = list()
-            rejected = 0
-            endorsed_members = instance.endorse_members.filter(~Q(status=EndorsementRequest.PENDING))
-            for mem in endorsed_members:
-                if mem.status == 3:
-                    rejected = rejected + 1
-
-                mem_data = {
-                    'name': mem.member.get_full_name().title(),
-                    'relation': mem.member.relation,
-                    'status': EndorsementRequest.STATUS_CHOICES[mem.status-1][1]
-                }
-                endorsement_list.append(mem_data)
-
-            context['endorsement_list'] = endorsement_list
-            context['few_rejected'] = True if rejected > 0 else False
+            # endorsement_list = list()
+            # rejected = 0
+            # endorsed_members = instance.endorse_members.filter(~Q(status=EndorsementRequest.PENDING))
+            # for mem in endorsed_members:
+            #     if mem.status == 3:
+            #         rejected = rejected + 1
+            #
+            #     mem_data = {
+            #         'name': mem.member.get_full_name().title(),
+            #         'relation': mem.member.relation,
+            #         'status': EndorsementRequest.STATUS_CHOICES[mem.status-1][1]
+            #     }
+            #     endorsement_list.append(mem_data)
+            #
+            # context['endorsement_list'] = endorsement_list
+            # context['few_rejected'] = True if rejected > 0 else False
+            approved_endorsed_members = instance.endorse_members.filter(status=EndorsementRequest.APPROVED)
+            approved_endorsed_members_context = self.get_endorsed_context(approved_endorsed_members)
+            context = context.update(approved_endorsed_members_context)
+        return context
 
         if self.notification_type == NotificationAction.INSURANCE_ENDORSMENT_PENDING:
             pending_endorsed_members = instance.endorse_members.filter(status=EndorsementRequest.PENDING)
-            pending_member_list = list()
-            scope = ['first_name', 'middle_name', 'last_name', 'dob', 'title', 'email', 'address', 'pincode', 'gender',
-                     'relation', 'town', 'district', 'state']
-            for end_member in pending_endorsed_members:
-                for s in scope:
-                    if not getattr(end_member, s) == getattr(end_member.member, s):
-                        pending_member_data = {
-                            'field_name' : s,
-                            'previous_name': getattr(end_member.member, s),
-                            'modified_name': getattr(end_member, s)
-                        }
-                    pending_member_list.append(pending_member_data)
-            context['pending_members'] = pending_member_list
+            pending_endorsed_members_context = self.get_endorsed_context(pending_endorsed_members)
+            context = context.update(pending_endorsed_members_context)
         return context
+
+        if self.notification_type == NotificationAction.INSURANCE_ENDORSMENT_PARTIAL_APPROVED:
+            partially_approved_endorsed_members = instance.endorse_members.filter(~Q(status=EndorsementRequest.PENDING))
+            partial_approved_context = self.get_endorsed_context(partially_approved_endorsed_members)
+            context = context.update(partial_approved_context)
+        return context
+
+    def get_endorsed_context(self, members):
+        member_list = list()
+        scope = ['first_name', 'middle_name', 'last_name', 'dob', 'title', 'email', 'address', 'pincode', 'gender',
+                 'relation', 'town', 'district', 'state']
+        context = {}
+        for end_member in members:
+            for s in scope:
+                if not getattr(end_member, s) == getattr(end_member.member, s):
+                    pending_member_data = {
+                        'name': end_member.get_full_name().title(),
+                        'field_name': s,
+                        'previous_name': getattr(end_member.member, s),
+                        'modified_name': getattr(end_member, s),
+                        'status': end_member.status
+                    }
+                member_list.append(pending_member_data)
+        context['pending_members'] = member_list
+        return context
+
 
     def get_receivers(self):
 

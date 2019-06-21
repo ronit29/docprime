@@ -627,6 +627,8 @@ class InsuranceCancelViewSet(viewsets.GenericViewSet):
             res['error'] = "One of the OPD or LAB Appointment have been completed, Cancellation could not be processed"
             return Response(data=res, status=status.HTTP_400_BAD_REQUEST)
         response = user_insurance.process_cancellation()
+        user_insurance.cancel_initiate_by = UserInsurance.SELF
+        user_insurance.save()
         return Response(data=response, status=status.HTTP_200_OK)
 
     def cancel_master(self,request):

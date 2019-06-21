@@ -530,7 +530,9 @@ class UserInsurance(auth_model.TimeStampedModel):
 
     FRAUD = 1
     OTHER = 2
-
+    SELF = 1
+    ADMIN = 2
+    CANCEL_BY_CHOICES = [(SELF, "Self"), (ADMIN, "Admin")]
     CANCEL_CUSTOMER_TYPE_CHOICES = [(FRAUD, "Fraud"), (OTHER, "Other")]
     CANCEL_CASE_CHOICES = [(REFUND, "Refund"), (NO_REFUND, "Non-Refund")]
     CANCEL_STATUS_CHOICES = [(NON_REFUNDED, "Non-Refunded"), (REFUND_INITIATE, "Refund-Initiate"), (REFUNDED, "Refunded")]
@@ -558,6 +560,7 @@ class UserInsurance(auth_model.TimeStampedModel):
     cancel_status = models.PositiveIntegerField(choices=CANCEL_STATUS_CHOICES, default=NON_REFUNDED)
     cancel_initial_date = models.DateTimeField(blank=True, null=True)
     cancel_customer_type = models.PositiveIntegerField(choices=CANCEL_CUSTOMER_TYPE_CHOICES, default=OTHER)
+    cancel_initiate_by = models.PositiveIntegerField(choices=CANCEL_BY_CHOICES, null=True, blank=True)
     notes = GenericRelation(GenericNotes)
 
     def __str__(self):
@@ -1974,6 +1977,7 @@ class EndorsementRequest(auth_model.TimeStampedModel):
     PENDING = 1
     APPROVED = 2
     REJECT = 3
+    PARTIAL_APPROVED=4
     STATUS_CHOICES = [(PENDING, "Pending"), (APPROVED, "Approved"), (REJECT, "Reject")]
     TITLE_TYPE_CHOICES = [(MR, 'mr.'), (MRS, 'mrs.'), (MISS, 'miss'), (MAST, 'mast.')]
     member = models.ForeignKey(InsuredMembers, related_name='related_endorse_request', on_delete=models.DO_NOTHING)

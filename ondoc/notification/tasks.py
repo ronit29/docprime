@@ -640,6 +640,8 @@ def send_insurance_endorsment_notifications(self, data):
             notification = NotificationAction.INSURANCE_ENDORSMENT_REJECTED
         elif endorsment_status == EndorsementRequest.APPROVED:
             notification = NotificationAction.INSURANCE_ENDORSMENT_APPROVED
+        elif endorsment_status == EndorsementRequest.PARTIAL_APPROVED:
+            notification = NotificationAction.INSURANCE_ENDORSMENT_PARTIAL_APPROVED
 
             if not user_insurance.coi:
                 try:

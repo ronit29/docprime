@@ -916,9 +916,9 @@ class UserInsuranceAdmin(ImportExportMixin, admin.ModelAdmin):
     list_display = ['id', 'insurance_plan', 'user_name', 'user', 'policy_number', 'purchase_date', 'status']
     fields = ['insurance_plan', 'user', 'purchase_date', 'expiry_date', 'policy_number', 'premium_amount',
               'merchant_payout', 'status', 'cancel_reason', 'cancel_after_utilize_insurance', 'cancel_case_type',
-              'cancel_status', 'cancel_initial_date', 'cancel_customer_type']
+              'cancel_status', 'cancel_initial_date', 'cancel_customer_type', 'cancel_initiate_by']
     readonly_fields = ('insurance_plan', 'user', 'purchase_date', 'expiry_date', 'policy_number', 'premium_amount',
-                       'merchant_payout', 'cancel_initial_date')
+                       'merchant_payout', 'cancel_initial_date', 'cancel_initiate_by')
     inlines = [InsuredMembersInline, UserBankInline, UserBankDocumentInline, GenericNotesInline]
     form = UserInsuranceForm
     search_fields = ['id']
@@ -973,18 +973,19 @@ class UserInsuranceAdmin(ImportExportMixin, admin.ModelAdmin):
     def save_model(self, request, obj, form, change):
         responsible_user = request.user
         obj._responsible_user = responsible_user if responsible_user and not responsible_user.is_anonymous else None
-        if request.user.is_member_of(constants['SUPER_INSURANCE_GROUP']):
-            if obj.status == UserInsurance.ACTIVE:
+        # if request.user.is_member_of(constants['SUPER_INSURANCE_GROUP']):
+        if obj.status == UserInsurance.ACTIVE:
+            super(UserInsuranceAdmin, self).save_model(request, obj, form, change)
+        # elif obj.status == UserInsurance.ONHOLD:
+        #     if obj.onhold_reason:
+        #         super(UserInsuranceAdmin, self).save_model(request, obj, form, change)
+        elif obj.status == UserInsurance.CANCEL_INITIATE:
+            response = obj.process_cancellation()
+            obj.cancel_initiate_by = UserInsurance.ADMIN
+            if response.get('success', None):
                 super(UserInsuranceAdmin, self).save_model(request, obj, form, change)
-            # elif obj.status == UserInsurance.ONHOLD:
-            #     if obj.onhold_reason:
-            #         super(UserInsuranceAdmin, self).save_model(request, obj, form, change)
-            elif obj.status == UserInsurance.CANCEL_INITIATE:
-                response = obj.process_cancellation()
-                if response.get('success', None):
-                    super(UserInsuranceAdmin, self).save_model(request, obj, form, change)
-            elif obj.status == UserInsurance.CANCELLED:
-                super(UserInsuranceAdmin, self).save_model(request, obj, form, change)
+        elif obj.status == UserInsurance.CANCELLED:
+            super(UserInsuranceAdmin, self).save_model(request, obj, form, change)
 
 
 class InsuranceDiseaseAdmin(admin.ModelAdmin):
@@ -1222,6 +1223,8 @@ class EndorsementRequestForm(forms.ModelForm):
         status = data.get('status')
         coi_status = data.get('mail_coi_to_customer')
         reject_reason = data.get('reject_reason')
+        if int(status) == EndorsementRequest.PARTIAL_APPROVED:
+            raise forms.ValidationError('Please select Approved or Rejected, Partial Approved can not be selected')
         if int(status) == EndorsementRequest.REJECT and not reject_reason:
             raise forms.ValidationError('For Rejection, reject reason is mandatory')
         if int(status) == EndorsementRequest.PENDING and coi_status:
