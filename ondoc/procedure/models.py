@@ -10,6 +10,7 @@ from ondoc.doctor.models import DoctorClinic, SearchKey, Hospital, PracticeSpeci
 from collections import deque, OrderedDict
 
 from ondoc.insurance.models import ThirdPartyAdministrator
+from django.conf import settings
 
 
 class IpdProcedure(auth_model.TimeStampedModel, SearchKey, auth_model.SoftDelete):
@@ -94,6 +95,36 @@ class IpdProcedureCategoryMapping(models.Model):
         unique_together = (('ipd_procedure', 'category'),)
 
 
+class IpdCostEstimateRoomType(models.Model):
+    room_type = models.CharField(max_length=200, unique=True)
+
+    def __str__(self):
+        return '{}'.format(self.room_type)
+
+    class Meta:
+        db_table = "ipd_cost_estimate_room_type"
+        verbose_name = "Ipd Cost Estimate Room Type"
+        verbose_name_plural = "Ipd Cost Estimate Room Types"
+
+
+class IpdProcedureCostEstimate(auth_model.TimeStampedModel):
+    ipd_procedure = models.ForeignKey(IpdProcedure, on_delete=models.CASCADE)
+    hospital = models.ForeignKey(Hospital, on_delete=models.CASCADE)
+    stay_duration = models.IntegerField(default=1)
+    costs = models.ManyToManyField(IpdCostEstimateRoomType, through='IpdCostEstimateRoomTypeMapping',
+                                      through_fields=('cost_estimate', 'room_type'), related_name='of_ipd_procedures')
+
+    def __str__(self):
+        return '{} - {} - {} day(s)'.format(self.ipd_procedure.name, self.hospital.name, self.stay_duration)
+
+    class Meta:
+        db_table = "ipd_procedure_cost_estimate"
+        unique_together = (('ipd_procedure', 'hospital'),)
+        verbose_name = "Ipd Cost Estimate"
+        verbose_name_plural = "Ipd Cost Estimate"
+
+
+
 class IpdProcedureLead(auth_model.TimeStampedModel):
 
     NEW = 1
@@ -162,6 +193,9 @@ class IpdProcedureLead(auth_model.TimeStampedModel):
     referer_doctor = models.CharField(max_length=500, null=True, blank=True)
     doctor = models.ForeignKey(Doctor, on_delete=models.SET_NULL, null=True, blank=True)
     remarks = models.TextField(null=True, blank=True)
+    procedure_cost_estimates = models.ManyToManyField(IpdProcedureCostEstimate,
+                                                     through='IpdProcedureLeadCostEstimateMapping',
+                                                     related_name='procedure_cost_estimates')
 
     # ADMIN :Is_OpDInsured, Specialization List, appointment list
     # DEFAULTS??
@@ -620,3 +654,53 @@ class Offer(auth_model.TimeStampedModel):
 
     class Meta:
         db_table = 'offer'
+
+
+class IpdProcedureLeadCostEstimateMapping(models.Model):
+    ipd_procedure_lead = models.ForeignKey(IpdProcedureLead, on_delete=models.CASCADE, related_name="lead")
+    cost_estimate = models.ForeignKey(IpdProcedureCostEstimate, on_delete=models.CASCADE)
+
+    class Meta:
+        db_table = "ipd_procedure_lead_cost_estimate"
+        unique_together = (('ipd_procedure_lead', 'cost_estimate'),)
+
+
+class IpdCostEstimateRoomTypeMapping(models.Model):
+    room_type = models.ForeignKey(IpdCostEstimateRoomType, on_delete=models.CASCADE, related_name='room')
+    cost_estimate = models.ForeignKey(IpdProcedureCostEstimate, on_delete=models.CASCADE, related_name='room_type_costs')
+    cost = models.CharField(max_length=200, blank=True, null=True)
+
+    class Meta:
+        db_table = "ipd_cost_estimate_room_type_mapping"
+
+
+class UploadCostEstimateData(auth_model.TimeStampedModel):
+    CREATED = 1
+    IN_PROGRESS = 2
+    SUCCESS = 3
+    FAIL = 4
+    STATUS_CHOICES = ("", "Select"), \
+                     (CREATED, "Created"), \
+                     (IN_PROGRESS, "Upload in progress"), \
+                     (SUCCESS, "Upload successful"),\
+                     (FAIL, "Upload Failed")
+    # file, batch, status, error msg, source
+    file = models.FileField()
+    source = models.CharField(max_length=20)
+    batch = models.CharField(max_length=20)
+    status = models.PositiveSmallIntegerField(choices=STATUS_CHOICES, default=CREATED, editable=False)
+    error_msg = JSONField(editable=False, null=True, blank=True)
+    lines = models.PositiveIntegerField(null=True, blank=True)
+    user = models.ForeignKey(settings.AUTH_USER_MODEL, related_name="uploaded_cost_estimates", null=True, editable=False,
+                             on_delete=models.SET_NULL)
+
+    def save(self, *args, **kwargs):
+        retry = kwargs.pop('retry', True)
+        from ondoc.notification.tasks import upload_cost_estimates
+        super().save(*args, **kwargs)
+        if (self.status == self.CREATED or self.status == self.FAIL) and retry:
+            self.status = self.IN_PROGRESS
+            self.error_msg = None
+            super().save(*args, **kwargs)
+            upload_cost_estimates.apply_async((self.id,), countdown=1)
+            # upload_cost_estimates(self.id)
