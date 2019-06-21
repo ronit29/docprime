@@ -211,9 +211,10 @@ class IpdProcedureLead(auth_model.TimeStampedModel):
             if self.hospital:
                 result2 = self.hospital.is_ipd_hospital
             else:
-                result2 = self.doctor.doctor_clinics.filter(hospital__is_ipd_hospital=True,
-                                                            hospital__is_live=True,
-                                                            enabled=True).exists()
+                # result2 = self.doctor.doctor_clinics.filter(hospital__is_ipd_hospital=True,
+                #                                             hospital__is_live=True,
+                #                                             enabled=True).exists()
+                result2 = False
             result = result1 and result2
         return result
 
