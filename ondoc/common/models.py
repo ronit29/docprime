@@ -530,6 +530,12 @@ class TdsDeductionMixin(object):
         tds = 0
         merchant = self.get_merchant
         booking_net_revenue = self.get_booking_revenue()
+
+        if self.__class__.__name__ == 'OpdAppointment':
+            payout_amount = self.fees
+        else:
+            payout_amount = self.agreed_price
+
         if merchant.enable_for_tds_deduction:
             merchant_net_revenue_obj = merchant.net_revenue.all().first()
             if merchant_net_revenue_obj:
@@ -543,20 +549,6 @@ class TdsDeductionMixin(object):
                 if booking_net_revenue >= Merchant.TDS_THRESHOLD_AMOUNT:
                     tds = (booking_net_revenue * Merchant.TDS_APPLICABLE_RATE) / 100
         return tds
-
-    def get_booking_revenue(self):
-        wallet_amount = self.price_data['wallet_amount']
-
-        if self.__class__.__name__ == 'OpdAppointment':
-            agreed_price = self.fees
-        else:
-            agreed_price = self.agreed_price
-
-        booking_net_revenue = wallet_amount - agreed_price
-        if booking_net_revenue < 0:
-            booking_net_revenue = 0
-
-        return booking_net_revenue
 
     def update_net_revenues(self, tds):
         from ondoc.authentication.models import MerchantNetRevenue

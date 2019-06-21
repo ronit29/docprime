@@ -2651,18 +2651,17 @@ class OpdAppointment(auth_model.TimeStampedModel, CouponsMixin, OpdAppointmentIn
         if self.payment_type in [OpdAppointment.COD]:
             raise Exception("Cannot create payout for COD appointments")
 
+        payout_amount = self.fees
         tds = self.get_tds_amount()
         if tds > 0:
-            merchant_fees = self.fees - tds
-        else:
-            merchant_fees = self.fees
+            payout_amount += tds
 
         # Update Net Revenue
         self.update_net_revenues(tds)
 
         payout_data = {
             "charged_amount" : self.effective_price,
-            "payable_amount" : merchant_fees,
+            "payable_amount" : payout_amount,
             "booking_type"  : Order.DOCTOR_PRODUCT_ID
         }
 
@@ -2684,42 +2683,14 @@ class OpdAppointment(auth_model.TimeStampedModel, CouponsMixin, OpdAppointmentIn
 
         return amount
 
-    # def get_tds_amount(self):
-    #     tds = 0
-    #     merchant = self.get_merchant
-    #     booking_net_revenue = self.get_booking_revenue()
-    #     if merchant.enable_for_tds_deduction:
-    #         merchant_net_revenue_obj = merchant.net_revenue.all().first()
-    #         if merchant_net_revenue_obj:
-    #             if merchant_net_revenue_obj.total_revenue > Merchant.TDS_THRESHOLD_AMOUNT:
-    #                 tds = (self.fees * Merchant.TDS_APPLICABLE_RATE) / 100
-    #         else:
-    #             if booking_net_revenue >= Merchant.TDS_THRESHOLD_AMOUNT:
-    #                 tds = (Merchant.TDS_THRESHOLD_AMOUNT * Merchant.TDS_APPLICABLE_RATE) / 100
-    #     return tds
-    #
-    # def get_booking_revenue(self):
-    #     booking_net_revenue = self.deal_price - self.fees
-    #     if booking_net_revenue < 0:
-    #         booking_net_revenue = 0
-    #
-    #     return  booking_net_revenue
-    #
-    # def update_net_revenues(self, tds):
-    #     merchant = self.get_merchant
-    #     booking_net_revenue = self.get_booking_revenue()
-    #     merchant_net_revenue_obj = merchant.net_revenue.all().first()
-    #     if merchant_net_revenue_obj:
-    #         total_revenue = booking_net_revenue + merchant_net_revenue_obj.total_revenue
-    #         total_tds = merchant_net_revenue_obj.tds_deducted + tds
-    #         merchant_net_revenue_obj.total_revenue = total_revenue
-    #         merchant_net_revenue_obj.tds_deducted = total_tds
-    #         merchant_net_revenue_obj.save()
-    #     else:
-    #         merchant_net_revenue_obj = MerchantNetRevenue(merchant=merchant, financial_year=MerchantNetRevenue.CURRENT_FINANCIAL_YEAR)
-    #         merchant_net_revenue_obj.tds = tds
-    #         merchant_net_revenue_obj.total_revenue = booking_net_revenue
-    #         merchant_net_revenue_obj.save()
+    def get_booking_revenue(self):
+        wallet_amount = self.price_data['wallet_amount']
+        agreed_price = self.fees
+        booking_net_revenue = wallet_amount - agreed_price
+        if booking_net_revenue < 0:
+            booking_net_revenue = 0
+
+        return booking_net_revenue
 
     @classmethod
     def get_billing_summary(cls, user, req_data):
