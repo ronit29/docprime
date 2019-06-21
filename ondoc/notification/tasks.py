@@ -773,7 +773,7 @@ def opd_send_after_appointment_confirmation(appointment_id, previous_appointment
                 not instance.user or \
                 str(math.floor(instance.time_slot_start.timestamp())) != previous_appointment_date_time:
             return
-        if instance.status == OpdAppointment.ACCEPTED:
+        if instance.status == OpdAppointment.ACCEPTED and not instance.insurance:
             if not second:
                 opd_notification = OpdNotification(instance, NotificationAction.OPD_CONFIRMATION_CHECK_AFTER_APPOINTMENT)
             else:
