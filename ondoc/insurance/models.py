@@ -524,7 +524,16 @@ class UserInsurance(auth_model.TimeStampedModel):
 
     STATUS_CHOICES = [(ACTIVE, "Active"), (CANCELLED, "Cancelled"), (EXPIRED, "Expired"), (ONHOLD, "Onhold"),
                       (CANCEL_INITIATE, 'Cancel Initiate')]
+    NON_REFUNDED = 1
+    REFUND_INITIATE = 2
+    REFUNDED = 3
+
+    FRAUD = 1
+    OTHER = 2
+
+    CANCEL_CUSTOMER_TYPE_CHOICES = [(FRAUD, "Fraud"), (OTHER, "Other")]
     CANCEL_CASE_CHOICES = [(REFUND, "Refund"), (NO_REFUND, "Non-Refund")]
+    CANCEL_STATUS_CHOICES = [(NON_REFUNDED, "Non-Refunded"), (REFUND_INITIATE, "Refund-Initiate"), (REFUNDED, "Refunded")]
 
     id = models.BigAutoField(primary_key=True)
     insurance_plan = models.ForeignKey(InsurancePlans, related_name='active_users', on_delete=models.DO_NOTHING)
@@ -546,7 +555,9 @@ class UserInsurance(auth_model.TimeStampedModel):
     cancel_case_type = models.PositiveIntegerField(choices=CANCEL_CASE_CHOICES, default=REFUND)
     master_policy_reference = models.ForeignKey(InsurerPolicyNumber, related_name='policy_reference', on_delete=models.DO_NOTHING, null=True)
     premium_transferred = models.NullBooleanField(default=False)
-
+    cancel_status = models.PositiveIntegerField(choices=CANCEL_STATUS_CHOICES, default=NON_REFUNDED)
+    cancel_initial_date = models.DateTimeField(blank=True, null=True)
+    cancel_customer_type = models.PositiveIntegerField(choices=CANCEL_CUSTOMER_TYPE_CHOICES, default=OTHER)
     notes = GenericRelation(GenericNotes)
 
     def __str__(self):
@@ -1402,6 +1413,7 @@ class UserInsurance(auth_model.TimeStampedModel):
             appointment.status = LabAppointment.CANCELLED
             appointment.save()
         self.status = UserInsurance.CANCEL_INITIATE
+        self.cancel_initial_date = timezone.now()
         self.save()
 
         send_cancellation_notification = True if self.user and hasattr(self, '_responsible_user') and self._responsible_user == self.user else None

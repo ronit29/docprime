@@ -6,7 +6,7 @@ from ondoc.authentication.models import User, UserProfile
 from ondoc.common.models import Feature, AppointmentHistory
 from ondoc.coupon.models import Coupon
 from ondoc.doctor.models import DoctorClinic, SearchKey, Hospital, PracticeSpecialization, HealthInsuranceProvider, \
-    HospitalNetwork
+    HospitalNetwork, Doctor
 from collections import deque, OrderedDict
 
 from ondoc.insurance.models import ThirdPartyAdministrator
@@ -191,6 +191,7 @@ class IpdProcedureLead(auth_model.TimeStampedModel):
     data = JSONField(blank=True, null=True)
     planned_date = models.DateField(null=True, blank=True)
     referer_doctor = models.CharField(max_length=500, null=True, blank=True)
+    doctor = models.ForeignKey(Doctor, on_delete=models.SET_NULL, null=True, blank=True)
     remarks = models.TextField(null=True, blank=True)
     procedure_cost_estimates = models.ManyToManyField(IpdProcedureCostEstimate,
                                                      through='IpdProcedureLeadCostEstimateMapping',
@@ -235,6 +236,48 @@ class IpdProcedureLead(auth_model.TimeStampedModel):
     def is_valid_hospital_for_lead(hospital):
         return hospital.has_ipd_doctors()
 
+    def is_potential_ipd(self):
+        result = False
+        if self.doctor:
+            result1 = self.doctor.doctorpracticespecializations.filter(
+                specialization__in=PotentialIpdLeadPracticeSpecialization.objects.all().values_list(
+                    'practice_specialization', flat=True)).exists()
+            if self.hospital:
+                result2 = self.hospital.is_ipd_hospital
+            else:
+                # result2 = self.doctor.doctor_clinics.filter(hospital__is_ipd_hospital=True,
+                #                                             hospital__is_live=True,
+                #                                             enabled=True).exists()
+                result2 = False
+            result = result1 and result2
+        return result
+
+    def update_idp_data(self, request_data):
+        concerned_opd_appointment_id = self.data.get('opd_appointment_id', None) if isinstance(self.data, dict) else None
+        if concerned_opd_appointment_id:
+            request_data.update({'IPDBookingId': concerned_opd_appointment_id})
+        if self.doctor:
+            request_data.update({'DoctorName': self.doctor.get_display_name()})
+            request_data.update({'DoctorSpec': "".join(self.doctor.doctorpracticespecializations.all().values_list('specialization__name', flat=True))})
+        if self.ipd_procedure:
+            request_data.update({'IPDProcedure': self.ipd_procedure.name})
+        if self.hospital:
+            request_data.update({'IPDHospitalName': self.hospital.name})
+        if self.planned_date:
+            request_data.update({'PlannedDate': int(self.planned_date.timestamp())})
+        if self.user:
+            request_data.update({'IPDIsInsured': 1 if self.is_user_insured() else 0})
+            request_data.update({'OPDAppointments': self.user.recent_opd_appointment.count()})
+            request_data.update({'LabAppointments': self.user.recent_lab_appointment.count()})
+        if self.comments:
+            request_data.update({'UserComment': self.comments})
+
+    def is_user_insured(self):
+        result = False
+        if self.user:
+            return bool(self.user.active_insurance)
+        return result
+
 
 class IpdProcedureDetailType(auth_model.TimeStampedModel):
     name = models.CharField(max_length=1000)
@@ -258,6 +301,16 @@ class IpdProcedureDetail(auth_model.TimeStampedModel):
 
     class Meta:
         db_table = "ipd_procedure_details"
+
+
+class PotentialIpdLeadPracticeSpecialization(models.Model):
+    practice_specialization = models.ForeignKey(PracticeSpecialization, on_delete=models.CASCADE)
+
+    def __str__(self):
+        return '{}'.format(self.practice_specialization.name)
+
+    class Meta:
+        db_table = "potential_ipd_lead_practice_specialization"
 
 
 class ProcedureCategory(auth_model.TimeStampedModel, SearchKey):

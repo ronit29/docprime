@@ -51,7 +51,7 @@ from ondoc.procedure.models import Procedure, ProcedureCategory, CommonProcedure
     ProcedureCategoryMapping, ProcedureToCategoryMapping, CommonProcedure, IpdProcedure, IpdProcedureFeatureMapping, \
     DoctorClinicIpdProcedure, IpdProcedureCategoryMapping, IpdProcedureCategory, CommonIpdProcedure, \
     IpdProcedureDetailType, IpdProcedureDetail, IpdProcedureSynonym, IpdProcedureSynonymMapping, \
-    IpdProcedurePracticeSpecialization, IpdProcedureLead, Offer, IpdCostEstimateRoomType, IpdProcedureCostEstimate, \
+    IpdProcedurePracticeSpecialization, IpdProcedureLead, Offer, PotentialIpdLeadPracticeSpecialization, IpdCostEstimateRoomType, IpdProcedureCostEstimate, \
     IpdCostEstimateRoomTypeMapping, IpdProcedureLeadCostEstimateMapping, UploadCostEstimateData
 from ondoc.reports import models as report_models
 
@@ -568,7 +568,8 @@ class Command(BaseCommand):
                                                            HospitalHelpline, IpdProcedure, HospitalTiming,
                                                            IpdProcedureDetailType, IpdProcedureDetail, IpdProcedureSynonym, IpdProcedureSynonymMapping,
                                                            EmailBanner, RecommenderThrough, Recommender,
-                                                           IpdProcedurePracticeSpecialization, CityLatLong, CommonHospital)
+                                                           IpdProcedurePracticeSpecialization, CityLatLong, CommonHospital,
+                                                           PotentialIpdLeadPracticeSpecialization)
         for cl, ct in content_types.items():
             permissions = Permission.objects.filter(
                 Q(content_type=ct),
@@ -885,7 +886,7 @@ class Command(BaseCommand):
 
             group.permissions.add(*permissions)
 
-        content_types = ContentType.objects.get_for_models(MerchantPayout, UserInsurance)
+        content_types = ContentType.objects.get_for_models(MerchantPayout, UserInsurance, InsurerAccount)
 
         for cl, ct in content_types.items():
             permissions = Permission.objects.filter(

@@ -8,7 +8,8 @@ from ondoc.crm.admin.corporate_booking import CorporateDealAdmin, CorporatesAdmi
 from ondoc.crm.admin.procedure import ProcedureCategoryAdmin, ProcedureAdmin, IpdProcedureAdmin, FeatureAdmin, \
     ServiceAdmin, HealthInsuranceProviderAdmin, IpdProcedureCategoryAdmin, IpdProcedureDetailAdmin, \
     IpdProcedureDetailTypeAdmin, IpdProcedureSynonymAdmin, IpdProcedureSynonymMappingAdmin, \
-    IpdProcedurePracticeSpecializationAdmin, IpdProcedureLeadAdmin, OfferAdmin, IpdProcedureCostEstimateAdmin, \
+    IpdProcedurePracticeSpecializationAdmin, IpdProcedureLeadAdmin, OfferAdmin, \
+    PotentialIpdLeadPracticeSpecializationAdmin, IpdProcedureCostEstimateAdmin, \
     IpdCostEstimateRoomTypeAdmin, UploadCostEstimateDataAdmin
 from ondoc.crm.admin.subscription_plan import SubscriptionPlanAdmin, SubscriptionPlanFeatureAdmin, UserPlanMappingAdmin
 from ondoc.doctor.models import (Doctor, Language, MedicalService, Specialization, College, Qualification, Hospital,
@@ -34,7 +35,8 @@ from ondoc.location.models import EntityUrls, CompareSEOUrls
 from ondoc.notification import models as notifcation_model
 from ondoc.procedure.models import Procedure, ProcedureCategory, CommonProcedureCategory, CommonProcedure, IpdProcedure, \
     IpdProcedureCategory, CommonIpdProcedure, IpdProcedureDetail, IpdProcedureDetailType, IpdProcedureSynonym, \
-    IpdProcedureSynonymMapping, IpdProcedurePracticeSpecialization, IpdProcedureLead, Offer, IpdProcedureCostEstimate, \
+    IpdProcedureSynonymMapping, IpdProcedurePracticeSpecialization, IpdProcedureLead, Offer, \
+    PotentialIpdLeadPracticeSpecialization, IpdProcedureCostEstimate, \
     IpdCostEstimateRoomType, UploadCostEstimateData
 from ondoc.subscription_plan.models import Plan, PlanFeature, UserPlanMapping
 from .common import Cities, CitiesAdmin, MatrixCityMapping, MatrixCityAdmin, MerchantAdmin, MerchantPayoutAdmin, \
@@ -196,6 +198,8 @@ admin.site.register(InsurerAccountTransfer, InsurerAccountTransferAdmin)
 
 admin.site.register(InsuranceTransaction)
 admin.site.register(InsurerPolicyNumber, InsurerPolicyNumberAdmin)
+admin.site.register(UserBank)
+admin.site.register(UserBankDocument)
 admin.site.register(Order)
 admin.site.register(AdwordLocationCriteria, AdwordLocationCriteriaAdmin)
 admin.site.register(ProcedureCategory, ProcedureCategoryAdmin)
@@ -236,6 +240,7 @@ admin.site.register(IpdProcedureDetail, IpdProcedureDetailAdmin)
 admin.site.register(IpdProcedurePracticeSpecialization, IpdProcedurePracticeSpecializationAdmin)
 admin.site.register(IpdProcedureLead, IpdProcedureLeadAdmin)
 admin.site.register(Offer, OfferAdmin)
+admin.site.register(PotentialIpdLeadPracticeSpecialization, PotentialIpdLeadPracticeSpecializationAdmin)
 admin.site.register(IpdProcedureCostEstimate, IpdProcedureCostEstimateAdmin)
 admin.site.register(IpdCostEstimateRoomType, IpdCostEstimateRoomTypeAdmin)
 admin.site.register(Feature, FeatureAdmin)
@@ -260,3 +265,5 @@ admin.site.register(BannerLocation)
 admin.site.register(EmailBanner, EmailBannerAdmin)
 admin.site.register(Recommender, RecommenderAdmin)
 admin.site.register(ThirdPartyAdministrator, ThirdPartyAdministratorAdmin)
+admin.site.register(BlacklistUser, BlacklistUserAdmin)
+admin.site.register(BlockedStates, BlockedStatesAdmin )
