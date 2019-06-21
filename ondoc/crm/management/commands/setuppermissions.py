@@ -51,7 +51,7 @@ from ondoc.procedure.models import Procedure, ProcedureCategory, CommonProcedure
     ProcedureCategoryMapping, ProcedureToCategoryMapping, CommonProcedure, IpdProcedure, IpdProcedureFeatureMapping, \
     DoctorClinicIpdProcedure, IpdProcedureCategoryMapping, IpdProcedureCategory, CommonIpdProcedure, \
     IpdProcedureDetailType, IpdProcedureDetail, IpdProcedureSynonym, IpdProcedureSynonymMapping, \
-    IpdProcedurePracticeSpecialization, IpdProcedureLead, Offer
+    IpdProcedurePracticeSpecialization, IpdProcedureLead, Offer, PotentialIpdLeadPracticeSpecialization
 from ondoc.reports import models as report_models
 
 from ondoc.diagnostic.models import LabPricing
@@ -567,7 +567,8 @@ class Command(BaseCommand):
                                                            HospitalHelpline, IpdProcedure, HospitalTiming,
                                                            IpdProcedureDetailType, IpdProcedureDetail, IpdProcedureSynonym, IpdProcedureSynonymMapping,
                                                            EmailBanner, RecommenderThrough, Recommender,
-                                                           IpdProcedurePracticeSpecialization, CityLatLong, CommonHospital)
+                                                           IpdProcedurePracticeSpecialization, CityLatLong, CommonHospital,
+                                                           PotentialIpdLeadPracticeSpecialization)
         for cl, ct in content_types.items():
             permissions = Permission.objects.filter(
                 Q(content_type=ct),

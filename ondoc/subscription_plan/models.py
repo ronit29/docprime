@@ -26,6 +26,7 @@ class Plan(auth_model.TimeStampedModel):
     features = models.ManyToManyField('PlanFeature', through='PlanFeatureMapping', through_fields=('plan', 'feature'),
                                       related_name='plans_included_in')
     enabled = models.BooleanField(default=True)
+    icon = models.ImageField('Icon', upload_to='plan/images', null=True, blank=True)
 
     class Meta:
         db_table = "subscription_plan"
