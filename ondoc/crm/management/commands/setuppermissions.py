@@ -592,7 +592,8 @@ class Command(BaseCommand):
 
             group.permissions.add(*permissions)
 
-        content_types = ContentType.objects.get_for_models(Coupon, UserSpecificCoupon, Hospital, HospitalNetwork)
+        content_types = ContentType.objects.get_for_models(Coupon, UserSpecificCoupon, Hospital, HospitalNetwork,
+                                                           PracticeSpecialization)
 
         for cl, ct in content_types.items():
             permissions = Permission.objects.filter(
