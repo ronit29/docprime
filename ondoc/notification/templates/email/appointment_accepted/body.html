@@ -75,13 +75,13 @@
             <table cellpadding="0" cellspacing="0"
                    style="width: 100%; padding: 20px 15px; border-bottom: 1px solid #d3d3d3;">
                 <tbody>
+                {% if not instance.hospital.id in hospitals_not_required_unique_code %}
                 <tr>
                     <td style="color: #000000; font-weight: 600;">
                         Unique Confirmation Code : <span
                             style="color: #3f3f3f; font-size: 16px; font-weight: 500;">{{instance.otp}}</span>
                     </td>
                 </tr>
-                {% if not instance.hospital.id in hospitals_not_required_unique_code %}
                 <tr>
                     <td style="color:#3f3f3f;font-size:16px;font-weight:500; padding-top: 4px;">
                         Share this code with the lab at the time of your appointment.
