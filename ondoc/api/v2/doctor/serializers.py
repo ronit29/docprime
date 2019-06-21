@@ -165,6 +165,9 @@ class ProviderSignupValidations:
 
 class GenerateOtpSerializer(serializers.Serializer):
     phone_number = serializers.IntegerField(min_value=5000000000,max_value=9999999999)
+    via_sms = serializers.BooleanField(default=True, required=False)
+    via_whatsapp = serializers.BooleanField(default=False, required=False)
+    request_source = serializers.CharField(required=False, max_length=200)
 
     def validate(self, attrs):
         if ProviderSignupValidations.user_exists(attrs):

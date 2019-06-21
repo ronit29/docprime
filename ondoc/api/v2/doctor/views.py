@@ -510,8 +510,11 @@ class ProviderSignupOtpViewset(viewsets.GenericViewSet):
         valid_data = serializer.validated_data
         phone_number = valid_data.get('phone_number')
         retry_send = request.query_params.get('retry', False)
+        via_sms = valid_data.get('via_sms', True)
+        via_whatsapp = valid_data.get('via_whatsapp', False)
+        call_source = valid_data.get('request_source')
         otp_message = OtpVerifications.get_otp_message(request.META.get('HTTP_PLATFORM'), None, True, version=request.META.get('HTTP_APP_VERSION'))
-        send_otp(otp_message, phone_number, retry_send)
+        send_otp(otp_message, phone_number, retry_send, via_sms=via_sms, via_whatsapp=via_whatsapp, call_source=call_source)
         response = {'otp_generated': True}
         return Response(response)
 
