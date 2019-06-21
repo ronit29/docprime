@@ -49,10 +49,10 @@ from ondoc.notification import models as notification_models
 from ondoc.notification import tasks as notification_tasks
 from django.contrib.contenttypes.fields import GenericRelation
 from ondoc.api.v1.utils import get_start_end_datetime, custom_form_datetime, CouponsMixin, aware_time_zone, \
-    form_time_slot, util_absolute_url, html_to_pdf, TimeSlotExtraction
+    form_time_slot, util_absolute_url, html_to_pdf, TimeSlotExtraction, resolve_address
 from ondoc.common.models import AppointmentHistory, AppointmentMaskNumber, Service, Remark, MatrixMappedState, \
     MatrixMappedCity, GlobalNonBookable, SyncBookingAnalytics, CompletedBreakupMixin, RefundDetails
-from ondoc.common.models import QRCode
+from ondoc.common.models import QRCode, MatrixDataMixin
 
 from functools import reduce
 from operator import or_
@@ -1509,7 +1509,6 @@ class DoctorClinicTiming(auth_model.TimeStampedModel):
                 return self.cod_deal_price
             else:
                 return self.mrp
-
         return None
 
     def save(self, *args, **kwargs):
@@ -2143,7 +2142,7 @@ class OpdAppointmentInvoiceMixin(object):
 
 
 @reversion.register()
-class OpdAppointment(auth_model.TimeStampedModel, CouponsMixin, OpdAppointmentInvoiceMixin, RefundMixin, CompletedBreakupMixin):
+class OpdAppointment(auth_model.TimeStampedModel, CouponsMixin, OpdAppointmentInvoiceMixin, RefundMixin, CompletedBreakupMixin, MatrixDataMixin):
     PRODUCT_ID = Order.DOCTOR_PRODUCT_ID
     CREATED = 1
     BOOKED = 2
@@ -2229,6 +2228,22 @@ class OpdAppointment(auth_model.TimeStampedModel, CouponsMixin, OpdAppointmentIn
 
     def __str__(self):
         return self.profile.name + " (" + self.doctor.name + ")"
+
+    def get_cod_amount(self):
+        result = int(self.mrp)
+        # day = self.time_slot_start.weekday()
+        # if self.doctor:
+        #     aware_dt = timezone.localtime(self.time_slot_start)
+        #     hour_min = aware_dt.hour + aware_dt.minute / 60
+        #     doc_clinic = DoctorClinicTiming.objects.filter(day=day, doctor_clinic__doctor=self.doctor,
+        #                                                    doctor_clinic__hospital=self.hospital, start__lte=hour_min,
+        #                                                    end__gt=hour_min).first()
+        #     if doc_clinic:
+        #         try:
+        #             result = doc_clinic.dct_cod_deal_price()
+        #         except:
+        #             pass
+        return result
 
     def allowed_action(self, user_type, request):
         allowed = []
@@ -3023,6 +3038,161 @@ class OpdAppointment(auth_model.TimeStampedModel, CouponsMixin, OpdAppointmentIn
                                                  user=self.user, triggered_at=datetime.datetime.utcnow())
         except Exception as e:
             logger.error("Could not save triggered event - " + str(e))
+
+    def get_matrix_data(self, order, product_id, sub_product_id):
+        # policy_details = self.get_matrix_policy_data()
+        appointment_details = self.get_matrix_appointment_data(order)
+
+        request_data = {
+            'DocPrimeUserId': self.user.id,
+            'LeadID': self.matrix_lead_id if self.matrix_lead_id else 0,
+            'Name': self.profile.name,
+            'PrimaryNo': self.user.phone_number,
+            'LeadSource': 'DocPrime',
+            'EmailId': self.profile.email,
+            'Gender': 1 if self.profile.gender == 'm' else 2 if self.profile.gender == 'f' else 0,
+            'CityId': 0,
+            'ProductId': product_id,
+            'SubProductId': sub_product_id,
+            'AppointmentDetails': appointment_details
+        }
+        return request_data
+
+    def get_matrix_appointment_data(self, order):
+        is_home_pickup = 0
+        report_uploaded = 0
+        report_sent = None
+        home_pickup_address = None
+        appointment_type = ''
+        location = ''
+        booking_url = '%s/admin/doctor/opdappointment/%s/change' % (settings.ADMIN_BASE_URL, self.id)
+        kyc = 1 if DoctorDocument.objects.filter(doctor=self.doctor, document_type__in=[DoctorDocument.CHEQUE, DoctorDocument.PAN]).distinct('document_type').count() == 2 else 0
+
+        if self.hospital.location:
+            location = 'https://www.google.com/maps/search/?api=1&query=%f,%f' % (self.hospital.location.y, self.hospital.location.x)
+
+        patient_address = ""
+        if hasattr(self, 'address') and self.address:
+            patient_address = resolve_address(self.address)
+
+        service_name = ""
+        profile_email = ''
+        if self.profile:
+            profile_email = self.profile.email
+
+        mask_number_instance = self.mask_number.filter(is_deleted=False, is_mask_number=True).first()
+        mask_number = ''
+        if mask_number_instance:
+            mask_number = mask_number_instance.mask_number
+
+        provider_booking_id = ''
+        merchant_code = ''
+        is_ipd_hospital = '1' if self.hospital and self.hospital.has_ipd_doctors() else '0'
+        location_verified = self.hospital.is_location_verified
+        provider_id = self.doctor.id
+        merchant = self.doctor.merchant.all().last()
+        if merchant:
+            merchant_code = merchant.id
+
+        order_id = order.id if order else None
+        dob_value = ''
+        try:
+            dob_value = datetime.datetime.strptime(self.profile_detail.get('dob'), "%Y-%m-%d").strftime("%d-%m-%Y") \
+                if self.profile_detail.get('dob', None) else ''
+        except Exception as e:
+            pass
+
+        merchant_payout = self.merchant_payout_data()
+        accepted_history = self.appointment_accepted_history()
+        user_insurance = self.insurance
+        mobile_list = self.get_matrix_spoc_data()
+        refund_data = self.refund_details_data()
+
+        appointment_details = {
+            'IPDHospital': is_ipd_hospital,
+            'IsInsured': 'yes' if user_insurance else 'no',
+            'InsurancePolicyNumber': str(user_insurance.policy_number) if user_insurance else None,
+            'AppointmentStatus': self.status,
+            'Age': self.calculate_age(),
+            'Email': profile_email,
+            'VirtualNo': mask_number,
+            'OTP': '',
+            'KYC': kyc,
+            'Location': location,
+            'PaymentType': self.payment_type,
+            'PaymentTypeId': self.payment_type,
+            'PaymentStatus': 300,
+            'OrderID': order_id if order_id else 0,
+            'DocPrimeBookingID': self.id,
+            'BookingDateTime': int(self.created_at.timestamp()),
+            'AppointmentDateTime': int(self.time_slot_start.timestamp()),
+            'BookingType': 'D',
+            'AppointmentType': appointment_type,
+            'IsHomePickUp': is_home_pickup,
+            'HomePickupAddress': home_pickup_address,
+            'PatientName': self.profile_detail.get("name", ''),
+            'PatientAddress': patient_address,
+            'ProviderName': getattr(self, 'doctor').name + " - " + self.hospital.name,
+            'ServiceName': service_name,
+            'InsuranceCover': 0,
+            'MobileList': mobile_list,
+            'BookingUrl': booking_url,
+            'Fees': float(self.fees),
+            'EffectivePrice': float(self.effective_price),
+            'MRP': float(self.mrp),
+            'DealPrice': float(self.deal_price),
+            'DOB': dob_value,
+            'ProviderAddress': self.hospital.get_hos_address(),
+            'ProviderID': provider_id,
+            'ProviderBookingID': provider_booking_id,
+            'MerchantCode': merchant_code,
+            'ProviderPaymentStatus': merchant_payout['provider_payment_status'],
+            'PaymentURN': merchant_payout['payment_URN'],
+            'Amount': float(merchant_payout['amount']) if merchant_payout['amount'] else None,
+            'SettlementDate': merchant_payout['settlement_date'],
+            'LocationVerified': location_verified,
+            'ReportUploaded': report_uploaded,
+            'Reportsent': report_sent,
+            'AcceptedBy': accepted_history['source'],
+            'AcceptedPhone': accepted_history['accepted_phone'],
+            "CustomerStatus": refund_data['customer_status'],
+            "RefundPaymentMode": float(refund_data['original_payment_mode_refund']) if refund_data['original_payment_mode_refund'] else None,
+            "RefundToWallet": float(refund_data['promotional_wallet_refund']) if refund_data['promotional_wallet_refund'] else None,
+            "RefundInitiationDate": int(refund_data['refund_initiated_at']) if refund_data['refund_initiated_at'] else None,
+            "RefundURN": refund_data['refund_urn']
+        }
+        return appointment_details
+
+    def get_matrix_spoc_data(self):
+        mobile_list = list()
+        # User mobile number
+        mobile_list.append({'MobileNo': self.user.phone_number, 'Name': self.profile.name, 'Type': 1})
+        auto_ivr_enabled = self.hospital.is_auto_ivr_enabled()
+        # SPOC details
+        for spoc_obj in self.hospital.spoc_details.all():
+            number = ''
+            if spoc_obj.number:
+                number = str(spoc_obj.number)
+            if spoc_obj.std_code:
+                number = str(spoc_obj.std_code) + number
+            if number:
+                number = int(number)
+
+            # spoc_type = dict(spoc_obj.CONTACT_TYPE_CHOICES)[spoc_obj.contact_type]
+            if number:
+                spoc_name = spoc_obj.name
+                mobile_list.append({'MobileNo': number,
+                                    'Name': spoc_name,
+                                    'DesignationID': spoc_obj.contact_type,
+                                    'AutoIVREnable': str(auto_ivr_enabled).lower(),
+                                    'Type': 2})
+
+        # Doctor mobile numbers
+        doctor_mobiles = [doctor_mobile.number for doctor_mobile in self.doctor.mobiles.all()]
+        doctor_mobiles = [{'MobileNo': number, 'Name': self.doctor.name, 'Type': 2} for number in doctor_mobiles]
+        mobile_list.extend(doctor_mobiles)
+
+        return mobile_list
 
     @classmethod
     def get_insured_completed_appointment(cls, insurance_obj):
