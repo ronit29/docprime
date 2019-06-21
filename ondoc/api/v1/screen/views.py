@@ -51,8 +51,8 @@ class ScreenViewSet(viewsets.GenericViewSet):
         profile = params.get('profile_id')
         product_id = params.get('product_id')
         app_version = params.get("app_version", "1.0")
-        lat = params.get('lat', None)
-        long = params.get('long', None)
+        lat = params.get('lat', '28.6862738')
+        long = params.get('long', '77.221783')
         city = city_match(params.get('city'))
         insurance_availability = False
 
