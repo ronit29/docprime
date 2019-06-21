@@ -103,7 +103,7 @@
 												</tr> -->
 												<tr>
 													<td style="font-weight: 500; color: #000; font-size: 12px;">
-														Dear {{proposer_name}}
+														Dear {{proposer_name|capfirst}}
 													</td>
 												</tr>
 												<tr>
@@ -161,16 +161,16 @@
                                                         {{forloop.counter}}
 													</td>
 													<td style="color: #000; font-size: 12px; padding:3px;">
-														{{member.modified_name}}
+														{{member.name|capfirst}}
 													</td>
 													<td style="color: #000; font-size: 12px; padding:3px;">
-														{{member.field_name}}
+														{{member.field_name|capfirst}}
 													</td>
 													<td style="color: #000; font-size: 12px; padding:3px;">
-														{{member.previous_name}}
+														{{member.previous_name|capfirst}}
 													</td>
 													<td style="color: #000; font-size: 12px; padding:3px;">
-														{{member.modified_name}}
+														{{member.modified_name|capfirst}}
 													</td>
 												</tr>
                                                 {%endfor%}

@@ -1560,14 +1560,12 @@ class InsuranceNotification(Notification):
         if self.notification_type == NotificationAction.INSURANCE_ENDORSMENT_PENDING:
             pending_endorsed_members = instance.endorse_members.filter(status=EndorsementRequest.PENDING)
             pending_endorsed_members_context = self.get_endorsed_context(pending_endorsed_members)
-            # context = context.update(pending_endorsed_members_context)
             context['pending_members'] = pending_endorsed_members_context['members']
 
         if self.notification_type == NotificationAction.INSURANCE_ENDORSMENT_PARTIAL_APPROVED:
             partially_approved_endorsed_members = instance.endorse_members.filter(~Q(status=EndorsementRequest.PENDING))
             partial_approved_context = self.get_endorsed_context(partially_approved_endorsed_members)
-            context['partialy_members'] = partial_approved_context['members']
-            # context = context.update(partial_approved_context)
+            context['partially_members'] = partial_approved_context['members']
         return context
 
     def get_endorsed_context(self, members):
@@ -1583,12 +1581,31 @@ class InsuranceNotification(Notification):
                         'field_name': s,
                         'previous_name': getattr(end_member.member, s),
                         'modified_name': getattr(end_member, s),
-                        'status': end_member.status
+                        'status': EndorsementRequest.STATUS_CHOICES[end_member.status-1]
                     }
                 member_list.append(pending_member_data)
         context['members'] = member_list
         return context
 
+    # def get_field_name(self, name):
+    #     ['first_name', 'middle_name', 'last_name', 'dob', 'title', 'email', 'address', 'pincode', 'gender',
+    #      'relation', 'town', 'district', 'state']
+    #     if name == "first_name":
+    #         return "First Name"
+    #     elif name == "middle_name":
+    #         return "Middle Name"
+    #     elif name == "last_name":
+    #         return "Last Name"
+    #     elif name == "dob":
+    #         return "DOB"
+    #     elif name == "title":
+    #         return "Title"
+    #     elif name == "email":
+    #         return "Email"
+    #     elif name == "address":
+    #         return "Address"
+    #     elif name == "pincode":
+    #         return "Pincode"
 
     def get_receivers(self):
 
@@ -1620,7 +1637,8 @@ class InsuranceNotification(Notification):
         if notification_type in [NotificationAction.INSURANCE_CONFIRMED, NotificationAction.INSURANCE_CANCEL_INITIATE,
                                  NotificationAction.INSURANCE_ENDORSMENT_APPROVED,
                                  NotificationAction.INSURANCE_ENDORSMENT_PENDING,
-                                 NotificationAction.INSURANCE_ENDORSMENT_REJECTED]:
+                                 NotificationAction.INSURANCE_ENDORSMENT_REJECTED,
+                                 NotificationAction.INSURANCE_ENDORSMENT_PARTIAL_APPROVED]:
             email_notification = EMAILNotification(notification_type, context)
             email_notification.send(all_receivers.get('email_receivers', []))
 

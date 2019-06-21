@@ -38,7 +38,7 @@
         <td style="padding:0 10px 10px"></td>
       </tr> -->
       <tr>
-        <td align="center" style="font-size:16px; color:#000; font-weight: 700;">Endorsement Request Processed.</td>
+        <td align="center" style="font-size:16px; color:#000; font-weight: 700;">Endorsement Request Partially Processed.</td>
       </tr>
       <!--
       <tr>
@@ -103,7 +103,7 @@
                         </tr> -->
                         <tr>
                           <td style="font-weight: 500; color: #000; font-size: 12px;">
-                            Dear {{proposer_name|capfirst}}
+                            Dear {{proposer_name||capfirst}}
                           </td>
                         </tr>
                         <tr>
@@ -113,7 +113,7 @@
                         </tr>
                         <tr>
                           <td style="font-weight: 500; color: #000; font-size: 12px;">
-                            We are pleased to inform you that your endorsement request has been processed.
+                            Your endorsement request has been partially processed.
                           </td>
                         </tr>
                         <tr>
@@ -123,7 +123,17 @@
                         </tr>
                         <tr>
                           <td style="font-weight: 500; color: #000; font-size: 12px;">
-                           Mentioned below are the details of the same:
+                           Details of the some of the insured members has not been updated due to insufficient documentations. Our customer service executive will shortly get in touch with you to resolve this issue.
+                          </td>
+                        </tr>
+                        <tr>
+                          <td style="padding:5px;">
+
+                          </td>
+                        </tr>
+                        <tr>
+                          <td style="font-weight: 500; color: #000; font-size: 12px;">
+                           Here are the details:
                           </td>
                         </tr>
                         <tr>
@@ -162,7 +172,7 @@
                           <th style="color: #000; font-size: 12px; padding:3px; text-align: left;">Status</th>
 
                         </tr>
-                        {%for member in approved_members%}
+                        {%for member in partially_members%}
                         <tr>
                           <td style="color: #000; font-size: 12px; padding:3px;">
                             {{forloop.counter}}
@@ -183,7 +193,26 @@
                             {{member.status}}
                           </td>
                         </tr>
-                        {%endfor%}
+                        <tr>
+                          <td style="color: #000; font-size: 12px; padding:3px;">
+                            1.
+                          </td>
+                          <td style="color: #000; font-size: 12px; padding:3px;">
+                            Tarun
+                          </td>
+                          <td style="color: #000; font-size: 12px; padding:3px;">
+                            Name
+                          </td>
+                          <td style="color: #000; font-size: 12px; padding:3px;">
+                            Name
+                          </td>
+                          <td style="color: #000; font-size: 12px; padding:3px;">
+                            NameSinghal
+                          </td>
+                          <td style="color: #000; font-size: 12px; padding:3px;">
+                            NameSinghal
+                          </td>
+                        </tr>
                       </table>
                     </td>
                   </tr>
@@ -197,17 +226,6 @@
                       You can find the updated COI along with this email.
                     </td>
                   </tr>
-                  <tr>
-                    <td style="padding:5px;">
-
-                    </td>
-                  </tr>
-                  <tr>
-                    <td colspan="2" style="font-weight: 500; color: #000; font-size: 12px;">
-                      In case of any queries, kindly write to us at <a style="text-decoration: none; color: #f78631;" href="mailto:customercare@docprime.com">customercare@docprime.com </a>
-                    </td>
-                  </tr>
-
                 </table>
               </td>
             </tr>
