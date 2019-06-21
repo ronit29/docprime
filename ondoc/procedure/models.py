@@ -223,15 +223,14 @@ class IpdProcedureLead(auth_model.TimeStampedModel):
         if concerned_opd_appointment_id:
             request_data.update({'IPDBookingId': concerned_opd_appointment_id})
         if self.doctor:
-            request_data.update({'DoctorName': self.doctor.get_display_name()})  # TODO: SHASHANK_SINGH
-            request_data.update({'DoctorSpec': "".join(self.doctor.doctorpracticespecializations.all().values_list('specialization__name', flat=True))})  # TODO: SHASHANK_SINGH
+            request_data.update({'DoctorName': self.doctor.get_display_name()})
+            request_data.update({'DoctorSpec': "".join(self.doctor.doctorpracticespecializations.all().values_list('specialization__name', flat=True))})
         if self.ipd_procedure:
             request_data.update({'IPDProcedure': self.ipd_procedure.name})
         if self.hospital:
             request_data.update({'IPDHospitalName': self.hospital.name})
         if self.planned_date:
-            # request_data.update({'PlannedDate': self.planned_date})  # TODO: correct format
-            pass
+            request_data.update({'PlannedDate': int(self.planned_date.timestamp())})
         if self.user:
             request_data.update({'IPDIsInsured': 1 if self.is_user_insured() else 0})
             request_data.update({'OPDAppointments': self.user.recent_opd_appointment.count()})
