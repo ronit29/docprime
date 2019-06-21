@@ -529,42 +529,47 @@ class TdsDeductionMixin(object):
         from ondoc.authentication.models import Merchant
         tds = 0
         merchant = self.get_merchant
-        booking_net_revenue = self.get_booking_revenue()
-        payout_amount = 0
-        if self.__class__.__name__ == 'OpdAppointment':
-            payout_amount = self.fees
-        elif self.__class__.__name__ == 'LabAppointment':
-            payout_amount = self.agreed_price
-            if self.is_home_pickup:
-                payout_amount += self.home_pickup_charges
+        if merchant:
+            booking_net_revenue = self.get_booking_revenue()
+            payout_amount = 0
+            if self.__class__.__name__ == 'OpdAppointment':
+                payout_amount = self.fees
+            elif self.__class__.__name__ == 'LabAppointment':
+                payout_amount = self.agreed_price
+                if self.is_home_pickup:
+                    payout_amount += self.home_pickup_charges
 
-        if merchant.enable_for_tds_deduction:
-            merchant_net_revenue_obj = merchant.net_revenue.all().first()
-            if merchant_net_revenue_obj:
-                old_revenue = merchant_net_revenue_obj.total_revenue
-                new_revenue = merchant_net_revenue_obj.total_revenue + booking_net_revenue
-                if (new_revenue >= Merchant.TDS_THRESHOLD_AMOUNT) and (old_revenue < Merchant.TDS_THRESHOLD_AMOUNT):
-                    tds = (new_revenue * Merchant.TDS_APPLICABLE_RATE) / 100
-                elif old_revenue > Merchant.TDS_THRESHOLD_AMOUNT:
-                    tds = (payout_amount * Merchant.TDS_APPLICABLE_RATE) / 100
-            else:
-                if booking_net_revenue >= Merchant.TDS_THRESHOLD_AMOUNT:
-                    tds = (booking_net_revenue * Merchant.TDS_APPLICABLE_RATE) / 100
+            if merchant.enable_for_tds_deduction:
+                merchant_net_revenue_obj = merchant.net_revenue.all().first()
+                if merchant_net_revenue_obj:
+                    old_revenue = merchant_net_revenue_obj.total_revenue
+                    new_revenue = merchant_net_revenue_obj.total_revenue + booking_net_revenue
+                    if (new_revenue >= Merchant.TDS_THRESHOLD_AMOUNT) and (old_revenue < Merchant.TDS_THRESHOLD_AMOUNT):
+                        tds = (new_revenue * Merchant.TDS_APPLICABLE_RATE) / 100
+                    elif old_revenue > Merchant.TDS_THRESHOLD_AMOUNT:
+                        tds = (payout_amount * Merchant.TDS_APPLICABLE_RATE) / 100
+                else:
+                    if booking_net_revenue >= Merchant.TDS_THRESHOLD_AMOUNT:
+                        tds = (payout_amount * Merchant.TDS_APPLICABLE_RATE) / 100
         return tds
 
     def update_net_revenues(self, tds):
         from ondoc.authentication.models import MerchantNetRevenue
         merchant = self.get_merchant
-        booking_net_revenue = self.get_booking_revenue()
-        merchant_net_revenue_obj = merchant.net_revenue.all().first()
-        if merchant_net_revenue_obj:
-            total_revenue = booking_net_revenue + merchant_net_revenue_obj.total_revenue
-            total_tds = merchant_net_revenue_obj.tds_deducted + tds
-            merchant_net_revenue_obj.total_revenue = total_revenue
-            merchant_net_revenue_obj.tds_deducted = total_tds
-            merchant_net_revenue_obj.save()
-        else:
-            merchant_net_revenue_obj = MerchantNetRevenue(merchant=merchant, financial_year=MerchantNetRevenue.CURRENT_FINANCIAL_YEAR)
-            merchant_net_revenue_obj.tds = tds
-            merchant_net_revenue_obj.total_revenue = booking_net_revenue
-            merchant_net_revenue_obj.save()
+        if merchant:
+            booking_net_revenue = self.get_booking_revenue()
+            merchant_net_revenue_obj = merchant.net_revenue.all().first()
+            if merchant_net_revenue_obj:
+                total_revenue = booking_net_revenue + merchant_net_revenue_obj.total_revenue
+                if not merchant_net_revenue_obj.tds_deducted:
+                    total_tds = tds
+                else:
+                    total_tds = merchant_net_revenue_obj.tds_deducted + tds
+                merchant_net_revenue_obj.total_revenue = total_revenue
+                merchant_net_revenue_obj.tds_deducted = total_tds
+                merchant_net_revenue_obj.save()
+            else:
+                merchant_net_revenue_obj = MerchantNetRevenue(merchant=merchant, financial_year=MerchantNetRevenue.CURRENT_FINANCIAL_YEAR)
+                merchant_net_revenue_obj.tds_deducted = tds
+                merchant_net_revenue_obj.total_revenue = booking_net_revenue
+                merchant_net_revenue_obj.save()
