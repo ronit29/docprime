@@ -1617,7 +1617,7 @@ class LabAppointment(TimeStampedModel, CouponsMixin, LabAppointmentInvoiceMixin,
     coupon_data = JSONField(blank=True, null=True)
     status_change_comments = models.CharField(max_length=5000, null=True, blank=True)
     appointment_prescriptions = GenericRelation("prescription.AppointmentPrescription", related_query_name="appointment_prescriptions")
-
+    reports_physically_collected = models.NullBooleanField()
 
     def get_all_uploaded_prescriptions(self, date=None):
         from ondoc.prescription.models import AppointmentPrescription
