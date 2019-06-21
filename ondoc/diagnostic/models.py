@@ -2627,7 +2627,11 @@ class LabAppointment(TimeStampedModel, CouponsMixin, LabAppointmentInvoiceMixin,
 
     def get_matrix_spoc_data(self):
         mobile_list = list()
-        auto_ivr_enabled = self.lab.is_auto_ivr_enabled()
+        if self.insurance_id:
+            auto_ivr_enabled = False
+        else:
+            auto_ivr_enabled = self.lab.is_auto_ivr_enabled()
+
         for contact_person in self.lab.labmanager_set.all():
             number = ''
             if contact_person.number:
