@@ -99,8 +99,6 @@ class LoginOTP(GenericViewSet):
         blocked_state = BlacklistUser.get_state_by_number(phone_number, BlockedStates.States.LOGIN)
         if blocked_state:
             return Response({'error': blocked_state.message}, status=status.HTTP_400_BAD_REQUEST)
-
-
         req_type = request.query_params.get('type')
         via_sms = data.get('via_sms', True)
         via_whatsapp = data.get('via_whatsapp', False)
@@ -121,7 +119,7 @@ class LoginOTP(GenericViewSet):
 
             if lab_queryset.exists() or doctor_queryset.exists() or provider_signup_queryset.exists():
                 response['exists'] = 1
-                send_otp(otp_message, phone_number, retry_send)
+                send_otp(otp_message, phone_number, retry_send, via_sms=via_sms, via_whatsapp=via_whatsapp, call_source=call_source)
 
             # if queryset.exists():
             #     response['exists'] = 1
