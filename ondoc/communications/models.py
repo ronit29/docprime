@@ -1554,17 +1554,20 @@ class InsuranceNotification(Notification):
             # context['few_rejected'] = True if rejected > 0 else False
             approved_endorsed_members = instance.endorse_members.filter(status=EndorsementRequest.APPROVED)
             approved_endorsed_members_context = self.get_endorsed_context(approved_endorsed_members)
-            context = context.update(approved_endorsed_members_context)
+            # context = context.update(approved_endorsed_members_context)
+            context['approved_members'] = approved_endorsed_members_context['members']
 
         if self.notification_type == NotificationAction.INSURANCE_ENDORSMENT_PENDING:
             pending_endorsed_members = instance.endorse_members.filter(status=EndorsementRequest.PENDING)
             pending_endorsed_members_context = self.get_endorsed_context(pending_endorsed_members)
-            context = context.update(pending_endorsed_members_context)
+            # context = context.update(pending_endorsed_members_context)
+            context['pending_members'] = pending_endorsed_members_context['members']
 
         if self.notification_type == NotificationAction.INSURANCE_ENDORSMENT_PARTIAL_APPROVED:
             partially_approved_endorsed_members = instance.endorse_members.filter(~Q(status=EndorsementRequest.PENDING))
             partial_approved_context = self.get_endorsed_context(partially_approved_endorsed_members)
-            context = context.update(partial_approved_context)
+            context['partialy_members'] = partial_approved_context['members']
+            # context = context.update(partial_approved_context)
         return context
 
     def get_endorsed_context(self, members):
@@ -1576,14 +1579,14 @@ class InsuranceNotification(Notification):
             for s in scope:
                 if not getattr(end_member, s) == getattr(end_member.member, s):
                     pending_member_data = {
-                        'name': end_member.get_full_name().title(),
+                        'name': end_member.member.get_full_name().title(),
                         'field_name': s,
                         'previous_name': getattr(end_member.member, s),
                         'modified_name': getattr(end_member, s),
                         'status': end_member.status
                     }
                 member_list.append(pending_member_data)
-        context['pending_members'] = member_list
+        context['members'] = member_list
         return context
 
 
