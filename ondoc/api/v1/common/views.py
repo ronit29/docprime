@@ -25,10 +25,12 @@ from ondoc.notification.rabbitmq_client import publish_message
 # from ondoc.notification.sqs_client import publish_message
 # from ondoc.notification.sqs_client import publish_message
 from django.template.loader import render_to_string
+
+from ondoc.procedure.models import IpdProcedure, IpdProcedureLead
 from . import serializers
 from ondoc.common.models import Cities, PaymentOptions, UserConfig, DeviceDetails
 from ondoc.common.utils import send_email, send_sms
-from ondoc.authentication.backends import JWTAuthentication
+from ondoc.authentication.backends import JWTAuthentication, WhatsappAuthentication
 from django.core.files.uploadedfile import SimpleUploadedFile, TemporaryUploadedFile, InMemoryUploadedFile
 from openpyxl import load_workbook
 from openpyxl.writer.excel import save_virtual_workbook
@@ -1075,3 +1077,33 @@ class SiteSettingsViewSet(viewsets.GenericViewSet):
         }
 
         return Response(data=settings)
+
+
+class DepartmentRouting(viewsets.GenericViewSet):
+    authentication_classes = (WhatsappAuthentication,)
+
+    def get_department(self, request):
+        params = request.query_params
+        phone_number = params.get('phone_number', None)
+        department_id = None
+        department_name = None
+
+        try:
+            phone_number = int(phone_number)
+
+            ipd_lead_active = IpdProcedureLead.check_if_lead_active(phone_number, 30)
+
+            if ipd_lead_active:
+                department_id = settings.CHAT_IPD_DEPARTMENT_ID
+                department_name = 'IPD'
+            else:
+                pass
+
+            resp = {
+                'department_id': department_id,
+                'department_name': department_name
+            }
+        except ValueError as e:
+            return Response({'error': str(e)}, status=status.HTTP_400_BAD_REQUEST)
+
+        return Response(resp)
