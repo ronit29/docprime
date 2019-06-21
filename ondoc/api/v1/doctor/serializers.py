@@ -1941,7 +1941,7 @@ class HospitalDetailIpdProcedureSerializer(TopHospitalForIpdProcedureSerializer)
                                                                      'doctors', 'rating_graph', 'rating',
                                                                      'display_rating_widget', 'opd_timings',
                                                                      'contact_number', 'specialization_doctors',
-                                                                     'offers', 'is_ipd_hospital', 'new_about', 'show_popup', 'force_popup')
+                                                                     'offers', 'is_ipd_hospital', 'new_about', 'show_popup', 'force_popup', 'enabled_for_prepaid')
 
     def get_show_popup(self, obj):
         request = self.context.get('request')
