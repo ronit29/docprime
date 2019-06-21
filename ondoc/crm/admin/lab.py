@@ -1070,12 +1070,12 @@ class LabAppointmentAdmin(nested_admin.NestedModelAdmin):
     #     return inline_instance
 
     def reports_uploaded(self, instance):
-        # if instance and instance.id:
-        #     if not instance.
-
         if instance and instance.id and sum(
                 instance.reports.annotate(no_of_files=Count('files')).values_list('no_of_files', flat=True)):
             return True
+        elif instance and instance.id and instance.reports_physically_collected:
+            return True
+
         return False
 
     def invoice_urls(self, instance):
