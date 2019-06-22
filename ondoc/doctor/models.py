@@ -3167,11 +3167,12 @@ class OpdAppointment(auth_model.TimeStampedModel, CouponsMixin, OpdAppointmentIn
         mobile_list = list()
         # User mobile number
         mobile_list.append({'MobileNo': self.user.phone_number, 'Name': self.profile.name, 'Type': 1})
-        if self.insurance_id:
-            auto_ivr_enabled = False
-        else:
-            auto_ivr_enabled = self.hospital.is_auto_ivr_enabled()
+        # if self.insurance_id:
+        #     auto_ivr_enabled = False
+        # else:
+        #     auto_ivr_enabled = self.hospital.is_auto_ivr_enabled()
 
+        auto_ivr_enabled = self.hospital.is_auto_ivr_enabled()
         # SPOC details
         for spoc_obj in self.hospital.spoc_details.all():
             number = ''
