@@ -798,6 +798,8 @@ class LabAppointmentForm(RefundableAppointmentForm):
                                                                   (1, 'Cancel and Refund'),), initial=0, widget=forms.RadioSelect)
     send_email_sms_report = forms.BooleanField(label='Send reports via message and email', initial=False, required=False)
     custom_otp = forms.IntegerField(required=False)
+    hospital_reference_id = forms.CharField(widget=forms.Textarea, required=False)
+    reports_physically_collected = forms.BooleanField(label='Reports collected physically by customer', initial=False, required=False)
 
     def clean(self):
         super().clean()
@@ -831,6 +833,10 @@ class LabAppointmentForm(RefundableAppointmentForm):
         if cleaned_data.get('send_email_sms_report',
                             False) and self.instance and self.instance.id and not self.instance.status == LabAppointment.COMPLETED:
                 raise forms.ValidationError("Can't send reports as appointment is not completed")
+
+        if cleaned_data.get('reports_physically_collected', False) and self.instance and \
+                self.instance.id and not self.instance.status == LabAppointment.COMPLETED:
+                raise forms.ValidationError("Can't collect reports as appointment is not completed")
 
         # if self.instance.status in [LabAppointment.CANCELLED, LabAppointment.COMPLETED] and len(cleaned_data):
         #     raise forms.ValidationError("Cancelled/Completed appointment cannot be modified.")
@@ -1028,8 +1034,8 @@ class LabAppointmentAdmin(nested_admin.NestedModelAdmin):
                     'deal_price', 'effective_price', 'payment_status', 'payment_type', 'insurance', 'is_home_pickup',
                     'get_pickup_address', 'get_lab_address', 'outstanding', 'status', 'cancel_type',
                     'cancellation_reason', 'cancellation_comments', 'start_date', 'start_time',
-                    'send_email_sms_report', 'invoice_urls', 'reports_uploaded', 'email_notification_timestamp', 'payment_type',
-                     'payout_info', 'refund_initiated', 'status_change_comments','uploaded_prescriptions')
+                    'send_email_sms_report', 'reports_physically_collected', 'invoice_urls', 'reports_uploaded', 'email_notification_timestamp', 'payment_type',
+                     'payout_info', 'refund_initiated', 'status_change_comments','uploaded_prescriptions', 'hospital_reference_id')
         if request.user.groups.filter(name=constants['APPOINTMENT_OTP_TEAM']).exists() or request.user.is_superuser:
             all_fields = all_fields + ('otp',)
 
@@ -1081,6 +1087,9 @@ class LabAppointmentAdmin(nested_admin.NestedModelAdmin):
         if instance and instance.id and sum(
                 instance.reports.annotate(no_of_files=Count('files')).values_list('no_of_files', flat=True)):
             return True
+        elif instance and instance.id and instance.reports_physically_collected:
+            return True
+
         return False
 
     def invoice_urls(self, instance):
@@ -1221,6 +1230,7 @@ class LabAppointmentAdmin(nested_admin.NestedModelAdmin):
             #
             # date_time = datetime.datetime.combine(date, time)
             send_email_sms_report = form.cleaned_data.get('send_email_sms_report', False)
+            # reports_physically_collected = form.cleaned_data.get('reports_physically_collected', False)
             if request.POST['start_date'] and request.POST['start_time']:
                 date_time_field = request.POST['start_date'] + " " + request.POST['start_time']
                 to_zone = tz.gettz(settings.TIME_ZONE)

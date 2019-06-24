@@ -2225,6 +2225,7 @@ class OpdAppointment(auth_model.TimeStampedModel, CouponsMixin, OpdAppointmentIn
     coupon_data = JSONField(blank=True, null=True)
     status_change_comments = models.CharField(max_length=5000, null=True, blank=True)
     is_cod_to_prepaid = models.NullBooleanField(default=False, null=True, blank=True)
+    hospital_reference_id = models.CharField(max_length=1000, null=True, blank=True)
 
     def __str__(self):
         return self.profile.name + " (" + self.doctor.name + ")"
