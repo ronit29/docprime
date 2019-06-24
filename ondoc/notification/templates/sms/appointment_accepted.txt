@@ -1,6 +1,8 @@
 The appointment request for {{patient_name|capfirst}} with Dr. {{doctor_name|capfirst}} has been confirmed.
+{% if not instance.hospital.id in hospitals_not_required_unique_code %}
 Unique Confirmation Code : {{instance.otp}}
 Please share this code with doctor at the time of appointment.
+{% endif %}
 The booking details are as below :
 Booking ID : {{instance.id}}
 Patient Name : {{patient_name|capfirst}}
