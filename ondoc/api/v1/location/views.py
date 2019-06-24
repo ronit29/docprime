@@ -782,22 +782,20 @@ class SearchUrlsViewSet(viewsets.GenericViewSet):
 
     def list_cities_for_hospitals(self, request):
         # TODO: SHASHANK_SINGH change if anything different logic
-        query = '''select max(eu.url), eu.locality_value, count(*) from entity_urls eu 
+        query = '''select eu.url, eu.locality_value as name from entity_urls eu 
                     left join seo_cities sc on eu.locality_value = sc.city
-                    inner join entity_urls eurl on eu.locality_value = eurl.locality_value and eurl.url_type='SEARCHURL'
-                     and eurl.sitemap_identifier = 'SPECIALIZATION_CITY' 
-                     where eu.sitemap_identifier='DOCTORS_CITY' and eu.is_valid =True
-                     group by eu.locality_value order by max(sc.rank) asc nulls last,count(*) desc 
-                     '''
+                     where eu.sitemap_identifier='HOSPITALS_CITY' and eu.is_valid =True
+                     order by sc.rank asc nulls last'''
 
         sql_urls = RawSql(query, []).fetch_all()
 
-        result = []
+        # result = []
+        #
+        # for data in sql_urls:
+        #     result.append(data.get('locality_value'))
+        # return Response({"cities": result})
 
-        for data in sql_urls:
-            result.append(data.get('locality_value'))
-
-        return Response({"cities": result})
+        return Response({"cities": sql_urls})
 
 
     def list_urls_by_city(self, request, city):
