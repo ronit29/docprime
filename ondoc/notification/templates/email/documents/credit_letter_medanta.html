@@ -1,0 +1,82 @@
+{% load static %}
+{% load invoice_tags %}
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml">
+	<head>
+		<meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
+		<title>Email Design</title>
+		<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+		<link href="https://fonts.googleapis.com/css?family=Open+Sans" rel="stylesheet">
+	</head>
+	<body style="margin: 0; padding: 0;font-family: Arial, sans-serif, ‘Open Sans’;padding: 0px 10px;">
+		<table align="center" bgcolor="#ffffff" border="0" cellpadding="0" cellspacing="0"  style="width: 100%;border-collapse: collapse; background: white; font-size: 14px;">
+			<tr>
+				<td style="padding-top: 50px;"></td>
+			</tr>
+			<tr>
+				<td>
+					<table border="0" cellpadding="0" cellspacing="0" style="padding: 14px 0px;">
+						<tr>
+							<td>
+								<img src="{{'notification/images/doctor_invoice_header.png'|get_absolute_url}}"/>
+							</td>
+						</tr>
+					</table>
+				</td>
+			</tr>
+			<tr>
+				<td style="padding-top: 50px;"></td>
+			</tr>
+			<tr>
+				<td>
+					<b>Date:</b>
+				</td>
+			</tr>
+			<tr>
+				<td style="padding-top: 50px;"></td>
+			</tr>
+			<tr>
+				<td>
+					To,<br><br>
+					Medical Superintendent<br><br>
+					Medanta Medicity<br><br>
+					Sector 38, Gurgaon<br><br>
+				</td>
+			</tr>
+			<tr>
+				<td style="padding-top: 50px;"></td>
+			</tr>
+			<tr>
+				<td>Subject : Appointment Intimation - <b>Docprime Booking ID {{instance.id}}</b></td>
+			</tr>
+			<tr>
+				<td style="padding-top: 50px;"></td>
+			</tr>
+			<tr>
+				<td>
+					Dear Sir,<br><br>
+					We hereby authorise <b>{{instance.profile.name}}</b>, customer of Docprime to avail the <b>Consultation</b> services at Medanta Medicity for <b>{{instance.doctor.name}}</b>  <br><br>
+					The invoice for this consultation needs to be given to the customer directly.<br><br>
+					Kindly extend consultation services on credit basis for the above doctor for {{instance.time_slot_start|date:"D jS F Y"}} at {{instance.time_slot_start|date:"h:i A"}}.<br><br>
+					For any clarification, you may contact our team at 1800-123-9419.<br><br>
+				</td>
+			</tr>
+			<tr>
+				<td style="padding-top: 50px;"></td>
+			</tr>
+			<tr>
+				<td>Sincerely,</td>
+			</tr>
+			<tr>
+				<td style="padding-top: 50px;"></td>
+			</tr>
+			<tr>
+				<td>
+					Dr. Satish Chandra<br><br>
+                    09560805054<br><br>
+					Head of IPD Operations
+				</td>
+			</tr>
+		</table>
+	</body>
+</html>
