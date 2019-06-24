@@ -795,8 +795,7 @@ class SearchUrlsViewSet(viewsets.GenericViewSet):
         #     result.append(data.get('locality_value'))
         # return Response({"cities": result})
 
-        return Response({"cities": sql_urls})
-
+        return Response(sql_urls)
 
     def list_urls_by_city(self, request, city):
         if not city:
