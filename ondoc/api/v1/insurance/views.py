@@ -455,7 +455,7 @@ class InsuranceProfileViewSet(viewsets.GenericViewSet):
                 resp['insurance_status'] = user_insurance.status
                 opd_appointment_count = OpdAppointment.get_insured_completed_appointment(user_insurance)
                 lab_appointment_count = LabAppointment.get_insured_completed_appointment(user_insurance)
-                if opd_appointment_count > 0 or lab_appointment_count > 0:
+                if not hasattr(request, 'agent') and (opd_appointment_count > 0 or lab_appointment_count > 0) :
                     resp['is_cancel_allowed'] = False
                     resp['is_endorsement_allowed'] = False
                 else:
@@ -464,7 +464,7 @@ class InsuranceProfileViewSet(viewsets.GenericViewSet):
                 members = user_insurance.get_members()
                 is_endorsement_exist = False
                 for member in members:
-                    if EndorsementRequest.is_endorsement_exist(member):
+                    if not (hasattr(request, 'agent')) and EndorsementRequest.is_endorsement_exist(member):
                         is_endorsement_exist = True
                         resp['is_endorsement_allowed'] = False
                         break
