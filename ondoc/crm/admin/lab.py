@@ -142,7 +142,7 @@ class LabManagerFormSet(forms.BaseInlineFormSet):
         phone_no_flag = False
         if self.cleaned_data and self.instance.network_type == 1:
             for data in self.cleaned_data:
-                number_pattern = re.compile("(0/91)?[7-9][0-9]{9}")
+                number_pattern = re.compile("(0/91)?[6-9][0-9]{9}")
                 if data.get('number') and number_pattern.match(str(data.get('number'))):
                     phone_no_flag = True
             if phone_no_flag == False:
