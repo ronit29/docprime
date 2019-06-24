@@ -3,10 +3,26 @@
 <!DOCTYPE html>
 <html xmlns="http://www.w3.org/1999/xhtml">
 	<head>
-		<meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
-		<title>Email Design</title>
-		<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+		<title>CREDIT LETTER</title>
+		<meta http-equiv="Content-Type" content="text/html; charset=UTF-8"/>
 		<link href="https://fonts.googleapis.com/css?family=Open+Sans" rel="stylesheet">
+		<style>
+			@page{
+			   margin:20px;
+			}
+
+			@media print{
+			   footer {
+			   left:0;
+			   position:fixed;
+			   }
+
+			   header {
+			   left:0;
+			   position:fixed;
+			   }
+			}
+		</style>
 	</head>
 	<body style="margin: 0; padding: 0;font-family: Arial, sans-serif, ‘Open Sans’;padding: 0px 10px;">
 		<table align="center" bgcolor="#ffffff" border="0" cellpadding="0" cellspacing="0"  style="width: 100%;border-collapse: collapse; background: white; font-size: 14px;">
@@ -18,7 +34,7 @@
 					<table border="0" cellpadding="0" cellspacing="0" style="padding: 14px 0px;">
 						<tr>
 							<td>
-								<img src="{{'notification/images/doctor_invoice_header.png'|get_absolute_url}}"/>
+								<img src="{{'notification/images/medanta-credit-letter-dp-logo.png'|get_absolute_url}}"/>
 							</td>
 						</tr>
 					</table>
@@ -29,7 +45,7 @@
 			</tr>
 			<tr>
 				<td>
-					<b>Date:</b>
+					<b>Date:</b> {{instance.booking_date|date:"D jS F Y"}}
 				</td>
 			</tr>
 			<tr>
