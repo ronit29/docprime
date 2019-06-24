@@ -300,7 +300,7 @@ class HospitalForm(FormCleanMixin):
 
     class Media:
         extend = True
-        js = ('https://cdn.ckeditor.com/ckeditor5/10.1.0/classic/ckeditor.js', 'doctor/js/init.js')
+        js = ('https://cdn.ckeditor.com/4.11.4/standard-all/ckeditor.js', 'doctor/js/init.js')
         css = {'all': ('doctor/css/style.css',)}
 
     def clean_location(self):

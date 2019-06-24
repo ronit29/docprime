@@ -51,7 +51,8 @@ from ondoc.procedure.models import Procedure, ProcedureCategory, CommonProcedure
     ProcedureCategoryMapping, ProcedureToCategoryMapping, CommonProcedure, IpdProcedure, IpdProcedureFeatureMapping, \
     DoctorClinicIpdProcedure, IpdProcedureCategoryMapping, IpdProcedureCategory, CommonIpdProcedure, \
     IpdProcedureDetailType, IpdProcedureDetail, IpdProcedureSynonym, IpdProcedureSynonymMapping, \
-    IpdProcedurePracticeSpecialization, IpdProcedureLead, Offer
+    IpdProcedurePracticeSpecialization, IpdProcedureLead, Offer, PotentialIpdLeadPracticeSpecialization, IpdCostEstimateRoomType, IpdProcedureCostEstimate, \
+    IpdCostEstimateRoomTypeMapping, IpdProcedureLeadCostEstimateMapping, UploadCostEstimateData
 from ondoc.reports import models as report_models
 
 from ondoc.diagnostic.models import LabPricing
@@ -567,7 +568,8 @@ class Command(BaseCommand):
                                                            HospitalHelpline, IpdProcedure, HospitalTiming,
                                                            IpdProcedureDetailType, IpdProcedureDetail, IpdProcedureSynonym, IpdProcedureSynonymMapping,
                                                            EmailBanner, RecommenderThrough, Recommender,
-                                                           IpdProcedurePracticeSpecialization, CityLatLong, CommonHospital)
+                                                           IpdProcedurePracticeSpecialization, CityLatLong, CommonHospital,
+                                                           PotentialIpdLeadPracticeSpecialization)
         for cl, ct in content_types.items():
             permissions = Permission.objects.filter(
                 Q(content_type=ct),
@@ -590,7 +592,8 @@ class Command(BaseCommand):
 
             group.permissions.add(*permissions)
 
-        content_types = ContentType.objects.get_for_models(Coupon, UserSpecificCoupon, Hospital, HospitalNetwork)
+        content_types = ContentType.objects.get_for_models(Coupon, UserSpecificCoupon, Hospital, HospitalNetwork,
+                                                           PracticeSpecialization)
 
         for cl, ct in content_types.items():
             permissions = Permission.objects.filter(
@@ -718,6 +721,17 @@ class Command(BaseCommand):
         for cl, ct in content_types.items():
             permissions = Permission.objects.filter(
                 Q(content_type=ct), Q(codename='change_' + ct.model))
+            group.permissions.add(*permissions)
+
+        content_types = ContentType.objects.get_for_models(IpdCostEstimateRoomType, IpdProcedureCostEstimate,
+                                                           IpdCostEstimateRoomTypeMapping,
+                                                           IpdProcedureLeadCostEstimateMapping,
+                                                           UploadCostEstimateData)
+        for cl, ct in content_types.items():
+            permissions = Permission.objects.filter(
+                Q(content_type=ct),
+                Q(codename='add_' + ct.model) |
+                Q(codename='change_' + ct.model))
             group.permissions.add(*permissions)
 
         group, created = Group.objects.get_or_create(name=constants['APPOINTMENT_OTP_BYPASS_AGENT_TEAM'])
