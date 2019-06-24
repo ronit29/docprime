@@ -1622,7 +1622,7 @@ class LabAppointment(TimeStampedModel, CouponsMixin, LabAppointmentInvoiceMixin,
     def get_all_uploaded_prescriptions(self, date=None):
         from ondoc.prescription.models import AppointmentPrescription
         qs = LabAppointment.objects.filter(user=self.user).values_list('id', flat=True)
-        prescriptions = AppointmentPrescription.objects.filter(content_type=ContentType.objects.get_for_model(self), object_id__in=qs)
+        prescriptions = AppointmentPrescription.objects.filter(content_type=ContentType.objects.get_for_model(self), object_id__in=qs).order_by('-id')
         return prescriptions
 
     def get_corporate_deal_id(self):
@@ -2627,6 +2627,11 @@ class LabAppointment(TimeStampedModel, CouponsMixin, LabAppointmentInvoiceMixin,
 
     def get_matrix_spoc_data(self):
         mobile_list = list()
+        # if self.insurance_id:
+        #     auto_ivr_enabled = False
+        # else:
+        #     auto_ivr_enabled = self.lab.is_auto_ivr_enabled()
+
         auto_ivr_enabled = self.lab.is_auto_ivr_enabled()
         for contact_person in self.lab.labmanager_set.all():
             number = ''

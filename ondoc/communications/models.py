@@ -342,6 +342,8 @@ class SMSNotification:
             body_template = "sms/cod_to_prepaid_doctor.txt"
         elif notification_type == NotificationAction.COD_TO_PREPAID_REQUEST:
             body_template = "sms/cod_to_prepaid_request.txt"
+        elif notification_type == NotificationAction.IPD_PROCEDURE_COST_ESTIMATE:
+            body_template = "sms/ipd/cost_estimate.txt"
         return body_template
 
     def trigger(self, receiver, template, context):
@@ -711,6 +713,13 @@ class WHTSAPPNotification:
             else:
                 data.append(' ')
 
+        elif notification_type == NotificationAction.IPD_PROCEDURE_COST_ESTIMATE:
+            # todo - get access permission from whatsapp
+            pass
+            # body_template = "cost_estimate"
+            #
+            # data.append(self.context.get('instance'))
+
         # elif notification_type == NotificationAction.LAB_REPORT_SEND_VIA_CRM:
         #     body_template = "sms/lab/lab_report_send_crm.txt"
         #     lab_reports = []
@@ -952,8 +961,11 @@ class EMAILNotification:
             body_template = "email/lab/lab_report_send_crm/body.html"
             subject_template = "email/lab/lab_report_send_crm/subject.txt"
         elif notification_type == NotificationAction.IPD_PROCEDURE_MAIL:
-            body_template = "email/ipd_lead/body.html"
-            subject_template = "email/ipd_lead/subject.txt"
+            body_template = "email/ipd/ipd_lead/new_lead/body.html"
+            subject_template = "email/ipd/ipd_lead/new_lead/subject.txt"
+        elif notification_type == NotificationAction.IPD_PROCEDURE_COST_ESTIMATE:
+            body_template = "email/ipd/ipd_lead/cost_estimate/body.html"
+            subject_template = "email/ipd/ipd_lead/cost_estimate/subject.txt"
         elif notification_type == NotificationAction.INSURANCE_CANCEL_INITIATE:
             body_template = "email/insurance_cancelled/body.html"
             subject_template = "email/insurance_cancelled/subject.txt"
@@ -1167,6 +1179,7 @@ class OpdNotification(Notification):
         opd_appointment_complete_url = booking_url + "&callbackurl=opd/appointment/{}?complete=true".format(self.appointment.id)
         opd_appointment_feedback_url = booking_url + "&callbackurl=opd/appointment/{}".format(self.appointment.id)
         reschdule_appointment_bypass_url = booking_url + "&callbackurl=opd/doctor/{}/{}/book?reschedule={}".format(self.appointment.doctor.id, self.appointment.hospital.id, self.appointment.id)
+        hospitals_not_required_unique_code = set(json.loads(settings.HOSPITALS_NOT_REQUIRED_UNIQUE_CODE))
         context = {
             "doctor_name": doctor_name,
             "patient_name": patient_name,
@@ -1191,7 +1204,8 @@ class OpdNotification(Notification):
             "reschdule_appointment_bypass_url": generate_short_url(reschdule_appointment_bypass_url),
             "show_amounts": bool(self.appointment.payment_type != OpdAppointment.INSURANCE),
             "opd_appointment_cod_to_prepaid_url": generate_short_url(opd_appointment_cod_to_prepaid_url) if opd_appointment_cod_to_prepaid_url else None,
-            "cod_to_prepaid_discount": cod_to_prepaid_discount
+            "cod_to_prepaid_discount": cod_to_prepaid_discount,
+            "hospitals_not_required_unique_code": hospitals_not_required_unique_code
         }
         return context
 
@@ -1215,6 +1229,7 @@ class OpdNotification(Notification):
                 notification_type == NotificationAction.COD_TO_PREPAID_REQUEST:
             sms_notification = SMSNotification(notification_type, context)
             sms_notification.send(all_receivers.get('sms_receivers', []))
+
             whtsapp_notification = WHTSAPPNotification(notification_type, context)
             whtsapp_notification.send(all_receivers.get('sms_receivers', []))
         elif notification_type == NotificationAction.APPOINTMENT_REMINDER_PROVIDER_SMS:
@@ -1633,4 +1648,49 @@ class ProviderAppNotification(Notification):
             if number:
                 user_and_phone_number.append({'user': None, 'phone_number': number})
         all_receivers['sms_receivers'] = user_and_phone_number
+        return all_receivers
+
+
+class IpdLeadNotification(Notification):
+    def __init__(self, ipd_procedure_lead, notification_type=None):
+        self.ipd_procedure_lead = ipd_procedure_lead
+        if notification_type:
+            self.notification_type = notification_type
+
+    def get_context(self):
+        context = {
+            "instance": self.ipd_procedure_lead
+        }
+        return context
+
+    def send(self):
+        context = self.get_context()
+        notification_type = self.notification_type
+        all_receivers = self.get_receivers()
+
+        email_notification = EMAILNotification(notification_type, context)
+        sms_notification = SMSNotification(notification_type, context)
+        whtsapp_notification = WHTSAPPNotification(notification_type, context)
+        email_notification.send(all_receivers.get('email_receivers', []))
+        sms_notification.send(all_receivers.get('sms_receivers', []))
+        # whtsapp_notification.send(all_receivers.get('sms_receivers', []))
+
+    def get_receivers(self):
+        all_receivers = {}
+        instance = self.ipd_procedure_lead
+        phone_numbers = []
+        emails = []
+        notification_type = self.notification_type
+        if not instance:
+            return []
+
+        if notification_type in [NotificationAction.IPD_PROCEDURE_COST_ESTIMATE]:
+            phone_numbers.append({'phone_number': instance.phone_number}) if instance.phone_number else None;
+            emails.append({'email': instance.email}) if instance.email else None;
+
+        emails = unique_emails(emails)
+        phone_numbers = unique_phone_numbers(phone_numbers)
+        all_receivers['sms_receivers'] = phone_numbers
+        all_receivers['email_receivers'] = emails
+
         return all_receivers

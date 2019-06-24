@@ -932,8 +932,8 @@ class LabAppointmentAdmin(nested_admin.NestedModelAdmin):
 
         prescription_string = ""
         for p in prescriptions:
-            prescription_string+="<div><a target='_blank' href={}>{}</a></div>".format(\
-                util_absolute_url(p.prescription_file.url), util_absolute_url(p.prescription_file.url))
+            prescription_string+="<div><a target='_blank' href={}>{}</a></div> | {}".format(
+                util_absolute_url(p.prescription_file.url), util_absolute_url(p.prescription_file.url), str(p.created_at.date()))
         return mark_safe(prescription_string)
 
     def get_search_results(self, request, queryset, search_term):
