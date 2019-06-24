@@ -1,3 +1,5 @@
+import re
+
 from django.shortcuts import render, HttpResponse, HttpResponseRedirect, redirect
 from django.conf.urls import url
 from django.conf import settings
@@ -134,6 +136,17 @@ class LabManagerFormSet(forms.BaseInlineFormSet):
         super().clean()
         if any(self.errors):
             return
+        if self.instance.data_status == QCModel.QC_APPROVED and not self.cleaned_data:
+            self.instance.is_enable = False
+            raise forms.ValidationError("Atleast one Lab Manager required for QC APPROVED or Enable for Online Booking")
+        phone_no_flag = False
+        if self.cleaned_data and self.instance.network_type == 1:
+            for data in self.cleaned_data:
+                number_pattern = re.compile("(0/91)?[6-9][0-9]{9}")
+                if data.get('number') and number_pattern.match(str(data.get('number'))):
+                    phone_no_flag = True
+            if phone_no_flag == False:
+                raise forms.ValidationError("Atleast one mobile no is required for SPOC Details")
 
 
 class LabManagerInline(admin.TabularInline):
