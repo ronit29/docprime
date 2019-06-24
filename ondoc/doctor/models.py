@@ -2246,6 +2246,7 @@ class OpdAppointment(auth_model.TimeStampedModel, CouponsMixin, OpdAppointmentIn
     coupon_data = JSONField(blank=True, null=True)
     status_change_comments = models.CharField(max_length=5000, null=True, blank=True)
     is_cod_to_prepaid = models.NullBooleanField(default=False, null=True, blank=True)
+    hospital_reference_id = models.CharField(max_length=1000, null=True, blank=True)
     documents = GenericRelation(Documents)
 
     def __str__(self):
@@ -2253,18 +2254,18 @@ class OpdAppointment(auth_model.TimeStampedModel, CouponsMixin, OpdAppointmentIn
 
     def get_cod_amount(self):
         result = int(self.mrp)
-        # day = self.time_slot_start.weekday()
-        # if self.doctor:
-        #     aware_dt = timezone.localtime(self.time_slot_start)
-        #     hour_min = aware_dt.hour + aware_dt.minute / 60
-        #     doc_clinic = DoctorClinicTiming.objects.filter(day=day, doctor_clinic__doctor=self.doctor,
-        #                                                    doctor_clinic__hospital=self.hospital, start__lte=hour_min,
-        #                                                    end__gt=hour_min).first()
-        #     if doc_clinic:
-        #         try:
-        #             result = doc_clinic.dct_cod_deal_price()
-        #         except:
-        #             pass
+        day = self.time_slot_start.weekday()
+        if self.doctor:
+            aware_dt = timezone.localtime(self.time_slot_start)
+            hour_min = aware_dt.hour + aware_dt.minute / 60
+            doc_clinic = DoctorClinicTiming.objects.filter(day=day, doctor_clinic__doctor=self.doctor,
+                                                           doctor_clinic__hospital=self.hospital, start__lte=hour_min,
+                                                           end__gt=hour_min).first()
+            if doc_clinic:
+                try:
+                    result = doc_clinic.dct_cod_deal_price()
+                except:
+                    pass
         return result
 
     def allowed_action(self, user_type, request):
