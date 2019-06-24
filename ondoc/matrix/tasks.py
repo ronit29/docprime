@@ -666,6 +666,7 @@ def create_or_update_lead_on_matrix(self, data):
         name = obj.name if hasattr(obj, 'name') and obj.name else ''
         lead_source = None
         request_data = {}
+        potential_ipd_lead = '0'
         if obj_type == Doctor.__name__:
             lead_source = 'referral'
             if obj.gender and obj.gender == 'm':
@@ -699,13 +700,12 @@ def create_or_update_lead_on_matrix(self, data):
             elif obj.type == ProviderSignupLead.HOSPITAL_ADMIN:
                 name = obj.name + ' (Hospital Admin)'
         elif obj_type == IpdProcedureLead.__name__:
+            potential_ipd_lead = '1' if obj.is_potential_ipd() else '0'
             lead_source = obj.source
             mobile = obj.phone_number
             email = obj.email if obj.email else ''
             name = obj.name
-            concerned_opd_appointment_id = obj.data.get('opd_appointment_id', None) if obj and isinstance(obj.data, dict) else None
-            if concerned_opd_appointment_id:
-                request_data.update({'IPDBookingId': concerned_opd_appointment_id})
+            obj.update_idp_data(request_data)
         mobile = int(mobile)
         # if not mobile:
         #     return
@@ -716,6 +716,7 @@ def create_or_update_lead_on_matrix(self, data):
             'LeadID': obj.matrix_lead_id if hasattr(obj, 'matrix_lead_id') and obj.matrix_lead_id else 0,
             'PrimaryNo': mobile,
             'EmailId': email,
+            'IPDPotential': potential_ipd_lead,
             'QcStatus': obj.data_status if hasattr(obj, 'data_status') else 0,
             'OnBoarding': obj.onboarding_status if hasattr(obj, 'onboarding_status') else 0,
             'Gender': gender,
