@@ -1,11 +1,5 @@
-Your endorsement request for policy ID: {{policy_number}} has been processed.
-
-{% for mem in endorsement_list %}
-{{mem.name}} : {{mem.status}}
-{% endfor %}
-
-PFA the updated COI for your reference
-
-{{coi_url}}
+Policy Number {{policy_number}}
+Your endorsement request has been processed and the updated COI has been shared in the email.
+For any further assistance, write to us at customercare@docprime.com
 Thanks
 Team Docprime

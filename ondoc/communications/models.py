@@ -318,6 +318,8 @@ class SMSNotification:
         elif notification_type == NotificationAction.INSURANCE_ENDORSMENT_REJECTED:
             body_template = "sms/insurance/insurance_endorsment_rejected.txt"
         elif notification_type == NotificationAction.INSURANCE_CANCEL_INITIATE:
+            body_template = "sms/insurance/insurance_cancel_initiate.txt"
+        elif notification_type == NotificationAction.INSURANCE_CANCELLATION:
             body_template = "sms/insurance/insurance_cancellation.txt"
         elif notification_type == NotificationAction.LAB_REPORT_SEND_VIA_CRM:
             body_template = "sms/lab/lab_report_send_crm.txt"
@@ -378,7 +380,25 @@ class SMSNotification:
             }
             message = json.dumps(message)
             publish_message(message)
-        elif phone_number:
+        elif phone_number and user and user.active_insurance and \
+                user.active_insurance.cancel_customer_type == UserInsurance.OTHER and \
+                notification_type in [NotificationAction.INSURANCE_CANCEL_INITIATE,
+                                      NotificationAction.INSURANCE_CANCELLATION]:
+            sms_noti = SmsNotification.objects.create(
+                user=user,
+                phone_number=phone_number,
+                notification_type=notification_type,
+                content=html_body
+            )
+            message = {
+                "data": model_to_dict(sms_noti),
+                "type": "sms"
+            }
+            message = json.dumps(message)
+            if phone_number not in settings.OTP_BYPASS_NUMBERS:
+                publish_message(message)
+
+        elif phone_number and not notification_type == NotificationAction.INSURANCE_CANCELLATION_APPROVED:
             sms_noti = SmsNotification.objects.create(
                 user=user,
                 phone_number=phone_number,
@@ -956,6 +976,12 @@ class EMAILNotification:
             subject_template = "email/ipd_lead/subject.txt"
         elif notification_type == NotificationAction.INSURANCE_CANCEL_INITIATE:
             body_template = "email/insurance_cancel_initiate/body.html"
+            subject_template = "email/insurance_cancel_initiate/subject.txt"
+        elif notification_type == NotificationAction.INSURANCE_CANCELLATION_APPROVED:
+            body_template = "email/insurance_cancellation_approved/body.html"
+            subject_template = "email/insurance_cancellation_approved/subject.txt"
+        elif notification_type == NotificationAction.INSURANCE_CANCELLATION:
+            body_template = "email/insurance_cancelled/body.html"
             subject_template = "email/insurance_cancelled/subject.txt"
         elif notification_type == NotificationAction.PRICING_ALERT_EMAIL:
             body_template = "email/lab/lab_pricing_change/body.html"
@@ -1037,8 +1063,13 @@ class EMAILNotification:
 
         elif (email or send_without_email) and user and user.active_insurance and \
                         user.active_insurance.cancel_customer_type == UserInsurance.OTHER and \
-                        notification_type == NotificationAction.INSURANCE_CANCEL_INITIATE:
-            bcc = settings.INSURANCE_CANCEL_INITIATE_EMAIL
+                        (notification_type == NotificationAction.INSURANCE_CANCEL_INITIATE or \
+                        notification_type == NotificationAction.INSURANCE_CANCELLATION_APPROVED or \
+                        notification_type == NotificationAction.INSURANCE_CANCELLATION):
+            if notification_type == NotificationAction.INSURANCE_CANCEL_INITIATE:
+                bcc = settings.INSURANCE_CANCEL_INITIATE_EMAIL
+            elif notification_type == NotificationAction.INSURANCE_CANCELLATION_APPROVED:
+                email = settings.INSURANCE_CANCELLATION_APPROVAL_ALERT_EMAIL
             email_noti = EmailNotification.objects.create(
                 user=user,
                 email=email,
@@ -1639,6 +1670,8 @@ class InsuranceNotification(Notification):
         all_receivers = self.get_receivers()
 
         if notification_type in [NotificationAction.INSURANCE_CONFIRMED, NotificationAction.INSURANCE_CANCEL_INITIATE,
+                                 NotificationAction.INSURANCE_CANCELLATION_APPROVED,
+                                 NotificationAction.INSURANCE_CANCELLATION,
                                  NotificationAction.INSURANCE_ENDORSMENT_APPROVED,
                                  NotificationAction.INSURANCE_ENDORSMENT_PENDING,
                                  NotificationAction.INSURANCE_ENDORSMENT_REJECTED,
