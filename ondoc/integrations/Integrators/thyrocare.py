@@ -113,7 +113,10 @@ class Thyrocare(BaseIntegrator):
         response = requests.get(url)
         if response.status_code != status.HTTP_200_OK or not response.ok:
             logger.error("[ERROR] Thyrocare Time slot api failed.")
-            return None
+            resp_list = dict()
+            resp_list[date] = list()
+            res_data = {"time_slots": resp_list, "upcoming_slots": [], "is_thyrocare": True}
+            return res_data
 
         resp_data = response.json()
         available_slots = resp_data.get('LSlotDataRes', [])
