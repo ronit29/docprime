@@ -29,7 +29,7 @@ from weasyprint import HTML
 from ondoc.account.models import Invoice, Order
 from ondoc.authentication.models import UserProfile, GenericAdmin, NotificationEndpoint, AgentToken, UserSecretKey, \
     ClickLoginToken
-from ondoc.insurance.models import EndorsementRequest
+from ondoc.insurance.models import EndorsementRequest, UserInsurance
 
 from ondoc.notification.models import NotificationAction, SmsNotification, EmailNotification, AppNotification, \
     PushNotification, WhtsappNotification
@@ -1034,7 +1034,31 @@ class EMAILNotification:
             }
             message = json.dumps(message)
             publish_message(message)
+
+        elif (email or send_without_email) and user and user.active_insurance and \
+                        user.active_insurance.cancel_customer_type == UserInsurance.OTHER and \
+                        notification_type == NotificationAction.INSURANCE_CANCEL_INITIATE:
+            bcc = settings.INSURANCE_CANCEL_INITIATE_EMAIL
+            email_noti = EmailNotification.objects.create(
+                user=user,
+                email=email,
+                notification_type=notification_type,
+                content=html_body,
+                email_subject=email_subject,
+                cc=cc,
+                bcc=bcc,
+                attachments=attachments,
+                content_object=instance
+            )
+            message = {
+                "data": model_to_dict(email_noti),
+                "type": "email"
+            }
+            message = json.dumps(message)
+            publish_message(message)
+
         elif (email or send_without_email):
+
             email_noti = EmailNotification.objects.create(
                 user=user,
                 email=email,
@@ -1586,26 +1610,6 @@ class InsuranceNotification(Notification):
                 member_list.append(pending_member_data)
         context['members'] = member_list
         return context
-
-    # def get_field_name(self, name):
-    #     ['first_name', 'middle_name', 'last_name', 'dob', 'title', 'email', 'address', 'pincode', 'gender',
-    #      'relation', 'town', 'district', 'state']
-    #     if name == "first_name":
-    #         return "First Name"
-    #     elif name == "middle_name":
-    #         return "Middle Name"
-    #     elif name == "last_name":
-    #         return "Last Name"
-    #     elif name == "dob":
-    #         return "DOB"
-    #     elif name == "title":
-    #         return "Title"
-    #     elif name == "email":
-    #         return "Email"
-    #     elif name == "address":
-    #         return "Address"
-    #     elif name == "pincode":
-    #         return "Pincode"
 
     def get_receivers(self):
 

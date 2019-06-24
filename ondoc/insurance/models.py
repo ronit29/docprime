@@ -518,12 +518,13 @@ class UserInsurance(auth_model.TimeStampedModel):
     EXPIRED = 3
     ONHOLD = 4
     CANCEL_INITIATE = 5
+    CANCELLATION_APPROVED = 6
 
     REFUND = 1
     NO_REFUND = 2
 
     STATUS_CHOICES = [(ACTIVE, "Active"), (CANCELLED, "Cancelled"), (EXPIRED, "Expired"), (ONHOLD, "Onhold"),
-                      (CANCEL_INITIATE, 'Cancel Initiate')]
+                      (CANCEL_INITIATE, 'Cancel Initiate'), (CANCELLATION_APPROVED, "Cancellation Approved")]
     NON_REFUNDED = 1
     REFUND_INITIATE = 2
     REFUNDED = 3
@@ -1432,7 +1433,7 @@ class UserInsurance(auth_model.TimeStampedModel):
                 # notification_tasks.send_insurance_cancellation.apply_async(self.id)
                 if send_cancellation_notification:
                     pass
-                    # send_insurance_notifications.apply_async(({'user_id': self.user.id, 'status': UserInsurance.CANCEL_INITIATE}, ))
+                    send_insurance_notifications.apply_async(({'user_id': self.user.id, 'status': UserInsurance.CANCEL_INITIATE}, ))
             except Exception as e:
                 logger.error(str(e))
 

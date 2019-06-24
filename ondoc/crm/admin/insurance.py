@@ -859,10 +859,12 @@ class UserInsuranceForm(forms.ModelForm):
                 raise forms.ValidationError('For Cancel Initiation, Cancel reason is mandatory')
             # if int(cancel_case_type) == UserInsurance.REFUND and not self.instance.is_bank_details_exist():
             #     raise forms.ValidationError('In Case of Refundable Bank details are mandatory, please upload bank details')
-        if int(status) == UserInsurance.CANCELLED and not self.instance.status == UserInsurance.CANCEL_INITIATE:
-            raise forms.ValidationError('Cancellation is only allowed for cancel initiate status')
+        if int(status) == UserInsurance.CANCELLED and not self.instance.status == UserInsurance.CANCELLATION_APPROVED:
+            raise forms.ValidationError('Cancellation is only allowed for cancellation approved status')
+        if self.intance.status == UserInsurance.CANCELLATION_APPROVED and not int(status) == UserInsurance.CANCELLED:
+            raise forms.ValidationError('CANCELLATION APPROVED can only changes to CANCELLED not else!!')
         if self.instance.status == UserInsurance.CANCELLED:
-            raise forms.ValidationError('Cancelled Insurance could not be changed')
+            raise forms.ValidationError('Cancelled Insurance could not be changed!!')
         # if cancel_status == UserInsurance.NON_REFUNDED and cancel_case_type == UserInsurance.REFUND:
         #     raise forms.ValidationError("Cancel Status must be Refunded in case of Refundable case type")
         if (int(cancel_status) == UserInsurance.REFUNDED and int(cancel_case_type) == UserInsurance.NO_REFUND) or \
@@ -974,7 +976,8 @@ class UserInsuranceAdmin(ImportExportMixin, admin.ModelAdmin):
         responsible_user = request.user
         obj._responsible_user = responsible_user if responsible_user and not responsible_user.is_anonymous else None
         if request.user.is_member_of(constants['SUPER_INSURANCE_GROUP']):
-            if obj.status == UserInsurance.ACTIVE:
+            if obj.status == UserInsurance.ACTIVE or obj.status == UserInsurance.CANCELLED or \
+                            obj.status == UserInsurance.CANCELLATION_APPROVED:
                 super(UserInsuranceAdmin, self).save_model(request, obj, form, change)
             # elif obj.status == UserInsurance.ONHOLD:
             #     if obj.onhold_reason:
@@ -984,8 +987,6 @@ class UserInsuranceAdmin(ImportExportMixin, admin.ModelAdmin):
                 obj.cancel_initiate_by = UserInsurance.ADMIN
                 if response.get('success', None):
                     super(UserInsuranceAdmin, self).save_model(request, obj, form, change)
-            elif obj.status == UserInsurance.CANCELLED:
-                super(UserInsuranceAdmin, self).save_model(request, obj, form, change)
 
 
 class InsuranceDiseaseAdmin(admin.ModelAdmin):
