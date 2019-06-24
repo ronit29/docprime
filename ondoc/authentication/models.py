@@ -17,7 +17,7 @@ import random, string
 from django.contrib.contenttypes.fields import GenericForeignKey, GenericRelation
 from django.contrib.contenttypes.models import ContentType
 from django.utils.functional import cached_property
-from datetime import date, timedelta, datetime
+from datetime import date, datetime
 from safedelete import SOFT_DELETE
 from safedelete.models import SafeDeleteModel
 import reversion
@@ -333,10 +333,36 @@ class User(AbstractBaseUser, PermissionsMixin):
         # return str(self.phone_number)
 
     # @property
+
+    @cached_property
+    def show_ipd_popup(self):
+        from ondoc.procedure.models import IpdProcedureLead
+        lead = IpdProcedureLead.objects.filter(phone_number=self.phone_number,
+                                               created_at__gt=timezone.now() - timezone.timedelta(hours=1)).first()
+        if lead:
+            return False
+        return True
+
+    @cached_property
+    def force_ipd_popup(self):
+        from ondoc.procedure.models import IpdProcedureLead
+        lead = IpdProcedureLead.objects.filter(phone_number=self.phone_number).exists()
+        if lead:
+            return False
+        return True
+
     @cached_property
     def active_insurance(self):
         active_insurance = self.purchased_insurance.filter().order_by('id').last()
         return active_insurance if active_insurance and active_insurance.is_valid() else None
+
+    @cached_property
+    def recent_opd_appointment(self):
+        return self.appointments.filter(created_at__gt=timezone.now() - timezone.timedelta(days=90)).order_by('-id')
+
+    @cached_property
+    def recent_lab_appointment(self):
+        return self.lab_appointments.filter(created_at__gt=timezone.now() - timezone.timedelta(days=90)).order_by('-id')
 
     def get_phone_number_for_communication(self):
         from ondoc.communications.models import unique_phone_numbers
@@ -494,6 +520,12 @@ class UserProfile(TimeStampedModel):
     def __str__(self):
         return "{}-{}".format(self.name, self.id)
 
+    @cached_property
+    def is_insured_profile(self):
+        insured_member_profile = self.insurance.filter().order_by('-id').first()
+        response = True if insured_member_profile and insured_member_profile.user_insurance.is_valid() else False
+        return response
+
     def get_thumbnail(self):
         if self.profile_image:
             return self.profile_image.url
@@ -536,6 +568,45 @@ class UserProfile(TimeStampedModel):
                                                       new_image_io.tell(), None)
         super().save(*args, **kwargs)
 
+    def update_profile_post_endorsement(self, endorsed_data):
+        self.name = endorsed_data.first_name + " " + endorsed_data.middle_name + " " + endorsed_data.last_name
+        self.email = endorsed_data.email
+        if endorsed_data.gender == 'f':
+            self.gender = UserProfile.FEMALE
+        elif endorsed_data.gender == 'm':
+            self.gender = UserProfile.MALE
+        else:
+            self.gender = UserProfile.OTHER
+        if endorsed_data.phone_number:
+            self.phone_number = endorsed_data.phone_number
+        else:
+            self.phone_number = self.user.phone_number
+        self.dob = endorsed_data.dob
+        self.save()
+
+    def is_insurance_package_limit_exceed(self):
+        from ondoc.diagnostic.models import LabAppointment
+        from ondoc.doctor.models import OpdAppointment
+        user = self.user
+        insurance = None
+        if user.is_authenticated:
+            insurance = user.active_insurance
+        if not insurance or not self.is_insured_profile:
+            return False
+        package_count = 0
+        previous_insured_lab_bookings = LabAppointment.objects.prefetch_related('tests').filter(insurance=insurance, profile=self).exclude(status=OpdAppointment.CANCELLED)
+        for booking in previous_insured_lab_bookings:
+            all_tests = booking.tests.all()
+            for test in all_tests:
+                if test.is_package:
+                    package_count += 1
+
+        if package_count >= insurance.insurance_plan.plan_usages.get('member_package_limit'):
+            return True
+        else:
+            return False
+
+
     class Meta:
         db_table = "user_profile"
 
@@ -546,6 +617,9 @@ class OtpVerifications(TimeStampedModel):
     code = models.CharField(max_length=10)
     country_code = models.CharField(max_length=10)
     is_expired = models.BooleanField(default=False)
+    otp_request_source = models.CharField(null=True, max_length=200, blank=True)
+    via_whatsapp = models.NullBooleanField(null=True)
+    via_sms = models.NullBooleanField(null=True)
 
     def __str__(self):
         return self.phone_number
@@ -559,9 +633,9 @@ class OtpVerifications(TimeStampedModel):
         result = "OTP for login is {}.\nDon't share this code with others."
         if platform == "android" and version:
             if (user_type == 'doctor' or is_doc) and parse(version) > parse("2.100.4"):
-                result = "<#>\n" + result + "\n" + settings.PROVIDER_ANDROID_MESSAGE_HASH
+                result = "<#> " + result + "\nMessage ID: " + settings.PROVIDER_ANDROID_MESSAGE_HASH
             elif parse(version) > parse("1.1"):
-                result = "<#>\n" + result + "\n" + settings.CONSUMER_ANDROID_MESSAGE_HASH
+                result = "<#> " + result + "\nMessage ID: " + settings.CONSUMER_ANDROID_MESSAGE_HASH
         return result
 
 
@@ -791,11 +865,11 @@ class GenericLabAdmin(TimeStampedModel, CreatedByModel):
 
     @classmethod
     def update_user_lab_admin(cls, phone_number):
-        user = User.objects.filter(phone_number=phone_number, user_type=User.DOCTOR)
-        if user.exists():
+        user = User.objects.filter(phone_number=phone_number, user_type=User.DOCTOR).first()
+        if user:
             admin = GenericLabAdmin.objects.filter(phone_number=phone_number, user__isnull=True)
             if admin.exists():
-                admin.update(user=user.first())
+                admin.update(user=user)
 
     @classmethod
     def get_user_admin_obj(cls, user):
@@ -1149,6 +1223,15 @@ class GenericAdmin(TimeStampedModel, CreatedByModel):
             if admin.user:
                 admin_users.append(admin.user)
         return admin_users
+
+    @staticmethod
+    def get_manageable_hospitals(user):
+        manageable_hosp_list = GenericAdmin.objects.filter(Q(is_disabled=False, user=user),
+                                                           (Q(permission_type=GenericAdmin.APPOINTMENT)
+                                                            |
+                                                            Q(super_user_permission=True))) \
+                                                   .values_list('hospital', flat=True)
+        return list(manageable_hosp_list)
 
 
 class BillingAccount(models.Model):
@@ -1755,3 +1838,16 @@ class RefundMixin(object):
         return not ConsumerTransaction.valid_appointment_for_cancellation(self.id, product_id)
         # return ConsumerRefund.objects.filter(consumer_transaction__reference_id=self.id,
         #                               consumer_transaction__product_id=product_id).first()
+
+
+class LastLoginTimestamp(TimeStampedModel):
+
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name="last_login_timestamp")
+    last_login = models.DateTimeField(auto_now=True)
+    source = models.CharField(max_length=100)
+
+    def __str__(self):
+        return self.user
+
+    class Meta:
+        db_table = "last_login_timestamp"

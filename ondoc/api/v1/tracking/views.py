@@ -1,6 +1,9 @@
 from ondoc.tracking import models as track_models
 from ondoc.tracking import mongo_models as track_mongo_models
 import logging
+
+
+
 logger = logging.getLogger(__name__)
 from rest_framework.response import Response
 from rest_framework import status
@@ -9,7 +12,7 @@ from rest_framework.viewsets import GenericViewSet
 from rest_framework import status
 import json
 from django.http import JsonResponse
-import datetime
+import datetime, pytz
 from ondoc.api.v1.utils import get_time_delta_in_minutes, aware_time_zone
 from ipware import get_client_ip
 from uuid import UUID
@@ -17,6 +20,7 @@ from django.conf import settings
 from django.db import IntegrityError
 from django.db import transaction
 from mongoengine.errors import NotUniqueError
+from copy import deepcopy
 
 #from django.utils import timezone
 
@@ -25,9 +29,17 @@ class EventCreateViewSet(GenericViewSet):
 
     @transaction.non_atomic_requests
     def create(self, request):
+        from ondoc.tracking.models import TrackingSaveLogs
+        try:
+            with transaction.atomic():
+                TrackingSaveLogs.objects.create(data=request.data)
+        except Exception as e:
+            logger.error(str(e))
+
         visitor_id, visit_id = self.get_visit(request)
         resp = {}
         data = request.data
+        data = deepcopy(data)
         data.pop('visitor_info', None)
 
         error_message = ""
@@ -48,12 +60,13 @@ class EventCreateViewSet(GenericViewSet):
         userAgent = data.get('userAgent', None)
         data.pop('userAgent', None)
         triggered_at = data.get('triggered_at', None)
+        tz = pytz.timezone(settings.TIME_ZONE)
         data.pop('created_at', None)
 
         if triggered_at:
             if len(str(triggered_at)) >= 13:
                 triggered_at = triggered_at/1000
-            triggered_at = datetime.datetime.fromtimestamp(triggered_at)
+            triggered_at = datetime.datetime.fromtimestamp(triggered_at, tz)
 
         try:
             user = None
@@ -143,7 +156,7 @@ class EventCreateViewSet(GenericViewSet):
                             ex_visitor = track_models.TrackingVisitor(id=visitor_id)
                             ex_visitor.save()
                     except IntegrityError as e:
-                        pass
+                        ex_visitor = track_models.TrackingVisitor.objects.filter(id=visitor_id).first()
 
                 if settings.MONGO_STORE:
                     mongo_visitor = track_mongo_models.TrackingVisitor.objects.filter(id=visitor_id).first()
@@ -163,7 +176,7 @@ class EventCreateViewSet(GenericViewSet):
                             ex_visit = track_models.TrackingVisit(id=visit_id, visitor_id=visitor_id, ip_address=client_ip)
                             ex_visit.save()
                     except IntegrityError as e:
-                        pass
+                        ex_visit = track_models.TrackingVisit.objects.filter(id=visit_id).first()
 
                 if settings.MONGO_STORE:
                     mongo_visit = track_mongo_models.TrackingVisit.objects.filter(id=visit_id).first()

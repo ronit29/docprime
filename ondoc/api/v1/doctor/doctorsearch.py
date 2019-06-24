@@ -1,20 +1,22 @@
 import operator
+from pyodbc import Date
 
 from django.contrib.gis.geos import Point
-from django.db.models import F
+from django.utils import timezone
 
 from ondoc.api.v1.doctor.serializers import DoctorProfileUserViewSerializer
 from ondoc.api.v1.procedure.serializers import DoctorClinicProcedureSerializer
 from ondoc.api.v1.ratings.serializers import GoogleRatingsGraphSerializer
+from ondoc.coupon.models import CouponRecommender
 from ondoc.doctor import models
-from ondoc.api.v1.utils import clinic_convert_timings
+from ondoc.api.v1.utils import clinic_convert_timings, aware_time_zone
 from ondoc.api.v1.doctor import serializers
 from ondoc.authentication.models import QCModel
 from ondoc.doctor.models import Doctor, PracticeSpecialization
 from ondoc.procedure.models import DoctorClinicProcedure, ProcedureCategory, ProcedureToCategoryMapping, \
     get_selected_and_other_procedures, get_included_doctor_clinic_procedure, \
     get_procedure_categories_with_procedures
-from datetime import datetime
+from datetime import datetime, timedelta
 import re
 import json
 from django.contrib.staticfiles.templatetags.staticfiles import static
@@ -23,6 +25,7 @@ from ondoc.location.models import EntityAddress
 from collections import OrderedDict
 from ondoc.insurance.models import UserInsurance
 from collections import defaultdict
+from ondoc.api.v1.doctor.serializers import DoctorListSerializer
 
 
 class DoctorSearchHelper:
@@ -46,6 +49,8 @@ class DoctorSearchHelper:
         procedure_ids = self.query_params.get("procedure_ids", [])# NEW_LOGIC
         ipd_procedure_ids = self.query_params.get("ipd_procedure_ids", [])
         procedure_category_ids = self.query_params.get("procedure_category_ids", [])  # NEW_LOGIC
+        sits_at_hosp_types = self.query_params.get("sits_at", [])
+
 
         if self.query_params.get('hospital_id') is not None:
             filtering_params.append(
@@ -78,13 +83,24 @@ class DoctorSearchHelper:
                 sp_str+')'
             )
 
+        counter = 1
         if self.query_params.get("sits_at"):
-            filtering_params.append(
-                "hospital_type IN(%(sits_at)s)"
-            )
-            params['sits_at'] = ", ".join(
-                [str(hospital_type_mapping.get(sits_at)) for sits_at in self.query_params.get("sits_at")])
+            sits_at_str = 'hospital_type IN('
+            for hosp_type in sits_at_hosp_types:
 
+                if counter != 1:
+                    sits_at_str += ', '
+                sits_at_str = sits_at_str + '%(' + 'sits_at' + str(counter) + ')s'
+                params['sits_at' + str(counter)] = hospital_type_mapping.get(hosp_type)
+                counter += 1
+
+            filtering_params.append(
+                sits_at_str + ')'
+            )
+            # filtering_params.append(
+            #     "hospital_type IN (%(sits_at)s)"
+            # )
+            # params['sits_at'] =  ", ".join([str(hospital_type_mapping.get(sits_at)) for sits_at in self.query_params.get("sits_at")])
 
         if procedure_category_ids and not procedure_ids:  # NEW_LOGIC
             preferred_procedure_ids = list(
@@ -130,11 +146,13 @@ class DoctorSearchHelper:
                 # "deal_price>={}".format(str(self.query_params.get("min_fees")))
                 "deal_price>=(%(min_fees)s)")
             params['min_fees'] = str(self.query_params.get("min_fees"))
+
         if len(procedure_ids) == 0 and self.query_params.get("max_fees") is not None:
             filtering_params.append(
                 # "deal_price<={}".format(str(self.query_params.get("max_fees"))))
                 "deal_price<=(%(max_fees)s)")
             params['max_fees'] = str(self.query_params.get("max_fees"))
+
         if self.query_params.get("is_female"):
             filtering_params.append(
                 "gender='f'"
@@ -147,6 +165,52 @@ class DoctorSearchHelper:
                 'dl.id is NULL and dct.day=(%(current_time)s) and dct.end>=(%(current_hour)s)')
             params['current_time'] = str(current_time.weekday())
             params['current_hour'] = str(current_hour)
+
+        if self.query_params.get('avg_ratings'):
+
+            filtering_params.append(" ((case when (d.rating_data is not null and (d.rating_data ->> 'avg_rating')::float > 4 ) or " \
+                            "( (d.rating_data ->> 'avg_rating')::float >= (%(avg_ratings)s) and (d.rating_data ->> 'rating_count') is not null and " \
+                            "(d.rating_data ->> 'rating_count')::int >5) then (d.rating_data ->> 'avg_rating')::float >= (%(avg_ratings)s) end) "
+                            " or  (case when h.google_avg_rating is not null and (h.google_avg_rating)::float >= (%(avg_ratings)s) then "
+                            "(h.google_avg_rating)::float >= (%(avg_ratings)s) end ))")
+
+            params['avg_ratings'] = min(self.query_params.get('avg_ratings'))
+
+        if self.query_params.get('availability'):
+            aval_query = "( "
+            availability = self.query_params.get('availability')
+            today = Date.today().weekday()
+            currentDT = timezone.now()
+            today_time = aware_time_zone(currentDT).strftime("%H.%M")
+            avail_days =list(map(int, availability))
+            if DoctorListSerializer.TODAY in avail_days:
+                aval_query += ' (dct.day = (%(today)s) and  (%(today_time)s) <= dct."end" ) '
+                params['today'] = today
+                params['today_time'] = today_time
+
+            if DoctorListSerializer.TOMORROW in avail_days and not DoctorListSerializer.NEXT_3_DAYS in avail_days:
+                if len(avail_days) > 1:
+                    aval_query += ' or '
+                aval_query += ' dct.day = (%(tomorrow)s) '
+                today += 1
+                params['tomorrow'] = (0 if today == 6 else today + 1)
+
+            if DoctorListSerializer.NEXT_3_DAYS in avail_days:
+                for day in range(1, 4):
+                    if not aval_query == "( ":
+                        aval_query += ' or '
+                    if today == 6:
+                        today = 0
+
+                        aval_query += ' dct.day =' + '%(' + 'next_day' + str(day) + ')s'
+                        params['next_day' + str(day)] = today
+
+                    else:
+                        today += 1
+                        aval_query += ' dct.day =' + '%(' + 'next_day' + str(day) + ')s'
+                        params['next_day' + str(day)] = today
+
+            filtering_params.append(aval_query + ')')
 
         if self.query_params.get("doctor_name"):
             name = self.query_params.get("doctor_name").lower().strip()
@@ -177,6 +241,10 @@ class DoctorSearchHelper:
             params['doctor_name1'] = search_key + ' %'
             params['doctor_name2'] = '% ' + search_key + ' %'
             params['doctor_name3'] = '% ' + search_key
+
+        if self.query_params.get('gender'):
+            filtering_params.append("d.gender=(%(gender)s)")
+            params['gender'] = self.query_params.get('gender')
 
         if self.query_params.get("hospital_name"):
             search_key = re.findall(r'[a-z0-9A-Z.]+', self.query_params.get("hospital_name"))
@@ -215,7 +283,10 @@ class DoctorSearchHelper:
                                              or self.query_params.get('sort_on')=='distance'):
             return ' enabled_for_online_booking DESC, distance, priority desc ', ' rnk=1 '
 
-        bucket_size=2000
+        bucket_size=8000
+
+        if self.query_params.get('is_user_insured') and not self.query_params.get('sort_on'):
+            return " enabled_for_online_booking DESC , floor(distance/{bucket_size}) ASC, fees ASC ".format(bucket_size=str(bucket_size)), "rnk=1"
 
         if self.count_of_procedure:
             order_by_field = ' distance, total_price '
@@ -225,7 +296,10 @@ class DoctorSearchHelper:
                     order_by_field = ' practicing_since ASC, distance ASC '
                     rank_by = "rnk=1"
                 elif self.query_params.get('sort_on') == 'fees':
-                    order_by_field = " total_price ASC, distance ASC "
+                    if self.query_params.get('sort_order') and self.query_params.get('sort_order') == 'desc':
+                        order_by_field = " total_price DESC, distance ASC "
+                    else:
+                        order_by_field = " total_price ASC, distance ASC "
                     rank_by = "rnk=1"
                 elif self.query_params.get('sort_on') == 'distance':
                     order_by_field = " distance ASC, total_price ASC "
@@ -240,7 +314,10 @@ class DoctorSearchHelper:
                     order_by_field = ' practicing_since ASC, distance ASC, priority desc '
                     rank_by = " rnk=1 "
                 elif self.query_params.get('sort_on') == 'fees':
-                    order_by_field = " deal_price ASC, distance ASC, priority desc "
+                    if self.query_params.get('sort_order') and self.query_params.get('sort_order') == 'desc':
+                        order_by_field = " deal_price DESC, distance ASC, priority desc "
+                    else:
+                        order_by_field = " deal_price ASC, distance ASC, priority desc "
                     rank_by = " rnk=1 "
                 elif self.query_params.get('sort_on') == 'distance':
                     order_by_field = " distance ASC, deal_price ASC, priority desc "
@@ -263,16 +340,19 @@ class DoctorSearchHelper:
         if not self.query_params.get('max_distance') == None and self.query_params.get('max_distance')*1000 == 0:
             max_distance = self.query_params.get('max_distance')
         else:
+            # max_distance = str(
+            #     self.query_params.get('max_distance') * 1000 if self.query_params.get(
+            #         'max_distance') and self.query_params.get(
+            #         'max_distance') * 1000 < int(DoctorSearchHelper.MAX_DISTANCE) else DoctorSearchHelper.MAX_DISTANCE)
             max_distance = str(
-                self.query_params.get('max_distance') * 1000 if self.query_params.get(
-                    'max_distance') and self.query_params.get(
-                    'max_distance') * 1000 < int(DoctorSearchHelper.MAX_DISTANCE) else DoctorSearchHelper.MAX_DISTANCE)
+                     self.query_params.get('max_distance') * 1000 if self.query_params.get(
+                        'max_distance') and self.query_params.get( 'max_distance') * 1000 else -1)
         min_distance = self.query_params.get('min_distance')*1000 if self.query_params.get('min_distance') else 0
 
         if self.query_params and self.query_params.get('sitemap_identifier') and self.query_params.get('max_distance')==None:
             sitemap_identifier = self.query_params.get('sitemap_identifier')
             if sitemap_identifier in ('SPECIALIZATION_LOCALITY_CITY', 'DOCTORS_LOCALITY_CITY'):
-                max_distance = 3000
+                max_distance = 5000
             if sitemap_identifier in ('SPECIALIZATION_CITY', 'DOCTORS_CITY'):
                 max_distance = 15000
 
@@ -318,7 +398,8 @@ class DoctorSearchHelper:
                            "INNER JOIN doctor_clinic_timing dct ON dc.id = dct.doctor_clinic_id " \
                            "INNER JOIN doctor_clinic_procedure dcp ON dc.id = dcp.doctor_clinic_id " \
                            "WHERE {filtering_params} AND " \
-                           "St_dwithin(St_setsrid(St_point((%(longitude)s), (%(latitude)s)), 4326 ), h.location, (%(max_distance)s)) AND " \
+                           "case when (%(max_distance)s) >= 0  then St_dwithin( St_setsrid(St_point((%(longitude)s), (%(latitude)s)), 4326), h.location, (%(max_distance)s))" \
+                           " else St_dwithin( St_setsrid(St_point((%(longitude)s), (%(latitude)s)), 4326), h.location, h.search_distance ) end AND " \
                            "St_dwithin(St_setsrid(St_point((%(longitude)s), (%(latitude)s)), 4326 ), h.location, (%(min_distance)s)) = false " \
                            " ) " \
                            "AS tempTable WHERE count_per_clinic={count_of_procedure}) AS tempTable2) " \
@@ -352,7 +433,7 @@ class DoctorSearchHelper:
             query_string = "SELECT x.doctor_id, x.hospital_id, doctor_clinic_id, doctor_clinic_timing_id " \
                            "FROM (select {rank_part}, " \
                            "St_distance(St_setsrid(St_point((%(longitude)s), (%(latitude)s)), 4326), h.location) distance, " \
-                           "d.id as doctor_id, " \
+                           "d.id as doctor_id, dct.fees as fees, " \
                            "dc.id as doctor_clinic_id,  d.search_key, " \
                            "dct.id as doctor_clinic_timing_id,practicing_since, " \
                            "d.enabled_for_online_booking and dc.enabled_for_online_booking and h.enabled_for_online_booking as enabled_for_online_booking, " \
@@ -367,7 +448,8 @@ class DoctorSearchHelper:
                            "AND (%(ist_time)s) BETWEEN dl.start_time and dl.end_time " \
                            "{sp_cond} " \
                            "WHERE {filtering_params} " \
-                           "and St_dwithin(St_setsrid(St_point((%(longitude)s), (%(latitude)s)), 4326 ), h.location, (%(max_distance)s)) " \
+                           "and case when (%(max_distance)s) >= 0  then St_dwithin( St_setsrid(St_point((%(longitude)s), (%(latitude)s)), 4326), h.location, (%(max_distance)s))" \
+                           " else St_dwithin( St_setsrid(St_point((%(longitude)s), (%(latitude)s)), 4326), h.location, h.search_distance ) end" \
                            "{min_dist_cond}" \
                            " )x " \
                            "where {rank_by} ORDER BY {order_by_field}".format(rank_part=rank_part, sp_cond=sp_cond, \
@@ -410,21 +492,30 @@ class DoctorSearchHelper:
             return
         for doctor_clinic_timing in doctor_clinic.availability.all():
             if doctor_clinic_timing.id == doctor_availability_mapping[doctor_clinic.doctor.id]:
-                return doctor_clinic_timing.deal_price, doctor_clinic_timing.mrp
+                return doctor_clinic_timing.dct_cod_deal_price(), doctor_clinic_timing.deal_price, doctor_clinic_timing.mrp
                 # return doctor_hospital.deal_price
         return None
 
     def prepare_search_response(self, doctor_data, doctor_search_result, request, **kwargs):
+        query_params = self.query_params
+
         doctor_clinic_mapping = {data.get("doctor_id"): data.get("hospital_id") for data in doctor_search_result}
         doctor_availability_mapping = {data.get("doctor_id"): data.get("doctor_clinic_timing_id") for data in
                                        doctor_search_result}
-        category_ids = self.query_params.get("procedure_category_ids", [])
-        procedure_ids = self.query_params.get("procedure_ids", [])
+        category_ids = query_params.get("procedure_category_ids", [])
+        procedure_ids = query_params.get("procedure_ids", [])
         category_ids = [int(x) for x in category_ids]
         procedure_ids = [int(x) for x in procedure_ids]
         response = []
-        specialization_ids = self.query_params.get('specialization_ids', [])
+        specialization_ids = query_params.get('specialization_ids', [])
         selected_procedure_ids, other_procedure_ids = get_selected_and_other_procedures(category_ids, procedure_ids)
+        profile = query_params.get("profile_id", None)
+        product_id = query_params.get("product_id", None)
+        coupon_code = query_params.get("coupon_code", None)
+
+        coupon_recommender = CouponRecommender(request.user, profile, 'doctor', product_id, coupon_code, None)
+        filters = dict()
+
         for doctor in doctor_data:
             enable_online_booking = False
             should_apply_coupon = False
@@ -433,7 +524,7 @@ class DoctorSearchHelper:
             doctor_clinics = [doctor_clinic for doctor_clinic in doctor.doctor_clinics.all() if
                               doctor_clinic.hospital_id == doctor_clinic_mapping[doctor_clinic.doctor_id]]
             doctor_clinic = doctor_clinics[0]
-            filtered_deal_price, filtered_mrp = self.get_doctor_fees(doctor_clinic, doctor_availability_mapping)
+            filtered_cod_deal_price, filtered_deal_price, filtered_mrp = self.get_doctor_fees(doctor_clinic, doctor_availability_mapping)
             # filtered_fees = self.get_doctor_fees(doctor, doctor_availability_mapping)
             min_deal_price = None
             min_price = dict()
@@ -497,8 +588,9 @@ class DoctorSearchHelper:
                          value]),
                     "short_address": doctor_clinic.hospital.get_short_address(),
                     "doctor": doctor.name,
-                    "enabled_for_cod": doctor_clinic.hospital.enabled_for_cod,
+                    # "enabled_for_cod": doctor_clinic.hospital.enabled_for_cod,
                     "enabled_for_prepaid": doctor_clinic.hospital.enabled_for_prepaid,
+                    "enabled_for_cod": doctor_clinic.is_enabled_for_cod(),
                     "display_name": doctor.get_display_name(),
                     "hospital_id": doctor_clinic.hospital.id,
                     "mrp": min_price["mrp"],
@@ -517,9 +609,11 @@ class DoctorSearchHelper:
             doctor_spec_list = []
             searched_spec_list = []
             general_specialization = []
+            doctor_specializations = []
             
             for dps in doctor.doctorpracticespecializations.all():
                 general_specialization.append(dps.specialization)
+                doctor_specializations.append(dps.specialization_id)
 
             general_specialization = sorted(general_specialization, key=operator.attrgetter('doctor_count'), reverse=True)
             for spec in general_specialization:
@@ -536,10 +630,16 @@ class DoctorSearchHelper:
                                                    doctor_clinic.availability.all()[0].end),
 
             from ondoc.coupon.models import Coupon
+            from ondoc.authentication import models as auth_model
 
             search_coupon = None
             if should_apply_coupon:
-                search_coupon = Coupon.get_search_coupon(request.user)
+                # search_coupon = Coupon.get_search_coupon(request.user)
+                filters['deal_price'] = filtered_deal_price
+                filters['doctor_id'] = doctor.id
+                filters['doctor_specializations_ids'] = doctor_specializations
+                filters['hospital'] = doctor_clinic.hospital
+                search_coupon = coupon_recommender.best_coupon(**filters)
 
             discounted_price = filtered_deal_price if not search_coupon else search_coupon.get_search_coupon_discounted_price(filtered_deal_price)
             schema_specialization = None
@@ -581,6 +681,8 @@ class DoctorSearchHelper:
                 "hospital_count": self.count_hospitals(doctor),
                 "id": doctor.id,
                 "deal_price": filtered_deal_price,
+                "cod_deal_price": filtered_cod_deal_price,
+                "enabled_for_cod": doctor_clinic.is_enabled_for_cod(),
                 "mrp": filtered_mrp,
                 "is_live": doctor.is_live,
                 "is_gold": is_gold,

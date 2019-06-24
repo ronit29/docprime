@@ -9,13 +9,18 @@ Booking ID : {{instance.id}}
 Patient Name : {{patient_name|capfirst}}
 Lab Name : {{lab_name|capfirst}}
 Date and Time : {{instance.time_slot_start|date:"D jS F Y"}} || {{instance.time_slot_start|date:"h:i A"}}
+{% if show_amounts %}
 {% if instance.effective_price > 0 %}
 Refund Amount : {{instance.effective_price}}
 
+{% if instance.payment_type is not 3 or instance.payment_type is not 2 %}
 Refund if applicable will be credited within 5-7 working days.
 {% endif %}
 
-In case of any queries please contact us at our toll free number 1800-123-9419.
+{% endif %}
+{% endif %}
+
+In case of any queries please contact us at customercare@docprime.com .
 
 Thanks for choosing docprime.com
 {% endspaceless %}

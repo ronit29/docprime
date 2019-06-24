@@ -3,12 +3,17 @@ from django import forms
 from django.db.models import Count, Q
 from django.db.models import F
 from rest_framework import serializers
+from dal import autocomplete
 from ondoc.api.v1.insurance.serializers import InsuranceTransactionSerializer
+from ondoc.common.models import GenericNotes
 from ondoc.crm.constants import constants
+from ondoc.authentication.models import User
 from ondoc.doctor.models import OpdAppointment, DoctorPracticeSpecialization, PracticeSpecialization, Hospital
 from ondoc.diagnostic.models import LabAppointment, LabTest, Lab
 from ondoc.insurance.models import InsurancePlanContent, InsurancePlans, InsuredMembers, UserInsurance, StateGSTCode, \
-    InsuranceCity, InsuranceDistrict, InsuranceDeal, InsurerPolicyNumber, InsuranceLead
+     ThirdPartyAdministrator, InsuranceEligibleCities, InsuranceCity, InsuranceDistrict, InsuranceDeal, \
+    InsurerPolicyNumber, InsuranceLead, EndorsementRequest, InsuredMemberDocument, InsuranceEligibleCities,\
+    InsuranceThreshold, UserBank, InsuredMemberHistory, UserBankDocument, InsurerAccountTransfer
 from import_export.admin import ImportExportMixin, ImportExportModelAdmin, base_formats
 import nested_admin
 from import_export import fields, resources
@@ -16,17 +21,37 @@ from datetime import datetime
 from ondoc.insurance.models import InsuranceDisease
 from django.db import transaction
 from django.conf import settings
+from django.contrib.contenttypes.admin import GenericTabularInline
+from django.contrib.admin import SimpleListFilter
+from django.utils.translation import ugettext_lazy as _
 
 
 class InsurerAdmin(admin.ModelAdmin):
 
     list_display = ['name', 'enabled', 'is_live']
     list_filter = ['name']
+    search_fields = ['name']
+
+
+class InsurerFloatForm(forms.ModelForm):
+
+    def clean(self):
+        super().clean()
+        # data = self.cleaned_data
+        if self.instance.id:
+            raise forms.ValidationError('Insurer Account can not be editable')
 
 
 class InsurerFloatAdmin(admin.ModelAdmin):
-    list_display = ['insurer']
-    readonly_fields = ['insurer', 'current_float']
+    list_display = ['apd_account_name', 'insurer']
+    form = InsurerFloatForm
+    # readonly_fields = ['current_float']
+
+    def get_readonly_fields(self, request, obj=None):
+        if obj:
+            return ["apd_account_name", "insurer", "current_float"]
+        else:
+            return []
 
 
 class InsurancePlanContentInline(admin.TabularInline):
@@ -37,6 +62,29 @@ class InsurancePlanContentInline(admin.TabularInline):
     # show_change_link = False
     # can_add = False
     # readonly_fields = ("first_name", 'last_name', 'relation', 'dob', 'gender', )
+
+
+class PolicyNumberFormset(forms.models.BaseInlineFormSet):
+    def clean(self):
+        if not self.forms:
+            raise forms.ValidationError('Master Policy Number must have at least one Policy Number')
+        for form in self.forms:
+            data = form.cleaned_data
+            if not data.get('insurer'):
+                raise forms.ValidationError('Master Policy Number must have at least one insurer')
+            if not data.get('insurance_plan'):
+                raise forms.ValidationError('Master Policy Number must have at least one insurance plan')
+            if not data.get('apd_account'):
+                raise forms.ValidationError('Master Policy Number must have at least one APD account')
+            if not data.get('insurer_policy_number'):
+                raise forms.ValidationError('Master Policy Number must have at least one Policy Number')
+
+
+class InsurerPolicyNumberInline(admin.TabularInline):
+    formset = PolicyNumberFormset
+    model = InsurerPolicyNumber
+    fields = ('insurer', 'apd_account', 'insurer_policy_number')
+    extra = 0
 
 
 class InsurancePlanAdminForm(forms.ModelForm):
@@ -57,10 +105,17 @@ class InsurancePlanAdminForm(forms.ModelForm):
         return is_selected
 
 
+class InsuranceThresholdInline(admin.TabularInline):
+    model = InsuranceThreshold
+    #fields = ('__all__',)
+    extra = 0
+
+
 class InsurancePlansAdmin(admin.ModelAdmin):
 
-    list_display = ['insurer', 'name', 'amount', 'is_selected']
-    inlines = [InsurancePlanContentInline]
+    list_display = ['insurer', 'name', 'internal_name', 'amount', 'is_selected','get_policy_prefix']
+    inlines = [InsurancePlanContentInline, InsurerPolicyNumberInline, InsuranceThresholdInline]
+    search_fields = ['name']
     form = InsurancePlanAdminForm
 
 
@@ -69,16 +124,34 @@ class InsuranceThresholdAdmin(admin.ModelAdmin):
     list_display = ['insurance_plan']
 
 
-# class InsuranceTransaction
-
 class InsuredMembersInline(admin.TabularInline):
     model = InsuredMembers
-    fields = ('first_name', 'last_name', 'relation', 'dob', 'gender',)
+    fields = ("first_name", 'last_name', 'relation', 'dob', 'gender', )
     extra = 0
     can_delete = False
     show_change_link = False
     can_add = False
     readonly_fields = ("first_name", 'last_name', 'relation', 'dob', 'gender', )
+
+
+class UserBankInline(admin.TabularInline):
+    model = UserBank
+    fields = ('insurance', 'bank_name', 'account_number', 'account_holder_name', 'ifsc_code', 'bank_address',)
+    extra = 0
+    can_delete = False
+    show_change_link = False
+    can_add = True
+    readonly_fields = ('insurance',)
+
+
+class UserBankDocumentInline(admin.TabularInline):
+    model = UserBankDocument
+    fields = ('insurance', 'document_image',)
+    extra = 0
+    can_delete = False
+    show_change_link = False
+    can_add = True
+    readonly_fields = ('insurance',)
 
 
 class InsuredMemberResource(resources.ModelResource):
@@ -258,6 +331,12 @@ class UserInsuranceDoctorResource(resources.ModelResource):
     gst_number_of_center = fields.Field()
     booking_date = fields.Field()
     status = fields.Field()
+    building = fields.Field()
+    sublocality = fields.Field()
+    locality = fields.Field()
+    city = fields.Field()
+    state = fields.Field()
+    pincode = fields.Field()
 
     def export(self, queryset=None, *args, **kwargs):
         queryset = self.get_queryset(**kwargs)
@@ -285,7 +364,8 @@ class UserInsuranceDoctorResource(resources.ModelResource):
                         'name_of_doctor', 'provider_code_of_doctor', 'speciality_of_doctor', 'diagnosis',
                         'icd_code_of_diagnosis', 'name_of_clinic', 'address_of_clinic', 'amount_to_be_paid',
                         'booking_date', 'status', 'pan_card_of_clinic',
-                        'existing_condition', 'bank_detail_of_center', 'gst_number_of_center')
+                        'existing_condition', 'bank_detail_of_center', 'gst_number_of_center',
+                        'building', 'sublocality', 'locality', 'city', 'state', 'pincode')
 
     def get_insured_member(self, profile):
         insured_member = InsuredMembers.objects.filter(profile_id=profile).first()
@@ -376,6 +456,24 @@ class UserInsuranceDoctorResource(resources.ModelResource):
         pincode = str(appointment.hospital.pin_code)
         return building + " " + sublocality + " " + locality + " " + city + " " + state + " " + pincode
 
+    def dehydrate_building(self, appointment):
+        return appointment.hospital.building if appointment.hospital and appointment.hospital.building  else ''
+
+    def dehydrate_sublocality(self, appointment):
+        return appointment.hospital.sublocality if appointment.hospital and appointment.hospital.sublocality  else ''
+
+    def dehydrate_locality(self, appointment):
+        return appointment.hospital.locality if appointment.hospital and appointment.hospital.locality  else ''
+
+    def dehydrate_city(self, appointment):
+        return appointment.hospital.city if appointment.hospital and appointment.hospital.city  else ''
+
+    def dehydrate_state(self, appointment):
+        return appointment.hospital.state if appointment.hospital and appointment.hospital.state  else ''
+
+    def dehydrate_pincode(self, appointment):
+        return appointment.hospital.pin_code if appointment.hospital and appointment.hospital.pin_code  else ''
+
     def dehydrate_pan_card_of_clinic(self, appointment):
         return ""
 
@@ -438,6 +536,12 @@ class UserInsuranceLabResource(resources.ModelResource):
     booking_date = fields.Field()
     status = fields.Field()
     number_of_tests = fields.Field()
+    building = fields.Field()
+    sublocality = fields.Field()
+    locality = fields.Field()
+    city = fields.Field()
+    state = fields.Field()
+    pincode = fields.Field()
 
     def export(self, queryset=None, *args, **kwargs):
         queryset = self.get_queryset(**kwargs)
@@ -465,7 +569,8 @@ class UserInsuranceLabResource(resources.ModelResource):
         export_order = ('appointment_id', 'policy_number', 'member_id', 'name', 'relationship_with_proposer',
                         'date_of_consultation', 'name_of_diagnostic_center', 'provider_code_of_the_center',
                         'name_of_tests', 'number_of_tests', 'address_of_center', 'amount_to_be_paid', 'booking_date', 'status',
-                        'bank_detail_of_center', 'gst_number_of_center', 'pan_card_of_center', 'existing_condition')
+                        'bank_detail_of_center', 'gst_number_of_center', 'pan_card_of_center', 'existing_condition',
+                        'building', 'sublocality', 'locality', 'city', 'state', 'pincode')
 
     def get_insured_member(self, profile):
         insured_member = InsuredMembers.objects.filter(profile_id=profile).first()
@@ -508,10 +613,10 @@ class UserInsuranceLabResource(resources.ModelResource):
         return str(appointment.time_slot_start)
 
     def dehydrate_name_of_diagnostic_center(self, appointment):
-        return str(appointment.lab.name)
+        return appointment.lab.name if appointment.lab else ""
 
     def dehydrate_provider_code_of_the_center(self, appointment):
-        return str(appointment.lab.id)
+        return str(appointment.lab.id) if appointment.lab else ""
 
     def dehydrate_name_of_tests(self, appointment):
         return ", ".join(list(map(lambda test: test.name, appointment.tests.all())))
@@ -520,6 +625,8 @@ class UserInsuranceLabResource(resources.ModelResource):
         return str(appointment.tests.all().count())
 
     def dehydrate_address_of_center(self, appointment):
+        if not appointment.lab:
+            return ''
         building = str(appointment.lab.building)
         sublocality = str(appointment.lab.sublocality)
         locality = str(appointment.lab.locality)
@@ -527,6 +634,24 @@ class UserInsuranceLabResource(resources.ModelResource):
         state = str(appointment.lab.state)
         pincode = str(appointment.lab.pin_code)
         return building + " " + sublocality + " " + locality + " " + city + " " + state + " " + pincode
+
+    def dehydrate_building(self, appointment):
+        return appointment.lab.building if appointment.lab and appointment.lab.building else ''
+
+    def dehydrate_sublocality(self, appointment):
+        return appointment.lab.sublocality if appointment.lab and appointment.lab.sublocality else ''
+
+    def dehydrate_locality(self, appointment):
+        return appointment.lab.locality if appointment.lab and appointment.lab.locality else ''
+
+    def dehydrate_city(self, appointment):
+        return appointment.lab.city if appointment.lab and appointment.lab.city else ''
+
+    def dehydrate_state(self, appointment):
+        return appointment.lab.state if appointment.lab and appointment.lab.state else ''
+
+    def dehydrate_pincode(self, appointment):
+        return appointment.lab.pin_code if appointment.lab and appointment.lab.pin_code else ''
 
     def dehydrate_pan_card_of_center(self, appointment):
         # from django.contrib.contenttypes.models import ContentType
@@ -561,7 +686,7 @@ class UserInsuranceLabResource(resources.ModelResource):
         return ""
 
     def dehydrate_booking_date(self, appointment):
-        return str(appointment.created_at.date())
+        return str(appointment.created_at)
 
     def dehydrate_status(self, appointment):
         if appointment.status == 1:
@@ -589,7 +714,9 @@ class UserInsuranceResource(resources.ModelResource):
     amount = fields.Field()
     receipt_number = fields.Field()
     coi = fields.Field()
+    status = fields.Field()
     matrix_lead = fields.Field()
+    pg_order_no = fields.Field()
 
     def export(self, queryset=None, *args, **kwargs):
         queryset = self.get_queryset(**kwargs)
@@ -610,7 +737,7 @@ class UserInsuranceResource(resources.ModelResource):
         fields = ()
         export_order = ('id', 'insurance_plan', 'user_name', 'phone_number', 'purchase_date', 'expiry_date',
                         'policy_number', 'amount', 'receipt_number',
-                        'coi', 'matrix_lead')
+                        'coi', 'status', 'matrix_lead')
 
     def dehydrate_id(self, insurance):
         return str(insurance.id)
@@ -647,8 +774,30 @@ class UserInsuranceResource(resources.ModelResource):
     def dehydrate_coi(self, insurance):
         return insurance.coi.url if insurance.coi is not None and insurance.coi.name else ''
 
+    def dehydrate_status(self, insurance):
+        if insurance.status == 1:
+            return "ACTIVE"
+        elif insurance.status == 2:
+            return "CANCELLED"
+        elif insurance.status == 3:
+            return "EXPIRED"
+        elif insurance.status == 4:
+            return "ONHOLD"
+        elif insurance.status == 5:
+            return "CANCEL_INITIATE"
+
     def dehydrate_matrix_lead(self, insurance):
         return str(insurance.matrix_lead_id)
+
+    def dehydrate_pg_order_no(self, insurance):
+        from ondoc.account.models import Order
+        order = Order.objects.filter(reference_id=insurance.id).first()
+        if not order:
+            return ""
+        transaction = order.getTransactions()
+        if not transaction:
+            return ""
+        return str(transaction.first().order_no)
 
 
 class CustomDateInput(forms.DateInput):
@@ -670,13 +819,16 @@ class UserInsuranceForm(forms.ModelForm):
 
     status_choices = [(UserInsurance.ACTIVE, "Active"), (UserInsurance.CANCEL_INITIATE, 'Cancel Initiate'),
                       (UserInsurance.CANCELLED, "Cancelled")]
+    cancel_status_choices = [(UserInsurance.NON_REFUNDED, "Non-Refunded"), (UserInsurance.REFUND_INITIATE,
+                                                                            "Refund Initiate"), (UserInsurance.REFUNDED
+                                                                            , "Refunded")]
     case_choices = [(UserInsurance.REFUND, "Refundable"), (UserInsurance.NO_REFUND, "Non-Refundable")]
     cancel_after_utilize_choices = [('YES', 'Yes'), ('NO', 'No')]
     status = forms.ChoiceField(choices=status_choices, required=True)
     cancel_after_utilize_insurance = forms.ChoiceField(choices=cancel_after_utilize_choices, initial='NO',  widget=forms.RadioSelect())
     cancel_reason = forms.CharField(max_length=400, required=False)
     cancel_case_type = forms.ChoiceField(choices=case_choices, initial=UserInsurance.REFUND)
-
+    cancel_status = forms.ChoiceField(choices=cancel_status_choices, initial=UserInsurance.NON_REFUNDED)
 
     def clean(self):
         super().clean()
@@ -685,12 +837,15 @@ class UserInsuranceForm(forms.ModelForm):
         case_type = data.get('cancel_after_utilize_insurance')
         cancel_reason = data.get('cancel_reason')
         cancel_case_type = data.get('cancel_case_type')
+        cancel_status = data.get('cancel_status')
         # if int(status) == UserInsurance.ONHOLD:
         #     if not onhold_reason:
         #         raise forms.ValidationError("In Case of ONHOLD status, Onhold reason is mandatory")
-        if case_type=="NO" and int(status) == UserInsurance.CANCEL_INITIATE or int(status) == UserInsurance.CANCELLED:
+        if case_type=="NO" and (int(status) == UserInsurance.CANCEL_INITIATE or int(status) == UserInsurance.CANCELLED):
             if not cancel_reason:
                 raise forms.ValidationError('For Cancel Initiation, Cancel reason is mandatory')
+            # if not self.instance.is_bank_details_exist():
+            #     raise forms.ValidationError('For Cancel Initiation, Bank details is mandatory')
             insured_opd_completed_app_count = OpdAppointment.get_insured_completed_appointment(self.instance)
             insured_lab_completed_app_count = LabAppointment.get_insured_completed_appointment(self.instance)
             if insured_lab_completed_app_count > 0:
@@ -699,16 +854,46 @@ class UserInsuranceForm(forms.ModelForm):
             if insured_opd_completed_app_count > 0:
                 raise forms.ValidationError('OPD appointment with insurance have been completed, '
                                             'Cancellation could not proceed')
-        if case_type == "YES" and int(status) == UserInsurance.CANCEL_INITIATE or int(status) == UserInsurance.CANCELLED:
+        if case_type == "YES" and (int(status) == UserInsurance.CANCEL_INITIATE or int(status) == UserInsurance.CANCELLED):
             if not cancel_reason:
                 raise forms.ValidationError('For Cancel Initiation, Cancel reason is mandatory')
+            # if int(cancel_case_type) == UserInsurance.REFUND and not self.instance.is_bank_details_exist():
+            #     raise forms.ValidationError('In Case of Refundable Bank details are mandatory, please upload bank details')
         if int(status) == UserInsurance.CANCELLED and not self.instance.status == UserInsurance.CANCEL_INITIATE:
             raise forms.ValidationError('Cancellation is only allowed for cancel initiate status')
         if self.instance.status == UserInsurance.CANCELLED:
             raise forms.ValidationError('Cancelled Insurance could not be changed')
+        # if cancel_status == UserInsurance.NON_REFUNDED and cancel_case_type == UserInsurance.REFUND:
+        #     raise forms.ValidationError("Cancel Status must be Refunded in case of Refundable case type")
+        if (int(cancel_status) == UserInsurance.REFUNDED and int(cancel_case_type) == UserInsurance.NO_REFUND) or \
+            (int(cancel_status) == UserInsurance.REFUND_INITIATE and int(cancel_case_type) == UserInsurance.NO_REFUND):
+            raise forms.ValidationError("Cancel Status must be Non-Refunded in case of Non-Refundable case type")
 
     class Meta:
         fields = '__all__'
+
+
+class UserBankAdmin(admin.ModelAdmin):
+    model = UserBank
+    fields = ['bank_name', 'account_holder_name', 'account_number', 'ifsc_code', 'bank_address']
+    list_display = ['id', 'account_holder_name', 'account_number']
+
+
+class UserBankDocumentAdmin(admin.ModelAdmin):
+    model = UserBankDocument
+    fields = ['insurance']
+    list_display = ['insurance']
+
+
+class GenericNotesInline(GenericTabularInline):
+    model = GenericNotes
+    fields = ('notes', 'created_by', 'created_at')
+    extra = 0
+    can_delete = False
+    show_change_link = False
+    can_add = True
+    editable = False
+    readonly_fields = ('created_by', 'created_at')
 
 
 class UserInsuranceAdmin(ImportExportMixin, admin.ModelAdmin):
@@ -717,6 +902,8 @@ class UserInsuranceAdmin(ImportExportMixin, admin.ModelAdmin):
     formats = (base_formats.XLS,)
     model = UserInsurance
     date_hierarchy = 'created_at'
+    list_filter = ['status', 'cancel_status']
+    ordering = ['-updated_at']
 
     def user_policy_number(self, obj):
         return str(obj.policy_number)
@@ -726,17 +913,25 @@ class UserInsuranceAdmin(ImportExportMixin, admin.ModelAdmin):
         user_profile = UserProfile.objects.filter(user=obj.user).first()
         return str(user_profile.name)
 
-    # def city_name(self, obj):
-    #     cities = InsuranceCity.objects.all().values_list('name', flat=True)
-    #     return cities
-
-    list_display = ['id', 'insurance_plan', 'user_name', 'user', 'policy_number', 'purchase_date','merchant_payout']
+    list_display = ['id', 'insurance_plan', 'user_name', 'user', 'policy_number', 'purchase_date', 'status']
     fields = ['insurance_plan', 'user', 'purchase_date', 'expiry_date', 'policy_number', 'premium_amount',
-              'merchant_payout', 'status', 'cancel_reason', 'cancel_after_utilize_insurance', 'cancel_case_type']
-    readonly_fields = ('insurance_plan', 'user', 'purchase_date', 'expiry_date', 'policy_number', 'premium_amount', 'merchant_payout')
-    inlines = [InsuredMembersInline]
+              'merchant_payout', 'status', 'cancel_reason', 'cancel_after_utilize_insurance', 'cancel_case_type',
+              'cancel_status', 'cancel_initial_date', 'cancel_customer_type']
+    readonly_fields = ('insurance_plan', 'user', 'purchase_date', 'expiry_date', 'policy_number', 'premium_amount',
+                       'merchant_payout', 'cancel_initial_date')
+    inlines = [InsuredMembersInline, UserBankInline, UserBankDocumentInline, GenericNotesInline]
     form = UserInsuranceForm
     search_fields = ['id']
+
+    def save_formset(self, request, form, formset, change):
+        if formset.model != GenericNotes:
+            return super(UserInsuranceAdmin, self).save_formset(request, form, formset, change)
+        instances = formset.save(commit=False)
+        for instance in instances:
+            if not instance.pk:
+                instance.created_by = request.user
+                instance.save()
+        formset.save_m2m()
 
     def get_search_results(self, request, queryset, search_term):
         queryset, use_distinct = super().get_search_results(request, queryset, None)
@@ -835,10 +1030,29 @@ class InsuranceDistrictAdmin(ImportExportModelAdmin):
     list_display = ('id', 'district_code', 'district_name', 'state')
 
 
+class InsurerPolicyNumberForm(forms.ModelForm):
+    def clean(self):
+        super().clean()
+        if any(self.errors):
+            return
+        data = self.cleaned_data
+        if not data.get('apd_account'):
+            raise forms.ValidationError('Apd Account is mandatory for Policy Number')
+        if not data.get('insurance_plan'):
+            raise forms.ValidationError('Insurance Plan is mandatory for Policy Number')
+        if not data.get('insurer_policy_number'):
+            raise forms.ValidationError('Insurance Policy number is mandatory for Policy Number')
+        if not data.get('insurer'):
+            raise forms.ValidationError('Insurer is mandatory for Policy Number')
+
+
 class InsurerPolicyNumberAdmin(admin.ModelAdmin):
     model = InsurerPolicyNumber
-    fields = ('insurer', 'insurer_policy_number')
-    list_display = ('insurer', 'insurer_policy_number', 'created_at')
+    fields = ('insurer', 'insurance_plan', 'insurer_policy_number', 'apd_account')
+    list_display = ('insurer', 'insurance_plan', 'insurer_policy_number', 'apd_account', 'created_at')
+    form = InsurerPolicyNumberForm
+    # search_fields = ['insurer']
+    # autocomplete_fields = ['insurer', 'insurance_plan']
 
 
 class InsuranceDealAdmin(admin.ModelAdmin):
@@ -891,11 +1105,17 @@ class InsuranceLeadResource(resources.ModelResource):
         user_profile = UserProfile.objects.filter(user=user, is_default_user=True).first()
         if user_profile:
             return str(user_profile.name)
+        elif obj.extras.get('lead_data'):
+            return obj.extras.get('lead_data').get('name', '')
         else:
             return ""
 
     def dehydrate_phone_number(self, obj):
-        return str(obj.user.phone_number)
+        user = obj.user
+        if user:
+            return str(obj.user.phone_number)
+        else:
+            return str(obj.phone_number)
 
     def dehydrate_status(self, obj):
         user_insurance = UserInsurance.objects.filter(user=obj.user).order_by('-id').first()
@@ -919,6 +1139,8 @@ class InsuranceLeadAdmin(ImportExportModelAdmin, admin.ModelAdmin):
         user_profile = UserProfile.objects.filter(user=user, is_default_user=True).first()
         if user_profile:
             return str(user_profile.name)
+        elif obj.extras.get('lead_data'):
+            return obj.extras.get('lead_data').get('name', '')
         else:
             return ""
 
@@ -926,8 +1148,12 @@ class InsuranceLeadAdmin(ImportExportModelAdmin, admin.ModelAdmin):
         extras = obj.extras
         return extras.get('source', '')
 
-    def phone_number(self, obj):
-        return str(obj.user.phone_number)
+    def lead_phone_number(self, obj):
+        user = obj.user
+        if user:
+            return str(obj.user.phone_number)
+        else:
+            return str(obj.phone_number)
 
     def status(self, obj):
         user_insurance = UserInsurance.objects.filter(user=obj.user).order_by('-id').first()
@@ -936,7 +1162,7 @@ class InsuranceLeadAdmin(ImportExportModelAdmin, admin.ModelAdmin):
         else:
             return "New"
 
-    list_display = ('id', 'name',  'phone_number', 'status', 'matrix_lead_id', 'source', 'created_at', 'updated_at')
+    list_display = ('id', 'name',  'lead_phone_number', 'status', 'matrix_lead_id', 'source', 'created_at', 'updated_at')
 
     def get_export_queryset(self, request):
         super().get_export_queryset(request)
@@ -973,3 +1199,200 @@ class InsuranceLeadForm(forms.ModelForm):
 
 class InsuranceCancelMasterAdmin(admin.ModelAdmin):
     list_display = ['insurer', 'min_days', 'max_days', 'refund_percentage']
+
+
+class EndorsementRequestForm(forms.ModelForm):
+
+    status_choices = [(EndorsementRequest.PENDING, "Pending"), (EndorsementRequest.APPROVED, 'Approved'),
+                      (EndorsementRequest.REJECT, "Reject")]
+    status = forms.ChoiceField(choices=status_choices, required=True)
+    mail_coi_to_customer = forms.BooleanField(initial=False)
+    reject_reason = forms.CharField(max_length=150, required=False)
+
+    def clean(self):
+        super().clean()
+        data = self.cleaned_data
+        status = data.get('status')
+        coi_status = data.get('mail_coi_to_customer')
+        reject_reason = data.get('reject_reason')
+        if status == EndorsementRequest.PENDING and coi_status:
+            raise forms.ValidationError('Without Approved COI can not be send to customer')
+        if status == EndorsementRequest.REJECT and not reject_reason:
+            raise forms.ValidationError('For Rejection, reject reason is mandatory')
+
+
+    class Meta:
+        fields = '__all__'
+
+
+class InsuredMemberDocumentInline(admin.TabularInline):
+    model = InsuredMemberDocument
+
+    def member_name(self, obj):
+        first_name = obj.member.first_name
+        last_name = obj.member.last_name
+        return first_name + " " + last_name
+
+    fields = ('member_name', 'document_image',)
+    extra = 0
+    can_delete = False
+    show_change_link = False
+    can_add = False
+    readonly_fields = ("member_name", 'document_image', )
+
+
+class InsuredMemberDocumentAdmin(admin.ModelAdmin):
+    list_display = ['member', 'document_image']
+
+
+class EndorsementRequestAdmin(admin.ModelAdmin):
+
+    def member_name(self, obj):
+        first_name = obj.member.first_name
+        last_name = obj.member.last_name
+        return first_name + " " + last_name
+
+    def insurance_id(self, obj):
+        return obj.insurance.id
+
+    def old_first_name(self, obj):
+        if obj.first_name == obj.member.first_name:
+            return ""
+        else:
+            return obj.member.first_name + "(edited)"
+        # return obj.member.first_name
+        # old_member_obj.first_name
+
+    def old_last_name(self, obj):
+        if obj.last_name == obj.member.last_name:
+            return ""
+        else:
+            return obj.member.last_name + "(edited)"
+
+    def old_dob(self, obj):
+        if obj.dob.date() == obj.member.dob.date():
+            return ""
+        else:
+            return obj.member.dob + "(edited)"
+
+    def old_email(self, obj):
+        if obj.email == obj.member.email:
+            return ""
+        else:
+            return obj.member.email + "(edited)"
+
+    def old_address(self, obj):
+        if obj.address == obj.member.address:
+            return ""
+        else:
+            return obj.member.address + "(edited)"
+
+    def old_pincode(self, obj):
+        if obj.pincode == obj.member.pincode:
+            return ""
+        else:
+            obj.member.pincode + "(edited)"
+
+    def old_gender(self, obj):
+        if obj.gender == obj.member.gender:
+            return ""
+        else:
+            return obj.member.gender + "(edited)"
+
+    def old_relation(self, obj):
+        if obj.relation == obj.member.relation:
+            return ""
+        else:
+            return obj.member.relation + "(edited)"
+
+    def old_town(self,obj):
+        if obj.town == obj.member.town:
+            return ""
+        else:
+            return obj.member.town + "(edited)"
+
+    def old_district(self, obj):
+        if obj.district == obj.member.district:
+            return ""
+        else:
+            return obj.member.district + "(edited)"
+
+    def old_state(self, obj):
+        if obj.state == obj.member.state:
+            return ""
+        else:
+            return obj.member.state + "(edited)"
+
+    def old_middle_name(self, obj):
+        if obj.middle_name == obj.member.middle_name:
+            return ""
+        else:
+            return obj.member.middle_name + "(edited)"
+
+    def old_title(self, obj):
+        if obj.title == obj.member.title:
+            return ""
+        else:
+            return obj.member.title + "(edited)"
+
+    list_display = ['member_name', 'insurance_id', 'status', 'created_at']
+    readonly_fields = ['member', 'insurance', 'member_type', 'title', 'old_title', 'first_name', 'old_first_name',
+                       'middle_name', 'old_middle_name', 'last_name', 'old_last_name', 'dob', 'old_dob', 'email',
+                       'old_email',  'address', 'old_address', 'pincode', 'old_pincode', 'gender', 'old_gender',
+                       'phone_number', 'relation', 'old_relation', 'profile', 'town', 'old_town',
+                       'district', 'old_district', 'state', 'old_state', 'state_code', 'city_code',
+                       'district_code']
+    inlines = [InsuredMemberDocumentInline]
+    # form = EndorsementRequestForm
+
+    def has_add_permission(self, request, obj=None):
+        return False
+
+    def has_delete_permission(self, request, obj=None):
+        return False
+
+    @transaction.atomic()
+    def save_model(self, request, obj, form, change):
+        user = request.user
+        obj._user = user if user and not user.is_anonymous else None
+
+        if request.user.is_member_of(constants['SUPER_INSURANCE_GROUP']) or request.user.is_member_of(constants['INSURANCE_GROUP']):
+            super().save_model(request, obj, form, change)
+
+            if obj.status == EndorsementRequest.APPROVED:
+                obj.process_endorsement()
+            elif obj.status == EndorsementRequest.REJECT:
+                obj.reject_endorsement()
+            if obj.mail_coi_to_customer:
+                obj.process_coi()
+
+
+class InsuredMemberHistoryAdmin(admin.ModelAdmin):
+    list_display = ['first_name', 'last_name', 'dob', 'email', 'address', 'pincode', 'gender', 'phone_number']
+    readonly_fields = ['first_name', 'last_name', 'dob', 'email', 'address', 'pincode', 'gender', 'phone_number', 'relation', 'profile']
+
+    def has_add_permission(self, request, obj=None):
+        return False
+
+    def has_delete_permission(self, request, obj=None):
+        return False
+
+
+class InsuranceEligibleCitiesAdmin(admin.ModelAdmin):
+    model = InsuranceEligibleCities
+
+
+class ThirdPartyAdministratorResource(resources.ModelResource):
+    class Meta:
+        model = ThirdPartyAdministrator
+        fields = ['id', 'name']
+
+
+class ThirdPartyAdministratorAdmin(ImportExportMixin, admin.ModelAdmin):
+    resource_class = ThirdPartyAdministratorResource
+    search_fields = ['name']
+    list_display = ['id', 'name']
+
+
+class InsurerAccountTransferAdmin(admin.ModelAdmin):
+    model = InsurerAccountTransfer

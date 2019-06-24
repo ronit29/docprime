@@ -20,7 +20,7 @@ constants = {
     'ELASTIC_TEAM': 'elastic_team',
     'PROCEDURE_TEAM': 'procedure_team',
     'COUPON_MANAGEMENT_GROUP': 'coupon_group',
-    'LAB_TEST_TEAM' : 'lab_test_team',
+    'LAB_TEST_TEAM': 'lab_test_team',
     'MERCHANT_TEAM': 'merchant_team',
     'COMMENT_TEAM': 'comment_team',
     'PRODUCT_TEAM': 'product_team',
@@ -29,13 +29,19 @@ constants = {
     'DOC_AVAILABILITY_TEAM_GROUP': 'doctor_availability_team',
     'APPOINTMENT_OTP_TEAM': 'appointment_otp_team',
     'INSURANCE_GROUP': 'insurance_group',
-    'APPOINTMENT_REFUND_TEAM' : 'appointment_refund_team',
-    'SUPER_INSURANCE_GROUP' : 'super_insurance_group',
+    'APPOINTMENT_REFUND_TEAM': 'appointment_refund_team',
+    'SUPER_INSURANCE_GROUP': 'super_insurance_group',
+    'IPD_TEAM': 'ipd_team',
+    'CORPORATE_GROUP' : 'corporate_group',
+    'BLOCK_STATE_GROUP': 'block_state_group',
+    'BLOCK_USER_GROUP': 'block_user_group',
+    'APPOINTMENT_OTP_BYPASS_AGENT_TEAM': 'appointment_otp_bypass_agent_team'
 }
 matrix_product_ids = {
     'opd_products': 1,
     'lab_products': 4,
-    'consumer': 5
+    'consumer': 5,
+    'ipd_procedure': 9
 }
 matrix_subproduct_ids = {
     "chat": 1,
@@ -45,4 +51,26 @@ matrix_subproduct_ids = {
     "doctor": 8,
     "hospital": 7,
     "hospitalnetwork": 6
+}
+matrix_status = {
+    'NEW': 1,
+    'COST_REQUESTED': 28,
+    'COST_SHARED': 29,
+    'OPD': 30,
+    'NOT_INTERESTED': 4,
+    'COMPLETED': 19,
+    'VALID': 2,
+    'CONTACTED': 3,
+    'PLANNED': 31,
+}
+matrix_status_to_ipd_lead_status_mapping = {
+    matrix_status['NEW']: 1,
+    matrix_status['COST_REQUESTED']: 2,
+    matrix_status['COST_SHARED']: 3,
+    matrix_status['OPD']: 4,
+    matrix_status['NOT_INTERESTED']: 5,
+    matrix_status['COMPLETED']: 6,
+    matrix_status['VALID']: 7,
+    matrix_status['CONTACTED']: 8,
+    matrix_status['PLANNED']: 9,
 }
