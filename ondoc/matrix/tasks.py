@@ -994,3 +994,28 @@ def create_ipd_lead_from_opd_appointment(self, data):
     data['source'] = IpdProcedureLead.CRM
     obj_created = IpdProcedureLead(**data)
     obj_created.save()
+
+
+@task(bind=True, max_retries=2)
+def create_ipd_lead_from_lab_appointment(self, data):
+    from ondoc.diagnostic.models import LabAppointment
+    from ondoc.procedure.models import IpdProcedureLead
+    obj_id = data.get('obj_id')
+    if not obj_id:
+        logger.error("[CELERY ERROR: Incorrect values provided.]")
+        raise ValueError()
+    obj = LabAppointment.objects.filter(id=obj_id).first()
+    if not obj:
+        return
+
+    is_valid = False
+    if obj.lab.is_ipd_lab:
+        is_valid = IpdProcedureLead.is_valid_hospital_for_lead(obj.lab.related_hospital)
+    if not is_valid:
+        return
+
+    data = obj.convert_ipd_lead_data()
+    data['status'] = IpdProcedureLead.NEW
+    data['source'] = IpdProcedureLead.CRM
+    obj_created = IpdProcedureLead(**data)
+    obj_created.save()
