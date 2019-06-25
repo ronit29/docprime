@@ -1395,10 +1395,11 @@ class TimeSlotExtraction(object):
 
 
     def format_data_new_v2(self, timing_date_obj, clinic_datetime, data, start_hour, start_hour_text, booking_details, is_thyrocare):
+        from ondoc.doctor.models import DoctorClinicTiming
         price = self.get_key_or_field_value(data, 'fees')
         mrp = self.get_key_or_field_value(data, 'mrp')
         deal_price = self.get_key_or_field_value(data, 'deal_price')
-        cod_deal_price = data.dct_cod_deal_price()
+        cod_deal_price = data.dct_cod_deal_price() if isinstance(data, DoctorClinicTiming) else False
         data_type = self.get_key_or_field_value(data, 'type', 1)
         on_call = bool(data_type==2)
         is_available = True

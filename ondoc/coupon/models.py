@@ -466,6 +466,8 @@ class CouponRecommender():
                 coupons = list(filter(lambda x: x.is_for_insurance == False or (x.is_for_insurance == True and x.max_order_amount >= deal_price), coupons))
             else:
                 coupons = list(filter(lambda x: x.is_for_insurance == False, coupons))
+        else:
+            coupons = list(filter(lambda x: x.is_for_insurance == False, coupons))
 
         if search_type == 'doctor' or search_type == 'lab':
             if tests:
