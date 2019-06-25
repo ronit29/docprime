@@ -4173,6 +4173,7 @@ class ProviderEncrypt(auth_model.TimeStampedModel):
     encrypted_hospital_id = models.CharField(max_length=128, null=True, blank=True)
     email = models.EmailField(max_length=100, null=True, blank=True)
     phone_numbers = ArrayField(models.CharField(max_length=10, blank=True), null=True)
+    google_drive = models.EmailField(max_length=100, null=True, blank=True)
     hospital = models.OneToOneField(Hospital, on_delete=models.CASCADE, related_name='encrypt_details')
     is_valid = models.BooleanField(default=True)
     is_consent_received = models.BooleanField(default=True)

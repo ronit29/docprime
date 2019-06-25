@@ -225,6 +225,7 @@ class HospitalProviderDataViewSet(viewsets.GenericViewSet):
                     admin_data["encryption_hint"] = admin.hospital.encrypt_details.hint
                     admin_data["email"] = admin.hospital.encrypt_details.email
                     admin_data["phone_numbers"] = admin.hospital.encrypt_details.phone_numbers
+                    admin_data["google_drive"] = admin.hospital.encrypt_details.google_drive
                     admin_data["is_consent_received"] = admin.hospital.encrypt_details.is_consent_received
                     admin_data["updated_at"] = admin.hospital.encrypt_details.updated_at
                     admin_data["created_at"] = admin.hospital.encrypt_details.created_at
@@ -593,6 +594,7 @@ class ProviderSignupDataViewset(viewsets.GenericViewSet):
                         encrypt_object.encrypted_hospital_id = hospital['encrypted_hospital_id']
                         encrypt_object.email = valid_data.get("email")
                         encrypt_object.phone_numbers = valid_data.get("phone_numbers")
+                        encrypt_object.google_drive = valid_data.get("google_drive")
                         encrypt_object.is_valid = True
                         encrypt_object.save()
                     else:
@@ -603,6 +605,7 @@ class ProviderSignupDataViewset(viewsets.GenericViewSet):
                                                                                 encrypted_hospital_id=hospital['encrypted_hospital_id'],
                                                                                 email=valid_data.get("email"),
                                                                                 phone_numbers=valid_data.get("phone_numbers"),
+                                                                                google_drive=valid_data.get("google_drive"),
                                                                                 is_valid=True))
                         hospital_ids_to_be_created.append(hospital['hospital_id'].id)
             else:
@@ -611,7 +614,9 @@ class ProviderSignupDataViewset(viewsets.GenericViewSet):
                 hospital_ids_to_be_created.append(hospital['hospital_id'].id)
         if 'is_encrypted' in valid_data and not valid_data.get('is_encrypted'):
             doc_models.ProviderEncrypt.objects.filter(hospital__in=[hospital['hospital_id'] for hospital in valid_data.get("hospitals")])\
-                                              .update(is_encrypted=False, encrypted_by=None, hint=None, encrypted_hospital_id=None, is_valid=False)
+                                              .update(is_encrypted=False, encrypted_by=None, hint=None,
+                                                      encrypted_hospital_id=None, email=None, phone_numbers=None,
+                                                      google_drive=None, is_valid=False)
         try:
             if 'is_encrypted' in valid_data and valid_data.get('is_encrypted') and objects_to_be_created and not doc_models.ProviderEncrypt.objects.filter(hospital_id__in=hospital_ids_to_be_created):
                 doc_models.ProviderEncrypt.objects.bulk_create(objects_to_be_created)

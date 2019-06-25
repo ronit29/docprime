@@ -227,6 +227,7 @@ class ConsentIsEncryptSerializer(serializers.Serializer):
     # decrypt = serializers.BooleanField(required=False)
     email = serializers.EmailField(required=False, allow_blank=True, max_length=100)
     phone_numbers = serializers.ListField(child=serializers.IntegerField(validators=[MaxValueValidator(9999999999), MinValueValidator(1000000000)]), allow_empty=True, required=False)
+    google_drive = serializers.EmailField(required=False, allow_blank=True, max_length=100)
     is_consent_received = serializers.BooleanField()
 
     def validate(self, attrs):
