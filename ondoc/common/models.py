@@ -626,6 +626,7 @@ class TdsDeductionMixin(object):
 
     def get_tds_amount(self):
         from ondoc.authentication.models import Merchant
+        from ondoc.authentication.models import MerchantNetRevenue
         tds = 0
         merchant = self.get_merchant
         if merchant:
@@ -639,7 +640,7 @@ class TdsDeductionMixin(object):
                     payout_amount += self.home_pickup_charges
 
             if merchant.enable_for_tds_deduction:
-                merchant_net_revenue_obj = merchant.net_revenue.all().first()
+                merchant_net_revenue_obj = merchant.net_revenue.filter(financial_year=MerchantNetRevenue.CURRENT_FINANCIAL_YEAR).first()
                 if merchant_net_revenue_obj:
                     old_revenue = merchant_net_revenue_obj.total_revenue
                     new_revenue = merchant_net_revenue_obj.total_revenue + booking_net_revenue
