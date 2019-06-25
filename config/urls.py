@@ -50,6 +50,7 @@ urlpatterns = [
     path('', include('ondoc.doctor.urls', namespace='doctor')),
     path('onboard/', include('ondoc.onboard.urls', namespace='onboard')),
     path('', include('ondoc.seo.urls')),
+    url(r'^select2/', include('django_select2.urls')),
 ] + additional_urls + static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)
 
 
