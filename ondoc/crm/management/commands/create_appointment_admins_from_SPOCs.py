@@ -32,9 +32,11 @@ class Command(BaseCommand):
                 continue
             admins_to_be_created.append(
                 GenericAdmin(name=spoc['name'], phone_number=str(spoc['number']), hospital_id=spoc['hospital_spocs'],
-                             permission_type=GenericAdmin.APPOINTMENT, auto_created_from_SPOCs=True))
+                             permission_type=GenericAdmin.APPOINTMENT, entity_type=GenericAdmin.HOSPITAL,
+                             auto_created_from_SPOCs=True))
         try:
             GenericAdmin.objects.bulk_create(admins_to_be_created)
+            GenericAdmin.objects.filter(auto_created_from_SPOCs=True).exclude(entity_type=GenericAdmin.HOSPITAL).update(entity_type=GenericAdmin.HOSPITAL)
         except Exception as e:
             logger.error(str(e))
             print("Error while bulk creating SPOCs. ERROR :: {}".format(str(e)))

@@ -3,8 +3,11 @@ import re
 from rest_framework import serializers
 
 from ondoc.diagnostic import models as diag_models
+from ondoc.diagnostic.models import Lab
 from ondoc.doctor import models as doc_models
+from ondoc.insurance.models import InsuredMemberDocument
 from ondoc.prescription import models as prescription_models
+from ondoc.prescription.models import AppointmentPrescription
 
 
 class PrescriptionModelComponents():
@@ -115,14 +118,20 @@ class PrescriptionDiagnosesBodySerializer(serializers.Serializer):
 
 class PrescriptionPatientSerializer(serializers.Serializer):
     id = serializers.CharField(max_length=100)
-    name = serializers.CharField(max_length=64)
+    name = serializers.CharField(required=False, allow_null=True, allow_blank=True, max_length=64)
+    encrypted_name = serializers.CharField(required=False, allow_null=True, allow_blank=True, max_length=64)
     age = serializers.IntegerField(required=False, allow_null=True)
     gender = serializers.CharField(max_length=6)
     phone_number = serializers.IntegerField(required=False, allow_null=True)
+    encrypted_phone_number = serializers.CharField(required=False, allow_null=True, allow_blank=True, max_length=64)
 
     def validate(self, attrs):
         if not (PrescriptionAppointmentValidation.validate_uuid(attrs.get("id")) or attrs.get('id').isdigit()):
             raise serializers.ValidationError("Invalid UUID or not a number- {}".format(attrs.get('id')))
+        if not ( (attrs.get('name') and not attrs.get('encrypted_name')) or (attrs.get('encrypted_name') and not attrs.get('name')) ):
+            raise serializers.ValidationError("either one of name or encrypted_name is required")
+        if attrs.get('phone_number') and attrs.get('encrypted_phone_number'):
+            raise serializers.ValidationError("either one of phone_number or encrypted_phone_number is required")
         return attrs
 
 
@@ -196,6 +205,8 @@ class GeneratePrescriptionPDFBodySerializer(serializers.Serializer):
     appointment_type = serializers.ChoiceField(choices=prescription_models.PresccriptionPdf.APPOINTMENT_TYPE_CHOICES, required=False)
     followup_instructions_date = serializers.DateTimeField(required=False, allow_null=True)
     followup_instructions_reason = serializers.CharField(required=False, allow_null=True)
+    is_encrypted = serializers.BooleanField(required=False, default=False)
+    serial_id = serializers.CharField(required=False, max_length=100)
 
     def validate(self, attrs):
         if attrs:
@@ -203,32 +214,38 @@ class GeneratePrescriptionPDFBodySerializer(serializers.Serializer):
                 raise serializers.ValidationError("Invalid UUID - {}".format(attrs.get('id')))
             if not (attrs.get('lab_tests') or attrs.get('medicines')):
                 raise serializers.ValidationError("Either one of test or medicines is required for prescription generation")
+            if ( attrs.get("is_encrypted") or attrs.get("serial_id") ) and not ( attrs.get("is_encrypted") and attrs.get("serial_id") ):
+                raise serializers.ValidationError("is_encrypted and serial_id both are required together.")
 
             appointment = PrescriptionAppointmentValidation.validate_appointment_object(attrs)
             attrs['appointment'] = appointment
             if not appointment.doctor.license:
                 raise serializers.ValidationError("Registration Number is required for Generating Prescription")
 
-            serial_id = prescription_models.PresccriptionPdf.get_serial(appointment)
+            if not attrs.get("serial_id"):
+                serial_id = prescription_models.PresccriptionPdf.get_serial(appointment)
             exists = False
-            i=0
+            i = 0
             for pres in appointment.eprescription.all():
-                i=+1
+                i += 1
                 if str(pres.id) == attrs.get("id"):
                     attrs['task'] = prescription_models.PresccriptionPdf.UPDATE
                     attrs['prescription_pdf'] = pres
-                    version = str(int(pres.serial_id[-2:]) + 1).zfill(2)
-                    attrs['serial_id'] = pres.serial_id[-12:-2] + version
+                    if not attrs.get("serial_id"):
+                        version = str(int(pres.serial_id[-2:]) + 1).zfill(2)
+                        attrs['serial_id'] = pres.serial_id[-12:-2] + version
                     exists = True
                     break
             if not exists:
-                if i!=0:
+                if i != 0:
                     attrs['task'] = prescription_models.PresccriptionPdf.CREATE
-                    file_no = str(int(serial_id[-5:-3]) + 1).zfill(2)
-                    attrs['serial_id'] = serial_id[-12:-5] + file_no + '-01'
+                    if not attrs.get("serial_id"):
+                        file_no = str(int(serial_id[-5:-3]) + 1).zfill(2)
+                        attrs['serial_id'] = serial_id[-12:-5] + file_no + '-01'
                 else:
                     attrs['task'] = prescription_models.PresccriptionPdf.CREATE
-                    attrs['serial_id'] = str(int(serial_id[-12:-6]) + 1) + '-01-01'
+                    if not attrs.get("serial_id"):
+                        attrs['serial_id'] = str(int(serial_id[-12:-6]) + 1) + '-01-01'
         return attrs
 
 
@@ -252,8 +269,12 @@ class OPDAppointmentModelSerializer(serializers.ModelSerializer):
 
 
 class PrescriptionPDFModelSerializer(serializers.ModelSerializer):
-    offline_opd_appointment = OfflineOPDAppointmentModelSerializer()
-    opd_appointment = OPDAppointmentModelSerializer()
+    # offline_opd_appointment = OfflineOPDAppointmentModelSerializer()
+    # opd_appointment = OPDAppointmentModelSerializer()
+    offline_opd_appointment = serializers.SerializerMethodField()
+
+    def get_offline_opd_appointment(self, obj):
+        return str(obj.id)
 
     class Meta:
         model = prescription_models.PresccriptionPdf
@@ -278,7 +299,7 @@ class PrescriptionResponseSerializer(serializers.ModelSerializer):
         model = prescription_models.PresccriptionPdf
         fields = ('medicines', 'special_instructions', 'symptoms_complaints', 'appointment_type', 'pdf_file',
                   'diagnoses', 'lab_tests', 'followup_instructions_date', 'followup_instructions_reason', 'updated_at',
-                  'appointment_id', 'id', 'serial_id')
+                  'appointment_id', 'id', 'serial_id', 'is_encrypted')
 
 
 class PrescriptionModelSerializerComponents():
@@ -302,3 +323,16 @@ class PrescriptionLabTestSerializer(serializers.ModelSerializer):
     class Meta:
         model = diag_models.LabTest
         fields = ('id', 'name', 'created_at', 'updated_at', 'moderated', 'hospitals', 'source_type', 'instructions')
+
+
+# class AppointmentPrescriptionSerializer(serializers.Serializer):
+#     lab_test = serializers.ListField(child=serializers.IntegerField(), required=True)
+#     lab = serializers.PrimaryKeyRelatedField(queryset=Lab.objects.all(), required=True)
+#     start_date = serializers.DateTimeField(required=True)
+
+
+class AppointmentPrescriptionUploadSerializer(serializers.ModelSerializer):
+    # prescription_file = serializers.FileField(max_length=None, use_url=True)
+    class Meta:
+        model = AppointmentPrescription
+        fields = ('prescription_file', 'user')

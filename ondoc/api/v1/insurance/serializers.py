@@ -2,12 +2,12 @@ from rest_framework import serializers
 from collections import defaultdict
 from rest_framework.fields import NullBooleanField
 from rest_framework.renderers import JSONRenderer
-
 from ondoc.diagnostic.models import Lab
 from ondoc.doctor.models import Doctor
 from ondoc.insurance.models import (Insurer, InsurancePlans, InsuranceThreshold, InsurerAccount, InsuredMembers,
                                     InsuranceTransaction, UserInsurance, InsuranceDisease, InsurancePlanContent,
-                                    StateGSTCode, InsuranceCity, InsuranceDistrict)
+                                    StateGSTCode, InsuranceCity, InsuranceDistrict, InsuredMemberDocument,
+                                    UserBankDocument, UserBank)
 from ondoc.authentication.models import (User, UserProfile)
 from ondoc.account import models as account_models
 from ondoc.account.models import (Order)
@@ -48,15 +48,35 @@ class InsurerSerializer(serializers.ModelSerializer):
         request = self.context.get('request')
         return request.build_absolute_uri(obj.insurer_document.url) if obj.insurer_document is not None and obj.insurer_document.name else None
 
-
     class Meta:
         model = Insurer
         #fields = '__all__'
         fields = ('id', 'name', 'min_float', 'logo', 'website', 'phone_number', 'email', 'plans', 'insurer_document')
 
 
-class MemberListSerializer(serializers.Serializer):
+class EndorseEnableInsurerSerializer(serializers.ModelSerializer):
+    plans = InsurancePlansSerializer(source='get_all_plans', many=True)
+    insurer_document = serializers.SerializerMethodField()
 
+    def get_insurer_document(self, obj):
+        request = self.context.get('request')
+        return request.build_absolute_uri(
+            obj.insurer_document.url) if obj.insurer_document is not None and obj.insurer_document.name else None
+
+    class Meta:
+        model = Insurer
+        # fields = '__all__'
+        fields = ('id', 'name', 'min_float', 'logo', 'website', 'phone_number', 'email', 'plans', 'insurer_document')
+
+
+class UploadMemberDocumentSerializer(serializers.ModelSerializer):
+    # document_image = serializers.ImageField(max_length=None, use_url=True)
+    class Meta:
+        model = InsuredMemberDocument
+        fields = ('document_image', 'member')
+
+
+class MemberListSerializer(serializers.Serializer):
     title = serializers.ChoiceField(choices=InsuredMembers.TITLE_TYPE_CHOICES)
     first_name = serializers.CharField(max_length=50)
     middle_name = serializers.CharField(max_length=50, allow_blank=True, allow_null=True)
@@ -73,6 +93,8 @@ class MemberListSerializer(serializers.Serializer):
     district = serializers.CharField(max_length=100)
     state = serializers.CharField(max_length=100)
     state_code = serializers.CharField(max_length=10)
+    city_code = serializers.CharField(allow_null=True, allow_blank=True, required=False)
+    district_code = serializers.CharField(allow_null=True, allow_blank=True, required=False)
 
     def validate(self, attrs):
         request = self.context.get("request")
@@ -98,13 +120,100 @@ class InsuredMemberSerializer(serializers.Serializer):
         member_list = attrs.get('members', [])
         name_set = set(map(lambda member: "%s-%s-%s" % (member['first_name'], member['middle_name'], member['last_name']), member_list))
 
+        adult_members = list(filter(lambda mem: mem.get('member_type') == InsuredMembers.ADULT, member_list))
+
+        if len(adult_members) == 2 and adult_members[0]['gender'] == adult_members[1]['gender']:
+            raise serializers.ValidationError({'name': 'Two adults cannot have same gender as per Insurance Plan.'})
+
         if len(name_set) != len(member_list):
             raise serializers.ValidationError({'name': 'Multiple members cannot have same name'})
 
         return attrs
 
-    # insurer = serializers.PrimaryKeyRelatedField(queryset=Insurer.objects.all())
-    # insurance_plan = serializers.PrimaryKeyRelatedField(queryset=InsurancePlans.objects.all())
+
+class InsuredMemberDocumentIdsSerializer(serializers.Serializer):
+    document_image = serializers.PrimaryKeyRelatedField(queryset=InsuredMemberDocument.objects.all())
+
+
+class EndorseMemberListSerializer(serializers.Serializer):
+
+    title = serializers.ChoiceField(choices=InsuredMembers.TITLE_TYPE_CHOICES)
+    first_name = serializers.CharField(max_length=50)
+    middle_name = serializers.CharField(max_length=50, allow_blank=True, allow_null=True)
+    last_name = serializers.CharField(max_length=50, allow_blank=True, allow_null=True)
+    dob = serializers.DateField()
+    email = serializers.EmailField(allow_blank=True, allow_null=True)
+    relation = serializers.ChoiceField(choices=InsuredMembers.RELATION_CHOICES)
+    address = serializers.CharField(max_length=250)
+    pincode = serializers.IntegerField()
+    member_type = serializers.ChoiceField(choices=InsuredMembers.MEMBER_TYPE_CHOICES)
+    profile = serializers.PrimaryKeyRelatedField(queryset=UserProfile.objects.all(), allow_null=True)
+    gender = serializers.ChoiceField(choices=InsuredMembers.GENDER_CHOICES)
+    town = serializers.CharField(max_length=100)
+    district = serializers.CharField(max_length=100)
+    state = serializers.CharField(max_length=100)
+    state_code = serializers.CharField(max_length=10)
+    city_code = serializers.CharField(allow_null=True, allow_blank=True)
+    district_code = serializers.CharField(allow_null=True, allow_blank=True)
+    is_change = serializers.BooleanField(required=False)
+    # id = serializers.IntegerField()
+    member = serializers.PrimaryKeyRelatedField(queryset=InsuredMembers.objects.all())
+    image_ids = serializers.ListSerializer(child=InsuredMemberDocumentIdsSerializer(), required=False)
+
+    def validate(self, attrs):
+        request = self.context.get("request")
+        insurance_plan = None
+        if request:
+            insurance_plan = request.data.get('insurance_plan')
+        if insurance_plan:
+            insurance_threshold = InsuranceThreshold.objects.filter(insurance_plan_id=
+                                                                    insurance_plan).first()
+            dob_flag, message = insurance_threshold.age_validate(attrs)
+            if not dob_flag:
+                raise serializers.ValidationError({'dob': message.get('message')})
+        return attrs
+
+
+class EndorseMemberSerializer(serializers.Serializer):
+    members = serializers.ListSerializer(child=EndorseMemberListSerializer())
+
+    def validate(self, attrs):
+        # check if there is name duplicacy or not.
+        member_list = attrs.get('members', [])
+        name_set = set(
+            map(lambda member: "%s-%s-%s" % (member['first_name'], member['middle_name'], member['last_name']),
+                member_list))
+
+        if len(name_set) != len(member_list):
+            raise serializers.ValidationError({'name': 'Multiple members cannot have same name'})
+
+        return attrs
+
+
+class MemberSerializer(serializers.ModelSerializer):
+
+    title = serializers.ReadOnlyField()
+    first_name = serializers.ReadOnlyField()
+    middle_name = serializers.ReadOnlyField()
+    last_name = serializers.ReadOnlyField()
+    dob = serializers.ReadOnlyField()
+    email = serializers.ReadOnlyField()
+    relation = serializers.ReadOnlyField()
+    address = serializers.ReadOnlyField()
+    pincode = serializers.ReadOnlyField()
+    profile = serializers.PrimaryKeyRelatedField(queryset=UserProfile.objects.all(), allow_null=True)
+    gender = serializers.ReadOnlyField()
+    town = serializers.ReadOnlyField()
+    district = serializers.ReadOnlyField()
+    state = serializers.ReadOnlyField()
+    state_code = serializers.ReadOnlyField()
+    city_code = serializers.ReadOnlyField(allow_null=True, required=False)
+    district_code = serializers.ReadOnlyField(allow_null=True, required=False)
+
+    class Meta:
+        model = InsuredMembers
+        fields = '__all__'
+        # fields = ('id', 'name', 'min_float', 'logo', 'website', 'phone_number', 'email', 'plans', 'insurer_document')
 
 
 class InsuredMemberIdSerializer(serializers.Serializer):
@@ -177,9 +286,34 @@ class StateGSTCodeSerializer(serializers.ModelSerializer):
         model = StateGSTCode
         fields = ('id', 'gst_code', 'state_name', 'cities', 'district')
 
+    # id = serializers.PrimaryKeyRelatedField(queryset=InsuredMemberDocument.objects.all())
 
 class InsuranceCityEligibilitySerializer(serializers.Serializer):
-    latitude = serializers.DecimalField(allow_null=False, max_digits=11, decimal_places=8)
-    longitude = serializers.DecimalField(allow_null=False, max_digits=11, decimal_places=8)
+    latitude = serializers.DecimalField(allow_null=False, max_digits=20, decimal_places=15)
+    longitude = serializers.DecimalField(allow_null=False, max_digits=20, decimal_places=15)
+
+
+class UserBankDocumentSerializer(serializers.Serializer):
+    document_image = serializers.PrimaryKeyRelatedField(queryset=UserBankDocument.objects.all())
+
+
+class UploadUserBankDocumentSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = UserBankDocument
+        fields = ('insurance', 'document_image')
+
+
+class UserBankSerializer(serializers.ModelSerializer):
+    insurance = serializers.PrimaryKeyRelatedField(queryset=UserInsurance.objects.all())
+    bank_name = serializers.CharField(max_length=250)
+    account_number = serializers.CharField(max_length=50)
+    account_holder_name = serializers.CharField(max_length=150)
+    ifsc_code = serializers.CharField(max_length=20)
+    bank_address = serializers.CharField(max_length=300, allow_blank=True, allow_null=True)
+    image_ids = serializers.ListSerializer(child=UserBankDocumentSerializer())
+
+    class Meta:
+        model = UserBank
+        fields = ('__all__')
 
 

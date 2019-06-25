@@ -1,16 +1,23 @@
+from django.db.models import F
 from rest_framework import viewsets
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 
 from ondoc.api.v1.auth.views import AppointmentViewSet
+from ondoc.api.v1.doctor.city_match import city_match
+from ondoc.api.v1.insurance.serializers import InsuranceCityEligibilitySerializer
+from ondoc.api.v1.procedure.serializers import CommonIpdProcedureSerializer
 from ondoc.authentication.backends import JWTAuthentication
 from ondoc.common.utils import get_all_upcoming_appointments
 from ondoc.coupon.models import CouponRecommender
-from ondoc.doctor.models import CommonSpecialization
+from ondoc.doctor.models import CommonSpecialization, Hospital
 from ondoc.diagnostic.models import CommonTest
 from ondoc.diagnostic.models import CommonPackage
 from ondoc.banner.models import Banner
 from ondoc.common.models import PaymentOptions, UserConfig
+from ondoc.insurance.models import InsuranceEligibleCities
+from ondoc.location.models import EntityUrls
+from ondoc.procedure.models import CommonIpdProcedure
 from ondoc.tracking.models import TrackingEvent
 from ondoc.common.models import UserConfig
 from ondoc.ratings_review.models import AppRatings
@@ -44,8 +51,24 @@ class ScreenViewSet(viewsets.GenericViewSet):
         profile = params.get('profile_id')
         product_id = params.get('product_id')
         app_version = params.get("app_version", "1.0")
-        lat = params.get('lat', None)
-        long = params.get('long', None)
+        lat = params.get('lat', '28.6862738')
+        long = params.get('long', '77.221783')
+        city = city_match(params.get('city'))
+        insurance_availability = False
+
+        if lat and long:
+            data = {
+                'latitude': lat,
+                'longitude': long
+            }
+
+            serializer = InsuranceCityEligibilitySerializer(data=data)
+            serializer.is_valid(raise_exception=True)
+            data = serializer.validated_data
+            city_name = InsuranceEligibleCities.get_nearest_city(data.get('latitude'), data.get('longitude'))
+            if city_name:
+                insurance_availability = True
+
         if UserConfig.objects.filter(key="app_update").exists():
             app_update = UserConfig.objects.filter(key="app_update").values_list('data', flat=True).first()
             if app_update:
@@ -72,9 +95,28 @@ class ScreenViewSet(viewsets.GenericViewSet):
         if request.user.is_authenticated:
             upcoming_appointment_result = get_all_upcoming_appointments(request.user.id)
 
+        common_package_data = package_serializer.data
+        top_hospitals_data = Hospital.get_top_hospitals_data(request, lat, long)
+
+        common_ipd_procedures = CommonIpdProcedure.objects.select_related('ipd_procedure').filter(
+            ipd_procedure__is_enabled=True).all().order_by("-priority")[:10]
+        common_ipd_procedures = list(common_ipd_procedures)
+        common_ipd_procedure_ids = [t.ipd_procedure.id for t in common_ipd_procedures]
+        ipd_entity_dict = {}
+        if city:
+            ipd_entity_qs = EntityUrls.objects.filter(ipd_procedure_id__in=common_ipd_procedure_ids,
+                                                      sitemap_identifier='IPD_PROCEDURE_CITY',
+                                                      is_valid=True,
+                                                      locality_value__iexact=city).annotate(
+                ipd_id=F('ipd_procedure_id')).values('ipd_id', 'url')
+            ipd_entity_dict = {x.get('ipd_id'): x.get('url') for x in ipd_entity_qs}
+        common_ipd_procedures_serializer = CommonIpdProcedureSerializer(common_ipd_procedures, many=True,
+                                                                        context={'entity_dict': ipd_entity_dict,
+                                                                                 'request': request})
+
         grid_list = [
             {
-                'priority': 2,
+                'priority': 4,
                 'title': "Book Doctor Appointment",
                 'type': "Specialization",
                 'items': specializations_serializer.data,
@@ -83,16 +125,16 @@ class ScreenViewSet(viewsets.GenericViewSet):
                 'addSearchItem': "Doctor"
             },
             {
-                'priority': 0,
+                'priority': 2,
                 'title': "Health Packages",
                 'type': "CommonPackage",
-                'items': package_serializer.data,
+                'items': common_package_data,
                 'tag': "Upto 50% off",
                 'tagColor': "#ff0000",
                 'addSearchItem': "Package"
             },
             {
-                'priority': 3,
+                'priority': 5,
                 'title': "Book a Test",
                 'type': "CommonTest",
                 'items': test_serializer.data,
@@ -102,13 +144,34 @@ class ScreenViewSet(viewsets.GenericViewSet):
             }
         ]
 
+        carousel_list = [
+            {
+                'priority': 0,
+                'title': "Top Hospitals",
+                'type': "Hospitals",
+                'items': top_hospitals_data,
+            },
+            {
+                'priority': 1,
+                'title': "Top Procedures",
+                'type': "IPD",
+                'items': common_ipd_procedures_serializer.data,
+            },
+
+        ]
+
+        if request.user and request.user.is_authenticated and request.user.active_insurance and not hasattr(request, 'agent'):
+            grid_list.pop(1)
+
+
+
         banner_list = Banner.get_all_banners(request, lat, long, from_app)
         banner_list_homepage = list()
         for banner in banner_list:
             if banner.get('slider_location') == 'home_page':
                 banner_list_homepage.append(banner)
         banner = [{
-            'priority': 1,
+            'priority': 3,
             'type': "Banners",
             'title': "Banners",
             'items': banner_list_homepage
@@ -127,6 +190,7 @@ class ScreenViewSet(viewsets.GenericViewSet):
                     "show_search_header": show_search_header,
                     "show_footer": show_footer,
                     "grid_list": grid_list,
+                    "carousel_list": carousel_list,
                     },
                 "banner": banner,
                 "upcoming_appointments": upcoming_appointment_result,
@@ -134,7 +198,10 @@ class ScreenViewSet(viewsets.GenericViewSet):
                 "app_custom_data": app_custom_data,
                 "app_force_update": app_version < force_update_version,
                 "app_update": app_version < update_version,
-                "ask_for_app_rating": self.ask_for_app_rating(request)
+                "ask_for_app_rating": self.ask_for_app_rating(request),
+                "settings": {
+                    "is_insurance_available": insurance_availability
+                }
         }
 
         return Response(resp)

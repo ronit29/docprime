@@ -24,7 +24,11 @@ from ondoc.authentication.models import User
 from ondoc.authentication import models as auth_model
 from ondoc.bookinganalytics.models import DP_StateMaster, DP_CityMaster
 import datetime
+from datetime import date
 from django.utils import timezone
+
+from ondoc.common.helper import Choices
+
 
 class Cities(models.Model):
     name = models.CharField(max_length=48, db_index=True)
@@ -100,7 +104,7 @@ class AppointmentHistory(TimeStampedModel):
     content_object = GenericForeignKey()
     status = models.PositiveSmallIntegerField(null=False)
     user = models.ForeignKey(User, null=True, default=None, on_delete=models.CASCADE)
-    source = models.CharField(max_length=10, blank=True, choices=SOURCE_CHOICES, default='')
+    source = models.CharField(max_length=50, blank=True, choices=SOURCE_CHOICES, default='')
 
     @classmethod
     def create(cls, *args, **kwargs):
@@ -246,6 +250,16 @@ class GlobalNonBookable(TimeStampedModel):
         end_time = self.end_time
         end_time = round(float(end_time.hour) + (float(end_time.minute) * 1 / 60), 2)
         return end_time
+
+    @classmethod
+    def get_non_bookables(self, booking_type=DOCTOR):
+        non_bookables_range = list()
+        non_bookables = self.objects.filter(deleted_at__isnull=True, booking_type=booking_type)
+        for nb in non_bookables:
+            start_datetime = datetime.datetime.combine(nb.start_date, nb.start_time)
+            end_datetime = datetime.datetime.combine(nb.end_date, nb.end_time)
+            non_bookables_range.append({'start_datetime': start_datetime, 'end_datetime': end_datetime})
+        return non_bookables_range
 
     class Meta:
         db_table = 'global_non_bookable_timing'
@@ -432,3 +446,193 @@ class RefundDetails(TimeStampedModel):
             if not refund_initiated_by:
                 raise Exception("Must have a responsible user.")
             cls .objects.create(refund_reason=refund_reason, refund_initiated_by=refund_initiated_by, content_object=appointment)
+
+
+class MatrixDataMixin(object):
+
+    def get_matrix_policy_data(self):
+        user_insurance = self.user.active_insurance
+        primary_proposer_name = None
+
+        if user_insurance:
+            primary_proposer = user_insurance.get_primary_member_profile()
+            primary_proposer_name = primary_proposer.get_full_name() if primary_proposer else None
+
+        policy_details = {
+            "ProposalNo": None,
+            "PolicyPaymentSTATUS": 300 if user_insurance else 0,
+            "BookingId": user_insurance.id if user_insurance else None,
+            "ProposerName": primary_proposer_name,
+            "PolicyId": user_insurance.policy_number if user_insurance else None,
+            "InsurancePlanPurchased": user_insurance.insurance_plan.name if user_insurance else None,
+            "PurchaseDate": int(user_insurance.purchase_date.timestamp()) if user_insurance else None,
+            "ExpirationDate": int(user_insurance.expiry_date.timestamp()) if user_insurance else None,
+            "COILink": user_insurance.coi.url if user_insurance and user_insurance.coi is not None and user_insurance.coi.name else None,
+            "PeopleCovered": user_insurance.insurance_plan.get_people_covered() if user_insurance else ""
+        }
+
+        return policy_details
+
+    def calculate_age(self):
+        if not self.profile:
+            return 0
+        if not self.profile.dob:
+            return 0
+        dob = self.profile.dob
+        today = date.today()
+        return today.year - dob.year - ((today.month, today.day) < (dob.month, dob.day))
+
+    def appointment_accepted_history(self):
+        source = ""
+        accepted_phone = None
+        history_obj = self.history.filter(status=self.ACCEPTED).first()
+        if history_obj:
+            source = history_obj.source
+            if source == 'ivr':
+                auto_ivr_data = history_obj.content_object.auto_ivr_data
+                for data in auto_ivr_data:
+                    if data.get('status') == self.ACCEPTED:
+                        accepted_phone = data.get('phone_number')
+            else:
+                user = history_obj.user
+                if user:
+                    accepted_phone = user.phone_number
+
+        return {'source': source, 'accepted_phone': accepted_phone}
+
+    def merchant_payout_data(self):
+        provider_payment_status = ''
+        settlement_date = None
+        payment_URN = ''
+        amount = None
+        merchant_payout = self.merchant_payout
+        if merchant_payout:
+            provider_payment_status = dict(merchant_payout.STATUS_CHOICES)[merchant_payout.status]
+            settlement_date = int(merchant_payout.payout_time.timestamp()) if merchant_payout.payout_time else None
+            payment_URN = merchant_payout.utr_no
+            amount = merchant_payout.payable_amount
+
+        return {'provider_payment_status': provider_payment_status, 'settlement_date': settlement_date, 'payment_URN': payment_URN, 'amount': amount}
+
+    def refund_details_data(self):
+        from ondoc.account.models import ConsumerTransaction
+        from ondoc.account.models import PgTransaction
+        from ondoc.account.models import ConsumerRefund
+        customer_status = ""
+        refund_urn = ""
+        refund_initiated_at = None
+        original_payment_mode_refund = 0.0
+        promotional_wallet_refund = 0.0
+
+        product_id = self.PRODUCT_ID
+        ct = ConsumerTransaction.objects.filter(type=PgTransaction.CREDIT, reference_id=self.id, product_id=product_id,
+                                                action=ConsumerTransaction.CANCELLATION)
+
+        wallet_ct = ct.filter(source=ConsumerTransaction.WALLET_SOURCE).first()
+        cashback_ct = ct.filter(source=ConsumerTransaction.CASHBACK_SOURCE).first()
+
+        if wallet_ct:
+            original_payment_mode_refund = wallet_ct.amount
+            refund_initiated_at = wallet_ct.created_at.timestamp()
+            # consumer_refund = ConsumerRefund.objects.filter(consumer_transaction_id=wallet_ct.id).first()
+            # if consumer_refund:
+            #     refund_initiated_at = consumer_refund.refund_initiated_at
+            #     customer_status = consumer_refund.refund_state
+
+        if cashback_ct:
+            promotional_wallet_refund = cashback_ct.amount
+            refund_initiated_at = cashback_ct.created_at.timestamp()
+
+        return {'original_payment_mode_refund': original_payment_mode_refund, 'promotional_wallet_refund': promotional_wallet_refund,
+                'customer_status': customer_status, 'refund_urn': refund_urn, 'refund_initiated_at': refund_initiated_at}
+
+
+class DeviceDetails(TimeStampedModel):
+    device_id = models.CharField(max_length=200)
+    app_version = models.CharField(max_length=20, null=True, blank=True)
+    os = models.CharField(max_length=40, null=True, blank=True)
+    os_version = models.CharField(max_length=20, null=True, blank=True)
+    make = models.CharField(max_length=100, null=True, blank=True)
+    model = models.CharField(max_length=100, null=True, blank=True)
+    # installed_date = models.DateTimeField()   # created_at is the installed_date for given d_token
+    firebase_reg_id = models.CharField(max_length=200, null=True, blank=True)
+    user = models.ForeignKey(User, null=True, blank=True, on_delete=models.SET_NULL, related_name="device_details")
+    app_name = models.CharField(max_length=200, null=True, blank=True)
+    ping_status = models.CharField(max_length=50, null=True, blank=True)
+    last_ping_time = models.DateTimeField(null=True, blank=True)
+    # last_usage = models.DateTimeField()   # updated_at is the last_usage
+    dnd = models.BooleanField(default=False)
+    res = models.CharField(max_length=100, null=True, blank=True)
+    adv_id = models.CharField(max_length=100, null=True, blank=True)
+    apps_flyer_id = models.CharField(max_length=100, null=True, blank=True)
+    data = JSONField()
+
+    def __str__(self):
+        return self.device_id
+
+    class Meta:
+        db_table = "device_details"
+
+
+class BlockedStates(TimeStampedModel):
+
+    class States(Choices):
+        LOGIN = 'LOGIN'
+        INSURANCE = 'INSURANCE'
+
+    state_name = models.CharField(max_length=50, null=False, blank=False, choices=States.as_choices(), unique=True)
+    message = models.TextField()
+
+    def __str__(self):
+        return self.state_name
+
+    class Meta:
+        db_table = 'blocked_states'
+
+
+class BlacklistUser(TimeStampedModel):
+    user = models.ForeignKey(User, related_name='blacklist_user', on_delete=models.DO_NOTHING)
+    type = models.ForeignKey(BlockedStates, on_delete=models.DO_NOTHING)
+    reason = models.TextField(null=True)
+    blocked_by = models.ForeignKey(User, on_delete=models.DO_NOTHING)
+    enabled = models.BooleanField(default=True)
+
+    @classmethod
+    def get_state_by_number(cls, phone_number, blocked_state):
+        blacklist_user = cls.objects.filter(user__phone_number=phone_number, type__state_name=blocked_state,
+                                            enabled=True, user__user_type=User.CONSUMER).first()
+        if blacklist_user:
+            return blacklist_user.type
+
+        return None
+
+    class Meta:
+        db_table = 'blacklist_users'
+        unique_together = (("user", "type"), )
+
+
+class GenericNotes(TimeStampedModel):
+    content_type = models.ForeignKey(ContentType, on_delete=models.DO_NOTHING)
+    object_id = models.BigIntegerField()
+    content_object = GenericForeignKey()
+    notes = models.TextField()
+    created_by = models.ForeignKey(User, on_delete=models.DO_NOTHING, blank=True, null=True)
+
+    class Meta:
+        db_table = 'generic_notes'
+
+
+class Documents(TimeStampedModel):
+    DOCUMENT = 1
+    CREDIT_LETTER = 2
+    DOCUMENT_TYPES = [("", "Select"), (DOCUMENT, "Document"), (CREDIT_LETTER, "Credit Letter")]
+
+    content_type = models.ForeignKey(ContentType, on_delete=models.DO_NOTHING)
+    object_id = models.PositiveIntegerField()
+    content_object = GenericForeignKey()
+    document_type = models.PositiveSmallIntegerField(default=1, choices=DOCUMENT_TYPES)
+    file = models.FileField(upload_to='credit_letter', null=True, blank=True)
+    is_valid = models.BooleanField(default=True)
+
+    class Meta:
+        db_table = 'documents'

@@ -1,4 +1,7 @@
 from django.db import models
+from ondoc.authentication.models import User
+from django.contrib.contenttypes.fields import GenericForeignKey, GenericRelation
+from django.contrib.contenttypes.models import ContentType
 from ondoc.authentication import models as auth_models
 from ondoc.doctor import models as doc_models
 from django.contrib.postgres.fields import JSONField, ArrayField
@@ -121,6 +124,7 @@ class PresccriptionPdf(auth_models.TimeStampedModel):
     appointment_type = models.PositiveSmallIntegerField(choices=APPOINTMENT_TYPE_CHOICES)
     prescription_file = models.FileField(upload_to=PRESCRIPTION_STORAGE_FOLDER, validators=[FileExtensionValidator(allowed_extensions=['pdf'])], null=True)
     serial_id = models.CharField(max_length=100)
+    is_encrypted = models.BooleanField(default=False)
 
     def get_medicines(self):
         if not self.medicines:
@@ -229,3 +233,24 @@ class OfflinePrescription(auth_models.TimeStampedModel, auth_models.Document):
 
     class Meta:
         db_table = 'offline_prescription'
+
+
+class AppointmentPrescription(auth_models.TimeStampedModel):
+
+    content_type = models.ForeignKey(ContentType, on_delete=models.DO_NOTHING, null=True)
+    object_id = models.PositiveIntegerField(null=True)
+    content_object = GenericForeignKey()
+    user = models.ForeignKey(User, null=True, default=None, on_delete=models.CASCADE)
+    prescription_file = models.FileField(null=False, upload_to='user_prescriptions', validators=[FileExtensionValidator(allowed_extensions=['pdf', 'jpg', 'jpeg', 'png'])])
+
+    @classmethod
+    def prescription_exist_for_date(cls, user, date):
+        return cls.objects.filter(created_at__date=date, user=user, object_id__isnull=False).exists()
+
+    @classmethod
+    def update_with_appointment(cls, app_obj, ids):
+        content_type = ContentType.objects.get_for_model(app_obj)
+        cls.objects.filter(id__in=ids).update(content_type_id=content_type.id, object_id=app_obj.id)
+
+    class Meta:
+        db_table = 'appointment_prescription'

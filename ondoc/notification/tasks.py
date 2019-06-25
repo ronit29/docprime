@@ -62,25 +62,27 @@ def send_lab_notifications_refactored(appointment_id):
 
 
 @task
-def send_ipd_procedure_lead_mail(obj_id):
+def send_ipd_procedure_lead_mail(data):
+    obj_id = data.get('obj_id')
+    send_email = data.get('send_email')
     from ondoc.communications.models import EMAILNotification
     from ondoc.procedure.models import IpdProcedureLead
     from ondoc.matrix.tasks import create_or_update_lead_on_matrix
     instance = IpdProcedureLead.objects.filter(id=obj_id).first()
     if not instance:
         return
+    if instance.matrix_lead_id:
+        return
     try:
-        if not instance.source or instance.source != 'docprimechat':
+        if send_email:
             emails = settings.IPD_PROCEDURE_CONTACT_DETAILS
             user_and_email = [{'user': None, 'email': email} for email in emails]
             email_notification = EMAILNotification(notification_type=NotificationAction.IPD_PROCEDURE_MAIL,
                                                    context={'instance': instance})
             email_notification.send(user_and_email)
-        else:
-            create_or_update_lead_on_matrix.apply_async(
-                ({'obj_type': instance.__class__.__name__, 'obj_id': instance.id}
-                 ,), countdown=5)
 
+        create_or_update_lead_on_matrix.apply_async(
+            ({'obj_type': instance.__class__.__name__, 'obj_id': instance.id},), countdown=5)
 
     except Exception as e:
         logger.error(str(e))
@@ -151,7 +153,7 @@ def send_lab_notifications(appointment_id):
 
 
 @task()
-def send_opd_notifications_refactored(appointment_id):
+def send_opd_notifications_refactored(appointment_id, notification_type=None):
     from ondoc.doctor.models import OpdAppointment
     from ondoc.communications.models import OpdNotification
     try:
@@ -160,6 +162,8 @@ def send_opd_notifications_refactored(appointment_id):
             return
         if instance.status == OpdAppointment.COMPLETED:
             instance.generate_invoice()
+        if instance.status == OpdAppointment.ACCEPTED and instance.is_medanta_hospital_booking():
+            instance.generate_credit_letter()
         counter = 1
         is_masking_done = False
         while counter < 3:
@@ -169,7 +173,7 @@ def send_opd_notifications_refactored(appointment_id):
                 counter = counter + 1
                 is_masking_done = generate_appointment_masknumber(
                     ({'type': 'OPD_APPOINTMENT', 'appointment': instance}))
-        opd_notification = OpdNotification(instance)
+        opd_notification = OpdNotification(instance, notification_type)
         opd_notification.send()
     except Exception as e:
         logger.error(str(e))
@@ -613,6 +617,50 @@ def send_insurance_notifications(self, data):
     except Exception as e:
         logger.error(str(e))
 
+
+@task(bind=True, max_retries=3)
+def send_insurance_endorsment_notifications(self, data):
+    from ondoc.authentication import models as auth_model
+    from ondoc.communications.models import InsuranceNotification
+    from ondoc.insurance.models import UserInsurance, EndorsementRequest
+    try:
+        user_id = int(data.get('user_id', 0))
+        user = auth_model.User.objects.filter(id=user_id).last()
+        if not user:
+            raise Exception("Invalid user id passed for insurance email notification. Userid %s" % str(user_id))
+
+        user_insurance = user.active_insurance
+        if not user_insurance:
+            raise Exception("Invalid or None user insurance found for email notification. User id %s" % str(user_id))
+
+        endorsment_status = data.get('endorsment_status', 0)
+        notification = None
+
+        if endorsment_status == EndorsementRequest.PENDING:
+            notification = NotificationAction.INSURANCE_ENDORSMENT_PENDING
+        elif endorsment_status == EndorsementRequest.REJECT:
+            notification = NotificationAction.INSURANCE_ENDORSMENT_REJECTED
+        elif endorsment_status == EndorsementRequest.APPROVED:
+            notification = NotificationAction.INSURANCE_ENDORSMENT_APPROVED
+
+            if not user_insurance.coi:
+                try:
+                    user_insurance.generate_pdf()
+                except Exception as e:
+                    logger.error('Insurance coi pdf cannot be generated. %s' % str(e))
+
+                    countdown_time = (2 ** self.request.retries) * 60 * 10
+                    print(countdown_time)
+                    self.retry([data], countdown=countdown_time)
+
+        if notification and user_insurance:
+            insurance_notification = InsuranceNotification(user_insurance, notification)
+            insurance_notification.send()
+
+    except Exception as e:
+        logger.error(str(e))
+
+
 @task(bind=True, max_retries=3)
 def send_insurance_float_limit_notifications(self, data):
     from ondoc.notification.models import EmailNotification
@@ -727,7 +775,7 @@ def opd_send_after_appointment_confirmation(appointment_id, previous_appointment
                 not instance.user or \
                 str(math.floor(instance.time_slot_start.timestamp())) != previous_appointment_date_time:
             return
-        if instance.status == OpdAppointment.ACCEPTED:
+        if instance.status == OpdAppointment.ACCEPTED and not instance.insurance:
             if not second:
                 opd_notification = OpdNotification(instance, NotificationAction.OPD_CONFIRMATION_CHECK_AFTER_APPOINTMENT)
             else:
@@ -896,13 +944,21 @@ def push_insurance_banner_lead_to_matrix(self, data):
 
         extras = banner_obj.extras
         plan_id = extras.get('plan_id', None)
+
+        lead_source = "InsuranceOPD"
+        lead_data = extras.get('lead_data')
+        if lead_data:
+            provided_lead_source = lead_data.get('source')
+            if type(provided_lead_source).__name__ == 'str' and provided_lead_source.lower() == 'docprimechat':
+                lead_source = 'docprimechat'
+
         plan = None
         if plan_id and type(plan_id).__name__ == 'int':
             plan = InsurancePlans.objects.filter(id=plan_id).first()
 
         request_data = {
             'LeadID': banner_obj.matrix_lead_id if banner_obj.matrix_lead_id else 0,
-            'LeadSource': 'InsuranceOPD',
+            'LeadSource': lead_source,
             'Name': 'none',
             'BookedBy': phone_number,
             'PrimaryNo': phone_number,
@@ -999,3 +1055,43 @@ def update_coupon_used_count():
                  where oa.status in (2,3,4,5,7) group by oac.coupon_id
                 ) x group by coupon_id
                 ) y where coupon.id = y.coupon_id ''', []).execute()
+
+
+@task
+def send_ipd_procedure_cost_estimate(ipd_procedure_lead_id=None):
+    from ondoc.procedure.models import IpdProcedureLead
+    from ondoc.communications.models import IpdLeadNotification
+    try:
+        instance = IpdProcedureLead.objects.filter(id=ipd_procedure_lead_id).first()
+        ipd_lead_notification = IpdLeadNotification(ipd_procedure_lead=instance, notification_type=NotificationAction.IPD_PROCEDURE_COST_ESTIMATE)
+        ipd_lead_notification.send()
+    except Exception as e:
+        logger.error(str(e))
+
+
+@task()
+def upload_cost_estimates(obj_id):
+    from ondoc.procedure.models import UploadCostEstimateData
+    from ondoc.crm.management.commands import upload_cost_estimates as upload_command
+    instance = UploadCostEstimateData.objects.filter(id=obj_id).first()
+    errors = []
+    if not instance or not instance.status == UploadCostEstimateData.IN_PROGRESS:
+        return
+    try:
+        wb = load_workbook(instance.file)
+        sheets = wb.worksheets
+        cost_estimate = upload_command.UploadCostEstimate(errors)
+        cost_estimate.upload(sheets[0])
+        if len(errors)>0:
+            raise Exception('errors in data')
+        instance.status = UploadCostEstimateData.SUCCESS
+        instance.save()
+    except Exception as e:
+        error_message = traceback.format_exc() + str(e)
+        logger.error(error_message)
+        instance.status = UploadCostEstimateData.FAIL
+        if errors:
+            instance.error_msg = errors
+        else:
+            instance.error_msg = [{'line number': 0, 'message': error_message}]
+        instance.save(retry=False)

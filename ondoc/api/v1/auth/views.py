@@ -20,7 +20,7 @@ from rest_framework.authtoken.models import Token
 from django.db.models import F, Sum, Max, Q, Prefetch, Case, When, Count
 from django.forms.models import model_to_dict
 
-from ondoc.common.models import UserConfig, PaymentOptions, AppointmentHistory
+from ondoc.common.models import UserConfig, PaymentOptions, AppointmentHistory, BlacklistUser, BlockedStates
 from ondoc.common.utils import get_all_upcoming_appointments
 from ondoc.coupon.models import UserSpecificCoupon, Coupon
 from ondoc.lead.models import UserLead
@@ -95,6 +95,12 @@ class LoginOTP(GenericViewSet):
 
         data = serializer.validated_data
         phone_number = data['phone_number']
+
+        blocked_state = BlacklistUser.get_state_by_number(phone_number, BlockedStates.States.LOGIN)
+        if blocked_state:
+            return Response({'error': blocked_state.message}, status=status.HTTP_400_BAD_REQUEST)
+
+
         req_type = request.query_params.get('type')
         via_sms = data.get('via_sms', True)
         via_whatsapp = data.get('via_whatsapp', False)
@@ -449,6 +455,13 @@ class UserProfileViewSet(mixins.CreateModelMixin, mixins.ListModelMixin,
             insured_member_profile = insured_member_obj.profile
             insured_member_status = insured_member_obj.user_insurance.status
         # if obj and hasattr(obj, 'id') and obj.id and insured_member_profile:
+
+        if request.user and request.user.active_insurance and data.get('is_default_user') and data.get('is_default_user') != obj.is_default_user:
+            return Response({
+                "request_errors": {"code": "invalid",
+                                   "message": "Any Profile or user associated with the insurance cannot change default user."
+                                   }})
+
         if obj and hasattr(obj, 'id') and obj.id and insured_member_profile and not (insured_member_status == UserInsurance.CANCELLED or
                                                               insured_member_status == UserInsurance.EXPIRED):
 
@@ -607,6 +620,8 @@ class UserAppointmentsViewSet(OndocViewSet):
         query_input_serializer.is_valid(raise_exception=True)
         source = ''
         responsible_user = None
+        if validated_data.get('source', None):
+            source = validated_data.get('source')
         if query_input_serializer.validated_data.get('source', None):
             source = query_input_serializer.validated_data.get('source')
         if request.user and hasattr(request.user, 'user_type'):
@@ -1184,7 +1199,7 @@ class TransactionViewSet(viewsets.GenericViewSet):
         SUCCESS_REDIRECT_URL = settings.BASE_URL + "/order/summary/%s"
         LAB_REDIRECT_URL = settings.BASE_URL + "/lab/appointment"
         OPD_REDIRECT_URL = settings.BASE_URL + "/opd/appointment"
-        PLAN_REDIRECT_URL = settings.BASE_URL + "/prime/success?user_plan="  # TODO: SHASHANK_SINGH is it OK?
+        PLAN_REDIRECT_URL = settings.BASE_URL + "/prime/success?user_plan="
 
         try:
             response = None
@@ -1232,6 +1247,17 @@ class TransactionViewSet(viewsets.GenericViewSet):
                 pg_resp_code = None
 
             order_obj = Order.objects.select_for_update().filter(pk=response.get("orderId")).first()
+            convert_cod_to_prepaid = False
+            # TODO : SHASHANK_SINGH correct amount
+            try:
+                if order_obj and response and order_obj.amount != Decimal(
+                        response.get('txAmount')) and order_obj.is_cod_order and order_obj.get_deal_price_without_coupon <= Decimal(response.get('txAmount')):
+                    convert_cod_to_prepaid = True
+                    order_obj.amount = Decimal(response.get('txAmount'))
+                    order_obj.save()
+            except:
+                pass
+
             if pg_resp_code == 1 and order_obj:
                 response_data = None
                 resp_serializer = serializers.TransactionSerializer(data=response)
@@ -1249,7 +1275,7 @@ class TransactionViewSet(viewsets.GenericViewSet):
 
                         try:
                             with transaction.atomic():
-                                processed_data = order_obj.process_pg_order()
+                                processed_data = order_obj.process_pg_order(convert_cod_to_prepaid)
                                 success_in_process = True
                         except Exception as e:
                             logger.error("Error in processing order - " + str(e))
@@ -1348,9 +1374,10 @@ class TransactionViewSet(viewsets.GenericViewSet):
         return amount, obj
 
     def send_failure_ops_email(self, order_obj):
-        html_body = "Payment failed for user with " \
+        booking_type = "Insurance " if order_obj.product_id == Order.INSURANCE_PRODUCT_ID else ""
+        html_body = "{}Payment failed for user with " \
                     "user id - {} and phone number - {}" \
-                    ", order id - {}.".format(order_obj.user.id, order_obj.user.phone_number, order_obj.id)
+                    ", order id - {}.".format(booking_type, order_obj.user.id, order_obj.user.phone_number, order_obj.id)
 
         # Push the order failure case to matrix.
 
@@ -1499,10 +1526,7 @@ class HospitalDoctorAppointmentPermissionViewSet(GenericViewSet):
     @transaction.non_atomic_requests
     def list(self, request):
         user = request.user
-        manageable_hosp_list = GenericAdmin.objects.filter(Q(is_disabled=False, user=user), (Q(permission_type=GenericAdmin.APPOINTMENT)
-                                                                                              |
-                                                                                            Q(super_user_permission=True)))\
-                                                    .values_list('hospital', flat=True)
+        manageable_hosp_list = GenericAdmin.get_manageable_hospitals(user)
         doc_hosp_queryset = (DoctorClinic.objects
                              .select_related('doctor', 'hospital')
                              .prefetch_related('doctor__manageable_doctors', 'hospital__manageable_hospitals')
@@ -1520,7 +1544,7 @@ class HospitalDoctorAppointmentPermissionViewSet(GenericViewSet):
                                        hospital_is_live=F('hospital__is_live'),
                                        online_consultation_fees=F('doctor__online_consultation_fees')
                                        )
-                             .filter(hospital_id__in=list(manageable_hosp_list))
+                             .filter(hospital_id__in=manageable_hosp_list)
                              .values('hospital', 'doctor', 'hospital_name', 'doctor_name', 'doctor_gender',
                                      'doctor_source_type', 'doctor_is_live', 'license',
                                      'is_license_verified', 'hospital_source_type', 'hospital_is_live',
@@ -1720,8 +1744,10 @@ class OrderViewSet(GenericViewSet):
         from_app = params.get("from_app", False)
         app_version = params.get("app_version", "1.0")
 
-        order_obj = Order.objects.filter(pk=pk, payment_status=Order.PAYMENT_PENDING).first()
-        if not order_obj.validate_user(user):
+        order_obj = Order.objects.filter(pk=pk).first()
+
+        if not (order_obj and order_obj.validate_user(user) and (
+                order_obj.payment_status == Order.PAYMENT_PENDING or order_obj.is_cod_order)):
             return Response({"status": 0}, status.HTTP_404_NOT_FOUND)
 
         resp = dict()
@@ -1831,6 +1857,9 @@ class SendBookingUrlViewSet(GenericViewSet):
         if purchase_type == 'insurance':
             SmsNotification.send_insurance_booking_url(token=token, phone_number=str(user_profile.phone_number))
             EmailNotification.send_insurance_booking_url(token=token, email=user_profile.email)
+        elif purchase_type == 'endorsement':
+            SmsNotification.send_endorsement_request_url(token=token, phone_number=str(user_profile.phone_number))
+            EmailNotification.send_endorsement_request_url(token=token, email=user_profile.email)
         else:
             booking_url = SmsNotification.send_booking_url(token=token, phone_number=str(user_profile.phone_number))
             EmailNotification.send_booking_url(token=token, email=user_profile.email)
@@ -1879,10 +1908,14 @@ class OrderDetailViewSet(GenericViewSet):
     @transaction.non_atomic_requests
     def summary(self, request, order_id):
         from ondoc.api.v1.cart import serializers as cart_serializers
+        from ondoc.api.v1.utils import convert_datetime_str_to_iso_str
 
         if not order_id:
             return Response(status=status.HTTP_400_BAD_REQUEST)
         order_data = Order.objects.filter(id=order_id).first()
+
+        if not order_data:
+            return Response({"message": "Invalid order ID"}, status.HTTP_404_NOT_FOUND)
 
         if not order_data.validate_user(request.user):
             return Response({"status": 0}, status.HTTP_404_NOT_FOUND)
@@ -1891,6 +1924,7 @@ class OrderDetailViewSet(GenericViewSet):
             return Response(status=status.HTTP_404_NOT_FOUND)
 
         processed_order_data = []
+        valid_for_cod_to_prepaid = order_data.is_cod_order
         child_orders = order_data.orders.all()
 
         class OrderCartItemMapper():
@@ -1899,19 +1933,38 @@ class OrderDetailViewSet(GenericViewSet):
                 self.order = order_obj
 
         for order in child_orders:
+            cod_deal_price = None
+            enabled_for_cod = False
+            # opd_appoint = OpdAppointment.objects.filter(id=order.reference_id)[0]
+            opd_appoint = OpdAppointment.objects.filter(id=order.reference_id).first()
+            if opd_appoint:
+                start_time = opd_appoint.time_slot_start
+                day = start_time.weekday()
+
+            if opd_appoint and opd_appoint.payment_type == OpdAppointment.COD:
+                # doc_clinic_timing = DoctorClinicTiming.objects.filter(day=day, doctor_clinic__doctor=opd_appoint.doctor, doctor_clinic__hospital=opd_appoint.hospital)[0]
+                doc_clinic_timing = DoctorClinicTiming.objects.filter(day=day, doctor_clinic__doctor=opd_appoint.doctor,
+                                                                      doctor_clinic__hospital=opd_appoint.hospital).first()
+                if doc_clinic_timing:
+                    cod_deal_price = doc_clinic_timing.dct_cod_deal_price()
+                    enabled_for_cod = doc_clinic_timing.is_enabled_for_cod()
+
             item = OrderCartItemMapper(order)
+            temp_time_slot_start = convert_datetime_str_to_iso_str(order.action_data["time_slot_start"])
             curr = {
-                "mrp" : order.action_data["mrp"] if "mrp" in order.action_data else order.action_data["agreed_price"],
+                "mrp": order.action_data["mrp"] if "mrp" in order.action_data else order.action_data["agreed_price"],
                 "deal_price": order.action_data["deal_price"],
                 "effective_price": order.action_data["effective_price"],
-                "data" : cart_serializers.CartItemSerializer(item, context={"validated_data" : None}).data,
-                "booking_id" : order.reference_id,
-                "time_slot_start" : order.action_data["time_slot_start"],
-                "payment_type" : order.action_data["payment_type"]
+                "data": cart_serializers.CartItemSerializer(item, context={"validated_data": None}).data,
+                "booking_id": order.reference_id,
+                "time_slot_start": temp_time_slot_start,
+                "payment_type": order.action_data["payment_type"],
+                "cod_deal_price": cod_deal_price,
+                "enabled_for_cod": enabled_for_cod
             }
             processed_order_data.append(curr)
 
-        return Response({"data": processed_order_data})
+        return Response({"data": processed_order_data, "valid_for_cod_to_prepaid": valid_for_cod_to_prepaid})
 
 
 class UserTokenViewSet(GenericViewSet):

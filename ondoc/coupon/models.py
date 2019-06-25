@@ -31,6 +31,7 @@ class Coupon(auth_model.TimeStampedModel):
 
     code = models.CharField(max_length=50)
     min_order_amount = models.DecimalField(max_digits=10, decimal_places=2, blank=True, null=True)
+    max_order_amount = models.DecimalField(max_digits=10, decimal_places=2, blank=True, null=True)
     percentage_discount = models.DecimalField(max_digits=10, decimal_places=2, blank=True, null=True, validators=[MaxValueValidator(100), MinValueValidator(0)])
     max_discount_amount = models.DecimalField(max_digits=10, decimal_places=2, blank=True, null=True)
     flat_discount = models.DecimalField(max_digits=10, decimal_places=2, blank=True, null=True)
@@ -62,6 +63,7 @@ class Coupon(auth_model.TimeStampedModel):
     is_user_specific = models.BooleanField(default=False)
     is_corporate = models.BooleanField(default=False)
     is_visible = models.BooleanField(default=True)
+    is_for_insurance = models.BooleanField(default=False)
     new_user_constraint = models.BooleanField(default=False)
     coupon_type = models.IntegerField(choices=COUPON_TYPE_CHOICES, default=DISCOUNT)
     payment_option = models.ForeignKey(PaymentOptions, on_delete=models.SET_NULL, blank=True, null=True)
@@ -182,26 +184,6 @@ class Coupon(auth_model.TimeStampedModel):
 
         return count
 
-    def total_used_coupon_count(self):
-        from ondoc.doctor.models import OpdAppointment
-        from ondoc.diagnostic.models import LabAppointment
-
-        count = 0
-        if str(self.type) == str(self.DOCTOR) or str(self.type) == str(self.ALL):
-            count += OpdAppointment.objects.filter(status__in=[OpdAppointment.CREATED, OpdAppointment.BOOKED,
-                                                               OpdAppointment.RESCHEDULED_DOCTOR,
-                                                               OpdAppointment.RESCHEDULED_PATIENT,
-                                                               OpdAppointment.ACCEPTED,
-                                                               OpdAppointment.COMPLETED],
-                                                   coupon=self).count()
-        if str(self.type) == str(self.LAB) or str(self.type) == str(self.ALL):
-            count += LabAppointment.objects.filter(status__in=[LabAppointment.CREATED, LabAppointment.BOOKED,
-                                                               LabAppointment.RESCHEDULED_LAB,
-                                                               LabAppointment.RESCHEDULED_PATIENT,
-                                                               LabAppointment.ACCEPTED,
-                                                               LabAppointment.COMPLETED],
-                                                   coupon=self).count()
-        return count
 
     @classmethod
     def get_total_deduction(cls, data, deal_price):
@@ -476,6 +458,16 @@ class CouponRecommender():
 
         if deal_price:
             coupons = list(filter(lambda x: x.min_order_amount == None or x.min_order_amount <= deal_price, coupons))
+            coupons = list(filter(lambda x: x.max_order_amount == None or x.max_order_amount >= deal_price, coupons))
+
+        if user and user.is_authenticated:
+            is_user_insured = user.active_insurance
+            if is_user_insured:
+                coupons = list(filter(lambda x: x.is_for_insurance == False or (x.is_for_insurance == True and x.max_order_amount >= deal_price), coupons))
+            else:
+                coupons = list(filter(lambda x: x.is_for_insurance == False, coupons))
+        else:
+            coupons = list(filter(lambda x: x.is_for_insurance == False, coupons))
 
         if search_type == 'doctor' or search_type == 'lab':
             if tests:
@@ -502,6 +494,7 @@ class CouponRecommender():
                 test_categories_ids = set(test_categories_ids)
 
                 # check test in coupon
+                coupons_list = list(coupons)
                 for coupon in coupons:
                     keep_coupon = False
                     if len(coupon.test.all()) == 0:
@@ -515,8 +508,9 @@ class CouponRecommender():
                                     break
 
                     if not keep_coupon:
-                        coupons.remove(coupon)
+                        coupons_list.remove(coupon)
 
+                coupons = list(coupons_list)
                 # check test categories in coupon
                 for coupon in coupons:
                     keep_coupon = False
@@ -531,7 +525,8 @@ class CouponRecommender():
                                     break
 
                     if not keep_coupon:
-                        coupons.remove(coupon)
+                        coupons_list.remove(coupon)
+                coupons = list(coupons_list)
             else:
                 coupons = list(filter(lambda x: len(x.test.all()) == 0, coupons))
                 coupons = list(filter(lambda x: len(x.test_categories.all()) == 0, coupons))
@@ -553,6 +548,7 @@ class CouponRecommender():
 
             if doctor_id:
                 coupons = list(filter(lambda x: len(x.doctors.all()) == 0 or doctor_id in list(map(lambda y: y.id, x.doctors.all())), coupons))
+                coupons_list = list(coupons)
                 for coupon in coupons:
                     keep_coupon = False
                     if len(coupon.specializations.all()) == 0:
@@ -566,7 +562,9 @@ class CouponRecommender():
                                     break
 
                     if not keep_coupon:
-                        coupons.remove(coupon)
+                        coupons_list.remove(coupon)
+
+                coupons = list(coupons_list)
             else:
                 coupons = list(filter(lambda x: len(x.doctors.all()) == 0, coupons))
                 coupons = list(filter(lambda x: len(x.specializations.all()) == 0, coupons))
@@ -583,6 +581,7 @@ class CouponRecommender():
                 coupons = list(filter(lambda x: len(x.procedures.all()) == 0, coupons))
                 coupons = list(filter(lambda x: len(x.procedure_categories.all()) == 0, coupons))
 
+        coupons_list = list(coupons)
         for coupon in coupons:
             coupon_properties = self.coupon_properties[coupon.code] = dict()
             remove_coupon = False
@@ -630,7 +629,7 @@ class CouponRecommender():
                 remove_coupon = True
 
             if remove_coupon:
-                coupons = list(filter(lambda x: x.id != coupon.id, coupons))
+                coupons_list = list(filter(lambda x: x.id != coupon.id, coupons_list))
 
             # TODO add cart_item_id
             cart_item_id = None
@@ -646,7 +645,7 @@ class CouponRecommender():
             coupon_properties['is_random_generated'] = is_random_generated
             coupon_properties['random_coupon_code'] = random_coupon_code
 
-
+        coupons = list(coupons_list)
         applicable_coupons = list(set(coupons))
 
         if applicable_coupons:

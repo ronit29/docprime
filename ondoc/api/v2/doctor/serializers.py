@@ -1,5 +1,7 @@
 from rest_framework import serializers
+from rest_framework.fields import UUIDField
 from django.contrib.auth import get_user_model
+from django.core.validators import MaxValueValidator, MinValueValidator
 from django.db.models import Q
 import logging
 from django.conf import settings
@@ -208,6 +210,41 @@ class ConsentIsDocprimeSerializer(serializers.Serializer):
             raise serializers.ValidationError("Provider not found")
         return attrs
 
+
+class EncryptedHospitalsSerializer(serializers.Serializer):
+    hospital_id = serializers.PrimaryKeyRelatedField(queryset=doc_models.Hospital.objects.all())
+    encrypted_hospital_id = serializers.CharField(required=False, allow_blank=True)
+
+
+class ConsentIsEncryptSerializer(serializers.Serializer):
+    is_encrypted = serializers.BooleanField(required=False)
+    hospitals = serializers.ListField(child=EncryptedHospitalsSerializer(many=False))
+    hint = serializers.CharField(required=False, allow_blank=True)
+    encryption_key = serializers.CharField(required=False, allow_blank=True)
+    # decrypt = serializers.BooleanField(required=False)
+    email = serializers.EmailField(required=False, allow_blank=True, max_length=100)
+    phone_numbers = serializers.ListField(child=serializers.IntegerField(validators=[MaxValueValidator(9999999999), MinValueValidator(1000000000)]), allow_empty=True, required=False)
+    is_consent_received = serializers.BooleanField()
+
+    def validate(self, attrs):
+        if attrs:
+            if 'is_encrypted' in attrs and not attrs.get('is_encrypted'):
+                if not attrs.get('encryption_key'):
+                    raise serializers.ValidationError('Encryption Key Not Found!')
+                else:
+                    for hospital in attrs['hospitals']:
+                        if not (hasattr(hospital['hospital_id'], 'encrypt_details') and hospital['hospital_id'].encrypt_details.is_valid):
+                            raise serializers.ValidationError('decrypt called for unencrypted hospital')
+            else:
+                existing_valid_details_indexes = list()
+                for index, hospital in enumerate(attrs['hospitals']):
+                    if hasattr(hospital['hospital_id'], 'encrypt_details') and hospital['hospital_id'].encrypt_details.is_valid:
+                        existing_valid_details_indexes.append(index)
+                for index in sorted(existing_valid_details_indexes, reverse=True):
+                    del attrs['hospitals'][index]
+                if not attrs['hospitals']:
+                    raise serializers.ValidationError('encrypted data already present for given hospitals')
+        return attrs
 
 class BulkCreateDoctorSerializer(serializers.Serializer):
     name = serializers.CharField(max_length=200)
@@ -436,6 +473,8 @@ class PartnersAppInvoiceSerialier(serializers.Serializer):
                                                    min_value=0, max_value=100)
     total_amount = serializers.DecimalField(max_digits=10, decimal_places=2)
     generate_invoice = serializers.BooleanField(default=False)
+    is_encrypted = serializers.BooleanField(required=False, default=False)
+    invoice_serial_id = serializers.CharField(required=False, max_length=100)
 
     def validate(self, attrs):
         selected_invoice_items = attrs.get('selected_invoice_items')
@@ -450,6 +489,10 @@ class PartnersAppInvoiceSerialier(serializers.Serializer):
             raise serializers.ValidationError('due date is required for payment status - pending')
         if attrs.get('generate_invoice') and not attrs.get('invoice_title'):
             raise serializers.ValidationError('invoice title is missing for invoice generation')
+        if ( attrs.get("is_encrypted") or attrs.get("invoice_serial_id") ) and not ( attrs.get("is_encrypted") and attrs.get("invoice_serial_id") ):
+            raise serializers.ValidationError("is_encrypted and invoice_serial_id both are required together.")
+        if attrs.get('is_encrypted') and attrs.get('generate_invoice'):
+            raise serializers.ValidationError('generate_invoice not possible for encrypted_data')
         if attrs.get('appointment_id'):
             attrs['appointment'] = attrs.pop('appointment_id')
 
@@ -487,13 +530,14 @@ class PartnersAppInvoiceSerialier(serializers.Serializer):
 
 
 class PartnersAppInvoiceModelSerialier(serializers.ModelSerializer):
+    appointment_id = serializers.PrimaryKeyRelatedField(read_only=True, pk_field=UUIDField(format='hex_verbose'))
 
     class Meta:
         model = doc_models.PartnersAppInvoice
         fields = ('id', 'created_at', 'updated_at', 'invoice_serial_id', 'consultation_fees', 'selected_invoice_items',
                   'payment_status', 'payment_type', 'due_date', 'invoice_title', 'sub_total_amount', 'tax_amount',
                   'tax_percentage', 'discount_amount', 'discount_percentage', 'total_amount', 'is_invoice_generated',
-                  'is_valid', 'is_edited', 'edited_by', 'appointment_id', 'encoded_url')
+                  'is_valid', 'is_edited', 'edited_by', 'appointment_id', 'encoded_url', 'is_encrypted')
 
 
 class ListInvoiceItemsSerializer(serializers.Serializer):

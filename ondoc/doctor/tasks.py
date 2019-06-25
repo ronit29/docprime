@@ -92,3 +92,21 @@ def update_seo_urls():
 
     # update ipd_procedure urls
     IpdProcedure.update_ipd_seo_urls()
+
+    # update labs, doctors and hospitals profile urls
+    from ondoc.location.models import UrlsModel
+    UrlsModel.update_profile_urls()
+    return True
+
+
+@task
+def update_hosp_google_avg_rating():
+    from ondoc.doctor.models import HospitalPlaceDetails, Hospital
+    HospitalPlaceDetails.update_hosp_place_with_google_api_details()
+    Hospital.update_hosp_google_avg_rating()
+
+
+@task()
+def update_flags():
+    from ondoc.doctor.models import Hospital
+    Hospital.update_is_big_hospital()
