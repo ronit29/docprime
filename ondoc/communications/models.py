@@ -1081,7 +1081,8 @@ class EMAILNotification:
             if notification_type == NotificationAction.INSURANCE_CANCEL_INITIATE:
                 bcc = settings.INSURANCE_CANCEL_INITIATE_EMAIL
             elif notification_type == NotificationAction.INSURANCE_CANCELLATION_APPROVED:
-                email = settings.INSURANCE_CANCELLATION_APPROVAL_ALERT_EMAIL
+                # email = settings.INSURANCE_CANCELLATION_APPROVAL_ALERT_EMAIL
+                email = 'ankushg@docprime.com'
             email_noti = EmailNotification.objects.create(
                 user=user,
                 email=email,
