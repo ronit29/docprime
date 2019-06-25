@@ -657,7 +657,7 @@ class TdsDeductionMixin(object):
         merchant = self.get_merchant
         if merchant:
             booking_net_revenue = self.get_booking_revenue()
-            merchant_net_revenue_obj = merchant.net_revenue.all().first()
+            merchant_net_revenue_obj = merchant.net_revenue.filter(financial_year=MerchantNetRevenue.CURRENT_FINANCIAL_YEAR).first()
             if merchant_net_revenue_obj:
                 total_revenue = booking_net_revenue + merchant_net_revenue_obj.total_revenue
                 if not merchant_net_revenue_obj.tds_deducted:
