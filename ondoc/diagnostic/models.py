@@ -21,7 +21,7 @@ from ondoc.notification import tasks as notification_tasks
 from ondoc.notification.labnotificationaction import LabNotificationAction
 from django.core.files.storage import get_storage_class
 from ondoc.api.v1.utils import AgreedPriceCalculate, DealPriceCalculate, TimeSlotExtraction, CouponsMixin, \
-    form_time_slot, util_absolute_url, html_to_pdf, RawSql
+    form_time_slot, util_absolute_url, html_to_pdf, RawSql, resolve_address
 from ondoc.account import models as account_model
 from django.utils import timezone
 from datetime import timedelta
@@ -35,6 +35,7 @@ from ondoc.authentication import models as auth_model
 from django.core.files.uploadedfile import InMemoryUploadedFile, TemporaryUploadedFile
 from io import BytesIO
 import datetime
+from datetime import date
 from ondoc.api.v1.utils import get_start_end_datetime, custom_form_datetime
 from ondoc.diagnostic import tasks
 from ondoc.authentication.models import UserProfile, Address
@@ -57,7 +58,7 @@ from ondoc.ratings_review import models as ratings_models
 # from ondoc.api.v1.common import serializers as common_serializers
 from ondoc.common.models import AppointmentHistory, AppointmentMaskNumber, Remark, GlobalNonBookable, \
     SyncBookingAnalytics, CompletedBreakupMixin, RefundDetails, MatrixMappedState, \
-    MatrixMappedCity
+    MatrixMappedCity, MatrixDataMixin
 import reversion
 from decimal import Decimal
 from django.utils.text import slugify
@@ -256,6 +257,7 @@ class Lab(TimeStampedModel, CreatedByModel, QCModel, SearchKey, WelcomeCallingDo
     rating_data = JSONField(blank=True, null=True)
     is_location_verified = models.BooleanField(verbose_name='Location Verified', default=False)
     auto_ivr_enabled = models.BooleanField(default=True)
+    search_distance = models.FloatField(default=20000)
 
     def __str__(self):
         return self.name
@@ -312,9 +314,12 @@ class Lab(TimeStampedModel, CreatedByModel, QCModel, SearchKey, WelcomeCallingDo
     @classmethod
     def get_insurance_details(cls, user):
 
+        from ondoc.insurance.models import InsuranceThreshold
+        insurance_threshold_obj = InsuranceThreshold.objects.all().order_by('-lab_amount_limit').first()
+        insurance_threshold_amount = insurance_threshold_obj.lab_amount_limit if insurance_threshold_obj else 1500
         resp = {
             'is_insurance_covered': False,
-            'insurance_threshold_amount': None,
+            'insurance_threshold_amount': insurance_threshold_amount,
             'is_user_insured': False
         }
 
@@ -633,11 +638,13 @@ class Lab(TimeStampedModel, CreatedByModel, QCModel, SearchKey, WelcomeCallingDo
 
         if not is_home_pickup and lab_timing_queryset[0].lab.always_open:
             for day in range(0, 7):
-                obj.form_time_slots(day, 0.0, 23.75, None, True)
+                obj.form_time_slots(day=day, start=0.0, end=23.75, price=None, is_available=True,
+                                    deal_price=None, mrp=None, cod_deal_price=None, is_doctor=False, on_call=0)
 
         else:
             for data in lab_timing_queryset:
-                obj.form_time_slots(data.day, data.start, data.end, None, True)
+                obj.form_time_slots(day=data.day, start=data.start, end=data.end, price=None, is_available=True,
+                                    deal_price=None, mrp=None, cod_deal_price=None, is_doctor=False, on_call=0)
 
         global_leave_serializer = common_serializers.GlobalNonBookableSerializer(
             GlobalNonBookable.objects.filter(deleted_at__isnull=True,
@@ -685,7 +692,7 @@ class Lab(TimeStampedModel, CreatedByModel, QCModel, SearchKey, WelcomeCallingDo
                 is_thyrocare = True
         timeslots = timeslot_object.format_timing_to_datetime_v2(lab_timing_queryset, total_leaves, booking_details, is_thyrocare)
         upcoming_slots = timeslot_object.get_upcoming_slots(time_slots=timeslots)
-        timing_response = {"timeslots": timeslots, "upcoming_slots": upcoming_slots, "is_thyrocare": is_thyrocare}
+        timing_response = {"time_slots": timeslots, "upcoming_slots": upcoming_slots, "is_thyrocare": is_thyrocare}
         return timing_response
 
     def get_available_slots(self, is_home_pickup, pincode, date):
@@ -872,11 +879,14 @@ class LabBookingClosingManager(models.Manager):
 
             if not is_home_pickup and lab_timing_queryset[0].lab.always_open:
                 for day in range(0, 7):
-                    obj.form_time_slots(day, 0.0, 23.75, None, True)
+                    obj.form_time_slots(day=day, start=0.0, end=23.75, price=None, is_available=True,
+                                        deal_price=None, mrp=None, cod_deal_price=None, is_doctor=False, on_call=0)
 
             else:
                 for data in lab_timing_queryset:
-                    obj.form_time_slots(data.day, data.start, data.end, None, True)
+                    obj.form_time_slots(day=data.day, start=data.start, end=data.end, price=None, is_available=True,
+                                        deal_price=None, mrp=None, cod_deal_price=None, is_doctor=False, on_call=0)
+
                 # daywise_data_array = sorted(lab_timing_queryset, key=lambda k: [k.day, k.start], reverse=True)
                 # day, end = daywise_data_array[0].day, daywise_data_array[0].end
                 # end = end - threshold
@@ -1245,6 +1255,7 @@ class LabTest(TimeStampedModel, SearchKey):
     author = models.ForeignKey(Doctor, null=True, blank=True, related_name='published_tests',
                                on_delete=models.SET_NULL)
     is_cancellable = models.BooleanField(default=True)
+    insurance_cutoff_price = models.PositiveIntegerField(default=None, null=True, blank=True)
 
     # test_sub_type = models.ManyToManyField(
     #     LabTestSubType,
@@ -1522,8 +1533,9 @@ class LabAppointmentInvoiceMixin(object):
             context = deepcopy(context)
             context['invoice'] = invoice
             html_body = render_to_string("email/lab_invoice/invoice_template.html", context=context)
-            filename = "invoice_{}_{}.pdf".format(str(timezone.now().strftime("%I%M_%d%m%Y")),
-                                                  random.randint(1111111111, 9999999999))
+            # filename = "invoice_{}_{}.pdf".format(str(timezone.now().strftime("%I%M_%d%m%Y")),
+            #                                       random.randint(1111111111, 9999999999))
+            filename = "payment_receipt_{}.pdf".format(context.get('instance').id)
             file = html_to_pdf(html_body, filename)
             if not file:
                 logger.error("Got error while creating pdf for lab invoice.")
@@ -1535,7 +1547,7 @@ class LabAppointmentInvoiceMixin(object):
 
 
 @reversion.register()
-class LabAppointment(TimeStampedModel, CouponsMixin, LabAppointmentInvoiceMixin, RefundMixin, CompletedBreakupMixin):
+class LabAppointment(TimeStampedModel, CouponsMixin, LabAppointmentInvoiceMixin, RefundMixin, CompletedBreakupMixin, MatrixDataMixin):
     from ondoc.integrations.models import IntegratorResponse
     PRODUCT_ID = Order.LAB_PRODUCT_ID
     CREATED = 1
@@ -1605,12 +1617,13 @@ class LabAppointment(TimeStampedModel, CouponsMixin, LabAppointmentInvoiceMixin,
     coupon_data = JSONField(blank=True, null=True)
     status_change_comments = models.CharField(max_length=5000, null=True, blank=True)
     appointment_prescriptions = GenericRelation("prescription.AppointmentPrescription", related_query_name="appointment_prescriptions")
-
+    hospital_reference_id = models.CharField(max_length=1000, null=True, blank=True)
+    reports_physically_collected = models.NullBooleanField()
 
     def get_all_uploaded_prescriptions(self, date=None):
         from ondoc.prescription.models import AppointmentPrescription
         qs = LabAppointment.objects.filter(user=self.user).values_list('id', flat=True)
-        prescriptions = AppointmentPrescription.objects.filter(content_type=ContentType.objects.get_for_model(self), object_id__in=qs)
+        prescriptions = AppointmentPrescription.objects.filter(content_type=ContentType.objects.get_for_model(self), object_id__in=qs).order_by('-id')
         return prescriptions
 
     def get_corporate_deal_id(self):
@@ -1670,7 +1683,6 @@ class LabAppointment(TimeStampedModel, CouponsMixin, LabAppointmentInvoiceMixin,
             pass
 
         return obj
-
 
     def get_tests_and_prices(self):
         test_price = []
@@ -2475,7 +2487,6 @@ class LabAppointment(TimeStampedModel, CouponsMixin, LabAppointmentInvoiceMixin,
 
         return [integrator_response.lead_id, integrator_response.integrator_order_id]
 
-
     def accepted_through(self):
         from ondoc.integrations.models import IntegratorHistory
 
@@ -2486,6 +2497,178 @@ class LabAppointment(TimeStampedModel, CouponsMixin, LabAppointmentInvoiceMixin,
             return 'Not Found'
 
         return integrator_history.accepted_through
+
+    def get_matrix_data(self, order, product_id, sub_product_id):
+        # policy_details = self.get_matrix_policy_data()
+        appointment_details = self.get_matrix_appointment_data(order)
+
+        request_data = {
+            'DocPrimeUserId': self.user.id,
+            'LeadID': self.matrix_lead_id if self.matrix_lead_id else 0,
+            'Name': self.profile.name,
+            'PrimaryNo': self.user.phone_number,
+            'LeadSource': 'DocPrime',
+            'EmailId': self.profile.email,
+            'Gender': 1 if self.profile.gender == 'm' else 2 if self.profile.gender == 'f' else 0,
+            'CityId': 0,
+            'ProductId': product_id,
+            'SubProductId': sub_product_id,
+            'AppointmentDetails': appointment_details
+        }
+        return request_data
+
+    def get_matrix_appointment_data(self, order):
+        location = ''
+        booking_url = '%s/admin/diagnostic/labappointment/%s/change' % (settings.ADMIN_BASE_URL, self.id)
+        kyc = 1 if LabDocument.objects.filter(lab=self.lab, document_type__in=[LabDocument.CHEQUE, LabDocument.PAN]).distinct('document_type').count() == 2 else 0
+        if self.lab.location:
+            location = 'https://www.google.com/maps/search/?api=1&query=%f,%f' % (self.lab.location.y, self.lab.location.x)
+
+        patient_address = ""
+        if hasattr(self, 'address') and self.address:
+            patient_address = resolve_address(self.address)
+
+        profile_email = ''
+        if self.profile:
+            profile_email = self.profile.email
+
+        mask_number_instance = self.mask_number.filter(is_deleted=False, is_mask_number=True).first()
+        mask_number = ''
+        if mask_number_instance:
+            mask_number = mask_number_instance.mask_number
+
+        provider_booking_id = ''
+        merchant_code = ''
+        is_ipd_hospital = '0'
+        service_name = ','.join([test_obj.test.name for test_obj in self.test_mappings.all()])
+        location_verified = self.lab.is_location_verified
+        provider_id = self.lab.id
+        merchant = self.lab.merchant.all().last()
+        if merchant:
+            merchant_code = merchant.id
+
+        if self.lab and self.lab.network and self.lab.network.id == settings.THYROCARE_NETWORK_ID:
+            integrator_obj = self.integrator_response.all().first()
+            if integrator_obj:
+                provider_booking_id = integrator_obj.integrator_order_id
+
+        order_id = order.id if order else None
+        dob_value = ''
+        try:
+            dob_value = datetime.datetime.strptime(self.profile_detail.get('dob'), "%Y-%m-%d").strftime("%d-%m-%Y") \
+                if self.profile_detail.get('dob', None) else ''
+        except Exception as e:
+            pass
+
+        appointment_type = 'Lab Visit'
+        is_home_pickup = 0
+        home_pickup_address = None
+        if self.is_home_pickup:
+            is_home_pickup = 1
+            appointment_type = 'Home Visit'
+            home_pickup_address = self.get_pickup_address()
+
+        report_uploaded = 0
+        report_sent = None
+        reports = self.get_reports()
+        if reports:
+            report_file = reports.first().files.first()
+            if report_file:
+                report_uploaded = 1
+                report_sent = report_file.created_at.timestamp()
+
+        merchant_payout = self.merchant_payout_data()
+        accepted_history = self.appointment_accepted_history()
+        user_insurance = self.insurance
+        mobile_list = self.get_matrix_spoc_data()
+        refund_data = self.refund_details_data()
+
+        appointment_details = {
+            'IPDHospital': is_ipd_hospital,
+            'IsInsured': 'yes' if user_insurance else 'no',
+            'InsurancePolicyNumber': str(user_insurance.policy_number) if user_insurance else None,
+            'AppointmentStatus': self.status,
+            'Age': self.calculate_age(),
+            'Email': profile_email,
+            'VirtualNo': mask_number,
+            'OTP': '',
+            'KYC': kyc,
+            'Location': location,
+            'PaymentType': self.payment_type,
+            'PaymentTypeId': self.payment_type,
+            'PaymentStatus': 300,
+            'OrderID': order_id if order_id else 0,
+            'DocPrimeBookingID': self.id,
+            'BookingDateTime': int(self.created_at.timestamp()),
+            'AppointmentDateTime': int(self.time_slot_start.timestamp()),
+            'BookingType': 'DC',
+            'AppointmentType': appointment_type,
+            'IsHomePickUp': is_home_pickup,
+            'HomePickupAddress': home_pickup_address,
+            'PatientName': self.profile_detail.get("name", ''),
+            'PatientAddress': patient_address,
+            'ProviderName': getattr(self, 'lab').name,
+            'ServiceName': service_name,
+            'InsuranceCover': 0,
+            'MobileList': mobile_list,
+            'BookingUrl': booking_url,
+            'Fees': float(self.agreed_price),
+            'EffectivePrice': float(self.effective_price),
+            'MRP': float(self.price),
+            'DealPrice': float(self.deal_price),
+            'DOB': dob_value,
+            'ProviderAddress': self.lab.get_lab_address(),
+            'ProviderID': provider_id,
+            'ProviderBookingID': provider_booking_id,
+            'MerchantCode': merchant_code,
+            'ProviderPaymentStatus': merchant_payout['provider_payment_status'],
+            'PaymentURN': merchant_payout['payment_URN'],
+            'Amount': float(merchant_payout['amount']) if merchant_payout['amount'] else None,
+            'SettlementDate': merchant_payout['settlement_date'],
+            'LocationVerified': location_verified,
+            'ReportUploaded': report_uploaded,
+            'Reportsent': int(report_sent) if report_sent else None,
+            'AcceptedBy': accepted_history['source'],
+            'AcceptedPhone': accepted_history['accepted_phone'],
+            "CustomerStatus": refund_data['customer_status'],
+            "RefundPaymentMode": float(refund_data['original_payment_mode_refund']) if refund_data['original_payment_mode_refund'] else None,
+            "RefundToWallet": float(refund_data['promotional_wallet_refund']) if refund_data['promotional_wallet_refund'] else None,
+            "RefundInitiationDate": int(refund_data['refund_initiated_at']) if refund_data['refund_initiated_at'] else None,
+            "RefundURN": refund_data['refund_urn']
+        }
+        return appointment_details
+
+    def get_matrix_spoc_data(self):
+        mobile_list = list()
+        # if self.insurance_id:
+        #     auto_ivr_enabled = False
+        # else:
+        #     auto_ivr_enabled = self.lab.is_auto_ivr_enabled()
+
+        auto_ivr_enabled = self.lab.is_auto_ivr_enabled()
+        for contact_person in self.lab.labmanager_set.all():
+            number = ''
+            if contact_person.number:
+                number = str(contact_person.number)
+            if number:
+                number = int(number)
+
+            if number:
+                contact_type = dict(contact_person.CONTACT_TYPE_CHOICES)[contact_person.contact_type]
+                contact_name = contact_person.name
+                mobile_list.append({'MobileNo': number,
+                                    'Name': contact_name,
+                                    'DesignationID': contact_person.contact_type,
+                                    'AutoIVREnable': str(auto_ivr_enabled).lower(),
+                                    'Type': 3})
+
+        # Lab mobile number
+        mobile_list.append({'MobileNo': self.lab.primary_mobile, 'Name': self.lab.name, 'Type': 3})
+
+        # User mobile number
+        mobile_list.append({'MobileNo': self.user.phone_number, 'Name': self.profile.name, 'Type': 1})
+
+        return mobile_list
 
     def __str__(self):
         return "{}, {}".format(self.profile.name if self.profile else "", self.lab.name)

@@ -45,13 +45,14 @@ from ondoc.insurance.models import (Insurer, InsurancePlans, InsuranceThreshold,
                                     UserInsurance, InsurancePlanContent, InsuredMembers, InsurerAccount, InsuranceLead,
                                     InsuranceDiseaseResponse, InsurerPolicyNumber, InsuranceCancelMaster,
                                     EndorsementRequest, InsuredMemberDocument, InsuredMemberHistory, ThirdPartyAdministrator,
-                                    UserBank, UserBankDocument)
+                                    UserBank, UserBankDocument, InsurerAccountTransfer)
 
 from ondoc.procedure.models import Procedure, ProcedureCategory, CommonProcedureCategory, DoctorClinicProcedure, \
     ProcedureCategoryMapping, ProcedureToCategoryMapping, CommonProcedure, IpdProcedure, IpdProcedureFeatureMapping, \
     DoctorClinicIpdProcedure, IpdProcedureCategoryMapping, IpdProcedureCategory, CommonIpdProcedure, \
     IpdProcedureDetailType, IpdProcedureDetail, IpdProcedureSynonym, IpdProcedureSynonymMapping, \
-    IpdProcedurePracticeSpecialization, IpdProcedureLead, Offer
+    IpdProcedurePracticeSpecialization, IpdProcedureLead, Offer, PotentialIpdLeadPracticeSpecialization, IpdCostEstimateRoomType, IpdProcedureCostEstimate, \
+    IpdCostEstimateRoomTypeMapping, IpdProcedureLeadCostEstimateMapping, UploadCostEstimateData
 from ondoc.reports import models as report_models
 
 from ondoc.diagnostic.models import LabPricing
@@ -567,7 +568,8 @@ class Command(BaseCommand):
                                                            HospitalHelpline, IpdProcedure, HospitalTiming,
                                                            IpdProcedureDetailType, IpdProcedureDetail, IpdProcedureSynonym, IpdProcedureSynonymMapping,
                                                            EmailBanner, RecommenderThrough, Recommender,
-                                                           IpdProcedurePracticeSpecialization, CityLatLong, CommonHospital)
+                                                           IpdProcedurePracticeSpecialization, CityLatLong, CommonHospital,
+                                                           PotentialIpdLeadPracticeSpecialization)
         for cl, ct in content_types.items():
             permissions = Permission.objects.filter(
                 Q(content_type=ct),
@@ -590,7 +592,8 @@ class Command(BaseCommand):
 
             group.permissions.add(*permissions)
 
-        content_types = ContentType.objects.get_for_models(Coupon, UserSpecificCoupon, Hospital, HospitalNetwork)
+        content_types = ContentType.objects.get_for_models(Coupon, UserSpecificCoupon, Hospital, HospitalNetwork,
+                                                           PracticeSpecialization)
 
         for cl, ct in content_types.items():
             permissions = Permission.objects.filter(
@@ -708,7 +711,7 @@ class Command(BaseCommand):
             group.permissions.add(*permissions)
 
         group, created = Group.objects.get_or_create(name=constants['APPOINTMENT_REFUND_TEAM'])
-        #group.permissions.clear()
+        # group.permissions.clear()
 
         group, created = Group.objects.get_or_create(name=constants['IPD_TEAM'])
         group.permissions.clear()
@@ -719,6 +722,20 @@ class Command(BaseCommand):
             permissions = Permission.objects.filter(
                 Q(content_type=ct), Q(codename='change_' + ct.model))
             group.permissions.add(*permissions)
+
+        content_types = ContentType.objects.get_for_models(IpdCostEstimateRoomType, IpdProcedureCostEstimate,
+                                                           IpdCostEstimateRoomTypeMapping,
+                                                           IpdProcedureLeadCostEstimateMapping,
+                                                           UploadCostEstimateData)
+        for cl, ct in content_types.items():
+            permissions = Permission.objects.filter(
+                Q(content_type=ct),
+                Q(codename='add_' + ct.model) |
+                Q(codename='change_' + ct.model))
+            group.permissions.add(*permissions)
+
+        group, created = Group.objects.get_or_create(name=constants['APPOINTMENT_OTP_BYPASS_AGENT_TEAM'])
+        # group.permissions.clear()
 
         self.stdout.write('Successfully created groups and permissions')
 
@@ -870,7 +887,7 @@ class Command(BaseCommand):
 
             group.permissions.add(*permissions)
 
-        content_types = ContentType.objects.get_for_models(MerchantPayout, UserInsurance)
+        content_types = ContentType.objects.get_for_models(MerchantPayout, UserInsurance, InsurerAccount)
 
         for cl, ct in content_types.items():
             permissions = Permission.objects.filter(
@@ -973,7 +990,7 @@ class Command(BaseCommand):
                                                            InsuredMembers, InsurerPolicyNumber, InsuranceCancelMaster,
                                                            EndorsementRequest, InsuredMemberDocument,
                                                            InsuredMemberHistory, UserBank, UserBankDocument,
-                                                           GenericNotes)
+                                                           GenericNotes, InsurerAccountTransfer)
 
         for cl, ct in content_types.items():
             permissions = Permission.objects.filter(

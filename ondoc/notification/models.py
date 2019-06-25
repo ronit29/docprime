@@ -80,11 +80,18 @@ class NotificationAction:
     CASHBACK_CREDITED = 55
 
     IPD_PROCEDURE_MAIL = 60
+    IPD_PROCEDURE_COST_ESTIMATE = 61
 
     LAB_LOGO_CHANGE_MAIL = 70
     PRICING_ALERT_EMAIL = 72
     APPOINTMENT_REMINDER_PROVIDER_SMS = 77
+    PROVIDER_ENCRYPTION_ENABLED = 78
+    PROVIDER_ENCRYPTION_DISABLED = 79
     LOGIN_OTP = 80
+    CHAT_NOTIFICATION = 87
+
+    COD_TO_PREPAID = 91
+    COD_TO_PREPAID_REQUEST = 92
     LAB_CONFIRMATION_CHECK_AFTER_APPOINTMENT = 81
     LAB_CONFIRMATION_SECOND_CHECK_AFTER_APPOINTMENT = 82
     LAB_FEEDBACK_AFTER_APPOINTMENT = 83
@@ -120,7 +127,10 @@ class NotificationAction:
         (PRICING_ALERT_EMAIL, 'Pricing Change Mail'),
         (LAB_LOGO_CHANGE_MAIL, 'Lab Logo Change Mail'),
         (APPOINTMENT_REMINDER_PROVIDER_SMS, 'Appointment Reminder Provider SMS'),
-        (LOGIN_OTP, 'Login OTP')
+        (LOGIN_OTP, 'Login OTP'),
+        (CHAT_NOTIFICATION, "Push Notification from chat"),
+        (COD_TO_PREPAID, 'COD to Prepaid'),
+        (COD_TO_PREPAID_REQUEST, 'COD To Prepaid Request')
     )
 
     OPD_APPOINTMENT = "opd_appointment"

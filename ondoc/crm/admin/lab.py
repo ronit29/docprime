@@ -1,3 +1,5 @@
+import re
+
 from django.shortcuts import render, HttpResponse, HttpResponseRedirect, redirect
 from django.conf.urls import url
 from django.conf import settings
@@ -134,6 +136,17 @@ class LabManagerFormSet(forms.BaseInlineFormSet):
         super().clean()
         if any(self.errors):
             return
+        if self.instance.data_status == QCModel.QC_APPROVED and not self.cleaned_data:
+            self.instance.is_enable = False
+            raise forms.ValidationError("Atleast one Lab Manager required for QC APPROVED or Enable for Online Booking")
+        phone_no_flag = False
+        if self.cleaned_data and self.instance.network_type == 1:
+            for data in self.cleaned_data:
+                number_pattern = re.compile("(0/91)?[6-9][0-9]{9}")
+                if data.get('number') and number_pattern.match(str(data.get('number'))):
+                    phone_no_flag = True
+            if phone_no_flag == False:
+                raise forms.ValidationError("Atleast one mobile no is required for SPOC Details")
 
 
 class LabManagerInline(admin.TabularInline):
@@ -400,6 +413,8 @@ class LabForm(FormCleanMixin):
         if any(self.errors):
             return
         data = self.cleaned_data
+        if self.data.get('search_distance') and float(self.data.get('search_distance')) > float(50000):
+            raise forms.ValidationError("Search Distance should be less than 50 KM.")
         if self.instance and self.instance.id and self.instance.data_status == QCModel.QC_APPROVED:
             is_enabled = data.get('enabled', None)
             if is_enabled is None:
@@ -783,6 +798,8 @@ class LabAppointmentForm(RefundableAppointmentForm):
                                                                   (1, 'Cancel and Refund'),), initial=0, widget=forms.RadioSelect)
     send_email_sms_report = forms.BooleanField(label='Send reports via message and email', initial=False, required=False)
     custom_otp = forms.IntegerField(required=False)
+    hospital_reference_id = forms.CharField(widget=forms.Textarea, required=False)
+    reports_physically_collected = forms.BooleanField(label='Reports collected physically by customer', initial=False, required=False)
 
     def clean(self):
         super().clean()
@@ -816,6 +833,10 @@ class LabAppointmentForm(RefundableAppointmentForm):
         if cleaned_data.get('send_email_sms_report',
                             False) and self.instance and self.instance.id and not self.instance.status == LabAppointment.COMPLETED:
                 raise forms.ValidationError("Can't send reports as appointment is not completed")
+
+        if cleaned_data.get('reports_physically_collected', False) and self.instance and \
+                self.instance.id and not self.instance.status == LabAppointment.COMPLETED:
+                raise forms.ValidationError("Can't collect reports as appointment is not completed")
 
         # if self.instance.status in [LabAppointment.CANCELLED, LabAppointment.COMPLETED] and len(cleaned_data):
         #     raise forms.ValidationError("Cancelled/Completed appointment cannot be modified.")
@@ -917,8 +938,8 @@ class LabAppointmentAdmin(nested_admin.NestedModelAdmin):
 
         prescription_string = ""
         for p in prescriptions:
-            prescription_string+="<div><a target='_blank' href={}>{}</a></div>".format(\
-                util_absolute_url(p.prescription_file.url), util_absolute_url(p.prescription_file.url))
+            prescription_string+="<div><a target='_blank' href={}>{}</a></div> | {}".format(
+                util_absolute_url(p.prescription_file.url), util_absolute_url(p.prescription_file.url), str(p.created_at.date()))
         return mark_safe(prescription_string)
 
     def get_search_results(self, request, queryset, search_term):
@@ -1013,8 +1034,8 @@ class LabAppointmentAdmin(nested_admin.NestedModelAdmin):
                     'deal_price', 'effective_price', 'payment_status', 'payment_type', 'insurance', 'is_home_pickup',
                     'get_pickup_address', 'get_lab_address', 'outstanding', 'status', 'cancel_type',
                     'cancellation_reason', 'cancellation_comments', 'start_date', 'start_time',
-                    'send_email_sms_report', 'invoice_urls', 'reports_uploaded', 'email_notification_timestamp', 'payment_type',
-                     'payout_info', 'refund_initiated', 'status_change_comments','uploaded_prescriptions')
+                    'send_email_sms_report', 'reports_physically_collected', 'invoice_urls', 'reports_uploaded', 'email_notification_timestamp', 'payment_type',
+                     'payout_info', 'refund_initiated', 'status_change_comments','uploaded_prescriptions', 'hospital_reference_id')
         if request.user.groups.filter(name=constants['APPOINTMENT_OTP_TEAM']).exists() or request.user.is_superuser:
             all_fields = all_fields + ('otp',)
 
@@ -1066,6 +1087,9 @@ class LabAppointmentAdmin(nested_admin.NestedModelAdmin):
         if instance and instance.id and sum(
                 instance.reports.annotate(no_of_files=Count('files')).values_list('no_of_files', flat=True)):
             return True
+        elif instance and instance.id and instance.reports_physically_collected:
+            return True
+
         return False
 
     def invoice_urls(self, instance):
@@ -1206,6 +1230,7 @@ class LabAppointmentAdmin(nested_admin.NestedModelAdmin):
             #
             # date_time = datetime.datetime.combine(date, time)
             send_email_sms_report = form.cleaned_data.get('send_email_sms_report', False)
+            # reports_physically_collected = form.cleaned_data.get('reports_physically_collected', False)
             if request.POST['start_date'] and request.POST['start_time']:
                 date_time_field = request.POST['start_date'] + " " + request.POST['start_time']
                 to_zone = tz.gettz(settings.TIME_ZONE)
@@ -1452,7 +1477,7 @@ class LabTestAdmin(ImportExportMixin, VersionAdmin):
     search_fields = ['name']
     list_filter = ('is_package', 'enable_for_ppc', 'enable_for_retail')
     exclude = ['search_key']
-    readonly_fields = ['url',]
+    #readonly_fields = ['url',]
     autocomplete_fields = ['author',]
 
     def get_fields(self, request, obj=None):
@@ -1460,6 +1485,14 @@ class LabTestAdmin(ImportExportMixin, VersionAdmin):
         if obj and not obj.is_package:
             return [value for value in fields if value != 'number_of_tests']
         return fields
+
+    def get_readonly_fields(self, request, obj=None):
+        read_only_fields = ['url']
+        if not request.user.is_member_of(constants['SUPER_INSURANCE_GROUP']) and not request.user.is_superuser:
+            read_only_fields += ['insurance_cutoff_price']
+
+        return read_only_fields
+
 
     def get_inline_instances(self, request, obj=None):
         inline_instance = super().get_inline_instances(request=request, obj=obj)
