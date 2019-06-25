@@ -12,8 +12,7 @@ from celery.schedules import crontab
 from ondoc.doctor.tasks import save_avg_rating, update_prices, update_city_search_key, update_doctors_count, update_search_score, \
     update_all_ipd_seo_urls, update_insured_labs_and_doctors, update_seo_urls, update_hosp_google_avg_rating, \
     update_flags
-from ondoc.account.tasks import update_ben_status_from_pg,update_merchant_payout_pg_status
-from ondoc.notification.tasks import create_appointment_admins_from_spocs
+from ondoc.account.tasks import update_ben_status_from_pg,update_merchant_payout_pg_status, create_appointment_admins_from_spocs
 from ondoc.insurance.tasks import push_mis
 # from ondoc.doctor.services.update_search_score import DoctorSearchScore
 from ondoc.bookinganalytics.tasks import sync_booking_data

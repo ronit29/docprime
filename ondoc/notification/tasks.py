@@ -1095,8 +1095,3 @@ def upload_cost_estimates(obj_id):
         else:
             instance.error_msg = [{'line number': 0, 'message': error_message}]
         instance.save(retry=False)
-
-@task()
-def create_appointment_admins_from_spocs():
-    from ondoc.authentication.models import SPOCDetails
-    SPOCDetails.create_appointment_admins_from_spocs()
