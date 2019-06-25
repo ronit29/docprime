@@ -1,4 +1,3 @@
-The encryption for Hospital - {{hospital_name|capfirst}} is disabled.
-No one from docprime will ever view/use the patient's data.
+Dear User,
 
-Thanks for choosing docprime.com
+Walk-in patient data encryption has been disabled on Hospital - {{hospital_name|capfirst}} by the user {{ action_user.phone_number }} on Docprime Partners app.

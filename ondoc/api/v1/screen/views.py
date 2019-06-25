@@ -198,7 +198,9 @@ class ScreenViewSet(viewsets.GenericViewSet):
                 "app_custom_data": app_custom_data,
                 "app_force_update": app_version < force_update_version,
                 "app_update": app_version < update_version,
-                "ask_for_app_rating": self.ask_for_app_rating(request),
+                # "ask_for_app_rating": self.ask_for_app_rating(request),
+                # HARD CODED UNTIL CHAT FIX DONE
+                "ask_for_app_rating": False,
                 "settings": {
                     "is_insurance_available": insurance_availability
                 }

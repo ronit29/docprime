@@ -54,3 +54,4 @@ pyminizip
 pycrypto
 django-multiselectfield
 django-extensions==2.0.7
+django-select2==7.0.5
