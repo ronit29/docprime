@@ -646,17 +646,17 @@ class UserInsurance(auth_model.TimeStampedModel):
         if self.premium_transferred:
             return
         payout_status = True
-        with transaction.atomic():
-            if self.can_process_payout():
-                payouts = self.get_insurance_payouts()
-                for p in payouts:
-                    payout_status = payout_status and p.process_insurance_premium_payout()
-                    pass
-                if payout_status:
-                    self.premium_transferred = True
-                    self.save()
-            else:
-                self.init_payout()
+        #with transaction.atomic():
+        if self.can_process_payout():
+            payouts = self.get_insurance_payouts()
+            for p in payouts:
+                payout_status = payout_status and p.process_insurance_premium_payout()
+                pass
+            if payout_status:
+                self.premium_transferred = True
+                self.save()
+        else:
+            self.init_payout()
 
     def can_process_payout(self):
         #do we have payouts for complete premium
