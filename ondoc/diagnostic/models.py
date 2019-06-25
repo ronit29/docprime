@@ -2213,9 +2213,12 @@ class LabAppointment(TimeStampedModel, CouponsMixin, LabAppointmentInvoiceMixin,
         return amount
 
     def get_booking_revenue(self):
-        wallet_amount = self.price_data.get('wallet_amount', None)
-        if not wallet_amount:
-            wallet_amount = self.deal_price
+        wallet_amount = self.deal_price
+        price_data = self.price_data
+        if price_data:
+            w_amount = price_data.get('wallet_amount', None)
+            if w_amount:
+                wallet_amount = w_amount
 
         agreed_price = self.agreed_price
         if self.is_home_pickup:
