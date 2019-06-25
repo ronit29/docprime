@@ -111,7 +111,7 @@ class HospitalNetworkForm(FormCleanMixin):
     about = forms.CharField(widget=forms.Textarea, required=False)
 
     class Media:
-        extend = False
+        extend = True
         js = ('https://cdn.ckeditor.com/ckeditor5/10.1.0/classic/ckeditor.js', 'hospital_network/js/init.js')
         css = {'all': ('hospital_network/css/style.css',)}
 

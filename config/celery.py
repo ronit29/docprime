@@ -12,7 +12,7 @@ from celery.schedules import crontab
 from ondoc.doctor.tasks import save_avg_rating, update_prices, update_city_search_key, update_doctors_count, update_search_score, \
     update_all_ipd_seo_urls, update_insured_labs_and_doctors, update_seo_urls, update_hosp_google_avg_rating, \
     update_flags
-from ondoc.account.tasks import update_ben_status_from_pg,update_merchant_payout_pg_status
+from ondoc.account.tasks import update_ben_status_from_pg,update_merchant_payout_pg_status, create_appointment_admins_from_spocs
 from ondoc.insurance.tasks import push_mis
 # from ondoc.doctor.services.update_search_score import DoctorSearchScore
 from ondoc.bookinganalytics.tasks import sync_booking_data
@@ -94,3 +94,5 @@ def setup_periodic_tasks(sender, **kwargs):
     sender.add_periodic_task(crontab(hour=23, minute=00), update_insured_labs_and_doctors.s(), name="Update insured labs and doctors")
     sender.add_periodic_task(crontab(hour=23, minute=30), update_hosp_google_avg_rating.s(), name="Update Hospital ratings with Google Avg Ratings")
     #sender.add_periodic_task(crontab(hour=23, minute=30), update_seo_urls.s(), name="Update Seo Urls")
+
+    sender.add_periodic_task(crontab(hour=19, minute=00), create_appointment_admins_from_spocs.s(), name='Create Appointment Admins from SPOCs')
