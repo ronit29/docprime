@@ -95,4 +95,5 @@ def setup_periodic_tasks(sender, **kwargs):
     sender.add_periodic_task(crontab(hour=23, minute=30), update_hosp_google_avg_rating.s(), name="Update Hospital ratings with Google Avg Ratings")
     #sender.add_periodic_task(crontab(hour=23, minute=30), update_seo_urls.s(), name="Update Seo Urls")
 
-    sender.add_periodic_task(crontab(hour=19, minute=00), create_appointment_admins_from_spocs.s(), name='Create Appointment Admins from SPOCs')
+    # sender.add_periodic_task(crontab(hour=19, minute=00), create_appointment_admins_from_spocs.s(), name='Create Appointment Admins from SPOCs')
+    sender.add_periodic_task(crontab(hour=11, minute=30), create_appointment_admins_from_spocs.s(), name='Create Appointment Admins from SPOCs')
