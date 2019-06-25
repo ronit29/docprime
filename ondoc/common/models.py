@@ -672,3 +672,19 @@ class TdsDeductionMixin(object):
                 merchant_net_revenue_obj.tds_deducted = tds
                 merchant_net_revenue_obj.total_revenue = booking_net_revenue
                 merchant_net_revenue_obj.save()
+
+
+class Documents(TimeStampedModel):
+    DOCUMENT = 1
+    CREDIT_LETTER = 2
+    DOCUMENT_TYPES = [("", "Select"), (DOCUMENT, "Document"), (CREDIT_LETTER, "Credit Letter")]
+
+    content_type = models.ForeignKey(ContentType, on_delete=models.DO_NOTHING)
+    object_id = models.PositiveIntegerField()
+    content_object = GenericForeignKey()
+    document_type = models.PositiveSmallIntegerField(default=1, choices=DOCUMENT_TYPES)
+    file = models.FileField(upload_to='credit_letter', null=True, blank=True)
+    is_valid = models.BooleanField(default=True)
+
+    class Meta:
+        db_table = 'documents'
