@@ -864,7 +864,7 @@ class UserInsuranceForm(forms.ModelForm):
             raise forms.ValidationError('Cancellation is only allowed for cancellation approved status')
         if self.intance.status == UserInsurance.CANCELLATION_APPROVED and not int(status) == UserInsurance.CANCELLED:
             raise forms.ValidationError('CANCELLATION APPROVED can only changes to CANCELLED not else!!')
-        if self.instance.status == UserInsurance.CANCELLED:
+        if self.instance.status == UserInsurance.CANCELLED and int(cancel_status) == UserInsurance.NON_REFUNDED:
             raise forms.ValidationError('Cancelled Insurance could not be changed!!')
         # if cancel_status == UserInsurance.NON_REFUNDED and cancel_case_type == UserInsurance.REFUND:
         #     raise forms.ValidationError("Cancel Status must be Refunded in case of Refundable case type")
