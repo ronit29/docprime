@@ -149,7 +149,7 @@ def advanced_doctor_search_view(request):
     from django_select2.forms import Select2MultipleWidget
 
     class SearchDataForm(forms.Form):
-        hospital = forms.ModelMultipleChoiceField(queryset=Hospital.objects.all(), widget=Select2MultipleWidget)
+        hospital = forms.ModelMultipleChoiceField(queryset=Hospital.objects.filter(is_live=True), widget=Select2MultipleWidget)
         specialization = forms.ModelMultipleChoiceField(queryset=PracticeSpecialization.objects.all(),
                                                         widget=Select2MultipleWidget)
 
