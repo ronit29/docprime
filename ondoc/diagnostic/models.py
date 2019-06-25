@@ -2066,8 +2066,9 @@ class LabAppointment(TimeStampedModel, CouponsMixin, LabAppointmentInvoiceMixin,
                 mrp = mrp + Decimal(agreed_price)
 
             insurance_limit_usage_data = insurance.validate_limit_usages(mrp)
-            if insurance_limit_usage_data.get('created_state'):
-                appointment_status = OpdAppointment.CREATED
+            appointment_status = OpdAppointment.CREATED
+            # if insurance_limit_usage_data.get('created_state'):
+            #     appointment_status = OpdAppointment.CREATED
 
         otp = random.randint(1000, 9999)
         appointment_data["payment_status"] = OpdAppointment.PAYMENT_ACCEPTED
