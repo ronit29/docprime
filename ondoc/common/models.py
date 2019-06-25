@@ -621,3 +621,18 @@ class GenericNotes(TimeStampedModel):
     class Meta:
         db_table = 'generic_notes'
 
+
+class Documents(TimeStampedModel):
+    DOCUMENT = 1
+    CREDIT_LETTER = 2
+    DOCUMENT_TYPES = [("", "Select"), (DOCUMENT, "Document"), (CREDIT_LETTER, "Credit Letter")]
+
+    content_type = models.ForeignKey(ContentType, on_delete=models.DO_NOTHING)
+    object_id = models.PositiveIntegerField()
+    content_object = GenericForeignKey()
+    document_type = models.PositiveSmallIntegerField(default=1, choices=DOCUMENT_TYPES)
+    file = models.FileField(upload_to='credit_letter', null=True, blank=True)
+    is_valid = models.BooleanField(default=True)
+
+    class Meta:
+        db_table = 'documents'

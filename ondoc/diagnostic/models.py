@@ -1617,12 +1617,13 @@ class LabAppointment(TimeStampedModel, CouponsMixin, LabAppointmentInvoiceMixin,
     coupon_data = JSONField(blank=True, null=True)
     status_change_comments = models.CharField(max_length=5000, null=True, blank=True)
     appointment_prescriptions = GenericRelation("prescription.AppointmentPrescription", related_query_name="appointment_prescriptions")
-
+    hospital_reference_id = models.CharField(max_length=1000, null=True, blank=True)
+    reports_physically_collected = models.NullBooleanField()
 
     def get_all_uploaded_prescriptions(self, date=None):
         from ondoc.prescription.models import AppointmentPrescription
         qs = LabAppointment.objects.filter(user=self.user).values_list('id', flat=True)
-        prescriptions = AppointmentPrescription.objects.filter(content_type=ContentType.objects.get_for_model(self), object_id__in=qs)
+        prescriptions = AppointmentPrescription.objects.filter(content_type=ContentType.objects.get_for_model(self), object_id__in=qs).order_by('-id')
         return prescriptions
 
     def get_corporate_deal_id(self):
@@ -2627,6 +2628,11 @@ class LabAppointment(TimeStampedModel, CouponsMixin, LabAppointmentInvoiceMixin,
 
     def get_matrix_spoc_data(self):
         mobile_list = list()
+        # if self.insurance_id:
+        #     auto_ivr_enabled = False
+        # else:
+        #     auto_ivr_enabled = self.lab.is_auto_ivr_enabled()
+
         auto_ivr_enabled = self.lab.is_auto_ivr_enabled()
         for contact_person in self.lab.labmanager_set.all():
             number = ''

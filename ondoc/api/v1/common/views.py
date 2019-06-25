@@ -1085,8 +1085,8 @@ class DepartmentRouting(viewsets.GenericViewSet):
     def get_department(self, request):
         params = request.query_params
         phone_number = params.get('phone_number', None)
-        department_id = None
-        department_name = None
+        department_id = settings.CHAT_SOT_DEPARTMENT_ID
+        department_name = 'Whatsapp'
 
         try:
             phone_number = int(phone_number)
