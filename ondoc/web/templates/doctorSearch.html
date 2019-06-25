@@ -1,0 +1,23 @@
+{% extends "admin/base_site.html" %}
+<!--{% load static %}-->
+{% block title %}Doctor Search{% endblock %}
+{% block extrahead %}<script src="https://ajax.googleapis.com/ajax/libs/jquery/3.4.1/jquery.min.js"></script>{% endblock %}
+{% block content %}
+{{ form.media.css }}
+<div class="hiring-form-div">
+	<form method="post" enctype="multipart/form-data">
+		  {% csrf_token %}
+		  {{ form.non_field_errors }}
+		{{ form.as_table }}
+		<div class="submit-btn-div">
+			<button type="submit" class="btn btn-primary send-btn">Submit</button>
+		</div>
+		{% if required_link %}
+		<a href="{{required_link}}" target="_blank"> Link </a>
+		{% endif %}
+	</form>
+</div>
+{% block jquery %}
+{{ form.media.js }}
+{% endblock %}
+{% endblock %}
