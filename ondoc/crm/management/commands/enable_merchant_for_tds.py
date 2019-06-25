@@ -10,7 +10,7 @@ def enable_merchant_for_tds():
         if pan_number:
             pan_character = list(pan_number)[3]
             if pan_character in pan_card_characters:
-                merchant.enable_for_tds_deductions = True
+                merchant.enable_for_tds_deduction = True
                 merchant.save()
 
 
