@@ -594,8 +594,14 @@ def send_insurance_notifications(self, data):
             user_insurance = UserInsurance.get_user_insurance(user)
             if not user_insurance:
                 raise Exception("Invalid or None user insurance found for email notification. User id %s" % str(user_id))
-
-            insurance_notification = InsuranceNotification(user_insurance, insurance_status)
+            insurance_notification_status = None
+            if insurance_status == UserInsurance.CANCEL_INITIATE:
+                insurance_notification_status = NotificationAction.INSURANCE_CANCEL_INITIATE
+            elif insurance_status == UserInsurance.CANCELLATION_APPROVED:
+                insurance_notification_status = NotificationAction.INSURANCE_CANCELLATION_APPROVED
+            elif insurance_status == UserInsurance.CANCELLED:
+                insurance_notification_status = NotificationAction.INSURANCE_CANCELLATION
+            insurance_notification = InsuranceNotification(user_insurance, insurance_notification_status)
             insurance_notification.send()
 
         else:

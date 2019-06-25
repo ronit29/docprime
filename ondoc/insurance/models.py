@@ -1421,7 +1421,6 @@ class UserInsurance(auth_model.TimeStampedModel):
         self.save()
 
         send_cancellation_notification = True if self.user and hasattr(self, '_responsible_user') and self._responsible_user == self.user else None
-
         transaction.on_commit(lambda: self.after_commit_task(send_cancellation_notification))
         res['success'] = "Cancellation request received, refund will be credited in your account in 10-15 working days"
         res['policy_number'] = self.policy_number
