@@ -37,6 +37,7 @@ from ondoc.diagnostic.models import (LabTiming, LabImage,
                                      TestParameterChat, LabTestThresholds)
 from ondoc.integrations.models import IntegratorHistory
 from ondoc.notification.models import EmailNotification, NotificationAction
+from ondoc.prescription.models import AppointmentPrescription
 from .common import *
 from ondoc.authentication.models import GenericAdmin, User, QCModel, GenericLabAdmin, AssociatedMerchant
 from ondoc.crm.admin.doctor import CustomDateInput, TimePickerWidget, CreatedByFilter, AutoComplete, \
@@ -912,6 +913,26 @@ class LabReportInline(nested_admin.NestedTabularInline):
     show_change_link = True
     inlines = [LabReportFileInline]
 
+class LabPrescriptionForm(forms.ModelForm):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        instance = getattr(self, 'instance', None)
+        if instance and instance.pk:
+            self.fields['prescription_file'].disabled = True
+
+class LabPrescriptionInline(nested_admin.NestedGenericTabularInline):
+    model = AppointmentPrescription
+    form = LabPrescriptionForm
+    #readonly_fields = ['user']
+    extra = 0
+    can_delete = True
+    show_change_link = False
+    max_num = 3
+
+    def get_readonly_fields(self, request, obj):
+        readonly_fields = ['user']
+        return readonly_fields
+
 
 class LabAppointmentAdmin(nested_admin.NestedModelAdmin):
     form = LabAppointmentForm
@@ -923,7 +944,8 @@ class LabAppointmentAdmin(nested_admin.NestedModelAdmin):
     date_hierarchy = 'created_at'
 
     inlines = [
-        LabReportInline
+        LabReportInline,
+        LabPrescriptionInline
     ]
 
     # def get_autocomplete_fields(self, request):
