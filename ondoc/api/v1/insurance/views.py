@@ -244,6 +244,14 @@ class InsuranceOrderViewSet(viewsets.GenericViewSet):
     # permission_classes = (IsAuthenticated,)
 
     def create_banner_lead(self, request):
+        latitude = request.data.get('latitude', None)
+        longitude = request.data.get('longitude', None)
+
+        if latitude or longitude:
+            city_name = InsuranceEligibleCities.get_nearest_city(latitude, longitude)
+            if not city_name:
+                return Response({'success': False, 'is_insured': False})
+
         phone_number = request.data.get('phone_number', None)
         if phone_number:
             user = User.objects.filter(phone_number=phone_number, user_type=User.CONSUMER).first()

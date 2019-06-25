@@ -12,7 +12,7 @@ from django.db.models import F, Q
 
 from ondoc.api.v1.utils import util_absolute_url, util_file_name, generate_short_url
 from ondoc.banner.models import EmailBanner
-from ondoc.doctor.models import OpdAppointment
+from ondoc.doctor.models import OpdAppointment, Hospital
 from ondoc.diagnostic.models import LabAppointment
 from ondoc.common.models import UserConfig
 from django.core.files.uploadedfile import SimpleUploadedFile, TemporaryUploadedFile, InMemoryUploadedFile
@@ -855,6 +855,19 @@ class EMAILNotification:
         body_template = ''
         subject_template = ''
         if notification_type == NotificationAction.APPOINTMENT_ACCEPTED:
+
+            if context.get("instance").is_medanta_hospital_booking():
+                credit_letter = context.get("instance").get_valid_credit_letter()
+                if not credit_letter:
+                    logger.error("Got error while getting pdf for opd credit letter")
+                    return '', ''
+                context.update({"credit_letter": credit_letter})
+                context.update({"credit_letter_url": credit_letter.file.url})
+                context.update(
+                    {"attachments": [
+                        {"filename": util_file_name(credit_letter.file.url),
+                         "path": util_absolute_url(credit_letter.file.url)}]})
+
             body_template = "email/appointment_accepted/body.html"
             subject_template = "email/appointment_accepted/subject.txt"
         elif notification_type == NotificationAction.APPOINTMENT_BOOKED and user and user.user_type == User.CONSUMER:
@@ -1236,6 +1249,7 @@ class OpdNotification(Notification):
         opd_appointment_feedback_url = booking_url + "&callbackurl=opd/appointment/{}".format(self.appointment.id)
         reschdule_appointment_bypass_url = booking_url + "&callbackurl=opd/doctor/{}/{}/book?reschedule={}".format(self.appointment.doctor.id, self.appointment.hospital.id, self.appointment.id)
         hospitals_not_required_unique_code = set(json.loads(settings.HOSPITALS_NOT_REQUIRED_UNIQUE_CODE))
+        credit_letter_url = self.appointment.get_credit_letter_url()
         context = {
             "doctor_name": doctor_name,
             "patient_name": patient_name,
@@ -1261,7 +1275,8 @@ class OpdNotification(Notification):
             "show_amounts": bool(self.appointment.payment_type != OpdAppointment.INSURANCE),
             "opd_appointment_cod_to_prepaid_url": generate_short_url(opd_appointment_cod_to_prepaid_url) if opd_appointment_cod_to_prepaid_url else None,
             "cod_to_prepaid_discount": cod_to_prepaid_discount,
-            "hospitals_not_required_unique_code": hospitals_not_required_unique_code
+            "hospitals_not_required_unique_code": hospitals_not_required_unique_code,
+            "credit_letter_url": generate_short_url(credit_letter_url) if credit_letter_url else None
         }
         return context
 
