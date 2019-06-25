@@ -688,6 +688,13 @@ class ProviderSignupDataViewset(viewsets.GenericViewSet):
                                                                            source_type=auth_models.GenericAdmin.APP,
                                                                            entity_type=auth_models.GenericAdmin.HOSPITAL,
                                                                            super_user_permission=True))
+                    generic_admin_obj_list.append(auth_models.GenericAdmin(name=doctor.name,
+                                                                           doctor=doctor, hospital=hospital,
+                                                                           phone_number=phone_number,
+                                                                           source_type=auth_models.GenericAdmin.APP,
+                                                                           entity_type=auth_models.GenericAdmin.HOSPITAL,
+                                                                           permission_type=auth_models.GenericAdmin.APPOINTMENT,
+                                                                           write_permission=True))
                     continue
                 if details.get('is_appointment'):
                     generic_admin_obj_list.append(auth_models.GenericAdmin(name=doctor.name,
