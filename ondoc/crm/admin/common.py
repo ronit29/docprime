@@ -140,7 +140,7 @@ class FormCleanMixin(forms.ModelForm):
         self.pin_code_qc_submit()
         phone_no_flag = False
         if isinstance(self.instance, Hospital) and self.data and self.instance.network_type == 1:
-            total_forms = int(self.data.get('authentication-spocdetails-content_type-object_id-TOTAL_FORMS'))
+            total_forms = int(self.data.get('authentication-spocdetails-content_type-object_id-TOTAL_FORMS', '0'))
             for form in range(total_forms):
                 number_pattern = re.compile("(0/91)?[6-9][0-9]{9}")
                 phone_number = self.data.get('authentication-spocdetails-content_type-object_id-' + str(form) + '-number')
