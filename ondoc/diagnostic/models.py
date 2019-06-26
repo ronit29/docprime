@@ -1617,7 +1617,8 @@ class LabAppointment(TimeStampedModel, CouponsMixin, LabAppointmentInvoiceMixin,
     coupon_data = JSONField(blank=True, null=True)
     status_change_comments = models.CharField(max_length=5000, null=True, blank=True)
     appointment_prescriptions = GenericRelation("prescription.AppointmentPrescription", related_query_name="appointment_prescriptions")
-
+    hospital_reference_id = models.CharField(max_length=1000, null=True, blank=True)
+    reports_physically_collected = models.NullBooleanField()
 
     def get_all_uploaded_prescriptions(self, date=None):
         from ondoc.prescription.models import AppointmentPrescription
@@ -2065,8 +2066,9 @@ class LabAppointment(TimeStampedModel, CouponsMixin, LabAppointmentInvoiceMixin,
                 mrp = mrp + Decimal(agreed_price)
 
             insurance_limit_usage_data = insurance.validate_limit_usages(mrp)
-            if insurance_limit_usage_data.get('created_state'):
-                appointment_status = OpdAppointment.CREATED
+            appointment_status = OpdAppointment.CREATED
+            # if insurance_limit_usage_data.get('created_state'):
+            #     appointment_status = OpdAppointment.CREATED
 
         otp = random.randint(1000, 9999)
         appointment_data["payment_status"] = OpdAppointment.PAYMENT_ACCEPTED

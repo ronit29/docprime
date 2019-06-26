@@ -57,10 +57,10 @@ class SPOCDetailsForm(forms.ModelForm):
     def clean(self):
         super().clean()
 
-        if not self.cleaned_data.get('number') and not self.cleaned_data.get('email'):
-            raise forms.ValidationError("Email or  Phone Number is required!")
+        # if not self.cleaned_data.get('number') and not self.cleaned_data.get('email'):
+        #     raise forms.ValidationError("Email or  Phone Number is required!")
 
-        if (self.cleaned_data.get('std_code')) and (not self.cleaned_data.get('number')):
+        if not self.cleaned_data.get('number') or ((self.cleaned_data.get('std_code')) and (not self.cleaned_data.get('number'))):
             raise forms.ValidationError("Phone Number is required!")
 
         if (not self.cleaned_data.get('std_code')) and (self.cleaned_data.get('number')):

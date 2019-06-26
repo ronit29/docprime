@@ -51,7 +51,7 @@ from django.contrib.contenttypes.fields import GenericRelation
 from ondoc.api.v1.utils import get_start_end_datetime, custom_form_datetime, CouponsMixin, aware_time_zone, \
     form_time_slot, util_absolute_url, html_to_pdf, TimeSlotExtraction, resolve_address
 from ondoc.common.models import AppointmentHistory, AppointmentMaskNumber, Service, Remark, MatrixMappedState, \
-    MatrixMappedCity, GlobalNonBookable, SyncBookingAnalytics, CompletedBreakupMixin, RefundDetails
+    MatrixMappedCity, GlobalNonBookable, SyncBookingAnalytics, CompletedBreakupMixin, RefundDetails, Documents
 from ondoc.common.models import QRCode, MatrixDataMixin
 
 from functools import reduce
@@ -637,6 +637,10 @@ class Hospital(auth_model.TimeStampedModel, auth_model.CreatedByModel, auth_mode
                 insured = True
 
         return insured
+
+    @classmethod
+    def get_medanta_hospital(cls):
+        return Hospital.objects.filter(id=settings.MEDANTA_HOSPITAL_ID).first()
 
 
 class HospitalPlaceDetails(auth_model.TimeStampedModel):
@@ -2140,6 +2144,23 @@ class OpdAppointmentInvoiceMixin(object):
             invoices = [invoice]
         return invoices
 
+    def generate_credit_letter(self):
+        old_credit_letters = self.get_document_objects(Documents.CREDIT_LETTER)
+        old_credit_letters.update(is_valid=False)
+        credit_letter = self.documents.create(document_type=Documents.CREDIT_LETTER)
+        context = {
+            "instance": self
+        }
+        html_body = render_to_string("email/documents/credit_letter_medanta.html", context=context)
+        filename = "credit_letter_{}.pdf".format(self.id)
+        file = html_to_pdf(html_body, filename)
+        if not file:
+            logger.error("Got error while creating pdf for opd credit letter.")
+            return []
+        credit_letter.file = file
+        credit_letter.save()
+        return credit_letter
+
 
 @reversion.register()
 class OpdAppointment(auth_model.TimeStampedModel, CouponsMixin, OpdAppointmentInvoiceMixin, RefundMixin, CompletedBreakupMixin, MatrixDataMixin):
@@ -2225,24 +2246,26 @@ class OpdAppointment(auth_model.TimeStampedModel, CouponsMixin, OpdAppointmentIn
     coupon_data = JSONField(blank=True, null=True)
     status_change_comments = models.CharField(max_length=5000, null=True, blank=True)
     is_cod_to_prepaid = models.NullBooleanField(default=False, null=True, blank=True)
+    hospital_reference_id = models.CharField(max_length=1000, null=True, blank=True)
+    documents = GenericRelation(Documents)
 
     def __str__(self):
         return self.profile.name + " (" + self.doctor.name + ")"
 
     def get_cod_amount(self):
         result = int(self.mrp)
-        # day = self.time_slot_start.weekday()
-        # if self.doctor:
-        #     aware_dt = timezone.localtime(self.time_slot_start)
-        #     hour_min = aware_dt.hour + aware_dt.minute / 60
-        #     doc_clinic = DoctorClinicTiming.objects.filter(day=day, doctor_clinic__doctor=self.doctor,
-        #                                                    doctor_clinic__hospital=self.hospital, start__lte=hour_min,
-        #                                                    end__gt=hour_min).first()
-        #     if doc_clinic:
-        #         try:
-        #             result = doc_clinic.dct_cod_deal_price()
-        #         except:
-        #             pass
+        day = self.time_slot_start.weekday()
+        if self.doctor:
+            aware_dt = timezone.localtime(self.time_slot_start)
+            hour_min = aware_dt.hour + aware_dt.minute / 60
+            doc_clinic = DoctorClinicTiming.objects.filter(day=day, doctor_clinic__doctor=self.doctor,
+                                                           doctor_clinic__hospital=self.hospital, start__lte=hour_min,
+                                                           end__gt=hour_min).first()
+            if doc_clinic:
+                try:
+                    result = doc_clinic.dct_cod_deal_price()
+                except:
+                    pass
         return result
 
     def allowed_action(self, user_type, request):
@@ -2349,6 +2372,9 @@ class OpdAppointment(auth_model.TimeStampedModel, CouponsMixin, OpdAppointmentIn
     def get_invoice_objects(self):
         return Invoice.objects.filter(reference_id=self.id, product_id=Order.DOCTOR_PRODUCT_ID)
 
+    def get_document_objects(self, document_type=1, is_valid=True):
+        return self.documents.filter(document_type=document_type, is_valid=is_valid).order_by('-created_at')
+
     def get_cancellation_reason(self):
         return CancellationReason.objects.filter(Q(type=Order.DOCTOR_PRODUCT_ID) | Q(type__isnull=True),
                                                  visible_on_front_end=True)
@@ -2367,6 +2393,23 @@ class OpdAppointment(auth_model.TimeStampedModel, CouponsMixin, OpdAppointmentIn
                 if invoice.file:
                     invoices_urls.append(util_absolute_url(invoice.file.url))
         return invoices_urls
+
+    def is_medanta_hospital_booking(self):
+        medanta_hospital = Hospital.get_medanta_hospital()
+        return self.hospital == medanta_hospital if medanta_hospital else False
+
+    def get_valid_credit_letter(self):
+        credit_letter = self.get_document_objects(Documents.CREDIT_LETTER).first()
+        return credit_letter
+
+    def get_credit_letter_url(self):
+        credit_letter_url = None
+        if self.id:
+            credit_letter = self.get_document_objects(Documents.CREDIT_LETTER).first()
+            if credit_letter:
+                if credit_letter.file:
+                    credit_letter_url = util_absolute_url(credit_letter.file.url)
+        return credit_letter_url
 
     # @staticmethod
     # def get_upcoming_appointment_serialized(user_id):
@@ -4179,6 +4222,7 @@ class ProviderEncrypt(auth_model.TimeStampedModel):
     encrypted_hospital_id = models.CharField(max_length=128, null=True, blank=True)
     email = models.EmailField(max_length=100, null=True, blank=True)
     phone_numbers = ArrayField(models.CharField(max_length=10, blank=True), null=True)
+    google_drive = models.EmailField(max_length=100, null=True, blank=True)
     hospital = models.OneToOneField(Hospital, on_delete=models.CASCADE, related_name='encrypt_details')
     is_valid = models.BooleanField(default=True)
     is_consent_received = models.BooleanField(default=True)
@@ -4189,13 +4233,13 @@ class ProviderEncrypt(auth_model.TimeStampedModel):
     class Meta:
         db_table = "provider_encrypt"
 
-    def send_sms(self):
+    def send_sms(self, action_user):
         from ondoc.communications.models import ProviderAppNotification
         if self.is_encrypted:
-            sms_notification = ProviderAppNotification(self.hospital, NotificationAction.PROVIDER_ENCRYPTION_ENABLED)
+            sms_notification = ProviderAppNotification(self.hospital, action_user, NotificationAction.PROVIDER_ENCRYPTION_ENABLED)
             sms_notification.send()
         elif not self.is_encrypted:
-            sms_notification = ProviderAppNotification(self.hospital, NotificationAction.PROVIDER_ENCRYPTION_DISABLED)
+            sms_notification = ProviderAppNotification(self.hospital, action_user, NotificationAction.PROVIDER_ENCRYPTION_DISABLED)
             sms_notification.send()
 
 
