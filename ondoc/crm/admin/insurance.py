@@ -884,10 +884,22 @@ class UserBankDocumentAdmin(admin.ModelAdmin):
     fields = ['insurance']
     list_display = ['insurance']
 
+class GenericNotesForm(forms.ModelForm):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        instance = getattr(self, 'instance', None)
+        if instance and instance.pk:
+            if instance.notes:
+                self.fields['notes'].widget.attrs['readonly'] = True
+            #self.fields['notes_file'].widget.attrs['readonly'] = True
+            if instance.notes_file:
+                self.fields['notes_file'].disabled = True
+
 
 class GenericNotesInline(GenericTabularInline):
     model = GenericNotes
-    fields = ('notes', 'created_by', 'created_at')
+    form = GenericNotesForm
+    fields = ('notes','notes_file', 'created_by', 'created_at')
     extra = 0
     can_delete = False
     show_change_link = False

@@ -19,10 +19,17 @@ class PlanSerializer(serializers.ModelSerializer):
 class PlanWithFeatureSerializer(PlanSerializer):
 
     features = serializers.SerializerMethodField()
+    icon = serializers.SerializerMethodField()
 
     class Meta:
         model = Plan
-        fields = ('id', 'name', 'mrp', 'deal_price', 'unlimited_online_consultation', 'priority_queue', 'features')
+        fields = ('id', 'name', 'mrp', 'deal_price', 'unlimited_online_consultation', 'priority_queue', 'features', 'icon')
+
+    def get_icon(self, obj):
+        request = self.context.get('request')
+        if request and obj.icon:
+            return request.build_absolute_uri(obj.icon.url)
+        return None
 
     def get_features(self, obj):
         plan_feature_dict = {}

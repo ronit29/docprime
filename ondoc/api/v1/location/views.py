@@ -780,6 +780,23 @@ class SearchUrlsViewSet(viewsets.GenericViewSet):
 
         return Response({"cities": result})
 
+    def list_cities_for_hospitals(self, request):
+        # TODO: SHASHANK_SINGH change if anything different logic
+        query = '''select eu.url, eu.locality_value as name from entity_urls eu 
+                    left join seo_cities sc on eu.locality_value = sc.city
+                     where eu.sitemap_identifier='HOSPITALS_CITY' and eu.is_valid =True
+                     order by sc.rank asc nulls last'''
+
+        sql_urls = RawSql(query, []).fetch_all()
+
+        # result = []
+        #
+        # for data in sql_urls:
+        #     result.append(data.get('locality_value'))
+        # return Response({"cities": result})
+
+        return Response(sql_urls)
+
     def list_urls_by_city(self, request, city):
         if not city:
             return Response(status=status.HTTP_404_NOT_FOUND)
