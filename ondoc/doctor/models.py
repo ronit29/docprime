@@ -4222,6 +4222,7 @@ class ProviderEncrypt(auth_model.TimeStampedModel):
     encrypted_hospital_id = models.CharField(max_length=128, null=True, blank=True)
     email = models.EmailField(max_length=100, null=True, blank=True)
     phone_numbers = ArrayField(models.CharField(max_length=10, blank=True), null=True)
+    google_drive = models.EmailField(max_length=100, null=True, blank=True)
     hospital = models.OneToOneField(Hospital, on_delete=models.CASCADE, related_name='encrypt_details')
     is_valid = models.BooleanField(default=True)
     is_consent_received = models.BooleanField(default=True)
@@ -4232,13 +4233,13 @@ class ProviderEncrypt(auth_model.TimeStampedModel):
     class Meta:
         db_table = "provider_encrypt"
 
-    def send_sms(self):
+    def send_sms(self, action_user):
         from ondoc.communications.models import ProviderAppNotification
         if self.is_encrypted:
-            sms_notification = ProviderAppNotification(self.hospital, NotificationAction.PROVIDER_ENCRYPTION_ENABLED)
+            sms_notification = ProviderAppNotification(self.hospital, action_user, NotificationAction.PROVIDER_ENCRYPTION_ENABLED)
             sms_notification.send()
         elif not self.is_encrypted:
-            sms_notification = ProviderAppNotification(self.hospital, NotificationAction.PROVIDER_ENCRYPTION_DISABLED)
+            sms_notification = ProviderAppNotification(self.hospital, action_user, NotificationAction.PROVIDER_ENCRYPTION_DISABLED)
             sms_notification.send()
 
 

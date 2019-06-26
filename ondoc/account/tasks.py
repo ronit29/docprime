@@ -531,3 +531,8 @@ def integrator_order_summary():
 def get_thyrocare_reports():
     from ondoc.integrations.Integrators import Thyrocare
     Thyrocare.get_generated_report()
+
+@task()
+def create_appointment_admins_from_spocs():
+    from ondoc.authentication.models import SPOCDetails
+    SPOCDetails.create_appointment_admins_from_spocs()

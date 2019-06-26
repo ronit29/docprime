@@ -1,0 +1,3 @@
+Dear User,
+
+Encryption Key for the Hospital - {{hospital_name|capfirst}} is being requested by the user {{ action_user.phone_number }} on Docprime Partners app.

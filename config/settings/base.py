@@ -147,7 +147,8 @@ THIRD_PARTY_APPS = (
     'safedelete',
     'qrcode',
     'Crypto',
-    'multiselectfield'
+    'multiselectfield',
+    'django_select2'
 )
 
 

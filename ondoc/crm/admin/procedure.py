@@ -2,6 +2,7 @@ from dal import autocomplete
 from django.conf import settings
 from django.contrib import messages, admin
 from django.contrib.admin import TabularInline
+from django.contrib.contenttypes.admin import GenericTabularInline
 from django.contrib.contenttypes.models import ContentType
 from django.db import transaction
 from django.http import HttpResponseRedirect
@@ -12,7 +13,7 @@ from import_export.admin import ImportExportMixin
 from ondoc.notification import tasks as notification_tasks
 from reversion.admin import VersionAdmin
 
-from ondoc.common.models import Feature, Service, AppointmentHistory
+from ondoc.common.models import Feature, Service, AppointmentHistory, VirtualAppointment
 from ondoc.crm.admin.doctor import AutoComplete
 from ondoc.procedure.models import Procedure, ProcedureCategory, ProcedureCategoryMapping, ProcedureToCategoryMapping, \
     IpdProcedure, IpdProcedureFeatureMapping, IpdProcedureCategoryMapping, IpdProcedureCategory, IpdProcedureDetail, \
@@ -362,6 +363,16 @@ class IpdProcedureLeadAdminForm(forms.ModelForm):
                 raise forms.ValidationError("Phone number or Email is required to send estimate.")
 
 
+class VirtualAppointmentInline(GenericTabularInline):
+    can_delete = True
+    extra = 0
+    # form = SPOCDetailsForm
+    model = VirtualAppointment
+    show_change_link = False
+    readonly_fields = ['id']
+    # fields = ['name', 'std_code', 'number', 'email', 'details', 'contact_type']
+
+
 class IpdProcedureLeadAdmin(VersionAdmin):
     form = IpdProcedureLeadAdminForm
     list_filter = ['created_at', 'source', 'ipd_procedure', 'planned_date', 'source']
@@ -371,7 +382,7 @@ class IpdProcedureLeadAdmin(VersionAdmin):
     exclude = ['user', 'lat', 'long']
     readonly_fields = ['phone_number', 'id', 'matrix_lead_id', 'comments', 'data', 'source', 'current_age',
                        'related_speciality', 'is_insured', 'insurance_details', 'opd_appointments', 'lab_appointments']
-    inlines = [IpdProcedureLeadCostEstimateMappingInline]
+    inlines = [IpdProcedureLeadCostEstimateMappingInline, VirtualAppointmentInline]
 
     fieldsets = (
         (None, {
