@@ -617,6 +617,7 @@ class GenericNotes(TimeStampedModel):
     content_object = GenericForeignKey()
     notes = models.TextField()
     created_by = models.ForeignKey(User, on_delete=models.DO_NOTHING, blank=True, null=True)
+    notes_file = models.FileField(null=True, blank=True, upload_to='notes', validators=[FileExtensionValidator(allowed_extensions=['pdf', 'jpg', 'jpeg', 'png'])])
 
     class Meta:
         db_table = 'generic_notes'
