@@ -1096,7 +1096,8 @@ class EMAILNotification:
             if notification_type == NotificationAction.INSURANCE_CANCEL_INITIATE:
                 bcc = settings.INSURANCE_CANCEL_INITIATE_EMAIL
             elif notification_type == NotificationAction.INSURANCE_CANCELLATION_APPROVED:
-                email = settings.INSURANCE_CANCELLATION_APPROVAL_ALERT_EMAIL
+                email = settings.INSURANCE_CANCELLATION_APPROVAL_ALERT_TO_EMAIL
+                cc = settings.INSURANCE_CANCELLATION_APPROVAL_ALERT_CC_EMAIL
                 # email = 'ankushg@docprime.com'
             email_noti = EmailNotification.objects.create(
                 user=user,
@@ -1671,7 +1672,7 @@ class InsuranceNotification(Notification):
                         'modified_name': getattr(end_member, s),
                         'status': EndorsementRequest.STATUS_CHOICES[end_member.status-1]
                     }
-            member_list.append(pending_member_data)
+                    member_list.append(pending_member_data)
         context['members'] = member_list
         return context
 
