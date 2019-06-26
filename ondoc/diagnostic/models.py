@@ -1855,7 +1855,7 @@ class LabAppointment(TimeStampedModel, CouponsMixin, LabAppointmentInvoiceMixin,
                 try:
                     if is_thyrocare_enabled:
                         if old_instance:
-                            if old_instance.status != self.CANCELLED and self.status == self.CANCELLED:
+                            if (old_instance.status != self.CANCELLED and self.status == self.CANCELLED) or (old_instance.status == self.CREATED and self.status == self.BOOKED):
                                 push_lab_appointment_to_integrator.apply_async(({'appointment_id': self.id},), countdown=5)
                         else:
                             push_lab_appointment_to_integrator.apply_async(({'appointment_id': self.id},), countdown=5)
@@ -2066,8 +2066,9 @@ class LabAppointment(TimeStampedModel, CouponsMixin, LabAppointmentInvoiceMixin,
                 mrp = mrp + Decimal(agreed_price)
 
             insurance_limit_usage_data = insurance.validate_limit_usages(mrp)
-            if insurance_limit_usage_data.get('created_state'):
-                appointment_status = OpdAppointment.CREATED
+            appointment_status = OpdAppointment.CREATED
+            # if insurance_limit_usage_data.get('created_state'):
+            #     appointment_status = OpdAppointment.CREATED
 
         otp = random.randint(1000, 9999)
         appointment_data["payment_status"] = OpdAppointment.PAYMENT_ACCEPTED
