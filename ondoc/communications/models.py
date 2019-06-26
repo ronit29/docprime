@@ -384,8 +384,8 @@ class SMSNotification:
             }
             message = json.dumps(message)
             publish_message(message)
-        elif phone_number and user and user.active_insurance and \
-                user.active_insurance.cancel_customer_type == UserInsurance.OTHER and \
+        elif phone_number and user and user.purchased_insurance.order_by('-id').first() and \
+                user.purchased_insurance.order_by('-id').first().cancel_customer_type == UserInsurance.OTHER and \
                 notification_type in [NotificationAction.INSURANCE_CANCEL_INITIATE,
                                       NotificationAction.INSURANCE_CANCELLATION]:
             sms_noti = SmsNotification.objects.create(
@@ -1088,8 +1088,8 @@ class EMAILNotification:
             message = json.dumps(message)
             publish_message(message)
 
-        elif (email or send_without_email) and user and user.active_insurance and \
-                        user.active_insurance.cancel_customer_type == UserInsurance.OTHER and \
+        elif (email or send_without_email) and user and user.purchased_insurance.order_by('-id').first() and \
+                        user.purchased_insurance.order_by('-id').first().cancel_customer_type == UserInsurance.OTHER and \
                         (notification_type == NotificationAction.INSURANCE_CANCEL_INITIATE or \
                         notification_type == NotificationAction.INSURANCE_CANCELLATION_APPROVED or \
                         notification_type == NotificationAction.INSURANCE_CANCELLATION):
