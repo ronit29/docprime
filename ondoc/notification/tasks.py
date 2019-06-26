@@ -590,7 +590,8 @@ def send_insurance_notifications(self, data):
         insurance_status = int(data.get('status', 0))
         # Cancellation
         if insurance_status and (insurance_status == UserInsurance.CANCEL_INITIATE
-                                 or insurance_status == UserInsurance.CANCELLATION_APPROVED):
+                                 or insurance_status == UserInsurance.CANCELLATION_APPROVED or
+                                 insurance_status == UserInsurance.CANCELLED):
             user_insurance = UserInsurance.get_user_insurance(user)
             if not user_insurance:
                 raise Exception("Invalid or None user insurance found for email notification. User id %s" % str(user_id))
