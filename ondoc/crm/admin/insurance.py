@@ -1225,7 +1225,7 @@ class EndorsementRequestForm(forms.ModelForm):
     status_choices = [(EndorsementRequest.PENDING, "Pending"), (EndorsementRequest.APPROVED, 'Approved'),
                       (EndorsementRequest.REJECT, "Reject")]
     status = forms.ChoiceField(choices=status_choices, required=True)
-    mail_coi_to_customer = forms.BooleanField(initial=True, disabled=True)
+    mail_coi_to_customer = forms.NullBooleanField(initial=False)
     reject_reason = forms.CharField(max_length=150, required=False)
 
     # def __init__(self, *args, **kwargs):
@@ -1247,7 +1247,9 @@ class EndorsementRequestForm(forms.ModelForm):
         if int(status) == EndorsementRequest.REJECT and not reject_reason:
             raise forms.ValidationError('For Rejection, reject reason is mandatory')
         if int(status) == EndorsementRequest.PENDING and coi_status:
-            raise forms.ValidationError('Without Approved COI can not be send to customer')
+            raise forms.ValidationError('Without Approved/Rejected COI can not be send to customer')
+        if coi_status and not self.instance.is_endorsement_complete():
+            raise forms.ValidationError('COI can not be sent until all endorsement request for this user have approve or reject')
 
 
     class Meta:
@@ -1373,7 +1375,7 @@ class EndorsementRequestAdmin(admin.ModelAdmin):
                        'district', 'old_district', 'state', 'old_state', 'state_code', 'city_code',
                        'district_code']
     inlines = [InsuredMemberDocumentInline]
-    # form = EndorsementRequestForm
+    form = EndorsementRequestForm
 
     def has_add_permission(self, request, obj=None):
         return False

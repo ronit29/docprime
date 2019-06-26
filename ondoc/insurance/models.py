@@ -2020,7 +2020,7 @@ class EndorsementRequest(auth_model.TimeStampedModel):
     city_code = models.CharField(max_length=10, default='')
     district_code = models.CharField(max_length=10, default='')
     member_type = models.CharField(max_length=20, choices=MEMBER_TYPE_CHOICES, default=ADULT)
-    mail_coi_to_customer = models.BooleanField(default=False)
+    mail_coi_to_customer = models.NullBooleanField(default=False)
     reject_reason = models.CharField(max_length=150, blank=True, null=True)
 
     @classmethod
@@ -2050,6 +2050,13 @@ class EndorsementRequest(auth_model.TimeStampedModel):
         insured_member.update_member(self)
         profile = self.member.profile
         profile.update_profile_post_endorsement(self)
+
+    def is_endorsement_complete(self):
+        user_insurance = self.insurance
+        if user_insurance.endorse_members.filter(status=EndorsementRequest.PENDING).first():
+            return False
+        else:
+            return True
 
     def process_coi(self):
         user_insurance = self.insurance
