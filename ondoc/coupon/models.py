@@ -462,8 +462,13 @@ class CouponRecommender():
 
         if user and user.is_authenticated:
             is_user_insured = user.active_insurance
+            if self.profile:
+                is_user_insured = self.profile.is_insured_profile
             if is_user_insured:
-                coupons = list(filter(lambda x: x.is_for_insurance == False or (x.is_for_insurance == True and x.max_order_amount >= deal_price), coupons))
+                if deal_price:
+                    coupons = list(filter(lambda x: x.is_for_insurance == False or (x.is_for_insurance == True and x.max_order_amount >= deal_price), coupons))
+                else:
+                    coupons = list(filter(lambda x: x.is_for_insurance == False, coupons))
             else:
                 coupons = list(filter(lambda x: x.is_for_insurance == False, coupons))
         else:
