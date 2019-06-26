@@ -1,9 +1,10 @@
+from django.contrib.contenttypes.fields import GenericRelation
 from django.contrib.postgres.fields import JSONField
 from django.core.validators import MaxValueValidator, MinValueValidator
 from django.db import models, transaction
 from ondoc.authentication import models as auth_model
 from ondoc.authentication.models import User, UserProfile
-from ondoc.common.models import Feature, AppointmentHistory
+from ondoc.common.models import Feature, AppointmentHistory, VirtualAppointment
 from ondoc.coupon.models import Coupon
 from ondoc.doctor.models import DoctorClinic, SearchKey, Hospital, PracticeSpecialization, HealthInsuranceProvider, \
     HospitalNetwork, Doctor
@@ -196,6 +197,7 @@ class IpdProcedureLead(auth_model.TimeStampedModel):
     procedure_cost_estimates = models.ManyToManyField(IpdProcedureCostEstimate,
                                                      through='IpdProcedureLeadCostEstimateMapping',
                                                      related_name='procedure_cost_estimates')
+    virtual_appointment = GenericRelation(VirtualAppointment, related_query_name='ipd_leads')
 
     # ADMIN :Is_OpDInsured, Specialization List, appointment list
     # DEFAULTS??
