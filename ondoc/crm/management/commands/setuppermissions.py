@@ -5,7 +5,7 @@ from django.db.models import Q
 
 from ondoc.banner.models import Banner, SliderLocation, BannerLocation, EmailBanner, RecommenderThrough, Recommender
 from ondoc.common.models import PaymentOptions, UserConfig, Feature, Service, Remark, MatrixMappedCity, \
-    MatrixMappedState, GenericNotes, BlacklistUser, BlockedStates
+    MatrixMappedState, GenericNotes, BlacklistUser, BlockedStates, VirtualAppointment
 from ondoc.corporate_booking.models import CorporateDeal, Corporates, CorporateDocument
 from ondoc.coupon.models import Coupon, UserSpecificCoupon, RandomGeneratedCoupon
 from ondoc.crm.constants import constants
@@ -583,7 +583,7 @@ class Command(BaseCommand):
         content_types = ContentType.objects.get_for_models(PaymentOptions, EntityUrls, Feature, Service, Doctor,
                                                            HealthInsuranceProvider, IpdProcedureCategory, Plan,
                                                            PlanFeature, PlanFeatureMapping, UserPlanMapping, UploadImage,
-                                                           Offer)
+                                                           Offer, VirtualAppointment)
 
         for cl, ct in content_types.items():
             permissions = Permission.objects.filter(
@@ -727,7 +727,7 @@ class Command(BaseCommand):
         content_types = ContentType.objects.get_for_models(IpdCostEstimateRoomType, IpdProcedureCostEstimate,
                                                            IpdCostEstimateRoomTypeMapping,
                                                            IpdProcedureLeadCostEstimateMapping,
-                                                           UploadCostEstimateData)
+                                                           UploadCostEstimateData, VirtualAppointment)
         for cl, ct in content_types.items():
             permissions = Permission.objects.filter(
                 Q(content_type=ct),

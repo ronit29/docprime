@@ -637,3 +637,23 @@ class Documents(TimeStampedModel):
 
     class Meta:
         db_table = 'documents'
+
+
+class VirtualAppointment(TimeStampedModel):
+    BOOKED = "booked"
+    CANCELLED = "cancelled"
+    COMPLETED = "completed"
+    DOCTOR = "doctor"
+    LAB = "lab"
+    STATUS_CHOICES = [(BOOKED, "Booked"), (CANCELLED, "Cancelled"), (COMPLETED, "Completed")]
+    TYPE_CHOICES = [(DOCTOR, "Doctor"), (LAB, "Lab")]
+    name = models.CharField(max_length=200)
+    type = models.CharField(choices=TYPE_CHOICES, max_length=20)
+    status = models.CharField(choices=STATUS_CHOICES, max_length=20)
+    time_slot_start = models.DateTimeField()
+    content_type = models.ForeignKey(ContentType, on_delete=models.CASCADE)
+    object_id = models.PositiveIntegerField()
+    content_object = GenericForeignKey()
+
+    class Meta:
+        db_table = 'virtual_appointment'
