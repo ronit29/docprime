@@ -175,6 +175,7 @@ class PresccriptionPdf(auth_models.TimeStampedModel):
                     'hosp_name':  appointment.hospital.name if appointment.hospital.name else '',
                     'tests': self.lab_tests if self.lab_tests else [],
                     'patient': self.patient_details,
+                    'is_docprime': True if self.opd_appointment else False,
                     'hosp_address': appointment.hospital.get_hos_address() if appointment.hospital.get_hos_address() else '',
                     'doc_qualification': ','.join([str(h.qualification) for h in appointment.doctor.qualifications.all()]),
                     'doc_reg': appointment.doctor.license,

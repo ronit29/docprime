@@ -142,3 +142,27 @@ def upload_search_data(request):
             error = True
 
     return render(request, 'search-data.html', {'form': form, 'error': error})
+
+
+def advanced_doctor_search_view(request):
+    from ondoc.doctor.models import Hospital, PracticeSpecialization
+    from django_select2.forms import Select2MultipleWidget
+
+    class SearchDataForm(forms.Form):
+        hospital = forms.ModelMultipleChoiceField(queryset=Hospital.objects.filter(is_live=True), widget=Select2MultipleWidget)
+        specialization = forms.ModelMultipleChoiceField(queryset=PracticeSpecialization.objects.all(),
+                                                        widget=Select2MultipleWidget)
+
+    from django.contrib import messages
+    if request.method == "POST":
+        form = SearchDataForm(request.POST, request.FILES)
+        if form.is_valid():
+            messages.add_message(request, messages.SUCCESS, "Link Created")
+            required_link = '{}/opd/searchresults?specializations={}&conditions=&lat=&long=&sort_on=&sort_order=&availability=&gender=&avg_ratings=&doctor_name=&hospital_name=&locationType=autoComplete&procedure_ids=&procedure_category_ids=&hospital_id={}&ipd_procedures=&is_insured=false&locality=&sub_locality=&sits_at_hospital=false&sits_at_clinic=false'.format(
+                settings.CONSUMER_APP_DOMAIN,
+                ",".join([str(x) for x in form.cleaned_data['hospital'].all().values_list('id', flat=True)]),
+                ",".join([str(x) for x in form.cleaned_data['specialization'].all().values_list('id', flat=True)]))
+            return render(request, 'doctorSearch.html', {'form': form, 'required_link': required_link})
+    else:
+        form = SearchDataForm()
+    return render(request, 'doctorSearch.html', {'form': form})
