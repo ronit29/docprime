@@ -2045,7 +2045,7 @@ class HospitalDetailIpdProcedureSerializer(TopHospitalForIpdProcedureSerializer)
         return doctor_list_viewset.list(request,
                                         parameters={'hospital_id': str(obj.id), 'longitude': validated_data.get('long'),
                                                     'latitude': validated_data.get('lat'), 'sort_on': 'experience',
-                                                    'restrict_result_count': 3}).data
+                                                    'restrict_result_count': 8}).data
 
     def get_rating_graph(self, obj):
         from ondoc.ratings_review.models import RatingsReview
