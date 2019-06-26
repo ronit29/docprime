@@ -17,7 +17,7 @@ from ondoc.doctor.models import (OpdAppointment, Doctor, Hospital, DoctorHospita
                                  CommonMedicalCondition, CommonSpecialization,
                                  DoctorPracticeSpecialization, DoctorClinic, OfflineOPDAppointments, OfflinePatients,
                                  CancellationReason, HealthInsuranceProvider, HospitalDocument, HospitalNetworkDocument,
-                                 AppointmentHistory, HospitalNetwork)
+                                 AppointmentHistory, HospitalNetwork, ProviderEncrypt)
 from ondoc.diagnostic import models as lab_models
 from ondoc.authentication.models import UserProfile, DoctorNumber, GenericAdmin, GenericLabAdmin
 from django.db.models import Avg
@@ -1745,7 +1745,6 @@ class AppointmentMessageSerializer(serializers.Serializer):
 
     def validate(self, attrs):
         from ondoc.doctor.models import OpdAppointment, OfflineOPDAppointments
-
         if attrs.get('is_docprime'):
             query = OpdAppointment.objects.filter(id=attrs['id'])
         else:
@@ -1753,6 +1752,16 @@ class AppointmentMessageSerializer(serializers.Serializer):
         if not query.exists():
             raise serializers.ValidationError('Appointment Id Not Found')
         attrs['appointment'] = query.first()
+        return attrs
+
+
+class EncryptionKeyRequestMessageSerializer(serializers.Serializer):
+    hospital_id = serializers.PrimaryKeyRelatedField(queryset=Hospital.objects.all())
+
+    def validate(self, attrs):
+        hospital = attrs.get("hospital_id")
+        if not (hasattr(hospital, 'encrypt_details') and hospital.encrypt_details.is_valid):
+            raise serializers.ValidationError('given hospital needs to be encrypted')
         return attrs
 
 

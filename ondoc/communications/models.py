@@ -289,6 +289,8 @@ class SMSNotification:
             body_template = "sms/provider/provider_encryption_enabled.txt"
         elif notification_type == NotificationAction.PROVIDER_ENCRYPTION_DISABLED:
             body_template = "sms/provider/provider_encryption_disabled.txt"
+        elif notification_type == NotificationAction.REQUEST_ENCRYPTION_KEY:
+            body_template = "sms/provider/request_encryption_key.txt"
 
         elif notification_type == NotificationAction.LAB_APPOINTMENT_ACCEPTED or \
                 notification_type == NotificationAction.LAB_OTP_BEFORE_APPOINTMENT:
@@ -1627,15 +1629,18 @@ class InsuranceNotification(Notification):
 
 class ProviderAppNotification(Notification):
 
-    def __init__(self, hospital, notification_type=None):
+    def __init__(self, hospital, action_user, notification_type=None):
         self.hospital = hospital
         self.notification_type = notification_type
+        self.action_user = action_user
 
     def get_context(self):
         context = {
             "id": self.hospital.id,
             "instance": self.hospital,
             "hospital_name": self.hospital.name,
+            "encrypted_by": self.hospital.encrypt_details.encrypted_by if hasattr(self.hospital, 'encrypt_details') else None,
+            "action_user": self.action_user,
         }
         return context
 
@@ -1646,23 +1651,29 @@ class ProviderAppNotification(Notification):
 
         if notification_type == NotificationAction.PROVIDER_ENCRYPTION_ENABLED:
             sms_notification = SMSNotification(notification_type, context)
-            sms_notification.send(all_receivers.get('sms_receivers', []))
+            sms_notification.send(all_receivers.get('encryption_status_sms_receivers', []))
         elif notification_type == NotificationAction.PROVIDER_ENCRYPTION_DISABLED:
             sms_notification = SMSNotification(notification_type, context)
-            sms_notification.send(all_receivers.get('sms_receivers', []))
+            sms_notification.send(all_receivers.get('encryption_status_sms_receivers', []))
+        elif notification_type == NotificationAction.REQUEST_ENCRYPTION_KEY:
+            sms_notification = SMSNotification(notification_type, context)
+            sms_notification.send(all_receivers.get('encryption_key_request_sms_receivers', []))
 
     def get_receivers(self):
         all_receivers = {}
         instance = self.hospital
-        receivers = []
         admins_phone_number = GenericAdmin.objects.filter(is_disabled=False, hospital=instance, entity_type=GenericAdmin.HOSPITAL)\
                                                   .values_list('phone_number', flat=True)\
                                                   .distinct()
         user_and_phone_number = list()
+        encryption_key_request_sms_receivers = list()
         for number in admins_phone_number:
             if number:
                 user_and_phone_number.append({'user': None, 'phone_number': number})
-        all_receivers['sms_receivers'] = user_and_phone_number
+        if hasattr(self.hospital, 'encrypt_details') and self.hospital.encrypt_details.is_valid:
+            encryption_key_request_sms_receivers.append({"user": None, "phone_number": self.hospital.encrypt_details.encrypted_by.phone_number})
+        all_receivers['encryption_status_sms_receivers'] = user_and_phone_number
+        all_receivers['encryption_key_request_sms_receivers'] = encryption_key_request_sms_receivers
         return all_receivers
 
 
