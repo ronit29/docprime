@@ -1671,7 +1671,7 @@ class InsuranceNotification(Notification):
                         'modified_name': getattr(end_member, s),
                         'status': EndorsementRequest.STATUS_CHOICES[end_member.status-1]
                     }
-                member_list.append(pending_member_data)
+            member_list.append(pending_member_data)
         context['members'] = member_list
         return context
 

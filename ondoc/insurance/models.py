@@ -2056,17 +2056,17 @@ class EndorsementRequest(auth_model.TimeStampedModel):
         if not user_insurance:
             logger.error('User Insurance not found for the endorsment request with id %d' % self.id)
             return
-        endorsment_members = user_insurance.endorse_members.all()
-        total_endorsment_members = endorsment_members.count()
-        endorment_rejected_members_count = user_insurance.endorse_members.filter(status=EndorsementRequest.REJECT).count()
-        if total_endorsment_members == endorment_rejected_members_count:
+        endorsement_members = user_insurance.endorse_members.all()
+        total_endorsement_members = endorsement_members.count()
+        endorsement_rejected_members_count = user_insurance.endorse_members.filter(status=EndorsementRequest.REJECT).count()
+        if total_endorsement_members == endorsement_rejected_members_count:
             return
 
         endorsed_members_count = user_insurance.endorse_members.filter(~Q(status=EndorsementRequest.PENDING),
                                                                        mail_coi_to_customer=True).count()
         endorsed_approved_members_count = user_insurance.endorse_members.filter(status=EndorsementRequest.APPROVED,
                                                                        mail_coi_to_customer=True).count()
-        if total_endorsment_members == endorsed_approved_members_count:
+        if total_endorsement_members == endorsed_approved_members_count:
             try:
                 user_insurance.generate_pdf()
                 EndorsementRequest.process_endorsment_notifications(EndorsementRequest.APPROVED, user_insurance.user)
@@ -2075,7 +2075,7 @@ class EndorsementRequest(auth_model.TimeStampedModel):
 
             return
 
-        if total_endorsment_members == endorsed_members_count:
+        if total_endorsement_members == endorsed_members_count:
             try:
                 user_insurance.generate_pdf()
                 EndorsementRequest.process_endorsment_notifications(EndorsementRequest.APPROVED, user_insurance.user)
