@@ -24,6 +24,7 @@ from django.conf import settings
 from django.contrib.contenttypes.admin import GenericTabularInline
 from django.contrib.admin import SimpleListFilter
 from django.utils.translation import ugettext_lazy as _
+from ondoc.notification.tasks import send_insurance_notifications
 
 
 class InsurerAdmin(admin.ModelAdmin):
@@ -977,8 +978,7 @@ class UserInsuranceAdmin(ImportExportMixin, admin.ModelAdmin):
         responsible_user = request.user
         obj._responsible_user = responsible_user if responsible_user and not responsible_user.is_anonymous else None
         if request.user.is_member_of(constants['SUPER_INSURANCE_GROUP']):
-            if obj.status == UserInsurance.ACTIVE or obj.status == UserInsurance.CANCELLED or \
-                            obj.status == UserInsurance.CANCELLATION_APPROVED:
+            if obj.status == UserInsurance.ACTIVE:
                 super(UserInsuranceAdmin, self).save_model(request, obj, form, change)
             # elif obj.status == UserInsurance.ONHOLD:
             #     if obj.onhold_reason:
@@ -987,7 +987,12 @@ class UserInsuranceAdmin(ImportExportMixin, admin.ModelAdmin):
                 response = obj.process_cancellation()
                 obj.cancel_initiate_by = UserInsurance.ADMIN
                 if response.get('success', None):
+                    send_insurance_notifications.apply_async(({'user_id': responsible_user, 'status': obj.status},))
                     super(UserInsuranceAdmin, self).save_model(request, obj, form, change)
+            elif obj.status == UserInsurance.CANCELLATION_APPROVED or obj.status == UserInsurance.CANCELLED:
+                    send_insurance_notifications.apply_async(({'user_id': responsible_user, 'status': obj.status},))
+                    super(UserInsuranceAdmin, self).save_model(request, obj, form, change)
+
 
 
 class InsuranceDiseaseAdmin(admin.ModelAdmin):

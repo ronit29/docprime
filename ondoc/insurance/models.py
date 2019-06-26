@@ -1428,8 +1428,7 @@ class UserInsurance(auth_model.TimeStampedModel):
         return res
 
     def after_commit_task(self, send_cancellation_notification):
-        if self.status == UserInsurance.CANCEL_INITIATE or self.status == UserInsurance.CANCELLATION_APPROVED or \
-                        self.status == UserInsurance.CANCELLED:
+        if self.status == UserInsurance.CANCEL_INITIATE:
             try:
                 # notification_tasks.send_insurance_cancellation.apply_async(self.id)
                 if send_cancellation_notification:

@@ -665,6 +665,7 @@ class InsuranceCancelViewSet(viewsets.GenericViewSet):
         res['expiry_date'] = policy_expiry_date
         res['policy_number'] = policy_number
         res['cancel_master'] = cancel_master
+        res['phone_number'] = user.phone_number
 
         return Response(data=res, status=status.HTTP_200_OK)
 
