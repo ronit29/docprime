@@ -4,7 +4,8 @@ from ondoc.crm.admin.common import MatrixStateAutocomplete, MatrixCityAutocomple
 from .views import (CitiesViewSet, ServicesViewSet, SmsServiceViewSet, UpdateXlsViewSet, UploadDoctorViewSet,
                     UploadQualificationViewSet, UploadExperienceViewSet, UploadAwardViewSet, UploadHospitalViewSet,
                     UploadMembershipViewSet, SearchLeadViewSet, GetPaymentOptionsViewSet, GetSearchUrlViewSet,
-                    GetKeyDataViewSet, AllUrlsViewset, DeviceDetailsSave, AppointmentPrerequisiteViewSet, SiteSettingsViewSet)
+                    GetKeyDataViewSet, AllUrlsViewset, DeviceDetailsSave, AppointmentPrerequisiteViewSet,
+                    SiteSettingsViewSet, DepartmentRouting)
 
 
 urlpatterns = [
@@ -33,5 +34,6 @@ urlpatterns = [
     # url(r'^insurer-autocomplete/$', InsurerAutocomplete.as_view(), name='insurer-autocomplete'),
     # url(r'^insurance-plan-autocomplete/$', InsurancePlanAutocomplete.as_view(), name='insurance-plan-autocomplete'),
     path('pre-booking', AppointmentPrerequisiteViewSet.as_view({'post': 'pre_booking'}), name='pre-booking'),
-    path('settings', SiteSettingsViewSet.as_view({'get': 'get_settings'}), name='pre-get_settings')
+    path('settings', SiteSettingsViewSet.as_view({'get': 'get_settings'}), name='pre-get_settings'),
+    path('get_department_for_routing', DepartmentRouting.as_view({'get': 'get_department'}), name='get-department')
 ]
