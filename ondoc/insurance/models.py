@@ -1997,6 +1997,9 @@ class EndorsementRequest(auth_model.TimeStampedModel):
     PARTIAL_APPROVED=4
     STATUS_CHOICES = [(PENDING, "Pending"), (APPROVED, "Approved"), (REJECT, "Reject")]
     TITLE_TYPE_CHOICES = [(MR, 'mr.'), (MRS, 'mrs.'), (MISS, 'miss'), (MAST, 'mast.')]
+    MAIL_PENDING = 1
+    MAIL_SENT = 2
+    MAIL_STATUS_CHOICES = [(MAIL_PENDING, "Mail Pending"), (MAIL_SENT, "Mail Sent")]
     member = models.ForeignKey(InsuredMembers, related_name='related_endorse_request', on_delete=models.DO_NOTHING)
     insurance = models.ForeignKey(UserInsurance, related_name='endorse_members', on_delete=models.DO_NOTHING)
     first_name = models.CharField(max_length=50, null=False)
@@ -2017,6 +2020,7 @@ class EndorsementRequest(auth_model.TimeStampedModel):
     state = models.CharField(max_length=100, null=False)
     state_code = models.CharField(max_length=10, default='')
     status = models.PositiveIntegerField(choices=STATUS_CHOICES, default=PENDING)
+    mail_status = models.PositiveIntegerField(choices=MAIL_STATUS_CHOICES, blank=True, null=True)
     city_code = models.CharField(max_length=10, default='')
     district_code = models.CharField(max_length=10, default='')
     member_type = models.CharField(max_length=20, choices=MEMBER_TYPE_CHOICES, default=ADULT)
