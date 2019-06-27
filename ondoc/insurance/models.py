@@ -643,8 +643,13 @@ class UserInsurance(auth_model.TimeStampedModel):
         super().save(*args, **kwargs)
 
     def process_payout(self):
+        cxn = transaction.get_connection()
+        if cxn.in_atomic_block:
+            raise Exception('this method should be run without transaction')
+
         if self.premium_transferred:
             return
+
         payout_status = True
         if self.can_process_payout():
             payouts = self.get_insurance_payouts()
@@ -701,7 +706,7 @@ class UserInsurance(auth_model.TimeStampedModel):
                     payout.booking_type = Order.INSURANCE_PRODUCT_ID
                     payout.save()
                     PayoutMapping.objects.create(**{'content_object': self, 'payout': payout})
-                transaction = payout.get_or_create_insurance_premium_transaction()
+                txn = payout.get_or_create_insurance_premium_transaction()
 
         amount = None
         order = self.order
@@ -1565,13 +1570,13 @@ class UserInsurance(auth_model.TimeStampedModel):
                     nodal_payout = MerchantPayout.objects.create(**payout_data)
                     PayoutMapping.objects.create(**{'content_object':self,'payout':nodal_payout})
 
-            transaction = nodal_payout.get_insurance_premium_transactions()
-            if transaction:
-                transaction = transaction[0]
+            txn = nodal_payout.get_insurance_premium_transactions()
+            if txn:
+                txn = txn[0]
             else:
-                transaction = nodal_payout.get_or_create_insurance_premium_transaction()
+                txn = nodal_payout.get_or_create_insurance_premium_transaction()
 
-            if transaction:
+            if txn:
                 status = nodal_payout.process_insurance_premium_payout()
 
             return status
