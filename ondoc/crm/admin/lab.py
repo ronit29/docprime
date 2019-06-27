@@ -432,7 +432,7 @@ class LabForm(FormCleanMixin):
                         'disable_comments', None):
                     raise forms.ValidationError("Must have disable comments if disable reason is others.")
 
-        if self.instance and self.instance.id and data.get('is_ipd_lab'):
+        if data.get('is_ipd_lab'):
             if not data.get('related_hospital'):
                 raise forms.ValidationError("Must have a related hospital selected when ipd lab enable.")
 

@@ -2537,7 +2537,7 @@ class LabAppointment(TimeStampedModel, CouponsMixin, LabAppointmentInvoiceMixin,
 
         provider_booking_id = ''
         merchant_code = ''
-        is_ipd_hospital = self.lab.is_ipd_lab
+        is_ipd_hospital = '1' if self.lab.is_ipd_lab else '0'
         service_name = ','.join([test_obj.test.name for test_obj in self.test_mappings.all()])
         location_verified = self.lab.is_location_verified
         provider_id = self.lab.id
@@ -2671,7 +2671,7 @@ class LabAppointment(TimeStampedModel, CouponsMixin, LabAppointmentInvoiceMixin,
     def convert_ipd_lead_data(self):
         result = {}
         result['hospital'] = self.lab.related_hospital
-        result['lab'] = self.lab
+        # result['lab'] = self.lab
         result['user'] = self.user
         result['payment_amount'] = self.deal_price  # To be confirmed
         if self.user:
@@ -2682,7 +2682,7 @@ class LabAppointment(TimeStampedModel, CouponsMixin, LabAppointmentInvoiceMixin,
             if default_user_profile:
                 result['gender'] = default_user_profile.gender
                 result['dob'] = default_user_profile.dob
-        result['data'] = {'opd_appointment_id': self.id}
+        result['data'] = {'lab_appointment_id': self.id}
         return result
 
     def __str__(self):

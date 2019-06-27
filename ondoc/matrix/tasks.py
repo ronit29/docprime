@@ -1008,9 +1008,7 @@ def create_ipd_lead_from_lab_appointment(self, data):
     if not obj:
         return
 
-    is_valid = False
-    if obj.lab.is_ipd_lab:
-        is_valid = IpdProcedureLead.is_valid_hospital_for_lead(obj.lab.related_hospital)
+    is_valid = IpdProcedureLead.is_valid_lab_for_lead(obj.lab)
     if not is_valid:
         return
 
