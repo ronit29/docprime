@@ -1089,7 +1089,7 @@ class LabAppointmentAdmin(nested_admin.NestedModelAdmin):
         if request.user.groups.filter(name=constants['APPOINTMENT_OTP_TEAM']).exists() or request.user.is_superuser:
             read_only = read_only + ['otp']
 
-        if obj.status is not LabAppointment.CREATED:
+        if obj and obj.status is not LabAppointment.CREATED:
             read_only = read_only + ['status_change_comments']
         return read_only
 
