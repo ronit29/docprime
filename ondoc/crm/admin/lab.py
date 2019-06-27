@@ -371,7 +371,8 @@ class LabForm(FormCleanMixin):
         widgets = {
             'lab_pricing_group': autocomplete.ModelSelect2(url='labpricing-autocomplete'),
             'matrix_state': autocomplete.ModelSelect2(url='matrix-state-autocomplete'),
-            'matrix_city': autocomplete.ModelSelect2(url='matrix-city-autocomplete', forward=['matrix_state'])
+            'matrix_city': autocomplete.ModelSelect2(url='matrix-city-autocomplete', forward=['matrix_state']),
+            'related_hospital': autocomplete.ModelSelect2(url='related-hospital-autocomplete')
         }
         # exclude = ('pathology_agreed_price_percentage', 'pathology_deal_price_percentage', 'radiology_agreed_price_percentage',
         #            'radiology_deal_price_percentage', )
@@ -565,7 +566,7 @@ class LabAdmin(ImportExportMixin, admin.GeoModelAdmin, VersionAdmin, ActionAdmin
     exclude = ('search_key', 'pathology_agreed_price_percentage', 'pathology_deal_price_percentage',
                'radiology_agreed_price_percentage', 'radiology_deal_price_percentage', 'live_at',
                'onboarded_at', 'qc_approved_at', 'disabled_at', 'welcome_calling_done_at')
-    autocomplete_fields = ['related_hospital']
+    # autocomplete_fields = ['related_hospital']
 
     def has_delete_permission(self, request, obj=None):
         return super().has_delete_permission(request, obj)
@@ -779,7 +780,7 @@ class LabAdmin(ImportExportMixin, admin.GeoModelAdmin, VersionAdmin, ActionAdmin
         form.base_fields['network'].queryset = LabNetwork.objects.filter(Q(data_status = QCModel.SUBMITTED_FOR_QC) | Q(data_status = QCModel.QC_APPROVED) | Q(created_by = request.user))
         form.base_fields['hospital'].queryset = Hospital.objects.filter(Q(data_status = QCModel.SUBMITTED_FOR_QC) | Q(data_status = QCModel.QC_APPROVED) | Q(created_by = request.user))
         form.base_fields['assigned_to'].queryset = User.objects.filter(user_type=User.STAFF)
-        form.base_fields['related_hospital'].queryset = Hospital.objects.filter(is_ipd_hospital=True)
+        # form.base_fields['related_hospital'].queryset = Hospital.objects.filter(is_ipd_hospital=True)
         if not request.user.is_superuser and not request.user.is_member_of(constants['QC_GROUP_NAME']):
             form.base_fields['assigned_to'].disabled = True
         return form
