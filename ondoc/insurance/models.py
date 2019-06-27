@@ -2067,16 +2067,16 @@ class EndorsementRequest(auth_model.TimeStampedModel):
         if not user_insurance:
             logger.error('User Insurance not found for the endorsment request with id %d' % self.id)
             return
-        endorsement_members = user_insurance.endorse_members.all()
+        # endorsement_members = user_insurance.endorse_members.all()
+        endorsement_members = user_insurance.endorse_members.objects.filter(mail_status=EndorsementRequest.MAIL_PENDING, \
+                                                                                mail_status__isnull=True)
         total_endorsement_members = endorsement_members.count()
-        endorsement_rejected_members_count = user_insurance.endorse_members.filter(status=EndorsementRequest.REJECT).count()
+        endorsement_rejected_members_count = user_insurance.endorse_members.filter((Q(mail_status=EndorsementRequest.MAIL_PENDING) | Q(mail_status__isnull=True)), Q(status=EndorsementRequest.REJECT)).count()
         if total_endorsement_members == endorsement_rejected_members_count:
             return
 
-        endorsed_members_count = user_insurance.endorse_members.filter(~Q(status=EndorsementRequest.PENDING),
-                                                                       mail_coi_to_customer=True).count()
-        endorsed_approved_members_count = user_insurance.endorse_members.filter(status=EndorsementRequest.APPROVED,
-                                                                       mail_coi_to_customer=True).count()
+        endorsed_members_count = user_insurance.endorse_members.filter((Q(mail_status=EndorsementRequest.MAIL_PENDING) | Q(mail_status__isnull=True)), ~Q(status=EndorsementRequest.PENDING)).count()
+        endorsed_approved_members_count = user_insurance.endorse_members.filter((Q(mail_status=EndorsementRequest.MAIL_PENDING) | Q(mail_status__isnull=True)), Q(status=EndorsementRequest.APPROVED)).count()
         if total_endorsement_members == endorsed_approved_members_count:
             try:
                 user_insurance.generate_pdf()

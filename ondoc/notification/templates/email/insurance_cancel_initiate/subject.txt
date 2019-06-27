@@ -1,1 +1,1 @@
-{{insurer_name}} Insurance Policy Cancellation request received | Policy Number: {{policy_number}}
+{{policy_number}}: Your Policy Cancellation Has Been Initialized
