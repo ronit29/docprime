@@ -1677,6 +1677,7 @@ class UserInsurance(auth_model.TimeStampedModel):
     #         if len(pg_transactions) == 1 and pg_transactions.first():
     #             pass
 
+    #one time required only. Not to be used. Only for reference
     @classmethod
     def transfer_to_nodal_if_required(cls):
         # cxn = transaction.get_connection()
@@ -1684,7 +1685,7 @@ class UserInsurance(auth_model.TimeStampedModel):
         #     print('in transaction')
         # return
 
-        objs = cls.objects.filter(id__in=[3000000306])
+        objs = cls.objects.filter(id__in=[])
         counter = 0
         for obj in objs:
             with transaction.atomic():
