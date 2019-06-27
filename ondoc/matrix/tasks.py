@@ -994,3 +994,32 @@ def create_ipd_lead_from_opd_appointment(self, data):
     data['source'] = IpdProcedureLead.CRM
     obj_created = IpdProcedureLead(**data)
     obj_created.save()
+
+
+@task()
+def decrypted_invoice_pdfs(hospital_ids):
+    from ondoc.doctor import models as doc_models
+
+    version = '01'
+    for hospital_id in hospital_ids:
+        encrypted_invoices = doc_models.PartnersAppInvoice.objects.filter(appointment__hospital_id=hospital_id, is_encrypted=True, is_valid=True).order_by('updated_at')
+        last_unencrypted_invoice = doc_models.PartnersAppInvoice.objects.filter(appointment__hospital_id=hospital_id, is_encrypted=False, is_valid=True).order_by('-created_at').first()
+        serial = last_unencrypted_invoice.serial_id[-9:-3] + 1 if last_unencrypted_invoice else doc_models.PartnersAppInvoice.INVOICE_SERIAL_ID_START
+        for invoice in encrypted_invoices:
+            invoice.serial_id = serial
+            invoice.serial_id = 'INV-' + str(invoice.appointment.hospital.id) + '-' + str(invoice.appointment.doctor.id) + '-' + str(serial) + '-' + version
+            invoice.generate_invoice(invoice.selected_invoice_items, invoice.appointment)
+            invoice.is_encrypted = False
+            invoice.save()
+            serial += 1
+
+
+@task()
+def decrypted_prescription_pdfs(self, hospital_ids):
+    from ondoc.prescription import models as pres_models
+
+    for hospital_id in hospital_ids:
+        encrypted_invoices = pres_models.PresccriptionPdf.objects.filter(appointment__hospital_id=hospital_id,
+                                                                      is_encrypted=True, is_valid=True).order_by(
+        'updated_at')
+        pass

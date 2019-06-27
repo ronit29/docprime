@@ -1,8 +1,8 @@
 from uuid import UUID
 from ondoc.doctor import models as doc_models
-from ondoc.doctor import tasks as doc_tasks
 from ondoc.diagnostic import models as lab_models
 from ondoc.authentication import models as auth_models
+from ondoc.matrix.tasks import decrypted_invoice_pdfs, decrypted_prescription_pdfs
 from django.utils.safestring import mark_safe
 from . import serializers
 from ondoc.api.v1 import utils as v1_utils
@@ -620,7 +620,8 @@ class ProviderSignupDataViewset(viewsets.GenericViewSet):
                                                                         is_valid=False))
                 hospital_ids_to_be_created.append(hospital['hospital_id'].id)
         if 'is_encrypted' in valid_data and not valid_data.get('is_encrypted'):
-            doc_tasks.decrypted_invoice_pdfs.apply_async((hospital_ids,), countdown=5)
+            decrypted_invoice_pdfs.apply_async((hospital_ids,), countdown=5)
+            decrypted_prescription_pdfs.apply_async((hospital_ids,), countdown=5)
             doc_models.ProviderEncrypt.objects.filter(hospital__in=[hospital['hospital_id'] for hospital in valid_data.get("hospitals")])\
                                               .update(is_encrypted=False, encrypted_by=None, hint=None,
                                                       encrypted_hospital_id=None, email=None, phone_numbers=None,
