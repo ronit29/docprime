@@ -1,5 +1,6 @@
 from uuid import UUID
 from ondoc.doctor import models as doc_models
+from ondoc.doctor import tasks as doc_tasks
 from ondoc.diagnostic import models as lab_models
 from ondoc.authentication import models as auth_models
 from django.utils.safestring import mark_safe
@@ -619,6 +620,7 @@ class ProviderSignupDataViewset(viewsets.GenericViewSet):
                                               .update(is_encrypted=False, encrypted_by=None, hint=None,
                                                       encrypted_hospital_id=None, email=None, phone_numbers=None,
                                                       google_drive=None, is_valid=False)
+            doc_tasks.decrypted_invoice_pdfs.apply_async((hospitals,), countdown=5)
         try:
             if 'is_encrypted' in valid_data and valid_data.get('is_encrypted') and objects_to_be_created and not doc_models.ProviderEncrypt.objects.filter(hospital_id__in=hospital_ids_to_be_created):
                 doc_models.ProviderEncrypt.objects.bulk_create(objects_to_be_created)
@@ -896,8 +898,8 @@ class PartnersAppInvoice(viewsets.GenericViewSet):
     authentication_classes = (JWTAuthentication,)
     permission_classes = (IsAuthenticated, DoctorPermission,)
 
-    CREATE = 1
-    UPDATE = 2
+    # CREATE = 1
+    # UPDATE = 2
 
     def add_or_edit_general_invoice_item(self, request):
         try:
@@ -958,7 +960,8 @@ class PartnersAppInvoice(viewsets.GenericViewSet):
         selected_invoice_items = invoice_data.get('selected_invoice_items')
         invoice_data['selected_invoice_items'] = serializers.SelectedInvoiceItemsJSONSerializer(
             selected_invoice_items, many=True).data
-        if task == self.CREATE:
+        # if task == self.CREATE:
+        if task == doc_models.PartnersAppInvoice.CREATE:
             invoice_obj = doc_models.PartnersAppInvoice(**invoice_data)
             if not invoice_data.get('is_encrypted'):
                 last_serial = doc_models.PartnersAppInvoice.last_serial(appointment)
@@ -975,26 +978,28 @@ class PartnersAppInvoice(viewsets.GenericViewSet):
             invoice_obj = invoice_queryset.first()
 
         if generate_invoice:
-            invoice_obj.is_invoice_generated = True
-            context = invoice_obj.get_context(selected_invoice_items)
-            content = render_to_string("partners_app_invoice/partners_app_invoice.html", context=context)
-            filename = (appointment.user.name + ' ' + invoice_obj.invoice_serial_id + '.pdf').replace(' ', '_')
-            file = v1_utils.html_to_pdf(content, filename)
-
-            invoice_obj.file = file
-            file_path = os.path.join(settings.MEDIA_ROOT, invoice_obj.INVOICE_STORAGE_FOLDER, filename)
-            if os.path.exists(file_path):
-                os.remove(file_path)
-            invoice_obj.invoice_url = "{}{}{}".format(settings.BASE_URL, "/api/v2/doctor/invoice/", filename)
-            encoded_filename = jwt.encode({"filename":filename}, settings.PARTNERS_INVOICE_ENCODE_KEY).decode('utf-8')
-            encoded_url = "{}{}{}".format(settings.BASE_URL, "/api/v2/doctor/invoice/", encoded_filename)
-            invoice_obj.encoded_url = v1_utils.generate_short_url(encoded_url)
+            # invoice_obj.is_invoice_generated = True
+            # context = invoice_obj.get_context(selected_invoice_items)
+            # content = render_to_string("partners_app_invoice/partners_app_invoice.html", context=context)
+            # filename = (appointment.user.name + ' ' + invoice_obj.invoice_serial_id + '.pdf').replace(' ', '_')
+            # file = v1_utils.html_to_pdf(content, filename)
+            #
+            # invoice_obj.file = file
+            # file_path = os.path.join(settings.MEDIA_ROOT, invoice_obj.INVOICE_STORAGE_FOLDER, filename)
+            # if os.path.exists(file_path):
+            #     os.remove(file_path)
+            # invoice_obj.invoice_url = "{}{}{}".format(settings.BASE_URL, "/api/v2/doctor/invoice/", filename)
+            # encoded_filename = jwt.encode({"filename":filename}, settings.PARTNERS_INVOICE_ENCODE_KEY).decode('utf-8')
+            # encoded_url = "{}{}{}".format(settings.BASE_URL, "/api/v2/doctor/invoice/", encoded_filename)
+            # invoice_obj.encoded_url = v1_utils.generate_short_url(encoded_url)
+            invoice_obj.generate_invoice(selected_invoice_items, appointment)
         try:
             invoice_obj.save()
             invoice = serializers.PartnersAppInvoiceModelSerialier(invoice_obj)
 
             if selected_invoice_items:
-                if task == self.UPDATE:
+                # if task == self.UPDATE:
+                if task == doc_models.PartnersAppInvoice.UPDATE:
                     doc_models.SelectedInvoiceItems.objects.filter(invoice=invoice_obj.id).delete()
                 selected_invoice_items_objects = self.bulk_create_selected_invoice_items(selected_invoice_items,
                                                                                          invoice_obj)
@@ -1019,7 +1024,8 @@ class PartnersAppInvoice(viewsets.GenericViewSet):
                 {"status": 0, "message": "Invoice for this appointment already exists, please try updating it"},
                  status.HTTP_400_BAD_REQUEST)
         try:
-            invoice_data['task'] = self.CREATE
+            # invoice_data['task'] = self.CREATE
+            invoice_data['task'] = doc_models.PartnersAppInvoice.CREATE
             invoice, selected_invoice_items_created, exception = self.create_or_update_invoice(invoice_data, version='01')
             if not exception:
                 return Response({"status": 1, "invoice": invoice.data,
@@ -1041,14 +1047,15 @@ class PartnersAppInvoice(viewsets.GenericViewSet):
                 invoice.edited_by = request.user
                 invoice.save()
                 version = invoice.invoice_serial_id[-2:] if not data.get('is_encrypted') else None
-                data['task'] = self.UPDATE
+                # data['task'] = self.UPDATE
+                data['task'] = doc_models.PartnersAppInvoice.UPDATE
                 invoice_data, selected_invoice_items_created, exception = self.create_or_update_invoice(data, version, invoice.id)
 
             else:
                 invoice.is_valid = False
                 invoice.save()
                 version = str(int(invoice.invoice_serial_id[-2:]) + 1).zfill(2)
-                data['task'] = self.CREATE
+                data['task'] = doc_models.PartnersAppInvoice.CREATE
                 invoice_data, selected_invoice_items_created, exception = self.create_or_update_invoice(data, version)
             if not exception:
                 return Response({"status": 1, "invoice": invoice_data.data,

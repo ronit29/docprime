@@ -49,7 +49,7 @@ from ondoc.notification import models as notification_models
 from ondoc.notification import tasks as notification_tasks
 from django.contrib.contenttypes.fields import GenericRelation
 from ondoc.api.v1.utils import get_start_end_datetime, custom_form_datetime, CouponsMixin, aware_time_zone, \
-    form_time_slot, util_absolute_url, html_to_pdf, TimeSlotExtraction, resolve_address
+    form_time_slot, util_absolute_url, html_to_pdf, TimeSlotExtraction, resolve_address, generate_short_url
 from ondoc.common.models import AppointmentHistory, AppointmentMaskNumber, Service, Remark, MatrixMappedState, \
     MatrixMappedCity, GlobalNonBookable, SyncBookingAnalytics, CompletedBreakupMixin, RefundDetails, Documents
 from ondoc.common.models import QRCode, MatrixDataMixin
@@ -57,7 +57,7 @@ from ondoc.common.models import QRCode, MatrixDataMixin
 from functools import reduce
 from operator import or_
 import logging
-import re, uuid, os, math, random
+import re, uuid, os, math, random, jwt
 import datetime
 from django.db.models import Q
 from django.core.files.uploadedfile import InMemoryUploadedFile
@@ -4057,6 +4057,8 @@ class HospitalTiming(auth_model.TimeStampedModel):
 
 
 class PartnersAppInvoice(auth_model.TimeStampedModel):
+    CREATE = 1
+    UPDATE = 2
     DECIMAL_PLACES = 2
     INVOICE_SERIAL_ID_START = 300000
     ONLINE = 1
@@ -4161,6 +4163,23 @@ class PartnersAppInvoice(auth_model.TimeStampedModel):
             return serial
         else:
             return cls.INVOICE_SERIAL_ID_START
+
+    def generate_invoice(self, selected_invoice_items, appointment):
+        self.is_invoice_generated = True
+        context = self.get_context(selected_invoice_items)
+        content = render_to_string("partners_app_invoice/partners_app_invoice.html", context=context)
+        filename = (appointment.user.name + ' ' + self.invoice_serial_id + '.pdf').replace(' ', '_')
+        file = html_to_pdf(content, filename)
+
+        self.file = file
+        file_path = os.path.join(settings.MEDIA_ROOT, self.INVOICE_STORAGE_FOLDER, filename)
+        if os.path.exists(file_path):
+            os.remove(file_path)
+        self.invoice_url = "{}{}{}".format(settings.BASE_URL, "/api/v2/doctor/invoice/", filename)
+        encoded_filename = jwt.encode({"filename": filename}, settings.PARTNERS_INVOICE_ENCODE_KEY).decode('utf-8')
+        encoded_url = "{}{}{}".format(settings.BASE_URL, "/api/v2/doctor/invoice/", encoded_filename)
+        self.encoded_url = generate_short_url(encoded_url)
+        return self
 
     class Meta:
         db_table = "partners_app_invoice"

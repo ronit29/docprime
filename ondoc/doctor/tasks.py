@@ -110,3 +110,20 @@ def update_hosp_google_avg_rating():
 def update_flags():
     from ondoc.doctor.models import Hospital
     Hospital.update_is_big_hospital()
+
+
+@task
+def decrypted_invoice_pdfs(self, hospitals):
+    from ondoc.doctor import models as doc_models
+
+    version = '01'
+    for hospital in hospitals:
+        encrypted_invoices = doc_models.PartnersAppInvoice.objects.filter(appointment__hospital=hospital, is_encrypted=True, is_valid=True).order_by('updated_at')
+        last_unencrypted_invoice = doc_models.PartnersAppInvoice.objects.filter(appointment__hospital=hospital, is_encrypted=False, is_valid=True).order_by('-created_at').first()
+        serial = last_unencrypted_invoice.serial_id[-9:-3] + 1 if last_unencrypted_invoice else doc_models.PartnersAppInvoice.INVOICE_SERIAL_ID_START
+        for invoice in encrypted_invoices:
+            invoice.serial_id = serial
+            invoice.serial_id = 'INV-' + str(invoice.appointment.hospital.id) + '-' + str(invoice.appointment.doctor.id) + '-' + str(serial) + '-' + version
+            invoice = invoice.generate_invoice(invoice.selected_invoice_items, invoice.appointment)
+            invoice.save()
+            serial += 1
