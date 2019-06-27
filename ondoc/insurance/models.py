@@ -510,6 +510,20 @@ class InsurerPolicyNumber(auth_model.TimeStampedModel):
         return InsurerAccount.objects.order_by('id').first()
 
 
+class BankHolidays(auth_model.TimeStampedModel):
+    date = models.DateField(null=False, blank=False)
+
+    def __str__(self):
+        return str(self.date)
+
+    @classmethod
+    def is_holiday(cls, date):
+        return cls.objects.filter(date=date).exists() or date.weekday() in [6]
+
+    class Meta:
+        db_table = "bank_holidays"
+
+
 class UserInsurance(auth_model.TimeStampedModel):
     from ondoc.account.models import MoneyPool
 
@@ -575,6 +589,33 @@ class UserInsurance(auth_model.TimeStampedModel):
             except Exception as e:
                 pass
         print(results)
+
+    @property
+    def hours_elapsed(self):
+        hours = 0
+        current_datetime = timezone.now()
+        created_at = self.created_at
+
+        if not BankHolidays.is_holiday(created_at.date()):
+            temp_datetime = created_at + timedelta(days=1)
+            temp_datetime = temp_datetime.replace(hour=0, minute=0, second=0, microsecond=0)
+            hours += ((temp_datetime - created_at).total_seconds()) // 3600
+        else:
+            temp_datetime = created_at + timedelta(days=1)
+            temp_datetime = temp_datetime.replace(hour=0, minute=0, second=0, microsecond=0)
+
+        while temp_datetime.date() < current_datetime.date():
+            if not BankHolidays.is_holiday(temp_datetime.date()):
+                hours += 24
+
+            temp_datetime = temp_datetime + timedelta(days=1)
+
+        if not BankHolidays.is_holiday(current_datetime.date()):
+            hours += ((current_datetime - temp_datetime).total_seconds()) // 3600
+
+        return math.floor(hours)
+
+
 
     @cached_property
     def master_policy(self):
@@ -1559,14 +1600,26 @@ class UserInsurance(auth_model.TimeStampedModel):
         response = None
         pg_transactions = PgTransaction.objects.filter(product_id=Order.INSURANCE_PRODUCT_ID, user=self.user)
         if not wallet_amount:
-            response = False
-        elif wallet_amount == premium_amount:
+            return False
+        if wallet_amount and not pg_transactions:
+            return True
+
+        order_ids = []
+        uis = UserInsurance.objects.filter(user = self.user).exclude(id=self.id)
+        for ui in uis:
+            order_ids.append(ui.order_id)
+        if order_ids:
+            pg_transactions = pg_transactions.exclude(order_id__in=order_ids)
+
+
+        if wallet_amount == premium_amount:
             if len(pg_transactions) == 1 and pg_transactions.first().amount == wallet_amount:
                 response = False
         elif wallet_amount != premium_amount:
             pg_amount = premium_amount - wallet_amount
             if len(pg_transactions) == 1 and pg_transactions.first().amount == pg_amount:
                 response = True
+
         if response==None:
             raise Exception('transfer not possible. Handle manually')
 
@@ -1624,6 +1677,27 @@ class UserInsurance(auth_model.TimeStampedModel):
     #         # Order not processed but payment sucess and same wallet amount used next time.
     #         if len(pg_transactions) == 1 and pg_transactions.first():
     #             pass
+
+    #one time required only. Not to be used. Only for reference
+    @classmethod
+    def transfer_to_nodal_if_required(cls):
+        # cxn = transaction.get_connection()
+        # if cxn.in_atomic_block:
+        #     print('in transaction')
+        # return
+
+        objs = cls.objects.filter(id__in=[])
+        counter = 0
+        for obj in objs:
+            with transaction.atomic():
+                try:
+                    counter+=1
+                    print(str(counter))
+                    if obj.needs_transfer_to_insurance_nodal():
+                        obj.transfer_to_insurance_nodal()
+                        print(str(obj.id))
+                except Exception as e:
+                    print(e)
 
     def is_bank_details_exist(self):
         bank_obj = UserBank.objects.filter(insurance=self).order_by('-id').first()
