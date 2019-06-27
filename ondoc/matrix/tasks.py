@@ -666,7 +666,7 @@ def create_or_update_lead_on_matrix(self, data):
         name = obj.name if hasattr(obj, 'name') and obj.name else ''
         lead_source = None
         request_data = {}
-        potential_ipd_lead = '0'
+        potential_ipd_lead = 0
         if obj_type == Doctor.__name__:
             lead_source = 'referral'
             if obj.gender and obj.gender == 'm':
@@ -700,11 +700,15 @@ def create_or_update_lead_on_matrix(self, data):
             elif obj.type == ProviderSignupLead.HOSPITAL_ADMIN:
                 name = obj.name + ' (Hospital Admin)'
         elif obj_type == IpdProcedureLead.__name__:
-            potential_ipd_lead = '1' if obj.is_potential_ipd() else '0'
+            potential_ipd_lead = 1 if obj.is_potential_ipd() else 0
             lead_source = obj.source
             mobile = obj.phone_number
             email = obj.email if obj.email else ''
             name = obj.name
+            if obj.gender and obj.gender == 'm':
+                gender = 1
+            elif obj.gender and obj.gender == 'f':
+                gender = 2
             obj.update_idp_data(request_data)
         mobile = int(mobile)
         # if not mobile:
