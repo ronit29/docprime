@@ -1,3 +1,4 @@
+from dal import autocomplete
 from rest_framework import status
 from django.shortcuts import render
 from django.contrib import messages
@@ -149,9 +150,12 @@ def advanced_doctor_search_view(request):
     from django_select2.forms import Select2MultipleWidget
 
     class SearchDataForm(forms.Form):
-        hospital = forms.ModelMultipleChoiceField(queryset=Hospital.objects.filter(is_live=True), widget=Select2MultipleWidget)
+        # hospital = forms.ModelMultipleChoiceField(queryset=Hospital.objects.filter(is_live=True), widget=Select2MultipleWidget)
+        hospital = forms.ModelMultipleChoiceField(queryset=Hospital.objects.filter(is_live=True), widget=autocomplete.ModelSelect2Multiple(url='hospital-autocomplete'))
+        # specialization = forms.ModelMultipleChoiceField(queryset=PracticeSpecialization.objects.all(),
+        #                                                 widget=Select2MultipleWidget)
         specialization = forms.ModelMultipleChoiceField(queryset=PracticeSpecialization.objects.all(),
-                                                        widget=Select2MultipleWidget)
+                                                        widget=autocomplete.ModelSelect2Multiple(url='practicespecialization-autocomplete'))
 
     from django.contrib import messages
     if request.method == "POST":
