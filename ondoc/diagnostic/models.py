@@ -2029,7 +2029,7 @@ class LabAppointment(TimeStampedModel, CouponsMixin, LabAppointmentInvoiceMixin,
             payout_amount += tds
 
         # Update Net Revenue
-        self.target_app(tds)
+        self.update_net_revenues(tds)
 
         payout_data = {
             "charged_amount" : self.effective_price,
