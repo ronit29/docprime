@@ -166,3 +166,32 @@ class JWTAuthentication(authentication.BaseAuthentication):
             ),
             'refresh': False
         }
+
+class WhatsappAuthentication(authentication.BaseAuthentication):
+    authentication_header_prefix = "Token"
+
+    def authenticate(self, request):
+        auth_header = authentication.get_authorization_header(request).split()
+        auth_header_prefix = self.authentication_header_prefix
+
+        if not auth_header:
+            raise exceptions.AuthenticationFailed('UnAuthorized')
+
+        if (len(auth_header) == 1) or (len(auth_header) > 2):
+            raise exceptions.AuthenticationFailed('UnAuthorized')
+
+        prefix = auth_header[0].decode('utf-8')
+        token = auth_header[1].decode('utf-8')
+
+        if prefix.lower() != auth_header_prefix.lower():
+            raise exceptions.AuthenticationFailed('UnAuthorized')
+
+        token = base64.b64decode(token)
+
+        if token.decode('utf-8') != settings.WHATSAPP_AUTH_TOKEN:
+            raise exceptions.AuthenticationFailed('UnAuthorized')
+
+        return (None, None)
+
+    def authenticate_header(self, request):
+        return self.authentication_header_prefix

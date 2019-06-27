@@ -5,7 +5,7 @@ from django.db.models import Q
 
 from ondoc.banner.models import Banner, SliderLocation, BannerLocation, EmailBanner, RecommenderThrough, Recommender
 from ondoc.common.models import PaymentOptions, UserConfig, Feature, Service, Remark, MatrixMappedCity, \
-    MatrixMappedState, GenericNotes, BlacklistUser, BlockedStates
+    MatrixMappedState, GenericNotes, BlacklistUser, BlockedStates, VirtualAppointment
 from ondoc.corporate_booking.models import CorporateDeal, Corporates, CorporateDocument
 from ondoc.coupon.models import Coupon, UserSpecificCoupon, RandomGeneratedCoupon
 from ondoc.crm.constants import constants
@@ -44,8 +44,9 @@ from ondoc.insurance.models import (Insurer, InsurancePlans, InsuranceThreshold,
                                     InsuranceDistrict, InsuranceTransaction, InsuranceDeal, InsuranceDisease,
                                     UserInsurance, InsurancePlanContent, InsuredMembers, InsurerAccount, InsuranceLead,
                                     InsuranceDiseaseResponse, InsurerPolicyNumber, InsuranceCancelMaster,
-                                    EndorsementRequest, InsuredMemberDocument, InsuredMemberHistory, ThirdPartyAdministrator,
-                                    UserBank, UserBankDocument, InsurerAccountTransfer)
+                                    EndorsementRequest, InsuredMemberDocument, InsuredMemberHistory,
+                                    ThirdPartyAdministrator,
+                                    UserBank, UserBankDocument, InsurerAccountTransfer, BankHolidays)
 
 from ondoc.procedure.models import Procedure, ProcedureCategory, CommonProcedureCategory, DoctorClinicProcedure, \
     ProcedureCategoryMapping, ProcedureToCategoryMapping, CommonProcedure, IpdProcedure, IpdProcedureFeatureMapping, \
@@ -583,7 +584,7 @@ class Command(BaseCommand):
         content_types = ContentType.objects.get_for_models(PaymentOptions, EntityUrls, Feature, Service, Doctor,
                                                            HealthInsuranceProvider, IpdProcedureCategory, Plan,
                                                            PlanFeature, PlanFeatureMapping, UserPlanMapping, UploadImage,
-                                                           Offer)
+                                                           Offer, VirtualAppointment)
 
         for cl, ct in content_types.items():
             permissions = Permission.objects.filter(
@@ -727,7 +728,7 @@ class Command(BaseCommand):
         content_types = ContentType.objects.get_for_models(IpdCostEstimateRoomType, IpdProcedureCostEstimate,
                                                            IpdCostEstimateRoomTypeMapping,
                                                            IpdProcedureLeadCostEstimateMapping,
-                                                           UploadCostEstimateData)
+                                                           UploadCostEstimateData, VirtualAppointment)
         for cl, ct in content_types.items():
             permissions = Permission.objects.filter(
                 Q(content_type=ct),
@@ -887,7 +888,7 @@ class Command(BaseCommand):
 
             group.permissions.add(*permissions)
 
-        content_types = ContentType.objects.get_for_models(AssociatedMerchant)
+        content_types = ContentType.objects.get_for_models(AssociatedMerchant, BankHolidays)
 
         for cl, ct in content_types.items():
             permissions = Permission.objects.filter(
@@ -962,15 +963,7 @@ class Command(BaseCommand):
         group, created = Group.objects.get_or_create(name=constants['INSURANCE_GROUP'])
         group.permissions.clear()
 
-        content_types = ContentType.objects.get_for_models(Insurer, InsuranceDisease, InsurerAccount,
-                                                           InsurancePlanContent, InsurancePlans, InsuranceCity,
-                                                           StateGSTCode, InsuranceDistrict, InsuranceThreshold,
-                                                           UserInsurance, InsuranceDeal, InsuranceLead,
-                                                           InsuranceTransaction, InsuranceDiseaseResponse,
-                                                           InsuredMembers, InsurerPolicyNumber, InsuranceCancelMaster,
-                                                           EndorsementRequest, InsuredMemberDocument,
-                                                           InsuredMemberHistory, UserBank, UserBankDocument,
-                                                           GenericNotes)
+        content_types = ContentType.objects.get_for_models(UserInsurance, InsuredMembers, GenericNotes)
 
         for cl, ct in content_types.items():
             permissions = Permission.objects.filter(

@@ -510,6 +510,20 @@ class InsurerPolicyNumber(auth_model.TimeStampedModel):
         return InsurerAccount.objects.order_by('id').first()
 
 
+class BankHolidays(auth_model.TimeStampedModel):
+    date = models.DateField(null=False, blank=False)
+
+    def __str__(self):
+        return str(self.date)
+
+    @classmethod
+    def is_holiday(cls, date):
+        return cls.objects.filter(date=date).exists() or date.weekday() in [6]
+
+    class Meta:
+        db_table = "bank_holidays"
+
+
 class UserInsurance(auth_model.TimeStampedModel):
     from ondoc.account.models import MoneyPool
 
@@ -580,6 +594,33 @@ class UserInsurance(auth_model.TimeStampedModel):
                 pass
         print(results)
 
+    @property
+    def hours_elapsed(self):
+        hours = 0
+        current_datetime = timezone.now()
+        created_at = self.created_at
+
+        if not BankHolidays.is_holiday(created_at.date()):
+            temp_datetime = created_at + timedelta(days=1)
+            temp_datetime = temp_datetime.replace(hour=0, minute=0, second=0, microsecond=0)
+            hours += ((temp_datetime - created_at).total_seconds()) // 3600
+        else:
+            temp_datetime = created_at + timedelta(days=1)
+            temp_datetime = temp_datetime.replace(hour=0, minute=0, second=0, microsecond=0)
+
+        while temp_datetime.date() < current_datetime.date():
+            if not BankHolidays.is_holiday(temp_datetime.date()):
+                hours += 24
+
+            temp_datetime = temp_datetime + timedelta(days=1)
+
+        if not BankHolidays.is_holiday(current_datetime.date()):
+            hours += ((current_datetime - temp_datetime).total_seconds()) // 3600
+
+        return math.floor(hours)
+
+
+
     @cached_property
     def master_policy(self):
 
@@ -606,20 +647,24 @@ class UserInsurance(auth_model.TimeStampedModel):
         super().save(*args, **kwargs)
 
     def process_payout(self):
+        cxn = transaction.get_connection()
+        if cxn.in_atomic_block:
+            raise Exception('this method should be run without transaction')
+
         if self.premium_transferred:
             return
+
         payout_status = True
-        with transaction.atomic():
-            if self.can_process_payout():
-                payouts = self.get_insurance_payouts()
-                for p in payouts:
-                    payout_status = payout_status and p.process_insurance_premium_payout()
-                    pass
-                if payout_status:
-                    self.premium_transferred = True
-                    self.save()
-            else:
-                self.init_payout()
+        if self.can_process_payout():
+            payouts = self.get_insurance_payouts()
+            for p in payouts:
+                payout_status = payout_status and p.process_insurance_premium_payout()
+                pass
+            if payout_status:
+                self.premium_transferred = True
+                self.save()
+        else:
+            self.init_payout()
 
     def can_process_payout(self):
         #do we have payouts for complete premium
@@ -655,16 +700,17 @@ class UserInsurance(auth_model.TimeStampedModel):
                     raise Exception('no transfers found')
                 nodal_payout = nodal_payout[0]
             if nodal_payout and nodal_payout.utr_no:
-                payout = MerchantPayout()
-                payout.charged_amount = nodal_payout.charged_amount
-                payout.payable_amount = nodal_payout.payable_amount
-                payout.content_object = self.insurance_plan.insurer
-                payout.type = MerchantPayout.AUTOMATIC
-                payout.paid_to = self.insurance_plan.insurer.merchant
-                payout.booking_type = Order.INSURANCE_PRODUCT_ID
-                payout.save()
-                PayoutMapping.objects.create(**{'content_object': self, 'payout': payout})
-                transaction = payout.get_or_create_insurance_premium_transaction()
+                with transaction.atomic():
+                    payout = MerchantPayout()
+                    payout.charged_amount = nodal_payout.charged_amount
+                    payout.payable_amount = nodal_payout.payable_amount
+                    payout.content_object = self.insurance_plan.insurer
+                    payout.type = MerchantPayout.AUTOMATIC
+                    payout.paid_to = self.insurance_plan.insurer.merchant
+                    payout.booking_type = Order.INSURANCE_PRODUCT_ID
+                    payout.save()
+                    PayoutMapping.objects.create(**{'content_object': self, 'payout': payout})
+                txn = payout.get_or_create_insurance_premium_transaction()
 
         amount = None
         order = self.order
@@ -685,8 +731,9 @@ class UserInsurance(auth_model.TimeStampedModel):
             payout.type = MerchantPayout.AUTOMATIC
             payout.paid_to = self.insurance_plan.insurer.merchant
             payout.booking_type = Order.INSURANCE_PRODUCT_ID
-            payout.save()
-            PayoutMapping.objects.create(**{'content_object': self, 'payout': payout})
+            with transaction.atomic():
+                payout.save()
+                PayoutMapping.objects.create(**{'content_object': self, 'payout': payout})
 
     #
     # def create_payout(self):
@@ -1523,17 +1570,17 @@ class UserInsurance(auth_model.TimeStampedModel):
                 "paid_to": merchant,
                 "booking_type": Order.INSURANCE_PRODUCT_ID
                 }
+                with transaction.atomic():
+                    nodal_payout = MerchantPayout.objects.create(**payout_data)
+                    PayoutMapping.objects.create(**{'content_object':self,'payout':nodal_payout})
 
-                nodal_payout = MerchantPayout.objects.create(**payout_data)
-                PayoutMapping.objects.create(**{'content_object':self,'payout':nodal_payout})
-
-            transaction = nodal_payout.get_insurance_premium_transactions()
-            if transaction:
-                transaction = transaction[0]
+            txn = nodal_payout.get_insurance_premium_transactions()
+            if txn:
+                txn = txn[0]
             else:
-                transaction = nodal_payout.get_or_create_insurance_premium_transaction()
+                txn = nodal_payout.get_or_create_insurance_premium_transaction()
 
-            if transaction:
+            if txn:
                 status = nodal_payout.process_insurance_premium_payout()
 
             return status
@@ -1562,14 +1609,26 @@ class UserInsurance(auth_model.TimeStampedModel):
         response = None
         pg_transactions = PgTransaction.objects.filter(product_id=Order.INSURANCE_PRODUCT_ID, user=self.user)
         if not wallet_amount:
-            response = False
-        elif wallet_amount == premium_amount:
+            return False
+        if wallet_amount and not pg_transactions:
+            return True
+
+        order_ids = []
+        uis = UserInsurance.objects.filter(user = self.user).exclude(id=self.id)
+        for ui in uis:
+            order_ids.append(ui.order_id)
+        if order_ids:
+            pg_transactions = pg_transactions.exclude(order_id__in=order_ids)
+
+
+        if wallet_amount == premium_amount:
             if len(pg_transactions) == 1 and pg_transactions.first().amount == wallet_amount:
                 response = False
         elif wallet_amount != premium_amount:
             pg_amount = premium_amount - wallet_amount
             if len(pg_transactions) == 1 and pg_transactions.first().amount == pg_amount:
                 response = True
+
         if response==None:
             raise Exception('transfer not possible. Handle manually')
 
@@ -1627,6 +1686,27 @@ class UserInsurance(auth_model.TimeStampedModel):
     #         # Order not processed but payment sucess and same wallet amount used next time.
     #         if len(pg_transactions) == 1 and pg_transactions.first():
     #             pass
+
+    #one time required only. Not to be used. Only for reference
+    @classmethod
+    def transfer_to_nodal_if_required(cls):
+        # cxn = transaction.get_connection()
+        # if cxn.in_atomic_block:
+        #     print('in transaction')
+        # return
+
+        objs = cls.objects.filter(id__in=[])
+        counter = 0
+        for obj in objs:
+            with transaction.atomic():
+                try:
+                    counter+=1
+                    print(str(counter))
+                    if obj.needs_transfer_to_insurance_nodal():
+                        obj.transfer_to_insurance_nodal()
+                        print(str(obj.id))
+                except Exception as e:
+                    print(e)
 
     def is_bank_details_exist(self):
         bank_obj = UserBank.objects.filter(insurance=self).order_by('-id').first()
@@ -1695,7 +1775,7 @@ class InsuranceTransaction(auth_model.TimeStampedModel):
 
     class Meta:
         db_table = "insurance_transaction"
-        unique_together = (("user_insurance", "account", "transaction_type"),)
+        #unique_together = (("user_insurance", "account", "transaction_type"),)
 
 
 class InsuredMembers(auth_model.TimeStampedModel):

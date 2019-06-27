@@ -1855,7 +1855,7 @@ class LabAppointment(TimeStampedModel, CouponsMixin, LabAppointmentInvoiceMixin,
                 try:
                     if is_thyrocare_enabled:
                         if old_instance:
-                            if old_instance.status != self.CANCELLED and self.status == self.CANCELLED:
+                            if (old_instance.status != self.CANCELLED and self.status == self.CANCELLED) or (old_instance.status == self.CREATED and self.status == self.BOOKED):
                                 push_lab_appointment_to_integrator.apply_async(({'appointment_id': self.id},), countdown=5)
                         else:
                             push_lab_appointment_to_integrator.apply_async(({'appointment_id': self.id},), countdown=5)

@@ -1373,7 +1373,7 @@ class DoctorAppointmentRetrieveSerializer(OpdAppointmentSerializer):
     is_docprime = serializers.ReadOnlyField(default=True)
 
     def get_mask_data(self, obj):
-        mask_number = obj.mask_number.first()
+        mask_number = obj.mask_number.all()[0] if obj.mask_number.all() else None
         if mask_number:
             return mask_number.build_data()
         return None
@@ -1848,12 +1848,19 @@ class TopHospitalForIpdProcedureSerializer(serializers.ModelSerializer):
     long = serializers.SerializerMethodField()
     url = serializers.SerializerMethodField()
     locality_url = serializers.SerializerMethodField()
+    name_city = serializers.SerializerMethodField()
 
     class Meta:
         model = Hospital
         fields = ('id', 'name', 'distance', 'certifications', 'bed_count', 'logo', 'avg_rating',
                   'count_of_insurance_provider', 'multi_speciality', 'address', 'short_address','open_today',
-                  'insurance_provider', 'established_in', 'long', 'lat', 'url', 'locality_url')
+                  'insurance_provider', 'established_in', 'long', 'lat', 'url', 'locality_url', 'name_city')
+
+    def get_name_city(self, obj):
+        result = obj.name
+        if obj.city:
+            result += " {}".format(obj.city)
+        return result
 
     def get_locality_url(self, obj):
         entity_url = self.context.get('hosp_locality_entity_dict', {})
@@ -2045,7 +2052,7 @@ class HospitalDetailIpdProcedureSerializer(TopHospitalForIpdProcedureSerializer)
         return doctor_list_viewset.list(request,
                                         parameters={'hospital_id': str(obj.id), 'longitude': validated_data.get('long'),
                                                     'latitude': validated_data.get('lat'), 'sort_on': 'experience',
-                                                    'restrict_result_count': 3}).data
+                                                    'restrict_result_count': 8}).data
 
     def get_rating_graph(self, obj):
         from ondoc.ratings_review.models import RatingsReview

@@ -140,12 +140,15 @@ class FormCleanMixin(forms.ModelForm):
         self.pin_code_qc_submit()
         phone_no_flag = False
         if isinstance(self.instance, Hospital) and self.data and self.instance.network_type == 1:
-            total_forms = int(self.data.get('authentication-spocdetails-content_type-object_id-TOTAL_FORMS', '0'))
-            for form in range(total_forms):
-                number_pattern = re.compile("(0/91)?[6-9][0-9]{9}")
-                phone_number = self.data.get('authentication-spocdetails-content_type-object_id-' + str(form) + '-number')
-                if phone_number and number_pattern.match(str(phone_number)):
-                    phone_no_flag = True
+            if 'authentication-spocdetails-content_type-object_id-TOTAL_FORMS' in self.data:
+                total_forms = int(self.data.get('authentication-spocdetails-content_type-object_id-TOTAL_FORMS', '0'))
+                for form in range(total_forms):
+                    number_pattern = re.compile("(0/91)?[6-9][0-9]{9}")
+                    phone_number = self.data.get('authentication-spocdetails-content_type-object_id-' + str(form) + '-number')
+                    if phone_number and number_pattern.match(str(phone_number)):
+                        phone_no_flag = True
+            else:
+                phone_no_flag = True  # Skip check if inline is not present.
             if phone_no_flag == False:
                 raise forms.ValidationError("Atleast one mobile no is required for SPOC Details")
 

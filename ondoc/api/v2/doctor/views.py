@@ -213,10 +213,12 @@ class HospitalProviderDataViewSet(viewsets.GenericViewSet):
                 hosp_id = admin.hospital.id
                 admin_data = {"name": admin.hospital.name,
                               "id": hosp_id,
-                              'pem_type': admin.permission_type
+                              'pem_type': admin.permission_type,
+                              "is_superuser": False
                              }
                 if admin.super_user_permission:
                     admin_data['pem_type'] = auth_models.GenericAdmin.ALL
+                    admin_data['is_superuser'] = True
                 # if admin.hospital.provider_encrypt:
                 if hasattr(admin.hospital, 'encrypt_details'):
                     admin_data['is_encrypted'] = admin.hospital.encrypt_details.is_encrypted

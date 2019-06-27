@@ -858,7 +858,7 @@ class EMAILNotification:
         subject_template = ''
         if notification_type == NotificationAction.APPOINTMENT_ACCEPTED:
 
-            if context.get("instance").is_medanta_hospital_booking():
+            if context.get("instance").is_medanta_hospital_booking() and not context.get("instance").is_payment_type_cod():
                 credit_letter = context.get("instance").get_valid_credit_letter()
                 if not credit_letter:
                     logger.error("Got error while getting pdf for opd credit letter")
@@ -1192,7 +1192,9 @@ class PUSHNotification:
         context = copy.deepcopy(context)
         context.pop("instance", None)
         context.pop('time_slot_start', None)
-        target_app = user.user_type
+        target_app = None
+        if user:
+            target_app = user.user_type
         push_noti = PushNotification.objects.create(
             user=user,
             notification_type=self.notification_type,
@@ -1440,6 +1442,15 @@ class LabNotification(Notification):
         mask_number = ''
         if mask_number_instance:
             mask_number = mask_number_instance.mask_number
+
+        is_thyrocare_report = False
+        chat_url = ""
+        if instance and instance.lab and instance.lab.network and instance.lab.network.id == settings.THYROCARE_NETWORK_ID:
+            is_thyrocare_report = True
+            # chat_url = "https://docprime.com/mobileviewchat?utm_source=Thyrocare&booking_id=%s" % instance.id
+            chat_url = "%s/mobileviewchat?utm_source=Thyrocare&booking_id=%s" % settings.API_BASE_URL, instance.id
+            chat_url = generate_short_url(chat_url)
+
         context = {
             "lab_name": lab_name,
             "patient_name": patient_name,
@@ -1459,6 +1470,8 @@ class LabNotification(Notification):
             "type": "lab",
             "mask_number": mask_number,
             "email_banners": email_banners_html if email_banners_html is not None else "",
+            "is_thyrocare_report": is_thyrocare_report,
+            "chat_url": chat_url,
             "show_amounts": bool(self.appointment.payment_type != OpdAppointment.INSURANCE)
         }
         return context
