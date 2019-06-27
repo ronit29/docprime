@@ -1680,6 +1680,13 @@ class MerchantPayout(TimeStampedModel):
         if trans and trans[0].amount == self.payable_amount:
             return trans
 
+        from ondoc.insurance.models import UserInsurance
+        uis = UserInsurance.objects.filter(user=user_insurance.user)
+        if len(uis)==1:
+            trans = PgTransaction.objects.filter(user=user_insurance.user, product_id=Order.INSURANCE_PRODUCT_ID)
+            if len(trans)==1 and trans[0].amount == self.payable_amount:
+                return trans
+
         return []
 
     def is_insurance_premium_payout(self):
@@ -1738,7 +1745,7 @@ class MerchantPayout(TimeStampedModel):
                 "buCallbackFailureUrl": ""
             }
             if not self.is_nodal_transfer():
-                req_data["insurerCode"] = "apolloDummy"
+                req_data["merchCode"] = "apolloDummy"
 
 
             response = requests.post(url, data=json.dumps(req_data), headers=headers)
@@ -1950,7 +1957,8 @@ class MerchantPayout(TimeStampedModel):
                     if resp_data.get('ok') == 1 and len(resp_data.get('settleDetails'))>0:
                         details = resp_data.get('settleDetails')
                         for d in details:
-                            if d.get('refNo') == str(self.payout_ref_id):
+                            if d.get('refNo') == str(self.payout_ref_id) or\
+                                    (not self.payout_ref_id and d.get('orderNo')==order_no):
                                 self.utr_no = d.get('utrNo','')
                                 self.pg_status = d.get('txStatus','')
                                 if self.utr_no:

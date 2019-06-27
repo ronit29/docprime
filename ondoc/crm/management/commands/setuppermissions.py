@@ -44,8 +44,9 @@ from ondoc.insurance.models import (Insurer, InsurancePlans, InsuranceThreshold,
                                     InsuranceDistrict, InsuranceTransaction, InsuranceDeal, InsuranceDisease,
                                     UserInsurance, InsurancePlanContent, InsuredMembers, InsurerAccount, InsuranceLead,
                                     InsuranceDiseaseResponse, InsurerPolicyNumber, InsuranceCancelMaster,
-                                    EndorsementRequest, InsuredMemberDocument, InsuredMemberHistory, ThirdPartyAdministrator,
-                                    UserBank, UserBankDocument, InsurerAccountTransfer)
+                                    EndorsementRequest, InsuredMemberDocument, InsuredMemberHistory,
+                                    ThirdPartyAdministrator,
+                                    UserBank, UserBankDocument, InsurerAccountTransfer, BankHolidays)
 
 from ondoc.procedure.models import Procedure, ProcedureCategory, CommonProcedureCategory, DoctorClinicProcedure, \
     ProcedureCategoryMapping, ProcedureToCategoryMapping, CommonProcedure, IpdProcedure, IpdProcedureFeatureMapping, \
@@ -887,7 +888,7 @@ class Command(BaseCommand):
 
             group.permissions.add(*permissions)
 
-        content_types = ContentType.objects.get_for_models(AssociatedMerchant)
+        content_types = ContentType.objects.get_for_models(AssociatedMerchant, BankHolidays)
 
         for cl, ct in content_types.items():
             permissions = Permission.objects.filter(
