@@ -1224,7 +1224,9 @@ class InsuranceCancelMasterAdmin(admin.ModelAdmin):
 class EndorsementRequestForm(forms.ModelForm):
     status_choices = [(EndorsementRequest.PENDING, "Pending"), (EndorsementRequest.APPROVED, 'Approved'),
                       (EndorsementRequest.REJECT, "Reject")]
+    # mail_status_choices = [(EndorsementRequest.MAIL_PENDING, "MAIL PENDING"), (EndorsementRequest.MAIL_SENT, "Mail Sent")]
     status = forms.ChoiceField(choices=status_choices, required=True)
+    # mail_status = forms.ChoiceField(choices=mail_status_choices, required=False, disabled=True, initial=EndorsementRequest.PENDING)
     mail_coi_to_customer = forms.NullBooleanField(initial=False)
     reject_reason = forms.CharField(max_length=150, required=False)
 
@@ -1250,7 +1252,8 @@ class EndorsementRequestForm(forms.ModelForm):
             raise forms.ValidationError('Without Approved/Rejected COI can not be send to customer')
         if coi_status and not self.instance.is_endorsement_complete():
             raise forms.ValidationError('COI can not be sent until all endorsement request for this user have approve or reject')
-
+        if coi_status and self.instance.mail_status == EndorsementRequest.MAIL_SENT:
+            raise forms.ValidationError('Mail Already sent to User!!')
 
     class Meta:
         readonly = 'mail_coi_to_customer'
@@ -1373,7 +1376,7 @@ class EndorsementRequestAdmin(admin.ModelAdmin):
                        'old_email',  'address', 'old_address', 'pincode', 'old_pincode', 'gender', 'old_gender',
                        'phone_number', 'relation', 'old_relation', 'profile', 'town', 'old_town',
                        'district', 'old_district', 'state', 'old_state', 'state_code', 'city_code',
-                       'district_code']
+                       'district_code', 'mail_status']
     inlines = [InsuredMemberDocumentInline]
     form = EndorsementRequestForm
 
