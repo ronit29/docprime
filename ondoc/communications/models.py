@@ -1135,24 +1135,23 @@ class PUSHNotification:
         context = copy.deepcopy(context)
         context.pop("instance", None)
         context.pop('time_slot_start', None)
-        target_app = None
         if user:
             target_app = user.user_type
-        push_noti = PushNotification.objects.create(
-            user=user,
-            notification_type=self.notification_type,
-            content=context,
-            target_app=target_app
-        )
+            push_noti = PushNotification.objects.create(
+                user=user,
+                notification_type=self.notification_type,
+                content=context,
+                target_app=target_app
+            )
 
-        data = model_to_dict(push_noti)
-        data["tokens"] = tokens
-        message = {
-            "data": data,
-            "type": "push"
-        }
-        message = json.dumps(message)
-        publish_message(message)
+            data = model_to_dict(push_noti)
+            data["tokens"] = tokens
+            message = {
+                "data": data,
+                "type": "push"
+            }
+            message = json.dumps(message)
+            publish_message(message)
 
     def send(self, receivers):
         context = self.context
