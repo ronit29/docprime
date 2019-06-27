@@ -838,7 +838,7 @@ class EMAILNotification:
         subject_template = ''
         if notification_type == NotificationAction.APPOINTMENT_ACCEPTED:
 
-            if context.get("instance").is_medanta_hospital_booking():
+            if context.get("instance").is_medanta_hospital_booking() and not context.get("instance").is_payment_type_cod():
                 credit_letter = context.get("instance").get_valid_credit_letter()
                 if not credit_letter:
                     logger.error("Got error while getting pdf for opd credit letter")
@@ -1135,7 +1135,9 @@ class PUSHNotification:
         context = copy.deepcopy(context)
         context.pop("instance", None)
         context.pop('time_slot_start', None)
-        target_app = user.user_type
+        target_app = None
+        if user:
+            target_app = user.user_type
         push_noti = PushNotification.objects.create(
             user=user,
             notification_type=self.notification_type,
