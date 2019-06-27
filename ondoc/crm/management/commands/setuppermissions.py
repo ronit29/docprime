@@ -962,15 +962,7 @@ class Command(BaseCommand):
         group, created = Group.objects.get_or_create(name=constants['INSURANCE_GROUP'])
         group.permissions.clear()
 
-        content_types = ContentType.objects.get_for_models(Insurer, InsuranceDisease, InsurerAccount,
-                                                           InsurancePlanContent, InsurancePlans, InsuranceCity,
-                                                           StateGSTCode, InsuranceDistrict, InsuranceThreshold,
-                                                           UserInsurance, InsuranceDeal, InsuranceLead,
-                                                           InsuranceTransaction, InsuranceDiseaseResponse,
-                                                           InsuredMembers, InsurerPolicyNumber, InsuranceCancelMaster,
-                                                           EndorsementRequest, InsuredMemberDocument,
-                                                           InsuredMemberHistory, UserBank, UserBankDocument,
-                                                           GenericNotes)
+        content_types = ContentType.objects.get_for_models(UserInsurance, InsuredMembers, GenericNotes)
 
         for cl, ct in content_types.items():
             permissions = Permission.objects.filter(
