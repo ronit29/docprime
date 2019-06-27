@@ -2068,8 +2068,8 @@ class EndorsementRequest(auth_model.TimeStampedModel):
             logger.error('User Insurance not found for the endorsment request with id %d' % self.id)
             return
         # endorsement_members = user_insurance.endorse_members.all()
-        endorsement_members = user_insurance.endorse_members.objects.filter(mail_status=EndorsementRequest.MAIL_PENDING, \
-                                                                                mail_status__isnull=True)
+        endorsement_members = user_insurance.endorse_members.filter(Q(mail_status=EndorsementRequest.MAIL_PENDING) |
+                                                                                Q(mail_status__isnull=True))
         total_endorsement_members = endorsement_members.count()
         endorsement_rejected_members_count = user_insurance.endorse_members.filter((Q(mail_status=EndorsementRequest.MAIL_PENDING) | Q(mail_status__isnull=True)), Q(status=EndorsementRequest.REJECT)).count()
         if total_endorsement_members == endorsement_rejected_members_count:
@@ -2089,7 +2089,7 @@ class EndorsementRequest(auth_model.TimeStampedModel):
         if total_endorsement_members == endorsed_members_count:
             try:
                 user_insurance.generate_pdf()
-                EndorsementRequest.process_endorsment_notifications(EndorsementRequest.APPROVED, user_insurance.user)
+                EndorsementRequest.process_endorsment_notifications(EndorsementRequest.PARTIAL_APPROVED, user_insurance.user)
             except Exception as e:
                 logger.error('Insurance coi pdf cannot be generated. %s' % str(e))
 

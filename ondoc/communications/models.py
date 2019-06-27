@@ -1652,7 +1652,9 @@ class InsuranceNotification(Notification):
             context['pending_members'] = pending_endorsed_members_context['members']
 
         if self.notification_type == NotificationAction.INSURANCE_ENDORSMENT_PARTIAL_APPROVED:
-            partially_approved_endorsed_members = instance.endorse_members.filter(~Q(status=EndorsementRequest.PENDING))
+            partially_approved_endorsed_members = instance.endorse_members.filter(~Q(status=EndorsementRequest.PENDING),
+                                                                                  (Q(mail_status=EndorsementRequest.MAIL_PENDING) |
+                                                                                   Q(mail_status__isnull=True)))
             partial_approved_context = self.get_endorsed_context(partially_approved_endorsed_members)
             context['partially_members'] = partial_approved_context['members']
         return context
