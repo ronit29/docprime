@@ -13,7 +13,7 @@ from ondoc.doctor.tasks import save_avg_rating, update_prices, update_city_searc
     update_all_ipd_seo_urls, update_insured_labs_and_doctors, update_seo_urls, update_hosp_google_avg_rating, \
     update_flags
 from ondoc.account.tasks import update_ben_status_from_pg,update_merchant_payout_pg_status, create_appointment_admins_from_spocs
-from ondoc.insurance.tasks import push_mis
+from ondoc.insurance.tasks import push_mis, process_insurance_payouts
 # from ondoc.doctor.services.update_search_score import DoctorSearchScore
 from ondoc.bookinganalytics.tasks import sync_booking_data
 
@@ -61,6 +61,7 @@ def setup_periodic_tasks(sender, **kwargs):
     polling_time = float(settings.PG_REFUND_STATUS_POLL_TIME) * float(60.0)
     sender.add_periodic_task(polling_time, consumer_refund_update.s(), name='Refund and update consumer account balance')
     sender.add_periodic_task(crontab(hour=18, minute=35), push_mis.s(), name='Send insurance mis via mail.')
+    sender.add_periodic_task(float(6*3600), process_insurance_payouts.s(), name='Process insurance payouts.')
 
     elastic_sync_cron_schedule = crontab(hour=19, minute=00)
     elastic_sync_post_cron_schedule = crontab(hour=20, minute=00)
