@@ -955,6 +955,11 @@ class LabAppointmentAdmin(nested_admin.NestedModelAdmin):
     #         temp_autocomplete_fields = super().get_autocomplete_fields(request)
     #     return temp_autocomplete_fields
 
+    def get_queryset(self, request):
+        qs = super().get_queryset(request).select_related('profile', 'lab').prefetch_related('lab_test', 'reports','reports__files',
+                                                                                      'test_mappings', 'test_mappings__test')
+        return qs
+
     def uploaded_prescriptions(self, obj):
         prescriptions = obj.get_all_uploaded_prescriptions()
 
@@ -1106,9 +1111,10 @@ class LabAppointmentAdmin(nested_admin.NestedModelAdmin):
     #     return inline_instance
 
     def reports_uploaded(self, instance):
-        if instance and instance.id and sum(
-                instance.reports.annotate(no_of_files=Count('files')).values_list('no_of_files', flat=True)):
-            return True
+        if instance and instance.id:
+            for report in instance.reports.all():
+                if report.files.all():
+                    return True
         elif instance and instance.id and instance.reports_physically_collected:
             return True
 
