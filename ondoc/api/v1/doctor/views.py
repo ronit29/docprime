@@ -2407,6 +2407,16 @@ class HospitalAutocomplete(autocomplete.Select2QuerySetView):
         return qs
 
 
+class PracticeSpecializationAutocomplete(autocomplete.Select2QuerySetView):
+    def get_queryset(self):
+        qs = models.PracticeSpecialization.objects.all()
+
+        if self.q:
+            qs = qs.filter(name__icontains=self.q).order_by('name')
+        return qs
+
+
+
 class CreateAdminViewSet(viewsets.GenericViewSet):
 
     authentication_classes = (JWTAuthentication,)
