@@ -605,17 +605,16 @@ class UserInsurance(auth_model.TimeStampedModel):
         if self.premium_transferred:
             return
         payout_status = True
-        with transaction.atomic():
-            if self.can_process_payout():
-                payouts = self.get_insurance_payouts()
-                for p in payouts:
-                    payout_status = payout_status and p.process_insurance_premium_payout()
-                    pass
-                if payout_status:
-                    self.premium_transferred = True
-                    self.save()
-            else:
-                self.init_payout()
+        if self.can_process_payout():
+            payouts = self.get_insurance_payouts()
+            for p in payouts:
+                payout_status = payout_status and p.process_insurance_premium_payout()
+                pass
+            if payout_status:
+                self.premium_transferred = True
+                self.save()
+        else:
+            self.init_payout()
 
     def can_process_payout(self):
         #do we have payouts for complete premium
@@ -651,15 +650,16 @@ class UserInsurance(auth_model.TimeStampedModel):
                     raise Exception('no transfers found')
                 nodal_payout = nodal_payout[0]
             if nodal_payout and nodal_payout.utr_no:
-                payout = MerchantPayout()
-                payout.charged_amount = nodal_payout.charged_amount
-                payout.payable_amount = nodal_payout.payable_amount
-                payout.content_object = self.insurance_plan.insurer
-                payout.type = MerchantPayout.AUTOMATIC
-                payout.paid_to = self.insurance_plan.insurer.merchant
-                payout.booking_type = Order.INSURANCE_PRODUCT_ID
-                payout.save()
-                PayoutMapping.objects.create(**{'content_object': self, 'payout': payout})
+                with transaction.atomic():
+                    payout = MerchantPayout()
+                    payout.charged_amount = nodal_payout.charged_amount
+                    payout.payable_amount = nodal_payout.payable_amount
+                    payout.content_object = self.insurance_plan.insurer
+                    payout.type = MerchantPayout.AUTOMATIC
+                    payout.paid_to = self.insurance_plan.insurer.merchant
+                    payout.booking_type = Order.INSURANCE_PRODUCT_ID
+                    payout.save()
+                    PayoutMapping.objects.create(**{'content_object': self, 'payout': payout})
                 transaction = payout.get_or_create_insurance_premium_transaction()
 
         amount = None
@@ -681,8 +681,9 @@ class UserInsurance(auth_model.TimeStampedModel):
             payout.type = MerchantPayout.AUTOMATIC
             payout.paid_to = self.insurance_plan.insurer.merchant
             payout.booking_type = Order.INSURANCE_PRODUCT_ID
-            payout.save()
-            PayoutMapping.objects.create(**{'content_object': self, 'payout': payout})
+            with transaction.atomic():
+                payout.save()
+                PayoutMapping.objects.create(**{'content_object': self, 'payout': payout})
 
     #
     # def create_payout(self):
@@ -1519,9 +1520,9 @@ class UserInsurance(auth_model.TimeStampedModel):
                 "paid_to": merchant,
                 "booking_type": Order.INSURANCE_PRODUCT_ID
                 }
-
-                nodal_payout = MerchantPayout.objects.create(**payout_data)
-                PayoutMapping.objects.create(**{'content_object':self,'payout':nodal_payout})
+                with transaction.atomic():
+                    nodal_payout = MerchantPayout.objects.create(**payout_data)
+                    PayoutMapping.objects.create(**{'content_object':self,'payout':nodal_payout})
 
             transaction = nodal_payout.get_insurance_premium_transactions()
             if transaction:
