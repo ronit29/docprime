@@ -1,6 +1,8 @@
+from dal import autocomplete
 from django.conf import settings
 from django.contrib import messages, admin
 from django.contrib.admin import TabularInline
+from django.contrib.contenttypes.admin import GenericTabularInline
 from django.contrib.contenttypes.models import ContentType
 from django.db import transaction
 from django.http import HttpResponseRedirect
@@ -8,14 +10,16 @@ from django.urls import reverse
 from django.utils.safestring import mark_safe
 from import_export import resources, fields, widgets
 from import_export.admin import ImportExportMixin
+from ondoc.notification import tasks as notification_tasks
 from reversion.admin import VersionAdmin
 
-from ondoc.common.models import Feature, Service, AppointmentHistory
+from ondoc.common.models import Feature, Service, AppointmentHistory, VirtualAppointment
 from ondoc.crm.admin.doctor import AutoComplete
 from ondoc.procedure.models import Procedure, ProcedureCategory, ProcedureCategoryMapping, ProcedureToCategoryMapping, \
     IpdProcedure, IpdProcedureFeatureMapping, IpdProcedureCategoryMapping, IpdProcedureCategory, IpdProcedureDetail, \
     IpdProcedureSynonym, IpdProcedureSynonymMapping, SimilarIpdProcedureMapping, IpdProcedurePracticeSpecialization, \
-    IpdProcedureLead
+    IpdProcedureLead, PotentialIpdLeadPracticeSpecialization, IpdProcedureCostEstimate, IpdProcedureLeadCostEstimateMapping, IpdCostEstimateRoomType, \
+    IpdCostEstimateRoomTypeMapping
 from django import forms
 
 
@@ -321,7 +325,24 @@ class IpdProcedurePracticeSpecializationAdmin(ImportExportMixin, VersionAdmin):
     # change_list_template = 'superuser_import_export.html'
 
 
+class IpdProcedureLeadCostEstimateMappingInline(TabularInline):
+    model = IpdProcedureLeadCostEstimateMapping
+    extra = 0
+    can_delete = True
+    verbose_name = "Procedure Cost Estimates"
+    verbose_name_plural = "Procedure Cost Estimates"
+    autocomplete_fields = ['cost_estimate']
+
+
 class IpdProcedureLeadAdminForm(forms.ModelForm):
+    send_estimate = forms.BooleanField(label='Send estimate', initial=False, required=False)
+
+    # class Meta:
+    #     widgets = {
+    #         'hospital': autocomplete.ModelSelect2(url='admin:doctor_hospital_autocomplete'),
+    #         'doctor': autocomplete.ModelSelect2(url='admin:doctor_doctor_autocomplete'),
+    #     }
+
     def clean(self):
         super().clean()
         if any(self.errors):
@@ -333,20 +354,35 @@ class IpdProcedureLeadAdminForm(forms.ModelForm):
             if not planned_date:
                 raise forms.ValidationError("Planned Date is mandatory for {} status.".format(
                     dict(IpdProcedureLead.STATUS_CHOICES)[curr_status]))
+        if cleaned_data.get('send_estimate'):
+            if not int(self.data.get('lead-TOTAL_FORMS', '0')) > 0:
+                raise forms.ValidationError("Procedure Cost Estimate not found.")
+            if self.instance.email or self.instance.phone_number:
+                notification_tasks.send_ipd_procedure_cost_estimate.apply_async((self.instance.pk,), countdown=60)
+            else:
+                raise forms.ValidationError("Phone number or Email is required to send estimate.")
+
+
+class VirtualAppointmentInline(GenericTabularInline):
+    can_delete = True
+    extra = 0
+    # form = SPOCDetailsForm
+    model = VirtualAppointment
+    show_change_link = False
+    readonly_fields = ['id']
+    # fields = ['name', 'std_code', 'number', 'email', 'details', 'contact_type']
 
 
 class IpdProcedureLeadAdmin(VersionAdmin):
     form = IpdProcedureLeadAdminForm
-    list_filter = ['created_at', 'source', 'ipd_procedure', 'planned_date']
+    list_filter = ['created_at', 'source', 'ipd_procedure', 'planned_date', 'source']
     search_fields = ['phone_number', 'matrix_lead_id']
     list_display = ['id', 'phone_number', 'name', 'matrix_lead_id']
-    autocomplete_fields = ['hospital', 'insurer', 'tpa', 'ipd_procedure']
+    autocomplete_fields = ['doctor', 'hospital', 'insurer', 'tpa', 'ipd_procedure']
     exclude = ['user', 'lat', 'long']
     readonly_fields = ['phone_number', 'id', 'matrix_lead_id', 'comments', 'data', 'source', 'current_age',
                        'related_speciality', 'is_insured', 'insurance_details', 'opd_appointments', 'lab_appointments']
-
-
-
+    inlines = [IpdProcedureLeadCostEstimateMappingInline, VirtualAppointmentInline]
 
     fieldsets = (
         (None, {
@@ -356,12 +392,15 @@ class IpdProcedureLeadAdmin(VersionAdmin):
         ('Lead Info', {
             # 'classes': ('collapse',),
             'fields': ('matrix_lead_id', 'comments', 'data', 'ipd_procedure', 'related_speciality',
-                       'hospital', 'hospital_reference_id', 'source', 'referer_doctor', 'status', 'planned_date',
+                       'hospital', 'doctor', 'hospital_reference_id', 'source', 'status', 'planned_date',
                        'payment_type', 'payment_amount', 'insurer', 'tpa', 'num_of_chats', 'remarks'),
         }),
         ('History', {
             # 'classes': ('collapse',),
             'fields': ('insurance_details', 'opd_appointments', 'lab_appointments'),
+        }),
+        ('Communication', {
+            'fields': ('send_estimate',),
         }),
     )
 
@@ -381,10 +420,9 @@ class IpdProcedureLeadAdmin(VersionAdmin):
         return ', '.join(result)
 
     def is_insured(self, obj):
-        result = False
-        if obj and obj.user:
-            return bool(obj.user.active_insurance)
-        return result
+        if obj:
+            return obj.is_user_insured()
+        return False
 
     def insurance_details(self, obj):
         result = None
@@ -443,3 +481,62 @@ class OfferAdmin(VersionAdmin):
     list_display = ['id', 'title', 'is_live']
     list_filter = ['is_live']
     form = OfferAdminForm
+
+
+class PotentialIpdLeadPracticeSpecializationResource(resources.ModelResource):
+    class Meta:
+        model = PotentialIpdLeadPracticeSpecialization
+        fields = ('id', 'practice_specialization')
+
+
+class PotentialIpdLeadPracticeSpecializationAdmin(ImportExportMixin, VersionAdmin):
+    search_fields = ['practice_specialization__name']
+    resource_class = PotentialIpdLeadPracticeSpecializationResource
+    list_display = ['id', 'practice_specialization']
+    autocomplete_fields = ['practice_specialization']
+    # change_list_template = 'superuser_import_export.html'
+
+
+class IpdCostEstimateRoomTypeAdmin(VersionAdmin):
+    model = IpdCostEstimateRoomType
+    list_display = ['room_type']
+    search_fields = ('room_type',)
+
+
+
+class IpdCostEstimateRoomTypeMappingInline(TabularInline):
+    model = IpdCostEstimateRoomTypeMapping
+    extra = 0
+    can_delete = True
+    verbose_name = "Room Type Cost"
+    verbose_name_plural = "Room Type Costs"
+    autocomplete_fields = ['room_type']
+
+
+class IpdProcedureCostEstimateAdmin(VersionAdmin):
+    model = IpdProcedureCostEstimate
+    list_display = ['ipd_procedure', 'hospital', 'stay_duration']
+    autocomplete_fields = ['ipd_procedure', 'hospital']
+    inlines = [IpdCostEstimateRoomTypeMappingInline]
+    search_fields = ('hospital__name', 'ipd_procedure__name')
+
+
+class UploadCostEstimateDataAdmin(admin.ModelAdmin):
+    list_display = ('id', 'source', 'batch', 'status', 'file')
+    readonly_fields = ('status', 'error_message', 'user', 'lines')
+
+    def save_model(self, request, obj, form, change):
+        if obj:
+            if not obj.user:
+                obj.user = request.user
+        super().save_model(request, obj, form, change)
+
+    def error_message(self, instance):
+        final_message = ''
+        if instance.error_msg:
+            for message in instance.error_msg:
+                if isinstance(message, dict):
+                    final_message += '{}  ::  {}\n\n'.format(message.get('line number', ''), message.get('message', ''))
+                else:
+                    final_message += str(message)
+        return final_message

@@ -1764,7 +1764,7 @@ class InsuranceTransaction(auth_model.TimeStampedModel):
 
     class Meta:
         db_table = "insurance_transaction"
-        unique_together = (("user_insurance", "account", "transaction_type"),)
+        #unique_together = (("user_insurance", "account", "transaction_type"),)
 
 
 class InsuredMembers(auth_model.TimeStampedModel):

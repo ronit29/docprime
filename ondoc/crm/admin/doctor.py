@@ -26,6 +26,8 @@ from ondoc.api.v1.utils import GenericAdminEntity, util_absolute_url, util_file_
 from ondoc.common.models import AppointmentHistory
 from django.contrib import messages
 from django.http import HttpResponseRedirect
+
+from ondoc.notification.models import NotificationAction
 from ondoc.procedure.models import DoctorClinicProcedure, Procedure, DoctorClinicIpdProcedure
 
 logger = logging.getLogger(__name__)
@@ -62,6 +64,7 @@ from decimal import Decimal
 from .common import AssociatedMerchantInline, RemarkInline
 from ondoc.sms import api
 from ondoc.ratings_review import models as rating_models
+from ondoc.notification import tasks as notification_tasks
 
 class AutoComplete:
     def autocomplete_view(self, request):
@@ -1458,6 +1461,8 @@ class DoctorOpdAppointmentForm(RefundableAppointmentForm):
     cancel_type = forms.ChoiceField(label='Cancel Type', choices=((0, 'Cancel and Rebook'),
                                                                   (1, 'Cancel and Refund'),), initial=0, widget=forms.RadioSelect)
     custom_otp = forms.IntegerField(required=False)
+    hospital_reference_id = forms.CharField(widget=forms.Textarea, required=False)
+    send_credit_letter = forms.BooleanField(label='Send credit letter', initial=False, required=False)
 
     def clean(self):
         super().clean()
@@ -1532,6 +1537,21 @@ class DoctorOpdAppointmentForm(RefundableAppointmentForm):
                 raise forms.ValidationError("Can only complete appointment if it is in accepted state.")
             if not cleaned_data.get('custom_otp') == self.instance.otp:
                 raise forms.ValidationError("Entered OTP is incorrect.")
+
+        if cleaned_data.get('send_credit_letter'):
+            if self.instance.status != cleaned_data.get('status'):
+                raise forms.ValidationError("Status change and Send credit letter can't be together.")
+            if self.instance:
+                if self.instance.status != OpdAppointment.ACCEPTED:
+                    raise forms.ValidationError("Can only send credit letter only if appointment status is accepted.")
+                elif not self.instance.is_medanta_hospital_booking():
+                    raise forms.ValidationError("Can only send credit letter for Medanta hospital bookings.")
+                else:
+                    try:
+                        notification_tasks.send_opd_notifications_refactored.apply_async((self.instance.id, NotificationAction.APPOINTMENT_ACCEPTED), countdown=1)
+                    except Exception as e:
+                        logger.error(str(e))
+
 
         # if self.instance.id:
         #     if cleaned_data.get('status') == OpdAppointment.RESCHEDULED_PATIENT or cleaned_data.get(
@@ -1637,7 +1657,8 @@ class DoctorOpdAppointmentAdmin(admin.ModelAdmin):
                 'fees', 'effective_price', 'mrp', 'deal_price', 'payment_status',
                 'payment_type', 'admin_information', 'insurance', 'outstanding',
                 'status', 'cancel_type', 'cancellation_reason', 'cancellation_comments',
-                'start_date', 'start_time', 'invoice_urls', 'payment_type', 'payout_info', 'refund_initiated', 'status_change_comments')
+                'start_date', 'start_time', 'invoice_urls', 'payment_type', 'payout_info', 'refund_initiated', 'status_change_comments',
+                      'hospital_reference_id', 'send_credit_letter')
         if request.user.groups.filter(name=constants['APPOINTMENT_OTP_TEAM']).exists() or request.user.is_superuser:
             all_fields = all_fields + ('otp',)
 
