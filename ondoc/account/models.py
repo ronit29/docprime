@@ -1597,7 +1597,7 @@ class MerchantPayout(TimeStampedModel):
 
     def create_insurance_transaction(self):
         from ondoc.insurance.models import UserInsurance, InsuranceTransaction
-        if True or not self.get_insurance_transaction():
+        if self.should_create_insurance_transaction():
             user_insurance = self.get_user_insurance()
             # InsuranceTransaction.objects.create(user_insurance=user_insurance,
             #     # account = user_insurance.insurance_plan.insurer.float.first(),
