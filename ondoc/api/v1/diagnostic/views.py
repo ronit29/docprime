@@ -1508,8 +1508,7 @@ class LabList(viewsets.ReadOnlyModelViewSet):
                 group_filter.append("(agreed_price<=insurance_cutoff_price or insurance_cutoff_price is null )")
         else:
             if not hasattr(self.request, 'agent'):
-                filtering_query.append("mrp<=(%(insurance_threshold_amount)s)")
-                group_filter.append("(agreed_price<=insurance_cutoff_price or insurance_cutoff_price is null )")
+                group_filter.append("(case when total_mrp<=(%(insurance_threshold_amount)s) then agreed_price<=insurance_cutoff_price or insurance_cutoff_price is null end )")
 
         filtering_params['insurance_threshold_amount'] = insurance_threshold_amount
         if avg_ratings:
