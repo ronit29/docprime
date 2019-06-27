@@ -1135,7 +1135,9 @@ class PUSHNotification:
         context = copy.deepcopy(context)
         context.pop("instance", None)
         context.pop('time_slot_start', None)
-        target_app = user.user_type
+        target_app = None
+        if user:
+            target_app = user.user_type
         push_noti = PushNotification.objects.create(
             user=user,
             notification_type=self.notification_type,
