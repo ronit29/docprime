@@ -581,7 +581,11 @@ class ProviderSignupDataViewset(viewsets.GenericViewSet):
         user = request.user
         objects_to_be_created = list()
         hospital_ids_to_be_created = list()
-        hospitals = [hospital['hospital_id'] for hospital in valid_data.get('hospitals')]
+        hospitals = list()
+        hospital_ids = list()
+        for hospital in valid_data.get('hospitals'):
+            hospitals.append(hospital['hospital_id'])
+            hospital_ids.append(hospital['hospital_id'].id)
         for hospital in valid_data.get("hospitals"):
             if 'is_encrypted' in valid_data:
                 if not valid_data.get('is_encrypted'):
@@ -616,11 +620,11 @@ class ProviderSignupDataViewset(viewsets.GenericViewSet):
                                                                         is_valid=False))
                 hospital_ids_to_be_created.append(hospital['hospital_id'].id)
         if 'is_encrypted' in valid_data and not valid_data.get('is_encrypted'):
+            doc_tasks.decrypted_invoice_pdfs.apply_async((hospital_ids,), countdown=5)
             doc_models.ProviderEncrypt.objects.filter(hospital__in=[hospital['hospital_id'] for hospital in valid_data.get("hospitals")])\
                                               .update(is_encrypted=False, encrypted_by=None, hint=None,
                                                       encrypted_hospital_id=None, email=None, phone_numbers=None,
                                                       google_drive=None, is_valid=False)
-            doc_tasks.decrypted_invoice_pdfs.apply_async((hospitals,), countdown=5)
         try:
             if 'is_encrypted' in valid_data and valid_data.get('is_encrypted') and objects_to_be_created and not doc_models.ProviderEncrypt.objects.filter(hospital_id__in=hospital_ids_to_be_created):
                 doc_models.ProviderEncrypt.objects.bulk_create(objects_to_be_created)
