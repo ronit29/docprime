@@ -1,7 +1,11 @@
+import datetime
+
 from django.contrib.contenttypes.fields import GenericRelation
 from django.contrib.postgres.fields import JSONField
 from django.core.validators import MaxValueValidator, MinValueValidator
 from django.db import models, transaction
+from django.db.models import Q
+
 from ondoc.authentication import models as auth_model
 from ondoc.authentication.models import User, UserProfile
 from ondoc.common.models import Feature, AppointmentHistory, VirtualAppointment
@@ -279,6 +283,13 @@ class IpdProcedureLead(auth_model.TimeStampedModel):
         if self.user:
             return bool(self.user.active_insurance)
         return result
+
+    @classmethod
+    def check_if_lead_active(cls, phone_number='', days=30):
+        ipd_precedure_leads = IpdProcedureLead.objects.filter(~Q(status=IpdProcedureLead.NOT_INTERESTED),
+                                                              created_at__gt=datetime.datetime.utcnow() - datetime.timedelta(days=days),
+                                                              phone_number=phone_number)
+        return ipd_precedure_leads.exists()
 
 
 class IpdProcedureDetailType(auth_model.TimeStampedModel):
