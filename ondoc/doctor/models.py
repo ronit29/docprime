@@ -4156,8 +4156,8 @@ class PartnersAppInvoice(auth_model.TimeStampedModel):
 
     @classmethod
     def last_serial(cls, appointment):
-        obj = cls.objects.filter(appointment__doctor=appointment.doctor,
-                                 appointment__hospital=appointment.hospital).order_by('-created_at').first()
+        obj = cls.objects.filter(appointment__doctor=appointment.doctor, appointment__hospital=appointment.hospital,
+                                 is_encrypted=False, is_valid=True).order_by('-created_at').first()
         if obj:
             serial = int(obj.invoice_serial_id[-9:-3])
             return serial

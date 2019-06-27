@@ -124,6 +124,7 @@ def decrypted_invoice_pdfs(self, hospitals):
         for invoice in encrypted_invoices:
             invoice.serial_id = serial
             invoice.serial_id = 'INV-' + str(invoice.appointment.hospital.id) + '-' + str(invoice.appointment.doctor.id) + '-' + str(serial) + '-' + version
-            invoice = invoice.generate_invoice(invoice.selected_invoice_items, invoice.appointment)
+            invoice.generate_invoice(invoice.selected_invoice_items, invoice.appointment)
+            invoice.is_encrypted = False
             invoice.save()
             serial += 1
