@@ -1264,10 +1264,10 @@ class LabList(viewsets.ReadOnlyModelViewSet):
 
         parameters['insurance_threshold_amount'] = insurance_data_dict['insurance_threshold_amount']
         parameters['is_user_insured'] = insurance_data_dict['is_user_insured']
-        queryset_result = self.get_lab_search_list(parameters, page)
+        queryset_result = self.get_lab_search_list(parameters, page, request)
         count = 0
         if len(queryset_result)>0:
-            count = queryset_result[0].get("result_count",0)
+            count = queryset_result[0].get("result_count", 0)
 
         #count = len(queryset_result)
         #paginated_queryset = paginate_queryset(queryset_result, request)
@@ -1377,7 +1377,7 @@ class LabList(viewsets.ReadOnlyModelViewSet):
                          "count": count, 'tests': tests,
                          "seo": seo, 'breadcrumb':breadcrumb})
 
-    def get_lab_search_list(self, parameters, page):
+    def get_lab_search_list(self, parameters, page, request=None):
         # distance in meters
 
         # DEFAULT_DISTANCE = 20000
@@ -1504,10 +1504,10 @@ class LabList(viewsets.ReadOnlyModelViewSet):
 
         if is_insurance and ids:
             # filtering_query.append("mrp<=(%(insurance_threshold_amount)s)")
-            if not hasattr(self.request, 'agent'):
+            if not hasattr(request, 'agent'):
                 group_filter.append("(case when covered_under_insurance then agreed_price<=insurance_cutoff_price or insurance_cutoff_price is null else false end  )")
         elif not is_insurance and ids:
-            if not hasattr(self.request, 'agent'):
+            if not hasattr(request, 'agent'):
                 group_filter.append("( case when covered_under_insurance then agreed_price<=insurance_cutoff_price or insurance_cutoff_price is null else true end  )")
 
         filtering_params['insurance_threshold_amount'] = insurance_threshold_amount
