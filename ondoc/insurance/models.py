@@ -2178,7 +2178,7 @@ class EndorsementRequest(auth_model.TimeStampedModel):
                 logger.error('Insurance coi pdf cannot be generated. %s' % str(e))
         pending_members = user_insurance.endorse_members.filter(Q(mail_status=EndorsementRequest.MAIL_PENDING) |
                                                               Q(mail_status__isnull=True))
-        for member in  pending_members:
+        for member in pending_members:
             member.mail_status = EndorsementRequest.MAIL_SENT
             member.save()
 

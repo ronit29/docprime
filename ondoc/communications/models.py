@@ -1685,10 +1685,10 @@ class InsuranceNotification(Notification):
                     if not getattr(end_member, s) == getattr(end_member.member, s):
                         pending_member_data = {
                             'name': end_member.member.get_full_name().title(),
-                            'field_name': s,
+                            'field_name': self.get_field_name(s),
                             'previous_name': getattr(end_member.member, s),
                             'modified_name': getattr(end_member, s),
-                            'status': EndorsementRequest.STATUS_CHOICES[end_member.status-1]
+                            'status': EndorsementRequest.STATUS_CHOICES[end_member.status-1][1]
                         }
                         member_list.append(pending_member_data)
                 elif end_member.status == EndorsementRequest.APPROVED:
@@ -1698,15 +1698,21 @@ class InsuranceNotification(Notification):
                     if not getattr(end_member, s) == getattr(old_member_obj, s):
                         pending_member_data = {
                             'name': end_member.member.get_full_name().title(),
-                            'field_name': s,
+                            'field_name': self.get_field_name(s),
                             'previous_name': getattr(old_member_obj.member, s),
                             'modified_name': getattr(end_member, s),
-                            'status': EndorsementRequest.STATUS_CHOICES[end_member.status-1]
+                            'status': EndorsementRequest.STATUS_CHOICES[end_member.status-1][1]
                         }
                         member_list.append(pending_member_data)
 
         context['members'] = member_list
         return context
+
+    def get_field_name(self, val):
+        res = val
+        if "_" in val:
+            res = val.replace("_", " ")
+        return res
 
     def get_receivers(self):
 
