@@ -2125,7 +2125,10 @@ class EndorsementRequest(auth_model.TimeStampedModel):
     def create(cls, endorsed_member):
         del endorsed_member['is_change']
         del endorsed_member['image_ids']
-        InsuredMemberHistory.create_member(endorsed_member.member)
+        insured_member = InsuredMembers.objects.filter(id=endorsed_member.get('member_id')).first()
+        if not insured_member:
+            raise Exception('Insured Member not found')
+        InsuredMemberHistory.create_member(insured_member)
         end_obj = EndorsementRequest.objects.create(**endorsed_member)
         return end_obj
 
