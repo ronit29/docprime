@@ -1654,7 +1654,9 @@ class InsuranceNotification(Notification):
             #
             # context['endorsement_list'] = endorsement_list
             # context['few_rejected'] = True if rejected > 0 else False
-            approved_endorsed_members = instance.endorse_members.filter(status=EndorsementRequest.APPROVED)
+            approved_endorsed_members = instance.endorse_members.filter((Q(mail_status=EndorsementRequest.MAIL_PENDING) |
+                                                                         Q(mail_status__isnull=True)),
+                                                                         status=EndorsementRequest.APPROVED)
             approved_endorsed_members_context = self.get_endorsed_context(approved_endorsed_members)
             # context = context.update(approved_endorsed_members_context)
             context['approved_members'] = approved_endorsed_members_context['members']
@@ -1679,15 +1681,30 @@ class InsuranceNotification(Notification):
         context = {}
         for end_member in members:
             for s in scope:
-                if not getattr(end_member, s) == getattr(end_member.member, s):
-                    pending_member_data = {
-                        'name': end_member.member.get_full_name().title(),
-                        'field_name': s,
-                        'previous_name': getattr(end_member.member, s),
-                        'modified_name': getattr(end_member, s),
-                        'status': EndorsementRequest.STATUS_CHOICES[end_member.status-1]
-                    }
-                    member_list.append(pending_member_data)
+                if end_member.status == EndorsementRequest.REJECT:
+                    if not getattr(end_member, s) == getattr(end_member.member, s):
+                        pending_member_data = {
+                            'name': end_member.member.get_full_name().title(),
+                            'field_name': s,
+                            'previous_name': getattr(end_member.member, s),
+                            'modified_name': getattr(end_member, s),
+                            'status': EndorsementRequest.STATUS_CHOICES[end_member.status-1]
+                        }
+                        member_list.append(pending_member_data)
+                elif end_member.status == EndorsementRequest.APPROVED:
+                    old_member_obj = end_member.member.member_history.order_by('-id').first()
+                    if not old_member_obj:
+                        return context
+                    if not getattr(end_member, s) == getattr(old_member_obj, s):
+                        pending_member_data = {
+                            'name': end_member.member.get_full_name().title(),
+                            'field_name': s,
+                            'previous_name': getattr(old_member_obj.member, s),
+                            'modified_name': getattr(end_member, s),
+                            'status': EndorsementRequest.STATUS_CHOICES[end_member.status-1]
+                        }
+                        member_list.append(pending_member_data)
+
         context['members'] = member_list
         return context
 
