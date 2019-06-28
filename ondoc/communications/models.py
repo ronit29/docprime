@@ -1681,7 +1681,7 @@ class InsuranceNotification(Notification):
         context = {}
         for end_member in members:
             for s in scope:
-                if end_member.status == EndorsementRequest.REJECT:
+                if end_member.status == EndorsementRequest.REJECT or end_member.status == EndorsementRequest.PENDING:
                     if not getattr(end_member, s) == getattr(end_member.member, s):
                         pending_member_data = {
                             'name': end_member.member.get_full_name().title(),
