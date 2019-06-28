@@ -1248,7 +1248,7 @@ class EndorsementRequestForm(forms.ModelForm):
             int(status) == EndorsementRequest.PARTIAL_APPROVED or int(status) == EndorsementRequest.REJECT):
             user_insurance = self.instance.insurance
             existing_incomplete_request = user_insurance.endorse_members.filter(~Q(status=EndorsementRequest.PENDING),
-                                                     ~Q(status=EndorsementRequest.MAIL_SENT))
+                                                     ~Q(mail_status=EndorsementRequest.MAIL_SENT))
             if existing_incomplete_request:
                 raise forms.ValidationError('Before Approve/Reject You need to sent mail for previous request')
         if int(status) == EndorsementRequest.PARTIAL_APPROVED:
