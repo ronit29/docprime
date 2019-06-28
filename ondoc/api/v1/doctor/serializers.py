@@ -1373,7 +1373,7 @@ class DoctorAppointmentRetrieveSerializer(OpdAppointmentSerializer):
     is_docprime = serializers.ReadOnlyField(default=True)
 
     def get_mask_data(self, obj):
-        mask_number = obj.mask_number.first()
+        mask_number = obj.mask_number.all()[0] if obj.mask_number.all() else None
         if mask_number:
             return mask_number.build_data()
         return None

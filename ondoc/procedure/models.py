@@ -141,7 +141,9 @@ class IpdProcedureLead(auth_model.TimeStampedModel):
     VALID = 7
     CONTACTED = 8
     PLANNED = 9
-
+    IPD_CONFIRMATION = 10
+    # If a new status is added also edit following:
+    # IpdProcedureSyncViewSet.sync_lead()
 
     CASH = 1
     INSURANCE = 2
@@ -161,7 +163,8 @@ class IpdProcedureLead(auth_model.TimeStampedModel):
 
     STATUS_CHOICES = [(None, "--Select--"), (NEW, 'NEW'), (COST_REQUESTED, 'COST_REQUESTED'),
                       (COST_SHARED, 'COST_SHARED'), (OPD, 'OPD'), (VALID, 'VALID'), (CONTACTED, 'CONTACTED'),
-                      (PLANNED, 'PLANNED'), (NOT_INTERESTED, 'NOT_INTERESTED'), (COMPLETED, 'COMPLETED')]
+                      (PLANNED, 'PLANNED'), (NOT_INTERESTED, 'NOT_INTERESTED'), (COMPLETED, 'COMPLETED'),
+                      (IPD_CONFIRMATION, "IPD_CONFIRM")]
 
     PAYMENT_TYPE_CHOICES = [(None, "--Select--"), (CASH, 'CASH'), (INSURANCE, 'INSURANCE'),
                             (GOVERNMENT_PANEL, 'GOVERNMENT_PANEL')]

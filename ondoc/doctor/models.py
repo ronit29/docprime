@@ -2417,6 +2417,9 @@ class OpdAppointment(auth_model.TimeStampedModel, CouponsMixin, OpdAppointmentIn
     #     appointment = doctor_serializers.OpdAppointmentUpcoming(response_appointment, many=True)
     #     return appointment.data
 
+    def is_payment_type_cod(self):
+        return self.payment_type == OpdAppointment.COD
+
     @classmethod
     def get_upcoming_appointment(cls, user_id):
         current_time = timezone.now()

@@ -367,112 +367,116 @@ class EntityAddress(TimeStampedModel):
 
     @classmethod
     def create(cls, geocoding_obj, value):
-        mapping_dictionary = {
-            'bengaluru': 'Bangalore',
-            'bengalooru': 'Bangalore',
-            'gurugram': 'Gurgaon',
-            'gurugram rural': 'Gurgaon'
-        }
+        try:
+            mapping_dictionary = {
+                'bengaluru': 'Bangalore',
+                'bengalooru': 'Bangalore',
+                'gurugram': 'Gurgaon',
+                'gurugram rural': 'Gurgaon'
+            }
 
-        response_list = list()
-        longitude = geocoding_obj.longitude
-        latitude = geocoding_obj.latitude
+            response_list = list()
+            longitude = geocoding_obj.longitude
+            latitude = geocoding_obj.latitude
 
-        # Take the address component with longest length as it can provide us the most relevant address.
-        max_length = 0
-        address_component = None
-        # result_value.get('results')[00].get('address_components')
-        if value.get('results'):
-            result_list = value.get('results')
-        for result in result_list:
-            if len(result.get('address_components', [])) > max_length:
-                address_component = result.get('address_components')
-                max_length = len(result.get('address_components'))
+            # Take the address component with longest length as it can provide us the most relevant address.
+            max_length = 0
+            address_component = None
+            # result_value.get('results')[00].get('address_components')
+            if value.get('results'):
+                result_list = value.get('results')
+            for result in result_list:
+                if len(result.get('address_components', [])) > max_length:
+                    address_component = result.get('address_components')
+                    max_length = len(result.get('address_components'))
 
-        if not address_component:
-            return response_list
+            if not address_component:
+                return response_list
 
-        system_types = ['COUNTRY', 'ADMINISTRATIVE_AREA_LEVEL_1', 'ADMINISTRATIVE_AREA_LEVEL_2', 'LOCALITY', 'SUBLOCALITY',
-                     'SUBLOCALITY_LEVEL_1', 'SUBLOCALITY_LEVEL_2', 'SUBLOCALITY_LEVEL_3']
+            system_types = ['COUNTRY', 'ADMINISTRATIVE_AREA_LEVEL_1', 'ADMINISTRATIVE_AREA_LEVEL_2', 'LOCALITY', 'SUBLOCALITY',
+                         'SUBLOCALITY_LEVEL_1', 'SUBLOCALITY_LEVEL_2', 'SUBLOCALITY_LEVEL_3']
 
-        pin_code = None
-        parent_id = None
-        parent_entity = None
+            pin_code = None
+            parent_id = None
+            parent_entity = None
 
-        order = 1
-        address_component.reverse()
-        save_location = False
+            order = 1
+            address_component.reverse()
+            save_location = False
 
-        for component in address_component:
+            for component in address_component:
 
-            long_name = component.get('long_name')
-            types = [key.upper() for key in component.get('types', [])]
-            type_blueprint = ",".join(types)
-            use_in_url = False
+                long_name = component.get('long_name')
+                types = [key.upper() for key in component.get('types', [])]
+                type_blueprint = ",".join(types)
+                use_in_url = False
 
-            if 'POSTAL_CODE' in types:
-                pin_code = long_name
-                continue
+                if 'POSTAL_CODE' in types:
+                    pin_code = long_name
+                    continue
 
-            selected_type = None
-            for st in system_types:
-                for tp in types:
-                    if st==tp:
-                        selected_type = st
-            if selected_type and selected_type.startswith('SUBLOCALITY'):
-                selected_type = 'SUBLOCALITY'
+                selected_type = None
+                for st in system_types:
+                    for tp in types:
+                        if st==tp:
+                            selected_type = st
+                if selected_type and selected_type.startswith('SUBLOCALITY'):
+                    selected_type = 'SUBLOCALITY'
 
-            if (selected_type and selected_type.startswith('SUBLOCALITY')) or (parent_entity and parent_entity.type and
-                parent_entity.type.startswith('LOCALITY')):
-                save_location = True
+                if (selected_type and selected_type.startswith('SUBLOCALITY')) or (parent_entity and parent_entity.type and
+                    parent_entity.type.startswith('LOCALITY')):
+                    save_location = True
 
-            postal_code = None
-            if save_location:
-                postal_code = pin_code
+                postal_code = None
+                if save_location:
+                    postal_code = pin_code
 
-            saved_data = EntityAddress.objects.filter(type=selected_type, value=long_name, parent=parent_id)
-            if len(saved_data) > 0:
-                entity_address = saved_data[0]                
-                AddressGeoMapping.objects.get_or_create(entity_address=entity_address, geocoding_result=geocoding_obj)
-            else:
-                point = None
-                if save_location:                    
-                    point = Point(float(longitude), float(latitude))
+                saved_data = EntityAddress.objects.filter(type=selected_type, value=long_name, parent=parent_id)
+                if len(saved_data) > 0:
+                    entity_address = saved_data[0]
+                    AddressGeoMapping.objects.get_or_create(entity_address=entity_address, geocoding_result=geocoding_obj)
+                else:
+                    point = None
+                    if save_location:
+                        point = Point(float(longitude), float(latitude))
 
-                alternative_name = mapping_dictionary.get(long_name.lower(), long_name)
-                #address = alternative_name
-                components = [alternative_name]
+                    alternative_name = mapping_dictionary.get(long_name.lower(), long_name)
+                    #address = alternative_name
+                    components = [alternative_name]
 
-                if parent_entity and parent_entity.components:
-                    #components.append(parent_entity.components)
-                    components = components + parent_entity.components
+                    if parent_entity and parent_entity.components:
+                        #components.append(parent_entity.components)
+                        components = components + parent_entity.components
 
-                #print(components)
-                components = cls.unique_components(components)
-                address = ", ".join(components)
-                use_in_url = cls.use_address_in_url(selected_type, alternative_name, parent_entity)
-                search_slug = None
-                if use_in_url:
-                    search_slug = cls.get_search_url_slug(selected_type, alternative_name, parent_entity)
-                #print(use_in_url)
+                    #print(components)
+                    components = cls.unique_components(components)
+                    address = ", ".join(components)
+                    use_in_url = cls.use_address_in_url(selected_type, alternative_name, parent_entity)
+                    search_slug = None
+                    if use_in_url:
+                        search_slug = cls.get_search_url_slug(selected_type, alternative_name, parent_entity)
+                    #print(use_in_url)
 
-                entity_address = EntityAddress(type=selected_type, abs_centroid=point, postal_code=postal_code,
-                                                   type_blueprint=type_blueprint, value=long_name, parent=parent_entity,
-                                                   alternative_value=alternative_name,
-                                                   order=order, use_in_url=use_in_url,
-                                                   address=address, components = components,
-                                                   search_slug = search_slug)
-                entity_address.save()
-                AddressGeoMapping.objects.get_or_create(entity_address=entity_address, geocoding_result=geocoding_obj)
-                #entity_address.geocoding..add(geocoding_obj)
-                
-
-            parent_id = entity_address.id
-            parent_entity = entity_address
-            order += 1
+                    entity_address = EntityAddress(type=selected_type, abs_centroid=point, postal_code=postal_code,
+                                                       type_blueprint=type_blueprint, value=long_name, parent=parent_entity,
+                                                       alternative_value=alternative_name,
+                                                       order=order, use_in_url=use_in_url,
+                                                       address=address, components = components,
+                                                       search_slug = search_slug)
+                    entity_address.save()
+                    AddressGeoMapping.objects.get_or_create(entity_address=entity_address, geocoding_result=geocoding_obj)
+                    #entity_address.geocoding..add(geocoding_obj)
 
 
-        return "success"
+                parent_id = entity_address.id
+                parent_entity = entity_address
+                order += 1
+
+
+            return "success"
+        except Exception as e:
+            print('Failure')
+            pass
 
 
 
