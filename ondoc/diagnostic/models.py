@@ -2217,11 +2217,11 @@ class LabAppointment(TimeStampedModel, CouponsMixin, LabAppointmentInvoiceMixin,
         if self.payment_type == 3:
             booking_net_revenue = 0
         else:
-            wallet_amount = self.deal_price
+            wallet_amount = self.effective_price
             price_data = self.price_data
             if price_data:
                 w_amount = price_data.get('wallet_amount', None)
-                if w_amount:
+                if w_amount is not None:
                     wallet_amount = w_amount
 
             agreed_price = self.agreed_price
