@@ -2125,12 +2125,13 @@ class EndorsementRequest(auth_model.TimeStampedModel):
     def create(cls, endorsed_member):
         del endorsed_member['is_change']
         del endorsed_member['image_ids']
+        InsuredMemberHistory.create_member(endorsed_member.member)
         end_obj = EndorsementRequest.objects.create(**endorsed_member)
         return end_obj
 
     def process_endorsement(self):
         insured_member = self.member
-        InsuredMemberHistory.create_member(insured_member)
+        # InsuredMemberHistory.create_member(insured_member)
         insured_member.update_member(self)
         profile = self.member.profile
         profile.update_profile_post_endorsement(self)
