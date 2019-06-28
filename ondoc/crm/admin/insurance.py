@@ -1244,8 +1244,8 @@ class EndorsementRequestForm(forms.ModelForm):
         status = data.get('status')
         coi_status = data.get('mail_coi_to_customer')
         reject_reason = data.get('reject_reason')
-        if int(status) == EndorsementRequest.APPROVED or int(status) == EndorsementRequest.PARTIAL_APPROVED or \
-            int(status) == EndorsementRequest.REJECT:
+        if self.instance.status == EndorsementRequest.PENDING and (int(status) == EndorsementRequest.APPROVED or
+            int(status) == EndorsementRequest.PARTIAL_APPROVED or int(status) == EndorsementRequest.REJECT):
             user_insurance = self.instance.insurance
             existing_incomplete_request = user_insurance.endorse_members.filter(~Q(status=EndorsementRequest.PENDING),
                                                      ~Q(status=EndorsementRequest.MAIL_SENT))
