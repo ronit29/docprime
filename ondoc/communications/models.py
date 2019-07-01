@@ -1196,24 +1196,23 @@ class PUSHNotification:
         context = copy.deepcopy(context)
         context.pop("instance", None)
         context.pop('time_slot_start', None)
-        target_app = None
         if user:
             target_app = user.user_type
-        push_noti = PushNotification.objects.create(
-            user=user,
-            notification_type=self.notification_type,
-            content=context,
-            target_app=target_app
-        )
+            push_noti = PushNotification.objects.create(
+                user=user,
+                notification_type=self.notification_type,
+                content=context,
+                target_app=target_app
+            )
 
-        data = model_to_dict(push_noti)
-        data["tokens"] = tokens
-        message = {
-            "data": data,
-            "type": "push"
-        }
-        message = json.dumps(message)
-        publish_message(message)
+            data = model_to_dict(push_noti)
+            data["tokens"] = tokens
+            message = {
+                "data": data,
+                "type": "push"
+            }
+            message = json.dumps(message)
+            publish_message(message)
 
     def send(self, receivers):
         context = self.context
@@ -1452,7 +1451,7 @@ class LabNotification(Notification):
         if instance and instance.lab and instance.lab.network and instance.lab.network.id == settings.THYROCARE_NETWORK_ID:
             is_thyrocare_report = True
             # chat_url = "https://docprime.com/mobileviewchat?utm_source=Thyrocare&booking_id=%s" % instance.id
-            chat_url = "%s/mobileviewchat?utm_source=Thyrocare&booking_id=%s" % settings.API_BASE_URL, instance.id
+            chat_url = '%s/mobileviewchat?utm_source=Thyrocare&booking_id=%s' % (settings.API_BASE_URL, instance.id)
             chat_url = generate_short_url(chat_url)
 
         context = {

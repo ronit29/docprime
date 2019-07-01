@@ -654,6 +654,12 @@ class UserInsurance(auth_model.TimeStampedModel):
         if self.premium_transferred:
             return
 
+        if self.hours_elapsed<48:
+            return
+
+        if not self.can_process_payout():
+            self.init_payout()
+
         payout_status = True
         if self.can_process_payout():
             payouts = self.get_insurance_payouts()
@@ -663,8 +669,6 @@ class UserInsurance(auth_model.TimeStampedModel):
             if payout_status:
                 self.premium_transferred = True
                 self.save()
-        else:
-            self.init_payout()
 
     def can_process_payout(self):
         #do we have payouts for complete premium
