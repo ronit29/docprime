@@ -315,6 +315,8 @@ class SMSNotification:
             body_template = "sms/insurance/insurance_confirmed.txt"
         elif notification_type == NotificationAction.INSURANCE_ENDORSMENT_APPROVED:
             body_template = "sms/insurance/insurance_endorsment_approved.txt"
+        elif notification_type == NotificationAction.INSURANCE_ENDORSMENT_PARTIAL_APPROVED:
+            body_template = "sms/insurance/insurance_endorsement_partially_approved.txt"
         elif notification_type == NotificationAction.INSURANCE_ENDORSMENT_PENDING:
             body_template = "sms/insurance/insurance_endorsment_pending.txt"
         elif notification_type == NotificationAction.INSURANCE_ENDORSMENT_REJECTED:

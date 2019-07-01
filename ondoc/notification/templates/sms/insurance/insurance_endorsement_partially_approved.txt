@@ -1,0 +1,4 @@
+Policy Number {{policy_number}}
+Your endorsement request has been partially processed.
+Please refer your email for more information.
+Our customer service executive will shortly get in touch with you to resolve this issue.

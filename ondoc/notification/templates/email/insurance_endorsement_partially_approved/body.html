@@ -103,7 +103,7 @@
                         </tr> -->
                         <tr>
                           <td style="font-weight: 500; color: #000; font-size: 12px;">
-                            Dear {{proposer_name||capfirst}}
+                            Dear {{proposer_name|capfirst}}
                           </td>
                         </tr>
                         <tr>
@@ -172,47 +172,29 @@
                           <th style="color: #000; font-size: 12px; padding:3px; text-align: left;">Status</th>
 
                         </tr>
-                        {%for member in partially_members%}
-                        <tr>
-                          <td style="color: #000; font-size: 12px; padding:3px;">
-                            {{forloop.counter}}
-                          </td>
-                          <td style="color: #000; font-size: 12px; padding:3px;">
-                            {{member.name|capfirst}}
-                          </td>
-                          <td style="color: #000; font-size: 12px; padding:3px;">
-                            {{member.field_name|capfirst}}
-                          </td>
-                          <td style="color: #000; font-size: 12px; padding:3px;">
-                            {{member.modified_name|capfirst}}
-                          </td>
-                          <td style="color: #000; font-size: 12px; padding:3px;">
-                            {{member.previous_name|capfirst}}
-                          </td>
-                          <td style="color: #000; font-size: 12px; padding:3px;">
-                            {{member.status}}
-                          </td>
-                        </tr>
-                        <tr>
-                          <td style="color: #000; font-size: 12px; padding:3px;">
-                            1.
-                          </td>
-                          <td style="color: #000; font-size: 12px; padding:3px;">
-                            Tarun
-                          </td>
-                          <td style="color: #000; font-size: 12px; padding:3px;">
-                            Name
-                          </td>
-                          <td style="color: #000; font-size: 12px; padding:3px;">
-                            Name
-                          </td>
-                          <td style="color: #000; font-size: 12px; padding:3px;">
-                            NameSinghal
-                          </td>
-                          <td style="color: #000; font-size: 12px; padding:3px;">
-                            NameSinghal
-                          </td>
-                        </tr>
+                        {% for member in partially_members %}
+                          <tr>
+                            <td style="color: #000; font-size: 12px; padding:3px;">
+                              {{forloop.counter}}
+                            </td>
+                            <td style="color: #000; font-size: 12px; padding:3px;">
+                              {{member.name|capfirst}}
+                            </td>
+                            <td style="color: #000; font-size: 12px; padding:3px;">
+                              {{member.field_name|capfirst}}
+                            </td>
+                            <td style="color: #000; font-size: 12px; padding:3px;">
+                              {{member.modified_name|capfirst}}
+                            </td>
+                            <td style="color: #000; font-size: 12px; padding:3px;">
+                              {{member.previous_name|capfirst}}
+                            </td>
+                            <td style="color: #000; font-size: 12px; padding:3px;">
+                              {{member.status}}
+                            </td>
+                          </tr>
+                        {% endfor %}
+
                       </table>
                     </td>
                   </tr>
