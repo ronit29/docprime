@@ -990,7 +990,7 @@ class UserInsuranceAdmin(ImportExportMixin, admin.ModelAdmin):
         responsible_user = request.user
         obj._responsible_user = responsible_user if responsible_user and not responsible_user.is_anonymous else None
         if request.user.is_member_of(constants['SUPER_INSURANCE_GROUP']):
-            if obj.status == UserInsurance.ACTIVE:
+            if obj.status == UserInsurance.ACTIVE or obj.status == UserInsurance.CANCELLED:
                 super(UserInsuranceAdmin, self).save_model(request, obj, form, change)
             # elif obj.status == UserInsurance.ONHOLD:
             #     if obj.onhold_reason:
@@ -1001,7 +1001,7 @@ class UserInsuranceAdmin(ImportExportMixin, admin.ModelAdmin):
                 if response.get('success', None):
                     send_insurance_notifications.apply_async(({'user_id': obj.user.id, 'status': obj.status},))
                     super(UserInsuranceAdmin, self).save_model(request, obj, form, change)
-            elif obj.status == UserInsurance.CANCELLATION_APPROVED or obj.status == UserInsurance.CANCELLED:
+            elif obj.status == UserInsurance.CANCELLATION_APPROVED:
                     send_insurance_notifications.apply_async(({'user_id': obj.user.id, 'status': obj.status},))
                     super(UserInsuranceAdmin, self).save_model(request, obj, form, change)
 

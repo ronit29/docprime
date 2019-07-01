@@ -623,9 +623,9 @@ class InsuranceCancelViewSet(viewsets.GenericViewSet):
             res["error"] = "Insurance not found for the user"
             return Response(data=res, status=status.HTTP_400_BAD_REQUEST)
 
-        if not data.get('cancel_reason'):
-            res['error'] = "Please provide cancellation reason for initiate cancellation!!"
-            return Response(data=res, status=status.HTTP_400_BAD_REQUEST)
+        # if not data.get('cancel_reason'):
+        #     res['error'] = "Please provide cancellation reason for initiate cancellation!!"
+        #     return Response(data=res, status=status.HTTP_400_BAD_REQUEST)
 
         data['insurance'] = user_insurance.id
         serializer = serializers.UserBankSerializer(data=data, context={'request': request})

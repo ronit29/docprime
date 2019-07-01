@@ -8,5 +8,23 @@ Policy Number : {{policy_number}}
 <br>
 Name: {{proposer_name}}
 <br><br>
-Docprime.com
+    {% if instance.user_bank %}
+    <div>
+        Please find below mention Bank Details of Customer:
+        <br>
+        <br>
+        Account Holder Name : instance.user_bank.account_holder_name
+        <br>
+        Bank Name : instance.user_bank.bank_name
+        <br>
+        Account Number : instance.user_bank.account_number
+        <br>
+        IFSC Code : instance.user_bank.ifsc_code
+        <br>
+        <br>
+    </div>
+    {% endif %}
+
+Thanks
+Team Docprime
 </div>
