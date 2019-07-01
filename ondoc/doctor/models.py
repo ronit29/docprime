@@ -2696,7 +2696,7 @@ class OpdAppointment(auth_model.TimeStampedModel, CouponsMixin, OpdAppointmentIn
             # while completing appointment
             if database_instance and database_instance.status != self.status and self.status == self.COMPLETED:
                 # add a merchant_payout entry
-                if self.merchant_payout is None and self.payment_type not in [OpdAppointment.COD]:
+                if self.merchant_payout is None and self.payment_type not in [OpdAppointment.COD] and not self.is_followup_appointment():
                     self.save_merchant_payout()
 
                 # credit cashback if any
@@ -3285,15 +3285,12 @@ class OpdAppointment(auth_model.TimeStampedModel, CouponsMixin, OpdAppointmentIn
         result['data'] = {'opd_appointment_id': self.id}
         return result
 
-    @classmethod
-    def is_followup_appointment(cls, current_appointment):
-        if not current_appointment:
-            return False
-        doctor = current_appointment.doctor
-        hospital = current_appointment.hospital
-        profile = current_appointment.profile
-        last_completed_appointment = cls.objects.filter(doctor=doctor, profile=profile, hospital=hospital,
-                                                        status=cls.COMPLETED).order_by('-id').first()
+    def is_followup_appointment(self):
+        doctor = self.doctor
+        hospital = self.hospital
+        profile = self.profile
+        last_completed_appointment = OpdAppointment.objects.filter(doctor=doctor, profile=profile, hospital=hospital,
+                                                        status=OpdAppointment.COMPLETED).order_by('-id').first()
         if not last_completed_appointment:
             return False
         last_appointment_date = last_completed_appointment.time_slot_start
@@ -3303,7 +3300,7 @@ class OpdAppointment(auth_model.TimeStampedModel, CouponsMixin, OpdAppointmentIn
         followup_duration = dc_obj.followup_duration
         if not followup_duration:
             followup_duration = settings.DEFAULT_FOLLOWUP_DURATION
-        days_diff = current_appointment.date() - last_appointment_date.date()
+        days_diff = self.date() - last_appointment_date.date()
         if days_diff.days < followup_duration:
             return True
         else:
