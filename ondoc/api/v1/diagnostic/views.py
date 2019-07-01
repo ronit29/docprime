@@ -1502,11 +1502,13 @@ class LabList(viewsets.ReadOnlyModelViewSet):
             group_filter.append("price<=(%(max_price)s)")
             filtering_params['max_price'] = max_price
 
-        if is_insurance and ids:
+        if is_insurance and ids and self.request.user and not self.request.user.is_anonymous and \
+                self.request.user.active_insurance:
             # filtering_query.append("mrp<=(%(insurance_threshold_amount)s)")
             if not hasattr(request, 'agent'):
                 group_filter.append("(case when covered_under_insurance then agreed_price<=insurance_cutoff_price or insurance_cutoff_price is null else false end  )")
-        elif not is_insurance and ids:
+        elif not is_insurance and ids and self.request.user and not self.request.user.is_anonymous and \
+                self.request.user.active_insurance:
             if not hasattr(request, 'agent'):
                 group_filter.append("( case when covered_under_insurance then agreed_price<=insurance_cutoff_price or insurance_cutoff_price is null else true end  )")
 
