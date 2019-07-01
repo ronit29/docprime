@@ -648,7 +648,11 @@ class TdsDeductionMixin(object):
                     if (new_revenue >= Merchant.TDS_THRESHOLD_AMOUNT) and (old_revenue < Merchant.TDS_THRESHOLD_AMOUNT):
                         tds = (new_revenue * Merchant.TDS_APPLICABLE_RATE) / 100
                     elif old_revenue > Merchant.TDS_THRESHOLD_AMOUNT:
-                        tds = (booking_net_revenue * Merchant.TDS_APPLICABLE_RATE) / 100
+                        tds_deduction_count = merchant.tds_deduction.all().count()
+                        if tds_deduction_count > 0:
+                            tds = (booking_net_revenue * Merchant.TDS_APPLICABLE_RATE) / 100
+                        else:
+                            tds = (new_revenue * Merchant.TDS_APPLICABLE_RATE) / 100
                 else:
                     if booking_net_revenue >= Merchant.TDS_THRESHOLD_AMOUNT:
                         tds = (booking_net_revenue * Merchant.TDS_APPLICABLE_RATE) / 100
