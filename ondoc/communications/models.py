@@ -989,8 +989,8 @@ class EMAILNotification:
             subject_template = "email/insurance_endorsment_rejected/subject.txt"
 
         elif notification_type == NotificationAction.INSURANCE_ENDORSMENT_PARTIAL_APPROVED:
-            body_template = "email/insurance_endorsment_partially_approved/body.html"
-            subject_template = "email/insurance_endorsment_partially_approved/subject.txt"
+            body_template = "email/insurance_endorsement_partially_approved/body.html"
+            subject_template = "email/insurance_endorsement_partially_approved/subject.txt"
 
         elif notification_type == NotificationAction.LAB_REPORT_SEND_VIA_CRM:
             attachments = []
