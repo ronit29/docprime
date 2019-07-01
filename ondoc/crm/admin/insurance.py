@@ -1386,6 +1386,8 @@ class EndorsementRequestAdmin(admin.ModelAdmin):
                        'district_code', 'mail_status']
     inlines = [InsuredMemberDocumentInline]
     form = EndorsementRequestForm
+    list_filter = ['status']
+    ordering = ['-created_at']
 
     def has_add_permission(self, request, obj=None):
         return False

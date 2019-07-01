@@ -988,6 +988,10 @@ class EMAILNotification:
             body_template = "email/insurance_endorsment_rejected/body.html"
             subject_template = "email/insurance_endorsment_rejected/subject.txt"
 
+        elif notification_type == NotificationAction.INSURANCE_ENDORSMENT_PARTIAL_APPROVED:
+            body_template = "email/insurance_endorsment_partially_approved/body.html"
+            subject_template = "email/insurance_endorsment_partially_approved/subject.txt"
+
         elif notification_type == NotificationAction.LAB_REPORT_SEND_VIA_CRM:
             attachments = []
             for report_link in context.get('reports', []):
@@ -1699,7 +1703,7 @@ class InsuranceNotification(Notification):
                         pending_member_data = {
                             'name': end_member.member.get_full_name().title(),
                             'field_name': self.get_field_name(s),
-                            'previous_name': getattr(old_member_obj.member, s),
+                            'previous_name': getattr(old_member_obj, s),
                             'modified_name': getattr(end_member, s),
                             'status': EndorsementRequest.STATUS_CHOICES[end_member.status-1][1]
                         }
