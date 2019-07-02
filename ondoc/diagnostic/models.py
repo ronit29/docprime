@@ -2044,7 +2044,7 @@ class LabAppointment(TimeStampedModel, CouponsMixin, LabAppointmentInvoiceMixin,
         if tds > 0:
             merchant = self.get_merchant
             MerchantTdsDeduction.objects.create(merchant=merchant, tds_deducted=tds,
-                                                financial_year=MerchantTdsDeduction.CURRENT_FINANCIAL_YEAR,
+                                                financial_year=settings.CURRENT_FINANCIAL_YEAR,
                                                 merchant_payout=merchant_payout)
 
     def get_auto_cancel_delay(self, app_obj):
