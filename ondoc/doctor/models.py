@@ -638,10 +638,6 @@ class Hospital(auth_model.TimeStampedModel, auth_model.CreatedByModel, auth_mode
 
         return insured
 
-    @classmethod
-    def get_medanta_hospital(cls):
-        return Hospital.objects.filter(id=settings.MEDANTA_HOSPITAL_ID).first()
-
 
 class HospitalPlaceDetails(auth_model.TimeStampedModel):
     hospital = models.ForeignKey(Hospital, on_delete=models.CASCADE, related_name='hospital_place_details')
@@ -2144,23 +2140,6 @@ class OpdAppointmentInvoiceMixin(object):
             invoices = [invoice]
         return invoices
 
-    def generate_credit_letter(self):
-        old_credit_letters = self.get_document_objects(Documents.CREDIT_LETTER)
-        old_credit_letters.update(is_valid=False)
-        credit_letter = self.documents.create(document_type=Documents.CREDIT_LETTER)
-        context = {
-            "instance": self
-        }
-        html_body = render_to_string("email/documents/credit_letter_medanta.html", context=context)
-        filename = "credit_letter_{}.pdf".format(self.id)
-        file = html_to_pdf(html_body, filename)
-        if not file:
-            logger.error("Got error while creating pdf for opd credit letter.")
-            return []
-        credit_letter.file = file
-        credit_letter.save()
-        return credit_letter
-
 
 @reversion.register()
 class OpdAppointment(auth_model.TimeStampedModel, CouponsMixin, OpdAppointmentInvoiceMixin, RefundMixin, CompletedBreakupMixin, MatrixDataMixin):
@@ -2394,9 +2373,13 @@ class OpdAppointment(auth_model.TimeStampedModel, CouponsMixin, OpdAppointmentIn
                     invoices_urls.append(util_absolute_url(invoice.file.url))
         return invoices_urls
 
-    def is_medanta_hospital_booking(self):
-        medanta_hospital = Hospital.get_medanta_hospital()
-        return self.hospital == medanta_hospital if medanta_hospital else False
+    def is_credit_letter_required_for_appointment(self):
+        hospital_ids_cl_required = list(settings.HOSPITAL_CREDIT_LETTER_REQUIRED.values())
+        if self.hospital and self.hospital.id in hospital_ids_cl_required:
+            if self.is_medanta_hospital_booking() or self.is_artemis_hospital_booking():
+                return True
+        return False
+
 
     def get_valid_credit_letter(self):
         credit_letter = self.get_document_objects(Documents.CREDIT_LETTER).first()
@@ -3330,6 +3313,38 @@ class OpdAppointment(auth_model.TimeStampedModel, CouponsMixin, OpdAppointmentIn
             url = settings.BASE_URL + '/order/paymentSummary?order_id={}&token={}'.format(order_id, token)
             result = url, discount
         return result
+
+    def generate_credit_letter(self):
+        old_credit_letters = self.get_document_objects(Documents.CREDIT_LETTER)
+        old_credit_letters.update(is_valid=False)
+        credit_letter = self.documents.create(document_type=Documents.CREDIT_LETTER)
+        context = {
+            "instance": self
+        }
+        html_body = None
+        if self.is_medanta_hospital_booking():
+            html_body = render_to_string("email/documents/credit_letter_medanta.html", context=context)
+        elif self.is_artemis_hospital_booking():
+            html_body = render_to_string("email/documents/credit_letter_artemis.html", context=context)
+        if not html_body:
+            logger.error("Got error while getting hospital for opd credit letter.")
+            return None
+        filename = "credit_letter_{}.pdf".format(self.id)
+        file = html_to_pdf(html_body, filename)
+        if not file:
+            logger.error("Got error while creating pdf for opd credit letter.")
+            return None
+        credit_letter.file = file
+        credit_letter.save()
+        return credit_letter
+
+    def is_medanta_hospital_booking(self):
+        medanta_hospital = Hospital.objects.filter(id=settings.MEDANTA_HOSPITAL_ID).first()
+        return self.hospital == medanta_hospital if medanta_hospital else False
+
+    def is_artemis_hospital_booking(self):
+        artemis_hospital = Hospital.objects.filter(id=settings.ARTEMIS_HOSPITAL_ID).first()
+        return self.hospital == artemis_hospital if artemis_hospital else False
 
 
 class OpdAppointmentProcedureMapping(models.Model):

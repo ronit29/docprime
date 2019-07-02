@@ -162,7 +162,7 @@ def send_opd_notifications_refactored(appointment_id, notification_type=None):
             return
         if instance.status == OpdAppointment.COMPLETED:
             instance.generate_invoice()
-        if instance.status == OpdAppointment.ACCEPTED and instance.is_medanta_hospital_booking() and not instance.is_payment_type_cod():
+        if instance.status == OpdAppointment.ACCEPTED and instance.is_credit_letter_required_for_appointment() and not instance.is_payment_type_cod():
             instance.generate_credit_letter()
         counter = 1
         is_masking_done = False
