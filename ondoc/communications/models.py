@@ -664,18 +664,36 @@ class WHTSAPPNotification:
             data.append(datetime.strftime(aware_time_zone(self.context.get('instance').time_slot_start), '%d-%m-%Y %H:%M'))
 
         elif notification_type == NotificationAction.LAB_APPOINTMENT_CANCELLED and user and user.user_type == User.CONSUMER:
-            body_template = "lab_appointment_cancellation_patient"
 
-            data.append(self.context.get('patient_name'))
-            data.append(datetime.strftime(aware_time_zone(self.context.get('instance').time_slot_start), '%d-%m-%Y %H:%M'))
-            data.append(self.context.get('lab_name'))
-            data.append(self.context.get('lab_name'))
-            data.append(self.context.get('instance').id)
-            data.append(self.context.get('patient_name'))
-            data.append(self.context.get('lab_name'))
-            data.append(datetime.strftime(aware_time_zone(self.context.get('instance').time_slot_start), '%d-%m-%Y %H:%M'))
-            # TODO: not implemented yet. So just setting generic text.
-            data.append('Paid amount')
+            instance = self.context.get('instance')
+
+            if instance.payment_type in [OpdAppointment.COD, OpdAppointment.INSURANCE]:
+                body_template = "labappointment_cancellation_patient_v1"
+
+                data.append(self.context.get('patient_name'))
+                data.append(
+                    datetime.strftime(aware_time_zone(self.context.get('instance').time_slot_start), '%d-%m-%Y'))
+                data.append(datetime.strftime(aware_time_zone(self.context.get('instance').time_slot_start), '%H:%M'))
+                data.append(self.context.get('lab_name'))
+                data.append(self.context.get('instance').id)
+                data.append(self.context.get('patient_name'))
+                data.append(self.context.get('lab_name'))
+                data.append(
+                    datetime.strftime(aware_time_zone(self.context.get('instance').time_slot_start), '%d-%m-%Y %H:%M'))
+
+            else:
+                body_template = "labappointment_cancel_without_insurance_patient"
+
+                data.append(self.context.get('patient_name'))
+                data.append(
+                    datetime.strftime(aware_time_zone(self.context.get('instance').time_slot_start), '%d-%m-%Y'))
+                data.append(datetime.strftime(aware_time_zone(self.context.get('instance').time_slot_start), '%H:%M'))
+                data.append(self.context.get('lab_name'))
+                data.append(self.context.get('instance').id)
+                data.append(self.context.get('patient_name'))
+                data.append(self.context.get('lab_name'))
+                data.append(
+                    datetime.strftime(aware_time_zone(self.context.get('instance').time_slot_start), '%d-%m-%Y %H:%M'))
 
         elif notification_type == NotificationAction.LAB_APPOINTMENT_CANCELLED and (not user or user.user_type == User.DOCTOR):
             body_template = "appointment_cancelled_lab"
@@ -714,6 +732,33 @@ class WHTSAPPNotification:
                 data.append('The transaction ID for this refund is : DPRF%s' % str(self.context.get('ctrnx_id')))
             else:
                 data.append(' ')
+
+        elif notification_type == NotificationAction.LAB_REPORT_SEND_VIA_CRM:
+            instance = self.context.get('instance')
+            if instance.is_thyrocare:
+                body_template = "labappointment_thyrocare_report_v1"
+
+                data.append(self.context.get('instance').id)
+                data.append(self.context.get('patient_name'))
+                data.append(self.context.get('lab_name'))
+                lab_reports = []
+                for report in self.context.get('reports', []):
+                    temp_short_url = generate_short_url(report)
+                    lab_reports.append(temp_short_url)
+                data.append(", ".join(lab_reports))
+                data.append(self.context.get('chat_url'))
+
+            else:
+                body_template = "labappointment_report_v1"
+
+                data.append(self.context.get('instance').id)
+                data.append(self.context.get('patient_name'))
+                data.append(self.context.get('lab_name'))
+                lab_reports = []
+                for report in self.context.get('reports', []):
+                    temp_short_url = generate_short_url(report)
+                    lab_reports.append(temp_short_url)
+                data.append(", ".join(lab_reports))
 
         elif notification_type == NotificationAction.IPD_PROCEDURE_COST_ESTIMATE:
             # todo - get access permission from whatsapp
