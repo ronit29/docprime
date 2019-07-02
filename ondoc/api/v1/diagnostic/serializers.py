@@ -1454,13 +1454,19 @@ class LabEntitySerializer(serializers.ModelSerializer):
 class CustomPackageLabSerializer(LabModelSerializer):
     # avg_rating = serializers.ReadOnlyField()
     url = serializers.SerializerMethodField()
+    is_thyrocare = serializers.SerializerMethodField()
+
+    def get_is_thyrocare(self, obj):
+        if obj and obj.network and obj.network.id == settings.THYROCARE_NETWORK_ID:
+            return True
+        return False
 
     class Meta:
         model = Lab
         fields = ('id', 'lat', 'long', 'lab_thumbnail', 'name', 'operational_since', 'locality', 'address',
                   'sublocality', 'city', 'state', 'country', 'always_open', 'about', 'home_pickup_charges',
                   'is_home_collection_enabled', 'seo', 'breadcrumb', 'center_visit_enabled', 'avg_rating', 'url',
-                  'city', 'network_id')
+                  'city', 'network_id', 'is_thyrocare')
 
     def get_url(self, obj):
         entity_url_dict = self.context.get('entity_url_dict', {})
