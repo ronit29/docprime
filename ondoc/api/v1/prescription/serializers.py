@@ -224,7 +224,7 @@ class GeneratePrescriptionPDFBodySerializer(serializers.Serializer):
 
             serial_id, task, prescription_pdf = prescription_models.PresccriptionPdf.compute_serial_id(id=attrs.get("id"),
                                                                                                        appointment=appointment,
-                                                                                                       serial_id=attrs.get("serial_id"))
+                                                                                                       req_serial_id=attrs.get("serial_id"))
             # if not attrs.get("serial_id"):
             #     serial_id = prescription_models.PresccriptionPdf.get_serial(appointment)
             # exists = False
