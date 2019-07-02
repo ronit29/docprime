@@ -711,11 +711,11 @@ class InsuranceEndorsementViewSet(viewsets.GenericViewSet):
             return Response(data=res, status=status.HTTP_400_BAD_REQUEST)
 
         # appointment should not be completed in insurance mode for endorsement!!
-        opd_completed_appointments = OpdAppointment.get_insured_completed_appointment(user.active_insurance)
-        lab_completed_appointments = LabAppointment.get_insured_completed_appointment(user.active_insurance)
-        if not hasattr(request, 'agent') and (opd_completed_appointments > 0 or lab_completed_appointments > 0):
-            res['error'] = "One of the OPD or LAB Appointment have been completed, could not process endorsement!!"
-            return Response(data=res, status=status.HTTP_400_BAD_REQUEST)
+        # opd_completed_appointments = OpdAppointment.get_insured_completed_appointment(user.active_insurance)
+        # lab_completed_appointments = LabAppointment.get_insured_completed_appointment(user.active_insurance)
+        # if not hasattr(request, 'agent') and (opd_completed_appointments > 0 or lab_completed_appointments > 0):
+        #     res['error'] = "One of the OPD or LAB Appointment have been completed, could not process endorsement!!"
+        #     return Response(data=res, status=status.HTTP_400_BAD_REQUEST)
 
         serializer = serializers.EndorseMemberSerializer(data=request.data, context={'request': request})
         if not serializer.is_valid() and serializer.errors:
