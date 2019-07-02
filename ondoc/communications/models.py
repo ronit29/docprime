@@ -355,6 +355,8 @@ class SMSNotification:
     def trigger(self, receiver, template, context):
         user = receiver.get('user')
         phone_number = receiver.get('phone_number')
+        if not phone_number:
+            phone_number = user.phone_number
         notification_type = self.notification_type
         context = copy.deepcopy(context)
         html_body = render_to_string(template, context=context)
