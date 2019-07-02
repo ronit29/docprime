@@ -549,7 +549,7 @@ class WHTSAPPNotification:
         elif notification_type == NotificationAction.APPOINTMENT_CANCELLED and user and user.user_type == User.CONSUMER:
             instance = self.context.get('instance')
 
-            if instance.payment_type in [OpdAppointment.COD, OpdAppointment.COD]:
+            if instance.payment_type in [OpdAppointment.COD, OpdAppointment.INSURANCE]:
                 body_template = "appointment_cancelled_doctor"
 
                 data.append(self.context.get('doctor_name'))
