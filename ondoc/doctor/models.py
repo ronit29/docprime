@@ -4171,7 +4171,7 @@ class PartnersAppInvoice(auth_model.TimeStampedModel):
     def last_serial(cls, appointment):
         # obj = cls.objects.filter(appointment__doctor=appointment.doctor, appointment__hospital=appointment.hospital,
         #                          is_encrypted=False, is_valid=True).order_by('-created_at').first()
-        obj = cls.objects.filter(serial_id__contains=str(appointment.hospital.id)+'-'+str(appointment.doctor.id)).order_by('-serial_id').first()
+        obj = cls.objects.filter(invoice_serial_id__contains=str(appointment.hospital.id)+'-'+str(appointment.doctor.id)).order_by('-invoice_serial_id').first()
         if obj:
             serial = int(obj.invoice_serial_id.split('-')[-2])
             return serial
