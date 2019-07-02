@@ -547,15 +547,31 @@ class WHTSAPPNotification:
             data.append(self.context.get('doctor_name'))
 
         elif notification_type == NotificationAction.APPOINTMENT_CANCELLED and user and user.user_type == User.CONSUMER:
-            body_template = "opd_appointment_cancellation_patient"
+            instance = self.context.get('instance')
 
-            data.append(self.context.get('patient_name'))
-            data.append(self.context.get('doctor_name'))
-            data.append(datetime.strftime(aware_time_zone(self.context.get('instance').time_slot_start), '%d-%m-%Y'))
-            data.append(datetime.strftime(aware_time_zone(self.context.get('instance').time_slot_start), '%H:%M'))
-            data.append(self.context.get('instance').id)
-            data.append(self.context.get('patient_name'))
-            data.append(self.context.get('doctor_name'))
+            if instance.payment_type in [OpdAppointment.COD, OpdAppointment.COD]:
+                body_template = "appointment_cancelled_doctor"
+
+                data.append(self.context.get('doctor_name'))
+                data.append(
+                    datetime.strftime(aware_time_zone(self.context.get('instance').time_slot_start), '%d-%m-%Y'))
+                data.append(datetime.strftime(aware_time_zone(self.context.get('instance').time_slot_start), '%H:%M'))
+                data.append(self.context.get('instance').hospital.name)
+                data.append(self.context.get('instance').id)
+                data.append(self.context.get('patient_name'))
+                data.append(self.context.get('doctor_name'))
+
+            else:
+
+                body_template = "opd_appointment_cancellation_patient"
+
+                data.append(self.context.get('patient_name'))
+                data.append(self.context.get('doctor_name'))
+                data.append(datetime.strftime(aware_time_zone(self.context.get('instance').time_slot_start), '%d-%m-%Y'))
+                data.append(datetime.strftime(aware_time_zone(self.context.get('instance').time_slot_start), '%H:%M'))
+                data.append(self.context.get('instance').id)
+                data.append(self.context.get('patient_name'))
+                data.append(self.context.get('doctor_name'))
 
         elif notification_type == NotificationAction.PRESCRIPTION_UPLOADED:
             body_template = "prescription_uploaded"
