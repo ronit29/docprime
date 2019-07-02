@@ -66,7 +66,9 @@ class InsuranceNetworkViewSet(viewsets.GenericViewSet):
             params['longitude'] = longitude
             result = list()
 
-            labs_query = '''select l.network_id,l.name, 'lab' as type,eu.url,l.city,l.id from lab_network ln inner join lab l on l.network_id = ln.id
+            labs_query = '''select l.network_id,l.name, 'lab' as type,eu.url,l.city,l.id, 
+             st_distance(l.location,st_setsrid(st_point((%(longitude)s),(%(latitude)s)), 4326))/1000  distance 
+             from lab_network ln inner join lab l on l.network_id = ln.id
             inner join entity_urls eu on l.id = eu.entity_id and eu.sitemap_identifier='LAB_PAGE' and eu.is_valid=true
             where l.is_live=true and l.is_test_lab=false and ln.id in (43, 18, 65, 22) and St_dwithin( St_setsrid(St_point((%(longitude)s), (%(latitude)s)), 4326),l.location, 15000) 
             order by ST_Distance(l.location, St_setsrid(St_point((%(longitude)s), (%(latitude)s)), 4326)) '''
