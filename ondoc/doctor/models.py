@@ -51,7 +51,7 @@ from django.contrib.contenttypes.fields import GenericRelation
 from ondoc.api.v1.utils import get_start_end_datetime, custom_form_datetime, CouponsMixin, aware_time_zone, \
     form_time_slot, util_absolute_url, html_to_pdf, TimeSlotExtraction, resolve_address
 from ondoc.common.models import AppointmentHistory, AppointmentMaskNumber, Service, Remark, MatrixMappedState, \
-    MatrixMappedCity, GlobalNonBookable, SyncBookingAnalytics, CompletedBreakupMixin, RefundDetails, Documents
+    MatrixMappedCity, GlobalNonBookable, SyncBookingAnalytics, CompletedBreakupMixin, RefundDetails, Documents, Fraud
 from ondoc.common.models import QRCode, MatrixDataMixin
 
 from functools import reduce
@@ -2248,6 +2248,7 @@ class OpdAppointment(auth_model.TimeStampedModel, CouponsMixin, OpdAppointmentIn
     is_cod_to_prepaid = models.NullBooleanField(default=False, null=True, blank=True)
     hospital_reference_id = models.CharField(max_length=1000, null=True, blank=True)
     documents = GenericRelation(Documents)
+    fraud = GenericRelation(Fraud)
 
     def __str__(self):
         return self.profile.name + " (" + self.doctor.name + ")"

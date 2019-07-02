@@ -1596,7 +1596,7 @@ class DoctorOpdAppointmentAdmin(admin.ModelAdmin):
     list_display = ('booking_id', 'get_doctor', 'get_profile', 'status', 'time_slot_start', 'effective_price', 'created_at', 'updated_at')
     list_filter = ('status', 'payment_type')
     date_hierarchy = 'created_at'
-    inlines = [PrescriptionInline]
+    inlines = [PrescriptionInline, FraudInline]
 
     def get_queryset(self, request):
         return super(DoctorOpdAppointmentAdmin, self).get_queryset(request).select_related('doctor', 'hospital', 'hospital__network')
