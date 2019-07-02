@@ -3,6 +3,7 @@ from ondoc.authentication.models import User
 from django.contrib.contenttypes.fields import GenericForeignKey, GenericRelation
 from django.contrib.contenttypes.models import ContentType
 from ondoc.authentication import models as auth_models
+from ondoc.prescription import models as pres_models
 from ondoc.doctor import models as doc_models
 from django.contrib.postgres.fields import JSONField, ArrayField
 from django.template.loader import render_to_string
@@ -199,10 +200,72 @@ class PresccriptionPdf(auth_models.TimeStampedModel):
         hospital_id = appointment.hospital.id
         obj = cls.objects.filter(serial_id__contains=str(hospital_id)+'-'+str(doctor_id)).order_by('-serial_id').first()
         if obj:
-            serial = obj.serial_id[-12:]
+            # serial = obj.serial_id[-12:]
+            serial = '-'.join(obj.serial_id.split('-')[-3:])
             return serial
         else:
             return str(cls.SERIAL_ID_START) + '-01-01'
+
+    @classmethod
+    def compute_serial_id(cls, id, appointment, req_serial_id):
+        serial_id = None
+        task = None
+        prescription_pdf = None
+        if not req_serial_id:
+            serial_id = cls.get_serial(appointment)
+        exists = False
+        i = 0
+        for pres in appointment.eprescription.all():
+            if pres.is_encrypted:
+                continue
+            i += 1
+            if str(pres.id) == id:
+                task = cls.UPDATE
+                prescription_pdf = pres
+                if not req_serial_id:
+                    serial_id_elements = pres.serial_id.split('-')
+                    serial_id_elements[-1] = str(int(serial_id_elements[-1]) + 1).zfill(2)      # version incremented
+                    serial_id = '-'.join(serial_id_elements)
+                exists = True
+                break
+        if not exists:
+            if i != 0:
+                task = cls.CREATE
+                if not req_serial_id:
+                    serial_id_elements = serial_id.split('-')
+                    serial_id_elements[-2] = str(int(serial_id_elements[-2]) + 1).zfill(2)      # file no incremented
+                    serial_id = '-'.join(serial_id_elements)
+            else:
+                task = cls.CREATE
+                if not req_serial_id:
+                    serial_id = str(int(serial_id.split('-')[-3]) + 1) + '-01-01'
+        return serial_id, task, prescription_pdf
+
+    def decrypt_prescription_history(self, appointment, passphrase):
+        pres_histories = self.history.filter(data__is_encrypted=True).order_by('created_at')
+        version = None
+        latest_decrypted_pres_history = self.history.filter(data__is_encrypted=False).order_by('-updated_at').first()
+        for index, pres_history_obj in enumerate(pres_histories):
+
+            utils.patient_details_name_phone_number_decrypt(pres_history_obj.data['patient_details'], passphrase)
+
+            pres_history_obj.data['is_encrypted'] = False
+            if index == 0:
+                if latest_decrypted_pres_history:
+                    serial_id_elements = latest_decrypted_pres_history.data['serial_id'].split('-')
+                    serial_id_elements[-1] = str(int(serial_id_elements[-1]) + 1).zfill(2)
+                    serial_id = '-'.join(serial_id_elements)
+                else:
+                    serial_id, task, pres_pdf = pres_models.PresccriptionPdf.compute_serial_id(self.id, appointment, None)
+            else:
+                serial_id_elements = serial_id.split('-')
+                serial_id_elements[-1] = str(int(serial_id_elements[-1]) + 1)
+                serial_id = '-'.join(serial_id_elements).zfill(2)
+            pres_history_obj.data['serial_id'] = str(appointment.hospital.id) + '-' + str(appointment.doctor.id) + '-' + serial_id
+            version = pres_history_obj.data['serial_id'].split('-')[-1]
+            pres_history_obj.save()
+
+        return version
 
     def __str__(self):
         return self.id
@@ -218,7 +281,7 @@ class PrescriptionHistory(auth_models.TimeStampedModel):
     data = JSONField()
 
     def __str__(self):
-        return self.id
+        return str(self.id) + '-' + str(self.prescription.id)
 
     class Meta:
         db_table = 'eprescription_history'

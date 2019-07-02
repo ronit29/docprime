@@ -621,7 +621,7 @@ class ProviderSignupDataViewset(viewsets.GenericViewSet):
                 hospital_ids_to_be_created.append(hospital['hospital_id'].id)
         if 'is_encrypted' in valid_data and not valid_data.get('is_encrypted'):
             decrypted_invoice_pdfs.apply_async((hospital_ids,), countdown=5)
-            decrypted_prescription_pdfs.apply_async((hospital_ids,), countdown=5)
+            decrypted_prescription_pdfs.apply_async((hospital_ids, valid_data['encryption_key']), countdown=5)
             doc_models.ProviderEncrypt.objects.filter(hospital__in=[hospital['hospital_id'] for hospital in valid_data.get("hospitals")])\
                                               .update(is_encrypted=False, encrypted_by=None, hint=None,
                                                       encrypted_hospital_id=None, email=None, phone_numbers=None,
@@ -880,13 +880,15 @@ class ProviderSignupDataViewset(viewsets.GenericViewSet):
     def decrypt_and_save_provider_data(self, hospital_id, key):
         passphrase = hashlib.md5(key.encode())
         passphrase = passphrase.hexdigest()[:16]
-        patient_queryset = doc_models.OfflinePatients.objects.prefetch_related('patient_mobiles').filter(hospital_id=hospital_id)
+        patient_queryset = doc_models.OfflinePatients.objects.prefetch_related('patient_mobiles'
+                                                                               # ,'hospital__offline_hospital_appointments__eprescription'
+                                                                               ).filter(hospital_id=hospital_id)
         for patient in patient_queryset:
             if patient.encrypted_name:
                 name, exception = v1_utils.AES_encryption.decrypt(patient.encrypted_name, passphrase)
                 if exception:
                     return exception
-                patient.name = name
+                patient.name = ''.join(e for e in name if e.isalnum() or e==' ')
                 patient.encrypted_name = None
                 patient.save()
             for mobile in patient.patient_mobiles.all():
@@ -955,7 +957,7 @@ class PartnersAppInvoice(viewsets.GenericViewSet):
         created_objects = doc_models.SelectedInvoiceItems.objects.bulk_create(obj_list)
         return created_objects
 
-    def create_or_update_invoice(self, invoice_data, version, id=None):
+    def create_or_update_invoice(self, invoice_data, version, user, id=None):
         invoice = selected_invoice_items_created = e = None
 
         task = invoice_data.pop('task')
@@ -983,6 +985,7 @@ class PartnersAppInvoice(viewsets.GenericViewSet):
             invoice_obj = invoice_queryset.first()
 
         if generate_invoice:
+            invoice_obj.is_invoice_generated = True
             # invoice_obj.is_invoice_generated = True
             # context = invoice_obj.get_context(selected_invoice_items)
             # content = render_to_string("partners_app_invoice/partners_app_invoice.html", context=context)
@@ -997,8 +1000,11 @@ class PartnersAppInvoice(viewsets.GenericViewSet):
             # encoded_filename = jwt.encode({"filename":filename}, settings.PARTNERS_INVOICE_ENCODE_KEY).decode('utf-8')
             # encoded_url = "{}{}{}".format(settings.BASE_URL, "/api/v2/doctor/invoice/", encoded_filename)
             # invoice_obj.encoded_url = v1_utils.generate_short_url(encoded_url)
-            invoice_obj.generate_invoice(selected_invoice_items, appointment)
+            # invoice_obj.generate_invoice(selected_invoice_items, appointment)
+            if not invoice_data.get('is_encrypted'):
+                invoice_obj.generate_invoice(invoice_data['selected_invoice_items'], appointment)
         try:
+            invoice_obj.edited_by = user
             invoice_obj.save()
             invoice = serializers.PartnersAppInvoiceModelSerialier(invoice_obj)
 
@@ -1031,7 +1037,7 @@ class PartnersAppInvoice(viewsets.GenericViewSet):
         try:
             # invoice_data['task'] = self.CREATE
             invoice_data['task'] = doc_models.PartnersAppInvoice.CREATE
-            invoice, selected_invoice_items_created, exception = self.create_or_update_invoice(invoice_data, version='01')
+            invoice, selected_invoice_items_created, exception = self.create_or_update_invoice(invoice_data, version='01', user=request.user, id=None)
             if not exception:
                 return Response({"status": 1, "invoice": invoice.data,
                                  "selected_invoice_items_created": selected_invoice_items_created}, status.HTTP_200_OK)
@@ -1049,19 +1055,19 @@ class PartnersAppInvoice(viewsets.GenericViewSet):
             data = serializer.validated_data['data']
             if not invoice.is_invoice_generated:
                 invoice.is_edited = True
-                invoice.edited_by = request.user
+                # invoice.edited_by = request.user
                 invoice.save()
-                version = invoice.invoice_serial_id[-2:] if not data.get('is_encrypted') else None
+                version = invoice.invoice_serial_id.split('-')[-1] if not data.get('is_encrypted') else None
                 # data['task'] = self.UPDATE
                 data['task'] = doc_models.PartnersAppInvoice.UPDATE
-                invoice_data, selected_invoice_items_created, exception = self.create_or_update_invoice(data, version, invoice.id)
+                invoice_data, selected_invoice_items_created, exception = self.create_or_update_invoice(data, version, request.user, invoice.id)
 
             else:
                 invoice.is_valid = False
                 invoice.save()
-                version = str(int(invoice.invoice_serial_id[-2:]) + 1).zfill(2)
+                version = str(int(invoice.invoice_serial_id.split('-')[-1]) + 1).zfill(2)
                 data['task'] = doc_models.PartnersAppInvoice.CREATE
-                invoice_data, selected_invoice_items_created, exception = self.create_or_update_invoice(data, version)
+                invoice_data, selected_invoice_items_created, exception = self.create_or_update_invoice(data, version, request.user)
             if not exception:
                 return Response({"status": 1, "invoice": invoice_data.data,
                                  "selected_invoice_items_created": selected_invoice_items_created}, status.HTTP_200_OK)

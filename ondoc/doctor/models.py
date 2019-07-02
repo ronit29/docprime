@@ -4137,16 +4137,29 @@ class PartnersAppInvoice(auth_model.TimeStampedModel):
         invoice_items = list()
         # selected_invoice_items = self.selected_invoice_items
         for item in selected_invoice_items:
-            if item['invoice_item'].tax_percentage:
-                tax = str(item['invoice_item'].tax_amount) + ' (' + str(item['invoice_item'].tax_percentage.normalize()) + '%)'
+            # if item['invoice_item'].tax_percentage:
+            if item['invoice_item'].get('tax_percentage'):
+                # tax = str(item['invoice_item'].tax_amount) + ' (' + str(item['invoice_item'].tax_percentage.normalize()) + '%)'
+                tax = str(item['invoice_item']['tax_amount']) + ' (' + str(item['invoice_item']['tax_percentage'].normalize()) + '%)'
             else:
-                tax = str(item['invoice_item'].tax_amount)
-            if item['invoice_item'].discount_percentage:
-                discount = str(item['invoice_item'].discount_amount) + ' (' + str(item['invoice_item'].discount_percentage.normalize()) + '%)'
+                # tax = str(item['invoice_item'].tax_amount)
+                tax = str(item['invoice_item']['tax_amount'])
+            # if item['invoice_item'].discount_percentage:
+            if item['invoice_item'].get('discount_percentage'):
+                # discount = str(item['invoice_item'].discount_amount) + ' (' + str(item['invoice_item'].discount_percentage.normalize()) + '%)'
+                discount = str(item['invoice_item']['discount_amount']) + ' (' + str(item['invoice_item']['discount_percentage'].normalize()) + '%)'
             else:
-                discount = str(item['invoice_item'].discount_amount)
-            invoice_items.append({"name": item['invoice_item'].item,
-                                  "base_price": str(item['invoice_item'].base_price),
+                # discount = str(item['invoice_item'].discount_amount)
+                discount = str(item['invoice_item']['discount_amount'])
+            # invoice_items.append({"name": item['invoice_item'].item,
+            #                       "base_price": str(item['invoice_item'].base_price),
+            #                       "quantity": item['quantity'],
+            #                       "tax": tax,
+            #                       "discount": discount,
+            #                       "amount": str(item['calculated_price'])
+            #                       })
+            invoice_items.append({"name": item['invoice_item']['item'],
+                                  "base_price": str(item['invoice_item']['base_price']),
                                   "quantity": item['quantity'],
                                   "tax": tax,
                                   "discount": discount,
@@ -4156,16 +4169,17 @@ class PartnersAppInvoice(auth_model.TimeStampedModel):
 
     @classmethod
     def last_serial(cls, appointment):
-        obj = cls.objects.filter(appointment__doctor=appointment.doctor, appointment__hospital=appointment.hospital,
-                                 is_encrypted=False, is_valid=True).order_by('-created_at').first()
+        # obj = cls.objects.filter(appointment__doctor=appointment.doctor, appointment__hospital=appointment.hospital,
+        #                          is_encrypted=False, is_valid=True).order_by('-created_at').first()
+        obj = cls.objects.filter(serial_id__contains=str(appointment.hospital.id)+'-'+str(appointment.doctor.id)).order_by('-serial_id').first()
         if obj:
-            serial = int(obj.invoice_serial_id[-9:-3])
+            serial = int(obj.invoice_serial_id.split('-')[-2])
             return serial
         else:
             return cls.INVOICE_SERIAL_ID_START
 
     def generate_invoice(self, selected_invoice_items, appointment):
-        self.is_invoice_generated = True
+
         context = self.get_context(selected_invoice_items)
         content = render_to_string("partners_app_invoice/partners_app_invoice.html", context=context)
         filename = (appointment.user.name + ' ' + self.invoice_serial_id + '.pdf').replace(' ', '_')

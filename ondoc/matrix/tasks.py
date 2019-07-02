@@ -1000,26 +1000,69 @@ def create_ipd_lead_from_opd_appointment(self, data):
 def decrypted_invoice_pdfs(hospital_ids):
     from ondoc.doctor import models as doc_models
 
-    version = '01'
     for hospital_id in hospital_ids:
-        encrypted_invoices = doc_models.PartnersAppInvoice.objects.filter(appointment__hospital_id=hospital_id, is_encrypted=True, is_valid=True).order_by('updated_at')
-        last_unencrypted_invoice = doc_models.PartnersAppInvoice.objects.filter(appointment__hospital_id=hospital_id, is_encrypted=False, is_valid=True).order_by('-created_at').first()
-        serial = last_unencrypted_invoice.serial_id[-9:-3] + 1 if last_unencrypted_invoice else doc_models.PartnersAppInvoice.INVOICE_SERIAL_ID_START
+        encrypted_invoices = doc_models.PartnersAppInvoice.objects.filter(appointment__hospital_id=hospital_id, is_encrypted=True).order_by('created_at')
         for invoice in encrypted_invoices:
-            invoice.serial_id = serial
-            invoice.serial_id = 'INV-' + str(invoice.appointment.hospital.id) + '-' + str(invoice.appointment.doctor.id) + '-' + str(serial) + '-' + version
+            previous_version_invoice = doc_models.PartnersAppInvoice.objects.filter(appointment=invoice.appointment, is_encrypted=False).order_by('-updated_at').first()
+            if previous_version_invoice:
+                serial = previous_version_invoice.invoice_serial_id.split('-')[-2]
+                version = str(int(previous_version_invoice.invoice_serial_id.split('-')[-1]) + 1).zfill(2)
+            else:
+                last_serial = doc_models.PartnersAppInvoice.last_serial(invoice.appointment)
+                serial = last_serial + 1
+                version = '01'
+            invoice.invoice_serial_id = 'INV-' + str(invoice.appointment.hospital.id) + '-' + str(invoice.appointment.doctor.id) + '-' + str(serial) + '-' + version
             invoice.generate_invoice(invoice.selected_invoice_items, invoice.appointment)
             invoice.is_encrypted = False
             invoice.save()
-            serial += 1
-
 
 @task()
-def decrypted_prescription_pdfs(self, hospital_ids):
+def decrypted_prescription_pdfs(hospital_ids, key):
     from ondoc.prescription import models as pres_models
+    from ondoc.api.v1 import utils as v1_utils
+    from django.db.models import Q
+    import hashlib
 
+    passphrase = hashlib.md5(key.encode())
+    passphrase = passphrase.hexdigest()[:16]
     for hospital_id in hospital_ids:
-        encrypted_invoices = pres_models.PresccriptionPdf.objects.filter(appointment__hospital_id=hospital_id,
-                                                                      is_encrypted=True, is_valid=True).order_by(
-        'updated_at')
-        pass
+
+        encrypted_prescriptions = pres_models.PresccriptionPdf.objects.prefetch_related('history').filter(Q(is_encrypted=True), (Q(opd_appointment__hospital_id=hospital_id) | Q(offline_opd_appointment__hospital_id=hospital_id))).order_by('created_at')
+
+        for prescription in encrypted_prescriptions:
+            appointment = None
+            appointments_previous_prescription = None
+            if prescription.appointment_type == pres_models.PresccriptionPdf.DOCPRIME_OPD:
+                appointment = prescription.opd_appointment
+                appointments_previous_prescription = pres_models.PresccriptionPdf.objects.filter(is_encrypted=False, opd_appointment=appointment).order_by('-serial_id').first()
+            elif prescription.appointment_type == pres_models.PresccriptionPdf.OFFLINE:
+                appointment = prescription.offline_opd_appointment
+                appointments_previous_prescription = pres_models.PresccriptionPdf.objects.filter(is_encrypted=False, offline_opd_appointment=appointment).order_by('-serial_id').first()
+
+            if not appointment:
+                raise Exception('Could not get docprime opd or offline appointment')
+
+            if not appointments_previous_prescription:
+                serial_id = prescription.get_serial(appointment)
+                serial_id_elements = serial_id.split('-')
+                serial_id_elements.insert(0, str(appointment.hospital.id))
+                serial_id_elements.insert(1, str(appointment.doctor.id))
+                serial_id_elements[-3] = str(int(serial_id_elements[-3]) + 1)                # serial number incremented
+            else:
+                serial_id_elements = appointments_previous_prescription.serial_id.split('-')
+                serial_id_elements[-3] = appointments_previous_prescription.serial_id.split('-')[-3]                            # serial number
+                serial_id_elements[-2] = str(int(appointments_previous_prescription.serial_id.split('-')[-2]) + 1).zfill(2)     # file number incremented
+
+            version = prescription.decrypt_prescription_history(appointment, passphrase)
+            if version:
+                serial_id_elements[-1] = str(int(version) + 1).zfill(2)  # version incremented
+            prescription.serial_id = '-'.join(serial_id_elements)
+
+            exception = v1_utils.patient_details_name_phone_number_decrypt(prescription.patient_details, passphrase)
+            if exception:
+                logger.error('Error while decrypting - ' + str(exception))
+                raise Exception("Error while decrypting - " + str(exception))
+
+            prescription.is_encrypted = False
+            prescription.prescription_file = prescription.get_pdf(appointment)
+            prescription.save()
