@@ -84,12 +84,18 @@ class InsuranceNetworkViewSet(viewsets.GenericViewSet):
             total_count_query= "select count(distinct entity_id) from insurance_covered_entity where type= %(type)s"
             total_count = RawSql(total_count_query, {'type':type}).fetch_all()[0].get('count')
 
+            data_list = []
+            for r in result:
+                data_list.append(
+                    {'name': r.get('name'), 'distance': math.ceil(r.get('distance')), 'id': r.get('id'), \
+                     'type': r.get('type'), 'url': r.get('url'), 'city': r.get('city')})
+
             resp = dict()
             resp["starts_with"] = None
             resp["count"] = len(result)
             resp["total_count"] = total_count
             resp["distance_count"] = len(result)
-            resp["results"] = result
+            resp["results"] = data_list
 
             return Response(resp)
 
