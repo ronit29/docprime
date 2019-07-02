@@ -284,12 +284,12 @@ class Hospital(auth_model.TimeStampedModel, auth_model.CreatedByModel, auth_mode
         pnt = GEOSGeometry(point_string, srid=4326)
         temp_hosp_queryset = Hospital.objects.filter(is_live=True)
 
-        if not request.user.is_anonymous and request.user.active_insurance:
-            for id in top_hospital_ids:
-                hosp_obj = Hospital.objects.filter(pk=id).first()
-                if hosp_obj:
-                    if not hosp_obj.is_hospital_doctor_insurance_enabled():
-                        top_hospital_ids.remove(id)
+        # if not request.user.is_anonymous and request.user.active_insurance:
+        #     for id in top_hospital_ids:
+        #         hosp_obj = Hospital.objects.filter(pk=id).first()
+        #         if hosp_obj:
+        #             if not hosp_obj.is_hospital_doctor_insurance_enabled():
+        #                 top_hospital_ids.remove(id)
 
         if top_network_ids:
             network_hospital_queryset = temp_hosp_queryset.filter(network__in=top_network_ids)
