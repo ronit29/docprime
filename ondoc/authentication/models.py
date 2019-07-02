@@ -1599,6 +1599,9 @@ class Merchant(TimeStampedModel):
     SAVINGS = 1
     CURRENT = 2
 
+    TDS_THRESHOLD_AMOUNT = 10000
+    TDS_APPLICABLE_RATE = 5
+
     #pg merchant creation codes
     NOT_INITIATED = 0
     INITIATED = 1
@@ -1637,6 +1640,7 @@ class Merchant(TimeStampedModel):
     mobile = models.CharField(max_length=200, null=False, blank= True)
     pg_status = models.PositiveIntegerField(choices=CREATION_STATUS_CHOICES, default=NOT_INITIATED, editable=False)
     api_response = JSONField(blank=True, null=True, editable=False)
+    enable_for_tds_deduction = models.BooleanField(default=False)
 
     class Meta:
         db_table = 'merchant'
@@ -1756,6 +1760,33 @@ class Merchant(TimeStampedModel):
                 if resp_data.get('statusCode') and resp_data.get('statusCode') in [cls.INITIATED, cls.INPROCESS]:
                     data.pg_status = resp_data.get('statusCode')
                     data.save()
+
+
+class MerchantNetRevenue(TimeStampedModel):
+
+    CURRENT_FINANCIAL_YEAR = '2019-2020'
+
+    merchant = models.ForeignKey(Merchant, on_delete=models.CASCADE, related_name='net_revenue')
+    total_revenue = models.DecimalField(max_digits=10, decimal_places=2, default=None, null=True, blank=True)
+    financial_year = models.CharField(max_length=20, null=True, blank=True)
+    tds_deducted = models.DecimalField(max_digits=10, decimal_places=2, default=None, null=True, blank=True)
+
+    class Meta:
+        db_table = 'merchant_net_revenue'
+
+
+class MerchantTdsDeduction(TimeStampedModel):
+
+    CURRENT_FINANCIAL_YEAR = '2019-2020'
+
+    merchant = models.ForeignKey(Merchant, on_delete=models.CASCADE, related_name='tds_deduction')
+    financial_year = models.CharField(max_length=20, null=True, blank=True)
+    tds_deducted = models.DecimalField(max_digits=10, decimal_places=2, default=None, null=True, blank=True)
+    merchant_payout = models.ForeignKey("account.MerchantPayout", on_delete=models.CASCADE, related_name='tds')
+
+    class Meta:
+        db_table = 'merchant_tds_deduction'
+
 
 class AssociatedMerchant(TimeStampedModel):
 

@@ -32,7 +32,7 @@ from datetime import timedelta
 from dateutil import tz
 from django.utils import timezone
 from ondoc.authentication import models as auth_model
-from ondoc.authentication.models import SPOCDetails, RefundMixin
+from ondoc.authentication.models import SPOCDetails, RefundMixin, MerchantTdsDeduction
 from ondoc.bookinganalytics.models import DP_OpdConsultsAndTests
 from ondoc.location import models as location_models
 from ondoc.account.models import Order, ConsumerAccount, ConsumerTransaction, PgTransaction, ConsumerRefund, \
@@ -51,9 +51,9 @@ from django.contrib.contenttypes.fields import GenericRelation
 from ondoc.api.v1.utils import get_start_end_datetime, custom_form_datetime, CouponsMixin, aware_time_zone, \
     form_time_slot, util_absolute_url, html_to_pdf, TimeSlotExtraction, resolve_address
 from ondoc.common.models import AppointmentHistory, AppointmentMaskNumber, Service, Remark, MatrixMappedState, \
-    MatrixMappedCity, GlobalNonBookable, SyncBookingAnalytics, CompletedBreakupMixin, RefundDetails, Documents
+    MatrixMappedCity, GlobalNonBookable, SyncBookingAnalytics, CompletedBreakupMixin, RefundDetails, TdsDeductionMixin, \
+    Documents
 from ondoc.common.models import QRCode, MatrixDataMixin
-
 from functools import reduce
 from operator import or_
 import logging
@@ -2142,7 +2142,7 @@ class OpdAppointmentInvoiceMixin(object):
 
 
 @reversion.register()
-class OpdAppointment(auth_model.TimeStampedModel, CouponsMixin, OpdAppointmentInvoiceMixin, RefundMixin, CompletedBreakupMixin, MatrixDataMixin):
+class OpdAppointment(auth_model.TimeStampedModel, CouponsMixin, OpdAppointmentInvoiceMixin, RefundMixin, CompletedBreakupMixin, MatrixDataMixin, TdsDeductionMixin):
     PRODUCT_ID = Order.DOCTOR_PRODUCT_ID
     CREATED = 1
     BOOKED = 2
@@ -2710,14 +2710,28 @@ class OpdAppointment(auth_model.TimeStampedModel, CouponsMixin, OpdAppointmentIn
         if self.payment_type in [OpdAppointment.COD]:
             raise Exception("Cannot create payout for COD appointments")
 
+        payout_amount = self.fees
+        tds = self.get_tds_amount()
+        if tds > 0:
+            payout_amount += tds
+
+        # Update Net Revenue
+        self.update_net_revenues(tds)
+
         payout_data = {
             "charged_amount" : self.effective_price,
-            "payable_amount" : self.fees,
-            "booking_type"   : Order.DOCTOR_PRODUCT_ID
+            "payable_amount" : payout_amount,
+            "booking_type"  : Order.DOCTOR_PRODUCT_ID
         }
 
         merchant_payout = MerchantPayout.objects.create(**payout_data)
         self.merchant_payout = merchant_payout
+
+        # TDS Deduction
+        if tds > 0:
+            merchant = self.get_merchant
+            MerchantTdsDeduction.objects.create(merchant=merchant, tds_deducted=tds, financial_year=MerchantTdsDeduction.CURRENT_FINANCIAL_YEAR,
+                                                merchant_payout=merchant_payout)
 
     def doc_payout_amount(self):
         amount = 0
@@ -2727,6 +2741,24 @@ class OpdAppointment(auth_model.TimeStampedModel, CouponsMixin, OpdAppointmentIn
             amount = self.fees
 
         return amount
+
+    def get_booking_revenue(self):
+        if self.payment_type == 3:
+            booking_net_revenue = 0
+        else:
+            wallet_amount = self.effective_price
+            price_data = self.price_data
+            if price_data:
+                w_amount = price_data.get('wallet_amount', None)
+                if w_amount is not None:
+                    wallet_amount = w_amount
+
+            agreed_price = self.fees
+            booking_net_revenue = wallet_amount - agreed_price
+            if booking_net_revenue < 0:
+                booking_net_revenue = 0
+
+        return booking_net_revenue
 
     @classmethod
     def get_billing_summary(cls, user, req_data):
