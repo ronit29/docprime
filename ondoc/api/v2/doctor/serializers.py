@@ -487,8 +487,10 @@ class PartnersAppInvoiceSerialier(serializers.Serializer):
         received_discount_amount = attrs.get('discount_amount')
         received_total_amount = attrs['total_amount']
 
-        if attrs.get('payment_status') == doc_models.PartnersAppInvoice.PAID and not attrs.get('payment_type'):
-            raise serializers.ValidationError('payment type is required for payment status - paid')
+        if attrs.get('payment_status') == doc_models.PartnersAppInvoice.PAID:
+            attrs['due_date'] = None
+            if not attrs.get('payment_type'):
+                raise serializers.ValidationError('payment type is required for payment status - paid')
         if attrs.get('payment_status') == doc_models.PartnersAppInvoice.PENDING and not attrs.get('due_date'):
             raise serializers.ValidationError('due date is required for payment status - pending')
         if attrs.get('generate_invoice') and not attrs.get('invoice_title'):

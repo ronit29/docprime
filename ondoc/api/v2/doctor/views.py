@@ -1065,7 +1065,7 @@ class PartnersAppInvoice(viewsets.GenericViewSet):
             else:
                 invoice.is_valid = False
                 invoice.save()
-                version = str(int(invoice.invoice_serial_id.split('-')[-1]) + 1).zfill(2)
+                version = str(int(invoice.invoice_serial_id.split('-')[-1]) + 1).zfill(2) if not invoice.is_encrypted else None
                 data['task'] = doc_models.PartnersAppInvoice.CREATE
                 invoice_data, selected_invoice_items_created, exception = self.create_or_update_invoice(data, version, request.user)
             if not exception:
