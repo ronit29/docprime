@@ -233,6 +233,7 @@ class PresccriptionPdf(auth_models.TimeStampedModel):
                 if not req_serial_id:
                     serial_id_elements = serial_id.split('-')
                     serial_id_elements[-2] = str(int(serial_id_elements[-2]) + 1).zfill(2)      # file no incremented
+                    serial_id_elements[-1] = '01'
                     serial_id = '-'.join(serial_id_elements)
             else:
                 task = cls.CREATE
@@ -258,8 +259,8 @@ class PresccriptionPdf(auth_models.TimeStampedModel):
                     serial_id, task, pres_pdf = pres_models.PresccriptionPdf.compute_serial_id(self.id, appointment, None)
             else:
                 serial_id_elements = serial_id.split('-')
-                serial_id_elements[-1] = str(int(serial_id_elements[-1]) + 1)
-                serial_id = '-'.join(serial_id_elements).zfill(2)
+                serial_id_elements[-1] = str(int(serial_id_elements[-1]) + 1).zfill(2)
+                serial_id = '-'.join(serial_id_elements)
             pres_history_obj.data['serial_id'] = str(appointment.hospital.id) + '-' + str(appointment.doctor.id) + '-' + serial_id
             version = pres_history_obj.data['serial_id'].split('-')[-1]
             pres_history_obj.save()
