@@ -1457,9 +1457,8 @@ class CustomPackageLabSerializer(LabModelSerializer):
     is_thyrocare = serializers.SerializerMethodField()
 
     def get_is_thyrocare(self, obj):
-        if obj and obj.network and settings.THYROCARE_NETWORK_ID:
-            if obj.network.id == settings.THYROCARE_NETWORK_ID:
-                return True
+        if obj and obj.network and obj.network.id == settings.THYROCARE_NETWORK_ID:
+            return True
         return False
 
     class Meta:
