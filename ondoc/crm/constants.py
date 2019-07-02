@@ -62,6 +62,7 @@ matrix_status = {
     'VALID': 2,
     'CONTACTED': 3,
     'PLANNED': 31,
+    'IPD_CONFIRMATION': 32,
 }
 matrix_status_to_ipd_lead_status_mapping = {
     matrix_status['NEW']: 1,
@@ -73,4 +74,5 @@ matrix_status_to_ipd_lead_status_mapping = {
     matrix_status['VALID']: 7,
     matrix_status['CONTACTED']: 8,
     matrix_status['PLANNED']: 9,
+    matrix_status['IPD_CONFIRMATION']: 10,
 }

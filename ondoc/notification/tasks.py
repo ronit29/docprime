@@ -162,7 +162,7 @@ def send_opd_notifications_refactored(appointment_id, notification_type=None):
             return
         if instance.status == OpdAppointment.COMPLETED:
             instance.generate_invoice()
-        if instance.status == OpdAppointment.ACCEPTED and instance.is_medanta_hospital_booking():
+        if instance.status == OpdAppointment.ACCEPTED and instance.is_credit_letter_required_for_appointment() and not instance.is_payment_type_cod():
             instance.generate_credit_letter()
         counter = 1
         is_masking_done = False
@@ -589,12 +589,20 @@ def send_insurance_notifications(self, data):
 
         insurance_status = int(data.get('status', 0))
         # Cancellation
-        if insurance_status and insurance_status == UserInsurance.CANCEL_INITIATE:
+        if insurance_status and (insurance_status == UserInsurance.CANCEL_INITIATE
+                                 or insurance_status == UserInsurance.CANCELLATION_APPROVED or
+                                 insurance_status == UserInsurance.CANCELLED):
             user_insurance = UserInsurance.get_user_insurance(user)
             if not user_insurance:
                 raise Exception("Invalid or None user insurance found for email notification. User id %s" % str(user_id))
-
-            insurance_notification = InsuranceNotification(user_insurance, NotificationAction.INSURANCE_CANCEL_INITIATE)
+            insurance_notification_status = None
+            if insurance_status == UserInsurance.CANCEL_INITIATE:
+                insurance_notification_status = NotificationAction.INSURANCE_CANCEL_INITIATE
+            elif insurance_status == UserInsurance.CANCELLATION_APPROVED:
+                insurance_notification_status = NotificationAction.INSURANCE_CANCELLATION_APPROVED
+            elif insurance_status == UserInsurance.CANCELLED:
+                insurance_notification_status = NotificationAction.INSURANCE_CANCELLATION
+            insurance_notification = InsuranceNotification(user_insurance, insurance_notification_status)
             insurance_notification.send()
 
         else:
@@ -642,6 +650,8 @@ def send_insurance_endorsment_notifications(self, data):
             notification = NotificationAction.INSURANCE_ENDORSMENT_REJECTED
         elif endorsment_status == EndorsementRequest.APPROVED:
             notification = NotificationAction.INSURANCE_ENDORSMENT_APPROVED
+        elif endorsment_status == EndorsementRequest.PARTIAL_APPROVED:
+            notification = NotificationAction.INSURANCE_ENDORSMENT_PARTIAL_APPROVED
 
             if not user_insurance.coi:
                 try:

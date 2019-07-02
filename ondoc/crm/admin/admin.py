@@ -74,7 +74,7 @@ from ondoc.insurance.models import Insurer, InsurerAccount, InsurancePlans, Insu
     InsuredMembers, InsuranceTransaction, InsurancePlanContent, InsuranceDisease, StateGSTCode, InsuranceCity, \
     InsuranceDistrict, InsuranceDeal, InsurerPolicyNumber, InsuranceLead, InsuranceCancelMaster, EndorsementRequest, \
     InsuredMemberDocument, InsuredMemberHistory, InsuranceEligibleCities, ThirdPartyAdministrator, \
-    UserBank, UserBankDocument, InsurerAccountTransfer
+    UserBank, UserBankDocument, InsurerAccountTransfer, BankHolidays
 from ondoc.crm.admin.insurance import InsurerAdmin, InsurancePlansAdmin, InsuranceThresholdAdmin, InsurerFloatAdmin, \
     UserInsuranceAdmin, InsuredMembersAdmin, InsuranceDiseaseAdmin, StateGSTCodeAdmin, InsuranceCityAdmin, \
     InsuranceDistrictAdmin, InsuranceDealAdmin, InsurerPolicyNumberAdmin, InsuranceLeadAdmin, InsuranceCancelMasterAdmin, \
@@ -267,3 +267,4 @@ admin.site.register(Recommender, RecommenderAdmin)
 admin.site.register(ThirdPartyAdministrator, ThirdPartyAdministratorAdmin)
 admin.site.register(BlacklistUser, BlacklistUserAdmin)
 admin.site.register(BlockedStates, BlockedStatesAdmin )
+admin.site.register(BankHolidays)

@@ -66,7 +66,9 @@ class InsuranceNetworkViewSet(viewsets.GenericViewSet):
             params['longitude'] = longitude
             result = list()
 
-            labs_query = '''select l.network_id,l.name, 'lab' as type,eu.url,l.city,l.id from lab_network ln inner join lab l on l.network_id = ln.id
+            labs_query = '''select l.network_id,l.name, 'lab' as type,eu.url,l.city,l.id, 
+             st_distance(l.location,st_setsrid(st_point((%(longitude)s),(%(latitude)s)), 4326))/1000  distance 
+             from lab_network ln inner join lab l on l.network_id = ln.id
             inner join entity_urls eu on l.id = eu.entity_id and eu.sitemap_identifier='LAB_PAGE' and eu.is_valid=true
             where l.is_live=true and l.is_test_lab=false and ln.id in (43, 18, 65, 22) and St_dwithin( St_setsrid(St_point((%(longitude)s), (%(latitude)s)), 4326),l.location, 15000) 
             order by ST_Distance(l.location, St_setsrid(St_point((%(longitude)s), (%(latitude)s)), 4326)) '''
@@ -82,12 +84,18 @@ class InsuranceNetworkViewSet(viewsets.GenericViewSet):
             total_count_query= "select count(distinct entity_id) from insurance_covered_entity where type= %(type)s"
             total_count = RawSql(total_count_query, {'type':type}).fetch_all()[0].get('count')
 
+            data_list = []
+            for r in result:
+                data_list.append(
+                    {'name': r.get('name'), 'distance': math.ceil(r.get('distance')), 'id': r.get('id'), \
+                     'type': r.get('type'), 'url': r.get('url'), 'city': r.get('city')})
+
             resp = dict()
             resp["starts_with"] = None
             resp["count"] = len(result)
             resp["total_count"] = total_count
             resp["distance_count"] = len(result)
-            resp["results"] = result
+            resp["results"] = data_list
 
             return Response(resp)
 
@@ -465,11 +473,12 @@ class InsuranceProfileViewSet(viewsets.GenericViewSet):
                 lab_appointment_count = LabAppointment.get_insured_completed_appointment(user_insurance)
                 if not hasattr(request, 'agent') and (opd_appointment_count > 0 or lab_appointment_count > 0) :
                     resp['is_cancel_allowed'] = False
-                    resp['is_endorsement_allowed'] = False
+                    # resp['is_endorsement_allowed'] = False
                 else:
                     resp['is_cancel_allowed'] = True
-                    resp['is_endorsement_allowed'] = True
+                    # resp['is_endorsement_allowed'] = True
                 members = user_insurance.get_members()
+                resp['is_endorsement_allowed'] = True
                 is_endorsement_exist = False
                 for member in members:
                     if not (hasattr(request, 'agent')) and EndorsementRequest.is_endorsement_exist(member):
@@ -621,6 +630,11 @@ class InsuranceCancelViewSet(viewsets.GenericViewSet):
         if not user_insurance:
             res["error"] = "Insurance not found for the user"
             return Response(data=res, status=status.HTTP_400_BAD_REQUEST)
+
+        # if not data.get('cancel_reason'):
+        #     res['error'] = "Please provide cancellation reason for initiate cancellation!!"
+        #     return Response(data=res, status=status.HTTP_400_BAD_REQUEST)
+
         data['insurance'] = user_insurance.id
         serializer = serializers.UserBankSerializer(data=data, context={'request': request})
         serializer.is_valid(raise_exception=True)
@@ -635,6 +649,9 @@ class InsuranceCancelViewSet(viewsets.GenericViewSet):
             res['error'] = "One of the OPD or LAB Appointment have been completed, Cancellation could not be processed"
             return Response(data=res, status=status.HTTP_400_BAD_REQUEST)
         response = user_insurance.process_cancellation()
+        user_insurance.cancel_initiate_by = UserInsurance.SELF
+        user_insurance.cancel_reason = data.get('cancel_reason', '')
+        user_insurance.save()
         return Response(data=response, status=status.HTTP_200_OK)
 
     def cancel_master(self,request):
@@ -657,6 +674,7 @@ class InsuranceCancelViewSet(viewsets.GenericViewSet):
         res['expiry_date'] = policy_expiry_date
         res['policy_number'] = policy_number
         res['cancel_master'] = cancel_master
+        res['phone_number'] = user.phone_number
 
         return Response(data=res, status=status.HTTP_200_OK)
 
@@ -701,11 +719,11 @@ class InsuranceEndorsementViewSet(viewsets.GenericViewSet):
             return Response(data=res, status=status.HTTP_400_BAD_REQUEST)
 
         # appointment should not be completed in insurance mode for endorsement!!
-        opd_completed_appointments = OpdAppointment.get_insured_completed_appointment(user.active_insurance)
-        lab_completed_appointments = LabAppointment.get_insured_completed_appointment(user.active_insurance)
-        if not hasattr(request, 'agent') and (opd_completed_appointments > 0 or lab_completed_appointments > 0):
-            res['error'] = "One of the OPD or LAB Appointment have been completed, could not process endorsement!!"
-            return Response(data=res, status=status.HTTP_400_BAD_REQUEST)
+        # opd_completed_appointments = OpdAppointment.get_insured_completed_appointment(user.active_insurance)
+        # lab_completed_appointments = LabAppointment.get_insured_completed_appointment(user.active_insurance)
+        # if not hasattr(request, 'agent') and (opd_completed_appointments > 0 or lab_completed_appointments > 0):
+        #     res['error'] = "One of the OPD or LAB Appointment have been completed, could not process endorsement!!"
+        #     return Response(data=res, status=status.HTTP_400_BAD_REQUEST)
 
         serializer = serializers.EndorseMemberSerializer(data=request.data, context={'request': request})
         if not serializer.is_valid() and serializer.errors:

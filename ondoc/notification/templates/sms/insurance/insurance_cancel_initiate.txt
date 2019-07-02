@@ -1,0 +1,4 @@
+Policy Number {{policy_number}}
+Your insurance policy cancellation process has been initialized.
+Confirmation of the same will be communicated to you over email and SMS.
+Thank you for choosing Docprime!

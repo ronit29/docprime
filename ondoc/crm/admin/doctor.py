@@ -1544,8 +1544,10 @@ class DoctorOpdAppointmentForm(RefundableAppointmentForm):
             if self.instance:
                 if self.instance.status != OpdAppointment.ACCEPTED:
                     raise forms.ValidationError("Can only send credit letter only if appointment status is accepted.")
-                elif not self.instance.is_medanta_hospital_booking():
-                    raise forms.ValidationError("Can only send credit letter for Medanta hospital bookings.")
+                elif not self.instance.is_credit_letter_required_for_appointment():
+                    raise forms.ValidationError("Can only send credit letter for Medanta and Artemis hospital bookings.")
+                elif self.instance.is_payment_type_cod():
+                    raise forms.ValidationError("Can not send credit letter for COD bookings.")
                 else:
                     try:
                         notification_tasks.send_opd_notifications_refactored.apply_async((self.instance.id, NotificationAction.APPOINTMENT_ACCEPTED), countdown=1)
