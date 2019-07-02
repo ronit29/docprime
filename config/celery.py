@@ -97,4 +97,4 @@ def setup_periodic_tasks(sender, **kwargs):
     sender.add_periodic_task(crontab(hour=18, minute=00), update_seo_urls.s(), name="Update Seo Urls")
 
     sender.add_periodic_task(crontab(hour=19, minute=00), create_appointment_admins_from_spocs.s(), name='Create Appointment Admins from SPOCs')
-    sender.add_periodic_task(crontab(hour=10, minute=00), add_net_revenue_for_merchant.s(), name='Add net revenue for merchants')
+    sender.add_periodic_task(crontab(hour=21, minute=00), add_net_revenue_for_merchant.s(), name='Add net revenue for merchants')
