@@ -172,7 +172,7 @@
                           <th style="color: #000; font-size: 12px; padding:3px; text-align: left;">Status</th>
 
                         </tr>
-                        {% for member in partially_members %}
+                        {%for member in partially_members%}
                           <tr>
                             <td style="color: #000; font-size: 12px; padding:3px;">
                               {{forloop.counter}}
@@ -193,7 +193,7 @@
                               {{member.status}}
                             </td>
                           </tr>
-                        {% endfor %}
+                        {%endfor%}
 
                       </table>
                     </td>
