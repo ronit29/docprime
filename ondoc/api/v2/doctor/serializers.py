@@ -495,8 +495,8 @@ class PartnersAppInvoiceSerialier(serializers.Serializer):
             raise serializers.ValidationError('invoice title is missing for invoice generation')
         if ( attrs.get("is_encrypted") or attrs.get("invoice_serial_id") ) and not ( attrs.get("is_encrypted") and attrs.get("invoice_serial_id") ):
             raise serializers.ValidationError("is_encrypted and invoice_serial_id both are required together.")
-        if attrs.get('is_encrypted') and attrs.get('generate_invoice'):
-            raise serializers.ValidationError('generate_invoice not possible for encrypted_data')
+        # if attrs.get('is_encrypted') and attrs.get('generate_invoice'):
+        #     raise serializers.ValidationError('generate_invoice not possible for encrypted_data')
         if attrs.get('appointment_id'):
             attrs['appointment'] = attrs.pop('appointment_id')
 
