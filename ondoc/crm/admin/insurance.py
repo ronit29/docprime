@@ -24,6 +24,7 @@ from django.conf import settings
 from django.contrib.contenttypes.admin import GenericTabularInline
 from django.contrib.admin import SimpleListFilter
 from django.utils.translation import ugettext_lazy as _
+from ondoc.notification.tasks import send_insurance_notifications
 
 
 class InsurerAdmin(admin.ModelAdmin):
@@ -818,7 +819,8 @@ class CustomDateInput(forms.DateInput):
 class UserInsuranceForm(forms.ModelForm):
 
     status_choices = [(UserInsurance.ACTIVE, "Active"), (UserInsurance.CANCEL_INITIATE, 'Cancel Initiate'),
-                      (UserInsurance.CANCELLED, "Cancelled")]
+                      (UserInsurance.CANCELLED, "Cancelled"), (UserInsurance.CANCELLATION_APPROVED,
+                                                               "Cancellation Approved")]
     cancel_status_choices = [(UserInsurance.NON_REFUNDED, "Non-Refunded"), (UserInsurance.REFUND_INITIATE,
                                                                             "Refund Initiate"), (UserInsurance.REFUNDED
                                                                             , "Refunded")]
@@ -859,10 +861,12 @@ class UserInsuranceForm(forms.ModelForm):
                 raise forms.ValidationError('For Cancel Initiation, Cancel reason is mandatory')
             # if int(cancel_case_type) == UserInsurance.REFUND and not self.instance.is_bank_details_exist():
             #     raise forms.ValidationError('In Case of Refundable Bank details are mandatory, please upload bank details')
-        if int(status) == UserInsurance.CANCELLED and not self.instance.status == UserInsurance.CANCEL_INITIATE:
-            raise forms.ValidationError('Cancellation is only allowed for cancel initiate status')
-        if self.instance.status == UserInsurance.CANCELLED:
-            raise forms.ValidationError('Cancelled Insurance could not be changed')
+        if int(status) == UserInsurance.CANCELLED and not self.instance.status == UserInsurance.CANCELLATION_APPROVED:
+            raise forms.ValidationError('Cancellation is only allowed for cancellation approved status')
+        if self.instance.status == UserInsurance.CANCELLATION_APPROVED and not int(status) == UserInsurance.CANCELLED:
+            raise forms.ValidationError('CANCELLATION APPROVED can only changes to CANCELLED not else!!')
+        if self.instance.status == UserInsurance.CANCELLED and int(cancel_status) == UserInsurance.NON_REFUNDED:
+            raise forms.ValidationError('Cancelled Insurance could not be changed!!')
         # if cancel_status == UserInsurance.NON_REFUNDED and cancel_case_type == UserInsurance.REFUND:
         #     raise forms.ValidationError("Cancel Status must be Refunded in case of Refundable case type")
         if (int(cancel_status) == UserInsurance.REFUNDED and int(cancel_case_type) == UserInsurance.NO_REFUND) or \
@@ -928,9 +932,9 @@ class UserInsuranceAdmin(ImportExportMixin, admin.ModelAdmin):
     list_display = ['id', 'insurance_plan', 'user_name', 'user', 'policy_number', 'purchase_date', 'status']
     fields = ['insurance_plan', 'user', 'purchase_date', 'expiry_date', 'policy_number', 'premium_amount',
               'merchant_payout', 'status', 'cancel_reason', 'cancel_after_utilize_insurance', 'cancel_case_type',
-              'cancel_status', 'cancel_initial_date', 'cancel_customer_type']
+              'cancel_status', 'cancel_initial_date', 'cancel_customer_type', 'cancel_initiate_by']
     readonly_fields = ('insurance_plan', 'user', 'purchase_date', 'expiry_date', 'policy_number', 'premium_amount',
-                       'merchant_payout', 'cancel_initial_date')
+                       'merchant_payout', 'cancel_initial_date', 'cancel_initiate_by')
     inlines = [InsuredMembersInline, UserBankInline, UserBankDocumentInline, GenericNotesInline]
     form = UserInsuranceForm
     search_fields = ['id']
@@ -986,17 +990,21 @@ class UserInsuranceAdmin(ImportExportMixin, admin.ModelAdmin):
         responsible_user = request.user
         obj._responsible_user = responsible_user if responsible_user and not responsible_user.is_anonymous else None
         if request.user.is_member_of(constants['SUPER_INSURANCE_GROUP']):
-            if obj.status == UserInsurance.ACTIVE:
+            if obj.status == UserInsurance.ACTIVE or obj.status == UserInsurance.CANCELLED:
                 super(UserInsuranceAdmin, self).save_model(request, obj, form, change)
             # elif obj.status == UserInsurance.ONHOLD:
             #     if obj.onhold_reason:
             #         super(UserInsuranceAdmin, self).save_model(request, obj, form, change)
             elif obj.status == UserInsurance.CANCEL_INITIATE:
                 response = obj.process_cancellation()
+                obj.cancel_initiate_by = UserInsurance.ADMIN
                 if response.get('success', None):
+                    send_insurance_notifications.apply_async(({'user_id': obj.user.id, 'status': obj.status},))
                     super(UserInsuranceAdmin, self).save_model(request, obj, form, change)
-            elif obj.status == UserInsurance.CANCELLED:
-                super(UserInsuranceAdmin, self).save_model(request, obj, form, change)
+            elif obj.status == UserInsurance.CANCELLATION_APPROVED:
+                    send_insurance_notifications.apply_async(({'user_id': obj.user.id, 'status': obj.status},))
+                    super(UserInsuranceAdmin, self).save_model(request, obj, form, change)
+
 
 
 class InsuranceDiseaseAdmin(admin.ModelAdmin):
@@ -1214,26 +1222,48 @@ class InsuranceCancelMasterAdmin(admin.ModelAdmin):
 
 
 class EndorsementRequestForm(forms.ModelForm):
-
     status_choices = [(EndorsementRequest.PENDING, "Pending"), (EndorsementRequest.APPROVED, 'Approved'),
                       (EndorsementRequest.REJECT, "Reject")]
+    # mail_status_choices = [(EndorsementRequest.MAIL_PENDING, "MAIL PENDING"), (EndorsementRequest.MAIL_SENT, "Mail Sent")]
     status = forms.ChoiceField(choices=status_choices, required=True)
-    mail_coi_to_customer = forms.BooleanField(initial=False)
+    # mail_status = forms.ChoiceField(choices=mail_status_choices, required=False, disabled=True, initial=EndorsementRequest.PENDING)
+    mail_coi_to_customer = forms.NullBooleanField(initial=False)
     reject_reason = forms.CharField(max_length=150, required=False)
+
+    # def __init__(self, *args, **kwargs):
+    #     super(EndorsementRequestForm, self).__init__(*args, **kwargs)
+    #     instance = getattr(self, 'instance', None)
+    #     if instance and instance.pk:
+    #         self.fields['mail_coi_to_customer'].widget.attrs['readonly'] = True
 
     def clean(self):
         super().clean()
+        if any(self.errors):
+            return
         data = self.cleaned_data
         status = data.get('status')
         coi_status = data.get('mail_coi_to_customer')
         reject_reason = data.get('reject_reason')
-        if status == EndorsementRequest.PENDING and coi_status:
-            raise forms.ValidationError('Without Approved COI can not be send to customer')
-        if status == EndorsementRequest.REJECT and not reject_reason:
+        # if self.instance.status == EndorsementRequest.PENDING and (int(status) == EndorsementRequest.APPROVED or
+        #     int(status) == EndorsementRequest.PARTIAL_APPROVED or int(status) == EndorsementRequest.REJECT):
+        #     user_insurance = self.instance.insurance
+        #     existing_incomplete_request = user_insurance.endorse_members.filter(~Q(status=EndorsementRequest.PENDING),
+        #                                              ~Q(mail_status=EndorsementRequest.MAIL_SENT))
+        #     if existing_incomplete_request:
+        #         raise forms.ValidationError('Before Approve/Reject You need to sent mail for previous request')
+        if int(status) == EndorsementRequest.PARTIAL_APPROVED:
+            raise forms.ValidationError('Please select Approved or Rejected, Partial Approved can not be selected')
+        if int(status) == EndorsementRequest.REJECT and not reject_reason:
             raise forms.ValidationError('For Rejection, reject reason is mandatory')
-
+        if int(status) == EndorsementRequest.PENDING and coi_status:
+            raise forms.ValidationError('Without Approved/Rejected COI can not be send to customer')
+        if coi_status and not self.instance.is_endorsement_complete():
+            raise forms.ValidationError('COI can not be sent until all endorsement request for this user have approve or reject')
+        if coi_status and self.instance.mail_status == EndorsementRequest.MAIL_SENT:
+            raise forms.ValidationError('Mail Already sent to User!!')
 
     class Meta:
+        readonly = 'mail_coi_to_customer'
         fields = '__all__'
 
 
@@ -1303,7 +1333,7 @@ class EndorsementRequestAdmin(admin.ModelAdmin):
         if obj.pincode == obj.member.pincode:
             return ""
         else:
-            obj.member.pincode + "(edited)"
+            str(obj.member.pincode) + "(edited)"
 
     def old_gender(self, obj):
         if obj.gender == obj.member.gender:
@@ -1353,9 +1383,11 @@ class EndorsementRequestAdmin(admin.ModelAdmin):
                        'old_email',  'address', 'old_address', 'pincode', 'old_pincode', 'gender', 'old_gender',
                        'phone_number', 'relation', 'old_relation', 'profile', 'town', 'old_town',
                        'district', 'old_district', 'state', 'old_state', 'state_code', 'city_code',
-                       'district_code']
+                       'district_code', 'mail_status']
     inlines = [InsuredMemberDocumentInline]
-    # form = EndorsementRequestForm
+    form = EndorsementRequestForm
+    list_filter = ['status']
+    ordering = ['-created_at']
 
     def has_add_permission(self, request, obj=None):
         return False
