@@ -164,8 +164,8 @@ def advanced_doctor_search_view(request):
             messages.add_message(request, messages.SUCCESS, "Link Created")
             required_link = '{}/opd/searchresults?specializations={}&conditions=&lat=&long=&sort_on=&sort_order=&availability=&gender=&avg_ratings=&doctor_name=&hospital_name=&locationType=autoComplete&procedure_ids=&procedure_category_ids=&hospital_id={}&ipd_procedures=&is_insured=false&locality=&sub_locality=&sits_at_hospital=false&sits_at_clinic=false'.format(
                 settings.CONSUMER_APP_DOMAIN,
-                ",".join([str(x) for x in form.cleaned_data['hospital'].all().values_list('id', flat=True)]),
-                ",".join([str(x) for x in form.cleaned_data['specialization'].all().values_list('id', flat=True)]))
+                ",".join([str(x) for x in form.cleaned_data['specialization'].all().values_list('id', flat=True)]),
+                ",".join([str(x) for x in form.cleaned_data['hospital'].all().values_list('id', flat=True)]))
             return render(request, 'doctorSearch.html', {'form': form, 'required_link': required_link})
     else:
         form = SearchDataForm()
