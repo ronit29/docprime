@@ -1102,6 +1102,7 @@ class APPNotification:
         context = copy.deepcopy(context)
         context.pop("instance", None)
         context.pop('time_slot_start', None)
+        context.pop('hospitals_not_required_unique_code', None)
         app_noti = AppNotification.objects.create(
             user=user,
             notification_type=self.notification_type,
