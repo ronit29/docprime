@@ -1331,8 +1331,8 @@ class OpdNotification(Notification):
             email_notification.send(all_receivers.get('email_receivers', []))
             sms_notification.send(all_receivers.get('sms_receivers', []))
             app_notification.send(all_receivers.get('app_receivers', []))
-            push_notification.send(all_receivers.get('push_receivers', []))
             whtsapp_notification.send(all_receivers.get('sms_receivers', []))
+            push_notification.send(all_receivers.get('push_receivers', []))
 
     def get_receivers(self):
         all_receivers = {}
@@ -1513,8 +1513,8 @@ class LabNotification(Notification):
             email_notification.send(all_receivers.get('email_receivers', []))
             sms_notification.send(all_receivers.get('sms_receivers', []))
             app_notification.send(all_receivers.get('app_receivers', []))
-            push_notification.send(all_receivers.get('push_receivers', []))
             whtsapp_notification.send(all_receivers.get('sms_receivers', []))
+            push_notification.send(all_receivers.get('push_receivers', []))
 
     def get_receivers(self):
         all_receivers = {}
