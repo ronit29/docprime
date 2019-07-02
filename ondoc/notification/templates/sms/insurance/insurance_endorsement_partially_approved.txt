@@ -1,5 +1,6 @@
 Policy Number {{policy_number}}
-We regret to inform you that your endorsement request has been rejected due to incomplete documentation.
+Your endorsement request has been partially processed.
+Please refer your email for more information.
 Our customer service executive will shortly get in touch with you to resolve this issue.
 Thanks
 Team Docprime

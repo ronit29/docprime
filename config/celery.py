@@ -7,7 +7,7 @@ import os
 from django.conf import settings
 from raven.contrib.celery import register_signal, register_logger_signal
 from ondoc.account.tasks import refund_status_update, consumer_refund_update, dump_to_elastic, integrator_order_summary,\
-    get_thyrocare_reports, elastic_alias_switch
+    get_thyrocare_reports, elastic_alias_switch, add_net_revenue_for_merchant
 from celery.schedules import crontab
 from ondoc.doctor.tasks import save_avg_rating, update_prices, update_city_search_key, update_doctors_count, update_search_score, \
     update_all_ipd_seo_urls, update_insured_labs_and_doctors, update_seo_urls, update_hosp_google_avg_rating, \
@@ -97,3 +97,4 @@ def setup_periodic_tasks(sender, **kwargs):
     sender.add_periodic_task(crontab(hour=18, minute=00), update_seo_urls.s(), name="Update Seo Urls")
 
     sender.add_periodic_task(crontab(hour=19, minute=00), create_appointment_admins_from_spocs.s(), name='Create Appointment Admins from SPOCs')
+    sender.add_periodic_task(crontab(hour=21, minute=00), add_net_revenue_for_merchant.s(), name='Add net revenue for merchants')
