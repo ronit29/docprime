@@ -216,9 +216,8 @@ class PresccriptionPdf(auth_models.TimeStampedModel):
         exists = False
         i = 0
         for pres in appointment.eprescription.all():
-            if pres.is_encrypted:
-                continue
-            i += 1
+            if not pres.is_encrypted:
+                i += 1
             if str(pres.id) == id:
                 task = cls.UPDATE
                 prescription_pdf = pres
