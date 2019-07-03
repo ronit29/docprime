@@ -3301,13 +3301,16 @@ class OpdAppointment(auth_model.TimeStampedModel, CouponsMixin, OpdAppointmentIn
         return result
 
     def is_followup_appointment(self):
+        if not self.insurance:
+            return False
         doctor = self.doctor
         hospital = self.hospital
         profile = self.profile
-        last_completed_appointment = OpdAppointment.objects.filter(doctor=doctor, profile=profile, hospital=hospital,
-                                                        status=OpdAppointment.COMPLETED).order_by('-id').first()
-        if not last_completed_appointment:
+        completed_appointment = OpdAppointment.objects.filter(doctor=doctor, profile=profile, hospital=hospital,
+                                                        status=OpdAppointment.COMPLETED).order_by('-id')
+        if not completed_appointment or completed_appointment.count == 1:
             return False
+        last_completed_appointment = completed_appointment.first()
         last_appointment_date = last_completed_appointment.time_slot_start
         dc_obj = DoctorClinic.objects.filter(doctor=doctor, hospital=hospital, enabled=True).first()
         if not dc_obj:
