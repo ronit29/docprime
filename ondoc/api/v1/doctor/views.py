@@ -171,7 +171,10 @@ class DoctorAppointmentsViewSet(OndocViewSet):
 
         if date:
             queryset = queryset.filter(time_slot_start__date=date)
-        queryset = queryset.distinct('id', 'time_slot_start')
+        queryset = queryset.select_related('profile', 'merchant_payout') \
+                           .prefetch_related('prescriptions', 'prescriptions__prescription_file', 'mask_number',
+                              'profile__insurance', 'profile__insurance__user_insurance', 'eprescription')\
+                           .distinct('id', 'time_slot_start')
         queryset = paginate_queryset(queryset, request)
         serializer = serializers.DoctorAppointmentRetrieveSerializer(queryset, many=True, context={'request': request})
         return Response(serializer.data)
@@ -2402,6 +2405,16 @@ class HospitalAutocomplete(autocomplete.Select2QuerySetView):
         if self.q:
             qs = qs.filter(name__icontains=self.q).order_by('name')
         return qs
+
+
+class PracticeSpecializationAutocomplete(autocomplete.Select2QuerySetView):
+    def get_queryset(self):
+        qs = models.PracticeSpecialization.objects.all()
+
+        if self.q:
+            qs = qs.filter(name__icontains=self.q).order_by('name')
+        return qs
+
 
 
 class CreateAdminViewSet(viewsets.GenericViewSet):

@@ -1,6 +1,5 @@
-We regret to inform you that your endorsement request for policy ID: {{policy_number}} has been rejected as the documents provided were insufficient to incorporate the changes.
-
-Our team will get in touch with you within 24-48 hours for the same.
-
+Policy Number {{policy_number}}
+We regret to inform you that your endorsement request has been rejected due to incomplete documentation.
+Our customer service executive will shortly get in touch with you to resolve this issue.
 Thanks
 Team Docprime
