@@ -1597,7 +1597,7 @@ class DoctorOpdAppointmentAdmin(admin.ModelAdmin):
                     'get_appointment_type', 'created_at', 'updated_at')
     list_filter = ('status', 'payment_type')
     date_hierarchy = 'created_at'
-    inlines = [PrescriptionInline]
+    inlines = [PrescriptionInline, FraudInline]
 
     def get_appointment_type(self, obj):
         if obj.is_followup_appointment():
@@ -1867,6 +1867,16 @@ class DoctorOpdAppointmentAdmin(admin.ModelAdmin):
         for doctor_admin in doctor_admins:
             doctor_admins_phone_numbers.append(doctor_admin.phone_number)
         return mark_safe(','.join(doctor_admins_phone_numbers))
+
+    def save_formset(self, request, form, formset, change):
+        if formset.model != Fraud:
+            return super(DoctorOpdAppointmentAdmin, self).save_formset(request, form, formset, change)
+        instances = formset.save(commit=False)
+        for instance in instances:
+            if not instance.pk:
+                instance.user = request.user
+                return super(DoctorOpdAppointmentAdmin, self).save_formset(request, form, formset, change)
+        formset.save_m2m()
 
     @transaction.atomic
     def save_model(self, request, obj, form, change):

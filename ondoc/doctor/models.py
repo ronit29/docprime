@@ -51,8 +51,8 @@ from django.contrib.contenttypes.fields import GenericRelation
 from ondoc.api.v1.utils import get_start_end_datetime, custom_form_datetime, CouponsMixin, aware_time_zone, \
     form_time_slot, util_absolute_url, html_to_pdf, TimeSlotExtraction, resolve_address
 from ondoc.common.models import AppointmentHistory, AppointmentMaskNumber, Service, Remark, MatrixMappedState, \
-    MatrixMappedCity, GlobalNonBookable, SyncBookingAnalytics, CompletedBreakupMixin, RefundDetails, TdsDeductionMixin, \
-    Documents
+    MatrixMappedCity, GlobalNonBookable, SyncBookingAnalytics, CompletedBreakupMixin, RefundDetails, Documents, \
+    Fraud, TdsDeductionMixin
 from ondoc.common.models import QRCode, MatrixDataMixin
 from functools import reduce
 from operator import or_
@@ -2227,6 +2227,7 @@ class OpdAppointment(auth_model.TimeStampedModel, CouponsMixin, OpdAppointmentIn
     is_cod_to_prepaid = models.NullBooleanField(default=False, null=True, blank=True)
     hospital_reference_id = models.CharField(max_length=1000, null=True, blank=True)
     documents = GenericRelation(Documents)
+    fraud = GenericRelation(Fraud)
 
     def __str__(self):
         return self.profile.name + " (" + self.doctor.name + ")"
@@ -2679,7 +2680,8 @@ class OpdAppointment(auth_model.TimeStampedModel, CouponsMixin, OpdAppointmentIn
             # while completing appointment
             if database_instance and database_instance.status != self.status and self.status == self.COMPLETED:
                 # add a merchant_payout entry
-                if self.merchant_payout is None and self.payment_type not in [OpdAppointment.COD] and not self.is_followup_appointment():
+                if self.merchant_payout is None and self.payment_type not in [OpdAppointment.COD] and not \
+                        self.is_followup_appointment() and not self.is_fraud_appointment:
                     self.save_merchant_payout()
 
                 # credit cashback if any
@@ -3320,6 +3322,17 @@ class OpdAppointment(auth_model.TimeStampedModel, CouponsMixin, OpdAppointmentIn
             followup_duration = settings.DEFAULT_FOLLOWUP_DURATION
         days_diff = self.time_slot_start.date() - last_appointment_date.date()
         if days_diff.days < followup_duration:
+            return True
+        else:
+            return False
+
+    @property
+    def is_fraud_appointment(self):
+        if not self.insurance:
+            return False
+        content_type = ContentType.objects.get_for_model(OpdAppointment)
+        appointment = Fraud.objects.filter(content_type=content_type, object_id=self.id).first()
+        if appointment:
             return True
         else:
             return False

@@ -888,6 +888,7 @@ class UserBankDocumentAdmin(admin.ModelAdmin):
     fields = ['insurance']
     list_display = ['insurance']
 
+
 class GenericNotesForm(forms.ModelForm):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
