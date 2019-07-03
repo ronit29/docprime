@@ -2230,8 +2230,9 @@ class CommonConditionsSerializer(serializers.Serializer):
 
 
 class IpdLeadUpdateSerializer(serializers.Serializer):
-    status = serializers.IntegerField()
+    status = serializers.IntegerField(required=False, allow_null=True)
     matrix_lead_id = serializers.IntegerField()
+    planned_date = serializers.DateField(required=False, allow_null=True)
 
     def validate(self, attrs):
         if not IpdProcedureLead.objects.filter(matrix_lead_id=attrs.get('matrix_lead_id')).exists():
