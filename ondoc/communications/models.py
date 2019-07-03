@@ -603,40 +603,49 @@ class WHTSAPPNotification:
 
         elif notification_type == NotificationAction.LAB_APPOINTMENT_ACCEPTED or \
                 notification_type == NotificationAction.LAB_OTP_BEFORE_APPOINTMENT:
-            body_template = "appointment_accepted"
 
-            data.append(self.context.get('patient_name'))
-            data.append(self.context.get('lab_name'))
-            data.append(datetime.strftime(aware_time_zone(self.context.get('instance').time_slot_start), '%d-%m-%Y'))
-            data.append(datetime.strftime(aware_time_zone(self.context.get('instance').time_slot_start), '%H:%M'))
-            data.append(self.context.get('instance').otp)
-            data.append(self.context.get('instance').id)
-            data.append(self.context.get('patient_name'))
-            data.append(self.context.get('lab_name'))
+            instance = self.context.get('instance')
+            if not instance.is_home_pickup:
+                body_template = "appointment_accepted"
 
-            pickup_address = 'NA'
-            if self.context.get('pickup_address'):
-                pickup_address = self.context.get('pickup_address')
+                data.append(self.context.get('patient_name'))
+                data.append(self.context.get('lab_name'))
+                data.append(datetime.strftime(aware_time_zone(self.context.get('instance').time_slot_start), '%d-%m-%Y'))
+                data.append(datetime.strftime(aware_time_zone(self.context.get('instance').time_slot_start), '%H:%M'))
+                data.append(self.context.get('instance').otp)
+                data.append(self.context.get('instance').id)
+                data.append(self.context.get('patient_name'))
+                data.append(self.context.get('lab_name'))
 
-            data.append(pickup_address)
-            data.append(datetime.strftime(aware_time_zone(self.context.get('instance').time_slot_start), '%d-%m-%Y %H:%M'))
+                if instance.lab and instance.lab.get_lab_address():
+                    data.append(instance.lab.get_lab_address())
+                else:
+                    data.append("NA")
 
-        # elif notification_type == NotificationAction.LAB_APPOINTMENT_BOOKED and user and user.user_type == User.CONSUMER:
-        #     body_template = "appointment_booked_patient"
-        #
-        #     data.append(self.context.get('patient_name'))
-        #     data.append(self.context.get('lab_name'))
-        #     data.append(datetime.strftime(aware_time_zone(self.context.get('instance').time_slot_start), '%d-%m-%Y'))
-        #     data.append(datetime.strftime(aware_time_zone(self.context.get('instance').time_slot_start), '%H:%M'))
-        #     data.append(self.context.get('instance').id)
-        #     data.append(self.context.get('patient_name'))
-        #     data.append(self.context.get('lab_name'))
-        #     pickup_address = 'NA'
-        #     if self.context.get('pickup_address'):
-        #         pickup_address = self.context.get('pickup_address')
-        #
-        #     data.append(pickup_address)
-        #     data.append(datetime.strftime(aware_time_zone(self.context.get('instance').time_slot_start), '%d-%m-%Y %H:%M'))
+                data.append(datetime.strftime(aware_time_zone(self.context.get('instance').time_slot_start), '%d-%m-%Y %H:%M'))
+            else:
+                pass
+
+        elif notification_type == NotificationAction.LAB_APPOINTMENT_BOOKED and user and user.user_type == User.CONSUMER:
+            instance = self.context.get('instance')
+            if not instance.is_home_pickup:
+                body_template = "appointment_booked_patient"
+
+                data.append(self.context.get('patient_name'))
+                data.append(self.context.get('lab_name'))
+                data.append(datetime.strftime(aware_time_zone(self.context.get('instance').time_slot_start), '%d-%m-%Y'))
+                data.append(datetime.strftime(aware_time_zone(self.context.get('instance').time_slot_start), '%H:%M'))
+                data.append(self.context.get('instance').id)
+                data.append(self.context.get('patient_name'))
+                data.append(self.context.get('lab_name'))
+                pickup_address = 'NA'
+                if self.context.get('pickup_address'):
+                    pickup_address = self.context.get('pickup_address')
+
+                data.append(pickup_address)
+                data.append(datetime.strftime(aware_time_zone(self.context.get('instance').time_slot_start), '%d-%m-%Y %H:%M'))
+            else:
+                pass
 
         elif notification_type == NotificationAction.LAB_APPOINTMENT_BOOKED and (not user or user.user_type == User.DOCTOR):
             body_template = "appointment_booked_lab"
@@ -1452,7 +1461,7 @@ class LabNotification(Notification):
         if instance and instance.lab and instance.lab.network and instance.lab.network.id == settings.THYROCARE_NETWORK_ID:
             is_thyrocare_report = True
             # chat_url = "https://docprime.com/mobileviewchat?utm_source=Thyrocare&booking_id=%s" % instance.id
-            chat_url = '%s/mobileviewchat?utm_source=Thyrocare&booking_id=%s' % (settings.API_BASE_URL, instance.id)
+            chat_url = '%s/mobileviewchat?utm_source=Thyrocare&booking_id=%s&msg=startchat' % (settings.API_BASE_URL, instance.id)
             chat_url = generate_short_url(chat_url)
 
         context = {
