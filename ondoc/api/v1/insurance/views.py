@@ -473,11 +473,12 @@ class InsuranceProfileViewSet(viewsets.GenericViewSet):
                 lab_appointment_count = LabAppointment.get_insured_completed_appointment(user_insurance)
                 if not hasattr(request, 'agent') and (opd_appointment_count > 0 or lab_appointment_count > 0) :
                     resp['is_cancel_allowed'] = False
-                    resp['is_endorsement_allowed'] = False
+                    # resp['is_endorsement_allowed'] = False
                 else:
                     resp['is_cancel_allowed'] = True
-                    resp['is_endorsement_allowed'] = True
+                    # resp['is_endorsement_allowed'] = True
                 members = user_insurance.get_members()
+                resp['is_endorsement_allowed'] = True
                 is_endorsement_exist = False
                 for member in members:
                     if not (hasattr(request, 'agent')) and EndorsementRequest.is_endorsement_exist(member):
@@ -629,6 +630,11 @@ class InsuranceCancelViewSet(viewsets.GenericViewSet):
         if not user_insurance:
             res["error"] = "Insurance not found for the user"
             return Response(data=res, status=status.HTTP_400_BAD_REQUEST)
+
+        # if not data.get('cancel_reason'):
+        #     res['error'] = "Please provide cancellation reason for initiate cancellation!!"
+        #     return Response(data=res, status=status.HTTP_400_BAD_REQUEST)
+
         data['insurance'] = user_insurance.id
         serializer = serializers.UserBankSerializer(data=data, context={'request': request})
         serializer.is_valid(raise_exception=True)
@@ -643,6 +649,9 @@ class InsuranceCancelViewSet(viewsets.GenericViewSet):
             res['error'] = "One of the OPD or LAB Appointment have been completed, Cancellation could not be processed"
             return Response(data=res, status=status.HTTP_400_BAD_REQUEST)
         response = user_insurance.process_cancellation()
+        user_insurance.cancel_initiate_by = UserInsurance.SELF
+        user_insurance.cancel_reason = data.get('cancel_reason', '')
+        user_insurance.save()
         return Response(data=response, status=status.HTTP_200_OK)
 
     def cancel_master(self,request):
@@ -710,11 +719,11 @@ class InsuranceEndorsementViewSet(viewsets.GenericViewSet):
             return Response(data=res, status=status.HTTP_400_BAD_REQUEST)
 
         # appointment should not be completed in insurance mode for endorsement!!
-        opd_completed_appointments = OpdAppointment.get_insured_completed_appointment(user.active_insurance)
-        lab_completed_appointments = LabAppointment.get_insured_completed_appointment(user.active_insurance)
-        if not hasattr(request, 'agent') and (opd_completed_appointments > 0 or lab_completed_appointments > 0):
-            res['error'] = "One of the OPD or LAB Appointment have been completed, could not process endorsement!!"
-            return Response(data=res, status=status.HTTP_400_BAD_REQUEST)
+        # opd_completed_appointments = OpdAppointment.get_insured_completed_appointment(user.active_insurance)
+        # lab_completed_appointments = LabAppointment.get_insured_completed_appointment(user.active_insurance)
+        # if not hasattr(request, 'agent') and (opd_completed_appointments > 0 or lab_completed_appointments > 0):
+        #     res['error'] = "One of the OPD or LAB Appointment have been completed, could not process endorsement!!"
+        #     return Response(data=res, status=status.HTTP_400_BAD_REQUEST)
 
         serializer = serializers.EndorseMemberSerializer(data=request.data, context={'request': request})
         if not serializer.is_valid() and serializer.errors:
