@@ -629,6 +629,7 @@ class TdsDeductionMixin(object):
     def get_tds_amount(self):
         from ondoc.authentication.models import Merchant
         from ondoc.authentication.models import MerchantNetRevenue
+        import decimal
         tds = 0
         merchant = self.get_merchant
         if merchant:
@@ -646,17 +647,17 @@ class TdsDeductionMixin(object):
                 if merchant_net_revenue_obj:
                     old_revenue = merchant_net_revenue_obj.total_revenue
                     new_revenue = merchant_net_revenue_obj.total_revenue + booking_net_revenue
-                    if (new_revenue >= settings.TDS_THRESHOLD_AMOUNT) and (old_revenue < settings.TDS_THRESHOLD_AMOUNT):
-                        tds = (new_revenue * settings.TDS_APPLICABLE_RATE) / 100
-                    elif old_revenue > settings.TDS_THRESHOLD_AMOUNT:
+                    if (new_revenue >= decimal.Decimal(settings.TDS_THRESHOLD_AMOUNT)) and (old_revenue < decimal.Decimal(settings.TDS_THRESHOLD_AMOUNT)):
+                        tds = (new_revenue * decimal.Decimal(settings.TDS_APPLICABLE_RATE)) / 100
+                    elif old_revenue > decimal.Decimal(settings.TDS_THRESHOLD_AMOUNT):
                         tds_deduction_count = merchant.tds_deduction.filter(financial_year=settings.CURRENT_FINANCIAL_YEAR).count()
                         if tds_deduction_count > 0:
-                            tds = (booking_net_revenue * settings.TDS_APPLICABLE_RATE) / 100
+                            tds = (booking_net_revenue * decimal.Decimal(settings.TDS_APPLICABLE_RATE)) / 100
                         else:
-                            tds = (new_revenue * settings.TDS_APPLICABLE_RATE) / 100
+                            tds = (new_revenue * decimal.Decimal(settings.TDS_APPLICABLE_RATE)) / 100
                 else:
-                    if booking_net_revenue >= settings.TDS_THRESHOLD_AMOUNT:
-                        tds = (booking_net_revenue * settings.TDS_APPLICABLE_RATE) / 100
+                    if booking_net_revenue >= decimal.Decimal(settings.TDS_THRESHOLD_AMOUNT):
+                        tds = (booking_net_revenue * decimal.Decimal(settings.TDS_APPLICABLE_RATE)) / 100
         return tds
 
     def update_net_revenues(self, tds):
