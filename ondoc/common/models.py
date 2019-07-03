@@ -28,6 +28,7 @@ from datetime import date
 from django.utils import timezone
 
 from ondoc.common.helper import Choices
+from django.conf import settings
 
 
 class Cities(models.Model):
@@ -641,21 +642,21 @@ class TdsDeductionMixin(object):
                     payout_amount += self.home_pickup_charges
 
             if merchant.enable_for_tds_deduction:
-                merchant_net_revenue_obj = merchant.net_revenue.filter(financial_year=MerchantNetRevenue.CURRENT_FINANCIAL_YEAR).first()
+                merchant_net_revenue_obj = merchant.net_revenue.filter(financial_year=settings.CURRENT_FINANCIAL_YEAR).first()
                 if merchant_net_revenue_obj:
                     old_revenue = merchant_net_revenue_obj.total_revenue
                     new_revenue = merchant_net_revenue_obj.total_revenue + booking_net_revenue
-                    if (new_revenue >= Merchant.TDS_THRESHOLD_AMOUNT) and (old_revenue < Merchant.TDS_THRESHOLD_AMOUNT):
-                        tds = (new_revenue * Merchant.TDS_APPLICABLE_RATE) / 100
-                    elif old_revenue > Merchant.TDS_THRESHOLD_AMOUNT:
-                        tds_deduction_count = merchant.tds_deduction.all().count()
+                    if (new_revenue >= settings.TDS_THRESHOLD_AMOUNT) and (old_revenue < settings.TDS_THRESHOLD_AMOUNT):
+                        tds = (new_revenue * settings.TDS_APPLICABLE_RATE) / 100
+                    elif old_revenue > settings.TDS_THRESHOLD_AMOUNT:
+                        tds_deduction_count = merchant.tds_deduction.filter(financial_year=settings.CURRENT_FINANCIAL_YEAR).count()
                         if tds_deduction_count > 0:
-                            tds = (booking_net_revenue * Merchant.TDS_APPLICABLE_RATE) / 100
+                            tds = (booking_net_revenue * settings.TDS_APPLICABLE_RATE) / 100
                         else:
-                            tds = (new_revenue * Merchant.TDS_APPLICABLE_RATE) / 100
+                            tds = (new_revenue * settings.TDS_APPLICABLE_RATE) / 100
                 else:
-                    if booking_net_revenue >= Merchant.TDS_THRESHOLD_AMOUNT:
-                        tds = (booking_net_revenue * Merchant.TDS_APPLICABLE_RATE) / 100
+                    if booking_net_revenue >= settings.TDS_THRESHOLD_AMOUNT:
+                        tds = (booking_net_revenue * settings.TDS_APPLICABLE_RATE) / 100
         return tds
 
     def update_net_revenues(self, tds):
@@ -663,7 +664,7 @@ class TdsDeductionMixin(object):
         merchant = self.get_merchant
         if merchant:
             booking_net_revenue = self.get_booking_revenue()
-            merchant_net_revenue_obj = merchant.net_revenue.filter(financial_year=MerchantNetRevenue.CURRENT_FINANCIAL_YEAR).first()
+            merchant_net_revenue_obj = merchant.net_revenue.filter(financial_year=settings.CURRENT_FINANCIAL_YEAR).first()
             if merchant_net_revenue_obj:
                 total_revenue = booking_net_revenue + merchant_net_revenue_obj.total_revenue
                 if not merchant_net_revenue_obj.tds_deducted:
@@ -674,7 +675,7 @@ class TdsDeductionMixin(object):
                 merchant_net_revenue_obj.tds_deducted = total_tds
                 merchant_net_revenue_obj.save()
             else:
-                merchant_net_revenue_obj = MerchantNetRevenue(merchant=merchant, financial_year=MerchantNetRevenue.CURRENT_FINANCIAL_YEAR)
+                merchant_net_revenue_obj = MerchantNetRevenue(merchant=merchant, financial_year=settings.CURRENT_FINANCIAL_YEAR)
                 merchant_net_revenue_obj.tds_deducted = tds
                 merchant_net_revenue_obj.total_revenue = booking_net_revenue
                 merchant_net_revenue_obj.save()

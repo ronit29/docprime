@@ -2730,7 +2730,7 @@ class OpdAppointment(auth_model.TimeStampedModel, CouponsMixin, OpdAppointmentIn
         # TDS Deduction
         if tds > 0:
             merchant = self.get_merchant
-            MerchantTdsDeduction.objects.create(merchant=merchant, tds_deducted=tds, financial_year=MerchantTdsDeduction.CURRENT_FINANCIAL_YEAR,
+            MerchantTdsDeduction.objects.create(merchant=merchant, tds_deducted=tds, financial_year=settings.CURRENT_FINANCIAL_YEAR,
                                                 merchant_payout=merchant_payout)
 
     def doc_payout_amount(self):
