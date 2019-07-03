@@ -1626,7 +1626,7 @@ class LabAppointment(TimeStampedModel, CouponsMixin, LabAppointmentInvoiceMixin,
         if not lab:
             return None
 
-        if self.lab.network.id == settings.THYROCARE_NETWORK_ID:
+        if self.lab.network and self.lab.network.id == settings.THYROCARE_NETWORK_ID:
             return True
 
         return False
