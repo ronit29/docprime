@@ -2294,6 +2294,11 @@ class OpdAppointment(auth_model.TimeStampedModel, CouponsMixin, OpdAppointmentIn
                 mime_type = get_file_mime_type(file)
                 file_url = pf.name.url
                 resp.append({"url": file_url, "type": mime_type})
+
+        for pres in self.eprescription.all():
+            file = pres.prescription_file
+            resp.append({"url": file.url, "type": get_file_mime_type(file)})
+
         return resp
 
 
