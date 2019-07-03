@@ -386,11 +386,11 @@ class MerchantAdmin(ImportExportMixin, VersionAdmin):
         if request.user.is_member_of(constants['MERCHANT_TEAM']):
             if obj and obj.verified_by:
                 return [f.name for f in self.model._meta.fields if
-                        f.name not in ['enabled', 'verified_by_finance', 'associated_to']]
+                        f.name not in ['enabled', 'verified_by_finance', 'associated_to', 'enable_for_tds_deduction']]
             return []
 
         if obj and obj.verified_by:
-            return [f.name for f in self.model._meta.fields] + ['associated_to']
+            return [f.name for f in self.model._meta.fields if f.name not in ['enable_for_tds_deduction']] + ['associated_to']
 
         return ['verified_by_finance', 'associated_to']
 

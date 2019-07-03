@@ -1,5 +1,5 @@
 The appointment request for {{patient_name|capfirst}} with Dr. {{doctor_name|capfirst}} has been confirmed.
-{% if instance.is_medanta_hospital_booking and not instance.is_payment_type_cod and credit_letter_url %}
+{% if instance.is_credit_letter_required_for_appointment and not instance.is_payment_type_cod and credit_letter_url %}
 Please share the credit letter (provided in the link below) at the time of your appointment.
 {{credit_letter_url}}{% endif %}
 {% if not instance.hospital.id in hospitals_not_required_unique_code %}

@@ -10,7 +10,8 @@ from django.template.loader import render_to_string
 from ondoc.account.models import MerchantPayout, ConsumerAccount, Order, UserReferred, MoneyPool, Invoice
 from ondoc.authentication.models import (TimeStampedModel, CreatedByModel, Image, Document, QCModel, UserProfile, User,
                                          UserPermission, GenericAdmin, LabUserPermission, GenericLabAdmin,
-                                         BillingAccount, SPOCDetails, RefundMixin, WelcomeCallingDone)
+                                         BillingAccount, SPOCDetails, RefundMixin, WelcomeCallingDone,
+                                         MerchantTdsDeduction)
 from ondoc.bookinganalytics.models import DP_OpdConsultsAndTests
 from ondoc.doctor.models import Hospital, SearchKey, CancellationReason, Doctor
 from ondoc.crm.constants import constants
@@ -58,7 +59,7 @@ from ondoc.ratings_review import models as ratings_models
 # from ondoc.api.v1.common import serializers as common_serializers
 from ondoc.common.models import AppointmentHistory, AppointmentMaskNumber, Remark, GlobalNonBookable, \
     SyncBookingAnalytics, CompletedBreakupMixin, RefundDetails, MatrixMappedState, \
-    MatrixMappedCity, MatrixDataMixin
+    MatrixMappedCity, TdsDeductionMixin, MatrixDataMixin
 import reversion
 from decimal import Decimal
 from django.utils.text import slugify
@@ -1547,7 +1548,7 @@ class LabAppointmentInvoiceMixin(object):
 
 
 @reversion.register()
-class LabAppointment(TimeStampedModel, CouponsMixin, LabAppointmentInvoiceMixin, RefundMixin, CompletedBreakupMixin, MatrixDataMixin):
+class LabAppointment(TimeStampedModel, CouponsMixin, LabAppointmentInvoiceMixin, RefundMixin, CompletedBreakupMixin, MatrixDataMixin, TdsDeductionMixin):
     from ondoc.integrations.models import IntegratorResponse
     PRODUCT_ID = Order.LAB_PRODUCT_ID
     CREATED = 1
@@ -2022,6 +2023,14 @@ class LabAppointment(TimeStampedModel, CouponsMixin, LabAppointmentInvoiceMixin,
         payout_amount = self.agreed_price
         if self.is_home_pickup:
             payout_amount += self.home_pickup_charges
+
+        tds = self.get_tds_amount()
+        if tds > 0:
+            payout_amount += tds
+
+        # Update Net Revenue
+        self.update_net_revenues(tds)
+
         payout_data = {
             "charged_amount" : self.effective_price,
             "payable_amount" : payout_amount,
@@ -2030,6 +2039,13 @@ class LabAppointment(TimeStampedModel, CouponsMixin, LabAppointmentInvoiceMixin,
 
         merchant_payout = MerchantPayout.objects.create(**payout_data)
         self.merchant_payout = merchant_payout
+
+        # TDS Deduction
+        if tds > 0:
+            merchant = self.get_merchant
+            MerchantTdsDeduction.objects.create(merchant=merchant, tds_deducted=tds,
+                                                financial_year=MerchantTdsDeduction.CURRENT_FINANCIAL_YEAR,
+                                                merchant_payout=merchant_payout)
 
     def get_auto_cancel_delay(self, app_obj):
         delay = settings.AUTO_CANCEL_LAB_DELAY * 60
@@ -2196,6 +2212,26 @@ class LabAppointment(TimeStampedModel, CouponsMixin, LabAppointmentInvoiceMixin,
         elif self.payment_type == OpdAppointment.PREPAID:
             amount = self.agreed_price + self.home_pickup_charges
         return amount
+
+    def get_booking_revenue(self):
+        if self.payment_type == 3:
+            booking_net_revenue = 0
+        else:
+            wallet_amount = self.effective_price
+            price_data = self.price_data
+            if price_data:
+                w_amount = price_data.get('wallet_amount', None)
+                if w_amount is not None:
+                    wallet_amount = w_amount
+
+            agreed_price = self.agreed_price
+            if self.is_home_pickup:
+                agreed_price += self.home_pickup_charges
+            booking_net_revenue = wallet_amount - agreed_price
+            if booking_net_revenue < 0:
+                booking_net_revenue = 0
+
+        return booking_net_revenue
 
     @classmethod
     def get_billing_summary(cls, user, req_data):

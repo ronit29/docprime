@@ -32,7 +32,7 @@ from datetime import timedelta
 from dateutil import tz
 from django.utils import timezone
 from ondoc.authentication import models as auth_model
-from ondoc.authentication.models import SPOCDetails, RefundMixin
+from ondoc.authentication.models import SPOCDetails, RefundMixin, MerchantTdsDeduction
 from ondoc.bookinganalytics.models import DP_OpdConsultsAndTests
 from ondoc.location import models as location_models
 from ondoc.account.models import Order, ConsumerAccount, ConsumerTransaction, PgTransaction, ConsumerRefund, \
@@ -51,9 +51,9 @@ from django.contrib.contenttypes.fields import GenericRelation
 from ondoc.api.v1.utils import get_start_end_datetime, custom_form_datetime, CouponsMixin, aware_time_zone, \
     form_time_slot, util_absolute_url, html_to_pdf, TimeSlotExtraction, resolve_address
 from ondoc.common.models import AppointmentHistory, AppointmentMaskNumber, Service, Remark, MatrixMappedState, \
-    MatrixMappedCity, GlobalNonBookable, SyncBookingAnalytics, CompletedBreakupMixin, RefundDetails, Documents, Fraud
+    MatrixMappedCity, GlobalNonBookable, SyncBookingAnalytics, CompletedBreakupMixin, RefundDetails, Documents, \
+    Fraud, TdsDeductionMixin
 from ondoc.common.models import QRCode, MatrixDataMixin
-
 from functools import reduce
 from operator import or_
 import logging
@@ -284,12 +284,12 @@ class Hospital(auth_model.TimeStampedModel, auth_model.CreatedByModel, auth_mode
         pnt = GEOSGeometry(point_string, srid=4326)
         temp_hosp_queryset = Hospital.objects.filter(is_live=True)
 
-        if not request.user.is_anonymous and request.user.active_insurance:
-            for id in top_hospital_ids:
-                hosp_obj = Hospital.objects.filter(pk=id).first()
-                if hosp_obj:
-                    if not hosp_obj.is_hospital_doctor_insurance_enabled():
-                        top_hospital_ids.remove(id)
+        # if not request.user.is_anonymous and request.user.active_insurance:
+        #     for id in top_hospital_ids:
+        #         hosp_obj = Hospital.objects.filter(pk=id).first()
+        #         if hosp_obj:
+        #             if not hosp_obj.is_hospital_doctor_insurance_enabled():
+        #                 top_hospital_ids.remove(id)
 
         if top_network_ids:
             network_hospital_queryset = temp_hosp_queryset.filter(network__in=top_network_ids)
@@ -637,10 +637,6 @@ class Hospital(auth_model.TimeStampedModel, auth_model.CreatedByModel, auth_mode
                 insured = True
 
         return insured
-
-    @classmethod
-    def get_medanta_hospital(cls):
-        return Hospital.objects.filter(id=settings.MEDANTA_HOSPITAL_ID).first()
 
 
 class HospitalPlaceDetails(auth_model.TimeStampedModel):
@@ -2144,26 +2140,9 @@ class OpdAppointmentInvoiceMixin(object):
             invoices = [invoice]
         return invoices
 
-    def generate_credit_letter(self):
-        old_credit_letters = self.get_document_objects(Documents.CREDIT_LETTER)
-        old_credit_letters.update(is_valid=False)
-        credit_letter = self.documents.create(document_type=Documents.CREDIT_LETTER)
-        context = {
-            "instance": self
-        }
-        html_body = render_to_string("email/documents/credit_letter_medanta.html", context=context)
-        filename = "credit_letter_{}.pdf".format(self.id)
-        file = html_to_pdf(html_body, filename)
-        if not file:
-            logger.error("Got error while creating pdf for opd credit letter.")
-            return []
-        credit_letter.file = file
-        credit_letter.save()
-        return credit_letter
-
 
 @reversion.register()
-class OpdAppointment(auth_model.TimeStampedModel, CouponsMixin, OpdAppointmentInvoiceMixin, RefundMixin, CompletedBreakupMixin, MatrixDataMixin):
+class OpdAppointment(auth_model.TimeStampedModel, CouponsMixin, OpdAppointmentInvoiceMixin, RefundMixin, CompletedBreakupMixin, MatrixDataMixin, TdsDeductionMixin):
     PRODUCT_ID = Order.DOCTOR_PRODUCT_ID
     CREATED = 1
     BOOKED = 2
@@ -2395,9 +2374,13 @@ class OpdAppointment(auth_model.TimeStampedModel, CouponsMixin, OpdAppointmentIn
                     invoices_urls.append(util_absolute_url(invoice.file.url))
         return invoices_urls
 
-    def is_medanta_hospital_booking(self):
-        medanta_hospital = Hospital.get_medanta_hospital()
-        return self.hospital == medanta_hospital if medanta_hospital else False
+    def is_credit_letter_required_for_appointment(self):
+        hospital_ids_cl_required = list(settings.HOSPITAL_CREDIT_LETTER_REQUIRED.values())
+        if self.hospital and self.hospital.id in hospital_ids_cl_required:
+            if self.is_medanta_hospital_booking() or self.is_artemis_hospital_booking():
+                return True
+        return False
+
 
     def get_valid_credit_letter(self):
         credit_letter = self.get_document_objects(Documents.CREDIT_LETTER).first()
@@ -2728,14 +2711,28 @@ class OpdAppointment(auth_model.TimeStampedModel, CouponsMixin, OpdAppointmentIn
         if self.payment_type in [OpdAppointment.COD]:
             raise Exception("Cannot create payout for COD appointments")
 
+        payout_amount = self.fees
+        tds = self.get_tds_amount()
+        if tds > 0:
+            payout_amount += tds
+
+        # Update Net Revenue
+        self.update_net_revenues(tds)
+
         payout_data = {
             "charged_amount" : self.effective_price,
-            "payable_amount" : self.fees,
-            "booking_type"   : Order.DOCTOR_PRODUCT_ID
+            "payable_amount" : payout_amount,
+            "booking_type"  : Order.DOCTOR_PRODUCT_ID
         }
 
         merchant_payout = MerchantPayout.objects.create(**payout_data)
         self.merchant_payout = merchant_payout
+
+        # TDS Deduction
+        if tds > 0:
+            merchant = self.get_merchant
+            MerchantTdsDeduction.objects.create(merchant=merchant, tds_deducted=tds, financial_year=MerchantTdsDeduction.CURRENT_FINANCIAL_YEAR,
+                                                merchant_payout=merchant_payout)
 
     def doc_payout_amount(self):
         amount = 0
@@ -2745,6 +2742,24 @@ class OpdAppointment(auth_model.TimeStampedModel, CouponsMixin, OpdAppointmentIn
             amount = self.fees
 
         return amount
+
+    def get_booking_revenue(self):
+        if self.payment_type == 3:
+            booking_net_revenue = 0
+        else:
+            wallet_amount = self.effective_price
+            price_data = self.price_data
+            if price_data:
+                w_amount = price_data.get('wallet_amount', None)
+                if w_amount is not None:
+                    wallet_amount = w_amount
+
+            agreed_price = self.fees
+            booking_net_revenue = wallet_amount - agreed_price
+            if booking_net_revenue < 0:
+                booking_net_revenue = 0
+
+        return booking_net_revenue
 
     @classmethod
     def get_billing_summary(cls, user, req_data):
@@ -3331,6 +3346,38 @@ class OpdAppointment(auth_model.TimeStampedModel, CouponsMixin, OpdAppointmentIn
             url = settings.BASE_URL + '/order/paymentSummary?order_id={}&token={}'.format(order_id, token)
             result = url, discount
         return result
+
+    def generate_credit_letter(self):
+        old_credit_letters = self.get_document_objects(Documents.CREDIT_LETTER)
+        old_credit_letters.update(is_valid=False)
+        credit_letter = self.documents.create(document_type=Documents.CREDIT_LETTER)
+        context = {
+            "instance": self
+        }
+        html_body = None
+        if self.is_medanta_hospital_booking():
+            html_body = render_to_string("email/documents/credit_letter_medanta.html", context=context)
+        elif self.is_artemis_hospital_booking():
+            html_body = render_to_string("email/documents/credit_letter_artemis.html", context=context)
+        if not html_body:
+            logger.error("Got error while getting hospital for opd credit letter.")
+            return None
+        filename = "credit_letter_{}.pdf".format(self.id)
+        file = html_to_pdf(html_body, filename)
+        if not file:
+            logger.error("Got error while creating pdf for opd credit letter.")
+            return None
+        credit_letter.file = file
+        credit_letter.save()
+        return credit_letter
+
+    def is_medanta_hospital_booking(self):
+        medanta_hospital = Hospital.objects.filter(id=settings.MEDANTA_HOSPITAL_ID).first()
+        return self.hospital == medanta_hospital if medanta_hospital else False
+
+    def is_artemis_hospital_booking(self):
+        artemis_hospital = Hospital.objects.filter(id=settings.ARTEMIS_HOSPITAL_ID).first()
+        return self.hospital == artemis_hospital if artemis_hospital else False
 
 
 class OpdAppointmentProcedureMapping(models.Model):

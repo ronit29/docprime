@@ -38,7 +38,7 @@
         <td style="padding:0 10px 10px"></td>
       </tr> -->
       <tr>
-        <td align="center" style="font-size:16px; color:#000; font-weight: 700;">Endorsement Request Rejected.</td>
+        <td align="center" style="font-size:16px; color:#000; font-weight: 700;">Endorsement Request Partially Processed.</td>
       </tr>
       <!--
       <tr>
@@ -101,40 +101,111 @@
                           <td width="45%" style="font-size: 12px;  padding-bottom: 15px; color: #757575;border-bottom: 1px solid rgba(0,0,0,0.12);padding-top: 15px;">Praposer Name:</td>
                           <td style="font-weight: 500; color: #000; vertical-align: top;border-bottom: 1px solid rgba(0,0,0,0.12);padding-top: 15px; font-size: 12px;"><b>{{proposer_name}}</b></td>
                         </tr> -->
+                        <tr>
+                          <td style="font-weight: 500; color: #000; font-size: 12px;">
+                            Dear {{proposer_name|capfirst}}
+                          </td>
+                        </tr>
+                        <tr>
+                          <td style="padding:5px;">
+
+                          </td>
+                        </tr>
+                        <tr>
+                          <td style="font-weight: 500; color: #000; font-size: 12px;">
+                            Your endorsement request has been partially processed.
+                          </td>
+                        </tr>
+                        <tr>
+                          <td style="padding:5px;">
+
+                          </td>
+                        </tr>
+                        <tr>
+                          <td style="font-weight: 500; color: #000; font-size: 12px;">
+                           Details of the some of the insured members has not been updated due to insufficient documentations. Our customer service executive will shortly get in touch with you to resolve this issue.
+                          </td>
+                        </tr>
+                        <tr>
+                          <td style="padding:5px;">
+
+                          </td>
+                        </tr>
+                        <tr>
+                          <td style="font-weight: 500; color: #000; font-size: 12px;">
+                           Here are the details:
+                          </td>
+                        </tr>
+                        <tr>
+                          <td style="padding:5px;">
+
+                          </td>
+                        </tr>
                         <!-- <tr>
                           <td style="font-weight: 500; color: #000; font-size: 12px; line-height: 2;">
-                            We regret to inform you that your endorsement request for policy ID: {{policy_number}} has been rejected as the documents provided were insufficient to incorporate the changes.<br>
-                            Our team will get in touch with you within 24-48 hours for the same
+                            Your endorsement request for policy id {{policy_number}} has been processed.<br>
+                            {% if few_rejected %}
+                              <p>Profiles of some insured members has not been updated due to insufficient documentation.</p>
+                            {% endif %}
+                            The details are mentioned below:<br>
+                            {% for member in endorsement_list %}
+                              {{member.name}} - {{member.status}}<br>
+                            {% endfor %}
+                            PFA the updated COI for your reference
                           </td>
                         </tr> -->
-                         <tr>
-                          <td style="font-weight: 500; color: #000; font-size: 12px;">
-                            Dear {{proposer_name}}
-                          </td>
-                        </tr>
-                        <tr>
-                          <td style="padding:5px;">
-
-                          </td>
-                        </tr>
-                        <tr>
-                          <td style="font-weight: 500; color: #000; font-size: 12px;">
-                            We regret to inform you that your endorsement request has been rejected due to incomplete documentation.
-                          </td>
-                        </tr>
-                        <tr>
-                          <td style="padding:5px;">
-
-                          </td>
-                        </tr>
-                        <tr>
-                          <td colspan="2" style="font-weight: 500; color: #000; font-size: 12px;"> In case of any queries, you can write to us at <a href="#" style="text-decoration: none; color: #f78631;">customercare@docprime.com</a>.
-                          </td>
-                        </tr>
                       </table>
                     </td>
                     <td style="vertical-align: top;">
                       <img src="https://cdn.docprime.com/images/dpsmile.png" alt="dp-img" width="70">
+                    </td>
+                  </tr>
+                  <tr>
+                    <td colspan="2">
+                      <table style="width: 100%" border="1" cellpadding="0" cellspacing="0">
+                        <tr>
+                          <th style="color: #000; font-size: 12px; padding:3px; text-align: left;">S.No.</th>
+                          <th style="color: #000; font-size: 12px; padding:3px; text-align: left;">Member Name</th>
+                          <th style="color: #000; font-size: 12px; padding:3px; text-align: left;">Field of Modification</th>
+                          <th style="color: #000; font-size: 12px; padding:3px; text-align: left;">Modified Entry</th>
+                          <th style="color: #000; font-size: 12px; padding:3px; text-align: left;">Orginal Entry</th>
+                          <th style="color: #000; font-size: 12px; padding:3px; text-align: left;">Status</th>
+
+                        </tr>
+                        {%for member in partially_members%}
+                          <tr>
+                            <td style="color: #000; font-size: 12px; padding:3px;">
+                              {{forloop.counter}}
+                            </td>
+                            <td style="color: #000; font-size: 12px; padding:3px;">
+                              {{member.name|capfirst}}
+                            </td>
+                            <td style="color: #000; font-size: 12px; padding:3px;">
+                              {{member.field_name|capfirst}}
+                            </td>
+                            <td style="color: #000; font-size: 12px; padding:3px;">
+                              {{member.modified_name|capfirst}}
+                            </td>
+                            <td style="color: #000; font-size: 12px; padding:3px;">
+                              {{member.previous_name|capfirst}}
+                            </td>
+                            <td style="color: #000; font-size: 12px; padding:3px;">
+                              {{member.status}}
+                            </td>
+                          </tr>
+                        {%endfor%}
+
+                      </table>
+                    </td>
+                  </tr>
+                  <tr>
+                    <td style="padding:5px;">
+
+                    </td>
+                  </tr>
+                  <tr>
+                    <td colspan="2" style="font-weight: 500; color: #000; font-size: 12px;">
+                      You can find the updated COI along with this email.
                     </td>
                   </tr>
                 </table>
