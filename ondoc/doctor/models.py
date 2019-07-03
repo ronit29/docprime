@@ -3315,7 +3315,7 @@ class OpdAppointment(auth_model.TimeStampedModel, CouponsMixin, OpdAppointmentIn
         followup_duration = dc_obj.followup_duration
         if not followup_duration:
             followup_duration = settings.DEFAULT_FOLLOWUP_DURATION
-        days_diff = self.date() - last_appointment_date.date()
+        days_diff = self.time_slot_start.date() - last_appointment_date.date()
         if days_diff.days < followup_duration:
             return True
         else:
