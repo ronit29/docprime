@@ -1621,6 +1621,17 @@ class LabAppointment(TimeStampedModel, CouponsMixin, LabAppointmentInvoiceMixin,
     hospital_reference_id = models.CharField(max_length=1000, null=True, blank=True)
     reports_physically_collected = models.NullBooleanField()
 
+    @cached_property
+    def is_thyrocare(self):
+        lab = self.lab
+        if not lab:
+            return None
+
+        if self.lab.network and self.lab.network.id == settings.THYROCARE_NETWORK_ID:
+            return True
+
+        return False
+
     def get_all_uploaded_prescriptions(self, date=None):
         from ondoc.prescription.models import AppointmentPrescription
         qs = LabAppointment.objects.filter(user=self.user).values_list('id', flat=True)
