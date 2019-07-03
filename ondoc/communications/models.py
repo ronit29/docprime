@@ -638,11 +638,10 @@ class WHTSAPPNotification:
                 data.append(self.context.get('instance').id)
                 data.append(self.context.get('patient_name'))
                 data.append(self.context.get('lab_name'))
-                pickup_address = 'NA'
-                if self.context.get('pickup_address'):
-                    pickup_address = self.context.get('pickup_address')
-
-                data.append(pickup_address)
+                if instance.lab and instance.lab.get_lab_address():
+                    data.append(instance.lab.get_lab_address())
+                else:
+                    data.append("NA")
                 data.append(datetime.strftime(aware_time_zone(self.context.get('instance').time_slot_start), '%d-%m-%Y %H:%M'))
             else:
                 pass
