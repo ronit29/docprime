@@ -2680,7 +2680,7 @@ class OpdAppointment(auth_model.TimeStampedModel, CouponsMixin, OpdAppointmentIn
             # while completing appointment
             if database_instance and database_instance.status != self.status and self.status == self.COMPLETED:
                 # add a merchant_payout entry
-                if self.merchant_payout is None and self.payment_type not in [OpdAppointment.COD]:
+                if self.merchant_payout is None and self.payment_type not in [OpdAppointment.COD] and not self.is_fraud_appointment:
                     self.save_merchant_payout()
 
                 # credit cashback if any
@@ -3321,6 +3321,17 @@ class OpdAppointment(auth_model.TimeStampedModel, CouponsMixin, OpdAppointmentIn
             followup_duration = settings.DEFAULT_FOLLOWUP_DURATION
         days_diff = current_appointment.date() - last_appointment_date.date()
         if days_diff.days < followup_duration:
+            return True
+        else:
+            return False
+
+    @property
+    def is_fraud_appointment(self):
+        if not self.insurance:
+            return False
+        content_type = ContentType.objects.get_for_model(OpdAppointment)
+        appointment = Fraud.objects.filter(content_type=content_type, object_id=self.id).first()
+        if appointment:
             return True
         else:
             return False

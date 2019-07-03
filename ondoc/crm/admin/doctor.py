@@ -1860,6 +1860,16 @@ class DoctorOpdAppointmentAdmin(admin.ModelAdmin):
             doctor_admins_phone_numbers.append(doctor_admin.phone_number)
         return mark_safe(','.join(doctor_admins_phone_numbers))
 
+    def save_formset(self, request, form, formset, change):
+        if formset.model != Fraud:
+            return super(DoctorOpdAppointmentAdmin, self).save_formset(request, form, formset, change)
+        instances = formset.save(commit=False)
+        for instance in instances:
+            if not instance.pk:
+                instance.user = request.user
+                return super(DoctorOpdAppointmentAdmin, self).save_formset(request, form, formset, change)
+        formset.save_m2m()
+
     @transaction.atomic
     def save_model(self, request, obj, form, change):
         responsible_user = request.user

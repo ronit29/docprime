@@ -759,9 +759,21 @@ class BlockedStatesAdmin(VersionAdmin):
     fields = ('state_name', 'message')
 
 
+class FraudForm(forms.ModelForm):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        instance = getattr(self, 'instance', None)
+        if instance and instance.pk:
+            if instance.reason:
+                self.fields['reason'].widget.attrs['readonly'] = True
+
+
 class FraudInline(GenericTabularInline):
-    can_delete = True
+    can_delete = False
+    form = FraudForm
     extra = 0
     model = Fraud
     show_change_link = False
-    fields = ['reason']
+    fields = ['reason', 'user', 'created_at']
+    editable = False
+    readonly_fields = ['created_at', 'user']
