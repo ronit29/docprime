@@ -51,11 +51,20 @@ class DoctorSearchHelper:
         procedure_category_ids = self.query_params.get("procedure_category_ids", [])  # NEW_LOGIC
         sits_at_hosp_types = self.query_params.get("sits_at", [])
 
-
+        counter = 1
         if self.query_params.get('hospital_id') is not None:
+            hosp_str = 'h.id IN('
+            for id in self.query_params.get('hospital_id'):
+
+                if not counter == 1:
+                    hosp_str += ','
+                hosp_str = hosp_str + '%(' + 'hospital' + str(counter) + ')s'
+                params['hospital' + str(counter)] = id
+                counter += 1
+
             filtering_params.append(
-                "h.id=(%(hospital_id)s)")
-            params['hospital_id'] = str(self.query_params.get("hospital_id"))
+                hosp_str + ')'
+            )
 
         if self.query_params.get('locality_value'):
             filtering_params.append("h.city_search_key ilike (%(locality_value)s)")
