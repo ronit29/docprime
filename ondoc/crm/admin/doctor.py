@@ -1463,6 +1463,7 @@ class DoctorOpdAppointmentForm(RefundableAppointmentForm):
     custom_otp = forms.IntegerField(required=False)
     hospital_reference_id = forms.CharField(widget=forms.Textarea, required=False)
     send_credit_letter = forms.BooleanField(label='Send credit letter', initial=False, required=False)
+    send_cod_to_prepaid_request = forms.BooleanField(label='Send COD to prepaid request via SMS', initial=False, required=False)
 
     def clean(self):
         super().clean()
@@ -1554,6 +1555,11 @@ class DoctorOpdAppointmentForm(RefundableAppointmentForm):
                     except Exception as e:
                         logger.error(str(e))
 
+        if cleaned_data.get('send_cod_to_prepaid_request', False) and self.instance and self.instance.is_cod_to_prepaid:
+            raise forms.ValidationError("Appointment has already been converted to prepaid.")
+
+        # if cleaned_data.get('send_cod_to_prepaid_request', False) and self.instance and self.instance.payment_status != OpdAppointment.COD:
+        #     raise forms.ValidationError("Appointment must be of COD type.")
 
         # if self.instance.id:
         #     if cleaned_data.get('status') == OpdAppointment.RESCHEDULED_PATIENT or cleaned_data.get(
@@ -1660,7 +1666,7 @@ class DoctorOpdAppointmentAdmin(admin.ModelAdmin):
                 'payment_type', 'admin_information', 'insurance', 'outstanding',
                 'status', 'cancel_type', 'cancellation_reason', 'cancellation_comments',
                 'start_date', 'start_time', 'invoice_urls', 'payment_type', 'payout_info', 'refund_initiated', 'status_change_comments',
-                      'hospital_reference_id', 'send_credit_letter')
+                      'hospital_reference_id', 'send_credit_letter', 'send_cod_to_prepaid_request')
         if request.user.groups.filter(name=constants['APPOINTMENT_OTP_TEAM']).exists() or request.user.is_superuser:
             all_fields = all_fields + ('otp',)
 
@@ -1884,6 +1890,9 @@ class DoctorOpdAppointmentAdmin(admin.ModelAdmin):
                     logger.warning("Admin Cancel completed - " + str(obj.id) + " timezone - " + str(timezone.now()))
             elif request.POST.get('status') and int(request.POST['status']) == OpdAppointment.COMPLETED and opd_obj and opd_obj.status != OpdAppointment.COMPLETED:
                 obj.action_completed()
+            send_cod_to_prepaid_request = form.cleaned_data.get('send_cod_to_prepaid_request', False)
+            if send_cod_to_prepaid_request:
+                notification_tasks.send_opd_notifications_refactored.apply_async((obj.id, NotificationAction.COD_TO_PREPAID_REQUEST), countdown=5)
             if form and form.cleaned_data and form.cleaned_data.get('refund_payment', False):
                 obj._refund_reason = form.cleaned_data.get('refund_reason', '')
                 obj.action_refund()
