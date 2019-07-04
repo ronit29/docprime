@@ -29,7 +29,7 @@ from weasyprint import HTML
 from ondoc.account.models import Invoice, Order
 from ondoc.authentication.models import UserProfile, GenericAdmin, NotificationEndpoint, AgentToken, UserSecretKey, \
     ClickLoginToken
-from ondoc.insurance.models import EndorsementRequest
+from ondoc.insurance.models import EndorsementRequest, UserInsurance
 
 from ondoc.notification.models import NotificationAction, SmsNotification, EmailNotification, AppNotification, \
     PushNotification, WhtsappNotification
@@ -315,11 +315,15 @@ class SMSNotification:
             body_template = "sms/insurance/insurance_confirmed.txt"
         elif notification_type == NotificationAction.INSURANCE_ENDORSMENT_APPROVED:
             body_template = "sms/insurance/insurance_endorsment_approved.txt"
+        elif notification_type == NotificationAction.INSURANCE_ENDORSMENT_PARTIAL_APPROVED:
+            body_template = "sms/insurance/insurance_endorsement_partially_approved.txt"
         elif notification_type == NotificationAction.INSURANCE_ENDORSMENT_PENDING:
             body_template = "sms/insurance/insurance_endorsment_pending.txt"
         elif notification_type == NotificationAction.INSURANCE_ENDORSMENT_REJECTED:
             body_template = "sms/insurance/insurance_endorsment_rejected.txt"
         elif notification_type == NotificationAction.INSURANCE_CANCEL_INITIATE:
+            body_template = "sms/insurance/insurance_cancel_initiate.txt"
+        elif notification_type == NotificationAction.INSURANCE_CANCELLATION:
             body_template = "sms/insurance/insurance_cancellation.txt"
         elif notification_type == NotificationAction.LAB_REPORT_SEND_VIA_CRM:
             body_template = "sms/lab/lab_report_send_crm.txt"
@@ -351,6 +355,8 @@ class SMSNotification:
     def trigger(self, receiver, template, context):
         user = receiver.get('user')
         phone_number = receiver.get('phone_number')
+        if not phone_number:
+            phone_number = user.phone_number
         notification_type = self.notification_type
         context = copy.deepcopy(context)
         html_body = render_to_string(template, context=context)
@@ -382,7 +388,25 @@ class SMSNotification:
             }
             message = json.dumps(message)
             publish_message(message)
-        elif phone_number:
+        elif phone_number and user and user.purchased_insurance.order_by('-id').first() and \
+                user.purchased_insurance.order_by('-id').first().cancel_customer_type == UserInsurance.OTHER and \
+                notification_type in [NotificationAction.INSURANCE_CANCEL_INITIATE,
+                                      NotificationAction.INSURANCE_CANCELLATION]:
+            sms_noti = SmsNotification.objects.create(
+                user=user,
+                phone_number=phone_number,
+                notification_type=notification_type,
+                content=html_body
+            )
+            message = {
+                "data": model_to_dict(sms_noti),
+                "type": "sms"
+            }
+            message = json.dumps(message)
+            if phone_number not in settings.OTP_BYPASS_NUMBERS:
+                publish_message(message)
+
+        elif phone_number and not notification_type == NotificationAction.INSURANCE_CANCELLATION_APPROVED:
             sms_noti = SmsNotification.objects.create(
                 user=user,
                 phone_number=phone_number,
@@ -1037,6 +1061,10 @@ class EMAILNotification:
             body_template = "email/insurance_endorsment_rejected/body.html"
             subject_template = "email/insurance_endorsment_rejected/subject.txt"
 
+        elif notification_type == NotificationAction.INSURANCE_ENDORSMENT_PARTIAL_APPROVED:
+            body_template = "email/insurance_endorsement_partially_approved/body.html"
+            subject_template = "email/insurance_endorsement_partially_approved/subject.txt"
+
         elif notification_type == NotificationAction.LAB_REPORT_SEND_VIA_CRM:
             attachments = []
             for report_link in context.get('reports', []):
@@ -1051,6 +1079,12 @@ class EMAILNotification:
             body_template = "email/ipd/ipd_lead/cost_estimate/body.html"
             subject_template = "email/ipd/ipd_lead/cost_estimate/subject.txt"
         elif notification_type == NotificationAction.INSURANCE_CANCEL_INITIATE:
+            body_template = "email/insurance_cancel_initiate/body.html"
+            subject_template = "email/insurance_cancel_initiate/subject.txt"
+        elif notification_type == NotificationAction.INSURANCE_CANCELLATION_APPROVED:
+            body_template = "email/insurance_cancellation_approved/body.html"
+            subject_template = "email/insurance_cancellation_approved/subject.txt"
+        elif notification_type == NotificationAction.INSURANCE_CANCELLATION:
             body_template = "email/insurance_cancelled/body.html"
             subject_template = "email/insurance_cancelled/subject.txt"
         elif notification_type == NotificationAction.PRICING_ALERT_EMAIL:
@@ -1130,7 +1164,38 @@ class EMAILNotification:
             }
             message = json.dumps(message)
             publish_message(message)
+
+        elif (email or send_without_email) and user and user.purchased_insurance.order_by('-id').first() and \
+                        user.purchased_insurance.order_by('-id').first().cancel_customer_type == UserInsurance.OTHER and \
+                        (notification_type == NotificationAction.INSURANCE_CANCEL_INITIATE or \
+                        notification_type == NotificationAction.INSURANCE_CANCELLATION_APPROVED or \
+                        notification_type == NotificationAction.INSURANCE_CANCELLATION):
+            if notification_type == NotificationAction.INSURANCE_CANCEL_INITIATE:
+                bcc = settings.INSURANCE_CANCEL_INITIATE_EMAIL
+            elif notification_type == NotificationAction.INSURANCE_CANCELLATION_APPROVED:
+                email = settings.INSURANCE_CANCELLATION_APPROVAL_ALERT_TO_EMAIL
+                cc = settings.INSURANCE_CANCELLATION_APPROVAL_ALERT_CC_EMAIL
+                # email = 'ankushg@docprime.com'
+            email_noti = EmailNotification.objects.create(
+                user=user,
+                email=email,
+                notification_type=notification_type,
+                content=html_body,
+                email_subject=email_subject,
+                cc=cc,
+                bcc=bcc,
+                attachments=attachments,
+                content_object=instance
+            )
+            message = {
+                "data": model_to_dict(email_noti),
+                "type": "email"
+            }
+            message = json.dumps(message)
+            publish_message(message)
+
         elif (email or send_without_email):
+
             email_noti = EmailNotification.objects.create(
                 user=user,
                 email=email,
@@ -1649,30 +1714,86 @@ class InsuranceNotification(Notification):
             'insured_members': member_list,
             'insurer_logo': instance.insurance_plan.insurer.logo.url,
             'coi_url': instance.coi.url,
-            'insurer_name': instance.insurance_plan.insurer.name
+            'insurer_name': instance.insurance_plan.insurer.name,
+            'user_bank' : instance.user_bank.last()
         }
 
         if self.notification_type == NotificationAction.INSURANCE_ENDORSMENT_APPROVED:
-            endorsement_list = list()
-            rejected = 0
-            endorsed_members = instance.endorse_members.filter(~Q(status=EndorsementRequest.PENDING))
-            for mem in endorsed_members:
-                if mem.status == 3:
-                    rejected = rejected + 1
+            # endorsement_list = list()
+            # rejected = 0
+            # endorsed_members = instance.endorse_members.filter(~Q(status=EndorsementRequest.PENDING))
+            # for mem in endorsed_members:
+            #     if mem.status == 3:
+            #         rejected = rejected + 1
+            #
+            #     mem_data = {
+            #         'name': mem.member.get_full_name().title(),
+            #         'relation': mem.member.relation,
+            #         'status': EndorsementRequest.STATUS_CHOICES[mem.status-1][1]
+            #     }
+            #     endorsement_list.append(mem_data)
+            #
+            # context['endorsement_list'] = endorsement_list
+            # context['few_rejected'] = True if rejected > 0 else False
+            approved_endorsed_members = instance.endorse_members.filter((Q(mail_status=EndorsementRequest.MAIL_PENDING) |
+                                                                         Q(mail_status__isnull=True)),
+                                                                         status=EndorsementRequest.APPROVED)
+            approved_endorsed_members_context = self.get_endorsed_context(approved_endorsed_members)
+            # context = context.update(approved_endorsed_members_context)
+            context['approved_members'] = approved_endorsed_members_context['members']
 
-                mem_data = {
-                    'name': mem.member.get_full_name().title(),
-                    'relation': mem.member.relation,
-                    'status': EndorsementRequest.STATUS_CHOICES[mem.status-1][1]
-                }
+        if self.notification_type == NotificationAction.INSURANCE_ENDORSMENT_PENDING:
+            pending_endorsed_members = instance.endorse_members.filter(status=EndorsementRequest.PENDING)
+            pending_endorsed_members_context = self.get_endorsed_context(pending_endorsed_members)
+            context['pending_members'] = pending_endorsed_members_context['members']
 
-                endorsement_list.append(mem_data)
-
-            context['endorsement_list'] = endorsement_list
-            context['few_rejected'] = True if rejected > 0 else False
-
-
+        if self.notification_type == NotificationAction.INSURANCE_ENDORSMENT_PARTIAL_APPROVED:
+            partially_approved_endorsed_members = instance.endorse_members.filter(~Q(status=EndorsementRequest.PENDING),
+                                                                                  (Q(mail_status=EndorsementRequest.MAIL_PENDING) |
+                                                                                   Q(mail_status__isnull=True)))
+            partial_approved_context = self.get_endorsed_context(partially_approved_endorsed_members)
+            context['partially_members'] = partial_approved_context['members']
         return context
+
+    def get_endorsed_context(self, members):
+        member_list = list()
+        scope = ['first_name', 'middle_name', 'last_name', 'dob', 'title', 'email', 'address', 'pincode', 'gender',
+                 'relation', 'town', 'district', 'state']
+        context = {}
+        for end_member in members:
+            for s in scope:
+                if end_member.status == EndorsementRequest.REJECT or end_member.status == EndorsementRequest.PENDING:
+                    if not getattr(end_member, s) == getattr(end_member.member, s):
+                        pending_member_data = {
+                            'name': end_member.member.get_full_name().title(),
+                            'field_name': self.get_field_name(s),
+                            'previous_name': getattr(end_member.member, s),
+                            'modified_name': getattr(end_member, s),
+                            'status': EndorsementRequest.STATUS_CHOICES[end_member.status-1][1]
+                        }
+                        member_list.append(pending_member_data)
+                elif end_member.status == EndorsementRequest.APPROVED:
+                    old_member_obj = end_member.member.member_history.order_by('-id').first()
+                    if not old_member_obj:
+                        return context
+                    if not getattr(end_member, s) == getattr(old_member_obj, s):
+                        pending_member_data = {
+                            'name': end_member.member.get_full_name().title(),
+                            'field_name': self.get_field_name(s),
+                            'previous_name': getattr(old_member_obj, s),
+                            'modified_name': getattr(end_member, s),
+                            'status': EndorsementRequest.STATUS_CHOICES[end_member.status-1][1]
+                        }
+                        member_list.append(pending_member_data)
+
+        context['members'] = member_list
+        return context
+
+    def get_field_name(self, val):
+        res = val
+        if "_" in val:
+            res = val.replace("_", " ")
+        return res
 
     def get_receivers(self):
 
@@ -1702,9 +1823,12 @@ class InsuranceNotification(Notification):
         all_receivers = self.get_receivers()
 
         if notification_type in [NotificationAction.INSURANCE_CONFIRMED, NotificationAction.INSURANCE_CANCEL_INITIATE,
+                                 NotificationAction.INSURANCE_CANCELLATION_APPROVED,
+                                 NotificationAction.INSURANCE_CANCELLATION,
                                  NotificationAction.INSURANCE_ENDORSMENT_APPROVED,
                                  NotificationAction.INSURANCE_ENDORSMENT_PENDING,
-                                 NotificationAction.INSURANCE_ENDORSMENT_REJECTED]:
+                                 NotificationAction.INSURANCE_ENDORSMENT_REJECTED,
+                                 NotificationAction.INSURANCE_ENDORSMENT_PARTIAL_APPROVED]:
             email_notification = EMAILNotification(notification_type, context)
             email_notification.send(all_receivers.get('email_receivers', []))
 

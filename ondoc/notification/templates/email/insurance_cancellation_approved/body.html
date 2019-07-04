@@ -1,0 +1,31 @@
+<div>
+    Hi Team,
+    <br>
+    <br>
+Please cancel the below mentioned policy and process the applicable refund-
+<br><br>
+Policy Number : {{policy_number}}
+<br>
+Name: {{proposer_name}}
+<br><br>
+    {% if user_bank %}
+    <div>
+        Please find below mention Bank Details of Customer:
+        <br>
+        <br>
+        <b>Account Holder Name :</b> {{user_bank.account_holder_name}}
+        <br>
+        <b>Bank Name :</b> {{user_bank.bank_name}}
+        <br>
+        <b>Account Number :</b> {{user_bank.account_number}}
+        <br>
+        <b>IFSC Code :</b> {{user_bank.ifsc_code}}
+        <br>
+        <br>
+    </div>
+    {% endif %}
+
+Thanks
+    <br>
+Team Docprime
+</div>
