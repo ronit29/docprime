@@ -739,6 +739,30 @@ class Command(BaseCommand):
         group, created = Group.objects.get_or_create(name=constants['APPOINTMENT_OTP_BYPASS_AGENT_TEAM'])
         # group.permissions.clear()
 
+        group, created = Group.objects.get_or_create(name=constants['MARKETING_INTERN'])
+        group.permissions.clear()
+
+        content_types = ContentType.objects.get_for_models(LabTest, LabTestCategory, LabTestRecommendedCategoryMapping,
+                                                           LabTestCategoryMapping, LabTestCategory,
+                                                           FrequentlyAddedTogetherTests,
+                                                           ParameterLabTest, TestParameter,
+                                                           QuestionAnswer,
+                                                           LabTestRecommendedCategoryMapping,
+                                                           FrequentlyAddedTogetherTests,
+                                                           IpdProcedureFeatureMapping,
+                                                           IpdProcedureCategoryMapping,
+                                                           IpdProcedure,
+                                                           IpdProcedureDetailType, IpdProcedureDetail,
+                                                           IpdProcedureSynonym, IpdProcedureSynonymMapping)
+
+        for cl, ct in content_types.items():
+            permissions = Permission.objects.filter(
+                Q(content_type=ct),
+                Q(codename='add_' + ct.model) |
+                Q(codename='change_' + ct.model))
+
+            group.permissions.add(*permissions)
+
         self.stdout.write('Successfully created groups and permissions')
 
         self.setup_comment_group()
