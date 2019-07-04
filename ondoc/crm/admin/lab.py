@@ -1,3 +1,5 @@
+import re
+
 from django.shortcuts import render, HttpResponse, HttpResponseRedirect, redirect
 from django.conf.urls import url
 from django.conf import settings
@@ -35,6 +37,7 @@ from ondoc.diagnostic.models import (LabTiming, LabImage,
                                      TestParameterChat, LabTestThresholds)
 from ondoc.integrations.models import IntegratorHistory
 from ondoc.notification.models import EmailNotification, NotificationAction
+from ondoc.prescription.models import AppointmentPrescription
 from .common import *
 from ondoc.authentication.models import GenericAdmin, User, QCModel, GenericLabAdmin, AssociatedMerchant
 from ondoc.crm.admin.doctor import CustomDateInput, TimePickerWidget, CreatedByFilter, AutoComplete, \
@@ -134,6 +137,17 @@ class LabManagerFormSet(forms.BaseInlineFormSet):
         super().clean()
         if any(self.errors):
             return
+        if self.instance.data_status == QCModel.QC_APPROVED and not self.cleaned_data:
+            self.instance.is_enable = False
+            raise forms.ValidationError("Atleast one Lab Manager required for QC APPROVED or Enable for Online Booking")
+        phone_no_flag = False
+        if self.cleaned_data and self.instance.network_type == 1:
+            for data in self.cleaned_data:
+                number_pattern = re.compile("(0/91)?[6-9][0-9]{9}")
+                if data.get('number') and number_pattern.match(str(data.get('number'))):
+                    phone_no_flag = True
+            if phone_no_flag == False:
+                raise forms.ValidationError("Atleast one mobile no is required for SPOC Details")
 
 
 class LabManagerInline(admin.TabularInline):
@@ -785,6 +799,8 @@ class LabAppointmentForm(RefundableAppointmentForm):
                                                                   (1, 'Cancel and Refund'),), initial=0, widget=forms.RadioSelect)
     send_email_sms_report = forms.BooleanField(label='Send reports via message and email', initial=False, required=False)
     custom_otp = forms.IntegerField(required=False)
+    hospital_reference_id = forms.CharField(widget=forms.Textarea, required=False)
+    reports_physically_collected = forms.BooleanField(label='Reports collected physically by customer', initial=False, required=False)
 
     def clean(self):
         super().clean()
@@ -818,6 +834,10 @@ class LabAppointmentForm(RefundableAppointmentForm):
         if cleaned_data.get('send_email_sms_report',
                             False) and self.instance and self.instance.id and not self.instance.status == LabAppointment.COMPLETED:
                 raise forms.ValidationError("Can't send reports as appointment is not completed")
+
+        if cleaned_data.get('reports_physically_collected', False) and self.instance and \
+                self.instance.id and not self.instance.status == LabAppointment.COMPLETED:
+                raise forms.ValidationError("Can't collect reports as appointment is not completed")
 
         # if self.instance.status in [LabAppointment.CANCELLED, LabAppointment.COMPLETED] and len(cleaned_data):
         #     raise forms.ValidationError("Cancelled/Completed appointment cannot be modified.")
@@ -893,6 +913,26 @@ class LabReportInline(nested_admin.NestedTabularInline):
     show_change_link = True
     inlines = [LabReportFileInline]
 
+class LabPrescriptionForm(forms.ModelForm):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        instance = getattr(self, 'instance', None)
+        if instance and instance.pk:
+            self.fields['prescription_file'].disabled = True
+
+class LabPrescriptionInline(nested_admin.NestedGenericTabularInline):
+    model = AppointmentPrescription
+    form = LabPrescriptionForm
+    #readonly_fields = ['user']
+    extra = 0
+    can_delete = True
+    show_change_link = False
+    max_num = 3
+
+    def get_readonly_fields(self, request, obj):
+        readonly_fields = ['user']
+        return readonly_fields
+
 
 class LabAppointmentAdmin(nested_admin.NestedModelAdmin):
     form = LabAppointmentForm
@@ -904,7 +944,8 @@ class LabAppointmentAdmin(nested_admin.NestedModelAdmin):
     date_hierarchy = 'created_at'
 
     inlines = [
-        LabReportInline
+        LabReportInline,
+        LabPrescriptionInline
     ]
 
     # def get_autocomplete_fields(self, request):
@@ -914,13 +955,18 @@ class LabAppointmentAdmin(nested_admin.NestedModelAdmin):
     #         temp_autocomplete_fields = super().get_autocomplete_fields(request)
     #     return temp_autocomplete_fields
 
+    def get_queryset(self, request):
+        qs = super().get_queryset(request).select_related('profile', 'lab').prefetch_related('lab_test', 'reports','reports__files',
+                                                                                      'test_mappings', 'test_mappings__test')
+        return qs
+
     def uploaded_prescriptions(self, obj):
         prescriptions = obj.get_all_uploaded_prescriptions()
 
         prescription_string = ""
         for p in prescriptions:
-            prescription_string+="<div><a target='_blank' href={}>{}</a></div>".format(\
-                util_absolute_url(p.prescription_file.url), util_absolute_url(p.prescription_file.url))
+            prescription_string+="<div><a target='_blank' href={}>{}</a></div> | {}".format(
+                util_absolute_url(p.prescription_file.url), util_absolute_url(p.prescription_file.url), str(p.created_at.date()))
         return mark_safe(prescription_string)
 
     def get_search_results(self, request, queryset, search_term):
@@ -1015,8 +1061,8 @@ class LabAppointmentAdmin(nested_admin.NestedModelAdmin):
                     'deal_price', 'effective_price', 'payment_status', 'payment_type', 'insurance', 'is_home_pickup',
                     'get_pickup_address', 'get_lab_address', 'outstanding', 'status', 'cancel_type',
                     'cancellation_reason', 'cancellation_comments', 'start_date', 'start_time',
-                    'send_email_sms_report', 'invoice_urls', 'reports_uploaded', 'email_notification_timestamp', 'payment_type',
-                     'payout_info', 'refund_initiated', 'status_change_comments','uploaded_prescriptions')
+                    'send_email_sms_report', 'reports_physically_collected', 'invoice_urls', 'reports_uploaded', 'email_notification_timestamp', 'payment_type',
+                     'payout_info', 'refund_initiated', 'status_change_comments','uploaded_prescriptions', 'hospital_reference_id')
         if request.user.groups.filter(name=constants['APPOINTMENT_OTP_TEAM']).exists() or request.user.is_superuser:
             all_fields = all_fields + ('otp',)
 
@@ -1048,7 +1094,7 @@ class LabAppointmentAdmin(nested_admin.NestedModelAdmin):
         if request.user.groups.filter(name=constants['APPOINTMENT_OTP_TEAM']).exists() or request.user.is_superuser:
             read_only = read_only + ['otp']
 
-        if obj.status is not LabAppointment.CREATED:
+        if obj and obj.status is not LabAppointment.CREATED:
             read_only = read_only + ['status_change_comments']
         return read_only
 
@@ -1065,9 +1111,13 @@ class LabAppointmentAdmin(nested_admin.NestedModelAdmin):
     #     return inline_instance
 
     def reports_uploaded(self, instance):
-        if instance and instance.id and sum(
-                instance.reports.annotate(no_of_files=Count('files')).values_list('no_of_files', flat=True)):
+        if instance and instance.id:
+            for report in instance.reports.all():
+                if report.files.all():
+                    return True
+        elif instance and instance.id and instance.reports_physically_collected:
             return True
+
         return False
 
     def invoice_urls(self, instance):
@@ -1208,6 +1258,7 @@ class LabAppointmentAdmin(nested_admin.NestedModelAdmin):
             #
             # date_time = datetime.datetime.combine(date, time)
             send_email_sms_report = form.cleaned_data.get('send_email_sms_report', False)
+            # reports_physically_collected = form.cleaned_data.get('reports_physically_collected', False)
             if request.POST['start_date'] and request.POST['start_time']:
                 date_time_field = request.POST['start_date'] + " " + request.POST['start_time']
                 to_zone = tz.gettz(settings.TIME_ZONE)

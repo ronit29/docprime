@@ -163,6 +163,8 @@ def send_opd_notifications_refactored(appointment_id, notification_type=None):
             return
         if instance.status == OpdAppointment.COMPLETED:
             instance.generate_invoice()
+        if instance.status == OpdAppointment.ACCEPTED and instance.is_credit_letter_required_for_appointment() and not instance.is_payment_type_cod():
+            instance.generate_credit_letter()
         counter = 1
         is_masking_done = False
         while counter < 3:
@@ -588,12 +590,20 @@ def send_insurance_notifications(self, data):
 
         insurance_status = int(data.get('status', 0))
         # Cancellation
-        if insurance_status and insurance_status == UserInsurance.CANCEL_INITIATE:
+        if insurance_status and (insurance_status == UserInsurance.CANCEL_INITIATE
+                                 or insurance_status == UserInsurance.CANCELLATION_APPROVED or
+                                 insurance_status == UserInsurance.CANCELLED):
             user_insurance = UserInsurance.get_user_insurance(user)
             if not user_insurance:
                 raise Exception("Invalid or None user insurance found for email notification. User id %s" % str(user_id))
-
-            insurance_notification = InsuranceNotification(user_insurance, NotificationAction.INSURANCE_CANCEL_INITIATE)
+            insurance_notification_status = None
+            if insurance_status == UserInsurance.CANCEL_INITIATE:
+                insurance_notification_status = NotificationAction.INSURANCE_CANCEL_INITIATE
+            elif insurance_status == UserInsurance.CANCELLATION_APPROVED:
+                insurance_notification_status = NotificationAction.INSURANCE_CANCELLATION_APPROVED
+            elif insurance_status == UserInsurance.CANCELLED:
+                insurance_notification_status = NotificationAction.INSURANCE_CANCELLATION
+            insurance_notification = InsuranceNotification(user_insurance, insurance_notification_status)
             insurance_notification.send()
 
         else:
@@ -641,6 +651,8 @@ def send_insurance_endorsment_notifications(self, data):
             notification = NotificationAction.INSURANCE_ENDORSMENT_REJECTED
         elif endorsment_status == EndorsementRequest.APPROVED:
             notification = NotificationAction.INSURANCE_ENDORSMENT_APPROVED
+        elif endorsment_status == EndorsementRequest.PARTIAL_APPROVED:
+            notification = NotificationAction.INSURANCE_ENDORSMENT_PARTIAL_APPROVED
 
             if not user_insurance.coi:
                 try:
@@ -774,7 +786,7 @@ def opd_send_after_appointment_confirmation(appointment_id, previous_appointment
                 not instance.user or \
                 str(math.floor(instance.time_slot_start.timestamp())) != previous_appointment_date_time:
             return
-        if instance.status == OpdAppointment.ACCEPTED:
+        if instance.status == OpdAppointment.ACCEPTED and not instance.insurance:
             if not second:
                 opd_notification = OpdNotification(instance, NotificationAction.OPD_CONFIRMATION_CHECK_AFTER_APPOINTMENT)
             else:
@@ -1054,6 +1066,46 @@ def update_coupon_used_count():
                  where oa.status in (2,3,4,5,7) group by oac.coupon_id
                 ) x group by coupon_id
                 ) y where coupon.id = y.coupon_id ''', []).execute()
+
+
+@task
+def send_ipd_procedure_cost_estimate(ipd_procedure_lead_id=None):
+    from ondoc.procedure.models import IpdProcedureLead
+    from ondoc.communications.models import IpdLeadNotification
+    try:
+        instance = IpdProcedureLead.objects.filter(id=ipd_procedure_lead_id).first()
+        ipd_lead_notification = IpdLeadNotification(ipd_procedure_lead=instance, notification_type=NotificationAction.IPD_PROCEDURE_COST_ESTIMATE)
+        ipd_lead_notification.send()
+    except Exception as e:
+        logger.error(str(e))
+
+
+@task()
+def upload_cost_estimates(obj_id):
+    from ondoc.procedure.models import UploadCostEstimateData
+    from ondoc.crm.management.commands import upload_cost_estimates as upload_command
+    instance = UploadCostEstimateData.objects.filter(id=obj_id).first()
+    errors = []
+    if not instance or not instance.status == UploadCostEstimateData.IN_PROGRESS:
+        return
+    try:
+        wb = load_workbook(instance.file)
+        sheets = wb.worksheets
+        cost_estimate = upload_command.UploadCostEstimate(errors)
+        cost_estimate.upload(sheets[0])
+        if len(errors)>0:
+            raise Exception('errors in data')
+        instance.status = UploadCostEstimateData.SUCCESS
+        instance.save()
+    except Exception as e:
+        error_message = traceback.format_exc() + str(e)
+        logger.error(error_message)
+        instance.status = UploadCostEstimateData.FAIL
+        if errors:
+            instance.error_msg = errors
+        else:
+            instance.error_msg = [{'line number': 0, 'message': error_message}]
+        instance.save(retry=False)
 
 
 @task(bind=True, max_retries=5)

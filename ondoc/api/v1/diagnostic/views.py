@@ -1264,10 +1264,10 @@ class LabList(viewsets.ReadOnlyModelViewSet):
 
         parameters['insurance_threshold_amount'] = insurance_data_dict['insurance_threshold_amount']
         parameters['is_user_insured'] = insurance_data_dict['is_user_insured']
-        queryset_result = self.get_lab_search_list(parameters, page)
+        queryset_result = self.get_lab_search_list(parameters, page, request)
         count = 0
         if len(queryset_result)>0:
-            count = queryset_result[0].get("result_count",0)
+            count = queryset_result[0].get("result_count", 0)
 
         #count = len(queryset_result)
         #paginated_queryset = paginate_queryset(queryset_result, request)
@@ -1377,7 +1377,7 @@ class LabList(viewsets.ReadOnlyModelViewSet):
                          "count": count, 'tests': tests,
                          "seo": seo, 'breadcrumb':breadcrumb})
 
-    def get_lab_search_list(self, parameters, page):
+    def get_lab_search_list(self, parameters, page, request=None):
         # distance in meters
 
         # DEFAULT_DISTANCE = 20000
@@ -1502,12 +1502,17 @@ class LabList(viewsets.ReadOnlyModelViewSet):
             group_filter.append("price<=(%(max_price)s)")
             filtering_params['max_price'] = max_price
 
-        if is_insurance and ids:
-            filtering_query.append("mrp<=(%(insurance_threshold_amount)s)")
-            if not hasattr(self.request, 'agent'):
-                group_filter.append("(agreed_price<=insurance_cutoff_price or insurance_cutoff_price is null )")
-            filtering_params['insurance_threshold_amount'] = insurance_threshold_amount
+        if is_insurance and ids and self.request.user and not self.request.user.is_anonymous and \
+                self.request.user.active_insurance:
+            # filtering_query.append("mrp<=(%(insurance_threshold_amount)s)")
+            if not hasattr(request, 'agent'):
+                group_filter.append("(case when covered_under_insurance then agreed_price<=insurance_cutoff_price or insurance_cutoff_price is null else false end  )")
+        elif not is_insurance and ids and self.request.user and not self.request.user.is_anonymous and \
+                self.request.user.active_insurance:
+            if not hasattr(request, 'agent'):
+                group_filter.append("( case when covered_under_insurance then agreed_price<=insurance_cutoff_price or insurance_cutoff_price is null else true end  )")
 
+        filtering_params['insurance_threshold_amount'] = insurance_threshold_amount
         if avg_ratings:
             filtering_query.append(" (case when (rating_data is not null and (rating_data ->> 'avg_rating')::float > 4 ) or " \
                             "( (rating_data ->> 'avg_rating')::float >= (%(avg_ratings)s) and (rating_data ->> 'rating_count') is not null and " \
@@ -1577,7 +1582,9 @@ class LabList(viewsets.ReadOnlyModelViewSet):
                         ROW_NUMBER () OVER (ORDER BY {order} ) order_rank,
                         max_order_priority as order_priority
                         from (
-                        select max(lt.insurance_cutoff_price) as insurance_cutoff_price , max(lt.test_type) as test_type, lb.*, sum(mrp) total_mrp, count(*) as test_count,
+                        select max(lt.insurance_cutoff_price) as insurance_cutoff_price , 
+                        case when sum(mrp)<=(%(insurance_threshold_amount)s) and is_insurance_enabled=true then true else false end as covered_under_insurance,
+                        max(lt.test_type) as test_type, lb.*, sum(mrp) total_mrp, count(*) as test_count,
                         case when bool_and(home_collection_possible)=True and is_home_collection_enabled=True 
                         then max(home_pickup_charges) else 0
                         end as pickup_charges,

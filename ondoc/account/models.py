@@ -1608,7 +1608,7 @@ class MerchantPayout(TimeStampedModel):
         if self.type == self.MANUAL and self.utr_no and self.status == self.PENDING:
             self.status = self.PAID
 
-        if self.utr_no and self.booking_type == self.InsurancePremium:
+        if self.utr_no and self.booking_type == self.InsurancePremium and self.paid_to != Merchant.objects.filter(id=settings.DOCPRIME_NODAL2_MERCHANT).first():
             self.create_insurance_transaction()
 
 
@@ -1640,9 +1640,53 @@ class MerchantPayout(TimeStampedModel):
     #         if p.utr_no:
     #             p.create_insurance_transaction()
 
+    def should_create_insurance_transaction(self):
+        from ondoc.insurance.models import InsuranceTransaction
+
+        premium_amount = None
+        transferred_amount = 0
+        user_insurance = None
+        all_payouts = None
+        pms = PayoutMapping.objects.filter(payout=self).first()
+        if pms:
+            user_insurance = pms.content_object
+        if user_insurance:
+            premium_amount = user_insurance.premium_amount
+            all_payouts = PayoutMapping.objects.filter(object_id=user_insurance.id, content_type_id=\
+                ContentType.objects.get_for_model(user_insurance).id).\
+                exclude(payout__paid_to_id=settings.DOCPRIME_NODAL2_MERCHANT).exclude(payout=self)
+
+            all_payouts = [x.payout for x in all_payouts]
+            transfers = InsuranceTransaction.objects.filter(user_insurance=user_insurance,\
+             transaction_type=InsuranceTransaction.CREDIT, reason=InsuranceTransaction.PREMIUM_PAYOUT)
+            transfers = list(transfers)
+
+            for transfer in transfers:
+                transferred_amount += transfer.amount
+            total_payouts = len(all_payouts)
+            counter = 0
+
+            for payout in all_payouts:
+                for transfer in transfers: 
+                    if not hasattr(payout,'_removed'):
+                        payout._removed = False
+                    if not hasattr(transfer,'_removed'):
+                        transfer._removed = False
+                   
+                    if not payout._removed and not transfer._removed and payout.payable_amount == transfer.amount:
+                        transfer._removed = True
+                        payout._removed = True
+
+            all_payouts = [x for x in all_payouts if not x._removed]
+            transfers = [x for x in transfers if not x._removed]
+            if len(transfers)==0 and (transferred_amount+self.payable_amount)<=premium_amount:
+                return True
+
+
+
     def create_insurance_transaction(self):
         from ondoc.insurance.models import UserInsurance, InsuranceTransaction
-        if not self.get_insurance_transaction():
+        if self.should_create_insurance_transaction():
             user_insurance = self.get_user_insurance()
             # InsuranceTransaction.objects.create(user_insurance=user_insurance,
             #     # account = user_insurance.insurance_plan.insurer.float.first(),
@@ -1725,6 +1769,15 @@ class MerchantPayout(TimeStampedModel):
         if trans and trans[0].amount == self.payable_amount:
             return trans
 
+        from ondoc.insurance.models import UserInsurance
+        uis = UserInsurance.objects.filter(user=user_insurance.user)
+        if len(uis)==1:
+            trans = PgTransaction.objects.filter(user=user_insurance.user, product_id=Order.INSURANCE_PRODUCT_ID)
+            if len(trans)==1 and trans[0].amount == self.payable_amount:
+                return trans
+
+        return []
+
     def is_insurance_premium_payout(self):
         if self.booking_type == Order.INSURANCE_PRODUCT_ID:
             return True
@@ -1781,7 +1834,7 @@ class MerchantPayout(TimeStampedModel):
                 "buCallbackFailureUrl": ""
             }
             if not self.is_nodal_transfer():
-                req_data["insurerCode"] = "apolloDummy"
+                req_data["merchCode"] = "apolloDummy"
 
 
             response = requests.post(url, data=json.dumps(req_data), headers=headers)
@@ -1819,7 +1872,7 @@ class MerchantPayout(TimeStampedModel):
             # if not self.is_nodal_transfer():
             #     raise Exception('Incorrect method called for payout')
 
-            if self.status == self.PAID:
+            if self.status == self.PAID or self.utr_no:
                 return True
 
             transaction = self.get_insurance_premium_transactions()
@@ -1854,6 +1907,9 @@ class MerchantPayout(TimeStampedModel):
             # curr_txn["txnAmount"] = str(self.payable_amount)
             curr_txn["settledAmount"] = str(self.payable_amount)
             curr_txn["merchantCode"] = self.paid_to.id
+            if txn.transaction_id:
+                curr_txn["pgtxId"] = txn.transaction_id
+
             curr_txn["refNo"] = self.payout_ref_id
             curr_txn["bookingId"] = user_insurance.id
             curr_txn["paymentType"] = default_payment_mode
@@ -1966,11 +2022,13 @@ class MerchantPayout(TimeStampedModel):
             if self.pg_status=='SETTLEMENT_COMPLETED' or self.utr_no or self.type ==self.MANUAL:
                 return
 
+            order_no = None
             url = settings.SETTLEMENT_DETAILS_API
             if self.is_insurance_premium_payout():
                 txn = self.get_insurance_premium_transactions()
                 if txn:
                     order_no = txn[0].order_no
+
             else:
                 order_no = self.get_pg_order_no()
 
@@ -1988,7 +2046,8 @@ class MerchantPayout(TimeStampedModel):
                     if resp_data.get('ok') == 1 and len(resp_data.get('settleDetails'))>0:
                         details = resp_data.get('settleDetails')
                         for d in details:
-                            if d.get('refNo') == str(self.payout_ref_id):
+                            if d.get('refNo') == str(self.payout_ref_id) or\
+                                    (not self.payout_ref_id and d.get('orderNo')==order_no):
                                 self.utr_no = d.get('utrNo','')
                                 self.pg_status = d.get('txStatus','')
                                 if self.utr_no:

@@ -213,10 +213,12 @@ class HospitalProviderDataViewSet(viewsets.GenericViewSet):
                 hosp_id = admin.hospital.id
                 admin_data = {"name": admin.hospital.name,
                               "id": hosp_id,
-                              'pem_type': admin.permission_type
+                              'pem_type': admin.permission_type,
+                              "is_superuser": False
                              }
                 if admin.super_user_permission:
                     admin_data['pem_type'] = auth_models.GenericAdmin.ALL
+                    admin_data['is_superuser'] = True
                 # if admin.hospital.provider_encrypt:
                 if hasattr(admin.hospital, 'encrypt_details'):
                     admin_data['is_encrypted'] = admin.hospital.encrypt_details.is_encrypted
@@ -225,6 +227,7 @@ class HospitalProviderDataViewSet(viewsets.GenericViewSet):
                     admin_data["encryption_hint"] = admin.hospital.encrypt_details.hint
                     admin_data["email"] = admin.hospital.encrypt_details.email
                     admin_data["phone_numbers"] = admin.hospital.encrypt_details.phone_numbers
+                    admin_data["google_drive"] = admin.hospital.encrypt_details.google_drive
                     admin_data["is_consent_received"] = admin.hospital.encrypt_details.is_consent_received
                     admin_data["updated_at"] = admin.hospital.encrypt_details.updated_at
                     admin_data["created_at"] = admin.hospital.encrypt_details.created_at
@@ -510,8 +513,11 @@ class ProviderSignupOtpViewset(viewsets.GenericViewSet):
         valid_data = serializer.validated_data
         phone_number = valid_data.get('phone_number')
         retry_send = request.query_params.get('retry', False)
+        via_sms = valid_data.get('via_sms', True)
+        via_whatsapp = valid_data.get('via_whatsapp', False)
+        call_source = valid_data.get('request_source')
         otp_message = OtpVerifications.get_otp_message(request.META.get('HTTP_PLATFORM'), None, True, version=request.META.get('HTTP_APP_VERSION'))
-        send_otp(otp_message, phone_number, retry_send)
+        send_otp(otp_message, phone_number, retry_send, via_sms=via_sms, via_whatsapp=via_whatsapp, call_source=call_source)
         response = {'otp_generated': True}
         return Response(response)
 
@@ -590,6 +596,7 @@ class ProviderSignupDataViewset(viewsets.GenericViewSet):
                         encrypt_object.encrypted_hospital_id = hospital['encrypted_hospital_id']
                         encrypt_object.email = valid_data.get("email")
                         encrypt_object.phone_numbers = valid_data.get("phone_numbers")
+                        encrypt_object.google_drive = valid_data.get("google_drive")
                         encrypt_object.is_valid = True
                         encrypt_object.save()
                     else:
@@ -600,6 +607,7 @@ class ProviderSignupDataViewset(viewsets.GenericViewSet):
                                                                                 encrypted_hospital_id=hospital['encrypted_hospital_id'],
                                                                                 email=valid_data.get("email"),
                                                                                 phone_numbers=valid_data.get("phone_numbers"),
+                                                                                google_drive=valid_data.get("google_drive"),
                                                                                 is_valid=True))
                         hospital_ids_to_be_created.append(hospital['hospital_id'].id)
             else:
@@ -608,14 +616,16 @@ class ProviderSignupDataViewset(viewsets.GenericViewSet):
                 hospital_ids_to_be_created.append(hospital['hospital_id'].id)
         if 'is_encrypted' in valid_data and not valid_data.get('is_encrypted'):
             doc_models.ProviderEncrypt.objects.filter(hospital__in=[hospital['hospital_id'] for hospital in valid_data.get("hospitals")])\
-                                              .update(is_encrypted=False, encrypted_by=None, hint=None, encrypted_hospital_id=None, is_valid=False)
+                                              .update(is_encrypted=False, encrypted_by=None, hint=None,
+                                                      encrypted_hospital_id=None, email=None, phone_numbers=None,
+                                                      google_drive=None, is_valid=False)
         try:
             if 'is_encrypted' in valid_data and valid_data.get('is_encrypted') and objects_to_be_created and not doc_models.ProviderEncrypt.objects.filter(hospital_id__in=hospital_ids_to_be_created):
                 doc_models.ProviderEncrypt.objects.bulk_create(objects_to_be_created)
-            if hospitals:
+            if hospitals and 'is_encrypted' in valid_data:
                 prov_ecrypt_objects = doc_models.ProviderEncrypt.objects.filter(hospital__in=hospitals)
                 for obj in prov_ecrypt_objects:
-                    obj.send_sms()
+                    obj.send_sms(request.user)
             return Response({"status": 1, "message": "consent updated"})
         except Exception as e:
             logger.error('Error updating consent: ' + str(e))
@@ -680,6 +690,13 @@ class ProviderSignupDataViewset(viewsets.GenericViewSet):
                                                                            source_type=auth_models.GenericAdmin.APP,
                                                                            entity_type=auth_models.GenericAdmin.HOSPITAL,
                                                                            super_user_permission=True))
+                    generic_admin_obj_list.append(auth_models.GenericAdmin(name=doctor.name,
+                                                                           doctor=doctor, hospital=hospital,
+                                                                           phone_number=phone_number,
+                                                                           source_type=auth_models.GenericAdmin.APP,
+                                                                           entity_type=auth_models.GenericAdmin.HOSPITAL,
+                                                                           permission_type=auth_models.GenericAdmin.APPOINTMENT,
+                                                                           write_permission=True))
                     continue
                 if details.get('is_appointment'):
                     generic_admin_obj_list.append(auth_models.GenericAdmin(name=doctor.name,

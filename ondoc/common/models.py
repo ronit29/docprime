@@ -24,9 +24,11 @@ from ondoc.authentication.models import User
 from ondoc.authentication import models as auth_model
 from ondoc.bookinganalytics.models import DP_StateMaster, DP_CityMaster
 import datetime
+from datetime import date
 from django.utils import timezone
 
 from ondoc.common.helper import Choices
+from django.conf import settings
 
 
 class Cities(models.Model):
@@ -447,6 +449,105 @@ class RefundDetails(TimeStampedModel):
             cls .objects.create(refund_reason=refund_reason, refund_initiated_by=refund_initiated_by, content_object=appointment)
 
 
+class MatrixDataMixin(object):
+
+    def get_matrix_policy_data(self):
+        user_insurance = self.user.active_insurance
+        primary_proposer_name = None
+
+        if user_insurance:
+            primary_proposer = user_insurance.get_primary_member_profile()
+            primary_proposer_name = primary_proposer.get_full_name() if primary_proposer else None
+
+        policy_details = {
+            "ProposalNo": None,
+            "PolicyPaymentSTATUS": 300 if user_insurance else 0,
+            "BookingId": user_insurance.id if user_insurance else None,
+            "ProposerName": primary_proposer_name,
+            "PolicyId": user_insurance.policy_number if user_insurance else None,
+            "InsurancePlanPurchased": user_insurance.insurance_plan.name if user_insurance else None,
+            "PurchaseDate": int(user_insurance.purchase_date.timestamp()) if user_insurance else None,
+            "ExpirationDate": int(user_insurance.expiry_date.timestamp()) if user_insurance else None,
+            "COILink": user_insurance.coi.url if user_insurance and user_insurance.coi is not None and user_insurance.coi.name else None,
+            "PeopleCovered": user_insurance.insurance_plan.get_people_covered() if user_insurance else ""
+        }
+
+        return policy_details
+
+    def calculate_age(self):
+        if not self.profile:
+            return 0
+        if not self.profile.dob:
+            return 0
+        dob = self.profile.dob
+        today = date.today()
+        return today.year - dob.year - ((today.month, today.day) < (dob.month, dob.day))
+
+    def appointment_accepted_history(self):
+        source = ""
+        accepted_phone = None
+        history_obj = self.history.filter(status=self.ACCEPTED).first()
+        if history_obj:
+            source = history_obj.source
+            if source == 'ivr':
+                auto_ivr_data = history_obj.content_object.auto_ivr_data
+                for data in auto_ivr_data:
+                    if data.get('status') == self.ACCEPTED:
+                        accepted_phone = data.get('phone_number')
+            else:
+                user = history_obj.user
+                if user:
+                    accepted_phone = user.phone_number
+
+        return {'source': source, 'accepted_phone': accepted_phone}
+
+    def merchant_payout_data(self):
+        provider_payment_status = ''
+        settlement_date = None
+        payment_URN = ''
+        amount = None
+        merchant_payout = self.merchant_payout
+        if merchant_payout:
+            provider_payment_status = dict(merchant_payout.STATUS_CHOICES)[merchant_payout.status]
+            settlement_date = int(merchant_payout.payout_time.timestamp()) if merchant_payout.payout_time else None
+            payment_URN = merchant_payout.utr_no
+            amount = merchant_payout.payable_amount
+
+        return {'provider_payment_status': provider_payment_status, 'settlement_date': settlement_date, 'payment_URN': payment_URN, 'amount': amount}
+
+    def refund_details_data(self):
+        from ondoc.account.models import ConsumerTransaction
+        from ondoc.account.models import PgTransaction
+        from ondoc.account.models import ConsumerRefund
+        customer_status = ""
+        refund_urn = ""
+        refund_initiated_at = None
+        original_payment_mode_refund = 0.0
+        promotional_wallet_refund = 0.0
+
+        product_id = self.PRODUCT_ID
+        ct = ConsumerTransaction.objects.filter(type=PgTransaction.CREDIT, reference_id=self.id, product_id=product_id,
+                                                action=ConsumerTransaction.CANCELLATION)
+
+        wallet_ct = ct.filter(source=ConsumerTransaction.WALLET_SOURCE).first()
+        cashback_ct = ct.filter(source=ConsumerTransaction.CASHBACK_SOURCE).first()
+
+        if wallet_ct:
+            original_payment_mode_refund = wallet_ct.amount
+            refund_initiated_at = wallet_ct.created_at.timestamp()
+            # consumer_refund = ConsumerRefund.objects.filter(consumer_transaction_id=wallet_ct.id).first()
+            # if consumer_refund:
+            #     refund_initiated_at = consumer_refund.refund_initiated_at
+            #     customer_status = consumer_refund.refund_state
+
+        if cashback_ct:
+            promotional_wallet_refund = cashback_ct.amount
+            refund_initiated_at = cashback_ct.created_at.timestamp()
+
+        return {'original_payment_mode_refund': original_payment_mode_refund, 'promotional_wallet_refund': promotional_wallet_refund,
+                'customer_status': customer_status, 'refund_urn': refund_urn, 'refund_initiated_at': refund_initiated_at}
+
+
 class DeviceDetails(TimeStampedModel):
     device_id = models.CharField(max_length=200)
     app_version = models.CharField(max_length=20, null=True, blank=True)
@@ -506,7 +607,6 @@ class BlacklistUser(TimeStampedModel):
 
         return None
 
-
     class Meta:
         db_table = 'blacklist_users'
         unique_together = (("user", "type"), )
@@ -518,7 +618,101 @@ class GenericNotes(TimeStampedModel):
     content_object = GenericForeignKey()
     notes = models.TextField()
     created_by = models.ForeignKey(User, on_delete=models.DO_NOTHING, blank=True, null=True)
+    notes_file = models.FileField(null=True, blank=True, upload_to='notes', validators=[FileExtensionValidator(allowed_extensions=['pdf', 'jpg', 'jpeg', 'png'])])
 
     class Meta:
         db_table = 'generic_notes'
 
+
+class TdsDeductionMixin(object):
+
+    def get_tds_amount(self):
+        from ondoc.authentication.models import Merchant
+        from ondoc.authentication.models import MerchantNetRevenue
+        import decimal
+        tds = 0
+        merchant = self.get_merchant
+        if merchant:
+            booking_net_revenue = self.get_booking_revenue()
+            payout_amount = 0
+            if self.__class__.__name__ == 'OpdAppointment':
+                payout_amount = self.fees
+            elif self.__class__.__name__ == 'LabAppointment':
+                payout_amount = self.agreed_price
+                if self.is_home_pickup:
+                    payout_amount += self.home_pickup_charges
+
+            if merchant.enable_for_tds_deduction:
+                merchant_net_revenue_obj = merchant.net_revenue.filter(financial_year=settings.CURRENT_FINANCIAL_YEAR).first()
+                if merchant_net_revenue_obj:
+                    old_revenue = merchant_net_revenue_obj.total_revenue
+                    new_revenue = merchant_net_revenue_obj.total_revenue + booking_net_revenue
+                    if (new_revenue >= decimal.Decimal(settings.TDS_THRESHOLD_AMOUNT)) and (old_revenue < decimal.Decimal(settings.TDS_THRESHOLD_AMOUNT)):
+                        tds = (new_revenue * decimal.Decimal(settings.TDS_APPLICABLE_RATE)) / 100
+                    elif old_revenue > decimal.Decimal(settings.TDS_THRESHOLD_AMOUNT):
+                        tds_deduction_count = merchant.tds_deduction.filter(financial_year=settings.CURRENT_FINANCIAL_YEAR).count()
+                        if tds_deduction_count > 0:
+                            tds = (booking_net_revenue * decimal.Decimal(settings.TDS_APPLICABLE_RATE)) / 100
+                        else:
+                            tds = (new_revenue * decimal.Decimal(settings.TDS_APPLICABLE_RATE)) / 100
+                else:
+                    if booking_net_revenue >= decimal.Decimal(settings.TDS_THRESHOLD_AMOUNT):
+                        tds = (booking_net_revenue * decimal.Decimal(settings.TDS_APPLICABLE_RATE)) / 100
+        return tds
+
+    def update_net_revenues(self, tds):
+        from ondoc.authentication.models import MerchantNetRevenue
+        merchant = self.get_merchant
+        if merchant:
+            booking_net_revenue = self.get_booking_revenue()
+            merchant_net_revenue_obj = merchant.net_revenue.filter(financial_year=settings.CURRENT_FINANCIAL_YEAR).first()
+            if merchant_net_revenue_obj:
+                total_revenue = booking_net_revenue + merchant_net_revenue_obj.total_revenue
+                if not merchant_net_revenue_obj.tds_deducted:
+                    total_tds = tds
+                else:
+                    total_tds = merchant_net_revenue_obj.tds_deducted + tds
+                merchant_net_revenue_obj.total_revenue = total_revenue
+                merchant_net_revenue_obj.tds_deducted = total_tds
+                merchant_net_revenue_obj.save()
+            else:
+                merchant_net_revenue_obj = MerchantNetRevenue(merchant=merchant, financial_year=settings.CURRENT_FINANCIAL_YEAR)
+                merchant_net_revenue_obj.tds_deducted = tds
+                merchant_net_revenue_obj.total_revenue = booking_net_revenue
+                merchant_net_revenue_obj.save()
+
+
+class Documents(TimeStampedModel):
+    DOCUMENT = 1
+    CREDIT_LETTER = 2
+    DOCUMENT_TYPES = [("", "Select"), (DOCUMENT, "Document"), (CREDIT_LETTER, "Credit Letter")]
+
+    content_type = models.ForeignKey(ContentType, on_delete=models.DO_NOTHING)
+    object_id = models.PositiveIntegerField()
+    content_object = GenericForeignKey()
+    document_type = models.PositiveSmallIntegerField(default=1, choices=DOCUMENT_TYPES)
+    file = models.FileField(upload_to='credit_letter', null=True, blank=True)
+    is_valid = models.BooleanField(default=True)
+
+    class Meta:
+        db_table = 'documents'
+
+
+class VirtualAppointment(TimeStampedModel):
+    BOOKED = "booked"
+    CANCELLED = "cancelled"
+    COMPLETED = "completed"
+    DOCTOR = "doctor"
+    LAB = "lab"
+    STATUS_CHOICES = [(BOOKED, "Booked"), (CANCELLED, "Cancelled"), (COMPLETED, "Completed")]
+    TYPE_CHOICES = [(DOCTOR, "Doctor"), (LAB, "Lab")]
+    name = models.CharField(max_length=200)
+    type = models.CharField(choices=TYPE_CHOICES, max_length=20)
+    status = models.CharField(choices=STATUS_CHOICES, max_length=20)
+    time_slot_start = models.DateTimeField()
+    content_type = models.ForeignKey(ContentType, on_delete=models.CASCADE)
+    object_id = models.PositiveIntegerField()
+    content_object = GenericForeignKey()
+
+    class Meta:
+        db_table = 'virtual_appointment'

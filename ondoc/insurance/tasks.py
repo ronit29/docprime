@@ -9,7 +9,6 @@ import requests
 import json
 import logging
 
-
 logger = logging.getLogger(__name__)
 
 
@@ -170,6 +169,14 @@ def push_insurance_buy_to_matrix(self, *args, **kwargs):
 
     except Exception as e:
         logger.error("Error in Celery. Failed pushing insurance to the matrix- " + str(e))
+
+@task()
+def process_insurance_payouts():
+    from ondoc.insurance.models import UserInsurance
+
+    uis = UserInsurance.objects.filter(premium_transferred=False).order_by('id')
+    for ui in uis:
+        ui.process_payout()
 
 @task()
 def push_mis():

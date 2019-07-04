@@ -1,15 +1,21 @@
+import datetime
+
+from django.contrib.contenttypes.fields import GenericRelation
 from django.contrib.postgres.fields import JSONField
 from django.core.validators import MaxValueValidator, MinValueValidator
 from django.db import models, transaction
+from django.db.models import Q
+
 from ondoc.authentication import models as auth_model
 from ondoc.authentication.models import User, UserProfile
-from ondoc.common.models import Feature, AppointmentHistory
+from ondoc.common.models import Feature, AppointmentHistory, VirtualAppointment
 from ondoc.coupon.models import Coupon
 from ondoc.doctor.models import DoctorClinic, SearchKey, Hospital, PracticeSpecialization, HealthInsuranceProvider, \
-    HospitalNetwork
+    HospitalNetwork, Doctor
 from collections import deque, OrderedDict
 
 from ondoc.insurance.models import ThirdPartyAdministrator
+from django.conf import settings
 
 
 class IpdProcedure(auth_model.TimeStampedModel, SearchKey, auth_model.SoftDelete):
@@ -94,6 +100,36 @@ class IpdProcedureCategoryMapping(models.Model):
         unique_together = (('ipd_procedure', 'category'),)
 
 
+class IpdCostEstimateRoomType(models.Model):
+    room_type = models.CharField(max_length=200, unique=True)
+
+    def __str__(self):
+        return '{}'.format(self.room_type)
+
+    class Meta:
+        db_table = "ipd_cost_estimate_room_type"
+        verbose_name = "Ipd Cost Estimate Room Type"
+        verbose_name_plural = "Ipd Cost Estimate Room Types"
+
+
+class IpdProcedureCostEstimate(auth_model.TimeStampedModel):
+    ipd_procedure = models.ForeignKey(IpdProcedure, on_delete=models.CASCADE)
+    hospital = models.ForeignKey(Hospital, on_delete=models.CASCADE)
+    stay_duration = models.IntegerField(default=1)
+    costs = models.ManyToManyField(IpdCostEstimateRoomType, through='IpdCostEstimateRoomTypeMapping',
+                                      through_fields=('cost_estimate', 'room_type'), related_name='of_ipd_procedures')
+
+    def __str__(self):
+        return '{} - {} - {} day(s)'.format(self.ipd_procedure.name, self.hospital.name, self.stay_duration)
+
+    class Meta:
+        db_table = "ipd_procedure_cost_estimate"
+        unique_together = (('ipd_procedure', 'hospital'),)
+        verbose_name = "Ipd Cost Estimate"
+        verbose_name_plural = "Ipd Cost Estimate"
+
+
+
 class IpdProcedureLead(auth_model.TimeStampedModel):
 
     NEW = 1
@@ -105,7 +141,9 @@ class IpdProcedureLead(auth_model.TimeStampedModel):
     VALID = 7
     CONTACTED = 8
     PLANNED = 9
-
+    IPD_CONFIRMATION = 10
+    # If a new status is added also edit following:
+    # IpdProcedureSyncViewSet.sync_lead()
 
     CASH = 1
     INSURANCE = 2
@@ -115,15 +153,18 @@ class IpdProcedureLead(auth_model.TimeStampedModel):
     CRM = 'crm'
     DOCPRIMEWEB = "docprimeweb"
     COST_ESTIMATE = "Costestimate"
+    DOCP_APP = "DocprimeApp"
 
     SOURCE_CHOICES = [(DOCPRIMECHAT, 'DocPrime Chat'),
                       (CRM, 'CRM'),
                       (DOCPRIMEWEB, "DocPrime Web"),
-                      (COST_ESTIMATE, "Cost Estimate")]
+                      (COST_ESTIMATE, "Cost Estimate"),
+                      (DOCP_APP, "Docprime Consumer App")]
 
     STATUS_CHOICES = [(None, "--Select--"), (NEW, 'NEW'), (COST_REQUESTED, 'COST_REQUESTED'),
                       (COST_SHARED, 'COST_SHARED'), (OPD, 'OPD'), (VALID, 'VALID'), (CONTACTED, 'CONTACTED'),
-                      (PLANNED, 'PLANNED'), (NOT_INTERESTED, 'NOT_INTERESTED'), (COMPLETED, 'COMPLETED')]
+                      (PLANNED, 'PLANNED'), (NOT_INTERESTED, 'NOT_INTERESTED'), (COMPLETED, 'COMPLETED'),
+                      (IPD_CONFIRMATION, "IPD_CONFIRM")]
 
     PAYMENT_TYPE_CHOICES = [(None, "--Select--"), (CASH, 'CASH'), (INSURANCE, 'INSURANCE'),
                             (GOVERNMENT_PANEL, 'GOVERNMENT_PANEL')]
@@ -158,7 +199,12 @@ class IpdProcedureLead(auth_model.TimeStampedModel):
     data = JSONField(blank=True, null=True)
     planned_date = models.DateField(null=True, blank=True)
     referer_doctor = models.CharField(max_length=500, null=True, blank=True)
+    doctor = models.ForeignKey(Doctor, on_delete=models.SET_NULL, null=True, blank=True)
     remarks = models.TextField(null=True, blank=True)
+    procedure_cost_estimates = models.ManyToManyField(IpdProcedureCostEstimate,
+                                                     through='IpdProcedureLeadCostEstimateMapping',
+                                                     related_name='procedure_cost_estimates')
+    virtual_appointment = GenericRelation(VirtualAppointment, related_query_name='ipd_leads')
 
     # ADMIN :Is_OpDInsured, Specialization List, appointment list
     # DEFAULTS??
@@ -199,6 +245,55 @@ class IpdProcedureLead(auth_model.TimeStampedModel):
     def is_valid_hospital_for_lead(hospital):
         return hospital.has_ipd_doctors()
 
+    def is_potential_ipd(self):
+        result = False
+        if self.doctor:
+            result1 = self.doctor.doctorpracticespecializations.filter(
+                specialization__in=PotentialIpdLeadPracticeSpecialization.objects.all().values_list(
+                    'practice_specialization', flat=True)).exists()
+            if self.hospital:
+                result2 = self.hospital.is_ipd_hospital
+            else:
+                # result2 = self.doctor.doctor_clinics.filter(hospital__is_ipd_hospital=True,
+                #                                             hospital__is_live=True,
+                #                                             enabled=True).exists()
+                result2 = False
+            result = result1 and result2
+        return result
+
+    def update_idp_data(self, request_data):
+        concerned_opd_appointment_id = self.data.get('opd_appointment_id', None) if isinstance(self.data, dict) else None
+        if concerned_opd_appointment_id:
+            request_data.update({'IPDBookingId': concerned_opd_appointment_id})
+        if self.doctor:
+            request_data.update({'DoctorName': self.doctor.get_display_name()})
+            request_data.update({'DoctorSpec': "".join(self.doctor.doctorpracticespecializations.all().values_list('specialization__name', flat=True))})
+        if self.ipd_procedure:
+            request_data.update({'IPDProcedure': self.ipd_procedure.name})
+        if self.hospital:
+            request_data.update({'IPDHospitalName': self.hospital.name})
+        if self.planned_date:
+            request_data.update({'PlannedDate': int(self.planned_date.timestamp())})
+        if self.user:
+            request_data.update({'IPDIsInsured': 1 if self.is_user_insured() else 0})
+            request_data.update({'OPDAppointments': self.user.recent_opd_appointment.count()})
+            request_data.update({'LabAppointments': self.user.recent_lab_appointment.count()})
+        if self.comments:
+            request_data.update({'UserComment': self.comments})
+
+    def is_user_insured(self):
+        result = False
+        if self.user:
+            return bool(self.user.active_insurance)
+        return result
+
+    @classmethod
+    def check_if_lead_active(cls, phone_number='', days=30):
+        ipd_precedure_leads = IpdProcedureLead.objects.filter(~Q(status=IpdProcedureLead.NOT_INTERESTED),
+                                                              created_at__gt=datetime.datetime.utcnow() - datetime.timedelta(days=days),
+                                                              phone_number=phone_number)
+        return ipd_precedure_leads.exists()
+
 
 class IpdProcedureDetailType(auth_model.TimeStampedModel):
     name = models.CharField(max_length=1000)
@@ -222,6 +317,16 @@ class IpdProcedureDetail(auth_model.TimeStampedModel):
 
     class Meta:
         db_table = "ipd_procedure_details"
+
+
+class PotentialIpdLeadPracticeSpecialization(models.Model):
+    practice_specialization = models.ForeignKey(PracticeSpecialization, on_delete=models.CASCADE)
+
+    def __str__(self):
+        return '{}'.format(self.practice_specialization.name)
+
+    class Meta:
+        db_table = "potential_ipd_lead_practice_specialization"
 
 
 class ProcedureCategory(auth_model.TimeStampedModel, SearchKey):
@@ -565,3 +670,53 @@ class Offer(auth_model.TimeStampedModel):
 
     class Meta:
         db_table = 'offer'
+
+
+class IpdProcedureLeadCostEstimateMapping(models.Model):
+    ipd_procedure_lead = models.ForeignKey(IpdProcedureLead, on_delete=models.CASCADE, related_name="lead")
+    cost_estimate = models.ForeignKey(IpdProcedureCostEstimate, on_delete=models.CASCADE)
+
+    class Meta:
+        db_table = "ipd_procedure_lead_cost_estimate"
+        unique_together = (('ipd_procedure_lead', 'cost_estimate'),)
+
+
+class IpdCostEstimateRoomTypeMapping(models.Model):
+    room_type = models.ForeignKey(IpdCostEstimateRoomType, on_delete=models.CASCADE, related_name='room')
+    cost_estimate = models.ForeignKey(IpdProcedureCostEstimate, on_delete=models.CASCADE, related_name='room_type_costs')
+    cost = models.CharField(max_length=200, blank=True, null=True)
+
+    class Meta:
+        db_table = "ipd_cost_estimate_room_type_mapping"
+
+
+class UploadCostEstimateData(auth_model.TimeStampedModel):
+    CREATED = 1
+    IN_PROGRESS = 2
+    SUCCESS = 3
+    FAIL = 4
+    STATUS_CHOICES = ("", "Select"), \
+                     (CREATED, "Created"), \
+                     (IN_PROGRESS, "Upload in progress"), \
+                     (SUCCESS, "Upload successful"),\
+                     (FAIL, "Upload Failed")
+    # file, batch, status, error msg, source
+    file = models.FileField()
+    source = models.CharField(max_length=20)
+    batch = models.CharField(max_length=20)
+    status = models.PositiveSmallIntegerField(choices=STATUS_CHOICES, default=CREATED, editable=False)
+    error_msg = JSONField(editable=False, null=True, blank=True)
+    lines = models.PositiveIntegerField(null=True, blank=True)
+    user = models.ForeignKey(settings.AUTH_USER_MODEL, related_name="uploaded_cost_estimates", null=True, editable=False,
+                             on_delete=models.SET_NULL)
+
+    def save(self, *args, **kwargs):
+        retry = kwargs.pop('retry', True)
+        from ondoc.notification.tasks import upload_cost_estimates
+        super().save(*args, **kwargs)
+        if (self.status == self.CREATED or self.status == self.FAIL) and retry:
+            self.status = self.IN_PROGRESS
+            self.error_msg = None
+            super().save(*args, **kwargs)
+            upload_cost_estimates.apply_async((self.id,), countdown=1)
+            # upload_cost_estimates(self.id)

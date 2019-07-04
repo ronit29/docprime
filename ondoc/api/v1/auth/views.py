@@ -99,8 +99,6 @@ class LoginOTP(GenericViewSet):
         blocked_state = BlacklistUser.get_state_by_number(phone_number, BlockedStates.States.LOGIN)
         if blocked_state:
             return Response({'error': blocked_state.message}, status=status.HTTP_400_BAD_REQUEST)
-
-
         req_type = request.query_params.get('type')
         via_sms = data.get('via_sms', True)
         via_whatsapp = data.get('via_whatsapp', False)
@@ -121,7 +119,7 @@ class LoginOTP(GenericViewSet):
 
             if lab_queryset.exists() or doctor_queryset.exists() or provider_signup_queryset.exists():
                 response['exists'] = 1
-                send_otp(otp_message, phone_number, retry_send)
+                send_otp(otp_message, phone_number, retry_send, via_sms=via_sms, via_whatsapp=via_whatsapp, call_source=call_source)
 
             # if queryset.exists():
             #     response['exists'] = 1
@@ -576,20 +574,20 @@ class UserAppointmentsViewSet(OndocViewSet):
         if lab_serializer.data:
             combined_data.extend(lab_serializer.data)
         combined_data = sorted(combined_data, key=lambda x: x['time_slot_start'], reverse=True)
-        temp_dict = dict()
-        for data in combined_data:
-            if not temp_dict.get(data["status"]):
-                temp_dict[data["status"]] = [data]
-            else:
-                temp_dict[data["status"]].append(data)
-        combined_data = list()
-        status_six_data = list()
-        for k, v in sorted(temp_dict.items(), key=lambda x: x[0]):
-            if k==6:
-                status_six_data.extend(v)
-            else:
-                combined_data.extend(v)
-        combined_data.extend(status_six_data)
+        # temp_dict = dict()
+        # for data in combined_data:
+        #     if not temp_dict.get(data["status"]):
+        #         temp_dict[data["status"]] = [data]
+        #     else:
+        #         temp_dict[data["status"]].append(data)
+        # combined_data = list()
+        # status_six_data = list()
+        # for k, v in sorted(temp_dict.items(), key=lambda x: x[0]):
+        #     if k==6:
+        #         status_six_data.extend(v)
+        #     else:
+        #         combined_data.extend(v)
+        # combined_data.extend(status_six_data)
         combined_data = combined_data[:200]
         return Response(combined_data)
 
@@ -1939,14 +1937,19 @@ class OrderDetailViewSet(GenericViewSet):
         for order in child_orders:
             cod_deal_price = None
             enabled_for_cod = False
-            opd_appoint = OpdAppointment.objects.filter(id=order.reference_id)[0]
-            start_time = opd_appoint.time_slot_start
-            day = start_time.weekday()
+            # opd_appoint = OpdAppointment.objects.filter(id=order.reference_id)[0]
+            opd_appoint = OpdAppointment.objects.filter(id=order.reference_id).first()
+            if opd_appoint:
+                start_time = opd_appoint.time_slot_start
+                day = start_time.weekday()
 
-            if opd_appoint.payment_type == OpdAppointment.COD:
-                doc_clinic_timing = DoctorClinicTiming.objects.filter(day=day, doctor_clinic__doctor=opd_appoint.doctor, doctor_clinic__hospital=opd_appoint.hospital)[0]
-                cod_deal_price = doc_clinic_timing.dct_cod_deal_price()
-                enabled_for_cod = doc_clinic_timing.is_enabled_for_cod()
+            if opd_appoint and opd_appoint.payment_type == OpdAppointment.COD:
+                # doc_clinic_timing = DoctorClinicTiming.objects.filter(day=day, doctor_clinic__doctor=opd_appoint.doctor, doctor_clinic__hospital=opd_appoint.hospital)[0]
+                doc_clinic_timing = DoctorClinicTiming.objects.filter(day=day, doctor_clinic__doctor=opd_appoint.doctor,
+                                                                      doctor_clinic__hospital=opd_appoint.hospital).first()
+                if doc_clinic_timing:
+                    cod_deal_price = doc_clinic_timing.dct_cod_deal_price()
+                    enabled_for_cod = doc_clinic_timing.is_enabled_for_cod()
 
             item = OrderCartItemMapper(order)
             temp_time_slot_start = convert_datetime_str_to_iso_str(order.action_data["time_slot_start"])

@@ -8,7 +8,9 @@ from ondoc.crm.admin.corporate_booking import CorporateDealAdmin, CorporatesAdmi
 from ondoc.crm.admin.procedure import ProcedureCategoryAdmin, ProcedureAdmin, IpdProcedureAdmin, FeatureAdmin, \
     ServiceAdmin, HealthInsuranceProviderAdmin, IpdProcedureCategoryAdmin, IpdProcedureDetailAdmin, \
     IpdProcedureDetailTypeAdmin, IpdProcedureSynonymAdmin, IpdProcedureSynonymMappingAdmin, \
-    IpdProcedurePracticeSpecializationAdmin, IpdProcedureLeadAdmin, OfferAdmin
+    IpdProcedurePracticeSpecializationAdmin, IpdProcedureLeadAdmin, OfferAdmin, \
+    PotentialIpdLeadPracticeSpecializationAdmin, IpdProcedureCostEstimateAdmin, \
+    IpdCostEstimateRoomTypeAdmin, UploadCostEstimateDataAdmin
 from ondoc.crm.admin.subscription_plan import SubscriptionPlanAdmin, SubscriptionPlanFeatureAdmin, UserPlanMappingAdmin
 from ondoc.doctor.models import (Doctor, Language, MedicalService, Specialization, College, Qualification, Hospital,
                                  HospitalNetwork, DoctorOnboardingToken, OpdAppointment,
@@ -33,7 +35,9 @@ from ondoc.location.models import EntityUrls, CompareSEOUrls
 from ondoc.notification import models as notifcation_model
 from ondoc.procedure.models import Procedure, ProcedureCategory, CommonProcedureCategory, CommonProcedure, IpdProcedure, \
     IpdProcedureCategory, CommonIpdProcedure, IpdProcedureDetail, IpdProcedureDetailType, IpdProcedureSynonym, \
-    IpdProcedureSynonymMapping, IpdProcedurePracticeSpecialization, IpdProcedureLead, Offer
+    IpdProcedureSynonymMapping, IpdProcedurePracticeSpecialization, IpdProcedureLead, Offer, \
+    PotentialIpdLeadPracticeSpecialization, IpdProcedureCostEstimate, \
+    IpdCostEstimateRoomType, UploadCostEstimateData
 from ondoc.subscription_plan.models import Plan, PlanFeature, UserPlanMapping
 from .common import Cities, CitiesAdmin, MatrixCityMapping, MatrixCityAdmin, MerchantAdmin, MerchantPayoutAdmin, \
     PaymentOptionsAdmin, MatrixMappedStateAdmin, MatrixMappedCityAdmin, GlobalNonBookableAdmin, UserConfigAdmin, BlacklistUserAdmin, BlockedStatesAdmin
@@ -70,7 +74,7 @@ from ondoc.insurance.models import Insurer, InsurerAccount, InsurancePlans, Insu
     InsuredMembers, InsuranceTransaction, InsurancePlanContent, InsuranceDisease, StateGSTCode, InsuranceCity, \
     InsuranceDistrict, InsuranceDeal, InsurerPolicyNumber, InsuranceLead, InsuranceCancelMaster, EndorsementRequest, \
     InsuredMemberDocument, InsuredMemberHistory, InsuranceEligibleCities, ThirdPartyAdministrator, \
-    UserBank, UserBankDocument, InsurerAccountTransfer
+    UserBank, UserBankDocument, InsurerAccountTransfer, BankHolidays
 from ondoc.crm.admin.insurance import InsurerAdmin, InsurancePlansAdmin, InsuranceThresholdAdmin, InsurerFloatAdmin, \
     UserInsuranceAdmin, InsuredMembersAdmin, InsuranceDiseaseAdmin, StateGSTCodeAdmin, InsuranceCityAdmin, \
     InsuranceDistrictAdmin, InsuranceDealAdmin, InsurerPolicyNumberAdmin, InsuranceLeadAdmin, InsuranceCancelMasterAdmin, \
@@ -223,6 +227,7 @@ admin.site.register(EntityUrls, EntityUrlsAdmin)
 admin.site.register(PaymentOptions, PaymentOptionsAdmin)
 admin.site.register(UserConfig, UserConfigAdmin)
 admin.site.register(UploadDoctorData, UploadDoctorDataAdmin)
+admin.site.register(UploadCostEstimateData, UploadCostEstimateDataAdmin)
 admin.site.register(SliderLocation, SliderLocationAdmin)
 admin.site.register(IntegratorMapping, IntegratorMappingAdmin)
 admin.site.register(IntegratorProfileMapping, IntegratorProfileMappingAdmin)
@@ -235,6 +240,9 @@ admin.site.register(IpdProcedureDetail, IpdProcedureDetailAdmin)
 admin.site.register(IpdProcedurePracticeSpecialization, IpdProcedurePracticeSpecializationAdmin)
 admin.site.register(IpdProcedureLead, IpdProcedureLeadAdmin)
 admin.site.register(Offer, OfferAdmin)
+admin.site.register(PotentialIpdLeadPracticeSpecialization, PotentialIpdLeadPracticeSpecializationAdmin)
+admin.site.register(IpdProcedureCostEstimate, IpdProcedureCostEstimateAdmin)
+admin.site.register(IpdCostEstimateRoomType, IpdCostEstimateRoomTypeAdmin)
 admin.site.register(Feature, FeatureAdmin)
 admin.site.register(Service, ServiceAdmin)
 admin.site.register(HealthInsuranceProvider, HealthInsuranceProviderAdmin)
@@ -259,3 +267,4 @@ admin.site.register(Recommender, RecommenderAdmin)
 admin.site.register(ThirdPartyAdministrator, ThirdPartyAdministratorAdmin)
 admin.site.register(BlacklistUser, BlacklistUserAdmin)
 admin.site.register(BlockedStates, BlockedStatesAdmin )
+admin.site.register(BankHolidays)

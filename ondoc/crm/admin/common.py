@@ -1,3 +1,5 @@
+import re
+
 from dal import autocomplete
 from django.db import transaction
 from django.contrib.contenttypes.admin import GenericTabularInline
@@ -136,6 +138,20 @@ class FormCleanMixin(forms.ModelForm):
 
     def clean(self):
         self.pin_code_qc_submit()
+        phone_no_flag = False
+        if isinstance(self.instance, Hospital) and self.data and self.instance.network_type == 1:
+            if 'authentication-spocdetails-content_type-object_id-TOTAL_FORMS' in self.data:
+                total_forms = int(self.data.get('authentication-spocdetails-content_type-object_id-TOTAL_FORMS', '0'))
+                for form in range(total_forms):
+                    number_pattern = re.compile("(0/91)?[6-9][0-9]{9}")
+                    phone_number = self.data.get('authentication-spocdetails-content_type-object_id-' + str(form) + '-number')
+                    if phone_number and number_pattern.match(str(phone_number)):
+                        phone_no_flag = True
+            else:
+                phone_no_flag = True  # Skip check if inline is not present.
+            if phone_no_flag == False:
+                raise forms.ValidationError("Atleast one mobile no is required for SPOC Details")
+
         if (not self.request.user.is_superuser and not self.request.user.groups.filter(name=constants['SUPER_QC_GROUP']).exists()):
             # and (not '_reopen' in self.data and not self.request.user.groups.filter(name__in=[constants['QC_GROUP_NAME'], constants['WELCOME_CALLING_TEAM']]).exists()):
             if isinstance(self.instance, Hospital) or isinstance(self.instance, HospitalNetwork):
@@ -370,11 +386,11 @@ class MerchantAdmin(ImportExportMixin, VersionAdmin):
         if request.user.is_member_of(constants['MERCHANT_TEAM']):
             if obj and obj.verified_by:
                 return [f.name for f in self.model._meta.fields if
-                        f.name not in ['enabled', 'verified_by_finance', 'associated_to']]
+                        f.name not in ['enabled', 'verified_by_finance', 'associated_to', 'enable_for_tds_deduction']]
             return []
 
         if obj and obj.verified_by:
-            return [f.name for f in self.model._meta.fields] + ['associated_to']
+            return [f.name for f in self.model._meta.fields if f.name not in ['enable_for_tds_deduction']] + ['associated_to']
 
         return ['verified_by_finance', 'associated_to']
 
