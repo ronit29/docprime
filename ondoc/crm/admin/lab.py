@@ -1244,6 +1244,16 @@ class LabAppointmentAdmin(nested_admin.NestedModelAdmin):
     def user_id(self, obj):
         return obj.user.id
 
+    def save_formset(self, request, form, formset, change):
+        if formset.model != Fraud:
+            return super(LabAppointmentAdmin, self).save_formset(request, form, formset, change)
+        instances = formset.save(commit=False)
+        for instance in instances:
+            if not instance.pk:
+                instance.user = request.user
+                return super(LabAppointmentAdmin, self).save_formset(request, form, formset, change)
+        formset.save_m2m()
+
     @transaction.atomic
     def save_model(self, request, obj, form, change):
         responsible_user = request.user
