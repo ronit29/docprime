@@ -421,11 +421,9 @@ def payment_details(request, order):
     isPreAuth = '1'
     profile = user.get_default_profile()
     profile_name = ""
+    paytmMsg = ''
     if profile:
         profile_name = profile.name
-    if not profile and order.product_id == 3:
-        if order.action_data.get('profile_detail'):
-            profile_name = order.action_data.get('profile_detail').get('name', "")
 
     insurer_code = None
     if order.product_id == Order.INSURANCE_PRODUCT_ID:
@@ -437,8 +435,26 @@ def payment_details(request, order):
         insurer = insurance_plan.insurer
         insurer_code = insurer.insurer_merchant_code
 
+        if not profile:
+            if order.action_data.get('profile_detail'):
+                profile_name = order.action_data.get('profile_detail').get('name', "")
+
     if order.product_id == Order.SUBSCRIPTION_PLAN_PRODUCT_ID:
         isPreAuth = '0'
+
+    if isPreAuth == '1':
+        first_slot = None
+        if order.is_parent():
+            for ord in order.orders.all():
+                ord_slot = ord.action_data.get('time_slot_start') if ord.action_data else None
+                if not first_slot and ord_slot:
+                    first_slot = parse_datetime(ord_slot)
+                if first_slot > parse_datetime(ord_slot):
+                    first_slot = parse_datetime(ord_slot)
+
+        if first_slot:
+            if first_slot > (timezone.now() + timedelta(hours=int(settings.PAYMENT_AUTO_CAPTURE_DURATION))):
+                paytmMsg = 'Blocked amount will be captured after 60 hrs of booking.'
 
     temp_product_id = order.product_id
 
@@ -475,7 +491,7 @@ def payment_details(request, order):
         'couponPgMode': couponPgMode,
         'discountedAmnt': discountedAmnt,
         'isPreAuth': isPreAuth,
-        'paytmMsg': ''
+        'paytmMsg': paytmMsg
     }
 
     if insurer_code:
