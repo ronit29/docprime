@@ -1599,9 +1599,6 @@ class Merchant(TimeStampedModel):
     SAVINGS = 1
     CURRENT = 2
 
-    TDS_THRESHOLD_AMOUNT = 10000
-    TDS_APPLICABLE_RATE = 5
-
     #pg merchant creation codes
     NOT_INITIATED = 0
     INITIATED = 1
@@ -1764,7 +1761,7 @@ class Merchant(TimeStampedModel):
 
 class MerchantNetRevenue(TimeStampedModel):
 
-    CURRENT_FINANCIAL_YEAR = '2019-2020'
+    # CURRENT_FINANCIAL_YEAR = '2019-2020'
 
     merchant = models.ForeignKey(Merchant, on_delete=models.CASCADE, related_name='net_revenue')
     total_revenue = models.DecimalField(max_digits=10, decimal_places=2, default=None, null=True, blank=True)
@@ -1777,7 +1774,7 @@ class MerchantNetRevenue(TimeStampedModel):
 
 class MerchantTdsDeduction(TimeStampedModel):
 
-    CURRENT_FINANCIAL_YEAR = '2019-2020'
+    # CURRENT_FINANCIAL_YEAR = '2019-2020'
 
     merchant = models.ForeignKey(Merchant, on_delete=models.CASCADE, related_name='tds_deduction')
     financial_year = models.CharField(max_length=20, null=True, blank=True)
