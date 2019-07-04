@@ -1120,9 +1120,7 @@ class LabAppointmentAdmin(nested_admin.NestedModelAdmin):
     def reports_uploaded(self, instance):
         if instance and instance.id and instance.reports.all():
             for report in instance.reports.all():
-                if report.files.all():
-                    return True
-                elif instance.reports_physically_collected:
+                if report.files.all() or instance.reports_physically_collected:
                     return True
         elif instance and instance.id and instance.reports_physically_collected:
             return True
