@@ -1118,9 +1118,9 @@ class LabAppointmentAdmin(nested_admin.NestedModelAdmin):
     #     return inline_instance
 
     def reports_uploaded(self, instance):
-        if instance and instance.id:
+        if instance and instance.id and instance.reports.all():
             for report in instance.reports.all():
-                if report.files.all():
+                if report.files.all() or instance.reports_physically_collected:
                     return True
         elif instance and instance.id and instance.reports_physically_collected:
             return True
