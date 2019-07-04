@@ -1568,21 +1568,21 @@ class LabList(viewsets.ReadOnlyModelViewSet):
         order_by = self.apply_search_sort(parameters)
 
         if ids:
-            query = ''' select * from (select id,network_id, name ,price, count, mrp, pickup_charges, distance, order_priority, is_home_collection_enabled, new_network_rank, rank,
+            query = ''' select * from (select id,network_id, name ,price, count, mrp, pickup_charges, distance, order_priority, new_network_rank, rank,
             max(new_network_rank) over(partition by 1) result_count
             from ( 
-            select is_home_collection_enabled, test_type, agreed_price, id, rating_data, network_id, name ,price, count, mrp, pickup_charges, distance, order_priority, 
+            select home_collection_possible, test_type, agreed_price, id, rating_data, network_id, name ,price, count, mrp, pickup_charges, distance, order_priority, 
                         dense_rank() over(order by network_rank) as new_network_rank, rank from
                         (
-                        select is_home_collection_enabled, test_type, agreed_price, id, rating_data, network_id, rank() over(partition by coalesce(network_id,random()) order by order_rank) as rank,
+                        select home_collection_possible, test_type, agreed_price, id, rating_data, network_id, rank() over(partition by coalesce(network_id,random()) order by order_rank) as rank,
                          min (order_rank) OVER (PARTITION BY coalesce(network_id,random())) network_rank,
                          name ,price, count, mrp, pickup_charges, distance, order_priority from
-                        (select is_home_collection_enabled, test_type, agreed_price, id, rating_data, network_id,  
+                        (select home_collection_possible, test_type, agreed_price, id, rating_data, network_id,  
                         name ,price, test_count as count, total_mrp as mrp,pickup_charges, distance, 
                         ROW_NUMBER () OVER (ORDER BY {order} ) order_rank,
                         max_order_priority as order_priority
                         from (
-                        select  max(lt.insurance_cutoff_price) as insurance_cutoff_price , 
+                        select bool_and(home_collection_possible) as home_collection_possible, max(lt.insurance_cutoff_price) as insurance_cutoff_price , 
                         case when sum(mrp)<=(%(insurance_threshold_amount)s) and is_insurance_enabled=true then true else false end as covered_under_insurance,
                         max(lt.test_type) as test_type, lb.*, sum(mrp) total_mrp, count(*) as test_count,
                         case when bool_and(home_collection_possible)=True and is_home_collection_enabled=True 
@@ -1606,7 +1606,7 @@ class LabList(viewsets.ReadOnlyModelViewSet):
                         group by lb.id having count(distinct lt.id)=(%(length)s))a
                         {group_filter_query_string})y )x where rank<=5 )z order by {order}
                         )r
-                        where new_network_rank<=(%(page_end)s) and new_network_rank>(%(page_start)s) order by is_home_collection_enabled, new_network_rank, rank
+                        where new_network_rank<=(%(page_end)s) and new_network_rank>(%(page_start)s) order by new_network_rank, rank
                          '''.format(filter_query_string=filter_query_string, 
                             group_filter_query_string=group_filter_query_string, order=order_by, lab_timing_join=lab_timing_join)
 
@@ -1644,10 +1644,9 @@ class LabList(viewsets.ReadOnlyModelViewSet):
         return lab_search_result
 
     def apply_search_sort(self, parameters):
+        parameters['is_user_insured'] = True
         if parameters.get('ids') and  parameters.get('is_user_insured') and not parameters.get('sort_on'):
-            return ' case when (test_type in (2,3)) then (case when is_home_collection_enabled=True then ((case when network_id=43 then -1 end) , agreed_price) end ' \
-                   ' ) end, case when (test_type in (2,3)) then (case when is_home_collection_enabled=False then  distance end) end , case when (test_type=1) ' \
-                   'then distance  end '
+            return ' case when (test_type in (2,3)) and home_collection_possible=true then ((case when network_id=43 then -1 end) , agreed_price ) end, distance '
         order_by = parameters.get("sort_on")
         if order_by is not None:
             if order_by == "fees" and parameters.get('ids'):
