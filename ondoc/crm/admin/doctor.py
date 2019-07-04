@@ -1558,8 +1558,8 @@ class DoctorOpdAppointmentForm(RefundableAppointmentForm):
         if cleaned_data.get('send_cod_to_prepaid_request', False) and self.instance and self.instance.is_cod_to_prepaid:
             raise forms.ValidationError("Appointment has already been converted to prepaid.")
 
-        # if cleaned_data.get('send_cod_to_prepaid_request', False) and self.instance and self.instance.payment_status != OpdAppointment.COD:
-        #     raise forms.ValidationError("Appointment must be of COD type.")
+        if cleaned_data.get('send_cod_to_prepaid_request', False) and self.instance and self.instance.payment_status != OpdAppointment.COD:
+            raise forms.ValidationError("Appointment must be of COD type.")
 
         # if self.instance.id:
         #     if cleaned_data.get('status') == OpdAppointment.RESCHEDULED_PATIENT or cleaned_data.get(

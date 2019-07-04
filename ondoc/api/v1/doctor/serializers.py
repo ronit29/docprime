@@ -1252,8 +1252,8 @@ class DoctorProfileUserViewSerializer(DoctorProfileSerializer):
         if obj.doctorpracticespecializations.filter(
                 specialization__in=PotentialIpdLeadPracticeSpecialization.objects.all().values_list(
                         'practice_specialization', flat=True)).exists():
-            # return True
-            pass
+            return True
+            #pass
         for x in obj.doctor_clinics.all():
             if x.hospital and x.hospital.is_live and x.hospital.city and x.hospital.city.lower() in top_cities:
                 return True
