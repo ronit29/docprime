@@ -923,6 +923,8 @@ class DoctorProfileUserViewSerializer(DoctorProfileSerializer):
     search_data = serializers.SerializerMethodField()
     enabled_for_cod = serializers.SerializerMethodField()
     doctor_specializations_ids = serializers.SerializerMethodField()
+    show_popup = serializers.SerializerMethodField()
+    force_popup = serializers.SerializerMethodField()
 
     def get_enabled_for_cod(self, obj):
         return obj.enabled_for_cod()
@@ -1242,14 +1244,36 @@ class DoctorProfileUserViewSerializer(DoctorProfileSerializer):
             doctor_specializations.append(dps.specialization_id)
         return doctor_specializations
 
+    def get_show_popup(self, obj):
+        from ondoc.procedure.models import PotentialIpdLeadPracticeSpecialization
+        from ondoc.location.models import CityInventory
+        top_cities = CityInventory.objects.all().values_list('city', flat=True)
+        top_cities = [x.lower() for x in top_cities]
+        if obj.doctorpracticespecializations.filter(
+                specialization__in=PotentialIpdLeadPracticeSpecialization.objects.all().values_list(
+                        'practice_specialization', flat=True)).exists():
+            # return True
+            pass
+        for x in obj.doctor_clinics.all():
+            if x.hospital and x.hospital.is_live and x.hospital.city and x.hospital.city.lower() in top_cities:
+                return True
+        return False
+
+    def get_force_popup(self, obj):
+        return False
+
     class Meta:
         model = Doctor
         # exclude = ('created_at', 'updated_at', 'onboarding_status', 'is_email_verified',
         #            'is_insurance_enabled', 'is_retail_enabled', 'user', 'created_by', )
-        fields = ('about', 'is_license_verified', 'additional_details', 'display_name', 'associations', 'awards', 'experience_years', 'experiences', 'gender',
-                  'hospital_count', 'hospitals', 'procedures', 'id', 'languages', 'name', 'practicing_since', 'qualifications',
-                  'general_specialization', 'doctor_specializations_ids', 'thumbnail', 'license', 'is_live', 'seo', 'breadcrumb', 'rating', 'rating_graph',
-                  'enabled_for_online_booking', 'unrated_appointment', 'display_rating_widget', 'is_gold', 'search_data', 'enabled_for_cod')
+        fields = ('about', 'is_license_verified', 'additional_details', 'display_name', 'associations', 'awards',
+                  'experience_years', 'experiences', 'gender',
+                  'hospital_count', 'hospitals', 'procedures', 'id', 'languages', 'name', 'practicing_since',
+                  'qualifications',
+                  'general_specialization', 'doctor_specializations_ids', 'thumbnail', 'license', 'is_live', 'seo',
+                  'breadcrumb', 'rating', 'rating_graph',
+                  'enabled_for_online_booking', 'unrated_appointment', 'display_rating_widget', 'is_gold',
+                  'search_data', 'enabled_for_cod', 'show_popup', 'force_popup')
 
 
 class DoctorAvailabilityTimingSerializer(serializers.Serializer):
