@@ -52,7 +52,8 @@ from ondoc.insurance import models as insurance_model
 from django.contrib.contenttypes.fields import GenericRelation
 from django.contrib.contenttypes.fields import GenericForeignKey
 from django.contrib.contenttypes.models import ContentType
-from ondoc.matrix.tasks import push_appointment_to_matrix, push_onboarding_qcstatus_to_matrix
+from ondoc.matrix.tasks import push_appointment_to_matrix, push_onboarding_qcstatus_to_matrix, \
+    create_ipd_lead_from_lab_appointment
 from ondoc.integrations.task import push_lab_appointment_to_integrator, get_integrator_order_status
 from ondoc.location import models as location_models
 from ondoc.ratings_review import models as ratings_models
@@ -259,6 +260,8 @@ class Lab(TimeStampedModel, CreatedByModel, QCModel, SearchKey, WelcomeCallingDo
     is_location_verified = models.BooleanField(verbose_name='Location Verified', default=False)
     auto_ivr_enabled = models.BooleanField(default=True)
     search_distance = models.FloatField(default=20000)
+    is_ipd_lab = models.BooleanField(default=False)
+    related_hospital = models.ForeignKey(Hospital, null=True, blank=True, on_delete=models.SET_NULL, related_name='ipd_hospital')
 
     def __str__(self):
         return self.name
@@ -1848,6 +1851,12 @@ class LabAppointment(TimeStampedModel, CouponsMixin, LabAppointmentInvoiceMixin,
             return False
 
     def app_commit_tasks(self, old_instance, push_to_matrix, push_to_integrator):
+        if old_instance is None:
+            try:
+                create_ipd_lead_from_lab_appointment.apply_async(({'obj_id': self.id},),)
+            except Exception as e:
+                logger.error(str(e))
+
         if push_to_matrix:
             # Push the appointment data to the matrix
             try:
@@ -2575,7 +2584,7 @@ class LabAppointment(TimeStampedModel, CouponsMixin, LabAppointmentInvoiceMixin,
 
         provider_booking_id = ''
         merchant_code = ''
-        is_ipd_hospital = '0'
+        is_ipd_hospital = '1' if self.lab.is_ipd_lab else '0'
         service_name = ','.join([test_obj.test.name for test_obj in self.test_mappings.all()])
         location_verified = self.lab.is_location_verified
         provider_id = self.lab.id
@@ -2705,6 +2714,23 @@ class LabAppointment(TimeStampedModel, CouponsMixin, LabAppointmentInvoiceMixin,
         mobile_list.append({'MobileNo': self.user.phone_number, 'Name': self.profile.name, 'Type': 1})
 
         return mobile_list
+
+    def convert_ipd_lead_data(self):
+        result = {}
+        result['hospital'] = self.lab.related_hospital
+        # result['lab'] = self.lab
+        result['user'] = self.user
+        result['payment_amount'] = self.deal_price
+        if self.user:
+            result['name'] = self.user.full_name
+            result['phone_number'] = self.user.phone_number
+            result['email'] = self.user.email
+            default_user_profile = self.user.get_default_profile()
+            if default_user_profile:
+                result['gender'] = default_user_profile.gender
+                result['dob'] = default_user_profile.dob
+        result['data'] = {'lab_appointment_id': self.id}
+        return result
 
     def __str__(self):
         return "{}, {}".format(self.profile.name if self.profile else "", self.lab.name)

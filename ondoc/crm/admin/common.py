@@ -690,6 +690,17 @@ class MatrixCityAutocomplete(autocomplete.Select2QuerySetView):
         return queryset
 
 
+class RelatedHospitalAutocomplete(autocomplete.Select2QuerySetView):
+
+    def get_queryset(self):
+        queryset = Hospital.objects.filter(is_ipd_hospital=True)
+
+        if self.q:
+            queryset = queryset.filter(name__istartswith=self.q)
+
+        return queryset
+
+
 class ContactUsAdmin(admin.ModelAdmin):
     list_display = ('name', 'mobile', 'email', 'from_app')
     fields = ('name', 'mobile', 'email', 'message', 'from_app')
