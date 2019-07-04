@@ -2720,7 +2720,7 @@ class LabAppointment(TimeStampedModel, CouponsMixin, LabAppointmentInvoiceMixin,
         result['hospital'] = self.lab.related_hospital
         # result['lab'] = self.lab
         result['user'] = self.user
-        result['payment_amount'] = self.deal_price  # To be confirmed
+        result['payment_amount'] = self.deal_price
         if self.user:
             result['name'] = self.user.full_name
             result['phone_number'] = self.user.phone_number
