@@ -1600,7 +1600,7 @@ class DoctorOpdAppointmentAdmin(admin.ModelAdmin):
     inlines = [PrescriptionInline, FraudInline]
 
     def get_appointment_type(self, obj):
-        if obj.is_followup_appointment():
+        if obj.is_followup_appointment("crm"):
             return "Followup"
         else:
             return "Regular"
