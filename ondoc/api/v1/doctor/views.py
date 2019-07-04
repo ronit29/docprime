@@ -171,7 +171,10 @@ class DoctorAppointmentsViewSet(OndocViewSet):
 
         if date:
             queryset = queryset.filter(time_slot_start__date=date)
-        queryset = queryset.distinct('id', 'time_slot_start')
+        queryset = queryset.select_related('profile', 'merchant_payout') \
+                           .prefetch_related('prescriptions', 'prescriptions__prescription_file', 'mask_number',
+                              'profile__insurance', 'profile__insurance__user_insurance', 'eprescription')\
+                           .distinct('id', 'time_slot_start')
         queryset = paginate_queryset(queryset, request)
         serializer = serializers.DoctorAppointmentRetrieveSerializer(queryset, many=True, context={'request': request})
         return Response(serializer.data)
@@ -2404,6 +2407,16 @@ class HospitalAutocomplete(autocomplete.Select2QuerySetView):
         return qs
 
 
+class PracticeSpecializationAutocomplete(autocomplete.Select2QuerySetView):
+    def get_queryset(self):
+        qs = models.PracticeSpecialization.objects.all()
+
+        if self.q:
+            qs = qs.filter(name__icontains=self.q).order_by('name')
+        return qs
+
+
+
 class CreateAdminViewSet(viewsets.GenericViewSet):
 
     authentication_classes = (JWTAuthentication,)
@@ -3804,6 +3817,25 @@ class AppointmentMessageViewset(viewsets.GenericViewSet):
             obj['message'] = "Message Sent Successfully"
         return Response(obj)
 
+    def encryption_key_request_message(self, request):
+        from ondoc.communications.models import ProviderAppNotification
+        serializer = serializers.EncryptionKeyRequestMessageSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        data = serializer.validated_data
+        obj = {"error": False}
+        try:
+            action_user = request.user
+            sms_notification = ProviderAppNotification(data.get('hospital_id'), action_user,
+                                                       notif_models.NotificationAction.REQUEST_ENCRYPTION_KEY)
+            sms_notification.send()
+        except Exception as e:
+            obj['error'] = True
+            obj['message'] = 'Error Sending Encryption Key Request Message!'
+            logger.error("Error Sending Encryption Key Request Message " + str(e))
+        if not 'message' in obj:
+            obj['message'] = "Message Sent Successfully"
+        return Response(obj)
+
 
 class HospitalViewSet(viewsets.GenericViewSet):
 
@@ -3864,6 +3896,7 @@ class HospitalViewSet(viewsets.GenericViewSet):
         if entity:
             breadcrumb = deepcopy(entity.breadcrumb) if isinstance(entity.breadcrumb, list) else []
             breadcrumb.insert(0, {"title": "Home", "url": "/", "link_title": "Home"})
+            # breadcrumb.insert(1, {"title": "Hospitals", "url": "hospitals", "link_title": "Hospitals"})
             locality = entity.sublocality_value
             city = entity.locality_value
             url = entity.url
@@ -4027,7 +4060,9 @@ class HospitalViewSet(viewsets.GenericViewSet):
         if entity:
             response['url'] = entity.url
             if entity.breadcrumb:
-                breadcrumb = [{'url': '/', 'title': 'Home', 'link_title': 'Home'}]
+                breadcrumb = [{'url': '/', 'title': 'Home', 'link_title': 'Home'}
+                              # {"title": "Hospitals", "url": "hospitals", "link_title": "Hospitals"}
+]
                 if entity.locality_value:
                     # breadcrumb.append({'url': request.build_absolute_uri('/'+ entity.locality_value), 'title': entity.locality_value, 'link_title': entity.locality_value})
                     breadcrumb = breadcrumb + entity.breadcrumb
@@ -4035,18 +4070,21 @@ class HospitalViewSet(viewsets.GenericViewSet):
                 breadcrumb.append({'title':  hospital_obj.name, 'url': None, 'link_title': None})
                 response['breadcrumb'] = breadcrumb
             else:
-                breadcrumb = [{'url': '/', 'title': 'Home', 'link_title': 'Home'}, {'title':  hospital_obj.name, 'url': None, 'link_title': None}]
+                breadcrumb = [{'url': '/', 'title': 'Home', 'link_title': 'Home'},
+                              # {"title": "Hospitals", "url": "hospitals", "link_title": "Hospitals"},
+                              {'title': hospital_obj.name, 'url': None, 'link_title': None}]
                 response['breadcrumb'] = breadcrumb
 
             if hospital_obj.name and entity.locality_value:
-                title = hospital_obj.name + ' in '
-                description = hospital_obj.name + ' in '
+                title = hospital_obj.name
+                description = hospital_obj.name
                 if entity.sublocality_value:
-                    title += entity.sublocality_value + ', '
-                    description += entity.sublocality_value + ', '
-                title += entity.locality_value + ' | Contact Info & Other Details '
+                    title += " " + entity.sublocality_value
+                    description += " " + entity.sublocality_value
 
-                description += entity.locality_value + ': Check ' + hospital_obj.name + " address, doctor's list, contact number and more to book appointment."
+                title += ' | Book Appointment, Check Doctors List, Reviews, Contact Number'
+                description += """: Get free booking on first appointment.\
+                 Check {} Doctors List, Reviews, Contact Number, Address, Procedures and more.""".format(hospital_obj.name)
             canonical_url = entity.url
         else:
             response['breadcrumb'] = None
@@ -4217,8 +4255,12 @@ class IpdProcedureSyncViewSet(viewsets.GenericViewSet):
         serializer.is_valid(raise_exception=True)
         validated_data = serializer.validated_data
         temp_status = validated_data.get('status')
+        temp_planned_date = validated_data.get('planned_date')
         temp_status = matrix_status_to_ipd_lead_status_mapping.get(temp_status)
-        if not temp_status:
-            return Response({'message': 'Invalid status'}, status=status.HTTP_400_BAD_REQUEST)
-        IpdProcedureLead.objects.filter(matrix_lead_id=validated_data.get('matrix_lead_id')).update(status=temp_status)
+        to_be_updated_dict = {}
+        if temp_status:
+            to_be_updated_dict['status'] = temp_status
+        if temp_planned_date:
+            to_be_updated_dict['planned_date'] = temp_planned_date
+        IpdProcedureLead.objects.filter(matrix_lead_id=validated_data.get('matrix_lead_id')).update(**to_be_updated_dict)
         return Response({'message': 'Success'})

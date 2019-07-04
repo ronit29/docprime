@@ -4,4 +4,4 @@ The appointment for {{patient_name|capfirst}} with Dr. {{doctor_name|capfirst}} 
 {% else %}
 Appointment ID <<{{instance.id}}>>: Your appointment with Dr. {{doctor_name|capfirst}} has been cancelled as per your request.{% endif %}
 Refund, if applicable will be credited to your account within 7 working days.
-{% endspaceless %}
+

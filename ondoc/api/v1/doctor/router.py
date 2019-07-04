@@ -4,7 +4,8 @@ from .views import (DoctorAppointmentsViewSet, DoctorProfileView, DoctorHospital
                     DoctorProfileUserViewSet, DoctorAvailabilityTimingViewSet, HealthTipView, ConfigView,
                     DoctorAppointmentNoAuthViewSet, DoctorContactNumberViewSet, DoctorFeedbackViewSet,
                     HospitalAutocomplete, CreateAdminViewSet, OfflineCustomerViewSet, HospitalNetworkListViewset,
-                    AppointmentMessageViewset, IpdProcedureViewSet, HospitalViewSet, IpdProcedureSyncViewSet)
+                    AppointmentMessageViewset, IpdProcedureViewSet, HospitalViewSet, IpdProcedureSyncViewSet,
+                    PracticeSpecializationAutocomplete)
 
 urlpatterns = [
     path('appointment', DoctorAppointmentsViewSet.as_view({'get': 'list'}), name='appointment-list'),
@@ -45,6 +46,7 @@ urlpatterns = [
     path('contact-number/<int:doctor_id>', DoctorContactNumberViewSet.as_view({'get':'retrieve'}), name='doctor-contact-number'),
     path('feedback', DoctorFeedbackViewSet.as_view({'post': 'feedback'}), name='doctor-feedback'),
     path('hospital-autocomplete', HospitalAutocomplete.as_view(), name='hospital-autocomplete'),
+    path('practicespecialization-autocomplete', PracticeSpecializationAutocomplete.as_view(), name='practicespecialization-autocomplete'),
     path('create_admin', CreateAdminViewSet.as_view({'post': 'create'}), name='create_admin'),
     path('update_admin', CreateAdminViewSet.as_view({'post': 'update'}), name='update_admin'),
     path('delete_admin', CreateAdminViewSet.as_view({'post': 'delete'}), name='delete_admin'),
@@ -60,6 +62,7 @@ urlpatterns = [
     path('list_appointments', OfflineCustomerViewSet.as_view({'get': 'list_appointments'}), name='list_appointments'),
     path('list_hospital/<int:hospital_network_id>', HospitalNetworkListViewset.as_view({'get':'list'}),name='list_hospital'),
     path('send_message', AppointmentMessageViewset.as_view({'post': 'send_message'}), name='send_message'),
+    path('request_encryption_key', AppointmentMessageViewset.as_view({'post': 'encryption_key_request_message'}), name='encryption_key_request_message'),
     path('ipd_procedure/list_by_alphabet', IpdProcedureViewSet.as_view({'get': 'list_by_alphabet'}), name='list_ipd_procedure_by_alphabet'),
     path('ipd_procedure_by_url/<str:url>', IpdProcedureViewSet.as_view({'get': 'ipd_procedure_detail_by_url'}), name='ipd_procedure_detail_by_url'),
     path('ipd_procedure/<int:pk>', IpdProcedureViewSet.as_view({'get': 'ipd_procedure_detail'}), name='ipd_procedure_detail'),

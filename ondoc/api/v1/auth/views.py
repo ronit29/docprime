@@ -99,8 +99,6 @@ class LoginOTP(GenericViewSet):
         blocked_state = BlacklistUser.get_state_by_number(phone_number, BlockedStates.States.LOGIN)
         if blocked_state:
             return Response({'error': blocked_state.message}, status=status.HTTP_400_BAD_REQUEST)
-
-
         req_type = request.query_params.get('type')
         via_sms = data.get('via_sms', True)
         via_whatsapp = data.get('via_whatsapp', False)
@@ -121,7 +119,7 @@ class LoginOTP(GenericViewSet):
 
             if lab_queryset.exists() or doctor_queryset.exists() or provider_signup_queryset.exists():
                 response['exists'] = 1
-                send_otp(otp_message, phone_number, retry_send)
+                send_otp(otp_message, phone_number, retry_send, via_sms=via_sms, via_whatsapp=via_whatsapp, call_source=call_source)
 
             # if queryset.exists():
             #     response['exists'] = 1
@@ -576,20 +574,20 @@ class UserAppointmentsViewSet(OndocViewSet):
         if lab_serializer.data:
             combined_data.extend(lab_serializer.data)
         combined_data = sorted(combined_data, key=lambda x: x['time_slot_start'], reverse=True)
-        temp_dict = dict()
-        for data in combined_data:
-            if not temp_dict.get(data["status"]):
-                temp_dict[data["status"]] = [data]
-            else:
-                temp_dict[data["status"]].append(data)
-        combined_data = list()
-        status_six_data = list()
-        for k, v in sorted(temp_dict.items(), key=lambda x: x[0]):
-            if k==6:
-                status_six_data.extend(v)
-            else:
-                combined_data.extend(v)
-        combined_data.extend(status_six_data)
+        # temp_dict = dict()
+        # for data in combined_data:
+        #     if not temp_dict.get(data["status"]):
+        #         temp_dict[data["status"]] = [data]
+        #     else:
+        #         temp_dict[data["status"]].append(data)
+        # combined_data = list()
+        # status_six_data = list()
+        # for k, v in sorted(temp_dict.items(), key=lambda x: x[0]):
+        #     if k==6:
+        #         status_six_data.extend(v)
+        #     else:
+        #         combined_data.extend(v)
+        # combined_data.extend(status_six_data)
         combined_data = combined_data[:200]
         return Response(combined_data)
 

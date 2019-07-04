@@ -666,7 +666,7 @@ def create_or_update_lead_on_matrix(self, data):
         name = obj.name if hasattr(obj, 'name') and obj.name else ''
         lead_source = None
         request_data = {}
-        potential_ipd_lead = '0'
+        potential_ipd_lead = 0
         if obj_type == Doctor.__name__:
             lead_source = 'referral'
             if obj.gender and obj.gender == 'm':
@@ -700,11 +700,15 @@ def create_or_update_lead_on_matrix(self, data):
             elif obj.type == ProviderSignupLead.HOSPITAL_ADMIN:
                 name = obj.name + ' (Hospital Admin)'
         elif obj_type == IpdProcedureLead.__name__:
-            potential_ipd_lead = '1' if obj.is_potential_ipd() else '0'
+            potential_ipd_lead = 1 if obj.is_potential_ipd() else 0
             lead_source = obj.source
             mobile = obj.phone_number
             email = obj.email if obj.email else ''
             name = obj.name
+            if obj.gender and obj.gender == 'm':
+                gender = 1
+            elif obj.gender and obj.gender == 'f':
+                gender = 2
             obj.update_idp_data(request_data)
         mobile = int(mobile)
         # if not mobile:
@@ -989,6 +993,29 @@ def create_ipd_lead_from_opd_appointment(self, data):
     is_valid = IpdProcedureLead.is_valid_hospital_for_lead(obj.hospital)
     if not is_valid:
         return
+    data = obj.convert_ipd_lead_data()
+    data['status'] = IpdProcedureLead.NEW
+    data['source'] = IpdProcedureLead.CRM
+    obj_created = IpdProcedureLead(**data)
+    obj_created.save()
+
+
+@task(bind=True, max_retries=2)
+def create_ipd_lead_from_lab_appointment(self, data):
+    from ondoc.diagnostic.models import LabAppointment
+    from ondoc.procedure.models import IpdProcedureLead
+    obj_id = data.get('obj_id')
+    if not obj_id:
+        logger.error("[CELERY ERROR: Incorrect values provided.]")
+        raise ValueError()
+    obj = LabAppointment.objects.filter(id=obj_id).first()
+    if not obj:
+        return
+
+    is_valid = IpdProcedureLead.is_valid_lab_for_lead(obj.lab)
+    if not is_valid:
+        return
+
     data = obj.convert_ipd_lead_data()
     data['status'] = IpdProcedureLead.NEW
     data['source'] = IpdProcedureLead.CRM

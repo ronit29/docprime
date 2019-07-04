@@ -1,7 +1,8 @@
 from django.conf import settings
 from django.db import models, transaction
 from django.contrib.gis.db import models as geo_models
-from django.db.models import Q, Prefetch
+from django.db.models import Q, Prefetch, F, CharField
+from django.db.models.functions import Cast
 from django.contrib.staticfiles.templatetags.staticfiles import static
 from django.contrib.auth.models import AbstractBaseUser, PermissionsMixin, BaseUserManager
 from django.core.validators import MaxValueValidator, MinValueValidator
@@ -27,7 +28,8 @@ import json
 from rest_framework import status
 from collections import OrderedDict
 from django.utils.text import slugify
-
+import logging
+logger = logging.getLogger(__name__)
 
 class Image(models.Model):
     # name = models.ImageField(height_field='height', width_field='width')
@@ -1538,6 +1540,37 @@ class SPOCDetails(TimeStampedModel):
     #         admin_to_be_deleted.delete()
     #     return super(SPOCDetails, self).delete(*args, **kwargs)
 
+    @staticmethod
+    def create_appointment_admins_from_spocs():
+        from ondoc.diagnostic.models import Hospital
+
+        all_spocs = SPOCDetails.objects
+        all_spocs_hospitals = all_spocs.filter(content_type=ContentType.objects.get_for_model(Hospital))
+        spocs_with_admins = SPOCDetails.objects.prefetch_related('content_object',
+                                                                 'content_object__manageable_hospitals').annotate(
+            chr_number=Cast('number', CharField())).filter(content_type=ContentType.objects.get_for_model(Hospital),
+                                                           hospital_spocs__manageable_hospitals__phone_number=F(
+                                                               'chr_number')).filter(
+            Q(hospital_spocs__manageable_hospitals__permission_type=GenericAdmin.APPOINTMENT) | Q(
+                hospital_spocs__manageable_hospitals__super_user_permission=True))
+        spocs_without_admins = all_spocs_hospitals.exclude(
+            Q(id__in=spocs_with_admins) | Q(number__isnull=True) | Q(number__lt=1000000000) | Q(
+                number__gt=9999999999)).values('name', 'number',
+                                               'hospital_spocs')
+        admins_to_be_created = list()
+        for spoc in spocs_without_admins:
+            if len(spoc['name']) > 100:
+                continue
+            admins_to_be_created.append(
+                GenericAdmin(name=spoc['name'], phone_number=str(spoc['number']), hospital_id=spoc['hospital_spocs'],
+                             permission_type=GenericAdmin.APPOINTMENT, entity_type=GenericAdmin.HOSPITAL,
+                             auto_created_from_SPOCs=True))
+        try:
+            GenericAdmin.objects.bulk_create(admins_to_be_created)
+        except Exception as e:
+            logger.error(str(e))
+            print("Error while bulk creating SPOCs. ERROR :: {}".format(str(e)))
+
     def __str__(self):
         return self.name
 
@@ -1604,6 +1637,7 @@ class Merchant(TimeStampedModel):
     mobile = models.CharField(max_length=200, null=False, blank= True)
     pg_status = models.PositiveIntegerField(choices=CREATION_STATUS_CHOICES, default=NOT_INITIATED, editable=False)
     api_response = JSONField(blank=True, null=True, editable=False)
+    enable_for_tds_deduction = models.BooleanField(default=False)
 
     class Meta:
         db_table = 'merchant'
@@ -1723,6 +1757,33 @@ class Merchant(TimeStampedModel):
                 if resp_data.get('statusCode') and resp_data.get('statusCode') in [cls.INITIATED, cls.INPROCESS]:
                     data.pg_status = resp_data.get('statusCode')
                     data.save()
+
+
+class MerchantNetRevenue(TimeStampedModel):
+
+    # CURRENT_FINANCIAL_YEAR = '2019-2020'
+
+    merchant = models.ForeignKey(Merchant, on_delete=models.CASCADE, related_name='net_revenue')
+    total_revenue = models.DecimalField(max_digits=10, decimal_places=2, default=None, null=True, blank=True)
+    financial_year = models.CharField(max_length=20, null=True, blank=True)
+    tds_deducted = models.DecimalField(max_digits=10, decimal_places=2, default=None, null=True, blank=True)
+
+    class Meta:
+        db_table = 'merchant_net_revenue'
+
+
+class MerchantTdsDeduction(TimeStampedModel):
+
+    # CURRENT_FINANCIAL_YEAR = '2019-2020'
+
+    merchant = models.ForeignKey(Merchant, on_delete=models.CASCADE, related_name='tds_deduction')
+    financial_year = models.CharField(max_length=20, null=True, blank=True)
+    tds_deducted = models.DecimalField(max_digits=10, decimal_places=2, default=None, null=True, blank=True)
+    merchant_payout = models.ForeignKey("account.MerchantPayout", on_delete=models.CASCADE, related_name='tds')
+
+    class Meta:
+        db_table = 'merchant_tds_deduction'
+
 
 class AssociatedMerchant(TimeStampedModel):
 

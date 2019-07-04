@@ -17,7 +17,7 @@ from ondoc.doctor.models import (OpdAppointment, Doctor, Hospital, DoctorHospita
                                  CommonMedicalCondition, CommonSpecialization,
                                  DoctorPracticeSpecialization, DoctorClinic, OfflineOPDAppointments, OfflinePatients,
                                  CancellationReason, HealthInsuranceProvider, HospitalDocument, HospitalNetworkDocument,
-                                 AppointmentHistory, HospitalNetwork)
+                                 AppointmentHistory, HospitalNetwork, ProviderEncrypt)
 from ondoc.diagnostic import models as lab_models
 from ondoc.authentication.models import UserProfile, DoctorNumber, GenericAdmin, GenericLabAdmin
 from django.db.models import Avg
@@ -1373,7 +1373,7 @@ class DoctorAppointmentRetrieveSerializer(OpdAppointmentSerializer):
     is_docprime = serializers.ReadOnlyField(default=True)
 
     def get_mask_data(self, obj):
-        mask_number = obj.mask_number.first()
+        mask_number = obj.mask_number.all()[0] if obj.mask_number.all() else None
         if mask_number:
             return mask_number.build_data()
         return None
@@ -1745,7 +1745,6 @@ class AppointmentMessageSerializer(serializers.Serializer):
 
     def validate(self, attrs):
         from ondoc.doctor.models import OpdAppointment, OfflineOPDAppointments
-
         if attrs.get('is_docprime'):
             query = OpdAppointment.objects.filter(id=attrs['id'])
         else:
@@ -1753,6 +1752,16 @@ class AppointmentMessageSerializer(serializers.Serializer):
         if not query.exists():
             raise serializers.ValidationError('Appointment Id Not Found')
         attrs['appointment'] = query.first()
+        return attrs
+
+
+class EncryptionKeyRequestMessageSerializer(serializers.Serializer):
+    hospital_id = serializers.PrimaryKeyRelatedField(queryset=Hospital.objects.all())
+
+    def validate(self, attrs):
+        hospital = attrs.get("hospital_id")
+        if not (hasattr(hospital, 'encrypt_details') and hospital.encrypt_details.is_valid):
+            raise serializers.ValidationError('given hospital needs to be encrypted')
         return attrs
 
 
@@ -1839,12 +1848,19 @@ class TopHospitalForIpdProcedureSerializer(serializers.ModelSerializer):
     long = serializers.SerializerMethodField()
     url = serializers.SerializerMethodField()
     locality_url = serializers.SerializerMethodField()
+    name_city = serializers.SerializerMethodField()
 
     class Meta:
         model = Hospital
         fields = ('id', 'name', 'distance', 'certifications', 'bed_count', 'logo', 'avg_rating',
                   'count_of_insurance_provider', 'multi_speciality', 'address', 'short_address','open_today',
-                  'insurance_provider', 'established_in', 'long', 'lat', 'url', 'locality_url')
+                  'insurance_provider', 'established_in', 'long', 'lat', 'url', 'locality_url', 'name_city')
+
+    def get_name_city(self, obj):
+        result = obj.name
+        if obj.city:
+            result += " {}".format(obj.city)
+        return result
 
     def get_locality_url(self, obj):
         entity_url = self.context.get('hosp_locality_entity_dict', {})
@@ -2036,7 +2052,7 @@ class HospitalDetailIpdProcedureSerializer(TopHospitalForIpdProcedureSerializer)
         return doctor_list_viewset.list(request,
                                         parameters={'hospital_id': str(obj.id), 'longitude': validated_data.get('long'),
                                                     'latitude': validated_data.get('lat'), 'sort_on': 'experience',
-                                                    'restrict_result_count': 3}).data
+                                                    'restrict_result_count': 8}).data
 
     def get_rating_graph(self, obj):
         from ondoc.ratings_review.models import RatingsReview
@@ -2214,8 +2230,9 @@ class CommonConditionsSerializer(serializers.Serializer):
 
 
 class IpdLeadUpdateSerializer(serializers.Serializer):
-    status = serializers.IntegerField()
+    status = serializers.IntegerField(required=False, allow_null=True)
     matrix_lead_id = serializers.IntegerField()
+    planned_date = serializers.DateField(required=False, allow_null=True)
 
     def validate(self, attrs):
         if not IpdProcedureLead.objects.filter(matrix_lead_id=attrs.get('matrix_lead_id')).exists():

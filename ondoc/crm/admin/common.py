@@ -140,12 +140,15 @@ class FormCleanMixin(forms.ModelForm):
         self.pin_code_qc_submit()
         phone_no_flag = False
         if isinstance(self.instance, Hospital) and self.data and self.instance.network_type == 1:
-            total_forms = int(self.data.get('authentication-spocdetails-content_type-object_id-TOTAL_FORMS'))
-            for form in range(total_forms):
-                number_pattern = re.compile("(0/91)?[6-9][0-9]{9}")
-                phone_number = self.data.get('authentication-spocdetails-content_type-object_id-' + str(form) + '-number')
-                if phone_number and number_pattern.match(str(phone_number)):
-                    phone_no_flag = True
+            if 'authentication-spocdetails-content_type-object_id-TOTAL_FORMS' in self.data:
+                total_forms = int(self.data.get('authentication-spocdetails-content_type-object_id-TOTAL_FORMS', '0'))
+                for form in range(total_forms):
+                    number_pattern = re.compile("(0/91)?[6-9][0-9]{9}")
+                    phone_number = self.data.get('authentication-spocdetails-content_type-object_id-' + str(form) + '-number')
+                    if phone_number and number_pattern.match(str(phone_number)):
+                        phone_no_flag = True
+            else:
+                phone_no_flag = True  # Skip check if inline is not present.
             if phone_no_flag == False:
                 raise forms.ValidationError("Atleast one mobile no is required for SPOC Details")
 
@@ -383,11 +386,11 @@ class MerchantAdmin(ImportExportMixin, VersionAdmin):
         if request.user.is_member_of(constants['MERCHANT_TEAM']):
             if obj and obj.verified_by:
                 return [f.name for f in self.model._meta.fields if
-                        f.name not in ['enabled', 'verified_by_finance', 'associated_to']]
+                        f.name not in ['enabled', 'verified_by_finance', 'associated_to', 'enable_for_tds_deduction']]
             return []
 
         if obj and obj.verified_by:
-            return [f.name for f in self.model._meta.fields] + ['associated_to']
+            return [f.name for f in self.model._meta.fields if f.name not in ['enable_for_tds_deduction']] + ['associated_to']
 
         return ['verified_by_finance', 'associated_to']
 
@@ -681,6 +684,17 @@ class MatrixCityAutocomplete(autocomplete.Select2QuerySetView):
 
         if matrix_state:
             queryset = MatrixMappedCity.objects.filter(state_id=matrix_state)
+        if self.q:
+            queryset = queryset.filter(name__istartswith=self.q)
+
+        return queryset
+
+
+class RelatedHospitalAutocomplete(autocomplete.Select2QuerySetView):
+
+    def get_queryset(self):
+        queryset = Hospital.objects.filter(is_ipd_hospital=True)
+
         if self.q:
             queryset = queryset.filter(name__istartswith=self.q)
 

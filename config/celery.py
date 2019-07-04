@@ -7,13 +7,13 @@ import os
 from django.conf import settings
 from raven.contrib.celery import register_signal, register_logger_signal
 from ondoc.account.tasks import refund_status_update, consumer_refund_update, dump_to_elastic, integrator_order_summary,\
-    get_thyrocare_reports, elastic_alias_switch
+    get_thyrocare_reports, elastic_alias_switch, add_net_revenue_for_merchant
 from celery.schedules import crontab
 from ondoc.doctor.tasks import save_avg_rating, update_prices, update_city_search_key, update_doctors_count, update_search_score, \
     update_all_ipd_seo_urls, update_insured_labs_and_doctors, update_seo_urls, update_hosp_google_avg_rating, \
     update_flags
-from ondoc.account.tasks import update_ben_status_from_pg,update_merchant_payout_pg_status
-from ondoc.insurance.tasks import push_mis
+from ondoc.account.tasks import update_ben_status_from_pg,update_merchant_payout_pg_status, create_appointment_admins_from_spocs
+from ondoc.insurance.tasks import push_mis, process_insurance_payouts
 # from ondoc.doctor.services.update_search_score import DoctorSearchScore
 from ondoc.bookinganalytics.tasks import sync_booking_data
 
@@ -61,6 +61,7 @@ def setup_periodic_tasks(sender, **kwargs):
     polling_time = float(settings.PG_REFUND_STATUS_POLL_TIME) * float(60.0)
     sender.add_periodic_task(polling_time, consumer_refund_update.s(), name='Refund and update consumer account balance')
     sender.add_periodic_task(crontab(hour=18, minute=35), push_mis.s(), name='Send insurance mis via mail.')
+    sender.add_periodic_task(float(6*3600), process_insurance_payouts.s(), name='Process insurance payouts.')
 
     elastic_sync_cron_schedule = crontab(hour=19, minute=00)
     elastic_sync_post_cron_schedule = crontab(hour=20, minute=00)
@@ -93,4 +94,7 @@ def setup_periodic_tasks(sender, **kwargs):
     sender.add_periodic_task(doctor_search_score_creation_time, update_search_score.s(), name='Update Doctor search score')
     sender.add_periodic_task(crontab(hour=23, minute=00), update_insured_labs_and_doctors.s(), name="Update insured labs and doctors")
     sender.add_periodic_task(crontab(hour=23, minute=30), update_hosp_google_avg_rating.s(), name="Update Hospital ratings with Google Avg Ratings")
-    #sender.add_periodic_task(crontab(hour=23, minute=30), update_seo_urls.s(), name="Update Seo Urls")
+    sender.add_periodic_task(crontab(hour=18, minute=00), update_seo_urls.s(), name="Update Seo Urls")
+
+    sender.add_periodic_task(crontab(hour=19, minute=00), create_appointment_admins_from_spocs.s(), name='Create Appointment Admins from SPOCs')
+    # sender.add_periodic_task(crontab(hour=21, minute=00), add_net_revenue_for_merchant.s(), name='Add net revenue for merchants')

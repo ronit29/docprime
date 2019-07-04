@@ -37,6 +37,7 @@ from ondoc.diagnostic.models import (LabTiming, LabImage,
                                      TestParameterChat, LabTestThresholds)
 from ondoc.integrations.models import IntegratorHistory
 from ondoc.notification.models import EmailNotification, NotificationAction
+from ondoc.prescription.models import AppointmentPrescription
 from .common import *
 from ondoc.authentication.models import GenericAdmin, User, QCModel, GenericLabAdmin, AssociatedMerchant
 from ondoc.crm.admin.doctor import CustomDateInput, TimePickerWidget, CreatedByFilter, AutoComplete, \
@@ -370,7 +371,8 @@ class LabForm(FormCleanMixin):
         widgets = {
             'lab_pricing_group': autocomplete.ModelSelect2(url='labpricing-autocomplete'),
             'matrix_state': autocomplete.ModelSelect2(url='matrix-state-autocomplete'),
-            'matrix_city': autocomplete.ModelSelect2(url='matrix-city-autocomplete', forward=['matrix_state'])
+            'matrix_city': autocomplete.ModelSelect2(url='matrix-city-autocomplete', forward=['matrix_state']),
+            'related_hospital': autocomplete.ModelSelect2(url='related-hospital-autocomplete')
         }
         # exclude = ('pathology_agreed_price_percentage', 'pathology_deal_price_percentage', 'radiology_agreed_price_percentage',
         #            'radiology_deal_price_percentage', )
@@ -430,6 +432,10 @@ class LabForm(FormCleanMixin):
                 if data.get('disable_reason', None) and data.get('disable_reason', None) == Lab.OTHERS and not data.get(
                         'disable_comments', None):
                     raise forms.ValidationError("Must have disable comments if disable reason is others.")
+
+        if data.get('is_ipd_lab'):
+            if not data.get('related_hospital'):
+                raise forms.ValidationError("Must have a related hospital selected when ipd lab enable.")
 
 
 class LabCityFilter(SimpleListFilter):
@@ -560,6 +566,7 @@ class LabAdmin(ImportExportMixin, admin.GeoModelAdmin, VersionAdmin, ActionAdmin
     exclude = ('search_key', 'pathology_agreed_price_percentage', 'pathology_deal_price_percentage',
                'radiology_agreed_price_percentage', 'radiology_deal_price_percentage', 'live_at',
                'onboarded_at', 'qc_approved_at', 'disabled_at', 'welcome_calling_done_at')
+    # autocomplete_fields = ['related_hospital']
 
     def has_delete_permission(self, request, obj=None):
         return super().has_delete_permission(request, obj)
@@ -773,6 +780,7 @@ class LabAdmin(ImportExportMixin, admin.GeoModelAdmin, VersionAdmin, ActionAdmin
         form.base_fields['network'].queryset = LabNetwork.objects.filter(Q(data_status = QCModel.SUBMITTED_FOR_QC) | Q(data_status = QCModel.QC_APPROVED) | Q(created_by = request.user))
         form.base_fields['hospital'].queryset = Hospital.objects.filter(Q(data_status = QCModel.SUBMITTED_FOR_QC) | Q(data_status = QCModel.QC_APPROVED) | Q(created_by = request.user))
         form.base_fields['assigned_to'].queryset = User.objects.filter(user_type=User.STAFF)
+        # form.base_fields['related_hospital'].queryset = Hospital.objects.filter(is_ipd_hospital=True)
         if not request.user.is_superuser and not request.user.is_member_of(constants['QC_GROUP_NAME']):
             form.base_fields['assigned_to'].disabled = True
         return form
@@ -912,6 +920,26 @@ class LabReportInline(nested_admin.NestedTabularInline):
     show_change_link = True
     inlines = [LabReportFileInline]
 
+class LabPrescriptionForm(forms.ModelForm):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        instance = getattr(self, 'instance', None)
+        if instance and instance.pk:
+            self.fields['prescription_file'].disabled = True
+
+class LabPrescriptionInline(nested_admin.NestedGenericTabularInline):
+    model = AppointmentPrescription
+    form = LabPrescriptionForm
+    #readonly_fields = ['user']
+    extra = 0
+    can_delete = True
+    show_change_link = False
+    max_num = 3
+
+    def get_readonly_fields(self, request, obj):
+        readonly_fields = ['user']
+        return readonly_fields
+
 
 class LabAppointmentAdmin(nested_admin.NestedModelAdmin):
     form = LabAppointmentForm
@@ -923,7 +951,8 @@ class LabAppointmentAdmin(nested_admin.NestedModelAdmin):
     date_hierarchy = 'created_at'
 
     inlines = [
-        LabReportInline
+        LabReportInline,
+        LabPrescriptionInline
     ]
 
     # def get_autocomplete_fields(self, request):
@@ -932,6 +961,11 @@ class LabAppointmentAdmin(nested_admin.NestedModelAdmin):
     #     else:
     #         temp_autocomplete_fields = super().get_autocomplete_fields(request)
     #     return temp_autocomplete_fields
+
+    def get_queryset(self, request):
+        qs = super().get_queryset(request).select_related('profile', 'lab').prefetch_related('lab_test', 'reports','reports__files',
+                                                                                      'test_mappings', 'test_mappings__test')
+        return qs
 
     def uploaded_prescriptions(self, obj):
         prescriptions = obj.get_all_uploaded_prescriptions()
@@ -1067,7 +1101,7 @@ class LabAppointmentAdmin(nested_admin.NestedModelAdmin):
         if request.user.groups.filter(name=constants['APPOINTMENT_OTP_TEAM']).exists() or request.user.is_superuser:
             read_only = read_only + ['otp']
 
-        if obj.status is not LabAppointment.CREATED:
+        if obj and obj.status is not LabAppointment.CREATED:
             read_only = read_only + ['status_change_comments']
         return read_only
 
@@ -1084,9 +1118,10 @@ class LabAppointmentAdmin(nested_admin.NestedModelAdmin):
     #     return inline_instance
 
     def reports_uploaded(self, instance):
-        if instance and instance.id and sum(
-                instance.reports.annotate(no_of_files=Count('files')).values_list('no_of_files', flat=True)):
-            return True
+        if instance and instance.id and instance.reports.all():
+            for report in instance.reports.all():
+                if report.files.all() or instance.reports_physically_collected:
+                    return True
         elif instance and instance.id and instance.reports_physically_collected:
             return True
 
