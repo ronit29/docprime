@@ -1,5 +1,5 @@
 from django.contrib.postgres.fields import JSONField
-from django.core.validators import FileExtensionValidator
+from django.core.validators import FileExtensionValidator, MinValueValidator, MaxValueValidator
 from django.db import models
 from weasyprint import HTML, CSS
 import string
@@ -18,6 +18,7 @@ from django.contrib.contenttypes.fields import GenericForeignKey, GenericRelatio
 from django.contrib.contenttypes.models import ContentType
 
 from ondoc.authentication.models import TimeStampedModel
+from ondoc.doctor import models as doc_models
 # from ondoc.doctor.models import OpdAppointment
 # from ondoc.diagnostic.models import LabAppointment
 from ondoc.authentication.models import User
@@ -560,7 +561,6 @@ class DeviceDetails(TimeStampedModel):
     app_name = models.CharField(max_length=200, null=True, blank=True)
     ping_status = models.CharField(max_length=50, null=True, blank=True)
     last_ping_time = models.DateTimeField(null=True, blank=True)
-    # last_usage = models.DateTimeField()   # updated_at is the last_usage
     dnd = models.BooleanField(default=False)
     res = models.CharField(max_length=100, null=True, blank=True)
     adv_id = models.CharField(max_length=100, null=True, blank=True)
@@ -572,6 +572,21 @@ class DeviceDetails(TimeStampedModel):
 
     class Meta:
         db_table = "device_details"
+
+
+class LastUsageTimestamp(TimeStampedModel):
+    phone_number = models.BigIntegerField(validators=[MinValueValidator(1000000000), MaxValueValidator(9999999999)])
+    registered_on_app = models.BooleanField(default=False)
+    device = models.ForeignKey(DeviceDetails, null=True, blank=True, related_name="last_usage", on_delete=models.SET_NULL)
+    source = models.CharField(max_length=20, choices=AppointmentHistory.SOURCE_CHOICES)
+    # first_usage_timestamp = models.DateTimeField(auto_now_add=True)           created_at is the first_usage_timestamp
+    last_app_open_timestamp = models.DateTimeField()
+
+    def __str__(self):
+        return str(self.phone_number)
+
+    class Meta:
+        db_table = "last_usage_timestamp"
 
 
 class BlockedStates(TimeStampedModel):

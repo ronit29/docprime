@@ -28,7 +28,7 @@ from django.template.loader import render_to_string
 
 from ondoc.procedure.models import IpdProcedure, IpdProcedureLead
 from . import serializers
-from ondoc.common.models import Cities, PaymentOptions, UserConfig, DeviceDetails
+from ondoc.common.models import Cities, PaymentOptions, UserConfig, DeviceDetails, LastUsageTimestamp
 from ondoc.common.utils import send_email, send_sms
 from ondoc.authentication.backends import JWTAuthentication, WhatsappAuthentication
 from django.core.files.uploadedfile import SimpleUploadedFile, TemporaryUploadedFile, InMemoryUploadedFile
@@ -991,17 +991,40 @@ class AllUrlsViewset(viewsets.GenericViewSet):
 class DeviceDetailsSave(viewsets.GenericViewSet):
 
     def save(self, request):
-        serializer = serializers.DeviceDetailsSerializer(data=request.data)
-        serializer.is_valid(raise_exception=True)
-        validated_data = serializer.validated_data
+        device_serializer = serializers.DeviceDetailsSerializer(data=request.data)
+        device_serializer.is_valid(raise_exception=True)
+        device_validated_data = device_serializer.validated_data
+
+        add_device_details = True if not (len(device_validated_data) == 1 and 'device_id' in device_validated_data) else False
+        update_usage_time = True if not (len(device_validated_data) == 3 and not device_validated_data.get('data') and 'last_ping_time' in device_validated_data) else False
+
+        last_usage_validated_data = dict()
+        last_usage_queryset = last_usage_details = None
         user = request.user if request.user and request.user.is_authenticated else None
-        device_details_queryset = DeviceDetails.objects.filter(device_id=validated_data.get('device_id'))
-        device_details = device_details_queryset.first()
+        if user and update_usage_time:
+            last_usage_serializer = serializers.LastUsageTimestampSerializer(data=request.data)
+            last_usage_serializer.is_valid(raise_exception=True)
+            last_usage_validated_data = last_usage_serializer.validated_data
+            last_usage_queryset = LastUsageTimestamp.objects.filter(phone_number=user.phone_number)
+            last_usage_details = last_usage_queryset.first()
+
         try:
-            if device_details:
-                device_details_queryset.update(**validated_data, user=user, updated_at=datetime.datetime.now())
-            else:
-                DeviceDetails.objects.create(**validated_data, user=user)
+            if add_device_details:
+                device_details_queryset = DeviceDetails.objects.filter(device_id=device_validated_data.get('device_id'))
+                device_details = device_details_queryset.first()
+                if device_details:
+                    device_details_queryset.update(**device_validated_data, user=user)
+                else:
+                    device_details = DeviceDetails.objects.create(**device_validated_data, user=user)
+                last_usage_validated_data['device_id'] = device_details.id
+
+            if user and update_usage_time:
+                last_usage_validated_data['phone_number'] = int(user.phone_number)
+                last_usage_validated_data['last_app_open_timestamp'] = datetime.datetime.now()
+                if last_usage_details:
+                    last_usage_queryset.update(**last_usage_validated_data)
+                else:
+                    LastUsageTimestamp.objects.create(**last_usage_validated_data)
         except Exception as e:
             logger.error("Something went wrong while saving device details - " + str(e))
             return Response("Error adding device details - " + str(e), status=status.HTTP_500_INTERNAL_SERVER_ERROR)
