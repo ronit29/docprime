@@ -82,6 +82,7 @@ class DP_OpdConsultsAndTests(models.Model):
     IsActive = models.BooleanField(default=True)
     CashbackUsed = models.IntegerField(null=True, blank=True)
     BookingDate = models.DateTimeField(null=True, blank=True)
+    CorporateDealId = models.BigIntegerField(null=True, blank=True)
 
     def __str__(self):
         return str(self.Appointment_Id)
@@ -154,4 +155,27 @@ class TeleDeal(models.Model):
 
     class Meta:
         db_table = "TeleDeal"
+        managed = False
+
+
+class DP_CorporateDeals(models.Model):
+    CorporateDealId = models.BigIntegerField(primary_key=True)
+    CorporateName = models.CharField(max_length=5000, null=True, blank=True)
+    DealStartDate = models.DateTimeField()
+    DealEndDate = models.DateTimeField()
+    GrossAmount = models.IntegerField(null=True, blank=True)
+    ExpectedProviderFee = models.IntegerField(null=True, blank=True)
+    NumberOfEmployees = models.IntegerField(null=True, blank=True)
+    PaymentDate = models.DateTimeField()
+    TDSDeducted = models.CharField(max_length=5000, null=True, blank=True)
+    ReceiptNumber = models.CharField(max_length=5000, null=True, blank=True)
+    IsActive = models.BooleanField(default=False)
+    CreatedDate = models.DateTimeField()
+    UpdatedDate = models.DateTimeField()
+
+    def __str__(self):
+        return str(self.CorporateDealId)
+
+    class Meta:
+        db_table = "DP_CorporateDeals"
         managed = False

@@ -1,11 +1,21 @@
 import datetime
+from django.utils.timezone import utc
+
+from django.contrib.contenttypes.fields import GenericRelation
+from django.contrib.contenttypes.models import ContentType
+from django.contrib.gis.geos import Point
 from django.core.validators import FileExtensionValidator
 
-from ondoc.notification.tasks import send_insurance_notifications
-from ondoc.insurance.tasks import push_insurance_buy_to_matrix, push_insurance_banner_lead_to_matrix
+from ondoc.common.models import GenericNotes
+from ondoc.notification.models import EmailNotification
+from ondoc.notification.tasks import send_insurance_notifications, send_insurance_float_limit_notifications, send_insurance_endorsment_notifications
+from ondoc.insurance.tasks import push_insurance_buy_to_matrix
+from ondoc.notification.tasks import push_insurance_banner_lead_to_matrix
 import json
 
 from django.db import models, transaction
+from django.contrib.gis.db.models import PointField
+
 from django.db.models import Q
 import logging
 from ondoc.authentication import models as auth_model
@@ -26,10 +36,14 @@ from num2words import num2words
 from hardcopy import bytestring_to_pdf
 import math
 import reversion
-from ondoc.account.models import Order, Merchant, MerchantPayout
+import numbers
+from ondoc.account.models import Order, Merchant, MerchantPayout, PgTransaction, PayoutMapping
 from decimal import  *
+
 logger = logging.getLogger(__name__)
 from django.utils.functional import cached_property
+from ondoc.notification import tasks as notification_tasks
+from dateutil.relativedelta import relativedelta
 
 
 def generate_insurance_policy_number():
@@ -45,16 +59,19 @@ def generate_insurance_policy_number():
         raise ValueError('Sequence Produced is not valid.')
 
 
-def generate_insurance_insurer_policy_number(insurer_id):
-    if not insurer_id:
+def generate_insurance_insurer_policy_number(insurance_plan):
+    if not insurance_plan:
         raise Exception('Could not generate policy number according to the insurer.')
-    insurer = Insurer.objects.filter(id=insurer_id).first()
-    policy_number_data = InsurerPolicyNumber.objects.filter(insurer=insurer).order_by('-id').first()
-    if not policy_number_data:
+    master_policy_number = None
+    plan_policy_number_obj = InsurerPolicyNumber.objects.filter(insurance_plan=insurance_plan).order_by('-id').first()
+    if plan_policy_number_obj:
+        master_policy_number = plan_policy_number_obj.insurer_policy_number
+    else:
+        insurer_policy_number_obj = InsurerPolicyNumber.objects.filter(insurer=insurance_plan.insurer, insurance_plan__isnull=True).order_by(
+            '-id').first()
+        master_policy_number = insurer_policy_number_obj.insurer_policy_number
+    if not master_policy_number:
         raise Exception('Master Policy number is missing.')
-    master_policy_number = policy_number_data.insurer_policy_number
-    # master_policy_number = insurer.policy_number_history.policy_number.order_by('-created_at').first()
-    # master_policy_number = insurer.master_policy_number
     query = '''select nextval('userinsurance_policy_num_seq') as inc'''
     seq = RawSql(query, []).fetch_all()
     sequence = None
@@ -66,7 +83,6 @@ def generate_insurance_insurer_policy_number(insurer_id):
         return str(master_policy_number + '%.8d' % sequence)
     else:
         raise ValueError('Sequence Produced is not valid.')
-
 
 
 def generate_insurance_reciept_number():
@@ -132,6 +148,7 @@ class InsuranceOncologist:
                                                   user=user).count()
         if count >= int(settings.INSURANCE_ONCOLOGIST_LIMIT):
             error = "Oncologist limit exceeded of limit {}".format(settings.INSURANCE_ONCOLOGIST_LIMIT)
+        return count, error
 
 
 
@@ -148,14 +165,20 @@ class InsuranceDoctorSpecializations(object):
 
     @classmethod
     def get_doctor_insurance_specializations(cls, doctor):
-        from ondoc.doctor.models import DoctorPracticeSpecialization, OpdAppointment
+        from ondoc.doctor.models import Doctor, DoctorPracticeSpecialization, OpdAppointment
         all_gynecologist_list = set(json.loads(settings.GYNECOLOGIST_SPECIALIZATION_IDS))
         all_oncologist_list = set(json.loads(settings.ONCOLOGIST_SPECIALIZATION_IDS))
 
+        if isinstance(doctor, numbers.Number):
+            doctor = Doctor.objects.filter(id=doctor).first()
+
         result = False
         specialization = None
-        doctor_specialization_ids = DoctorPracticeSpecialization.objects.filter(doctor_id=doctor).values_list('specialization_id', flat=True)
-        doctor_specialization_ids_set = set(doctor_specialization_ids)
+
+        doctor_specialization_ids_set = set([x.specialization_id for x in doctor.doctorpracticespecializations.all()])
+        
+        # doctor_specialization_ids = DoctorPracticeSpecialization.objects.prefetch_.filter(doctor_id=doctor).values_list('specialization_id', flat=True)
+        # doctor_specialization_ids_set = set(doctor_specialization_ids)
         for specialiization_id in doctor_specialization_ids_set:
             if specialiization_id in all_gynecologist_list:
                 # self.doctor_specialization = InsuranceDoctorSpecializations.SpecializationMapping.GYNOCOLOGIST
@@ -238,6 +261,16 @@ class InsuranceCity(auth_model.TimeStampedModel):
     def __str__(self):
         return "{} ({})".format(self.city_code, self.city_name)
 
+    @classmethod
+    def get_city_code_with_name(cls, name):
+        if not name:
+            return None
+        city_obj = cls.objects.filter(city_name=name).first()
+        if not city_obj:
+            return None
+        city_code = city_obj.city_code
+        return city_code
+
     class Meta:
         db_table = "insurance_city"
 
@@ -251,6 +284,16 @@ class InsuranceDistrict(auth_model.TimeStampedModel):
 
     def __str__(self):
         return "{} ({})".format(self.district_code, self.district_name)
+
+    @classmethod
+    def get_district_code_with_name(cls, name):
+        if not name:
+            return None
+        district_obj = InsuranceDistrict.objects.filter(district_name=name).first()
+        if not district_obj:
+            return None
+        district_code = district_obj.district_code
+        return district_code
 
     class Meta:
         db_table = "insurance_district"
@@ -288,6 +331,10 @@ class Insurer(auth_model.TimeStampedModel, LiveMixin):
     def get_active_plans(self):
         return self.plans.filter(is_live=True).order_by('total_allowed_members')
 
+    @property
+    def get_all_plans(self):
+        return self.plans.all().order_by('total_allowed_members')
+
     def __str__(self):
         return self.name
 
@@ -298,18 +345,45 @@ class Insurer(auth_model.TimeStampedModel, LiveMixin):
 class InsurerAccount(auth_model.TimeStampedModel):
 
     insurer = models.ForeignKey(Insurer, related_name="float", on_delete=models.CASCADE)
+    apd_account_name = models.CharField(max_length=200, null=True, unique=True)
     current_float = models.PositiveIntegerField(default=None)
 
     def __str__(self):
-        return str(self.insurer)
+        return str(self.apd_account_name)
 
     class Meta:
         db_table = "insurer_account"
+
+class InsurerAccountTransfer(auth_model.TimeStampedModel):
+    from_account = models.ForeignKey(InsurerAccount, related_name="from_account", on_delete=models.CASCADE)
+    to_account = models.ForeignKey(InsurerAccount, related_name="to_account", on_delete=models.CASCADE)
+    amount = models.PositiveIntegerField(default=None)
+
+    class Meta:
+        db_table = "insurer_account_transfer"
+
+    def save(self, *args, **kwargs):
+        exists = True
+
+        if not self.id:
+            exists = False
+        super().save(*args, **kwargs)     
+
+        if not exists:
+            from_account = InsurerAccount.objects.select_for_update().get(id=self.from_account.id)
+            to_account = InsurerAccount.objects.select_for_update().get(id=self.to_account.id)
+            if from_account.current_float<self.amount:
+                raise Exception('amount cannot be greater then amount in source account')
+            from_account.current_float -= self.amount
+            to_account.current_float += self.amount
+            from_account.save()
+            to_account.save()
 
 
 class InsurancePlans(auth_model.TimeStampedModel, LiveMixin):
     insurer = models.ForeignKey(Insurer,related_name="plans", on_delete=models.CASCADE)
     name = models.CharField(max_length=100)
+    internal_name = models.CharField(max_length=200, null=True)
     amount = models.PositiveIntegerField(default=0)
     policy_tenure = models.PositiveIntegerField(default=1)
     adult_count = models.SmallIntegerField(default=0)
@@ -318,16 +392,31 @@ class InsurancePlans(auth_model.TimeStampedModel, LiveMixin):
     is_live = models.BooleanField(default=False)
     total_allowed_members = models.PositiveSmallIntegerField(default=0)
     is_selected = models.BooleanField(default=False)
+    plan_usages = JSONField(default=dict, null=True, blank=True)
 
     @property
     def get_active_threshold(self):
         return self.threshold.filter(is_live=True)
 
+    def get_policy_prefix(self):
+        insurer_policy_number = None
+        if self.plan_policy_number.first():
+            insurer_policy_number = self.plan_policy_number.first().insurer_policy_number
+        else :
+            insurer_policy_number_obj = InsurerPolicyNumber.objects.filter(insurer=self.insurer, insurance_plan__isnull=True).order_by(
+                '-id').first()
+            if insurer_policy_number_obj:
+                insurer_policy_number = insurer_policy_number_obj.insurer_policy_number
+
+        return insurer_policy_number
+
     def get_people_covered(self):
         return "%d adult, %d childs" % (self.adult_count, self.child_count)
 
     def __str__(self):
-        return self.name
+        if self.internal_name:            
+            return self.name+'('+self.internal_name+')'
+        return self.name    
 
     class Meta:
         db_table = "insurance_plans"
@@ -367,12 +456,16 @@ class InsuranceThreshold(auth_model.TimeStampedModel, LiveMixin):
         message = {}
         is_dob_valid = False
         # Calculate day difference between dob and current date
-        # current_date = datetime.datetime.now().date()
+
         current_date = timezone.now().date()
+        # days_diff = current_date - member['dob']
+        # days_diff = days_diff.days
+        # years_diff = days_diff / 365
+        # years_diff = math.ceil(years_diff)
+
+        years_diff = relativedelta(current_date, member['dob']).years
         days_diff = current_date - member['dob']
         days_diff = days_diff.days
-        years_diff = days_diff / 365
-        years_diff = math.ceil(years_diff)
         adult_max_age = self.max_age
         adult_min_age = self.min_age
         child_min_age = self.child_min_age
@@ -401,8 +494,63 @@ class InsuranceThreshold(auth_model.TimeStampedModel, LiveMixin):
         db_table = "insurance_threshold"
 
 
+class InsurerPolicyNumber(auth_model.TimeStampedModel):
+    insurer = models.ForeignKey(Insurer, related_name='policy_number_history', on_delete=models.DO_NOTHING, null=True, blank=True)
+    insurer_policy_number = models.CharField(max_length=50)
+    insurance_plan = models.ForeignKey(InsurancePlans, related_name='plan_policy_number', on_delete=models.DO_NOTHING, null=True, blank=True)
+    apd_account = models.ForeignKey(InsurerAccount, related_name='policy_apd_account', on_delete=models.DO_NOTHING, null=True, blank=True)
+
+    class Meta:
+        db_table = 'insurer_policy_numbers'
+
+    @cached_property
+    def insurer_account(self):
+        if self.apd_account:
+            return self.apd_account
+        return InsurerAccount.objects.order_by('id').first()
+
+
+class BankHolidays(auth_model.TimeStampedModel):
+    date = models.DateField(null=False, blank=False)
+
+    def __str__(self):
+        return str(self.date)
+
+    @classmethod
+    def is_holiday(cls, date):
+        return cls.objects.filter(date=date).exists() or date.weekday() in [6]
+
+    class Meta:
+        db_table = "bank_holidays"
+
+
 class UserInsurance(auth_model.TimeStampedModel):
     from ondoc.account.models import MoneyPool
+
+    ACTIVE = 1
+    CANCELLED = 2
+    EXPIRED = 3
+    ONHOLD = 4
+    CANCEL_INITIATE = 5
+    CANCELLATION_APPROVED = 6
+
+    REFUND = 1
+    NO_REFUND = 2
+
+    STATUS_CHOICES = [(ACTIVE, "Active"), (CANCELLED, "Cancelled"), (EXPIRED, "Expired"), (ONHOLD, "Onhold"),
+                      (CANCEL_INITIATE, 'Cancel Initiate'), (CANCELLATION_APPROVED, "Cancellation Approved")]
+    NON_REFUNDED = 1
+    REFUND_INITIATE = 2
+    REFUNDED = 3
+
+    FRAUD = 1
+    OTHER = 2
+    SELF = 1
+    ADMIN = 2
+    CANCEL_BY_CHOICES = [(SELF, "Self"), (ADMIN, "Admin")]
+    CANCEL_CUSTOMER_TYPE_CHOICES = [(FRAUD, "Fraud"), (OTHER, "Other")]
+    CANCEL_CASE_CHOICES = [(REFUND, "Refund"), (NO_REFUND, "Non-Refund")]
+    CANCEL_STATUS_CHOICES = [(NON_REFUNDED, "Non-Refunded"), (REFUND_INITIATE, "Refund-Initiate"), (REFUNDED, "Refunded")]
 
     id = models.BigAutoField(primary_key=True)
     insurance_plan = models.ForeignKey(InsurancePlans, related_name='active_users', on_delete=models.DO_NOTHING)
@@ -418,41 +566,205 @@ class UserInsurance(auth_model.TimeStampedModel):
     price_data = JSONField(blank=True, null=True)
     money_pool = models.ForeignKey(MoneyPool, on_delete=models.SET_NULL, null=True)
     matrix_lead_id = models.IntegerField(null=True)
+    status = models.PositiveIntegerField(choices=STATUS_CHOICES, default=ACTIVE)
     merchant_payout = models.ForeignKey(MerchantPayout, related_name="user_insurance", on_delete=models.DO_NOTHING, null=True)
+    cancel_reason = models.CharField(max_length=200, blank=True, null=True, default=None)
+    cancel_case_type = models.PositiveIntegerField(choices=CANCEL_CASE_CHOICES, default=REFUND)
+    master_policy_reference = models.ForeignKey(InsurerPolicyNumber, related_name='policy_reference', on_delete=models.DO_NOTHING, null=True)
+    premium_transferred = models.NullBooleanField(default=False)
+    cancel_status = models.PositiveIntegerField(choices=CANCEL_STATUS_CHOICES, default=NON_REFUNDED)
+    cancel_initial_date = models.DateTimeField(blank=True, null=True)
+    cancel_customer_type = models.PositiveIntegerField(choices=CANCEL_CUSTOMER_TYPE_CHOICES, default=OTHER)
+    cancel_initiate_by = models.PositiveIntegerField(choices=CANCEL_BY_CHOICES, null=True, blank=True)
+    notes = GenericRelation(GenericNotes)
 
     def __str__(self):
         return str(self.user)
 
+    @classmethod
+    def all_premiums_which_need_transfer(cls):
+        objs = cls.objects.filter(premium_transferred=False)
+        results = []
+        for obj in objs:
+            try:
+                if obj.needs_transfer_to_insurance_nodal():
+                    results.append(obj.id)
+                    print(results)
+            except Exception as e:
+                pass
+        print(results)
+
+    @property
+    def hours_elapsed(self):
+        hours = 0
+        current_datetime = timezone.now()
+        created_at = self.created_at
+
+        if not BankHolidays.is_holiday(created_at.date()):
+            temp_datetime = created_at + timedelta(days=1)
+            temp_datetime = temp_datetime.replace(hour=0, minute=0, second=0, microsecond=0)
+            hours += ((temp_datetime - created_at).total_seconds()) // 3600
+        else:
+            temp_datetime = created_at + timedelta(days=1)
+            temp_datetime = temp_datetime.replace(hour=0, minute=0, second=0, microsecond=0)
+
+        while temp_datetime.date() < current_datetime.date():
+            if not BankHolidays.is_holiday(temp_datetime.date()):
+                hours += 24
+
+            temp_datetime = temp_datetime + timedelta(days=1)
+
+        if not BankHolidays.is_holiday(current_datetime.date()):
+            hours += ((current_datetime - temp_datetime).total_seconds()) // 3600
+
+        return math.floor(hours)
+
+
+
+    @cached_property
+    def master_policy(self):
+
+        if self.master_policy_reference:
+            return self.master_policy_reference
+
+        policy = InsurerPolicyNumber.objects.\
+            filter(insurance_plan=self.insurance_plan,insurer=self.insurance_plan.insurer).order_by('-id').first()
+        if not policy:
+            policy = InsurerPolicyNumber.objects.\
+            filter(insurance_plan__isnull=True,insurer=self.insurance_plan.insurer).order_by('-id').first()
+
+        return policy
+
+    @cached_property
+    def specialization_days_limit(self):
+        plan_limits = self.insurance_plan.plan_usages
+        days = plan_limits.get('specialization_days_limit', 0)
+        return days
+
     def save(self, *args, **kwargs):
-        if not self.merchant_payout:
-            self.create_payout()
+        # if not self.merchant_payout:
+        #     self.create_payout()
         super().save(*args, **kwargs)
 
-    def create_payout(self):
-        if self.merchant_payout:
-            raise Exception("payout already created for this insurance purchase")
+    def process_payout(self):
+        cxn = transaction.get_connection()
+        if cxn.in_atomic_block:
+            raise Exception('this method should be run without transaction')
 
-        payout_data = {
-            "charged_amount" : self.premium_amount,
-            "payable_amount" : self.premium_amount,
-            "content_object" : self.insurance_plan.insurer,
-            "type"   : MerchantPayout.AUTOMATIC,
-            "paid_to"        : self.insurance_plan.insurer.merchant,
-            "booking_type"   : Order.INSURANCE_PRODUCT_ID
-        }
+        if self.premium_transferred:
+            return
 
-        merchant_payout = MerchantPayout.objects.create(**payout_data)
-        self.merchant_payout = merchant_payout
+        if self.hours_elapsed<48:
+            return
 
-    def save_payout(self):
-        self.create_payout()
-        self.save()
+        if not self.can_process_payout():
+            self.init_payout()
 
-    @classmethod
-    def generate_pending_payouts(cls):
-        bookings = cls.objects.filter(merchant_payout__isnull=True)
-        for booking in bookings:
-            booking.save_payout()
+        payout_status = True
+        if self.can_process_payout():
+            payouts = self.get_insurance_payouts()
+            for p in payouts:
+                payout_status = payout_status and p.process_insurance_premium_payout()
+                pass
+            if payout_status:
+                self.premium_transferred = True
+                self.save()
+
+    def can_process_payout(self):
+        #do we have payouts for complete premium
+        #do we have transaction for these payouts
+        premium = self.premium_amount
+        can_process = True
+        payout_premium = 0
+        payouts = self.get_insurance_payouts()
+        for p in payouts:
+            if not p.is_nodal_transfer():
+                payout_premium += p.payable_amount
+            elif not p.utr_no:
+                can_process = False
+            transactions = p.get_insurance_premium_transactions()
+            transaction = transactions[0] if transactions else None
+            if not transaction:
+                can_process = False
+        if payout_premium != premium:
+            can_process=False
+
+        return can_process
+
+    def init_payout(self):
+        transfer_status = False
+        nodal_payout = None
+        if self.needs_transfer_to_insurance_nodal():
+            transfer_status = self.transfer_to_insurance_nodal()
+            if transfer_status:
+                nodal_payout = self.get_insurance_nodal_transfer_payouts()
+                if len(nodal_payout)>1:
+                    raise Exception('multiple nodal transfer found')
+                elif len(nodal_payout)==0:
+                    raise Exception('no transfers found')
+                nodal_payout = nodal_payout[0]
+            if nodal_payout and nodal_payout.utr_no:
+                with transaction.atomic():
+                    payout = MerchantPayout()
+                    payout.charged_amount = nodal_payout.charged_amount
+                    payout.payable_amount = nodal_payout.payable_amount
+                    payout.content_object = self.insurance_plan.insurer
+                    payout.type = MerchantPayout.AUTOMATIC
+                    payout.paid_to = self.insurance_plan.insurer.merchant
+                    payout.booking_type = Order.INSURANCE_PRODUCT_ID
+                    payout.save()
+                    PayoutMapping.objects.create(**{'content_object': self, 'payout': payout})
+                txn = payout.get_or_create_insurance_premium_transaction()
+
+        amount = None
+        order = self.order
+
+        if order.amount>0 and order.wallet_amount>0:
+            amount = order.amount
+        if order.amount==0 and not self.needs_transfer_to_insurance_nodal():
+            amount = order.wallet_amount
+        if order.wallet_amount==0:
+            amount = order.amount        
+        if amount and amount>0:
+            if PayoutMapping.objects.filter(object_id=self.id, content_type_id=ContentType.objects.get_for_model(self).id, payout__payable_amount=amount).exists():
+                return
+            payout = MerchantPayout()
+            payout.charged_amount = amount
+            payout.payable_amount = amount
+            payout.content_object = self.insurance_plan.insurer
+            payout.type = MerchantPayout.AUTOMATIC
+            payout.paid_to = self.insurance_plan.insurer.merchant
+            payout.booking_type = Order.INSURANCE_PRODUCT_ID
+            with transaction.atomic():
+                payout.save()
+                PayoutMapping.objects.create(**{'content_object': self, 'payout': payout})
+
+    #
+    # def create_payout(self):
+    #     if self.merchant_payout:
+    #         raise Exception("payout already created for this insurance purchase")
+    #
+    #     payout_data = {
+    #         "charged_amount" : self.premium_amount,
+    #         "payable_amount" : self.premium_amount,
+    #         "content_object" : self.insurance_plan.insurer,
+    #         "type"   : MerchantPayout.AUTOMATIC,
+    #         "paid_to"        : self.insurance_plan.insurer.merchant,
+    #         "booking_type"   : Order.INSURANCE_PRODUCT_ID
+    #     }
+    #
+    #     merchant_payout = MerchantPayout.objects.create(**payout_data)
+    #     self.merchant_payout = merchant_payout
+
+    # def save_payout(self):
+    #     self.create_payout()
+    #     self.save()
+    #
+    # @classmethod
+    # def generate_pending_payouts(cls):
+    #     bookings = cls.objects.filter(merchant_payout__isnull=True)
+    #     for booking in bookings:
+    #         booking.save_payout()
 
     def get_primary_member_profile(self):
         insured_members = self.members.filter().order_by('id')
@@ -461,6 +773,9 @@ class UserInsurance(auth_model.TimeStampedModel):
             return proposers[0]
 
         return None
+
+    def get_members(self):
+        return InsuredMembers.objects.filter(user_insurance=self).all()
 
     @classmethod
     def get_user_insurance(cls, user):
@@ -598,7 +913,7 @@ class UserInsurance(auth_model.TimeStampedModel):
             'premium_in_words': ('%s rupees ' % num2words(self.premium_amount)).title() + "only",
             'proposer_name': proposer_name.title(),
             'proposer_address': '%s, %s, %s, %s, %d' % (proposer.address, proposer.town, proposer.district, proposer.state, proposer.pincode),
-            'proposer_mobile': proposer.phone_number,
+            'proposer_mobile': self.user.phone_number,
             'proposer_email': proposer.email,
             'intermediary_name': self.insurance_plan.insurer.intermediary_name,
             'intermediary_code': self.insurance_plan.insurer.intermediary_code,
@@ -653,7 +968,14 @@ class UserInsurance(auth_model.TimeStampedModel):
         db_table = "user_insurance"
 
     def is_valid(self):
-        if self.expiry_date >= timezone.now():
+        if self.expiry_date >= timezone.now() and self.status == self.ACTIVE:
+            return True
+        else:
+            return False
+
+    def is_profile_valid(self):
+        if self.expiry_date >= timezone.now() and (self.status == self.ACTIVE or self.status == self.ONHOLD or
+                                                       self.status == self.CANCEL_INITIATE):
             return True
         else:
             return False
@@ -793,8 +1115,9 @@ class UserInsurance(auth_model.TimeStampedModel):
     @classmethod
     def profile_create_or_update(cls, member, user):
         profile = {}
-        name = "{fname} {mname} {lname}".format(fname=member['first_name'], mname=member.get('middle_name', ''),
-                                                lname=member.get('last_name', ''))
+        m_name = member.get('middle_name') if member.get('middle_name') else ''
+        l_name = member.get('last_name') if member.get('last_name') else ''
+        name = "{fname} {mname} {lname}".format(fname=member['first_name'], mname=m_name, lname=l_name)
         if member['profile'] or UserProfile.objects.filter(name__iexact=name, user=user.id).exists():
             # Check whether Profile exist with same name
             existing_profile = UserProfile.objects.filter(name__iexact=name, user=user.id).first()
@@ -848,7 +1171,6 @@ class UserInsurance(auth_model.TimeStampedModel):
             # member['profile'] = member['profile'].id if member.get('profile') else None
         insurance_data['insured_members'] = members
 
-
         user_insurance_obj = UserInsurance.objects.create(insurance_plan=insurance_data['insurance_plan'],
                                                             user=insurance_data['user'],
                                                             insured_members=json.dumps(insurance_data['insured_members']),
@@ -856,17 +1178,32 @@ class UserInsurance(auth_model.TimeStampedModel):
                                                             expiry_date=insurance_data['expiry_date'],
                                                             premium_amount=insurance_data['premium_amount'],
                                                             order=insurance_data['order'],
-                                                            policy_number=generate_insurance_insurer_policy_number(insurer_id))
+                                                            policy_number=generate_insurance_insurer_policy_number(insurance_data['insurance_plan']),
+                                                            master_policy_reference=cls.get_master_policy_reference(insurance_data['insurance_plan']))
+
         insured_members = InsuredMembers.create_insured_members(user_insurance_obj)
         return user_insurance_obj
 
+    @classmethod
+    def get_master_policy_reference(cls, plan):
+        policy_number_obj = InsurerPolicyNumber.objects.filter(insurance_plan=plan).order_by('-id').first()
+        if not policy_number_obj:
+            return None
+        return policy_number_obj
+
     def validate_insurance(self, appointment_data):
+        from ondoc.doctor.models import OpdAppointment
+
         response_dict = {
             'is_insured': False,
             'insurance_id': None,
             'insurance_message': "",
             'doctor_specialization_dict': dict()
         }
+
+        # skip insurance check for COD appointments
+        if appointment_data.get('payment_type') == OpdAppointment.COD:
+            return response_dict
 
         profile = appointment_data.get('profile', None)
         user = profile.user
@@ -1121,12 +1458,268 @@ class UserInsurance(auth_model.TimeStampedModel):
         from ondoc.tracking.models import TrackingEvent
         try:
             with transaction.atomic():
-                event_data = TrackingEvent.build_event_data(self.user, TrackingEvent.InsurancePurchased, appointmentId=self.id)
+                event_data = TrackingEvent.build_event_data(self.user, TrackingEvent.InsurancePurchased, appointmentId=self.id, visitor_info=visitor_info)
                 if event_data and visitor_info:
                     TrackingEvent.save_event(event_name=event_data.get('event'), data=event_data, visit_id=visitor_info.get('visit_id'),
                                              user=self.user, triggered_at=datetime.datetime.utcnow())
         except Exception as e:
             logger.error("Could not save triggered event - " + str(e))
+
+    def process_cancellation(self):
+        from ondoc.doctor.models import OpdAppointment
+        from ondoc.diagnostic.models import LabAppointment
+        res = {}
+        # opd_appointment_count = OpdAppointment.get_insured_completed_appointment(self)
+        # lab_appointment_count = LabAppointment.get_insured_completed_appointment(self)
+        # if opd_appointment_count > 0 or lab_appointment_count > 0:
+        #     res['error'] = "One of the OPD or LAB Appointment have been completed, Cancellation could not be processed"
+        #     return res
+            # return Response(data=res, status=status.HTTP_400_BAD_REQUEST)
+        opd_active_appointment = OpdAppointment.get_insured_active_appointment(self)
+        lab_active_appointment = LabAppointment.get_insured_active_appointment(self)
+        for appointment in opd_active_appointment:
+            appointment.status = OpdAppointment.CANCELLED
+            appointment.save()
+        for appointment in lab_active_appointment:
+            appointment.status = LabAppointment.CANCELLED
+            appointment.save()
+        self.status = UserInsurance.CANCEL_INITIATE
+        self.cancel_initial_date = timezone.now()
+        self.save()
+
+        # send_cancellation_notification = True if self.user and hasattr(self, '_responsible_user') and self._responsible_user == self.user else None
+        send_cancellation_notification = True if self.user else False
+        transaction.on_commit(lambda: self.after_commit_task(send_cancellation_notification))
+        res['success'] = "Cancellation request received, refund will be credited in your account in 10-15 working days"
+        res['policy_number'] = self.policy_number
+        return res
+
+    def after_commit_task(self, send_cancellation_notification):
+        if self.status == UserInsurance.CANCEL_INITIATE:
+            try:
+                # notification_tasks.send_insurance_cancellation.apply_async(self.id)
+                if send_cancellation_notification:
+                    # pass
+                    send_insurance_notifications.apply_async(({'user_id': self.user.id, 'status': self.status}, ))
+            except Exception as e:
+                logger.error(str(e))
+
+    def get_insurance_appointment_stats(self):
+        from ondoc.doctor.models import OpdAppointment
+        from ondoc.diagnostic.models import LabAppointment
+
+        total_opd_stats = {'count': 0, 'sum': 0} #OpdAppointment.get_insurance_usage(self)
+        today_opd_stats = {'count': 0, 'sum': 0} #OpdAppointment.get_insurance_usage(self, timezone.now().date())
+
+        total_lab_stats = LabAppointment.get_insurance_usage(self)
+        today_lab_stats = LabAppointment.get_insurance_usage(self, timezone.now().date())
+
+        data = {
+            'used_ytd_count': total_opd_stats['count'] + total_lab_stats['count'],
+            'used_ytd_amount': total_opd_stats['sum'] + total_lab_stats['sum'],
+            'used_daily_count': today_opd_stats['count'] + today_lab_stats['count'],
+            'used_daily_amount': today_opd_stats['sum'] + today_lab_stats['sum']
+        }
+
+        return data
+
+    def validate_limit_usages(self, tests_amount):
+        from ondoc.prescription.models import AppointmentPrescription
+        response = {
+            'prescription_needed': False,
+            'created_state': False
+        }
+        plan_usages = self.insurance_plan.plan_usages
+        ytd_count = plan_usages.get('ytd_count', None)
+        ytd_amount = plan_usages.get('ytd_amount', None)
+        daily_count = plan_usages.get('daily_count', None)
+        daily_amount = plan_usages.get('daily_amount', None)
+
+        insurance_appointment_stats = self.get_insurance_appointment_stats()
+
+        if ytd_count and insurance_appointment_stats['used_ytd_count'] + 1 > ytd_count:
+            response['created_state'] = True
+        elif ytd_amount and insurance_appointment_stats['used_ytd_amount'] + tests_amount > ytd_amount:
+            response['created_state'] = True
+        elif daily_amount and insurance_appointment_stats['used_daily_amount'] + tests_amount > daily_amount:
+            response['created_state'] = True
+        elif daily_count and insurance_appointment_stats['used_daily_count'] + 1 > daily_count:
+            response['created_state'] = True
+
+        if response['created_state'] and not AppointmentPrescription.prescription_exist_for_date(self.user, timezone.now().date()):
+            response['prescription_needed'] = True
+
+        return response
+
+    # @classmethod
+    # def process_payouts(cls):
+    #     insurance_list = cls.objects.filter(
+    #         merchant_payout__status__in=[MerchantPayout.PENDING, MerchantPayout.ATTEMPTED, MerchantPayout.AUTOMATIC])
+    #     for insurance in insurance_list:
+    #         insurance.process_insurance_obj_payouts()
+
+    def transfer_to_insurance_nodal(self):
+        status = False
+        if self.needs_transfer_to_insurance_nodal():
+            nodal_payout = self.get_insurance_nodal_transfer_payouts()
+            if nodal_payout:
+                nodal_payout = nodal_payout[0]
+            else:
+                merchant = Merchant.objects.filter(id=settings.DOCPRIME_NODAL2_MERCHANT).first()
+                payout_data = {
+                "charged_amount": self.order.wallet_amount,
+                "payable_amount": self.order.wallet_amount,
+                #"content_object": self.insurance_plan.insurer,
+                "type": MerchantPayout.AUTOMATIC,
+                "paid_to": merchant,
+                "booking_type": Order.INSURANCE_PRODUCT_ID
+                }
+                with transaction.atomic():
+                    nodal_payout = MerchantPayout.objects.create(**payout_data)
+                    PayoutMapping.objects.create(**{'content_object':self,'payout':nodal_payout})
+
+            txn = nodal_payout.get_insurance_premium_transactions()
+            if txn:
+                txn = txn[0]
+            else:
+                txn = nodal_payout.get_or_create_insurance_premium_transaction()
+
+            if txn:
+                status = nodal_payout.process_insurance_premium_payout()
+
+            return status
+
+    def get_insurance_payouts(self):
+        results = []
+        pms = PayoutMapping.objects.filter(object_id=self.id, content_type_id=ContentType.objects.get_for_model(self).id)
+        for pm in pms:
+            results.append(pm.payout)
+        return results
+
+
+    def get_insurance_nodal_transfer_payouts(self):
+        docprime_merchant = Merchant.objects.filter(id=settings.DOCPRIME_NODAL2_MERCHANT).first()
+        results = []
+        payouts = self.get_insurance_payouts()
+        for p in payouts:
+            if p.paid_to == docprime_merchant:
+                results.append(p)
+        return results
+
+    def needs_transfer_to_insurance_nodal(self):
+        order = self.order
+        wallet_amount = order.wallet_amount
+        premium_amount = self.premium_amount
+        response = None
+        pg_transactions = PgTransaction.objects.filter(product_id=Order.INSURANCE_PRODUCT_ID, user=self.user)
+        if not wallet_amount:
+            return False
+        if wallet_amount and not pg_transactions:
+            return True
+
+        order_ids = []
+        uis = UserInsurance.objects.filter(user = self.user).exclude(id=self.id)
+        for ui in uis:
+            order_ids.append(ui.order_id)
+        if order_ids:
+            pg_transactions = pg_transactions.exclude(order_id__in=order_ids)
+
+
+        if wallet_amount == premium_amount:
+            if len(pg_transactions) == 1 and pg_transactions.first().amount == wallet_amount:
+                response = False
+        elif wallet_amount != premium_amount:
+            pg_amount = premium_amount - wallet_amount
+            if len(pg_transactions) == 1 and pg_transactions.first().amount == pg_amount:
+                response = True
+
+        if response==None:
+            raise Exception('transfer not possible. Handle manually')
+
+        return response
+        # DummyTransactions.objects.filter(reference_id = self.id,product_id=3, transaction_type=DummyTransactions.INSURANCE_NODAL_TRANSFER)
+        #     response=Fa
+
+    # @classmethod
+    # def transfer_insurance_amount(cls):
+    #     from ondoc.account.models import PgTransaction
+    #     insurances = UserInsurance.objects.all()
+    #     for ins in insurances:
+    #         order = ins.order
+    #         wallet_amount = order.wallet_amount
+    #         premium_amount = ins.premium_amount
+    #         pg_transactions = PgTransaction.objects.filter(product_id=Order.INSURANCE_PRODUCT_ID, user=ins.user)
+    #         if wallet_amount>0 and wallet_amount!=premium_amount:
+    #             pg_amount = ins.premium_amount - wallet_amount
+
+    #             if len(pg_transactions) == 1 and pg_transactions.first().amount == pg_amount:
+
+    #                 #paid_to nodal2 merchant
+    #                 paid_to = None
+    #                 payout_data = {
+    #                     "charged_amount": wallet_amount,
+    #                     "payable_amount": wallet_amount,
+    #                     "content_object": ins.insurance_plan.insurer,
+    #                     "type": MerchantPayout.AUTOMATIC,
+    #                     "paid_to": paid_to,
+    #                     "booking_type": Order.INSURANCE_PRODUCT_ID
+    #                 }
+
+    #                 merchant_payout_obj = MerchantPayout.objects.create(**payout_data)
+
+
+    # def process_insurance_obj_payouts(self):
+    #     from ondoc.account.models import PgTransaction
+
+    #     order = self.order
+    #     merchant_payout_obj = self.merchant_payout
+    #     user = self.user
+
+    #     if merchant_payout_obj.status not in [MerchantPayout.PENDING, MerchantPayout.ATTEMPTED,
+    #                                           MerchantPayout.AUTOMATIC]:
+    #         return
+
+    #     # Directly Paid from the Pg as no wallet amount is used.
+    #     if not order.wallet_amount or order.wallet_amount == Decimal(0):
+    #         merchant_payout_obj.process_payout = True
+    #         merchant_payout_obj.save()
+
+    #     elif order.wallet_amount and order.wallet_amount == self.premium_amount:
+    #         pg_transactions = PgTransaction.objects.filter(product_id=Order.INSURANCE_PRODUCT_ID, user=user)
+
+    #         # Order not processed but payment sucess and same wallet amount used next time.
+    #         if len(pg_transactions) == 1 and pg_transactions.first():
+    #             pass
+
+    #one time required only. Not to be used. Only for reference
+    @classmethod
+    def transfer_to_nodal_if_required(cls):
+        # cxn = transaction.get_connection()
+        # if cxn.in_atomic_block:
+        #     print('in transaction')
+        # return
+
+        objs = cls.objects.filter(id__in=[])
+        counter = 0
+        for obj in objs:
+            with transaction.atomic():
+                try:
+                    counter+=1
+                    print(str(counter))
+                    if obj.needs_transfer_to_insurance_nodal():
+                        obj.transfer_to_insurance_nodal()
+                        print(str(obj.id))
+                except Exception as e:
+                    print(e)
+
+    def is_bank_details_exist(self):
+        bank_obj = UserBank.objects.filter(insurance=self).order_by('-id').first()
+        # bank_document_obj = UserBankDocument.objects.filter(insurance=self).order_by('-id').first()
+        # if bank_obj and bank_document_obj:
+        if bank_obj:
+            return True
+        else:
+            return False
 
 
 class InsuranceTransaction(auth_model.TimeStampedModel):
@@ -1147,6 +1740,12 @@ class InsuranceTransaction(auth_model.TimeStampedModel):
     reason = models.PositiveSmallIntegerField(null=True, choices=REASON_CHOICES)
 
     def after_commit_tasks(self):
+
+        # Trigger Email if insurer account current float get lower.
+        insurer_account = InsurerAccount.objects.filter(id=self.account.id).first()
+        if insurer_account.current_float < self.account.insurer.min_float:
+            send_insurance_float_limit_notifications.apply_async(({'insurer_id': self.account.insurer.id},))
+
         if self.transaction_type == InsuranceTransaction.DEBIT:
             try:
                 self.user_insurance.generate_pdf()
@@ -1167,7 +1766,12 @@ class InsuranceTransaction(auth_model.TimeStampedModel):
         if self.transaction_type == self.DEBIT:
             transaction_amount = -1*transaction_amount
 
-        insurer_account = InsurerAccount.objects.select_for_update().get(insurer=self.user_insurance.insurance_plan.insurer)
+        # master_policy_obj = self.user_insurance.master_policy_reference
+        # account_id = master_policy_obj.apd_account.id
+        master_policy_obj = self.user_insurance.master_policy
+        account_id = master_policy_obj.insurer_account.id
+        # insurer_account = InsurerAccount.objects.select_for_update().get(insurer=self.user_insurance.insurance_plan.insurer)
+        insurer_account = InsurerAccount.objects.select_for_update().get(id=account_id)
         insurer_account.current_float += transaction_amount        
         insurer_account.save()
 
@@ -1175,7 +1779,7 @@ class InsuranceTransaction(auth_model.TimeStampedModel):
 
     class Meta:
         db_table = "insurance_transaction"
-        unique_together = (("user_insurance", "account", "transaction_type"),)
+        #unique_together = (("user_insurance", "account", "transaction_type"),)
 
 
 class InsuredMembers(auth_model.TimeStampedModel):
@@ -1214,8 +1818,10 @@ class InsuredMembers(auth_model.TimeStampedModel):
     town = models.CharField(max_length=100, null=False)
     district = models.CharField(max_length=100, null=False)
     state = models.CharField(max_length=100, null=False)
-    state_code = models.CharField(max_length=10, null=True)
+    state_code = models.CharField(max_length=10, default='')
     user_insurance = models.ForeignKey(UserInsurance, related_name="members", on_delete=models.DO_NOTHING, null=False)
+    city_code = models.CharField(max_length=10, blank=True, null=True, default='')
+    district_code = models.CharField(max_length=10, blank=True, null=True, default='')
 
     class Meta:
         db_table = "insured_members"
@@ -1229,6 +1835,26 @@ class InsuredMembers(auth_model.TimeStampedModel):
         proposer_name = '%s %s %s %s' % (self.title, proposer_fname, proposer_mname, proposer_lname)
         proposer_name = " ".join(proposer_name.split())
         return proposer_name
+
+    def update_member(self, endorsed_data):
+        self.first_name = endorsed_data.first_name
+        self.middle_name = endorsed_data.middle_name
+        self.last_name = endorsed_data.last_name
+        self.title = endorsed_data.title
+        self.dob = endorsed_data.dob
+        self.email = endorsed_data.email
+        self.relation = endorsed_data.relation
+        self.address = endorsed_data.address
+        self.state = endorsed_data.state
+        self.state_code = endorsed_data.state_code
+        self.gender = endorsed_data.gender
+        self.phone_number = endorsed_data.phone_number
+        self.town = endorsed_data.town
+        self.district = endorsed_data.district
+        self.city_code = endorsed_data.city_code
+        self.district_code = endorsed_data.district_code
+        self.pincode = endorsed_data.pincode
+        self.save()
 
     @classmethod
     def create_insured_members(cls, user_insurance):
@@ -1252,8 +1878,17 @@ class InsuredMembers(auth_model.TimeStampedModel):
                                                                         district=member.get('district'),
                                                                         state=member.get('state'),
                                                                         state_code = member.get('state_code'),
-                                                                        user_insurance=user_insurance
+                                                                        user_insurance=user_insurance,
+                                                                        city_code=member.get('city_code'),
+                                                                        district_code=member.get('district_code')
                                                                         )
+
+    def is_document_available(self):
+        document_obj = InsuredMemberDocument.objects.filter(member=self, document_image__isnull=False).first()
+        if document_obj:
+            return True
+        else:
+            return False
 
 
 class Insurance(auth_model.TimeStampedModel):
@@ -1272,6 +1907,7 @@ class InsuranceDisease(auth_model.TimeStampedModel):
     disease = models.CharField(max_length=100)
     enabled = models.BooleanField()
     is_live = models.BooleanField()
+    is_female_related = models.BooleanField(default=False)
 
     class Meta:
         db_table = "insurance_disease"
@@ -1289,12 +1925,49 @@ class InsuranceDiseaseResponse(auth_model.TimeStampedModel):
 class InsuranceLead(auth_model.TimeStampedModel):
     matrix_lead_id = models.IntegerField(null=True)
     extras = JSONField(default={})
-    user = models.ForeignKey(User, on_delete=models.CASCADE)
+    user = models.ForeignKey(User, on_delete=models.CASCADE, null=True, blank=True)
+    phone_number = models.BigIntegerField(blank=True, null=True, validators=[MaxValueValidator(9999999999), MinValueValidator(1000000000)])
 
     def save(self, *args, **kwargs):
         super().save(*args, **kwargs)
+        transaction.on_commit(lambda: self.after_commit())
 
-        push_insurance_banner_lead_to_matrix.apply_async(({'id': self.id}, ), countdown=10)
+    def after_commit(self):
+        lat = self.extras.get('latitude', None)
+        long = self.extras.get('longitude', None)
+
+        city_name = InsuranceEligibleCities.get_nearest_city(lat, long)
+        if not lat or not long or city_name:
+            countdown = self.get_lead_creation_wait_time()
+            #print(str(countdown))
+            push_insurance_banner_lead_to_matrix.apply_async(({'id': self.id}, ),countdown=countdown)
+
+    # get seconds elapsed since creation time
+    def get_creation_time_diff(self):
+        now = datetime.datetime.utcnow().replace(tzinfo=utc)
+        timediff = now - self.created_at
+        return timediff.total_seconds()
+
+    def get_lead_creation_wait_time(self):
+        source = self.get_source()
+        if source!='docprimechat':
+            return 0
+        tdiff = self.get_creation_time_diff()
+        wait = 86400 - tdiff
+        if wait<0:
+            wait=0
+        return wait
+
+    def get_source(self):
+        extras = self.extras
+        lead_source = "InsuranceOPD"
+        lead_data = extras.get('lead_data')
+        if lead_data:
+            provided_lead_source = lead_data.get('source')
+            if type(provided_lead_source).__name__ == 'str' and provided_lead_source.lower() == 'docprimechat':
+                lead_source = 'docprimechat'
+
+        return lead_source
 
     @classmethod
     def get_latest_lead_id(cls, user):
@@ -1303,6 +1976,20 @@ class InsuranceLead(auth_model.TimeStampedModel):
             return insurance_lead.matrix_lead_id
 
         return None
+
+    @classmethod
+    def create_lead_by_phone_number(cls, request):
+        phone_number = request.data.get('phone_number', None)
+        if not phone_number:
+            return None
+
+        user_insurance_lead = InsuranceLead.objects.filter(phone_number=phone_number).order_by('id').last()
+        if not user_insurance_lead:
+            user_insurance_lead = InsuranceLead(phone_number=phone_number)
+
+        user_insurance_lead.extras = request.data
+        user_insurance_lead.save()
+        return True
 
     class Meta:
         db_table = 'insurance_leads'
@@ -1320,25 +2007,324 @@ class InsuranceDeal(auth_model.TimeStampedModel):
         db_table = 'insurance_deals'
 
 
-class InsurerPolicyNumber(auth_model.TimeStampedModel):
-    insurer = models.ForeignKey(Insurer, related_name='policy_number_history', on_delete=models.DO_NOTHING)
-    insurer_policy_number = models.CharField(max_length=50)
-
-    class Meta:
-        db_table = 'insurer_policy_numbers'
-
-
 class InsuranceDummyData(auth_model.TimeStampedModel):
+    BOOKING = 1
+    ENDORSEMENT = 2
+    TYPE_CHOICES = [(BOOKING, "Booking"), (ENDORSEMENT, "Endorsement")]
     user = models.ForeignKey(User, related_name='user_insurance_dummy_data', on_delete=models.DO_NOTHING)
     data = JSONField(null=True, blank=True)
+    type = models.PositiveIntegerField(choices=TYPE_CHOICES, default=BOOKING)
 
     class Meta:
         db_table = 'insurance_dummy_data'
 
 
-# class InsuranceReport(UserInsurance):
-#
-#     class Meta:
-#         proxy = True
+class InsuranceCancelMaster(auth_model.TimeStampedModel):
+    insurer = models.ForeignKey(Insurer, related_name='insurance_cancel_master', on_delete=models.DO_NOTHING)
+    min_days = models.PositiveIntegerField(default=0)
+    max_days = models.PositiveIntegerField(default=0)
+    refund_percentage = models.PositiveIntegerField(default=0)
+
+    class Meta:
+        db_table = 'insurance_cancel_master'
 
 
+class InsuranceMIS(auth_model.TimeStampedModel):
+    class AttachmentType(Choices):
+        USER_INSURANCE_DOCTOR_RESOURCE = "USER_INSURANCE_DOCTOR_RESOURCE"
+        USER_INSURANCE_LAB_RESOURCE = "USER_INSURANCE_LAB_RESOURCE"
+        USER_INSURANCE_RESOURCE = "USER_INSURANCE_RESOURCE"
+        INSURED_MEMBERS_RESOURCE = "INSURED_MEMBERS_RESOURCE"
+        ALL_MIS_ZIP = "ALL_MIS_ZIP"
+
+    attachment_type = models.CharField(max_length=100, null=False, blank=False, choices=AttachmentType.as_choices())
+    attachment_file = models.FileField(default=None, null=True, upload_to='insurance/mis', validators=[FileExtensionValidator(allowed_extensions=['zip' ,'pdf', 'xls', 'xlsx'])])
+
+    class Meta:
+        db_table = 'insurance_mis'
+
+
+class InsuranceCoveredEntity(auth_model.TimeStampedModel):
+
+    entity_id = models.PositiveIntegerField()
+    name = models.CharField(max_length=1000)
+    location = PointField(geography=True, srid=4326, blank=True, null=True)
+    type = models.CharField(max_length=50)
+    search_key = models.CharField(max_length=1000, null=True, blank=True)
+    data = JSONField(null=True, blank=True)
+    specialization_search_key = models.CharField(max_length=1000, null=True, blank=True)
+
+    class Meta:
+        db_table = 'insurance_covered_entity'
+
+
+class EndorsementRequest(auth_model.TimeStampedModel):
+    MALE = 'm'
+    FEMALE = 'f'
+    OTHER = 'o'
+    GENDER_CHOICES = [(MALE, 'Male'), (FEMALE, 'Female'), (OTHER, 'Other')]
+    SELF = 'self'
+    SPOUSE = 'spouse'
+    SON = 'son'
+    DAUGHTER = 'daughter'
+    RELATION_CHOICES = [(SPOUSE, 'Spouse'), (SON, 'Son'), (DAUGHTER, 'Daughter'), (SELF, 'Self')]
+    ADULT = "adult"
+    CHILD = "child"
+    MEMBER_TYPE_CHOICES = [(ADULT, 'adult'), (CHILD, 'child')]
+    MR = 'mr.'
+    MISS = 'miss'
+    MRS = 'mrs.'
+    MAST = 'mast.'
+    PENDING = 1
+    APPROVED = 2
+    REJECT = 3
+    PARTIAL_APPROVED=4
+    STATUS_CHOICES = [(PENDING, "Pending"), (APPROVED, "Approved"), (REJECT, "Reject")]
+    TITLE_TYPE_CHOICES = [(MR, 'mr.'), (MRS, 'mrs.'), (MISS, 'miss'), (MAST, 'mast.')]
+    MAIL_PENDING = 1
+    MAIL_SENT = 2
+    MAIL_STATUS_CHOICES = [(MAIL_PENDING, "Mail Pending"), (MAIL_SENT, "Mail Sent")]
+    member = models.ForeignKey(InsuredMembers, related_name='related_endorse_request', on_delete=models.DO_NOTHING)
+    insurance = models.ForeignKey(UserInsurance, related_name='endorse_members', on_delete=models.DO_NOTHING)
+    first_name = models.CharField(max_length=50, null=False)
+    last_name = models.CharField(max_length=50, null=True)
+    dob = models.DateField(blank=False, null=False)
+    email = models.EmailField(max_length=100, null=True)
+    relation = models.CharField(max_length=50, choices=RELATION_CHOICES, default=None)
+    pincode = models.PositiveIntegerField(default=None)
+    address = models.TextField(default=None)
+    gender = models.CharField(max_length=50, choices=GENDER_CHOICES, default=None)
+    phone_number = models.BigIntegerField(blank=True, null=True,
+                                          validators=[MaxValueValidator(9999999999), MinValueValidator(1000000000)])
+    profile = models.ForeignKey(auth_model.UserProfile, related_name="endorsement_insurance", on_delete=models.SET_NULL, null=True)
+    title = models.CharField(max_length=20, choices=TITLE_TYPE_CHOICES, default=None)
+    middle_name = models.CharField(max_length=50, null=True)
+    town = models.CharField(max_length=100, null=False)
+    district = models.CharField(max_length=100, null=False)
+    state = models.CharField(max_length=100, null=False)
+    state_code = models.CharField(max_length=10, default='')
+    status = models.PositiveIntegerField(choices=STATUS_CHOICES, default=PENDING)
+    mail_status = models.PositiveIntegerField(choices=MAIL_STATUS_CHOICES, blank=True, null=True)
+    city_code = models.CharField(max_length=10, default='')
+    district_code = models.CharField(max_length=10, default='')
+    member_type = models.CharField(max_length=20, choices=MEMBER_TYPE_CHOICES, default=ADULT)
+    mail_coi_to_customer = models.NullBooleanField(default=False)
+    reject_reason = models.CharField(max_length=150, blank=True, null=True)
+
+    @classmethod
+    def is_endorsement_exist(cls, member_obj):
+        endorsement_request = cls.objects.filter(member=member_obj, status=EndorsementRequest.PENDING).first()
+        if endorsement_request:
+            return True
+        else:
+            return False
+
+    @classmethod
+    def process_endorsment_notifications(cls, status, user):
+        user_id = user.id
+        send_insurance_endorsment_notifications.apply_async(({'user_id': user_id, 'endorsment_status': status}, ))
+
+
+    @classmethod
+    def create(cls, endorsed_member):
+        del endorsed_member['is_change']
+        del endorsed_member['image_ids']
+        insured_member = InsuredMembers.objects.filter(id=endorsed_member.get('member_id')).first()
+        if not insured_member:
+            raise Exception('Insured Member not found')
+        InsuredMemberHistory.create_member(insured_member)
+        end_obj = EndorsementRequest.objects.create(**endorsed_member)
+        return end_obj
+
+    def process_endorsement(self):
+        insured_member = self.member
+        # InsuredMemberHistory.create_member(insured_member)
+        insured_member.update_member(self)
+        profile = self.member.profile
+        profile.update_profile_post_endorsement(self)
+
+    def is_endorsement_complete(self):
+        user_insurance = self.insurance
+        if user_insurance.endorse_members.filter(status=EndorsementRequest.PENDING).first():
+            return False
+        else:
+            return True
+
+    def process_coi(self):
+        user_insurance = self.insurance
+        if not user_insurance:
+            logger.error('User Insurance not found for the endorsment request with id %d' % self.id)
+            return
+        # endorsement_members = user_insurance.endorse_members.all()
+        endorsement_members = user_insurance.endorse_members.filter(Q(mail_status=EndorsementRequest.MAIL_PENDING) |
+                                                                                Q(mail_status__isnull=True))
+        total_endorsement_members = endorsement_members.count()
+        endorsement_rejected_members_count = user_insurance.endorse_members.filter((Q(mail_status=EndorsementRequest.MAIL_PENDING) | Q(mail_status__isnull=True)), Q(status=EndorsementRequest.REJECT)).count()
+        if total_endorsement_members == endorsement_rejected_members_count:
+            return
+
+        endorsed_members_count = user_insurance.endorse_members.filter((Q(mail_status=EndorsementRequest.MAIL_PENDING) | Q(mail_status__isnull=True)), ~Q(status=EndorsementRequest.PENDING)).count()
+        endorsed_approved_members_count = user_insurance.endorse_members.filter((Q(mail_status=EndorsementRequest.MAIL_PENDING) | Q(mail_status__isnull=True)), Q(status=EndorsementRequest.APPROVED)).count()
+        if total_endorsement_members == endorsed_approved_members_count:
+            try:
+                user_insurance.generate_pdf()
+                EndorsementRequest.process_endorsment_notifications(EndorsementRequest.APPROVED, user_insurance.user)
+            except Exception as e:
+                logger.error('Insurance coi pdf cannot be generated. %s' % str(e))
+
+            return
+
+        if total_endorsement_members == endorsed_members_count:
+            try:
+                user_insurance.generate_pdf()
+                EndorsementRequest.process_endorsment_notifications(EndorsementRequest.PARTIAL_APPROVED, user_insurance.user)
+            except Exception as e:
+                logger.error('Insurance coi pdf cannot be generated. %s' % str(e))
+        pending_members = user_insurance.endorse_members.filter(Q(mail_status=EndorsementRequest.MAIL_PENDING) |
+                                                              Q(mail_status__isnull=True))
+        for member in pending_members:
+            member.mail_status = EndorsementRequest.MAIL_SENT
+            member.save()
+
+    def reject_endorsement(self):
+        user_insurance = self.insurance
+        if not user_insurance:
+            logger.error('User Insurance not found for the endorsment request with id %d' % self.id)
+            return
+        endorsment_members = user_insurance.endorse_members.all()
+        total_endorsment_members = endorsment_members.count()
+        endorment_rejected_members_count = user_insurance.endorse_members.filter(status=EndorsementRequest.REJECT).count()
+
+        if total_endorsment_members == endorment_rejected_members_count:
+            EndorsementRequest.process_endorsment_notifications(EndorsementRequest.REJECT, user_insurance.user)
+
+    class Meta:
+        db_table = 'insurance_endorsement'
+
+
+class InsuredMemberDocument(auth_model.TimeStampedModel):
+    member = models.ForeignKey(InsuredMembers, related_name='related_document', on_delete=models.DO_NOTHING)
+    # document_image = models.ImageField(upload_to='users/images', height_field=None, width_field=None, blank=True, null=True)
+    document_image = models.FileField(upload_to='users/images', blank=False, null=False, validators=[
+        FileExtensionValidator(allowed_extensions=['pdf', 'jpg', 'jpeg', 'png'])])
+    is_enabled = models.BooleanField(default=False)
+    endorsement_request = models.ForeignKey(EndorsementRequest, related_name='member_documents', null=True, on_delete=models.DO_NOTHING)
+
+    class Meta:
+        db_table = 'insured_member_document'
+
+
+class InsuredMemberHistory(auth_model.TimeStampedModel):
+    MALE = 'm'
+    FEMALE = 'f'
+    OTHER = 'o'
+    GENDER_CHOICES = [(MALE, 'Male'), (FEMALE, 'Female'), (OTHER, 'Other')]
+    SELF = 'self'
+    SPOUSE = 'spouse'
+    SON = 'son'
+    DAUGHTER = 'daughter'
+    RELATION_CHOICES = [(SPOUSE, 'Spouse'), (SON, 'Son'), (DAUGHTER, 'Daughter'), (SELF, 'Self')]
+    ADULT = "adult"
+    CHILD = "child"
+    MEMBER_TYPE_CHOICES = [(ADULT, 'adult'), (CHILD, 'child')]
+    MR = 'mr.'
+    MISS = 'miss'
+    MRS = 'mrs.'
+    MAST = 'mast.'
+    TITLE_TYPE_CHOICES = [(MR, 'mr.'), (MRS, 'mrs.'), (MISS, 'miss'), (MAST, 'mast.')]
+    # insurer = models.ForeignKey(Insurer, on_delete=models.DO_NOTHING)
+    # insurance_plan = models.ForeignKey(InsurancePlans, on_delete=models.DO_NOTHING)
+    member = models.ForeignKey(InsuredMembers, related_name='member_history', on_delete=models.DO_NOTHING, null=True)
+    first_name = models.CharField(max_length=50, null=False)
+    last_name = models.CharField(max_length=50, null=True)
+    dob = models.DateField(blank=False, null=False)
+    email = models.EmailField(max_length=100, null=True)
+    relation = models.CharField(max_length=50, choices=RELATION_CHOICES, default=None)
+    pincode = models.PositiveIntegerField(default=None)
+    address = models.TextField(default=None)
+    gender = models.CharField(max_length=50, choices=GENDER_CHOICES, default=None)
+    phone_number = models.BigIntegerField(blank=True, null=True,
+                                          validators=[MaxValueValidator(9999999999), MinValueValidator(1000000000)])
+    profile = models.ForeignKey(auth_model.UserProfile, related_name="history_insurance", on_delete=models.SET_NULL, null=True)
+    title = models.CharField(max_length=20, choices=TITLE_TYPE_CHOICES, default=None)
+    middle_name = models.CharField(max_length=50, null=True)
+    town = models.CharField(max_length=100, null=False)
+    district = models.CharField(max_length=100, null=False)
+    state = models.CharField(max_length=100, null=False)
+    state_code = models.CharField(max_length=10, default='')
+    user_insurance = models.ForeignKey(UserInsurance, related_name="history_members", on_delete=models.DO_NOTHING, null=False)
+    city_code = models.CharField(max_length=10, blank=True, null=True, default='')
+    district_code = models.CharField(max_length=10, blank=True, null=True, default='')
+
+    @classmethod
+    def create_member(cls, member):
+        cls.objects.create(member=member, first_name=member.first_name, middle_name=member.middle_name,
+                           last_name=member.last_name, dob=member.dob, email=member.email, relation=member.relation,
+                           pincode=member.pincode, address=member.address, gender=member.gender,
+                           phone_number=member.phone_number, profile=member.profile, title=member.title,
+                           town=member.town, district=member.district, state=member.state, state_code=member.state_code,
+                           user_insurance=member.user_insurance, city_code=member.city_code,
+                           district_code=member.district_code)
+
+    class Meta:
+        db_table = "insured_member_history"
+
+
+class InsuranceEligibleCities(auth_model.TimeStampedModel):
+
+    Radius = 50
+
+    name = models.CharField(max_length=100, blank=False, null=False)
+    latitude = models.DecimalField(null=False, max_digits=11, decimal_places=8)
+    longitude = models.DecimalField(null=False, max_digits=11, decimal_places=8)
+
+    @classmethod
+    def get_nearest_city(cls, latitude, longitude):
+        if not latitude or not longitude:
+            return None
+
+        providing_cities = cls.objects.all()
+
+        pnt1 = Point(float(longitude), float(latitude))
+
+        for insurance_city in providing_cities:
+            try:
+                pnt2 = Point(float(insurance_city.longitude), float(insurance_city.latitude))
+                distance = pnt1.distance(pnt2) * 100
+                if distance <= cls.Radius:
+                    return insurance_city.name
+            except Exception as e:
+                pass
+
+        return None
+
+    class Meta:
+        db_table = "insurance_eligible_cities"
+
+
+class ThirdPartyAdministrator(auth_model.TimeStampedModel):
+    name = models.CharField(max_length=500, unique=True)
+
+    class Meta:
+        db_table = "third_party_administrator"
+
+
+class UserBank(auth_model.TimeStampedModel):
+    insurance = models.ForeignKey(UserInsurance, related_name='user_bank', on_delete=models.DO_NOTHING)
+    bank_name = models.CharField(max_length=250)
+    account_number = models.CharField(max_length=50)
+    account_holder_name = models.CharField(max_length=150)
+    ifsc_code = models.CharField(max_length=20)
+    bank_address = models.CharField(max_length=300, blank=True, null=True)
+
+    class Meta:
+        db_table = "user_bank"
+
+
+class UserBankDocument(auth_model.TimeStampedModel):
+    insurance = models.ForeignKey(UserInsurance, related_name='user_bank_document', on_delete=models.DO_NOTHING)
+    document_image = models.FileField(upload_to='users/images', blank=False, null=False, validators=[
+        FileExtensionValidator(allowed_extensions=['pdf', 'jpg', 'jpeg', 'png'])])
+
+    class Meta:
+        db_table = "user_bank_document"

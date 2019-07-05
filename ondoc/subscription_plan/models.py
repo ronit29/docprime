@@ -6,9 +6,10 @@ from django.db.models import Count
 from django.utils import timezone
 import logging
 from ondoc.account.models import ConsumerAccount, Order, MoneyPool, ConsumerRefund
-from ondoc.api.v1.utils import payment_details
+from ondoc.api.v1.utils import payment_details, CouponsMixin
 from ondoc.authentication import models as auth_model
 from ondoc.authentication.models import User
+from ondoc.coupon.models import Coupon
 from ondoc.diagnostic.models import LabNetwork, Lab, LabTest, LabAppointment
 
 # Create your models here.
@@ -25,6 +26,7 @@ class Plan(auth_model.TimeStampedModel):
     features = models.ManyToManyField('PlanFeature', through='PlanFeatureMapping', through_fields=('plan', 'feature'),
                                       related_name='plans_included_in')
     enabled = models.BooleanField(default=True)
+    icon = models.ImageField('Icon', upload_to='plan/images', null=True, blank=True)
 
     class Meta:
         db_table = "subscription_plan"
@@ -67,7 +69,7 @@ class PlanFeatureMapping(models.Model):
         unique_together = (('plan', 'feature'),)
 
 
-class UserPlanMapping(auth_model.TimeStampedModel):
+class UserPlanMapping(auth_model.TimeStampedModel, CouponsMixin):
     CANCELLED = 2
     BOOKED = 1
 
@@ -81,6 +83,8 @@ class UserPlanMapping(auth_model.TimeStampedModel):
     extra_details = JSONField(blank=True, null=True)  # Snapshot of the plan when bought
     money_pool = models.ForeignKey(MoneyPool, on_delete=models.SET_NULL, null=True)
     status = models.PositiveSmallIntegerField(default=BOOKED, choices=STATUS_CHOICES)
+    coupon = models.ManyToManyField(Coupon, blank=True, null=True, related_name="plan_coupon")
+    coupon_data = JSONField(blank=True, null=True)
 
     class Meta:
         db_table = "subscription_plan_user"
@@ -140,7 +144,11 @@ class UserPlanMapping(auth_model.TimeStampedModel):
         # cashback_balance = consumer_account.cashback
         # total_balance = balance + cashback_balance
         total_balance = balance
-        payable_amount = plan.deal_price
+        deal_price = plan.deal_price
+
+        coupon_discount, coupon_cashback, coupon_list, random_coupon_list = Coupon.get_total_deduction(data, deal_price)
+        payable_amount = max(0, deal_price - coupon_discount - coupon_cashback)
+
         product_id = Order.SUBSCRIPTION_PLAN_PRODUCT_ID
         if total_balance >= payable_amount:
             # cashback_amount = min(cashback_balance, payable_amount)
@@ -182,6 +190,7 @@ class UserPlanMapping(auth_model.TimeStampedModel):
                          "name": plan.name,
                          "mrp": str(plan.mrp),
                          "deal_price": str(plan.deal_price),
+                         "payable_amount": str(payable_amount),
                          "unlimited_online_consultation": plan.unlimited_online_consultation,
                          "priority_queue": plan.priority_queue,
                          "features": [{"id": feature_mapping.feature.id, "name": feature_mapping.feature.name,
@@ -190,7 +199,8 @@ class UserPlanMapping(auth_model.TimeStampedModel):
                                        "test_name": feature_mapping.feature.test.name} for feature_mapping in
                                       plan.feature_mappings.filter(enabled=True)]}
 
-        action_data = {"user": user.id, "plan": plan.id, "extra_details": extra_details}
+        action_data = {"user": user.id, "plan": plan.id, "extra_details": extra_details, "coupon": coupon_list,
+                       "coupon_data": {"random_coupon_list": random_coupon_list}}
         child_order = Order.objects.create(
             product_id=product_id,
             action=action,
@@ -232,7 +242,7 @@ class UserPlanMapping(auth_model.TimeStampedModel):
             test_id=F('test_mappings__test__id')).values_list('test_id', flat=True))
         used_test_count_dict = cls.get_frequency_test(used_test_count)
         plan_test_count_dict = {x['test_id']: x['count'] for x in plan_test_count}
-        # TODO : SHASHANK_SINGH consider valid cart items only
+
         cart_queryset = Cart.objects.all()
         if cart_item_id:
             cart_queryset = cart_queryset.exclude(id=cart_item_id)

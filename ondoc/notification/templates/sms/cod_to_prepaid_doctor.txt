@@ -1,0 +1,3 @@
+This is a payment update for {{instance.id}}. {{patient_name|capfirst}} has already paid online for the upcoming appointment with you. The appointment is scheduled for {{instance.time_slot_start|date:"D jS F Y"}} at {{instance.time_slot_start|date:"h:i A"}}. The consultation fee will now be paid to you by Docprime. We request you to not charge any fee for this appointment.
+
+Thank you for choosing Docprime.com!

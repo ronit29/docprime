@@ -1,0 +1,7 @@
+Policy Number {{policy_number}}
+Your insurance policy has been cancelled.
+You will shortly receive the cancellation details from your insurance provider.
+In case of any queries, write to us at customercare@docprime.com
+
+Thanks
+Team Docprime
