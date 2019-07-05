@@ -4255,8 +4255,12 @@ class IpdProcedureSyncViewSet(viewsets.GenericViewSet):
         serializer.is_valid(raise_exception=True)
         validated_data = serializer.validated_data
         temp_status = validated_data.get('status')
+        temp_planned_date = validated_data.get('planned_date')
         temp_status = matrix_status_to_ipd_lead_status_mapping.get(temp_status)
-        if not temp_status:
-            return Response({'message': 'Invalid status'}, status=status.HTTP_400_BAD_REQUEST)
-        IpdProcedureLead.objects.filter(matrix_lead_id=validated_data.get('matrix_lead_id')).update(status=temp_status)
+        to_be_updated_dict = {}
+        if temp_status:
+            to_be_updated_dict['status'] = temp_status
+        if temp_planned_date:
+            to_be_updated_dict['planned_date'] = temp_planned_date
+        IpdProcedureLead.objects.filter(matrix_lead_id=validated_data.get('matrix_lead_id')).update(**to_be_updated_dict)
         return Response({'message': 'Success'})
