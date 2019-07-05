@@ -1832,8 +1832,15 @@ class LabList(viewsets.ReadOnlyModelViewSet):
                     key = random.randint(10, 1000000000)
                 lab_network[key] = res
             else:
-                existing['other_labs'].append(res)
-
+                if insurance_data_dict.get('is_user_insured'):
+                    if res.get('distance') < existing.get('distance'):
+                        temp = existing
+                        existing = res
+                        existing['other_labs'].append(temp)
+                    else:
+                        existing['other_labs'].append(res)
+                else:
+                    existing['other_labs'].append(res)
         return lab_network.values()
 
 
