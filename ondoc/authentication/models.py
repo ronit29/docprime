@@ -1274,6 +1274,7 @@ class GenericAdmin(TimeStampedModel, CreatedByModel):
         return list(manageable_hosp_list)
 
     def doctor_number_exists(self):
+        # Ensure 'hospital' and 'hospital__doctor_number' is prefetched
         doctor_number_exists = False
         if self.doctor and self.hospital.hospital_doctor_number.all():
             for doc_num in self.hospital.hospital_doctor_number.all():
