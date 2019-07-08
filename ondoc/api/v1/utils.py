@@ -453,8 +453,8 @@ def payment_details(request, order):
                     first_slot = parse_datetime(ord_slot)
 
         if first_slot:
-            if first_slot > (timezone.now() + timedelta(hours=int(settings.PAYMENT_AUTO_CAPTURE_DURATION))):
-                paytmMsg = 'Blocked amount will be captured after 60 hrs of booking.'
+            if first_slot < (timezone.now() + timedelta(hours=int(settings.PAYMENT_AUTO_CAPTURE_DURATION))):
+                paytmMsg = 'Your payment will be deducted from Paytm wallet on appointment completion.'
 
     temp_product_id = order.product_id
 
