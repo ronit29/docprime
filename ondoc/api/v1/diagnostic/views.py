@@ -1646,7 +1646,7 @@ class LabList(viewsets.ReadOnlyModelViewSet):
     def apply_search_sort(self, parameters):
 
         if parameters.get('ids') and  parameters.get('is_user_insured') and not parameters.get('sort_on'):
-            return ' case when (test_type in (2,3)) and insurance_home_pickup=true then (insurance_home_pickup ,(case when network_id=43 then -1 end) , agreed_price )	end, distance '
+            return ' case when (test_type in (2,3)) and insurance_home_pickup=true and pickup_charges=0  then (insurance_home_pickup ,(case when network_id=43 then -1 end) , agreed_price )	end, distance '
         order_by = parameters.get("sort_on")
         if order_by is not None:
             if order_by == "fees" and parameters.get('ids'):
