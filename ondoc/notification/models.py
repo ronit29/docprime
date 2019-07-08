@@ -86,11 +86,14 @@ class NotificationAction:
 
     LAB_LOGO_CHANGE_MAIL = 70
     PRICING_ALERT_EMAIL = 72
-    APPOINTMENT_REMINDER_PROVIDER_SMS = 77
-    PROVIDER_ENCRYPTION_ENABLED = 78
-    PROVIDER_ENCRYPTION_DISABLED = 79
+
+    PROVIDER_MATRIX_LEAD_EMAIL = 111
+    APPOINTMENT_REMINDER_PROVIDER_SMS = 112
+    PROVIDER_ENCRYPTION_ENABLED = 113
+    PROVIDER_ENCRYPTION_DISABLED = 114
+    REQUEST_ENCRYPTION_KEY = 115
+
     LOGIN_OTP = 80
-    REQUEST_ENCRYPTION_KEY = 81
     CHAT_NOTIFICATION = 87
 
     COD_TO_PREPAID = 91
@@ -128,7 +131,11 @@ class NotificationAction:
         (IPD_PROCEDURE_MAIL, 'IPD Procedure Mail'),
         (PRICING_ALERT_EMAIL, 'Pricing Change Mail'),
         (LAB_LOGO_CHANGE_MAIL, 'Lab Logo Change Mail'),
+        (PROVIDER_MATRIX_LEAD_EMAIL, 'Provider Matrix Lead Email'),
         (APPOINTMENT_REMINDER_PROVIDER_SMS, 'Appointment Reminder Provider SMS'),
+        (PROVIDER_ENCRYPTION_ENABLED, 'Provider Encryption Enabled'),
+        (PROVIDER_ENCRYPTION_DISABLED, 'Provider Decryption Disabled'),
+        (REQUEST_ENCRYPTION_KEY, 'Request Encryption Key'),
         (LOGIN_OTP, 'Login OTP'),
         (CHAT_NOTIFICATION, "Push Notification from chat"),
         (COD_TO_PREPAID, 'COD to Prepaid'),

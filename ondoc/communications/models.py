@@ -982,6 +982,9 @@ class EMAILNotification:
                      "path": util_absolute_url(invoices[0].file.url)}]})
             body_template = "email/doctor_invoice/body.html"
             subject_template = "email/doctor_invoice/subject.txt"
+        elif notification_type == NotificationAction.PROVIDER_MATRIX_LEAD_EMAIL:
+            body_template = "email/provider/matrix_lead_creation/body.html"
+            subject_template = "email/provider/matrix_lead_creation/subject.txt"
         elif notification_type == NotificationAction.LAB_APPOINTMENT_ACCEPTED:
             body_template = "email/lab/appointment_accepted/body.html"
             subject_template = "email/lab/appointment_accepted/subject.txt"
