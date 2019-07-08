@@ -4130,7 +4130,7 @@ class PartnersAppInvoice(auth_model.TimeStampedModel):
     sub_total_amount = models.DecimalField(max_digits=10, decimal_places=DECIMAL_PLACES)
     tax_amount = models.DecimalField(max_digits=10, decimal_places=DECIMAL_PLACES, blank=True, null=True)
     tax_percentage = models.DecimalField(max_digits=5, decimal_places=DECIMAL_PLACES, blank=True, null=True,
-                                         validators=[MinValueValidator(0), MaxValueValidator(100)])
+                                         validators=[MinValueValidator(0)])
     discount_amount = models.DecimalField(max_digits=10, decimal_places=DECIMAL_PLACES, blank=True, null=True)
     discount_percentage = models.DecimalField(max_digits=5, decimal_places=DECIMAL_PLACES, blank=True, null=True,
                                               validators=[MinValueValidator(0), MaxValueValidator(100)])
@@ -4264,7 +4264,7 @@ class GeneralInvoiceItems(auth_model.TimeStampedModel):
     description = models.CharField(max_length=500, null=True, blank=True)
     tax_amount = models.DecimalField(max_digits=10, decimal_places=DECIMAL_PLACES, blank=True, null=True)
     tax_percentage = models.DecimalField(max_digits=5, decimal_places=DECIMAL_PLACES, blank=True, null=True,
-                                         validators=[MinValueValidator(0), MaxValueValidator(100)])
+                                         validators=[MinValueValidator(0)])
     discount_amount = models.DecimalField(max_digits=10, decimal_places=DECIMAL_PLACES, blank=True, null=True)
     discount_percentage = models.DecimalField(max_digits=5, decimal_places=DECIMAL_PLACES, blank=True, null=True,
                                               validators=[MinValueValidator(0), MaxValueValidator(100)])

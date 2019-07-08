@@ -351,7 +351,7 @@ class GeneralInvoiceItemsSerializer(serializers.Serializer):
     description = serializers.CharField(max_length=500, required=False, allow_null=True, allow_blank=True)
     tax_amount = serializers.DecimalField(max_digits=10, decimal_places=2, required=False, allow_null=True)
     tax_percentage = serializers.DecimalField(max_digits=5, decimal_places=2, required=False, allow_null=True,
-                                              min_value=0, max_value=100)
+                                              min_value=0)
     discount_amount = serializers.DecimalField(max_digits=10, decimal_places=2, required=False, allow_null=True)
     discount_percentage = serializers.DecimalField(max_digits=5, decimal_places=2, required=False, allow_null=True,
                                                    min_value=0, max_value=100)
@@ -471,7 +471,7 @@ class PartnersAppInvoiceSerialier(serializers.Serializer):
     invoice_title = serializers.CharField(max_length=300, required=False, allow_blank=True)
     tax_amount = serializers.DecimalField(max_digits=10, decimal_places=2, required=False, allow_null=True)
     tax_percentage = serializers.DecimalField(max_digits=5, decimal_places=2, required=False, allow_null=True,
-                                              min_value=0, max_value=100)
+                                              min_value=0)
     discount_amount = serializers.DecimalField(max_digits=10, decimal_places=2, required=False, allow_null=True)
     discount_percentage = serializers.DecimalField(max_digits=5, decimal_places=2, required=False, allow_null=True,
                                                    min_value=0, max_value=100)
