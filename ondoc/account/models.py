@@ -1932,8 +1932,8 @@ class MerchantPayout(TimeStampedModel):
 
     def update_status_from_pg(self):
         with transaction.atomic():
-            if self.pg_status=='SETTLEMENT_COMPLETED' or self.utr_no or self.type ==self.MANUAL:
-                return
+            # if self.pg_status=='SETTLEMENT_COMPLETED' or self.utr_no or self.type ==self.MANUAL:
+            #     return
 
             order_no = None
             url = settings.SETTLEMENT_DETAILS_API

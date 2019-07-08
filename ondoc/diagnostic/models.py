@@ -1786,9 +1786,10 @@ class LabAppointment(TimeStampedModel, CouponsMixin, LabAppointmentInvoiceMixin,
     def allowed_action(self, user_type, request):
         allowed = []
         if self.status == self.CREATED:
-            if user_type == User.CONSUMER:
-                return [self.CANCELLED]
-            return []
+            return [self.CANCELLED]
+            # if user_type == User.CONSUMER:
+            #     return [self.CANCELLED]
+            # return []
 
         current_datetime = timezone.now()
         if user_type == User.CONSUMER and current_datetime <= self.time_slot_start:
