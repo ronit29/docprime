@@ -1020,6 +1020,7 @@ def decrypted_invoice_pdfs(hospital_ids):
             invoice.is_encrypted = False
             invoice.save()
 
+
 @task()
 def decrypted_prescription_pdfs(hospital_ids, key):
     from ondoc.prescription import models as pres_models
@@ -1070,3 +1071,26 @@ def decrypted_prescription_pdfs(hospital_ids, key):
             prescription.is_encrypted = False
             prescription.prescription_file = prescription.get_pdf(appointment)
             prescription.save()
+
+
+@task(bind=True, max_retries=2)
+def create_ipd_lead_from_lab_appointment(self, data):
+    from ondoc.diagnostic.models import LabAppointment
+    from ondoc.procedure.models import IpdProcedureLead
+    obj_id = data.get('obj_id')
+    if not obj_id:
+        logger.error("[CELERY ERROR: Incorrect values provided.]")
+        raise ValueError()
+    obj = LabAppointment.objects.filter(id=obj_id).first()
+    if not obj:
+        return
+
+    is_valid = IpdProcedureLead.is_valid_lab_for_lead(obj.lab)
+    if not is_valid:
+        return
+
+    data = obj.convert_ipd_lead_data()
+    data['status'] = IpdProcedureLead.NEW
+    data['source'] = IpdProcedureLead.CRM
+    obj_created = IpdProcedureLead(**data)
+    obj_created.save()

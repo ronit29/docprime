@@ -361,8 +361,8 @@ class LabList(viewsets.ReadOnlyModelViewSet):
         package_count = RawSql(package_count_query, params).fetch_all()
         result_count = package_count[0].get('count', 0)
         temp_categories_ids = package_count[0].get('category_ids', [])
-        if temp_categories_ids:
-            category_ids = temp_categories_ids
+        # if temp_categories_ids:
+        #     category_ids = temp_categories_ids
         # if filter_query:
         #     filter_query = ' and '+filter_query
         package_search_query = package_search_query.format(filter_query=filter_query, sort_query=sort_query, offset=offset, limit=page_size)
@@ -433,7 +433,7 @@ class LabList(viewsets.ReadOnlyModelViewSet):
 
         category_to_be_shown_in_filter_ids = set()
         category_queryset = []
-        category_queryset = LabTestCategory.objects.filter(is_package_category=True, is_live=True, id__in=category_ids).order_by('-priority')
+        category_queryset = LabTestCategory.objects.filter(is_package_category=True, is_live=True, id__in=temp_categories_ids).order_by('-priority')
         category_result = []
         for category in category_queryset:
             name = category.name
@@ -1507,8 +1507,7 @@ class LabList(viewsets.ReadOnlyModelViewSet):
             # filtering_query.append("mrp<=(%(insurance_threshold_amount)s)")
             if not hasattr(request, 'agent'):
                 group_filter.append("(case when covered_under_insurance then agreed_price<=insurance_cutoff_price or insurance_cutoff_price is null else false end  )")
-        elif not is_insurance and ids and self.request.user and not self.request.user.is_anonymous and \
-                self.request.user.active_insurance:
+        elif not is_insurance and ids and request.user and not request.user.is_anonymous and request.user.active_insurance:
             if not hasattr(request, 'agent'):
                 group_filter.append("( case when covered_under_insurance then agreed_price<=insurance_cutoff_price or insurance_cutoff_price is null else true end  )")
 
