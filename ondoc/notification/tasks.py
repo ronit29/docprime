@@ -1149,14 +1149,14 @@ def send_capture_payment_request(self, product_id, appointment_id):
             response = requests.post(url, data=json.dumps(req_data), headers=headers)
             if response.status_code == status.HTTP_200_OK:
                 resp_data = response.json()
+                txn_obj.status_type = resp_data.get('txStatus')
+                txn_obj.payment_mode = resp_data.get("paymentMode")
+                txn_obj.bank_name = resp_data.get('bankName')
                 if resp_data.get("ok") is not None and resp_data.get("ok") == '1':
-                    txn_obj.status_type = resp_data.get('txStatus')
-                    txn_obj.payment_mode = resp_data.get("paymentMode")
-                    txn_obj.bank_name = resp_data.get('bankName')
                     txn_obj.transaction_id = resp_data.get('bankTxId')
-                    txn_obj.save()
                 else:
                     logger.error("Error in capture the payment with data - " + json.dumps(req_data) + " with error message - " + resp_data.get('statusMsg', ''))
+                txn_obj.save()
             else:
                 raise Exception("Retry on invalid Http response status - " + str(response.content))
 

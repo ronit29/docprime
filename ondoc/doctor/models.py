@@ -2523,7 +2523,7 @@ class OpdAppointment(auth_model.TimeStampedModel, CouponsMixin, OpdAppointmentIn
 
         try:
             notification_tasks.send_capture_payment_request.apply_async(
-                Order.DOCTOR_PRODUCT_ID, self.id, eta=datetime.datetime.now(), )
+                (Order.DOCTOR_PRODUCT_ID, self.id), eta=datetime.datetime.now(), )
         except Exception as e:
             logger.error(str(e))
 
