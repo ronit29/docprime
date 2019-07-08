@@ -3092,7 +3092,7 @@ class TestDetailsViewset(viewsets.GenericViewSet):
             parameters['long'] = params.get('long')
 
         parameters['ids'] = ",".join(test_ids)
-        parameters['max_distance'] = 15
+        parameters['max_distance'] = 20
         parameters['min_distance'] = 0
 
         kwargs['parameters'] = parameters
