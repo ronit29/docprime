@@ -1702,10 +1702,14 @@ class GetOfflinePatientsSerializer(serializers.Serializer):
 
 
 class OfflineAppointmentFilterSerializer(serializers.Serializer):
+    OPD='doc'
+    LAB='lab'
+    TYPE_CHOICES = ((OPD, "Opd"), (LAB, "Lab"))
     start_date = serializers.DateField(format="%Y-%m-%d", required=False)
     end_date = serializers.DateField(format="%Y-%m-%d", required=False)
     updated_at = serializers.DateField(format="%Y-%m-%d", required=False)
     appointment_id = serializers.CharField(required=False)
+    type = serializers.ChoiceField(required=False, default=OPD, choices=TYPE_CHOICES)
 
 
 class OfflinePatientSerializer(serializers.ModelSerializer):
