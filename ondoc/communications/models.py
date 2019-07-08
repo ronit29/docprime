@@ -1525,7 +1525,8 @@ class LabNotification(Notification):
         if instance and instance.lab and instance.lab.network and instance.lab.network.id == settings.THYROCARE_NETWORK_ID:
             is_thyrocare_report = True
             # chat_url = "https://docprime.com/mobileviewchat?utm_source=Thyrocare&booking_id=%s" % instance.id
-            chat_url = '%s/mobileviewchat?utm_source=Thyrocare&booking_id=%s&msg=startchat' % (settings.API_BASE_URL, instance.id)
+            # chat_url = '%s/mobileviewchat?utm_source=Thyrocare&booking_id=%s&msg=startchat' % (settings.API_BASE_URL, instance.id)
+            chat_url = '%s/livechat?product=DocPrime&cb=1&source=Thyrocare&booking_id=%s&msg=startchat' % (settings.CHAT_API_URL, instance.id)
             chat_url = generate_short_url(chat_url)
 
         context = {

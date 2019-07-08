@@ -3330,8 +3330,8 @@ class OpdAppointment(auth_model.TimeStampedModel, CouponsMixin, OpdAppointmentIn
         if order_obj:
             try:
                 patent_id = order_obj.parent_id
-                discount = (Decimal(order_obj.action_data.get('mrp')) - Decimal(order_obj.action_data.get(
-                    'deal_price'))) / Decimal(order_obj.action_data.get('mrp'))
+                discount = ((Decimal(order_obj.action_data.get('mrp')) - Decimal(order_obj.action_data.get(
+                    'deal_price'))) / Decimal(order_obj.action_data.get('mrp'))) * 100
                 discount = str(round(discount, 2))
                 result = patent_id, discount
             except Exception as e:
