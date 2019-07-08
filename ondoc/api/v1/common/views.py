@@ -1018,6 +1018,8 @@ class DeviceDetailsSave(viewsets.GenericViewSet):
                 if device_details:
                     device_details_queryset.update(**device_validated_data, user=user)
                 else:
+                    if not 'data' in device_validated_data:
+                        device_validated_data['data'] = {}
                     device_details = DeviceDetails.objects.create(**device_validated_data, user=user)
                 last_usage_validated_data['device_id'] = device_details.id
 
@@ -1031,9 +1033,9 @@ class DeviceDetailsSave(viewsets.GenericViewSet):
                 else:
                     LastUsageTimestamp.objects.create(**last_usage_validated_data)
         except Exception as e:
-            logger.error("Something went wrong while saving device details and last_usage_timestmap - " + str(e))
-            return Response("Error adding device details and last_usage_timestmap - " + str(e), status=status.HTTP_500_INTERNAL_SERVER_ERROR)
-        return Response({"status": 1, "message": "device details and last usage timestmap added"}, status=status.HTTP_200_OK)
+            logger.error("Something went wrong while saving last_usage_timestmap and device details - " + str(e))
+            return Response("Error adding last_usage_timestmap and device details - " + str(e), status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+        return Response({"status": 1, "message": "last_usage_timestmap and device details added"}, status=status.HTTP_200_OK)
 
 
 class AppointmentPrerequisiteViewSet(viewsets.GenericViewSet):
