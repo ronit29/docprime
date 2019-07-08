@@ -245,6 +245,10 @@ class IpdProcedureLead(auth_model.TimeStampedModel):
     def is_valid_hospital_for_lead(hospital):
         return hospital.has_ipd_doctors()
 
+    @staticmethod
+    def is_valid_lab_for_lead(lab):
+        return lab.is_ipd_lab
+
     def is_potential_ipd(self):
         result = False
         if self.doctor:
