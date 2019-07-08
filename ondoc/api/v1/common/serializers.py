@@ -2,7 +2,7 @@ from rest_framework import serializers
 
 from ondoc.common.models import GlobalNonBookable, DeviceDetails, LastUsageTimestamp
 from ondoc.authentication.models import UserProfile
-from ondoc.common.models import GlobalNonBookable
+from ondoc.common.models import GlobalNonBookable, AppointmentHistory
 from ondoc.diagnostic.models import Lab
 from ondoc.lead.models import SearchLead
 
@@ -51,6 +51,8 @@ class GlobalNonBookableSerializer(serializers.ModelSerializer):
 
 
 class DeviceDetailsSerializer(serializers.ModelSerializer):
+    device_id = serializers.CharField(required=False, allow_null=True, allow_blank=True)
+    data = serializers.JSONField(required=False)
 
     class Meta:
         model = DeviceDetails
