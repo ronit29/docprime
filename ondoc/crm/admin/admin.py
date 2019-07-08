@@ -37,7 +37,7 @@ from ondoc.procedure.models import Procedure, ProcedureCategory, CommonProcedure
     IpdProcedureCategory, CommonIpdProcedure, IpdProcedureDetail, IpdProcedureDetailType, IpdProcedureSynonym, \
     IpdProcedureSynonymMapping, IpdProcedurePracticeSpecialization, IpdProcedureLead, Offer, \
     PotentialIpdLeadPracticeSpecialization, IpdProcedureCostEstimate, \
-    IpdCostEstimateRoomType, UploadCostEstimateData
+    IpdCostEstimateRoomType, UploadCostEstimateData, DoctorClinicIpdProcedure
 from ondoc.subscription_plan.models import Plan, PlanFeature, UserPlanMapping
 from .common import Cities, CitiesAdmin, MatrixCityMapping, MatrixCityAdmin, MerchantAdmin, MerchantPayoutAdmin, \
     PaymentOptionsAdmin, MatrixMappedStateAdmin, MatrixMappedCityAdmin, GlobalNonBookableAdmin, UserConfigAdmin, BlacklistUserAdmin, BlockedStatesAdmin
@@ -48,7 +48,7 @@ from .doctor import (DoctorAdmin, MedicalServiceAdmin, SpecializationAdmin, Qual
                      SpecializationFieldAdmin, SpecializationDepartmentAdmin, PracticeSpecializationAdmin,
                      CompetitorInfoImportAdmin, VisitReasonAdmin, PracticeSpecializationContentAdmin,
                      OfflinePatientAdmin,
-                     UploadDoctorDataAdmin, DoctorLeaveAdmin)
+                     UploadDoctorDataAdmin, DoctorLeaveAdmin, DoctorClinicIpdProcedureAdmin)
 from .aboutdoctor import AboutDoctorAdmin
 from .hospital import HospitalAdmin, CommonHospitalAdmin
 from .user import CustomUserAdmin
@@ -268,3 +268,5 @@ admin.site.register(ThirdPartyAdministrator, ThirdPartyAdministratorAdmin)
 admin.site.register(BlacklistUser, BlacklistUserAdmin)
 admin.site.register(BlockedStates, BlockedStatesAdmin )
 admin.site.register(BankHolidays)
+admin.site.register(DoctorClinic, DoctorClinicAdmin)
+admin.site.register(DoctorClinicIpdProcedure, DoctorClinicIpdProcedureAdmin)
