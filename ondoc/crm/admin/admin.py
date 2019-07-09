@@ -26,7 +26,7 @@ from ondoc.diagnostic.models import (Lab, LabNetwork, LabTest, LabTestType, LabS
                                      AvailableLabTest, LabAppointment, CommonTest, CommonDiagnosticCondition,
                                      LabPricingGroup,
                                      TestParameter, CommonPackage, LabTestCategory, LabTestGroup, LabTestGroupMapping,
-                                     TestParameterChat)
+                                     TestParameterChat, LabTestCategoryUrls)
 from ondoc.coupon.models import Coupon, UserSpecificCoupon, RandomGeneratedCoupon
 from ondoc.lead.models import HospitalLead, DoctorLead, SearchLead
 from ondoc.account.models import ConsumerAccount, MerchantPayout, Order
@@ -55,7 +55,7 @@ from .user import CustomUserAdmin
 from .hospital_network import HospitalNetworkAdmin
 from .lab import LabAdmin, LabTestAdmin, LabTestTypeAdmin, AvailableLabTestAdmin, CommonDiagnosticConditionAdmin, \
     LabAppointmentAdmin, CommonTestAdmin, TestParameterAdmin, CommonPackageAdmin, LabTestCategoryAdmin, \
-    LabTestGroupAdmin, LabTestGroupMappingAdmin, TestParameterChatAdmin
+    LabTestGroupAdmin, LabTestGroupMappingAdmin, TestParameterChatAdmin, LabTestCategoryUrlsAdmin
 from .lab_network import LabNetworkAdmin
 from .notification import (EmailNotificationAdmin, SmsNotificationAdmin,
                            PushNotificationAdmin, AppNotificationAdmin)
@@ -270,3 +270,4 @@ admin.site.register(BlockedStates, BlockedStatesAdmin )
 admin.site.register(BankHolidays)
 admin.site.register(DoctorClinic, DoctorClinicAdmin)
 admin.site.register(DoctorClinicIpdProcedure, DoctorClinicIpdProcedureAdmin)
+admin.site.register(LabTestCategoryUrls, LabTestCategoryUrlsAdmin)

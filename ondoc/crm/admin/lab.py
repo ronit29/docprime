@@ -34,7 +34,8 @@ from ondoc.diagnostic.models import (LabTiming, LabImage,
                                      TestParameter, ParameterLabTest, FrequentlyAddedTogetherTests, QuestionAnswer,
                                      LabReport, LabReportFile, LabTestCategoryMapping,
                                      LabTestRecommendedCategoryMapping, LabTestGroupTiming, LabTestGroupMapping,
-                                     TestParameterChat, LabTestThresholds)
+                                     TestParameterChat, LabTestThresholds, LabTestCategoryUrls,
+                                     LabTestCategoryLandingURLS)
 from ondoc.integrations.models import IntegratorHistory
 from ondoc.notification.models import EmailNotification, NotificationAction
 from ondoc.prescription.models import AppointmentPrescription
@@ -1683,3 +1684,17 @@ class TestParameterChatAdmin(admin.ModelAdmin):
     form = TestParameterChatForm
     list_display = ['test_name']
     readonly_fields = ('test_name',)
+
+
+
+class LabTestCategoryLandingURLSInline(admin.TabularInline):
+    model = LabTestCategoryLandingURLS
+    extra = 0
+    can_delete = True
+    show_change_link = False
+    # autocomplete_fields = ['lab_test']
+
+
+class LabTestCategoryUrlsAdmin(admin.ModelAdmin):
+    model = LabTestCategoryUrls
+    inlines = [LabTestCategoryLandingURLSInline]
