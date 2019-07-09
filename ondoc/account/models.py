@@ -480,8 +480,8 @@ class Order(TimeStampedModel):
             all_txn = self.txn.all()
         elif self.dummy_txn.exists():
             all_txn = self.dummy_txn.all()
-        elif self.parent.getTransactions().exists():
-            all_txn = self.parent.getTransactions().exists()
+        elif self.parent.dummy_txn.exists():
+            all_txn = self.parent.dummy_txn.exists()
         return all_txn
 
     @classmethod
