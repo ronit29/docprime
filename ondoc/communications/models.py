@@ -1270,6 +1270,7 @@ class PUSHNotification:
         context = copy.deepcopy(context)
         context.pop("instance", None)
         context.pop('time_slot_start', None)
+        context.pop('hospitals_not_required_unique_code', None)
         if user:
             target_app = user.user_type
             push_noti = PushNotification.objects.create(
