@@ -4062,7 +4062,7 @@ class HospitalViewSet(viewsets.GenericViewSet):
             response['url'] = entity.url
             if entity.breadcrumb:
                 breadcrumb = [{'url': '/', 'title': 'Home', 'link_title': 'Home'}
-                              {"title": "Hospitals", "url": "hospitals", "link_title": "Hospitals"}
+                              ,{"title": "Hospitals", "url": "hospitals", "link_title": "Hospitals"}
                               ]
                 if entity.locality_value:
                     # breadcrumb.append({'url': request.build_absolute_uri('/'+ entity.locality_value), 'title': entity.locality_value, 'link_title': entity.locality_value})
