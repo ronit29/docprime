@@ -3194,6 +3194,7 @@ class OpdAppointment(auth_model.TimeStampedModel, CouponsMixin, OpdAppointmentIn
             'PatientName': self.profile_detail.get("name", ''),
             'PatientAddress': patient_address,
             'ProviderName': getattr(self, 'doctor').name + " - " + self.hospital.name,
+            'HospitalName': self.hospital.name,
             'ServiceName': service_name,
             'InsuranceCover': 0,
             'MobileList': mobile_list,
