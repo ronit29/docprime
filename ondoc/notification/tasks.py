@@ -1120,7 +1120,7 @@ def send_user_number_update_otp(obj_id):
 
     sms_class = BaseSmsBackend()
     message = "Otp for new number update :%s . Dont share this with anyone." % str(otp)
-    success = sms_class.send(str(otp), phone_numer)
+    success = sms_class.send(message, phone_numer)
     if not success:
         logger.error("Could not send otp for user number update.")
 
