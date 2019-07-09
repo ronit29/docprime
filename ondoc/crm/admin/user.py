@@ -110,7 +110,7 @@ class UserNumberUpdateForm(forms.ModelForm):
             obj = UserNumberUpdate.objects.filter(user=user, old_number=user.phone_number, new_number=self.cleaned_data.get('new_number')).order_by('id').last()
 
             if obj and obj.otp != self.cleaned_data.get('user_otp'):
-                raise forms.ValidationError('')
+                raise forms.ValidationError('Given otp does not match.')
 
         new_number = self.cleaned_data.get('new_number')
 

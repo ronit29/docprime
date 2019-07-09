@@ -1334,6 +1334,7 @@ class OpdNotification(Notification):
         credit_letter_url = self.appointment.get_credit_letter_url()
         context = {
             "doctor_name": doctor_name,
+            "hospital_name": self.appointment.hospital.name,
             "patient_name": patient_name,
             "id": self.appointment.id,
             "instance": self.appointment,

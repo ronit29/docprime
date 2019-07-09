@@ -1915,7 +1915,7 @@ class LastLoginTimestamp(TimeStampedModel):
 
 
 class UserNumberUpdate(TimeStampedModel):
-    user = models.ForeignKey(User, on_delete=models.DO_NOTHING, related_name="number_updates")
+    user = models.ForeignKey(User, on_delete=models.DO_NOTHING, related_name="number_updates", limit_choices_to={'user_type': 3})
     old_number = models.CharField(max_length=10, blank=False, null=True, default=None)
     new_number = models.CharField(max_length=10, blank=False, null=True, default=None)
     is_successfull = models.BooleanField(default=False)
@@ -1945,11 +1945,13 @@ class UserNumberUpdate(TimeStampedModel):
                 send_otp = True
 
             elif hasattr(self, '_process_update') and self._process_update:
-                self.user.phone_number = self.new_number
-                profiles = UserProfile.objects.filter(phone_number=self.new_number)
+
+                profiles = UserProfile.objects.filter(phone_number=self.user.phone_number)
                 for profile in profiles:
                     profile.phone_number = self.new_number
                     profile.save()
+
+                self.user.phone_number = self.new_number
 
                 self.user.save()
                 self.is_successfull = True
