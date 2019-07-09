@@ -1002,23 +1002,94 @@ def create_ipd_lead_from_opd_appointment(self, data):
 
 @task()
 def decrypted_invoice_pdfs(hospital_ids):
+    import operator
+    from functools import reduce
+    from django.db.models import Q
     from ondoc.doctor import models as doc_models
+    from django.db.transaction import atomic
+
+    # for hospital_id in hospital_ids:
+    #     encrypted_invoices = doc_models.PartnersAppInvoice.objects.filter(appointment__hospital_id=hospital_id, is_encrypted=True).order_by('created_at')
+    #     for invoice in encrypted_invoices:
+    #         previous_version_invoice = doc_models.PartnersAppInvoice.objects.filter(appointment=invoice.appointment, is_encrypted=False).order_by('-updated_at').first()
+    #         if previous_version_invoice:
+    #             serial = previous_version_invoice.invoice_serial_id.split('-')[-2]
+    #             version = str(int(previous_version_invoice.invoice_serial_id.split('-')[-1]) + 1).zfill(2)
+    #         else:
+    #             last_serial = doc_models.PartnersAppInvoice.last_serial(invoice.appointment)
+    #             serial = last_serial + 1
+    #             version = '01'
+    #         invoice.invoice_serial_id = 'INV-' + str(invoice.appointment.hospital.id) + '-' + str(invoice.appointment.doctor.id) + '-' + str(serial) + '-' + version
+    #         invoice.generate_invoice(invoice.selected_invoice_items, invoice.appointment)
+    #         invoice.is_encrypted = False
+    #         invoice.save()
 
     for hospital_id in hospital_ids:
-        encrypted_invoices = doc_models.PartnersAppInvoice.objects.filter(appointment__hospital_id=hospital_id, is_encrypted=True).order_by('created_at')
+
+        encrypted_invoices = doc_models.PartnersAppInvoice.objects.select_related('appointment') \
+                                                                  .prefetch_related('appointment__user',
+                                                                                    'appointment__user__patient_mobiles',
+                                                                                    'appointment__doctor',
+                                                                                    'appointment__doctor__doctor_number',
+                                                                                    'appointment__hospital') \
+                                                                  .filter(appointment__hospital_id=hospital_id, is_encrypted=True).order_by('updated_at')
+
+        appointments = set()
         for invoice in encrypted_invoices:
-            previous_version_invoice = doc_models.PartnersAppInvoice.objects.filter(appointment=invoice.appointment, is_encrypted=False).order_by('-updated_at').first()
-            if previous_version_invoice:
-                serial = previous_version_invoice.invoice_serial_id.split('-')[-2]
-                version = str(int(previous_version_invoice.invoice_serial_id.split('-')[-1]) + 1).zfill(2)
-            else:
-                last_serial = doc_models.PartnersAppInvoice.last_serial(invoice.appointment)
-                serial = last_serial + 1
-                version = '01'
-            invoice.invoice_serial_id = 'INV-' + str(invoice.appointment.hospital.id) + '-' + str(invoice.appointment.doctor.id) + '-' + str(serial) + '-' + version
-            invoice.generate_invoice(invoice.selected_invoice_items, invoice.appointment)
-            invoice.is_encrypted = False
-            invoice.save()
+            appointments.add(invoice.appointment)
+        hospital_doctor_combo_ids = set()
+        for appointment in appointments:
+            hospital_doctor_combo_ids.add(str(appointment.hospital.id) + '-' + str(appointment.doctor.id))
+
+        query = reduce(operator.and_, (Q(invoice_serial_id__contains=combo) for combo in hospital_doctor_combo_ids))
+        last_serial_invoices = doc_models.PartnersAppInvoice.objects.filter(query)
+
+        combo_latest_file_value = dict()
+        combo_latest_version_value = dict()
+        appointment_file_mapping = dict()
+        for invoice in last_serial_invoices:
+            serial_id_elements = invoice.invoice_serial_id.split('-')
+            file_value = int(serial_id_elements[-2])
+            version_value = int(serial_id_elements[-1])
+            hosp_doc_combo = '-'.join(serial_id_elements[1:3])
+            hosp_doc_file_combo = '-'.join(serial_id_elements[1:4])
+            if not invoice.appointment in appointment_file_mapping or appointment_file_mapping.get(invoice.appointment) < file_value:
+                appointment_file_mapping[invoice.appointment] = file_value
+            if hosp_doc_combo not in combo_latest_file_value or combo_latest_file_value.get(hosp_doc_combo) < file_value:
+                combo_latest_file_value[hosp_doc_combo] = file_value
+            if hosp_doc_file_combo not in combo_latest_version_value or combo_latest_version_value.get(hosp_doc_file_combo) < version_value:
+                combo_latest_version_value[hosp_doc_file_combo] = version_value
+
+        with atomic():
+            for invoice in encrypted_invoices:
+                hosp_doc_combo = str(invoice.appointment.hospital.id) + '-' + str(invoice.appointment.doctor.id)
+                if not hosp_doc_combo in combo_latest_file_value:
+                    file = str(doc_models.PartnersAppInvoice.INVOICE_SERIAL_ID_START + 1)
+                    version = '01'
+                else:
+                    file_value = appointment_file_mapping.get(invoice.appointment)
+                    if file_value:
+                        file = str(file_value)
+                        hosp_doc_file_combo = hosp_doc_combo + '-' + file
+                        version_value = combo_latest_version_value[hosp_doc_file_combo]
+                        version_value += 1
+                        combo_latest_version_value[hosp_doc_file_combo] = version_value
+                        version = str(version_value).zfill(2)
+                    else:
+                        file_value = combo_latest_file_value[hosp_doc_combo]
+                        file_value += 1
+                        combo_latest_file_value[hosp_doc_combo] = file_value
+                        appointment_file_mapping[invoice.appointment] = file_value
+                        file = str(file_value)
+                        version_value = 1
+                        hosp_doc_file_combo = hosp_doc_combo + '-' + file
+                        combo_latest_version_value[hosp_doc_file_combo] = version_value
+                        version = str(version_value).zfill(2)
+
+                invoice.invoice_serial_id = 'INV-' + str(invoice.appointment.hospital.id) + '-' + str(invoice.appointment.doctor.id) + '-' + str(file) + '-' + version
+                invoice.generate_invoice(invoice.selected_invoice_items, invoice.appointment)
+                invoice.is_encrypted = False
+                invoice.save()
 
 
 @task()

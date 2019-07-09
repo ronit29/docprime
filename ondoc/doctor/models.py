@@ -4150,12 +4150,19 @@ class PartnersAppInvoice(auth_model.TimeStampedModel):
     def get_context(self, selected_invoice_items):
         context = dict()
         context["patient_name"] = self.appointment.user.name
+        patient_mobile = None
         patient_mobile_queryset = self.appointment.user.patient_mobiles.all()
-        if patient_mobile_queryset.exists():
-            patient_mobile = patient_mobile_queryset.filter(is_default=True).first() if patient_mobile_queryset.filter(
-                is_default=True).exists() else patient_mobile_queryset.first()
-        else:
-            patient_mobile = None
+        if patient_mobile_queryset:
+            patient_mobile = patient_mobile_queryset[0]
+            for obj in patient_mobile_queryset:
+                if obj.is_default:
+                    patient_mobile = obj
+                    break
+        # if patient_mobile_queryset.exists():
+        #     patient_mobile = patient_mobile_queryset.filter(is_default=True).first() if patient_mobile_queryset.filter(
+        #         is_default=True).exists() else patient_mobile_queryset.first()
+        # else:
+        #     patient_mobile = None
         context["patient_phone_number"] = patient_mobile
         context["invoice_serial_id"] = self.invoice_serial_id
         context["updated_at"] = self.updated_at if self.updated_at else datetime.datetime.now()
@@ -4169,7 +4176,11 @@ class PartnersAppInvoice(auth_model.TimeStampedModel):
         context["doctor_name"] = self.appointment.doctor.name
         context["hospital_name"] = self.appointment.hospital.name
         context["hospital_address"] = self.appointment.hospital.get_hos_address()
-        doctor_number = self.appointment.doctor.doctor_number.first()
+        # doctor_number = self.appointment.doctor.doctor_number.first()
+        doctor_number = None
+        doctor_numbers = self.appointment.doctor.doctor_number.all()
+        if doctor_numbers:
+            doctor_number = doctor_numbers[0]
         if doctor_number:
             context["doctor_phone_number"] = doctor_number.phone_number
         context["invoice_title"] = self.invoice_title
