@@ -1032,7 +1032,7 @@ def decrypted_invoice_pdfs(hospital_ids):
                                                                                     'appointment__doctor',
                                                                                     'appointment__doctor__doctor_number',
                                                                                     'appointment__hospital') \
-                                                                  .filter(appointment__hospital_id=hospital_id, is_encrypted=True).order_by('updated_at')
+                                                                  .filter(appointment__hospital_id=hospital_id, is_encrypted=True).order_by('created_at')
 
         appointments = set()
         for invoice in encrypted_invoices:
