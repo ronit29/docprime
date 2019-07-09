@@ -51,6 +51,8 @@ import nested_admin
 from .common import AssociatedMerchantInline, RemarkInline
 from ondoc.location.models import EntityUrls
 logger = logging.getLogger(__name__)
+from django.urls import reverse
+from django.utils.html import format_html_join, format_html
 
 
 class LabTestResource(resources.ModelResource):
@@ -949,7 +951,7 @@ class LabAppointmentAdmin(nested_admin.NestedModelAdmin):
         'get_profile_age', 'get_insurance', 'is_prescription_uploaded', 'created_at', 'updated_at', 'get_lab_test_name')
     list_filter = ('status', 'payment_type')
     date_hierarchy = 'created_at'
-    list_display_links = ('get_insurance',)
+    list_display_links = ('booking_id', 'get_insurance',)
 
     inlines = [
         LabReportInline,
@@ -958,7 +960,10 @@ class LabAppointmentAdmin(nested_admin.NestedModelAdmin):
 
     def get_insurance(self, obj):
         if obj.insurance:
-            return str(obj.insurance.id)
+            content_type = ContentType.objects.get_for_model(UserInsurance)
+            link = reverse('admin:{}_{}_change'.format(content_type.app_label,
+                                                       content_type.model), args=[obj.insurance.id])
+            return format_html('<a href="{}">{}</a>', link, obj.insurance.id)
         else:
             return ""
     get_insurance.short_description = 'Insurance'
