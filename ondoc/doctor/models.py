@@ -2309,6 +2309,35 @@ class OpdAppointment(auth_model.TimeStampedModel, CouponsMixin, OpdAppointmentIn
         else:
             return None
 
+    def get_booking_analytics_data(self):
+        data = dict()
+
+        promo_cost = self.deal_price - self.effective_price if self.deal_price and self.effective_price else 0
+        department = None
+        if self.doctor:
+            if self.doctor.doctorpracticespecializations.first():
+                if self.doctor.doctorpracticespecializations.first().specialization.department.first():
+                    department = self.doctor.doctorpracticespecializations.first().specialization.department.first().id
+
+        wallet, cashback = self.get_completion_breakup()
+
+        data['Appointment_Id'] = self.id
+        data['CityId'] = self.get_city()
+        data['StateId'] = self.get_state()
+        data['SpecialityId'] = department
+        data['TypeId'] = 1
+        data['ProviderId'] = self.hospital.id
+        data['PaymentType'] = self.payment_type if self.payment_type else None
+        data['Payout'] = self.fees
+        data['CashbackUsed'] = cashback
+        data['BookingDate'] = self.created_at
+        data['CorporateDealId'] = self.get_corporate_deal_id()
+        data['PromoCost'] = max(0, promo_cost)
+        data['GMValue'] = self.deal_price
+        data['StatusId'] = self.status
+
+        return data
+
     def sync_with_booking_analytics(self):
 
         promo_cost = self.deal_price - self.effective_price if self.deal_price and self.effective_price else 0

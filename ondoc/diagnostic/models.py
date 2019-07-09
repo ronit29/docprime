@@ -1657,6 +1657,36 @@ class LabAppointment(TimeStampedModel, CouponsMixin, LabAppointmentInvoiceMixin,
         else:
             return None
 
+    def get_booking_analytics_data(self):
+        data = dict()
+
+        category = None
+        for t in self.tests.all():
+            if t.is_package == True:
+                category = 1
+                break
+            else:
+                category = 0
+
+        promo_cost = self.deal_price - self.effective_price if self.deal_price and self.effective_price else 0
+
+        data['Appointment_Id'] = self.id
+        data['CityId'] = self.get_city()
+        data['StateId'] = self.get_state()
+        data['ProviderId'] = self.lab.id
+        data['TypeId'] = 2
+        data['PaymentType'] = self.payment_type if self.payment_type else None
+        data['Payout'] = self.agreed_price
+        data['BookingDate'] = self.created_at
+        data['CorporateDealId'] = self.get_corporate_deal_id()
+        data['PromoCost'] = max(0, promo_cost)
+        data['GMValue'] = self.deal_price
+        data['Category'] = category
+        data['StatusId'] = self.status
+
+        return data
+
+
     def sync_with_booking_analytics(self):
 
         category = None

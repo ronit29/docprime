@@ -48,6 +48,24 @@ class CorporateDeal(auth_model.TimeStampedModel):
     def __str__(self):
         return "{}".format(self.id)
 
+    def get_booking_analytics_data(self):
+        data = dict()
+        data['CorporateDealId'] = self.id
+        data['CorporateName'] = self.corporate.corporate_name
+        data['DealStartDate'] = self.deal_start_date
+        data['ReceiptNumber'] = self.receipt_no
+        data['CreatedDate'] = self.created_at
+        data['ExpectedProviderFee'] = self.expected_provider_fee
+        data['GrossAmount'] = self.gross_amount
+        data['NumberOfEmployees'] = self.employee_count
+        data['TDSDeducted'] = self.tds_deducted
+        data['PaymentDate'] = self.payment_date
+        data['IsActive'] = self.is_active
+        data['DealEndDate'] = self.deal_end_date
+        data['UpdatedDate'] = self.updated_at
+
+        return data
+
 
     def sync_with_booking_analytics(self):
         obj = DP_CorporateDeals.objects.filter(CorporateDealId=self.id).first()

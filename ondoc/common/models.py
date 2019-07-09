@@ -333,6 +333,15 @@ class MatrixMappedState(TimeStampedModel):
         db_table = 'matrix_mapped_state'
         verbose_name_plural = "Matrix Mapped States"
 
+    def get_booking_analytics_data(self):
+        data = dict()
+
+        data['CreatedOn'] = self.updated_at
+        data['StateId'] = self.id
+        data['StateName'] = self.name
+
+        return data
+
 
     def sync_with_booking_analytics(self):
         obj = DP_StateMaster.objects.filter(StateId=self.id).first()
@@ -365,6 +374,14 @@ class MatrixMappedCity(TimeStampedModel):
         db_table = 'matrix_mapped_city'
         verbose_name_plural = "Matrix Mapped Cities"
 
+    def get_booking_analytics_data(self):
+        data = dict()
+
+        data['CreatedOn'] = self.updated_at
+        data['CityId'] = self.id
+        data['CityName'] = self.name
+
+        return data
 
     def sync_with_booking_analytics(self):
         obj = DP_CityMaster.objects.filter(CityId=self.id).first()
