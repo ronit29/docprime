@@ -361,8 +361,8 @@ class LabList(viewsets.ReadOnlyModelViewSet):
         package_count = RawSql(package_count_query, params).fetch_all()
         result_count = package_count[0].get('count', 0)
         temp_categories_ids = package_count[0].get('category_ids', [])
-        # if temp_categories_ids:
-        #     category_ids = temp_categories_ids
+        if not temp_categories_ids:
+            temp_categories_ids = []
         # if filter_query:
         #     filter_query = ' and '+filter_query
         package_search_query = package_search_query.format(filter_query=filter_query, sort_query=sort_query, offset=offset, limit=page_size)
