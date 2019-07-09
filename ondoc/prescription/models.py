@@ -224,7 +224,7 @@ class PresccriptionPdf(auth_models.TimeStampedModel):
                 if not req_serial_id:
                     serial_id_elements = pres.serial_id.split('-')
                     serial_id_elements[-1] = str(int(serial_id_elements[-1]) + 1).zfill(2)      # version incremented
-                    serial_id = '-'.join(serial_id_elements)
+                    serial_id = '-'.join(serial_id_elements[-3:])
                 exists = True
                 break
         if not exists:
