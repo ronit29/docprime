@@ -2218,7 +2218,7 @@ class LabAppointment(TimeStampedModel, CouponsMixin, LabAppointmentInvoiceMixin,
 
         try:
             notification_tasks.send_capture_payment_request.apply_async(
-                (Order.LAB_PRODUCT_ID, self.id), eta=datetime.datetime.now(), )
+                (Order.LAB_PRODUCT_ID, self.id), eta=timezone.localtime(), )
         except Exception as e:
             logger.error(str(e))
 
