@@ -3312,7 +3312,8 @@ class OpdAppointment(auth_model.TimeStampedModel, CouponsMixin, OpdAppointmentIn
         if type == "payout":
             completed_appointment = OpdAppointment.objects.filter(doctor=doctor, profile=profile, hospital=hospital,
                                                                   status=OpdAppointment.COMPLETED,
-                                                                  created_at__lt=self.created_at).order_by('-id')
+                                                                  created_at__lt=self.created_at,
+                                                                  insurance__isnull=False).order_by('-id')
             if not completed_appointment:
                 return False
             last_appointment = completed_appointment.first()
@@ -3320,7 +3321,8 @@ class OpdAppointment(auth_model.TimeStampedModel, CouponsMixin, OpdAppointmentIn
         if type == "crm":
             previous_appointments = OpdAppointment.objects.filter(~Q(status=OpdAppointment.CANCELLED), doctor=doctor,
                                                                   profile=profile, hospital=hospital,
-                                                                  created_at__lt=self.created_at).order_by('-id')
+                                                                  created_at__lt=self.created_at,
+                                                                  insurance_isnull=False).order_by('-id')
 
             if not previous_appointments:
                 return False
