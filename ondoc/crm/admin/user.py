@@ -4,6 +4,8 @@ from django.contrib.auth.admin import UserAdmin
 from reversion.admin import VersionAdmin
 from django import forms
 from ondoc.authentication.models import (StaffProfile)
+from ondoc.authentication.models import UserNumberUpdate
+from django.db import transaction
 
 
 class StaffProfileInline(admin.TabularInline):
@@ -11,6 +13,20 @@ class StaffProfileInline(admin.TabularInline):
     extra = 0
     can_delete = False
     show_change_link = False
+
+
+
+
+# class UserNumberUpdateInline(admin.TabularInline):
+#     model = UserNumberUpdate
+#     extra = 0
+#     max_num = 1
+#     can_delete = False
+#     show_change_link = False
+#     fields = ('new_number', 'otp', 'is_successfull')
+#     readonly_fields = ('is_successfull',)
+#     form = UserNumberUpdateForm
+
 
 
 class CustomUserChangeForm(UserChangeForm):
@@ -43,6 +59,7 @@ class CustomUserAdmin(UserAdmin,VersionAdmin):
     ordering = []
     inlines = [
         StaffProfileInline
+        # UserNumberUpdateInline
     ]
     search_fields = ['email', 'phone_number']
     list_display = ('email','phone_number', 'is_active')
@@ -75,3 +92,56 @@ class CustomUserAdmin(UserAdmin,VersionAdmin):
         return qs
     def get_changeform_initial_data(self, request):
         return {'user_type': 1}
+
+
+class UserNumberUpdateForm(forms.ModelForm):
+    user_otp = forms.IntegerField(required=False, label="User otp")
+
+    def __init__(self, *args, **kwargs):
+        super(UserNumberUpdateForm, self).__init__(*args, **kwargs)
+        instance = getattr(self, 'instance', None)
+        if not instance or (instance and instance.is_successfull):
+            self.fields['user_otp'].disabled = True
+            self.fields['user_otp'].disabled = True
+
+    def clean(self):
+        if self.cleaned_data.get('user_otp'):
+            user = self.cleaned_data.get('user')
+            obj = UserNumberUpdate.objects.filter(user=user, old_number=user.phone_number, new_number=self.cleaned_data.get('new_number')).order_by('id').last()
+
+            if obj and obj.otp != self.cleaned_data.get('user_otp'):
+                raise forms.ValidationError('')
+
+        new_number = self.cleaned_data.get('new_number')
+
+        if not UserNumberUpdate.can_be_changed(new_number):
+            raise forms.ValidationError('Given new number is already in used by some other person.')
+
+        return super().clean()
+
+
+class UserNumberUpdateAdmin(admin.ModelAdmin):
+
+    model = UserNumberUpdate
+    date_hierarchy = 'created_at'
+    fields = ('user','new_number', 'user_otp', 'is_successfull')
+    readonly_fields = ('is_successfull',)
+    form = UserNumberUpdateForm
+
+    autocomplete_fields = ['user']
+
+    @transaction.atomic
+    def save_model(self, request, obj, form, change):
+        if obj and obj.id and form.data and form.data.get('user_otp'):
+            obj._process_update = True
+
+        super().save_model(request, obj, form, change)
+
+    def get_readonly_fields(self, request, obj=None):
+        if obj and obj.is_successfull:
+            return ['user', 'new_number', 'is_successfull', ]
+        else:
+            if obj and obj.id and not obj.is_successfull:
+                return ['is_successfull']
+            else:
+                return ['is_successfull']
