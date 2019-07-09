@@ -1889,7 +1889,7 @@ class DoctorListViewSet(viewsets.GenericViewSet):
             reviews = validated_data.get('reviews')
         hospital_req_data = {}
         if validated_data.get('hospital_id'):
-            hospital_req_data = Hospital.objects.filter(id=validated_data.get('hospital_id')).values('id', 'name').first()
+            hospital_req_data = Hospital.objects.filter(id__in=validated_data.get('hospital_id')).values('id', 'name').first()
 
         return Response({"result": response, "count": result_count,
                          'specializations': specializations, 'conditions': conditions, "seo": seo,
