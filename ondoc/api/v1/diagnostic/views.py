@@ -361,8 +361,8 @@ class LabList(viewsets.ReadOnlyModelViewSet):
         package_count = RawSql(package_count_query, params).fetch_all()
         result_count = package_count[0].get('count', 0)
         temp_categories_ids = package_count[0].get('category_ids', [])
-        if temp_categories_ids:
-            category_ids = temp_categories_ids
+        # if temp_categories_ids:
+        #     category_ids = temp_categories_ids
         # if filter_query:
         #     filter_query = ' and '+filter_query
         package_search_query = package_search_query.format(filter_query=filter_query, sort_query=sort_query, offset=offset, limit=page_size)
@@ -433,7 +433,7 @@ class LabList(viewsets.ReadOnlyModelViewSet):
 
         category_to_be_shown_in_filter_ids = set()
         category_queryset = []
-        category_queryset = LabTestCategory.objects.filter(is_package_category=True, is_live=True, id__in=category_ids).order_by('-priority')
+        category_queryset = LabTestCategory.objects.filter(is_package_category=True, is_live=True, id__in=temp_categories_ids).order_by('-priority')
         category_result = []
         for category in category_queryset:
             name = category.name
@@ -1507,8 +1507,7 @@ class LabList(viewsets.ReadOnlyModelViewSet):
             # filtering_query.append("mrp<=(%(insurance_threshold_amount)s)")
             if not hasattr(request, 'agent'):
                 group_filter.append("(case when covered_under_insurance then agreed_price<=insurance_cutoff_price or insurance_cutoff_price is null else false end  )")
-        elif not is_insurance and ids and self.request.user and not self.request.user.is_anonymous and \
-                self.request.user.active_insurance:
+        elif not is_insurance and ids and request.user and not request.user.is_anonymous and request.user.active_insurance:
             if not hasattr(request, 'agent'):
                 group_filter.append("( case when covered_under_insurance then agreed_price<=insurance_cutoff_price or insurance_cutoff_price is null else true end  )")
 
@@ -1571,18 +1570,19 @@ class LabList(viewsets.ReadOnlyModelViewSet):
             query = ''' select * from (select id,network_id, name ,price, count, mrp, pickup_charges, distance, order_priority, new_network_rank, rank,
             max(new_network_rank) over(partition by 1) result_count
             from ( 
-            select test_type, agreed_price, id, rating_data, network_id, name ,price, count, mrp, pickup_charges, distance, order_priority, 
+            select insurance_home_pickup, test_type, agreed_price, id, rating_data, network_id, name ,price, count, mrp, pickup_charges, distance, order_priority, 
                         dense_rank() over(order by network_rank) as new_network_rank, rank from
                         (
-                        select test_type, agreed_price, id, rating_data, network_id, rank() over(partition by coalesce(network_id,random()) order by order_rank) as rank,
+                        select insurance_home_pickup, test_type, agreed_price, id, rating_data, network_id, rank() over(partition by coalesce(network_id,random()) order by order_rank) as rank,
                          min (order_rank) OVER (PARTITION BY coalesce(network_id,random())) network_rank,
                          name ,price, count, mrp, pickup_charges, distance, order_priority from
-                        (select test_type, agreed_price, id, rating_data, network_id,  
+                        (select insurance_home_pickup, test_type, agreed_price, id, rating_data, network_id,  
                         name ,price, test_count as count, total_mrp as mrp,pickup_charges, distance, 
                         ROW_NUMBER () OVER (ORDER BY {order} ) order_rank,
                         max_order_priority as order_priority
                         from (
-                        select max(lt.insurance_cutoff_price) as insurance_cutoff_price , 
+                        select case when (bool_and(home_collection_possible) and is_home_collection_enabled) then true else false end as insurance_home_pickup, 
+                        max(lt.insurance_cutoff_price) as insurance_cutoff_price , 
                         case when sum(mrp)<=(%(insurance_threshold_amount)s) and is_insurance_enabled=true then true else false end as covered_under_insurance,
                         max(lt.test_type) as test_type, lb.*, sum(mrp) total_mrp, count(*) as test_count,
                         case when bool_and(home_collection_possible)=True and is_home_collection_enabled=True 
@@ -1644,8 +1644,9 @@ class LabList(viewsets.ReadOnlyModelViewSet):
         return lab_search_result
 
     def apply_search_sort(self, parameters):
+
         if parameters.get('ids') and  parameters.get('is_user_insured') and not parameters.get('sort_on'):
-            return ' case when (test_type in (2,3)) then ((case when network_id=43 then -1 end) , agreed_price ) end, case when (test_type=1) then distance  end '
+            return ' case when (test_type in (2,3)) and insurance_home_pickup=true and pickup_charges=0  then (insurance_home_pickup ,(case when network_id=43 then -1 end) , agreed_price )	end, distance '
         order_by = parameters.get("sort_on")
         if order_by is not None:
             if order_by == "fees" and parameters.get('ids'):
@@ -1831,8 +1832,15 @@ class LabList(viewsets.ReadOnlyModelViewSet):
                     key = random.randint(10, 1000000000)
                 lab_network[key] = res
             else:
-                existing['other_labs'].append(res)
-
+                if insurance_data_dict and insurance_data_dict.get('is_user_insured'):
+                    if res.get('distance') < existing.get('distance'):
+                        temp = existing
+                        existing = res
+                        existing['other_labs'].append(temp)
+                    else:
+                        existing['other_labs'].append(res)
+                else:
+                    existing['other_labs'].append(res)
         return lab_network.values()
 
 

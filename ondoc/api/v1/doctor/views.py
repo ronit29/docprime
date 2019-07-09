@@ -1889,7 +1889,7 @@ class DoctorListViewSet(viewsets.GenericViewSet):
             reviews = validated_data.get('reviews')
         hospital_req_data = {}
         if validated_data.get('hospital_id'):
-            hospital_req_data = Hospital.objects.filter(id=validated_data.get('hospital_id')).values('id', 'name').first()
+            hospital_req_data = Hospital.objects.filter(id__in=validated_data.get('hospital_id')).values('id', 'name').first()
 
         return Response({"result": response, "count": result_count,
                          'specializations': specializations, 'conditions': conditions, "seo": seo,
@@ -4255,8 +4255,12 @@ class IpdProcedureSyncViewSet(viewsets.GenericViewSet):
         serializer.is_valid(raise_exception=True)
         validated_data = serializer.validated_data
         temp_status = validated_data.get('status')
+        temp_planned_date = validated_data.get('planned_date')
         temp_status = matrix_status_to_ipd_lead_status_mapping.get(temp_status)
-        if not temp_status:
-            return Response({'message': 'Invalid status'}, status=status.HTTP_400_BAD_REQUEST)
-        IpdProcedureLead.objects.filter(matrix_lead_id=validated_data.get('matrix_lead_id')).update(status=temp_status)
+        to_be_updated_dict = {}
+        if temp_status:
+            to_be_updated_dict['status'] = temp_status
+        if temp_planned_date:
+            to_be_updated_dict['planned_date'] = temp_planned_date
+        IpdProcedureLead.objects.filter(matrix_lead_id=validated_data.get('matrix_lead_id')).update(**to_be_updated_dict)
         return Response({'message': 'Success'})

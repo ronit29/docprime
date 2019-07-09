@@ -371,7 +371,8 @@ class LabForm(FormCleanMixin):
         widgets = {
             'lab_pricing_group': autocomplete.ModelSelect2(url='labpricing-autocomplete'),
             'matrix_state': autocomplete.ModelSelect2(url='matrix-state-autocomplete'),
-            'matrix_city': autocomplete.ModelSelect2(url='matrix-city-autocomplete', forward=['matrix_state'])
+            'matrix_city': autocomplete.ModelSelect2(url='matrix-city-autocomplete', forward=['matrix_state']),
+            'related_hospital': autocomplete.ModelSelect2(url='related-hospital-autocomplete')
         }
         # exclude = ('pathology_agreed_price_percentage', 'pathology_deal_price_percentage', 'radiology_agreed_price_percentage',
         #            'radiology_deal_price_percentage', )
@@ -431,6 +432,10 @@ class LabForm(FormCleanMixin):
                 if data.get('disable_reason', None) and data.get('disable_reason', None) == Lab.OTHERS and not data.get(
                         'disable_comments', None):
                     raise forms.ValidationError("Must have disable comments if disable reason is others.")
+
+        if data.get('is_ipd_lab'):
+            if not data.get('related_hospital'):
+                raise forms.ValidationError("Must have a related hospital selected when ipd lab enable.")
 
 
 class LabCityFilter(SimpleListFilter):
@@ -561,6 +566,7 @@ class LabAdmin(ImportExportMixin, admin.GeoModelAdmin, VersionAdmin, ActionAdmin
     exclude = ('search_key', 'pathology_agreed_price_percentage', 'pathology_deal_price_percentage',
                'radiology_agreed_price_percentage', 'radiology_deal_price_percentage', 'live_at',
                'onboarded_at', 'qc_approved_at', 'disabled_at', 'welcome_calling_done_at')
+    # autocomplete_fields = ['related_hospital']
 
     def has_delete_permission(self, request, obj=None):
         return super().has_delete_permission(request, obj)
@@ -774,6 +780,7 @@ class LabAdmin(ImportExportMixin, admin.GeoModelAdmin, VersionAdmin, ActionAdmin
         form.base_fields['network'].queryset = LabNetwork.objects.filter(Q(data_status = QCModel.SUBMITTED_FOR_QC) | Q(data_status = QCModel.QC_APPROVED) | Q(created_by = request.user))
         form.base_fields['hospital'].queryset = Hospital.objects.filter(Q(data_status = QCModel.SUBMITTED_FOR_QC) | Q(data_status = QCModel.QC_APPROVED) | Q(created_by = request.user))
         form.base_fields['assigned_to'].queryset = User.objects.filter(user_type=User.STAFF)
+        # form.base_fields['related_hospital'].queryset = Hospital.objects.filter(is_ipd_hospital=True)
         if not request.user.is_superuser and not request.user.is_member_of(constants['QC_GROUP_NAME']):
             form.base_fields['assigned_to'].disabled = True
         return form
@@ -1111,9 +1118,9 @@ class LabAppointmentAdmin(nested_admin.NestedModelAdmin):
     #     return inline_instance
 
     def reports_uploaded(self, instance):
-        if instance and instance.id:
+        if instance and instance.id and instance.reports.all():
             for report in instance.reports.all():
-                if report.files.all():
+                if report.files.all() or instance.reports_physically_collected:
                     return True
         elif instance and instance.id and instance.reports_physically_collected:
             return True

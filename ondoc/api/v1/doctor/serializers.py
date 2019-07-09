@@ -844,7 +844,7 @@ class DoctorListSerializer(serializers.Serializer):
     max_distance = serializers.IntegerField(required=False, allow_null=True)
     min_distance = serializers.IntegerField(required=False, allow_null=True)
     is_insurance = serializers.BooleanField(required=False)
-    hospital_id = serializers.IntegerField(required=False, allow_null=True)
+    hospital_id = CommaSepratedToListField(required=False, max_length=500, typecast_to=str, allow_blank=True)
     locality = serializers.CharField(required=False)
     city = serializers.CharField(required=False, allow_null=True)
     ipd_procedure_ids = CommaSepratedToListField(required=False, max_length=500, typecast_to=str)
@@ -852,6 +852,16 @@ class DoctorListSerializer(serializers.Serializer):
     gender = serializers.ChoiceField(choices=GENDER_CHOICES, required=False)
     availability = CommaSepratedToListField(required=False,  max_length=50, typecast_to=str)
     avg_ratings = CommaSepratedToListField(required=False,  max_length=50, typecast_to=str)
+
+    def validate_hospital_id(self, attrs):
+        try:
+            temp_attrs = [int(attr) for attr in attrs]
+            temp_attrs=set(temp_attrs)
+            if Hospital.objects.filter(id__in=temp_attrs, is_live=True).count() == len(temp_attrs):
+                return attrs
+        except:
+            raise serializers.ValidationError('Invalid Hospital IDs')
+        raise serializers.ValidationError('Invalid Hospital IDs')
 
     def validate_ipd_procedure_ids(self, attrs):
         try:
@@ -923,6 +933,8 @@ class DoctorProfileUserViewSerializer(DoctorProfileSerializer):
     search_data = serializers.SerializerMethodField()
     enabled_for_cod = serializers.SerializerMethodField()
     doctor_specializations_ids = serializers.SerializerMethodField()
+    show_popup = serializers.SerializerMethodField()
+    force_popup = serializers.SerializerMethodField()
 
     def get_enabled_for_cod(self, obj):
         return obj.enabled_for_cod()
@@ -1242,14 +1254,36 @@ class DoctorProfileUserViewSerializer(DoctorProfileSerializer):
             doctor_specializations.append(dps.specialization_id)
         return doctor_specializations
 
+    def get_show_popup(self, obj):
+        from ondoc.procedure.models import PotentialIpdLeadPracticeSpecialization
+        from ondoc.location.models import CityInventory
+        top_cities = CityInventory.objects.all().values_list('city', flat=True)
+        top_cities = [x.lower() for x in top_cities]
+        if obj.doctorpracticespecializations.filter(
+                specialization__in=PotentialIpdLeadPracticeSpecialization.objects.all().values_list(
+                        'practice_specialization', flat=True)).exists():
+            return True
+            #pass
+        for x in obj.doctor_clinics.all():
+            if x.hospital and x.hospital.is_live and x.hospital.city and x.hospital.city.lower() in top_cities:
+                return True
+        return False
+
+    def get_force_popup(self, obj):
+        return False
+
     class Meta:
         model = Doctor
         # exclude = ('created_at', 'updated_at', 'onboarding_status', 'is_email_verified',
         #            'is_insurance_enabled', 'is_retail_enabled', 'user', 'created_by', )
-        fields = ('about', 'is_license_verified', 'additional_details', 'display_name', 'associations', 'awards', 'experience_years', 'experiences', 'gender',
-                  'hospital_count', 'hospitals', 'procedures', 'id', 'languages', 'name', 'practicing_since', 'qualifications',
-                  'general_specialization', 'doctor_specializations_ids', 'thumbnail', 'license', 'is_live', 'seo', 'breadcrumb', 'rating', 'rating_graph',
-                  'enabled_for_online_booking', 'unrated_appointment', 'display_rating_widget', 'is_gold', 'search_data', 'enabled_for_cod')
+        fields = ('about', 'is_license_verified', 'additional_details', 'display_name', 'associations', 'awards',
+                  'experience_years', 'experiences', 'gender',
+                  'hospital_count', 'hospitals', 'procedures', 'id', 'languages', 'name', 'practicing_since',
+                  'qualifications',
+                  'general_specialization', 'doctor_specializations_ids', 'thumbnail', 'license', 'is_live', 'seo',
+                  'breadcrumb', 'rating', 'rating_graph',
+                  'enabled_for_online_booking', 'unrated_appointment', 'display_rating_widget', 'is_gold',
+                  'search_data', 'enabled_for_cod', 'show_popup', 'force_popup')
 
 
 class DoctorAvailabilityTimingSerializer(serializers.Serializer):
@@ -2230,8 +2264,9 @@ class CommonConditionsSerializer(serializers.Serializer):
 
 
 class IpdLeadUpdateSerializer(serializers.Serializer):
-    status = serializers.IntegerField()
+    status = serializers.IntegerField(required=False, allow_null=True)
     matrix_lead_id = serializers.IntegerField()
+    planned_date = serializers.DateField(required=False, allow_null=True)
 
     def validate(self, attrs):
         if not IpdProcedureLead.objects.filter(matrix_lead_id=attrs.get('matrix_lead_id')).exists():
