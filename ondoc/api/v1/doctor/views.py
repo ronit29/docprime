@@ -4103,42 +4103,55 @@ class HospitalViewSet(viewsets.GenericViewSet):
 
 
     def build_schema_for_hospital(self, serialized_data, hospital, url):
-        schema = {
-            "@type": "Hospital",
-            "@context": "https://schema.org/",
-            "currenciesAccepted": "INR",
-            "name": serialized_data['name'],
-            "url": url,
-            "medicalSpecialty": None,
-            "description": serialized_data['new_about'] if serialized_data['new_about'] else serialized_data['about'],
-            "telephone": serialized_data["contact_number"],
-            "logo": serialized_data["logo"],
-            "geo": {
-                "@type": "GeoCoordinates",
-                "@context": "https://schema.org",
-                "latitude": serialized_data['lat'],
-                "longitude": serialized_data['long']
-            } if serialized_data['lat'] and serialized_data['long'] else None,
-            "image": serialized_data["images"][0]["original"] if len(serialized_data["images"]) > 0 else None,
-            "photo": [{
-                "@type": "CreativeWork",
-                "@context": "https://schema.org",
-                "url": x["original"]
-            } for x in serialized_data["images"]],
-            "address": {
-                "@type": "PostalAddress",
-                "@context": "https://schema.org",
-                "streetAddress": hospital.get_hos_address(),
-                "addressLocality": hospital.city,
-                "addressRegion": hospital.state,
-                "postalCode": hospital.pin_code
-            },
-            "availableService": {
-                "@type": "MedicalTherapy",
-                "@context": "https://schema.org",
-                "name": [y["name"] for x in serialized_data['ipd_procedure_categories'] for y in x["ipd_procedures"]]
-            },
-        }
+        try:
+            schema = {
+                "@type": "Hospital",
+                "@context": "https://schema.org/",
+                "currenciesAccepted": "INR",
+                "name": serialized_data['name'],
+                "url": "{}/{}".format(settings.BASE_URL, url) if url and isinstance(url, str) else None,
+                "medicalSpecialty": "Multi-Speciality" if serialized_data["multi_speciality"] else None,
+                "description": serialized_data['new_about'] if serialized_data['new_about'] else serialized_data['about'],
+                "telephone": serialized_data["contact_number"],
+                "logo": serialized_data["logo"],
+                "geo": {
+                    "@type": "GeoCoordinates",
+                    "@context": "https://schema.org",
+                    "latitude": serialized_data['lat'],
+                    "longitude": serialized_data['long']
+                } if serialized_data['lat'] and serialized_data['long'] else None,
+                "image": serialized_data["images"][0]["original"] if len(serialized_data["images"]) > 0 else None,
+                "photo": [{
+                    "@type": "CreativeWork",
+                    "@context": "https://schema.org",
+                    "url": x["original"]
+                } for x in serialized_data["images"]],
+                "address": {
+                    "@type": "PostalAddress",
+                    "@context": "https://schema.org",
+                    "streetAddress": hospital.get_hos_address(),
+                    "addressLocality": hospital.city,
+                    "addressRegion": hospital.state,
+                    "postalCode": hospital.pin_code
+                },
+                "availableService": {
+                    "@type": "MedicalTherapy",
+                    "@context": "https://schema.org",
+                    "name": [y["name"] for x in serialized_data['ipd_procedure_categories'] for y in x["ipd_procedures"]]
+                },
+                "member": [x["new_schema"] for x in serialized_data["doctors"]["result"]],
+                "aggregateRating": {
+                    "@type": "AggregateRating",
+                    "@context": "https://schema.org",
+                    "worstRating": "1",
+                    "ratingValue": serialized_data.get('rating_graph', {}).get('avg_rating'),
+                    "bestRating": "5",
+                    "ratingCount": serialized_data.get('rating_graph', {}).get('rating_count'),
+                },
+            }
+        except Exception as e:
+            logger.error(str(e))
+            schema = None
         return schema
 
 
