@@ -1926,8 +1926,7 @@ class UserNumberUpdate(TimeStampedModel):
 
     @classmethod
     def can_be_changed(cls, new_number):
-        return not User.objects.filter(phone_number=new_number).exists() \
-               and not UserProfile.objects.filter(phone_number=new_number).exists()
+        return not User.objects.filter(phone_number=new_number).exists()
 
     def after_commit_tasks(self, send_otp=False):
         from ondoc.notification.tasks import send_user_number_update_otp
