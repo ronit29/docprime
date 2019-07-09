@@ -1774,3 +1774,10 @@ class CompareLabPackagesSerializer(serializers.Serializer):
     longitude = serializers.FloatField(default=77.071848)
     latitude = serializers.FloatField(default=28.450367)
     title = serializers.CharField(required=False, max_length=500)
+
+
+class LabTestCategorySerializer(serializers.Serializer):
+    class Meta:
+        model = LabTestCategory
+        fields = '__all__'
+
