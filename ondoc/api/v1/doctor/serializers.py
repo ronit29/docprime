@@ -844,7 +844,7 @@ class DoctorListSerializer(serializers.Serializer):
     max_distance = serializers.IntegerField(required=False, allow_null=True)
     min_distance = serializers.IntegerField(required=False, allow_null=True)
     is_insurance = serializers.BooleanField(required=False)
-    hospital_id = serializers.IntegerField(required=False, allow_null=True)
+    hospital_id = CommaSepratedToListField(required=False, max_length=500, typecast_to=str, allow_blank=True)
     locality = serializers.CharField(required=False)
     city = serializers.CharField(required=False, allow_null=True)
     ipd_procedure_ids = CommaSepratedToListField(required=False, max_length=500, typecast_to=str)
@@ -852,6 +852,16 @@ class DoctorListSerializer(serializers.Serializer):
     gender = serializers.ChoiceField(choices=GENDER_CHOICES, required=False)
     availability = CommaSepratedToListField(required=False,  max_length=50, typecast_to=str)
     avg_ratings = CommaSepratedToListField(required=False,  max_length=50, typecast_to=str)
+
+    def validate_hospital_id(self, attrs):
+        try:
+            temp_attrs = [int(attr) for attr in attrs]
+            temp_attrs=set(temp_attrs)
+            if Hospital.objects.filter(id__in=temp_attrs, is_live=True).count() == len(temp_attrs):
+                return attrs
+        except:
+            raise serializers.ValidationError('Invalid Hospital IDs')
+        raise serializers.ValidationError('Invalid Hospital IDs')
 
     def validate_ipd_procedure_ids(self, attrs):
         try:
@@ -1972,6 +1982,7 @@ class HospitalDetailIpdProcedureSerializer(TopHospitalForIpdProcedureSerializer)
     show_popup = serializers.SerializerMethodField()
     force_popup = serializers.SerializerMethodField()
     new_about = serializers.SerializerMethodField()
+    all_specializations = serializers.SerializerMethodField()
 
     class Meta(TopHospitalForIpdProcedureSerializer.Meta):
         model = Hospital
@@ -1981,7 +1992,16 @@ class HospitalDetailIpdProcedureSerializer(TopHospitalForIpdProcedureSerializer)
                                                                      'doctors', 'rating_graph', 'rating',
                                                                      'display_rating_widget', 'opd_timings',
                                                                      'contact_number', 'specialization_doctors',
-                                                                     'offers', 'is_ipd_hospital', 'new_about', 'show_popup', 'force_popup', 'enabled_for_prepaid')
+                                                                     'offers', 'is_ipd_hospital', 'new_about',
+                                                                     'show_popup', 'force_popup', 'enabled_for_prepaid',
+                                                                     'all_specializations')
+
+    def get_all_specializations(self, obj):
+        from ondoc.doctor.models import PracticeSpecialization
+        from ondoc.api.v2.doctor.serializers import PracticeSpecializationSerializer
+        q = PracticeSpecialization.objects.filter(specialization__doctor__doctor_clinics__hospital=obj).distinct()
+        return PracticeSpecializationSerializer(q, many=True).data
+
 
     def get_show_popup(self, obj):
         request = self.context.get('request')

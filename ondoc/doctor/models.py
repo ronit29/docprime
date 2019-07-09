@@ -2712,8 +2712,6 @@ class OpdAppointment(auth_model.TimeStampedModel, CouponsMixin, OpdAppointmentIn
 
         payout_amount = self.fees
         tds = self.get_tds_amount()
-        if tds > 0:
-            payout_amount += tds
 
         # Update Net Revenue
         self.update_net_revenues(tds)
@@ -2721,7 +2719,8 @@ class OpdAppointment(auth_model.TimeStampedModel, CouponsMixin, OpdAppointmentIn
         payout_data = {
             "charged_amount" : self.effective_price,
             "payable_amount" : payout_amount,
-            "booking_type"  : Order.DOCTOR_PRODUCT_ID
+            "booking_type"  : Order.DOCTOR_PRODUCT_ID,
+            "tds_amount" : tds
         }
 
         merchant_payout = MerchantPayout.objects.create(**payout_data)
@@ -3194,6 +3193,7 @@ class OpdAppointment(auth_model.TimeStampedModel, CouponsMixin, OpdAppointmentIn
             'PatientName': self.profile_detail.get("name", ''),
             'PatientAddress': patient_address,
             'ProviderName': getattr(self, 'doctor').name + " - " + self.hospital.name,
+            'HospitalName': self.hospital.name,
             'ServiceName': service_name,
             'InsuranceCover': 0,
             'MobileList': mobile_list,
