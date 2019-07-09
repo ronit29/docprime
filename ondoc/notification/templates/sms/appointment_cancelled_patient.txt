@@ -2,7 +2,7 @@
 {% if instance.cancellation_type == 3 %}
     The appointment for {{patient_name|capfirst}} with Dr. {{doctor_name|capfirst}} on {{instance.time_slot_start|date:"d/m/y"}} at {{instance.time_slot_start|date:"h:i a"}} has been cancelled.
 {% else %}
-    The appointment for {{patient_name|capfirst}} with Dr. {{doctor_name|capfirst}} on {{instance.time_slot_start|date:"d/m/y"}} at {{instance.time_slot_start|date:"h:i a"}} has been cancelled as per your request.
+    The appointment for {{patient_name|capfirst}} with Dr. {{doctor_name|capfirst}} on {{instance.time_slot_start|date:"d/m/y"}} at {{instance.time_slot_start|date:"h:i a"}} has been cancelled.
 {% endif %}
 
 Booking ID : {{instance.id}}
