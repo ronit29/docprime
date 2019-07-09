@@ -11,7 +11,7 @@ from ondoc.authentication.models import User, UserProfile
 from ondoc.common.models import Feature, AppointmentHistory, VirtualAppointment
 from ondoc.coupon.models import Coupon
 from ondoc.doctor.models import DoctorClinic, SearchKey, Hospital, PracticeSpecialization, HealthInsuranceProvider, \
-    HospitalNetwork, Doctor
+    HospitalNetwork, Doctor, OpdAppointment
 from collections import deque, OrderedDict
 
 from ondoc.insurance.models import ThirdPartyAdministrator
@@ -127,7 +127,6 @@ class IpdProcedureCostEstimate(auth_model.TimeStampedModel):
         unique_together = (('ipd_procedure', 'hospital'),)
         verbose_name = "Ipd Cost Estimate"
         verbose_name_plural = "Ipd Cost Estimate"
-
 
 
 class IpdProcedureLead(auth_model.TimeStampedModel):
@@ -278,12 +277,24 @@ class IpdProcedureLead(auth_model.TimeStampedModel):
             request_data.update({'IPDHospitalName': self.hospital.name})
         if self.planned_date:
             request_data.update({'PlannedDate': int(self.planned_date.timestamp())})
+        if self.get_appointment_time():
+            request_data.update({'AppointmentDate': self.get_appointment_time()})
         if self.user:
             request_data.update({'IPDIsInsured': 1 if self.is_user_insured() else 0})
             request_data.update({'OPDAppointments': self.user.recent_opd_appointment.count()})
             request_data.update({'LabAppointments': self.user.recent_lab_appointment.count()})
         if self.comments:
             request_data.update({'UserComment': self.comments})
+        utm_tags = self.data.get('utm_tags', None)
+        if utm_tags:
+            if utm_tags.get('utm_medium', None):
+                request_data.update({'UTMMedium': utm_tags.get('utm_medium')})
+            if utm_tags.get('utm_campaign', None):
+                request_data.update({'UtmCampaign': utm_tags.get('utm_campaign')})
+            if utm_tags.get('utm_source', None):
+                request_data.update({'UtmSource': utm_tags.get('utm_source')})
+            if utm_tags.get('utm_term', None):
+                request_data.update({'UtmTerm': utm_tags.get('utm_term')})
 
     def is_user_insured(self):
         result = False
@@ -297,6 +308,20 @@ class IpdProcedureLead(auth_model.TimeStampedModel):
                                                               created_at__gt=datetime.datetime.utcnow() - datetime.timedelta(days=days),
                                                               phone_number=phone_number)
         return ipd_precedure_leads.exists()
+
+    def get_appointment_time(self):
+        from ondoc.diagnostic.models import LabAppointment
+        appointment_time = None
+        if self.data.get('opd_appointment_id', None):
+            appointment_obj = OpdAppointment.objects.filter(id=self.data.get('opd_appointment_id')).first()
+        elif self.data.get('lab_appointment_id', None):
+            appointment_obj = LabAppointment.objects.filter(id=self.data.get('lab_appointment_id')).first()
+
+        if appointment_obj:
+            appointment_time = int(appointment_obj.time_slot_start.timestamp())
+
+        return appointment_time
+
 
 
 class IpdProcedureDetailType(auth_model.TimeStampedModel):

@@ -809,6 +809,7 @@ def update_onboarding_qcstatus_to_matrix(self, data):
             new_status = obj.status
         else:
             new_status = obj.data_status
+
         request_data = {
             "LeadID": obj_matrix_lead_id,
             "Comment": comment,
@@ -816,6 +817,10 @@ def update_onboarding_qcstatus_to_matrix(self, data):
             "AssignedUser": assigned_user,
             "CRMStatusId": new_status
         }
+        if getattr(obj, 'planned_date', None):
+            request_data.update({'PlannedDate': int(obj.planned_date.timestamp())})
+        if obj.get_appointment_time():
+            request_data.update({'AppointmentDate': obj.get_appointment_time()})
 
         url = settings.MATRIX_STATUS_UPDATE_API_URL
         matrix_api_token = settings.MATRIX_API_TOKEN
