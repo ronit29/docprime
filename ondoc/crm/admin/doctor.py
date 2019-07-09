@@ -1599,10 +1599,19 @@ class PrescriptionInline(nested_admin.NestedTabularInline):
 class DoctorOpdAppointmentAdmin(admin.ModelAdmin):
     form = DoctorOpdAppointmentForm
     search_fields = ['id', 'profile__name', 'profile__phone_number', 'doctor__name', 'hospital__name']
-    list_display = ('booking_id', 'get_doctor', 'get_profile', 'status', 'time_slot_start', 'effective_price', 'created_at', 'updated_at')
+    list_display = ('booking_id', 'get_doctor', 'get_profile', 'status', 'time_slot_start', 'effective_price',
+                    'get_insurance', 'created_at', 'updated_at')
     list_filter = ('status', 'payment_type')
     date_hierarchy = 'created_at'
+    list_display_links = ('get_insurance',)
     inlines = [PrescriptionInline]
+
+    def get_insurance(self, obj):
+        if obj.insurance:
+            return str(obj.insurance.id)
+        else:
+            return ""
+    get_insurance.short_description = 'Insurance'
 
     def get_queryset(self, request):
         return super(DoctorOpdAppointmentAdmin, self).get_queryset(request).select_related('doctor', 'hospital', 'hospital__network')
