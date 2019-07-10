@@ -4318,3 +4318,22 @@ class CommonHospital(auth_model.TimeStampedModel):
     class Meta:
         db_table = "common_hospital"
 
+
+class SimilarSpecializationGroup(auth_model.TimeStampedModel):
+    name = models.SlugField(unique=True, db_index=True)
+    specializations = models.ManyToManyField(PracticeSpecialization, through='SimilarSpecializationGroupMapping',
+                                             through_fields=('group', 'specialization'))
+
+    class Meta:
+        db_table = "similar_specialization_group"
+
+    def __str__(self):
+        return self.name
+
+
+class SimilarSpecializationGroupMapping(models.Model):
+    specialization = models.ForeignKey(PracticeSpecialization, on_delete=models.CASCADE)
+    group = models.ForeignKey(SimilarSpecializationGroup, on_delete=models.CASCADE)
+
+    class Meta:
+        db_table = "similar_specialization_group_mapping"
