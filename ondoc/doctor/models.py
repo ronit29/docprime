@@ -2416,16 +2416,11 @@ class OpdAppointment(auth_model.TimeStampedModel, CouponsMixin, OpdAppointmentIn
         insurance = appointment_data.get('insurance')
         appointment_status = OpdAppointment.BOOKED
 
-        # if insurance and insurance.is_valid():
-        #     hospital = appointment_data.get('hospital')
-        #     if hospital:
-        #        is_appointment_exist = hospital.get_active_opd_appointments(insurance.user, insurance, appointment_data.get('time_slot_start').date())
-        #        if is_appointment_exist:
-        #            raise Exception('Some error occurred. Please try after some time')
-        #     mrp = appointment_data.get('fees')
-        #     insurance_limit_usage_data = insurance.validate_limit_usages(mrp)
-        #     if insurance_limit_usage_data.get('created_state'):
-        #         appointment_status = OpdAppointment.CREATED
+        if insurance and insurance.is_valid():
+            mrp = appointment_data.get('fees')
+            insurance_limit_usage_data = insurance.validate_limit_usages(mrp)
+            if insurance_limit_usage_data.get('created_state'):
+                appointment_status = OpdAppointment.CREATED
 
         otp = random.randint(1000, 9999)
         appointment_data["payment_status"] = OpdAppointment.PAYMENT_ACCEPTED
@@ -3193,6 +3188,7 @@ class OpdAppointment(auth_model.TimeStampedModel, CouponsMixin, OpdAppointmentIn
             'PatientName': self.profile_detail.get("name", ''),
             'PatientAddress': patient_address,
             'ProviderName': getattr(self, 'doctor').name + " - " + self.hospital.name,
+            'HospitalName': self.hospital.name,
             'ServiceName': service_name,
             'InsuranceCover': 0,
             'MobileList': mobile_list,

@@ -1960,3 +1960,55 @@ class LastLoginTimestamp(TimeStampedModel):
 
     class Meta:
         db_table = "last_login_timestamp"
+
+
+class UserNumberUpdate(TimeStampedModel):
+    user = models.ForeignKey(User, on_delete=models.DO_NOTHING, related_name="number_updates", limit_choices_to={'user_type': 3})
+    old_number = models.CharField(max_length=10, blank=False, null=True, default=None)
+    new_number = models.CharField(max_length=10, blank=False, null=True, default=None)
+    is_successfull = models.BooleanField(default=False)
+    otp = models.IntegerField(null=True, blank=True)
+
+    def __str__(self):
+        return str(self.user)
+
+    @classmethod
+    def can_be_changed(cls, new_number):
+        return not User.objects.filter(phone_number=new_number).exists()
+
+    def after_commit_tasks(self, send_otp=False):
+        from ondoc.notification.tasks import send_user_number_update_otp
+        if send_otp:
+            send_user_number_update_otp.apply_async((self.id,))
+
+    def save(self, *args, **kwargs):
+        if not self.is_successfull:
+            send_otp = False
+
+            # Instance comming First time.
+            if not self.id:
+                self.old_number = self.user.phone_number
+
+                self.otp = random.choice(range(100000, 999999))
+                send_otp = True
+
+            elif hasattr(self, '_process_update') and self._process_update:
+
+                profiles = UserProfile.objects.filter(phone_number=self.user.phone_number)
+                for profile in profiles:
+                    profile.phone_number = self.new_number
+                    profile.save()
+
+                self.user.phone_number = self.new_number
+
+                self.user.save()
+                self.is_successfull = True
+
+            super().save(*args, **kwargs)
+
+            transaction.on_commit(lambda: self.after_commit_tasks(send_otp=send_otp))
+        else:
+            pass
+
+    class Meta:
+        db_table = "user_number_updates"

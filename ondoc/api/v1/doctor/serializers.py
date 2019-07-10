@@ -1986,6 +1986,7 @@ class HospitalDetailIpdProcedureSerializer(TopHospitalForIpdProcedureSerializer)
     show_popup = serializers.SerializerMethodField()
     force_popup = serializers.SerializerMethodField()
     new_about = serializers.SerializerMethodField()
+    all_specializations = serializers.SerializerMethodField()
 
     class Meta(TopHospitalForIpdProcedureSerializer.Meta):
         model = Hospital
@@ -1995,7 +1996,16 @@ class HospitalDetailIpdProcedureSerializer(TopHospitalForIpdProcedureSerializer)
                                                                      'doctors', 'rating_graph', 'rating',
                                                                      'display_rating_widget', 'opd_timings',
                                                                      'contact_number', 'specialization_doctors',
-                                                                     'offers', 'is_ipd_hospital', 'new_about', 'show_popup', 'force_popup', 'enabled_for_prepaid')
+                                                                     'offers', 'is_ipd_hospital', 'new_about',
+                                                                     'show_popup', 'force_popup', 'enabled_for_prepaid',
+                                                                     'all_specializations')
+
+    def get_all_specializations(self, obj):
+        from ondoc.doctor.models import PracticeSpecialization
+        from ondoc.api.v2.doctor.serializers import PracticeSpecializationSerializer
+        q = PracticeSpecialization.objects.filter(specialization__doctor__doctor_clinics__hospital=obj).distinct()
+        return PracticeSpecializationSerializer(q, many=True).data
+
 
     def get_show_popup(self, obj):
         request = self.context.get('request')

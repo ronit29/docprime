@@ -361,8 +361,8 @@ class LabList(viewsets.ReadOnlyModelViewSet):
         package_count = RawSql(package_count_query, params).fetch_all()
         result_count = package_count[0].get('count', 0)
         temp_categories_ids = package_count[0].get('category_ids', [])
-        # if temp_categories_ids:
-        #     category_ids = temp_categories_ids
+        if not temp_categories_ids:
+            temp_categories_ids = []
         # if filter_query:
         #     filter_query = ' and '+filter_query
         package_search_query = package_search_query.format(filter_query=filter_query, sort_query=sort_query, offset=offset, limit=page_size)
@@ -1502,12 +1502,13 @@ class LabList(viewsets.ReadOnlyModelViewSet):
             group_filter.append("price<=(%(max_price)s)")
             filtering_params['max_price'] = max_price
 
-        if is_insurance and ids and self.request.user and not self.request.user.is_anonymous and \
-                self.request.user.active_insurance:
+        if is_insurance and ids and request and request.user and not request.user.is_anonymous and \
+                request.user.active_insurance:
             # filtering_query.append("mrp<=(%(insurance_threshold_amount)s)")
             if not hasattr(request, 'agent'):
                 group_filter.append("(case when covered_under_insurance then agreed_price<=insurance_cutoff_price or insurance_cutoff_price is null else false end  )")
-        elif not is_insurance and ids and request.user and not request.user.is_anonymous and request.user.active_insurance:
+        elif not is_insurance and ids and request and request.user and not request.user.is_anonymous and \
+                request.user.active_insurance:
             if not hasattr(request, 'agent'):
                 group_filter.append("( case when covered_under_insurance then agreed_price<=insurance_cutoff_price or insurance_cutoff_price is null else true end  )")
 
@@ -3100,7 +3101,7 @@ class TestDetailsViewset(viewsets.GenericViewSet):
             parameters['long'] = params.get('long')
 
         parameters['ids'] = ",".join(test_ids)
-        parameters['max_distance'] = 15
+        parameters['max_distance'] = 20
         parameters['min_distance'] = 0
 
         kwargs['parameters'] = parameters
