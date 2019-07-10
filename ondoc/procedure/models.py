@@ -278,8 +278,8 @@ class IpdProcedureLead(auth_model.TimeStampedModel):
             request_data.update({'IPDHospitalName': self.hospital.name})
         if self.planned_date:
             request_data.update({'PlannedDate': int(self.planned_date.timestamp())})
-        if self.get_appointment_time():
-            request_data.update({'AppointmentDate': self.get_appointment_time()})
+        if self.get_appointment_time:
+            request_data.update({'AppointmentDate': self.get_appointment_time})
         if self.user:
             request_data.update({'IPDIsInsured': 1 if self.is_user_insured() else 0})
             request_data.update({'OPDAppointments': self.user.recent_opd_appointment.count()})
