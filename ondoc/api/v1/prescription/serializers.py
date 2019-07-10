@@ -225,30 +225,6 @@ class GeneratePrescriptionPDFBodySerializer(serializers.Serializer):
             serial_id, task, prescription_pdf = prescription_models.PresccriptionPdf.compute_serial_id(id=attrs.get("id"),
                                                                                                        appointment=appointment,
                                                                                                        req_serial_id=attrs.get("serial_id"))
-            # if not attrs.get("serial_id"):
-            #     serial_id = prescription_models.PresccriptionPdf.get_serial(appointment)
-            # exists = False
-            # i = 0
-            # for pres in appointment.eprescription.all():
-            #     i += 1
-            #     if str(pres.id) == attrs.get("id"):
-            #         attrs['task'] = prescription_models.PresccriptionPdf.UPDATE
-            #         attrs['prescription_pdf'] = pres
-            #         if not attrs.get("serial_id"):
-            #             version = str(int(pres.serial_id[-2:]) + 1).zfill(2)
-            #             attrs['serial_id'] = pres.serial_id[-12:-2] + version
-            #         exists = True
-            #         break
-            # if not exists:
-            #     if i != 0:
-            #         attrs['task'] = prescription_models.PresccriptionPdf.CREATE
-            #         if not attrs.get("serial_id"):
-            #             file_no = str(int(serial_id[-5:-3]) + 1).zfill(2)
-            #             attrs['serial_id'] = serial_id[-12:-5] + file_no + '-01'
-            #     else:
-            #         attrs['task'] = prescription_models.PresccriptionPdf.CREATE
-            #         if not attrs.get("serial_id"):
-            #             attrs['serial_id'] = str(int(serial_id[-12:-6]) + 1) + '-01-01'
             attrs['task'] = task
             if serial_id:
                 attrs['serial_id'] = serial_id

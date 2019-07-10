@@ -883,9 +883,7 @@ class ProviderSignupDataViewset(viewsets.GenericViewSet):
     def decrypt_and_save_provider_data(self, hospital_id, key):
         passphrase = hashlib.md5(key.encode())
         passphrase = passphrase.hexdigest()[:16]
-        patient_queryset = doc_models.OfflinePatients.objects.prefetch_related('patient_mobiles'
-                                                                               # ,'hospital__offline_hospital_appointments__eprescription'
-                                                                               ).filter(hospital_id=hospital_id)
+        patient_queryset = doc_models.OfflinePatients.objects.prefetch_related('patient_mobiles').filter(hospital_id=hospital_id)
         for patient in patient_queryset:
             if patient.encrypted_name:
                 name, exception = v1_utils.AES_encryption.decrypt(patient.encrypted_name, passphrase)
@@ -907,9 +905,6 @@ class ProviderSignupDataViewset(viewsets.GenericViewSet):
 class PartnersAppInvoice(viewsets.GenericViewSet):
     authentication_classes = (JWTAuthentication,)
     permission_classes = (IsAuthenticated, DoctorPermission,)
-
-    # CREATE = 1
-    # UPDATE = 2
 
     def add_or_edit_general_invoice_item(self, request):
         try:
@@ -970,7 +965,6 @@ class PartnersAppInvoice(viewsets.GenericViewSet):
         selected_invoice_items = invoice_data.get('selected_invoice_items')
         invoice_data['selected_invoice_items'] = serializers.SelectedInvoiceItemsJSONSerializer(
             selected_invoice_items, many=True).data
-        # if task == self.CREATE:
         if task == doc_models.PartnersAppInvoice.CREATE:
             invoice_obj = doc_models.PartnersAppInvoice(**invoice_data)
             if not invoice_data.get('is_encrypted'):
@@ -989,21 +983,6 @@ class PartnersAppInvoice(viewsets.GenericViewSet):
 
         if generate_invoice:
             invoice_obj.is_invoice_generated = True
-            # invoice_obj.is_invoice_generated = True
-            # context = invoice_obj.get_context(selected_invoice_items)
-            # content = render_to_string("partners_app_invoice/partners_app_invoice.html", context=context)
-            # filename = (appointment.user.name + ' ' + invoice_obj.invoice_serial_id + '.pdf').replace(' ', '_')
-            # file = v1_utils.html_to_pdf(content, filename)
-            #
-            # invoice_obj.file = file
-            # file_path = os.path.join(settings.MEDIA_ROOT, invoice_obj.INVOICE_STORAGE_FOLDER, filename)
-            # if os.path.exists(file_path):
-            #     os.remove(file_path)
-            # invoice_obj.invoice_url = "{}{}{}".format(settings.BASE_URL, "/api/v2/doctor/invoice/", filename)
-            # encoded_filename = jwt.encode({"filename":filename}, settings.PARTNERS_INVOICE_ENCODE_KEY).decode('utf-8')
-            # encoded_url = "{}{}{}".format(settings.BASE_URL, "/api/v2/doctor/invoice/", encoded_filename)
-            # invoice_obj.encoded_url = v1_utils.generate_short_url(encoded_url)
-            # invoice_obj.generate_invoice(selected_invoice_items, appointment)
             if not invoice_data.get('is_encrypted'):
                 invoice_obj.generate_invoice(invoice_data['selected_invoice_items'], appointment)
         try:
@@ -1012,7 +991,6 @@ class PartnersAppInvoice(viewsets.GenericViewSet):
             invoice = serializers.PartnersAppInvoiceModelSerialier(invoice_obj)
 
             if selected_invoice_items:
-                # if task == self.UPDATE:
                 if task == doc_models.PartnersAppInvoice.UPDATE:
                     doc_models.SelectedInvoiceItems.objects.filter(invoice=invoice_obj.id).delete()
                 selected_invoice_items_objects = self.bulk_create_selected_invoice_items(selected_invoice_items,
@@ -1038,7 +1016,6 @@ class PartnersAppInvoice(viewsets.GenericViewSet):
                 {"status": 0, "message": "Invoice for this appointment already exists, please try updating it"},
                  status.HTTP_400_BAD_REQUEST)
         try:
-            # invoice_data['task'] = self.CREATE
             invoice_data['task'] = doc_models.PartnersAppInvoice.CREATE
             invoice, selected_invoice_items_created, exception = self.create_or_update_invoice(invoice_data, version='01', user=request.user, id=None)
             if not exception:
@@ -1058,10 +1035,8 @@ class PartnersAppInvoice(viewsets.GenericViewSet):
             data = serializer.validated_data['data']
             if not invoice.is_invoice_generated:
                 invoice.is_edited = True
-                # invoice.edited_by = request.user
                 invoice.save()
                 version = invoice.invoice_serial_id.split('-')[-1] if not data.get('is_encrypted') else None
-                # data['task'] = self.UPDATE
                 data['task'] = doc_models.PartnersAppInvoice.UPDATE
                 invoice_data, selected_invoice_items_created, exception = self.create_or_update_invoice(data, version, request.user, invoice.id)
 

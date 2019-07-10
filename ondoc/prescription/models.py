@@ -200,7 +200,6 @@ class PresccriptionPdf(auth_models.TimeStampedModel):
         hospital_id = appointment.hospital.id
         obj = cls.objects.filter(serial_id__contains=str(hospital_id)+'-'+str(doctor_id)).order_by('-serial_id').first()
         if obj:
-            # serial = obj.serial_id[-12:]
             serial = '-'.join(obj.serial_id.split('-')[-3:])
             return serial
         else:
@@ -299,7 +298,7 @@ class PresccriptionPdf(auth_models.TimeStampedModel):
         return version
 
     def __str__(self):
-        return self.id
+        return str(self.id)
 
     class Meta:
         db_table = 'eprescription_pdf'
@@ -312,7 +311,7 @@ class PrescriptionHistory(auth_models.TimeStampedModel):
     data = JSONField()
 
     def __str__(self):
-        return str(self.id) + '-' + str(self.prescription.id)
+        return '(' + str(self.id) + ') - (' + str(self.prescription.id) + ')'
 
     class Meta:
         db_table = 'eprescription_history'

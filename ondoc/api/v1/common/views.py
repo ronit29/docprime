@@ -996,8 +996,6 @@ class DeviceDetailsSave(viewsets.GenericViewSet):
         last_usage_serializer = serializers.LastUsageTimestampSerializer(data=request.data)
         last_usage_serializer.is_valid(raise_exception=True)
         last_usage_validated_data = last_usage_serializer.validated_data
-        if not last_usage_validated_data.get('source'):
-            return Response("Error saving last usage timestamp - 'source' is required", status=status.HTTP_400_BAD_REQUEST)
 
         add_or_update_device_details = False
         add_or_update_usage_time = True
