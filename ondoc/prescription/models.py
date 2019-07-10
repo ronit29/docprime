@@ -241,26 +241,57 @@ class PresccriptionPdf(auth_models.TimeStampedModel):
                     serial_id = str(int(serial_id.split('-')[-3]) + 1) + '-01-01'
         return serial_id, task, prescription_pdf
 
-    def decrypt_prescription_history(self, appointment, passphrase):
-        pres_histories = self.history.filter(data__is_encrypted=True).order_by('created_at')
-        version = None
-        latest_decrypted_pres_history = self.history.filter(data__is_encrypted=False).order_by('-updated_at').first()
-        for index, pres_history_obj in enumerate(pres_histories):
+    def decrypt_prescription_history(self, appointment, serial, file, passphrase):
+        # pres_histories = self.history.filter(data__is_encrypted=True).order_by('created_at')
+        # version = None
+        # latest_decrypted_pres_history = self.history.filter(data__is_encrypted=False).order_by('-updated_at').first()
+        # for index, pres_history_obj in enumerate(pres_histories):
+        #
+        #     utils.patient_details_name_phone_number_decrypt(pres_history_obj.data['patient_details'], passphrase)
+        #
+        #     pres_history_obj.data['is_encrypted'] = False
+        #     if index == 0:
+        #         if latest_decrypted_pres_history:
+        #             serial_id_elements = latest_decrypted_pres_history.data['serial_id'].split('-')
+        #             serial_id_elements[-1] = str(int(serial_id_elements[-1]) + 1).zfill(2)
+        #             serial_id = '-'.join(serial_id_elements)
+        #         else:
+        #             serial_id, task, pres_pdf = pres_models.PresccriptionPdf.compute_serial_id(self.id, appointment, None)
+        #     else:
+        #         serial_id_elements = serial_id.split('-')
+        #         serial_id_elements[-1] = str(int(serial_id_elements[-1]) + 1).zfill(2)
+        #         serial_id = '-'.join(serial_id_elements)
+        #     pres_history_obj.data['serial_id'] = str(appointment.hospital.id) + '-' + str(appointment.doctor.id) + '-' + serial_id
+        #     version = pres_history_obj.data['serial_id'].split('-')[-1]
+        #     pres_history_obj.save()
+        #
+        # return version
 
+        pres_histories = self.history.all()
+        encrypted_history = list()
+        latest_decrypted_pres_history = None
+        for pres in pres_histories:
+            if pres.data.is_encrypted:
+                encrypted_history.append(pres)
+            elif not latest_decrypted_pres_history or latest_decrypted_pres_history.data.updated_at < pres.data.updated_at:
+                latest_decrypted_pres_history = pres
+
+        for index, pres_history_obj in enumerate(encrypted_history):
             utils.patient_details_name_phone_number_decrypt(pres_history_obj.data['patient_details'], passphrase)
-
             pres_history_obj.data['is_encrypted'] = False
             if index == 0:
                 if latest_decrypted_pres_history:
                     serial_id_elements = latest_decrypted_pres_history.data['serial_id'].split('-')
                     serial_id_elements[-1] = str(int(serial_id_elements[-1]) + 1).zfill(2)
-                    serial_id = '-'.join(serial_id_elements)
+                    serial_id = '-'.join(serial_id_elements[-3:])
                 else:
-                    serial_id, task, pres_pdf = pres_models.PresccriptionPdf.compute_serial_id(self.id, appointment, None)
+                    serial_id_elements = [str(appointment.hospital.id), str(appointment.doctor.id),
+                                          serial, file, '01']
+                    serial_id = '-'.join(serial_id_elements[-3:])
             else:
                 serial_id_elements = serial_id.split('-')
                 serial_id_elements[-1] = str(int(serial_id_elements[-1]) + 1).zfill(2)
-                serial_id = '-'.join(serial_id_elements)
+                serial_id = '-'.join(serial_id_elements[-3:])
             pres_history_obj.data['serial_id'] = str(appointment.hospital.id) + '-' + str(appointment.doctor.id) + '-' + serial_id
             version = pres_history_obj.data['serial_id'].split('-')[-1]
             pres_history_obj.save()
