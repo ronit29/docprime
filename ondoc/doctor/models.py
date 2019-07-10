@@ -2416,16 +2416,11 @@ class OpdAppointment(auth_model.TimeStampedModel, CouponsMixin, OpdAppointmentIn
         insurance = appointment_data.get('insurance')
         appointment_status = OpdAppointment.BOOKED
 
-        # if insurance and insurance.is_valid():
-        #     hospital = appointment_data.get('hospital')
-        #     if hospital:
-        #        is_appointment_exist = hospital.get_active_opd_appointments(insurance.user, insurance, appointment_data.get('time_slot_start').date())
-        #        if is_appointment_exist:
-        #            raise Exception('Some error occurred. Please try after some time')
-        #     mrp = appointment_data.get('fees')
-        #     insurance_limit_usage_data = insurance.validate_limit_usages(mrp)
-        #     if insurance_limit_usage_data.get('created_state'):
-        #         appointment_status = OpdAppointment.CREATED
+        if insurance and insurance.is_valid():
+            mrp = appointment_data.get('fees')
+            insurance_limit_usage_data = insurance.validate_limit_usages(mrp)
+            if insurance_limit_usage_data.get('created_state'):
+                appointment_status = OpdAppointment.CREATED
 
         otp = random.randint(1000, 9999)
         appointment_data["payment_status"] = OpdAppointment.PAYMENT_ACCEPTED
@@ -2712,8 +2707,6 @@ class OpdAppointment(auth_model.TimeStampedModel, CouponsMixin, OpdAppointmentIn
 
         payout_amount = self.fees
         tds = self.get_tds_amount()
-        if tds > 0:
-            payout_amount += tds
 
         # Update Net Revenue
         self.update_net_revenues(tds)
@@ -2721,7 +2714,8 @@ class OpdAppointment(auth_model.TimeStampedModel, CouponsMixin, OpdAppointmentIn
         payout_data = {
             "charged_amount" : self.effective_price,
             "payable_amount" : payout_amount,
-            "booking_type"  : Order.DOCTOR_PRODUCT_ID
+            "booking_type"  : Order.DOCTOR_PRODUCT_ID,
+            "tds_amount" : tds
         }
 
         merchant_payout = MerchantPayout.objects.create(**payout_data)
@@ -2730,7 +2724,7 @@ class OpdAppointment(auth_model.TimeStampedModel, CouponsMixin, OpdAppointmentIn
         # TDS Deduction
         if tds > 0:
             merchant = self.get_merchant
-            MerchantTdsDeduction.objects.create(merchant=merchant, tds_deducted=tds, financial_year=MerchantTdsDeduction.CURRENT_FINANCIAL_YEAR,
+            MerchantTdsDeduction.objects.create(merchant=merchant, tds_deducted=tds, financial_year=settings.CURRENT_FINANCIAL_YEAR,
                                                 merchant_payout=merchant_payout)
 
     def doc_payout_amount(self):
@@ -3194,6 +3188,7 @@ class OpdAppointment(auth_model.TimeStampedModel, CouponsMixin, OpdAppointmentIn
             'PatientName': self.profile_detail.get("name", ''),
             'PatientAddress': patient_address,
             'ProviderName': getattr(self, 'doctor').name + " - " + self.hospital.name,
+            'HospitalName': self.hospital.name,
             'ServiceName': service_name,
             'InsuranceCover': 0,
             'MobileList': mobile_list,
@@ -3330,8 +3325,8 @@ class OpdAppointment(auth_model.TimeStampedModel, CouponsMixin, OpdAppointmentIn
         if order_obj:
             try:
                 patent_id = order_obj.parent_id
-                discount = (Decimal(order_obj.action_data.get('mrp')) - Decimal(order_obj.action_data.get(
-                    'deal_price'))) / Decimal(order_obj.action_data.get('mrp'))
+                discount = ((Decimal(order_obj.action_data.get('mrp')) - Decimal(order_obj.action_data.get(
+                    'deal_price'))) / Decimal(order_obj.action_data.get('mrp'))) * 100
                 discount = str(round(discount, 2))
                 result = patent_id, discount
             except Exception as e:

@@ -480,6 +480,8 @@ class Order(TimeStampedModel):
             all_txn = self.txn.all()
         elif self.dummy_txn.exists():
             all_txn = self.dummy_txn.all()
+        elif self.is_parent() and self.parent and self.parent.dummy_txn.exists():
+            all_txn = self.parent.dummy_txn.exists()
         return all_txn
 
     @classmethod
@@ -1491,6 +1493,7 @@ class MerchantPayout(TimeStampedModel):
     object_id = models.PositiveIntegerField(null=True, blank=True)
     content_object = GenericForeignKey()
     booking_type = models.IntegerField(null=True, blank=True, choices=BookingTypeChoices)
+    tds_amount = models.DecimalField(max_digits=10, decimal_places=2, default=None, null=True, blank=True)
 
     def save(self, *args, **kwargs):
 
@@ -1677,6 +1680,7 @@ class MerchantPayout(TimeStampedModel):
         if len(trans)>1:
             raise Exception('multiple transactions found')
 
+        # TO DO - Check for TDS
         if trans and trans[0].amount == self.payable_amount:
             return trans
 
@@ -1930,8 +1934,8 @@ class MerchantPayout(TimeStampedModel):
 
     def update_status_from_pg(self):
         with transaction.atomic():
-            if self.pg_status=='SETTLEMENT_COMPLETED' or self.utr_no or self.type ==self.MANUAL:
-                return
+            # if self.pg_status=='SETTLEMENT_COMPLETED' or self.utr_no or self.type ==self.MANUAL:
+            #     return
 
             order_no = None
             url = settings.SETTLEMENT_DETAILS_API

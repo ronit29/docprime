@@ -465,7 +465,7 @@ class MerchantPayoutAdmin(ExportMixin, VersionAdmin):
     resource_class = MerchantPayoutResource
     form = MerchantPayoutForm
     model = MerchantPayout
-    fields = ['id','booking_type', 'payment_mode','charged_amount', 'updated_at', 'created_at', 'payable_amount', 'status', 'payout_time', 'paid_to',
+    fields = ['id','booking_type', 'payment_mode','charged_amount', 'updated_at', 'created_at', 'payable_amount', 'tds_amount', 'status', 'payout_time', 'paid_to',
               'appointment_id', 'get_billed_to', 'get_merchant', 'process_payout', 'type', 'utr_no', 'amount_paid','api_response','pg_status','status_api_response']
     list_display = ('id', 'status', 'payable_amount', 'appointment_id', 'doc_lab_name','booking_type')
     search_fields = ['name']
@@ -689,6 +689,17 @@ class MatrixCityAutocomplete(autocomplete.Select2QuerySetView):
 
         if matrix_state:
             queryset = MatrixMappedCity.objects.filter(state_id=matrix_state)
+        if self.q:
+            queryset = queryset.filter(name__istartswith=self.q)
+
+        return queryset
+
+
+class RelatedHospitalAutocomplete(autocomplete.Select2QuerySetView):
+
+    def get_queryset(self):
+        queryset = Hospital.objects.filter(is_ipd_hospital=True)
+
         if self.q:
             queryset = queryset.filter(name__istartswith=self.q)
 

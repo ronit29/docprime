@@ -51,6 +51,8 @@ import nested_admin
 from .common import AssociatedMerchantInline, RemarkInline
 from ondoc.location.models import EntityUrls
 logger = logging.getLogger(__name__)
+from django.urls import reverse
+from django.utils.html import format_html_join, format_html
 
 
 class LabTestResource(resources.ModelResource):
@@ -371,7 +373,8 @@ class LabForm(FormCleanMixin):
         widgets = {
             'lab_pricing_group': autocomplete.ModelSelect2(url='labpricing-autocomplete'),
             'matrix_state': autocomplete.ModelSelect2(url='matrix-state-autocomplete'),
-            'matrix_city': autocomplete.ModelSelect2(url='matrix-city-autocomplete', forward=['matrix_state'])
+            'matrix_city': autocomplete.ModelSelect2(url='matrix-city-autocomplete', forward=['matrix_state']),
+            'related_hospital': autocomplete.ModelSelect2(url='related-hospital-autocomplete')
         }
         # exclude = ('pathology_agreed_price_percentage', 'pathology_deal_price_percentage', 'radiology_agreed_price_percentage',
         #            'radiology_deal_price_percentage', )
@@ -431,6 +434,10 @@ class LabForm(FormCleanMixin):
                 if data.get('disable_reason', None) and data.get('disable_reason', None) == Lab.OTHERS and not data.get(
                         'disable_comments', None):
                     raise forms.ValidationError("Must have disable comments if disable reason is others.")
+
+        if data.get('is_ipd_lab'):
+            if not data.get('related_hospital'):
+                raise forms.ValidationError("Must have a related hospital selected when ipd lab enable.")
 
 
 class LabCityFilter(SimpleListFilter):
@@ -561,6 +568,7 @@ class LabAdmin(ImportExportMixin, admin.GeoModelAdmin, VersionAdmin, ActionAdmin
     exclude = ('search_key', 'pathology_agreed_price_percentage', 'pathology_deal_price_percentage',
                'radiology_agreed_price_percentage', 'radiology_deal_price_percentage', 'live_at',
                'onboarded_at', 'qc_approved_at', 'disabled_at', 'welcome_calling_done_at')
+    # autocomplete_fields = ['related_hospital']
 
     def has_delete_permission(self, request, obj=None):
         return super().has_delete_permission(request, obj)
@@ -774,6 +782,7 @@ class LabAdmin(ImportExportMixin, admin.GeoModelAdmin, VersionAdmin, ActionAdmin
         form.base_fields['network'].queryset = LabNetwork.objects.filter(Q(data_status = QCModel.SUBMITTED_FOR_QC) | Q(data_status = QCModel.QC_APPROVED) | Q(created_by = request.user))
         form.base_fields['hospital'].queryset = Hospital.objects.filter(Q(data_status = QCModel.SUBMITTED_FOR_QC) | Q(data_status = QCModel.QC_APPROVED) | Q(created_by = request.user))
         form.base_fields['assigned_to'].queryset = User.objects.filter(user_type=User.STAFF)
+        # form.base_fields['related_hospital'].queryset = Hospital.objects.filter(is_ipd_hospital=True)
         if not request.user.is_superuser and not request.user.is_member_of(constants['QC_GROUP_NAME']):
             form.base_fields['assigned_to'].disabled = True
         return form
@@ -939,14 +948,33 @@ class LabAppointmentAdmin(nested_admin.NestedModelAdmin):
     search_fields = ['id']
     list_display = (
         'booking_id', 'get_profile', 'get_lab', 'status', 'reports_uploaded', 'time_slot_start', 'effective_price', 'get_profile_email',
-        'get_profile_age', 'created_at', 'updated_at', 'get_lab_test_name')
+        'get_profile_age', 'get_insurance', 'is_prescription_uploaded', 'created_at', 'updated_at', 'get_lab_test_name')
     list_filter = ('status', 'payment_type')
     date_hierarchy = 'created_at'
+    list_display_links = ('booking_id', 'get_insurance',)
 
     inlines = [
         LabReportInline,
         LabPrescriptionInline
     ]
+
+    def get_insurance(self, obj):
+        if obj.insurance:
+            content_type = ContentType.objects.get_for_model(UserInsurance)
+            link = reverse('admin:{}_{}_change'.format(content_type.app_label,
+                                                       content_type.model), args=[obj.insurance.id])
+            return format_html('<a href="{}">{}</a>', link, obj.insurance.id)
+        else:
+            return ""
+    get_insurance.short_description = 'Insurance'
+
+    def is_prescription_uploaded(self, obj):
+        is_prescription = AppointmentPrescription.is_prescription_uploaded_for_appointment(obj)
+        if is_prescription:
+            return str(True)
+        else:
+            return str(False)
+    is_prescription_uploaded.short_description = 'Prescription Uploaded'
 
     # def get_autocomplete_fields(self, request):
     #     if request.user.is_superuser:
@@ -1111,9 +1139,9 @@ class LabAppointmentAdmin(nested_admin.NestedModelAdmin):
     #     return inline_instance
 
     def reports_uploaded(self, instance):
-        if instance and instance.id:
+        if instance and instance.id and instance.reports.all():
             for report in instance.reports.all():
-                if report.files.all():
+                if report.files.all() or instance.reports_physically_collected:
                     return True
         elif instance and instance.id and instance.reports_physically_collected:
             return True
