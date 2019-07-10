@@ -271,9 +271,9 @@ class PresccriptionPdf(auth_models.TimeStampedModel):
         encrypted_history = list()
         latest_decrypted_pres_history = None
         for pres in pres_histories:
-            if pres.data.is_encrypted:
+            if pres.data['is_encrypted']:
                 encrypted_history.append(pres)
-            elif not latest_decrypted_pres_history or latest_decrypted_pres_history.data.updated_at < pres.data.updated_at:
+            elif not latest_decrypted_pres_history or latest_decrypted_pres_history.data['updated_at'] < pres.data['updated_at']:
                 latest_decrypted_pres_history = pres
 
         for index, pres_history_obj in enumerate(encrypted_history):

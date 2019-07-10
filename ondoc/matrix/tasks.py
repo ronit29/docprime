@@ -1101,6 +1101,7 @@ def decrypted_prescription_pdfs(hospital_ids, key):
 
     passphrase = hashlib.md5(key.encode())
     passphrase = passphrase.hexdigest()[:16]
+
     # for hospital_id in hospital_ids:
     #
     #     encrypted_prescriptions = pres_models.PresccriptionPdf.objects.prefetch_related('history').filter(Q(is_encrypted=True), (Q(opd_appointment__hospital_id=hospital_id) | Q(offline_opd_appointment__hospital_id=hospital_id))).order_by('created_at')
@@ -1150,15 +1151,6 @@ def decrypted_prescription_pdfs(hospital_ids, key):
                                                                               (Q(opd_appointment__hospital_id=hospital_id) |
                                                                                Q(offline_opd_appointment__hospital_id=hospital_id))) \
                                                                       .order_by('created_at')
-
-        prescription_histories = pres_models.PrescriptionHistory.objects.filter(prescription__in=encrypted_prescriptions)
-        prescription_histories_dict = dict()
-        for history in prescription_histories:
-            if history.prescription not in prescription_histories_dict:
-                prescription_histories_dict[history.prescription] = [history]
-            else:
-                prescription_histories_dict[history.prescription].append(history)
-
         appointments = set()
         for prescription in encrypted_prescriptions:
             pres_appointment = prescription.opd_appointment if prescription.appointment_type == pres_models.PresccriptionPdf.DOCPRIME_OPD else prescription.offline_opd_appointment
