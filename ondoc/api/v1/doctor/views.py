@@ -4015,7 +4015,7 @@ class HospitalViewSet(viewsets.GenericViewSet):
                     is_valid='t')
                 if valid_entity_url_qs.exists():
                     corrected_url = valid_entity_url_qs[0].url
-                    return Response(status=status.HTTP_301_MOVED_PERMANENTLY, data={'url': corrected_url})
+                    return Response(data={'url': corrected_url, 'status': 301})
                 else:
                     return Response(status=status.HTTP_404_NOT_FOUND)
 
@@ -4047,6 +4047,7 @@ class HospitalViewSet(viewsets.GenericViewSet):
         title = None
         description = None
         canonical_url = None
+        h1_title = None
 
         if not entity:
             entity = EntityUrls.objects.filter(entity_id=hospital_obj.id,
@@ -4096,8 +4097,10 @@ class HospitalViewSet(viewsets.GenericViewSet):
                 title = new_dynamic.meta_title
             if new_dynamic.meta_description:
                 description = new_dynamic.meta_description
+            if new_dynamic.h1_title:
+                h1_title = new_dynamic.h1_title
         schema = self.build_schema_for_hospital(hosp_serializer, hospital_obj, canonical_url)
-        response['seo'] = {'title': title, "description": description, "schema": schema}
+        response['seo'] = {'title': title, "description": description, "schema": schema, "h1_title": h1_title}
         response['canonical_url'] = canonical_url
 
         return Response(response)
