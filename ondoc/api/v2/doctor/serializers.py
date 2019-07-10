@@ -586,3 +586,10 @@ class UpdatePartnersAppInvoiceSerializer(serializers.Serializer):
         if not attrs.get('invoice_id').is_valid:
             raise serializers.ValidationError("valid invoice id is required")
         return attrs
+
+
+class ProviderEncryptResponseModelSerializer(serializers.ModelSerializer):
+
+    class Meta:
+        model = doc_models.ProviderEncrypt
+        fields = "__all__"
