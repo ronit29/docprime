@@ -266,6 +266,7 @@ class PresccriptionPdf(auth_models.TimeStampedModel):
         #
         # return version
 
+        version = None
         pres_histories = self.history.all()
         encrypted_history = list()
         latest_decrypted_pres_history = None
