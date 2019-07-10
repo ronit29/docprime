@@ -933,7 +933,7 @@ class UserInsuranceAdmin(ImportExportMixin, admin.ModelAdmin):
     list_display = ['id', 'insurance_plan', 'user_name', 'user', 'policy_number', 'purchase_date', 'status']
     fields = ['insurance_plan', 'user', 'purchase_date', 'expiry_date', 'policy_number', 'premium_amount',
               'merchant_payout', 'status', 'cancel_reason', 'cancel_after_utilize_insurance', 'cancel_case_type',
-              'cancel_status', 'cancel_initial_date', 'cancel_customer_type', 'cancel_initiate_by']
+              'cancel_status', 'cancel_initial_date', 'cancel_customer_type', 'cancel_initiate_by', 'appointment_status']
     readonly_fields = ('insurance_plan', 'user', 'purchase_date', 'expiry_date', 'policy_number', 'premium_amount',
                        'merchant_payout', 'cancel_initial_date', 'cancel_initiate_by')
     inlines = [InsuredMembersInline, UserBankInline, UserBankDocumentInline, GenericNotesInline]
@@ -1005,7 +1005,6 @@ class UserInsuranceAdmin(ImportExportMixin, admin.ModelAdmin):
             elif obj.status == UserInsurance.CANCELLATION_APPROVED:
                     send_insurance_notifications.apply_async(({'user_id': obj.user.id, 'status': obj.status},))
                     super(UserInsuranceAdmin, self).save_model(request, obj, form, change)
-
 
 
 class InsuranceDiseaseAdmin(admin.ModelAdmin):

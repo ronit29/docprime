@@ -2413,14 +2413,14 @@ class OpdAppointment(auth_model.TimeStampedModel, CouponsMixin, OpdAppointmentIn
 
     @classmethod
     def create_appointment(cls, appointment_data):
-
+        from ondoc.insurance.models import UserInsurance
         insurance = appointment_data.get('insurance')
         appointment_status = OpdAppointment.BOOKED
 
         if insurance and insurance.is_valid():
             mrp = appointment_data.get('fees')
             insurance_limit_usage_data = insurance.validate_limit_usages(mrp)
-            if insurance_limit_usage_data.get('created_state'):
+            if insurance_limit_usage_data.get('created_state') or insurance.appointment_status == UserInsurance.CREATED:
                 appointment_status = OpdAppointment.CREATED
 
         otp = random.randint(1000, 9999)
