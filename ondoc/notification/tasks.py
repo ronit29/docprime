@@ -15,6 +15,7 @@ from django.utils import timezone
 from openpyxl import load_workbook
 
 from ondoc.api.v1.utils import aware_time_zone, util_absolute_url
+from ondoc.authentication.models import UserNumberUpdate
 from ondoc.common.models import AppointmentMaskNumber
 from ondoc.notification.labnotificationaction import LabNotificationAction
 from ondoc.notification import models as notification_models
@@ -28,7 +29,6 @@ from ondoc.notification.models import NotificationAction
 import random
 import string
 from ondoc.api.v1.utils import RawSql
-
 
 logger = logging.getLogger(__name__)
 
@@ -1130,3 +1130,23 @@ def upload_cost_estimates(obj_id):
         else:
             instance.error_msg = [{'line number': 0, 'message': error_message}]
         instance.save(retry=False)
+
+
+@task()
+def send_user_number_update_otp(obj_id):
+    from ondoc.sms.backends.backend import BaseSmsBackend
+
+    obj = UserNumberUpdate.objects.filter(id=obj_id).first()
+    if not obj:
+        return
+
+    phone_numer = obj.new_number
+    otp = obj.otp
+
+    sms_class = BaseSmsBackend()
+    message = "Otp for new number update :%s . Dont share this with anyone." % str(otp)
+    success = sms_class.send(message, phone_numer)
+    if not success:
+        logger.error("Could not send otp for user number update.")
+
+    return

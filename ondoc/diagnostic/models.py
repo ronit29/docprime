@@ -1786,9 +1786,10 @@ class LabAppointment(TimeStampedModel, CouponsMixin, LabAppointmentInvoiceMixin,
     def allowed_action(self, user_type, request):
         allowed = []
         if self.status == self.CREATED:
-            if user_type == User.CONSUMER:
-                return [self.CANCELLED]
-            return []
+            return [self.CANCELLED]
+            # if user_type == User.CONSUMER:
+            #     return [self.CANCELLED]
+            # return []
 
         current_datetime = timezone.now()
         if user_type == User.CONSUMER and current_datetime <= self.time_slot_start:
@@ -2057,16 +2058,14 @@ class LabAppointment(TimeStampedModel, CouponsMixin, LabAppointmentInvoiceMixin,
             payout_amount += self.home_pickup_charges
 
         tds = self.get_tds_amount()
-        if tds > 0:
-            payout_amount += tds
-
         # Update Net Revenue
         self.update_net_revenues(tds)
 
         payout_data = {
             "charged_amount" : self.effective_price,
             "payable_amount" : payout_amount,
-            "booking_type": Order.LAB_PRODUCT_ID
+            "booking_type": Order.LAB_PRODUCT_ID,
+            "tds_amount": tds
         }
 
         merchant_payout = MerchantPayout.objects.create(**payout_data)

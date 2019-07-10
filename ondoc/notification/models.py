@@ -281,7 +281,7 @@ class NotificationAction:
             patient_name = instance.profile.name if instance.profile.name else ""
             doctor_name = instance.doctor.name if instance.doctor.name else ""
             if instance.cancellation_type != instance.AUTO_CANCELLED:
-                body = "Appointment with Dr. {} at {}, {} has been cancelled as per your request.".format(
+                body = "Appointment with Dr. {} at {}, {} has been cancelled.".format(
                     doctor_name, time_slot_start.strftime("%I:%M %P"),
                     time_slot_start.strftime("%d/%m/%y")
                 )

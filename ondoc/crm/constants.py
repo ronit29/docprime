@@ -36,7 +36,8 @@ constants = {
     'BLOCK_STATE_GROUP': 'block_state_group',
     'BLOCK_USER_GROUP': 'block_user_group',
     'APPOINTMENT_OTP_BYPASS_AGENT_TEAM': 'appointment_otp_bypass_agent_team',
-    'MARKETING_INTERN': 'marketing_intern'
+    'MARKETING_INTERN': 'marketing_intern',
+    'USER_UPDATE_TEAM': 'user_update_team'
 }
 matrix_product_ids = {
     'opd_products': 1,

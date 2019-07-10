@@ -459,6 +459,8 @@ class MatrixDataMixin(object):
             primary_proposer = user_insurance.get_primary_member_profile()
             primary_proposer_name = primary_proposer.get_full_name() if primary_proposer else None
 
+        insurance_link = '%s/admin/insurance/userinsurance/%s/change' % (settings.ADMIN_BASE_URL, user_insurance.id)
+
         policy_details = {
             "ProposalNo": None,
             "PolicyPaymentSTATUS": 300 if user_insurance else 0,
@@ -468,7 +470,8 @@ class MatrixDataMixin(object):
             "InsurancePlanPurchased": user_insurance.insurance_plan.name if user_insurance else None,
             "PurchaseDate": int(user_insurance.purchase_date.timestamp()) if user_insurance else None,
             "ExpirationDate": int(user_insurance.expiry_date.timestamp()) if user_insurance else None,
-            "COILink": user_insurance.coi.url if user_insurance and user_insurance.coi is not None and user_insurance.coi.name else None,
+            "COILink": insurance_link,
+            "InsuranceLink": insurance_link,
             "PeopleCovered": user_insurance.insurance_plan.get_people_covered() if user_insurance else ""
         }
 

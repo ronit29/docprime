@@ -1889,7 +1889,7 @@ class DoctorListViewSet(viewsets.GenericViewSet):
             reviews = validated_data.get('reviews')
         hospital_req_data = {}
         if validated_data.get('hospital_id'):
-            hospital_req_data = Hospital.objects.filter(id=validated_data.get('hospital_id')).values('id', 'name').first()
+            hospital_req_data = Hospital.objects.filter(id__in=validated_data.get('hospital_id')).values('id', 'name').first()
 
         return Response({"result": response, "count": result_count,
                          'specializations': specializations, 'conditions': conditions, "seo": seo,
@@ -3896,7 +3896,7 @@ class HospitalViewSet(viewsets.GenericViewSet):
         if entity:
             breadcrumb = deepcopy(entity.breadcrumb) if isinstance(entity.breadcrumb, list) else []
             breadcrumb.insert(0, {"title": "Home", "url": "/", "link_title": "Home"})
-            # breadcrumb.insert(1, {"title": "Hospitals", "url": "hospitals", "link_title": "Hospitals"})
+            breadcrumb.insert(1, {"title": "Hospitals", "url": "hospitals", "link_title": "Hospitals"})
             locality = entity.sublocality_value
             city = entity.locality_value
             url = entity.url
@@ -4054,15 +4054,16 @@ class HospitalViewSet(viewsets.GenericViewSet):
                 entity = entity[0]
 
         hosp_serializer = serializers.HospitalDetailIpdProcedureSerializer(hospital_obj, context={'request': request,
-                                                                                    'validated_data': validated_data,
-                                                                                    "entity": entity}).data
+                                                                                                  'validated_data': validated_data,
+                                                                                                  "entity": entity}).data
+
         response = hosp_serializer
         if entity:
             response['url'] = entity.url
             if entity.breadcrumb:
                 breadcrumb = [{'url': '/', 'title': 'Home', 'link_title': 'Home'}
-                              # {"title": "Hospitals", "url": "hospitals", "link_title": "Hospitals"}
-]
+                              ,{"title": "Hospitals", "url": "hospitals", "link_title": "Hospitals"}
+                              ]
                 if entity.locality_value:
                     # breadcrumb.append({'url': request.build_absolute_uri('/'+ entity.locality_value), 'title': entity.locality_value, 'link_title': entity.locality_value})
                     breadcrumb = breadcrumb + entity.breadcrumb
@@ -4071,7 +4072,7 @@ class HospitalViewSet(viewsets.GenericViewSet):
                 response['breadcrumb'] = breadcrumb
             else:
                 breadcrumb = [{'url': '/', 'title': 'Home', 'link_title': 'Home'},
-                              # {"title": "Hospitals", "url": "hospitals", "link_title": "Hospitals"},
+                              {"title": "Hospitals", "url": "hospitals", "link_title": "Hospitals"},
                               {'title': hospital_obj.name, 'url': None, 'link_title': None}]
                 response['breadcrumb'] = breadcrumb
 
@@ -4094,10 +4095,64 @@ class HospitalViewSet(viewsets.GenericViewSet):
                 title = new_dynamic.meta_title
             if new_dynamic.meta_description:
                 description = new_dynamic.meta_description
-        response['seo'] = {'title': title, "description": description}
+        schema = self.build_schema_for_hospital(hosp_serializer, hospital_obj, canonical_url)
+        response['seo'] = {'title': title, "description": description, "schema": schema}
         response['canonical_url'] = canonical_url
 
         return Response(response)
+
+
+    def build_schema_for_hospital(self, serialized_data, hospital, url):
+        try:
+            schema = {
+                "@type": "Hospital",
+                "@context": "https://schema.org/",
+                "currenciesAccepted": "INR",
+                "name": serialized_data['name'],
+                "url": "{}/{}".format(settings.BASE_URL, url) if url and isinstance(url, str) else None,
+                "medicalSpecialty": "Multi-Speciality" if serialized_data["multi_speciality"] else None,
+                "description": serialized_data['new_about'] if serialized_data['new_about'] else serialized_data['about'],
+                "telephone": serialized_data["contact_number"],
+                "logo": serialized_data["logo"],
+                "geo": {
+                    "@type": "GeoCoordinates",
+                    "@context": "https://schema.org",
+                    "latitude": serialized_data['lat'],
+                    "longitude": serialized_data['long']
+                } if serialized_data['lat'] and serialized_data['long'] else None,
+                "image": serialized_data["images"][0]["original"] if len(serialized_data["images"]) > 0 else None,
+                "photo": [{
+                    "@type": "CreativeWork",
+                    "@context": "https://schema.org",
+                    "url": x["original"]
+                } for x in serialized_data["images"]],
+                "address": {
+                    "@type": "PostalAddress",
+                    "@context": "https://schema.org",
+                    "streetAddress": hospital.get_hos_address(),
+                    "addressLocality": hospital.city,
+                    "addressRegion": hospital.state,
+                    "postalCode": hospital.pin_code
+                },
+                "availableService": {
+                    "@type": "MedicalTherapy",
+                    "@context": "https://schema.org",
+                    "name": [y["name"] for x in serialized_data['ipd_procedure_categories'] for y in x["ipd_procedures"]]
+                },
+                "member": [x["new_schema"] for x in serialized_data["doctors"]["result"]],
+                "aggregateRating": {
+                    "@type": "AggregateRating",
+                    "@context": "https://schema.org",
+                    "worstRating": "1",
+                    "ratingValue": serialized_data.get('rating_graph', {}).get('avg_rating'),
+                    "bestRating": "5",
+                    "ratingCount": serialized_data.get('rating_graph', {}).get('rating_count'),
+                },
+            }
+        except Exception as e:
+            logger.error(str(e))
+            schema = None
+        return schema
 
 
 class IpdProcedureViewSet(viewsets.GenericViewSet):
