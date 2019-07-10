@@ -1003,7 +1003,7 @@ class UserInsuranceAdmin(ImportExportMixin, admin.ModelAdmin):
                     send_insurance_notifications.apply_async(({'user_id': obj.user.id, 'status': obj.status},))
                     super(UserInsuranceAdmin, self).save_model(request, obj, form, change)
             elif obj.status == UserInsurance.CANCELLATION_APPROVED:
-                    send_insurance_notifications.apply_async(({'user_id': obj.user.id, 'status': obj.status},))
+                    # send_insurance_notifications.apply_async(({'user_id': obj.user.id, 'status': obj.status},))
                     super(UserInsuranceAdmin, self).save_model(request, obj, form, change)
 
 
