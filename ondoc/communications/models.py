@@ -1321,7 +1321,7 @@ class OpdNotification(Notification):
         est = pytz.timezone(settings.TIME_ZONE)
         time_slot_start = self.appointment.time_slot_start.astimezone(est)
         mask_number_instance = self.appointment.mask_number.filter(is_deleted=False).first()
-        mask_number=''
+        mask_number = ''
         if mask_number_instance:
             mask_number = mask_number_instance.mask_number
 
@@ -1336,10 +1336,13 @@ class OpdNotification(Notification):
             clinic_or_hospital = "Hospital"
         token_object = JWTAuthentication.generate_token(self.appointment.user)
         booking_url = settings.BASE_URL + '/sms/booking?token={}'.format(token_object['token'].decode("utf-8"))
-        opd_appointment_cod_to_prepaid_url, cod_to_prepaid_discount = self.appointment.get_cod_to_prepaid_url_and_discount(token_object['token'].decode("utf-8"))
-        opd_appointment_complete_url = booking_url + "&callbackurl=opd/appointment/{}?complete=true".format(self.appointment.id)
+        opd_appointment_cod_to_prepaid_url, cod_to_prepaid_discount = self.appointment.get_cod_to_prepaid_url_and_discount(
+            token_object['token'].decode("utf-8"))
+        opd_appointment_complete_url = booking_url + "&callbackurl=opd/appointment/{}?complete=true".format(
+            self.appointment.id)
         opd_appointment_feedback_url = booking_url + "&callbackurl=opd/appointment/{}".format(self.appointment.id)
-        reschdule_appointment_bypass_url = booking_url + "&callbackurl=opd/doctor/{}/{}/book?reschedule={}".format(self.appointment.doctor.id, self.appointment.hospital.id, self.appointment.id)
+        reschdule_appointment_bypass_url = booking_url + "&callbackurl=opd/doctor/{}/{}/book?reschedule={}".format(
+            self.appointment.doctor.id, self.appointment.hospital.id, self.appointment.id)
         hospitals_not_required_unique_code = set(json.loads(settings.HOSPITALS_NOT_REQUIRED_UNIQUE_CODE))
         credit_letter_url = self.appointment.get_credit_letter_url()
         context = {
@@ -1368,7 +1371,8 @@ class OpdNotification(Notification):
             "opd_appointment_feedback_url": generate_short_url(opd_appointment_feedback_url),
             "reschdule_appointment_bypass_url": generate_short_url(reschdule_appointment_bypass_url),
             "show_amounts": bool(self.appointment.payment_type != OpdAppointment.INSURANCE),
-            "opd_appointment_cod_to_prepaid_url": generate_short_url(opd_appointment_cod_to_prepaid_url) if opd_appointment_cod_to_prepaid_url else None,
+            "opd_appointment_cod_to_prepaid_url": generate_short_url(
+                opd_appointment_cod_to_prepaid_url) if opd_appointment_cod_to_prepaid_url else None,
             "cod_to_prepaid_discount": cod_to_prepaid_discount,
             "hospitals_not_required_unique_code": hospitals_not_required_unique_code,
             "credit_letter_url": generate_short_url(credit_letter_url) if credit_letter_url else None
@@ -1567,14 +1571,11 @@ class LabNotification(Notification):
             "type": "lab",
             "mask_number": mask_number,
             "email_banners": email_banners_html if email_banners_html is not None else "",
-<<<<<<< HEAD
             "lab_appointment_complete_url": generate_short_url(lab_appointment_complete_url),
             "lab_appointment_feedback_url": generate_short_url(lab_appointment_feedback_url),
             "reschedule_appointment_bypass_url": generate_short_url(reschedule_appointment_bypass_url),
-=======
             "is_thyrocare_report": is_thyrocare_report,
             "chat_url": chat_url,
->>>>>>> master
             "show_amounts": bool(self.appointment.payment_type != OpdAppointment.INSURANCE)
         }
         return context

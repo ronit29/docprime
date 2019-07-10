@@ -176,7 +176,9 @@ def send_opd_notifications_refactored(appointment_id, notification_type=None):
         opd_notification = OpdNotification(instance, notification_type)
         opd_notification.send()
     except Exception as e:
+        import traceback
         logger.error(str(e))
+        traceback.print_exc()
 
 
 @task
