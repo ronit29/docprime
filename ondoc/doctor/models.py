@@ -3318,7 +3318,7 @@ class OpdAppointment(auth_model.TimeStampedModel, CouponsMixin, OpdAppointmentIn
             previous_appointments = OpdAppointment.objects.filter(~Q(status=OpdAppointment.CANCELLED), doctor=doctor,
                                                                   profile=profile, hospital=hospital,
                                                                   created_at__lt=self.created_at,
-                                                                  insurance_isnull=False).order_by('-id')
+                                                                  insurance__isnull=False).order_by('-id')
 
             if not previous_appointments:
                 return False
