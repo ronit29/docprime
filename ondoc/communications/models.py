@@ -166,7 +166,7 @@ def get_title_body(notification_type, context, user):
             patient_name, time_slot_start.strftime("%I:%M %P"), time_slot_start.strftime("%d/%m/%y"))
     elif notification_type == NotificationAction.APPOINTMENT_CANCELLED and user and user.user_type == User.CONSUMER:
         if instance.cancellation_type != instance.AUTO_CANCELLED:
-            body = "Appointment with Dr. {} for {}, {} has been cancelled as per your request.".format(
+            body = "Appointment with Dr. {} for {}, {} has been cancelled.".format(
                 doctor_name, time_slot_start.strftime("%d/%m/%y"), time_slot_start.strftime("%I:%M %P"))
         else:
             body = "Appointment with Dr. {} for {}, {} has been cancelled due to unavailability of doctor manager.".format(
@@ -203,7 +203,7 @@ def get_title_body(notification_type, context, user):
             patient_name, time_slot_start.strftime("%I:%M %P"), time_slot_start.strftime("%d/%m/%y"))
     elif notification_type == NotificationAction.LAB_APPOINTMENT_CANCELLED and user and user.user_type == User.CONSUMER:
         if instance.cancellation_type != instance.AUTO_CANCELLED:
-            body = "Appointment with Lab - {} for {}, {} has been cancelled as per your request.".format(
+            body = "Appointment with Lab - {} for {}, {} has been cancelled.".format(
                 lab_name, time_slot_start.strftime("%d/%m/%y"), time_slot_start.strftime("%I:%M %P"))
         else:
             body = "Appointment with Lab - {} for {}, {} has cancelled due to unavailability of lab manager.".format(
@@ -1335,6 +1335,7 @@ class OpdNotification(Notification):
         credit_letter_url = self.appointment.get_credit_letter_url()
         context = {
             "doctor_name": doctor_name,
+            "hospital_name": self.appointment.hospital.name,
             "patient_name": patient_name,
             "id": self.appointment.id,
             "instance": self.appointment,
