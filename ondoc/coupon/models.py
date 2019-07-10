@@ -435,8 +435,8 @@ class CouponRecommender():
         else:
             all_coupons = all_coupons.filter(Q(is_user_specific=False))
 
-        # if product_id:
-        #     all_coupons = all_coupons.filter(is_corporate=False)
+        if product_id:
+            all_coupons = all_coupons.filter(is_corporate=False)
 
         all_coupons = list(set(all_coupons))
 
