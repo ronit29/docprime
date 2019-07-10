@@ -1465,7 +1465,7 @@ class TimeSlotExtraction(object):
                     pass
 
             if will_doctor_data_append:
-                data_list = {"value": start_hour, "text": start_hour_text, "price": price, "is_price_zero": True if price is not None and price == 0 else False, "mrp": mrp, 'deal_price': deal_price,
+                data_list = {"value": start_hour, "text": start_hour_text, "price": price, "fees": price, "is_price_zero": True if price is not None and price == 0 else False, "mrp": mrp, 'deal_price': deal_price,
                              "is_available": is_available, "on_call": on_call, "cod_deal_price": cod_deal_price}
         else:
             will_lab_data_append = False
