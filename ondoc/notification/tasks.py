@@ -1125,3 +1125,34 @@ def send_user_number_update_otp(obj_id):
         logger.error("Could not send otp for user number update.")
 
     return
+
+@task()
+def send_contactus_notification(obj_id):
+    from ondoc.notification.models import EmailNotification
+    from ondoc.web.models import ContactUs
+    from django.contrib.contenttypes.models import ContentType
+    obj = ContactUs.objects.filter(id=obj_id).first()
+
+    if not obj:
+        return
+
+    emails = settings.CONTACTUS_EMAILS
+
+    html_body = "{name} ( {email}-{mobile} ) has sent message {message}" \
+        .format(name=obj.name, email=obj.email, mobile=obj.mobile, message={obj.message})
+
+    if obj.from_app:
+        html_body += " from mobile app."
+    else:
+        html_body += "."
+
+    content_type = ContentType.objects.get_for_model(obj)
+    date = timezone.now() - timedelta(days=1)
+    is_already_sent = EmailNotification.objects.filter(created_at__gte=date,
+                                                       notification_type=NotificationAction.CONTACT_US_EMAIL,
+                                                       content_type=content_type,
+                                                       object_id=obj.id).exists()
+
+    if not is_already_sent:
+        for email in emails:
+            EmailNotification.send_contact_us_notification_email(content_type, obj.id, email, html_body)
