@@ -51,7 +51,7 @@ from .doctor import (DoctorAdmin, MedicalServiceAdmin, SpecializationAdmin, Qual
                      UploadDoctorDataAdmin, DoctorLeaveAdmin)
 from .aboutdoctor import AboutDoctorAdmin
 from .hospital import HospitalAdmin, CommonHospitalAdmin
-from .user import CustomUserAdmin
+from .user import CustomUserAdmin, UserNumberUpdateAdmin
 from .hospital_network import HospitalNetworkAdmin
 from .lab import LabAdmin, LabTestAdmin, LabTestTypeAdmin, AvailableLabTestAdmin, CommonDiagnosticConditionAdmin, \
     LabAppointmentAdmin, CommonTestAdmin, TestParameterAdmin, CommonPackageAdmin, LabTestCategoryAdmin, \
@@ -62,7 +62,7 @@ from .notification import (EmailNotificationAdmin, SmsNotificationAdmin,
 from .report import ReportAdmin
 from .coupon import CouponAdmin, UserSpecificCouponAdmin, RandomGeneratedCouponAdmin
 from ondoc.reports import models as report_models
-from ondoc.authentication.models import GenericLabAdmin
+from ondoc.authentication.models import GenericLabAdmin, UserNumberUpdate
 
 from ondoc.web.models import OnlineLead, Career, ContactUs
 from django.contrib.auth import get_user_model
@@ -268,3 +268,4 @@ admin.site.register(ThirdPartyAdministrator, ThirdPartyAdministratorAdmin)
 admin.site.register(BlacklistUser, BlacklistUserAdmin)
 admin.site.register(BlockedStates, BlockedStatesAdmin )
 admin.site.register(BankHolidays)
+admin.site.register(UserNumberUpdate, UserNumberUpdateAdmin)

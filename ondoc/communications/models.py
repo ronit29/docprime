@@ -166,7 +166,7 @@ def get_title_body(notification_type, context, user):
             patient_name, time_slot_start.strftime("%I:%M %P"), time_slot_start.strftime("%d/%m/%y"))
     elif notification_type == NotificationAction.APPOINTMENT_CANCELLED and user and user.user_type == User.CONSUMER:
         if instance.cancellation_type != instance.AUTO_CANCELLED:
-            body = "Appointment with Dr. {} for {}, {} has been cancelled as per your request.".format(
+            body = "Appointment with Dr. {} for {}, {} has been cancelled.".format(
                 doctor_name, time_slot_start.strftime("%d/%m/%y"), time_slot_start.strftime("%I:%M %P"))
         else:
             body = "Appointment with Dr. {} for {}, {} has been cancelled due to unavailability of doctor manager.".format(
@@ -203,7 +203,7 @@ def get_title_body(notification_type, context, user):
             patient_name, time_slot_start.strftime("%I:%M %P"), time_slot_start.strftime("%d/%m/%y"))
     elif notification_type == NotificationAction.LAB_APPOINTMENT_CANCELLED and user and user.user_type == User.CONSUMER:
         if instance.cancellation_type != instance.AUTO_CANCELLED:
-            body = "Appointment with Lab - {} for {}, {} has been cancelled as per your request.".format(
+            body = "Appointment with Lab - {} for {}, {} has been cancelled.".format(
                 lab_name, time_slot_start.strftime("%d/%m/%y"), time_slot_start.strftime("%I:%M %P"))
         else:
             body = "Appointment with Lab - {} for {}, {} has cancelled due to unavailability of lab manager.".format(
@@ -1270,6 +1270,7 @@ class PUSHNotification:
         context = copy.deepcopy(context)
         context.pop("instance", None)
         context.pop('time_slot_start', None)
+        context.pop('hospitals_not_required_unique_code', None)
         if user:
             target_app = user.user_type
             push_noti = PushNotification.objects.create(
@@ -1334,6 +1335,8 @@ class OpdNotification(Notification):
         credit_letter_url = self.appointment.get_credit_letter_url()
         context = {
             "doctor_name": doctor_name,
+            "hospital_address": self.appointment.hospital.get_hos_address(),
+            "hospital_name": self.appointment.hospital.name,
             "patient_name": patient_name,
             "id": self.appointment.id,
             "instance": self.appointment,
@@ -1524,9 +1527,10 @@ class LabNotification(Notification):
         chat_url = ""
         if instance and instance.lab and instance.lab.network and instance.lab.network.id == settings.THYROCARE_NETWORK_ID:
             is_thyrocare_report = True
-            # chat_url = "https://docprime.com/mobileviewchat?utm_source=Thyrocare&booking_id=%s" % instance.id
-            # chat_url = '%s/mobileviewchat?utm_source=Thyrocare&booking_id=%s&msg=startchat' % (settings.API_BASE_URL, instance.id)
-            chat_url = '%s/livechat?product=DocPrime&cb=1&source=Thyrocare&booking_id=%s&msg=startchat' % (settings.CHAT_API_URL, instance.id)
+            chat_url = "https://docprime.com/mobileviewchat?utm_source=Thyrocare&booking_id=%s" % instance.id
+            # # chat_url = '%s/mobileviewchat?utm_source=Thyrocare&booking_id=%s&msg=startchat' % (settings.API_BASE_URL, instance.id)
+            # # chat_url = '%s/livechat?product=DocPrime&cb=1&source=Thyrocare&booking_id=%s&msg=startchat' % (settings.CHAT_API_URL, instance.id)
+            # chat_url = '%s/livechat?product=DocPrime&cb=1&source=Thyrocare&booking_id=%s&msg=startchat' % (settings.CHAT_API_URL, instance.id)
             chat_url = generate_short_url(chat_url)
 
         context = {

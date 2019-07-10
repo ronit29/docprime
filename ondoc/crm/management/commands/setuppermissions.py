@@ -65,7 +65,8 @@ from ondoc.web.models import Career, OnlineLead, UploadImage
 from ondoc.ratings_review import models as rating_models
 from ondoc.articles.models import Article, ArticleLinkedUrl, LinkedArticle, ArticleContentBox, ArticleCategory
 
-from ondoc.authentication.models import BillingAccount, SPOCDetails, GenericAdmin, User, Merchant, AssociatedMerchant, DoctorNumber
+from ondoc.authentication.models import BillingAccount, SPOCDetails, GenericAdmin, User, Merchant, AssociatedMerchant, \
+    DoctorNumber, UserNumberUpdate
 from ondoc.account.models import MerchantPayout
 from ondoc.seo.models import Sitemap, NewDynamic
 from ondoc.elastic.models import DemoElastic
@@ -1072,3 +1073,20 @@ class Command(BaseCommand):
                 Q(codename='change_' + ct.model))
 
             group.permissions.add(*permissions)
+
+    def create_update_number_group(self):
+
+        group, created = Group.objects.get_or_create(name=constants['USER_UPDATE_TEAM'])
+        group.permissions.clear()
+
+        content_types = ContentType.objects.get_for_models(UserNumberUpdate)
+
+        for cl, ct in content_types.items():
+            permissions = Permission.objects.filter(
+                Q(content_type=ct),
+                Q(codename='add_' + ct.model) |
+                Q(codename='change_' + ct.model))
+
+            group.permissions.add(*permissions)
+
+

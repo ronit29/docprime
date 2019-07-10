@@ -372,7 +372,11 @@ class UserSpecificCouponResource(resources.ModelResource):
 
 
 class UserSpecificCouponAdmin(ImportExportModelAdmin):
+
+    from import_export.tmp_storages import MediaStorage
+
     resource_class = UserSpecificCouponResource
+    tmp_storage_class = MediaStorage
 
 
 class RandomGeneratedCouponAdmin(ImportExportModelAdmin):
