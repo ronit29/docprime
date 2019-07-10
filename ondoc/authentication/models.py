@@ -937,6 +937,43 @@ class GenericLabAdmin(TimeStampedModel, CreatedByModel):
                                )
 
 
+class GenericAdminManager(models.Manager):
+
+    def bulk_create(self, objs, **kwargs):
+        phone_numbers = list()
+        hospitals = list()
+        for obj in objs:
+            if obj.phone_number not in phone_numbers:
+                phone_numbers.append(obj.phone_number)
+            if obj.hospital not in hospitals:
+                hospitals.append(obj.hospital)
+        all_admins = GenericAdmin.objects.prefetch_related('hospital', 'hospital__hospital_doctor_number')\
+                                         .filter(phone_number__in=phone_numbers, hospital__in=hospitals)\
+                                         .order_by('-super_user_permission')
+        for obj in objs:
+            for admin in all_admins:
+                if admin.hospital != obj.hospital or int(admin.phone_number) != int(obj.phone_number):
+                    continue
+                if admin.super_user_permission:
+                    objs.remove(obj)
+                    break
+                elif obj.super_user_permission and admin.hospital == obj.hospital and int(admin.phone_number) == int(obj.phone_number):
+                    if not admin.doctor_number_exists():
+                        admin.delete()
+                elif not obj.super_user_permission and admin.permission_type == obj.permission_type:
+                    if not admin.doctor:
+                        objs.remove(obj)
+                    elif admin.doctor:
+                        if not obj.doctor:
+                            if not admin.doctor_number_exists():
+                                admin.doctor = None
+                                admin.save()
+                                objs.remove(obj)
+                        elif obj.doctor and admin.doctor == obj.doctor:
+                            objs.remove(obj)
+        return super().bulk_create(objs, **kwargs)
+
+
 class GenericAdmin(TimeStampedModel, CreatedByModel):
     APPOINTMENT = 1
     BILLINNG = 2
@@ -946,6 +983,7 @@ class GenericAdmin(TimeStampedModel, CreatedByModel):
     OTHER = 3
     CRM = 1
     APP = 2
+    objects = GenericAdminManager()
     entity_choices = ((OTHER, 'Other'), (DOCTOR, 'Doctor'), (HOSPITAL, 'Hospital'),)
     source_choices = ((CRM, 'CRM'), (APP, 'App'),)
     user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='manages', null=True, blank=True)
@@ -1234,6 +1272,16 @@ class GenericAdmin(TimeStampedModel, CreatedByModel):
                                                             Q(super_user_permission=True))) \
                                                    .values_list('hospital', flat=True)
         return list(manageable_hosp_list)
+
+    def doctor_number_exists(self):
+        # Ensure 'hospital' and 'hospital__doctor_number' is prefetched
+        doctor_number_exists = False
+        if self.doctor and self.hospital.hospital_doctor_number.all():
+            for doc_num in self.hospital.hospital_doctor_number.all():
+                if doc_num.doctor == self.doctor and doc_num.phone_number == self.phone_number:
+                    doctor_number_exists = True
+                    break
+        return doctor_number_exists
 
 
 class BillingAccount(models.Model):
