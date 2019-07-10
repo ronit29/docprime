@@ -90,7 +90,7 @@ import random
 from ondoc.prescription import models as pres_models
 from ondoc.api.v1.prescription import serializers as pres_serializers
 from django.template.defaultfilters import slugify
-from ondoc.api.v1.diagnostic.serializers import LabTestCategorySerializer
+
 
 class CreateAppointmentPermission(permissions.BasePermission):
     message = 'creating appointment is not allowed.'
@@ -1366,15 +1366,15 @@ class SearchedItemsViewSet(viewsets.GenericViewSet):
         top_hospitals_data = Hospital.get_top_hospitals_data(request, validated_data.get('lat'), validated_data.get('long'))
 
         categories = LabTestCategory.objects.filter(is_live=True, is_package_category=True,
-                                                    show_on_recommended_screen=True).order_by('priority')[:10]
-        categories_serializer = LabTestCategorySerializer(categories, many=True,   context={  'request': request})
+                                                    show_on_recommended_screen=True).order_by('priority')[:15].values('id', 'name', 'preferred_lab_test', 'is_live', 'is_package_category', 'show_on_recommended_screen',
+                  'priority', 'icon')
 
         return Response({"conditions": conditions_serializer.data, "specializations": specializations_serializer.data,
                          "procedure_categories": common_procedure_categories_serializer.data,
                          "procedures": common_procedures_serializer.data,
                          "ipd_procedures": common_ipd_procedures_serializer.data,
                          "top_hospitals": top_hospitals_data,
-                         'package_categories': categories_serializer.data})
+                         'package_categories': categories})
 
 
 class DoctorListViewSet(viewsets.GenericViewSet):

@@ -1776,8 +1776,3 @@ class CompareLabPackagesSerializer(serializers.Serializer):
     title = serializers.CharField(required=False, max_length=500)
 
 
-class LabTestCategorySerializer(serializers.Serializer):
-    class Meta:
-        model = LabTestCategory
-        fields = '__all__'
-
