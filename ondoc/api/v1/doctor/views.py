@@ -4030,6 +4030,7 @@ class HospitalViewSet(viewsets.GenericViewSet):
         serializer.is_valid(raise_exception=True)
         validated_data = serializer.validated_data
         hospital_obj = Hospital.objects.prefetch_related('service', 'network',
+                                                         'hosp_availability',
                                                          'hospital_documents',
                                                          'hospital_helpline_numbers',
                                                          'network__hospital_network_documents',
@@ -4062,7 +4063,7 @@ class HospitalViewSet(viewsets.GenericViewSet):
             response['url'] = entity.url
             if entity.breadcrumb:
                 breadcrumb = [{'url': '/', 'title': 'Home', 'link_title': 'Home'}
-                              ,{"title": "Hospitals", "url": "hospitals", "link_title": "Hospitals"}
+                    , {"title": "Hospitals", "url": "hospitals", "link_title": "Hospitals"}
                               ]
                 if entity.locality_value:
                     # breadcrumb.append({'url': request.build_absolute_uri('/'+ entity.locality_value), 'title': entity.locality_value, 'link_title': entity.locality_value})
@@ -4104,14 +4105,47 @@ class HospitalViewSet(viewsets.GenericViewSet):
 
     def build_schema_for_hospital(self, serialized_data, hospital, url):
         try:
+            from ondoc.doctor.models import HospitalTiming
+            min_fee, max_fee = None, None
+            for x in serialized_data.get("doctors", {}).get("result", []):
+                if not min_fee or min_fee > x["deal_price"]:
+                    min_fee = x["deal_price"]
+                if not max_fee or max_fee < x["deal_price"]:
+                    max_fee = x["deal_price"]
+            fee_range = None
+            if min_fee and max_fee and min_fee != max_fee:
+                fee_range = "INR {} - INR {}".format(min_fee, max_fee)
+            elif min_fee or max_fee:
+                fee_range = "INR {}".format(min_fee if min_fee else max_fee)
+
+            def time_float_to_str(t):
+                h, m, s = 0, 0, 0
+                h = t // 1
+                m = int((t * 10) % 10)
+                if m == 5:
+                    m = 30
+                result = "{:0>2}:{:0>2}:{:0>2}".format(h, m, s)
+                return result
+
+            available_days = {}
+            opens_at, closes_at = None, None
+            num_day = dict(HospitalTiming.DAY_CHOICES)
+            for x in hospital.hosp_availability.all():
+                available_days[x.day] = num_day[x.day]
+                if not opens_at and not closes_at:
+                    opens_at = time_float_to_str(x.start)
+                    closes_at = time_float_to_str(x.end)
+
             schema = {
                 "@type": "Hospital",
                 "@context": "https://schema.org/",
                 "currenciesAccepted": "INR",
+                "priceRange": fee_range,
                 "name": serialized_data['name'],
                 "url": "{}/{}".format(settings.BASE_URL, url) if url and isinstance(url, str) else None,
                 "medicalSpecialty": "Multi-Speciality" if serialized_data["multi_speciality"] else None,
-                "description": serialized_data['new_about'] if serialized_data['new_about'] else serialized_data['about'],
+                "description": serialized_data['new_about'] if serialized_data['new_about'] else serialized_data[
+                    'about'],
                 "telephone": serialized_data["contact_number"],
                 "logo": serialized_data["logo"],
                 "geo": {
@@ -4120,6 +4154,12 @@ class HospitalViewSet(viewsets.GenericViewSet):
                     "latitude": serialized_data['lat'],
                     "longitude": serialized_data['long']
                 } if serialized_data['lat'] and serialized_data['long'] else None,
+                "hasMap": {
+                    "@type": "Map",
+                    "@context": "https://schema.org",
+                    "url": "https://maps.google.com/maps?f=d&amp;hl=en&amp;addr={},{}".format(serialized_data['lat'],
+                                                                                              serialized_data['long'])
+                },
                 "image": serialized_data["images"][0]["original"] if len(serialized_data["images"]) > 0 else None,
                 "photo": [{
                     "@type": "CreativeWork",
@@ -4137,7 +4177,8 @@ class HospitalViewSet(viewsets.GenericViewSet):
                 "availableService": {
                     "@type": "MedicalTherapy",
                     "@context": "https://schema.org",
-                    "name": [y["name"] for x in serialized_data['ipd_procedure_categories'] for y in x["ipd_procedures"]]
+                    "name": [y["name"] for x in serialized_data['ipd_procedure_categories'] for y in
+                             x["ipd_procedures"]]
                 },
                 "member": [x["new_schema"] for x in serialized_data["doctors"]["result"]],
                 "aggregateRating": {
@@ -4148,6 +4189,25 @@ class HospitalViewSet(viewsets.GenericViewSet):
                     "bestRating": "5",
                     "ratingCount": serialized_data.get('rating_graph', {}).get('rating_count'),
                 },
+                "review": [
+                    {
+                        "@type": "Review",
+                        "reviewBody": x["compliment"],
+                        "datePublished": x["date"],
+                        "author": {
+                            "@type": "Person",
+                            "name": x["user_name"]
+                        }
+                    } for x in serialized_data["rating"]
+                ],
+                "openingHoursSpecification": [
+                    {
+                        "@type": "OpeningHoursSpecification",
+                        "dayOfWeek": list(available_days.values()),
+                        "opens": opens_at,
+                        "closes": closes_at
+                    }
+                ],
             }
         except Exception as e:
             logger.error(str(e))
@@ -4190,9 +4250,13 @@ class IpdProcedureViewSet(viewsets.GenericViewSet):
         serializer.is_valid(raise_exception=True)
         validated_data = serializer.validated_data
         ipd_procedure = IpdProcedure.objects.prefetch_related(
-            Prefetch('feature_mappings', IpdProcedureFeatureMapping.objects.select_related('feature').all().order_by('-feature__priority')),
-            Prefetch('ipdproceduredetail_set', IpdProcedureDetail.objects.select_related('detail_type').all().order_by('-detail_type__priority')),
-            Prefetch('similar_ipds', SimilarIpdProcedureMapping.objects.select_related('similar_ipd_procedure').all().order_by('-order')),
+            Prefetch('feature_mappings',
+                     IpdProcedureFeatureMapping.objects.select_related('feature').all().order_by('-feature__priority')),
+            Prefetch('ipdproceduredetail_set',
+                     IpdProcedureDetail.objects.select_related('detail_type').all().order_by('-detail_type__priority')),
+            Prefetch('similar_ipds',
+                     SimilarIpdProcedureMapping.objects.select_related('similar_ipd_procedure').all().order_by(
+                         '-order')),
             Prefetch('ipd_offers', Offer.objects.select_related('coupon', 'hospital', 'network').filter(is_live=True)),
         ).filter(is_enabled=True, id=pk).first()
         if ipd_procedure is None:
