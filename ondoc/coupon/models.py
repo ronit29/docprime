@@ -1,6 +1,5 @@
 from django.db import models
 from django.db.models import F, ExpressionWrapper, DateTimeField
-
 from ondoc.authentication import models as auth_model
 from ondoc.common.models import PaymentOptions
 from django.core.validators import MaxValueValidator, MinValueValidator
@@ -260,12 +259,19 @@ class Coupon(auth_model.TimeStampedModel):
         db_table = "coupon"
 
 
+class CustomUserSpecificManager(models.Manager):
+
+    def get_queryset(self):
+        return super().get_queryset().select_related('coupon')
+
+
 class UserSpecificCoupon(auth_model.TimeStampedModel):
 
     coupon = models.ForeignKey(Coupon, on_delete=models.CASCADE, null=False, related_name="user_specific_coupon")
     phone_number = models.CharField(max_length=10, blank=False, null=False)
     user = models.ForeignKey(auth_model.User, on_delete=models.SET_NULL, null=True, blank=True)
     count = models.PositiveIntegerField(default=1)
+    objects = CustomUserSpecificManager()
 
     def save(self, *args, **kwargs):
         try:

@@ -253,5 +253,14 @@ class AppointmentPrescription(auth_models.TimeStampedModel):
         content_type = ContentType.objects.get_for_model(app_obj)
         cls.objects.filter(id__in=ids).update(content_type_id=content_type.id, object_id=app_obj.id)
 
+    @classmethod
+    def is_prescription_uploaded_for_appointment(cls, app_obj):
+        content_type = ContentType.objects.get_for_model(app_obj)
+        appointment_with_prescription = cls.objects.filter(content_type_id=content_type.id, object_id=app_obj.id)
+        if appointment_with_prescription:
+            return True
+        else:
+            return False
+
     class Meta:
         db_table = 'appointment_prescription'
