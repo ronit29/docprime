@@ -1837,6 +1837,8 @@ class LabList(viewsets.ReadOnlyModelViewSet):
                     if res.get('distance') < existing.get('distance'):
                         temp = existing
                         existing = res
+                        if not existing.get('other_labs'):
+                            existing['other_labs'] = []
                         existing['other_labs'].append(temp)
                     else:
                         existing['other_labs'].append(res)
