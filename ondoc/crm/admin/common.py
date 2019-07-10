@@ -473,7 +473,7 @@ class MerchantPayoutAdmin(ExportMixin, VersionAdmin):
 
     def get_queryset(self, request):
         return super().get_queryset(request).filter(payable_amount__gt=0).order_by('-id').prefetch_related('lab_appointment__lab',
-                                                                             'opd_appointment__doctor')
+                                                                             'opd_appointment__doctor', 'user_insurance')
 
     def get_search_results(self, request, queryset, search_term):
         queryset, use_distinct = super().get_search_results(request, queryset, None)
@@ -658,6 +658,11 @@ class MatrixMappedCityAdmin(ImportMixin, admin.ModelAdmin):
     readonly_fields = ('name', 'state', )
     search_fields = ['name']
     resource_class = MatrixMappedCityResource
+
+    def get_queryset(self, request):
+        qs = super().get_queryset(request)
+        qs = qs.select_related('state')
+        return qs
 
     def get_readonly_fields(self, request, obj=None):
         if not request.user.is_superuser and not request.user.groups.filter(name=constants['SUPER_QC_GROUP']).exists():

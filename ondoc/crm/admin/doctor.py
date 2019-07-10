@@ -32,7 +32,6 @@ from ondoc.procedure.models import DoctorClinicProcedure, Procedure, DoctorClini
 
 logger = logging.getLogger(__name__)
 
-
 from ondoc.account.models import Order, Invoice
 from django.contrib.contenttypes.admin import GenericTabularInline
 from ondoc.authentication.models import GenericAdmin, SPOCDetails, AssociatedMerchant, Merchant, QCModel
@@ -1100,7 +1099,6 @@ class DoctorAdmin(AutoComplete, ImportExportMixin, VersionAdmin, ActionAdmin, QC
     # class DoctorAdmin(nested_admin.NestedModelAdmin):
     resource_class = DoctorResource
     change_list_template = 'superuser_import_export.html'
-
     # fieldsets = ((None,{'fields':('name','gender','practicing_since','license','is_license_verified','signature','raw_about' \
     #               ,'about',  'onboarding_url', 'get_onboard_link', 'additional_details')}),
     #              (None,{'fields':('assigned_to',)}),
@@ -1395,7 +1393,7 @@ class DoctorAdmin(AutoComplete, ImportExportMixin, VersionAdmin, ActionAdmin, QC
         super().save_model(request, obj, form, change)
 
     def has_add_permission(self, request):
-        if request.user.groups.filter(name=constants['DOCTOR_NETWORK_GROUP_NAME']).exists():
+        if request.user.is_member_of(constants['DOCTOR_NETWORK_GROUP_NAME']):
             requested_leadId = request.GET.get('LeadId')
             if not requested_leadId:
                 return False
