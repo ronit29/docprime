@@ -16,6 +16,7 @@ from collections import deque, OrderedDict
 
 from ondoc.insurance.models import ThirdPartyAdministrator
 from django.conf import settings
+from django.utils.functional import cached_property
 
 
 class IpdProcedure(auth_model.TimeStampedModel, SearchKey, auth_model.SoftDelete):
@@ -309,6 +310,7 @@ class IpdProcedureLead(auth_model.TimeStampedModel):
                                                               phone_number=phone_number)
         return ipd_precedure_leads.exists()
 
+    @cached_property
     def get_appointment_time(self):
         from ondoc.diagnostic.models import LabAppointment
         appointment_time = None
@@ -321,7 +323,6 @@ class IpdProcedureLead(auth_model.TimeStampedModel):
             appointment_time = int(appointment_obj.time_slot_start.timestamp())
 
         return appointment_time
-
 
 
 class IpdProcedureDetailType(auth_model.TimeStampedModel):

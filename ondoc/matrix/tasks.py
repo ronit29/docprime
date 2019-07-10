@@ -819,8 +819,8 @@ def update_onboarding_qcstatus_to_matrix(self, data):
         }
         if getattr(obj, 'planned_date', None):
             request_data.update({'PlannedDate': int(obj.planned_date.timestamp())})
-        if obj.get_appointment_time():
-            request_data.update({'AppointmentDate': obj.get_appointment_time()})
+        if hasattr(obj, 'get_appointment_time') and obj.get_appointment_time is not None:
+            request_data.update({'AppointmentDate': obj.get_appointment_time})
 
         url = settings.MATRIX_STATUS_UPDATE_API_URL
         matrix_api_token = settings.MATRIX_API_TOKEN
