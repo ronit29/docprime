@@ -371,7 +371,7 @@ class DoctorSearchHelper:
         specialization_ids = self.query_params.get("specialization_ids", [])
         condition_ids = self.query_params.get("condition_ids", [])
 
-        if filtering_params.get('params', {}).get('hospital_id'):
+        if self.query_params.get('hospital_id'):
             max_distance = 10000000
             min_distance = 0
 

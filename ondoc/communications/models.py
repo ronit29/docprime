@@ -1335,6 +1335,7 @@ class OpdNotification(Notification):
         credit_letter_url = self.appointment.get_credit_letter_url()
         context = {
             "doctor_name": doctor_name,
+            "hospital_address": self.appointment.hospital.get_hos_address(),
             "hospital_name": self.appointment.hospital.name,
             "patient_name": patient_name,
             "id": self.appointment.id,
@@ -1526,9 +1527,10 @@ class LabNotification(Notification):
         chat_url = ""
         if instance and instance.lab and instance.lab.network and instance.lab.network.id == settings.THYROCARE_NETWORK_ID:
             is_thyrocare_report = True
-            # chat_url = "https://docprime.com/mobileviewchat?utm_source=Thyrocare&booking_id=%s" % instance.id
-            # chat_url = '%s/mobileviewchat?utm_source=Thyrocare&booking_id=%s&msg=startchat' % (settings.API_BASE_URL, instance.id)
-            chat_url = '%s/livechat?product=DocPrime&cb=1&source=Thyrocare&booking_id=%s&msg=startchat' % (settings.CHAT_API_URL, instance.id)
+            chat_url = "https://docprime.com/mobileviewchat?utm_source=Thyrocare&booking_id=%s" % instance.id
+            # # chat_url = '%s/mobileviewchat?utm_source=Thyrocare&booking_id=%s&msg=startchat' % (settings.API_BASE_URL, instance.id)
+            # # chat_url = '%s/livechat?product=DocPrime&cb=1&source=Thyrocare&booking_id=%s&msg=startchat' % (settings.CHAT_API_URL, instance.id)
+            # chat_url = '%s/livechat?product=DocPrime&cb=1&source=Thyrocare&booking_id=%s&msg=startchat' % (settings.CHAT_API_URL, instance.id)
             chat_url = generate_short_url(chat_url)
 
         context = {

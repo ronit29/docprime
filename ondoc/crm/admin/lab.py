@@ -1631,6 +1631,11 @@ class AvailableLabTestAdmin(VersionAdmin):
     search_fields = ['test__name', 'lab_pricing_group__group_name', 'lab_pricing_group__labs__name']
     # autocomplete_fields = ['test']
 
+    def get_queryset(self, request):
+        qs = super().get_queryset(request)
+        qs = qs.select_related('lab_pricing_group', 'test', 'lab')
+        return qs
+
     class Media:
         js = ('js/admin/ondoc.js',)
 
@@ -1673,6 +1678,11 @@ class CommonTestAdmin(VersionAdmin):
 
 
 class CommonPackageAdmin(VersionAdmin):
+
+    def get_queryset(self, request):
+        qs = super().get_queryset(request)
+        qs = qs.select_related('package', 'lab')
+        return qs
 
     def get_form(self, request, obj=None, **kwargs):
         form = super(CommonPackageAdmin, self).get_form(request, obj=obj, **kwargs)

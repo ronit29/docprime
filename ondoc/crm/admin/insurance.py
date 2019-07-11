@@ -926,9 +926,22 @@ class UserInsuranceAdmin(ImportExportMixin, admin.ModelAdmin):
         return str(obj.policy_number)
 
     def user_name(self, obj):
-        from ondoc.authentication.models import UserProfile
-        user_profile = UserProfile.objects.filter(user=obj.user).first()
-        return str(user_profile.name)
+        # from ondoc.authentication.models import UserProfile
+        # user_profile = UserProfile.objects.filter(user=obj.user).first()
+        def_prof = False
+        for profile in obj.user.profiles.all():
+            first_name = profile.name
+            if profile.is_default_user:
+                def_prof = True
+                return str(profile.name)
+        if not def_prof:
+            return str(first_name)
+
+
+    def get_queryset(self, request):
+        qs = super().get_queryset(request)
+        qs = qs.select_related('user', 'insurance_plan').prefetch_related('user__profiles')
+        return qs
 
     list_display = ['id', 'insurance_plan', 'user_name', 'user', 'policy_number', 'purchase_date', 'status']
     fields = ['insurance_plan', 'user', 'purchase_date', 'expiry_date', 'policy_number', 'premium_amount',

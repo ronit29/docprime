@@ -2757,6 +2757,20 @@ class LabAppointment(TimeStampedModel, CouponsMixin, LabAppointmentInvoiceMixin,
         sum = sum if sum else 0
         return {'count': count, 'sum': sum}
 
+    def get_prescriptions(self, request):
+        prescription_dict = {}
+        files = []
+        upd = None
+        for pres in self.appointment_prescriptions.all():
+            url = request.build_absolute_uri(pres.prescription_file.url) if pres.prescription_file else None
+            files.append(url)
+            upd = pres.updated_at
+        prescription_dict = {
+            "updated_at": upd,
+            "files": files
+        }
+        return prescription_dict
+
     class Meta:
         db_table = "lab_appointment"
 
