@@ -2175,6 +2175,7 @@ class OpdAppointment(auth_model.TimeStampedModel, CouponsMixin, OpdAppointmentIn
     CANCELLATION_TYPE_CHOICES = [(PATIENT_CANCELLED, 'Patient Cancelled'), (AGENT_CANCELLED, 'Agent Cancelled'),
                                  (AUTO_CANCELLED, 'Auto Cancelled')]
 
+    SMS_APPOINTMENT_REMINDER_TIME = 5
     MAX_FREE_BOOKINGS_ALLOWED = 3
     # PATIENT_SHOW = 1
     # PATIENT_DIDNT_SHOW = 2
@@ -2618,10 +2619,10 @@ class OpdAppointment(auth_model.TimeStampedModel, CouponsMixin, OpdAppointmentIn
 
         if old_instance and old_instance.status != self.ACCEPTED and self.status == self.ACCEPTED:
             try:
-                notification_tasks.appointment_reminder_sms_provider.apply_async(
+                notification_tasks.docprime_appointment_reminder_sms_provider.apply_async(
                     (self.id, str(math.floor(self.updated_at.timestamp()))),
                     eta=self.time_slot_start - datetime.timedelta(
-                        minutes=int(settings.PROVIDER_SMS_APPOINTMENT_REMINDER_TIME)), )
+                        minutes=int(self.SMS_APPOINTMENT_REMINDER_TIME)), )
                 notification_tasks.opd_send_otp_before_appointment.apply_async(
                     (self.id, str(math.floor(self.time_slot_start.timestamp()))),
                     eta=self.time_slot_start - datetime.timedelta(
@@ -3849,6 +3850,8 @@ class OfflineOPDAppointments(auth_model.TimeStampedModel):
     REMINDER = 8
     SEND_MAP_LINK = 9
 
+    SMS_APPOINTMENT_REMINDER_TIME = 60         # minutes before appointment
+
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     STATUS_CHOICES = [(CREATED, 'Created'), (BOOKED, 'Booked'),
                       (RESCHEDULED_DOCTOR, 'Rescheduled by Doctor'),
@@ -3957,6 +3960,22 @@ class OfflineOPDAppointments(auth_model.TimeStampedModel):
 
         return resp
 
+    def after_commit_tasks(self, old_instance):
+        if not old_instance or (old_instance and
+                                ((old_instance.time_slot_start.timestamp() != self.time_slot_start.timestamp()) or
+                                 (old_instance.status != self.ACCEPTED and self.status == self.ACCEPTED))):
+            try:
+                notification_tasks.offline_appointment_reminder_sms_provider.apply_async(
+                    (self.id, str(math.floor(self.time_slot_start.timestamp()))),
+                    eta=self.time_slot_start - datetime.timedelta(
+                        minutes=int(self.SMS_APPOINTMENT_REMINDER_TIME)), )
+            except Exception as e:
+                logger.error(str(e))
+
+    def save(self, *args, **kwargs):
+        database_instance = OfflineOPDAppointments.objects.filter(pk=self.id).first()
+        super().save(*args, **kwargs)
+        transaction.on_commit(lambda: self.after_commit_tasks(database_instance))
 
 
 class SearchScore(auth_model.TimeStampedModel):

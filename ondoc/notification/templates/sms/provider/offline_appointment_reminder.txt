@@ -1,0 +1,11 @@
+Gentle Reminder: You have an appointment for
+{{patient_name|capfirst}}
+Dr. {{doctor_name|capfirst}} at {{instance.hospital.name|capfirst}} on {{instance.time_slot_start|date:"D jS F Y"}} at {{instance.time_slot_start|date:"h:i A"}}
+
+The booking details are as below :
+Patient Name : {{patient_name|capfirst}}
+Doctor Name : Dr. {{doctor_name|capfirst}}
+Appointment Date and Time : {{instance.time_slot_start|date:"D jS F Y"}} || {{instance.time_slot_start|date:"h:i A"}}
+
+Thanks
+Docprime Partners App

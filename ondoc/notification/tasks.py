@@ -755,7 +755,7 @@ def opd_send_otp_before_appointment(appointment_id, previous_appointment_date_ti
         logger.error(str(e))
 
 @task()
-def appointment_reminder_sms_provider(appointment_id, appointment_updated_at):
+def docprime_appointment_reminder_sms_provider(appointment_id, appointment_updated_at):
     from ondoc.doctor.models import OpdAppointment
     from ondoc.communications.models import OpdNotification
     try:
@@ -769,7 +769,28 @@ def appointment_reminder_sms_provider(appointment_id, appointment_updated_at):
             #                                                previous_appointment_date_time,
             #                                                str(math.floor(instance.time_slot_start.timestamp()))))
             return
-        opd_notification = OpdNotification(instance, NotificationAction.APPOINTMENT_REMINDER_PROVIDER_SMS)
+        opd_notification = OpdNotification(instance, NotificationAction.DOCPRIME_APPOINTMENT_REMINDER_PROVIDER_SMS)
+        opd_notification.send()
+    except Exception as e:
+        logger.error(str(e))
+
+
+@task()
+def offline_appointment_reminder_sms_provider(appointment_id, time_slot_start_timestamp):
+    from ondoc.doctor.models import OfflineOPDAppointments
+    from ondoc.communications.models import OpdNotification
+    try:
+        instance = OfflineOPDAppointments.objects.filter(id=appointment_id).first()
+        if not instance or \
+                not instance.user or \
+                str(math.floor(instance.time_slot_start.timestamp())) != time_slot_start_timestamp \
+                or instance.status != OfflineOPDAppointments.ACCEPTED:
+            # logger.error(
+            #     'instance : {}, time : {}, str: {}'.format(str(model_to_dict(instance)),
+            #                                                previous_appointment_date_time,
+            #                                                str(math.floor(instance.time_slot_start.timestamp()))))
+            return
+        opd_notification = OpdNotification(instance, NotificationAction.OFFLINE_APPOINTMENT_REMINDER_PROVIDER_SMS)
         opd_notification.send()
     except Exception as e:
         logger.error(str(e))
