@@ -2627,9 +2627,13 @@ class LabAppointment(TimeStampedModel, CouponsMixin, LabAppointmentInvoiceMixin,
         mobile_list = self.get_matrix_spoc_data()
         refund_data = self.refund_details_data()
 
+
+        insurance_link = '%s/admin/insurance/userinsurance/%s/change' % (settings.ADMIN_BASE_URL, user_insurance.id)
+
         appointment_details = {
             'IPDHospital': is_ipd_hospital,
             'IsInsured': 'yes' if user_insurance else 'no',
+            'PolicyLink': str(insurance_link),
             'InsurancePolicyNumber': str(user_insurance.policy_number) if user_insurance else None,
             'AppointmentStatus': self.status,
             'Age': self.calculate_age(),
