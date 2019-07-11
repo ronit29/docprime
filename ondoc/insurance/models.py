@@ -579,7 +579,7 @@ class UserInsurance(auth_model.TimeStampedModel):
     notes = GenericRelation(GenericNotes)
 
     def __str__(self):
-        return self.user
+        return str(self.user)
 
     @classmethod
     def all_premiums_which_need_transfer(cls):
