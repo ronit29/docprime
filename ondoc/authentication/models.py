@@ -1994,7 +1994,7 @@ class UserNumberUpdate(TimeStampedModel):
 
             elif hasattr(self, '_process_update') and self._process_update:
 
-                profiles = UserProfile.objects.filter(phone_number=self.user.phone_number)
+                profiles = self.user.profiles.filter(phone_number=self.user.phone_number)
                 for profile in profiles:
                     profile.phone_number = self.new_number
                     profile.save()
