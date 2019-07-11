@@ -3163,7 +3163,9 @@ class OpdAppointment(auth_model.TimeStampedModel, CouponsMixin, OpdAppointmentIn
         mobile_list = self.get_matrix_spoc_data()
         refund_data = self.refund_details_data()
 
-        insurance_link = '%s/admin/insurance/userinsurance/%s/change' % (settings.ADMIN_BASE_URL, user_insurance.id)
+        insurance_link = None
+        if user_insurance:
+            insurance_link = '%s/admin/insurance/userinsurance/%s/change' % (settings.ADMIN_BASE_URL, user_insurance.id)
 
         appointment_details = {
             'IPDHospital': is_ipd_hospital,
