@@ -72,8 +72,7 @@ from rest_framework.throttling import AnonRateThrottle
 from ondoc.matrix.tasks import push_order_to_matrix
 from dal import autocomplete
 from django.contrib.staticfiles.templatetags.staticfiles import static
-from django.db.models import Avg
-from django.db.models import Count
+from django.db.models import Count, IntegerField, Avg
 from ondoc.insurance.models import InsuranceThreshold
 import logging
 from ondoc.api.v1.auth import serializers as auth_serializers
@@ -3510,16 +3509,110 @@ class OfflineCustomerViewSet(viewsets.GenericViewSet):
         else:
             return Response([])
 
-    def list_appointments(self, request):
-        ONLINE = 1
-        OFFLINE = 2
+    def get_app_billing_status(self, app):
         INCOMPLETE = 1
         ELIGIBLE = 2
         INITIATED = 3
         PROCESSED = 4
+        billing_status = None
+        if app.time_slot_start <= timezone.now() and \
+                app.status not in [models.OpdAppointment.COMPLETED, models.OpdAppointment.CANCELLED,
+                                   models.OpdAppointment.BOOKED]:
+            billing_status = INCOMPLETE
+        elif app.status == models.OpdAppointment.COMPLETED and (
+                not app.merchant_payout or app.merchant_payout.status not in \
+                [account_models.MerchantPayout.ATTEMPTED, account_models.MerchantPayout.PAID]):
+            billing_status = ELIGIBLE
+        elif app.status == models.OpdAppointment.COMPLETED and (
+                app.merchant_payout and app.merchant_payout.status == account_models.MerchantPayout.ATTEMPTED):
+            billing_status = INITIATED
+        elif app.status == models.OpdAppointment.COMPLETED and (
+                app.merchant_payout and app.merchant_payout.status == account_models.MerchantPayout.PAID):
+            billing_status = PROCESSED
+        return billing_status
+
+    def get_lab_appointment_list(self, request, user):
+        from ondoc.diagnostic import models as lab_models
+        mask_data = None
+        response = []
+        manageable_lab_list = auth_models.GenericLabAdmin.objects.filter(is_disabled=False, user=user) \
+            .values_list('lab', flat=True)
+        appointment_queryset = lab_models.LabAppointment.objects\
+                                                        .select_related('lab', 'merchant_payout', 'profile')\
+                                                        .prefetch_related('lab__lab_documents', 'mask_number',
+                                                                          'profile__insurance',
+                                                                          'profile__insurance__user_insurance',
+                                                                          'appointment_prescriptions')\
+                                                        .filter(lab_id__in=manageable_lab_list) \
+                                                        .annotate(pem_type=Case(When(Q(lab__manageable_lab_admins__user=user) &
+                                                                 Q(lab__manageable_lab_admins__super_user_permission=True) &
+                                                                 Q(lab__manageable_lab_admins__is_disabled=False), then=Value(3)),
+                                                            When(Q(lab__manageable_lab_admins__user=user) &
+                                                                 Q(lab__manageable_lab_admins__super_user_permission=False) &
+                                                                 Q(
+                                                                     lab__manageable_lab_admins__permission_type=auth_models.GenericAdmin.BILLINNG) &
+                                                                 ~Q(
+                                                                     lab__manageable_lab_admins__permission_type=auth_models.GenericAdmin.APPOINTMENT) &
+                                                                 Q(lab__manageable_lab_admins__is_disabled=False), then=Value(2)),
+                                                            When(Q(lab__manageable_lab_admins__user=user) &
+                                                                 Q(lab__manageable_lab_admins__super_user_permission=False) &
+                                                                 Q(
+                                                                     lab__manageable_lab_admins__permission_type=auth_models.GenericAdmin.BILLINNG) &
+                                                                 Q(
+                                                                     lab__manageable_lab_admins__permission_type=auth_models.GenericAdmin.APPOINTMENT) &
+                                                                 Q(lab__manageable_lab_admins__is_disabled=False), then=Value(3)),
+                                                            default=Value(1),
+                                                            output_field=IntegerField()
+                                                            )
+                                                        )
+        for app in appointment_queryset:
+            mask_number = app.mask_number.all()
+            if mask_number and mask_number[0]:
+                mask_data = mask_number[0].build_data()
+            patient_profile = auth_serializers.UserProfileSerializer(app.profile, context={'request': request}).data
+            patient_profile['profile_id'] = app.profile.id if hasattr(app, 'profile') else None
+            patient_thumbnail = patient_profile['profile_image']
+            ret_obj = {}
+            ret_obj['id'] = app.id
+            ret_obj['deal_price'] = app.deal_price
+            ret_obj['payout_amount'] = app.merchant_payout.payable_amount if app.merchant_payout else app.agreed_price
+            ret_obj['effective_price'] = app.effective_price
+            ret_obj['allowed_action'] = app.allowed_action(User.DOCTOR, request)
+            ret_obj['patient_name'] = app.profile.name if hasattr(app, 'profile') else None
+            ret_obj['updated_at'] = app.updated_at
+            ret_obj['created_at'] = app.created_at
+            ret_obj['lab_name'] = app.lab.name
+            ret_obj['lab_id'] = app.lab.id
+            ret_obj['lab_thumbnail'] = request.build_absolute_uri(
+                    app.lab.get_thumbnail()) if app.lab.get_thumbnail() else None
+            ret_obj['time_slot_start'] = app.time_slot_start
+            ret_obj['status'] = app.status
+            ret_obj['mrp'] = app.price
+            ret_obj['mask_data'] = mask_data
+            ret_obj['payment_type'] = app.payment_type
+            ret_obj['billing_status'] = self.get_app_billing_status(app)
+            ret_obj['profile'] = patient_profile
+            ret_obj['permission_type'] = app.pem_type
+            ret_obj['is_docprime'] = True
+            ret_obj['patient_thumbnail'] = patient_thumbnail
+            ret_obj['type'] = 'lab'
+            ret_obj['prescriptions'] = app.get_prescriptions(request)
+            # ret_obj['invoice'] = invoice_data
+            response.append(ret_obj)
+        return response
+
+    def list_appointments(self, request):
+        ONLINE = 1
+        OFFLINE = 2
         serializer = serializers.OfflineAppointmentFilterSerializer(data=request.query_params)
         serializer.is_valid(raise_exception=True)
         valid_data = serializer.validated_data
+
+        type = valid_data.get('type')
+        if type == serializers.OfflineAppointmentFilterSerializer.LAB:
+            lab_data = self.get_lab_appointment_list(request, request.user)
+            return Response(lab_data)
+
         online_queryset = get_opd_pem_queryset(request.user, models.OpdAppointment)\
             .select_related('profile', 'merchant_payout')\
             .prefetch_related('prescriptions', 'prescriptions__prescription_file', 'mask_number',
@@ -3527,7 +3620,7 @@ class OfflineCustomerViewSet(viewsets.GenericViewSet):
 
         offline_queryset = get_opd_pem_queryset(request.user, models.OfflineOPDAppointments)\
             .select_related('user')\
-            .prefetch_related('user__patient_mobiles', 'eprescription', 'offline_prescription', 'partners_app_invoice').distinct('id')
+                .prefetch_related('user__patient_mobiles', 'eprescription', 'offline_prescription', 'partners_app_invoice').distinct('id')
         start_date = valid_data.get('start_date')
         end_date = valid_data.get('end_date')
         updated_at = valid_data.get('updated_at')
@@ -3617,23 +3710,10 @@ class OfflineCustomerViewSet(viewsets.GenericViewSet):
                 allowed_actions = app.allowed_action(User.DOCTOR, request)
                 # phone_number.append({"phone_number": app.user.phone_number, "is_default": True})
                 patient_profile = auth_serializers.UserProfileSerializer(app.profile, context={'request': request}).data
-                patient_thumbnail = patient_profile['profile_image']
-                patient_profile['user_id'] = app.user.id if app.user else None
                 patient_profile['profile_id'] = app.profile.id if hasattr(app, 'profile') else None
-                # patient_profile['phone_numbers'] = phone_number
+                patient_thumbnail = patient_profile['profile_image']
                 patient_name = app.profile.name if hasattr(app, 'profile') else None
-                if app.time_slot_start <= timezone.now() and \
-                        app.status not in [models.OpdAppointment.COMPLETED, models.OpdAppointment.CANCELLED, models.OpdAppointment.BOOKED]:
-                    billing_status = INCOMPLETE
-                elif app.status == models.OpdAppointment.COMPLETED and (not app.merchant_payout or app.merchant_payout.status not in \
-                        [account_models.MerchantPayout.ATTEMPTED, account_models.MerchantPayout.PAID]):
-                    billing_status = ELIGIBLE
-                elif app.status == models.OpdAppointment.COMPLETED and (app.merchant_payout and app.merchant_payout.status == account_models.MerchantPayout.ATTEMPTED):
-                    billing_status = INITIATED
-                elif app.status == models.OpdAppointment.COMPLETED and (
-                        app.merchant_payout and app.merchant_payout.status == account_models.MerchantPayout.PAID):
-                    billing_status = PROCESSED
-
+                billing_status = self.get_app_billing_status(app)
                 payout_amount = app.merchant_payout.payable_amount if app.merchant_payout else app.fees
                 prescription = app.get_prescriptions(request)
             doc_number = None
@@ -4015,7 +4095,7 @@ class HospitalViewSet(viewsets.GenericViewSet):
                     is_valid='t')
                 if valid_entity_url_qs.exists():
                     corrected_url = valid_entity_url_qs[0].url
-                    return Response(status=status.HTTP_301_MOVED_PERMANENTLY, data={'url': corrected_url})
+                    return Response(data={'url': corrected_url, 'status': 301})
                 else:
                     return Response(status=status.HTTP_404_NOT_FOUND)
 
@@ -4030,6 +4110,7 @@ class HospitalViewSet(viewsets.GenericViewSet):
         serializer.is_valid(raise_exception=True)
         validated_data = serializer.validated_data
         hospital_obj = Hospital.objects.prefetch_related('service', 'network',
+                                                         'hosp_availability',
                                                          'hospital_documents',
                                                          'hospital_helpline_numbers',
                                                          'network__hospital_network_documents',
@@ -4046,6 +4127,7 @@ class HospitalViewSet(viewsets.GenericViewSet):
         title = None
         description = None
         canonical_url = None
+        h1_title = None
 
         if not entity:
             entity = EntityUrls.objects.filter(entity_id=hospital_obj.id,
@@ -4062,7 +4144,7 @@ class HospitalViewSet(viewsets.GenericViewSet):
             response['url'] = entity.url
             if entity.breadcrumb:
                 breadcrumb = [{'url': '/', 'title': 'Home', 'link_title': 'Home'}
-                              ,{"title": "Hospitals", "url": "hospitals", "link_title": "Hospitals"}
+                    , {"title": "Hospitals", "url": "hospitals", "link_title": "Hospitals"}
                               ]
                 if entity.locality_value:
                     # breadcrumb.append({'url': request.build_absolute_uri('/'+ entity.locality_value), 'title': entity.locality_value, 'link_title': entity.locality_value})
@@ -4095,8 +4177,10 @@ class HospitalViewSet(viewsets.GenericViewSet):
                 title = new_dynamic.meta_title
             if new_dynamic.meta_description:
                 description = new_dynamic.meta_description
+            if new_dynamic.h1_title:
+                h1_title = new_dynamic.h1_title
         schema = self.build_schema_for_hospital(hosp_serializer, hospital_obj, canonical_url)
-        response['seo'] = {'title': title, "description": description, "schema": schema}
+        response['seo'] = {'title': title, "description": description, "schema": schema, "h1_title": h1_title}
         response['canonical_url'] = canonical_url
 
         return Response(response)
@@ -4104,14 +4188,47 @@ class HospitalViewSet(viewsets.GenericViewSet):
 
     def build_schema_for_hospital(self, serialized_data, hospital, url):
         try:
+            from ondoc.doctor.models import HospitalTiming
+            min_fee, max_fee = None, None
+            for x in serialized_data.get("doctors", {}).get("result", []):
+                if not min_fee or min_fee > x["deal_price"]:
+                    min_fee = x["deal_price"]
+                if not max_fee or max_fee < x["deal_price"]:
+                    max_fee = x["deal_price"]
+            fee_range = None
+            if min_fee and max_fee and min_fee != max_fee:
+                fee_range = "INR {} - INR {}".format(min_fee, max_fee)
+            elif min_fee or max_fee:
+                fee_range = "INR {}".format(min_fee if min_fee else max_fee)
+
+            def time_float_to_str(t):
+                h, m, s = 0, 0, 0
+                h = t // 1
+                m = int((t * 10) % 10)
+                if m == 5:
+                    m = 30
+                result = "{:0>2}:{:0>2}:{:0>2}".format(h, m, s)
+                return result
+
+            available_days = {}
+            opens_at, closes_at = None, None
+            num_day = dict(HospitalTiming.DAY_CHOICES)
+            for x in hospital.hosp_availability.all():
+                available_days[x.day] = num_day[x.day]
+                if not opens_at and not closes_at:
+                    opens_at = time_float_to_str(x.start)
+                    closes_at = time_float_to_str(x.end)
+
             schema = {
                 "@type": "Hospital",
                 "@context": "https://schema.org/",
                 "currenciesAccepted": "INR",
+                "priceRange": fee_range,
                 "name": serialized_data['name'],
                 "url": "{}/{}".format(settings.BASE_URL, url) if url and isinstance(url, str) else None,
                 "medicalSpecialty": "Multi-Speciality" if serialized_data["multi_speciality"] else None,
-                "description": serialized_data['new_about'] if serialized_data['new_about'] else serialized_data['about'],
+                "description": serialized_data['new_about'] if serialized_data['new_about'] else serialized_data[
+                    'about'],
                 "telephone": serialized_data["contact_number"],
                 "logo": serialized_data["logo"],
                 "geo": {
@@ -4120,6 +4237,12 @@ class HospitalViewSet(viewsets.GenericViewSet):
                     "latitude": serialized_data['lat'],
                     "longitude": serialized_data['long']
                 } if serialized_data['lat'] and serialized_data['long'] else None,
+                "hasMap": {
+                    "@type": "Map",
+                    "@context": "https://schema.org",
+                    "url": "https://maps.google.com/maps?f=d&amp;hl=en&amp;addr={},{}".format(serialized_data['lat'],
+                                                                                              serialized_data['long'])
+                },
                 "image": serialized_data["images"][0]["original"] if len(serialized_data["images"]) > 0 else None,
                 "photo": [{
                     "@type": "CreativeWork",
@@ -4137,7 +4260,8 @@ class HospitalViewSet(viewsets.GenericViewSet):
                 "availableService": {
                     "@type": "MedicalTherapy",
                     "@context": "https://schema.org",
-                    "name": [y["name"] for x in serialized_data['ipd_procedure_categories'] for y in x["ipd_procedures"]]
+                    "name": [y["name"] for x in serialized_data['ipd_procedure_categories'] for y in
+                             x["ipd_procedures"]]
                 },
                 "member": [x["new_schema"] for x in serialized_data["doctors"]["result"]],
                 "aggregateRating": {
@@ -4148,6 +4272,25 @@ class HospitalViewSet(viewsets.GenericViewSet):
                     "bestRating": "5",
                     "ratingCount": serialized_data.get('rating_graph', {}).get('rating_count'),
                 },
+                "review": [
+                    {
+                        "@type": "Review",
+                        "reviewBody": x["compliment"],
+                        "datePublished": x["date"],
+                        "author": {
+                            "@type": "Person",
+                            "name": x["user_name"]
+                        }
+                    } for x in serialized_data["rating"]
+                ],
+                "openingHoursSpecification": [
+                    {
+                        "@type": "OpeningHoursSpecification",
+                        "dayOfWeek": list(available_days.values()),
+                        "opens": opens_at,
+                        "closes": closes_at
+                    }
+                ],
             }
         except Exception as e:
             logger.error(str(e))
@@ -4190,9 +4333,13 @@ class IpdProcedureViewSet(viewsets.GenericViewSet):
         serializer.is_valid(raise_exception=True)
         validated_data = serializer.validated_data
         ipd_procedure = IpdProcedure.objects.prefetch_related(
-            Prefetch('feature_mappings', IpdProcedureFeatureMapping.objects.select_related('feature').all().order_by('-feature__priority')),
-            Prefetch('ipdproceduredetail_set', IpdProcedureDetail.objects.select_related('detail_type').all().order_by('-detail_type__priority')),
-            Prefetch('similar_ipds', SimilarIpdProcedureMapping.objects.select_related('similar_ipd_procedure').all().order_by('-order')),
+            Prefetch('feature_mappings',
+                     IpdProcedureFeatureMapping.objects.select_related('feature').all().order_by('-feature__priority')),
+            Prefetch('ipdproceduredetail_set',
+                     IpdProcedureDetail.objects.select_related('detail_type').all().order_by('-detail_type__priority')),
+            Prefetch('similar_ipds',
+                     SimilarIpdProcedureMapping.objects.select_related('similar_ipd_procedure').all().order_by(
+                         '-order')),
             Prefetch('ipd_offers', Offer.objects.select_related('coupon', 'hospital', 'network').filter(is_live=True)),
         ).filter(is_enabled=True, id=pk).first()
         if ipd_procedure is None:

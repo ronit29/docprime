@@ -1819,3 +1819,19 @@ def convert_datetime_str_to_iso_str(datetime_string_to_be_converted):
         result = datetime_string_to_be_converted
     return result
 
+
+def patient_details_name_phone_number_decrypt(patient_details, passphrase):
+    name = patient_details.get('encrypted_name')
+    phone_number = patient_details.get('encrypted_phone_number')
+    if name:
+        name, exception = AES_encryption.decrypt(name, passphrase)
+        if exception:
+            return exception
+    if phone_number:
+        phone_number, exception = AES_encryption.decrypt(phone_number, passphrase)
+        if exception:
+            return exception
+    patient_details['encrypted_name'] = None
+    patient_details['name'] = ''.join(e for e in name if e.isalnum() or e == ' ')
+    patient_details['encrypted_phone_number'] = None
+    patient_details['phone_number'] = ''.join(e for e in phone_number if e.isalnum())
