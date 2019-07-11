@@ -3935,7 +3935,7 @@ class OfflineOPDAppointments(auth_model.TimeStampedModel):
                 kwargs={'appointment_id': sms_obj['appointment'].id,
                         'time_slot_start_timestamp': sms_obj['appointment'].time_slot_start.timestamp(),
                         'number': sms_obj['phone_number'], 'text': default_text, 'type': 'Appointment RESCHEDULE'},
-                countdown=1)
+                eta=sms_obj['appointment'].time_slot_start - datetime.timedelta(minutes=int(OfflineOPDAppointments.SMS_APPOINTMENT_REMINDER_TIME)))
         except Exception as e:
             logger.error("Failed to Push Offline Appointment Reminder Message SMS Task " + str(e))
 
