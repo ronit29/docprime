@@ -3926,12 +3926,27 @@ class OfflineOPDAppointments(auth_model.TimeStampedModel):
             logger.error("Failed to Push Offline Appointment Rescehdule Message SMS Task " + str(e))
 
     @staticmethod
+    def schedule_appointment_reminder_sms(sms_obj):
+        try:
+            default_text = "GENTLE REMINDER: Dear %s, your appointment with %s at %s is scheduled at %s. In case of any query, please reach out to the clinic." % (
+                sms_obj['name'], sms_obj['appointment'].doctor.get_display_name(), sms_obj['appointment'].hospital.name,
+                sms_obj['appointment'].time_slot_start.strftime("%B %d, %Y %I:%M %p"))
+            notification_tasks.offline_appointment_reminder_sms_patient.apply_async(
+                kwargs={'appointment_id': sms_obj['appointment'].id,
+                        'time_slot_start_timestamp': sms_obj['appointment'].time_slot_start.timestamp(),
+                        'number': sms_obj['phone_number'], 'text': default_text, 'type': 'Appointment RESCHEDULE'},
+                countdown=1)
+        except Exception as e:
+            logger.error("Failed to Push Offline Appointment Reminder Message SMS Task " + str(e))
+
+    @staticmethod
     def after_commit_create_sms(sms_list):
         for sms_obj in sms_list:
             if sms_obj:
                 if sms_obj.get('display_welcome_message'):
                     OfflinePatients.welcome_message_sms(sms_obj)
                 OfflineOPDAppointments.appointment_add_sms(sms_obj)
+                OfflineOPDAppointments.schedule_appointment_reminder_sms(sms_obj)
 
     @staticmethod
     def after_commit_update_sms(sms_list):
@@ -3944,6 +3959,7 @@ class OfflineOPDAppointments(auth_model.TimeStampedModel):
                     OfflineOPDAppointments.appointment_add_sms(sms_obj)
                 elif sms_obj.get('action_reschedule') and sms_obj['action_reschedule']:
                     OfflineOPDAppointments.appointment_reschedule_sms(sms_obj)
+                    OfflineOPDAppointments.schedule_appointment_reminder_sms(sms_obj)
 
     def get_prescriptions(self, request):
 
@@ -3959,23 +3975,6 @@ class OfflineOPDAppointments(auth_model.TimeStampedModel):
         resp['files']= files
 
         return resp
-
-    def after_commit_tasks(self, old_instance):
-        if not old_instance or (old_instance and
-                                ((old_instance.time_slot_start.timestamp() != self.time_slot_start.timestamp()) or
-                                 (old_instance.status != self.ACCEPTED and self.status == self.ACCEPTED))):
-            try:
-                notification_tasks.offline_appointment_reminder_sms_provider.apply_async(
-                    (self.id, str(math.floor(self.time_slot_start.timestamp()))),
-                    eta=self.time_slot_start - datetime.timedelta(
-                        minutes=int(self.SMS_APPOINTMENT_REMINDER_TIME)), )
-            except Exception as e:
-                logger.error(str(e))
-
-    def save(self, *args, **kwargs):
-        database_instance = OfflineOPDAppointments.objects.filter(pk=self.id).first()
-        super().save(*args, **kwargs)
-        transaction.on_commit(lambda: self.after_commit_tasks(database_instance))
 
 
 class SearchScore(auth_model.TimeStampedModel):
