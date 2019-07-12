@@ -279,7 +279,7 @@ class IpdProcedureLead(auth_model.TimeStampedModel):
         if self.planned_date:
             request_data.update({'PlannedDate': int(self.planned_date.timestamp())})
         if self.get_appointment_time:
-            request_data.update({'AppointmentDate': self.get_appointment_time})
+            request_data.update({'AppointmentDate': int(self.get_appointment_time)})
         if self.user:
             request_data.update({'IPDIsInsured': 1 if self.is_user_insured() else 0})
             request_data.update({'OPDAppointments': self.user.recent_opd_appointment.count()})
@@ -320,7 +320,7 @@ class IpdProcedureLead(auth_model.TimeStampedModel):
             appointment_obj = LabAppointment.objects.filter(id=self.data.get('lab_appointment_id')).first()
 
         if appointment_obj:
-            appointment_time = int(appointment_obj.time_slot_start.timestamp())
+            appointment_time = appointment_obj.time_slot_start.timestamp()
 
         return appointment_time
 
