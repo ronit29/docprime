@@ -175,6 +175,7 @@ def send_opd_notifications_refactored(appointment_id, notification_type=None):
                     ({'type': 'OPD_APPOINTMENT', 'appointment': instance}))
     except Exception as e:
         logger.error(str(e))
+    logger.error("AFTER EXCEPTION")
     opd_notification = OpdNotification(instance, notification_type)
     opd_notification.send()
 

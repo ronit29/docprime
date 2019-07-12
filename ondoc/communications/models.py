@@ -1214,6 +1214,7 @@ class EMAILNotification:
             publish_message(message)
 
     def send(self, receivers):
+        logger.error("FINAL")
         context = self.context
         if not context:
             return
@@ -1299,6 +1300,7 @@ class PUSHNotification:
 class OpdNotification(Notification):
 
     def __init__(self, appointment, notification_type=None):
+        logger.error("INITIATED")
         self.appointment = appointment
         if notification_type:
             self.notification_type = notification_type
@@ -1364,10 +1366,11 @@ class OpdNotification(Notification):
         return context
 
     def send(self):
+        logger.error("IN SEND")
         context = self.get_context()
         notification_type = self.notification_type
         all_receivers = self.get_receivers()
-
+        logger.error(str(all_receivers))
         if notification_type == NotificationAction.DOCTOR_INVOICE:
             email_notification = EMAILNotification(notification_type, context)
             email_notification.send(all_receivers.get('email_receivers', []))
