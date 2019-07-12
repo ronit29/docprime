@@ -2176,6 +2176,11 @@ class OpdAppointment(auth_model.TimeStampedModel, CouponsMixin, OpdAppointmentIn
                                  (AUTO_CANCELLED, 'Auto Cancelled')]
 
     MAX_FREE_BOOKINGS_ALLOWED = 3
+
+    REGULAR = 1
+    FOLLOWUP = 2
+    APPOINTMENT_TYPE_CHOICES = [(REGULAR, "Regular"), (FOLLOWUP, "Followup")]
+
     # PATIENT_SHOW = 1
     # PATIENT_DIDNT_SHOW = 2
     # PATIENT_STATUS_CHOICES = [PATIENT_SHOW, PATIENT_DIDNT_SHOW]
@@ -2228,6 +2233,7 @@ class OpdAppointment(auth_model.TimeStampedModel, CouponsMixin, OpdAppointmentIn
     hospital_reference_id = models.CharField(max_length=1000, null=True, blank=True)
     documents = GenericRelation(Documents)
     fraud = GenericRelation(Fraud)
+    appointment_type = models.PositiveSmallIntegerField(choices=APPOINTMENT_TYPE_CHOICES, null=True, blank=True)
 
     def __str__(self):
         return self.profile.name + " (" + self.doctor.name + ")"
@@ -2675,8 +2681,8 @@ class OpdAppointment(auth_model.TimeStampedModel, CouponsMixin, OpdAppointmentIn
             # while completing appointment
             if database_instance and database_instance.status != self.status and self.status == self.COMPLETED:
                 # add a merchant_payout entry
-                if self.merchant_payout is None and self.payment_type not in [OpdAppointment.COD] and not \
-                        self.is_followup_appointment("payout") and not self.is_fraud_appointment:
+                if self.merchant_payout is None and self.payment_type not in [OpdAppointment.COD] and  \
+                        (self.appointment_type != OpdAppointment.FOLLOWUP or not self.is_fraud_appointment):
                     self.save_merchant_payout()
 
                 # credit cashback if any
@@ -3305,7 +3311,7 @@ class OpdAppointment(auth_model.TimeStampedModel, CouponsMixin, OpdAppointmentIn
         result['data'] = {'opd_appointment_id': self.id}
         return result
 
-    def is_followup_appointment(self, type):
+    def is_followup_appointment(self):
         if not self.insurance:
             return False
         doctor = self.doctor
@@ -3313,24 +3319,24 @@ class OpdAppointment(auth_model.TimeStampedModel, CouponsMixin, OpdAppointmentIn
         profile = self.profile
         last_appointment = None
 
-        if type == "payout":
-            completed_appointment = OpdAppointment.objects.filter(doctor=doctor, profile=profile, hospital=hospital,
-                                                                  status=OpdAppointment.COMPLETED,
-                                                                  created_at__lt=self.created_at,
-                                                                  insurance__isnull=False).order_by('-id')
-            if not completed_appointment:
-                return False
-            last_appointment = completed_appointment.first()
+        # if type == "payout":
+        #     completed_appointment = OpdAppointment.objects.filter(doctor=doctor, profile=profile, hospital=hospital,
+        #                                                           status=OpdAppointment.COMPLETED,
+        #                                                           created_at__lt=self.created_at,
+        #                                                           insurance__isnull=False).order_by('-id')
+        #     if not completed_appointment:
+        #         return False
+        #     last_appointment = completed_appointment.first()
 
-        if type == "crm":
-            previous_appointments = OpdAppointment.objects.filter(~Q(status=OpdAppointment.CANCELLED), doctor=doctor,
-                                                                  profile=profile, hospital=hospital,
-                                                                  created_at__lt=self.created_at,
-                                                                  insurance__isnull=False).order_by('-id')
+        # if type == "crm":
+        previous_appointments = OpdAppointment.objects.filter(~Q(status=OpdAppointment.CANCELLED), doctor=doctor,
+                                                              profile=profile, hospital=hospital,
+                                                              created_at__lt=self.created_at,
+                                                              insurance__isnull=False).order_by('-id')
 
-            if not previous_appointments:
-                return False
-            last_appointment = previous_appointments.first()
+        if not previous_appointments:
+            return False
+        last_appointment = previous_appointments.first()
 
         last_appointment_date = last_appointment.time_slot_start
         dc_obj = DoctorClinic.objects.filter(doctor=doctor, hospital=hospital, enabled=True).first()

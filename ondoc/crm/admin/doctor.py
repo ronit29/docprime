@@ -1607,11 +1607,11 @@ class DoctorOpdAppointmentAdmin(admin.ModelAdmin):
     inlines = [PrescriptionInline, FraudInline]
 
     def get_appointment_type(self, obj):
-        if obj.is_followup_appointment("crm"):
+        if obj.is_followup_appointment():
             return "Followup"
         else:
             return "Regular"
-    get_appointment_type.short_description = 'Appointment Type'
+    get_appointment_type.short_description = 'Type'
 
     def get_insurance(self, obj):
         if obj.insurance:
@@ -1686,7 +1686,7 @@ class DoctorOpdAppointmentAdmin(admin.ModelAdmin):
                 'status', 'cancel_type', 'cancellation_reason', 'cancellation_comments',
                 'start_date', 'start_time', 'invoice_urls', 'payment_type', 'payout_info', 'refund_initiated',
                 'status_change_comments', 'get_appointment_type', 'hospital_reference_id', 'send_credit_letter',
-                'send_cod_to_prepaid_request')
+                'send_cod_to_prepaid_request', 'appointment_type')
 
         if request.user.groups.filter(name=constants['APPOINTMENT_OTP_TEAM']).exists() or request.user.is_superuser:
             all_fields = all_fields + ('otp',)
