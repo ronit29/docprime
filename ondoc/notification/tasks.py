@@ -156,8 +156,8 @@ def send_lab_notifications(appointment_id):
 def send_opd_notifications_refactored(appointment_id, notification_type=None):
     from ondoc.doctor.models import OpdAppointment
     from ondoc.communications.models import OpdNotification
+    instance = OpdAppointment.objects.filter(id=appointment_id).first()
     try:
-        instance = OpdAppointment.objects.filter(id=appointment_id).first()
         if not instance or not instance.user:
             return
         if instance.status == OpdAppointment.COMPLETED:
@@ -173,10 +173,10 @@ def send_opd_notifications_refactored(appointment_id, notification_type=None):
                 counter = counter + 1
                 is_masking_done = generate_appointment_masknumber(
                     ({'type': 'OPD_APPOINTMENT', 'appointment': instance}))
-        opd_notification = OpdNotification(instance, notification_type)
-        opd_notification.send()
     except Exception as e:
         logger.error(str(e))
+    opd_notification = OpdNotification(instance, notification_type)
+    opd_notification.send()
 
 
 @task
