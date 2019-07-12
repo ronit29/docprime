@@ -25,7 +25,8 @@ from ondoc.doctor.models import (Doctor, Hospital, DoctorClinicTiming, DoctorCli
                                  MedicalConditionSpecialization, CompetitorInfo, CompetitorMonthlyVisit,
                                  SpecializationDepartmentMapping, CancellationReason, UploadDoctorData,
                                  HospitalServiceMapping, HealthInsuranceProviderHospitalMapping,
-                                 HealthInsuranceProvider, HospitalHelpline, HospitalTiming, CommonHospital)
+                                 HealthInsuranceProvider, HospitalHelpline, HospitalTiming, CommonHospital,
+                                 SimilarSpecializationGroup, SimilarSpecializationGroupMapping)
 
 from ondoc.diagnostic.models import (Lab, LabTiming, LabImage, GenericLabAdmin,
                                      LabManager, LabAccreditation, LabAward, LabCertification,
@@ -585,7 +586,8 @@ class Command(BaseCommand):
         content_types = ContentType.objects.get_for_models(PaymentOptions, EntityUrls, Feature, Service, Doctor,
                                                            HealthInsuranceProvider, IpdProcedureCategory, Plan,
                                                            PlanFeature, PlanFeatureMapping, UserPlanMapping, UploadImage,
-                                                           Offer, VirtualAppointment)
+                                                           Offer, VirtualAppointment, SimilarSpecializationGroup,
+                                                           SimilarSpecializationGroupMapping)
 
         for cl, ct in content_types.items():
             permissions = Permission.objects.filter(
