@@ -2877,7 +2877,10 @@ class OpdAppointment(auth_model.TimeStampedModel, CouponsMixin, OpdAppointmentIn
         procedures = [
             {"name": str(procedure["name"]), "mrp": str(procedure["mrp"]),
              "deal_price": str(procedure["deal_price"]),
-             "discount": str(procedure["discount"]), "agreed_price": str(procedure["agreed_price"])} for procedure in procedures]
+             "dp_price": 0 if not procedure["agreed_price"] else None,
+             "convenience_charges": procedure["deal_price"] if not procedure["agreed_price"] else None,
+             "discount": str(procedure["discount"]), "agreed_price": str(procedure["agreed_price"])} for procedure in
+            procedures]
 
         return procedures
 
@@ -3163,9 +3166,14 @@ class OpdAppointment(auth_model.TimeStampedModel, CouponsMixin, OpdAppointmentIn
         mobile_list = self.get_matrix_spoc_data()
         refund_data = self.refund_details_data()
 
+        insurance_link = None
+        if user_insurance:
+            insurance_link = '%s/admin/insurance/userinsurance/%s/change' % (settings.ADMIN_BASE_URL, user_insurance.id)
+
         appointment_details = {
             'IPDHospital': is_ipd_hospital,
             'IsInsured': 'yes' if user_insurance else 'no',
+            'PolicyLink': str(insurance_link),
             'InsurancePolicyNumber': str(user_insurance.policy_number) if user_insurance else None,
             'AppointmentStatus': self.status,
             'Age': self.calculate_age(),
@@ -4318,3 +4326,22 @@ class CommonHospital(auth_model.TimeStampedModel):
     class Meta:
         db_table = "common_hospital"
 
+
+class SimilarSpecializationGroup(auth_model.TimeStampedModel):
+    name = models.SlugField(unique=True, db_index=True)
+    specializations = models.ManyToManyField(PracticeSpecialization, through='SimilarSpecializationGroupMapping',
+                                             through_fields=('group', 'specialization'))
+
+    class Meta:
+        db_table = "similar_specialization_group"
+
+    def __str__(self):
+        return self.name
+
+
+class SimilarSpecializationGroupMapping(models.Model):
+    specialization = models.ForeignKey(PracticeSpecialization, on_delete=models.CASCADE)
+    group = models.ForeignKey(SimilarSpecializationGroup, on_delete=models.CASCADE)
+
+    class Meta:
+        db_table = "similar_specialization_group_mapping"
