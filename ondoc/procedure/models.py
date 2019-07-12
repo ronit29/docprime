@@ -314,6 +314,7 @@ class IpdProcedureLead(auth_model.TimeStampedModel):
     def get_appointment_time(self):
         from ondoc.diagnostic.models import LabAppointment
         appointment_time = None
+        appointment_obj = None
         if self.data.get('opd_appointment_id', None):
             appointment_obj = OpdAppointment.objects.filter(id=self.data.get('opd_appointment_id')).first()
         elif self.data.get('lab_appointment_id', None):
