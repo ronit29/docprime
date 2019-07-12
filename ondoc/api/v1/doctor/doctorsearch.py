@@ -51,11 +51,20 @@ class DoctorSearchHelper:
         procedure_category_ids = self.query_params.get("procedure_category_ids", [])  # NEW_LOGIC
         sits_at_hosp_types = self.query_params.get("sits_at", [])
 
-
+        counter = 1
         if self.query_params.get('hospital_id') is not None:
+            hosp_str = 'h.id IN('
+            for id in self.query_params.get('hospital_id'):
+
+                if not counter == 1:
+                    hosp_str += ','
+                hosp_str = hosp_str + '%(' + 'hospital' + str(counter) + ')s'
+                params['hospital' + str(counter)] = id
+                counter += 1
+
             filtering_params.append(
-                "h.id=(%(hospital_id)s)")
-            params['hospital_id'] = str(self.query_params.get("hospital_id"))
+                hosp_str + ')'
+            )
 
         if self.query_params.get('locality_value'):
             filtering_params.append("h.city_search_key ilike (%(locality_value)s)")
@@ -286,7 +295,7 @@ class DoctorSearchHelper:
         bucket_size=8000
 
         if self.query_params.get('is_user_insured') and not self.query_params.get('sort_on'):
-            return " enabled_for_online_booking DESC , floor(distance/{bucket_size}) ASC, fees ASC ".format(bucket_size=str(bucket_size)), "rnk=1"
+            return "  distance ASC, fees ASC ", "rnk=1"
 
         if self.count_of_procedure:
             order_by_field = ' distance, total_price '
@@ -362,7 +371,7 @@ class DoctorSearchHelper:
         specialization_ids = self.query_params.get("specialization_ids", [])
         condition_ids = self.query_params.get("condition_ids", [])
 
-        if filtering_params.get('params', {}).get('hospital_id'):
+        if self.query_params.get('hospital_id'):
             max_distance = 10000000
             min_distance = 0
 

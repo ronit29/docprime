@@ -52,7 +52,8 @@ from ondoc.insurance import models as insurance_model
 from django.contrib.contenttypes.fields import GenericRelation
 from django.contrib.contenttypes.fields import GenericForeignKey
 from django.contrib.contenttypes.models import ContentType
-from ondoc.matrix.tasks import push_appointment_to_matrix, push_onboarding_qcstatus_to_matrix
+from ondoc.matrix.tasks import push_appointment_to_matrix, push_onboarding_qcstatus_to_matrix, \
+    create_ipd_lead_from_lab_appointment
 from ondoc.integrations.task import push_lab_appointment_to_integrator, get_integrator_order_status
 from ondoc.location import models as location_models
 from ondoc.ratings_review import models as ratings_models
@@ -259,6 +260,8 @@ class Lab(TimeStampedModel, CreatedByModel, QCModel, SearchKey, WelcomeCallingDo
     is_location_verified = models.BooleanField(verbose_name='Location Verified', default=False)
     auto_ivr_enabled = models.BooleanField(default=True)
     search_distance = models.FloatField(default=20000)
+    is_ipd_lab = models.BooleanField(default=False)
+    related_hospital = models.ForeignKey(Hospital, null=True, blank=True, on_delete=models.SET_NULL, related_name='ipd_hospital')
 
     def __str__(self):
         return self.name
@@ -1813,9 +1816,10 @@ class LabAppointment(TimeStampedModel, CouponsMixin, LabAppointmentInvoiceMixin,
     def allowed_action(self, user_type, request):
         allowed = []
         if self.status == self.CREATED:
-            if user_type == User.CONSUMER:
-                return [self.CANCELLED]
-            return []
+            return [self.CANCELLED]
+            # if user_type == User.CONSUMER:
+            #     return [self.CANCELLED]
+            # return []
 
         current_datetime = timezone.now()
         if user_type == User.CONSUMER and current_datetime <= self.time_slot_start:
@@ -1878,6 +1882,12 @@ class LabAppointment(TimeStampedModel, CouponsMixin, LabAppointmentInvoiceMixin,
             return False
 
     def app_commit_tasks(self, old_instance, push_to_matrix, push_to_integrator):
+        if old_instance is None:
+            try:
+                create_ipd_lead_from_lab_appointment.apply_async(({'obj_id': self.id},),)
+            except Exception as e:
+                logger.error(str(e))
+
         if push_to_matrix:
             # Push the appointment data to the matrix
             try:
@@ -2066,16 +2076,14 @@ class LabAppointment(TimeStampedModel, CouponsMixin, LabAppointmentInvoiceMixin,
             payout_amount += self.home_pickup_charges
 
         tds = self.get_tds_amount()
-        if tds > 0:
-            payout_amount += tds
-
         # Update Net Revenue
         self.update_net_revenues(tds)
 
         payout_data = {
             "charged_amount" : self.effective_price,
             "payable_amount" : payout_amount,
-            "booking_type": Order.LAB_PRODUCT_ID
+            "booking_type": Order.LAB_PRODUCT_ID,
+            "tds_amount": tds
         }
 
         merchant_payout = MerchantPayout.objects.create(**payout_data)
@@ -2605,7 +2613,7 @@ class LabAppointment(TimeStampedModel, CouponsMixin, LabAppointmentInvoiceMixin,
 
         provider_booking_id = ''
         merchant_code = ''
-        is_ipd_hospital = '0'
+        is_ipd_hospital = '1' if self.lab.is_ipd_lab else '0'
         service_name = ','.join([test_obj.test.name for test_obj in self.test_mappings.all()])
         location_verified = self.lab.is_location_verified
         provider_id = self.lab.id
@@ -2649,9 +2657,14 @@ class LabAppointment(TimeStampedModel, CouponsMixin, LabAppointmentInvoiceMixin,
         mobile_list = self.get_matrix_spoc_data()
         refund_data = self.refund_details_data()
 
+        insurance_link = None
+        if user_insurance:
+            insurance_link = '%s/admin/insurance/userinsurance/%s/change' % (settings.ADMIN_BASE_URL, user_insurance.id)
+
         appointment_details = {
             'IPDHospital': is_ipd_hospital,
             'IsInsured': 'yes' if user_insurance else 'no',
+            'PolicyLink': str(insurance_link),
             'InsurancePolicyNumber': str(user_insurance.policy_number) if user_insurance else None,
             'AppointmentStatus': self.status,
             'Age': self.calculate_age(),
@@ -2736,6 +2749,23 @@ class LabAppointment(TimeStampedModel, CouponsMixin, LabAppointmentInvoiceMixin,
 
         return mobile_list
 
+    def convert_ipd_lead_data(self):
+        result = {}
+        result['hospital'] = self.lab.related_hospital
+        # result['lab'] = self.lab
+        result['user'] = self.user
+        result['payment_amount'] = self.deal_price
+        if self.user:
+            result['name'] = self.user.full_name
+            result['phone_number'] = self.user.phone_number
+            result['email'] = self.user.email
+            default_user_profile = self.user.get_default_profile()
+            if default_user_profile:
+                result['gender'] = default_user_profile.gender
+                result['dob'] = default_user_profile.dob
+        result['data'] = {'lab_appointment_id': self.id}
+        return result
+
     def __str__(self):
         return "{}, {}".format(self.profile.name if self.profile else "", self.lab.name)
 
@@ -2761,6 +2791,20 @@ class LabAppointment(TimeStampedModel, CouponsMixin, LabAppointmentInvoiceMixin,
         sum = data.get('sum_amount', 0)
         sum = sum if sum else 0
         return {'count': count, 'sum': sum}
+
+    def get_prescriptions(self, request):
+        prescription_dict = {}
+        files = []
+        upd = None
+        for pres in self.appointment_prescriptions.all():
+            url = request.build_absolute_uri(pres.prescription_file.url) if pres.prescription_file else None
+            files.append(url)
+            upd = pres.updated_at
+        prescription_dict = {
+            "updated_at": upd,
+            "files": files
+        }
+        return prescription_dict
 
     class Meta:
         db_table = "lab_appointment"

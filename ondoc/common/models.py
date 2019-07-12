@@ -1,5 +1,5 @@
 from django.contrib.postgres.fields import JSONField
-from django.core.validators import FileExtensionValidator
+from django.core.validators import FileExtensionValidator, MinValueValidator, MaxValueValidator
 from django.db import models
 from weasyprint import HTML, CSS
 import string
@@ -18,6 +18,7 @@ from django.contrib.contenttypes.fields import GenericForeignKey, GenericRelatio
 from django.contrib.contenttypes.models import ContentType
 
 from ondoc.authentication.models import TimeStampedModel
+from ondoc.doctor import models as doc_models
 # from ondoc.doctor.models import OpdAppointment
 # from ondoc.diagnostic.models import LabAppointment
 from ondoc.authentication.models import User
@@ -476,6 +477,8 @@ class MatrixDataMixin(object):
             primary_proposer = user_insurance.get_primary_member_profile()
             primary_proposer_name = primary_proposer.get_full_name() if primary_proposer else None
 
+        insurance_link = '%s/admin/insurance/userinsurance/%s/change' % (settings.ADMIN_BASE_URL, user_insurance.id)
+
         policy_details = {
             "ProposalNo": None,
             "PolicyPaymentSTATUS": 300 if user_insurance else 0,
@@ -485,7 +488,8 @@ class MatrixDataMixin(object):
             "InsurancePlanPurchased": user_insurance.insurance_plan.name if user_insurance else None,
             "PurchaseDate": int(user_insurance.purchase_date.timestamp()) if user_insurance else None,
             "ExpirationDate": int(user_insurance.expiry_date.timestamp()) if user_insurance else None,
-            "COILink": user_insurance.coi.url if user_insurance and user_insurance.coi is not None and user_insurance.coi.name else None,
+            "COILink": insurance_link,
+            "InsuranceLink": insurance_link,
             "PeopleCovered": user_insurance.insurance_plan.get_people_covered() if user_insurance else ""
         }
 
@@ -578,7 +582,6 @@ class DeviceDetails(TimeStampedModel):
     app_name = models.CharField(max_length=200, null=True, blank=True)
     ping_status = models.CharField(max_length=50, null=True, blank=True)
     last_ping_time = models.DateTimeField(null=True, blank=True)
-    # last_usage = models.DateTimeField()   # updated_at is the last_usage
     dnd = models.BooleanField(default=False)
     res = models.CharField(max_length=100, null=True, blank=True)
     adv_id = models.CharField(max_length=100, null=True, blank=True)
@@ -590,6 +593,21 @@ class DeviceDetails(TimeStampedModel):
 
     class Meta:
         db_table = "device_details"
+
+
+class LastUsageTimestamp(TimeStampedModel):
+    phone_number = models.BigIntegerField(validators=[MinValueValidator(1000000000), MaxValueValidator(9999999999)])
+    registered_on_app = models.BooleanField(default=False)
+    device = models.ForeignKey(DeviceDetails, null=True, blank=True, related_name="last_usage", on_delete=models.SET_NULL)
+    source = models.CharField(max_length=20, choices=AppointmentHistory.SOURCE_CHOICES)
+    # first_usage_timestamp = models.DateTimeField(auto_now_add=True)           created_at is the first_usage_timestamp
+    last_app_open_timestamp = models.DateTimeField()
+
+    def __str__(self):
+        return str(self.phone_number)
+
+    class Meta:
+        db_table = "last_usage_timestamp"
 
 
 class BlockedStates(TimeStampedModel):
@@ -646,6 +664,7 @@ class TdsDeductionMixin(object):
     def get_tds_amount(self):
         from ondoc.authentication.models import Merchant
         from ondoc.authentication.models import MerchantNetRevenue
+        import decimal
         tds = 0
         merchant = self.get_merchant
         if merchant:
@@ -663,17 +682,17 @@ class TdsDeductionMixin(object):
                 if merchant_net_revenue_obj:
                     old_revenue = merchant_net_revenue_obj.total_revenue
                     new_revenue = merchant_net_revenue_obj.total_revenue + booking_net_revenue
-                    if (new_revenue >= settings.TDS_THRESHOLD_AMOUNT) and (old_revenue < settings.TDS_THRESHOLD_AMOUNT):
-                        tds = (new_revenue * settings.TDS_APPLICABLE_RATE) / 100
-                    elif old_revenue > settings.TDS_THRESHOLD_AMOUNT:
+                    if (new_revenue >= decimal.Decimal(settings.TDS_THRESHOLD_AMOUNT)) and (old_revenue < decimal.Decimal(settings.TDS_THRESHOLD_AMOUNT)):
+                        tds = (new_revenue * decimal.Decimal(settings.TDS_APPLICABLE_RATE)) / 100
+                    elif old_revenue > decimal.Decimal(settings.TDS_THRESHOLD_AMOUNT):
                         tds_deduction_count = merchant.tds_deduction.filter(financial_year=settings.CURRENT_FINANCIAL_YEAR).count()
                         if tds_deduction_count > 0:
-                            tds = (booking_net_revenue * settings.TDS_APPLICABLE_RATE) / 100
+                            tds = (booking_net_revenue * decimal.Decimal(settings.TDS_APPLICABLE_RATE)) / 100
                         else:
-                            tds = (new_revenue * settings.TDS_APPLICABLE_RATE) / 100
+                            tds = (new_revenue * decimal.Decimal(settings.TDS_APPLICABLE_RATE)) / 100
                 else:
-                    if booking_net_revenue >= settings.TDS_THRESHOLD_AMOUNT:
-                        tds = (booking_net_revenue * settings.TDS_APPLICABLE_RATE) / 100
+                    if booking_net_revenue >= decimal.Decimal(settings.TDS_THRESHOLD_AMOUNT):
+                        tds = (booking_net_revenue * decimal.Decimal(settings.TDS_APPLICABLE_RATE)) / 100
         return tds
 
     def update_net_revenues(self, tds):

@@ -465,7 +465,7 @@ class MerchantPayoutAdmin(ExportMixin, VersionAdmin):
     resource_class = MerchantPayoutResource
     form = MerchantPayoutForm
     model = MerchantPayout
-    fields = ['id','booking_type', 'payment_mode','charged_amount', 'updated_at', 'created_at', 'payable_amount', 'status', 'payout_time', 'paid_to',
+    fields = ['id','booking_type', 'payment_mode','charged_amount', 'updated_at', 'created_at', 'payable_amount', 'tds_amount', 'status', 'payout_time', 'paid_to',
               'appointment_id', 'get_billed_to', 'get_merchant', 'process_payout', 'type', 'utr_no', 'amount_paid','api_response','pg_status','status_api_response']
     list_display = ('id', 'status', 'payable_amount', 'appointment_id', 'doc_lab_name','booking_type')
     search_fields = ['name']
@@ -473,7 +473,7 @@ class MerchantPayoutAdmin(ExportMixin, VersionAdmin):
 
     def get_queryset(self, request):
         return super().get_queryset(request).filter(payable_amount__gt=0).order_by('-id').prefetch_related('lab_appointment__lab',
-                                                                             'opd_appointment__doctor')
+                                                                             'opd_appointment__doctor', 'user_insurance')
 
     def get_search_results(self, request, queryset, search_term):
         queryset, use_distinct = super().get_search_results(request, queryset, None)
@@ -659,6 +659,11 @@ class MatrixMappedCityAdmin(ImportMixin, admin.ModelAdmin):
     search_fields = ['name']
     resource_class = MatrixMappedCityResource
 
+    def get_queryset(self, request):
+        qs = super().get_queryset(request)
+        qs = qs.select_related('state')
+        return qs
+
     def get_readonly_fields(self, request, obj=None):
         if not request.user.is_superuser and not request.user.groups.filter(name=constants['SUPER_QC_GROUP']).exists():
             return super().get_readonly_fields(request, obj)
@@ -684,6 +689,17 @@ class MatrixCityAutocomplete(autocomplete.Select2QuerySetView):
 
         if matrix_state:
             queryset = MatrixMappedCity.objects.filter(state_id=matrix_state)
+        if self.q:
+            queryset = queryset.filter(name__istartswith=self.q)
+
+        return queryset
+
+
+class RelatedHospitalAutocomplete(autocomplete.Select2QuerySetView):
+
+    def get_queryset(self):
+        queryset = Hospital.objects.filter(is_ipd_hospital=True)
+
         if self.q:
             queryset = queryset.filter(name__istartswith=self.q)
 
