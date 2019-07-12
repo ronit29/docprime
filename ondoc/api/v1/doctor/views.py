@@ -4112,7 +4112,7 @@ class HospitalViewSet(viewsets.GenericViewSet):
                     is_valid='t')
                 if valid_entity_url_qs.exists():
                     corrected_url = valid_entity_url_qs[0].url
-                    return Response(data={'url': corrected_url, 'status': 301})
+                    return Response(status=status.HTTP_301_MOVED_PERMANENTLY, data={'url': corrected_url, 'status': 301})
                 else:
                     return Response(status=status.HTTP_404_NOT_FOUND)
 
