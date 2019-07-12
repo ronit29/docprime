@@ -1367,7 +1367,6 @@ class OpdNotification(Notification):
         context = self.get_context()
         notification_type = self.notification_type
         all_receivers = self.get_receivers()
-
         if notification_type == NotificationAction.DOCTOR_INVOICE:
             email_notification = EMAILNotification(notification_type, context)
             email_notification.send(all_receivers.get('email_receivers', []))

@@ -877,9 +877,16 @@ class DoctorProfileUserViewSet(viewsets.GenericViewSet):
         spec_ids = list()
         spec_url_dict = dict()
 
+        from ondoc.procedure.models import PotentialIpdLeadPracticeSpecialization
+        all_potential_spec = set(PotentialIpdLeadPracticeSpecialization.objects.all().values_list('practice_specialization', flat=True))
+        is_congot = False
+
         for dps in doctor.doctorpracticespecializations.all():
             general_specialization.append(dps.specialization)
             spec_ids.append(dps.specialization.id)
+            if dps.specialization.id in all_potential_spec:
+                is_congot = True
+
         if spec_ids and entity:
             spec_urls = EntityUrls.objects.filter(specialization_id__in=spec_ids, sublocality_value=entity.sublocality_value,
                                           locality_value=entity.locality_value, is_valid=True, entity_type='Doctor', url_type='SEARCHURL')
@@ -903,6 +910,7 @@ class DoctorProfileUserViewSet(viewsets.GenericViewSet):
 
         hospital = None
         response_data['about_web'] = None
+        response_data['is_congot'] = is_congot
         google_rating = dict()
         date = None
 
@@ -4104,7 +4112,7 @@ class HospitalViewSet(viewsets.GenericViewSet):
                     is_valid='t')
                 if valid_entity_url_qs.exists():
                     corrected_url = valid_entity_url_qs[0].url
-                    return Response(data={'url': corrected_url, 'status': 301})
+                    return Response(status=status.HTTP_301_MOVED_PERMANENTLY, data={'url': corrected_url, 'status': 301})
                 else:
                     return Response(status=status.HTTP_404_NOT_FOUND)
 
@@ -4397,16 +4405,22 @@ class IpdProcedureViewSet(viewsets.GenericViewSet):
         if city:
             breadcrumb.append({"title": "{} Cost in {}".format(ipd_procedure.name, city), "url": None, "link_title": None})
 
+        near_by = validated_data.get('near_by', False)
+        hospital_request_data = {}
+        doctor_search_parameters = {'ipd_procedure_ids': str(pk),
+                                    'longitude': validated_data.get('long'),
+                                    'latitude': validated_data.get('lat'),
+                                    'sort_on': 'experience',
+                                    'city': city,
+                                    'restrict_result_count': 3}
+        if near_by:
+            hospital_request_data.update({'max_distance': 1000000})
+            doctor_search_parameters.update({'max_distance': 1000000})
         hospital_view_set = HospitalViewSet()
-        hospital_result = hospital_view_set.list(request, pk, 2)
+        hospital_result = hospital_view_set.list(request, pk, 2, request_data=hospital_request_data)
         doctor_result_data = {}
         doctor_list_viewset = DoctorListViewSet()
-        doctor_result = doctor_list_viewset.list(request, parameters={'ipd_procedure_ids': str(pk),
-                                                                      'longitude': validated_data.get('long'),
-                                                                      'latitude': validated_data.get('lat'),
-                                                                      'sort_on': 'experience',
-                                                                      'city': city,
-                                                                      'restrict_result_count': 3})
+        doctor_result = doctor_list_viewset.list(request, parameters=doctor_search_parameters)
         doctor_result_data = doctor_result.data
         ipd_procedure_serializer = serializers.IpdProcedureDetailSerializer(ipd_procedure, context={'request': request,
                                                                                                     'similar_ipds_entity_dict': similar_ipds_entity_dict,
