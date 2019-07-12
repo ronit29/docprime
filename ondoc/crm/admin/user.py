@@ -6,6 +6,7 @@ from django import forms
 from ondoc.authentication.models import (StaffProfile)
 from ondoc.authentication.models import UserNumberUpdate
 from django.db import transaction
+from django.utils import timezone
 
 
 class StaffProfileInline(admin.TabularInline):
@@ -109,7 +110,7 @@ class UserNumberUpdateForm(forms.ModelForm):
             user = self.cleaned_data.get('user')
             obj = UserNumberUpdate.objects.filter(user=user, old_number=user.phone_number, new_number=self.cleaned_data.get('new_number')).order_by('id').last()
 
-            if obj and obj.otp != self.cleaned_data.get('user_otp'):
+            if (obj and obj.otp != self.cleaned_data.get('user_otp')) or obj.otp_expiry < timezone.now():
                 raise forms.ValidationError('Given otp does not match.')
 
         new_number = self.cleaned_data.get('new_number')
@@ -124,8 +125,9 @@ class UserNumberUpdateAdmin(admin.ModelAdmin):
 
     model = UserNumberUpdate
     date_hierarchy = 'created_at'
-    fields = ('user','new_number', 'user_otp', 'is_successfull')
-    readonly_fields = ('is_successfull',)
+    fields = ('user', 'old_number', 'new_number', 'user_otp', 'is_successfull')
+    list_display = ('old_number', 'new_number', 'is_successfull',)
+    readonly_fields = ('is_successfull', 'old_number')
     form = UserNumberUpdateForm
 
     autocomplete_fields = ['user']
@@ -139,9 +141,9 @@ class UserNumberUpdateAdmin(admin.ModelAdmin):
 
     def get_readonly_fields(self, request, obj=None):
         if obj and obj.is_successfull:
-            return ['user', 'new_number', 'is_successfull', ]
+            return ['user', 'new_number', 'is_successfull', 'old_number' ]
         else:
             if obj and obj.id and not obj.is_successfull:
-                return ['is_successfull']
+                return ['is_successfull', 'old_number']
             else:
-                return ['is_successfull']
+                return ['is_successfull', 'old_number']
