@@ -1577,6 +1577,9 @@ class MerchantPayout(TimeStampedModel):
             if not transfers:
                 return True
 
+            if not all_payouts and transfers:
+                return False
+
             transfers = list(transfers)
 
             for transfer in transfers:
