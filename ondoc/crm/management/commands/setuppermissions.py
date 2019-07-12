@@ -25,7 +25,8 @@ from ondoc.doctor.models import (Doctor, Hospital, DoctorClinicTiming, DoctorCli
                                  MedicalConditionSpecialization, CompetitorInfo, CompetitorMonthlyVisit,
                                  SpecializationDepartmentMapping, CancellationReason, UploadDoctorData,
                                  HospitalServiceMapping, HealthInsuranceProviderHospitalMapping,
-                                 HealthInsuranceProvider, HospitalHelpline, HospitalTiming, CommonHospital)
+                                 HealthInsuranceProvider, HospitalHelpline, HospitalTiming, CommonHospital,
+                                 SimilarSpecializationGroup, SimilarSpecializationGroupMapping)
 
 from ondoc.diagnostic.models import (Lab, LabTiming, LabImage, GenericLabAdmin,
                                      LabManager, LabAccreditation, LabAward, LabCertification,
@@ -585,7 +586,8 @@ class Command(BaseCommand):
         content_types = ContentType.objects.get_for_models(PaymentOptions, EntityUrls, Feature, Service, Doctor,
                                                            HealthInsuranceProvider, IpdProcedureCategory, Plan,
                                                            PlanFeature, PlanFeatureMapping, UserPlanMapping, UploadImage,
-                                                           Offer, VirtualAppointment)
+                                                           Offer, VirtualAppointment, SimilarSpecializationGroup,
+                                                           SimilarSpecializationGroupMapping)
 
         for cl, ct in content_types.items():
             permissions = Permission.objects.filter(
@@ -1019,7 +1021,7 @@ class Command(BaseCommand):
                                                            InsuredMembers, InsurerPolicyNumber, InsuranceCancelMaster,
                                                            EndorsementRequest, InsuredMemberDocument,
                                                            InsuredMemberHistory, UserBank, UserBankDocument,
-                                                           GenericNotes, InsurerAccountTransfer)
+                                                           GenericNotes, InsurerAccountTransfer, UserNumberUpdate)
 
         for cl, ct in content_types.items():
             permissions = Permission.objects.filter(
@@ -1065,21 +1067,6 @@ class Command(BaseCommand):
         group.permissions.clear()
 
         content_types = ContentType.objects.get_for_models(BlacklistUser)
-
-        for cl, ct in content_types.items():
-            permissions = Permission.objects.filter(
-                Q(content_type=ct),
-                Q(codename='add_' + ct.model) |
-                Q(codename='change_' + ct.model))
-
-            group.permissions.add(*permissions)
-
-    def create_update_number_group(self):
-
-        group, created = Group.objects.get_or_create(name=constants['USER_UPDATE_TEAM'])
-        group.permissions.clear()
-
-        content_types = ContentType.objects.get_for_models(UserNumberUpdate)
 
         for cl, ct in content_types.items():
             permissions = Permission.objects.filter(

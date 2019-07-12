@@ -47,7 +47,8 @@ from ondoc.doctor.models import (Doctor, DoctorQualification,
                                  DoctorPracticeSpecialization, CompetitorMonthlyVisit,
                                  GoogleDetailing, VisitReason, VisitReasonMapping, PracticeSpecializationContent,
                                  PatientMobile, DoctorMobileOtp,
-                                 UploadDoctorData, CancellationReason, Prescription, PrescriptionFile)
+                                 UploadDoctorData, CancellationReason, Prescription, PrescriptionFile,
+                                 SimilarSpecializationGroup, SimilarSpecializationGroupMapping)
 
 from ondoc.authentication.models import User
 from .common import *
@@ -2260,3 +2261,16 @@ class UploadDoctorDataAdmin(admin.ModelAdmin):
                 else:
                     final_message += str(message)
         return final_message
+
+
+class SimilarSpecializationGroupInline(admin.TabularInline):
+    model = SimilarSpecializationGroupMapping
+    extra = 0
+    can_delete = True
+    autocomplete_fields = ['specialization']
+    fk_name = 'group'
+
+
+class SimilarSpecializationGroupAdmin(VersionAdmin):
+    inlines = [SimilarSpecializationGroupInline]
+    list_display = ['id', 'name']

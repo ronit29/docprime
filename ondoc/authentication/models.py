@@ -18,7 +18,7 @@ import random, string
 from django.contrib.contenttypes.fields import GenericForeignKey, GenericRelation
 from django.contrib.contenttypes.models import ContentType
 from django.utils.functional import cached_property
-from datetime import date, datetime
+from datetime import date, datetime, timedelta
 from safedelete import SOFT_DELETE
 from safedelete.models import SafeDeleteModel
 import reversion
@@ -1968,6 +1968,7 @@ class UserNumberUpdate(TimeStampedModel):
     new_number = models.CharField(max_length=10, blank=False, null=True, default=None)
     is_successfull = models.BooleanField(default=False)
     otp = models.IntegerField(null=True, blank=True)
+    otp_expiry = models.DateTimeField(default=None, null=True)
 
     def __str__(self):
         return str(self.user)
@@ -1988,13 +1989,14 @@ class UserNumberUpdate(TimeStampedModel):
             # Instance comming First time.
             if not self.id:
                 self.old_number = self.user.phone_number
+                self.otp_expiry = timezone.now() + timedelta(minutes=30)
 
                 self.otp = random.choice(range(100000, 999999))
                 send_otp = True
 
             elif hasattr(self, '_process_update') and self._process_update:
 
-                profiles = UserProfile.objects.filter(phone_number=self.user.phone_number)
+                profiles = self.user.profiles.filter(phone_number=self.user.phone_number)
                 for profile in profiles:
                     profile.phone_number = self.new_number
                     profile.save()
