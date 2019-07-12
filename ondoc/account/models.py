@@ -1450,26 +1450,27 @@ class OrderLog(TimeStampedModel):
     class Meta:
         db_table = "order_log"
 
+
 class MerchantPayout(TimeStampedModel):    
 
     PENDING = 1
     ATTEMPTED = 2
     PAID = 3
+    INITIATED = 4
+    FAILED = 5
     AUTOMATIC = 1
     MANUAL = 2
-
 
     DoctorPayout = Order.DOCTOR_PRODUCT_ID
     LabPayout = Order.LAB_PRODUCT_ID
     InsurancePremium = Order.INSURANCE_PRODUCT_ID
     BookingTypeChoices = [(DoctorPayout,'Doctor Booking'),(LabPayout,'Lab Booking'),(InsurancePremium,'Insurance Purchase')]
 
-
     NEFT = "NEFT"
     IMPS = "IMPS"
     IFT = "IFT"
     INTRABANK_IDENTIFIER = "KKBK"
-    STATUS_CHOICES = [(PENDING, 'Pending'), (ATTEMPTED, 'ATTEMPTED'), (PAID, 'Paid')]
+    STATUS_CHOICES = [(PENDING, 'Pending'), (ATTEMPTED, 'ATTEMPTED'), (PAID, 'Paid'), (INITIATED, 'Initiated'), (FAILED, 'Failed')]
     PAYMENT_MODE_CHOICES = [(NEFT, 'NEFT'), (IMPS, 'IMPS'), (IFT, 'IFT')]    
     TYPE_CHOICES = [(AUTOMATIC, 'Automatic'), (MANUAL, 'Manual')]
 
@@ -1948,17 +1949,16 @@ class MerchantPayout(TimeStampedModel):
                 order_no = self.get_pg_order_no()
 
             if order_no:
-                req_data = {"orderNo":order_no}
+                req_data = {"orderNo": order_no}
                 req_data["hash"] = self.create_checksum(req_data)
 
-                headers = {"auth": settings.SETTLEMENT_AUTH,
-                           "Content-Type": "application/json"}
+                headers = {"auth": settings.SETTLEMENT_AUTH, "Content-Type": "application/json"}
 
                 response = requests.post(url, data=json.dumps(req_data), headers=headers)
                 if response.status_code == status.HTTP_200_OK:
                     resp_data = response.json()
                     self.status_api_response = resp_data
-                    if resp_data.get('ok') == 1 and len(resp_data.get('settleDetails'))>0:
+                    if resp_data.get('ok') == 1 and len(resp_data.get('settleDetails')) > 0:
                         details = resp_data.get('settleDetails')
                         for d in details:
                             if d.get('refNo') == str(self.payout_ref_id) or\
