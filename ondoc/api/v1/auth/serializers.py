@@ -1,7 +1,7 @@
 from rest_framework import serializers
 from ondoc.authentication.models import (OtpVerifications, User, UserProfile, Notification, NotificationEndpoint,
                                          DoctorNumber, Address, GenericAdmin, UserSecretKey,
-                                         UserPermission, Address, GenericAdmin, GenericLabAdmin)
+                                         UserPermission, Address, GenericAdmin, GenericLabAdmin, UserProfileEmailUpdate)
 from ondoc.doctor.models import DoctorMobile, ProviderSignupLead, Hospital
 from ondoc.common.models import AppointmentHistory
 from ondoc.doctor.models import DoctorMobile
@@ -557,4 +557,14 @@ class TokenFromUrlKeySerializer(serializers.Serializer):
     def validate(self, attrs):
         if not (attrs.get('auth_token') or attrs.get('key')):
             raise serializers.ValidationError('neither auth_token nor key found')
+        return attrs
+
+
+class ProfileEmailUpdateSerializer(serializers.Serializer):
+    profile = serializers.PrimaryKeyRelatedField(queryset=UserProfile.objects.all(), allow_null=False)
+    email = serializers.EmailField(max_length=256, required=True)
+
+    def validate(self, attrs):
+        if not UserProfileEmailUpdate.can_be_changed(attrs.get('email')):
+            raise serializers.ValidationError('Email id already in use.')
         return attrs

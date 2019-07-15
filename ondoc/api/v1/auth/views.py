@@ -2161,3 +2161,14 @@ class TokenFromUrlKey(viewsets.GenericViewSet):
                 return Response({'status': 1, 'token': obj.token})
             else:
                 return Response({'status': 0, 'token': None, 'message': 'key not found'}, status=status.HTTP_404_NOT_FOUND)
+
+
+class ProfileEmailUpdateViewset(viewsets.GenericViewSet):
+    authentication_classes = (JWTAuthentication, )
+    permission_classes = (IsAuthenticated, IsNotAgent)
+
+    def create(self, request):
+        request_data = request.data
+
+
+        return Response()

@@ -15,7 +15,7 @@ from django.utils import timezone
 from openpyxl import load_workbook
 
 from ondoc.api.v1.utils import aware_time_zone, util_absolute_url
-from ondoc.authentication.models import UserNumberUpdate
+from ondoc.authentication.models import UserNumberUpdate, UserProfileEmailUpdate
 from ondoc.common.models import AppointmentMaskNumber
 from ondoc.notification.labnotificationaction import LabNotificationAction
 from ondoc.notification import models as notification_models
@@ -1125,6 +1125,19 @@ def send_user_number_update_otp(obj_id):
         logger.error("Could not send otp for user number update.")
 
     return
+
+
+@task()
+def send_userprofile_email_update_otp(obj_id):
+    from ondoc.notification.models import EmailNotification
+    obj = UserProfileEmailUpdate.objects.filter(id=obj_id).first()
+    if not obj:
+        return
+
+    EmailNotification.send_userprofile_email_update(obj)
+
+    return
+
 
 @task()
 def send_contactus_notification(obj_id):

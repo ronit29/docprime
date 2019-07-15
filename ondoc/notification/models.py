@@ -97,6 +97,7 @@ class NotificationAction:
     COD_TO_PREPAID_REQUEST = 92
 
     CONTACT_US_EMAIL = 65
+    USERPROFILE_EMAIL_UPDATE = 99
 
     NOTIFICATION_TYPE_CHOICES = (
         (APPOINTMENT_ACCEPTED, "Appointment Accepted"),
@@ -859,6 +860,23 @@ class EmailNotification(TimeStampedModel, EmailNotificationOpdMixin, EmailNotifi
             }
             message = json.dumps(message)
             publish_message(message)
+
+    @classmethod
+    def send_userprofile_email_update(cls, obj):
+        email = obj.new_email
+
+        email_subject = 'Docprime : Profile Email update otp'
+        html_body = 'Please find the otp for email change. %s' % str(obj.otp)
+        email_obj = cls.objects.create(email=email, notification_type=NotificationAction.INSURANCE_MIS,
+                                       content=html_body, email_subject=email_subject, cc=[], bcc=[])
+        email_obj.save()
+
+        message = {
+            "data": model_to_dict(email_obj),
+            "type": "email"
+        }
+        message = json.dumps(message)
+        publish_message(message)
 
 
 class SmsNotificationOpdMixin:

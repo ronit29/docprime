@@ -2038,3 +2038,46 @@ class UserNumberUpdate(TimeStampedModel):
 
     class Meta:
         db_table = "user_number_updates"
+
+
+class UserProfileEmailUpdate(TimeStampedModel):
+    profile = models.ForeignKey(UserProfile, on_delete=models.DO_NOTHING, related_name="email_updates")
+    old_email = models.CharField(max_length=256, blank=False)
+    new_email = models.CharField(max_length=256, blank=False)
+    is_successfull = models.BooleanField(default=False)
+    otp = models.IntegerField(null=True, blank=True)
+    otp_expiry = models.DateTimeField(default=None, null=True)
+
+    def __str__(self):
+        return str(self.profile)
+
+    @classmethod
+    def can_be_changed(cls, new_email):
+        return not UserProfile.objects.filter(email=new_email).exists()
+
+    def after_commit_tasks(self, send_otp=False):
+        from ondoc.notification.tasks import send_userprofile_email_update_otp
+        if send_otp:
+            send_userprofile_email_update_otp.apply_async((self.id,))
+
+    @classmethod
+    def initiate(cls, profile, email):
+        obj = cls(profile=profile, new_email=email, old_email=profile.email, otp=random.choice(range(100000, 999999)), otp_expiry=(timezone.now() + timedelta(minutes=30)))
+        obj.save()
+
+    def save(self, *args, **kwargs):
+        if not self.is_successfull:
+            send_otp = False
+
+            # Instance comming First time.
+            if not self.id:
+                send_otp = True
+
+            super().save(*args, **kwargs)
+
+            transaction.on_commit(lambda: self.after_commit_tasks(send_otp=send_otp))
+        else:
+            pass
+
+    class Meta:
+        db_table = "userprofile_email_updates"
