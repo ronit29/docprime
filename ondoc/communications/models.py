@@ -348,12 +348,12 @@ class SMSNotification:
             body_template = "sms/cod_to_prepaid_request.txt"
         elif notification_type == NotificationAction.IPD_PROCEDURE_COST_ESTIMATE:
             body_template = "sms/ipd/cost_estimate.txt"
-        elif notification_type == NotificationAction.LAB_CONFIRMATION_CHECK_AFTER_APPOINTMENT:
-            body_template = "sms/lab/lab_confirmation_check.txt"
-        elif notification_type == NotificationAction.LAB_CONFIRMATION_SECOND_CHECK_AFTER_APPOINTMENT:
-            body_template = "sms/lab/lab_confirmation_second_check.txt"
-        elif notification_type == NotificationAction.LAB_FEEDBACK_AFTER_APPOINTMENT:
-            body_template = "sms/lab/lab_feedback.txt"
+    #    elif notification_type == NotificationAction.LAB_CONFIRMATION_CHECK_AFTER_APPOINTMENT:
+    #        body_template = "sms/lab/lab_confirmation_check.txt"
+    #   elif notification_type == NotificationAction.LAB_CONFIRMATION_SECOND_CHECK_AFTER_APPOINTMENT:
+    #        body_template = "sms/lab/lab_confirmation_second_check.txt"
+    #    elif notification_type == NotificationAction.LAB_FEEDBACK_AFTER_APPOINTMENT:
+    #        body_template = "sms/lab/lab_feedback.txt"
         return body_template
 
     def trigger(self, receiver, template, context):
