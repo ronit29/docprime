@@ -3678,11 +3678,11 @@ class OfflineCustomerViewSet(viewsets.GenericViewSet):
         for app in final_data:
             instance = ONLINE if isinstance(app, models.OpdAppointment) else OFFLINE
             patient_name = is_docprime = effective_price = deal_price = patient_thumbnail = prescription = None
-            if instance == OFFLINE and not hasattr(app.user, 'name') and (
+            if instance == OFFLINE and (hasattr(app.user, 'encrypted_name') and app.user.encrypted_name) and (
                     (request.META.get('HTTP_PLATFORM') == 'android' and not parse(request.META.get(
-                        'HTTP_APP_VERSION')) > parse(settings.get('LIST_APPOINTMENTS_VERSION_CHECK_ANDROID_GT'))) or
+                        'HTTP_APP_VERSION')) > parse(settings.LIST_APPOINTMENTS_VERSION_CHECK_ANDROID_GT[0])) or
                     (request.META.get('HTTP_PLATFORM') == 'ios' and not parse(request.META.get(
-                        'HTTP_APP_VERSION')) > parse(settings.get('LIST_APPOINTMENTS_VERSION_CHECK_IOS_GT')))):
+                        'HTTP_APP_VERSION')) > parse(settings.LIST_APPOINTMENTS_VERSION_CHECK_IOS_GT[0]))):
                 continue
             error_flag = False
             error_message = ''
