@@ -1,6 +1,6 @@
 from rest_framework import serializers
 
-from ondoc.doctor.models import OpdAppointmentProcedureMapping
+from ondoc.doctor.models import OpdAppointmentProcedureMapping, CommonHospital
 from ondoc.procedure.models import Procedure, DoctorClinicProcedure, ProcedureToCategoryMapping, \
     CommonProcedureCategory, CommonProcedure, CommonIpdProcedure
 
@@ -104,7 +104,32 @@ class CommonProcedureSerializer(serializers.ModelSerializer):
 class CommonIpdProcedureSerializer(serializers.ModelSerializer):
     id = serializers.ReadOnlyField(source='ipd_procedure.id')
     name = serializers.ReadOnlyField(source='ipd_procedure.name')
+    url = serializers.SerializerMethodField()
+    icon = serializers.SerializerMethodField()
 
     class Meta:
         model = CommonIpdProcedure
-        fields = ['id', 'name']
+        fields = ['id', 'name', 'url', 'icon']
+
+    def get_url(self, obj):
+        entity_dict = self.context.get('entity_dict', {})
+        url = entity_dict.get(obj.ipd_procedure.id, None)
+        return url
+
+    def get_icon(self, obj):
+        url = None
+        request = self.context.get('request')
+        if request:
+            if obj and obj.ipd_procedure and obj.ipd_procedure.icon:
+                url = request.build_absolute_uri(obj.ipd_procedure.icon.url)
+        return url
+
+
+class CommonHospitalSerializer(serializers.ModelSerializer):
+    # id = serializers.ReadOnlyField(source='ipd_procedure.id')
+    # name = serializers.ReadOnlyField(source='ipd_procedure.name')
+    # url = serializers.SerializerMethodField()
+
+    class Meta:
+        model = CommonHospital
+        fields = ['id']

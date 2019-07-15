@@ -2,6 +2,8 @@ from django.contrib.gis.db import models
 from django.contrib.contenttypes.fields import GenericForeignKey
 from django.contrib.contenttypes.models import ContentType
 import logging
+
+# from ondoc.diagnostic import models as diagnostic_models
 from .service import get_meta_by_latlong
 import logging
 import json
@@ -33,6 +35,49 @@ def split_and_append(initial_str, spliter, appender):
     value_chunks = initial_str.split(spliter)
     return appender.join(value_chunks)
 
+
+class UrlsModel(models.Model):
+    url = models.CharField(blank=False, null=True, max_length=2000, db_index=True, editable=False)
+
+    class Meta:
+        abstract = True
+
+    @classmethod
+    def update_profile_urls(cls):
+        update_doctor_page_urls = RawSql(
+            ''' UPDATE doctor d SET url = eu.url FROM entity_urls eu WHERE eu.entity_id=d.id and eu.is_valid=true and sitemap_identifier='DOCTOR_PAGE'  ''',
+            []).execute()
+
+        update_lab_page_urls = RawSql(''' UPDATE lab l SET url = eu.url FROM entity_urls eu WHERE eu.entity_id=l.id and eu.is_valid=true and sitemap_identifier='LAB_PAGE'  ''',
+            []).execute()
+
+        update_hosp_page_urls = RawSql(''' UPDATE hospital h SET url = eu.url FROM entity_urls eu WHERE eu.entity_id=h.id and eu.is_valid=true and sitemap_identifier='HOSPITAL_PAGE' ''',
+            []).execute()
+
+class CompareSEOUrls(TimeStampedModel):
+    url = models.SlugField(blank=False, null=True, max_length=2000, db_index=True, unique=True)
+    title = models.CharField(blank=True, null=True, max_length=2000)
+
+    class Meta:
+        db_table = 'compare_seo_urls'
+
+    def save(self, *args, **kwargs):
+        self.url = self.url.lower()
+        if not self.url.endswith('hpcp'):
+            self.url = self.url + '-hpcp'
+
+        super(CompareSEOUrls, self).save(*args, **kwargs)
+
+
+class CompareLabPackagesSeoUrls(TimeStampedModel):
+    url = models.ForeignKey(CompareSEOUrls, related_name="compare_url", on_delete=models.CASCADE)
+    lab = models.ForeignKey('diagnostic.Lab', related_name="compare_lab", on_delete=models.CASCADE)
+    package = models.ForeignKey('diagnostic.LabTest', related_name="compare_package", on_delete=models.CASCADE)
+
+    class Meta:
+        db_table = "compare_lab_packages_seo_urls"
+
+
 class TempURL(TimeStampedModel):
 
     url = models.CharField(blank=False, null=True, max_length=2000, db_index=True)
@@ -46,19 +91,22 @@ class TempURL(TimeStampedModel):
     count = models.IntegerField(max_length=30, null=True, default=0)
     sitemap_identifier = models.CharField(max_length=28, null=True)
     sequence = models.PositiveIntegerField(default=0, null=True)
-    locality_latitude = models.DecimalField(null=True, max_digits=10, decimal_places=8)
-    locality_longitude = models.DecimalField(null=True, max_digits=10, decimal_places=8)
+    locality_latitude = models.DecimalField(null=True, max_digits=11, decimal_places=8)
+    locality_longitude = models.DecimalField(null=True, max_digits=11, decimal_places=8)
     sublocality_value = models.TextField(default='', null=True)
     locality_value = models.TextField(default='', null=True)
-    sublocality_latitude = models.DecimalField(null=True, max_digits=10, decimal_places=8, blank=True)
-    sublocality_longitude = models.DecimalField(null=True, max_digits=10, decimal_places=8, blank=True)
+    sublocality_latitude = models.DecimalField(null=True, max_digits=11, decimal_places=8, blank=True)
+    sublocality_longitude = models.DecimalField(null=True, max_digits=11, decimal_places=8, blank=True)
     locality_id = models.PositiveIntegerField(default=None,null=True)
     sublocality_id = models.PositiveIntegerField(default=None, null=True)
     specialization = models.TextField(default='', null=True)
     specialization_id = models.PositiveIntegerField(default=None, null=True)
+    ipd_procedure = models.TextField(default='', null=True)
+    ipd_procedure_id = models.PositiveIntegerField(default=None, null=True)
     locality_location = models.PointField(geography=True, srid=4326, blank=True, null=True)
     sublocality_location = models.PointField(geography=True, srid=4326, blank=True, null=True)
     location = models.PointField(geography=True, srid=4326, blank=True, null=True)
+    bookable_doctors_count = JSONField(null=True)
 
     class Meta:
         db_table='temp_url'
@@ -257,18 +305,26 @@ class EntityAddress(TimeStampedModel):
         if not cls.is_english(name):
             return False
 
+        if not parent_entity:
+            return False
+
         if parent_entity and parent_entity.use_in_url and not cls.is_english(parent_entity.alternative_value):
             return False
 
         use_in_url = True
-        if not type.startswith('LOCALITY') and not type.startswith('SUBLOCALITY'):
+        if not type or (not type.startswith('LOCALITY') and not type.startswith('SUBLOCALITY')):
             use_in_url = False
 
-        if type.startswith('LOCALITY') and parent_entity.use_in_url:
+        # if type and type.startswith('LOCALITY') and not parent_entity:
+        #     print(type+' '+name)
+
+
+
+        if not type or (type.startswith('LOCALITY') and parent_entity.use_in_url):
             use_in_url = False
 
-        if type.startswith('SUBLOCALITY') and (not parent_entity or not parent_entity.use_in_url\
-            or not parent_entity.type or not parent_entity.type.startswith('LOCALITY')):
+        if not type or (type.startswith('SUBLOCALITY') and (not parent_entity or not parent_entity.use_in_url\
+            or not parent_entity.type or not parent_entity.type.startswith('LOCALITY'))):
             use_in_url = False
 
         if name in ('[no name]', 'Unnamed Road'):
@@ -311,112 +367,116 @@ class EntityAddress(TimeStampedModel):
 
     @classmethod
     def create(cls, geocoding_obj, value):
-        mapping_dictionary = {
-            'bengaluru': 'Bangalore',
-            'bengalooru': 'Bangalore',
-            'gurugram': 'Gurgaon',
-            'gurugram rural': 'Gurgaon'
-        }
+        try:
+            mapping_dictionary = {
+                'bengaluru': 'Bangalore',
+                'bengalooru': 'Bangalore',
+                'gurugram': 'Gurgaon',
+                'gurugram rural': 'Gurgaon'
+            }
 
-        response_list = list()
-        longitude = geocoding_obj.longitude
-        latitude = geocoding_obj.latitude
+            response_list = list()
+            longitude = geocoding_obj.longitude
+            latitude = geocoding_obj.latitude
 
-        # Take the address component with longest length as it can provide us the most relevant address.
-        max_length = 0
-        address_component = None
-        # result_value.get('results')[00].get('address_components')
-        if value.get('results'):
-            result_list = value.get('results')
-        for result in result_list:
-            if len(result.get('address_components', [])) > max_length:
-                address_component = result.get('address_components')
-                max_length = len(result.get('address_components'))
+            # Take the address component with longest length as it can provide us the most relevant address.
+            max_length = 0
+            address_component = None
+            # result_value.get('results')[00].get('address_components')
+            if value.get('results'):
+                result_list = value.get('results')
+            for result in result_list:
+                if len(result.get('address_components', [])) > max_length:
+                    address_component = result.get('address_components')
+                    max_length = len(result.get('address_components'))
 
-        if not address_component:
-            return response_list
+            if not address_component:
+                return response_list
 
-        system_types = ['COUNTRY', 'ADMINISTRATIVE_AREA_LEVEL_1', 'ADMINISTRATIVE_AREA_LEVEL_2', 'LOCALITY', 'SUBLOCALITY',
-                     'SUBLOCALITY_LEVEL_1', 'SUBLOCALITY_LEVEL_2', 'SUBLOCALITY_LEVEL_3']
+            system_types = ['COUNTRY', 'ADMINISTRATIVE_AREA_LEVEL_1', 'ADMINISTRATIVE_AREA_LEVEL_2', 'LOCALITY', 'SUBLOCALITY',
+                         'SUBLOCALITY_LEVEL_1', 'SUBLOCALITY_LEVEL_2', 'SUBLOCALITY_LEVEL_3']
 
-        pin_code = None
-        parent_id = None
-        parent_entity = None
+            pin_code = None
+            parent_id = None
+            parent_entity = None
 
-        order = 1
-        address_component.reverse()
-        save_location = False
+            order = 1
+            address_component.reverse()
+            save_location = False
 
-        for component in address_component:
+            for component in address_component:
 
-            long_name = component.get('long_name')
-            types = [key.upper() for key in component.get('types', [])]
-            type_blueprint = ",".join(types)
-            use_in_url = False
+                long_name = component.get('long_name')
+                types = [key.upper() for key in component.get('types', [])]
+                type_blueprint = ",".join(types)
+                use_in_url = False
 
-            if 'POSTAL_CODE' in types:
-                pin_code = long_name
-                continue
+                if 'POSTAL_CODE' in types:
+                    pin_code = long_name
+                    continue
 
-            selected_type = None
-            for st in system_types:
-                for tp in types:
-                    if st==tp:
-                        selected_type = st
-            if selected_type and selected_type.startswith('SUBLOCALITY'):
-                selected_type = 'SUBLOCALITY'
+                selected_type = None
+                for st in system_types:
+                    for tp in types:
+                        if st==tp:
+                            selected_type = st
+                if selected_type and selected_type.startswith('SUBLOCALITY'):
+                    selected_type = 'SUBLOCALITY'
 
-            if (selected_type and selected_type.startswith('SUBLOCALITY')) or (parent_entity and parent_entity.type and
-                parent_entity.type.startswith('LOCALITY')):
-                save_location = True
+                if (selected_type and selected_type.startswith('SUBLOCALITY')) or (parent_entity and parent_entity.type and
+                    parent_entity.type.startswith('LOCALITY')):
+                    save_location = True
 
-            postal_code = None
-            if save_location:
-                postal_code = pin_code
+                postal_code = None
+                if save_location:
+                    postal_code = pin_code
 
-            saved_data = EntityAddress.objects.filter(type=selected_type, value=long_name, parent=parent_id)
-            if len(saved_data) > 0:
-                entity_address = saved_data[0]                
-                AddressGeoMapping.objects.get_or_create(entity_address=entity_address, geocoding_result=geocoding_obj)
-            else:
-                point = None
-                if save_location:                    
-                    point = Point(float(longitude), float(latitude))
+                saved_data = EntityAddress.objects.filter(type=selected_type, value=long_name, parent=parent_id)
+                if len(saved_data) > 0:
+                    entity_address = saved_data[0]
+                    AddressGeoMapping.objects.get_or_create(entity_address=entity_address, geocoding_result=geocoding_obj)
+                else:
+                    point = None
+                    if save_location:
+                        point = Point(float(longitude), float(latitude))
 
-                alternative_name = mapping_dictionary.get(long_name.lower(), long_name)
-                #address = alternative_name
-                components = [alternative_name]
+                    alternative_name = mapping_dictionary.get(long_name.lower(), long_name)
+                    #address = alternative_name
+                    components = [alternative_name]
 
-                if parent_entity and parent_entity.components:
-                    #components.append(parent_entity.components)
-                    components = components + parent_entity.components
+                    if parent_entity and parent_entity.components:
+                        #components.append(parent_entity.components)
+                        components = components + parent_entity.components
 
-                #print(components)
-                components = cls.unique_components(components)
-                address = ", ".join(components)
-                use_in_url = cls.use_address_in_url(selected_type, alternative_name, parent_entity)
-                search_slug = None
-                if use_in_url:
-                    search_slug = cls.get_search_url_slug(selected_type, alternative_name, parent_entity)
-                #print(use_in_url)
+                    #print(components)
+                    components = cls.unique_components(components)
+                    address = ", ".join(components)
+                    use_in_url = cls.use_address_in_url(selected_type, alternative_name, parent_entity)
+                    search_slug = None
+                    if use_in_url:
+                        search_slug = cls.get_search_url_slug(selected_type, alternative_name, parent_entity)
+                    #print(use_in_url)
 
-                entity_address = EntityAddress(type=selected_type, abs_centroid=point, postal_code=postal_code,
-                                                   type_blueprint=type_blueprint, value=long_name, parent=parent_entity,
-                                                   alternative_value=alternative_name,
-                                                   order=order, use_in_url=use_in_url,
-                                                   address=address, components = components,
-                                                   search_slug = search_slug)
-                entity_address.save()
-                AddressGeoMapping.objects.get_or_create(entity_address=entity_address, geocoding_result=geocoding_obj)
-                #entity_address.geocoding..add(geocoding_obj)
-                
-
-            parent_id = entity_address.id
-            parent_entity = entity_address
-            order += 1
+                    entity_address = EntityAddress(type=selected_type, abs_centroid=point, postal_code=postal_code,
+                                                       type_blueprint=type_blueprint, value=long_name, parent=parent_entity,
+                                                       alternative_value=alternative_name,
+                                                       order=order, use_in_url=use_in_url,
+                                                       address=address, components = components,
+                                                       search_slug = search_slug)
+                    entity_address.save()
+                    AddressGeoMapping.objects.get_or_create(entity_address=entity_address, geocoding_result=geocoding_obj)
+                    #entity_address.geocoding..add(geocoding_obj)
 
 
-        return "success"
+                parent_id = entity_address.id
+                parent_entity = entity_address
+                order += 1
+
+
+            return "success"
+        except Exception as e:
+            print('Failure')
+            pass
 
 
 
@@ -587,10 +647,16 @@ class EntityUrls(TimeStampedModel):
         DOCTORS_CITY = 'DOCTORS_CITY'
         DOCTOR_PAGE = 'DOCTOR_PAGE'
         LAB_TEST = 'LAB_TEST'
-
         LAB_LOCALITY_CITY = 'LAB_LOCALITY_CITY'
         LAB_CITY = 'LAB_CITY'
         LAB_PAGE = 'LAB_PAGE'
+
+        HOSPITAL_PAGE = 'HOSPITAL_PAGE'
+        HOSPITALS_LOCALITY_CITY = 'HOSPITALS_LOCALITY_CITY'
+        HOSPITALS_CITY = 'HOSPITALS_CITY'
+        IPD_PROCEDURE_CITY = 'IPD_PROCEDURE_CITY'
+        IPD_PROCEDURE_HOSPITAL_CITY = 'IPD_PROCEDURE_HOSPITAL_CITY'
+        IPD_PROCEDURE_DOCTOR_CITY = 'IPD_PROCEDURE_DOCTOR_CITY'
 
     class UrlType(Choices):
         PAGEURL = 'PAGEURL'
@@ -606,19 +672,22 @@ class EntityUrls(TimeStampedModel):
     count = models.IntegerField(max_length=30, null=True, default=0)
     sitemap_identifier = models.CharField(max_length=28, null=True, choices=SitemapIdentifier.as_choices())
     sequence = models.PositiveIntegerField(default=0)
-    locality_latitude = models.DecimalField(null=True, max_digits=10, decimal_places=8)
-    locality_longitude = models.DecimalField(null=True, max_digits=10, decimal_places=8)
+    locality_latitude = models.DecimalField(null=True, max_digits=11, decimal_places=8)
+    locality_longitude = models.DecimalField(null=True, max_digits=11, decimal_places=8)
     sublocality_value = models.TextField(default='', null=True)
     locality_value = models.TextField(default='', null=True)
-    sublocality_latitude = models.DecimalField(null=True, max_digits=10, decimal_places=8, blank=True)
-    sublocality_longitude = models.DecimalField(null=True, max_digits=10, decimal_places=8, blank=True)
+    sublocality_latitude = models.DecimalField(null=True, max_digits=11, decimal_places=8, blank=True)
+    sublocality_longitude = models.DecimalField(null=True, max_digits=11, decimal_places=8, blank=True)
     locality_id = models.PositiveIntegerField(default=None,null=True)
     sublocality_id = models.PositiveIntegerField(default=None, null=True)
     specialization = models.TextField(default='', null=True)
     specialization_id = models.PositiveIntegerField(default=None, null=True)
+    ipd_procedure = models.TextField(default=None, null=True)
+    ipd_procedure_id = models.PositiveIntegerField(default=None, null=True)
     locality_location = models.PointField(geography=True, srid=4326, blank=True, null=True)
     sublocality_location = models.PointField(geography=True, srid=4326, blank=True, null=True)
     location = models.PointField(geography=True, srid=4326, blank=True, null=True)
+    bookable_doctors_count = JSONField(null=True)
 
     def __str__(self):
         return self.url
@@ -1141,7 +1210,7 @@ class EntityUrls(TimeStampedModel):
 
         # Mark all existing urls as is_valid=False.
 
-        update_query = '''update entity_urls set is_valid=false where sitemap_identifier in ('LAB_LOCALITY_CITY', 'LAB_CITY');'''
+        # update_query = '''update entity_urls set is_valid=false where sitemap_identifier in ('LAB_LOCALITY_CITY', 'LAB_CITY');'''
 
         query =  '''insert into entity_urls(extras, sitemap_identifier, url, count, entity_type, url_type, is_valid, created_at, 
                        updated_at, sequence, sublocality_latitude, sublocality_longitude, locality_latitude, locality_longitude, locality_id, sublocality_id,
@@ -1159,7 +1228,7 @@ class EntityUrls(TimeStampedModel):
                               'sublocality_longitude', x.sublocality_longitude, 'locality_latitude', x.locality_latitude, 'locality_longitude', 
                               x.locality_longitude))
                         
-                       end as extras, x.sitemap_identifier as sitemap_identifier, x.url as url, 
+                       end as extras, x.sitemap_identifier as sitemap_identifier, lower(x.url) as url, 
                        x.count as count, x.entity_type as entity_type, x.url_type as url_type , x.is_valid, 
                        x.created_at as created_at, x.updated_at as updated_at, x.sequence as sequence,
                        x.sublocality_latitude as sublocality_latitude, x.sublocality_longitude as sublocality_longitude, x.locality_latitude as locality_latitude,
@@ -1206,7 +1275,7 @@ class EntityUrls(TimeStampedModel):
 
                        'Lab' as entity_type,
                        'SEARCHURL' as url_type,
-                       True as is_valid,
+                       False as is_valid,
                        NOW() as created_at,
                        NOW() as updated_at,
                        %d as sequence,
@@ -1220,20 +1289,46 @@ class EntityUrls(TimeStampedModel):
                        end as url
                        from
                        (select * from 
-                       (select ea.id location_id,ea.alternative_value location_name, ea.type,ea.parent_id,
+                       (select ea.id location_id,lower(ea.alternative_value) location_name, ea.type,ea.parent_id,
                        st_x(centroid::geometry) as longitude, st_y(centroid::geometry) as latitude
                        ,count(*) count from entity_address ea
                        inner join lab l on l.is_live=true 
                        and (
-                       (type_blueprint='LOCALITY' and ST_DWithin(ea.centroid,l.location,15000)) or
-                       (type_blueprint='SUBLOCALITY' and ST_DWithin(ea.centroid,l.location,5000))
+                       (type='LOCALITY' and ST_DWithin(ea.centroid,l.location,15000)) or
+                       (type='SUBLOCALITY' and ST_DWithin(ea.centroid,l.location,5000))
                        )
-                       where type_blueprint in ('LOCALITY','SUBLOCALITY')
+                       where type in ('LOCALITY','SUBLOCALITY')
                        group by ea.id)x where count>=3)y
                        left join entity_address ea on y.parent_id=ea.id 
                        ) as data 
                        ) x where rnum=1 and x.url ~* 'y*?(^[A-Za-z0-9-]+$)' 
                        ''' % (sequence)
+
+        update_locality_lat_long = '''UPDATE entity_urls 
+                        SET locality_latitude = st_y(centroid::geometry), locality_longitude = st_x(centroid::geometry),
+                        locality_value = ea.alternative_value, locality_location = centroid
+                        FROM entity_address ea
+                        WHERE locality_id = ea.id  and url_type='SEARCHURL' and entity_type='Lab' '''
+
+        update_sublocality_lat_long = '''UPDATE entity_urls 
+                        SET sublocality_latitude = st_y(centroid::geometry), sublocality_longitude = st_x(centroid::geometry),
+                        sublocality_value = ea.alternative_value, sublocality_location = centroid
+                        FROM entity_address ea
+                        WHERE sublocality_id = ea.id  and url_type='SEARCHURL' and entity_type='Lab'
+                        '''
+
+        update_location = '''update entity_urls set location = sublocality_location where sublocality_location is not null and  url_type='SEARCHURL' and entity_type='Lab' '''
+
+        update_null_location = '''update entity_urls set location = locality_location where location is null and  url_type='SEARCHURL' and entity_type='Lab' '''
+
+        update_current_urls_query = '''update entity_urls set is_valid=true where url_type='SEARCHURL' and entity_type='Lab' and sequence = %d''' % sequence
+
+        update_previous_urls_query = '''update entity_urls set is_valid=false where url_type='SEARCHURL' and entity_type='Lab' and sequence < %d''' % sequence
+
+        cleanup = '''delete from entity_urls where id in (select id from 
+                   (select eu.*, row_number() over(partition by url order by is_valid desc, sequence desc) rownum from entity_urls eu  
+                   )x where rownum>1 
+                   ) '''
 
         # query ='''insert into entity_urls(extras, sitemap_identifier, url, count, entity_type, url_type, is_valid, created_at, updated_at, sequence)
         #     select x.extras as extras, x.sitemap_identifier as sitemap_identifier, x.url as url,
@@ -1290,8 +1385,15 @@ class EntityUrls(TimeStampedModel):
         from django.db import connection
         with connection.cursor() as cursor:
             try:
-                cursor.execute(update_query)
+
                 cursor.execute(query)
+                cursor.execute(update_locality_lat_long)
+                cursor.execute(update_sublocality_lat_long)
+                cursor.execute(update_location)
+                cursor.execute(update_null_location)
+                cursor.execute(update_current_urls_query)
+                cursor.execute(update_previous_urls_query)
+                cursor.execute(cleanup)
 
             except Exception as e:
                 print(str(e))
@@ -1651,7 +1753,7 @@ class LabPageUrl(object):
             EntityUrls.objects.filter(entity_id=self.lab.id, sitemap_identifier=EntityUrls.SitemapIdentifier.LAB_PAGE, url=url).delete()
             EntityUrls.objects.create(**data)
 
-    def create_lab_page_urls(lab, sequence):
+    def create_lab_page_urls(lab, sequence, cache):
         sequence = sequence
         locality_value = None
         locality_id = None
@@ -1730,24 +1832,20 @@ class LabPageUrl(object):
 
                     new_url = url
 
-                    dup_url = EntityUrls.objects.filter(url=new_url+'-lpp',
-                                                        sitemap_identifier=EntityUrls.SitemapIdentifier.LAB_PAGE
-                                                        ).filter(~Q(entity_id=lab.id)).first()
-                    if dup_url:
+                    is_duplicate = cache.is_duplicate(new_url + '-lpp', lab.id)
+
+                    if is_duplicate:
                         new_url = new_url + '-' + str(lab.id)
+
                     new_url = new_url + '-lpp'
 
-                    EntityUrls.objects.filter(entity_id=lab.id,
-                                              sitemap_identifier=EntityUrls.SitemapIdentifier.LAB_PAGE,
-                                              is_valid=True).filter(
-                        ~Q(url=new_url)).update(is_valid=False)
-
-                    EntityUrls.objects.filter(entity_id=lab.id,
-                                              sitemap_identifier=EntityUrls.SitemapIdentifier.LAB_PAGE,
-                                              url=new_url).delete()
                     data['url'] = new_url
-                    EntityUrls.objects.create(**data)
-                    return ("success: " + str(lab.id))
+                    new_entity = EntityUrls(**data)
+
+                    cache.add(new_entity)
+
+                    return new_entity
+
 
 
 class DoctorPageURL(object):
@@ -1869,6 +1967,7 @@ class DoctorPageURL(object):
 
         sequence = seq[0]['inc']
 
+        from ondoc.location.services.doctor_urls import PageUrlCache
         cache = PageUrlCache(EntityUrls.SitemapIdentifier.DOCTOR_PAGE)
         #to_disable = []
         to_delete = []
@@ -2046,8 +2145,8 @@ class DoctorPageURL(object):
             # EntityUrls.objects.filter(entity_id=doctor.id,
             #                           sitemap_identifier=EntityUrls.SitemapIdentifier.DOCTOR_PAGE).filter(
             #     ~Q(url=new_url)).update(is_valid=False)
-
-            to_delete.extend(cache.get_deletions(new_url, doctor.id))
+            #
+            # to_delete.extend(cache.get_deletions(new_url, doctor.id))
             # EntityUrls.objects.filter(entity_id=doctor.id, sitemap_identifier=EntityUrls.SitemapIdentifier.DOCTOR_PAGE,
             #                           url=new_url).delete()
 

@@ -4,7 +4,10 @@ import logging
 
 SECRET_KEY = env('DJANGO_SECRET_KEY')
 
-ALLOWED_HOSTS = env.list('DJANGO_ALLOWED_HOSTS', default=['panaceatechno.com', 'docprime.com','admin.docprime.com'])
+# ALLOWED_HOSTS = env.list('DJANGO_ALLOWED_HOSTS', default=['panaceatechno.com', 'test.docprime.com', 'docprime.com','admin.docprime.com'])
+ALLOWED_HOSTS = ['panaceatechno.com', 'test.docprime.com', 'docprime.com','admin.docprime.com', 'backendprod']
+ALLOWED_HOSTS += ['10.20.{}.{}'.format(i,j) for i in range(256) for j in range(256)]
+
 DATABASES['default']['ATOMIC_REQUESTS'] = True  # noqa F405
 DATABASES['default']['CONN_MAX_AGE'] = env.int('CONN_MAX_AGE', default=60)  # noqa F405
 DEBUG = False
@@ -40,29 +43,18 @@ SECURE_BROWSER_XSS_FILTER = True
 # https://docs.djangoproject.com/en/dev/ref/settings/#x-frame-options
 X_FRAME_OPTIONS = 'DENY'
 
-if env('ENABLE_DATADOG', default=False):
+if env.bool('ENABLE_DATADOG', default=False):
     INSTALLED_APPS = DJANGO_APPS + THIRD_PARTY_APPS + ('ddtrace.contrib.django',) + LOCAL_APPS 
-
-INSTALLED_APPS += ('raven.contrib.django.raven_compat',)
 
 INSTALLED_APPS += ('gunicorn',)
 
-
-RAVEN_MIDDLEWARE = ['raven.contrib.django.raven_compat.middleware.SentryResponseErrorIdMiddleware']
-MIDDLEWARE = RAVEN_MIDDLEWARE + MIDDLEWARE
-
 SMS_BACKEND = 'ondoc.sms.backends.backend.SmsBackend'
-
-# Sentry Configuration
-SENTRY_DSN = env('DJANGO_SENTRY_DSN')
-SENTRY_CLIENT = env('DJANGO_SENTRY_CLIENT', default='raven.contrib.django.raven_compat.DjangoClient')
-
 LOGGING = {
     'version': 1,
     'disable_existing_loggers': True,
     'root': {
         'level': 'WARNING',
-        'handlers': ['sentry', ],
+        'handlers': ['console', ],
     },
     'formatters': {
         'verbose': {
@@ -71,10 +63,6 @@ LOGGING = {
         },
     },
     'handlers': {
-        'sentry': {
-            'level': 'ERROR',
-            'class': 'raven.contrib.django.raven_compat.handlers.SentryHandler',
-        },
         'console': {
             'level': 'DEBUG',
             'class': 'logging.StreamHandler',
@@ -99,19 +87,32 @@ LOGGING = {
         },
         'django.security.DisallowedHost': {
             'level': 'ERROR',
-            'handlers': ['console', 'sentry', ],
+            'handlers': ['console', ],
             'propagate': False,
         },
     },
 }
+SENTRY_DSN = env('DJANGO_SENTRY_DSN')
 
-SENTRY_CELERY_LOGLEVEL = env.int('DJANGO_SENTRY_LOG_LEVEL', logging.INFO)
-RAVEN_CONFIG = {
-    'CELERY_LOGLEVEL': env.int('DJANGO_SENTRY_LOG_LEVEL', logging.INFO),
-    'DSN': SENTRY_DSN,
-    #'release': raven.fetch_git_sha(os.path.abspath(os.pardir)),
+if env('ENABLE_SENTRY', default=False):
+    INSTALLED_APPS += ('raven.contrib.django.raven_compat',)
+    RAVEN_MIDDLEWARE = ['raven.contrib.django.raven_compat.middleware.SentryResponseErrorIdMiddleware']
+    MIDDLEWARE = RAVEN_MIDDLEWARE + MIDDLEWARE
+    # Sentry Configuration
+    SENTRY_CLIENT = env('DJANGO_SENTRY_CLIENT', default='raven.contrib.django.raven_compat.DjangoClient')
+    SENTRY_CELERY_LOGLEVEL = env.int('DJANGO_SENTRY_LOG_LEVEL', logging.INFO)
+    RAVEN_CONFIG = {
+        'CELERY_LOGLEVEL': env.int('DJANGO_SENTRY_LOG_LEVEL', logging.INFO),
+        'DSN': SENTRY_DSN,
+        # 'release': raven.fetch_git_sha(os.path.abspath(os.pardir)),
+    }
+    LOGGING['handlers']['sentry'] = {
+                                    'level': 'ERROR',
+                                    'class': 'raven.contrib.django.raven_compat.handlers.SentryHandler',
+                                     }
+    LOGGING['loggers']['django.security.DisallowedHost']['handlers'] = ['console', 'sentry', ]
+    LOGGING['root']['handlers'] = ['sentry', ]
 
-}
 
 EMAIL_HOST = env('EMAIL_HOST')
 EMAIL_PORT = env('EMAIL_PORT')
@@ -154,7 +155,6 @@ AWS_HEADERS = {
 AWS_S3_OBJECT_PARAMETERS = {
     'CacheControl': 'max-age=31536000',
 }
-
 
 RATING_SMS_NOTIF=env('RATING_SMS_NOTIF_PRD', default=86400)
 THYROCARE_NETWORK_ID = 43

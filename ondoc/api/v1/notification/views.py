@@ -1,3 +1,5 @@
+from itertools import groupby
+
 from ondoc.notification import models
 from ondoc.api.v1.utils import IsNotAgent
 from rest_framework.permissions import IsAuthenticated
@@ -7,6 +9,7 @@ from rest_framework import viewsets
 from django.utils import timezone
 from django.db import transaction
 from . import serializers
+from rest_framework import status
 
 
 class AppNotificationViewSet(viewsets.GenericViewSet):
@@ -69,3 +72,34 @@ class AppNotificationViewSet(viewsets.GenericViewSet):
         paginated_queryset = paginate_queryset(queryset, request)
         serializer = serializers.AppNotificationSerializer(paginated_queryset, many=True)
         return AppNotificationViewSet.append_unviewed_unread_count(serializer.data, queryset)
+
+
+class ChatNotificationViewSet(viewsets.GenericViewSet):
+
+    def chat_send(self, request):
+        from ondoc.authentication.models import NotificationEndpoint
+        from ondoc.communications.models import PUSHNotification, NotificationAction
+
+        data = request.data
+
+        if not data or not data.get('title') or not data.get('body') or not data.get('room_id') or not data.get('device_id'):
+            return Response({"message":"Insufficient Data"}, status=status.HTTP_400_BAD_REQUEST)
+
+        user_and_tokens = []
+        user_and_token = [{'user': token.user, 'token': token.token, 'app_name': token.app_name} for token in
+                          NotificationEndpoint.objects.filter(device_id__icontains=str(data.get('device_id')).lower()).order_by('user')]
+        for user, user_token_group in groupby(user_and_token, key=lambda x: x['user']):
+            user_and_tokens.append(
+                {'user': user, 'tokens': [{"token": t['token'], "app_name": t["app_name"]} for t in user_token_group]})
+
+        context = {
+            "title" : data.get('title'),
+            "body" : data.get('body'),
+            "screen": data.get('screen', "chat"),
+            "room_id": data.get('room_id'),
+            "data_only": True
+        }
+        noti = PUSHNotification(NotificationAction.CHAT_NOTIFICATION, context)
+        noti.send(user_and_tokens)
+        return Response({"message": "Notification Sent"})
+

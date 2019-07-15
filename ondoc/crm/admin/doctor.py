@@ -26,10 +26,11 @@ from ondoc.api.v1.utils import GenericAdminEntity, util_absolute_url, util_file_
 from ondoc.common.models import AppointmentHistory
 from django.contrib import messages
 from django.http import HttpResponseRedirect
+
+from ondoc.notification.models import NotificationAction
 from ondoc.procedure.models import DoctorClinicProcedure, Procedure, DoctorClinicIpdProcedure
 
 logger = logging.getLogger(__name__)
-
 
 from ondoc.account.models import Order, Invoice
 from django.contrib.contenttypes.admin import GenericTabularInline
@@ -46,13 +47,14 @@ from ondoc.doctor.models import (Doctor, DoctorQualification,
                                  DoctorPracticeSpecialization, CompetitorMonthlyVisit,
                                  GoogleDetailing, VisitReason, VisitReasonMapping, PracticeSpecializationContent,
                                  PatientMobile, DoctorMobileOtp,
-                                 UploadDoctorData, CancellationReason)
+                                 UploadDoctorData, CancellationReason, Prescription, PrescriptionFile,
+                                 SimilarSpecializationGroup, SimilarSpecializationGroupMapping)
 
 from ondoc.authentication.models import User
 from .common import *
 from .autocomplete import CustomAutoComplete
 from ondoc.crm.constants import constants
-from django.utils.html import format_html_join
+from django.utils.html import format_html_join, format_html
 from django.template.loader import render_to_string
 import nested_admin
 from django.contrib.admin.widgets import AdminSplitDateTime
@@ -62,6 +64,9 @@ from decimal import Decimal
 from .common import AssociatedMerchantInline, RemarkInline
 from ondoc.sms import api
 from ondoc.ratings_review import models as rating_models
+from ondoc.notification import tasks as notification_tasks
+from django.urls import reverse
+
 
 class AutoComplete:
     def autocomplete_view(self, request):
@@ -488,23 +493,23 @@ class DoctorMobileForm(forms.ModelForm):
                 std_code=int(std_code)
             except:
                 raise forms.ValidationError("Invalid STD code")
-    
+
         try:
             number=int(number)
         except:
             raise forms.ValidationError("Invalid Number")
-    
+
         if std_code:
             if data.get('is_primary'):
                 raise forms.ValidationError("Primary number should be a mobile number")
         else:
             if number and (number<5000000000 or number>9999999999):
                 raise forms.ValidationError("Invalid mobile number")
-    
+
         #Marking doctor mobile primary work.
         # if std_code and data.get('mark_primary'):
         #     raise forms.ValidationError('Primary number should be a mobile number')
-        
+
         # if not std_code and data.get('mark_primary'):
         #     if number and (number<5000000000 or number>9999999999):
         #         raise forms.ValidationError("Invalid mobile number")
@@ -754,6 +759,32 @@ class DoctorForm(FormCleanMixin):
                     raise forms.ValidationError("Must have disable comments if disable reason is others.")
         # if '_mark_in_progress' in self.data and data.get('enabled'):
         #     raise forms.ValidationError("Must be disabled before rejecting.")
+
+        if data.get('enabled_for_online_booking'):
+            if self.instance and self.instance.data_status == QCModel.QC_APPROVED:
+                pass
+            elif self.instance and self.instance.data_status != QCModel.QC_APPROVED and '_qc_approve' in self.data:
+                pass
+            else:
+                raise forms.ValidationError("Must be QC Approved for enable online booking")
+
+        if '_mark_in_progress' in self.request.POST:
+            if data.get('enabled_for_online_booking'):
+                raise forms.ValidationError("Enable for online booking should be disabled for QC Reject/Reopen")
+            else:
+                pass
+
+        if data.get('is_live'):
+            if self.instance and self.instance.source == 'pr':
+                pass
+            else:
+                history_obj = self.instance.history.filter(status=QCModel.QC_APPROVED).first()
+                if self.instance and self.instance.enabled and history_obj:
+                    pass
+                elif self.instance and not self.instance.enabled and data.get('enabled') and history_obj:
+                    pass
+                else:
+                    raise forms.ValidationError("Should be enabled and QC Approved once for is_live")
 
 
 class CityFilter(SimpleListFilter):
@@ -1012,7 +1043,7 @@ class CompetitorInfoFormSet(forms.BaseInlineFormSet):
         super().clean()
         if any(self.errors):
             return
-            
+
         # prev_compe_infos = {}
         # for item in self.cleaned_data:
         #     req_set = (item.get('name'), item.get('hospital_name'), item.get('doctor'))
@@ -1069,7 +1100,6 @@ class DoctorAdmin(AutoComplete, ImportExportMixin, VersionAdmin, ActionAdmin, QC
     # class DoctorAdmin(nested_admin.NestedModelAdmin):
     resource_class = DoctorResource
     change_list_template = 'superuser_import_export.html'
-
     # fieldsets = ((None,{'fields':('name','gender','practicing_since','license','is_license_verified','signature','raw_about' \
     #               ,'about',  'onboarding_url', 'get_onboard_link', 'additional_details')}),
     #              (None,{'fields':('assigned_to',)}),
@@ -1084,6 +1114,12 @@ class DoctorAdmin(AutoComplete, ImportExportMixin, VersionAdmin, ActionAdmin, QC
     list_filter = (
         'data_status', 'onboarding_status', 'is_live', 'enabled', 'is_insurance_enabled', 'doctorpracticespecializations__specialization',
         CityFilter, CreatedByFilter)
+
+    # def get_inline_instances(self, request, obj=None):
+    #     res = super().get_inline_instances(request, obj)
+    #     if obj and obj.id and obj.data_status == obj.QC_APPROVED:
+    #         res = [x for x in res if not isinstance(x, RemarkInline)]
+    #     return res
 
     def has_delete_permission(self, request, obj=None):
         return super().has_delete_permission(request, obj)
@@ -1147,7 +1183,7 @@ class DoctorAdmin(AutoComplete, ImportExportMixin, VersionAdmin, ActionAdmin, QC
     #                                                                                   'doctor_clinics__availability',
     #                                                                                   'documents')
     #exclude = ('source','batch','lead_url','registered')
-    
+
     def get_queryset(self, request):
         qs = super().get_queryset(request)
         if request.user.is_member_of(constants['DOCTOR_SALES_GROUP']):
@@ -1358,7 +1394,7 @@ class DoctorAdmin(AutoComplete, ImportExportMixin, VersionAdmin, ActionAdmin, QC
         super().save_model(request, obj, form, change)
 
     def has_add_permission(self, request):
-        if request.user.groups.filter(name=constants['DOCTOR_NETWORK_GROUP_NAME']).exists():
+        if request.user.is_member_of(constants['DOCTOR_NETWORK_GROUP_NAME']):
             requested_leadId = request.GET.get('LeadId')
             if not requested_leadId:
                 return False
@@ -1426,12 +1462,16 @@ class DoctorOpdAppointmentForm(RefundableAppointmentForm):
     cancel_type = forms.ChoiceField(label='Cancel Type', choices=((0, 'Cancel and Rebook'),
                                                                   (1, 'Cancel and Refund'),), initial=0, widget=forms.RadioSelect)
     custom_otp = forms.IntegerField(required=False)
+    hospital_reference_id = forms.CharField(widget=forms.Textarea, required=False)
+    send_credit_letter = forms.BooleanField(label='Send credit letter', initial=False, required=False)
+    send_cod_to_prepaid_request = forms.BooleanField(label='Send COD to prepaid request via SMS', initial=False, required=False)
 
     def clean(self):
         super().clean()
         cleaned_data = self.cleaned_data
-        if self.request.user.groups.filter(name=constants['OPD_APPOINTMENT_MANAGEMENT_TEAM']).exists() and cleaned_data.get('status') == OpdAppointment.BOOKED:
-            raise forms.ValidationError("Form cant be Saved with Booked Status.")
+        # Appointments are now made with CREATED status.
+        # if self.request.user.groups.filter(name=constants['OPD_APPOINTMENT_MANAGEMENT_TEAM']).exists() and cleaned_data.get('status') == OpdAppointment.BOOKED:
+        #     raise forms.ValidationError("Form cant be Saved with Booked Status.")
         if cleaned_data.get('start_date') and cleaned_data.get('start_time'):
                 date_time_field = str(cleaned_data.get('start_date')) + " " + str(cleaned_data.get('start_time'))
                 dt_field = parse_datetime(date_time_field)
@@ -1442,6 +1482,9 @@ class DoctorOpdAppointmentForm(RefundableAppointmentForm):
             hour = round(float(time_slot_start.hour) + (float(time_slot_start.minute) * 1 / 60), 2)
         else:
             raise forms.ValidationError("Invalid start date and time.")
+
+        if time_slot_start != self.instance.time_slot_start and time_slot_start < timezone.now():
+            raise forms.ValidationError("Time slot can never be in past. Please add time slot in future.")
 
         if cleaned_data.get('doctor') and cleaned_data.get('hospital'):
             doctor = cleaned_data.get('doctor')
@@ -1459,6 +1502,9 @@ class DoctorOpdAppointmentForm(RefundableAppointmentForm):
                 'cancellation_reason') or cleaned_data.get('cancellation_comments')):
             raise forms.ValidationError(
                 "Reason/Comment for cancellation can only be entered on cancelled appointment")
+        
+        if cleaned_data.get('status') is OpdAppointment.CREATED and cleaned_data.get('status_change_comments'):
+            raise forms.ValidationError("Comment for status change can only be entered when changing status from created to other.")
 
         if cleaned_data.get('status') is OpdAppointment.CANCELLED and not cleaned_data.get('cancellation_reason'):
             raise forms.ValidationError("Reason for Cancelled appointment should be set.")
@@ -1467,6 +1513,19 @@ class DoctorOpdAppointmentForm(RefundableAppointmentForm):
                 'cancellation_reason') and cleaned_data.get('cancellation_reason').is_comment_needed and not cleaned_data.get('cancellation_comments'):
             raise forms.ValidationError(
                 "Cancellation comments must be mentioned for selected cancellation reason.")
+
+        if cleaned_data.get('status') and self.instance and self.instance.status == OpdAppointment.CREATED:
+            if cleaned_data.get('status') not in [OpdAppointment.BOOKED, OpdAppointment.CANCELLED, OpdAppointment.CREATED]:
+                raise forms.ValidationError(
+                    "Created status can only be changed to Booked or cancelled.")
+
+            if cleaned_data.get('status') != OpdAppointment.CREATED and not cleaned_data.get('status_change_comments'):
+                raise forms.ValidationError(
+                    "Status change comments must be mentioned when changing status from created to other.")
+
+        # if cleaned_data.get('status') and self.instance and self.instance.status == OpdAppointment.CREATED and cleaned_data.get('status') in [OpdAppointment.BOOKED, OpdAppointment.CANCELLED] and not
+        #     raise forms.ValidationError(
+        #         "Status change comments must be mentioned when changing status from created to other.")
 
         if cleaned_data.get('status') not in [OpdAppointment.CANCELLED, OpdAppointment.COMPLETED, None]:
             if not DoctorClinicTiming.objects.filter(doctor_clinic__doctor=doctor,
@@ -1480,6 +1539,28 @@ class DoctorOpdAppointmentForm(RefundableAppointmentForm):
                 raise forms.ValidationError("Can only complete appointment if it is in accepted state.")
             if not cleaned_data.get('custom_otp') == self.instance.otp:
                 raise forms.ValidationError("Entered OTP is incorrect.")
+
+        if cleaned_data.get('send_credit_letter'):
+            if self.instance.status != cleaned_data.get('status'):
+                raise forms.ValidationError("Status change and Send credit letter can't be together.")
+            if self.instance:
+                if self.instance.status != OpdAppointment.ACCEPTED:
+                    raise forms.ValidationError("Can only send credit letter only if appointment status is accepted.")
+                elif not self.instance.is_credit_letter_required_for_appointment():
+                    raise forms.ValidationError("Can only send credit letter for Medanta and Artemis hospital bookings.")
+                elif self.instance.is_payment_type_cod():
+                    raise forms.ValidationError("Can not send credit letter for COD bookings.")
+                else:
+                    try:
+                        notification_tasks.send_opd_notifications_refactored.apply_async((self.instance.id, NotificationAction.APPOINTMENT_ACCEPTED), countdown=1)
+                    except Exception as e:
+                        logger.error(str(e))
+
+        if cleaned_data.get('send_cod_to_prepaid_request', False) and self.instance and self.instance.is_cod_to_prepaid:
+            raise forms.ValidationError("Appointment has already been converted to prepaid.")
+
+        if cleaned_data.get('send_cod_to_prepaid_request', False) and self.instance and self.instance.payment_type != OpdAppointment.COD:
+            raise forms.ValidationError("Appointment must be of COD type.")
 
         # if self.instance.id:
         #     if cleaned_data.get('status') == OpdAppointment.RESCHEDULED_PATIENT or cleaned_data.get(
@@ -1499,18 +1580,47 @@ class DoctorOpdAppointmentForm(RefundableAppointmentForm):
         return cleaned_data
 
 
+
+class PrescriptionFileInline(nested_admin.NestedTabularInline):
+    model = PrescriptionFile
+    extra = 0
+    can_delete = True
+    show_change_link = True
+
+
+class PrescriptionInline(nested_admin.NestedTabularInline):
+    model = Prescription
+    extra = 0
+    can_delete = True
+    show_change_link = True
+    inlines = [PrescriptionFileInline]
+
+
 class DoctorOpdAppointmentAdmin(admin.ModelAdmin):
     form = DoctorOpdAppointmentForm
-    search_fields = ['id']
-    list_display = ('booking_id', 'get_doctor', 'get_profile', 'status', 'time_slot_start', 'effective_price', 'created_at', 'updated_at')
-    list_filter = ('status', )
+    search_fields = ['id', 'profile__name', 'profile__phone_number', 'doctor__name', 'hospital__name']
+    list_display = ('booking_id', 'get_doctor', 'get_profile', 'status', 'time_slot_start', 'effective_price',
+                    'get_insurance', 'created_at', 'updated_at')
+    list_filter = ('status', 'payment_type')
     date_hierarchy = 'created_at'
+    list_display_links = ('booking_id', 'get_insurance',)
+    inlines = [PrescriptionInline]
+
+    def get_insurance(self, obj):
+        if obj.insurance:
+            content_type = ContentType.objects.get_for_model(UserInsurance)
+            link = reverse('admin:{}_{}_change'.format(content_type.app_label,
+                                                content_type.model), args=[obj.insurance.id])
+            return format_html('<a href="{}">{}</a>', link, obj.insurance.id)
+        else:
+            return ""
+    get_insurance.short_description = 'Insurance'
 
     def get_queryset(self, request):
         return super(DoctorOpdAppointmentAdmin, self).get_queryset(request).select_related('doctor', 'hospital', 'hospital__network')
 
     @transaction.non_atomic_requests
-    def change_view(self, request, object_id, form_url='', extra_context=None):        
+    def change_view(self, request, object_id, form_url='', extra_context=None):
         resp = super().change_view(request, object_id, form_url, extra_context=None)
         return resp
 
@@ -1567,7 +1677,8 @@ class DoctorOpdAppointmentAdmin(admin.ModelAdmin):
                 'fees', 'effective_price', 'mrp', 'deal_price', 'payment_status',
                 'payment_type', 'admin_information', 'insurance', 'outstanding',
                 'status', 'cancel_type', 'cancellation_reason', 'cancellation_comments',
-                'start_date', 'start_time', 'invoice_urls', 'payment_type', 'payout_info', 'refund_initiated')
+                'start_date', 'start_time', 'invoice_urls', 'payment_type', 'payout_info', 'refund_initiated', 'status_change_comments',
+                      'hospital_reference_id', 'send_credit_letter', 'send_cod_to_prepaid_request')
         if request.user.groups.filter(name=constants['APPOINTMENT_OTP_TEAM']).exists() or request.user.is_superuser:
             all_fields = all_fields + ('otp',)
 
@@ -1597,6 +1708,10 @@ class DoctorOpdAppointmentAdmin(admin.ModelAdmin):
             read_only += ('status',)
         if request.user.groups.filter(name=constants['APPOINTMENT_OTP_TEAM']).exists() or request.user.is_superuser:
             read_only = read_only + ('otp',)
+
+        if obj.status is not OpdAppointment.CREATED:
+            read_only = read_only + ('status_change_comments',)
+
         return read_only
         # else:
         #     return ('invoice_urls')
@@ -1787,6 +1902,9 @@ class DoctorOpdAppointmentAdmin(admin.ModelAdmin):
                     logger.warning("Admin Cancel completed - " + str(obj.id) + " timezone - " + str(timezone.now()))
             elif request.POST.get('status') and int(request.POST['status']) == OpdAppointment.COMPLETED and opd_obj and opd_obj.status != OpdAppointment.COMPLETED:
                 obj.action_completed()
+            send_cod_to_prepaid_request = form.cleaned_data.get('send_cod_to_prepaid_request', False)
+            if send_cod_to_prepaid_request:
+                notification_tasks.send_opd_notifications_refactored.apply_async((obj.id, NotificationAction.COD_TO_PREPAID_REQUEST), countdown=5)
             if form and form.cleaned_data and form.cleaned_data.get('refund_payment', False):
                 obj._refund_reason = form.cleaned_data.get('refund_reason', '')
                 obj.action_refund()
@@ -2006,11 +2124,20 @@ class SpecializationFieldAdmin(ImportExportMixin, VersionAdmin):
     resource_class = SpecializationFieldResource
 
 
+class PracticeSpecializationForm(forms.ModelForm):
+    def clean(self):
+        if self.data.get('specializationdepartmentmapping_set-TOTAL_FORMS') and int(
+                self.data.get('specializationdepartmentmapping_set-TOTAL_FORMS')) <= 0:
+            raise forms.ValidationError("Atleast one entry of Department is required.")
+        return super().clean()
+
+
 class PracticeSpecializationDepartmentMappingInline(admin.TabularInline):
     model = SpecializationDepartmentMapping
     extra = 0
     can_delete = True
     show_change_link = False
+
 
 
 class PracticeSpecializationAdmin(AutoComplete, ImportExportMixin, VersionAdmin):
@@ -2020,6 +2147,7 @@ class PracticeSpecializationAdmin(AutoComplete, ImportExportMixin, VersionAdmin)
     inlines = [PracticeSpecializationDepartmentMappingInline, ]
     resource_class = PracticeSpecializationSynonymResource
     search_fields = ['name', ]
+    form = PracticeSpecializationForm
 
 
 class GoogleDetailingResource(resources.ModelResource):
@@ -2084,7 +2212,7 @@ class OfflinePatientAdmin(VersionAdmin):
 
 
 class DoctorLeaveAdmin(VersionAdmin):
-
+    search_fields = ['doctor__name', 'doctor__id']
     autocomplete_fields = ('doctor', 'hospital')
     exclude = ('deleted_at',)
 
@@ -2114,3 +2242,16 @@ class UploadDoctorDataAdmin(admin.ModelAdmin):
                 else:
                     final_message += str(message)
         return final_message
+
+
+class SimilarSpecializationGroupInline(admin.TabularInline):
+    model = SimilarSpecializationGroupMapping
+    extra = 0
+    can_delete = True
+    autocomplete_fields = ['specialization']
+    fk_name = 'group'
+
+
+class SimilarSpecializationGroupAdmin(VersionAdmin):
+    inlines = [SimilarSpecializationGroupInline]
+    list_display = ['id', 'name']

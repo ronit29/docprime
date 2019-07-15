@@ -1,9 +1,13 @@
 from django.conf.urls import url
 from django.urls import path
-from ondoc.crm.admin.common import MatrixStateAutocomplete, MatrixCityAutocomplete
+from ondoc.crm.admin.common import MatrixStateAutocomplete, MatrixCityAutocomplete, LabPricingAutocomplete, \
+                                   RelatedHospitalAutocomplete
 from .views import (CitiesViewSet, ServicesViewSet, SmsServiceViewSet, UpdateXlsViewSet, UploadDoctorViewSet,
                     UploadQualificationViewSet, UploadExperienceViewSet, UploadAwardViewSet, UploadHospitalViewSet,
-                    UploadMembershipViewSet, SearchLeadViewSet, GetPaymentOptionsViewSet, GetSearchUrlViewSet)
+                    UploadMembershipViewSet, SearchLeadViewSet, GetPaymentOptionsViewSet, GetSearchUrlViewSet,
+                    GetKeyDataViewSet, AllUrlsViewset, DeviceDetailsSave, AppointmentPrerequisiteViewSet,
+                    SiteSettingsViewSet, DepartmentRouting)
+
 
 urlpatterns = [
     path('cities/list', CitiesViewSet.as_view({'get': 'list'}), name='cities-list'),
@@ -22,6 +26,16 @@ urlpatterns = [
     path('search-lead/create', SearchLeadViewSet.as_view({'post': 'create'}, ), name='create-search-lead'),
     path('payment-options', GetPaymentOptionsViewSet.as_view({'get':'list'},), name='payment_options'),
     url(r'^matrix-state-autocomplete/$', MatrixStateAutocomplete.as_view(), name='matrix-state-autocomplete'),
+    url(r'^labpricing-autocomplete/$', LabPricingAutocomplete.as_view(), name='labpricing-autocomplete'),
     url(r'^matrix-city-autocomplete/$', MatrixCityAutocomplete.as_view(), name='matrix-city-autocomplete'),
+    url(r'^related-hospital-autocomplete/$', RelatedHospitalAutocomplete.as_view(), name='related-hospital-autocomplete'),
     path('get_search_url', GetSearchUrlViewSet.as_view({'get':'search_url'}), name='get-search-url'),
+    path('get_key_data', GetKeyDataViewSet.as_view({'get':'list'}), name='get-key-data'),
+    path('entity-compare-autocomplete', AllUrlsViewset.as_view({'get':'list'}), name='entity-compare-autocomplete'),
+    path('device-details/save', DeviceDetailsSave.as_view({'post': 'save'}), name='device-details'),
+    # url(r'^insurer-autocomplete/$', InsurerAutocomplete.as_view(), name='insurer-autocomplete'),
+    # url(r'^insurance-plan-autocomplete/$', InsurancePlanAutocomplete.as_view(), name='insurance-plan-autocomplete'),
+    path('pre-booking', AppointmentPrerequisiteViewSet.as_view({'post': 'pre_booking'}), name='pre-booking'),
+    path('settings', SiteSettingsViewSet.as_view({'get': 'get_settings'}), name='pre-get_settings'),
+    path('get_department_for_routing', DepartmentRouting.as_view({'get': 'get_department'}), name='get-department')
 ]

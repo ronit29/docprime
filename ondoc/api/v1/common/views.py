@@ -1,4 +1,5 @@
 # from hardcopy import bytestring_to_pdf
+from rest_framework.permissions import IsAuthenticated
 from rest_framework import mixins, viewsets, status
 from rest_framework.response import Response
 from django.contrib.gis.geos import Point, GEOSGeometry
@@ -8,6 +9,8 @@ from ondoc.api.v1.common.serializers import SearchLeadSerializer
 from django.utils.dateparse import parse_datetime
 from weasyprint import HTML
 from django.http import HttpResponse
+
+from ondoc.api.v1.insurance.serializers import InsuranceCityEligibilitySerializer
 from ondoc.api.v1.utils import html_to_pdf, generate_short_url
 from ondoc.diagnostic.models import Lab
 from ondoc.doctor.models import (Doctor, DoctorPracticeSpecialization, PracticeSpecialization, DoctorMobile, Qualification,
@@ -15,16 +18,19 @@ from ondoc.doctor.models import (Doctor, DoctorPracticeSpecialization, PracticeS
                                  DoctorClinicTiming, DoctorClinic, Hospital, SourceIdentifier, DoctorAssociation)
 
 from ondoc.chat.models import ChatPrescription
+from ondoc.insurance.models import InsuranceEligibleCities
 from ondoc.lead.models import SearchLead
 from ondoc.notification.models import EmailNotification
 from ondoc.notification.rabbitmq_client import publish_message
 # from ondoc.notification.sqs_client import publish_message
 # from ondoc.notification.sqs_client import publish_message
 from django.template.loader import render_to_string
+
+from ondoc.procedure.models import IpdProcedure, IpdProcedureLead
 from . import serializers
-from ondoc.common.models import Cities, PaymentOptions
+from ondoc.common.models import Cities, PaymentOptions, UserConfig, DeviceDetails, LastUsageTimestamp, AppointmentHistory
 from ondoc.common.utils import send_email, send_sms
-from ondoc.authentication.backends import JWTAuthentication
+from ondoc.authentication.backends import JWTAuthentication, WhatsappAuthentication
 from django.core.files.uploadedfile import SimpleUploadedFile, TemporaryUploadedFile, InMemoryUploadedFile
 from openpyxl import load_workbook
 from openpyxl.writer.excel import save_virtual_workbook
@@ -40,6 +46,7 @@ import requests
 from PIL import Image as Img
 import os
 import math
+from decimal import Decimal
 
 logger = logging.getLogger(__name__)
 
@@ -908,18 +915,223 @@ class GetSearchUrlViewSet(viewsets.GenericViewSet):
     def search_url(self, request):
         params = request.query_params
         specialization_ids = params.get("specialization", '')
+        from_app = params.get("from_app", False)
         test_ids = params.get("test", '')
         lat = params.get("lat", 28.4485)  # if no lat long then default to gurgaon
         long = params.get("long", 77.0759)
 
-        opd_search_url = "%s/opd/searchresults?specializations=%s" \
-                         "&lat=%s&long=%s" \
-                         % (settings.BASE_URL, specialization_ids, lat, long)
-        tiny_opd_search_url = generate_short_url(opd_search_url)
+        if from_app == False:
 
-        lab_search_url = "%s/lab/searchresults?test_ids=%s" \
-                         "&lat=%s&long=%s" \
-                         % (settings.BASE_URL, test_ids, lat, long)
-        tiny_lab_search_url = generate_short_url(lab_search_url)
+            opd_search_url = "%s/opd/searchresults?specializations=%s" \
+                             "&lat=%s&long=%s" \
+                             % (settings.BASE_URL, specialization_ids, lat, long)
+            tiny_opd_search_url = generate_short_url(opd_search_url)
 
-        return Response({"opd_search_url": tiny_opd_search_url, "lab_search_url": tiny_lab_search_url})
+            lab_search_url = "%s/lab/searchresults?test_ids=%s" \
+                             "&lat=%s&long=%s" \
+                             % (settings.BASE_URL, test_ids, lat, long)
+            tiny_lab_search_url = generate_short_url(lab_search_url)
+
+            return Response({"opd_search_url": tiny_opd_search_url, "lab_search_url": tiny_lab_search_url})
+
+        else:
+
+            opd_search_url = "docprm://docprime.com/opd/searchresults?specializations=%s" \
+                             "&lat=%s&long=%s" \
+                             % (specialization_ids, lat, long)
+
+            lab_search_url = "docprm://docprime.com/lab/searchresults?test_ids=%s" \
+                             "&lat=%s&long=%s" \
+                             % (test_ids, lat, long)
+
+            return Response({"opd_search_url": opd_search_url, "lab_search_url": lab_search_url})
+
+
+
+class GetKeyDataViewSet(viewsets.GenericViewSet):
+
+    def list(self, request):
+
+        parameters = request.query_params
+        key = parameters.get('key')
+        if not key:
+            return Response(status=status.HTTP_400_BAD_REQUEST)
+        queryset = UserConfig.objects.filter(key__iexact=key)
+        if not queryset:
+            return Response(status=status.HTTP_404_NOT_FOUND)
+        resp = []
+        for info in queryset:
+            data_key = info.key
+            data_key = data_key.lower()
+            data = info.data
+            resp.append({'data': data, 'key': data_key})
+        return Response(resp)
+
+
+class AllUrlsViewset(viewsets.GenericViewSet):
+
+    def list(self, request):
+        parameters = request.query_params
+        key = parameters.get('query')
+        if not key:
+            return Response(status=status.HTTP_400_BAD_REQUEST)
+        key = key.lower()
+        if len(key)<3:
+            return Response(dict())
+
+
+        from ondoc.location.models import EntityUrls
+        from ondoc.location.models import CompareSEOUrls
+        e_urls = list(EntityUrls.objects.filter(url__startswith=key, is_valid=True).values_list('url', flat=True))[:5]
+        c_urls = list(CompareSEOUrls.objects.filter(url__startswith=key).values_list('url', flat=True))[:5]
+        result = e_urls + c_urls
+        return Response(dict(enumerate(result)))
+
+
+class DeviceDetailsSave(viewsets.GenericViewSet):
+
+    def save(self, request):
+        user = request.user if request.user and request.user.is_authenticated else None
+
+        last_usage_serializer = serializers.LastUsageTimestampSerializer(data=request.data)
+        last_usage_serializer.is_valid(raise_exception=True)
+        last_usage_validated_data = last_usage_serializer.validated_data
+
+        add_or_update_device_details = False
+        add_or_update_usage_time = True
+        device_validated_data = None
+        if last_usage_validated_data['source'] == AppointmentHistory.DOC_APP:
+            device_serializer = serializers.DeviceDetailsSerializer(data=request.data)
+            device_serializer.is_valid(raise_exception=True)
+            device_validated_data = device_serializer.validated_data
+            if 'device_id' in device_validated_data and device_validated_data.get('device_id'):
+                add_or_update_device_details = True
+                if 'last_ping_time' in device_validated_data and len(device_validated_data) == 2:
+                    add_or_update_usage_time = False
+
+        try:
+            if add_or_update_device_details and device_validated_data:
+                device_details_queryset = DeviceDetails.objects.filter(device_id=device_validated_data.get('device_id'))
+                device_details = device_details_queryset.first()
+                if device_details:
+                    device_details_queryset.update(**device_validated_data, user=user)
+                else:
+                    if not 'data' in device_validated_data:
+                        device_validated_data['data'] = {}
+                    device_details = DeviceDetails.objects.create(**device_validated_data, user=user)
+                last_usage_validated_data['device_id'] = device_details.id
+
+            if user and add_or_update_usage_time:
+                last_usage_queryset = LastUsageTimestamp.objects.filter(phone_number=user.phone_number)
+                last_usage_details = last_usage_queryset.first()
+                last_usage_validated_data['phone_number'] = int(user.phone_number)
+                last_usage_validated_data['last_app_open_timestamp'] = datetime.datetime.now()
+                if last_usage_details:
+                    last_usage_queryset.update(**last_usage_validated_data)
+                else:
+                    LastUsageTimestamp.objects.create(**last_usage_validated_data)
+        except Exception as e:
+            logger.error("Something went wrong while saving last_usage_timestmap and device details - " + str(e))
+            return Response("Error adding last_usage_timestmap and device details - " + str(e), status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+        return Response({"status": 1, "message": "last_usage_timestmap and device details added"}, status=status.HTTP_200_OK)
+
+
+class AppointmentPrerequisiteViewSet(viewsets.GenericViewSet):
+
+    authentication_classes = (JWTAuthentication,)
+    permission_classes = (IsAuthenticated, )
+
+    def pre_booking(self, request):
+        user = request.user
+        insurance = user.active_insurance
+        if not insurance or (user.is_authenticated and hasattr(request,'agent')):
+            return Response({'prescription_needed': False})
+
+        serializer = serializers.AppointmentPrerequisiteSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        valid_data = serializer.validated_data
+
+        user_profile = valid_data.get('profile', None)
+        if not user_profile.is_insured_profile:
+            return Response({'prescription_needed': False})
+
+        lab = valid_data.get('lab')
+        lab_pricing_group = lab.lab_pricing_group
+        available_lab_test_qs = lab_pricing_group.available_lab_tests.all().filter(test__in=valid_data.get('lab_test'))
+        tests_amount = Decimal(0)
+        for available_lab_test in available_lab_test_qs:
+            if available_lab_test.test.is_package and insurance.insurance_plan.plan_usages.get('member_package_limit'):
+                if user_profile.is_insurance_package_limit_exceed():
+                    return Response({'prescription_needed': True})
+            agreed_price = available_lab_test.custom_agreed_price if available_lab_test.custom_agreed_price else available_lab_test.computed_agreed_price
+            tests_amount = tests_amount + agreed_price
+
+        # start_date = valid_data.get('start_date').date()
+
+        resp = insurance.validate_limit_usages(tests_amount)
+
+        return Response(resp)
+
+
+class SiteSettingsViewSet(viewsets.GenericViewSet):
+    authentication_classes = (JWTAuthentication,)
+
+    def get_settings(self, request):
+        params = request.query_params
+
+        lat = params.get('latitude', None)
+        long = params.get('longitude', None)
+
+        insurance_availability = False
+
+        if request.user and request.user.is_authenticated and request.user.active_insurance:
+            insurance_availability = True
+
+        if lat and long and not insurance_availability:
+            data = {
+                'latitude': lat,
+                'longitude': long
+            }
+
+            serializer = InsuranceCityEligibilitySerializer(data=data)
+            serializer.is_valid(raise_exception=True)
+            data = serializer.validated_data
+            city_name = InsuranceEligibleCities.get_nearest_city(data.get('latitude'), data.get('longitude'))
+            if city_name:
+                insurance_availability = True
+
+        settings = {
+            'insurance_availability': insurance_availability
+        }
+
+        return Response(data=settings)
+
+
+class DepartmentRouting(viewsets.GenericViewSet):
+    authentication_classes = (WhatsappAuthentication,)
+
+    def get_department(self, request):
+        params = request.query_params
+        phone_number = params.get('phone_number', None)
+        department_id = settings.CHAT_SOT_DEPARTMENT_ID
+        department_name = 'Whatsapp'
+
+        try:
+            phone_number = int(phone_number)
+
+            ipd_lead_active = IpdProcedureLead.check_if_lead_active(phone_number, 30)
+
+            if ipd_lead_active:
+                department_id = settings.CHAT_IPD_DEPARTMENT_ID
+                department_name = 'IPD'
+            else:
+                pass
+
+            resp = {
+                'department_id': department_id,
+                'department_name': department_name
+            }
+        except ValueError as e:
+            return Response({'error': str(e)}, status=status.HTTP_400_BAD_REQUEST)
+
+        return Response(resp)

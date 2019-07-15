@@ -1,0 +1,172 @@
+{% load static %}
+{% load invoice_tags %}
+<!DOCTYPE>
+<html xmlns="http://www.w3.org/1999/xhtml">
+   <head>
+      <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+      <meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
+      <title>Insurance Emailer</title>
+      <link href="https://fonts.googleapis.com/css?family=Quicksand:400,500,700" rel="stylesheet">
+      <style>
+          @media screen and (max-width: 480px) and (min-width: 320px){
+              .info .info-details{font-size: 12px !important;}
+              .info .info-title{font-size: 12px !important;}
+              .policy-table tr td{font-size: 12px !important;}
+              .opd-ins{font-size: 14px !important;}
+          }
+      </style>
+   </head>
+   <body style="margin: 0; padding: 0;font-family: 'Quicksand', sans-serif;">
+
+       <table align="center" border="0" cellpadding="0" cellspacing="0" width="500" style="width:500px; border-collapse: collapse; border: 1px solid rgba(0,0,0,0.12)">
+      <tr>
+        <td>
+          <table border="0" cellpadding="0" cellspacing="0" width="100%" style="background: #fa7d1f; padding: 0px 15px;box-shadow: 0px 2px 4px 0 rgba(0, 0, 0, 0.2);">
+              <tr>
+                  <td style="padding:2px;"></td>
+              </tr>
+            <tr>
+              <td style="width: 100%;"><a href="#"><img src="https://cdn.docprime.com/images/doc-logo-small.png" width="70" alt="logo" style="width: 70px;"></a></td>
+              <td style="width: 100%;"></td>
+            </tr>
+          </table>
+        </td>
+      </tr>
+      <tr>
+        <td style="padding: 10px"></td>
+      </tr>
+      <tr>
+        <td>
+          <table align="center" border="0" cellpadding="0" cellspacing="0" width="500">
+            <tr>
+
+              <td align="right" style=" font-weight: 500;"> <img width="135" src="https://cdn.docprime.com/images/Apollo_logo_new.png" alt="logo" style="width: 135px;padding-top: 4px;padding-right: 5px;">
+              </td>
+              <td><p style="margin: 0px; padding: 0px;">OPD Insurance</p>
+              <p style="margin: 0px; padding: 0px;">by <b>Apollo Munich</b></p>
+            </td>
+
+          </tr>
+        </table>
+      </td>
+    </tr>
+    <tr>
+      <td style="padding:0 10px 10px"></td>
+    </tr>
+    <tr>
+      <td align="center" style="font-size:18px; color:#000; font-weight: 700;">Cancellation of Policy</td>
+    </tr>
+    <tr>
+      <td style="padding: 10px;"></td>
+    </tr>
+    <tr>
+      <td>
+        <table class="info" border="0" cellpadding="0" cellspacing="0" width="100%" style="width: 100%; padding: 15px 0; background:#fa7d1f; text-align: center;">
+          <tr>
+            <td width="33%" style="border-right: 1px solid rgba(255, 255, 255, 0.5);">
+              <span class="info-title" style="color: #ffffff; text-align: center; font-size: 12px;">Policy Issue Date</span><br>
+              <span class="info-details" style="color: #ffffff; text-align: center; font-size: 12px; font-weight: 700;">{{purchase_date}}</span>
+            </td>
+             <td width="33.3%" style="border-right: 1px solid rgba(255, 255, 255, 0.5);">
+                <span class="info-title" style="color: rgba(255, 255, 255, 0.8); text-align: center; font-size: 12px;">Policy Expiry Date</span><br>
+                <span class="info-details" style="color: rgba(255, 255, 255, 1); text-align: center; font-size: 12px;font-weight: 700;">{{expiry_date}}</span>
+              </td>
+            <td width="33%" style="">
+              <span class="info-title" style="color: #ffffff; text-align: center; font-size: 12px;">Policy Number</span><br>
+              <span class="info-details" style="color: #ffffff; text-align: center; font-size: 12px;font-weight: 700;">{{policy_number}}</span>
+            </td>
+          </tr>
+        </table>
+      </td>
+    </tr>
+    <tr>
+      <td>
+        <table border="0" cellpadding="0" cellspacing="0" width="100%" style="padding: 15px; background: #f1f1f1;">
+          <tr>
+            <td>
+              <table border="0" cellpadding="0" cellspacing="0" width="100%" style="padding:15px 30px; background: #fff; border-radius: 5px; border: 1px solid #f78631; width: 500px">
+                <tr>
+                  <td>
+                    <table border="0" cellpadding="0" cellspacing="0" width="100%" class="policy-table">
+                      <!-- <tr>
+
+                        <td style="font-size: 12px; font-weight: 500; color: #000; vertical-align: top;">Our team will get in touch within 24 hours</td>
+                      </tr>
+                      <tr>
+
+                        <td style="font-weight: 500; color: #000; vertical-align: top;padding-top: 10px; font-size: 12px;">For any other query you can contact us at :</td>
+                      </tr>
+                      <tr>
+
+                        <td style="display:none;font-weight: 500; color: #000; padding-top: 10px; font-size: 12px;">
+                           Toll Free No.: 1800-123-9419
+                        </td>
+                      </tr>
+                      <tr>
+                         <td style="font-weight: 500; color: #000; padding-top: 10px; font-size: 12px;">
+                          <a href="mailto:customercare@docprime.com" mailt style="text-decoration: none; color: #f78631;">Email: customercare@docprime.com</a>
+                        </td>
+                      </tr> -->
+                      <tr>
+                          <td style="font-weight: 500; color: #000; font-size: 12px;">
+                            Dear {{proposer_name}}
+                          </td>
+                        </tr>
+                        <tr>
+                          <td style="padding:5px;">
+
+                          </td>
+                        </tr>
+                        <tr>
+                          <td style="font-weight: 500; color: #000; font-size: 12px;">
+                           This is to inform you that your insurance policy has been cancelled. The refund has been initiated from {{insurer_name}} and it shall reflect in your account within 7-10 working days.
+                          </td>
+                        </tr>
+                        <tr>
+                          <td style="padding:5px;">
+
+                          </td>
+                        </tr>
+                        <tr>
+                          <td colspan="2" style="font-weight: 500; color: #000; font-size: 12px;"> In case of any queries, you can write to us at <a href="#" style="text-decoration: none; color: #f78631;">customercare@docprime.com</a>.
+                          </td>
+                        </tr>
+                    </table>
+                  </td>
+                </tr>
+              </table>
+            </td>
+          </tr>
+        </table>
+      </td>
+    </tr>
+    <tr>
+      <td>
+        <table border="0" cellpadding="0" cellspacing="0" width="100%" style="padding: 15px;">
+          <tr>
+            <td style="text-align: center; font-size: 16px; color: #000;font-weight: 500; border-bottom: 1px solid rgba(0,0,0,0.12); padding-bottom: 15px;"> Thanks for choosing <a href="#" style="text-decoration: none; color: #f78631;">docprime.com</a></td>
+          </tr>
+          <tr>
+            <td style="text-align: center; font-size: 12px; color: #000;font-weight: 500;padding: 15px; padding-bottom: 0;"> This is a system-generated e-mail. Please do not reply to this e-mail.</td>
+          </tr>
+        </table>
+      </td>
+    </tr>
+    <tr>
+      <td style="width: 100%;">
+        <table border="0" cellpadding="0" cellspacing="0" width="100%" style="background: #fa7d1f; padding: 15px;">
+          <tr>
+            <td style="text-align: left; color: #fff; font-size: 12px;">docprime.com Copyright © 2019.</td>
+            <td style="padding-right: 10px;text-align: right"><img src="https://cdn.docprime.com/images/youtube.png" alt="youtube"></td>
+            <td style="padding-right: 10px;text-align: right"><img src="https://cdn.docprime.com/images/instagram.png" alt="instagram"></td>
+            <td style="padding-right: 10px;text-align: right"><img src="https://cdn.docprime.com/images/facebook.png" alt="facebook"></td>
+            <td style="padding-right: 10px;text-align: right"><img src="https://cdn.docprime.com/images/twitter.png" alt="twitter"></td>
+            <td style="text-align: right"><img src="https://cdn.docprime.com/images/Inklendin.png" alt="inklendin"></td>
+          </tr>
+        </table>
+      </td>
+    </tr>
+  </table>
+
+   </body>
+</html>

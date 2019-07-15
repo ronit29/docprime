@@ -1,4 +1,7 @@
+import re
+
 from dal import autocomplete
+from django.db import transaction
 from django.contrib.contenttypes.admin import GenericTabularInline
 from django.contrib.gis import admin
 import datetime
@@ -11,7 +14,8 @@ from django.conf import settings
 from django.utils.dateparse import parse_datetime
 from ondoc.authentication.models import Merchant, AssociatedMerchant, QCModel
 from ondoc.account.models import MerchantPayout
-from ondoc.common.models import Cities, MatrixCityMapping, PaymentOptions, Remark, MatrixMappedCity, MatrixMappedState, GlobalNonBookable
+from ondoc.common.models import Cities, MatrixCityMapping, PaymentOptions, Remark, MatrixMappedCity, MatrixMappedState, \
+    GlobalNonBookable, UserConfig, BlacklistUser, BlockedStates
 from import_export import resources, fields
 from import_export.admin import ImportMixin, base_formats, ImportExportMixin, ImportExportModelAdmin, ExportMixin
 from reversion.admin import VersionAdmin
@@ -21,8 +25,9 @@ from django.utils.safestring import mark_safe
 from django.contrib.contenttypes.models import ContentType
 from import_export.admin import ImportExportMixin
 
-from ondoc.diagnostic.models import Lab, LabAppointment
+from ondoc.diagnostic.models import Lab, LabAppointment, LabPricingGroup
 from ondoc.doctor.models import Hospital, Doctor, OpdAppointment, HospitalNetwork
+from ondoc.insurance.models import UserInsurance
 from django.db.models import Q
 from django import forms
 
@@ -133,6 +138,19 @@ class FormCleanMixin(forms.ModelForm):
 
     def clean(self):
         self.pin_code_qc_submit()
+        phone_no_flag = False
+        if isinstance(self.instance, Hospital) and self.data and self.instance.network_type == 1:
+            if 'authentication-spocdetails-content_type-object_id-TOTAL_FORMS' in self.data:
+                total_forms = int(self.data.get('authentication-spocdetails-content_type-object_id-TOTAL_FORMS', '0'))
+                for form in range(total_forms):
+                    number_pattern = re.compile("(0/91)?[6-9][0-9]{9}")
+                    phone_number = self.data.get('authentication-spocdetails-content_type-object_id-' + str(form) + '-number')
+                    if phone_number and number_pattern.match(str(phone_number)):
+                        phone_no_flag = True
+            else:
+                phone_no_flag = True  # Skip check if inline is not present.
+            if phone_no_flag == False:
+                raise forms.ValidationError("Atleast one mobile no is required for SPOC Details")
 
         if (not self.request.user.is_superuser and not self.request.user.groups.filter(name=constants['SUPER_QC_GROUP']).exists()):
             # and (not '_reopen' in self.data and not self.request.user.groups.filter(name__in=[constants['QC_GROUP_NAME'], constants['WELCOME_CALLING_TEAM']]).exists()):
@@ -144,14 +162,14 @@ class FormCleanMixin(forms.ModelForm):
                     raise forms.ValidationError("There is not state mapped with selected city")
             if self.instance.data_status == QCModel.QC_APPROVED:
                 # allow welcome_calling_team to modify qc_approved data
-                if not self.request.user.groups.filter(name=constants['WELCOME_CALLING_TEAM']).exists():
+                if not self.request.user.groups.filter(name__in=[constants['WELCOME_CALLING_TEAM'], constants['ARTICLE_TEAM']]).exists():
                     raise forms.ValidationError("Cannot modify QC approved Data")
             if not self.request.user.groups.filter(name=constants['QC_GROUP_NAME']).exists():
                 if self.instance.data_status == QCModel.SUBMITTED_FOR_QC:
                     raise forms.ValidationError("Cannot update Data submitted for QC approval")
-                if not self.request.user.groups.filter(name=constants['DOCTOR_SALES_GROUP']).exists():
-                    if self.instance.data_status in [QCModel.IN_PROGRESS] and self.instance.created_by and self.instance.created_by.groups.filter(name=constants['DOCTOR_NETWORK_GROUP_NAME']).exists() and self.instance.created_by != self.request.user:
-                        raise forms.ValidationError("Cannot modify Data added by other users")
+                # if not self.request.user.groups.filter(name=constants['DOCTOR_SALES_GROUP']).exists():
+                #     if self.instance.data_status in [QCModel.IN_PROGRESS] and self.instance.created_by and self.instance.created_by.groups.filter(name=constants['DOCTOR_NETWORK_GROUP_NAME']).exists() and self.instance.created_by != self.request.user:
+                #         raise forms.ValidationError("Cannot modify Data added by other users")
             if '_submit_for_qc' in self.data:
                 self.validate_qc()
                 # if hasattr(self.instance, 'doctor_clinics') and self.instance.doctor_clinics is not None:
@@ -368,11 +386,11 @@ class MerchantAdmin(ImportExportMixin, VersionAdmin):
         if request.user.is_member_of(constants['MERCHANT_TEAM']):
             if obj and obj.verified_by:
                 return [f.name for f in self.model._meta.fields if
-                        f.name not in ['enabled', 'verified_by_finance', 'associated_to']]
+                        f.name not in ['enabled', 'verified_by_finance', 'associated_to', 'enable_for_tds_deduction']]
             return []
 
         if obj and obj.verified_by:
-            return [f.name for f in self.model._meta.fields] + ['associated_to']
+            return [f.name for f in self.model._meta.fields if f.name not in ['enable_for_tds_deduction']] + ['associated_to']
 
         return ['verified_by_finance', 'associated_to']
 
@@ -423,9 +441,10 @@ class MerchantPayoutForm(forms.ModelForm):
             if not billed_to:
                 raise forms.ValidationError("Billing entity not defined.")
 
-            associated_merchant = billed_to.merchant.first()
-            if not associated_merchant.verified:
-                raise forms.ValidationError("Associated Merchant not verified.")
+            if not self.instance.booking_type == self.instance.InsurancePremium:
+                associated_merchant = billed_to.merchant.first()
+                if not associated_merchant.verified:
+                    raise forms.ValidationError("Associated Merchant not verified.")
 
         if not self.instance.status == self.instance.PENDING:
             raise forms.ValidationError("This payout is already under process")
@@ -446,26 +465,26 @@ class MerchantPayoutAdmin(ExportMixin, VersionAdmin):
     resource_class = MerchantPayoutResource
     form = MerchantPayoutForm
     model = MerchantPayout
-    fields = ['id', 'payment_mode','charged_amount', 'updated_at', 'created_at', 'payable_amount', 'status', 'payout_time', 'paid_to',
+    fields = ['id','booking_type', 'payment_mode','charged_amount', 'updated_at', 'created_at', 'payable_amount', 'tds_amount', 'status', 'payout_time', 'paid_to',
               'appointment_id', 'get_billed_to', 'get_merchant', 'process_payout', 'type', 'utr_no', 'amount_paid','api_response','pg_status','status_api_response']
-    list_display = ('id', 'status', 'payable_amount', 'appointment_id', 'doc_lab_name')
+    list_display = ('id', 'status', 'payable_amount', 'appointment_id', 'doc_lab_name','booking_type')
     search_fields = ['name']
-    list_filter = ['status']
+    list_filter = ['status','booking_type']
 
     def get_queryset(self, request):
         return super().get_queryset(request).filter(payable_amount__gt=0).order_by('-id').prefetch_related('lab_appointment__lab',
-                                                                             'opd_appointment__doctor')
+                                                                             'opd_appointment__doctor', 'user_insurance')
 
     def get_search_results(self, request, queryset, search_term):
         queryset, use_distinct = super().get_search_results(request, queryset, None)
-
-        queryset = queryset.filter(Q(opd_appointment__doctor__name__icontains=search_term) |
-         Q(lab_appointment__lab__name__icontains=search_term))
+        if search_term:
+            queryset = queryset.filter(Q(opd_appointment__doctor__name__icontains=search_term) |
+             Q(lab_appointment__lab__name__icontains=search_term))
 
         return queryset, use_distinct
 
     def get_readonly_fields(self, request, obj=None):
-        base = ['appointment_id', 'get_billed_to', 'get_merchant']
+        base = ['appointment_id', 'get_billed_to', 'get_merchant','booking_type']
         editable_fields = ['payout_approved']
         if obj and obj.status == MerchantPayout.PENDING:
             editable_fields += ['type', 'amount_paid','payment_mode']
@@ -487,6 +506,10 @@ class MerchantPayoutAdmin(ExportMixin, VersionAdmin):
         elif isinstance(appt, LabAppointment):
             if appt.lab:
                 return appt.lab.name
+        elif isinstance(appt, UserInsurance):
+            if appt.insurance_plan.insurer:
+                return appt.insurance_plan.insurer.name
+
         return ''
 
     def appointment_id(self, instance):
@@ -613,18 +636,39 @@ class MatrixMappedCityResource(resources.ModelResource):
         fields = ('id', 'name', 'state_id')
 
 
+class MatrixMappedCityAdminForm(forms.ModelForm):
+    def clean(self):
+        super().clean()
+        if any(self.errors):
+            return
+        cleaned_data = self.cleaned_data
+        state = cleaned_data.get('state', None)
+        city_name = cleaned_data.get('name', '')
+        if not state:
+            raise forms.ValidationError("State is required.")
+        if state and city_name:
+            if MatrixMappedCity.objects.filter(name__iexact=city_name.strip(), state=state).exists():
+                raise forms.ValidationError("City-State combination already exists.")
+
 
 class MatrixMappedCityAdmin(ImportMixin, admin.ModelAdmin):
+    form = MatrixMappedCityAdminForm
     formats = (base_formats.XLS, base_formats.XLSX,)
     list_display = ('name', 'state')
     readonly_fields = ('name', 'state', )
     search_fields = ['name']
     resource_class = MatrixMappedCityResource
 
+    def get_queryset(self, request):
+        qs = super().get_queryset(request)
+        qs = qs.select_related('state')
+        return qs
+
     def get_readonly_fields(self, request, obj=None):
         if not request.user.is_superuser and not request.user.groups.filter(name=constants['SUPER_QC_GROUP']).exists():
             return super().get_readonly_fields(request, obj)
         return ()
+
 
 class MatrixStateAutocomplete(autocomplete.Select2QuerySetView):
 
@@ -649,4 +693,84 @@ class MatrixCityAutocomplete(autocomplete.Select2QuerySetView):
             queryset = queryset.filter(name__istartswith=self.q)
 
         return queryset
+
+
+class RelatedHospitalAutocomplete(autocomplete.Select2QuerySetView):
+
+    def get_queryset(self):
+        queryset = Hospital.objects.filter(is_ipd_hospital=True)
+
+        if self.q:
+            queryset = queryset.filter(name__istartswith=self.q)
+
+        return queryset
+
+
+class ContactUsAdmin(admin.ModelAdmin):
+    list_display = ('name', 'mobile', 'email', 'from_app')
+    fields = ('name', 'mobile', 'email', 'message', 'from_app')
+    readonly_fields = ('name', 'mobile', 'email', 'message', 'from_app')
+    list_filter = ("from_app",)
+
+
+class UserConfigAdmin(admin.ModelAdmin):
+    model = UserConfig
+    list_display = ('key',)
+
+
+class LabPricingAutocomplete(autocomplete.Select2QuerySetView):
+
+    def get_queryset(self):
+        queryset = LabPricingGroup.objects.all()
+
+        if self.q:
+            queryset = queryset.filter(group_name__istartswith=self.q)
+
+        return queryset
+
+
+class BlacklistUserForm(forms.ModelForm):
+    def __init__(self, *args, **kwargs):
+        super(BlacklistUserForm, self).__init__(*args, **kwargs)
+        if self.instance and self.instance.id and self.instance.user:
+            self.fields['phone_number'].initial = self.instance.user.phone_number
+
+    phone_number = forms.CharField(required=True)
+
+    def clean(self):
+        super().clean()
+        cleaned_data = self.cleaned_data
+        from ondoc.authentication.models import User
+        phone_number = cleaned_data['phone_number']
+        user = User.objects.filter(user_type=User.CONSUMER, phone_number=phone_number).first()
+        if user:
+            if cleaned_data.get('type') and BlacklistUser.get_state_by_number(user.phone_number, cleaned_data.get('type')):
+                raise forms.ValidationError('User with given block state already exists.')
+
+            self.instance.user = user
+        else:
+            raise forms.ValidationError('User with given number does not exists.')
+
+        return cleaned_data
+
+
+class BlacklistUserAdmin(VersionAdmin):
+    model = BlacklistUser
+    form = BlacklistUserForm
+    list_display = ('user', 'type')
+    fields = ('phone_number', 'type', 'reason', 'enabled')
+    # autocomplete_fields = ['user']
+
+    @transaction.atomic
+    def save_model(self, request, obj, form, change):
+        responsible_user = request.user
+        obj.blocked_by = responsible_user if responsible_user and not responsible_user.is_anonymous else None
+
+        super().save_model(request, obj, form, change)
+
+
+class BlockedStatesAdmin(VersionAdmin):
+    model = BlockedStates
+    list_display = ('state_name', 'message')
+    fields = ('state_name', 'message')
 

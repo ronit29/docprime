@@ -7,6 +7,7 @@ from ondoc.authentication.models import TimeStampedModel, UserProfile, User
 from ondoc.common.models import Cities
 from ondoc.doctor.models import Doctor, Hospital
 from ondoc.matrix.tasks import push_signup_lead_to_matrix, push_non_bookable_doctor_lead_to_matrix
+from ondoc.notification import tasks as notification_tasks
 import json
 from django.contrib.postgres.fields import JSONField
 import hashlib
@@ -87,9 +88,17 @@ class ContactUs(TimeStampedModel):
                                                 MinValueValidator(1000000000)])
     email = models.EmailField()
     message = models.CharField(max_length=2000)
+    from_app = models.BooleanField(default=False)
 
     def __str__(self):
         return self.name
+
+    def save(self, *args, **kwargs):
+        super(ContactUs, self).save(*args, **kwargs)
+        try:
+            notification_tasks.send_contactus_notification.apply_async((self.id,), countdown=1)
+        except Exception as e:
+            logger.error(str(e))
 
     class Meta:
         db_table = "contactus"

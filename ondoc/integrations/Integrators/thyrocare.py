@@ -14,7 +14,7 @@ logger = logging.getLogger(__name__)
 from datetime import datetime, date, timedelta
 from ondoc.diagnostic.models import LabReport, LabReportFile, LabAppointment
 from django.contrib.contenttypes.models import ContentType
-from ondoc.api.v1.utils import resolve_address, aware_time_zone
+from ondoc.api.v1.utils import thyrocare_resolve_address, aware_time_zone
 from django.utils import timezone
 import time
 
@@ -113,7 +113,10 @@ class Thyrocare(BaseIntegrator):
         response = requests.get(url)
         if response.status_code != status.HTTP_200_OK or not response.ok:
             logger.error("[ERROR] Thyrocare Time slot api failed.")
-            return None
+            resp_list = dict()
+            resp_list[date] = list()
+            res_data = {"time_slots": resp_list, "upcoming_slots": [], "is_thyrocare": True}
+            return res_data
 
         resp_data = response.json()
         available_slots = resp_data.get('LSlotDataRes', [])
@@ -178,7 +181,7 @@ class Thyrocare(BaseIntegrator):
 
         profile = lab_appointment.profile
         if hasattr(lab_appointment, 'address') and lab_appointment.address:
-            patient_address = resolve_address(lab_appointment.address)
+            patient_address = thyrocare_resolve_address(lab_appointment.address)
             pincode = lab_appointment.address["pincode"]
         else:
             patient_address = ""
@@ -281,7 +284,7 @@ class Thyrocare(BaseIntegrator):
                             if response.get('RES_ID') == 'RES0000':
                                 result[format] = response["URL"]
                             else:
-                                logger.error("[ERROR] %s" % response.get('RESPONSE'))
+                                logger.info("[ERROR] %s" % response.get('RESPONSE'))
 
                         if result:
                             cls.save_reports(booking, result)
@@ -380,7 +383,7 @@ class Thyrocare(BaseIntegrator):
                                                               content_type=lab_appointment_content_type).order_by('id').last()
         if integrator_history:
             status = integrator_history.status
-            if dp_appointment.status != LabAppointment.CANCELLED or dp_appointment.status != LabAppointment.COMPLETED:
+            if not dp_appointment.status in [LabAppointment.CANCELLED, LabAppointment.COMPLETED]:
                 if dp_appointment.time_slot_start + timedelta(days=1) > timezone.now():
                     url = "%s/order.svc/%s/%s/%s/all/OrderSummary" % (settings.THYROCARE_BASE_URL, settings.THYROCARE_API_KEY,
                                                                       integrator_response.dp_order_id,
@@ -405,13 +408,14 @@ class Thyrocare(BaseIntegrator):
                             status = IntegratorHistory.PUSHED_AND_NOT_ACCEPTED
                         elif response['BEN_MASTER'][0]['STATUS'].upper() == "ACCEPTED":
                             if not dp_appointment.status in [5, 6, 7]:
-                                dp_appointment.status = 5
-                                dp_appointment.save()
+                                # dp_appointment.status = 5
+                                # dp_appointment.save()
+                                dp_appointment.action_accepted()
                                 status = IntegratorHistory.PUSHED_AND_ACCEPTED
                         elif response['BEN_MASTER'][0]['STATUS'].upper() == 'CANCELLED':
                             if not dp_appointment.status == 6:
-                                dp_appointment.status = 6
-                                dp_appointment.save()
+                                # dp_appointment.status = 6
+                                # dp_appointment.save()
                                 dp_appointment.action_cancelled(1)
                                 status = IntegratorHistory.CANCELLED
 

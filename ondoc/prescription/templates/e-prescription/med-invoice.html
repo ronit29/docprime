@@ -1,0 +1,210 @@
+<!DOCTYPE>
+<html xmlns="http://www.w3.org/1999/xhtml">
+	<head>
+		<meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
+		<title>{{ patient.name }}</title>
+		<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+		<link href="https://fonts.googleapis.com/css?family=Quicksand:400,700" rel="stylesheet">
+	</head>
+	<style>
+		@page{
+		margin:20px;
+		}
+		@media print{
+			footer {
+				left:0;
+				position:fixed;
+			}
+			header {
+				left:0;
+				position:fixed;
+			}
+		}
+	</style>
+	<body style="margin: 0; padding: 0;font-family: 'Quicksand', sans-serif;">
+		<table align="center" border="0" cellpadding="0" cellspacing="0" width="600" style="border-collapse: collapse; background: #ffffff;">
+			<tr>
+				<td>
+					<table border="0" cellpadding="0" cellspacing="0" width="600" style="padding: 10px;">
+						<tr valign="top">
+							<td style="width: 300px;">
+								<p style="margin: 0px; color: #000000; font-size:18px; font-weight: 700; padding-bottom: 10px;">Dr. {{ doc_name }}</p>
+								<p style="margin: 0px; color: #000000; font-size:14px; "></p>
+								<p style="margin: 0px; color: #000000; font-size:14px; ">{% if doc_qualification %}{{ doc_qualification }}{% endif %} </p>
+								<p style="margin: 0px; color: #000000; font-size:14px; ">Registration No: {{ doc_reg }}</p>
+								<p style="margin: 0px; color: #000000; font-size:14px; ">{{ doctor_number }}</p>
+								<p style="margin: 0px; color: #000000; font-size:14px; ">{{ hosp_name }}</p>
+								<p style="margin: 0px; color: #000000; font-size:14px; ">{{ hosp_address }}</p>
+							</td>
+							
+						</tr>
+					</table>
+				</td>
+			</tr>
+			<tr>
+				<td>
+					<table border="0" cellpadding="0" cellspacing="0" width="600" style="padding: 10px; border-top: 1px solid #b9b6b6;">
+						<tr>
+							<td style="width: 70%">
+								<p style="margin: 0px;color: #000000; font-size: 16px; font-weight: 600;padding-bottom: 3px;">{% if patient.name %}{{ patient.name }}{% endif %}{% if patient.age %}, {{ patient.age }}{% endif %}{% if patient.gender %}, {{ patient.gender }}{% endif %}</p>
+								<p style="margin: 0px;color: #000000; font-size: 14px;">{% if is_docprime %}{{ patient.phone_number }}{% endif %}</p>
+							</td>
+							<td style="width: 30%">
+								<p style="margin: 0px;color: #000000; font-size: 16px; font-weight: 600;padding-bottom: 3px;">{{ date }}</p>
+								<p style="margin: 0px;color: #000000; font-size: 14px;">Prescription Id: {{ serial_id }}</p>
+							</td>
+						</tr>
+					</table>
+				</td>
+			</tr>
+			<tr>
+				<td>
+					<table border="0" cellpadding="0" cellspacing="0" width="600" style="  border-collapse: collapse;">
+						{% if symptoms_complaints %}
+						<tr>
+							<td style="padding: 6px; background:#f1efef;border: 1px solid #000000; ">
+								Symptoms/Complaints
+							</td>
+							<td style="padding: 6px; border: 1px solid #000000; ">
+								<ul style="padding-left: 15px; list-style: disc;margin: 0">
+								{% for symp in symptoms_complaints %}
+									<li style="margin: 0px;color: #000000; font-size: 12px;">{{ symp.name }} </li>
+								{% endfor %}
+								</ul>
+							</td>
+						</tr>
+						{% endif %}{% if diagnoses %}
+						<tr>
+							<td style="padding: 6px; background:#f1efef;border: 1px solid #000000; ">
+								Diagnoses
+							</td>
+							<td style="padding: 6px; border: 1px solid #000000; ">
+								<ul style="padding-left: 15px; list-style: disc;margin: 0">
+								{% for diagnosis in diagnoses %}
+									<li style="margin: 0px;color: #000000; font-size: 12px;">{{ diagnosis.name }} </li>
+								{% endfor %}
+								</ul>
+							</td>
+						</tr>
+						{% endif %}{% if special_instructions %}
+						<tr>
+							<td style="padding: 6px; background:#f1efef;border: 1px solid #000000; ">
+								Special Instructions
+							</td>
+							<td style="padding: 6px; border: 1px solid #000000; ">
+								<ul style="padding-left: 15px; list-style: disc;margin: 0">
+								{% for instruction in special_instructions %}
+									<li style="margin: 0px;color: #000000; font-size: 12px;">{{ instruction.name }} </li>
+								{% endfor %}
+								</ul>
+							</td>
+						</tr>
+						{% endif %}
+					</table>
+				</td>
+			</tr>
+			<tr>
+				<td style="padding: 10px;"></td>
+			</tr>
+			{% if medicines %}
+			<tr>
+				<td>
+					<table border="0" cellpadding="0" cellspacing="0" width="600" style=" border-top: 1px solid #000000; border-bottom: 1px solid #000000;">
+						<thead>
+							<tr>
+								<th style="padding: 14px 0px; background: #f1efef;  text-align: center; padding-left: 10px;">
+									S.No
+								</th>
+								<th style="padding: 14px 0px; background: #f1efef; text-align:left; padding-left: 10px;">
+									Medicines
+								</th>
+								<th style="padding: 14px 0px; background: #f1efef; text-align:center; padding-left: 10px;">
+									Quantity
+								</th>
+								<th style="padding: 14px 0px; background: #f1efef; text-align:center; padding-left: 10px;">
+									Frequency
+								</th>
+								<th style="padding: 14px 0px; background: #f1efef; text-align: center; padding-left: 10px;">
+									Duration
+								</th>
+							</tr>
+						</thead>
+						<tbody>
+						    {% for medicine in medicines %}
+								<tr valign="top">
+									<td style="text-align: center; font-size: 14px;padding-top: 10px; padding-bottom: 10px;">{{ forloop.counter }}</td>
+									<td style="text-align: left; font-size: 14px;padding-top: 10px; padding-bottom: 10px; ">
+										<p style="margin: 0px;color: #000000; font-size: 14px;">{{ medicine.name }}</p>
+										{% if medicine.additional_notes %}
+										<p style="margin: 0px;color: #000000; font-size: 12px;">{{ medicine.additional_notes }}</p>
+										{% endif %}
+									</td>
+									<td style="text-align: center; font-size: 14px;padding-top: 10px; padding-bottom: 10px; ">{{ medicine.quantity }} {{ medicine.dosage_type }}</td>
+									<td style="text-align: center; font-size: 14px;padding-top: 10px; padding-bottom: 10px; ">
+										<p style="margin: 0px;color: #000000; font-size: 14px;    padding-bottom: 2px;border-bottom: 1px solid #b5b5b5;"> {{ medicine.pres_time }} </p>
+										{% if medicine.meal %}
+										<p style="margin: 0px;color: #000000; font-size: 12px; padding-top: 2px;"> {{ medicine.meal }} </p>
+										{% endif %}
+									</td>
+									{% if medicine.duration %}
+									<td style="text-align: center; font-size: 14px;padding-top: 10px; padding-bottom: 10px; ">{{ medicine.duration }} {{ medicine.durationstring }}</td>
+									{% endif %}
+								</tr>
+							{% endfor %}
+
+						</tbody>
+					</table>
+				</td>
+			</tr>
+			{% endif %}{% if tests %}
+			<tr>
+				<td style="padding: 10px;">
+					
+				</td>
+			</tr>
+			<tr>
+				<td>
+					<table border="0" cellpadding="0" cellspacing="0" width="400" style="">
+						<tr>
+							<td style="padding-bottom: 10px;">
+								<p style="margin: 0px;color: #000000; font-size: 16px;font-weight: 600;padding-bottom: 10px; ">Lab Tests:</p>
+								<ul  style="padding-left: 15px; list-style: disc;margin: 0">
+									{% for test in tests %}
+									<li style="margin: 0px;color: #000000; font-size: 14px;">
+										<p style="margin: 0px;color: #000000; font-size: 14px;font-weight: 600;">{{ test.name }}</p>
+										<p style="margin: 0px;color: #000000; font-size: 12px;">{{ test.instruction }}</p>
+									</li>
+									{% endfor %}
+								</ul>
+							</td>
+						</tr>
+					</table>
+				</td>
+			</tr>
+			{% endif %}
+			<tr>
+				<td style="padding: 60px;"></td>
+			</tr>
+			<tr>
+				<td>
+					<table border="0" cellpadding="0" cellspacing="0" width="600" style="border-top: 1px solid #000000;">
+						<tr>
+							{% if followup_date %}
+							<td style="padding: 6px; background:#f1efef;width: 150px; text-align: center;">
+								<p style="margin: 0px;color: #000000; font-size: 12px;">Next Follow Up Date:</p>
+								<p style="margin: 0px;color: #000000; font-size: 12px;">{{ followup_date }}</p>
+							</td>
+							{% endif %}{% if followup_reason %}
+							<td style="border-left: 1px solid #000000;">
+								<div style="padding: 6px 10px 6px 20px; margin: 0">
+									<p style="margin: 0px;color: #000000; font-size: 12px;">{{ followup_reason }}</p>
+								</div>
+							</td>
+							{% endif %}
+						</tr>
+					</table>
+				</td>
+			</tr>
+		</table>
+	</body>
+</html>

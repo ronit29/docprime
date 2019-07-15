@@ -1,0 +1,5 @@
+Policy Number {{policy_number}}.
+We have received your endorsement request.
+You will receive further updates on your registered email ID and phone number.
+Thanks
+Team Docprime
