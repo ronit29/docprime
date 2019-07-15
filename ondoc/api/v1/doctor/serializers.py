@@ -2069,17 +2069,24 @@ class HospitalDetailIpdProcedureSerializer(TopHospitalForIpdProcedureSerializer)
             doctor_clinic_ipd_mappings__doctor_clinic__hospital=obj,
             is_enabled=True).distinct()
         procedure_ids = [x.id for x in queryset]
-        # TODO : SHASHANK_SINGH find its SEO URLs
+        entity = self.context.get('entity', None)
+        city = None
+        ipd_entity_dict = {}
+        if entity:
+            city = entity.locality_value
+        if city:
+            ipd_entity_dict = IpdProcedure.get_locality_dict(procedure_ids, city=city)
         for ipd_procedure in queryset:
             for category_mapping in ipd_procedure.ipd_category_mappings.all():
                 if category_mapping.category.id in result:
                     result[category_mapping.category.id]['ipd_procedures'].append(
-                        {'id': ipd_procedure.id, 'name': ipd_procedure.name})
+                        {'id': ipd_procedure.id, 'name': ipd_procedure.name, 'url': ipd_entity_dict.get(ipd_procedure.id, None)})
                 else:
                     result[category_mapping.category.id] = {'id': category_mapping.category.id,
                                                             'name': category_mapping.category.name,
                                                             'ipd_procedures': [
-                                                                {'id': ipd_procedure.id, 'name': ipd_procedure.name}]}
+                                                                {'id': ipd_procedure.id, 'name': ipd_procedure.name,
+                                                                 'url': ipd_entity_dict.get(ipd_procedure.id, None)}]}
         return list(result.values())
 
     def get_other_network_hospitals(self, obj):
