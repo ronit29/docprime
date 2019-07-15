@@ -3550,6 +3550,7 @@ class OfflineCustomerViewSet(viewsets.GenericViewSet):
 
     def get_lab_appointment_list(self, request, user):
         from ondoc.diagnostic import models as lab_models
+        from ondoc.api.v1.diagnostic.serializers import LabAppointmentTestMappingSerializer
         mask_data = None
         response = []
         manageable_lab_list = auth_models.GenericLabAdmin.objects.filter(is_disabled=False, user=user) \
@@ -3614,6 +3615,7 @@ class OfflineCustomerViewSet(viewsets.GenericViewSet):
             ret_obj['patient_thumbnail'] = patient_thumbnail
             ret_obj['type'] = 'lab'
             ret_obj['prescriptions'] = app.get_prescriptions(request)
+            ret_obj['lab_test'] = LabAppointmentTestMappingSerializer(app.test_mappings.all(), many=True).data
             # ret_obj['invoice'] = invoice_data
             response.append(ret_obj)
         return response
