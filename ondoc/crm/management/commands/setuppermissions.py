@@ -288,7 +288,7 @@ class Command(BaseCommand):
             group.permissions.add(*permissions)
 
 
-        content_types = ContentType.objects.get_for_models(ParameterLabTest, LabTestPackage, LabTestCategoryMapping)
+        content_types = ContentType.objects.get_for_models(ParameterLabTest, LabTestPackage, LabTestCategoryMapping, HospitalTiming)
 
         for cl, ct in content_types.items():
             permissions = Permission.objects.filter(
