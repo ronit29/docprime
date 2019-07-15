@@ -231,7 +231,8 @@ class CartViewSet(viewsets.GenericViewSet):
                     "errors": str(e),
                     "product_id": item.product_id,
                     "data": serializers.CartItemSerializer(item, context={"validated_data":None}).data,
-                    "actual_data": item.data
+                    "actual_data": item.data,
+                    "consultation": None,
                 })
 
         # items = sorted(items, key=lambda x: 0 if x["valid"] else -1)
