@@ -54,27 +54,25 @@ def get_spoc_email_and_number_hospital(spocs, appointment):
                                                                             Q(doctor__isnull=True) | Q(doctor=appointment.doctor)))
             if admins:
                 admins_with_user = admins.filter(user__isnull=False)
-                if admins_with_user.exists():
-                    for admin in admins_with_user:
-                        if int(admin.user.phone_number) == int(spoc.number):
-                            user_and_number.append({'user': admin.user, 'phone_number': spoc.number})
-                            if spoc.email:
-                                user_and_email.append({'user': admin.user, 'email': spoc.email})
-                        else:
-                            user_and_number.append({'user': None, 'phone_number': spoc.number})
-                            if spoc.email:
-                                user_and_email.append({'user': None, 'email': spoc.email})
+                for admin in admins_with_user:
+                    if int(admin.user.phone_number) == int(spoc.number):
+                        user_and_number.append({'user': admin.user, 'phone_number': spoc.number})
+                        if spoc.email:
+                            user_and_email.append({'user': admin.user, 'email': spoc.email})
+                    else:
+                        user_and_number.append({'user': None, 'phone_number': spoc.number})
+                        if spoc.email:
+                            user_and_email.append({'user': None, 'email': spoc.email})
 
                 admins_without_user = admins.exclude(id__in=admins_with_user)
-                if admins_without_user.exists():
-                    for admin in admins_without_user:
-                        created_user = User.objects.create(phone_number=spoc.number, user_type=User.DOCTOR,
-                                                           auto_created=True)
-                        admin.user = created_user
-                        admin.save()
-                        user_and_number.append({'user': created_user, 'phone_number': spoc.number})
-                        if spoc.email:
-                            user_and_email.append({'user': created_user, 'email': spoc.email})
+                for admin in admins_without_user:
+                    created_user = User.objects.create(phone_number=spoc.number, user_type=User.DOCTOR,
+                                                       auto_created=True)
+                    admin.user = created_user
+                    admin.save()
+                    user_and_number.append({'user': created_user, 'phone_number': spoc.number})
+                    if spoc.email:
+                        user_and_email.append({'user': created_user, 'email': spoc.email})
             else:
                 user_and_number.append({'user': None, 'phone_number': spoc.number})
                 if spoc.email:
@@ -1369,7 +1367,6 @@ class OpdNotification(Notification):
         context = self.get_context()
         notification_type = self.notification_type
         all_receivers = self.get_receivers()
-
         if notification_type == NotificationAction.DOCTOR_INVOICE:
             email_notification = EMAILNotification(notification_type, context)
             email_notification.send(all_receivers.get('email_receivers', []))

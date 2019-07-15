@@ -116,7 +116,7 @@ class Order(TimeStampedModel):
         if self.is_parent():
             raise Exception('Not implemented for parent orders')
         appt = self.getAppointment()
-        if appt and appt.insurance_id:
+        if appt and hasattr(appt, 'insurance_id') and appt.insurance_id:
             return True
         return False
 
