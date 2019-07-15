@@ -474,7 +474,7 @@ def send_appointment_location_message(number, hospital_lat, hospital_long):
 
 @task()
 def process_payout(payout_id):
-    from ondoc.account.models import MerchantPayout, Order
+    from ondoc.account.models import MerchantPayout, Order, MerchantPayoutLog
     from ondoc.account.models import DummyTransactions
     from ondoc.doctor.models import OpdAppointment
 
@@ -487,6 +487,9 @@ def process_payout(payout_id):
             raise Exception("Payout not found")
         if payout_data.status == payout_data.PAID:
             raise Exception("Payment already done for this payout")
+
+        # update payout status
+        payout_data.update_to_attempt()
 
         default_payment_mode = payout_data.get_default_payment_mode()
         appointment = payout_data.get_appointment()
@@ -572,6 +575,7 @@ def process_payout(payout_id):
 
     except Exception as e:
         logger.error("Error in processing payout - with exception - " + str(e))
+        MerchantPayoutLog.create_log(payout_data, str(e))
 
 
 @task(bind=True, max_retries=3)

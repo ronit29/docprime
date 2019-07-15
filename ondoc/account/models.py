@@ -1512,8 +1512,9 @@ class MerchantPayout(TimeStampedModel):
             try:
                 has_txn, order_data, appointment = self.has_transaction()
                 if has_txn:
-                    if self.status == self.PENDING:
-                        self.status = self.ATTEMPTED
+                    # # Moved this to process payout
+                    # if self.status == self.PENDING:
+                    #     self.status = self.ATTEMPTED
                     transaction.on_commit(lambda: process_payout.apply_async((self.id,), countdown=3))
                 else:
                     transaction.on_commit(lambda: set_order_dummy_transaction.apply_async((order_data.id, appointment.user_id,), countdown=5))
@@ -1525,7 +1526,6 @@ class MerchantPayout(TimeStampedModel):
 
         if self.utr_no and self.booking_type == self.InsurancePremium and self.paid_to != Merchant.objects.filter(id=settings.DOCPRIME_NODAL2_MERCHANT).first():
             self.create_insurance_transaction()
-
 
         if (not first_instance and self.status != self.PENDING) and not self.booking_type == self.InsurancePremium:
             from ondoc.matrix.tasks import push_appointment_to_matrix
@@ -1604,8 +1604,6 @@ class MerchantPayout(TimeStampedModel):
             if len(transfers)==0 and (transferred_amount+self.payable_amount)<=premium_amount:
                 return True
 
-
-
     def create_insurance_transaction(self):
         from ondoc.insurance.models import UserInsurance, InsuranceTransaction
         if self.should_create_insurance_transaction():
@@ -1640,6 +1638,10 @@ class MerchantPayout(TimeStampedModel):
         pms = PayoutMapping.objects.filter(payout=self).first()
         user_insurance = pms.content_object
         return user_insurance
+
+    def update_to_attempt(self):
+        self.status = self.ATTEMPTED
+        self.save()
 
     @staticmethod
     def get_merchant_payout_info(obj):
@@ -2007,6 +2009,7 @@ class PayoutMapping(TimeStampedModel):
     class Meta:
         db_table = "payout_mapping"
 
+
 class UserReferrals(TimeStampedModel):
     SIGNUP_CASHBACK = 50
     COMPLETION_CASHBACK = 50
@@ -2060,3 +2063,20 @@ class PgLogs(TimeStampedModel):
 
     class Meta:
         db_table = "pg_log"
+
+
+class MerchantPayoutLog(TimeStampedModel):
+    merchant_payout = models.ForeignKey(MerchantPayout, on_delete=models.DO_NOTHING, null=True)
+    error = models.TextField(null=True, blank=True)
+    is_fixed = models.BooleanField(default=False)
+    req_data = JSONField(blank=True, null=True)
+    res_data = JSONField(blank=True, null=True)
+
+    class Meta:
+        db_table = "merchant_payout_log"
+
+    @classmethod
+    def create_log(cls, payout, error, **kwargs):
+        payout_log = MerchantPayoutLog(merchant_payout=payout)
+        payout_log.error = error
+        payout_log.save()
