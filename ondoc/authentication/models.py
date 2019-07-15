@@ -1720,7 +1720,7 @@ class Merchant(TimeStampedModel):
     def save(self, *args, **kwargs):
         if self.verified_by_finance and (self.pg_status == self.NOT_INITIATED or self.pg_status == self.FAILURE):
             pass
-            # self.create_in_pg()
+            #self.create_in_pg()
 
         super().save(*args, **kwargs)
 
@@ -1871,7 +1871,6 @@ class MerchantTdsDeduction(TimeStampedModel):
 
     class Meta:
         db_table = 'merchant_tds_deduction'
-
 
 
 class AssociatedMerchant(TimeStampedModel):
