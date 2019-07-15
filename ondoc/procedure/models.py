@@ -36,6 +36,36 @@ class IpdProcedure(auth_model.TimeStampedModel, SearchKey, auth_model.SoftDelete
         db_table = "ipd_procedure"
 
     @classmethod
+    def get_hosp_and_locality_dict(cls, temp_ids, required_identifier):
+        # if not temp_ids:
+        #     return {}, {}
+        # from ondoc.location.models import EntityUrls
+        # hosp_entity_qs = list(EntityUrls.objects.filter(is_valid=True,
+        #                                                 sitemap_identifier=EntityUrls.SitemapIdentifier.IPD_PROCEDURE_CITY,
+        #                                                 entity_id__in=temp_ids))
+        # locality_city_dict = {(x.sublocality_value.lower(), x.locality_value.lower()): None for x in hosp_entity_qs if
+        #                       x.sublocality_value and x.locality_value}
+        # hosp_locality_entity_qs = []
+        # if locality_city_dict:
+        #     hosp_locality_entity_qs = list(EntityUrls.objects.filter(is_valid=True,
+        #                                                              sitemap_identifier=required_identifier,
+        #                                                              sublocality_value__iregex=r'(' + '|'.join(
+        #                                                                  [x[0] for x in
+        #                                                                   locality_city_dict.keys()]) + ')',
+        #                                                              locality_value__iregex=r'(' + '|'.join(
+        #                                                                  [x[1] for x in
+        #                                                                   locality_city_dict.keys()]) + ')'))
+        # for x in hosp_locality_entity_qs:
+        #     if x.sublocality_value and x.locality_value:
+        #         locality_city_dict[(x.sublocality_value.lower(), x.locality_value.lower())] = x.url
+        # hosp_entity_dict = {x.entity_id: x.url for x in hosp_entity_qs}
+        # hosp_locality_entity_dict = {
+        #     x.entity_id: locality_city_dict.get((x.sublocality_value.lower(), x.locality_value.lower()), None) for x in
+        #     hosp_entity_qs if x.sublocality_value and x.locality_value}
+        # return hosp_entity_dict, hosp_locality_entity_dict
+        pass  # TODO: SHASHANK_SINGH
+
+    @classmethod
     def update_ipd_seo_urls(cls):
         from ondoc.location.services.doctor_urls import IpdProcedureSeo
         ipd_procedure = IpdProcedureSeo()

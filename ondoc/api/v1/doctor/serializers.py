@@ -2068,6 +2068,8 @@ class HospitalDetailIpdProcedureSerializer(TopHospitalForIpdProcedureSerializer)
             doctor_clinic_ipd_mappings__doctor_clinic__enabled=True,
             doctor_clinic_ipd_mappings__doctor_clinic__hospital=obj,
             is_enabled=True).distinct()
+        procedure_ids = [x.id for x in queryset]
+        # TODO : SHASHANK_SINGH find its SEO URLs
         for ipd_procedure in queryset:
             for category_mapping in ipd_procedure.ipd_category_mappings.all():
                 if category_mapping.category.id in result:
