@@ -43,6 +43,11 @@ class IntegratorReportAdmin(admin.ModelAdmin):
     search_fields = ['integrator_response__object_id']
     fields = ('booking_id', 'lead_id', 'pdf_url', 'xml_url')
 
+    def get_queryset(self, request):
+        qs = super().get_queryset(request)
+        qs = qs.select_related('integrator_response')
+        return qs
+
     def booking_id(self, obj):
         return obj.integrator_response.object_id
 

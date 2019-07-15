@@ -49,7 +49,7 @@ from ondoc.notification import models as notification_models
 from ondoc.notification import tasks as notification_tasks
 from django.contrib.contenttypes.fields import GenericRelation
 from ondoc.api.v1.utils import get_start_end_datetime, custom_form_datetime, CouponsMixin, aware_time_zone, \
-    form_time_slot, util_absolute_url, html_to_pdf, TimeSlotExtraction, resolve_address
+    form_time_slot, util_absolute_url, html_to_pdf, TimeSlotExtraction, resolve_address, generate_short_url
 from ondoc.common.models import AppointmentHistory, AppointmentMaskNumber, Service, Remark, MatrixMappedState, \
     MatrixMappedCity, GlobalNonBookable, SyncBookingAnalytics, CompletedBreakupMixin, RefundDetails, TdsDeductionMixin, \
     Documents
@@ -57,7 +57,7 @@ from ondoc.common.models import QRCode, MatrixDataMixin
 from functools import reduce
 from operator import or_
 import logging
-import re, uuid, os, math, random
+import re, uuid, os, math, random, jwt
 import datetime
 from django.db.models import Q
 from django.core.files.uploadedfile import InMemoryUploadedFile
@@ -2416,16 +2416,11 @@ class OpdAppointment(auth_model.TimeStampedModel, CouponsMixin, OpdAppointmentIn
         insurance = appointment_data.get('insurance')
         appointment_status = OpdAppointment.BOOKED
 
-        # if insurance and insurance.is_valid():
-        #     hospital = appointment_data.get('hospital')
-        #     if hospital:
-        #        is_appointment_exist = hospital.get_active_opd_appointments(insurance.user, insurance, appointment_data.get('time_slot_start').date())
-        #        if is_appointment_exist:
-        #            raise Exception('Some error occurred. Please try after some time')
-        #     mrp = appointment_data.get('fees')
-        #     insurance_limit_usage_data = insurance.validate_limit_usages(mrp)
-        #     if insurance_limit_usage_data.get('created_state'):
-        #         appointment_status = OpdAppointment.CREATED
+        if insurance and insurance.is_valid():
+            mrp = appointment_data.get('fees')
+            insurance_limit_usage_data = insurance.validate_limit_usages(mrp)
+            if insurance_limit_usage_data.get('created_state'):
+                appointment_status = OpdAppointment.CREATED
 
         otp = random.randint(1000, 9999)
         appointment_data["payment_status"] = OpdAppointment.PAYMENT_ACCEPTED
@@ -2712,8 +2707,6 @@ class OpdAppointment(auth_model.TimeStampedModel, CouponsMixin, OpdAppointmentIn
 
         payout_amount = self.fees
         tds = self.get_tds_amount()
-        if tds > 0:
-            payout_amount += tds
 
         # Update Net Revenue
         self.update_net_revenues(tds)
@@ -2721,7 +2714,8 @@ class OpdAppointment(auth_model.TimeStampedModel, CouponsMixin, OpdAppointmentIn
         payout_data = {
             "charged_amount" : self.effective_price,
             "payable_amount" : payout_amount,
-            "booking_type"  : Order.DOCTOR_PRODUCT_ID
+            "booking_type"  : Order.DOCTOR_PRODUCT_ID,
+            "tds_amount" : tds
         }
 
         merchant_payout = MerchantPayout.objects.create(**payout_data)
@@ -2883,7 +2877,10 @@ class OpdAppointment(auth_model.TimeStampedModel, CouponsMixin, OpdAppointmentIn
         procedures = [
             {"name": str(procedure["name"]), "mrp": str(procedure["mrp"]),
              "deal_price": str(procedure["deal_price"]),
-             "discount": str(procedure["discount"]), "agreed_price": str(procedure["agreed_price"])} for procedure in procedures]
+             "dp_price": 0 if not procedure["agreed_price"] else None,
+             "convenience_charges": procedure["deal_price"] if not procedure["agreed_price"] else None,
+             "discount": str(procedure["discount"]), "agreed_price": str(procedure["agreed_price"])} for procedure in
+            procedures]
 
         return procedures
 
@@ -3169,9 +3166,14 @@ class OpdAppointment(auth_model.TimeStampedModel, CouponsMixin, OpdAppointmentIn
         mobile_list = self.get_matrix_spoc_data()
         refund_data = self.refund_details_data()
 
+        insurance_link = None
+        if user_insurance:
+            insurance_link = '%s/admin/insurance/userinsurance/%s/change' % (settings.ADMIN_BASE_URL, user_insurance.id)
+
         appointment_details = {
             'IPDHospital': is_ipd_hospital,
             'IsInsured': 'yes' if user_insurance else 'no',
+            'PolicyLink': str(insurance_link),
             'InsurancePolicyNumber': str(user_insurance.policy_number) if user_insurance else None,
             'AppointmentStatus': self.status,
             'Age': self.calculate_age(),
@@ -3194,6 +3196,7 @@ class OpdAppointment(auth_model.TimeStampedModel, CouponsMixin, OpdAppointmentIn
             'PatientName': self.profile_detail.get("name", ''),
             'PatientAddress': patient_address,
             'ProviderName': getattr(self, 'doctor').name + " - " + self.hospital.name,
+            'HospitalName': self.hospital.name,
             'ServiceName': service_name,
             'InsuranceCover': 0,
             'MobileList': mobile_list,
@@ -4107,6 +4110,8 @@ class HospitalTiming(auth_model.TimeStampedModel):
 
 
 class PartnersAppInvoice(auth_model.TimeStampedModel):
+    CREATE = 1
+    UPDATE = 2
     DECIMAL_PLACES = 2
     INVOICE_SERIAL_ID_START = 300000
     ONLINE = 1
@@ -4128,7 +4133,7 @@ class PartnersAppInvoice(auth_model.TimeStampedModel):
     sub_total_amount = models.DecimalField(max_digits=10, decimal_places=DECIMAL_PLACES)
     tax_amount = models.DecimalField(max_digits=10, decimal_places=DECIMAL_PLACES, blank=True, null=True)
     tax_percentage = models.DecimalField(max_digits=5, decimal_places=DECIMAL_PLACES, blank=True, null=True,
-                                         validators=[MinValueValidator(0), MaxValueValidator(100)])
+                                         validators=[MinValueValidator(0)])
     discount_amount = models.DecimalField(max_digits=10, decimal_places=DECIMAL_PLACES, blank=True, null=True)
     discount_percentage = models.DecimalField(max_digits=5, decimal_places=DECIMAL_PLACES, blank=True, null=True,
                                               validators=[MinValueValidator(0), MaxValueValidator(100)])
@@ -4148,12 +4153,14 @@ class PartnersAppInvoice(auth_model.TimeStampedModel):
     def get_context(self, selected_invoice_items):
         context = dict()
         context["patient_name"] = self.appointment.user.name
+        patient_mobile = None
         patient_mobile_queryset = self.appointment.user.patient_mobiles.all()
-        if patient_mobile_queryset.exists():
-            patient_mobile = patient_mobile_queryset.filter(is_default=True).first() if patient_mobile_queryset.filter(
-                is_default=True).exists() else patient_mobile_queryset.first()
-        else:
-            patient_mobile = None
+        if patient_mobile_queryset:
+            patient_mobile = patient_mobile_queryset[0]
+            for obj in patient_mobile_queryset:
+                if obj.is_default:
+                    patient_mobile = obj
+                    break
         context["patient_phone_number"] = patient_mobile
         context["invoice_serial_id"] = self.invoice_serial_id
         context["updated_at"] = self.updated_at if self.updated_at else datetime.datetime.now()
@@ -4167,7 +4174,10 @@ class PartnersAppInvoice(auth_model.TimeStampedModel):
         context["doctor_name"] = self.appointment.doctor.name
         context["hospital_name"] = self.appointment.hospital.name
         context["hospital_address"] = self.appointment.hospital.get_hos_address()
-        doctor_number = self.appointment.doctor.doctor_number.first()
+        doctor_number = None
+        doctor_numbers = self.appointment.doctor.doctor_number.all()
+        if doctor_numbers:
+            doctor_number = doctor_numbers[0]
         if doctor_number:
             context["doctor_phone_number"] = doctor_number.phone_number
         context["invoice_title"] = self.invoice_title
@@ -4183,18 +4193,17 @@ class PartnersAppInvoice(auth_model.TimeStampedModel):
 
     def get_invoice_items(self, selected_invoice_items):
         invoice_items = list()
-        # selected_invoice_items = self.selected_invoice_items
         for item in selected_invoice_items:
-            if item['invoice_item'].tax_percentage:
-                tax = str(item['invoice_item'].tax_amount) + ' (' + str(item['invoice_item'].tax_percentage.normalize()) + '%)'
+            if item['invoice_item'].get('tax_percentage'):
+                tax = str(item['invoice_item']['tax_amount']) + ' (' + str(item['invoice_item']['tax_percentage'].normalize()) + '%)'
             else:
-                tax = str(item['invoice_item'].tax_amount)
-            if item['invoice_item'].discount_percentage:
-                discount = str(item['invoice_item'].discount_amount) + ' (' + str(item['invoice_item'].discount_percentage.normalize()) + '%)'
+                tax = str(item['invoice_item']['tax_amount'])
+            if item['invoice_item'].get('discount_percentage'):
+                discount = str(item['invoice_item']['discount_amount']) + ' (' + str(item['invoice_item']['discount_percentage'].normalize()) + '%)'
             else:
-                discount = str(item['invoice_item'].discount_amount)
-            invoice_items.append({"name": item['invoice_item'].item,
-                                  "base_price": str(item['invoice_item'].base_price),
+                discount = str(item['invoice_item']['discount_amount'])
+            invoice_items.append({"name": item['invoice_item']['item'],
+                                  "base_price": str(item['invoice_item']['base_price']),
                                   "quantity": item['quantity'],
                                   "tax": tax,
                                   "discount": discount,
@@ -4204,13 +4213,29 @@ class PartnersAppInvoice(auth_model.TimeStampedModel):
 
     @classmethod
     def last_serial(cls, appointment):
-        obj = cls.objects.filter(appointment__doctor=appointment.doctor,
-                                 appointment__hospital=appointment.hospital).order_by('-created_at').first()
+        obj = cls.objects.filter(invoice_serial_id__contains=str(appointment.hospital.id)+'-'+str(appointment.doctor.id)).order_by('-invoice_serial_id').first()
         if obj:
-            serial = int(obj.invoice_serial_id[-9:-3])
+            serial = int(obj.invoice_serial_id.split('-')[-2])
             return serial
         else:
             return cls.INVOICE_SERIAL_ID_START
+
+    def generate_invoice(self, selected_invoice_items, appointment):
+
+        context = self.get_context(selected_invoice_items)
+        content = render_to_string("partners_app_invoice/partners_app_invoice.html", context=context)
+        filename = (appointment.user.name + ' ' + self.invoice_serial_id + '.pdf').replace(' ', '_')
+        file = html_to_pdf(content, filename)
+
+        self.file = file
+        file_path = os.path.join(settings.MEDIA_ROOT, self.INVOICE_STORAGE_FOLDER, filename)
+        if os.path.exists(file_path):
+            os.remove(file_path)
+        self.invoice_url = "{}{}{}".format(settings.BASE_URL, "/api/v2/doctor/invoice/", filename)
+        encoded_filename = jwt.encode({"filename": filename}, settings.PARTNERS_INVOICE_ENCODE_KEY).decode('utf-8')
+        encoded_url = "{}{}{}".format(settings.BASE_URL, "/api/v2/doctor/invoice/", encoded_filename)
+        self.encoded_url = generate_short_url(encoded_url)
+        return self
 
     class Meta:
         db_table = "partners_app_invoice"
@@ -4231,7 +4256,7 @@ class GeneralInvoiceItems(auth_model.TimeStampedModel):
     description = models.CharField(max_length=500, null=True, blank=True)
     tax_amount = models.DecimalField(max_digits=10, decimal_places=DECIMAL_PLACES, blank=True, null=True)
     tax_percentage = models.DecimalField(max_digits=5, decimal_places=DECIMAL_PLACES, blank=True, null=True,
-                                         validators=[MinValueValidator(0), MaxValueValidator(100)])
+                                         validators=[MinValueValidator(0)])
     discount_amount = models.DecimalField(max_digits=10, decimal_places=DECIMAL_PLACES, blank=True, null=True)
     discount_percentage = models.DecimalField(max_digits=5, decimal_places=DECIMAL_PLACES, blank=True, null=True,
                                               validators=[MinValueValidator(0), MaxValueValidator(100)])
@@ -4301,3 +4326,22 @@ class CommonHospital(auth_model.TimeStampedModel):
     class Meta:
         db_table = "common_hospital"
 
+
+class SimilarSpecializationGroup(auth_model.TimeStampedModel):
+    name = models.SlugField(unique=True, db_index=True)
+    specializations = models.ManyToManyField(PracticeSpecialization, through='SimilarSpecializationGroupMapping',
+                                             through_fields=('group', 'specialization'))
+
+    class Meta:
+        db_table = "similar_specialization_group"
+
+    def __str__(self):
+        return self.name
+
+
+class SimilarSpecializationGroupMapping(models.Model):
+    specialization = models.ForeignKey(PracticeSpecialization, on_delete=models.CASCADE)
+    group = models.ForeignKey(SimilarSpecializationGroup, on_delete=models.CASCADE)
+
+    class Meta:
+        db_table = "similar_specialization_group_mapping"

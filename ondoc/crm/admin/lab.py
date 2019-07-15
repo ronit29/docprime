@@ -52,6 +52,8 @@ import nested_admin
 from .common import AssociatedMerchantInline, RemarkInline
 from ondoc.location.models import EntityUrls
 logger = logging.getLogger(__name__)
+from django.urls import reverse
+from django.utils.html import format_html_join, format_html
 
 
 class LabTestResource(resources.ModelResource):
@@ -947,14 +949,33 @@ class LabAppointmentAdmin(nested_admin.NestedModelAdmin):
     search_fields = ['id']
     list_display = (
         'booking_id', 'get_profile', 'get_lab', 'status', 'reports_uploaded', 'time_slot_start', 'effective_price', 'get_profile_email',
-        'get_profile_age', 'created_at', 'updated_at', 'get_lab_test_name')
+        'get_profile_age', 'get_insurance', 'is_prescription_uploaded', 'created_at', 'updated_at', 'get_lab_test_name')
     list_filter = ('status', 'payment_type')
     date_hierarchy = 'created_at'
+    list_display_links = ('booking_id', 'get_insurance',)
 
     inlines = [
         LabReportInline,
         LabPrescriptionInline
     ]
+
+    def get_insurance(self, obj):
+        if obj.insurance:
+            content_type = ContentType.objects.get_for_model(UserInsurance)
+            link = reverse('admin:{}_{}_change'.format(content_type.app_label,
+                                                       content_type.model), args=[obj.insurance.id])
+            return format_html('<a href="{}">{}</a>', link, obj.insurance.id)
+        else:
+            return ""
+    get_insurance.short_description = 'Insurance'
+
+    def is_prescription_uploaded(self, obj):
+        is_prescription = AppointmentPrescription.is_prescription_uploaded_for_appointment(obj)
+        if is_prescription:
+            return str(True)
+        else:
+            return str(False)
+    is_prescription_uploaded.short_description = 'Prescription Uploaded'
 
     # def get_autocomplete_fields(self, request):
     #     if request.user.is_superuser:
@@ -1601,6 +1622,11 @@ class AvailableLabTestAdmin(VersionAdmin):
     search_fields = ['test__name', 'lab_pricing_group__group_name', 'lab_pricing_group__labs__name']
     # autocomplete_fields = ['test']
 
+    def get_queryset(self, request):
+        qs = super().get_queryset(request)
+        qs = qs.select_related('lab_pricing_group', 'test', 'lab')
+        return qs
+
     class Media:
         js = ('js/admin/ondoc.js',)
 
@@ -1643,6 +1669,11 @@ class CommonTestAdmin(VersionAdmin):
 
 
 class CommonPackageAdmin(VersionAdmin):
+
+    def get_queryset(self, request):
+        qs = super().get_queryset(request)
+        qs = qs.select_related('package', 'lab')
+        return qs
 
     def get_form(self, request, obj=None, **kwargs):
         form = super(CommonPackageAdmin, self).get_form(request, obj=obj, **kwargs)

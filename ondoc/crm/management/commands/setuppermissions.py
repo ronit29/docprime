@@ -25,7 +25,8 @@ from ondoc.doctor.models import (Doctor, Hospital, DoctorClinicTiming, DoctorCli
                                  MedicalConditionSpecialization, CompetitorInfo, CompetitorMonthlyVisit,
                                  SpecializationDepartmentMapping, CancellationReason, UploadDoctorData,
                                  HospitalServiceMapping, HealthInsuranceProviderHospitalMapping,
-                                 HealthInsuranceProvider, HospitalHelpline, HospitalTiming, CommonHospital)
+                                 HealthInsuranceProvider, HospitalHelpline, HospitalTiming, CommonHospital,
+                                 SimilarSpecializationGroup, SimilarSpecializationGroupMapping)
 
 from ondoc.diagnostic.models import (Lab, LabTiming, LabImage, GenericLabAdmin,
                                      LabManager, LabAccreditation, LabAward, LabCertification,
@@ -65,7 +66,8 @@ from ondoc.web.models import Career, OnlineLead, UploadImage
 from ondoc.ratings_review import models as rating_models
 from ondoc.articles.models import Article, ArticleLinkedUrl, LinkedArticle, ArticleContentBox, ArticleCategory
 
-from ondoc.authentication.models import BillingAccount, SPOCDetails, GenericAdmin, User, Merchant, AssociatedMerchant, DoctorNumber
+from ondoc.authentication.models import BillingAccount, SPOCDetails, GenericAdmin, User, Merchant, AssociatedMerchant, \
+    DoctorNumber, UserNumberUpdate
 from ondoc.account.models import MerchantPayout
 from ondoc.seo.models import Sitemap, NewDynamic
 from ondoc.elastic.models import DemoElastic
@@ -584,7 +586,8 @@ class Command(BaseCommand):
         content_types = ContentType.objects.get_for_models(PaymentOptions, EntityUrls, Feature, Service, Doctor,
                                                            HealthInsuranceProvider, IpdProcedureCategory, Plan,
                                                            PlanFeature, PlanFeatureMapping, UserPlanMapping, UploadImage,
-                                                           Offer, VirtualAppointment)
+                                                           Offer, VirtualAppointment, SimilarSpecializationGroup,
+                                                           SimilarSpecializationGroupMapping)
 
         for cl, ct in content_types.items():
             permissions = Permission.objects.filter(
@@ -1018,7 +1021,7 @@ class Command(BaseCommand):
                                                            InsuredMembers, InsurerPolicyNumber, InsuranceCancelMaster,
                                                            EndorsementRequest, InsuredMemberDocument,
                                                            InsuredMemberHistory, UserBank, UserBankDocument,
-                                                           GenericNotes, InsurerAccountTransfer)
+                                                           GenericNotes, InsurerAccountTransfer, UserNumberUpdate)
 
         for cl, ct in content_types.items():
             permissions = Permission.objects.filter(
@@ -1072,3 +1075,5 @@ class Command(BaseCommand):
                 Q(codename='change_' + ct.model))
 
             group.permissions.add(*permissions)
+
+

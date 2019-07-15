@@ -1508,8 +1508,11 @@ class UserInsurance(auth_model.TimeStampedModel):
         from ondoc.doctor.models import OpdAppointment
         from ondoc.diagnostic.models import LabAppointment
 
-        total_opd_stats = {'count': 0, 'sum': 0} #OpdAppointment.get_insurance_usage(self)
-        today_opd_stats = {'count': 0, 'sum': 0} #OpdAppointment.get_insurance_usage(self, timezone.now().date())
+        # total_opd_stats = {'count': 0, 'sum': 0}
+        # today_opd_stats = {'count': 0, 'sum': 0}
+
+        total_opd_stats = OpdAppointment.get_insurance_usage(self)
+        today_opd_stats = OpdAppointment.get_insurance_usage(self, timezone.now().date())
 
         total_lab_stats = LabAppointment.get_insurance_usage(self)
         today_lab_stats = LabAppointment.get_insurance_usage(self, timezone.now().date())
@@ -1530,6 +1533,7 @@ class UserInsurance(auth_model.TimeStampedModel):
             'created_state': False
         }
         plan_usages = self.insurance_plan.plan_usages
+        prescription_required = plan_usages.get('prescription_required', False)
         ytd_count = plan_usages.get('ytd_count', None)
         ytd_amount = plan_usages.get('ytd_amount', None)
         daily_count = plan_usages.get('daily_count', None)
@@ -1546,7 +1550,8 @@ class UserInsurance(auth_model.TimeStampedModel):
         elif daily_count and insurance_appointment_stats['used_daily_count'] + 1 > daily_count:
             response['created_state'] = True
 
-        if response['created_state'] and not AppointmentPrescription.prescription_exist_for_date(self.user, timezone.now().date()):
+        if response['created_state'] and prescription_required and \
+                not AppointmentPrescription.prescription_exist_for_date(self.user, timezone.now().date()):
             response['prescription_needed'] = True
 
         return response
