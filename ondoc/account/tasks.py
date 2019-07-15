@@ -536,8 +536,9 @@ def get_thyrocare_reports():
 
 @task()
 def create_appointment_admins_from_spocs():
-    from ondoc.authentication.models import SPOCDetails
+    from ondoc.authentication.models import SPOCDetails, GenericAdmin
     SPOCDetails.create_appointment_admins_from_spocs()
+    GenericAdmin.create_users_from_generic_admins()
 
 @task()
 def add_net_revenue_for_merchant():
