@@ -829,6 +829,7 @@ class UserInsuranceForm(forms.ModelForm):
     status = forms.ChoiceField(choices=status_choices, required=True)
     cancel_after_utilize_insurance = forms.ChoiceField(choices=cancel_after_utilize_choices, initial='NO',  widget=forms.RadioSelect())
     cancel_reason = forms.CharField(max_length=400, required=False)
+    onhold_reason = forms.CharField(max_length=400, required=False)
     cancel_case_type = forms.ChoiceField(choices=case_choices, initial=UserInsurance.REFUND)
     cancel_status = forms.ChoiceField(choices=cancel_status_choices, initial=UserInsurance.NON_REFUNDED)
 
@@ -840,6 +841,7 @@ class UserInsuranceForm(forms.ModelForm):
         cancel_reason = data.get('cancel_reason')
         cancel_case_type = data.get('cancel_case_type')
         cancel_status = data.get('cancel_status')
+        onhold_reason = data.get('onhold_reason')
         if int(status) == UserInsurance.ONHOLD:
             if not onhold_reason:
                 raise forms.ValidationError("In Case of ONHOLD status, Onhold reason is mandatory")
