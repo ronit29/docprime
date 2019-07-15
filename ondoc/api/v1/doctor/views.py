@@ -352,6 +352,9 @@ class DoctorAppointmentsViewSet(OndocViewSet):
         balance = 0
         cashback_balance = 0
 
+        if user and user.active_insurance and user.active_insurance.status == UserInsurance.ONHOLD:
+            return Response(status=status.HTTP_400_BAD_REQUEST, data={'error': 'There is some problem, Please try again later'})
+
         if use_wallet:
             consumer_account = account_models.ConsumerAccount.objects.get_or_create(user=user)
             consumer_account = account_models.ConsumerAccount.objects.select_for_update().get(user=user)

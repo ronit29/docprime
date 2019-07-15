@@ -968,14 +968,16 @@ class UserInsurance(auth_model.TimeStampedModel):
         db_table = "user_insurance"
 
     def is_valid(self):
-        if self.expiry_date >= timezone.now() and self.status == self.ACTIVE:
+        if self.expiry_date >= timezone.now() and (self.status == self.ACTIVE or self.status == self.ONHOLD):
             return True
         else:
             return False
 
     def is_profile_valid(self):
-        if self.expiry_date >= timezone.now() and (self.status == self.ACTIVE or self.status == self.ONHOLD or
-                                                       self.status == self.CANCEL_INITIATE):
+        # if self.expiry_date >= timezone.now() and (self.status == self.ACTIVE or self.status == self.ONHOLD or
+        #                                                self.status == self.CANCEL_INITIATE):
+        if self.expiry_date >= timezone.now() and (self.status == self.ACTIVE or
+                                                           self.status == self.CANCEL_INITIATE):
             return True
         else:
             return False

@@ -840,9 +840,9 @@ class UserInsuranceForm(forms.ModelForm):
         cancel_reason = data.get('cancel_reason')
         cancel_case_type = data.get('cancel_case_type')
         cancel_status = data.get('cancel_status')
-        # if int(status) == UserInsurance.ONHOLD:
-        #     if not onhold_reason:
-        #         raise forms.ValidationError("In Case of ONHOLD status, Onhold reason is mandatory")
+        if int(status) == UserInsurance.ONHOLD:
+            if not onhold_reason:
+                raise forms.ValidationError("In Case of ONHOLD status, Onhold reason is mandatory")
         if case_type=="NO" and (int(status) == UserInsurance.CANCEL_INITIATE or int(status) == UserInsurance.CANCELLED):
             if not cancel_reason:
                 raise forms.ValidationError('For Cancel Initiation, Cancel reason is mandatory')
@@ -1005,9 +1005,9 @@ class UserInsuranceAdmin(ImportExportMixin, admin.ModelAdmin):
         if request.user.is_member_of(constants['SUPER_INSURANCE_GROUP']):
             if obj.status == UserInsurance.ACTIVE or obj.status == UserInsurance.CANCELLED:
                 super(UserInsuranceAdmin, self).save_model(request, obj, form, change)
-            # elif obj.status == UserInsurance.ONHOLD:
-            #     if obj.onhold_reason:
-            #         super(UserInsuranceAdmin, self).save_model(request, obj, form, change)
+            elif obj.status == UserInsurance.ONHOLD:
+                if obj.onhold_reason:
+                    super(UserInsuranceAdmin, self).save_model(request, obj, form, change)
             elif obj.status == UserInsurance.CANCEL_INITIATE:
                 response = obj.process_cancellation()
                 obj.cancel_initiate_by = UserInsurance.ADMIN
