@@ -3176,12 +3176,12 @@ class LabTestCategoryUrls(TimeStampedModel):
     class Meta:
         db_table = 'lab_test_category_urls'
 
-    def save(self, *args, **kwargs):
-        self.url = self.url.lower()
-        if not self.url.endswith('hpcp'):
-            self.url = self.url + '-hpcp'
-
-        super(LabTestCategoryUrls, self).save(*args, **kwargs)
+    # def save(self, *args, **kwargs):
+    #     self.url = self.url.lower()
+    #     if not self.url.endswith('hpcp'):
+    #         self.url = self.url + '-hpcp'
+    #
+    #     super(LabTestCategoryUrls, self).save(*args, **kwargs)
 
 
 class LabTestCategoryLandingURLS(TimeStampedModel):

@@ -1,3 +1,4 @@
+import json
 import operator
 from copy import deepcopy
 from itertools import groupby
@@ -15,7 +16,8 @@ from ondoc.ratings_review import models as rating_models
 from ondoc.diagnostic.models import (LabTest, AvailableLabTest, Lab, LabAppointment, LabTiming, PromotedLab,
                                      CommonDiagnosticCondition, CommonTest, CommonPackage,
                                      FrequentlyAddedTogetherTests, TestParameter, ParameterLabTest, QuestionAnswer,
-                                     LabPricingGroup, LabTestCategory, LabTestCategoryMapping, LabTestThresholds)
+                                     LabPricingGroup, LabTestCategory, LabTestCategoryMapping, LabTestThresholds,
+                                     LabTestCategoryLandingURLS)
 from ondoc.account import models as account_models
 from ondoc.authentication.models import UserProfile, Address
 from ondoc.insurance.models import UserInsurance, InsuranceThreshold
@@ -3525,3 +3527,16 @@ class CompareLabPackagesViewSet(viewsets.ReadOnlyModelViewSet):
             discounted_price = deal_price if not search_coupon else search_coupon.get_search_coupon_discounted_price(deal_price)
 
         return discounted_price
+
+class LabTestCategoryLandingUrlViewSet(viewsets.GenericViewSet):
+
+    def category_landing_url(self, request):
+        queryset = LabTestCategoryLandingURLS.objects.all()
+        res = {}
+        for obj in queryset:
+            res['title'] = obj.url.title
+            res['url'] = obj.url.url
+            res['test'] = {'id': obj.test.id, 'test_category': obj.test.name, 'tests': [{'id': tests.id, 'name': tests.name} for tests in obj.test.lab_tests.all()]}
+
+        return Response(res)
+
