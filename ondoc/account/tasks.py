@@ -16,6 +16,7 @@ import json
 import logging
 from collections import OrderedDict
 import datetime
+from django.db.models import Q
 
 logger = logging.getLogger(__name__)
 
@@ -240,7 +241,8 @@ def update_ben_status_from_pg():
 @task()
 def update_merchant_payout_pg_status():
     from ondoc.account.models import MerchantPayout
-    payouts = MerchantPayout.objects.all().order_by('-id')
+    # payouts = MerchantPayout.objects.all().order_by('-id')
+    payouts = MerchantPayout.objects.filter(Q(pg_status='SETTLEMENT_COMPLETED')|Q(utr_no__gt='')|Q(utr_no__isnull=False)|Q(type=2))
     for p in payouts:
         p.refresh_from_db()
         p.update_status_from_pg()
@@ -534,8 +536,9 @@ def get_thyrocare_reports():
 
 @task()
 def create_appointment_admins_from_spocs():
-    from ondoc.authentication.models import SPOCDetails
+    from ondoc.authentication.models import SPOCDetails, GenericAdmin
     SPOCDetails.create_appointment_admins_from_spocs()
+    GenericAdmin.create_users_from_generic_admins()
 
 @task()
 def add_net_revenue_for_merchant():

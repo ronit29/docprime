@@ -96,6 +96,7 @@ class NotificationAction:
     COD_TO_PREPAID = 91
     COD_TO_PREPAID_REQUEST = 92
 
+    CONTACT_US_EMAIL = 65
 
     NOTIFICATION_TYPE_CHOICES = (
         (APPOINTMENT_ACCEPTED, "Appointment Accepted"),
@@ -280,7 +281,7 @@ class NotificationAction:
             patient_name = instance.profile.name if instance.profile.name else ""
             doctor_name = instance.doctor.name if instance.doctor.name else ""
             if instance.cancellation_type != instance.AUTO_CANCELLED:
-                body = "Appointment with Dr. {} at {}, {} has been cancelled as per your request.".format(
+                body = "Appointment with Dr. {} at {}, {} has been cancelled.".format(
                     doctor_name, time_slot_start.strftime("%I:%M %P"),
                     time_slot_start.strftime("%d/%m/%y")
                 )
@@ -837,6 +838,27 @@ class EmailNotification(TimeStampedModel, EmailNotificationOpdMixin, EmailNotifi
         }
         message = json.dumps(message)
         publish_message(message)
+
+    @classmethod
+    def send_contact_us_notification_email(cls, content_type, obj_id, email, html_body):
+        email_subject = 'CONTACT US - A New Message Received'
+        if email:
+            email_obj = cls.objects.create(email=email, notification_type=NotificationAction.CONTACT_US_EMAIL,
+                                           content=html_body, email_subject=email_subject, cc=[], bcc=[],
+                                           content_type=content_type, object_id=obj_id)
+            email_obj.save()
+
+            email_noti = {
+                "email": email,
+                "content": html_body,
+                "email_subject": email_subject
+            }
+            message = {
+                "data": email_noti,
+                "type": "email"
+            }
+            message = json.dumps(message)
+            publish_message(message)
 
 
 class SmsNotificationOpdMixin:

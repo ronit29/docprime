@@ -116,7 +116,7 @@ class Order(TimeStampedModel):
         if self.is_parent():
             raise Exception('Not implemented for parent orders')
         appt = self.getAppointment()
-        if appt and appt.insurance_id:
+        if appt and hasattr(appt, 'insurance_id') and appt.insurance_id:
             return True
         return False
 
@@ -480,6 +480,8 @@ class Order(TimeStampedModel):
             all_txn = self.txn.all()
         elif self.dummy_txn.exists():
             all_txn = self.dummy_txn.all()
+        elif self.is_parent() and self.parent and self.parent.dummy_txn.exists():
+            all_txn = self.parent.dummy_txn.exists()
         return all_txn
 
     @classmethod
@@ -1491,6 +1493,7 @@ class MerchantPayout(TimeStampedModel):
     object_id = models.PositiveIntegerField(null=True, blank=True)
     content_object = GenericForeignKey()
     booking_type = models.IntegerField(null=True, blank=True, choices=BookingTypeChoices)
+    tds_amount = models.DecimalField(max_digits=10, decimal_places=2, default=None, null=True, blank=True)
 
     def save(self, *args, **kwargs):
 
@@ -1570,6 +1573,13 @@ class MerchantPayout(TimeStampedModel):
             all_payouts = [x.payout for x in all_payouts]
             transfers = InsuranceTransaction.objects.filter(user_insurance=user_insurance,\
              transaction_type=InsuranceTransaction.CREDIT, reason=InsuranceTransaction.PREMIUM_PAYOUT)
+
+            if not transfers:
+                return True
+
+            if not all_payouts and transfers:
+                return False
+
             transfers = list(transfers)
 
             for transfer in transfers:
@@ -1588,8 +1598,8 @@ class MerchantPayout(TimeStampedModel):
                         transfer._removed = True
                         payout._removed = True
 
-            all_payouts = [x for x in all_payouts if not x._removed]
-            transfers = [x for x in transfers if not x._removed]
+            all_payouts = [x for x in all_payouts if hasattr(x, '_removed') and not x._removed]
+            transfers = [x for x in transfers if hasattr(x, '_removed') and not x._removed]
             if len(transfers)==0 and (transferred_amount+self.payable_amount)<=premium_amount:
                 return True
 
@@ -1677,6 +1687,7 @@ class MerchantPayout(TimeStampedModel):
         if len(trans)>1:
             raise Exception('multiple transactions found')
 
+        # TO DO - Check for TDS
         if trans and trans[0].amount == self.payable_amount:
             return trans
 
@@ -1930,8 +1941,8 @@ class MerchantPayout(TimeStampedModel):
 
     def update_status_from_pg(self):
         with transaction.atomic():
-            if self.pg_status=='SETTLEMENT_COMPLETED' or self.utr_no or self.type ==self.MANUAL:
-                return
+            # if self.pg_status=='SETTLEMENT_COMPLETED' or self.utr_no or self.type ==self.MANUAL:
+            #     return
 
             order_no = None
             url = settings.SETTLEMENT_DETAILS_API

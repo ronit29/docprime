@@ -877,9 +877,16 @@ class DoctorProfileUserViewSet(viewsets.GenericViewSet):
         spec_ids = list()
         spec_url_dict = dict()
 
+        from ondoc.procedure.models import PotentialIpdLeadPracticeSpecialization
+        all_potential_spec = set(PotentialIpdLeadPracticeSpecialization.objects.all().values_list('practice_specialization', flat=True))
+        is_congot = False
+
         for dps in doctor.doctorpracticespecializations.all():
             general_specialization.append(dps.specialization)
             spec_ids.append(dps.specialization.id)
+            if dps.specialization.id in all_potential_spec:
+                is_congot = True
+
         if spec_ids and entity:
             spec_urls = EntityUrls.objects.filter(specialization_id__in=spec_ids, sublocality_value=entity.sublocality_value,
                                           locality_value=entity.locality_value, is_valid=True, entity_type='Doctor', url_type='SEARCHURL')
@@ -903,6 +910,7 @@ class DoctorProfileUserViewSet(viewsets.GenericViewSet):
 
         hospital = None
         response_data['about_web'] = None
+        response_data['is_congot'] = is_congot
         google_rating = dict()
         date = None
 
@@ -1888,7 +1896,7 @@ class DoctorListViewSet(viewsets.GenericViewSet):
             reviews = validated_data.get('reviews')
         hospital_req_data = {}
         if validated_data.get('hospital_id'):
-            hospital_req_data = Hospital.objects.filter(id=validated_data.get('hospital_id')).values('id', 'name').first()
+            hospital_req_data = Hospital.objects.filter(id__in=validated_data.get('hospital_id')).values('id', 'name').first()
 
         return Response({"result": response, "count": result_count,
                          'specializations': specializations, 'conditions': conditions, "seo": seo,
@@ -2409,6 +2417,15 @@ class HospitalAutocomplete(autocomplete.Select2QuerySetView):
 class PracticeSpecializationAutocomplete(autocomplete.Select2QuerySetView):
     def get_queryset(self):
         qs = models.PracticeSpecialization.objects.all()
+
+        if self.q:
+            qs = qs.filter(name__icontains=self.q).order_by('name')
+        return qs
+
+
+class SimilarSpecializationGroupAutocomplete(autocomplete.Select2QuerySetView):
+    def get_queryset(self):
+        qs = models.SimilarSpecializationGroup.objects.all()
 
         if self.q:
             qs = qs.filter(name__icontains=self.q).order_by('name')
@@ -3976,7 +3993,7 @@ class HospitalViewSet(viewsets.GenericViewSet):
         if entity:
             breadcrumb = deepcopy(entity.breadcrumb) if isinstance(entity.breadcrumb, list) else []
             breadcrumb.insert(0, {"title": "Home", "url": "/", "link_title": "Home"})
-            # breadcrumb.insert(1, {"title": "Hospitals", "url": "hospitals", "link_title": "Hospitals"})
+            breadcrumb.insert(1, {"title": "Hospitals", "url": "hospitals", "link_title": "Hospitals"})
             locality = entity.sublocality_value
             city = entity.locality_value
             url = entity.url
@@ -4095,7 +4112,7 @@ class HospitalViewSet(viewsets.GenericViewSet):
                     is_valid='t')
                 if valid_entity_url_qs.exists():
                     corrected_url = valid_entity_url_qs[0].url
-                    return Response(status=status.HTTP_301_MOVED_PERMANENTLY, data={'url': corrected_url})
+                    return Response(status=status.HTTP_301_MOVED_PERMANENTLY, data={'url': corrected_url, 'status': 301})
                 else:
                     return Response(status=status.HTTP_404_NOT_FOUND)
 
@@ -4110,6 +4127,7 @@ class HospitalViewSet(viewsets.GenericViewSet):
         serializer.is_valid(raise_exception=True)
         validated_data = serializer.validated_data
         hospital_obj = Hospital.objects.prefetch_related('service', 'network',
+                                                         'hosp_availability',
                                                          'hospital_documents',
                                                          'hospital_helpline_numbers',
                                                          'network__hospital_network_documents',
@@ -4126,6 +4144,7 @@ class HospitalViewSet(viewsets.GenericViewSet):
         title = None
         description = None
         canonical_url = None
+        h1_title = None
 
         if not entity:
             entity = EntityUrls.objects.filter(entity_id=hospital_obj.id,
@@ -4134,15 +4153,16 @@ class HospitalViewSet(viewsets.GenericViewSet):
                 entity = entity[0]
 
         hosp_serializer = serializers.HospitalDetailIpdProcedureSerializer(hospital_obj, context={'request': request,
-                                                                                    'validated_data': validated_data,
-                                                                                    "entity": entity}).data
+                                                                                                  'validated_data': validated_data,
+                                                                                                  "entity": entity}).data
+
         response = hosp_serializer
         if entity:
             response['url'] = entity.url
             if entity.breadcrumb:
                 breadcrumb = [{'url': '/', 'title': 'Home', 'link_title': 'Home'}
-                              # {"title": "Hospitals", "url": "hospitals", "link_title": "Hospitals"}
-]
+                    , {"title": "Hospitals", "url": "hospitals", "link_title": "Hospitals"}
+                              ]
                 if entity.locality_value:
                     # breadcrumb.append({'url': request.build_absolute_uri('/'+ entity.locality_value), 'title': entity.locality_value, 'link_title': entity.locality_value})
                     breadcrumb = breadcrumb + entity.breadcrumb
@@ -4151,7 +4171,7 @@ class HospitalViewSet(viewsets.GenericViewSet):
                 response['breadcrumb'] = breadcrumb
             else:
                 breadcrumb = [{'url': '/', 'title': 'Home', 'link_title': 'Home'},
-                              # {"title": "Hospitals", "url": "hospitals", "link_title": "Hospitals"},
+                              {"title": "Hospitals", "url": "hospitals", "link_title": "Hospitals"},
                               {'title': hospital_obj.name, 'url': None, 'link_title': None}]
                 response['breadcrumb'] = breadcrumb
 
@@ -4174,10 +4194,125 @@ class HospitalViewSet(viewsets.GenericViewSet):
                 title = new_dynamic.meta_title
             if new_dynamic.meta_description:
                 description = new_dynamic.meta_description
-        response['seo'] = {'title': title, "description": description}
+            if new_dynamic.h1_title:
+                h1_title = new_dynamic.h1_title
+        schema = self.build_schema_for_hospital(hosp_serializer, hospital_obj, canonical_url)
+        response['seo'] = {'title': title, "description": description, "schema": schema, "h1_title": h1_title}
         response['canonical_url'] = canonical_url
 
         return Response(response)
+
+
+    def build_schema_for_hospital(self, serialized_data, hospital, url):
+        try:
+            from ondoc.doctor.models import HospitalTiming
+            min_fee, max_fee = None, None
+            for x in serialized_data.get("doctors", {}).get("result", []):
+                if not min_fee or min_fee > x["deal_price"]:
+                    min_fee = x["deal_price"]
+                if not max_fee or max_fee < x["deal_price"]:
+                    max_fee = x["deal_price"]
+            fee_range = None
+            if min_fee and max_fee and min_fee != max_fee:
+                fee_range = "INR {} - INR {}".format(min_fee, max_fee)
+            elif min_fee or max_fee:
+                fee_range = "INR {}".format(min_fee if min_fee else max_fee)
+
+            def time_float_to_str(t):
+                h, m, s = 0, 0, 0
+                h = t // 1
+                m = int((t * 10) % 10)
+                if m == 5:
+                    m = 30
+                result = "{:0>2}:{:0>2}:{:0>2}".format(h, m, s)
+                return result
+
+            available_days = {}
+            opens_at, closes_at = None, None
+            num_day = dict(HospitalTiming.DAY_CHOICES)
+            for x in hospital.hosp_availability.all():
+                available_days[x.day] = num_day[x.day]
+                if not opens_at and not closes_at:
+                    opens_at = time_float_to_str(x.start)
+                    closes_at = time_float_to_str(x.end)
+
+            schema = {
+                "@type": "Hospital",
+                "@context": "https://schema.org/",
+                "currenciesAccepted": "INR",
+                "priceRange": fee_range,
+                "name": serialized_data['name'],
+                "url": "{}/{}".format(settings.BASE_URL, url) if url and isinstance(url, str) else None,
+                "medicalSpecialty": "Multi-Speciality" if serialized_data["multi_speciality"] else None,
+                "description": serialized_data['new_about'] if serialized_data['new_about'] else serialized_data[
+                    'about'],
+                "telephone": serialized_data["contact_number"],
+                "logo": serialized_data["logo"],
+                "geo": {
+                    "@type": "GeoCoordinates",
+                    "@context": "https://schema.org",
+                    "latitude": serialized_data['lat'],
+                    "longitude": serialized_data['long']
+                } if serialized_data['lat'] and serialized_data['long'] else None,
+                "hasMap": {
+                    "@type": "Map",
+                    "@context": "https://schema.org",
+                    "url": "https://maps.google.com/maps?f=d&amp;hl=en&amp;addr={},{}".format(serialized_data['lat'],
+                                                                                              serialized_data['long'])
+                },
+                "image": serialized_data["images"][0]["original"] if len(serialized_data["images"]) > 0 else None,
+                "photo": [{
+                    "@type": "CreativeWork",
+                    "@context": "https://schema.org",
+                    "url": x["original"]
+                } for x in serialized_data["images"]],
+                "address": {
+                    "@type": "PostalAddress",
+                    "@context": "https://schema.org",
+                    "streetAddress": hospital.get_hos_address(),
+                    "addressLocality": hospital.city,
+                    "addressRegion": hospital.state,
+                    "postalCode": hospital.pin_code
+                },
+                "availableService": {
+                    "@type": "MedicalTherapy",
+                    "@context": "https://schema.org",
+                    "name": [y["name"] for x in serialized_data['ipd_procedure_categories'] for y in
+                             x["ipd_procedures"]]
+                },
+                "member": [x["new_schema"] for x in serialized_data["doctors"]["result"]],
+                "aggregateRating": {
+                    "@type": "AggregateRating",
+                    "@context": "https://schema.org",
+                    "worstRating": "1",
+                    "ratingValue": serialized_data.get('rating_graph', {}).get('avg_rating'),
+                    "bestRating": "5",
+                    "ratingCount": serialized_data.get('rating_graph', {}).get('rating_count'),
+                },
+                "review": [
+                    {
+                        "@type": "Review",
+                        "reviewBody": x["compliment"],
+                        "datePublished": x["date"],
+                        "author": {
+                            "@type": "Person",
+                            "name": x["user_name"]
+                        }
+                    } for x in serialized_data["rating"]
+                ],
+                "openingHoursSpecification": [
+                    {
+                        "@type": "OpeningHoursSpecification",
+                        "dayOfWeek": list(available_days.values()),
+                        "opens": opens_at,
+                        "closes": closes_at
+                    }
+                ],
+            }
+        except Exception as e:
+            logger.error(str(e))
+            schema = None
+        return schema
 
 
 class IpdProcedureViewSet(viewsets.GenericViewSet):
@@ -4215,9 +4350,13 @@ class IpdProcedureViewSet(viewsets.GenericViewSet):
         serializer.is_valid(raise_exception=True)
         validated_data = serializer.validated_data
         ipd_procedure = IpdProcedure.objects.prefetch_related(
-            Prefetch('feature_mappings', IpdProcedureFeatureMapping.objects.select_related('feature').all().order_by('-feature__priority')),
-            Prefetch('ipdproceduredetail_set', IpdProcedureDetail.objects.select_related('detail_type').all().order_by('-detail_type__priority')),
-            Prefetch('similar_ipds', SimilarIpdProcedureMapping.objects.select_related('similar_ipd_procedure').all().order_by('-order')),
+            Prefetch('feature_mappings',
+                     IpdProcedureFeatureMapping.objects.select_related('feature').all().order_by('-feature__priority')),
+            Prefetch('ipdproceduredetail_set',
+                     IpdProcedureDetail.objects.select_related('detail_type').all().order_by('-detail_type__priority')),
+            Prefetch('similar_ipds',
+                     SimilarIpdProcedureMapping.objects.select_related('similar_ipd_procedure').all().order_by(
+                         '-order')),
             Prefetch('ipd_offers', Offer.objects.select_related('coupon', 'hospital', 'network').filter(is_live=True)),
         ).filter(is_enabled=True, id=pk).first()
         if ipd_procedure is None:
@@ -4266,16 +4405,22 @@ class IpdProcedureViewSet(viewsets.GenericViewSet):
         if city:
             breadcrumb.append({"title": "{} Cost in {}".format(ipd_procedure.name, city), "url": None, "link_title": None})
 
+        near_by = validated_data.get('near_by', False)
+        hospital_request_data = {}
+        doctor_search_parameters = {'ipd_procedure_ids': str(pk),
+                                    'longitude': validated_data.get('long'),
+                                    'latitude': validated_data.get('lat'),
+                                    'sort_on': 'experience',
+                                    'city': city,
+                                    'restrict_result_count': 3}
+        if near_by:
+            hospital_request_data.update({'max_distance': 1000000})
+            doctor_search_parameters.update({'max_distance': 1000000})
         hospital_view_set = HospitalViewSet()
-        hospital_result = hospital_view_set.list(request, pk, 2)
+        hospital_result = hospital_view_set.list(request, pk, 2, request_data=hospital_request_data)
         doctor_result_data = {}
         doctor_list_viewset = DoctorListViewSet()
-        doctor_result = doctor_list_viewset.list(request, parameters={'ipd_procedure_ids': str(pk),
-                                                                      'longitude': validated_data.get('long'),
-                                                                      'latitude': validated_data.get('lat'),
-                                                                      'sort_on': 'experience',
-                                                                      'city': city,
-                                                                      'restrict_result_count': 3})
+        doctor_result = doctor_list_viewset.list(request, parameters=doctor_search_parameters)
         doctor_result_data = doctor_result.data
         ipd_procedure_serializer = serializers.IpdProcedureDetailSerializer(ipd_procedure, context={'request': request,
                                                                                                     'similar_ipds_entity_dict': similar_ipds_entity_dict,

@@ -18,7 +18,7 @@ import random, string
 from django.contrib.contenttypes.fields import GenericForeignKey, GenericRelation
 from django.contrib.contenttypes.models import ContentType
 from django.utils.functional import cached_property
-from datetime import date, datetime
+from datetime import date, datetime, timedelta
 from safedelete import SOFT_DELETE
 from safedelete.models import SafeDeleteModel
 import reversion
@@ -937,6 +937,43 @@ class GenericLabAdmin(TimeStampedModel, CreatedByModel):
                                )
 
 
+class GenericAdminManager(models.Manager):
+
+    def bulk_create(self, objs, **kwargs):
+        phone_numbers = list()
+        hospitals = list()
+        for obj in objs:
+            if obj.phone_number not in phone_numbers:
+                phone_numbers.append(obj.phone_number)
+            if obj.hospital not in hospitals:
+                hospitals.append(obj.hospital)
+        all_admins = GenericAdmin.objects.prefetch_related('hospital', 'hospital__hospital_doctor_number')\
+                                         .filter(phone_number__in=phone_numbers, hospital__in=hospitals)\
+                                         .order_by('-super_user_permission')
+        for obj in objs:
+            for admin in all_admins:
+                if admin.hospital != obj.hospital or int(admin.phone_number) != int(obj.phone_number):
+                    continue
+                if admin.super_user_permission:
+                    objs.remove(obj)
+                    break
+                elif obj.super_user_permission and admin.hospital == obj.hospital and int(admin.phone_number) == int(obj.phone_number):
+                    if not admin.doctor_number_exists():
+                        admin.delete()
+                elif not obj.super_user_permission and admin.permission_type == obj.permission_type:
+                    if not admin.doctor:
+                        objs.remove(obj)
+                    elif admin.doctor:
+                        if not obj.doctor:
+                            if not admin.doctor_number_exists():
+                                admin.doctor = None
+                                admin.save()
+                                objs.remove(obj)
+                        elif obj.doctor and admin.doctor == obj.doctor:
+                            objs.remove(obj)
+        return super().bulk_create(objs, **kwargs)
+
+
 class GenericAdmin(TimeStampedModel, CreatedByModel):
     APPOINTMENT = 1
     BILLINNG = 2
@@ -946,6 +983,7 @@ class GenericAdmin(TimeStampedModel, CreatedByModel):
     OTHER = 3
     CRM = 1
     APP = 2
+    objects = GenericAdminManager()
     entity_choices = ((OTHER, 'Other'), (DOCTOR, 'Doctor'), (HOSPITAL, 'Hospital'),)
     source_choices = ((CRM, 'CRM'), (APP, 'App'),)
     user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='manages', null=True, blank=True)
@@ -1234,6 +1272,40 @@ class GenericAdmin(TimeStampedModel, CreatedByModel):
                                                             Q(super_user_permission=True))) \
                                                    .values_list('hospital', flat=True)
         return list(manageable_hosp_list)
+
+    def doctor_number_exists(self):
+        # Ensure 'hospital' and 'hospital__doctor_number' is prefetched
+        doctor_number_exists = False
+        if self.doctor and self.hospital.hospital_doctor_number.all():
+            for doc_num in self.hospital.hospital_doctor_number.all():
+                if doc_num.doctor == self.doctor and doc_num.phone_number == self.phone_number:
+                    doctor_number_exists = True
+                    break
+        return doctor_number_exists
+
+    @staticmethod
+    def create_users_from_generic_admins():
+        all_admins_without_users = GenericAdmin.objects.filter(user__isnull=True, entity_type=GenericAdmin.HOSPITAL)[:100]
+        admins_phone_numbers = all_admins_without_users.values_list('phone_number', flat=True)
+        users_for_admins = User.objects.filter(phone_number__in=admins_phone_numbers, user_type=User.DOCTOR)
+        users_admin_dict = dict()
+        for user in users_for_admins:
+            users_admin_dict[user.phone_number] = user
+        # users_phone_numbers = users_for_admins.values_list('phone_number', flat=True)
+
+        users_to_be_created = list()
+        try:
+            for admin in all_admins_without_users:
+                if admin.phone_number in users_admin_dict:
+                    admin.user = users_admin_dict[admin.phone_number]
+                    admin.save()
+                else:
+                    users_to_be_created.append(User(phone_number=admin.phone_number, user_type=User.DOCTOR,
+                                                           auto_created=True))
+            User.objects.bulk_create(users_to_be_created)
+        except Exception as e:
+            logger.error(str(e))
+            print("Error while bulk creating Users. ERROR :: {}".format(str(e)))
 
 
 class BillingAccount(models.Model):
@@ -1912,3 +1984,57 @@ class LastLoginTimestamp(TimeStampedModel):
 
     class Meta:
         db_table = "last_login_timestamp"
+
+
+class UserNumberUpdate(TimeStampedModel):
+    user = models.ForeignKey(User, on_delete=models.DO_NOTHING, related_name="number_updates", limit_choices_to={'user_type': 3})
+    old_number = models.CharField(max_length=10, blank=False, null=True, default=None)
+    new_number = models.CharField(max_length=10, blank=False, null=True, default=None)
+    is_successfull = models.BooleanField(default=False)
+    otp = models.IntegerField(null=True, blank=True)
+    otp_expiry = models.DateTimeField(default=None, null=True)
+
+    def __str__(self):
+        return str(self.user)
+
+    @classmethod
+    def can_be_changed(cls, new_number):
+        return not User.objects.filter(phone_number=new_number).exists()
+
+    def after_commit_tasks(self, send_otp=False):
+        from ondoc.notification.tasks import send_user_number_update_otp
+        if send_otp:
+            send_user_number_update_otp.apply_async((self.id,))
+
+    def save(self, *args, **kwargs):
+        if not self.is_successfull:
+            send_otp = False
+
+            # Instance comming First time.
+            if not self.id:
+                self.old_number = self.user.phone_number
+                self.otp_expiry = timezone.now() + timedelta(minutes=30)
+
+                self.otp = random.choice(range(100000, 999999))
+                send_otp = True
+
+            elif hasattr(self, '_process_update') and self._process_update:
+
+                profiles = self.user.profiles.filter(phone_number=self.user.phone_number)
+                for profile in profiles:
+                    profile.phone_number = self.new_number
+                    profile.save()
+
+                self.user.phone_number = self.new_number
+
+                self.user.save()
+                self.is_successfull = True
+
+            super().save(*args, **kwargs)
+
+            transaction.on_commit(lambda: self.after_commit_tasks(send_otp=send_otp))
+        else:
+            pass
+
+    class Meta:
+        db_table = "user_number_updates"
