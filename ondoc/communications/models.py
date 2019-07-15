@@ -1167,8 +1167,10 @@ class EMAILNotification:
                         user.purchased_insurance.order_by('-id').first().cancel_customer_type == UserInsurance.OTHER and \
                         (notification_type == NotificationAction.INSURANCE_CANCEL_INITIATE or \
                         notification_type == NotificationAction.INSURANCE_CANCELLATION_APPROVED or \
-                        notification_type == NotificationAction.INSURANCE_CANCELLATION):
-            if notification_type == NotificationAction.INSURANCE_CANCEL_INITIATE:
+                        notification_type == NotificationAction.INSURANCE_CANCELLATION or \
+                         notification_type == NotificationAction.INSURANCE_ENDORSMENT_PENDING):
+            if notification_type == NotificationAction.INSURANCE_CANCEL_INITIATE or \
+                notification_type == NotificationAction.INSURANCE_ENDORSMENT_PENDING:
                 bcc = settings.INSURANCE_CANCEL_INITIATE_EMAIL
             elif notification_type == NotificationAction.INSURANCE_CANCELLATION_APPROVED:
                 email = settings.INSURANCE_CANCELLATION_APPROVAL_ALERT_TO_EMAIL
