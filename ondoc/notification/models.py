@@ -95,9 +95,12 @@ class NotificationAction:
 
     COD_TO_PREPAID = 91
     COD_TO_PREPAID_REQUEST = 92
-    LAB_CONFIRMATION_CHECK_AFTER_APPOINTMENT = 81
+
+    LAB_CONFIRMATION_CHECK_AFTER_APPOINTMENT = 86
     LAB_CONFIRMATION_SECOND_CHECK_AFTER_APPOINTMENT = 82
     LAB_FEEDBACK_AFTER_APPOINTMENT = 83
+
+    CONTACT_US_EMAIL = 65
     NOTIFICATION_TYPE_CHOICES = (
         (APPOINTMENT_ACCEPTED, "Appointment Accepted"),
         (APPOINTMENT_CANCELLED, "Appointment Cancelled"),
@@ -838,6 +841,27 @@ class EmailNotification(TimeStampedModel, EmailNotificationOpdMixin, EmailNotifi
         }
         message = json.dumps(message)
         publish_message(message)
+
+    @classmethod
+    def send_contact_us_notification_email(cls, content_type, obj_id, email, html_body):
+        email_subject = 'CONTACT US - A New Message Received'
+        if email:
+            email_obj = cls.objects.create(email=email, notification_type=NotificationAction.CONTACT_US_EMAIL,
+                                           content=html_body, email_subject=email_subject, cc=[], bcc=[],
+                                           content_type=content_type, object_id=obj_id)
+            email_obj.save()
+
+            email_noti = {
+                "email": email,
+                "content": html_body,
+                "email_subject": email_subject
+            }
+            message = {
+                "data": email_noti,
+                "type": "email"
+            }
+            message = json.dumps(message)
+            publish_message(message)
 
 
 class SmsNotificationOpdMixin:

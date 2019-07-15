@@ -116,7 +116,7 @@ class Order(TimeStampedModel):
         if self.is_parent():
             raise Exception('Not implemented for parent orders')
         appt = self.getAppointment()
-        if appt and appt.insurance_id:
+        if appt and hasattr(appt, 'insurance_id') and appt.insurance_id:
             return True
         return False
 
@@ -1573,6 +1573,13 @@ class MerchantPayout(TimeStampedModel):
             all_payouts = [x.payout for x in all_payouts]
             transfers = InsuranceTransaction.objects.filter(user_insurance=user_insurance,\
              transaction_type=InsuranceTransaction.CREDIT, reason=InsuranceTransaction.PREMIUM_PAYOUT)
+
+            if not transfers:
+                return True
+
+            if not all_payouts and transfers:
+                return False
+
             transfers = list(transfers)
 
             for transfer in transfers:
@@ -1591,8 +1598,8 @@ class MerchantPayout(TimeStampedModel):
                         transfer._removed = True
                         payout._removed = True
 
-            all_payouts = [x for x in all_payouts if not x._removed]
-            transfers = [x for x in transfers if not x._removed]
+            all_payouts = [x for x in all_payouts if hasattr(x, '_removed') and not x._removed]
+            transfers = [x for x in transfers if hasattr(x, '_removed') and not x._removed]
             if len(transfers)==0 and (transferred_amount+self.payable_amount)<=premium_amount:
                 return True
 

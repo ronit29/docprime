@@ -18,7 +18,7 @@ import random, string
 from django.contrib.contenttypes.fields import GenericForeignKey, GenericRelation
 from django.contrib.contenttypes.models import ContentType
 from django.utils.functional import cached_property
-from datetime import date, datetime
+from datetime import date, datetime, timedelta
 from safedelete import SOFT_DELETE
 from safedelete.models import SafeDeleteModel
 import reversion
@@ -1283,6 +1283,30 @@ class GenericAdmin(TimeStampedModel, CreatedByModel):
                     break
         return doctor_number_exists
 
+    @staticmethod
+    def create_users_from_generic_admins():
+        all_admins_without_users = GenericAdmin.objects.filter(user__isnull=True, entity_type=GenericAdmin.HOSPITAL)[:100]
+        admins_phone_numbers = all_admins_without_users.values_list('phone_number', flat=True)
+        users_for_admins = User.objects.filter(phone_number__in=admins_phone_numbers, user_type=User.DOCTOR)
+        users_admin_dict = dict()
+        for user in users_for_admins:
+            users_admin_dict[user.phone_number] = user
+        # users_phone_numbers = users_for_admins.values_list('phone_number', flat=True)
+
+        users_to_be_created = list()
+        try:
+            for admin in all_admins_without_users:
+                if admin.phone_number in users_admin_dict:
+                    admin.user = users_admin_dict[admin.phone_number]
+                    admin.save()
+                else:
+                    users_to_be_created.append(User(phone_number=admin.phone_number, user_type=User.DOCTOR,
+                                                           auto_created=True))
+            User.objects.bulk_create(users_to_be_created)
+        except Exception as e:
+            logger.error(str(e))
+            print("Error while bulk creating Users. ERROR :: {}".format(str(e)))
+
 
 class BillingAccount(models.Model):
     SAVINGS = 1
@@ -1968,6 +1992,7 @@ class UserNumberUpdate(TimeStampedModel):
     new_number = models.CharField(max_length=10, blank=False, null=True, default=None)
     is_successfull = models.BooleanField(default=False)
     otp = models.IntegerField(null=True, blank=True)
+    otp_expiry = models.DateTimeField(default=None, null=True)
 
     def __str__(self):
         return str(self.user)
@@ -1988,13 +2013,14 @@ class UserNumberUpdate(TimeStampedModel):
             # Instance comming First time.
             if not self.id:
                 self.old_number = self.user.phone_number
+                self.otp_expiry = timezone.now() + timedelta(minutes=30)
 
                 self.otp = random.choice(range(100000, 999999))
                 send_otp = True
 
             elif hasattr(self, '_process_update') and self._process_update:
 
-                profiles = UserProfile.objects.filter(phone_number=self.user.phone_number)
+                profiles = self.user.profiles.filter(phone_number=self.user.phone_number)
                 for profile in profiles:
                     profile.phone_number = self.new_number
                     profile.save()
