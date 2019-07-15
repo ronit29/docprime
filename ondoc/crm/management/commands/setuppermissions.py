@@ -53,8 +53,9 @@ from ondoc.procedure.models import Procedure, ProcedureCategory, CommonProcedure
     ProcedureCategoryMapping, ProcedureToCategoryMapping, CommonProcedure, IpdProcedure, IpdProcedureFeatureMapping, \
     DoctorClinicIpdProcedure, IpdProcedureCategoryMapping, IpdProcedureCategory, CommonIpdProcedure, \
     IpdProcedureDetailType, IpdProcedureDetail, IpdProcedureSynonym, IpdProcedureSynonymMapping, \
-    IpdProcedurePracticeSpecialization, IpdProcedureLead, Offer, PotentialIpdLeadPracticeSpecialization, IpdCostEstimateRoomType, IpdProcedureCostEstimate, \
-    IpdCostEstimateRoomTypeMapping, IpdProcedureLeadCostEstimateMapping, UploadCostEstimateData
+    IpdProcedurePracticeSpecialization, IpdProcedureLead, Offer, PotentialIpdLeadPracticeSpecialization, \
+    IpdCostEstimateRoomType, IpdProcedureCostEstimate, \
+    IpdCostEstimateRoomTypeMapping, IpdProcedureLeadCostEstimateMapping, UploadCostEstimateData, PotentialIpdCity
 from ondoc.reports import models as report_models
 from ondoc.prescription.models import AppointmentPrescription
 
@@ -573,7 +574,7 @@ class Command(BaseCommand):
                                                            IpdProcedureDetailType, IpdProcedureDetail, IpdProcedureSynonym, IpdProcedureSynonymMapping,
                                                            EmailBanner, RecommenderThrough, Recommender,
                                                            IpdProcedurePracticeSpecialization, CityLatLong, CommonHospital,
-                                                           PotentialIpdLeadPracticeSpecialization)
+                                                           PotentialIpdLeadPracticeSpecialization, PotentialIpdCity)
         for cl, ct in content_types.items():
             permissions = Permission.objects.filter(
                 Q(content_type=ct),

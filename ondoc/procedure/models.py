@@ -8,7 +8,7 @@ from django.db.models import Q
 
 from ondoc.authentication import models as auth_model
 from ondoc.authentication.models import User, UserProfile
-from ondoc.common.models import Feature, AppointmentHistory, VirtualAppointment
+from ondoc.common.models import Feature, AppointmentHistory, VirtualAppointment, MatrixMappedCity
 from ondoc.coupon.models import Coupon
 from ondoc.doctor.models import DoctorClinic, SearchKey, Hospital, PracticeSpecialization, HealthInsuranceProvider, \
     HospitalNetwork, Doctor, OpdAppointment
@@ -184,12 +184,14 @@ class IpdProcedureLead(auth_model.TimeStampedModel):
     DOCPRIMEWEB = "docprimeweb"
     COST_ESTIMATE = "Costestimate"
     DOCP_APP = "DocprimeApp"
+    SEO_DP = "seo_dp"
 
     SOURCE_CHOICES = [(DOCPRIMECHAT, 'DocPrime Chat'),
                       (CRM, 'CRM'),
                       (DOCPRIMEWEB, "DocPrime Web"),
                       (COST_ESTIMATE, "Cost Estimate"),
-                      (DOCP_APP, "Docprime Consumer App")]
+                      (DOCP_APP, "Docprime Consumer App"),
+                      (SEO_DP, "SEO Doctor Profile")]
 
     STATUS_CHOICES = [(None, "--Select--"), (NEW, 'NEW'), (COST_REQUESTED, 'COST_REQUESTED'),
                       (COST_SHARED, 'COST_SHARED'), (OPD, 'OPD'), (VALID, 'VALID'), (CONTACTED, 'CONTACTED'),
@@ -388,6 +390,16 @@ class PotentialIpdLeadPracticeSpecialization(models.Model):
 
     class Meta:
         db_table = "potential_ipd_lead_practice_specialization"
+
+
+class PotentialIpdCity(models.Model):
+    city = models.ForeignKey(MatrixMappedCity, on_delete=models.CASCADE)
+
+    def __str__(self):
+        return '{}'.format(self.city.name)
+
+    class Meta:
+        db_table = "potential_ipd_city"
 
 
 class ProcedureCategory(auth_model.TimeStampedModel, SearchKey):
