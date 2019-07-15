@@ -1,5 +1,6 @@
 import datetime
 
+from django.contrib.contenttypes.models import ContentType
 from fluent_comments import appsettings
 from django.contrib.admin.widgets import AdminTextInputWidget
 from django.core.exceptions import ImproperlyConfigured
@@ -90,7 +91,9 @@ class CustomCommentsAdmin(CommentsAdminBase):
                                                    is_public=True,  is_removed=False)
 
             if comment.id:
-                if obj and obj.content_object and obj.content_object.author and obj.content_object.author.id:
+                if comment.content_type and comment.content_type == ContentType.objects.get(model="hospital"):
+                    author_id = None
+                elif obj and obj.content_object and obj.content_object.author and obj.content_object.author.id:
                     author_id = obj.content_object.author.id
                     custom_comment = CustomComment.objects.create(author_id=author_id, comment_id=comment.id)
                 else:
@@ -98,7 +101,9 @@ class CustomCommentsAdmin(CommentsAdminBase):
 
     def author(self, comment):
         if comment:
-            if comment.content_object and comment.content_object.author.id:
+            if comment.content_type and comment.content_type==ContentType.objects.get(model="hospital"):
+                return "docprime"
+            elif comment.content_object and comment.content_object.author.id:
                 author = comment.content_object.author
                 author_id = author.id
                 author_name = author.name
@@ -160,3 +165,4 @@ class CustomCommentsAdmin(CommentsAdminBase):
 admin.site.unregister(ThreadedComment)
 
 admin.site.register(FluentComment, CustomCommentsAdmin)
+
