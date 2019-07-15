@@ -1767,18 +1767,10 @@ class Merchant(TimeStampedModel):
                                                                               'Content-Type': 'application/json'})
 
         if response.status_code == status.HTTP_200_OK:
-            self.api_response = response.json()
-
-            if response.json():
-                for data in response.json():
-                    if data.get('StatusCode') and data.get('StatusCode') > 0:
-                        if self.pg_status == 0:
-                            self.pg_status = data.get('StatusCode')
-                        elif data.get('StatusCode') < self.pg_status:
-                            self.pg_status = data.get('StatusCode')
-
-            # if resp_data.get('StatusCode') and resp_data.get('StatusCode') in [1,2,3,4]:
-            #     self.pg_status = resp_data.get('StatusCode')
+            resp_data = response.json()
+            self.api_response = resp_data
+            if resp_data.get('StatusCode') and resp_data.get('StatusCode') in [1,2,3,4]:
+                self.pg_status = resp_data.get('StatusCode')
 
     @classmethod
     def get_abbreviation(cls, state_name):
@@ -1832,16 +1824,11 @@ class Merchant(TimeStampedModel):
             response = requests.post(url, data=json.dumps(request_payload), headers={'auth': bene_status_token,
                                                                                      'Content-Type': 'application/json'})
             if response.status_code == status.HTTP_200_OK:
-                data.api_response = response.json()
-                status_code = set()
-                if response.json():
-                    for resp in response.json():
-                        if resp.get('statusCode'):
-                            status_code.add(resp.get('statusCode'))
-                    data.pg_status = min(status_code) if status_code else data.pg_status
-                    data.save()
-
-                # data.api_response = resp_data[0]
+                resp_data = response.json()
+                data.api_response = resp_data
+                if resp_data.get('statusCode') and resp_data.get('statusCode') in [cls.INITIATED, cls.INPROCESS]:
+                    data.pg_status = resp_data.get('statusCode')
+                    data.save()ponse = resp_data[0]
                 # if resp_data[0].get('statusCode') and resp_data[0].get('statusCode') in [cls.INITIATED, cls.INPROCESS]:
                 #     data.pg_status = resp_data[0].get('statusCode')
                 #     data.save()

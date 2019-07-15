@@ -165,4 +165,3 @@ class CustomCommentsAdmin(CommentsAdminBase):
 admin.site.unregister(ThreadedComment)
 
 admin.site.register(FluentComment, CustomCommentsAdmin)
-
