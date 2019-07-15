@@ -2222,6 +2222,9 @@ class IpdProcedureLeadSerializer(serializers.ModelSerializer):
     num_of_chats = serializers.IntegerField(min_value=0, required=False, default=None, allow_null=True)
     comments = serializers.CharField(required=False, default=None, allow_blank=True, allow_null=True)
     data = serializers.JSONField(required=False, default=None, allow_null=True)
+    first_name = serializers.CharField(max_length=100, required=False, allow_null=True, allow_blank=True)
+    last_name = serializers.CharField(max_length=100, required=False, allow_null=True, allow_blank=True)
+    requested_date_time = serializers.DateTimeField(required=False, default=None, allow_null=True)
 
     class Meta:
         model = IpdProcedureLead

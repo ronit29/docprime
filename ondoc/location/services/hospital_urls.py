@@ -159,8 +159,8 @@ class HospitalURL():
 
         # set breadcrumbs to default empty array
         RawSql('''update temp_url tu set breadcrumb=json_build_array()''', []).execute()
-        # TODO: SHASHANK_SINGH Left from Vaishali's end
-        RawSql('''update temp_url tu set breadcrumb=(select json_build_array(json_build_object('title', concat('Hospitals in ', locality_value) , 'url', url, 'link_title', concat(locality_value, ' Hospitals'))) 
+
+        RawSql('''update temp_url tu set breadcrumb=(select json_build_array(json_build_object('title', concat('Hospitals in ', locality_value) , 'url', url, 'link_title', concat('Hospitals in ', locality_value))) 
                    from temp_url where sitemap_identifier ='HOSPITALS_CITY' and lower(locality_value)=lower(tu.locality_value)
                    and st_dwithin(location::geography, tu.location::geography, 20000) order by st_distance(location, tu.location) asc limit 1)
                    where sitemap_identifier ='HOSPITALS_LOCALITY_CITY' ''', []).execute()
