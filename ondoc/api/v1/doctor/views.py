@@ -88,6 +88,7 @@ import random
 from ondoc.prescription import models as pres_models
 from ondoc.api.v1.prescription import serializers as pres_serializers
 from django.template.defaultfilters import slugify
+from packaging.version import parse
 
 class CreateAppointmentPermission(permissions.BasePermission):
     message = 'creating appointment is not allowed.'
@@ -3677,6 +3678,12 @@ class OfflineCustomerViewSet(viewsets.GenericViewSet):
         for app in final_data:
             instance = ONLINE if isinstance(app, models.OpdAppointment) else OFFLINE
             patient_name = is_docprime = effective_price = deal_price = patient_thumbnail = prescription = None
+            if instance == OFFLINE and not hasattr(app.user, 'name') and (
+                    (request.META.get('HTTP_PLATFORM') == 'android' and not parse(request.META.get(
+                        'HTTP_APP_VERSION')) > parse(settings.get('LIST_APPOINTMENTS_VERSION_CHECK_ANDROID_GT'))) or
+                    (request.META.get('HTTP_PLATFORM') == 'ios' and not parse(request.META.get(
+                        'HTTP_APP_VERSION')) > parse(settings.get('LIST_APPOINTMENTS_VERSION_CHECK_IOS_GT')))):
+                continue
             error_flag = False
             error_message = ''
             phone_number = []
