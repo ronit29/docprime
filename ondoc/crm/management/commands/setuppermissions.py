@@ -574,7 +574,8 @@ class Command(BaseCommand):
                                                            IpdProcedureDetailType, IpdProcedureDetail, IpdProcedureSynonym, IpdProcedureSynonymMapping,
                                                            EmailBanner, RecommenderThrough, Recommender,
                                                            IpdProcedurePracticeSpecialization, CityLatLong, CommonHospital,
-                                                           PotentialIpdLeadPracticeSpecialization, PotentialIpdCity)
+                                                           PotentialIpdLeadPracticeSpecialization, PotentialIpdCity,
+                                                           SimilarSpecializationGroupMapping)
         for cl, ct in content_types.items():
             permissions = Permission.objects.filter(
                 Q(content_type=ct),
@@ -587,8 +588,7 @@ class Command(BaseCommand):
         content_types = ContentType.objects.get_for_models(PaymentOptions, EntityUrls, Feature, Service, Doctor,
                                                            HealthInsuranceProvider, IpdProcedureCategory, Plan,
                                                            PlanFeature, PlanFeatureMapping, UserPlanMapping, UploadImage,
-                                                           Offer, VirtualAppointment, SimilarSpecializationGroup,
-                                                           SimilarSpecializationGroupMapping)
+                                                           Offer, VirtualAppointment, SimilarSpecializationGroup)
 
         for cl, ct in content_types.items():
             permissions = Permission.objects.filter(
