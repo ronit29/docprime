@@ -2068,16 +2068,25 @@ class HospitalDetailIpdProcedureSerializer(TopHospitalForIpdProcedureSerializer)
             doctor_clinic_ipd_mappings__doctor_clinic__enabled=True,
             doctor_clinic_ipd_mappings__doctor_clinic__hospital=obj,
             is_enabled=True).distinct()
+        procedure_ids = [x.id for x in queryset]
+        entity = self.context.get('entity', None)
+        city = None
+        ipd_entity_dict = {}
+        if entity:
+            city = entity.locality_value
+        if city:
+            ipd_entity_dict = IpdProcedure.get_locality_dict(procedure_ids, city=city)
         for ipd_procedure in queryset:
             for category_mapping in ipd_procedure.ipd_category_mappings.all():
                 if category_mapping.category.id in result:
                     result[category_mapping.category.id]['ipd_procedures'].append(
-                        {'id': ipd_procedure.id, 'name': ipd_procedure.name})
+                        {'id': ipd_procedure.id, 'name': ipd_procedure.name, 'url': ipd_entity_dict.get(ipd_procedure.id, None)})
                 else:
                     result[category_mapping.category.id] = {'id': category_mapping.category.id,
                                                             'name': category_mapping.category.name,
                                                             'ipd_procedures': [
-                                                                {'id': ipd_procedure.id, 'name': ipd_procedure.name}]}
+                                                                {'id': ipd_procedure.id, 'name': ipd_procedure.name,
+                                                                 'url': ipd_entity_dict.get(ipd_procedure.id, None)}]}
         return list(result.values())
 
     def get_other_network_hospitals(self, obj):
@@ -2213,6 +2222,9 @@ class IpdProcedureLeadSerializer(serializers.ModelSerializer):
     num_of_chats = serializers.IntegerField(min_value=0, required=False, default=None, allow_null=True)
     comments = serializers.CharField(required=False, default=None, allow_blank=True, allow_null=True)
     data = serializers.JSONField(required=False, default=None, allow_null=True)
+    first_name = serializers.CharField(max_length=100, required=False, allow_null=True, allow_blank=True)
+    last_name = serializers.CharField(max_length=100, required=False, allow_null=True, allow_blank=True)
+    requested_date_time = serializers.DateTimeField(required=False, default=None, allow_null=True)
 
     class Meta:
         model = IpdProcedureLead
