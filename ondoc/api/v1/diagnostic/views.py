@@ -3536,7 +3536,7 @@ class LabTestCategoryLandingUrlViewSet(viewsets.GenericViewSet):
         for obj in queryset:
             res['title'] = obj.url.title
             res['url'] = obj.url.url
-            res['test'] = {'id': obj.test.id, 'test_category': obj.test.name, 'tests': [{'id': tests.id, 'name': tests.name} for tests in obj.test.lab_tests.all()]}
+            res['test_category_list'] = {'id': obj.test.id, 'test_category': obj.test.name, 'tests': [{'id': tests.id, 'name': tests.name} for tests in obj.test.lab_tests.all()]}
 
         return Response(res)
 

@@ -3172,16 +3172,19 @@ class LabTestThresholds(TimeStampedModel):
 class LabTestCategoryUrls(TimeStampedModel):
     url = models.SlugField(blank=False, null=True, max_length=2000, db_index=True, unique=True)
     title = models.CharField(blank=True, null=True, max_length=2000)
+    latitude = models.FloatField(null=True, blank=True)
+    longitude = models.FloatField(null=True, blank=True)
+    radius = models.FloatField(null=True, blank=True)
 
     class Meta:
         db_table = 'lab_test_category_urls'
 
-    # def save(self, *args, **kwargs):
-    #     self.url = self.url.lower()
-    #     if not self.url.endswith('hpcp'):
-    #         self.url = self.url + '-hpcp'
-    #
-    #     super(LabTestCategoryUrls, self).save(*args, **kwargs)
+    def save(self, *args, **kwargs):
+        self.url = self.url.lower()
+        if not self.url.endswith('tpcp'):
+            self.url = self.url + '-tpcp'
+
+        super(LabTestCategoryUrls, self).save(*args, **kwargs)
 
 
 class LabTestCategoryLandingURLS(TimeStampedModel):
