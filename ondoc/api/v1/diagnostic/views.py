@@ -3543,12 +3543,16 @@ class CompareLabPackagesViewSet(viewsets.ReadOnlyModelViewSet):
 class LabTestCategoryLandingUrlViewSet(viewsets.GenericViewSet):
 
     def category_landing_url(self, request):
-        queryset = LabTestCategoryLandingURLS.objects.all()
+        queryset1 = LabTestCategoryLandingURLS.objects.all()
         res = {}
-        for obj in queryset:
+        for obj in queryset1:
             res['title'] = obj.url.title
             res['url'] = obj.url.url
             res['test_category_list'] = {'id': obj.test.id, 'test_category': obj.test.name, 'tests': [{'id': tests.id, 'name': tests.name} for tests in obj.test.lab_tests.all()]}
+
+        # queryset2 = NewDynamic.objects.all().first()
+        # for obj in queryset2:
+        #     res['meta_title'] = obj.meta_title
 
         return Response(res)
 
