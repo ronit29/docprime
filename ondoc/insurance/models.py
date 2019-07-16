@@ -552,6 +552,10 @@ class UserInsurance(auth_model.TimeStampedModel):
     CANCEL_CASE_CHOICES = [(REFUND, "Refund"), (NO_REFUND, "Non-Refund")]
     CANCEL_STATUS_CHOICES = [(NON_REFUNDED, "Non-Refunded"), (REFUND_INITIATE, "Refund-Initiate"), (REFUNDED, "Refunded")]
 
+    CREATED = 1
+    BOOKED = 2
+    APPOINTMENT_STATUS_CHOICES = [(CREATED, "Created"), (BOOKED, "Booked")]
+
     id = models.BigAutoField(primary_key=True)
     insurance_plan = models.ForeignKey(InsurancePlans, related_name='active_users', on_delete=models.DO_NOTHING)
     user = models.ForeignKey(auth_model.User, related_name='purchased_insurance', on_delete=models.DO_NOTHING)
@@ -576,6 +580,7 @@ class UserInsurance(auth_model.TimeStampedModel):
     cancel_initial_date = models.DateTimeField(blank=True, null=True)
     cancel_customer_type = models.PositiveIntegerField(choices=CANCEL_CUSTOMER_TYPE_CHOICES, default=OTHER)
     cancel_initiate_by = models.PositiveIntegerField(choices=CANCEL_BY_CHOICES, null=True, blank=True)
+    appointment_status = models.PositiveIntegerField(choices=APPOINTMENT_STATUS_CHOICES, null=True, blank=True)
     notes = GenericRelation(GenericNotes)
 
     def __str__(self):
