@@ -1714,7 +1714,7 @@ class DoctorOpdAppointmentAdmin(admin.ModelAdmin):
                      'admin_information', 'insurance', 'outstanding', 'procedures_details', 'invoice_urls',
                      'payment_type', 'invoice_urls', 'payout_info', 'refund_initiated', 'get_appointment_type')
         if obj and (obj.status == LabAppointment.COMPLETED or obj.status == LabAppointment.CANCELLED):
-            read_only += ('status',)
+            read_only += ('status', 'appointment_type',)
         if request.user.groups.filter(name=constants['APPOINTMENT_OTP_TEAM']).exists() or request.user.is_superuser:
             read_only = read_only + ('otp',)
 
