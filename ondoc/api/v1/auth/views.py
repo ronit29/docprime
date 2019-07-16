@@ -2175,7 +2175,7 @@ class ProfileEmailUpdateViewset(viewsets.GenericViewSet):
         data = serializer.validated_data
 
         obj = UserProfileEmailUpdate.objects.filter(profile=data['profile'], old_email=data['profile'].email,
-                                                    new_email=data['email']).filter(~Q(otp=None) | ~Q(otp='')).order_by('id').last()
+                                                    new_email=data['email']).filter(~Q(otp=None)).order_by('id').last()
         if obj and obj.is_request_alive():
             obj.send_otp_email()
             return Response({'success': True, 'id': obj.id})
