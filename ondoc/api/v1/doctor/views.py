@@ -3566,7 +3566,8 @@ class OfflineCustomerViewSet(viewsets.GenericViewSet):
                                                         .prefetch_related('lab__lab_documents', 'mask_number',
                                                                           'profile__insurance',
                                                                           'profile__insurance__user_insurance',
-                                                                          'appointment_prescriptions')\
+                                                                          'appointment_prescriptions', 'test_mappings',
+                                                                          'test_mappings__test')\
                                                         .filter(lab_id__in=manageable_lab_list) \
                                                         .annotate(pem_type=Case(When(Q(lab__manageable_lab_admins__user=user) &
                                                                  Q(lab__manageable_lab_admins__super_user_permission=True) &
@@ -3620,6 +3621,9 @@ class OfflineCustomerViewSet(viewsets.GenericViewSet):
             ret_obj['is_docprime'] = True
             ret_obj['patient_thumbnail'] = patient_thumbnail
             ret_obj['type'] = 'lab'
+            ret_obj['address'] = app.lab.get_lab_address()
+            ret_obj['is_home_pickup'] = app.is_home_pickup
+            ret_obj['home_pickup_charges'] = app.home_pickup_charges
             ret_obj['prescriptions'] = app.get_prescriptions(request)
             ret_obj['lab_test'] = LabAppointmentTestMappingSerializer(app.test_mappings.all(), many=True).data
             # ret_obj['invoice'] = invoice_data
