@@ -1,6 +1,8 @@
 from dal import autocomplete
 from django.contrib import admin
 from django import forms
+from django.db.models import F
+
 from ondoc.doctor.models import PracticeSpecialization, Doctor, Hospital
 from ondoc.diagnostic.models import LabNetwork, Lab, LabTest, LabTestCategory
 from ondoc.coupon.models import Coupon, UserSpecificCoupon, RandomGeneratedCoupon

@@ -588,7 +588,7 @@ class Command(BaseCommand):
         content_types = ContentType.objects.get_for_models(PaymentOptions, EntityUrls, Feature, Service, Doctor,
                                                            HealthInsuranceProvider, IpdProcedureCategory, Plan,
                                                            PlanFeature, PlanFeatureMapping, UserPlanMapping, UploadImage,
-                                                           Offer, VirtualAppointment, SimilarSpecializationGroup)
+                                                           Offer, VirtualAppointment, SimilarSpecializationGroup, MatrixMappedCity)
 
         for cl, ct in content_types.items():
             permissions = Permission.objects.filter(

@@ -4189,8 +4189,7 @@ class HospitalViewSet(viewsets.GenericViewSet):
                     description += " " + entity.sublocality_value
 
                 title += ' | Book Appointment, Check Doctors List, Reviews, Contact Number'
-                description += """: Get free booking on first appointment.\
-                 Check {} Doctors List, Reviews, Contact Number, Address, Procedures and more.""".format(hospital_obj.name)
+                description += """: Get free booking on first appointment. Check {} Doctors List, Reviews, Contact Number, Address, Procedures and more.""".format(hospital_obj.name)
             canonical_url = entity.url
         else:
             response['breadcrumb'] = None
@@ -4446,6 +4445,15 @@ class IpdProcedureViewSet(viewsets.GenericViewSet):
         obj_created = IpdProcedureLead(**validated_data)
         obj_created.save()
         return Response(serializers.IpdProcedureLeadSerializer(obj_created).data)
+
+    def update_lead(self, request):
+        serializer = serializers.IpdLeadUpdateSerializerPopUp(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        validated_data = serializer.validated_data
+        temp_id = validated_data.pop('id')
+        IpdProcedureLead.objects.filter(matrix_lead_id=temp_id).update(**validated_data)
+        return Response({'message': 'Success'})
+
 
     def list_by_alphabet(self, request):
         import re
