@@ -1168,7 +1168,7 @@ class EMAILNotification:
                         (notification_type == NotificationAction.INSURANCE_CANCEL_INITIATE or \
                         notification_type == NotificationAction.INSURANCE_CANCELLATION_APPROVED or \
                         notification_type == NotificationAction.INSURANCE_CANCELLATION or \
-                         notification_type == NotificationAction.INSURANCE_ENDORSMENT_PENDING):
+                        notification_type == NotificationAction.INSURANCE_ENDORSMENT_PENDING):
             if notification_type == NotificationAction.INSURANCE_CANCEL_INITIATE or \
                 notification_type == NotificationAction.INSURANCE_ENDORSMENT_PENDING:
                 bcc = settings.INSURANCE_CANCEL_INITIATE_EMAIL
