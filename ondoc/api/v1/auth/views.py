@@ -62,7 +62,7 @@ import jwt
 from ondoc.insurance.models import InsuranceTransaction, UserInsurance, InsuredMembers
 from decimal import Decimal
 from ondoc.web.models import ContactUs
-from ondoc.notification.tasks import send_pg_acknowledge
+from ondoc.notification.tasks import send_pg_acknowledge, save_pg_response
 
 from ondoc.ratings_review import models as rate_models
 from django.contrib.contenttypes.models import ContentType
@@ -1218,6 +1218,7 @@ class TransactionViewSet(viewsets.GenericViewSet):
             # log pg data
             try:
                 PgLogs.objects.create(decoded_response=response, coded_response=coded_response)
+                save_pg_response.apply_async((None, response,), eta=timezone.localtime(), )
             except Exception as e:
                 logger.error("Cannot log pg response - " + str(e))
 
