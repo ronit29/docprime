@@ -173,7 +173,7 @@ class Order(TimeStampedModel):
             opd_obj.payment_type = OpdAppointment.PREPAID
             # self.action_data['appointment_id'] = self.reference_id
             self.action_data['payment_type'] = OpdAppointment.PREPAID
-            self.action_data['effective_price'] = self.action_data['deal_price']  # TODO : SHASHANK_SINGH set to correct price
+            self.action_data['effective_price'] = self.action_data['deal_price']
             opd_obj.effective_price = Decimal(self.action_data['deal_price'])
             opd_obj.is_cod_to_prepaid = True
             opd_obj.save()

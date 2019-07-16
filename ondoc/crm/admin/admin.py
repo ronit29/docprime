@@ -10,7 +10,7 @@ from ondoc.crm.admin.procedure import ProcedureCategoryAdmin, ProcedureAdmin, Ip
     IpdProcedureDetailTypeAdmin, IpdProcedureSynonymAdmin, IpdProcedureSynonymMappingAdmin, \
     IpdProcedurePracticeSpecializationAdmin, IpdProcedureLeadAdmin, OfferAdmin, \
     PotentialIpdLeadPracticeSpecializationAdmin, IpdProcedureCostEstimateAdmin, \
-    IpdCostEstimateRoomTypeAdmin, UploadCostEstimateDataAdmin
+    IpdCostEstimateRoomTypeAdmin, UploadCostEstimateDataAdmin, PotentialIpdCityAdmin
 from ondoc.crm.admin.subscription_plan import SubscriptionPlanAdmin, SubscriptionPlanFeatureAdmin, UserPlanMappingAdmin
 from ondoc.doctor.models import (Doctor, Language, MedicalService, Specialization, College, Qualification, Hospital,
                                  HospitalNetwork, DoctorOnboardingToken, OpdAppointment,
@@ -37,7 +37,7 @@ from ondoc.procedure.models import Procedure, ProcedureCategory, CommonProcedure
     IpdProcedureCategory, CommonIpdProcedure, IpdProcedureDetail, IpdProcedureDetailType, IpdProcedureSynonym, \
     IpdProcedureSynonymMapping, IpdProcedurePracticeSpecialization, IpdProcedureLead, Offer, \
     PotentialIpdLeadPracticeSpecialization, IpdProcedureCostEstimate, \
-    IpdCostEstimateRoomType, UploadCostEstimateData
+    IpdCostEstimateRoomType, UploadCostEstimateData, PotentialIpdCity
 from ondoc.subscription_plan.models import Plan, PlanFeature, UserPlanMapping
 from .common import Cities, CitiesAdmin, MatrixCityMapping, MatrixCityAdmin, MerchantAdmin, MerchantPayoutAdmin, \
     PaymentOptionsAdmin, MatrixMappedStateAdmin, MatrixMappedCityAdmin, GlobalNonBookableAdmin, UserConfigAdmin, BlacklistUserAdmin, BlockedStatesAdmin
@@ -242,6 +242,7 @@ admin.site.register(IpdProcedurePracticeSpecialization, IpdProcedurePracticeSpec
 admin.site.register(IpdProcedureLead, IpdProcedureLeadAdmin)
 admin.site.register(Offer, OfferAdmin)
 admin.site.register(PotentialIpdLeadPracticeSpecialization, PotentialIpdLeadPracticeSpecializationAdmin)
+admin.site.register(PotentialIpdCity, PotentialIpdCityAdmin)
 admin.site.register(IpdProcedureCostEstimate, IpdProcedureCostEstimateAdmin)
 admin.site.register(IpdCostEstimateRoomType, IpdCostEstimateRoomTypeAdmin)
 admin.site.register(Feature, FeatureAdmin)
