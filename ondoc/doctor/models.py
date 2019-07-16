@@ -3330,7 +3330,10 @@ class OpdAppointment(auth_model.TimeStampedModel, CouponsMixin, OpdAppointmentIn
         #     last_appointment = completed_appointment.first()
 
         # if type == "crm":
-        previous_appointments = OpdAppointment.objects.filter(~Q(status=OpdAppointment.CANCELLED), doctor=doctor,
+        previous_appointments = OpdAppointment.objects.filter(~Q(status=OpdAppointment.CANCELLED) &
+                                                              (Q(appointment_type=OpdAppointment.REGULAR) |
+                                                               Q(appointment_type__isnull=True)),
+                                                              doctor=doctor,
                                                               profile=profile, hospital=hospital,
                                                               created_at__lt=self.created_at,
                                                               insurance__isnull=False).order_by('-id')
