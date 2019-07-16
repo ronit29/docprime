@@ -1457,7 +1457,8 @@ class MerchantPayout(TimeStampedModel):
     ATTEMPTED = 2
     PAID = 3
     INITIATED = 4
-    FAILED = 5
+    INPROCESS = 5
+    FAILED = 6
     AUTOMATIC = 1
     MANUAL = 2
 
@@ -1470,7 +1471,7 @@ class MerchantPayout(TimeStampedModel):
     IMPS = "IMPS"
     IFT = "IFT"
     INTRABANK_IDENTIFIER = "KKBK"
-    STATUS_CHOICES = [(PENDING, 'Pending'), (ATTEMPTED, 'ATTEMPTED'), (PAID, 'Paid'), (INITIATED, 'Initiated'), (FAILED, 'Failed')]
+    STATUS_CHOICES = [(PENDING, 'Pending'), (ATTEMPTED, 'ATTEMPTED'), (PAID, 'Paid'), (INITIATED, 'Initiated'), (INPROCESS, 'In Process'), (FAILED, 'Failed')]
     PAYMENT_MODE_CHOICES = [(NEFT, 'NEFT'), (IMPS, 'IMPS'), (IFT, 'IFT')]    
     TYPE_CHOICES = [(AUTOMATIC, 'Automatic'), (MANUAL, 'Manual')]
 
@@ -1662,8 +1663,11 @@ class MerchantPayout(TimeStampedModel):
         user_insurance = pms.content_object
         return user_insurance
 
-    def update_to_attempt(self):
-        self.status = self.ATTEMPTED
+    def update_status(self, status):
+        if status == 'attempted':
+            self.status = self.ATTEMPTED
+        elif status == 'initiated':
+            self.status = self.INITIATED
         self.save()
 
     @staticmethod

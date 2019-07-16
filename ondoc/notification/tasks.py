@@ -488,9 +488,6 @@ def process_payout(payout_id):
         if payout_data.status == payout_data.PAID:
             raise Exception("Payment already done for this payout")
 
-        # update payout status
-        payout_data.update_to_attempt()
-
         default_payment_mode = payout_data.get_default_payment_mode()
         appointment = payout_data.get_appointment()
         if not appointment:
@@ -551,9 +548,9 @@ def process_payout(payout_id):
                 curr_txn2["txnAmount"] = str(0)
                 curr_txn2["idx"] = len(req_data2.get('payload'))
                 req_data2["payload"].append(curr_txn2)
-
+        payout_data.update_status('initiated')
         payout_status = None
-        if len(req_data2.get('payload'))>0:
+        if len(req_data2.get('payload')) > 0:
             payout_status = request_payout(req_data2, order_data)
             payout_data.request_data = req_data2
 
@@ -567,15 +564,18 @@ def process_payout(payout_id):
                 payout_data.payout_time = datetime.datetime.now()
                 # # Removed PAID status and add add initiated status when payout processed
                 # payout_data.status = payout_data.PAID
-                payout_data.status = payout_data.INITIATED
+                payout_data.status = payout_data.INPROCESS
             else:
                 payout_data.retry_count += 1
+                payout_data.status = payout_data.FAILED
 
             payout_data.save()
 
     except Exception as e:
-        logger.error("Error in processing payout - with exception - " + str(e))
+        # update payout status
+        payout_data.update_status('attempted')
         MerchantPayoutLog.create_log(payout_data, str(e))
+        logger.error("Error in processing payout - with exception - " + str(e))
 
 
 @task(bind=True, max_retries=3)
@@ -730,8 +730,7 @@ def request_payout(req_data, order_data):
 
             if success_payout:
                 return {"status": 1, "response": resp_data}
-            
-    
+
     logger.error("payout failed for request data - " + str(req_data))
     return {"status" : 0, "response" : resp_data}
 
