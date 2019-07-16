@@ -3553,6 +3553,8 @@ class LabTestCategoryLandingUrlViewSet(viewsets.GenericViewSet):
         # queryset2 = NewDynamic.objects.all().first()
         # for obj in queryset2:
         #     res['meta_title'] = obj.meta_title
+        #     res['meta_description'] = obj.meta_description
+        #     res['']
 
         return Response(res)
 
