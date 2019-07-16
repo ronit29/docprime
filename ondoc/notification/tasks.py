@@ -1198,7 +1198,7 @@ def send_capture_payment_request(self, product_id, appointment_id):
             }
 
             response = requests.post(url, data=json.dumps(req_data), headers=headers)
-            save_pg_response.apply_async((txn_obj.id, response.json(),), eta=timezone.localtime(), )
+            save_pg_response.apply_async((order.id, txn_obj.id, response.json(),), eta=timezone.localtime(), )
             if response.status_code == status.HTTP_200_OK:
                 resp_data = response.json()
                 txn_obj.status_type = resp_data.get('txStatus')
@@ -1259,7 +1259,7 @@ def send_release_payment_request(self, product_id, appointment_id):
                 }
 
                 response = requests.post(url, data=json.dumps(req_data), headers=headers)
-                save_pg_response.apply_async((txn_obj.id, response.json(),), eta=timezone.localtime(), )
+                save_pg_response.apply_async((order.id, txn_obj.id, response.json(),), eta=timezone.localtime(), )
                 if response.status_code == status.HTTP_200_OK:
                     resp_data = response.json()
                     if resp_data.get("ok") is not None and resp_data.get("ok") == '1':
@@ -1276,10 +1276,10 @@ def send_release_payment_request(self, product_id, appointment_id):
         self.retry([product_id, appointment_id], countdown=300)
 
 @task(bind=True)
-def save_pg_response(self, txn_id, response):
+def save_pg_response(self, order_id, txn_id, response):
     try:
         from ondoc.account.mongo_models import PgLogs
-        PgLogs.save_pg_response(txn_id, response)
+        PgLogs.save_pg_response(order_id, txn_id, response)
     except Exception as e:
        logger.error("Error in saving pg response to mongo database - " + json.dumps(response) + " with exception - " + str(e))
        self.retry([txn_id, response], countdown=300)

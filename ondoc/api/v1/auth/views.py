@@ -1218,7 +1218,7 @@ class TransactionViewSet(viewsets.GenericViewSet):
             # log pg data
             try:
                 PgLogs.objects.create(decoded_response=response, coded_response=coded_response)
-                save_pg_response.apply_async((None, response,), eta=timezone.localtime(), )
+                save_pg_response.apply_async((response.get("orderId"), None, response,), eta=timezone.localtime(), )
             except Exception as e:
                 logger.error("Cannot log pg response - " + str(e))
 
