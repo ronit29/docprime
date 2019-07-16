@@ -734,3 +734,13 @@ class VirtualAppointment(TimeStampedModel):
 
     class Meta:
         db_table = 'virtual_appointment'
+
+
+class MerchantPayoutMixin(object):
+
+    def create_payout_from_appointment(self):
+        from ondoc.doctor.models import OpdAppointment
+        if self.merchant_payout is None and self.payment_type not in [OpdAppointment.COD]:
+            self.save_merchant_payout()
+            self.save()
+

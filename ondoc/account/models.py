@@ -3,7 +3,7 @@ from django.contrib.postgres.fields import JSONField
 from django.forms import model_to_dict
 from django.utils.functional import cached_property
 
-from ondoc.authentication.models import TimeStampedModel, User, UserProfile, Merchant
+from ondoc.authentication.models import TimeStampedModel, User, UserProfile, Merchant, AssociatedMerchant
 from ondoc.account.tasks import refund_curl_task
 from ondoc.notification.models import AppNotification, NotificationAction
 from ondoc.notification.tasks import process_payout
@@ -1495,6 +1495,7 @@ class MerchantPayout(TimeStampedModel):
     content_object = GenericForeignKey()
     booking_type = models.IntegerField(null=True, blank=True, choices=BookingTypeChoices)
     tds_amount = models.DecimalField(max_digits=10, decimal_places=2, default=None, null=True, blank=True)
+    recreated_from = models.ForeignKey('self', on_delete=models.DO_NOTHING, null=True, blank=True)
 
     def save(self, *args, **kwargs):
 
@@ -1995,6 +1996,30 @@ class MerchantPayout(TimeStampedModel):
         checksum_hash = hashlib.sha256(str(checksum).encode())
         checksum_hash = checksum_hash.hexdigest()
         return checksum_hash
+
+    def recreate_failed_payouts(self):
+        new_obj = MerchantPayout(recreated_from=self)
+        new_obj.payable_amount = self.payable_amount
+        new_obj.charged_amount = self.charged_amount
+        new_obj.booking_type = self.booking_type
+        new_obj.tds_amount = self.tds_amount
+        new_obj.save()
+
+        # update appointment payout id
+        appointment = self.get_appointment()
+        appointment.merchant_payout_id = new_obj.id
+        appointment.save()
+
+    def update_billed_to_content_type(self):
+        merchant = self.get_merchant()
+        current_associated_merchant = AssociatedMerchant.objects.filter(merchant_id=merchant.id, object_id=self.object_id, content_type_id=self.content_type_id).first()
+        if current_associated_merchant and current_associated_merchant.verified:
+            pass
+        else:
+            appt = self.get_appointment()
+            if appt and appt.get_billed_to:
+                self.content_object = appt.get_billed_to
+                self.save()
 
     class Meta:
         db_table = "merchant_payout"
