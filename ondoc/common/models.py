@@ -752,3 +752,16 @@ class MerchantPayoutMixin(object):
             OpdAppointment.objects.filter(id=self.id).update(merchant_payout_id=payout_id)
         elif self.__class__.__name__ == 'LabAppointment':
             LabAppointment.objects.filter(id=self.id).update(merchant_payout_id=payout_id)
+
+
+class Fraud(auth_model.TimeStampedModel):
+    content_type = models.ForeignKey(ContentType, on_delete=models.DO_NOTHING)
+    object_id = models.PositiveIntegerField()
+    content_object = GenericForeignKey()
+    user = models.ForeignKey(auth_model.User, on_delete=models.SET_NULL, null=True, blank=True)
+    reason = models.TextField(max_length=300)
+
+    class Meta:
+        db_table = 'fraud'
+        unique_together = ('content_type', 'object_id',)
+
