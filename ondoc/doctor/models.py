@@ -961,6 +961,13 @@ class Doctor(auth_model.TimeStampedModel, auth_model.QCModel, SearchKey, auth_mo
 
         update_doctor_deal_price = RawSql(query, [self.pk]).execute()
 
+        # update nanavati hospital deal price
+
+        query1 = '''update doctor_clinic_timing set deal_price = mrp*0.20 
+                         where doctor_clinic_id  in (select id from doctor_clinic doctor_id= %s and  hospital_id=3560 ) '''
+
+        update_all_nanavati_doctor_deal_price = RawSql(query1, [self.pk]).execute()
+
     @classmethod
     def update_all_deal_price(cls):
         # will update all doctors prices
@@ -978,6 +985,13 @@ class Doctor(auth_model.TimeStampedModel, auth_model.QCModel, SearchKey, auth_mo
                     end  /5)*5, fees), mrp) where doctor_clinic_id  in (select id from doctor_clinic where hospital_id!=3560 ) '''
 
         update_all_doctor_deal_price = RawSql(query, []).execute()
+
+        #update nanavati hospital deal price
+
+        query1 = '''update doctor_clinic_timing set deal_price = mrp*0.20 
+                 where doctor_clinic_id  in (select id from doctor_clinic where hospital_id=3560 ) '''
+
+        update_all_nanavati_doctor_deal_price = RawSql(query1, []).execute()
 
     def get_display_name(self):
         return "Dr. {}".format(self.name.title()) if self.name else None
