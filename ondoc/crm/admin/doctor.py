@@ -32,7 +32,6 @@ from ondoc.procedure.models import DoctorClinicProcedure, Procedure, DoctorClini
 
 logger = logging.getLogger(__name__)
 
-
 from ondoc.account.models import Order, Invoice
 from django.contrib.contenttypes.admin import GenericTabularInline
 from ondoc.authentication.models import GenericAdmin, SPOCDetails, AssociatedMerchant, Merchant, QCModel
@@ -48,13 +47,14 @@ from ondoc.doctor.models import (Doctor, DoctorQualification,
                                  DoctorPracticeSpecialization, CompetitorMonthlyVisit,
                                  GoogleDetailing, VisitReason, VisitReasonMapping, PracticeSpecializationContent,
                                  PatientMobile, DoctorMobileOtp,
-                                 UploadDoctorData, CancellationReason, Prescription, PrescriptionFile)
+                                 UploadDoctorData, CancellationReason, Prescription, PrescriptionFile,
+                                 SimilarSpecializationGroup, SimilarSpecializationGroupMapping)
 
 from ondoc.authentication.models import User
 from .common import *
 from .autocomplete import CustomAutoComplete
 from ondoc.crm.constants import constants
-from django.utils.html import format_html_join
+from django.utils.html import format_html_join, format_html
 from django.template.loader import render_to_string
 import nested_admin
 from django.contrib.admin.widgets import AdminSplitDateTime
@@ -65,6 +65,8 @@ from .common import AssociatedMerchantInline, RemarkInline
 from ondoc.sms import api
 from ondoc.ratings_review import models as rating_models
 from ondoc.notification import tasks as notification_tasks
+from django.urls import reverse
+
 
 class AutoComplete:
     def autocomplete_view(self, request):
@@ -1098,7 +1100,6 @@ class DoctorAdmin(AutoComplete, ImportExportMixin, VersionAdmin, ActionAdmin, QC
     # class DoctorAdmin(nested_admin.NestedModelAdmin):
     resource_class = DoctorResource
     change_list_template = 'superuser_import_export.html'
-
     # fieldsets = ((None,{'fields':('name','gender','practicing_since','license','is_license_verified','signature','raw_about' \
     #               ,'about',  'onboarding_url', 'get_onboard_link', 'additional_details')}),
     #              (None,{'fields':('assigned_to',)}),
@@ -1393,7 +1394,7 @@ class DoctorAdmin(AutoComplete, ImportExportMixin, VersionAdmin, ActionAdmin, QC
         super().save_model(request, obj, form, change)
 
     def has_add_permission(self, request):
-        if request.user.groups.filter(name=constants['DOCTOR_NETWORK_GROUP_NAME']).exists():
+        if request.user.is_member_of(constants['DOCTOR_NETWORK_GROUP_NAME']):
             requested_leadId = request.GET.get('LeadId')
             if not requested_leadId:
                 return False
@@ -1558,7 +1559,7 @@ class DoctorOpdAppointmentForm(RefundableAppointmentForm):
         if cleaned_data.get('send_cod_to_prepaid_request', False) and self.instance and self.instance.is_cod_to_prepaid:
             raise forms.ValidationError("Appointment has already been converted to prepaid.")
 
-        if cleaned_data.get('send_cod_to_prepaid_request', False) and self.instance and self.instance.payment_status != OpdAppointment.COD:
+        if cleaned_data.get('send_cod_to_prepaid_request', False) and self.instance and self.instance.payment_type != OpdAppointment.COD:
             raise forms.ValidationError("Appointment must be of COD type.")
 
         # if self.instance.id:
@@ -1595,14 +1596,25 @@ class PrescriptionInline(nested_admin.NestedTabularInline):
     inlines = [PrescriptionFileInline]
 
 
-
 class DoctorOpdAppointmentAdmin(admin.ModelAdmin):
     form = DoctorOpdAppointmentForm
     search_fields = ['id', 'profile__name', 'profile__phone_number', 'doctor__name', 'hospital__name']
-    list_display = ('booking_id', 'get_doctor', 'get_profile', 'status', 'time_slot_start', 'effective_price', 'created_at', 'updated_at')
+    list_display = ('booking_id', 'get_doctor', 'get_profile', 'status', 'time_slot_start', 'effective_price',
+                    'get_insurance', 'created_at', 'updated_at')
     list_filter = ('status', 'payment_type')
     date_hierarchy = 'created_at'
+    list_display_links = ('booking_id', 'get_insurance',)
     inlines = [PrescriptionInline]
+
+    def get_insurance(self, obj):
+        if obj.insurance:
+            content_type = ContentType.objects.get_for_model(UserInsurance)
+            link = reverse('admin:{}_{}_change'.format(content_type.app_label,
+                                                content_type.model), args=[obj.insurance.id])
+            return format_html('<a href="{}">{}</a>', link, obj.insurance.id)
+        else:
+            return ""
+    get_insurance.short_description = 'Insurance'
 
     def get_queryset(self, request):
         return super(DoctorOpdAppointmentAdmin, self).get_queryset(request).select_related('doctor', 'hospital', 'hospital__network')
@@ -2230,3 +2242,16 @@ class UploadDoctorDataAdmin(admin.ModelAdmin):
                 else:
                     final_message += str(message)
         return final_message
+
+
+class SimilarSpecializationGroupInline(admin.TabularInline):
+    model = SimilarSpecializationGroupMapping
+    extra = 0
+    can_delete = True
+    autocomplete_fields = ['specialization']
+    fk_name = 'group'
+
+
+class SimilarSpecializationGroupAdmin(VersionAdmin):
+    inlines = [SimilarSpecializationGroupInline]
+    list_display = ['id', 'name']

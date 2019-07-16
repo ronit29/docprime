@@ -16,6 +16,7 @@ from django.utils import timezone
 from openpyxl import load_workbook
 
 from ondoc.api.v1.utils import aware_time_zone, util_absolute_url, pg_seamless_hash
+from ondoc.authentication.models import UserNumberUpdate
 from ondoc.common.models import AppointmentMaskNumber
 from ondoc.notification.labnotificationaction import LabNotificationAction
 from ondoc.notification import models as notification_models
@@ -29,7 +30,6 @@ from ondoc.notification.models import NotificationAction
 import random
 import string
 from ondoc.api.v1.utils import RawSql
-
 
 logger = logging.getLogger(__name__)
 
@@ -157,8 +157,8 @@ def send_lab_notifications(appointment_id):
 def send_opd_notifications_refactored(appointment_id, notification_type=None):
     from ondoc.doctor.models import OpdAppointment
     from ondoc.communications.models import OpdNotification
+    instance = OpdAppointment.objects.filter(id=appointment_id).first()
     try:
-        instance = OpdAppointment.objects.filter(id=appointment_id).first()
         if not instance or not instance.user:
             return
         if instance.status == OpdAppointment.COMPLETED:
@@ -174,10 +174,10 @@ def send_opd_notifications_refactored(appointment_id, notification_type=None):
                 counter = counter + 1
                 is_masking_done = generate_appointment_masknumber(
                     ({'type': 'OPD_APPOINTMENT', 'appointment': instance}))
-        opd_notification = OpdNotification(instance, notification_type)
-        opd_notification.send()
     except Exception as e:
         logger.error(str(e))
+    opd_notification = OpdNotification(instance, notification_type)
+    opd_notification.send()
 
 
 @task
@@ -1106,6 +1106,57 @@ def upload_cost_estimates(obj_id):
         else:
             instance.error_msg = [{'line number': 0, 'message': error_message}]
         instance.save(retry=False)
+
+
+@task()
+def send_user_number_update_otp(obj_id):
+    from ondoc.sms.backends.backend import BaseSmsBackend
+
+    obj = UserNumberUpdate.objects.filter(id=obj_id).first()
+    if not obj:
+        return
+
+    phone_numer = obj.new_number
+    otp = obj.otp
+
+    sms_class = BaseSmsBackend()
+    message = "Otp for new number update :%s . Dont share this with anyone." % str(otp)
+    success = sms_class.send(message, phone_numer)
+    if not success:
+        logger.error("Could not send otp for user number update.")
+
+    return
+
+@task()
+def send_contactus_notification(obj_id):
+    from ondoc.notification.models import EmailNotification
+    from ondoc.web.models import ContactUs
+    from django.contrib.contenttypes.models import ContentType
+    obj = ContactUs.objects.filter(id=obj_id).first()
+
+    if not obj:
+        return
+
+    emails = settings.CONTACTUS_EMAILS
+
+    html_body = "{name} ( {email}-{mobile} ) has sent message {message}" \
+        .format(name=obj.name, email=obj.email, mobile=obj.mobile, message={obj.message})
+
+    if obj.from_app:
+        html_body += " from mobile app."
+    else:
+        html_body += "."
+
+    content_type = ContentType.objects.get_for_model(obj)
+    date = timezone.now() - timedelta(days=1)
+    is_already_sent = EmailNotification.objects.filter(created_at__gte=date,
+                                                       notification_type=NotificationAction.CONTACT_US_EMAIL,
+                                                       content_type=content_type,
+                                                       object_id=obj.id).exists()
+
+    if not is_already_sent:
+        for email in emails:
+            EmailNotification.send_contact_us_notification_email(content_type, obj.id, email, html_body)
 
 
 @task(bind=True, max_retries=5)

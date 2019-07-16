@@ -1548,7 +1548,7 @@ class TimeSlotExtraction(object):
                     pass
 
             if will_doctor_data_append:
-                data_list = {"value": start_hour, "text": start_hour_text, "price": price, "is_price_zero": True if price is not None and price == 0 else False, "mrp": mrp, 'deal_price': deal_price,
+                data_list = {"value": start_hour, "text": start_hour_text, "price": price, "fees": price, "is_price_zero": True if price is not None and price == 0 else False, "mrp": mrp, 'deal_price': deal_price,
                              "is_available": is_available, "on_call": on_call, "cod_deal_price": cod_deal_price}
         else:
             will_lab_data_append = False
@@ -1902,3 +1902,19 @@ def convert_datetime_str_to_iso_str(datetime_string_to_be_converted):
         result = datetime_string_to_be_converted
     return result
 
+
+def patient_details_name_phone_number_decrypt(patient_details, passphrase):
+    name = patient_details.get('encrypted_name')
+    phone_number = patient_details.get('encrypted_phone_number')
+    if name:
+        name, exception = AES_encryption.decrypt(name, passphrase)
+        if exception:
+            return exception
+    if phone_number:
+        phone_number, exception = AES_encryption.decrypt(phone_number, passphrase)
+        if exception:
+            return exception
+    patient_details['encrypted_name'] = None
+    patient_details['name'] = ''.join(e for e in name if e.isalnum() or e == ' ')
+    patient_details['encrypted_phone_number'] = None
+    patient_details['phone_number'] = ''.join(e for e in phone_number if e.isalnum())
