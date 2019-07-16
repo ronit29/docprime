@@ -1532,9 +1532,7 @@ class MerchantPayout(TimeStampedModel):
         if (not first_instance and self.status != self.PENDING) and not self.booking_type == self.InsurancePremium:
             from ondoc.matrix.tasks import push_appointment_to_matrix
 
-            appointment = self.lab_appointment.all().first()
-            if not appointment:
-                appointment = self.opd_appointment.all().first()
+            appointment = self.get_corrosponding_appointment()
 
             if appointment and appointment.__class__.__name__ == 'LabAppointment':
                 transaction.on_commit(lambda: push_appointment_to_matrix.apply_async(({'type': 'LAB_APPOINTMENT', 'appointment_id': appointment.id, 'product_id': 5,
@@ -1547,6 +1545,22 @@ class MerchantPayout(TimeStampedModel):
 
         if first_instance:
             MerchantPayout.objects.filter(id=self.id).update(payout_ref_id=self.id)
+
+            appointment = self.get_corrosponding_appointment()
+
+            if appointment and appointment.insurance and self.id and not self.is_insurance_premium_payout() and self.status==self.PENDING:
+                self.type = self.AUTOMATIC
+                if not self.content_object:
+                    self.content_object = self.get_billed_to()
+                if not self.paid_to:
+                    self.paid_to = self.get_merchant()
+
+                try:
+                    has_txn, order_data, appointment = self.has_transaction()
+                    if not has_txn:
+                        transaction.on_commit(lambda: set_order_dummy_transaction.apply_async((order_data.id, appointment.user_id,)))
+                except Exception as e:
+                    logger.error(str(e))
             # self.payout_ref_id = self.id
             # self.save()
 
@@ -1556,6 +1570,13 @@ class MerchantPayout(TimeStampedModel):
     #     for p in pending:
     #         if p.utr_no:
     #             p.create_insurance_transaction()
+
+    def get_corrosponding_appointment(self):
+        appointment = self.lab_appointment.all().first()
+        if not appointment:
+            appointment = self.opd_appointment.all().first()
+
+        return appointment
 
     def should_create_insurance_transaction(self):
         from ondoc.insurance.models import InsuranceTransaction
