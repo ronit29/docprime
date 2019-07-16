@@ -6,7 +6,7 @@ from .views import (CitiesViewSet, ServicesViewSet, SmsServiceViewSet, UpdateXls
                     UploadQualificationViewSet, UploadExperienceViewSet, UploadAwardViewSet, UploadHospitalViewSet,
                     UploadMembershipViewSet, SearchLeadViewSet, GetPaymentOptionsViewSet, GetSearchUrlViewSet,
                     GetKeyDataViewSet, AllUrlsViewset, DeviceDetailsSave, AppointmentPrerequisiteViewSet,
-                    SiteSettingsViewSet, DepartmentRouting)
+                    SiteSettingsViewSet, DepartmentRouting, CommentViewSet)
 
 
 urlpatterns = [
@@ -37,5 +37,7 @@ urlpatterns = [
     # url(r'^insurance-plan-autocomplete/$', InsurancePlanAutocomplete.as_view(), name='insurance-plan-autocomplete'),
     path('pre-booking', AppointmentPrerequisiteViewSet.as_view({'post': 'pre_booking'}), name='pre-booking'),
     path('settings', SiteSettingsViewSet.as_view({'get': 'get_settings'}), name='pre-get_settings'),
-    path('get_department_for_routing', DepartmentRouting.as_view({'get': 'get_department'}), name='get-department')
+    path('get_department_for_routing', DepartmentRouting.as_view({'get': 'get_department'}), name='get-department'),
+    path('comment/post', CommentViewSet.as_view({'post': 'create'}), name='post-comment'),
+    path('comment/list', CommentViewSet.as_view({'get': 'list'}), name='list-comment'),
 ]

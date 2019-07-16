@@ -1828,7 +1828,7 @@ class Merchant(TimeStampedModel):
                 data.api_response = resp_data
                 if resp_data.get('statusCode') and resp_data.get('statusCode') in [cls.INITIATED, cls.INPROCESS]:
                     data.pg_status = resp_data.get('statusCode')
-                    data.save()ponse = resp_data[0]
+                    data.pg_status  = resp_data[0]
                 # if resp_data[0].get('statusCode') and resp_data[0].get('statusCode') in [cls.INITIATED, cls.INPROCESS]:
                 #     data.pg_status = resp_data[0].get('statusCode')
                 #     data.save()
