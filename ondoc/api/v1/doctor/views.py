@@ -294,7 +294,7 @@ class DoctorAppointmentsViewSet(OndocViewSet):
             cart_item.save()
         else:
             cart_item, is_new = Cart.objects.update_or_create(id=cart_item_id, deleted_at__isnull=True, product_id=account_models.Order.DOCTOR_PRODUCT_ID,
-                                                  user=request.user,defaults={"data": data})
+                                                  user=request.user, defaults={"data": data})
 
         resp = None
         if hasattr(request, 'agent') and request.agent:
@@ -3592,9 +3592,14 @@ class OfflineCustomerViewSet(viewsets.GenericViewSet):
                                                             )
                                                         )
         for app in appointment_queryset:
+            address = ''
             mask_number = app.mask_number.all()
             if mask_number and mask_number[0]:
                 mask_data = mask_number[0].build_data()
+            if app.address:
+                ad = app.address.get('address') if app.address.get('address') else ''
+                loc = app.address.get('locality') if app.address.get('locality') else ''
+                address = ad + ' ' + loc
             patient_profile = auth_serializers.UserProfileSerializer(app.profile, context={'request': request}).data
             patient_profile['profile_id'] = app.profile.id if hasattr(app, 'profile') else None
             patient_thumbnail = patient_profile['profile_image']
@@ -3622,7 +3627,7 @@ class OfflineCustomerViewSet(viewsets.GenericViewSet):
             ret_obj['is_docprime'] = True
             ret_obj['patient_thumbnail'] = patient_thumbnail
             ret_obj['type'] = 'lab'
-            ret_obj['address'] = app.lab.get_lab_address()
+            ret_obj['address'] = address
             ret_obj['is_home_pickup'] = app.is_home_pickup
             ret_obj['home_pickup_charges'] = app.home_pickup_charges
             ret_obj['prescriptions'] = app.get_prescriptions(request)
