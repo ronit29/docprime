@@ -497,6 +497,14 @@ class PotentialIpdLeadPracticeSpecializationAdmin(ImportExportMixin, VersionAdmi
     # change_list_template = 'superuser_import_export.html'
 
 
+class PotentialIpdCityAdmin(VersionAdmin):
+    search_fields = ['city__name']
+    # resource_class = PotentialIpdLeadPracticeSpecializationResource
+    list_display = ['id', 'city']
+    autocomplete_fields = ['city']
+    # change_list_template = 'superuser_import_export.html'
+
+
 class IpdCostEstimateRoomTypeAdmin(VersionAdmin):
     model = IpdCostEstimateRoomType
     list_display = ['room_type']

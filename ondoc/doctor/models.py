@@ -2973,7 +2973,8 @@ class OpdAppointment(auth_model.TimeStampedModel, CouponsMixin, OpdAppointmentIn
             "coupon_list": coupon_list,
             "consultation" : {
                 "deal_price": doctor_clinic_timing.deal_price,
-                "mrp": doctor_clinic_timing.mrp
+                "mrp": doctor_clinic_timing.mrp,
+                "fees": doctor_clinic_timing.fees
             },
             "coupon_data" : { "random_coupon_list" : random_coupon_list }
         }
