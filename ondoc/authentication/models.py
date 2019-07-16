@@ -2080,7 +2080,7 @@ class PaymentMixin(object):
     def get_transaction(self):
         from ondoc.account.models import Order
         from ondoc.account.models import PgTransaction
-        child_order = Order.objects.filter(reference_id=self.id).first()
+        child_order = Order.objects.filter(reference_id=self.id, product_id=self.PRODUCT_ID).first()
         parent_order = None
         pg_transaction = None
 
