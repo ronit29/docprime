@@ -69,5 +69,6 @@ urlpatterns = [
     path('get-token', TokenFromUrlKey.as_view({'get': 'get_token'}), name='get-token-from-url-key'),
     # path('test/', PathologyTestList.as_view({'get': 'list'}), name='test-list'),
     # path('test/<int:id>/', PathologyTestList.as_view({'get': 'retrieve'}), name='test-detail'),
-    path('profile-email/update/init', ProfileEmailUpdateViewset.as_view({'post': 'create'}), name='update-profile-email')
+    path('profile-email/update/init', ProfileEmailUpdateViewset.as_view({'post': 'create'}), name='update-profile-email-init'),
+    path('profile-email/update', ProfileEmailUpdateViewset.as_view({'post': 'update_email'}), name='update-profile-email')
 ]

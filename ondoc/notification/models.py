@@ -867,7 +867,7 @@ class EmailNotification(TimeStampedModel, EmailNotificationOpdMixin, EmailNotifi
 
         email_subject = 'Docprime : Profile Email update otp'
         html_body = 'Please find the otp for email change. %s' % str(obj.otp)
-        email_obj = cls.objects.create(email=email, notification_type=NotificationAction.INSURANCE_MIS,
+        email_obj = cls.objects.create(email=email, notification_type=NotificationAction.USERPROFILE_EMAIL_UPDATE,
                                        content=html_body, email_subject=email_subject, cc=[], bcc=[])
         email_obj.save()
 

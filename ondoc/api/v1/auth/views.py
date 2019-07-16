@@ -29,7 +29,7 @@ from ondoc.doctor.models import DoctorMobile, Doctor, HospitalNetwork, Hospital,
                                 DoctorClinicTiming, ProviderSignupLead
 from ondoc.authentication.models import (OtpVerifications, NotificationEndpoint, Notification, UserProfile,
                                          Address, AppointmentTransaction, GenericAdmin, UserSecretKey, GenericLabAdmin,
-                                         AgentToken, DoctorNumber, LastLoginTimestamp)
+                                         AgentToken, DoctorNumber, LastLoginTimestamp, UserProfileEmailUpdate)
 from ondoc.notification.models import SmsNotification, EmailNotification
 from ondoc.account.models import PgTransaction, ConsumerAccount, ConsumerTransaction, Order, ConsumerRefund, OrderLog, \
     UserReferrals, UserReferred, PgLogs
@@ -2170,5 +2170,46 @@ class ProfileEmailUpdateViewset(viewsets.GenericViewSet):
     def create(self, request):
         request_data = request.data
 
+        serializer = serializers.ProfileEmailUpdateInitSerializer(data=request_data, context={'request': request})
+        serializer.is_valid(raise_exception=True)
+        data = serializer.validated_data
 
-        return Response()
+        obj = UserProfileEmailUpdate.objects.filter(profile=data['profile'], old_email=data['profile'].email,
+                                                    new_email=data['email']).filter(~Q(otp=None) | ~Q(otp='')).order_by('id').last()
+        if obj and obj.is_request_alive():
+            obj.send_otp_email()
+            return Response({'success': True, 'id': obj.id})
+
+        obj_id = None
+
+        try:
+            obj = UserProfileEmailUpdate.initiate(data['profile'], data['email'])
+            obj_id = obj.id
+        except Exception as e:
+            logger.error(str(e))
+            return Response({'success': False})
+
+        return Response({'success': True, 'id': obj_id})
+
+    def update_email(self, request):
+        request_data = request.data
+
+        serializer = serializers.ProfileEmailUpdateProcessSerializer(data=request_data, context={'request': request})
+        serializer.is_valid(raise_exception=True)
+        data = serializer.validated_data
+
+        obj = UserProfileEmailUpdate.objects.filter(profile=data['profile'], id=data['id'], is_successfull=False).first()
+        if not obj:
+            return Response(status=status.HTTP_400_BAD_REQUEST)
+
+        if not obj.is_request_alive():
+            return Response(status=status.HTTP_400_BAD_REQUEST, data={'success': False, 'message': 'Given otp has been expired.'})
+
+        if obj.otp != data['otp']:
+            return Response(data={'success': False, 'message': 'Given otp does not match'})
+
+        is_changed = obj.process_email_change(obj.otp, data.get('process_immediately', False))
+        if not is_changed:
+            return Response({'success': False})
+
+        return Response({'success': True, 'message': 'Successfully changed.'})

@@ -560,11 +560,38 @@ class TokenFromUrlKeySerializer(serializers.Serializer):
         return attrs
 
 
-class ProfileEmailUpdateSerializer(serializers.Serializer):
+class ProfileEmailUpdateInitSerializer(serializers.Serializer):
     profile = serializers.PrimaryKeyRelatedField(queryset=UserProfile.objects.all(), allow_null=False)
     email = serializers.EmailField(max_length=256, required=True)
 
     def validate(self, attrs):
-        if not UserProfileEmailUpdate.can_be_changed(attrs.get('email')):
-            raise serializers.ValidationError('Email id already in use.')
+        request = self.context.get('request')
+        user = request.user
+        email = attrs.get('email')
+        profile = attrs.get('profile')
+
+        if not UserProfileEmailUpdate.can_be_changed(user, email):
+            raise serializers.ValidationError('Email is being used by another user.')
+
+        if not UserProfile.objects.filter(id=profile.id, user=user).exists():
+            raise serializers.ValidationError('Given profile is not valid family profile.')
+
         return attrs
+
+
+class ProfileEmailUpdateProcessSerializer(serializers.Serializer):
+    profile = serializers.PrimaryKeyRelatedField(queryset=UserProfile.objects.all(), allow_null=False)
+    otp = serializers.IntegerField(min_value=100000, max_value=999999, required=True)
+    id = serializers.IntegerField(required=True, min_value=1)
+    process_immediately = serializers.BooleanField(default=False, required=False)
+
+    def validate(self, attrs):
+        request = self.context.get('request')
+        user = request.user
+        profile = attrs.get('profile')
+
+        if not UserProfile.objects.filter(id=profile.id, user=user).exists():
+            raise serializers.ValidationError('Given profile is not valid family profile.')
+
+        return attrs
+
