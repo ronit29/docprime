@@ -1600,11 +1600,18 @@ class DoctorOpdAppointmentAdmin(admin.ModelAdmin):
     form = DoctorOpdAppointmentForm
     search_fields = ['id', 'profile__name', 'profile__phone_number', 'doctor__name', 'hospital__name']
     list_display = ('booking_id', 'get_doctor', 'get_profile', 'status', 'time_slot_start', 'effective_price',
-                    'get_insurance', 'created_at', 'updated_at')
+                    'get_insurance','get_appointment_type', 'created_at', 'updated_at')
     list_filter = ('status', 'payment_type')
     date_hierarchy = 'created_at'
     list_display_links = ('booking_id', 'get_insurance',)
-    inlines = [PrescriptionInline]
+    inlines = [PrescriptionInline, FraudInline]
+
+    def get_appointment_type(self, obj):
+        if obj.is_followup_appointment():
+            return "Followup"
+        else:
+            return "Regular"
+    get_appointment_type.short_description = 'Type'
 
     def get_insurance(self, obj):
         if obj.insurance:
@@ -1677,8 +1684,10 @@ class DoctorOpdAppointmentAdmin(admin.ModelAdmin):
                 'fees', 'effective_price', 'mrp', 'deal_price', 'payment_status',
                 'payment_type', 'admin_information', 'insurance', 'outstanding',
                 'status', 'cancel_type', 'cancellation_reason', 'cancellation_comments',
-                'start_date', 'start_time', 'invoice_urls', 'payment_type', 'payout_info', 'refund_initiated', 'status_change_comments',
-                      'hospital_reference_id', 'send_credit_letter', 'send_cod_to_prepaid_request')
+                'start_date', 'start_time', 'invoice_urls', 'payment_type', 'payout_info', 'refund_initiated',
+                'status_change_comments', 'get_appointment_type', 'hospital_reference_id', 'send_credit_letter',
+                'send_cod_to_prepaid_request', 'appointment_type')
+
         if request.user.groups.filter(name=constants['APPOINTMENT_OTP_TEAM']).exists() or request.user.is_superuser:
             all_fields = all_fields + ('otp',)
 
@@ -1703,7 +1712,7 @@ class DoctorOpdAppointmentAdmin(admin.ModelAdmin):
                      'default_profile_number', 'user_id', 'user_number', 'booked_by',
                      'fees', 'effective_price', 'mrp', 'deal_price', 'payment_status', 'payment_type',
                      'admin_information', 'insurance', 'outstanding', 'procedures_details', 'invoice_urls',
-                     'payment_type', 'invoice_urls', 'payout_info', 'refund_initiated')
+                     'payment_type', 'invoice_urls', 'payout_info', 'refund_initiated', 'get_appointment_type')
         if obj and (obj.status == LabAppointment.COMPLETED or obj.status == LabAppointment.CANCELLED):
             read_only += ('status',)
         if request.user.groups.filter(name=constants['APPOINTMENT_OTP_TEAM']).exists() or request.user.is_superuser:
@@ -1877,6 +1886,16 @@ class DoctorOpdAppointmentAdmin(admin.ModelAdmin):
         for doctor_admin in doctor_admins:
             doctor_admins_phone_numbers.append(doctor_admin.phone_number)
         return mark_safe(','.join(doctor_admins_phone_numbers))
+
+    def save_formset(self, request, form, formset, change):
+        if formset.model != Fraud:
+            return super(DoctorOpdAppointmentAdmin, self).save_formset(request, form, formset, change)
+        instances = formset.save(commit=False)
+        for instance in instances:
+            if not instance.pk:
+                instance.user = request.user
+                return super(DoctorOpdAppointmentAdmin, self).save_formset(request, form, formset, change)
+        formset.save_m2m()
 
     @transaction.atomic
     def save_model(self, request, obj, form, change):
