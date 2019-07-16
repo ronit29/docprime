@@ -944,7 +944,7 @@ class Doctor(auth_model.TimeStampedModel, auth_model.QCModel, SearchKey, auth_mo
         return resp
 
     def update_deal_price(self):        
-        # will update only this doctor prices and will be called on save
+        # will update only this doctor prices and will be called on save    
         query = '''update doctor_clinic_timing set deal_price = least(
                     greatest(floor(
                     case when fees <=0 then mrp*.4 
@@ -957,14 +957,14 @@ class Doctor(auth_model.TimeStampedModel, auth_model.QCModel, SearchKey, auth_mo
                     else
                     least(fees+100, mrp) end 	
                     end  /5)*5, fees), mrp) where doctor_clinic_id in (
-                    select id from doctor_clinic where doctor_id= %s and hospital_id!=3560) '''
+                    select id from doctor_clinic where doctor_id=%s and hospital_id!=3560) '''
 
         update_doctor_deal_price = RawSql(query, [self.pk]).execute()
 
         # update nanavati hospital deal price
 
         query1 = '''update doctor_clinic_timing set deal_price = mrp*0.20 
-                         where doctor_clinic_id  in (select id from doctor_clinic doctor_id= %s and  hospital_id=3560 ) '''
+                         where doctor_clinic_id  in (select id from doctor_clinic where doctor_id= %s and  hospital_id=3560 ) '''
 
         update_all_nanavati_doctor_deal_price = RawSql(query1, [self.pk]).execute()
 
