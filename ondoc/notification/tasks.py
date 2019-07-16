@@ -567,7 +567,7 @@ def process_payout(payout_id):
                 payout_data.status = payout_data.INPROCESS
             else:
                 payout_data.retry_count += 1
-                payout_data.status = payout_data.FAILED
+                payout_data.status = payout_data.FAILED_FROM_QUEUE
 
             payout_data.save()
 

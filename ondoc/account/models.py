@@ -1458,7 +1458,8 @@ class MerchantPayout(TimeStampedModel):
     PAID = 3
     INITIATED = 4
     INPROCESS = 5
-    FAILED = 6
+    FAILED_FROM_QUEUE = 6
+    FAILED_FROM_DETAIL = 7
     AUTOMATIC = 1
     MANUAL = 2
 
@@ -1471,7 +1472,7 @@ class MerchantPayout(TimeStampedModel):
     IMPS = "IMPS"
     IFT = "IFT"
     INTRABANK_IDENTIFIER = "KKBK"
-    STATUS_CHOICES = [(PENDING, 'Pending'), (ATTEMPTED, 'ATTEMPTED'), (PAID, 'Paid'), (INITIATED, 'Initiated'), (INPROCESS, 'In Process'), (FAILED, 'Failed')]
+    STATUS_CHOICES = [(PENDING, 'Pending'), (ATTEMPTED, 'ATTEMPTED'), (PAID, 'Paid'), (INITIATED, 'Initiated'), (INPROCESS, 'In Process'), (FAILED_FROM_QUEUE, 'Failed from Queue'), (FAILED_FROM_DETAIL, 'Failed from Detail')]
     PAYMENT_MODE_CHOICES = [(NEFT, 'NEFT'), (IMPS, 'IMPS'), (IFT, 'IFT')]    
     TYPE_CHOICES = [(AUTOMATIC, 'Automatic'), (MANUAL, 'Manual')]
 
@@ -1998,11 +1999,13 @@ class MerchantPayout(TimeStampedModel):
                         details = resp_data.get('settleDetails')
                         for d in details:
                             if d.get('refNo') == str(self.payout_ref_id) or\
-                                    (not self.payout_ref_id and d.get('orderNo')==order_no):
-                                self.utr_no = d.get('utrNo','')
-                                self.pg_status = d.get('txStatus','')
+                                    (not self.payout_ref_id and d.get('orderNo') == order_no):
+                                self.utr_no = d.get('utrNo', '')
+                                self.pg_status = d.get('txStatus', '')
                                 if self.utr_no:
                                     self.status = self.PAID
+                                if d.get('txStatus', '') == "SETTLEMENT_FAILURE":
+                                    self.status = self.FAILED_FROM_DETAIL
                                 break
                     self.save()
 
@@ -2025,17 +2028,17 @@ class MerchantPayout(TimeStampedModel):
 
     def recreate_failed_payouts(self):
         # # recreate payout only when status is failed
-        # if self.status == FAILED
-        new_obj = MerchantPayout(recreated_from=self)
-        new_obj.payable_amount = self.payable_amount
-        new_obj.charged_amount = self.charged_amount
-        new_obj.booking_type = self.booking_type
-        new_obj.tds_amount = self.tds_amount
-        new_obj.save()
+        if self.status == self.FAILED_FROM_DETAIL or self.status == self.FAILED_FROM_QUEUE:
+            new_obj = MerchantPayout(recreated_from=self)
+            new_obj.payable_amount = self.payable_amount
+            new_obj.charged_amount = self.charged_amount
+            new_obj.booking_type = self.booking_type
+            new_obj.tds_amount = self.tds_amount
+            new_obj.save()
 
-        # update appointment payout id
-        appointment = self.get_appointment()
-        appointment.update_payout_id(new_obj.id)
+            # update appointment payout id
+            appointment = self.get_appointment()
+            appointment.update_payout_id(new_obj.id)
 
     def update_billed_to_content_type(self):
         merchant = self.get_merchant()
