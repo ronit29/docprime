@@ -925,6 +925,7 @@ class PgTransaction(TimeStampedModel):
     status_type = models.CharField(max_length=50)
     transaction_id = models.CharField(max_length=100, blank=True, null=True)
     pb_gateway_name = models.CharField(max_length=100, null=True, blank=True)
+    payment_captured = models.BooleanField(default=False)
 
     @transaction.atomic
     def save(self, *args, **kwargs):

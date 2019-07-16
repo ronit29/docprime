@@ -2076,3 +2076,18 @@ class PaymentMixin(object):
                     # raise Exception('Preauth booked appointment can not be rebooked.')
 
         return initiate_refund
+
+    def get_transaction(self):
+        from ondoc.account.models import Order
+        from ondoc.account.models import PgTransaction
+        child_order = Order.objects.filter(reference_id=self.id).first()
+        parent_order = None
+        pg_transaction = None
+
+        if child_order:
+            parent_order = child_order.parent
+
+        if parent_order:
+            pg_transaction = PgTransaction.objects.filter(order_id=parent_order.id).first()
+
+        return pg_transaction

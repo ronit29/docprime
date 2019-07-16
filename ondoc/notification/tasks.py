@@ -1206,7 +1206,9 @@ def send_capture_payment_request(self, product_id, appointment_id):
                 txn_obj.bank_name = resp_data.get('bankName')
                 if resp_data.get("ok") is not None and resp_data.get("ok") == '1':
                     txn_obj.transaction_id = resp_data.get('bankTxId')
+                    txn_obj.payment_captured = True
                 else:
+                    txn_obj.payment_captured = False
                     logger.error("Error in capture the payment with data - " + json.dumps(req_data) + " with error message - " + resp_data.get('statusMsg', ''))
                 txn_obj.save()
             else:

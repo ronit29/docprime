@@ -1933,8 +1933,10 @@ class LabAppointment(TimeStampedModel, CouponsMixin, LabAppointmentInvoiceMixin,
 
         if not old_instance:
             try:
-                notification_tasks.send_capture_payment_request.apply_async(
-                    (Order.LAB_PRODUCT_ID, self.id), eta=timezone.localtime() + datetime.timedelta(hours=int(settings.PAYMENT_AUTO_CAPTURE_DURATION)), )
+                txn_obj = self.get_transaction()
+                if txn_obj and txn_obj.is_preauth():
+                    notification_tasks.send_capture_payment_request.apply_async(
+                        (Order.LAB_PRODUCT_ID, self.id), eta=timezone.localtime() + datetime.timedelta(hours=int(settings.PAYMENT_AUTO_CAPTURE_DURATION)), )
             except Exception as e:
                 logger.error(str(e))
 
@@ -2216,8 +2218,10 @@ class LabAppointment(TimeStampedModel, CouponsMixin, LabAppointmentInvoiceMixin,
         self.save()
 
         try:
-            notification_tasks.send_capture_payment_request.apply_async(
-                (Order.LAB_PRODUCT_ID, self.id), eta=timezone.localtime(), )
+            txn_obj = self.get_transaction()
+            if txn_obj and txn_obj.is_preauth():
+                notification_tasks.send_capture_payment_request.apply_async(
+                    (Order.LAB_PRODUCT_ID, self.id), eta=timezone.localtime(), )
         except Exception as e:
             logger.error(str(e))
 
