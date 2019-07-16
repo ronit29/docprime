@@ -742,5 +742,13 @@ class MerchantPayoutMixin(object):
         from ondoc.doctor.models import OpdAppointment
         if self.merchant_payout is None and self.payment_type not in [OpdAppointment.COD]:
             self.save_merchant_payout()
-            self.save()
+            self.update_payout_id(self.merchant_payout_id)
 
+    def update_payout_id(self, payout_id):
+        from ondoc.doctor.models import OpdAppointment
+        from ondoc.diagnostic.models import LabAppointment
+
+        if self.__class__.__name__ == 'OpdAppointment':
+            OpdAppointment.objects.filter(id=self.id).update(merchant_payout_id=payout_id)
+        elif self.__class__.__name__ == 'LabAppointment':
+            LabAppointment.objects.filter(id=self.id).update(merchant_payout_id=payout_id)

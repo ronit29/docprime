@@ -1505,6 +1505,7 @@ class MerchantPayout(TimeStampedModel):
 
         if self.id and not self.is_insurance_premium_payout() and hasattr(self,'process_payout') and self.process_payout and self.status==self.PENDING and self.type==self.AUTOMATIC:
             self.type = self.AUTOMATIC
+            self.update_billed_to_content_type()
             if not self.content_object:
                 self.content_object = self.get_billed_to()
             if not self.paid_to:
@@ -1998,6 +1999,8 @@ class MerchantPayout(TimeStampedModel):
         return checksum_hash
 
     def recreate_failed_payouts(self):
+        # # recreate payout only when status is failed
+        # if self.status == FAILED
         new_obj = MerchantPayout(recreated_from=self)
         new_obj.payable_amount = self.payable_amount
         new_obj.charged_amount = self.charged_amount
@@ -2007,8 +2010,7 @@ class MerchantPayout(TimeStampedModel):
 
         # update appointment payout id
         appointment = self.get_appointment()
-        appointment.merchant_payout_id = new_obj.id
-        appointment.save()
+        appointment.update_payout_id(new_obj.id)
 
     def update_billed_to_content_type(self):
         merchant = self.get_merchant()
