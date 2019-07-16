@@ -2258,7 +2258,15 @@ class ConfigView(viewsets.GenericViewSet):
         serializer_data = serializers.ConfigGetSerializer(data=request.data, context={'request': request})
         serializer_data.is_valid(raise_exception=True)
         validated_data = serializer_data.validated_data
-        return Response({})
+        return Response({
+  "blocker_screen": {
+    "type": 2,
+    "title_text": "New version available!",
+    "title_text2": "Please update your app from store to get enhanced experience on Docprime Partners app",
+    "store_url": "https://play.google.com/store/apps/details?id=com.docprime.partner",
+    "messages": []
+  }
+})
 
 
 class DoctorAppointmentNoAuthViewSet(viewsets.GenericViewSet):
