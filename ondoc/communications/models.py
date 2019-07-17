@@ -48,7 +48,8 @@ def get_spoc_email_and_number_hospital(spocs, appointment):
     for spoc in spocs:
         if spoc.number and spoc.number in range(1000000000, 9999999999):
             admins = GenericAdmin.objects.prefetch_related('user').filter(Q(phone_number=str(spoc.number),
-                                                                            hospital=spoc.content_object),
+                                                                            hospital=spoc.content_object,
+                                                                            entity_type=GenericAdmin.HOSPITAL),
                                                                           Q(super_user_permission=True) |
                                                                           Q(Q(permission_type=GenericAdmin.APPOINTMENT),
                                                                             Q(doctor__isnull=True) | Q(doctor=appointment.doctor)))
@@ -63,16 +64,6 @@ def get_spoc_email_and_number_hospital(spocs, appointment):
                         user_and_number.append({'user': None, 'phone_number': spoc.number})
                         if spoc.email:
                             user_and_email.append({'user': None, 'email': spoc.email})
-
-                admins_without_user = admins.exclude(id__in=admins_with_user)
-                for admin in admins_without_user:
-                    created_user = User.objects.create(phone_number=spoc.number, user_type=User.DOCTOR,
-                                                       auto_created=True)
-                    admin.user = created_user
-                    admin.save()
-                    user_and_number.append({'user': created_user, 'phone_number': spoc.number})
-                    if spoc.email:
-                        user_and_email.append({'user': created_user, 'email': spoc.email})
             else:
                 user_and_number.append({'user': None, 'phone_number': spoc.number})
                 if spoc.email:
