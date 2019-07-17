@@ -5,6 +5,7 @@ from django.utils.functional import cached_property
 
 from ondoc.authentication.models import TimeStampedModel, User, UserProfile, Merchant, AssociatedMerchant
 from ondoc.account.tasks import refund_curl_task
+from ondoc.coupon.models import Coupon
 from ondoc.notification.models import AppNotification, NotificationAction
 from ondoc.notification.tasks import process_payout
 # from ondoc.diagnostic.models import LabAppointment
@@ -24,6 +25,7 @@ import json
 import logging
 import requests
 import datetime
+import itertools
 from decimal import Decimal
 from ondoc.notification.tasks import set_order_dummy_transaction
 from django.contrib.contenttypes.fields import GenericForeignKey
@@ -811,6 +813,84 @@ class Order(TimeStampedModel):
         return deal_price
 
 
+    @cached_property
+    def get_amount_without_pg_coupon(self):
+        from ondoc.doctor.models import OpdAppointment
+        from ondoc.diagnostic.models import LabAppointment
+
+        amount = self.amount
+        used_pgspecific_coupons = self.used_pgspecific_coupons
+        used_pgspecific_coupons_ids = list(map(lambda x: x.id, used_pgspecific_coupons)) if used_pgspecific_coupons else []
+        if self.is_parent():
+            for order in self.orders.all():
+                if self.product_id == Order.DOCTOR_PRODUCT_ID or self.product_id == Order.LAB_PRODUCT_ID:
+                    if self.product_id == Order.DOCTOR_PRODUCT_ID:
+                        obj = OpdAppointment()
+                    elif self.product_id == Order.LAB_PRODUCT_ID:
+                        obj = LabAppointment()
+                    order_coupons_ids = order.action_data['coupon']
+                    for coupon_id in order_coupons_ids:
+                        if coupon_id in used_pgspecific_coupons_ids:
+                            coupon = Coupon.objects.filter(pk=coupon_id).first()
+                            if coupon:
+                                amount += obj.get_discount(coupon, Decimal(order.action_data['deal_price']))
+        return amount
+
+
+    def used_coupons(self):
+        coupons_ids = []
+        if self.is_parent():
+            for order in self.orders.all():
+                coupons_ids.append(order.action_data.get('coupon'))
+        else:
+            coupons_ids.append(self.action_data.get('coupon'))
+
+        coupons_ids = list(itertools.chain(*coupons_ids))
+        coupons = Coupon.objects.filter(pk__in=coupons_ids)
+        return coupons
+
+    @cached_property
+    def used_pgspecific_coupons(self):
+        used_pgspecific_coupons = None
+        used_coupons = self.used_coupons()
+        if used_coupons:
+            used_pgspecific_coupons = list(filter(lambda x: x.payment_option, used_coupons))
+
+        return used_pgspecific_coupons
+
+    def update_fields_after_coupon_remove(self):
+        from ondoc.doctor.models import OpdAppointment
+        from ondoc.diagnostic.models import LabAppointment
+
+        amount = self.amount
+        if self.is_parent():
+            used_pgspecific_coupons = self.used_pgspecific_coupons
+            if used_pgspecific_coupons:
+                used_pgspecific_coupons_ids = list(map(lambda x: x.id, used_pgspecific_coupons))
+                for order in self.orders.all():
+                    if order.product_id == Order.DOCTOR_PRODUCT_ID or order.product_id == Order.LAB_PRODUCT_ID:
+                        if order.action_data:
+                            if self.product_id == Order.DOCTOR_PRODUCT_ID:
+                                obj = OpdAppointment()
+                            elif self.product_id == Order.LAB_PRODUCT_ID:
+                                obj = LabAppointment()
+                            order_coupons_ids = order.action_data['coupon']
+                            for coupon_id in order_coupons_ids:
+                                if coupon_id in used_pgspecific_coupons_ids:
+                                    coupon = Coupon.objects.filter(pk=coupon_id).first()
+                                    if coupon:
+                                        pg_coupon_discount = obj.get_discount(coupon, Decimal(order.action_data['deal_price']))
+                                        amount += pg_coupon_discount
+                                        order.action_data['effective_price'] = str(Decimal(order.action_data['effective_price']) + pg_coupon_discount)
+                                        order.action_data['discount'] = str(Decimal(order.action_data['discount']) - pg_coupon_discount)
+                                        order.action_data['coupon'].remove(coupon_id)
+                                        order.save()
+                self.amount = amount
+                self.save()
+
+        return True
+
+
 class PgTransaction(TimeStampedModel):
     PG_REFUND_SUCCESS_OK_STATUS = '1'
     PG_REFUND_FAILURE_OK_STATUS = '0'
@@ -843,20 +923,27 @@ class PgTransaction(TimeStampedModel):
     status_code = models.IntegerField()
     pg_name = models.CharField(max_length=100, null=True, blank=True)
     status_type = models.CharField(max_length=50)
-    transaction_id = models.CharField(max_length=100, unique=True)
+    transaction_id = models.CharField(max_length=100, blank=True, null=True)
     pb_gateway_name = models.CharField(max_length=100, null=True, blank=True)
+    payment_captured = models.BooleanField(default=False)
 
     @transaction.atomic
     def save(self, *args, **kwargs):
         """
             Save PG transaction and credit consumer account, with amount paid at PaymentGateway.
         """
+        update_consumer_account = False
+        if self.id is None:
+            update_consumer_account = True
+
         super(PgTransaction, self).save(*args, **kwargs)
-        consumer_account = ConsumerAccount.objects.get_or_create(user=self.user)
-        consumer_account = ConsumerAccount.objects.select_for_update().get(user=self.user)
-        pg_data = vars(self)
-        pg_data['user'] = self.user
-        consumer_account.credit_payment(pg_data, pg_data['amount'])
+
+        if update_consumer_account:
+            consumer_account = ConsumerAccount.objects.get_or_create(user=self.user)
+            consumer_account = ConsumerAccount.objects.select_for_update().get(user=self.user)
+            pg_data = vars(self)
+            pg_data['user'] = self.user
+            consumer_account.credit_payment(pg_data, pg_data['amount'])
 
     @classmethod
     def get_transactions(cls, user, amount):
@@ -954,6 +1041,9 @@ class PgTransaction(TimeStampedModel):
 
         encrypted_message_digest = encrypted_message_object.hexdigest()
         return encrypted_message_digest
+
+    def is_preauth(self):
+        return self.status_type == 'TXN_AUTHORIZE'
 
     class Meta:
         db_table = "pg_transaction"

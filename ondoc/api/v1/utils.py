@@ -15,7 +15,7 @@ import calendar
 from django.contrib.auth import get_user_model
 from django.contrib.gis.geos import GEOSGeometry
 from ondoc.account.tasks import refund_curl_task
-from ondoc.coupon.models import UserSpecificCoupon
+from ondoc.coupon.models import UserSpecificCoupon, Coupon
 from ondoc.crm.constants import constants
 import copy
 import requests
@@ -39,6 +39,7 @@ import tempfile
 import base64, hashlib
 from Crypto import Random
 from Crypto.Cipher import AES
+import decimal
 
 logger = logging.getLogger(__name__)
 
@@ -408,6 +409,7 @@ def payment_details(request, order):
     from ondoc.authentication.models import UserProfile
     from ondoc.insurance.models import InsurancePlans
     from ondoc.account.models import PgTransaction, Order
+    from ondoc.notification.tasks import save_pg_response
     payment_required = True
     user = request.user
     if user.email:
@@ -417,16 +419,16 @@ def payment_details(request, order):
     base_url = "https://{}".format(request.get_host())
     surl = base_url + '/api/v1/user/transaction/save'
     furl = base_url + '/api/v1/user/transaction/save'
+    isPreAuth = '1'
     profile = user.get_default_profile()
     profile_name = ""
+    paytmMsg = ''
     if profile:
         profile_name = profile.name
-    if not profile and order.product_id == 3:
-        if order.action_data.get('profile_detail'):
-            profile_name = order.action_data.get('profile_detail').get('name', "")
 
     insurer_code = None
     if order.product_id == Order.INSURANCE_PRODUCT_ID:
+        isPreAuth = '0'
         insurance_plan_id = order.action_data.get('insurance_plan')
         insurance_plan = InsurancePlans.objects.filter(id=insurance_plan_id).first()
         if not insurance_plan:
@@ -434,7 +436,45 @@ def payment_details(request, order):
         insurer = insurance_plan.insurer
         insurer_code = insurer.insurer_merchant_code
 
+        if not profile:
+            if order.action_data.get('profile_detail'):
+                profile_name = order.action_data.get('profile_detail').get('name', "")
+
+    if order.product_id == Order.SUBSCRIPTION_PLAN_PRODUCT_ID:
+        isPreAuth = '0'
+
+    if isPreAuth == '1':
+        first_slot = None
+        if order.is_parent():
+            for ord in order.orders.all():
+                ord_slot = ord.action_data.get('time_slot_start') if ord.action_data else None
+                if not first_slot and ord_slot:
+                    first_slot = parse_datetime(ord_slot)
+                if first_slot > parse_datetime(ord_slot):
+                    first_slot = parse_datetime(ord_slot)
+
+        if first_slot:
+            if first_slot < (timezone.now() + timedelta(hours=int(settings.PAYMENT_AUTO_CAPTURE_DURATION))):
+                paytmMsg = 'Your payment will be deducted from Paytm wallet on appointment completion.'
+
     temp_product_id = order.product_id
+
+    couponCode = ''
+    couponPgMode = ''
+    discountedAmnt = ''
+
+    if order.is_cod_order:
+        txAmount = str(round(decimal.Decimal(order.get_deal_price_without_coupon), 2))
+    else:
+        usedPgCoupons = order.used_pgspecific_coupons
+        if usedPgCoupons and usedPgCoupons[0].payment_option:
+            couponCode = usedPgCoupons[0].code
+            couponPgMode = get_coupon_pg_mode(usedPgCoupons[0])
+            discountedAmnt = str(round(decimal.Decimal(order.amount), 2))
+            txAmount = str(round(decimal.Decimal(order.get_amount_without_pg_coupon), 2))
+        else:
+            txAmount = str(round(decimal.Decimal(order.amount), 2))
+
 
     pgdata = {
         'custId': user.id,
@@ -446,12 +486,40 @@ def payment_details(request, order):
         'referenceId': "",
         'orderId': order.id,
         'name': profile_name,
-        'txAmount': str(order.amount) if not order.is_cod_order else str(round(order.get_deal_price_without_coupon, 2)),
+        'txAmount': txAmount,
+        'holdPayment': 0,
+        'couponCode': couponCode,
+        'couponPgMode': couponPgMode,
+        'discountedAmnt': discountedAmnt,
+        'isPreAuth': isPreAuth,
+        'paytmMsg': paytmMsg
     }
 
     if insurer_code:
         pgdata['insurerCode'] = insurer_code
 
+    secret_key, client_key = get_pg_secret_client_key(order)
+    filtered_pgdata = {k: v for k, v in pgdata.items() if v is not None and v != ''}
+    pgdata.clear()
+    pgdata.update(filtered_pgdata)
+    pgdata['hash'] = PgTransaction.create_pg_hash(pgdata, secret_key, client_key)
+
+    save_pg_response.apply_async((order.id, None, None, pgdata), eta=timezone.localtime(), )
+    return pgdata, payment_required
+
+
+def pg_seamless_hash(order, order_no):
+    from ondoc.account.models import PgTransaction
+    secret_key, client_key = get_pg_secret_client_key(order)
+    orderData = {
+        "orderId": order.id,
+        "orderNo": order_no
+    }
+    pg_hash = PgTransaction.create_pg_hash(orderData, secret_key, client_key)
+    return pg_hash
+
+def get_pg_secret_client_key(order):
+    from ondoc.account.models import Order
     secret_key = client_key = ""
 
     if order.product_id == Order.DOCTOR_PRODUCT_ID or order.product_id == Order.SUBSCRIPTION_PLAN_PRODUCT_ID:
@@ -464,10 +532,27 @@ def payment_details(request, order):
         secret_key = settings.PG_SECRET_KEY_P3
         client_key = settings.PG_CLIENT_KEY_P3
 
-    pgdata['hash'] = PgTransaction.create_pg_hash(pgdata, secret_key, client_key)
+    return [secret_key, client_key]
 
-    return pgdata, payment_required
+def get_coupon_pg_mode(coupon):
+    couponPgMode = None
+    payment_option = coupon.payment_option
+    if payment_option.action == 'DC' and payment_option.payment_gateway == 'paytm':
+        couponPgMode = 'dcpt'
+    elif payment_option.action == 'CC' and payment_option.payment_gateway == 'paytm':
+        couponPgMode = 'ccpt'
+    elif payment_option.action == 'NB' and payment_option.payment_gateway == 'paytm':
+        couponPgMode = 'nbpt'
+    elif payment_option.action == 'UPI' and payment_option.payment_gateway == 'payu':
+        couponPgMode = 'puUPI'
+    elif payment_option.action == 'PPI' and payment_option.payment_gateway == 'payu':
+        couponPgMode = 'puAmz'
+    elif payment_option.action == 'PPI' and payment_option.payment_gateway == 'paytm':
+        couponPgMode = 'papt'
+    elif payment_option.action == 'PPI' and payment_option.payment_gateway == 'olamoney':
+        couponPgMode = 'ola'
 
+    return couponPgMode
 
 def get_location(lat, long):
     pnt = None

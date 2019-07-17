@@ -9,12 +9,13 @@ import traceback
 from collections import OrderedDict
 from io import BytesIO
 
+import pytz
 from django.db import transaction
 from django.forms import model_to_dict
 from django.utils import timezone
 from openpyxl import load_workbook
 
-from ondoc.api.v1.utils import aware_time_zone, util_absolute_url
+from ondoc.api.v1.utils import aware_time_zone, util_absolute_url, pg_seamless_hash
 from ondoc.authentication.models import UserNumberUpdate
 from ondoc.common.models import AppointmentMaskNumber
 from ondoc.notification.labnotificationaction import LabNotificationAction
@@ -1157,3 +1158,131 @@ def send_contactus_notification(obj_id):
     if not is_already_sent:
         for email in emails:
             EmailNotification.send_contact_us_notification_email(content_type, obj.id, email, html_body)
+
+
+@task(bind=True, max_retries=5)
+def send_capture_payment_request(self, product_id, appointment_id):
+    from ondoc.doctor.models import OpdAppointment
+    from ondoc.diagnostic.models import LabAppointment
+    from ondoc.account.models import Order, PgTransaction
+    req_data = dict()
+    if product_id == Order.DOCTOR_PRODUCT_ID:
+        obj = OpdAppointment
+    if product_id == Order.LAB_PRODUCT_ID:
+        obj = LabAppointment
+    try:
+        order = Order.objects.filter(product_id=product_id, reference_id=appointment_id).first()
+
+        appointment = order.getAppointment()
+        if not appointment:
+            raise Exception("No Appointment found.")
+
+        if order and not order.is_parent():
+            order = order.parent
+
+        txn_obj = PgTransaction.objects.filter(order=order).first()
+
+        # if not appointment.status == obj.CANCELLED:
+        if txn_obj and txn_obj.is_preauth():
+            url = settings.PG_CAPTURE_PAYMENT_URL
+            token = settings.PG_SEAMLESS_CAPTURE_AUTH_TOKEN
+
+            req_data = {
+                "orderNo": txn_obj.order_no,
+                "orderId": str(order.id),
+                "hash": pg_seamless_hash(order, txn_obj.order_no)
+            }
+
+            headers = {
+                "auth": token,
+                "Content-Type": "application/json"
+            }
+
+            response = requests.post(url, data=json.dumps(req_data), headers=headers)
+            save_pg_response.apply_async((order.id, txn_obj.id, response.json(), req_data,), eta=timezone.localtime(), )
+            if response.status_code == status.HTTP_200_OK:
+                resp_data = response.json()
+                txn_obj.status_type = resp_data.get('txStatus')
+                txn_obj.payment_mode = resp_data.get("paymentMode")
+                txn_obj.bank_name = resp_data.get('bankName')
+                if resp_data.get("ok") is not None and resp_data.get("ok") == '1':
+                    txn_obj.transaction_id = resp_data.get('bankTxId')
+                    txn_obj.payment_captured = True
+                else:
+                    txn_obj.payment_captured = False
+                    logger.error("Error in capture the payment with data - " + json.dumps(req_data) + " with error message - " + resp_data.get('statusMsg', ''))
+                txn_obj.save()
+            else:
+                raise Exception("Retry on invalid Http response status - " + str(response.content))
+
+    except Exception as e:
+        logger.error("Error in payment capture with data - " + json.dumps(req_data) + " with exception - " + str(e))
+        self.retry([product_id, appointment_id], countdown=300)
+
+@task(bind=True, max_retries=5)
+def send_release_payment_request(self, product_id, appointment_id):
+    from ondoc.doctor.models import OpdAppointment
+    from ondoc.diagnostic.models import LabAppointment
+    from ondoc.account.models import Order, PgTransaction
+    req_data = dict()
+    if product_id == Order.DOCTOR_PRODUCT_ID:
+        obj = OpdAppointment
+    if product_id == Order.LAB_PRODUCT_ID:
+        obj = LabAppointment
+    try:
+        order = Order.objects.filter(product_id=product_id, reference_id=appointment_id).first()
+
+        appointment = order.getAppointment()
+        if not appointment:
+            raise Exception("No Appointment found.")
+
+        if order and not order.is_parent():
+            order = order.parent
+
+        txn_obj = PgTransaction.objects.filter(order=order).first()
+
+        # if appointment.status == obj.CANCELLED:
+        if txn_obj and txn_obj.is_preauth():
+
+            tz = pytz.timezone(settings.TIME_ZONE)
+            if datetime.datetime.now(tz) < (txn_obj.transaction_date + datetime.timedelta(
+                    hours=int(settings.PAYMENT_AUTO_CAPTURE_DURATION))).astimezone(tz):
+                url = settings.PG_RELEASE_PAYMENT_URL
+                token = settings.PG_SEAMLESS_RELEASE_AUTH_TOKEN
+
+                req_data = {
+                    "orderNo": txn_obj.order_no,
+                    "orderId": str(order.id),
+                    "hash": pg_seamless_hash(order, txn_obj.order_no)
+                }
+
+                headers = {
+                    "auth": token,
+                    "Content-Type": "application/json"
+                }
+
+                response = requests.post(url, data=json.dumps(req_data), headers=headers)
+                save_pg_response.apply_async((order.id, txn_obj.id, response.json(), req_data,), eta=timezone.localtime(), )
+                if response.status_code == status.HTTP_200_OK:
+                    resp_data = response.json()
+                    if resp_data.get("ok") is not None and resp_data.get("ok") == '1':
+                        txn_obj.status_type = 'TXN_RELEASE'
+                        txn_obj.save()
+                    else:
+                        logger.error("Error in releasing the payment with data - " + json.dumps(
+                            req_data) + " with error message - " + resp_data.get('statusMsg', ''))
+                else:
+                    raise Exception("Retry on invalid Http response status - " + str(response.content))
+
+    except Exception as e:
+        logger.error("Error in payment release with data - " + json.dumps(req_data) + " with exception - " + str(e))
+        self.retry([product_id, appointment_id], countdown=300)
+
+@task(bind=True)
+def save_pg_response(self, order_id, txn_id, response, request):
+    try:
+        from ondoc.account.mongo_models import PgLogs
+        PgLogs.save_pg_response(order_id, txn_id, response, request)
+    except Exception as e:
+       logger.error("Error in saving pg response to mongo database - " + json.dumps(response) + " with exception - " + str(e))
+       self.retry([txn_id, response], countdown=300)
