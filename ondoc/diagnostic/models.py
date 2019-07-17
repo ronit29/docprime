@@ -11,7 +11,7 @@ from ondoc.account.models import MerchantPayout, ConsumerAccount, Order, UserRef
 from ondoc.authentication.models import (TimeStampedModel, CreatedByModel, Image, Document, QCModel, UserProfile, User,
                                          UserPermission, GenericAdmin, LabUserPermission, GenericLabAdmin,
                                          BillingAccount, SPOCDetails, RefundMixin, WelcomeCallingDone,
-                                         MerchantTdsDeduction)
+                                         MerchantTdsDeduction, PaymentMixin)
 from ondoc.bookinganalytics.models import DP_OpdConsultsAndTests
 from ondoc.doctor.models import Hospital, SearchKey, CancellationReason, Doctor
 from ondoc.crm.constants import constants
@@ -1551,7 +1551,7 @@ class LabAppointmentInvoiceMixin(object):
 
 
 @reversion.register()
-class LabAppointment(TimeStampedModel, CouponsMixin, LabAppointmentInvoiceMixin, RefundMixin, CompletedBreakupMixin, MatrixDataMixin, TdsDeductionMixin):
+class LabAppointment(TimeStampedModel, CouponsMixin, LabAppointmentInvoiceMixin, RefundMixin, CompletedBreakupMixin, MatrixDataMixin, TdsDeductionMixin, PaymentMixin):
     from ondoc.integrations.models import IntegratorResponse
     PRODUCT_ID = Order.LAB_PRODUCT_ID
     CREATED = 1
@@ -1931,6 +1931,14 @@ class LabAppointment(TimeStampedModel, CouponsMixin, LabAppointmentInvoiceMixin,
             except Exception as e:
                 logger.error(str(e))
 
+        if not old_instance:
+            try:
+                txn_obj = self.get_transaction()
+                if txn_obj and txn_obj.is_preauth():
+                    notification_tasks.send_capture_payment_request.apply_async(
+                        (Order.LAB_PRODUCT_ID, self.id), eta=timezone.localtime() + datetime.timedelta(hours=int(settings.PAYMENT_AUTO_CAPTURE_DURATION)), )
+            except Exception as e:
+                logger.error(str(e))
 
         # Do not delete below commented code
         # try:
@@ -2185,7 +2193,8 @@ class LabAppointment(TimeStampedModel, CouponsMixin, LabAppointmentInvoiceMixin,
         if old_instance.status != self.CANCELLED:
             self.status = self.CANCELLED
             self.save()
-            self.action_refund(refund_flag)
+            initiate_refund = old_instance.preauth_process(refund_flag)
+            self.action_refund(refund_flag, initiate_refund)
 
     def get_cancellation_breakup(self):
         wallet_refund = cashback_refund = 0
@@ -2207,6 +2216,14 @@ class LabAppointment(TimeStampedModel, CouponsMixin, LabAppointmentInvoiceMixin,
                 out_obj = self.outstanding_create()
                 self.outstanding = out_obj
         self.save()
+
+        try:
+            txn_obj = self.get_transaction()
+            if txn_obj and txn_obj.is_preauth():
+                notification_tasks.send_capture_payment_request.apply_async(
+                    (Order.LAB_PRODUCT_ID, self.id), eta=timezone.localtime(), )
+        except Exception as e:
+            logger.error(str(e))
 
     def outstanding_create(self):
         admin_obj, out_level = self.get_billable_admin_level()
