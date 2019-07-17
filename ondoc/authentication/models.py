@@ -2038,3 +2038,14 @@ class UserNumberUpdate(TimeStampedModel):
 
     class Meta:
         db_table = "user_number_updates"
+
+
+class GenericQuestionAnswer(TimeStampedModel):
+    question = models.TextField(null=False, verbose_name='Question')
+    answer = models.TextField(null=True, verbose_name='Answer')
+    content_type = models.ForeignKey(ContentType, on_delete=models.DO_NOTHING)
+    object_id = models.BigIntegerField()
+    content_object = GenericForeignKey()
+
+    class Meta:
+        db_table = "generic_question_answer"

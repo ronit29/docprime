@@ -8,7 +8,7 @@ from collections import defaultdict, OrderedDict
 from ondoc.api.v1.procedure.serializers import DoctorClinicProcedureSerializer, OpdAppointmentProcedureMappingSerializer
 from ondoc.api.v1.ratings.serializers import RatingsGraphSerializer
 from ondoc.cart.models import Cart
-from ondoc.common.models import Feature
+from ondoc.common.models import Feature, MatrixMappedCity
 from ondoc.doctor.models import (OpdAppointment, Doctor, Hospital, DoctorHospital, DoctorClinicTiming,
                                  DoctorAssociation,
                                  DoctorAward, DoctorDocument, DoctorEmail, DoctorExperience, DoctorImage,
@@ -1988,6 +1988,7 @@ class HospitalDetailIpdProcedureSerializer(TopHospitalForIpdProcedureSerializer)
     new_about = serializers.SerializerMethodField(read_only=True)
     all_specializations = serializers.SerializerMethodField(read_only=True)
     all_doctors = serializers.SerializerMethodField(read_only=True)
+    all_cities = serializers.SerializerMethodField(read_only=True)
 
     class Meta(TopHospitalForIpdProcedureSerializer.Meta):
         model = Hospital
@@ -1999,11 +2000,14 @@ class HospitalDetailIpdProcedureSerializer(TopHospitalForIpdProcedureSerializer)
                                                                      'contact_number', 'specialization_doctors',
                                                                      'offers', 'is_ipd_hospital', 'new_about',
                                                                      'show_popup', 'force_popup', 'enabled_for_prepaid',
-                                                                     'all_specializations', 'all_doctors')
+                                                                     'all_specializations', 'all_doctors', 'all_cities')
 
     def get_all_doctors(self, obj):
         q = Doctor.objects.filter(is_live=True, doctor_clinics__enabled=True, doctor_clinics__hospital=obj).distinct()
         return [{'id': x.id, 'name': x.name} for x in q]
+
+    def get_all_cities(self, obj):
+        return obj.get_all_cities()
 
     def get_all_specializations(self, obj):
         from ondoc.doctor.models import PracticeSpecialization
@@ -2233,6 +2237,8 @@ class IpdProcedureLeadSerializer(serializers.ModelSerializer):
     first_name = serializers.CharField(max_length=100, required=False, allow_null=True, allow_blank=True)
     last_name = serializers.CharField(max_length=100, required=False, allow_null=True, allow_blank=True)
     requested_date_time = serializers.DateTimeField(required=False, default=None, allow_null=True)
+    matrix_city = serializers.PrimaryKeyRelatedField(queryset=MatrixMappedCity.objects.all(),
+                                                     required=False, allow_null=True)
 
     class Meta:
         model = IpdProcedureLead
@@ -2316,6 +2322,8 @@ class IpdLeadUpdateSerializerPopUp(serializers.Serializer):
     hospital = serializers.PrimaryKeyRelatedField(queryset=Hospital.objects.filter(is_live=True), required=False, allow_null=True)
     doctor = serializers.PrimaryKeyRelatedField(queryset=Doctor.objects.filter(is_live=True), required=False, allow_null=True)
     city = serializers.CharField(required=False, allow_null=True, allow_blank=True)
+    matrix_city = serializers.PrimaryKeyRelatedField(queryset=MatrixMappedCity.objects.all(),
+                                                     required=False, allow_null=True)
 
     def validate(self, attrs):
         if not IpdProcedureLead.objects.filter(id=attrs.get('id')).exists():

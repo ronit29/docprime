@@ -14,7 +14,8 @@ from .common import *
 from ondoc.crm.constants import constants
 from django.utils.safestring import mark_safe
 from django.contrib.admin import SimpleListFilter
-from ondoc.authentication.models import GenericAdmin, User, QCModel, DoctorNumber, AssociatedMerchant, SPOCDetails
+from ondoc.authentication.models import GenericAdmin, User, QCModel, DoctorNumber, AssociatedMerchant, SPOCDetails, \
+    GenericQuestionAnswer
 from ondoc.authentication.admin import SPOCDetailsInline
 from django import forms
 from ondoc.api.v1.utils import GenericAdminEntity
@@ -428,6 +429,31 @@ class HospCityFilter(SimpleListFilter):
             return queryset.filter(city__iexact=self.value()).distinct()
 
 
+class QuestionAnswerInline(GenericTabularInline):
+    model = GenericQuestionAnswer
+    extra = 0
+    can_delete = True
+    verbose_name = "FAQ"
+    verbose_name_plural = "FAQs"
+    fields = ['add_or_change_link', 'preview']
+    readonly_fields = ['add_or_change_link', 'preview']
+
+    def add_or_change_link(self, obj):
+        if obj and obj.id:
+            url = reverse('admin:authentication_genericquestionanswer_change', kwargs={"object_id": obj.id})
+        else:
+            url = reverse('admin:authentication_genericquestionanswer_add')
+        final_url = "<a href='{}' target=_blank>Click Here</a>".format(url)
+        return mark_safe(final_url)
+    add_or_change_link.short_description = "Link"
+
+    def preview(self, obj):
+        result = None
+        if obj and obj.id:
+            result = "{}".format(obj.question)
+        return result
+
+
 class HospitalAdmin(admin.GeoModelAdmin, VersionAdmin, ActionAdmin, QCPemAdmin):
     list_filter = ('data_status', 'welcome_calling_done', 'enabled_for_online_booking', 'enabled', CreatedByFilter,
                    HospCityFilter)
@@ -452,6 +478,7 @@ class HospitalAdmin(admin.GeoModelAdmin, VersionAdmin, ActionAdmin, QCPemAdmin):
         HospitalImageInline,
         HospitalDocumentInline,
         HospitalCertificationInline,
+        QuestionAnswerInline,
         GenericAdminInline,
         SPOCDetailsInline,
         AssociatedMerchantInline,
@@ -646,3 +673,15 @@ class CommonHospitalAdmin(admin.ModelAdmin):
     class Meta:
         model = CommonHospital
         fields = '__all__'
+
+
+class GenericQuestionAnswerForm(forms.ModelForm):
+
+    class Media:
+        extend = True
+        js = ('https://cdn.ckeditor.com/4.11.4/standard-all/ckeditor.js', 'q_a/js/init.js')
+        css = {'all': ('q_a/css/style.css',)}
+
+
+class GenericQuestionAnswerAdmin(admin.ModelAdmin):
+    form = GenericQuestionAnswerForm

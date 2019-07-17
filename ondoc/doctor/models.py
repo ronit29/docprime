@@ -273,6 +273,17 @@ class Hospital(auth_model.TimeStampedModel, auth_model.CreatedByModel, auth_mode
     #         self.city_search_key = search_city
     #         return self.city
     #     return None
+
+    def get_all_cities(self):
+        result = []
+        q = MatrixMappedCity.objects.prefetch_related('state').all()
+        if self and self.matrix_city:
+            q = q.exclude(id=self.matrix_city.id)
+            result.append({'id': self.matrix_city.id, 'name': self.matrix_city.name,
+                           'state': self.matrix_city.state.name if self.matrix_city.state else None})
+        result.extend([{'id': x.id, 'name': x.name, 'state': x.state.name if x.state else None} for x in q])
+        return result
+
     @staticmethod
     def get_top_hospitals_data(request, lat=28.450367, long=77.071848):
         from ondoc.api.v1.doctor.serializers import TopHospitalForIpdProcedureSerializer

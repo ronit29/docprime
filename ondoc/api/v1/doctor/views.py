@@ -984,6 +984,7 @@ class DoctorProfileUserViewSet(viewsets.GenericViewSet):
 
         hospital = None
         potential_ipd = False
+        all_cities = []
         all_ipd_cities = set(PotentialIpdCity.objects.all().values_list('city', flat=True))
         if doctor_clinics:
             for doc_clinic in doctor_clinics:
@@ -991,6 +992,8 @@ class DoctorProfileUserViewSet(viewsets.GenericViewSet):
                     if doc_clinic.hospital.is_live and doc_clinic.hospital.matrix_city and doc_clinic.hospital.matrix_city.id in all_ipd_cities:
                         potential_ipd = True
                     hospital = doc_clinic.hospital
+                    if not all_cities:
+                        all_cities = hospital.get_all_cities()
                     hosp_reviews_dict = dict()
                     hosp_reviews_dict[hospital.pk] = dict()
                     hosp_reviews_dict[hospital.pk]['google_rating'] = list()
@@ -1024,6 +1027,7 @@ class DoctorProfileUserViewSet(viewsets.GenericViewSet):
 
         response_data['google_rating'] = google_rating
         response_data['potential_ipd'] = potential_ipd
+        response_data['all_cities'] = all_cities
         return Response(response_data)
 
 
@@ -4453,7 +4457,6 @@ class IpdProcedureViewSet(viewsets.GenericViewSet):
         temp_id = validated_data.pop('id')
         IpdProcedureLead.objects.filter(matrix_lead_id=temp_id).update(**validated_data)
         return Response({'message': 'Success'})
-
 
     def list_by_alphabet(self, request):
         import re
