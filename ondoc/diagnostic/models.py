@@ -60,7 +60,7 @@ from ondoc.ratings_review import models as ratings_models
 # from ondoc.api.v1.common import serializers as common_serializers
 from ondoc.common.models import AppointmentHistory, AppointmentMaskNumber, Remark, GlobalNonBookable, \
     SyncBookingAnalytics, CompletedBreakupMixin, RefundDetails, MatrixMappedState, \
-    MatrixMappedCity, TdsDeductionMixin, MatrixDataMixin
+    MatrixMappedCity, TdsDeductionMixin, MatrixDataMixin, MerchantPayoutMixin
 import reversion
 from decimal import Decimal
 from django.utils.text import slugify
@@ -1551,7 +1551,7 @@ class LabAppointmentInvoiceMixin(object):
 
 
 @reversion.register()
-class LabAppointment(TimeStampedModel, CouponsMixin, LabAppointmentInvoiceMixin, RefundMixin, CompletedBreakupMixin, MatrixDataMixin, TdsDeductionMixin, PaymentMixin):
+class LabAppointment(TimeStampedModel, CouponsMixin, LabAppointmentInvoiceMixin, RefundMixin, CompletedBreakupMixin, MatrixDataMixin, TdsDeductionMixin, PaymentMixin, MerchantPayoutMixin):
     from ondoc.integrations.models import IntegratorResponse
     PRODUCT_ID = Order.LAB_PRODUCT_ID
     CREATED = 1
@@ -2601,6 +2601,9 @@ class LabAppointment(TimeStampedModel, CouponsMixin, LabAppointmentInvoiceMixin,
         provider_booking_id = ''
         merchant_code = ''
         is_ipd_hospital = '1' if self.lab.is_ipd_lab else '0'
+        hospital_name = ''
+        if self.lab and self.lab.is_ipd_lab and self.lab.related_hospital:
+            hospital_name = self.lab.related_hospital.name
         service_name = ','.join([test_obj.test.name for test_obj in self.test_mappings.all()])
         location_verified = self.lab.is_location_verified
         provider_id = self.lab.id
@@ -2700,7 +2703,8 @@ class LabAppointment(TimeStampedModel, CouponsMixin, LabAppointmentInvoiceMixin,
             "RefundPaymentMode": float(refund_data['original_payment_mode_refund']) if refund_data['original_payment_mode_refund'] else None,
             "RefundToWallet": float(refund_data['promotional_wallet_refund']) if refund_data['promotional_wallet_refund'] else None,
             "RefundInitiationDate": int(refund_data['refund_initiated_at']) if refund_data['refund_initiated_at'] else None,
-            "RefundURN": refund_data['refund_urn']
+            "RefundURN": refund_data['refund_urn'],
+            "HospitalName": hospital_name
         }
         return appointment_details
 

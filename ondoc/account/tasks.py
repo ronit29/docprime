@@ -242,7 +242,9 @@ def update_ben_status_from_pg():
 def update_merchant_payout_pg_status():
     from ondoc.account.models import MerchantPayout
     # payouts = MerchantPayout.objects.all().order_by('-id')
-    payouts = MerchantPayout.objects.filter(Q(pg_status='SETTLEMENT_COMPLETED')|Q(utr_no__gt='')|Q(utr_no__isnull=False)|Q(type=2))
+    # payouts = MerchantPayout.objects.filter(Q(pg_status='SETTLEMENT_COMPLETED')|Q(utr_no__gt='')|Q(utr_no__isnull=False)|Q(type=2))
+
+    payouts = MerchantPayout.objects.filter((Q(pg_status='SETTLEMENT_COMPLETED') & Q(utr_no='')) | Q(status=MerchantPayout.INPROCESS) | Q(type=2))
     for p in payouts:
         p.refresh_from_db()
         p.update_status_from_pg()
@@ -466,7 +468,6 @@ def process_payout(payout_id):
 
         if not order_data:
              raise Exception("Order not found for given payout " + str(payout_data))
-
 
         all_txn = order_data.getTransactions()
 

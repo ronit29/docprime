@@ -32,6 +32,11 @@ from django.db.models import Q
 from django import forms
 
 
+class MediaImportMixin(ImportExportModelAdmin):
+    from import_export.tmp_storages import MediaStorage
+    tmp_storage_class = MediaStorage
+
+
 def practicing_since_choices():
     return [(None,'---------')]+[(x, str(x)) for x in range(datetime.datetime.now().year,datetime.datetime.now().year-80,-1)]
 
@@ -446,23 +451,43 @@ class MerchantPayoutForm(forms.ModelForm):
                 if not associated_merchant.verified:
                     raise forms.ValidationError("Associated Merchant not verified.")
 
-        if not self.instance.status == self.instance.PENDING:
-            raise forms.ValidationError("This payout is already under process")
+        if self.instance.status in [3, 4, 6, 7]:
+            raise forms.ValidationError("This payout is already under process or completed or failed")
 
         return self.cleaned_data
 
 
 class MerchantPayoutResource(resources.ModelResource):
 
+    def export(self, queryset=None, *args, **kwargs):
+        queryset = self.get_queryset(**kwargs)
+        fetched_queryset = list(queryset)
+        return super().export(fetched_queryset)
+
+    def get_queryset(self, **kwargs):
+        date_range = [datetime.datetime.strptime(kwargs.get('from_date'), '%Y-%m-%d').date(), datetime.datetime.strptime(
+                                        kwargs.get('to_date'), '%Y-%m-%d').date()]
+        payout_status = kwargs.get('payout_status')
+
+        payouts = MerchantPayout.objects.filter(created_at__date__range=date_range)
+        if payout_status:
+            if [str(x[0]) for x in MerchantPayout.STATUS_CHOICES]:
+                payouts = payouts.filter(status=payout_status)
+
+        payouts = payouts.order_by('-updated_at')
+        return payouts
+
     class Meta:
         model = MerchantPayout
         fields = ('id', 'payment_mode', 'payout_ref_id', 'charged_amount', 'payable_amount', 'payout_approved',
-                  'status', 'payout_time', 'api_response', 'retry_count', 'paid_to', 'utr_no', 'type', 'amount_paid',
+                  'status', 'payout_time', 'retry_count', 'paid_to', 'utr_no', 'type', 'amount_paid',
                   'content_type', 'object_id')
 
 
-class MerchantPayoutAdmin(ExportMixin, VersionAdmin):
+class MerchantPayoutAdmin(MediaImportMixin, VersionAdmin):
+    export_template_name = "export_merchant_payout.html"
     resource_class = MerchantPayoutResource
+    formats = (base_formats.XLS,)
     form = MerchantPayoutForm
     model = MerchantPayout
     fields = ['id','booking_type', 'payment_mode','charged_amount', 'updated_at', 'created_at', 'payable_amount', 'tds_amount', 'status', 'payout_time', 'paid_to',
@@ -473,13 +498,13 @@ class MerchantPayoutAdmin(ExportMixin, VersionAdmin):
 
     def get_queryset(self, request):
         return super().get_queryset(request).filter(payable_amount__gt=0).order_by('-id').prefetch_related('lab_appointment__lab',
-                                                                             'opd_appointment__doctor', 'user_insurance')
+                                                                                                           'opd_appointment__doctor', 'user_insurance')
 
     def get_search_results(self, request, queryset, search_term):
         queryset, use_distinct = super().get_search_results(request, queryset, None)
         if search_term:
             queryset = queryset.filter(Q(opd_appointment__doctor__name__icontains=search_term) |
-             Q(lab_appointment__lab__name__icontains=search_term))
+                                       Q(lab_appointment__lab__name__icontains=search_term))
 
         return queryset, use_distinct
 
@@ -542,6 +567,20 @@ class MerchantPayoutAdmin(ExportMixin, VersionAdmin):
             return mark_safe(html)
 
         return ''
+
+    def get_export_data(self, file_format, queryset, *args, **kwargs):
+        """
+        Returns file_format representation for given queryset.
+        """
+        kwargs['from_date'] = kwargs.get('request').POST.get('from_date')
+        kwargs['to_date'] = kwargs.get('request').POST.get('to_date')
+        kwargs['payout_status'] = kwargs.get('request').POST.get('payout_status')
+        resource_class = self.get_export_resource_class()
+        data = resource_class(**self.get_export_resource_kwargs(kwargs.get('request'))).export(queryset, *args,
+                                                                                               **kwargs)
+        export_data = file_format.export_data(data)
+        return export_data
+        # return super().get_export_data(file_format, queryset, *args, **kwargs)
 
 
 class AssociatedMerchantInline(GenericTabularInline, nested_admin.NestedTabularInline):
@@ -793,3 +832,5 @@ class FraudInline(GenericTabularInline):
     fields = ['reason', 'user', 'created_at']
     editable = False
     readonly_fields = ['created_at', 'user']
+
+

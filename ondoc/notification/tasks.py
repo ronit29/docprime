@@ -475,7 +475,7 @@ def send_appointment_location_message(number, hospital_lat, hospital_long):
 
 @task()
 def process_payout(payout_id):
-    from ondoc.account.models import MerchantPayout, Order
+    from ondoc.account.models import MerchantPayout, Order, MerchantPayoutLog
     from ondoc.account.models import DummyTransactions
     from ondoc.doctor.models import OpdAppointment
 
@@ -489,17 +489,15 @@ def process_payout(payout_id):
         if payout_data.status == payout_data.PAID:
             raise Exception("Payment already done for this payout")
 
-
         default_payment_mode = payout_data.get_default_payment_mode()
         appointment = payout_data.get_appointment()
-        if not appointment :
+        if not appointment:
             raise Exception("Insufficient Data " + str(payout_data))
 
         if not payout_data.booking_type == payout_data.InsurancePremium:
             if appointment.payment_type in [OpdAppointment.COD]:
                 raise Exception("Cannot process payout for COD appointments")
 
-        
         billed_to = payout_data.get_billed_to()
         merchant = payout_data.get_merchant()
         order_data = None
@@ -515,21 +513,19 @@ def process_payout(payout_id):
             if not associated_merchant.verified:
                 raise Exception("Associated Merchant not verified. " + str(payout_data))
 
-
         # assuming 1 to 1 relation between Order and Appointment
         order_data = Order.objects.filter(reference_id=appointment.id).order_by('-id').first()
 
         if not order_data:
-             raise Exception("Order not found for given payout " + str(payout_data))
-
+            raise Exception("Order not found for given payout " + str(payout_data))
 
         all_txn = order_data.getTransactions()
 
         if not all_txn or all_txn.count() == 0:
             raise Exception("No transactions found for given payout " + str(payout_data))
 
-        req_data = { "payload" : [], "checkSum" : "" }
-        req_data2 = { "payload" : [], "checkSum" : "" }
+        req_data = {"payload": [], "checkSum": ""}
+        req_data2 = {"payload": [], "checkSum": ""}
 
         idx = 0
         for txn in all_txn:
@@ -553,9 +549,9 @@ def process_payout(payout_id):
                 curr_txn2["txnAmount"] = str(0)
                 curr_txn2["idx"] = len(req_data2.get('payload'))
                 req_data2["payload"].append(curr_txn2)
-
+        payout_data.update_status('initiated')
         payout_status = None
-        if len(req_data2.get('payload'))>0:
+        if len(req_data2.get('payload')) > 0:
             payout_status = request_payout(req_data2, order_data)
             payout_data.request_data = req_data2
 
@@ -563,17 +559,23 @@ def process_payout(payout_id):
             payout_status = request_payout(req_data, order_data)
             payout_data.request_data = req_data
 
-        if payout_status:            
+        if payout_status:
             payout_data.api_response = payout_status.get("response")
             if payout_status.get("status"):
                 payout_data.payout_time = datetime.datetime.now()
-                payout_data.status = payout_data.PAID
+                # # Removed PAID status and add add initiated status when payout processed
+                # payout_data.status = payout_data.PAID
+                payout_data.status = payout_data.INPROCESS
             else:
                 payout_data.retry_count += 1
+                payout_data.status = payout_data.FAILED_FROM_QUEUE
 
             payout_data.save()
 
     except Exception as e:
+        # update payout status
+        payout_data.update_status('attempted')
+        MerchantPayoutLog.create_log(payout_data, str(e))
         logger.error("Error in processing payout - with exception - " + str(e))
 
 
@@ -729,8 +731,7 @@ def request_payout(req_data, order_data):
 
             if success_payout:
                 return {"status": 1, "response": resp_data}
-            
-    
+
     logger.error("payout failed for request data - " + str(req_data))
     return {"status" : 0, "response" : resp_data}
 
