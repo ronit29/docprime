@@ -1574,9 +1574,11 @@ class MerchantPayout(TimeStampedModel):
     #             p.create_insurance_transaction()
 
     def get_corrosponding_appointment(self):
-        appointment = self.lab_appointment.all().first()
-        if not appointment:
+        appointment = None
+        if self.booking_type == Order.DOCTOR_PRODUCT_ID:
             appointment = self.opd_appointment.all().first()
+        elif self.booking_type == Order.LAB_PRODUCT_ID:
+            appointment = self.lab_appointment.all().first()
 
         return appointment
 
@@ -2126,6 +2128,7 @@ class MerchantPayoutLog(TimeStampedModel):
     is_fixed = models.BooleanField(default=False)
     req_data = JSONField(blank=True, null=True)
     res_data = JSONField(blank=True, null=True)
+    endpoint = models.TextField(null=True, blank=True)
 
     class Meta:
         db_table = "merchant_payout_log"

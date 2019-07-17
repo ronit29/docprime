@@ -740,7 +740,7 @@ class MerchantPayoutMixin(object):
 
     def create_payout_from_appointment(self):
         from ondoc.doctor.models import OpdAppointment
-        if self.merchant_payout is None and self.payment_type not in [OpdAppointment.COD]:
+        if self.status == self.COMPLETED and self.merchant_payout is None and self.payment_type not in [OpdAppointment.COD]:
             self.save_merchant_payout()
             self.update_payout_id(self.merchant_payout_id)
 
