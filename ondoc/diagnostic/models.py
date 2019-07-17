@@ -1407,7 +1407,7 @@ class AvailableLabTest(TimeStampedModel):
                     case 
                     when agreed_price <=0 then mrp*.4 
                     when mrp<=2000 then
-                        case when (least(agreed_price*1.5, .8*mrp) - agreed_price) >100 then least(agreed_price*1.5, .8*mrp) 
+                        case when (least(agreed_price*1.5, .9*mrp) - agreed_price) >100 then least(agreed_price*1.5, .9*mrp) 
                         else least(agreed_price+100, mrp) end
                     else 
                         case when (least(agreed_price*1.5, agreed_price+.5*(mrp-agreed_price)) - agreed_price )>100
@@ -1435,7 +1435,7 @@ class AvailableLabTest(TimeStampedModel):
                 case 
                 when agreed_price <=0 then mrp*.4 
                 when mrp<=2000 then
-                    case when (least(agreed_price*1.5, .8*mrp) - agreed_price) >100 then least(agreed_price*1.5, .8*mrp) 
+                    case when (least(agreed_price*1.5, .9*mrp) - agreed_price) >100 then least(agreed_price*1.5, .9*mrp) 
                     else least(agreed_price+100, mrp) end
                 else 
                     case when (least(agreed_price*1.5, agreed_price+.5*(mrp-agreed_price)) - agreed_price )>100
