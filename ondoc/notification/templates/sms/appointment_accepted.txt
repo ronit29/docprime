@@ -1,4 +1,4 @@
-Appointment ID:{{instance.id}} - Your appointment with Dr.{{doctor_name|capfirst}} is confirmed for {{instance.time_slot_start|date:"D jS F Y"}} at {{instance.time_slot_start|date:"h:i A"}}. Please share unique confirmation code and appointment id while availing the service. Unique Confirmation Code : {{instance.otp}}
+Appointment ID:{{instance.id}} - Your appointment with Dr.{{doctor_name|capfirst}} is confirmed for {{instance.time_slot_start|date:"D jS F Y"}} at {{instance.time_slot_start|date:"h:i A"}}. Please share unique confirmation code and appointment id while availing the service.
 {% if instance.is_credit_letter_required_for_appointment and not instance.is_payment_type_cod and credit_letter_url %}
 Please share the credit letter (provided in the link below) at the time of your appointment.
 {{credit_letter_url}}{% endif %}
