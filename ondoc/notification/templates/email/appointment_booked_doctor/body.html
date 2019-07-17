@@ -7,25 +7,32 @@
     <title>New Appointment</title>
     <meta http-equiv="Content-Type" content="text/html; charset=UTF-8"/>
     <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-    <link href="https://fonts.googleapis.com/css?family=Quicksand:300,400,500,700" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css?family=Quicksand:300,400,500,700"
+          rel="stylesheet">
 </head>
-<body style="margin: 0; padding: 0; width: 100%; font-family: 'Quicksand', sans-serif;">
-<table align="center" cellpadding="0" cellspacing="0" style="width: 100%; max-width: 600px; margin: auto;">
+<body style="margin: 0; padding: 0; width: 100%; font-family:
+'Quicksand', sans-serif;">
+<table align="center" cellpadding="0" cellspacing="0" style="width:
+100%; max-width: 600px; margin: auto;">
     <tbody>
     <tr>
         <td>
-            <table bgcolor="#ececec" style="padding: 0 15px 40px; background-color: #ececec; width: 100%;">
+            <table bgcolor="#ececec" style="padding: 0 15px 40px;
+background-color: #ececec; width: 100%;">
                 <tbody>
                 <tr>
                     <td>
-                        <table cellpadding="0" cellspacing="0" style="width: 100%; padding-top: 20px;">
+                        <table cellpadding="0" cellspacing="0"
+                               style="width: 100%; padding-top: 20px;">
                             <tbody>
                             <tr>
                                 <td>
-                                    <img src="{{'notification/images/appointment.png'|get_absolute_url}}">
+                                    <img
+                                            src="{{'notification/images/appointment.png'|get_absolute_url}}">
                                 </td>
                                 <td style="text-align: right;">
-                                    <img src="{{'notification/images/logo.png'|get_absolute_url}}">
+                                    <img
+                                            src="{{'notification/images/logo.png'|get_absolute_url}}">
                                 </td>
                             </tr>
                             </tbody>
@@ -34,15 +41,18 @@
                 </tr>
                 <tr>
                     <td>
-                        <table cellpadding="0" cellspacing="0" style="width: 100%; padding-top: 16px;">
+                        <table cellpadding="0" cellspacing="0"
+                               style="width: 100%; padding-top: 16px;">
                             <tbody>
                             <tr>
-                                <td style="color: #0b0a0a; font-size: 16px; font-weight: 600;">
+                                <td style="color: #0b0a0a; font-size:
+16px; font-weight: 600;">
                                     New Appointment
                                 </td>
                             </tr>
                             <tr>
-                                <td style="color: #0b0a0a; font-size: 14px; font-weight: 500; padding-top: 4px;">
+                                <td style="color: #0b0a0a; font-size:
+14px; font-weight: 500; padding-top: 4px;">
                                     {{instance.updated_at|date:'M d, Y'}}
                                 </td>
                             </tr>
@@ -60,8 +70,10 @@
                    style="width: 100%; padding: 20px 15px 30px;">
                 <tbody>
                 <tr>
-                    <td style="color: #3f3f3f; font-size: 16px; font-weight: 500;">
-                        Hi,<br/><br/>We have received a new appointment request. Below are the details:
+                    <td style="color: #3f3f3f; font-size: 16px;
+font-weight: 500;">
+                        Hi,<br/><br/>We have received a new
+                        appointment request. Below are the details:
                     </td>
                 </tr>
                 <tr>
@@ -69,85 +81,97 @@
                         <table style="border:1px solid grey">
                             <tbody>
                             <tr>
-                                <td style="color:#000000;font-size:14px;font-weight:700;padding-top:16px;width:40%">
+                                <td
+                                        style="color:#000000;font-size:14px;font-weight:700;padding-top:16px;width:40%">
                                     Appointment ID
                                 </td>
-                                <td style="color:#3f3f3f;font-size:16px;font-weight:500;padding-top:16px">
+                                <td
+                                        style="color:#3f3f3f;font-size:16px;font-weight:500;padding-top:16px">
                                     {{instance.id}}
                                 </td>
                             </tr>
+                            {% if instance.payment_type == instance.COD %}
                             <tr>
-                                <td style="color:#000000;font-size:14px;font-weight:700;padding-top:16px;width:40%">
+                                <td
+                                        style="color:#000000;font-size:14px;font-weight:700;padding-top:16px;width:40%">
                                     Appointment Type
                                 </td>
-                                <td style="color:#000000;font-size:14px;font-weight:700;padding-top:16px;width:40%">
-                                    Pay-At-Hospital(Cash)
-                                </td>
-                            </tr>
-                            <tr>
-                                <td style="color:#000000;font-size:14px;font-weight:700;padding-top:16px;width:40%">
-                                    Appointment Type
-                                </td>
-                                <td style="color:#3f3f3f;font-size:16px;font-weight:500;padding-top:16px">
+                                <td
+                                        style="color:#3f3f3f;font-size:16px;font-weight:500;padding-top:16px">
                                     Pay-At-Hospital(Cash)
                                 </td>
                             </tr>
                             {% endif %}
                             <tr>
-                                <td style="color:#000000;font-size:14px;font-weight:700;padding-top:16px;width:40%">
+                                <td
+                                        style="color:#000000;font-size:14px;font-weight:700;padding-top:16px;width:40%">
                                     Patient Name
                                 </td>
-                                <td style="color:#3f3f3f;font-size:16px;font-weight:500;padding-top:16px">
+                                <td
+                                        style="color:#3f3f3f;font-size:16px;font-weight:500;padding-top:16px">
                                     {{patient_name|capfirst}}
                                 </td>
                             </tr>
                             <tr>
-                                <td style="color:#000000;font-size:14px;font-weight:700;padding-top:16px;width:40%">
-                                   Patient Contact Number
+                                <td
+                                        style="color:#000000;font-size:14px;font-weight:700;padding-top:16px;width:40%">
+                                    Patient Contact Number
                                 </td>
-                                <td style="color:#3f3f3f;font-size:16px;font-weight:500;padding-top:16px">
+                                <td
+                                        style="color:#3f3f3f;font-size:16px;font-weight:500;padding-top:16px">
                                     {{mask_number}}
                                 </td>
                             </tr>
                             <tr>
-                                <td style="color:#000000;font-size:14px;font-weight:700;padding-top:16px;width:40%">
+                                <td
+                                        style="color:#000000;font-size:14px;font-weight:700;padding-top:16px;width:40%">
                                     Appointment with Doctor
                                 </td>
-                                <td style="color:#3f3f3f;font-size:16px;font-weight:500;padding-top:16px">
+                                <td
+                                        style="color:#3f3f3f;font-size:16px;font-weight:500;padding-top:16px">
                                     {{doctor_name|capfirst}}
                                 </td>
                             </tr>
                             <tr>
-                                <td style="color:#000000;font-size:14px;font-weight:700;padding-top:16px;width:40%">
+                                <td
+                                        style="color:#000000;font-size:14px;font-weight:700;padding-top:16px;width:40%">
                                     Hospital/clinic Name
                                 </td>
-                                <td style="color:#3f3f3f;font-size:16px;font-weight:500;padding-top:16px">
+                                <td
+                                        style="color:#3f3f3f;font-size:16px;font-weight:500;padding-top:16px">
                                     {{hospital_name|capfirst}}
                                 </td>
                             </tr>
                             <tr>
-                                <td style="color:#000000;font-size:14px;font-weight:700;padding-top:16px;width:40%">
+                                <td
+                                        style="color:#000000;font-size:14px;font-weight:700;padding-top:16px;width:40%">
                                     Hospital/clinic Address
                                 </td>
-                                <td style="color:#3f3f3f;font-size:16px;font-weight:500;padding-top:16px">
+                                <td
+                                        style="color:#3f3f3f;font-size:16px;font-weight:500;padding-top:16px">
                                     {{hospital_address|capfirst}}
                                 </td>
                             </tr>
                             <tr>
-                                <td style="color:#000000;font-size:14px;font-weight:700;padding-top:16px;width:40%">
+                                <td
+                                        style="color:#000000;font-size:14px;font-weight:700;padding-top:16px;width:40%">
                                     Date and Time
                                 </td>
-                                <td style="color:#3f3f3f;font-size:16px;font-weight:500;padding-top:16px">
-                                    {{instance.time_slot_start|date:"D jS F Y"}} ||
+                                <td
+                                        style="color:#3f3f3f;font-size:16px;font-weight:500;padding-top:16px">
+                                    {{instance.time_slot_start|date:"D
+                                    jS F Y"}} ||
                                     {{instance.time_slot_start|date:"h:i A"}}
                                 </td>
                             </tr>
                             {% if instance.payment_type == instance.COD %}
                             <tr>
-                                <td style="color:#000000;font-size:14px;font-weight:700;padding-top:16px;width:40%">
+                                <td
+                                        style="color:#000000;font-size:14px;font-weight:700;padding-top:16px;width:40%">
                                     Amount to be Collected from Patient
                                 </td>
-                                <td style="color:#3f3f3f;font-size:16px;font-weight:500;padding-top:16px">
+                                <td
+                                        style="color:#3f3f3f;font-size:16px;font-weight:500;padding-top:16px">
                                     Rs.{{cod_amount}}
                                 </td>
                             </tr>
@@ -156,126 +180,161 @@
                         </table>
                     </td>
                 </tr>
-                {% if instance.payment_type != instance.COD %}
                 <tr>
-                    <td style="color: #3f3f3f; font-size: 16px; font-weight: 500; padding-top:10px;">
-                        Please confirm the appointment by using Docprime provider app. Below are the steps to complete the appointment and billing process :<br/>
+                    <td style="color: #3f3f3f; font-size: 16px;
+font-weight: 500; padding-top:10px;">
+                        Please confirm the appointment by using
+                        Docprime provider app. Below are the steps to complete the appointment
+                        and billing process :<br/>
                         <ol>
                             <li>In case you have Docprime Provider App:<br/>
-                            <ul>
-                                <li>Take 4-digit Unique Confirmation Code from the patient</li>
-                                <li>Open the appointment details</li>
-                                <li>Enter the Unique Confirmation Code</li>
-                            </ul>
-                            </li><br/>
-                            <li>In case you do not have Docprime Provider App:<br/>
-                            <ul>
-                                <li>Open the link: <a href="https://provider.docprime.com/opd/otp">https://provider.docprime.com/opd/otp</a></li>
-                                <li>Enter 4-digit Unique Confirmation Code and Appointment ID provided by the patient</li>
-                            </ul>
+                                <ul>
+                                    <li>Take 4-digit Unique Confirmation
+                                        Code from the patient
+                                    </li>
+                                    <li>Open the appointment details</li>
+                                    <li>Enter the Unique Confirmation Code</li>
+                                </ul>
+                            </li>
+                            <br/>
+                            <li>In case you do not have Docprime
+                                Provider App:<br/>
+                                <ul>
+                                    <li>Open the link: <a
+                                            href="https://provider.docprime.com/opd/otp">https://provider.docprime.com/opd/otp</a>
+                                    </li>
+                                    <li>Enter 4-digit Unique Confirmation
+                                        Code and Appointment ID provided by the patient
+                                    </li>
+                                </ul>
                             </li>
                         </ol>
                     </td>
                 </tr>
                 <br/>
                 <tr>
-                    <td style="color: #3f3f3f; font-size: 16px; font-weight: 500;">
+                    <td style="color: #3f3f3f; font-size: 16px;
+font-weight: 500;">
                         Thanks,<br/>Team Docprime.com
                     </td>
                 </tr>
                 {% if instance.payment_type != instance.COD %}
                 <tr>
-                    <td style="color: #3f3f3f; font-size: 16px; font-weight: 500;padding-top: 10px">
-                        Please note that the consultation needs to be done on Credit Basis.<br>
-                        Please do not ask for consultation fees from the customer.
+                    <td style="color: #3f3f3f; font-size: 16px;
+font-weight: 500;padding-top: 10px">
+                        Please note that the consultation needs to be
+                        done on Credit Basis.<br>
+                        Please do not ask for consultation fees from
+                        the customer.
                     </td>
                 </tr>
                 {% endif %}
                 <!--{% if procedures %}-->
                 <!--<tr>-->
-                    <!--<td style="color:#000000;font-size:14px;font-weight:700;padding-top:16px;padding-bottom:2px">-->
-                        <!--Service(s) Included-->
-                    <!--</td>-->
+                <!--<td
+style="color:#000000;font-size:14px;font-weight:700;padding-top:16px;padding-bottom:2px">-->
+                <!--Service(s) Included-->
+                <!--</td>-->
                 <!--</tr>-->
                 <!--<tr>-->
-                    <!--<td>-->
-                        <!--<table cellpadding="0" cellspacing="0" style="width:100%">-->
-                            <!--<tbody>-->
-                            <!--<tr>-->
-                                <!--<th style="font-size:16px;border:1px solid black">-->
-                                    <!--Name-->
-                                <!--</th>-->
-                            <!--</tr>-->
-                            <!--{% for procedure in procedures %}-->
+                <!--<td>-->
+                <!--<table cellpadding="0" cellspacing="0"
+style="width:100%">-->
+                <!--<tbody>-->
+                <!--<tr>-->
+                <!--<th
+style="font-size:16px;border:1px solid black">-->
+                <!--Name-->
+                <!--</th>-->
+                <!--</tr>-->
+                <!--{% for procedure in procedures %}-->
 
-                            <!--<tr>-->
-                                <!--<td style="color:#3f3f3f;font-size:16px;font-weight:500;border:1px solid black;text-align:center;">-->
-                                    <!--{{procedure.name|capfirst}}-->
-                                <!--</td>-->
-                            <!--</tr>-->
-                            <!--{% endfor %}-->
-                            <!--</tbody>-->
-                        <!--</table>-->
-                    <!--</td>-->
+                <!--<tr>-->
+                <!--<td
+style="color:#3f3f3f;font-size:16px;font-weight:500;border:1px solid
+black;text-align:center;">-->
+                <!--{{procedure.name|capfirst}}-->
+                <!--</td>-->
+                <!--</tr>-->
+                <!--{% endfor %}-->
+                <!--</tbody>-->
+                <!--</table>-->
+                <!--</td>-->
                 <!--</tr>-->
                 <!--{% endif %}-->
                 <!--</tbody>-->
-            <!--</table>-->
-        <!--</td>-->
-    <!--</tr>-->
-    <tr>
-        <td>
-            <table cellpadding="0" cellspacing="0" style="width: 100%; padding: 20px 15px 40px;">
-                <tbody>
+                <!--</table>-->
+                <!--</td>-->
+                <!--</tr>-->
                 <tr>
-                    <td style="font-size: 14px; font-weight: 500; color: #757575; text-align: center;  border-top: 1px solid #d3d3d3;">
-                        This is a system-generated e-mail. Please do not reply to this e-mail. For any support
-                        please write to provider@docprime.com
+                    <td>
+                        <table cellpadding="0" cellspacing="0" style="width: 100%;
+padding: 20px 15px 40px;">
+                            <tbody>
+                            <tr>
+                                <td style="font-size: 14px; font-weight: 500;
+color: #757575; text-align: center;  border-top: 1px solid #d3d3d3;">
+                                    This is a system-generated e-mail. Please do
+                                    not reply to this e-mail. For any support
+                                    please write to provider@docprime.com
+                                </td>
+                            </tr>
+                            </tbody>
+                        </table>
+                    </td>
+                </tr>
+                <tr>
+                    <td>
+                        <table cellpadding="0" cellspacing="0" style="width: 100%;
+padding: 10px 15px; background-color: #f78631;">
+                            <tbody>
+                            <tr>
+                                <td style="font-size: 14px; color: #fafafa; width: 55%">
+                                    All Rights Reserved
+                                </td>
+                                <td style="width: 9%; text-align: right;">
+                                    <a
+                                            href="https://www.youtube.com/channel/UCL_6Tstix2ACaBk0jwf_1ug"
+                                            target="_blank"><img
+
+                                            src="{{'notification/images/youtube-email.png'|get_absolute_url}}">
+                                    </a>
+                                </td>
+                                <td style="width: 9%; text-align: right;">
+                                    <a
+                                            href="https://www.instagram.com/docprimeIndia/" target="_blank"><img
+
+                                            src="{{'notification/images/instagram-email.png'|get_absolute_url}}">
+                                    </a>
+                                </td>
+                                <td style="width: 9%; text-align: right;">
+                                    <a
+                                            href="https://www.facebook.com/DocPrimeIndia" target="_blank"><img
+
+                                            src="{{'notification/images/facebook-email.png'|get_absolute_url}}">
+                                    </a>
+                                </td>
+                                <td style="width: 9%; text-align: right;">
+                                    <a href="https://twitter.com/DocPrimeindia"
+                                       target="_blank"><img
+
+                                            src="{{'notification/images/twitter-email.png'|get_absolute_url}}">
+                                    </a>
+                                </td>
+                                <td style="width: 9%; text-align: right;">
+                                    <a
+                                            href="https://www.linkedin.com/company/docprime/" target="_blank"><img
+
+                                            src="{{'notification/images/linkedin-email.png'|get_absolute_url}}">
+                                    </a>
+                                </td>
+                            </tr>
+                            </tbody>
+                        </table>
                     </td>
                 </tr>
                 </tbody>
             </table>
-        </td>
-    </tr>
-    <tr>
-        <td>
-            <table cellpadding="0" cellspacing="0" style="width: 100%; padding: 10px 15px; background-color: #f78631;">
-                <tbody>
-                <tr>
-                    <td style="font-size: 14px; color: #fafafa; width: 55%">
-                        All Rights Reserved
-                    </td>
-                    <td style="width: 9%; text-align: right;">
-                        <a href="https://www.youtube.com/channel/UCL_6Tstix2ACaBk0jwf_1ug" target="_blank"><img
-                                src="{{'notification/images/youtube-email.png'|get_absolute_url}}">
-                        </a>
-                    </td>
-                    <td style="width: 9%; text-align: right;">
-                        <a href="https://www.instagram.com/docprimeIndia/" target="_blank"><img
-                                src="{{'notification/images/instagram-email.png'|get_absolute_url}}">
-                        </a>
-                    </td>
-                    <td style="width: 9%; text-align: right;">
-                        <a href="https://www.facebook.com/DocPrimeIndia" target="_blank"><img
-                                src="{{'notification/images/facebook-email.png'|get_absolute_url}}">
-                        </a>
-                    </td>
-                    <td style="width: 9%; text-align: right;">
-                        <a href="https://twitter.com/DocPrimeindia" target="_blank"><img
-                                src="{{'notification/images/twitter-email.png'|get_absolute_url}}">
-                        </a>
-                    </td>
-                    <td style="width: 9%; text-align: right;">
-                        <a href="https://www.linkedin.com/company/docprime/" target="_blank"><img
-                                src="{{'notification/images/linkedin-email.png'|get_absolute_url}}">
-                        </a>
-                    </td>
-                </tr>
-                </tbody>
-            </table>
-        </td>
-    </tr>
-    </tbody>
-</table>
 </body>
 </html>
+
