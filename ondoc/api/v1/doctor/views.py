@@ -245,6 +245,9 @@ class DoctorAppointmentsViewSet(OndocViewSet):
         # data['is_appointment_insured'], data['insurance_id'], data[
         #     'insurance_message'] = Cart.check_for_insurance(validated_data,request)
         if user_insurance:
+            if user_insurance.status == UserInsurance.ONHOLD:
+                return Response(status=status.HTTP_400_BAD_REQUEST, data={'error': 'Some error occured. Please try '
+                                                                                   'again after some time.'})
             hospital = validated_data.get('hospital')
             doctor = validated_data.get('doctor')
 

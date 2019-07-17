@@ -535,8 +535,10 @@ class DoctorHospitalSerializer(serializers.ModelSerializer):
                     resp['is_insurance_covered'] = True
                 if specialization == InsuranceDoctorSpecializations.SpecializationMapping.GYNOCOLOGIST and doctor_specialization_count_dict.get(specialization, {}).get('count') >= settings.INSURANCE_GYNECOLOGIST_LIMIT:
                     resp['is_insurance_covered'] = False
+                    resp['error_message'] = "Gynocologist Count limit of {} have been exceeded".format(settings.INSURANCE_GYNECOLOGIST_LIMIT)
                 elif specialization == InsuranceDoctorSpecializations.SpecializationMapping.ONCOLOGIST and doctor_specialization_count_dict.get(specialization, {}).get('count') >= settings.INSURANCE_ONCOLOGIST_LIMIT:
                     resp['is_insurance_covered'] = False
+                    resp['error_message'] = "Oncologist Count limit of {} have been exceeded".format(settings.INSURANCE_ONCOLOGIST_LIMIT)
                 else:
                     resp['is_insurance_covered'] = True
 
