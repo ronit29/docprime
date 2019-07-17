@@ -11,7 +11,7 @@ from ondoc.account.models import MerchantPayout, ConsumerAccount, Order, UserRef
 from ondoc.authentication.models import (TimeStampedModel, CreatedByModel, Image, Document, QCModel, UserProfile, User,
                                          UserPermission, GenericAdmin, LabUserPermission, GenericLabAdmin,
                                          BillingAccount, SPOCDetails, RefundMixin, WelcomeCallingDone,
-                                         MerchantTdsDeduction)
+                                         MerchantTdsDeduction, PaymentMixin)
 from ondoc.bookinganalytics.models import DP_OpdConsultsAndTests
 from ondoc.doctor.models import Hospital, SearchKey, CancellationReason, Doctor
 from ondoc.crm.constants import constants
@@ -60,7 +60,7 @@ from ondoc.ratings_review import models as ratings_models
 # from ondoc.api.v1.common import serializers as common_serializers
 from ondoc.common.models import AppointmentHistory, AppointmentMaskNumber, Remark, GlobalNonBookable, \
     SyncBookingAnalytics, CompletedBreakupMixin, RefundDetails, MatrixMappedState, \
-    MatrixMappedCity, TdsDeductionMixin, MatrixDataMixin
+    MatrixMappedCity, TdsDeductionMixin, MatrixDataMixin, MerchantPayoutMixin
 import reversion
 from decimal import Decimal
 from django.utils.text import slugify
@@ -1551,7 +1551,7 @@ class LabAppointmentInvoiceMixin(object):
 
 
 @reversion.register()
-class LabAppointment(TimeStampedModel, CouponsMixin, LabAppointmentInvoiceMixin, RefundMixin, CompletedBreakupMixin, MatrixDataMixin, TdsDeductionMixin):
+class LabAppointment(TimeStampedModel, CouponsMixin, LabAppointmentInvoiceMixin, RefundMixin, CompletedBreakupMixin, MatrixDataMixin, TdsDeductionMixin, PaymentMixin, MerchantPayoutMixin):
     from ondoc.integrations.models import IntegratorResponse
     PRODUCT_ID = Order.LAB_PRODUCT_ID
     CREATED = 1
@@ -1931,6 +1931,14 @@ class LabAppointment(TimeStampedModel, CouponsMixin, LabAppointmentInvoiceMixin,
             except Exception as e:
                 logger.error(str(e))
 
+        if not old_instance:
+            try:
+                txn_obj = self.get_transaction()
+                if txn_obj and txn_obj.is_preauth():
+                    notification_tasks.send_capture_payment_request.apply_async(
+                        (Order.LAB_PRODUCT_ID, self.id), eta=timezone.localtime() + datetime.timedelta(hours=int(settings.PAYMENT_AUTO_CAPTURE_DURATION)), )
+            except Exception as e:
+                logger.error(str(e))
 
         # Do not delete below commented code
         # try:
@@ -2185,7 +2193,8 @@ class LabAppointment(TimeStampedModel, CouponsMixin, LabAppointmentInvoiceMixin,
         if old_instance.status != self.CANCELLED:
             self.status = self.CANCELLED
             self.save()
-            self.action_refund(refund_flag)
+            initiate_refund = old_instance.preauth_process(refund_flag)
+            self.action_refund(refund_flag, initiate_refund)
 
     def get_cancellation_breakup(self):
         wallet_refund = cashback_refund = 0
@@ -2207,6 +2216,14 @@ class LabAppointment(TimeStampedModel, CouponsMixin, LabAppointmentInvoiceMixin,
                 out_obj = self.outstanding_create()
                 self.outstanding = out_obj
         self.save()
+
+        try:
+            txn_obj = self.get_transaction()
+            if txn_obj and txn_obj.is_preauth():
+                notification_tasks.send_capture_payment_request.apply_async(
+                    (Order.LAB_PRODUCT_ID, self.id), eta=timezone.localtime(), )
+        except Exception as e:
+            logger.error(str(e))
 
     def outstanding_create(self):
         admin_obj, out_level = self.get_billable_admin_level()
@@ -2584,6 +2601,9 @@ class LabAppointment(TimeStampedModel, CouponsMixin, LabAppointmentInvoiceMixin,
         provider_booking_id = ''
         merchant_code = ''
         is_ipd_hospital = '1' if self.lab.is_ipd_lab else '0'
+        hospital_name = ''
+        if self.lab and self.lab.is_ipd_lab and self.lab.related_hospital:
+            hospital_name = self.lab.related_hospital.name
         service_name = ','.join([test_obj.test.name for test_obj in self.test_mappings.all()])
         location_verified = self.lab.is_location_verified
         provider_id = self.lab.id
@@ -2683,7 +2703,8 @@ class LabAppointment(TimeStampedModel, CouponsMixin, LabAppointmentInvoiceMixin,
             "RefundPaymentMode": float(refund_data['original_payment_mode_refund']) if refund_data['original_payment_mode_refund'] else None,
             "RefundToWallet": float(refund_data['promotional_wallet_refund']) if refund_data['promotional_wallet_refund'] else None,
             "RefundInitiationDate": int(refund_data['refund_initiated_at']) if refund_data['refund_initiated_at'] else None,
-            "RefundURN": refund_data['refund_urn']
+            "RefundURN": refund_data['refund_urn'],
+            "HospitalName": hospital_name
         }
         return appointment_details
 

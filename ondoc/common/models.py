@@ -734,3 +734,34 @@ class VirtualAppointment(TimeStampedModel):
 
     class Meta:
         db_table = 'virtual_appointment'
+
+
+class MerchantPayoutMixin(object):
+
+    def create_payout_from_appointment(self):
+        from ondoc.doctor.models import OpdAppointment
+        if self.status == self.COMPLETED and self.merchant_payout is None and self.payment_type not in [OpdAppointment.COD]:
+            self.save_merchant_payout()
+            self.update_payout_id(self.merchant_payout_id)
+
+    def update_payout_id(self, payout_id):
+        from ondoc.doctor.models import OpdAppointment
+        from ondoc.diagnostic.models import LabAppointment
+
+        if self.__class__.__name__ == 'OpdAppointment':
+            OpdAppointment.objects.filter(id=self.id).update(merchant_payout_id=payout_id)
+        elif self.__class__.__name__ == 'LabAppointment':
+            LabAppointment.objects.filter(id=self.id).update(merchant_payout_id=payout_id)
+
+
+class Fraud(auth_model.TimeStampedModel):
+    content_type = models.ForeignKey(ContentType, on_delete=models.DO_NOTHING)
+    object_id = models.PositiveIntegerField()
+    content_object = GenericForeignKey()
+    user = models.ForeignKey(auth_model.User, on_delete=models.SET_NULL, null=True, blank=True)
+    reason = models.TextField(max_length=300)
+
+    class Meta:
+        db_table = 'fraud'
+        unique_together = ('content_type', 'object_id',)
+

@@ -9,7 +9,7 @@ from import_export.admin import ImportExportModelAdmin
 from import_export import resources
 from ondoc.authentication.models import User, UserProfile
 from django.utils.crypto import get_random_string
-
+from ondoc.crm.admin.common import MediaImportMixin
 
 class LabNetworkAutocomplete(autocomplete.Select2QuerySetView):
 
@@ -371,12 +371,12 @@ class UserSpecificCouponResource(resources.ModelResource):
         fields = ('phone_number', 'coupon', 'id', 'user', 'count')
 
 
-class UserSpecificCouponAdmin(ImportExportModelAdmin):
+class UserSpecificCouponAdmin(MediaImportMixin):
 
-    from import_export.tmp_storages import MediaStorage
+    # from import_export.tmp_storages import MediaStorage
 
     resource_class = UserSpecificCouponResource
-    tmp_storage_class = MediaStorage
+    # tmp_storage_class = MediaStorage
 
 
 class RandomGeneratedCouponAdmin(ImportExportModelAdmin):
