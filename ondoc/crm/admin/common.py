@@ -32,6 +32,11 @@ from django.db.models import Q
 from django import forms
 
 
+class MediaImportMixin(ImportExportModelAdmin):
+    from import_export.tmp_storages import MediaStorage
+    tmp_storage_class = MediaStorage
+
+
 def practicing_since_choices():
     return [(None,'---------')]+[(x, str(x)) for x in range(datetime.datetime.now().year,datetime.datetime.now().year-80,-1)]
 
@@ -446,8 +451,8 @@ class MerchantPayoutForm(forms.ModelForm):
                 if not associated_merchant.verified:
                     raise forms.ValidationError("Associated Merchant not verified.")
 
-        if not self.instance.status == self.instance.PENDING:
-            raise forms.ValidationError("This payout is already under process")
+        if self.instance.status in [3, 4, 6, 7]:
+            raise forms.ValidationError("This payout is already under process or completed or failed")
 
         return self.cleaned_data
 
@@ -479,7 +484,7 @@ class MerchantPayoutResource(resources.ModelResource):
                   'content_type', 'object_id')
 
 
-class MerchantPayoutAdmin(ExportMixin, VersionAdmin):
+class MerchantPayoutAdmin(MediaImportMixin, VersionAdmin):
     export_template_name = "export_merchant_payout.html"
     resource_class = MerchantPayoutResource
     formats = (base_formats.XLS,)
@@ -493,13 +498,13 @@ class MerchantPayoutAdmin(ExportMixin, VersionAdmin):
 
     def get_queryset(self, request):
         return super().get_queryset(request).filter(payable_amount__gt=0).order_by('-id').prefetch_related('lab_appointment__lab',
-                                                                             'opd_appointment__doctor', 'user_insurance')
+                                                                                                           'opd_appointment__doctor', 'user_insurance')
 
     def get_search_results(self, request, queryset, search_term):
         queryset, use_distinct = super().get_search_results(request, queryset, None)
         if search_term:
             queryset = queryset.filter(Q(opd_appointment__doctor__name__icontains=search_term) |
-             Q(lab_appointment__lab__name__icontains=search_term))
+                                       Q(lab_appointment__lab__name__icontains=search_term))
 
         return queryset, use_distinct
 
@@ -827,3 +832,5 @@ class FraudInline(GenericTabularInline):
     fields = ['reason', 'user', 'created_at']
     editable = False
     readonly_fields = ['created_at', 'user']
+
+
