@@ -409,6 +409,7 @@ def payment_details(request, order):
     from ondoc.authentication.models import UserProfile
     from ondoc.insurance.models import InsurancePlans
     from ondoc.account.models import PgTransaction, Order
+    from ondoc.notification.tasks import save_pg_response
     payment_required = True
     user = request.user
     if user.email:
@@ -503,6 +504,7 @@ def payment_details(request, order):
     pgdata.update(filtered_pgdata)
     pgdata['hash'] = PgTransaction.create_pg_hash(pgdata, secret_key, client_key)
 
+    save_pg_response.apply_async((order.id, None, None, pgdata), eta=timezone.localtime(), )
     return pgdata, payment_required
 
 

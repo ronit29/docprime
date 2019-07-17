@@ -20,12 +20,15 @@ class PgLogs(DynamicDocument, TimeStampedModel):
     response = DictField(blank=True, null=True)
 
     @classmethod
-    def save_pg_response(cls, order_id, txn_id, response):
-        if not isinstance(response, dict):
+    def save_pg_response(cls, order_id, txn_id, response=None, request=None):
+        if request and not isinstance(request, dict):
+            request = json.loads(request)
+        if response and not isinstance(response, dict):
             response = json.loads(response)
         if settings.MONGO_STORE:
             PgLogs.objects.create(pg_transaction_id=txn_id,
                                   order_id=order_id,
                                   response=response,
+                                  request=request,
                                   created_at=timezone.localtime(),
                                   updated_at=timezone.localtime())
