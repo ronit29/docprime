@@ -2143,7 +2143,7 @@ class MerchantPayout(TimeStampedModel):
                 MerchantPayout.objects.filter(id=self.id).update(content_type_id=content_type, object_id=appt.get_billed_to.id)
 
             am = AssociatedMerchant.objects.filter(object_id=appt.get_billed_to.id, content_type_id=content_type).first()
-            if not am.merchant_id == self.paid_to_id:
+            if am and not am.merchant_id == self.paid_to_id:
                 if appt and appt.get_merchant:
                     MerchantPayout.objects.filter(id=self.id).update(paid_to=appt.get_merchant)
 
