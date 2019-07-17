@@ -1,4 +1,3 @@
-Appointment ID <<{{instance.id}}>>:
-We still haven't received any response from you! Please click on the link to complete your appointment with Dr.{{doctor_name|capfirst}}, scheduled on {{instance.time_slot_start|date:"D jS F Y"}}
+Appointment ID:{{instance.id}} - We still haven't received any response from you! Please click on the link to complete your appointment with Dr.{{doctor_name|capfirst}}, scheduled on {{instance.time_slot_start|date:"D jS F Y"}}
 {{opd_appointment_complete_url}}.
 Want to reschedule, click here {{reschdule_appointment_bypass_url}}

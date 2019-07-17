@@ -1,3 +1,2 @@
-Appointment ID<<{{instance.id}}>>:
-Please share your valuable feedback for your recent appointment with Dr.{{doctor_name|capfirst}}.
+Appointment ID:{{instance.id}} - Please share your valuable feedback for your recent appointment with Dr.{{doctor_name|capfirst}}.
 {{opd_appointment_feedback_url}}

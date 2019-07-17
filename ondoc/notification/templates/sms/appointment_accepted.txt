@@ -1,25 +1,8 @@
-Appointment ID <<{{instance.id}}>> : Your appointment with Dr.{{doctor_name|capfirst}} is confirmed for {{instance.time_slot_start|date:"D jS F Y"}} at {{instance.time_slot_start|date:"h:i A"}}. Please share unique confirmation code and appointment id while availing the service. Unique Confirmation Code : {{instance.otp}}
+Appointment ID:{{instance.id}} - Your appointment with Dr.{{doctor_name|capfirst}} is confirmed for {{instance.time_slot_start|date:"D jS F Y"}} at {{instance.time_slot_start|date:"h:i A"}}. Please share unique confirmation code and appointment id while availing the service. Unique Confirmation Code : {{instance.otp}}
 {% if instance.is_credit_letter_required_for_appointment and not instance.is_payment_type_cod and credit_letter_url %}
 Please share the credit letter (provided in the link below) at the time of your appointment.
 {{credit_letter_url}}{% endif %}
 {% if not instance.hospital.id in hospitals_not_required_unique_code %}
 Unique Confirmation Code : {{instance.otp}}
 Please share this code with doctor at the time of appointment.
-{% endif %}
-The booking details are as below :
-Booking ID : {{instance.id}}
-Patient Name : {{patient_name|capfirst}}
-Doctor Name : Dr. {{doctor_name|capfirst}}
-{% if show_amounts %}
-{% if instance.payment_type == 2 %}
-Amount To Be Paid :Rs {{cod_amount}}
-{% else %}
-Amount Paid : Rs {{instance.effective_price}}
-{% endif %}
-{% endif %}
-Clinic : {{instance.hospital.name|capfirst}}
-Clinic Address : {{instance.hospital.get_hos_address}}
-Appointment Date and Time : {{instance.time_slot_start|date:"D jS F Y"}} || {{instance.time_slot_start|date:"h:i A"}}
-{% if instance.payment_type == 2 %}
-Please pay Rs {{cod_amount}} at the center at the time of appointment.
 {% endif %}

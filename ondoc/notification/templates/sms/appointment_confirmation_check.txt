@@ -1,4 +1,3 @@
-Appointment ID <<{{instance.id}}>>:
-Please click on the link to complete your appointment with Dr.{{doctor_name|capfirst}}.
+Appointment ID:{{instance.id}} - Please click on the link to complete your appointment with Dr.{{doctor_name|capfirst}}.
 {{opd_appointment_complete_url}}
 Did not make it to the appointment? Click to reschedule {{reschdule_appointment_bypass_url}}.
