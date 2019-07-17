@@ -73,8 +73,7 @@
                     {% else %}
                     <td style="color:#3f3f3f;font-size:16px;font-weight:500;padding-top: 16px;">
                         Appointment for {{patient_name|capfirst}} on {{instance.time_slot_start|date:"d/m/y"}} at
-                        {{instance.time_slot_start|date:"h:i a"}} with {{lab_name|capfirst}} has been cancelled as
-                        requested by you.
+                        {{instance.time_slot_start|date:"h:i a"}} with {{lab_name|capfirst}} has been cancelled.
                     </td>
                     {% endif %}
                 </tr>
