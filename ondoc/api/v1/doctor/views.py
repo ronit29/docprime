@@ -31,7 +31,8 @@ from ondoc.account import models as account_models
 from ondoc.location.models import EntityUrls, EntityAddress, DefaultRating
 from ondoc.procedure.models import Procedure, ProcedureCategory, CommonProcedureCategory, ProcedureToCategoryMapping, \
     get_selected_and_other_procedures, CommonProcedure, CommonIpdProcedure, IpdProcedure, DoctorClinicIpdProcedure, \
-    IpdProcedureFeatureMapping, IpdProcedureDetail, SimilarIpdProcedureMapping, IpdProcedureLead, Offer
+    IpdProcedureFeatureMapping, IpdProcedureDetail, SimilarIpdProcedureMapping, IpdProcedureLead, Offer, \
+    PotentialIpdCity
 from ondoc.seo.models import NewDynamic
 from . import serializers
 from ondoc.api.v2.doctor import serializers as v2_serializers
@@ -848,7 +849,7 @@ class DoctorProfileUserViewSet(viewsets.GenericViewSet):
         coupon_code = request.query_params.get('coupon_code', None)
         doctor = (models.Doctor.objects
                   .prefetch_related('languages__language',
-                                    'doctor_clinics__hospital',
+                                    'doctor_clinics__hospital__matrix_city',
                                     'doctor_clinics__procedures_from_doctor_clinic__procedure__parent_categories_mapping',
                                     'qualifications__qualification',
                                     'qualifications__specialization',
@@ -985,9 +986,13 @@ class DoctorProfileUserViewSet(viewsets.GenericViewSet):
                     response_data['doctors']['doctors_url'] = None
 
         hospital = None
+        potential_ipd = False
+        all_ipd_cities = set(PotentialIpdCity.objects.all().values_list('city', flat=True))
         if doctor_clinics:
             for doc_clinic in doctor_clinics:
                 if doc_clinic and doc_clinic.hospital:
+                    if doc_clinic.hospital.is_live and doc_clinic.hospital.matrix_city and doc_clinic.hospital.matrix_city.id in all_ipd_cities:
+                        potential_ipd = True
                     hospital = doc_clinic.hospital
                     hosp_reviews_dict = dict()
                     hosp_reviews_dict[hospital.pk] = dict()
@@ -1021,6 +1026,7 @@ class DoctorProfileUserViewSet(viewsets.GenericViewSet):
                     google_rating.update(hosp_reviews_dict)
 
         response_data['google_rating'] = google_rating
+        response_data['potential_ipd'] = potential_ipd
         return Response(response_data)
 
 

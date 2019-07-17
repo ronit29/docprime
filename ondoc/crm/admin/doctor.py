@@ -1457,6 +1457,8 @@ class TimePickerWidget(forms.TextInput):
 
 class DoctorOpdAppointmentForm(RefundableAppointmentForm):
 
+    # APPOINTMENT_TYPE = [(OpdAppointment.REGULAR, "Regular"),(OpdAppointment.FOLLOWUP, "Followup")]
+    # appointment_type = forms.ChoiceField(label='Appointment Type', choices=APPOINTMENT_TYPE)
     start_date = forms.DateField(widget=CustomDateInput(format=('%d-%m-%Y'), attrs={'placeholder':'Select a date'}))
     start_time = forms.CharField(widget=TimePickerWidget())
     cancel_type = forms.ChoiceField(label='Cancel Type', choices=((0, 'Cancel and Rebook'),
@@ -1539,6 +1541,9 @@ class DoctorOpdAppointmentForm(RefundableAppointmentForm):
                 raise forms.ValidationError("Can only complete appointment if it is in accepted state.")
             if not cleaned_data.get('custom_otp') == self.instance.otp:
                 raise forms.ValidationError("Entered OTP is incorrect.")
+
+        if not self.instance.insurance and cleaned_data.get('appointment_type') == OpdAppointment.FOLLOWUP:
+            raise forms.ValidationError("Appointment without insurance can not be saved as Followup")
 
         if cleaned_data.get('send_credit_letter'):
             if self.instance.status != cleaned_data.get('status'):
@@ -1714,7 +1719,7 @@ class DoctorOpdAppointmentAdmin(admin.ModelAdmin):
                      'admin_information', 'insurance', 'outstanding', 'procedures_details', 'invoice_urls',
                      'payment_type', 'invoice_urls', 'payout_info', 'refund_initiated', 'get_appointment_type')
         if obj and (obj.status == LabAppointment.COMPLETED or obj.status == LabAppointment.CANCELLED):
-            read_only += ('status',)
+            read_only += ('status', 'appointment_type',)
         if request.user.groups.filter(name=constants['APPOINTMENT_OTP_TEAM']).exists() or request.user.is_superuser:
             read_only = read_only + ('otp',)
 
