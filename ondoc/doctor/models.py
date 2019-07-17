@@ -32,7 +32,7 @@ from datetime import timedelta
 from dateutil import tz
 from django.utils import timezone
 from ondoc.authentication import models as auth_model
-from ondoc.authentication.models import SPOCDetails, RefundMixin, MerchantTdsDeduction
+from ondoc.authentication.models import SPOCDetails, RefundMixin, MerchantTdsDeduction, PaymentMixin
 from ondoc.bookinganalytics.models import DP_OpdConsultsAndTests
 from ondoc.location import models as location_models
 from ondoc.account.models import Order, ConsumerAccount, ConsumerTransaction, PgTransaction, ConsumerRefund, \
@@ -51,8 +51,8 @@ from django.contrib.contenttypes.fields import GenericRelation
 from ondoc.api.v1.utils import get_start_end_datetime, custom_form_datetime, CouponsMixin, aware_time_zone, \
     form_time_slot, util_absolute_url, html_to_pdf, TimeSlotExtraction, resolve_address, generate_short_url
 from ondoc.common.models import AppointmentHistory, AppointmentMaskNumber, Service, Remark, MatrixMappedState, \
-    MatrixMappedCity, GlobalNonBookable, SyncBookingAnalytics, CompletedBreakupMixin, RefundDetails, Documents, \
-    Fraud, TdsDeductionMixin
+    MatrixMappedCity, GlobalNonBookable, SyncBookingAnalytics, CompletedBreakupMixin, RefundDetails, TdsDeductionMixin, \
+    Documents, MerchantPayoutMixin, Fraud
 from ondoc.common.models import QRCode, MatrixDataMixin
 from functools import reduce
 from operator import or_
@@ -2156,7 +2156,7 @@ class OpdAppointmentInvoiceMixin(object):
 
 
 @reversion.register()
-class OpdAppointment(auth_model.TimeStampedModel, CouponsMixin, OpdAppointmentInvoiceMixin, RefundMixin, CompletedBreakupMixin, MatrixDataMixin, TdsDeductionMixin):
+class OpdAppointment(auth_model.TimeStampedModel, CouponsMixin, OpdAppointmentInvoiceMixin, RefundMixin, CompletedBreakupMixin, MatrixDataMixin, TdsDeductionMixin, PaymentMixin, MerchantPayoutMixin):
     PRODUCT_ID = Order.DOCTOR_PRODUCT_ID
     CREATED = 1
     BOOKED = 2
@@ -2512,7 +2512,8 @@ class OpdAppointment(auth_model.TimeStampedModel, CouponsMixin, OpdAppointmentIn
         if old_instance.status != self.CANCELLED:
             self.status = self.CANCELLED
             self.save()
-            self.action_refund(refund_flag)
+            initiate_refund = old_instance.preauth_process(refund_flag)
+            self.action_refund(refund_flag, initiate_refund)
 
     def get_cancellation_breakup(self):
         wallet_refund = cashback_refund = 0
@@ -2535,6 +2536,14 @@ class OpdAppointment(auth_model.TimeStampedModel, CouponsMixin, OpdAppointmentIn
                 out_obj = payout_model.Outstanding.create_outstanding(admin_obj, out_level, app_outstanding_fees)
                 self.outstanding = out_obj
         self.save()
+
+        try:
+            txn_obj = self.get_transaction()
+            if txn_obj and txn_obj.is_preauth():
+                notification_tasks.send_capture_payment_request.apply_async(
+                    (Order.DOCTOR_PRODUCT_ID, self.id), eta=timezone.localtime() , )
+        except Exception as e:
+            logger.error(str(e))
 
     def get_billable_admin_level(self):
         if self.hospital.network and self.hospital.network.is_billing_enabled:
@@ -2673,6 +2682,17 @@ class OpdAppointment(auth_model.TimeStampedModel, CouponsMixin, OpdAppointmentIn
         #         }, ), countdown=countdown)
         # except Exception as e:
         #     logger.error("Error in auto cancel flow - " + str(e))
+
+        if not old_instance:
+            try:
+                txn_obj = self.get_transaction()
+                if txn_obj and txn_obj.is_preauth():
+                    notification_tasks.send_capture_payment_request.apply_async(
+                        (Order.DOCTOR_PRODUCT_ID, self.id), eta=timezone.localtime() + datetime.timedelta(
+                            hours=int(settings.PAYMENT_AUTO_CAPTURE_DURATION)), )
+            except Exception as e:
+                logger.error(str(e))
+
         print('all ops tasks completed')
 
     def save(self, *args, **kwargs):
