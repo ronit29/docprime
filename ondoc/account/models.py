@@ -2140,8 +2140,8 @@ class MerchantPayout(TimeStampedModel):
         else:
             appt = self.get_appointment()
             if appt and appt.get_billed_to:
-                self.content_object = appt.get_billed_to
-                self.save()
+                content_type = ContentType.objects.get_for_model(appt.get_billed_to)
+                MerchantPayout.objects.filter(id=self.id).update(content_type_id=content_type, object_id=appt.get_billed_to.id)
 
     class Meta:
         db_table = "merchant_payout"

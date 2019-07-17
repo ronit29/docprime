@@ -305,16 +305,17 @@ class IpdProcedureLead(auth_model.TimeStampedModel):
             request_data.update({'LabAppointments': self.user.recent_lab_appointment.count()})
         if self.comments:
             request_data.update({'UserComment': self.comments})
-        utm_tags = self.data.get('utm_tags', None)
-        if utm_tags:
-            if utm_tags.get('utm_medium', None):
-                request_data.update({'UTMMedium': utm_tags.get('utm_medium')})
-            if utm_tags.get('utm_campaign', None):
-                request_data.update({'UtmCampaign': utm_tags.get('utm_campaign')})
-            if utm_tags.get('utm_source', None):
-                request_data.update({'UtmSource': utm_tags.get('utm_source')})
-            if utm_tags.get('utm_term', None):
-                request_data.update({'UtmTerm': utm_tags.get('utm_term')})
+        if self.data:
+            utm_tags = self.data.get('utm_tags', None)
+            if utm_tags:
+                if utm_tags.get('utm_medium', None):
+                    request_data.update({'UTMMedium': utm_tags.get('utm_medium')})
+                if utm_tags.get('utm_campaign', None):
+                    request_data.update({'UtmCampaign': utm_tags.get('utm_campaign')})
+                if utm_tags.get('utm_source', None):
+                    request_data.update({'UtmSource': utm_tags.get('utm_source')})
+                if utm_tags.get('utm_term', None):
+                    request_data.update({'UtmTerm': utm_tags.get('utm_term')})
 
     def is_user_insured(self):
         result = False
