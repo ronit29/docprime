@@ -498,6 +498,7 @@ def process_payout(payout_id):
             if appointment.payment_type in [OpdAppointment.COD]:
                 raise Exception("Cannot process payout for COD appointments")
 
+        payout_data.update_billed_to_content_type()
         billed_to = payout_data.get_billed_to()
         merchant = payout_data.get_merchant()
         order_data = None
