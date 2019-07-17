@@ -1285,7 +1285,7 @@ class GenericAdmin(TimeStampedModel, CreatedByModel):
 
     @staticmethod
     def create_users_from_generic_admins():
-        all_admins_without_users = GenericAdmin.objects.filter(user__isnull=True, entity_type=GenericAdmin.HOSPITAL)[:100]
+        all_admins_without_users = GenericAdmin.objects.filter(user__isnull=True, entity_type=GenericAdmin.HOSPITAL).order_by('-updated_at')[:100]
         admins_phone_numbers = all_admins_without_users.values_list('phone_number', flat=True)
         users_for_admins = User.objects.filter(phone_number__in=admins_phone_numbers, user_type=User.DOCTOR)
         users_admin_dict = dict()
@@ -1939,7 +1939,7 @@ class PhysicalAgreementSigned(models.Model):
 class RefundMixin(object):
 
     @transaction.atomic
-    def action_refund(self, refund_flag=1):
+    def action_refund(self, refund_flag=1, initiate_refund=1):
         from ondoc.doctor.models import OpdAppointment
         from ondoc.account.models import ConsumerAccount
         from ondoc.common.models import RefundDetails
@@ -1957,7 +1957,7 @@ class RefundMixin(object):
             consumer_account.credit_cancellation(self, product_id, wallet_refund, cashback_refund)
             if refund_flag:
                 ctx_obj = consumer_account.debit_refund()
-                ConsumerRefund.initiate_refund(self.user, ctx_obj)
+                ConsumerRefund.initiate_refund(self.user, ctx_obj) if initiate_refund else None
 
     def can_agent_refund(self, user):
         from ondoc.crm.constants import constants
@@ -2038,3 +2038,56 @@ class UserNumberUpdate(TimeStampedModel):
 
     class Meta:
         db_table = "user_number_updates"
+
+
+class PaymentMixin(object):
+
+    def capture_payment(self):
+        from ondoc.notification import tasks as notification_tasks
+        notification_tasks.send_capture_payment_request.apply_async(
+            (self.PRODUCT_ID, self.id), eta=timezone.localtime(), )
+
+    def release_payment(self):
+        from ondoc.notification import tasks as notification_tasks
+        notification_tasks.send_release_payment_request.apply_async(
+            (self.PRODUCT_ID, self.id), eta=timezone.localtime(), )
+
+    def preauth_process(self, refund_flag=1):
+        from ondoc.account.models import Order
+        from ondoc.account.models import PgTransaction
+        initiate_refund = 1
+        order = Order.objects.filter(product_id=self.PRODUCT_ID,
+                                         reference_id=self.id).first()
+        if order:
+            order_parent = order.parent
+            txn_obj = PgTransaction.objects.filter(order=order_parent).first() if order_parent else None
+
+            if txn_obj and txn_obj.is_preauth():
+                if refund_flag:
+                    if order_parent.orders.count() > 1:
+                        self.capture_payment()
+                    else:
+                        self.release_payment()
+                        initiate_refund = 0
+                else:
+                    #if order_parent.orders.count() > 1:
+                    self.capture_payment()
+                    initiate_refund = 0
+                    # raise Exception('Preauth booked appointment can not be rebooked.')
+
+        return initiate_refund
+
+    def get_transaction(self):
+        from ondoc.account.models import Order
+        from ondoc.account.models import PgTransaction
+        child_order = Order.objects.filter(reference_id=self.id, product_id=self.PRODUCT_ID).first()
+        parent_order = None
+        pg_transaction = None
+
+        if child_order:
+            parent_order = child_order.parent
+
+        if parent_order:
+            pg_transaction = PgTransaction.objects.filter(order_id=parent_order.id).first()
+
+        return pg_transaction

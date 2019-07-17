@@ -62,7 +62,7 @@ import jwt
 from ondoc.insurance.models import InsuranceTransaction, UserInsurance, InsuredMembers
 from decimal import Decimal
 from ondoc.web.models import ContactUs
-from ondoc.notification.tasks import send_pg_acknowledge
+from ondoc.notification.tasks import send_pg_acknowledge, save_pg_response
 
 from ondoc.ratings_review import models as rate_models
 from django.contrib.contenttypes.models import ContentType
@@ -1031,6 +1031,7 @@ class UserAppointmentsViewSet(OndocViewSet):
         return serializer
 
 
+
 class AddressViewsSet(viewsets.ModelViewSet):
     serializer_class = serializers.AddressSerializer
     authentication_classes = (JWTAuthentication, )
@@ -1217,6 +1218,7 @@ class TransactionViewSet(viewsets.GenericViewSet):
             # log pg data
             try:
                 PgLogs.objects.create(decoded_response=response, coded_response=coded_response)
+                save_pg_response.apply_async((response.get("orderId"), None, response, None), eta=timezone.localtime(), )
             except Exception as e:
                 logger.error("Cannot log pg response - " + str(e))
 
@@ -1246,7 +1248,6 @@ class TransactionViewSet(viewsets.GenericViewSet):
 
             order_obj = Order.objects.select_for_update().filter(pk=response.get("orderId")).first()
             convert_cod_to_prepaid = False
-            # TODO : SHASHANK_SINGH correct amount
             try:
                 if order_obj and response and order_obj.amount != Decimal(
                         response.get('txAmount')) and order_obj.is_cod_order and order_obj.get_deal_price_without_coupon <= Decimal(response.get('txAmount')):
@@ -1257,6 +1258,9 @@ class TransactionViewSet(viewsets.GenericViewSet):
                 pass
 
             if pg_resp_code == 1 and order_obj:
+                if response.get("couponUsed") and response.get("couponUsed") == "false":
+                    order_obj.update_fields_after_coupon_remove()
+
                 response_data = None
                 resp_serializer = serializers.TransactionSerializer(data=response)
                 if resp_serializer.is_valid():
@@ -1341,7 +1345,7 @@ class TransactionViewSet(viewsets.GenericViewSet):
         data['status_code'] = response.get('statusCode')
         data['pg_name'] = response.get('pgGatewayName')
         data['status_type'] = response.get('txStatus')
-        data['transaction_id'] = response.get('pgTxId')
+        data['transaction_id'] = response.get('pgTxId') if not response.get('pgTxId') == 'null' else None
         data['pb_gateway_name'] = response.get('pbGatewayName')
 
         return data

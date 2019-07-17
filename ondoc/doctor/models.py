@@ -32,7 +32,7 @@ from datetime import timedelta
 from dateutil import tz
 from django.utils import timezone
 from ondoc.authentication import models as auth_model
-from ondoc.authentication.models import SPOCDetails, RefundMixin, MerchantTdsDeduction
+from ondoc.authentication.models import SPOCDetails, RefundMixin, MerchantTdsDeduction, PaymentMixin
 from ondoc.bookinganalytics.models import DP_OpdConsultsAndTests
 from ondoc.location import models as location_models
 from ondoc.account.models import Order, ConsumerAccount, ConsumerTransaction, PgTransaction, ConsumerRefund, \
@@ -52,7 +52,7 @@ from ondoc.api.v1.utils import get_start_end_datetime, custom_form_datetime, Cou
     form_time_slot, util_absolute_url, html_to_pdf, TimeSlotExtraction, resolve_address, generate_short_url
 from ondoc.common.models import AppointmentHistory, AppointmentMaskNumber, Service, Remark, MatrixMappedState, \
     MatrixMappedCity, GlobalNonBookable, SyncBookingAnalytics, CompletedBreakupMixin, RefundDetails, TdsDeductionMixin, \
-    Documents
+    Documents, MerchantPayoutMixin, Fraud
 from ondoc.common.models import QRCode, MatrixDataMixin
 from functools import reduce
 from operator import or_
@@ -2142,7 +2142,7 @@ class OpdAppointmentInvoiceMixin(object):
 
 
 @reversion.register()
-class OpdAppointment(auth_model.TimeStampedModel, CouponsMixin, OpdAppointmentInvoiceMixin, RefundMixin, CompletedBreakupMixin, MatrixDataMixin, TdsDeductionMixin):
+class OpdAppointment(auth_model.TimeStampedModel, CouponsMixin, OpdAppointmentInvoiceMixin, RefundMixin, CompletedBreakupMixin, MatrixDataMixin, TdsDeductionMixin, PaymentMixin, MerchantPayoutMixin):
     PRODUCT_ID = Order.DOCTOR_PRODUCT_ID
     CREATED = 1
     BOOKED = 2
@@ -2176,6 +2176,11 @@ class OpdAppointment(auth_model.TimeStampedModel, CouponsMixin, OpdAppointmentIn
                                  (AUTO_CANCELLED, 'Auto Cancelled')]
 
     MAX_FREE_BOOKINGS_ALLOWED = 3
+
+    REGULAR = 1
+    FOLLOWUP = 2
+    APPOINTMENT_TYPE_CHOICES = [(REGULAR, "Regular"), (FOLLOWUP, "Followup")]
+
     # PATIENT_SHOW = 1
     # PATIENT_DIDNT_SHOW = 2
     # PATIENT_STATUS_CHOICES = [PATIENT_SHOW, PATIENT_DIDNT_SHOW]
@@ -2227,6 +2232,8 @@ class OpdAppointment(auth_model.TimeStampedModel, CouponsMixin, OpdAppointmentIn
     is_cod_to_prepaid = models.NullBooleanField(default=False, null=True, blank=True)
     hospital_reference_id = models.CharField(max_length=1000, null=True, blank=True)
     documents = GenericRelation(Documents)
+    fraud = GenericRelation(Fraud)
+    appointment_type = models.PositiveSmallIntegerField(choices=APPOINTMENT_TYPE_CHOICES, null=True, blank=True)
 
     def __str__(self):
         return self.profile.name + " (" + self.doctor.name + ")"
@@ -2412,14 +2419,14 @@ class OpdAppointment(auth_model.TimeStampedModel, CouponsMixin, OpdAppointmentIn
 
     @classmethod
     def create_appointment(cls, appointment_data):
-
+        from ondoc.insurance.models import UserInsurance
         insurance = appointment_data.get('insurance')
         appointment_status = OpdAppointment.BOOKED
 
         if insurance and insurance.is_valid():
             mrp = appointment_data.get('fees')
             insurance_limit_usage_data = insurance.validate_limit_usages(mrp)
-            if insurance_limit_usage_data.get('created_state'):
+            if insurance_limit_usage_data.get('created_state') or insurance.appointment_status == UserInsurance.CREATED:
                 appointment_status = OpdAppointment.CREATED
 
         otp = random.randint(1000, 9999)
@@ -2491,7 +2498,8 @@ class OpdAppointment(auth_model.TimeStampedModel, CouponsMixin, OpdAppointmentIn
         if old_instance.status != self.CANCELLED:
             self.status = self.CANCELLED
             self.save()
-            self.action_refund(refund_flag)
+            initiate_refund = old_instance.preauth_process(refund_flag)
+            self.action_refund(refund_flag, initiate_refund)
 
     def get_cancellation_breakup(self):
         wallet_refund = cashback_refund = 0
@@ -2514,6 +2522,14 @@ class OpdAppointment(auth_model.TimeStampedModel, CouponsMixin, OpdAppointmentIn
                 out_obj = payout_model.Outstanding.create_outstanding(admin_obj, out_level, app_outstanding_fees)
                 self.outstanding = out_obj
         self.save()
+
+        try:
+            txn_obj = self.get_transaction()
+            if txn_obj and txn_obj.is_preauth():
+                notification_tasks.send_capture_payment_request.apply_async(
+                    (Order.DOCTOR_PRODUCT_ID, self.id), eta=timezone.localtime() , )
+        except Exception as e:
+            logger.error(str(e))
 
     def get_billable_admin_level(self):
         if self.hospital.network and self.hospital.network.is_billing_enabled:
@@ -2652,6 +2668,17 @@ class OpdAppointment(auth_model.TimeStampedModel, CouponsMixin, OpdAppointmentIn
         #         }, ), countdown=countdown)
         # except Exception as e:
         #     logger.error("Error in auto cancel flow - " + str(e))
+
+        if not old_instance:
+            try:
+                txn_obj = self.get_transaction()
+                if txn_obj and txn_obj.is_preauth():
+                    notification_tasks.send_capture_payment_request.apply_async(
+                        (Order.DOCTOR_PRODUCT_ID, self.id), eta=timezone.localtime() + datetime.timedelta(
+                            hours=int(settings.PAYMENT_AUTO_CAPTURE_DURATION)), )
+            except Exception as e:
+                logger.error(str(e))
+
         print('all ops tasks completed')
 
     def save(self, *args, **kwargs):
@@ -2674,7 +2701,8 @@ class OpdAppointment(auth_model.TimeStampedModel, CouponsMixin, OpdAppointmentIn
             # while completing appointment
             if database_instance and database_instance.status != self.status and self.status == self.COMPLETED:
                 # add a merchant_payout entry
-                if self.merchant_payout is None and self.payment_type not in [OpdAppointment.COD]:
+                if self.merchant_payout is None and self.payment_type not in [OpdAppointment.COD] and  \
+                        (self.appointment_type != OpdAppointment.FOLLOWUP or not self.is_fraud_appointment):
                     self.save_merchant_payout()
 
                 # credit cashback if any
@@ -2965,7 +2993,8 @@ class OpdAppointment(auth_model.TimeStampedModel, CouponsMixin, OpdAppointmentIn
             "coupon_list": coupon_list,
             "consultation" : {
                 "deal_price": doctor_clinic_timing.deal_price,
-                "mrp": doctor_clinic_timing.mrp
+                "mrp": doctor_clinic_timing.mrp,
+                "fees": doctor_clinic_timing.fees
             },
             "coupon_data" : { "random_coupon_list" : random_coupon_list }
         }
@@ -3303,26 +3332,56 @@ class OpdAppointment(auth_model.TimeStampedModel, CouponsMixin, OpdAppointmentIn
         result['data'] = {'opd_appointment_id': self.id}
         return result
 
-    @classmethod
-    def is_followup_appointment(cls, current_appointment):
-        if not current_appointment:
+    def is_followup_appointment(self):
+        if not self.insurance:
             return False
-        doctor = current_appointment.doctor
-        hospital = current_appointment.hospital
-        profile = current_appointment.profile
-        last_completed_appointment = cls.objects.filter(doctor=doctor, profile=profile, hospital=hospital,
-                                                        status=cls.COMPLETED).order_by('-id').first()
-        if not last_completed_appointment:
+        doctor = self.doctor
+        hospital = self.hospital
+        profile = self.profile
+        last_appointment = None
+
+        # if type == "payout":
+        #     completed_appointment = OpdAppointment.objects.filter(doctor=doctor, profile=profile, hospital=hospital,
+        #                                                           status=OpdAppointment.COMPLETED,
+        #                                                           created_at__lt=self.created_at,
+        #                                                           insurance__isnull=False).order_by('-id')
+        #     if not completed_appointment:
+        #         return False
+        #     last_appointment = completed_appointment.first()
+
+        # if type == "crm":
+        previous_appointments = OpdAppointment.objects.filter(~Q(status=OpdAppointment.CANCELLED) &
+                                                              (Q(appointment_type=OpdAppointment.REGULAR) |
+                                                               Q(appointment_type__isnull=True)),
+                                                              doctor=doctor,
+                                                              profile=profile, hospital=hospital,
+                                                              created_at__lt=self.created_at,
+                                                              insurance__isnull=False).order_by('-id')
+
+        if not previous_appointments:
             return False
-        last_appointment_date = last_completed_appointment.time_slot_start
+        last_appointment = previous_appointments.first()
+
+        last_appointment_date = last_appointment.time_slot_start
         dc_obj = DoctorClinic.objects.filter(doctor=doctor, hospital=hospital, enabled=True).first()
         if not dc_obj:
             return False
         followup_duration = dc_obj.followup_duration
         if not followup_duration:
             followup_duration = settings.DEFAULT_FOLLOWUP_DURATION
-        days_diff = current_appointment.date() - last_appointment_date.date()
+        days_diff = self.time_slot_start.date() - last_appointment_date.date()
         if days_diff.days < followup_duration:
+            return True
+        else:
+            return False
+
+    @property
+    def is_fraud_appointment(self):
+        if not self.insurance:
+            return False
+        content_type = ContentType.objects.get_for_model(OpdAppointment)
+        appointment = Fraud.objects.filter(content_type=content_type, object_id=self.id).first()
+        if appointment:
             return True
         else:
             return False

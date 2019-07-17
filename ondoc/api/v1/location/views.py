@@ -781,7 +781,6 @@ class SearchUrlsViewSet(viewsets.GenericViewSet):
         return Response({"cities": result})
 
     def list_cities_for_hospitals(self, request):
-        # TODO: SHASHANK_SINGH change if anything different logic
         query = '''select eu.url, eu.locality_value as name from entity_urls eu 
                     left join seo_cities sc on eu.locality_value = sc.city
                      where eu.sitemap_identifier='HOSPITALS_CITY' and eu.is_valid =True
