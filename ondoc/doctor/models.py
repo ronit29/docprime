@@ -963,7 +963,7 @@ class Doctor(auth_model.TimeStampedModel, auth_model.QCModel, SearchKey, auth_mo
 
         # update nanavati hospital deal price
 
-        query1 = '''update doctor_clinic_timing set deal_price = mrp*0.20 
+        query1 = '''update doctor_clinic_timing set deal_price = mrp*0.80 
                          where doctor_clinic_id  in (select id from doctor_clinic where doctor_id= %s and  hospital_id=3560 ) '''
 
         update_all_nanavati_doctor_deal_price = RawSql(query1, [self.pk]).execute()
@@ -988,7 +988,7 @@ class Doctor(auth_model.TimeStampedModel, auth_model.QCModel, SearchKey, auth_mo
 
         #update nanavati hospital deal price
 
-        query1 = '''update doctor_clinic_timing set deal_price = mrp*0.20 
+        query1 = '''update doctor_clinic_timing set deal_price = mrp*0.80 
                  where doctor_clinic_id  in (select id from doctor_clinic where hospital_id=3560 ) '''
 
         update_all_nanavati_doctor_deal_price = RawSql(query1, []).execute()
