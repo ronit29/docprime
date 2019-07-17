@@ -2053,7 +2053,7 @@ class UserProfileEmailUpdate(TimeStampedModel):
         return str(self.profile)
 
     def is_request_alive(self):
-        return timezone.now() <= self.otp_expiry
+        return timezone.now() <= self.otp_expiry and not self.otp_verified
 
     @classmethod
     def can_be_changed(cls, user, new_email):

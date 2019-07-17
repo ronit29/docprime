@@ -2201,6 +2201,9 @@ class ProfileEmailUpdateViewset(viewsets.GenericViewSet):
         if not obj:
             return Response(status=status.HTTP_400_BAD_REQUEST)
 
+        if obj.otp_verified:
+            return Response({'success': True, 'message': 'Successfully changed.'})
+
         if not obj.is_request_alive():
             return Response(status=status.HTTP_400_BAD_REQUEST, data={'success': False, 'message': 'Given otp has been expired.'})
 
