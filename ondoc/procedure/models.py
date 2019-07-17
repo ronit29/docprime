@@ -8,7 +8,7 @@ from django.db.models import Q
 
 from ondoc.authentication import models as auth_model
 from ondoc.authentication.models import User, UserProfile
-from ondoc.common.models import Feature, AppointmentHistory, VirtualAppointment
+from ondoc.common.models import Feature, AppointmentHistory, VirtualAppointment, MatrixMappedCity
 from ondoc.coupon.models import Coupon
 from ondoc.doctor.models import DoctorClinic, SearchKey, Hospital, PracticeSpecialization, HealthInsuranceProvider, \
     HospitalNetwork, Doctor, OpdAppointment
@@ -35,6 +35,17 @@ class IpdProcedure(auth_model.TimeStampedModel, SearchKey, auth_model.SoftDelete
 
     class Meta:
         db_table = "ipd_procedure"
+
+    @classmethod
+    def get_locality_dict(cls, temp_ids, city):
+        if not temp_ids:
+            return {}
+        from ondoc.location.models import EntityUrls
+        ipd_entity_qs = list(EntityUrls.objects.filter(is_valid=True,
+                                                       sitemap_identifier=EntityUrls.SitemapIdentifier.IPD_PROCEDURE_CITY,
+                                                       ipd_procedure_id__in=temp_ids, locality_value__iexact=city))
+        ipd_entity_dict = {x.ipd_procedure_id: x.url for x in ipd_entity_qs}
+        return ipd_entity_dict
 
     @classmethod
     def update_ipd_seo_urls(cls):
@@ -154,12 +165,14 @@ class IpdProcedureLead(auth_model.TimeStampedModel):
     DOCPRIMEWEB = "docprimeweb"
     COST_ESTIMATE = "Costestimate"
     DOCP_APP = "DocprimeApp"
+    SEO_DP = "seo_dp"
 
     SOURCE_CHOICES = [(DOCPRIMECHAT, 'DocPrime Chat'),
                       (CRM, 'CRM'),
                       (DOCPRIMEWEB, "DocPrime Web"),
                       (COST_ESTIMATE, "Cost Estimate"),
-                      (DOCP_APP, "Docprime Consumer App")]
+                      (DOCP_APP, "Docprime Consumer App"),
+                      (SEO_DP, "SEO Doctor Profile")]
 
     STATUS_CHOICES = [(None, "--Select--"), (NEW, 'NEW'), (COST_REQUESTED, 'COST_REQUESTED'),
                       (COST_SHARED, 'COST_SHARED'), (OPD, 'OPD'), (VALID, 'VALID'), (CONTACTED, 'CONTACTED'),
@@ -205,6 +218,10 @@ class IpdProcedureLead(auth_model.TimeStampedModel):
                                                      through='IpdProcedureLeadCostEstimateMapping',
                                                      related_name='procedure_cost_estimates')
     virtual_appointment = GenericRelation(VirtualAppointment, related_query_name='ipd_leads')
+    requested_date_time = models.DateTimeField(blank=True, null=True, default=None)
+    first_name = models.CharField(max_length=100, blank=True, null=True, default=None)
+    last_name = models.CharField(max_length=100, blank=True, null=True, default=None)
+
 
     # ADMIN :Is_OpDInsured, Specialization List, appointment list
     # DEFAULTS??
@@ -213,6 +230,8 @@ class IpdProcedureLead(auth_model.TimeStampedModel):
         db_table = "ipd_procedure_lead"
 
     def save(self, *args, **kwargs):
+        if (self.first_name or self.last_name) and not self.name:
+            self.name = self.first_name + " " + self.last_name
         if self.phone_number and not self.user:
             self.user = User.objects.filter(phone_number=self.phone_number).first()
         send_lead_email = False
@@ -358,6 +377,16 @@ class PotentialIpdLeadPracticeSpecialization(models.Model):
 
     class Meta:
         db_table = "potential_ipd_lead_practice_specialization"
+
+
+class PotentialIpdCity(models.Model):
+    city = models.ForeignKey(MatrixMappedCity, on_delete=models.CASCADE)
+
+    def __str__(self):
+        return '{}'.format(self.city.name)
+
+    class Meta:
+        db_table = "potential_ipd_city"
 
 
 class ProcedureCategory(auth_model.TimeStampedModel, SearchKey):

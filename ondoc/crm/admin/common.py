@@ -15,7 +15,7 @@ from django.utils.dateparse import parse_datetime
 from ondoc.authentication.models import Merchant, AssociatedMerchant, QCModel
 from ondoc.account.models import MerchantPayout
 from ondoc.common.models import Cities, MatrixCityMapping, PaymentOptions, Remark, MatrixMappedCity, MatrixMappedState, \
-    GlobalNonBookable, UserConfig, BlacklistUser, BlockedStates
+    GlobalNonBookable, UserConfig, BlacklistUser, BlockedStates, Fraud
 from import_export import resources, fields
 from import_export.admin import ImportMixin, base_formats, ImportExportMixin, ImportExportModelAdmin, ExportMixin
 from reversion.admin import VersionAdmin
@@ -774,3 +774,22 @@ class BlockedStatesAdmin(VersionAdmin):
     list_display = ('state_name', 'message')
     fields = ('state_name', 'message')
 
+
+class FraudForm(forms.ModelForm):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        instance = getattr(self, 'instance', None)
+        if instance and instance.pk:
+            if instance.reason:
+                self.fields['reason'].widget.attrs['readonly'] = True
+
+
+class FraudInline(GenericTabularInline):
+    can_delete = False
+    form = FraudForm
+    extra = 0
+    model = Fraud
+    show_change_link = False
+    fields = ['reason', 'user', 'created_at']
+    editable = False
+    readonly_fields = ['created_at', 'user']

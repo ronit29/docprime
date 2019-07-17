@@ -1285,7 +1285,7 @@ class GenericAdmin(TimeStampedModel, CreatedByModel):
 
     @staticmethod
     def create_users_from_generic_admins():
-        all_admins_without_users = GenericAdmin.objects.filter(user__isnull=True, entity_type=GenericAdmin.HOSPITAL)[:100]
+        all_admins_without_users = GenericAdmin.objects.filter(user__isnull=True, entity_type=GenericAdmin.HOSPITAL).order_by('-updated_at')[:100]
         admins_phone_numbers = all_admins_without_users.values_list('phone_number', flat=True)
         users_for_admins = User.objects.filter(phone_number__in=admins_phone_numbers, user_type=User.DOCTOR)
         users_admin_dict = dict()
