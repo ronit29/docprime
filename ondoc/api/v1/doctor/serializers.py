@@ -511,6 +511,7 @@ class DoctorHospitalSerializer(serializers.ModelSerializer):
         resp = Doctor.get_insurance_details(user)
 
         # enabled for online booking check
+        resp['error_message'] = ""
         doctor_clinic = obj.doctor_clinic
         doctor = doctor_clinic.doctor
         hospital = doctor_clinic.hospital
