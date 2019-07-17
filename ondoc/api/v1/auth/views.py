@@ -1864,7 +1864,7 @@ class SendBookingUrlViewSet(GenericViewSet):
             SmsNotification.send_endorsement_request_url(token=token, phone_number=str(user_profile.phone_number))
             EmailNotification.send_endorsement_request_url(token=token, email=user_profile.email)
         else:
-            booking_url = SmsNotification.send_booking_url(token=token, phone_number=str(user_profile.phone_number))
+            booking_url = SmsNotification.send_booking_url(token=token, phone_number=str(user_profile.phone_number), name=user_profile.name)
             EmailNotification.send_booking_url(token=token, email=user_profile.email)
 
         return Response({"status": 1})
