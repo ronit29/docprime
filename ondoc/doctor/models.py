@@ -949,7 +949,7 @@ class Doctor(auth_model.TimeStampedModel, auth_model.QCModel, SearchKey, auth_mo
                     greatest(floor(
                     case when fees <=0 then mrp*.4 
                     when mrp<=2000 then
-                    case when (least(fees*1.5, .8*mrp) - fees) >100 then least(fees*1.5, .8*mrp) 
+                    case when (least(fees*1.5, .9*mrp) - fees) >100 then least(fees*1.5, .9*mrp) 
                     else least(fees+100, mrp) end
                     else 
                     case when (least(fees*1.5, fees+.5*(mrp-fees)) - fees )>100
@@ -975,7 +975,7 @@ class Doctor(auth_model.TimeStampedModel, auth_model.QCModel, SearchKey, auth_mo
                     greatest(floor(
                     case when fees <=0 then mrp*.4 
                     when mrp<=2000 then
-                    case when (least(fees*1.5, .8*mrp) - fees) >100 then least(fees*1.5, .8*mrp) 
+                    case when (least(fees*1.5, .9*mrp) - fees) >100 then least(fees*1.5, .9*mrp) 
                     else least(fees+100, mrp) end
                     else 
                     case when (least(fees*1.5, fees+.5*(mrp-fees)) - fees )>100
