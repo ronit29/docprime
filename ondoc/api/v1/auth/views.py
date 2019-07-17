@@ -33,6 +33,7 @@ from ondoc.authentication.models import (OtpVerifications, NotificationEndpoint,
 from ondoc.notification.models import SmsNotification, EmailNotification
 from ondoc.account.models import PgTransaction, ConsumerAccount, ConsumerTransaction, Order, ConsumerRefund, OrderLog, \
     UserReferrals, UserReferred, PgLogs
+from ondoc.account.mongo_models import PgLogs as mongo_pglogs
 from django.contrib.auth import get_user_model
 from django.shortcuts import get_object_or_404
 from ondoc.api.pagination import paginate_queryset
@@ -1218,7 +1219,7 @@ class TransactionViewSet(viewsets.GenericViewSet):
             # log pg data
             try:
                 PgLogs.objects.create(decoded_response=response, coded_response=coded_response)
-                save_pg_response.apply_async((response.get("orderId"), None, response, None), eta=timezone.localtime(), )
+                save_pg_response.apply_async((mongo_pglogs.TXN_RESPONSE, response.get("orderId"), None, response, None), eta=timezone.localtime(), )
             except Exception as e:
                 logger.error("Cannot log pg response - " + str(e))
 
