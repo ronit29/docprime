@@ -5,7 +5,7 @@ from django.db.models import Q
 
 from ondoc.banner.models import Banner, SliderLocation, BannerLocation, EmailBanner, RecommenderThrough, Recommender
 from ondoc.common.models import PaymentOptions, UserConfig, Feature, Service, Remark, MatrixMappedCity, \
-    MatrixMappedState, GenericNotes, BlacklistUser, BlockedStates, VirtualAppointment
+    MatrixMappedState, GenericNotes, BlacklistUser, BlockedStates, VirtualAppointment, Fraud
 from ondoc.corporate_booking.models import CorporateDeal, Corporates, CorporateDocument
 from ondoc.coupon.models import Coupon, UserSpecificCoupon, RandomGeneratedCoupon
 from ondoc.crm.constants import constants
@@ -1020,7 +1020,7 @@ class Command(BaseCommand):
                                                            UserInsurance, InsuranceDeal, InsuranceLead,
                                                            InsuranceTransaction, InsuranceDiseaseResponse,
                                                            InsuredMembers, InsurerPolicyNumber, InsuranceCancelMaster,
-                                                           EndorsementRequest, InsuredMemberDocument,
+                                                           EndorsementRequest, InsuredMemberDocument, Fraud,
                                                            InsuredMemberHistory, UserBank, UserBankDocument,
                                                            GenericNotes, InsurerAccountTransfer, UserNumberUpdate)
 
