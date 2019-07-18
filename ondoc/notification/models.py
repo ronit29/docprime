@@ -96,6 +96,7 @@ class NotificationAction:
     COD_TO_PREPAID = 91
     COD_TO_PREPAID_REQUEST = 92
 
+    USERPROFILE_EMAIL_UPDATE = 99
     LAB_CONFIRMATION_CHECK_AFTER_APPOINTMENT = 93
     LAB_CONFIRMATION_SECOND_CHECK_AFTER_APPOINTMENT = 94
     LAB_FEEDBACK_AFTER_APPOINTMENT = 95
@@ -862,6 +863,25 @@ class EmailNotification(TimeStampedModel, EmailNotificationOpdMixin, EmailNotifi
             }
             message = json.dumps(message)
             publish_message(message)
+
+    @classmethod
+    def send_userprofile_email_update(cls, obj):
+        from django.utils.safestring import mark_safe
+        email = obj.new_email
+        name = obj.profile.name
+        email_subject = 'Docprime : Profile Email update otp'
+        html_body = mark_safe('<p>Dear  {name},</p><p>Please enter the OTP mentioned below to verify the new email ID for Insurance profile</p><p>OTP: {otp}</p><p>Thanks</p><p>Team Docprime </p>'.format(name=str(name.title()), otp=str(obj.otp)))
+        # html_body = 'Please find the otp for email change. %s' % str(obj.otp)
+        email_obj = cls.objects.create(email=email, notification_type=NotificationAction.USERPROFILE_EMAIL_UPDATE,
+                                       content=html_body, email_subject=email_subject, cc=[], bcc=[])
+        email_obj.save()
+
+        message = {
+            "data": model_to_dict(email_obj),
+            "type": "email"
+        }
+        message = json.dumps(message)
+        publish_message(message)
 
 
 class SmsNotificationOpdMixin:

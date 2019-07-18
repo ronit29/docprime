@@ -2040,6 +2040,71 @@ class UserNumberUpdate(TimeStampedModel):
         db_table = "user_number_updates"
 
 
+class UserProfileEmailUpdate(TimeStampedModel):
+    profile = models.ForeignKey(UserProfile, on_delete=models.DO_NOTHING, related_name="email_updates")
+    old_email = models.CharField(max_length=256, blank=False)
+    new_email = models.CharField(max_length=256, blank=False)
+    otp_verified = models.BooleanField(default=False)
+    is_successfull = models.BooleanField(default=False)
+    otp = models.IntegerField(null=True, blank=True)
+    otp_expiry = models.DateTimeField(default=None, null=True)
+
+    def __str__(self):
+        return str(self.profile)
+
+    def is_request_alive(self):
+        return timezone.now() <= self.otp_expiry
+
+    @classmethod
+    def can_be_changed(cls, user, new_email):
+        return not UserProfile.objects.filter(email=new_email).exclude(user=user).exists()
+
+    def send_otp_email(self):
+        from ondoc.notification.tasks import send_userprofile_email_update_otp
+        send_userprofile_email_update_otp.apply_async((self.id,))
+
+    def after_commit_tasks(self, send_otp=False):
+        if send_otp:
+            self.send_otp_email()
+
+    @classmethod
+    def initiate(cls, profile, email):
+        obj = cls(profile=profile, new_email=email, old_email=profile.email, otp=random.choice(range(100000, 999999)),
+                  otp_expiry=(timezone.now() + timedelta(minutes=30)))
+        obj.save()
+        return obj
+
+    def process_email_change(self, otp, process_immediate=False):
+        if process_immediate:
+            if otp and self.otp != otp:
+                return False
+
+            self.otp_verified = True
+            self.profile.email = self.new_email
+            self.is_successfull = True
+            self.profile.save()
+            self.save()
+        else:
+            self.otp_verified = True
+            self.save()
+
+        return True
+
+    def save(self, *args, **kwargs):
+        send_otp = False
+
+        # Instance comming First time.
+        if not self.id:
+            send_otp = True
+
+        super().save(*args, **kwargs)
+
+        transaction.on_commit(lambda: self.after_commit_tasks(send_otp=send_otp))
+
+    class Meta:
+        db_table = "userprofile_email_updates"
+
+
 class PaymentMixin(object):
 
     def capture_payment(self):
