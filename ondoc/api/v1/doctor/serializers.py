@@ -1990,6 +1990,7 @@ class HospitalDetailIpdProcedureSerializer(TopHospitalForIpdProcedureSerializer)
     all_doctors = serializers.SerializerMethodField(read_only=True)
     all_cities = serializers.SerializerMethodField(read_only=True)
     question_answers = serializers.SerializerMethodField(read_only=True)
+    all_specialization_groups = serializers.SerializerMethodField(read_only=True)
 
     class Meta(TopHospitalForIpdProcedureSerializer.Meta):
         model = Hospital
@@ -2002,7 +2003,7 @@ class HospitalDetailIpdProcedureSerializer(TopHospitalForIpdProcedureSerializer)
                                                                      'offers', 'is_ipd_hospital', 'new_about',
                                                                      'show_popup', 'force_popup', 'enabled_for_prepaid',
                                                                      'all_specializations', 'all_doctors', 'all_cities',
-                                                                     'question_answers')
+                                                                     'question_answers', 'all_specialization_groups')
 
     def get_question_answers(self, obj):
         q = obj.question_answer.all()
@@ -2024,6 +2025,28 @@ class HospitalDetailIpdProcedureSerializer(TopHospitalForIpdProcedureSerializer)
             '-priority').distinct()
         return PracticeSpecializationSerializer(q, many=True).data
 
+    def get_all_specialization_groups(self, obj):
+        from ondoc.doctor.models import SimilarSpecializationGroup
+        from itertools import groupby
+        all_specilization_groups = list(
+            SimilarSpecializationGroup.objects.filter(specializations__specialization__doctor__is_live=True,
+                                                      specializations__specialization__doctor__doctor_clinics__enabled=True,
+                                                      specializations__specialization__doctor__doctor_clinics__hospital=obj,
+                                                      show_on_front_end=True).order_by(
+                '-specializations__priority').values('id', 'name', 'specializations'))
+        result = []
+        all_specilization_groups = sorted(all_specilization_groups, key=lambda a: a['id'])
+        for key, the_group in groupby(all_specilization_groups, key=lambda a: a['id']):
+            temp_group = list(the_group)
+            if len(temp_group) > 0:
+                one_ans = {}
+                one_ans['id'], one_ans['name'] = temp_group[0]['id'], temp_group[0]['name']
+                sepc = set()
+                for o in temp_group:
+                    sepc.add(o['specializations'])
+                one_ans['specialization_ids'] = list(sepc)
+                result.append(one_ans)
+        return result
 
     def get_show_popup(self, obj):
         request = self.context.get('request')
