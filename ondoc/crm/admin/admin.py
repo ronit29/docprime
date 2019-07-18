@@ -51,7 +51,7 @@ from .doctor import (DoctorAdmin, MedicalServiceAdmin, SpecializationAdmin, Qual
                      UploadDoctorDataAdmin, DoctorLeaveAdmin, SimilarSpecializationGroupAdmin)
 from .aboutdoctor import AboutDoctorAdmin
 from .hospital import HospitalAdmin, CommonHospitalAdmin
-from .user import CustomUserAdmin, UserNumberUpdateAdmin
+from .user import CustomUserAdmin, UserNumberUpdateAdmin, UserProfileAdmin
 from .hospital_network import HospitalNetworkAdmin
 from .lab import LabAdmin, LabTestAdmin, LabTestTypeAdmin, AvailableLabTestAdmin, CommonDiagnosticConditionAdmin, \
     LabAppointmentAdmin, CommonTestAdmin, TestParameterAdmin, CommonPackageAdmin, LabTestCategoryAdmin, \
@@ -110,7 +110,7 @@ admin.site.index_title = 'CRM Administration'
 
 admin.site.register(OtpVerifications)
 # admin.site.register(OpdAppointment)
-admin.site.register(UserProfile)
+admin.site.register(UserProfile, UserProfileAdmin)
 admin.site.register(ReviewCompliments, ReviewComplimentsAdmin)
 admin.site.register(Banner, BannerAdmin)
 
