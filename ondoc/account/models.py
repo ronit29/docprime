@@ -7,7 +7,7 @@ from ondoc.authentication.models import TimeStampedModel, User, UserProfile, Mer
 from ondoc.account.tasks import refund_curl_task
 from ondoc.coupon.models import Coupon
 from ondoc.notification.models import AppNotification, NotificationAction
-from ondoc.notification.tasks import process_payout
+from ondoc.notification.tasks import process_payout, save_pg_response
 # from ondoc.diagnostic.models import LabAppointment
 # from ondoc.matrix.tasks import push_order_to_matrix
 from django.db import transaction
@@ -90,7 +90,7 @@ class Order(TimeStampedModel):
         if self.product_id == Order.INSURANCE_PRODUCT_ID:
             user_insurance = UserInsurance.objects.filter(order=self).first()
             if user_insurance:
-                data['merchCode'] = str(user_insurance.insurance_plan.insurer.insurer_merchant_code)
+                data['insurerCode'] = str(user_insurance.insurance_plan.insurer.insurer_merchant_code)
         elif (self.product_id in (self.DOCTOR_PRODUCT_ID,self.LAB_PRODUCT_ID)):
             if not self.is_parent() and self.booked_using_insurance():
             # if self.is_parent():
@@ -104,7 +104,7 @@ class Order(TimeStampedModel):
                     insurance_order_transaction = transactions[0]
                     data['refOrderId'] = str(insurance_order_transaction.order_id)
                     data['refOrderNo'] = str(insurance_order_transaction.order_no)
-                    data['merchCode'] = str(user_insurance.insurance_plan.insurer.insurer_merchant_code)
+                    data['insurerCode'] = str(user_insurance.insurance_plan.insurer.insurer_merchant_code)
 
         return data
 
@@ -482,8 +482,8 @@ class Order(TimeStampedModel):
             all_txn = self.txn.all()
         elif self.dummy_txn.exists():
             all_txn = self.dummy_txn.all()
-        elif self.is_parent() and self.parent and self.parent.dummy_txn.exists():
-            all_txn = self.parent.dummy_txn.exists()
+        elif self.parent and self.parent.dummy_txn.exists():
+            all_txn = self.parent.dummy_txn.all()
         return all_txn
 
     @classmethod
@@ -1598,8 +1598,9 @@ class MerchantPayout(TimeStampedModel):
         if self.id and not self.is_insurance_premium_payout() and hasattr(self,'process_payout') and self.process_payout and self.status==self.PENDING and self.type==self.AUTOMATIC:
             self.type = self.AUTOMATIC
             self.update_billed_to_content_type()
-            if not self.content_object:
-                self.content_object = self.get_billed_to()
+
+            # if not self.content_object:
+            #     self.content_object = self.get_billed_to()
             if not self.paid_to:
                 self.paid_to = self.get_merchant()
 
@@ -1879,10 +1880,13 @@ class MerchantPayout(TimeStampedModel):
                 "buCallbackFailureUrl": ""
             }
             if not self.is_nodal_transfer():
-                req_data["merchCode"] = "apolloDummy"
+                req_data["insurerCode"] = "apolloDummy"
 
+            for key in req_data:
+                req_data[key] = str(req_data[key])
 
             response = requests.post(url, data=json.dumps(req_data), headers=headers)
+            save_pg_response.apply_async((PgLogs.DUMMY_TXN, user_insurance.order.id, None, response.json(), req_data,), eta=timezone.localtime(), )
             if response.status_code == status.HTTP_200_OK:
                 resp_data = response.json()
                 #logger.error(resp_data)
@@ -2140,8 +2144,14 @@ class MerchantPayout(TimeStampedModel):
         else:
             appt = self.get_appointment()
             if appt and appt.get_billed_to:
-                self.content_object = appt.get_billed_to
-                self.save()
+                billed_to = appt.get_billed_to
+                self.content_object = billed_to
+
+            content_type = ContentType.objects.get_for_model(billed_to)
+            am = AssociatedMerchant.objects.filter(content_type_id=content_type, object_id=billed_to.id).first()
+            if am and not am.merchant_id == self.paid_to_id:
+                if appt and appt.get_merchant:
+                    self.paid_to = appt.get_merchant
 
     class Meta:
         db_table = "merchant_payout"

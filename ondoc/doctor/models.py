@@ -961,7 +961,7 @@ class Doctor(auth_model.TimeStampedModel, auth_model.QCModel, SearchKey, auth_mo
                     greatest(floor(
                     case when fees <=0 then mrp*.4 
                     when mrp<=2000 then
-                    case when (least(fees*1.5, .8*mrp) - fees) >100 then least(fees*1.5, .8*mrp) 
+                    case when (least(fees*1.5, .9*mrp) - fees) >100 then least(fees*1.5, .9*mrp) 
                     else least(fees+100, mrp) end
                     else 
                     case when (least(fees*1.5, fees+.5*(mrp-fees)) - fees )>100
@@ -969,9 +969,16 @@ class Doctor(auth_model.TimeStampedModel, auth_model.QCModel, SearchKey, auth_mo
                     else
                     least(fees+100, mrp) end 	
                     end  /5)*5, fees), mrp) where doctor_clinic_id in (
-                    select id from doctor_clinic where doctor_id= %s) '''
+                    select id from doctor_clinic where doctor_id=%s and hospital_id!=3560) '''
 
         update_doctor_deal_price = RawSql(query, [self.pk]).execute()
+
+        # update nanavati hospital deal price
+
+        query1 = '''update doctor_clinic_timing set deal_price = mrp*0.80 
+                         where doctor_clinic_id  in (select id from doctor_clinic where doctor_id= %s and  hospital_id=3560 ) '''
+
+        update_all_nanavati_doctor_deal_price = RawSql(query1, [self.pk]).execute()
 
     @classmethod
     def update_all_deal_price(cls):
@@ -980,16 +987,23 @@ class Doctor(auth_model.TimeStampedModel, auth_model.QCModel, SearchKey, auth_mo
                     greatest(floor(
                     case when fees <=0 then mrp*.4 
                     when mrp<=2000 then
-                    case when (least(fees*1.5, .8*mrp) - fees) >100 then least(fees*1.5, .8*mrp) 
+                    case when (least(fees*1.5, .9*mrp) - fees) >100 then least(fees*1.5, .9*mrp) 
                     else least(fees+100, mrp) end
                     else 
                     case when (least(fees*1.5, fees+.5*(mrp-fees)) - fees )>100
                     then least(fees*1.5, fees+.5*(mrp-fees))
                     else
                     least(fees+100, mrp) end 	
-                    end  /5)*5, fees), mrp) '''
+                    end  /5)*5, fees), mrp) where doctor_clinic_id  in (select id from doctor_clinic where hospital_id!=3560 ) '''
 
         update_all_doctor_deal_price = RawSql(query, []).execute()
+
+        #update nanavati hospital deal price
+
+        query1 = '''update doctor_clinic_timing set deal_price = mrp*0.80 
+                 where doctor_clinic_id  in (select id from doctor_clinic where hospital_id=3560 ) '''
+
+        update_all_nanavati_doctor_deal_price = RawSql(query1, []).execute()
 
     def get_display_name(self):
         return "Dr. {}".format(self.name.title()) if self.name else None

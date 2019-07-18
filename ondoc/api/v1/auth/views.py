@@ -33,6 +33,7 @@ from ondoc.authentication.models import (OtpVerifications, NotificationEndpoint,
 from ondoc.notification.models import SmsNotification, EmailNotification
 from ondoc.account.models import PgTransaction, ConsumerAccount, ConsumerTransaction, Order, ConsumerRefund, OrderLog, \
     UserReferrals, UserReferred, PgLogs
+from ondoc.account.mongo_models import PgLogs as mongo_pglogs
 from django.contrib.auth import get_user_model
 from django.shortcuts import get_object_or_404
 from ondoc.api.pagination import paginate_queryset
@@ -1218,7 +1219,7 @@ class TransactionViewSet(viewsets.GenericViewSet):
             # log pg data
             try:
                 PgLogs.objects.create(decoded_response=response, coded_response=coded_response)
-                save_pg_response.apply_async((response.get("orderId"), None, response, None), eta=timezone.localtime(), )
+                save_pg_response.apply_async((mongo_pglogs.TXN_RESPONSE, response.get("orderId"), None, response, None), eta=timezone.localtime(), )
             except Exception as e:
                 logger.error("Cannot log pg response - " + str(e))
 
@@ -1228,6 +1229,14 @@ class TransactionViewSet(viewsets.GenericViewSet):
                 if response and response.get("orderNo"):
                     pg_txn = PgTransaction.objects.filter(order_no__iexact=response.get("orderNo")).first()
                     if pg_txn:
+                        if pg_txn.is_preauth():
+                            pg_txn.status_code = response.get('statusCode')
+                            pg_txn.status_type = response.get('txStatus')
+                            pg_txn.payment_mode = response.get("paymentMode")
+                            pg_txn.bank_name = response.get('bankName')
+                            pg_txn.transaction_id = response.get('bankTxId')
+                            #pg_txn.payment_captured = True
+                            pg_txn.save()
                         send_pg_acknowledge.apply_async((pg_txn.order_id, pg_txn.order_no,), countdown=1)
                         REDIRECT_URL = (SUCCESS_REDIRECT_URL % pg_txn.order_id) + "?payment_success=true"
                         return HttpResponseRedirect(redirect_to=REDIRECT_URL)
@@ -1863,7 +1872,7 @@ class SendBookingUrlViewSet(GenericViewSet):
             SmsNotification.send_endorsement_request_url(token=token, phone_number=str(user_profile.phone_number))
             EmailNotification.send_endorsement_request_url(token=token, email=user_profile.email)
         else:
-            booking_url = SmsNotification.send_booking_url(token=token, phone_number=str(user_profile.phone_number))
+            booking_url = SmsNotification.send_booking_url(token=token, phone_number=str(user_profile.phone_number), name=user_profile.name)
             EmailNotification.send_booking_url(token=token, email=user_profile.email)
 
         return Response({"status": 1})
