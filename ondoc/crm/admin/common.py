@@ -408,6 +408,7 @@ class MerchantAdmin(ImportExportMixin, VersionAdmin):
 
 class MerchantPayoutForm(forms.ModelForm):
     process_payout = forms.BooleanField(required=False)
+    recreate_payout = forms.BooleanField(required=False)
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
@@ -451,8 +452,16 @@ class MerchantPayoutForm(forms.ModelForm):
                 if not associated_merchant.verified:
                     raise forms.ValidationError("Associated Merchant not verified.")
 
-        if self.instance.status in [3, 4, 6, 7]:
-            raise forms.ValidationError("This payout is already under process or completed or failed")
+            if self.instance.status in [3, 4, 5, 6, 7]:
+                raise forms.ValidationError("This payout is already under process or completed or failed.")
+
+        recreate_payout = self.cleaned_data.get('recreate_payout')
+        if recreate_payout:
+            if self.instance.status not in [6, 7]:
+                raise forms.ValidationError("Only failed payout can be re-created.")
+
+        if self.instance.status in [3, 4, 5]:
+            raise forms.ValidationError("This payout is already under process or completed.")
 
         return self.cleaned_data
 
@@ -491,10 +500,10 @@ class MerchantPayoutAdmin(MediaImportMixin, VersionAdmin):
     form = MerchantPayoutForm
     model = MerchantPayout
     fields = ['id','booking_type', 'payment_mode','charged_amount', 'updated_at', 'created_at', 'payable_amount', 'tds_amount', 'status', 'payout_time', 'paid_to',
-              'appointment_id', 'get_billed_to', 'get_merchant', 'process_payout', 'type', 'utr_no', 'amount_paid','api_response','pg_status','status_api_response']
+              'appointment_id', 'get_billed_to', 'get_merchant', 'process_payout', 'type', 'utr_no', 'amount_paid','api_response','pg_status','status_api_response', 'duplicate_of', 'recreate_payout']
     list_display = ('id', 'status', 'payable_amount', 'appointment_id', 'doc_lab_name','booking_type')
-    search_fields = ['name']
-    list_filter = ['status','booking_type']
+    search_fields = ['name', 'id', 'appointment_id']
+    list_filter = ['status', 'booking_type']
 
     def get_queryset(self, request):
         return super().get_queryset(request).filter(payable_amount__gt=0).order_by('-id').prefetch_related('lab_appointment__lab',
@@ -504,12 +513,14 @@ class MerchantPayoutAdmin(MediaImportMixin, VersionAdmin):
         queryset, use_distinct = super().get_search_results(request, queryset, None)
         if search_term:
             queryset = queryset.filter(Q(opd_appointment__doctor__name__icontains=search_term) |
-                                       Q(lab_appointment__lab__name__icontains=search_term))
+                                       Q(lab_appointment__lab__name__icontains=search_term) |
+                                       Q(id__icontains=search_term) | Q(lab_appointment__id__icontains=search_term) |
+                                       Q(opd_appointment__id__icontains=search_term))
 
         return queryset, use_distinct
 
     def get_readonly_fields(self, request, obj=None):
-        base = ['appointment_id', 'get_billed_to', 'get_merchant','booking_type']
+        base = ['appointment_id', 'get_billed_to', 'get_merchant','booking_type', 'duplicate_of']
         editable_fields = ['payout_approved']
         if obj and obj.status == MerchantPayout.PENDING:
             editable_fields += ['type', 'amount_paid','payment_mode']
@@ -520,7 +531,11 @@ class MerchantPayoutAdmin(MediaImportMixin, VersionAdmin):
         return base + readonly
 
     def save_model(self, request, obj, form, change):
-        obj.process_payout=form.cleaned_data.get('process_payout')
+        obj.process_payout = form.cleaned_data.get('process_payout')
+
+        if form.cleaned_data.get('recreate_payout', False):
+            obj.recreate_failed_payouts()
+
         super().save_model(request, obj, form, change)
 
     def doc_lab_name(self, instance):
@@ -547,7 +562,6 @@ class MerchantPayoutAdmin(MediaImportMixin, VersionAdmin):
 
         return None
 
-
     def get_billed_to(self, instance):
         billed_to = instance.get_billed_to()
         if billed_to:
@@ -564,6 +578,15 @@ class MerchantPayoutAdmin(MediaImportMixin, VersionAdmin):
             content_type = ContentType.objects.get_for_model(merchant.__class__)
             change_url = reverse('admin:%s_%s_change' % (content_type.app_label, content_type.model), args=[merchant.id])
             html = '''<a href='%s' target=_blank>%s</a>''' % (change_url, merchant.id)
+            return mark_safe(html)
+
+        return ''
+
+    def duplicate_of(self, instance):
+        if instance.recreated_from_id:
+            content_type = ContentType.objects.get_for_model(instance.__class__)
+            change_url = reverse('admin:%s_%s_change' % (content_type.app_label, content_type.model), args=[instance.recreated_from_id])
+            html = '''<a href='%s' target=_blank>%s</a>''' % (change_url, instance.recreated_from_id)
             return mark_safe(html)
 
         return ''
@@ -605,6 +628,7 @@ class GlobalNonBookableAdmin(admin.ModelAdmin):
     model = GlobalNonBookable
     list_display = ['booking_type', 'start_date', 'end_date', 'start_time', 'end_time']
 
+
 class RemarkInlineForm(forms.ModelForm):
     # content = forms.CharField(widget=forms.Textarea, required=False)
     # print(content)
@@ -623,7 +647,6 @@ class RemarkInlineForm(forms.ModelForm):
         if self.instance and self.instance.id:
             if self.changed_data:
                 raise forms.ValidationError("Cannot alter already saved remarks.")
-
 
 
 class RemarkInline(GenericTabularInline, nested_admin.NestedTabularInline):
