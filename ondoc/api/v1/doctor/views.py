@@ -3539,6 +3539,7 @@ class OfflineCustomerViewSet(viewsets.GenericViewSet):
         INITIATED = 3
         PROCESSED = 4
         billing_status = None
+        utr_number = app.merchant_payout.utr_no
         if app.time_slot_start <= timezone.now() and \
                 app.status not in [models.OpdAppointment.COMPLETED, models.OpdAppointment.CANCELLED,
                                    models.OpdAppointment.BOOKED]:
@@ -3553,7 +3554,7 @@ class OfflineCustomerViewSet(viewsets.GenericViewSet):
         elif app.status == models.OpdAppointment.COMPLETED and (
                 app.merchant_payout and app.merchant_payout.status == account_models.MerchantPayout.PAID):
             billing_status = PROCESSED
-        return billing_status
+        return (billing_status, utr_number)
 
     def get_lab_appointment_list(self, request, user, valid_data):
         from ondoc.diagnostic import models as lab_models
@@ -3619,6 +3620,7 @@ class OfflineCustomerViewSet(viewsets.GenericViewSet):
             patient_profile = auth_serializers.UserProfileSerializer(app.profile, context={'request': request}).data
             patient_profile['profile_id'] = app.profile.id if hasattr(app, 'profile') else None
             patient_thumbnail = patient_profile['profile_image']
+            billing_status, utr_number = self.get_app_billing_status(app)
             ret_obj = {}
             ret_obj['id'] = app.id
             ret_obj['deal_price'] = app.deal_price
@@ -3637,7 +3639,8 @@ class OfflineCustomerViewSet(viewsets.GenericViewSet):
             ret_obj['mrp'] = app.price
             ret_obj['mask_data'] = mask_data
             ret_obj['payment_type'] = app.payment_type
-            ret_obj['billing_status'] = self.get_app_billing_status(app)
+            ret_obj['billing_status'] = billing_status
+            ret_obj['utr_number'] = utr_number
             ret_obj['profile'] = patient_profile
             ret_obj['permission_type'] = app.pem_type
             ret_obj['is_docprime'] = True
@@ -3723,7 +3726,7 @@ class OfflineCustomerViewSet(viewsets.GenericViewSet):
             error_message = ''
             phone_number = []
             allowed_actions = []
-            payout_amount = billing_status = None
+            payout_amount = billing_status = utr_number = None
             mask_data = None
             mrp = None
             payment_type = None
@@ -3772,7 +3775,7 @@ class OfflineCustomerViewSet(viewsets.GenericViewSet):
                 patient_profile['profile_id'] = app.profile.id if hasattr(app, 'profile') else None
                 patient_thumbnail = patient_profile['profile_image']
                 patient_name = app.profile.name if hasattr(app, 'profile') else None
-                billing_status = self.get_app_billing_status(app)
+                billing_status, utr_number = self.get_app_billing_status(app)
                 payout_amount = app.merchant_payout.payable_amount if app.merchant_payout else app.fees
                 prescription = app.get_prescriptions(request)
             doc_number = None
@@ -3801,6 +3804,7 @@ class OfflineCustomerViewSet(viewsets.GenericViewSet):
             ret_obj['mask_data'] = mask_data
             ret_obj['payment_type'] = payment_type
             ret_obj['billing_status'] = billing_status
+            ret_obj['utr_number'] = utr_number
             ret_obj['profile'] = patient_profile
             ret_obj['permission_type'] = app.pem_type
             ret_obj['hospital'] = HospitalModelSerializer(app.hospital).data
