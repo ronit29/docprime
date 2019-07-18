@@ -820,7 +820,7 @@ class UserInsuranceForm(forms.ModelForm):
 
     status_choices = [(UserInsurance.ACTIVE, "Active"), (UserInsurance.CANCEL_INITIATE, 'Cancel Initiate'),
                       (UserInsurance.CANCELLED, "Cancelled"), (UserInsurance.CANCELLATION_APPROVED,
-                                                               "Cancellation Approved")]
+                      "Cancellation Approved"), (UserInsurance.ONHOLD, "Onhold")]
     cancel_status_choices = [(UserInsurance.NON_REFUNDED, "Non-Refunded"), (UserInsurance.REFUND_INITIATE,
                                                                             "Refund Initiate"), (UserInsurance.REFUNDED
                                                                             , "Refunded")]
