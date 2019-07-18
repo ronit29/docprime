@@ -16,7 +16,7 @@ from django.utils import timezone
 from openpyxl import load_workbook
 
 from ondoc.api.v1.utils import aware_time_zone, util_absolute_url, pg_seamless_hash
-from ondoc.authentication.models import UserNumberUpdate
+from ondoc.authentication.models import UserNumberUpdate, UserProfileEmailUpdate
 from ondoc.common.models import AppointmentMaskNumber
 from ondoc.notification.labnotificationaction import LabNotificationAction
 from ondoc.notification import models as notification_models
@@ -805,6 +805,31 @@ def opd_send_after_appointment_confirmation(appointment_id, previous_appointment
         logger.error(str(e))
 
 
+
+@task()
+def lab_send_after_appointment_confirmation(appointment_id, previous_appointment_date_time, second=False):
+    from ondoc.diagnostic.models import LabAppointment
+    from ondoc.communications.models import LabNotification
+
+    try:
+        instance = LabAppointment.objects.filter(id=appointment_id).first()
+        if not instance or \
+                not instance.user or \
+                str(math.floor(instance.time_slot_start.timestamp())) != previous_appointment_date_time:
+            return
+        if instance.status == LabAppointment.ACCEPTED:
+            if not second:
+                lab_notification = LabNotification(instance, NotificationAction.LAB_CONFIRMATION_CHECK_AFTER_APPOINTMENT)
+            else:
+                lab_notification = LabNotification(instance, NotificationAction.LAB_CONFIRMATION_SECOND_CHECK_AFTER_APPOINTMENT)
+            lab_notification.send()
+        if instance.status == LabAppointment.COMPLETED and not instance.is_rated:
+            lab_notification = LabNotification(instance, NotificationAction.LAB_FEEDBACK_AFTER_APPOINTMENT)
+            lab_notification.send()
+    except Exception as e:
+        logger.error(str(e))
+
+
 @task()
 def lab_send_otp_before_appointment(appointment_id, previous_appointment_date_time):
     from ondoc.diagnostic.models import LabAppointment
@@ -1132,6 +1157,19 @@ def send_user_number_update_otp(obj_id):
         logger.error("Could not send otp for user number update.")
 
     return
+
+
+@task()
+def send_userprofile_email_update_otp(obj_id):
+    from ondoc.notification.models import EmailNotification
+    obj = UserProfileEmailUpdate.objects.filter(id=obj_id).first()
+    if not obj:
+        return
+
+    EmailNotification.send_userprofile_email_update(obj)
+
+    return
+
 
 @task()
 def send_contactus_notification(obj_id):

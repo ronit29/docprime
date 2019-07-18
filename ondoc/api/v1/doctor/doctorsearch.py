@@ -446,7 +446,7 @@ class DoctorSearchHelper:
                            "dc.id as doctor_clinic_id,  d.search_key, " \
                            "dct.id as doctor_clinic_timing_id,practicing_since, " \
                            "d.enabled_for_online_booking and dc.enabled_for_online_booking and h.enabled_for_online_booking as enabled_for_online_booking, " \
-                           "is_license_verified, priority,deal_price, h.welcome_calling_done, " \
+                           "is_license_verified, dc.priority,deal_price, h.welcome_calling_done, " \
                            "dc.hospital_id as hospital_id, d.search_score FROM doctor d " \
                            "INNER JOIN doctor_clinic dc ON d.id = dc.doctor_id and dc.enabled=true and d.is_live=true " \
                            "and d.is_test_doctor is False and d.is_internal is False " \

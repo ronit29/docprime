@@ -53,7 +53,7 @@ class NewDynamicAdmin(admin.ModelAdmin):
     form = NewDynamicAdminForm
     list_display = ['id', 'url_value', 'is_enabled']
     autocomplete_fields = ['url']
-    # search_fields = ['url__url', 'url_value__url']
+    search_fields = ['url_value']
     # exclude = ['url_value']
     # readonly_fields = ['url_value']
     readonly_fields = ['url', 'admin_page']
