@@ -1989,6 +1989,7 @@ class HospitalDetailIpdProcedureSerializer(TopHospitalForIpdProcedureSerializer)
     all_specializations = serializers.SerializerMethodField(read_only=True)
     all_doctors = serializers.SerializerMethodField(read_only=True)
     all_cities = serializers.SerializerMethodField(read_only=True)
+    question_answers = serializers.SerializerMethodField(read_only=True)
 
     class Meta(TopHospitalForIpdProcedureSerializer.Meta):
         model = Hospital
@@ -2000,7 +2001,12 @@ class HospitalDetailIpdProcedureSerializer(TopHospitalForIpdProcedureSerializer)
                                                                      'contact_number', 'specialization_doctors',
                                                                      'offers', 'is_ipd_hospital', 'new_about',
                                                                      'show_popup', 'force_popup', 'enabled_for_prepaid',
-                                                                     'all_specializations', 'all_doctors', 'all_cities')
+                                                                     'all_specializations', 'all_doctors', 'all_cities',
+                                                                     'question_answers')
+
+    def get_question_answers(self, obj):
+        q = obj.question_answer.all()
+        return [{'id': x.id, 'name': x.question, 'answer': x.answer} for x in q]
 
     def get_all_doctors(self, obj):
         q = Doctor.objects.filter(is_live=True, doctor_clinics__enabled=True, doctor_clinics__hospital=obj).distinct()

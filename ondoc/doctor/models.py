@@ -258,6 +258,7 @@ class Hospital(auth_model.TimeStampedModel, auth_model.CreatedByModel, auth_mode
     is_ipd_hospital = models.BooleanField(default=False)
     is_big_hospital = models.BooleanField(default=False)
     has_proper_hospital_page = models.BooleanField(default=False)
+    question_answer = GenericRelation(auth_model.GenericQuestionAnswer, related_query_name='hospital_qa')
 
     def __str__(self):
         return self.name

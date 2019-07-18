@@ -4143,6 +4143,7 @@ class HospitalViewSet(viewsets.GenericViewSet):
                                                          'network__hospital_network_documents',
                                                          'hospitalcertification_set',
                                                          'hosp_availability',
+                                                         'question_answer',
                                                          'hospitalspeciality_set', Prefetch('hospitalimage_set',
                                                                                             HospitalImage.objects.all().order_by(
                                                                                                 '-cover_image'))).filter(
