@@ -2091,3 +2091,14 @@ class PaymentMixin(object):
             pg_transaction = PgTransaction.objects.filter(order_id=parent_order.id).first()
 
         return pg_transaction
+
+
+class GenericQuestionAnswer(TimeStampedModel):
+    question = models.TextField(null=False, verbose_name='Question')
+    answer = models.TextField(null=True, verbose_name='Answer')
+    content_type = models.ForeignKey(ContentType, on_delete=models.DO_NOTHING)
+    object_id = models.BigIntegerField()
+    content_object = GenericForeignKey()
+
+    class Meta:
+        db_table = "generic_question_answer"

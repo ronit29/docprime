@@ -221,7 +221,7 @@ class IpdProcedureLead(auth_model.TimeStampedModel):
     requested_date_time = models.DateTimeField(blank=True, null=True, default=None)
     first_name = models.CharField(max_length=100, blank=True, null=True, default=None)
     last_name = models.CharField(max_length=100, blank=True, null=True, default=None)
-
+    matrix_city = models.ForeignKey(MatrixMappedCity, related_name='ipd_lead_in', null=True, default=None, on_delete=models.SET_NULL)
 
     # ADMIN :Is_OpDInsured, Specialization List, appointment list
     # DEFAULTS??
@@ -230,6 +230,8 @@ class IpdProcedureLead(auth_model.TimeStampedModel):
         db_table = "ipd_procedure_lead"
 
     def save(self, *args, **kwargs):
+        if self.matrix_city and not self.city:
+            self.city = self.matrix_city.name
         if (self.first_name or self.last_name) and not self.name:
             self.name = self.first_name + " " + self.last_name
         if self.phone_number and not self.user:
