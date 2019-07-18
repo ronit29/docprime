@@ -828,8 +828,8 @@ class UserInsuranceForm(forms.ModelForm):
     cancel_after_utilize_choices = [('YES', 'Yes'), ('NO', 'No')]
     status = forms.ChoiceField(choices=status_choices, required=True)
     cancel_after_utilize_insurance = forms.ChoiceField(choices=cancel_after_utilize_choices, initial='NO',  widget=forms.RadioSelect())
-    cancel_reason = forms.CharField(max_length=400, required=False)
-    onhold_reason = forms.CharField(max_length=400, required=False)
+    cancel_reason = forms.CharField(max_length=200, required=False)
+    # onhold_reason = forms.CharField(max_length=200, required=False)
     cancel_case_type = forms.ChoiceField(choices=case_choices, initial=UserInsurance.REFUND)
     cancel_status = forms.ChoiceField(choices=cancel_status_choices, initial=UserInsurance.NON_REFUNDED)
 
@@ -947,7 +947,7 @@ class UserInsuranceAdmin(ImportExportMixin, admin.ModelAdmin):
 
     list_display = ['id', 'insurance_plan', 'user_name', 'user', 'policy_number', 'purchase_date', 'status']
     fields = ['insurance_plan', 'user', 'purchase_date', 'expiry_date', 'policy_number', 'premium_amount',
-              'merchant_payout', 'status', 'cancel_reason', 'cancel_after_utilize_insurance', 'cancel_case_type',
+              'merchant_payout', 'status', 'cancel_reason', 'cancel_after_utilize_insurance', 'onhold_reason', 'cancel_case_type',
               'cancel_status', 'cancel_initial_date', 'cancel_customer_type', 'cancel_initiate_by', 'appointment_status']
     readonly_fields = ('insurance_plan', 'user', 'purchase_date', 'expiry_date', 'policy_number', 'premium_amount',
                        'merchant_payout', 'cancel_initial_date', 'cancel_initiate_by')
