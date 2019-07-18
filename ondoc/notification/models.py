@@ -840,8 +840,8 @@ class EmailNotification(TimeStampedModel, EmailNotificationOpdMixin, EmailNotifi
         publish_message(message)
 
     @classmethod
-    def send_contact_us_notification_email(cls, content_type, obj_id, email, html_body):
-        email_subject = 'CONTACT US - A New Message Received'
+    def send_contact_us_notification_email(cls, content_type, obj_id, email, html_body, mobile_number):
+        email_subject = 'CONTACT US - A New Message Received ({})'.format(mobile_number)
         if email:
             email_obj = cls.objects.create(email=email, notification_type=NotificationAction.CONTACT_US_EMAIL,
                                            content=html_body, email_subject=email_subject, cc=[], bcc=[],

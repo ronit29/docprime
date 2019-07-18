@@ -1148,6 +1148,10 @@ def send_contactus_notification(obj_id):
     html_body = "{name} ( {email}-{mobile} ) has sent message {message}" \
         .format(name=obj.name, email=obj.email, mobile=obj.mobile, message={obj.message})
 
+    mobile_number = None
+    if obj.mobile:
+        mobile_number = obj.mobile
+
     if obj.from_app:
         html_body += " from mobile app."
     else:
@@ -1162,7 +1166,7 @@ def send_contactus_notification(obj_id):
 
     if not is_already_sent:
         for email in emails:
-            EmailNotification.send_contact_us_notification_email(content_type, obj.id, email, html_body)
+            EmailNotification.send_contact_us_notification_email(content_type, obj.id, email, html_body, mobile_number)
 
 
 @task(bind=True, max_retries=5)
