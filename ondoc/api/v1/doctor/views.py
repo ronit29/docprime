@@ -4456,7 +4456,7 @@ class IpdProcedureViewSet(viewsets.GenericViewSet):
         serializer.is_valid(raise_exception=True)
         validated_data = serializer.validated_data
         temp_id = validated_data.pop('id')
-        IpdProcedureLead.objects.filter(matrix_lead_id=temp_id).update(**validated_data)
+        IpdProcedureLead.objects.filter(id=temp_id).update(**validated_data)
         return Response({'message': 'Success'})
 
     def list_by_alphabet(self, request):
