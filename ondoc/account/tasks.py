@@ -17,6 +17,7 @@ import logging
 from collections import OrderedDict
 import datetime
 from django.db.models import Q
+from django.utils import timezone
 
 logger = logging.getLogger(__name__)
 
@@ -242,7 +243,9 @@ def update_ben_status_from_pg():
 def update_merchant_payout_pg_status():
     from ondoc.account.models import MerchantPayout
     # payouts = MerchantPayout.objects.all().order_by('-id')
-    payouts = MerchantPayout.objects.filter(Q(pg_status='SETTLEMENT_COMPLETED')|Q(utr_no__gt='')|Q(utr_no__isnull=False)|Q(type=2))
+    # payouts = MerchantPayout.objects.filter(Q(pg_status='SETTLEMENT_COMPLETED')|Q(utr_no__gt='')|Q(utr_no__isnull=False)|Q(type=2))
+
+    payouts = MerchantPayout.objects.filter((Q(pg_status='SETTLEMENT_COMPLETED') & Q(utr_no='')) | Q(status=MerchantPayout.INPROCESS) | Q(type=2))
     for p in payouts:
         p.refresh_from_db()
         p.update_status_from_pg()
@@ -332,6 +335,8 @@ def set_order_dummy_transaction(self, order_id, user_id):
     from ondoc.account.models import Order, DummyTransactions
     from ondoc.insurance.models import UserInsurance
     from ondoc.account.models import User
+    from ondoc.account.mongo_models import PgLogs
+    from ondoc.notification.tasks import save_pg_response
     try:
         if not settings.PAYOUTS_ENABLED:
             return
@@ -395,7 +400,11 @@ def set_order_dummy_transaction(self, order_id, user_id):
             if insurer_code:
                 req_data['insurerCode'] = insurer_code
 
+            for key in req_data:
+                req_data[key] = str(req_data[key])
+
             response = requests.post(url, data=json.dumps(req_data), headers=headers)
+            save_pg_response.apply_async((PgLogs.DUMMY_TXN, user_insurance.order.id, None, response.json(), req_data,), eta=timezone.localtime(), )
             if response.status_code == status.HTTP_200_OK:
                 resp_data = response.json()
                 if resp_data.get("ok") is not None and resp_data.get("ok") == 1:
@@ -466,7 +475,6 @@ def process_payout(payout_id):
 
         if not order_data:
              raise Exception("Order not found for given payout " + str(payout_data))
-
 
         all_txn = order_data.getTransactions()
 
