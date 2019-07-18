@@ -1287,11 +1287,22 @@ def send_release_payment_request(self, product_id, appointment_id):
         logger.error("Error in payment release with data - " + json.dumps(req_data) + " with exception - " + str(e))
         self.retry([product_id, appointment_id], countdown=300)
 
+
 @task(bind=True)
 def save_pg_response(self, log_type, order_id, txn_id, response, request):
     try:
         from ondoc.account.mongo_models import PgLogs
         PgLogs.save_pg_response(log_type, order_id, txn_id, response, request)
     except Exception as e:
-       logger.error("Error in saving pg response to mongo database - " + json.dumps(response) + " with exception - " + str(e))
-       self.retry([txn_id, response], countdown=300)
+        logger.error("Error in saving pg response to mongo database - " + json.dumps(response) + " with exception - " + str(e))
+        self.retry([txn_id, response], countdown=300)
+
+
+@task(bind=True)
+def save_payment_status(self, current_status, args):
+    try:
+        from ondoc.account.models import PaymentProcessStatus
+
+        PaymentProcessStatus.save_payment_status(current_status, args)
+    except Exception as e:
+       logger.error("Error in saving payment status - " + json.dumps(args) + " with exception - " + str(e))

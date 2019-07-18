@@ -2238,3 +2238,59 @@ class MerchantPayoutLog(TimeStampedModel):
         payout_log = MerchantPayoutLog(merchant_payout=payout)
         payout_log.error = error
         payout_log.save()
+
+
+class PgStatusCode(TimeStampedModel):
+    code = models.PositiveSmallIntegerField(default=1)
+    message = models.TextField(blank=False, null=False)
+
+    class Meta:
+        db_table = "pg_status_code"
+
+
+class PaymentProcessStatus(TimeStampedModel):
+    INITIATED = 1
+    AUTHORIZE = 2
+    SUCCESS = 3
+    FAILURE = 4
+
+    STATUS_CHOICES = [(INITIATED, "Initiated"), (AUTHORIZE, "Authorize"),
+                      (SUCCESS, "Success"), (FAILURE, "Failure")]
+
+    user = models.ForeignKey(User, on_delete=models.DO_NOTHING, null=True)
+    order = models.ForeignKey(Order, on_delete=models.DO_NOTHING, null=True)
+    current_status = models.PositiveSmallIntegerField(default=1, editable=False, choices=STATUS_CHOICES)
+    status_code = models.PositiveSmallIntegerField(null=True, blank=True)
+    source = models.CharField(blank=True, max_length=50, null=True)
+
+    class Meta:
+        db_table = "payment_process_status"
+
+    @classmethod
+    def save_payment_status(cls, current_status, args):
+        user_id = args.get('user_id')
+        order_id = args.get('order_id')
+        status_code = args.get('status_code')
+        source = args.get('source')
+
+        if order_id:
+            payment_process_status = PaymentProcessStatus.objects.filter(order_id=order_id).first()
+            if not payment_process_status:
+                payment_process_status = PaymentProcessStatus(order_id=order_id)
+
+            payment_process_status.user_id = user_id
+            payment_process_status.status_code = status_code
+            payment_process_status.source = source
+            payment_process_status.current_status = current_status
+
+            payment_process_status.save()
+
+    @classmethod
+    def get_status_type(cls, status_code, txStatus):
+        if status_code == 1:
+            if txStatus == 'TXN_AUTHORIZE':
+                return PaymentProcessStatus.AUTHORIZE
+            else:
+                return PaymentProcessStatus.SUCCESS
+
+        return PaymentProcessStatus.FAILURE
