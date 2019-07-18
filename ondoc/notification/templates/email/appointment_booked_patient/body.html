@@ -154,15 +154,23 @@
                                         Particulars
                                     </th>
                                     {% if show_amounts %}
-                                        <th style="border: 1px solid black;">
-                                            MRP
-                                        </th>
-                                        <th style="border: 1px solid black;">
-                                            Discount
-                                        </th>
-                                        <th style="border: 1px solid black;">
-                                            Grand Total
-                                        </th>
+                                    <th style="border: 1px solid black;">
+                                        MRP
+                                    </th>
+                                    {% if not instance.fees %}
+                                    <th style="border: 1px solid black;">
+                                        Docprime Price
+                                    </th>
+                                    <th style="border: 1px solid black;">
+                                        Platform Convenience Charges
+                                    </th>
+                                    {% endif %}
+                                    <th style="border: 1px solid black;">
+                                        Discount
+                                    </th>
+                                    <th style="border: 1px solid black;">
+                                        Grand Total
+                                    </th>
                                     {% endif %}
                                 </tr>
                                 </thead>
@@ -176,47 +184,55 @@
                                         {{procedure.name|capfirst}}
                                     </td>
                                     {% if show_amounts %}
-                                        <td style="border: 1px solid black;text-align: center;color:#3f3f3f;font-size:16px;font-weight:500;">
-                                            {{procedure.mrp}}
-                                        </td>
-                                        <td style="border: 1px solid black;text-align: center;color:#3f3f3f;font-size:16px;font-weight:500;">
-                                            {{procedure.discount}}
-                                        </td>
-                                        <td style="border: 1px solid black;text-align: center;color:#3f3f3f;font-size:16px;font-weight:500;">
-                                            {{procedure.deal_price}}
-                                        </td>
+                                    <td style="border: 1px solid black;text-align: center;color:#3f3f3f;font-size:16px;font-weight:500;">
+                                        {{procedure.mrp}}
+                                    </td>
+                                    {% if not instance.fees %}
+                                    <td style="border: 1px solid black;text-align: center;color:#3f3f3f;font-size:16px;font-weight:500;">
+                                        {{procedure.dp_price}}
+                                    </td>
+                                    <td style="border: 1px solid black;text-align: center;color:#3f3f3f;font-size:16px;font-weight:500;">
+                                        {{procedure.convenience_charges}}
+                                    </td>
+                                    {% endif %}
+                                    <td style="border: 1px solid black;text-align: center;color:#3f3f3f;font-size:16px;font-weight:500;">
+                                        {{procedure.discount}}
+                                    </td>
+                                    <td style="border: 1px solid black;text-align: center;color:#3f3f3f;font-size:16px;font-weight:500;">
+                                        {{procedure.deal_price}}
+                                    </td>
                                     {% endif %}
                                 </tr>
                                 {% endfor %}
                                 {% if show_amounts %}
-                                    {% if coupon_discount %}
-                                    <tr>
-                                        <td colspan="4"
-                                            style="border: 1px solid black;text-align: center;color:#000000;font-size:16px;font-weight:700;">
-                                            Coupon Discount
-                                        </td>
-                                        <td style="border: 1px solid black;text-align: center;color:#3f3f3f;font-size:16px;font-weight:500;">
-                                            {{coupon_discount}}
-                                        </td>
-                                    </tr>
-                                    {% endif %}
-                                    <tr>
-                                        <td colspan="4"
-                                            style="border: 1px solid black;text-align: center;color:#000000;font-size:16px;font-weight:700;">
-                                            {% if instance.payment_type == 2 %}
-                                            Amount To Be Paid
-                                            {% else %}
-                                            Amount Paid
-                                            {% endif %}
-                                        </td>
-                                        <td style="border: 1px solid black;text-align: center;color:#3f3f3f;font-size:16px;font-weight:500;">
-                                            {% if instance.payment_type == 2 %}
-                                            {{cod_amount}}
-                                            {% else %}
-                                            {{instance.effective_price}}
-                                            {% endif %}
-                                        </td>
-                                    </tr>
+                                {% if coupon_discount %}
+                                <tr>
+                                    <td colspan="{% if not instance.fees %}6{% else %}4{% endif %}"
+                                        style="border: 1px solid black;text-align: center;color:#000000;font-size:16px;font-weight:700;">
+                                        Coupon Discount
+                                    </td>
+                                    <td style="border: 1px solid black;text-align: center;color:#3f3f3f;font-size:16px;font-weight:500;">
+                                        {{coupon_discount}}
+                                    </td>
+                                </tr>
+                                {% endif %}
+                                <tr>
+                                    <td colspan="{% if not instance.fees %}6{% else %}4{% endif %}"
+                                        style="border: 1px solid black;text-align: center;color:#000000;font-size:16px;font-weight:700;">
+                                        {% if instance.payment_type == 2 %}
+                                        Amount To Be Paid
+                                        {% else %}
+                                        Amount Paid
+                                        {% endif %}
+                                    </td>
+                                    <td style="border: 1px solid black;text-align: center;color:#3f3f3f;font-size:16px;font-weight:500;">
+                                        {% if instance.payment_type == 2 %}
+                                        {{cod_amount}}
+                                        {% else %}
+                                        {{instance.effective_price}}
+                                        {% endif %}
+                                    </td>
+                                </tr>
                                 {% endif %}
                                 </tbody>
                             </table>
