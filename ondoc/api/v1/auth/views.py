@@ -2208,16 +2208,16 @@ class ProfileEmailUpdateViewset(viewsets.GenericViewSet):
             return Response(status=status.HTTP_400_BAD_REQUEST)
 
         if obj.otp_verified:
-            return Response({'success': True, 'message': 'Successfully changed.'})
+            return Response({'success': True, 'message': 'OTP verified successfully.'})
 
         if not obj.is_request_alive():
             return Response(status=status.HTTP_400_BAD_REQUEST, data={'success': False, 'message': 'Given otp has been expired.'})
 
         if obj.otp != data['otp']:
-            return Response(data={'success': False, 'message': 'Given otp does not match'})
+            return Response(data={'success': False, 'message': 'Please enter a valid OTP.'})
 
         is_changed = obj.process_email_change(obj.otp, data.get('process_immediately', False))
         if not is_changed:
             return Response({'success': False})
 
-        return Response({'success': True, 'message': 'Successfully changed.'})
+        return Response({'success': True, 'message': 'OTP verified successfully.'})
