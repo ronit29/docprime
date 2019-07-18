@@ -3568,7 +3568,7 @@ class OfflineCustomerViewSet(viewsets.GenericViewSet):
                                                                           'profile__insurance',
                                                                           'profile__insurance__user_insurance',
                                                                           'appointment_prescriptions', 'test_mappings',
-                                                                          'test_mappings__test')\
+                                                                          'test_mappings__test', 'reports', 'reports__files')\
                                                         .filter(lab_id__in=manageable_lab_list) \
                                                         .annotate(pem_type=Case(When(Q(lab__manageable_lab_admins__user=user) &
                                                                  Q(lab__manageable_lab_admins__super_user_permission=True) &
@@ -3605,6 +3605,17 @@ class OfflineCustomerViewSet(viewsets.GenericViewSet):
                 ad = app.address.get('address') if app.address.get('address') else ''
                 loc = app.address.get('locality') if app.address.get('locality') else ''
                 address = ad + ' ' + loc
+            rep_dict = {}
+            files = []
+            for rep in app.reports.all():
+                for file in rep.files.all():
+                    url = request.build_absolute_uri(file.name.url) if file.name else None
+                    files.append(url)
+                rep_dict = {
+                    "updated_at": rep.updated_at,
+                    "details": rep.report_details,
+                    "files": files
+                }
             patient_profile = auth_serializers.UserProfileSerializer(app.profile, context={'request': request}).data
             patient_profile['profile_id'] = app.profile.id if hasattr(app, 'profile') else None
             patient_thumbnail = patient_profile['profile_image']
@@ -3637,7 +3648,7 @@ class OfflineCustomerViewSet(viewsets.GenericViewSet):
             ret_obj['home_pickup_charges'] = app.home_pickup_charges
             ret_obj['prescriptions'] = app.get_prescriptions(request)
             ret_obj['lab_test'] = LabAppointmentTestMappingSerializer(app.test_mappings.all(), many=True).data
-            # ret_obj['invoice'] = invoice_data
+            ret_obj['reports'] = rep_dict
             response.append(ret_obj)
         return response
 
