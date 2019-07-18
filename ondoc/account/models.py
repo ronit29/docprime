@@ -2278,7 +2278,8 @@ class PaymentProcessStatus(TimeStampedModel):
             if not payment_process_status:
                 payment_process_status = PaymentProcessStatus(order_id=order_id)
 
-            payment_process_status.user_id = user_id
+            if user_id:
+                payment_process_status.user_id = user_id
             payment_process_status.status_code = status_code
             payment_process_status.source = source
             payment_process_status.current_status = current_status
