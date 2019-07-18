@@ -96,6 +96,7 @@ class NotificationAction:
 
     COD_TO_PREPAID = 91
     COD_TO_PREPAID_REQUEST = 92
+    OPD_DAILY_SCHEDULE = 99
 
 
     NOTIFICATION_TYPE_CHOICES = (
@@ -134,7 +135,8 @@ class NotificationAction:
         (LOGIN_OTP, 'Login OTP'),
         (CHAT_NOTIFICATION, "Push Notification from chat"),
         (COD_TO_PREPAID, 'COD to Prepaid'),
-        (COD_TO_PREPAID_REQUEST, 'COD To Prepaid Request')
+        (COD_TO_PREPAID_REQUEST, 'COD To Prepaid Request'),
+        (OPD_DAILY_SCHEDULE, 'OPD Daily Schedule')
     )
 
     OPD_APPOINTMENT = "opd_appointment"

@@ -1,0 +1,3 @@
+Good Morning,
+You have {{ no_of_appointments }} confirmed appointments scheduled for today at {{ hospital.name }} on Docprime Partners app!
+{% for appointment, number in appointments_and_numbers %}{{ appointment.time_slot_start|date:"g:i a" }}  {% if appointment.profile %} {{ appointment.profile.name }} {% else %} {{ appointment.user.name }} {% endif %} | {{ number }}{% endfor %}

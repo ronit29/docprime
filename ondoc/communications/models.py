@@ -286,6 +286,8 @@ class SMSNotification:
             body_template = "sms/docprime_appointment_reminder.txt"
         elif notification_type == NotificationAction.OFFLINE_APPOINTMENT_REMINDER_PROVIDER_SMS:
             body_template = "sms/provider/offline_appointment_reminder.txt"
+        elif notification_type == NotificationAction.OPD_DAILY_SCHEDULE:
+            body_template = "sms/provider/opd_daily_schedule.txt"
 
         elif notification_type == NotificationAction.PROVIDER_ENCRYPTION_ENABLED:
             body_template = "sms/provider/provider_encryption_enabled.txt"
