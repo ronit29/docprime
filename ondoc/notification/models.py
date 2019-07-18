@@ -96,8 +96,11 @@ class NotificationAction:
     COD_TO_PREPAID = 91
     COD_TO_PREPAID_REQUEST = 92
 
-    CONTACT_US_EMAIL = 65
+    LAB_CONFIRMATION_CHECK_AFTER_APPOINTMENT = 93
+    LAB_CONFIRMATION_SECOND_CHECK_AFTER_APPOINTMENT = 94
+    LAB_FEEDBACK_AFTER_APPOINTMENT = 95
 
+    CONTACT_US_EMAIL = 65
     NOTIFICATION_TYPE_CHOICES = (
         (APPOINTMENT_ACCEPTED, "Appointment Accepted"),
         (APPOINTMENT_CANCELLED, "Appointment Cancelled"),
@@ -968,10 +971,14 @@ class SmsNotification(TimeStampedModel, SmsNotificationOpdMixin, SmsNotification
             publish_message(message)
 
     @classmethod
-    def send_booking_url(cls, token, phone_number):
+    def send_booking_url(cls, token, phone_number, name):
         booking_url = "{}/agent/booking?token={}".format(settings.CONSUMER_APP_DOMAIN, token)
         short_url = generate_short_url(booking_url)
-        html_body = "Your booking url is - {} . Please pay to confirm".format(short_url)
+        html_body = "Dear {}, \n" \
+                    "Please click on the link to review your appointment details and make an online payment.\n" \
+                    "{}\n"\
+                    "Thanks,\n" \
+                    "Team Docprime".format(name, short_url)
         if phone_number:
             sms_noti = {
                 "phone_number": phone_number,
