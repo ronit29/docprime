@@ -2009,7 +2009,7 @@ class HospitalDetailIpdProcedureSerializer(TopHospitalForIpdProcedureSerializer)
         return [{'id': x.id, 'name': x.question, 'answer': x.answer} for x in q]
 
     def get_all_doctors(self, obj):
-        q = Doctor.objects.filter(is_live=True, doctor_clinics__enabled=True, doctor_clinics__hospital=obj).distinct()
+        q = Doctor.objects.filter(is_live=True, doctor_clinics__enabled=True, doctor_clinics__hospital=obj).distinct().order_by('name')
         return [{'id': x.id, 'name': x.name} for x in q]
 
     def get_all_cities(self, obj):

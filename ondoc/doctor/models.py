@@ -277,7 +277,7 @@ class Hospital(auth_model.TimeStampedModel, auth_model.CreatedByModel, auth_mode
 
     def get_all_cities(self):
         result = []
-        q = MatrixMappedCity.objects.prefetch_related('state').all()
+        q = MatrixMappedCity.objects.prefetch_related('state').all().order_by('name')
         if self and self.matrix_city:
             q = q.exclude(id=self.matrix_city.id)
             result.append({'id': self.matrix_city.id, 'name': self.matrix_city.name,
