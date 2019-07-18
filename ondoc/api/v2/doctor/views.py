@@ -1074,3 +1074,13 @@ class PartnersAppInvoicePDF(viewsets.GenericViewSet):
         return response
 
 
+class PartnerEConsultationViewSet(viewsets.GenericViewSet):
+
+    def create(self, request):
+        pass
+
+    def list(self, request):
+        pass
+
+    def get(self, request):
+        pass

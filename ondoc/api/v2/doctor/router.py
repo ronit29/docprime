@@ -27,6 +27,8 @@ urlpatterns = [
     path('invoice/create', views.PartnersAppInvoice.as_view({'post': 'create'}), name='create-invoice'),
     path('invoice/update', views.PartnersAppInvoice.as_view({'post': 'update'}), name='update-invoice'),
     path('invoice/<str:encoded_filename>', views.PartnersAppInvoicePDF.as_view({'get': 'download_pdf'}), name='invoice-pdf'),
+    path('ecs/create', views.PartnersAppInvoicePDF.as_view({'post': 'ecs_create'}), name='ecs_create'),
+    path('ecs/list', views.PartnersAppInvoicePDF.as_view({'get': 'ecs_list'}), name='ecs_list'),
 ]
 
 
