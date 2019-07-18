@@ -1597,8 +1597,10 @@ class MerchantPayout(TimeStampedModel):
 
         if self.id and not self.is_insurance_premium_payout() and hasattr(self,'process_payout') and self.process_payout and self.status==self.PENDING and self.type==self.AUTOMATIC:
             self.type = self.AUTOMATIC
-            if not self.content_object:
-                self.content_object = self.get_billed_to()
+            self.update_billed_to_content_type()
+
+            # if not self.content_object:
+            #     self.content_object = self.get_billed_to()
             if not self.paid_to:
                 self.paid_to = self.get_merchant()
 
@@ -2139,14 +2141,14 @@ class MerchantPayout(TimeStampedModel):
         else:
             appt = self.get_appointment()
             if appt and appt.get_billed_to:
-                content_type = ContentType.objects.get_for_model(appt.get_billed_to)
-                MerchantPayout.objects.filter(id=self.id).update(content_type_id=content_type, object_id=appt.get_billed_to.id)
+                billed_to = appt.get_billed_to
+                self.content_object = billed_to
 
-            am = AssociatedMerchant.objects.filter(object_id=appt.get_billed_to.id, content_type_id=content_type).first()
+            content_type = ContentType.objects.get_for_model(billed_to)
+            am = AssociatedMerchant.objects.filter(content_type_id=content_type, object_id=billed_to.id).first()
             if am and not am.merchant_id == self.paid_to_id:
                 if appt and appt.get_merchant:
-                    MerchantPayout.objects.filter(id=self.id).update(paid_to=appt.get_merchant)
-
+                    self.paid_to = appt.get_merchant
 
     class Meta:
         db_table = "merchant_payout"
