@@ -3555,7 +3555,7 @@ class OfflineCustomerViewSet(viewsets.GenericViewSet):
             billing_status = PROCESSED
         return billing_status
 
-    def get_lab_appointment_list(self, request, user):
+    def get_lab_appointment_list(self, request, user, valid_data):
         from ondoc.diagnostic import models as lab_models
         from ondoc.api.v1.diagnostic.serializers import LabAppointmentTestMappingSerializer
         mask_data = None
@@ -3590,7 +3590,12 @@ class OfflineCustomerViewSet(viewsets.GenericViewSet):
                                                             default=Value(1),
                                                             output_field=IntegerField()
                                                             )
-                                                        )
+                                                        ).distinct('id')
+
+        appointment_id = valid_data.get('appointment_id')
+        if appointment_id:
+            appointment_queryset = appointment_queryset.filter(id=appointment_id)
+
         for app in appointment_queryset:
             address = ''
             mask_number = app.mask_number.all()
@@ -3645,7 +3650,9 @@ class OfflineCustomerViewSet(viewsets.GenericViewSet):
 
         type = valid_data.get('type')
         if type == serializers.OfflineAppointmentFilterSerializer.LAB:
-            lab_data = self.get_lab_appointment_list(request, request.user)
+            lab_data = self.get_lab_appointment_list(request, request.user, valid_data)
+            if not lab_data:
+                return Response({"status": 0, "error": "data not found"}, status=status.HTTP_404_NOT_FOUND)
             return Response(lab_data)
 
         online_queryset = get_opd_pem_queryset(request.user, models.OpdAppointment)\

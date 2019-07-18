@@ -968,10 +968,14 @@ class SmsNotification(TimeStampedModel, SmsNotificationOpdMixin, SmsNotification
             publish_message(message)
 
     @classmethod
-    def send_booking_url(cls, token, phone_number):
+    def send_booking_url(cls, token, phone_number, name):
         booking_url = "{}/agent/booking?token={}".format(settings.CONSUMER_APP_DOMAIN, token)
         short_url = generate_short_url(booking_url)
-        html_body = "Your booking url is - {} . Please pay to confirm".format(short_url)
+        html_body = "Dear {}, \n" \
+                    "Please click on the link to review your appointment details and make an online payment.\n" \
+                    "{}\n"\
+                    "Thanks,\n" \
+                    "Team Docprime".format(name, short_url)
         if phone_number:
             sms_noti = {
                 "phone_number": phone_number,
