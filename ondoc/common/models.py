@@ -1,6 +1,6 @@
 from django.contrib.postgres.fields import JSONField
 from django.core.validators import FileExtensionValidator, MinValueValidator, MaxValueValidator
-from django.db import models
+from django.db import models, transaction
 from weasyprint import HTML, CSS
 import string
 import random
@@ -734,6 +734,19 @@ class VirtualAppointment(TimeStampedModel):
 
     class Meta:
         db_table = 'virtual_appointment'
+
+    def save(self, *args, **kwargs):
+        push_to_matrix = False
+        if not self.id:
+            push_to_matrix = True
+        super().save(*args, **kwargs)
+        transaction.on_commit(lambda: self.app_commit_tasks(push_to_matrix=push_to_matrix))
+
+    def app_commit_tasks(self, push_to_matrix):
+        from ondoc.procedure.models import IpdProcedureLead
+        if push_to_matrix:
+            if isinstance(self.content_object, IpdProcedureLead):
+                self.content_object.app_commit_tasks(send_lead_email=False, update_status_in_matrix=True)
 
 
 class MerchantPayoutMixin(object):
