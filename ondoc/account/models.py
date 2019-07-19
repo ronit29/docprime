@@ -1643,10 +1643,10 @@ class MerchantPayout(TimeStampedModel):
 
             if appointment and appointment.insurance and self.id and not self.is_insurance_premium_payout() and self.status==self.PENDING:
                 self.type = self.AUTOMATIC
-                if not self.content_object:
-                    self.content_object = self.get_billed_to()
-                if not self.paid_to:
-                    self.paid_to = self.get_merchant()
+                # if not self.content_object:
+                #     self.content_object = self.get_billed_to()
+                # if not self.paid_to:
+                #     self.paid_to = self.get_merchant()
 
                 try:
                     has_txn, order_data, appointment = self.has_transaction()
@@ -2238,3 +2238,29 @@ class MerchantPayoutLog(TimeStampedModel):
         payout_log = MerchantPayoutLog(merchant_payout=payout)
         payout_log.error = error
         payout_log.save()
+
+
+class MerchantPayoutBulkProcess(TimeStampedModel):
+    payout_ids = models.TextField(null=False, blank=False, help_text="Enter comma separated payout ids here.")
+
+    class Meta:
+        db_table = "merchant_payout_bulk_process"
+
+    def save(self, *args, **kwargs):
+        super().save(*args, **kwargs)
+        transaction.on_commit(lambda: self.after_commit_tasks())
+
+    def after_commit_tasks(self):
+        # payout_ids_list = list()
+        payout_ids = self.payout_ids
+        if payout_ids:
+            payout_ids_list = self.payout_ids.split(',')
+
+        for id in payout_ids_list:
+            merchant_payout = MerchantPayout.objects.filter(id=id).first()
+            if merchant_payout.id and not merchant_payout.is_insurance_premium_payout() and merchant_payout.status == merchant_payout.PENDING:
+                merchant_payout.type = merchant_payout.AUTOMATIC
+                merchant_payout.process_payout = True
+                merchant_payout.save()
+
+

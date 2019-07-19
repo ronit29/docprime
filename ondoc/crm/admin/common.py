@@ -13,7 +13,7 @@ from dateutil import tz
 from django.conf import settings
 from django.utils.dateparse import parse_datetime
 from ondoc.authentication.models import Merchant, AssociatedMerchant, QCModel
-from ondoc.account.models import MerchantPayout
+from ondoc.account.models import MerchantPayout, MerchantPayoutBulkProcess
 from ondoc.common.models import Cities, MatrixCityMapping, PaymentOptions, Remark, MatrixMappedCity, MatrixMappedState, \
     GlobalNonBookable, UserConfig, BlacklistUser, BlockedStates, Fraud
 from import_export import resources, fields
@@ -364,6 +364,7 @@ class MerchantForm(forms.ModelForm):
         #     raise forms.ValidationError("No abbreviation for the state. Allowed states are " + Merchant.get_states_string())
         return self.cleaned_data
 
+
 class MerchantAdmin(ImportExportMixin, VersionAdmin):
     resource_class = MerchantResource
     change_list_template = 'export_template.html'
@@ -452,8 +453,8 @@ class MerchantPayoutForm(forms.ModelForm):
                 if not associated_merchant.verified:
                     raise forms.ValidationError("Associated Merchant not verified.")
 
-            if self.instance.status in [3, 4, 5, 6, 7]:
-                raise forms.ValidationError("This payout is already under process or completed or failed.")
+            if self.instance.status not in [1]:
+                raise forms.ValidationError("Only pending payouts can be processed.")
 
         recreate_payout = self.cleaned_data.get('recreate_payout')
         if recreate_payout:
@@ -467,6 +468,7 @@ class MerchantPayoutForm(forms.ModelForm):
 
 
 class MerchantPayoutResource(resources.ModelResource):
+    appointment_id = fields.Field()
 
     def export(self, queryset=None, *args, **kwargs):
         queryset = self.get_queryset(**kwargs)
@@ -486,11 +488,25 @@ class MerchantPayoutResource(resources.ModelResource):
         payouts = payouts.order_by('-updated_at')
         return payouts
 
+    def dehydrate_appointment_id(self, merchant_payout):
+        appt = merchant_payout.get_appointment()
+        if appt:
+            return appt.id
+
+        return ''
+
+    def dehydrate_status(self, merchant_payout):
+        return dict(MerchantPayout.STATUS_CHOICES)[merchant_payout.status]
+
     class Meta:
         model = MerchantPayout
         fields = ('id', 'payment_mode', 'payout_ref_id', 'charged_amount', 'payable_amount', 'payout_approved',
                   'status', 'payout_time', 'retry_count', 'paid_to', 'utr_no', 'type', 'amount_paid',
-                  'content_type', 'object_id')
+                  'content_type', 'object_id', 'appointment_id')
+
+        export_order = ('id', 'payment_mode', 'payout_ref_id', 'charged_amount', 'payable_amount', 'payout_approved',
+                  'status', 'payout_time', 'retry_count', 'paid_to', 'utr_no', 'type', 'amount_paid',
+                  'content_type', 'object_id', 'appointment_id')
 
 
 class MerchantPayoutAdmin(MediaImportMixin, VersionAdmin):
@@ -504,6 +520,9 @@ class MerchantPayoutAdmin(MediaImportMixin, VersionAdmin):
     list_display = ('id', 'status', 'payable_amount', 'appointment_id', 'doc_lab_name','booking_type')
     search_fields = ['name', 'id', 'appointment_id']
     list_filter = ['status', 'booking_type']
+
+    class Media:
+        js = ('js/admin/ondoc.js',)
 
     def get_queryset(self, request):
         return super().get_queryset(request).filter(payable_amount__gt=0).order_by('-id').prefetch_related('lab_appointment__lab',
@@ -674,6 +693,7 @@ class MatrixMappedStateResource(resources.ModelResource):
     class Meta:
         model = MatrixMappedState
 
+
 class MatrixMappedStateAdmin(ImportMixin, admin.ModelAdmin):
     formats = (base_formats.XLS, base_formats.XLSX,)
     list_display = ('name',)
@@ -685,7 +705,6 @@ class MatrixMappedStateAdmin(ImportMixin, admin.ModelAdmin):
         if not request.user.is_superuser and not request.user.groups.filter(name=constants['SUPER_QC_GROUP']).exists():
             return super().get_readonly_fields(request, obj)
         return ()
-
 
 
 class MatrixMappedCityResource(resources.ModelResource):
@@ -857,3 +876,14 @@ class FraudInline(GenericTabularInline):
     readonly_fields = ['created_at', 'user']
 
 
+class MerchantPayoutBulkProcessAdmin(admin.ModelAdmin):
+    model = MerchantPayoutBulkProcess
+    list_display = ('id',)
+
+    class Media:
+        js = ('js/admin/ondoc.js',)
+
+    def get_readonly_fields(self, request, obj=None):
+        if obj:  # editing an existing object
+            return self.readonly_fields + ('payout_ids',)
+        return self.readonly_fields
