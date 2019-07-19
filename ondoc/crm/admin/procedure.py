@@ -392,7 +392,7 @@ class IpdProcedureLeadAdmin(VersionAdmin):
         ('Lead Info', {
             # 'classes': ('collapse',),
             'fields': ('matrix_lead_id', 'comments', 'data', 'ipd_procedure', 'related_speciality',
-                       'hospital', 'doctor', 'hospital_reference_id', 'source', 'status', 'planned_date',
+                       'hospital', 'doctor', 'hospital_reference_id', 'source', 'status', 'planned_date', 'requested_date_time',
                        'payment_type', 'payment_amount', 'insurer', 'tpa', 'num_of_chats', 'remarks'),
         }),
         ('History', {

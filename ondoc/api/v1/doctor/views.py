@@ -984,6 +984,7 @@ class DoctorProfileUserViewSet(viewsets.GenericViewSet):
 
         hospital = None
         potential_ipd = False
+        all_cities = []
         all_ipd_cities = set(PotentialIpdCity.objects.all().values_list('city', flat=True))
         if doctor_clinics:
             for doc_clinic in doctor_clinics:
@@ -991,6 +992,8 @@ class DoctorProfileUserViewSet(viewsets.GenericViewSet):
                     if doc_clinic.hospital.is_live and doc_clinic.hospital.matrix_city and doc_clinic.hospital.matrix_city.id in all_ipd_cities:
                         potential_ipd = True
                     hospital = doc_clinic.hospital
+                    if not all_cities:
+                        all_cities = hospital.get_all_cities()
                     hosp_reviews_dict = dict()
                     hosp_reviews_dict[hospital.pk] = dict()
                     hosp_reviews_dict[hospital.pk]['google_rating'] = list()
@@ -1024,6 +1027,7 @@ class DoctorProfileUserViewSet(viewsets.GenericViewSet):
 
         response_data['google_rating'] = google_rating
         response_data['potential_ipd'] = potential_ipd
+        response_data['all_cities'] = all_cities
         return Response(response_data)
 
 
@@ -4139,6 +4143,7 @@ class HospitalViewSet(viewsets.GenericViewSet):
                                                          'network__hospital_network_documents',
                                                          'hospitalcertification_set',
                                                          'hosp_availability',
+                                                         'question_answer',
                                                          'hospitalspeciality_set', Prefetch('hospitalimage_set',
                                                                                             HospitalImage.objects.all().order_by(
                                                                                                 '-cover_image'))).filter(
@@ -4189,8 +4194,7 @@ class HospitalViewSet(viewsets.GenericViewSet):
                     description += " " + entity.sublocality_value
 
                 title += ' | Book Appointment, Check Doctors List, Reviews, Contact Number'
-                description += """: Get free booking on first appointment.\
-                 Check {} Doctors List, Reviews, Contact Number, Address, Procedures and more.""".format(hospital_obj.name)
+                description += """: Get free booking on first appointment. Check {} Doctors List, Reviews, Contact Number, Address, Procedures and more.""".format(hospital_obj.name)
             canonical_url = entity.url
         else:
             response['breadcrumb'] = None
@@ -4446,6 +4450,14 @@ class IpdProcedureViewSet(viewsets.GenericViewSet):
         obj_created = IpdProcedureLead(**validated_data)
         obj_created.save()
         return Response(serializers.IpdProcedureLeadSerializer(obj_created).data)
+
+    def update_lead(self, request):
+        serializer = serializers.IpdLeadUpdateSerializerPopUp(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        validated_data = serializer.validated_data
+        temp_id = validated_data.pop('id')
+        IpdProcedureLead.objects.filter(id=temp_id).update(**validated_data)
+        return Response({'message': 'Success'})
 
     def list_by_alphabet(self, request):
         import re
