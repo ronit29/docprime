@@ -3542,8 +3542,7 @@ class OfflineCustomerViewSet(viewsets.GenericViewSet):
         ELIGIBLE = 2
         INITIATED = 3
         PROCESSED = 4
-        billing_status = None
-        utr_number = app.merchant_payout.utr_no
+        billing_status = utr_number = None
         if app.time_slot_start <= timezone.now() and \
                 app.status not in [models.OpdAppointment.COMPLETED, models.OpdAppointment.CANCELLED,
                                    models.OpdAppointment.BOOKED]:
@@ -3558,6 +3557,8 @@ class OfflineCustomerViewSet(viewsets.GenericViewSet):
         elif app.status == models.OpdAppointment.COMPLETED and (
                 app.merchant_payout and app.merchant_payout.status == account_models.MerchantPayout.PAID):
             billing_status = PROCESSED
+            if app.merchant_payout and app.merchant_payout.utr_no:
+                utr_number = app.merchant_payout.utr_no
         return (billing_status, utr_number)
 
     def get_lab_appointment_list(self, request, user, valid_data):
