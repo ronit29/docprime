@@ -392,7 +392,7 @@ class IpdProcedureLeadAdmin(VersionAdmin):
         ('Lead Info', {
             # 'classes': ('collapse',),
             'fields': ('matrix_lead_id', 'comments', 'data', 'ipd_procedure', 'related_speciality',
-                       'hospital', 'doctor', 'hospital_reference_id', 'source', 'status', 'planned_date',
+                       'hospital', 'doctor', 'hospital_reference_id', 'source', 'status', 'planned_date', 'requested_date_time',
                        'payment_type', 'payment_amount', 'insurer', 'tpa', 'num_of_chats', 'remarks'),
         }),
         ('History', {
@@ -494,6 +494,14 @@ class PotentialIpdLeadPracticeSpecializationAdmin(ImportExportMixin, VersionAdmi
     resource_class = PotentialIpdLeadPracticeSpecializationResource
     list_display = ['id', 'practice_specialization']
     autocomplete_fields = ['practice_specialization']
+    # change_list_template = 'superuser_import_export.html'
+
+
+class PotentialIpdCityAdmin(VersionAdmin):
+    search_fields = ['city__name']
+    # resource_class = PotentialIpdLeadPracticeSpecializationResource
+    list_display = ['id', 'city']
+    autocomplete_fields = ['city']
     # change_list_template = 'superuser_import_export.html'
 
 

@@ -48,33 +48,22 @@ def get_spoc_email_and_number_hospital(spocs, appointment):
     for spoc in spocs:
         if spoc.number and spoc.number in range(1000000000, 9999999999):
             admins = GenericAdmin.objects.prefetch_related('user').filter(Q(phone_number=str(spoc.number),
-                                                                            hospital=spoc.content_object),
+                                                                            hospital=spoc.content_object,
+                                                                            entity_type=GenericAdmin.HOSPITAL),
                                                                           Q(super_user_permission=True) |
                                                                           Q(Q(permission_type=GenericAdmin.APPOINTMENT),
                                                                             Q(doctor__isnull=True) | Q(doctor=appointment.doctor)))
             if admins:
                 admins_with_user = admins.filter(user__isnull=False)
-                if admins_with_user.exists():
-                    for admin in admins_with_user:
-                        if int(admin.user.phone_number) == int(spoc.number):
-                            user_and_number.append({'user': admin.user, 'phone_number': spoc.number})
-                            if spoc.email:
-                                user_and_email.append({'user': admin.user, 'email': spoc.email})
-                        else:
-                            user_and_number.append({'user': None, 'phone_number': spoc.number})
-                            if spoc.email:
-                                user_and_email.append({'user': None, 'email': spoc.email})
-
-                admins_without_user = admins.exclude(id__in=admins_with_user)
-                if admins_without_user.exists():
-                    for admin in admins_without_user:
-                        created_user = User.objects.create(phone_number=spoc.number, user_type=User.DOCTOR,
-                                                           auto_created=True)
-                        admin.user = created_user
-                        admin.save()
-                        user_and_number.append({'user': created_user, 'phone_number': spoc.number})
+                for admin in admins_with_user:
+                    if int(admin.user.phone_number) == int(spoc.number):
+                        user_and_number.append({'user': admin.user, 'phone_number': spoc.number})
                         if spoc.email:
-                            user_and_email.append({'user': created_user, 'email': spoc.email})
+                            user_and_email.append({'user': admin.user, 'email': spoc.email})
+                    else:
+                        user_and_number.append({'user': None, 'phone_number': spoc.number})
+                        if spoc.email:
+                            user_and_email.append({'user': None, 'email': spoc.email})
             else:
                 user_and_number.append({'user': None, 'phone_number': spoc.number})
                 if spoc.email:
@@ -354,6 +343,12 @@ class SMSNotification:
             body_template = "sms/cod_to_prepaid_request.txt"
         elif notification_type == NotificationAction.IPD_PROCEDURE_COST_ESTIMATE:
             body_template = "sms/ipd/cost_estimate.txt"
+    #    elif notification_type == NotificationAction.LAB_CONFIRMATION_CHECK_AFTER_APPOINTMENT:
+    #        body_template = "sms/lab/lab_confirmation_check.txt"
+    #   elif notification_type == NotificationAction.LAB_CONFIRMATION_SECOND_CHECK_AFTER_APPOINTMENT:
+    #        body_template = "sms/lab/lab_confirmation_second_check.txt"
+    #    elif notification_type == NotificationAction.LAB_FEEDBACK_AFTER_APPOINTMENT:
+    #        body_template = "sms/lab/lab_feedback.txt"
         return body_template
 
     def trigger(self, receiver, template, context):
@@ -526,8 +521,7 @@ class WHTSAPPNotification:
             data.append(self.context.get('patient_name'))
             data.append(self.context.get('instance').profile.phone_number)
             data.append(self.context.get('doctor_name'))
-            data.append(self.context.get('instance').hospital.name)
-            data.append(self.context.get('instance').hospital.get_hos_address())
+            data.append(datetime.strftime(aware_time_zone(self.context.get('instance').time_slot_start), '%d-%m-%Y %H:%M'))
 
         elif notification_type == NotificationAction.APPOINTMENT_RESCHEDULED_BY_PATIENT and user and user.user_type == User.CONSUMER:
             body_template = "opd_appointment_rescheduled_patient_initiated_to_patient"
@@ -674,18 +668,18 @@ class WHTSAPPNotification:
             else:
                 pass
 
-        elif notification_type == NotificationAction.LAB_APPOINTMENT_BOOKED and (not user or user.user_type == User.DOCTOR):
-            body_template = "appointment_booked_lab"
-
-            data.append(self.context.get('patient_name'))
-            data.append(self.context.get('lab_name'))
-            data.append(datetime.strftime(aware_time_zone(self.context.get('instance').time_slot_start), '%d-%m-%Y'))
-            data.append(datetime.strftime(aware_time_zone(self.context.get('instance').time_slot_start), '%H:%M'))
-            data.append(self.context.get('instance').id)
-            data.append(self.context.get('patient_name'))
-            data.append(self.context.get('instance').profile.phone_number)
-            data.append(self.context.get('lab_name'))
-            data.append(datetime.strftime(aware_time_zone(self.context.get('instance').time_slot_start), '%d-%m-%Y %H:%M'))
+        # elif notification_type == NotificationAction.LAB_APPOINTMENT_BOOKED and (not user or user.user_type == User.DOCTOR):
+        #     body_template = "appointment_booked_lab"
+        #
+        #     data.append(self.context.get('patient_name'))
+        #     data.append(self.context.get('lab_name'))
+        #     data.append(datetime.strftime(aware_time_zone(self.context.get('instance').time_slot_start), '%d-%m-%Y'))
+        #     data.append(datetime.strftime(aware_time_zone(self.context.get('instance').time_slot_start), '%H:%M'))
+        #     data.append(self.context.get('instance').id)
+        #     data.append(self.context.get('patient_name'))
+        #     data.append(self.context.get('instance').profile.phone_number)
+        #     data.append(self.context.get('lab_name'))
+        #     data.append(datetime.strftime(aware_time_zone(self.context.get('instance').time_slot_start), '%d-%m-%Y %H:%M'))
 
         elif notification_type == NotificationAction.LAB_APPOINTMENT_RESCHEDULED_BY_PATIENT and user and user.user_type == User.CONSUMER:
             body_template = "appointment_rescheduled_patient_initiated_to_patient"
@@ -1173,8 +1167,10 @@ class EMAILNotification:
                         user.purchased_insurance.order_by('-id').first().cancel_customer_type == UserInsurance.OTHER and \
                         (notification_type == NotificationAction.INSURANCE_CANCEL_INITIATE or \
                         notification_type == NotificationAction.INSURANCE_CANCELLATION_APPROVED or \
-                        notification_type == NotificationAction.INSURANCE_CANCELLATION):
-            if notification_type == NotificationAction.INSURANCE_CANCEL_INITIATE:
+                        notification_type == NotificationAction.INSURANCE_CANCELLATION or \
+                        notification_type == NotificationAction.INSURANCE_ENDORSMENT_PENDING):
+            if notification_type == NotificationAction.INSURANCE_CANCEL_INITIATE or \
+                notification_type == NotificationAction.INSURANCE_ENDORSMENT_PENDING:
                 bcc = settings.INSURANCE_CANCEL_INITIATE_EMAIL
             elif notification_type == NotificationAction.INSURANCE_CANCELLATION_APPROVED:
                 email = settings.INSURANCE_CANCELLATION_APPROVAL_ALERT_TO_EMAIL
@@ -1319,7 +1315,7 @@ class OpdNotification(Notification):
         est = pytz.timezone(settings.TIME_ZONE)
         time_slot_start = self.appointment.time_slot_start.astimezone(est)
         mask_number_instance = self.appointment.mask_number.filter(is_deleted=False).first()
-        mask_number=''
+        mask_number = ''
         if mask_number_instance:
             mask_number = mask_number_instance.mask_number
 
@@ -1329,12 +1325,18 @@ class OpdNotification(Notification):
 
         # Implmented According to DOCNEW-360
         # auth_token = AgentToken.objects.create_token(user=self.appointment.user)
+        clinic_or_hospital = "Clinic"
+        if self.appointment.hospital.assoc_doctors.filter(enabled=True).count() > 10:
+            clinic_or_hospital = "Hospital"
         token_object = JWTAuthentication.generate_token(self.appointment.user)
         booking_url = settings.BASE_URL + '/sms/booking?token={}'.format(token_object['token'].decode("utf-8"))
-        opd_appointment_cod_to_prepaid_url, cod_to_prepaid_discount = self.appointment.get_cod_to_prepaid_url_and_discount(token_object['token'].decode("utf-8"))
-        opd_appointment_complete_url = booking_url + "&callbackurl=opd/appointment/{}?complete=true".format(self.appointment.id)
+        opd_appointment_cod_to_prepaid_url, cod_to_prepaid_discount = self.appointment.get_cod_to_prepaid_url_and_discount(
+            token_object['token'].decode("utf-8"))
+        opd_appointment_complete_url = booking_url + "&callbackurl=opd/appointment/{}?complete=true".format(
+            self.appointment.id)
         opd_appointment_feedback_url = booking_url + "&callbackurl=opd/appointment/{}".format(self.appointment.id)
-        reschdule_appointment_bypass_url = booking_url + "&callbackurl=opd/doctor/{}/{}/book?reschedule={}".format(self.appointment.doctor.id, self.appointment.hospital.id, self.appointment.id)
+        reschdule_appointment_bypass_url = booking_url + "&callbackurl=opd/doctor/{}/{}/book?reschedule={}".format(
+            self.appointment.doctor.id, self.appointment.hospital.id, self.appointment.id)
         hospitals_not_required_unique_code = set(json.loads(settings.HOSPITALS_NOT_REQUIRED_UNIQUE_CODE))
         credit_letter_url = self.appointment.get_credit_letter_url()
         context = {
@@ -1344,6 +1346,7 @@ class OpdNotification(Notification):
             "patient_name": patient_name,
             "id": self.appointment.id,
             "instance": self.appointment,
+            "clinic_or_hospital": clinic_or_hospital,
             "procedures": procedures,
             "coupon_discount": str(self.appointment.discount) if self.appointment.discount else None,
             "url": "/opd/appointment/{}".format(self.appointment.id),
@@ -1362,7 +1365,8 @@ class OpdNotification(Notification):
             "opd_appointment_feedback_url": generate_short_url(opd_appointment_feedback_url),
             "reschdule_appointment_bypass_url": generate_short_url(reschdule_appointment_bypass_url),
             "show_amounts": bool(self.appointment.payment_type != OpdAppointment.INSURANCE),
-            "opd_appointment_cod_to_prepaid_url": generate_short_url(opd_appointment_cod_to_prepaid_url) if opd_appointment_cod_to_prepaid_url else None,
+            "opd_appointment_cod_to_prepaid_url": generate_short_url(
+                opd_appointment_cod_to_prepaid_url) if opd_appointment_cod_to_prepaid_url else None,
             "cod_to_prepaid_discount": cod_to_prepaid_discount,
             "hospitals_not_required_unique_code": hospitals_not_required_unique_code,
             "credit_letter_url": generate_short_url(credit_letter_url) if credit_letter_url else None
@@ -1373,7 +1377,6 @@ class OpdNotification(Notification):
         context = self.get_context()
         notification_type = self.notification_type
         all_receivers = self.get_receivers()
-
         if notification_type == NotificationAction.DOCTOR_INVOICE:
             email_notification = EMAILNotification(notification_type, context)
             email_notification.send(all_receivers.get('email_receivers', []))
@@ -1516,6 +1519,11 @@ class LabNotification(Notification):
         time_slot_start = self.appointment.time_slot_start.astimezone(est)
         tests = self.appointment.get_tests_and_prices()
         report_file_links = instance.get_report_urls()
+        token_object = JWTAuthentication.generate_token(self.appointment.user)
+        booking_url = settings.BASE_URL + '/sms/booking?token={}'.format(token_object['token'].decode("utf-8"))
+        lab_appointment_complete_url = booking_url + "&callbackurl=lab/appointment/{}?complete=true".format(self.appointment.id)
+        lab_appointment_feedback_url = booking_url + "&callbackurl=lab/appointment/{}".format(self.appointment.id)
+        reschedule_appointment_bypass_url = booking_url + "&callbackurl=lab/{}/timeslots?reschedule=true".format(self.appointment.lab.id)
 
         email_banners_html = EmailBanner.get_banner(instance, self.notification_type)
         # email_banners_html = UserConfig.objects.filter(key__iexact="email_banners") \
@@ -1560,6 +1568,9 @@ class LabNotification(Notification):
             "type": "lab",
             "mask_number": mask_number,
             "email_banners": email_banners_html if email_banners_html is not None else "",
+            "lab_appointment_complete_url": generate_short_url(lab_appointment_complete_url),
+            "lab_appointment_feedback_url": generate_short_url(lab_appointment_feedback_url),
+            "reschedule_appointment_bypass_url": generate_short_url(reschedule_appointment_bypass_url),
             "is_thyrocare_report": is_thyrocare_report,
             "chat_url": chat_url,
             "show_amounts": bool(self.appointment.payment_type != OpdAppointment.INSURANCE)
@@ -1619,6 +1630,9 @@ class LabNotification(Notification):
                                  NotificationAction.LAB_REPORT_UPLOADED,
                                  NotificationAction.LAB_INVOICE,
                                  NotificationAction.LAB_OTP_BEFORE_APPOINTMENT,
+                                 NotificationAction.LAB_CONFIRMATION_CHECK_AFTER_APPOINTMENT,
+                                 NotificationAction.LAB_CONFIRMATION_SECOND_CHECK_AFTER_APPOINTMENT,
+                                 NotificationAction.LAB_FEEDBACK_AFTER_APPOINTMENT,
                                  NotificationAction.LAB_REPORT_SEND_VIA_CRM]:
             receivers.append(instance.user)
         elif notification_type in [NotificationAction.LAB_APPOINTMENT_RESCHEDULED_BY_PATIENT,

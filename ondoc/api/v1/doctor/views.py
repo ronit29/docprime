@@ -31,7 +31,8 @@ from ondoc.account import models as account_models
 from ondoc.location.models import EntityUrls, EntityAddress, DefaultRating
 from ondoc.procedure.models import Procedure, ProcedureCategory, CommonProcedureCategory, ProcedureToCategoryMapping, \
     get_selected_and_other_procedures, CommonProcedure, CommonIpdProcedure, IpdProcedure, DoctorClinicIpdProcedure, \
-    IpdProcedureFeatureMapping, IpdProcedureDetail, SimilarIpdProcedureMapping, IpdProcedureLead, Offer
+    IpdProcedureFeatureMapping, IpdProcedureDetail, SimilarIpdProcedureMapping, IpdProcedureLead, Offer, \
+    PotentialIpdCity
 from ondoc.seo.models import NewDynamic
 from . import serializers
 from ondoc.api.v2.doctor import serializers as v2_serializers
@@ -845,7 +846,7 @@ class DoctorProfileUserViewSet(viewsets.GenericViewSet):
         coupon_code = request.query_params.get('coupon_code', None)
         doctor = (models.Doctor.objects
                   .prefetch_related('languages__language',
-                                    'doctor_clinics__hospital',
+                                    'doctor_clinics__hospital__matrix_city',
                                     'doctor_clinics__procedures_from_doctor_clinic__procedure__parent_categories_mapping',
                                     'qualifications__qualification',
                                     'qualifications__specialization',
@@ -877,9 +878,16 @@ class DoctorProfileUserViewSet(viewsets.GenericViewSet):
         spec_ids = list()
         spec_url_dict = dict()
 
+        from ondoc.procedure.models import PotentialIpdLeadPracticeSpecialization
+        all_potential_spec = set(PotentialIpdLeadPracticeSpecialization.objects.all().values_list('practice_specialization', flat=True))
+        is_congot = False
+
         for dps in doctor.doctorpracticespecializations.all():
             general_specialization.append(dps.specialization)
             spec_ids.append(dps.specialization.id)
+            if dps.specialization.id in all_potential_spec:
+                is_congot = True
+
         if spec_ids and entity:
             spec_urls = EntityUrls.objects.filter(specialization_id__in=spec_ids, sublocality_value=entity.sublocality_value,
                                           locality_value=entity.locality_value, is_valid=True, entity_type='Doctor', url_type='SEARCHURL')
@@ -903,6 +911,7 @@ class DoctorProfileUserViewSet(viewsets.GenericViewSet):
 
         hospital = None
         response_data['about_web'] = None
+        response_data['is_congot'] = is_congot
         google_rating = dict()
         date = None
 
@@ -974,10 +983,17 @@ class DoctorProfileUserViewSet(viewsets.GenericViewSet):
                     response_data['doctors']['doctors_url'] = None
 
         hospital = None
+        potential_ipd = False
+        all_cities = []
+        all_ipd_cities = set(PotentialIpdCity.objects.all().values_list('city', flat=True))
         if doctor_clinics:
             for doc_clinic in doctor_clinics:
                 if doc_clinic and doc_clinic.hospital:
+                    if doc_clinic.hospital.is_live and doc_clinic.hospital.matrix_city and doc_clinic.hospital.matrix_city.id in all_ipd_cities:
+                        potential_ipd = True
                     hospital = doc_clinic.hospital
+                    if not all_cities:
+                        all_cities = hospital.get_all_cities()
                     hosp_reviews_dict = dict()
                     hosp_reviews_dict[hospital.pk] = dict()
                     hosp_reviews_dict[hospital.pk]['google_rating'] = list()
@@ -1010,6 +1026,8 @@ class DoctorProfileUserViewSet(viewsets.GenericViewSet):
                     google_rating.update(hosp_reviews_dict)
 
         response_data['google_rating'] = google_rating
+        response_data['potential_ipd'] = potential_ipd
+        response_data['all_cities'] = all_cities
         return Response(response_data)
 
 
@@ -2409,6 +2427,15 @@ class HospitalAutocomplete(autocomplete.Select2QuerySetView):
 class PracticeSpecializationAutocomplete(autocomplete.Select2QuerySetView):
     def get_queryset(self):
         qs = models.PracticeSpecialization.objects.all()
+
+        if self.q:
+            qs = qs.filter(name__icontains=self.q).order_by('name')
+        return qs
+
+
+class SimilarSpecializationGroupAutocomplete(autocomplete.Select2QuerySetView):
+    def get_queryset(self):
+        qs = models.SimilarSpecializationGroup.objects.all()
 
         if self.q:
             qs = qs.filter(name__icontains=self.q).order_by('name')
@@ -4095,7 +4122,7 @@ class HospitalViewSet(viewsets.GenericViewSet):
                     is_valid='t')
                 if valid_entity_url_qs.exists():
                     corrected_url = valid_entity_url_qs[0].url
-                    return Response(data={'url': corrected_url, 'status': 301})
+                    return Response(status=status.HTTP_301_MOVED_PERMANENTLY, data={'url': corrected_url, 'status': 301})
                 else:
                     return Response(status=status.HTTP_404_NOT_FOUND)
 
@@ -4116,6 +4143,7 @@ class HospitalViewSet(viewsets.GenericViewSet):
                                                          'network__hospital_network_documents',
                                                          'hospitalcertification_set',
                                                          'hosp_availability',
+                                                         'question_answer',
                                                          'hospitalspeciality_set', Prefetch('hospitalimage_set',
                                                                                             HospitalImage.objects.all().order_by(
                                                                                                 '-cover_image'))).filter(
@@ -4166,8 +4194,7 @@ class HospitalViewSet(viewsets.GenericViewSet):
                     description += " " + entity.sublocality_value
 
                 title += ' | Book Appointment, Check Doctors List, Reviews, Contact Number'
-                description += """: Get free booking on first appointment.\
-                 Check {} Doctors List, Reviews, Contact Number, Address, Procedures and more.""".format(hospital_obj.name)
+                description += """: Get free booking on first appointment. Check {} Doctors List, Reviews, Contact Number, Address, Procedures and more.""".format(hospital_obj.name)
             canonical_url = entity.url
         else:
             response['breadcrumb'] = None
@@ -4388,16 +4415,22 @@ class IpdProcedureViewSet(viewsets.GenericViewSet):
         if city:
             breadcrumb.append({"title": "{} Cost in {}".format(ipd_procedure.name, city), "url": None, "link_title": None})
 
+        near_by = validated_data.get('near_by', False)
+        hospital_request_data = {}
+        doctor_search_parameters = {'ipd_procedure_ids': str(pk),
+                                    'longitude': validated_data.get('long'),
+                                    'latitude': validated_data.get('lat'),
+                                    'sort_on': 'experience',
+                                    'city': city,
+                                    'restrict_result_count': 3}
+        if near_by:
+            hospital_request_data.update({'max_distance': 1000000})
+            doctor_search_parameters.update({'max_distance': 1000000})
         hospital_view_set = HospitalViewSet()
-        hospital_result = hospital_view_set.list(request, pk, 2)
+        hospital_result = hospital_view_set.list(request, pk, 2, request_data=hospital_request_data)
         doctor_result_data = {}
         doctor_list_viewset = DoctorListViewSet()
-        doctor_result = doctor_list_viewset.list(request, parameters={'ipd_procedure_ids': str(pk),
-                                                                      'longitude': validated_data.get('long'),
-                                                                      'latitude': validated_data.get('lat'),
-                                                                      'sort_on': 'experience',
-                                                                      'city': city,
-                                                                      'restrict_result_count': 3})
+        doctor_result = doctor_list_viewset.list(request, parameters=doctor_search_parameters)
         doctor_result_data = doctor_result.data
         ipd_procedure_serializer = serializers.IpdProcedureDetailSerializer(ipd_procedure, context={'request': request,
                                                                                                     'similar_ipds_entity_dict': similar_ipds_entity_dict,
@@ -4417,6 +4450,14 @@ class IpdProcedureViewSet(viewsets.GenericViewSet):
         obj_created = IpdProcedureLead(**validated_data)
         obj_created.save()
         return Response(serializers.IpdProcedureLeadSerializer(obj_created).data)
+
+    def update_lead(self, request):
+        serializer = serializers.IpdLeadUpdateSerializerPopUp(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        validated_data = serializer.validated_data
+        temp_id = validated_data.pop('id')
+        IpdProcedureLead.objects.filter(id=temp_id).update(**validated_data)
+        return Response({'message': 'Success'})
 
     def list_by_alphabet(self, request):
         import re

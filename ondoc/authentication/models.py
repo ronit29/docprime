@@ -1283,6 +1283,30 @@ class GenericAdmin(TimeStampedModel, CreatedByModel):
                     break
         return doctor_number_exists
 
+    @staticmethod
+    def create_users_from_generic_admins():
+        all_admins_without_users = GenericAdmin.objects.filter(user__isnull=True, entity_type=GenericAdmin.HOSPITAL).order_by('-updated_at')[:100]
+        admins_phone_numbers = all_admins_without_users.values_list('phone_number', flat=True)
+        users_for_admins = User.objects.filter(phone_number__in=admins_phone_numbers, user_type=User.DOCTOR)
+        users_admin_dict = dict()
+        for user in users_for_admins:
+            users_admin_dict[user.phone_number] = user
+        # users_phone_numbers = users_for_admins.values_list('phone_number', flat=True)
+
+        users_to_be_created = list()
+        try:
+            for admin in all_admins_without_users:
+                if admin.phone_number in users_admin_dict:
+                    admin.user = users_admin_dict[admin.phone_number]
+                    admin.save()
+                else:
+                    users_to_be_created.append(User(phone_number=admin.phone_number, user_type=User.DOCTOR,
+                                                           auto_created=True))
+            User.objects.bulk_create(users_to_be_created)
+        except Exception as e:
+            logger.error(str(e))
+            print("Error while bulk creating Users. ERROR :: {}".format(str(e)))
+
 
 class BillingAccount(models.Model):
     SAVINGS = 1
@@ -1915,7 +1939,7 @@ class PhysicalAgreementSigned(models.Model):
 class RefundMixin(object):
 
     @transaction.atomic
-    def action_refund(self, refund_flag=1):
+    def action_refund(self, refund_flag=1, initiate_refund=1):
         from ondoc.doctor.models import OpdAppointment
         from ondoc.account.models import ConsumerAccount
         from ondoc.common.models import RefundDetails
@@ -1933,7 +1957,7 @@ class RefundMixin(object):
             consumer_account.credit_cancellation(self, product_id, wallet_refund, cashback_refund)
             if refund_flag:
                 ctx_obj = consumer_account.debit_refund()
-                ConsumerRefund.initiate_refund(self.user, ctx_obj)
+                ConsumerRefund.initiate_refund(self.user, ctx_obj) if initiate_refund else None
 
     def can_agent_refund(self, user):
         from ondoc.crm.constants import constants
@@ -2014,3 +2038,132 @@ class UserNumberUpdate(TimeStampedModel):
 
     class Meta:
         db_table = "user_number_updates"
+
+
+class UserProfileEmailUpdate(TimeStampedModel):
+    profile = models.ForeignKey(UserProfile, on_delete=models.DO_NOTHING, related_name="email_updates")
+    old_email = models.CharField(max_length=256, blank=False)
+    new_email = models.CharField(max_length=256, blank=False)
+    otp_verified = models.BooleanField(default=False)
+    is_successfull = models.BooleanField(default=False)
+    otp = models.IntegerField(null=True, blank=True)
+    otp_expiry = models.DateTimeField(default=None, null=True)
+
+    def __str__(self):
+        return str(self.profile)
+
+    def is_request_alive(self):
+        return timezone.now() <= self.otp_expiry
+
+    @classmethod
+    def can_be_changed(cls, user, new_email):
+        return not UserProfile.objects.filter(email=new_email).exclude(user=user).exists()
+
+    def send_otp_email(self):
+        from ondoc.notification.tasks import send_userprofile_email_update_otp
+        send_userprofile_email_update_otp.apply_async((self.id,))
+
+    def after_commit_tasks(self, send_otp=False):
+        if send_otp:
+            self.send_otp_email()
+
+    @classmethod
+    def initiate(cls, profile, email):
+        obj = cls(profile=profile, new_email=email, old_email=profile.email, otp=random.choice(range(100000, 999999)),
+                  otp_expiry=(timezone.now() + timedelta(minutes=30)))
+        obj.save()
+        return obj
+
+    def process_email_change(self, otp, process_immediate=False):
+        if process_immediate:
+            if otp and self.otp != otp:
+                return False
+
+            self.otp_verified = True
+            self.profile.email = self.new_email
+            self.is_successfull = True
+            self.profile.save()
+            self.save()
+        else:
+            self.otp_verified = True
+            self.save()
+
+        return True
+
+    def save(self, *args, **kwargs):
+        send_otp = False
+
+        # Instance comming First time.
+        if not self.id:
+            send_otp = True
+
+        super().save(*args, **kwargs)
+
+        transaction.on_commit(lambda: self.after_commit_tasks(send_otp=send_otp))
+
+    class Meta:
+        db_table = "userprofile_email_updates"
+
+
+class PaymentMixin(object):
+
+    def capture_payment(self):
+        from ondoc.notification import tasks as notification_tasks
+        notification_tasks.send_capture_payment_request.apply_async(
+            (self.PRODUCT_ID, self.id), eta=timezone.localtime(), )
+
+    def release_payment(self):
+        from ondoc.notification import tasks as notification_tasks
+        notification_tasks.send_release_payment_request.apply_async(
+            (self.PRODUCT_ID, self.id), eta=timezone.localtime(), )
+
+    def preauth_process(self, refund_flag=1):
+        from ondoc.account.models import Order
+        from ondoc.account.models import PgTransaction
+        initiate_refund = 1
+        order = Order.objects.filter(product_id=self.PRODUCT_ID,
+                                         reference_id=self.id).first()
+        if order:
+            order_parent = order.parent
+            txn_obj = PgTransaction.objects.filter(order=order_parent).first() if order_parent else None
+
+            if txn_obj and txn_obj.is_preauth():
+                if refund_flag:
+                    if order_parent.orders.count() > 1:
+                        self.capture_payment()
+                    else:
+                        self.release_payment()
+                        initiate_refund = 0
+                else:
+                    #if order_parent.orders.count() > 1:
+                    self.capture_payment()
+                    initiate_refund = 0
+                    # raise Exception('Preauth booked appointment can not be rebooked.')
+
+        return initiate_refund
+
+    def get_transaction(self):
+        from ondoc.account.models import Order
+        from ondoc.account.models import PgTransaction
+        child_order = Order.objects.filter(reference_id=self.id, product_id=self.PRODUCT_ID).first()
+        parent_order = None
+        pg_transaction = None
+
+        if child_order:
+            parent_order = child_order.parent
+
+        if parent_order:
+            pg_transaction = PgTransaction.objects.filter(order_id=parent_order.id).first()
+
+        return pg_transaction
+
+
+class GenericQuestionAnswer(TimeStampedModel):
+    question = models.TextField(null=False, verbose_name='Question')
+    answer = models.TextField(null=True, verbose_name='Answer')
+    content_type = models.ForeignKey(ContentType, on_delete=models.DO_NOTHING)
+    object_id = models.BigIntegerField()
+    content_object = GenericForeignKey()
+
+    class Meta:
+        db_table = "generic_question_answer"
