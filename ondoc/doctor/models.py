@@ -258,6 +258,7 @@ class Hospital(auth_model.TimeStampedModel, auth_model.CreatedByModel, auth_mode
     is_ipd_hospital = models.BooleanField(default=False)
     is_big_hospital = models.BooleanField(default=False)
     has_proper_hospital_page = models.BooleanField(default=False)
+    question_answer = GenericRelation(auth_model.GenericQuestionAnswer, related_query_name='hospital_qa')
 
     def __str__(self):
         return self.name
@@ -273,6 +274,17 @@ class Hospital(auth_model.TimeStampedModel, auth_model.CreatedByModel, auth_mode
     #         self.city_search_key = search_city
     #         return self.city
     #     return None
+
+    def get_all_cities(self):
+        result = []
+        q = MatrixMappedCity.objects.prefetch_related('state').all().order_by('name')
+        if self and self.matrix_city:
+            q = q.exclude(id=self.matrix_city.id)
+            result.append({'id': self.matrix_city.id, 'name': self.matrix_city.name,
+                           'state': self.matrix_city.state.name if self.matrix_city.state else None})
+        result.extend([{'id': x.id, 'name': x.name, 'state': x.state.name if x.state else None} for x in q])
+        return result
+
     @staticmethod
     def get_top_hospitals_data(request, lat=28.450367, long=77.071848):
         from ondoc.api.v1.doctor.serializers import TopHospitalForIpdProcedureSerializer
@@ -3705,6 +3717,7 @@ class PracticeSpecialization(auth_model.TimeStampedModel, SearchKey):
     synonyms = models.CharField(max_length=4000, null=True, blank=True)
     doctor_count = models.PositiveIntegerField(default=0, null=True)
     is_insurance_enabled = models.BooleanField(default=True)
+    priority = models.PositiveIntegerField(default=0, null=True)
 
     class Meta:
         db_table = 'practice_specialization'
@@ -4402,6 +4415,7 @@ class CommonHospital(auth_model.TimeStampedModel):
 
 class SimilarSpecializationGroup(auth_model.TimeStampedModel):
     name = models.SlugField(unique=True, db_index=True)
+    show_on_front_end = models.BooleanField(default=False)
     specializations = models.ManyToManyField(PracticeSpecialization, through='SimilarSpecializationGroupMapping',
                                              through_fields=('group', 'specialization'))
 
