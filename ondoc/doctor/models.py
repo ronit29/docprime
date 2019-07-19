@@ -3020,7 +3020,9 @@ class OpdAppointment(auth_model.TimeStampedModel, CouponsMixin, OpdAppointmentIn
             "consultation" : {
                 "deal_price": doctor_clinic_timing.deal_price,
                 "mrp": doctor_clinic_timing.mrp,
-                "fees": doctor_clinic_timing.fees
+                "fees": doctor_clinic_timing.fees,
+                "cod_deal_price": doctor_clinic_timing.dct_cod_deal_price(),
+                "is_enabled_for_cod": doctor_clinic_timing.is_enabaled_for_cod()
             },
             "coupon_data" : { "random_coupon_list" : random_coupon_list }
         }
