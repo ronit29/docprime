@@ -1851,6 +1851,7 @@ class DoctorListViewSet(viewsets.GenericViewSet):
                             resp['parent_url'] = parent_url
 
         specializations = list(models.PracticeSpecialization.objects.filter(id__in=validated_data.get('specialization_ids',[])).values('id','name'))
+        specialization_groups = list(models.SimilarSpecializationGroup.objects.filter(id__in=validated_data.get('group_ids', [])).values('id', 'name'))
         if validated_data.get('url'):
             canonical_url = validated_data.get('url')
         else:
@@ -1914,7 +1915,8 @@ class DoctorListViewSet(viewsets.GenericViewSet):
                          'procedures': procedures, 'procedure_categories': procedure_categories,
                          'ratings': ratings, 'reviews': reviews, 'ratings_title': ratings_title,
                          'bottom_content': bottom_content, 'canonical_url': canonical_url,
-                         'ipd_procedures': ipd_procedures, 'hospital': hospital_req_data})
+                         'ipd_procedures': ipd_procedures, 'hospital': hospital_req_data,
+                         'specialization_groups': specialization_groups})
 
     def get_schema(self, request, response):
 

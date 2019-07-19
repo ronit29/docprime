@@ -4414,7 +4414,7 @@ class CommonHospital(auth_model.TimeStampedModel):
 
 
 class SimilarSpecializationGroup(auth_model.TimeStampedModel):
-    name = models.SlugField(unique=True, db_index=True)
+    name = models.CharField(unique=True, db_index=True, max_length=100)
     show_on_front_end = models.BooleanField(default=False)
     specializations = models.ManyToManyField(PracticeSpecialization, through='SimilarSpecializationGroupMapping',
                                              through_fields=('group', 'specialization'))
