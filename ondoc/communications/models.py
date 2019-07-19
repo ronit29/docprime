@@ -1732,6 +1732,7 @@ class InsuranceNotification(Notification):
             'insured_members': member_list,
             'insurer_logo': instance.insurance_plan.insurer.logo.url,
             'coi_url': instance.coi.url,
+            'coi_short_url': generate_short_url(instance.coi.url),
             'insurer_name': instance.insurance_plan.insurer.name,
             'user_bank' : instance.user_bank.last()
         }
