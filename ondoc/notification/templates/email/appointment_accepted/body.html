@@ -207,9 +207,11 @@
                                     Platform Convenience Charges
                                 </th>
                                 {% endif %}
+                                {% if instance.fees %}
                                 <th style="border: 1px solid black;">
                                     Discount
                                 </th>
+                                {% endif %}
                                 <th style="border: 1px solid black;">
                                     Grand Total
                                 </th>
@@ -237,9 +239,11 @@
                                     {{procedure.convenience_charges}}
                                 </td>
                                 {% endif %}
+                                {% if instance.fees %}
                                 <td style="border: 1px solid black;text-align: center;color:#3f3f3f;font-size:16px;font-weight:500;">
                                     {{procedure.discount}}
                                 </td>
+                                {% endif %}
                                 <td style="border: 1px solid black;text-align: center;color:#3f3f3f;font-size:16px;font-weight:500;">
                                     {{procedure.deal_price}}
                                 </td>
@@ -249,7 +253,7 @@
                             {% if show_amounts %}
                             {% if coupon_discount %}
                             <tr>
-                                <td colspan="{% if not instance.fees %}6{% else %}4{% endif %}"
+                                <td colspan="{% if not instance.fees %}5{% else %}4{% endif %}"
                                     style="border: 1px solid black;text-align: center;color:#000000;font-size:16px;font-weight:700;">
                                     Coupon Discount
                                 </td>
@@ -259,7 +263,7 @@
                             </tr>
                             {% endif %}
                             <tr>
-                                <td colspan="{% if not instance.fees %}6{% else %}4{% endif %}"
+                                <td colspan="{% if not instance.fees %}5{% else %}4{% endif %}"
                                     style="border: 1px solid black;text-align: center;color:#000000;font-size:16px;font-weight:700;">
                                     {% if instance.payment_type == 2 %}
                                     Amount To Be Paid
