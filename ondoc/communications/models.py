@@ -489,7 +489,7 @@ class WHTSAPPNotification:
 
             if self.context.get('instance').payment_type == 2:
                 data.append('Please pay Rs {cod_amount} at the center at the time of appointment.'.
-                            format(cod_amount=str(self.context.get('code_amount'))))
+                            format(cod_amount=str(self.context.get('cod_amount'))))
             else:
                 data.append(" ")
 
