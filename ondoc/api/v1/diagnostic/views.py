@@ -3548,7 +3548,8 @@ class LabTestCategoryLandingUrlViewSet(viewsets.GenericViewSet):
         for obj in queryset1:
             res['title'] = obj.url.title
             res['url'] = obj.url.url
-            res['test_category_list'] = {'id': obj.test.id, 'test_category': obj.test.name, 'tests': [{'id': tests.id, 'name': tests.name} for tests in obj.test.lab_tests.all()]}
+            for obj.test in obj:
+                res['test_category_list'] = {'id': obj.test.id, 'test_category': obj.test.name, 'tests': [{'id': tests.id, 'name': tests.name} for tests in obj.test.lab_tests.all()]}
 
         # queryset2 = NewDynamic.objects.all().first()
         # for obj in queryset2:
