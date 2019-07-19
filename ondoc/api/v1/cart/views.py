@@ -221,7 +221,7 @@ class CartViewSet(viewsets.GenericViewSet):
                     "coupon_cashback" : price_data["coupon_cashback"],
                     "home_pickup_charges" : price_data.get("home_pickup_charges", 0),
                     "consultation" : price_data.get("consultation", None),
-                    "cod_deal_price": price_data.get("consultation", {}).dct_cod_deal_price(),
+                    "cod_deal_price": price_data.get("consultation", {}).get('cod_deal_price'),
                     "is_enabled_for_cod" : price_data.get("consultation", {}).get('is_enabled_for_cod'),
                     "is_price_zero": True if price_data['fees'] is not None and price_data['fees']==0 else False
                 })
