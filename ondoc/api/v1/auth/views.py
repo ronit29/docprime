@@ -29,10 +29,11 @@ from ondoc.doctor.models import DoctorMobile, Doctor, HospitalNetwork, Hospital,
                                 DoctorClinicTiming, ProviderSignupLead
 from ondoc.authentication.models import (OtpVerifications, NotificationEndpoint, Notification, UserProfile,
                                          Address, AppointmentTransaction, GenericAdmin, UserSecretKey, GenericLabAdmin,
-                                         AgentToken, DoctorNumber, LastLoginTimestamp)
+                                         AgentToken, DoctorNumber, LastLoginTimestamp, UserProfileEmailUpdate)
 from ondoc.notification.models import SmsNotification, EmailNotification
 from ondoc.account.models import PgTransaction, ConsumerAccount, ConsumerTransaction, Order, ConsumerRefund, OrderLog, \
     UserReferrals, UserReferred, PgLogs
+from ondoc.account.mongo_models import PgLogs as mongo_pglogs
 from django.contrib.auth import get_user_model
 from django.shortcuts import get_object_or_404
 from ondoc.api.pagination import paginate_queryset
@@ -62,7 +63,7 @@ import jwt
 from ondoc.insurance.models import InsuranceTransaction, UserInsurance, InsuredMembers
 from decimal import Decimal
 from ondoc.web.models import ContactUs
-from ondoc.notification.tasks import send_pg_acknowledge
+from ondoc.notification.tasks import send_pg_acknowledge, save_pg_response
 
 from ondoc.ratings_review import models as rate_models
 from django.contrib.contenttypes.models import ContentType
@@ -1031,6 +1032,7 @@ class UserAppointmentsViewSet(OndocViewSet):
         return serializer
 
 
+
 class AddressViewsSet(viewsets.ModelViewSet):
     serializer_class = serializers.AddressSerializer
     authentication_classes = (JWTAuthentication, )
@@ -1217,6 +1219,7 @@ class TransactionViewSet(viewsets.GenericViewSet):
             # log pg data
             try:
                 PgLogs.objects.create(decoded_response=response, coded_response=coded_response)
+                save_pg_response.apply_async((mongo_pglogs.TXN_RESPONSE, response.get("orderId"), None, response, None), eta=timezone.localtime(), )
             except Exception as e:
                 logger.error("Cannot log pg response - " + str(e))
 
@@ -1226,6 +1229,14 @@ class TransactionViewSet(viewsets.GenericViewSet):
                 if response and response.get("orderNo"):
                     pg_txn = PgTransaction.objects.filter(order_no__iexact=response.get("orderNo")).first()
                     if pg_txn:
+                        if pg_txn.is_preauth():
+                            pg_txn.status_code = response.get('statusCode')
+                            pg_txn.status_type = response.get('txStatus')
+                            pg_txn.payment_mode = response.get("paymentMode")
+                            pg_txn.bank_name = response.get('bankName')
+                            pg_txn.transaction_id = response.get('bankTxId')
+                            #pg_txn.payment_captured = True
+                            pg_txn.save()
                         send_pg_acknowledge.apply_async((pg_txn.order_id, pg_txn.order_no,), countdown=1)
                         REDIRECT_URL = (SUCCESS_REDIRECT_URL % pg_txn.order_id) + "?payment_success=true"
                         return HttpResponseRedirect(redirect_to=REDIRECT_URL)
@@ -1256,6 +1267,9 @@ class TransactionViewSet(viewsets.GenericViewSet):
                 pass
 
             if pg_resp_code == 1 and order_obj:
+                if response.get("couponUsed") and response.get("couponUsed") == "false":
+                    order_obj.update_fields_after_coupon_remove()
+
                 response_data = None
                 resp_serializer = serializers.TransactionSerializer(data=response)
                 if resp_serializer.is_valid():
@@ -1340,7 +1354,7 @@ class TransactionViewSet(viewsets.GenericViewSet):
         data['status_code'] = response.get('statusCode')
         data['pg_name'] = response.get('pgGatewayName')
         data['status_type'] = response.get('txStatus')
-        data['transaction_id'] = response.get('pgTxId')
+        data['transaction_id'] = response.get('pgTxId') if not response.get('pgTxId') == 'null' else None
         data['pb_gateway_name'] = response.get('pbGatewayName')
 
         return data
@@ -1858,7 +1872,7 @@ class SendBookingUrlViewSet(GenericViewSet):
             SmsNotification.send_endorsement_request_url(token=token, phone_number=str(user_profile.phone_number))
             EmailNotification.send_endorsement_request_url(token=token, email=user_profile.email)
         else:
-            booking_url = SmsNotification.send_booking_url(token=token, phone_number=str(user_profile.phone_number))
+            booking_url = SmsNotification.send_booking_url(token=token, phone_number=str(user_profile.phone_number), name=user_profile.name)
             EmailNotification.send_booking_url(token=token, email=user_profile.email)
 
         return Response({"status": 1})
@@ -2160,3 +2174,58 @@ class TokenFromUrlKey(viewsets.GenericViewSet):
                 return Response({'status': 1, 'token': obj.token})
             else:
                 return Response({'status': 0, 'token': None, 'message': 'key not found'}, status=status.HTTP_404_NOT_FOUND)
+
+
+class ProfileEmailUpdateViewset(viewsets.GenericViewSet):
+    authentication_classes = (JWTAuthentication, )
+    permission_classes = (IsAuthenticated, IsNotAgent)
+
+    def create(self, request):
+        request_data = request.data
+
+        serializer = serializers.ProfileEmailUpdateInitSerializer(data=request_data, context={'request': request})
+        serializer.is_valid(raise_exception=True)
+        data = serializer.validated_data
+
+        obj = UserProfileEmailUpdate.objects.filter(profile=data['profile'], old_email=data['profile'].email,
+                                                    new_email=data['email']).filter(~Q(otp=None)).order_by('id').last()
+        if obj and obj.is_request_alive():
+            obj.send_otp_email()
+            return Response({'success': True, 'id': obj.id})
+
+        obj_id = None
+
+        try:
+            obj = UserProfileEmailUpdate.initiate(data['profile'], data['email'])
+            obj_id = obj.id
+        except Exception as e:
+            logger.error(str(e))
+            return Response({'success': False})
+
+        return Response({'success': True, 'id': obj_id})
+
+    def update_email(self, request):
+        request_data = request.data
+
+        serializer = serializers.ProfileEmailUpdateProcessSerializer(data=request_data, context={'request': request})
+        serializer.is_valid(raise_exception=True)
+        data = serializer.validated_data
+
+        obj = UserProfileEmailUpdate.objects.filter(profile=data['profile'], id=data['id'], is_successfull=False).first()
+        if not obj:
+            return Response(status=status.HTTP_400_BAD_REQUEST)
+
+        if obj.otp_verified:
+            return Response({'success': True, 'message': 'OTP verified successfully.'})
+
+        if not obj.is_request_alive():
+            return Response(status=status.HTTP_400_BAD_REQUEST, data={'success': False, 'message': 'Given otp has been expired.'})
+
+        if obj.otp != data['otp']:
+            return Response(data={'success': False, 'message': 'Please enter a valid OTP.'})
+
+        is_changed = obj.process_email_change(obj.otp, data.get('process_immediately', False))
+        if not is_changed:
+            return Response({'success': False})
+
+        return Response({'success': True, 'message': 'OTP verified successfully.'})
