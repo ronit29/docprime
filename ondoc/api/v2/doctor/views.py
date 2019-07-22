@@ -1113,7 +1113,10 @@ class PartnersAppInvoicePDF(viewsets.GenericViewSet):
 class PartnerEConsultationViewSet(viewsets.GenericViewSet):
 
     def create(self, request):
-        pass
+        serializer = serializers.EConsultCreateBodySerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        valid_data = serializer.validated_data
+        resp = {}
 
     def list(self, request):
         pass

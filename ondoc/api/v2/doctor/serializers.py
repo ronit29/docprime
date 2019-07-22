@@ -591,3 +591,10 @@ class ProviderEncryptResponseModelSerializer(serializers.ModelSerializer):
     class Meta:
         model = doc_models.ProviderEncrypt
         fields = "__all__"
+
+
+class EConsultCreateBodySerializer(serializers.Serializer):
+    validity = serializers.IntegerField(max_value=256, allow_null=True, required=False)
+    doctor = serializers.IntegerField()
+    patient = serializers.IntegerField()
+    fees = serializers.FloatField()
