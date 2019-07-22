@@ -3576,6 +3576,7 @@ class OfflineCustomerViewSet(viewsets.GenericViewSet):
                                                                           'appointment_prescriptions', 'test_mappings',
                                                                           'test_mappings__test', 'reports', 'reports__files')\
                                                         .filter(lab_id__in=manageable_lab_list) \
+                                                        .exclude(status=lab_models.LabAppointment.CREATED)\
                                                         .annotate(pem_type=Case(When(Q(lab__manageable_lab_admins__user=user) &
                                                                  Q(lab__manageable_lab_admins__super_user_permission=True) &
                                                                  Q(lab__manageable_lab_admins__is_disabled=False), then=Value(3)),
