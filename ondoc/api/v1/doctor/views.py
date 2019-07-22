@@ -246,8 +246,7 @@ class DoctorAppointmentsViewSet(OndocViewSet):
         #     'insurance_message'] = Cart.check_for_insurance(validated_data,request)
         if user_insurance:
             if user_insurance.status == UserInsurance.ONHOLD:
-                return Response(status=status.HTTP_400_BAD_REQUEST, data={'error': 'Your documents from the last claim are under verification. \
-                            Please write to customercare@docprime.com for more information'})
+                return Response(status=status.HTTP_400_BAD_REQUEST, data={'error': 'Your documents from the last claim are under verification.Please write to customercare@docprime.com for more information'})
             hospital = validated_data.get('hospital')
             doctor = validated_data.get('doctor')
 
