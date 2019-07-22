@@ -1244,7 +1244,8 @@ class TransactionViewSet(viewsets.GenericViewSet):
                             pg_txn.status_type = response.get('txStatus')
                             pg_txn.payment_mode = response.get("paymentMode")
                             pg_txn.bank_name = response.get('bankName')
-                            pg_txn.transaction_id = response.get('bankTxId')
+                            pg_txn.transaction_id = response.get('pgTxId')
+                            pg_txn.bank_id = response.get('bankTxId')
                             #pg_txn.payment_captured = True
                             pg_txn.save()
                         send_pg_acknowledge.apply_async((pg_txn.order_id, pg_txn.order_no,), countdown=1)
