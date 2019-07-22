@@ -2262,11 +2262,11 @@ class MerchantPayoutBulkProcess(TimeStampedModel):
         if payout_ids:
             payout_ids_list = self.payout_ids.split(',')
 
-        for id in payout_ids_list:
-            merchant_payout = MerchantPayout.objects.filter(id=id).first()
-            if merchant_payout.id and not merchant_payout.is_insurance_premium_payout() and merchant_payout.status == merchant_payout.PENDING:
-                merchant_payout.type = merchant_payout.AUTOMATIC
-                merchant_payout.process_payout = True
-                merchant_payout.save()
+        merchant_payouts = MerchantPayout.objects.filter(id__in=payout_ids_list)
+        for mp in merchant_payouts:
+            if mp.id and not mp.is_insurance_premium_payout() and mp.status == mp.PENDING:
+                mp.type = mp.AUTOMATIC
+                mp.process_payout = True
+                mp.save()
 
 
