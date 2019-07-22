@@ -2178,10 +2178,18 @@ class EndorsementRequest(auth_model.TimeStampedModel):
 
         endorsed_members_count = user_insurance.endorse_members.filter((Q(mail_status=EndorsementRequest.MAIL_PENDING) | Q(mail_status__isnull=True)), ~Q(status=EndorsementRequest.PENDING)).count()
         endorsed_approved_members_count = user_insurance.endorse_members.filter((Q(mail_status=EndorsementRequest.MAIL_PENDING) | Q(mail_status__isnull=True)), Q(status=EndorsementRequest.APPROVED)).count()
+
+        pending_members = user_insurance.endorse_members.filter(Q(mail_status=EndorsementRequest.MAIL_PENDING) |
+                                                              Q(mail_status__isnull=True))
+        for member in pending_members:
+            member.mail_status = EndorsementRequest.MAIL_SENT
+            member.save()
         if total_endorsement_members == endorsed_approved_members_count:
             try:
+
                 user_insurance.generate_pdf()
-                EndorsementRequest.process_endorsment_notifications(EndorsementRequest.APPROVED, user_insurance.user)
+                EndorsementRequest.process_endorsment_notifications(EndorsementRequest.APPROVED,
+                                                                    user_insurance.user)
             except Exception as e:
                 logger.error('Insurance coi pdf cannot be generated. %s' % str(e))
 
@@ -2190,14 +2198,10 @@ class EndorsementRequest(auth_model.TimeStampedModel):
         if total_endorsement_members == endorsed_members_count:
             try:
                 user_insurance.generate_pdf()
-                EndorsementRequest.process_endorsment_notifications(EndorsementRequest.PARTIAL_APPROVED, user_insurance.user)
+                EndorsementRequest.process_endorsment_notifications(EndorsementRequest.PARTIAL_APPROVED,
+                                                                    user_insurance.user)
             except Exception as e:
                 logger.error('Insurance coi pdf cannot be generated. %s' % str(e))
-        pending_members = user_insurance.endorse_members.filter(Q(mail_status=EndorsementRequest.MAIL_PENDING) |
-                                                              Q(mail_status__isnull=True))
-        for member in pending_members:
-            member.mail_status = EndorsementRequest.MAIL_SENT
-            member.save()
 
     def reject_endorsement(self):
         user_insurance = self.insurance
