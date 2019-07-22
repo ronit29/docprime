@@ -923,7 +923,7 @@ class PgTransaction(TimeStampedModel):
     status_code = models.IntegerField()
     pg_name = models.CharField(max_length=100, null=True, blank=True)
     status_type = models.CharField(max_length=50)
-    transaction_id = models.CharField(max_length=100, blank=True, null=True)
+    transaction_id = models.CharField(max_length=100, null=True, unique=True)
     pb_gateway_name = models.CharField(max_length=100, null=True, blank=True)
     payment_captured = models.BooleanField(default=False)
 
@@ -1643,10 +1643,10 @@ class MerchantPayout(TimeStampedModel):
 
             if appointment and appointment.insurance and self.id and not self.is_insurance_premium_payout() and self.status==self.PENDING:
                 self.type = self.AUTOMATIC
-                if not self.content_object:
-                    self.content_object = self.get_billed_to()
-                if not self.paid_to:
-                    self.paid_to = self.get_merchant()
+                # if not self.content_object:
+                #     self.content_object = self.get_billed_to()
+                # if not self.paid_to:
+                #     self.paid_to = self.get_merchant()
 
                 try:
                     has_txn, order_data, appointment = self.has_transaction()
@@ -1833,6 +1833,7 @@ class MerchantPayout(TimeStampedModel):
         return False
 
     def get_or_create_insurance_premium_transaction(self):
+        from ondoc.account.mongo_models import PgLogs as PgLogsMongo
         #transaction already created no need to proceed
         transaction = None
         transaction = self.get_insurance_premium_transactions()
@@ -1886,7 +1887,7 @@ class MerchantPayout(TimeStampedModel):
                 req_data[key] = str(req_data[key])
 
             response = requests.post(url, data=json.dumps(req_data), headers=headers)
-            save_pg_response.apply_async((PgLogs.DUMMY_TXN, user_insurance.order.id, None, response.json(), req_data,), eta=timezone.localtime(), )
+            save_pg_response.apply_async((PgLogsMongo.DUMMY_TXN, user_insurance.order.id, None, response.json(), req_data,), eta=timezone.localtime(), )
             if response.status_code == status.HTTP_200_OK:
                 resp_data = response.json()
                 #logger.error(resp_data)
@@ -2130,6 +2131,11 @@ class MerchantPayout(TimeStampedModel):
             new_obj.charged_amount = self.charged_amount
             new_obj.booking_type = self.booking_type
             new_obj.tds_amount = self.tds_amount
+            if self.booking_type == self.InsurancePremium:
+                new_obj.content_type_id = self.content_type_id
+                new_obj.object_id = self.object_id
+                new_obj.type = MerchantPayout.AUTOMATIC
+                new_obj.paid_to = self.paid_to
             new_obj.save()
 
             # update appointment payout id
@@ -2238,3 +2244,87 @@ class MerchantPayoutLog(TimeStampedModel):
         payout_log = MerchantPayoutLog(merchant_payout=payout)
         payout_log.error = error
         payout_log.save()
+
+
+class MerchantPayoutBulkProcess(TimeStampedModel):
+    payout_ids = models.TextField(null=False, blank=False, help_text="Enter comma separated payout ids here.")
+
+    class Meta:
+        db_table = "merchant_payout_bulk_process"
+
+    def save(self, *args, **kwargs):
+        super().save(*args, **kwargs)
+        transaction.on_commit(lambda: self.after_commit_tasks())
+
+    def after_commit_tasks(self):
+        # payout_ids_list = list()
+        payout_ids = self.payout_ids
+        if payout_ids:
+            payout_ids_list = self.payout_ids.split(',')
+        try:
+            merchant_payouts = MerchantPayout.objects.filter(id__in=payout_ids_list)
+            for mp in merchant_payouts:
+                if mp.id and not mp.is_insurance_premium_payout() and mp.status == mp.PENDING:
+                    mp.type = mp.AUTOMATIC
+                    mp.process_payout = True
+                    mp.save()
+        except Exception as e:
+            logger.error("Error in processing bulk payout - with exception - " + str(e))
+
+
+
+class PgStatusCode(TimeStampedModel):
+    code = models.PositiveSmallIntegerField(default=1)
+    message = models.TextField(blank=False, null=False)
+
+    class Meta:
+        db_table = "pg_status_code"
+
+
+class PaymentProcessStatus(TimeStampedModel):
+    INITIATED = 1
+    AUTHORIZE = 2
+    SUCCESS = 3
+    FAILURE = 4
+
+    STATUS_CHOICES = [(INITIATED, "Initiated"), (AUTHORIZE, "Authorize"),
+                      (SUCCESS, "Success"), (FAILURE, "Failure")]
+
+    user = models.ForeignKey(User, on_delete=models.DO_NOTHING, null=True)
+    order = models.ForeignKey(Order, on_delete=models.DO_NOTHING, null=True)
+    current_status = models.PositiveSmallIntegerField(default=1, editable=False, choices=STATUS_CHOICES)
+    status_code = models.PositiveSmallIntegerField(null=True, blank=True)
+    source = models.CharField(blank=True, max_length=50, null=True)
+
+    class Meta:
+        db_table = "payment_process_status"
+
+    @classmethod
+    def save_payment_status(cls, current_status, args):
+        user_id = args.get('user_id')
+        order_id = args.get('order_id')
+        status_code = args.get('status_code')
+        source = args.get('source')
+
+        if order_id:
+            payment_process_status = PaymentProcessStatus.objects.filter(order_id=order_id).first()
+            if not payment_process_status:
+                payment_process_status = PaymentProcessStatus(order_id=order_id)
+
+            if user_id:
+                payment_process_status.user_id = user_id
+            payment_process_status.status_code = status_code
+            payment_process_status.source = source
+            payment_process_status.current_status = current_status
+
+            payment_process_status.save()
+
+    @classmethod
+    def get_status_type(cls, status_code, txStatus):
+        if status_code == 1:
+            if txStatus == 'TXN_AUTHORIZE':
+                return PaymentProcessStatus.AUTHORIZE
+            else:
+                return PaymentProcessStatus.SUCCESS
+
+        return PaymentProcessStatus.FAILURE
