@@ -273,8 +273,6 @@ class SMSNotification:
             body_template = "sms/prescription_uploaded.txt"
         elif notification_type == NotificationAction.DOCPRIME_APPOINTMENT_REMINDER_PROVIDER_SMS:
             body_template = "sms/docprime_appointment_reminder.txt"
-        elif notification_type == NotificationAction.OFFLINE_APPOINTMENT_REMINDER_PROVIDER_SMS:
-            body_template = "sms/provider/offline_appointment_reminder.txt"
         elif notification_type == NotificationAction.OPD_DAILY_SCHEDULE:
             body_template = "sms/provider/opd_daily_schedule.txt"
 
@@ -1398,9 +1396,6 @@ class OpdNotification(Notification):
         elif notification_type == NotificationAction.DOCPRIME_APPOINTMENT_REMINDER_PROVIDER_SMS:
             sms_notification = SMSNotification(notification_type, context)
             sms_notification.send(all_receivers.get('sms_receivers', []))
-        elif notification_type == NotificationAction.OFFLINE_APPOINTMENT_REMINDER_PROVIDER_SMS:
-            sms_notification = SMSNotification(notification_type, context)
-            sms_notification.send(all_receivers.get('sms_receivers', []))
         elif notification_type == NotificationAction.COD_TO_PREPAID:
             email_notification = EMAILNotification(notification_type, context)
             sms_notification = SMSNotification(notification_type, context)
@@ -1451,8 +1446,7 @@ class OpdNotification(Notification):
             doctor_spocs_app_recievers = GenericAdmin.get_appointment_admins(instance)
             # receivers.extend(doctor_spocs)
             receivers.append(instance.user)
-        elif notification_type in [NotificationAction.DOCPRIME_APPOINTMENT_REMINDER_PROVIDER_SMS,
-                                   NotificationAction.OFFLINE_APPOINTMENT_REMINDER_PROVIDER_SMS]:
+        elif notification_type in [NotificationAction.DOCPRIME_APPOINTMENT_REMINDER_PROVIDER_SMS]:
             spocs_to_be_communicated = doctor_spocs
             doctor_spocs_app_recievers = GenericAdmin.get_appointment_admins(instance)
         receivers = list(set(receivers))

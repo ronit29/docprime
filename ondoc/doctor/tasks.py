@@ -126,13 +126,17 @@ def doctors_daily_schedule():
                                                                            'user__patient_mobiles') \
                                                          .filter(time_slot_start__date=curr_date.date(),
                                                                  hospital__network_type=Hospital.NON_NETWORK_HOSPITAL,
-                                                                 hospital__is_live=True)
+                                                                 hospital__is_live=True) \
+                                                         .exclude(status__in=[OfflineOPDAppointments.CANCELLED,
+                                                                              OfflineOPDAppointments.COMPLETED])
 
     docprime_appointments = OpdAppointment.objects.select_related('profile') \
                                                   .prefetch_related('hospital__manageable_hospitals') \
                                                   .filter(time_slot_start__date=curr_date.date(),
                                                           hospital__network_type=Hospital.NON_NETWORK_HOSPITAL,
-                                                          hospital__is_live=True)
+                                                          hospital__is_live=True) \
+                                                  .exclude(status__in=[OPDAppointment.CANCELLED,
+                                                                       OPDAppointment.COMPLETED])
     hospital_admins_dict = dict()
     hospital_admin_appointments_dict = dict()
     appointments_list = [*offline_appointments, *docprime_appointments]

@@ -87,7 +87,6 @@ class NotificationAction:
     LAB_LOGO_CHANGE_MAIL = 70
     PRICING_ALERT_EMAIL = 72
     DOCPRIME_APPOINTMENT_REMINDER_PROVIDER_SMS = 69
-    OFFLINE_APPOINTMENT_REMINDER_PROVIDER_SMS = 77
     PROVIDER_ENCRYPTION_ENABLED = 78
     PROVIDER_ENCRYPTION_DISABLED = 79
     LOGIN_OTP = 80
@@ -136,7 +135,6 @@ class NotificationAction:
         (PRICING_ALERT_EMAIL, 'Pricing Change Mail'),
         (LAB_LOGO_CHANGE_MAIL, 'Lab Logo Change Mail'),
         (DOCPRIME_APPOINTMENT_REMINDER_PROVIDER_SMS, 'Docprime Appointment Reminder Provider SMS'),
-        (OFFLINE_APPOINTMENT_REMINDER_PROVIDER_SMS, 'Offline Appointment Reminder Provider SMS'),
         (LOGIN_OTP, 'Login OTP'),
         (CHAT_NOTIFICATION, "Push Notification from chat"),
         (COD_TO_PREPAID, 'COD to Prepaid'),
