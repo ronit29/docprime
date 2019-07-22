@@ -1255,7 +1255,8 @@ def send_capture_payment_request(self, product_id, appointment_id):
                     txn_obj.status_type = resp_data.get('txStatus')
                     txn_obj.payment_mode = resp_data.get("paymentMode")
                     txn_obj.bank_name = resp_data.get('bankName')
-                    txn_obj.transaction_id = resp_data.get('bankTxId') or resp_data.get('pgTxId')
+                    txn_obj.transaction_id = resp_data.get('pgTxId')
+                    txn_obj.bank_id = resp_data.get('bankTxId')
                     txn_obj.payment_captured = True
                 else:
                     txn_obj.payment_captured = False
