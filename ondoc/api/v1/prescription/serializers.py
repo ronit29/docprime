@@ -1,4 +1,5 @@
 import re
+from decimal import Decimal
 
 from rest_framework import serializers
 
@@ -69,7 +70,7 @@ class PrescriptionMedicineBodySerializer(serializers.Serializer):
         if (attrs.get("quantity") or attrs.get("dosage_type")) and not (attrs.get("quantity") and attrs.get("dosage_type")):
             raise serializers.ValidationError("dosage quantity and type both are required together")
         if attrs.get("quantity"):
-            attrs["quantity"] = str(attrs["quantity"].normalize())
+            attrs["quantity"] = str(Decimal(attrs["quantity"]).normalize())
         if attrs.get("time") and attrs.get("custom_time"):
             raise serializers.ValidationError("only one of the time and custom_time is required")
         return attrs

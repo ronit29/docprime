@@ -4270,9 +4270,9 @@ class PartnersAppInvoice(auth_model.TimeStampedModel):
         context["consultation_fees"] = self.consultation_fees
         context["invoice_items"] = self.get_invoice_items(selected_invoice_items)
         context["sub_total_amount"] = str(self.sub_total_amount)
-        context["tax_percentage"] = self.tax_percentage.normalize() if self.tax_percentage else None
+        context["tax_percentage"] = str(Decimal(self.tax_percentage.normalize())) if self.tax_percentage else None
         context["tax_amount"] = str(self.tax_amount) if self.tax_amount else "-"
-        context["discount_percentage"] = self.discount_percentage.normalize() if self.discount_percentage else None
+        context["discount_percentage"] = str(Decimal(self.discount_percentage.normalize())) if self.discount_percentage else None
         context["discount_amount"] = str(self.discount_amount) if self.discount_amount else "-"
         context["total_amount"] = str(self.total_amount)
         return context
@@ -4281,11 +4281,11 @@ class PartnersAppInvoice(auth_model.TimeStampedModel):
         invoice_items = list()
         for item in selected_invoice_items:
             if item['invoice_item'].get('tax_percentage'):
-                tax = str(item['invoice_item']['tax_amount']) + ' (' + str(item['invoice_item']['tax_percentage'].normalize()) + '%)'
+                tax = str(item['invoice_item']['tax_amount']) + ' (' + str(Decimal(item['invoice_item']['tax_percentage']).normalize()) + '%)'
             else:
                 tax = str(item['invoice_item']['tax_amount'])
             if item['invoice_item'].get('discount_percentage'):
-                discount = str(item['invoice_item']['discount_amount']) + ' (' + str(item['invoice_item']['discount_percentage'].normalize()) + '%)'
+                discount = str(item['invoice_item']['discount_amount']) + ' (' + str(Decimal(item['invoice_item']['discount_percentage']).normalize()) + '%)'
             else:
                 discount = str(item['invoice_item']['discount_amount'])
             invoice_items.append({"name": item['invoice_item']['item'],
