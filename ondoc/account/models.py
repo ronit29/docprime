@@ -2130,6 +2130,11 @@ class MerchantPayout(TimeStampedModel):
             new_obj.charged_amount = self.charged_amount
             new_obj.booking_type = self.booking_type
             new_obj.tds_amount = self.tds_amount
+            if self.booking_type == self.InsurancePremium:
+                new_obj.content_type_id = self.content_type_id
+                new_obj.object_id = self.object_id
+                new_obj.type = MerchantPayout.AUTOMATIC
+                new_obj.paid_to = self.paid_to
             new_obj.save()
 
             # update appointment payout id
