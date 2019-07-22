@@ -1923,3 +1923,10 @@ def patient_details_name_phone_number_decrypt(patient_details, passphrase):
     patient_details['name'] = ''.join(e for e in name if e.isalnum() or e == ' ')
     patient_details['encrypted_phone_number'] = None
     patient_details['phone_number'] = ''.join(e for e in phone_number if e.isalnum())
+
+
+def format_return_value(value):
+    if value == 'null':
+        return None
+
+    return value

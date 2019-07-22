@@ -1337,6 +1337,7 @@ class TransactionViewSet(viewsets.GenericViewSet):
         return HttpResponseRedirect(redirect_to=REDIRECT_URL)
 
     def form_pg_transaction_data(self, response, order_obj):
+        from ondoc.api.v1.utils import format_return_value
         data = dict()
         user_id = order_obj.get_user_id()
         user = get_object_or_404(User, pk=user_id)
@@ -1348,17 +1349,17 @@ class TransactionViewSet(viewsets.GenericViewSet):
         data['type'] = PgTransaction.CREDIT
         data['amount'] = order_obj.amount
 
-        data['payment_mode'] = response.get('paymentMode')
+        data['payment_mode'] = format_return_value(response.get('paymentMode'))
         data['response_code'] = response.get('responseCode')
-        data['bank_id'] = response.get('bankTxId')
+        data['bank_id'] = format_return_value(response.get('bankTxId'))
         transaction_time = parse(response.get("txDate"))
         data['transaction_date'] = transaction_time
-        data['bank_name'] = response.get('bankName')
+        data['bank_name'] = format_return_value(response.get('bankName'))
         data['currency'] = response.get('currency')
         data['status_code'] = response.get('statusCode')
-        data['pg_name'] = response.get('pgGatewayName')
+        data['pg_name'] = format_return_value(response.get('pgGatewayName'))
         data['status_type'] = response.get('txStatus')
-        data['transaction_id'] = response.get('pgTxId') if not response.get('pgTxId') == 'null' else None
+        data['transaction_id'] = format_return_value(response.get('pgTxId'))
         data['pb_gateway_name'] = response.get('pbGatewayName')
 
         return data
