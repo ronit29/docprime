@@ -1474,6 +1474,11 @@ class DoctorOpdAppointmentForm(RefundableAppointmentForm):
         # Appointments are now made with CREATED status.
         # if self.request.user.groups.filter(name=constants['OPD_APPOINTMENT_MANAGEMENT_TEAM']).exists() and cleaned_data.get('status') == OpdAppointment.BOOKED:
         #     raise forms.ValidationError("Form cant be Saved with Booked Status.")
+        if self.instance.status in [OpdAppointment.ACCEPTED, OpdAppointment.COMPLETED] and self.is_follow_appointment() \
+            and not self.instance.appointment_type in [OpdAppointment.FOLLOWUP, OpdAppointment.REGULAR]:
+            raise forms.ValidationError("Please select Appointment type for Follow up Appointment!!")
+
+
         if cleaned_data.get('start_date') and cleaned_data.get('start_time'):
                 date_time_field = str(cleaned_data.get('start_date')) + " " + str(cleaned_data.get('start_time'))
                 dt_field = parse_datetime(date_time_field)
@@ -1605,11 +1610,18 @@ class DoctorOpdAppointmentAdmin(admin.ModelAdmin):
     form = DoctorOpdAppointmentForm
     search_fields = ['id', 'profile__name', 'profile__phone_number', 'doctor__name', 'hospital__name']
     list_display = ('booking_id', 'get_doctor', 'get_profile', 'status', 'time_slot_start', 'effective_price',
-                    'get_insurance','get_appointment_type', 'created_at', 'updated_at')
-    list_filter = ('status', 'payment_type')
+                    'get_insurance', 'get_appointment_type', 'get_is_fraud', 'created_at', 'updated_at',)
+    list_filter = ('status', 'payment_type', 'appointment_type')
     date_hierarchy = 'created_at'
     list_display_links = ('booking_id', 'get_insurance',)
     inlines = [PrescriptionInline, FraudInline]
+
+    def get_is_fraud(self, obj):
+        if obj.is_fraud_appointment:
+            return "True"
+        else:
+            return "False"
+    get_is_fraud.short_description = 'Is Fraud'
 
     def get_appointment_type(self, obj):
         if obj.is_followup_appointment():
