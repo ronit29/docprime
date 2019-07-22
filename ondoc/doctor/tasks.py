@@ -121,13 +121,15 @@ def doctors_daily_schedule():
 
     curr_date = datetime.datetime.now()
 
-    offline_appointments = OfflineOPDAppointments.objects.prefetch_related('hospital__manageable_hospitals',
+    offline_appointments = OfflineOPDAppointments.objects.select_related('hospital', 'user') \
+                                                         .prefetch_related('hospital__manageable_hospitals',
                                                                            'user__patient_mobiles') \
                                                          .filter(time_slot_start__date=curr_date.date(),
                                                                  hospital__network_type=Hospital.NON_NETWORK_HOSPITAL,
                                                                  hospital__is_live=True)
 
-    docprime_appointments = OpdAppointment.objects.prefetch_related('hospital__manageable_hospitals') \
+    docprime_appointments = OpdAppointment.objects.select_related('profile') \
+                                                  .prefetch_related('hospital__manageable_hospitals') \
                                                   .filter(time_slot_start__date=curr_date.date(),
                                                           hospital__network_type=Hospital.NON_NETWORK_HOSPITAL,
                                                           hospital__is_live=True)
@@ -155,7 +157,7 @@ def doctors_daily_schedule():
                 if hospital_admin_combo not in hospital_admin_appointments_dict:
                     hospital_admin_appointments_dict[hospital_admin_combo] = {(appointment, patient_number)}
                 else:
-                    hospital_admin_appointments_dict[hospital_admin_combo].add(appointment)
+                    hospital_admin_appointments_dict[hospital_admin_combo].add((appointment, patient_number))
 
     for hospital in hospital_admins_dict:
         admins = hospital_admins_dict[hospital]
@@ -168,7 +170,7 @@ def doctors_daily_schedule():
             appointments_and_numbers = hospital_admin_appointments_dict[hospital_admin_combo]
             if appointments_and_numbers:
                 context = {
-                    "hospital": hospital,
+                    "hospital_name": hospital.name,
                     "no_of_appointments": len(appointments_and_numbers),
                     "appointments_and_numbers": appointments_and_numbers
                 }
