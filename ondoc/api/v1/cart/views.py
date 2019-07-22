@@ -246,7 +246,8 @@ class CartViewSet(viewsets.GenericViewSet):
             return Response({"status": 0}, status.HTTP_401_UNAUTHORIZED)
 
         if user.onhold_insurance:
-            return Response({"error": "Insurance is onhold, Not able to process request"}, status.HTTP_400_BAD_REQUEST)
+            return Response({"error": "Your documents from the last claim are under verification. \
+                            Please write to customercare@docprime.com for more information"}, status.HTTP_400_BAD_REQUEST)
 
         use_wallet = int(request.query_params.get('use_wallet', 1))
         cart_items = Cart.objects.filter(user=user, deleted_at__isnull=True)
