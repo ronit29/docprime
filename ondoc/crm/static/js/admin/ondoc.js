@@ -68,4 +68,10 @@ jQuery(document).ready(function(){
             return c;
         }
     })
+
+    jQuery('#merchantpayout_form, #merchantpayoutbulkprocess_form').submit(function() {
+        var c = confirm("Are you sure you want to proceed?")
+        return c;
+    })
 });
+
