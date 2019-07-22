@@ -17,7 +17,7 @@ from ondoc.doctor.models import (OpdAppointment, Doctor, Hospital, DoctorHospita
                                  CommonMedicalCondition, CommonSpecialization,
                                  DoctorPracticeSpecialization, DoctorClinic, OfflineOPDAppointments, OfflinePatients,
                                  CancellationReason, HealthInsuranceProvider, HospitalDocument, HospitalNetworkDocument,
-                                 AppointmentHistory, HospitalNetwork, ProviderEncrypt)
+                                 AppointmentHistory, HospitalNetwork, ProviderEncrypt, SimilarSpecializationGroup)
 from ondoc.diagnostic import models as lab_models
 from ondoc.authentication.models import UserProfile, DoctorNumber, GenericAdmin, GenericLabAdmin
 from django.db.models import Avg
@@ -852,6 +852,18 @@ class DoctorListSerializer(serializers.Serializer):
     gender = serializers.ChoiceField(choices=GENDER_CHOICES, required=False)
     availability = CommaSepratedToListField(required=False,  max_length=50, typecast_to=str)
     avg_ratings = CommaSepratedToListField(required=False,  max_length=50, typecast_to=str)
+    group_ids = CommaSepratedToListField(required=False,  max_length=50, typecast_to=str)
+
+    def validate(self, attrs):
+        if attrs.get('group_ids'):
+            q = SimilarSpecializationGroup.objects.prefetch_related('specializations').filter(
+                id__in=attrs.get('group_ids'))
+            temp = set()
+            for x in q:
+                for y in x.specializations.all():
+                    temp.add(str(y.id))
+            attrs['specialization_ids'] = list(temp)
+        return attrs
 
     def validate_hospital_id(self, attrs):
         try:
@@ -862,6 +874,16 @@ class DoctorListSerializer(serializers.Serializer):
         except:
             raise serializers.ValidationError('Invalid Hospital IDs')
         raise serializers.ValidationError('Invalid Hospital IDs')
+
+    def validate_group_ids(self, attrs):
+        try:
+            temp_attrs = [int(attr) for attr in attrs]
+            temp_attrs = set(temp_attrs)
+            if SimilarSpecializationGroup.objects.filter(id__in=temp_attrs, show_on_front_end=True).count() == len(temp_attrs):
+                return attrs
+        except:
+            raise serializers.ValidationError('Invalid Group IDs')
+        raise serializers.ValidationError('Invalid Group IDs')
 
     def validate_ipd_procedure_ids(self, attrs):
         try:
