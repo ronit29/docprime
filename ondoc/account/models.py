@@ -1643,10 +1643,10 @@ class MerchantPayout(TimeStampedModel):
 
             if appointment and appointment.insurance and self.id and not self.is_insurance_premium_payout() and self.status==self.PENDING:
                 self.type = self.AUTOMATIC
-                if not self.content_object:
-                    self.content_object = self.get_billed_to()
-                if not self.paid_to:
-                    self.paid_to = self.get_merchant()
+                # if not self.content_object:
+                #     self.content_object = self.get_billed_to()
+                # if not self.paid_to:
+                #     self.paid_to = self.get_merchant()
 
                 try:
                     has_txn, order_data, appointment = self.has_transaction()
@@ -2131,6 +2131,11 @@ class MerchantPayout(TimeStampedModel):
             new_obj.charged_amount = self.charged_amount
             new_obj.booking_type = self.booking_type
             new_obj.tds_amount = self.tds_amount
+            if self.booking_type == self.InsurancePremium:
+                new_obj.content_type_id = self.content_type_id
+                new_obj.object_id = self.object_id
+                new_obj.type = MerchantPayout.AUTOMATIC
+                new_obj.paid_to = self.paid_to
             new_obj.save()
 
             # update appointment payout id
@@ -2239,6 +2244,33 @@ class MerchantPayoutLog(TimeStampedModel):
         payout_log = MerchantPayoutLog(merchant_payout=payout)
         payout_log.error = error
         payout_log.save()
+
+
+class MerchantPayoutBulkProcess(TimeStampedModel):
+    payout_ids = models.TextField(null=False, blank=False, help_text="Enter comma separated payout ids here.")
+
+    class Meta:
+        db_table = "merchant_payout_bulk_process"
+
+    def save(self, *args, **kwargs):
+        super().save(*args, **kwargs)
+        transaction.on_commit(lambda: self.after_commit_tasks())
+
+    def after_commit_tasks(self):
+        # payout_ids_list = list()
+        payout_ids = self.payout_ids
+        if payout_ids:
+            payout_ids_list = self.payout_ids.split(',')
+        try:
+            merchant_payouts = MerchantPayout.objects.filter(id__in=payout_ids_list)
+            for mp in merchant_payouts:
+                if mp.id and not mp.is_insurance_premium_payout() and mp.status == mp.PENDING:
+                    mp.type = mp.AUTOMATIC
+                    mp.process_payout = True
+                    mp.save()
+        except Exception as e:
+            logger.error("Error in processing bulk payout - with exception - " + str(e))
+
 
 
 class PgStatusCode(TimeStampedModel):
