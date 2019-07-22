@@ -11,6 +11,7 @@ Coverage:{%if total_member_covered > 1%} {{total_member_covered}} Members {% els
 Policy Issue Date: {{purchase_date}}
 Policy Expiry Date: {{expiry_date}}
 Policy Status:  Active
+COI Url: {{coi_short_url}}
 For any query please contact us at customercare@docprime.com
 
 Thanks for choosing Docprime.com

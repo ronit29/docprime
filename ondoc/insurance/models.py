@@ -6,7 +6,7 @@ from django.contrib.contenttypes.models import ContentType
 from django.contrib.gis.geos import Point
 from django.core.validators import FileExtensionValidator
 
-from ondoc.common.models import GenericNotes
+from ondoc.common.models import GenericNotes, MerchantPayoutMixin
 from ondoc.notification.models import EmailNotification
 from ondoc.notification.tasks import send_insurance_notifications, send_insurance_float_limit_notifications, send_insurance_endorsment_notifications
 from ondoc.insurance.tasks import push_insurance_buy_to_matrix
@@ -524,7 +524,7 @@ class BankHolidays(auth_model.TimeStampedModel):
         db_table = "bank_holidays"
 
 
-class UserInsurance(auth_model.TimeStampedModel):
+class UserInsurance(auth_model.TimeStampedModel, MerchantPayoutMixin):
     from ondoc.account.models import MoneyPool
 
     ACTIVE = 1

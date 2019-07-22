@@ -489,7 +489,7 @@ class WHTSAPPNotification:
 
             if self.context.get('instance').payment_type == 2:
                 data.append('Please pay Rs {cod_amount} at the center at the time of appointment.'.
-                            format(cod_amount=str(self.context.get('code_amount'))))
+                            format(cod_amount=str(self.context.get('cod_amount'))))
             else:
                 data.append(" ")
 
@@ -517,8 +517,7 @@ class WHTSAPPNotification:
             data.append(self.context.get('patient_name'))
             data.append(self.context.get('instance').profile.phone_number)
             data.append(self.context.get('doctor_name'))
-            data.append(self.context.get('instance').hospital.name)
-            data.append(self.context.get('instance').hospital.get_hos_address())
+            data.append(datetime.strftime(aware_time_zone(self.context.get('instance').time_slot_start), '%d-%m-%Y %H:%M'))
 
         elif notification_type == NotificationAction.APPOINTMENT_RESCHEDULED_BY_PATIENT and user and user.user_type == User.CONSUMER:
             body_template = "opd_appointment_rescheduled_patient_initiated_to_patient"
@@ -531,17 +530,17 @@ class WHTSAPPNotification:
             data.append(self.context.get('doctor_name'))
             data.append(datetime.strftime(aware_time_zone(self.context.get('instance').time_slot_start), '%d-%m-%Y %H:%M'))
 
-        elif notification_type == NotificationAction.APPOINTMENT_RESCHEDULED_BY_PATIENT and (not user or user.user_type == User.DOCTOR):
-            body_template = "appointment_rescheduled_patient_initiated_to_doctor"
-
-            data.append(self.context.get('patient_name'))
-            data.append(self.context.get('doctor_name'))
-            data.append(datetime.strftime(aware_time_zone(self.context.get('instance').time_slot_start), '%d-%m-%Y %H:%M'))
-            data.append(self.context.get('instance').id)
-            data.append(self.context.get('patient_name'))
-            data.append(self.context.get('instance').profile.phone_number)
-            data.append(self.context.get('doctor_name'))
-            data.append(datetime.strftime(aware_time_zone(self.context.get('instance').time_slot_start), '%d-%m-%Y %H:%M'))
+        # elif notification_type == NotificationAction.APPOINTMENT_RESCHEDULED_BY_PATIENT and (not user or user.user_type == User.DOCTOR):
+        #     body_template = "appointment_rescheduled_patient_initiated_to_doctor"
+        #
+        #     data.append(self.context.get('patient_name'))
+        #     data.append(self.context.get('doctor_name'))
+        #     data.append(datetime.strftime(aware_time_zone(self.context.get('instance').time_slot_start), '%d-%m-%Y %H:%M'))
+        #     data.append(self.context.get('instance').id)
+        #     data.append(self.context.get('patient_name'))
+        #     data.append(self.context.get('instance').profile.phone_number)
+        #     data.append(self.context.get('doctor_name'))
+        #     data.append(datetime.strftime(aware_time_zone(self.context.get('instance').time_slot_start), '%d-%m-%Y %H:%M'))
 
         elif notification_type == NotificationAction.APPOINTMENT_RESCHEDULED_BY_DOCTOR and user and user.user_type == User.CONSUMER:
             body_template = "opd_appointment_rescheduled_patient_initiated_to_patient"
@@ -665,18 +664,18 @@ class WHTSAPPNotification:
             else:
                 pass
 
-        elif notification_type == NotificationAction.LAB_APPOINTMENT_BOOKED and (not user or user.user_type == User.DOCTOR):
-            body_template = "appointment_booked_lab"
-
-            data.append(self.context.get('patient_name'))
-            data.append(self.context.get('lab_name'))
-            data.append(datetime.strftime(aware_time_zone(self.context.get('instance').time_slot_start), '%d-%m-%Y'))
-            data.append(datetime.strftime(aware_time_zone(self.context.get('instance').time_slot_start), '%H:%M'))
-            data.append(self.context.get('instance').id)
-            data.append(self.context.get('patient_name'))
-            data.append(self.context.get('instance').profile.phone_number)
-            data.append(self.context.get('lab_name'))
-            data.append(datetime.strftime(aware_time_zone(self.context.get('instance').time_slot_start), '%d-%m-%Y %H:%M'))
+        # elif notification_type == NotificationAction.LAB_APPOINTMENT_BOOKED and (not user or user.user_type == User.DOCTOR):
+        #     body_template = "appointment_booked_lab"
+        #
+        #     data.append(self.context.get('patient_name'))
+        #     data.append(self.context.get('lab_name'))
+        #     data.append(datetime.strftime(aware_time_zone(self.context.get('instance').time_slot_start), '%d-%m-%Y'))
+        #     data.append(datetime.strftime(aware_time_zone(self.context.get('instance').time_slot_start), '%H:%M'))
+        #     data.append(self.context.get('instance').id)
+        #     data.append(self.context.get('patient_name'))
+        #     data.append(self.context.get('instance').profile.phone_number)
+        #     data.append(self.context.get('lab_name'))
+        #     data.append(datetime.strftime(aware_time_zone(self.context.get('instance').time_slot_start), '%d-%m-%Y %H:%M'))
 
         elif notification_type == NotificationAction.LAB_APPOINTMENT_RESCHEDULED_BY_PATIENT and user and user.user_type == User.CONSUMER:
             body_template = "appointment_rescheduled_patient_initiated_to_patient"
@@ -1234,6 +1233,7 @@ class APPNotification:
         context.pop("instance", None)
         context.pop('time_slot_start', None)
         context.pop('hospitals_not_required_unique_code', None)
+        context.pop('procedures', None)
         app_noti = AppNotification.objects.create(
             user=user,
             notification_type=self.notification_type,
@@ -1302,7 +1302,7 @@ class OpdNotification(Notification):
         if notification_type:
             self.notification_type = notification_type
         else:
-            self.notification_type = self.OPD_NOTIFICATION_TYPE_MAPPING[appointment.status]
+            self.notification_type = self.OPD_NOTIFICATION_TYPE_MAPPING.get(appointment.status)
 
     def get_context(self):
         patient_name = self.appointment.profile.name if self.appointment.profile.name else ""
@@ -1733,6 +1733,7 @@ class InsuranceNotification(Notification):
             'insured_members': member_list,
             'insurer_logo': instance.insurance_plan.insurer.logo.url,
             'coi_url': instance.coi.url,
+            'coi_short_url': generate_short_url(instance.coi.url),
             'insurer_name': instance.insurance_plan.insurer.name,
             'user_bank' : instance.user_bank.last()
         }
