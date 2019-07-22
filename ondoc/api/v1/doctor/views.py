@@ -3675,7 +3675,8 @@ class OfflineCustomerViewSet(viewsets.GenericViewSet):
                 return Response({"status": 0, "error": "data not found"}, status=status.HTTP_404_NOT_FOUND)
             return Response(lab_data)
 
-        online_queryset = get_opd_pem_queryset(request.user, models.OpdAppointment)\
+        online_queryset = get_opd_pem_queryset(request.user, models.OpdAppointment) \
+            .exclude(status=models.OpdAppointment.CREATED)\
             .select_related('profile', 'merchant_payout')\
             .prefetch_related('prescriptions', 'prescriptions__prescription_file', 'mask_number',
                               'profile__insurance', 'profile__insurance__user_insurance', 'eprescription').distinct('id', 'time_slot_start')

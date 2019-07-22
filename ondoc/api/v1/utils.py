@@ -408,8 +408,8 @@ def is_valid_testing_lab_data(user, lab):
 def payment_details(request, order):
     from ondoc.authentication.models import UserProfile
     from ondoc.insurance.models import InsurancePlans
-    from ondoc.account.models import PgTransaction, Order
-    from ondoc.notification.tasks import save_pg_response
+    from ondoc.account.models import PgTransaction, Order, PaymentProcessStatus
+    from ondoc.notification.tasks import save_pg_response, save_payment_status
     from ondoc.account.mongo_models import PgLogs
     payment_required = True
     user = request.user
@@ -505,6 +505,8 @@ def payment_details(request, order):
     pgdata.update(filtered_pgdata)
     pgdata['hash'] = PgTransaction.create_pg_hash(pgdata, secret_key, client_key)
 
+    args = {'user_id': user.id, 'order_id': order.id}
+    save_payment_status.apply_async((PaymentProcessStatus.INITIATED, args),eta=timezone.localtime(), )
     save_pg_response.apply_async((PgLogs.TXN_REQUEST, order.id, None, None, pgdata), eta=timezone.localtime(), )
     return pgdata, payment_required
 
@@ -1921,3 +1923,10 @@ def patient_details_name_phone_number_decrypt(patient_details, passphrase):
     patient_details['name'] = ''.join(e for e in name if e.isalnum() or e == ' ')
     patient_details['encrypted_phone_number'] = None
     patient_details['phone_number'] = ''.join(e for e in phone_number if e.isalnum())
+
+
+def format_return_value(value):
+    if value == 'null':
+        return None
+
+    return value

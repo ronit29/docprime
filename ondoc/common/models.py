@@ -747,11 +747,14 @@ class MerchantPayoutMixin(object):
     def update_payout_id(self, payout_id):
         from ondoc.doctor.models import OpdAppointment
         from ondoc.diagnostic.models import LabAppointment
+        from ondoc.insurance.models import UserInsurance
 
         if self.__class__.__name__ == 'OpdAppointment':
             OpdAppointment.objects.filter(id=self.id).update(merchant_payout_id=payout_id)
         elif self.__class__.__name__ == 'LabAppointment':
             LabAppointment.objects.filter(id=self.id).update(merchant_payout_id=payout_id)
+        elif self.__class__.__name__ == 'UserInsurance':
+            UserInsurance.objects.filter(id=self.id).update(merchant_payout_id=payout_id)
 
 
 class Fraud(auth_model.TimeStampedModel):
