@@ -2261,12 +2261,12 @@ class MerchantPayoutBulkProcess(TimeStampedModel):
         payout_ids = self.payout_ids
         if payout_ids:
             payout_ids_list = self.payout_ids.split(',')
-
-        merchant_payouts = MerchantPayout.objects.filter(id__in=payout_ids_list)
-        for mp in merchant_payouts:
-            if mp.id and not mp.is_insurance_premium_payout() and mp.status == mp.PENDING:
-                mp.type = mp.AUTOMATIC
-                mp.process_payout = True
-                mp.save()
-
-
+        try:
+            merchant_payouts = MerchantPayout.objects.filter(id__in=payout_ids_list)
+            for mp in merchant_payouts:
+                if mp.id and not mp.is_insurance_premium_payout() and mp.status == mp.PENDING:
+                    mp.type = mp.AUTOMATIC
+                    mp.process_payout = True
+                    mp.save()
+        except Exception as e:
+            logger.error("Error in processing bulk payout - with exception - " + str(e))
