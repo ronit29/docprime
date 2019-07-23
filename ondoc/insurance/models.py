@@ -982,8 +982,8 @@ class UserInsurance(auth_model.TimeStampedModel, MerchantPayoutMixin):
     def is_profile_valid(self):
         # if self.expiry_date >= timezone.now() and (self.status == self.ACTIVE or self.status == self.ONHOLD or
         #                                                self.status == self.CANCEL_INITIATE):
-        if self.expiry_date >= timezone.now() and (self.status == self.ACTIVE or
-                                                           self.status == self.CANCEL_INITIATE):
+        if self.expiry_date >= timezone.now() and (self.status == self.ACTIVE or self.status == self.CANCEL_INITIATE
+                                                   or self.status == self.ONHOLD):
             return True
         else:
             return False
