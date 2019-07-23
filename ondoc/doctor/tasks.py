@@ -174,9 +174,10 @@ def doctors_daily_schedule():
             appointments_and_numbers = hospital_admin_appointments_dict[hospital_admin_combo]
             if appointments_and_numbers:
                 context = {
+                    "curr_date": curr_date,
                     "hospital_name": hospital.name,
                     "no_of_appointments": len(appointments_and_numbers),
-                    "appointments_and_numbers": appointments_and_numbers
+                    # "appointments_and_numbers": appointments_and_numbers
                 }
                 sms_notification = SMSNotification(notification_type=NotificationAction.OPD_DAILY_SCHEDULE, context=context)
                 sms_notification.send(receiver)
