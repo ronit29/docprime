@@ -1235,6 +1235,7 @@ class APPNotification:
         context.pop("instance", None)
         context.pop('time_slot_start', None)
         context.pop('hospitals_not_required_unique_code', None)
+        context.pop('procedures', None)
         app_noti = AppNotification.objects.create(
             user=user,
             notification_type=self.notification_type,
@@ -1303,7 +1304,7 @@ class OpdNotification(Notification):
         if notification_type:
             self.notification_type = notification_type
         else:
-            self.notification_type = self.OPD_NOTIFICATION_TYPE_MAPPING[appointment.status]
+            self.notification_type = self.OPD_NOTIFICATION_TYPE_MAPPING.get(appointment.status)
 
     def get_context(self):
         patient_name = self.appointment.profile.name if self.appointment.profile.name else ""
