@@ -2922,8 +2922,8 @@ class OfflineCustomerViewSet(viewsets.GenericViewSet):
                         patient_profile['encrypt_phone_number'] = mob.encrypted_number
                     patient_profile['encrypt_numbers'] = phone_number
         # patient_profile['patient_numbers'] = phone_number
-        mrp_fees = appnt.fees if appnt.fees else 0
-        mrp = appnt.mrp if appnt.payment_type == appnt.COD else mrp_fees
+        mrp = appnt.fees if appnt.fees else 0
+        # mrp = appnt.mrp if appnt.payment_type == appnt.COD else mrp_fees
         ret_obj = {}
         ret_obj['patient_name'] = patient_name
         # ret_obj['patient_number'] = phone_number
