@@ -135,8 +135,8 @@ def doctors_daily_schedule():
                                                   .filter(time_slot_start__date=curr_date.date(),
                                                           hospital__network_type=Hospital.NON_NETWORK_HOSPITAL,
                                                           hospital__is_live=True) \
-                                                  .exclude(status__in=[OPDAppointment.CANCELLED,
-                                                                       OPDAppointment.COMPLETED])
+                                                  .exclude(status__in=[OpdAppointment.CANCELLED,
+                                                                       OpdAppointment.COMPLETED])
     hospital_admins_dict = dict()
     hospital_admin_appointments_dict = dict()
     appointments_list = [*offline_appointments, *docprime_appointments]
