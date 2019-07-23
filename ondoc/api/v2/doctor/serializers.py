@@ -596,5 +596,11 @@ class ProviderEncryptResponseModelSerializer(serializers.ModelSerializer):
 class EConsultCreateBodySerializer(serializers.Serializer):
     validity = serializers.IntegerField(max_value=256, allow_null=True, required=False)
     doctor = serializers.IntegerField()
-    patient = serializers.IntegerField()
+    patient = serializers.CharField()
     fees = serializers.FloatField()
+
+    def validate(self, attrs):
+        super().validate(attrs)
+        patient = doc_models.OfflinePatients.objects.filter()
+            raise serializers.ValidationError("valid invoice id is required")
+        return attrs
