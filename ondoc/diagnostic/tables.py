@@ -42,7 +42,7 @@ class LabTestTable(tables.Table):
     class Meta:
         model = AvailableLabTest
         template_name = 'table.html'
-        fields = ('id', 'enabled', 'test', 'mrp', 'computed_agreed_price', 'custom_agreed_price', 'computed_deal_price', 'custom_deal_price', 'edit')
+        fields = ('id', 'enabled', 'test', 'mrp', 'computed_agreed_price', 'custom_agreed_price', 'computed_deal_price', 'custom_deal_price', 'insurance_agreed_price', 'edit')
         row_attrs = {'data-id': lambda record: record.pk, 'data-test-id': lambda record: record.test.id}
         attrs = {'class':'table table-condensed table-striped'}
 
