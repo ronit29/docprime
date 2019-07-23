@@ -4022,7 +4022,7 @@ class OfflineOPDAppointments(auth_model.TimeStampedModel):
     @staticmethod
     def schedule_appointment_reminder_sms(sms_obj):
         try:
-            default_text = "GENTLE REMINDER: Dear %s, your appointment with %s at %s is scheduled at %s. In case of any query, please reach out to the clinic." % (
+            default_text = "GENTLE REMINDER: Dear %s, your appointment with %s at %s is scheduled at %s. Please make sure you reach the clinic premises on time." % (
                 sms_obj['name'], sms_obj['appointment'].doctor.get_display_name(), sms_obj['appointment'].hospital.name,
                 sms_obj['appointment'].time_slot_start.strftime("%B %d, %Y %I:%M %p"))
             notification_tasks.offline_appointment_reminder_sms_patient.apply_async(
