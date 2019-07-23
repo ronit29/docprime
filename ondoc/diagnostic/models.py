@@ -2401,12 +2401,14 @@ class LabAppointment(TimeStampedModel, CouponsMixin, LabAppointmentInvoiceMixin,
                                                                                      total_deal_price=Sum(
                                                                                          deal_price_calculation),
                                                                                      total_agreed_price=Sum(
-                                                                                         agreed_price_calculation))
-        total_agreed = total_deal_price = total_mrp = effective_price = home_pickup_charges = 0
+                                                                                         agreed_price_calculation),
+                                                                                     total_insurance_agreed_price=Sum('insurance_agreed_price'))
+        total_insurance_agreed_price = total_agreed = total_deal_price = total_mrp = effective_price = home_pickup_charges = 0
         if temp_lab_test:
             total_mrp = temp_lab_test[0].get("total_mrp", 0)
             total_agreed = temp_lab_test[0].get("total_agreed_price", 0)
             total_deal_price = temp_lab_test[0].get("total_deal_price", 0)
+            total_insurance_agreed_price = temp_lab_test[0].get("total_insurance_agreed_price", 0)
             effective_price = total_deal_price
             if data["is_home_pickup"] and data["lab"].is_home_collection_enabled:
                 effective_price += data["lab"].home_pickup_charges
@@ -2426,6 +2428,7 @@ class LabAppointment(TimeStampedModel, CouponsMixin, LabAppointmentInvoiceMixin,
 
         if data.get("payment_type") in [OpdAppointment.INSURANCE]:
             effective_price = effective_price
+            total_agreed = total_insurance_agreed_price if total_insurance_agreed_price > 0 else total_agreed
             coupon_discount, coupon_cashback, coupon_list, random_coupon_list = 0, 0, [], []
 
         return {
