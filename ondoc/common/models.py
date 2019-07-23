@@ -736,8 +736,11 @@ class VirtualAppointment(TimeStampedModel):
         db_table = 'virtual_appointment'
 
     def save(self, *args, **kwargs):
+        database_instance = None
+        if self.id:
+            database_instance = self.__class__.objects.filter(pk=self.id).first()
         push_to_matrix = False
-        if not self.id:
+        if (not database_instance) or (database_instance and database_instance.time_slot_start != database_instance):
             push_to_matrix = True
         super().save(*args, **kwargs)
         transaction.on_commit(lambda: self.app_commit_tasks(push_to_matrix=push_to_matrix))
@@ -745,7 +748,7 @@ class VirtualAppointment(TimeStampedModel):
     def app_commit_tasks(self, push_to_matrix):
         from ondoc.procedure.models import IpdProcedureLead
         if push_to_matrix:
-            if isinstance(self.content_object, IpdProcedureLead):
+            if isinstance(self.content_object, IpdProcedureLead) and hasattr(self.content_object, 'app_commit_tasks'):
                 self.content_object.app_commit_tasks(send_lead_email=False, update_status_in_matrix=True)
 
 
