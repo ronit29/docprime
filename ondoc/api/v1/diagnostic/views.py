@@ -2857,15 +2857,10 @@ class LabReportFileViewset(mixins.CreateModelMixin,
         request = self.request
         if request.user.user_type == User.DOCTOR:
             user = request.user
-            return (models.LabReportFile.objects.filter(
-                Q(report__appointment__lab__manageable_lab_admins__user=user,
-                  report__appointment__lab__manageable_lab_admins__permission_type=auth_models.GenericLabAdmin.APPOINTMENT,
-                  report__appointment__lab__manageable_lab_admins__is_disabled=False) |
-                Q(report__appointment__lab__network__manageable_lab_network_admins__user=request.user,
-                  report__appointment__lab__network__manageable_lab_network_admins__permission_type=auth_models.GenericLabAdmin.APPOINTMENT,
-                  report__appointment__lab__network__manageable_lab_network_admins__is_disabled=False)).distinct())
-
-            # return models.PrescriptionFile.objects.filter(prescription__appointment__doctor=request.user.doctor)
+            return models.LabReportFile.objects.filter(
+                                         report__appointment__lab__manageable_lab_admins__user=user,
+                                         report__appointment__lab__manageable_lab_admins__is_disabled=False
+                                        ).distinct()
         elif request.user.user_type == User.CONSUMER:
             return models.LabReportFile.objects.filter(report__appointment__user=request.user)
         else:
@@ -2877,10 +2872,8 @@ class LabReportFileViewset(mixins.CreateModelMixin,
         validated_data = serializer.validated_data
         if not self.lab_report_permission(request.user, validated_data.get('appointment')):
             return Response([])
-        if models.LabReport.objects.filter(appointment=validated_data.get('appointment')).exists():
-            report = models.LabReport.objects.filter(
-                appointment=validated_data.get('appointment')).first()
-        else:
+        report = models.LabReport.objects.filter(appointment=validated_data.get('appointment')).first()
+        if not report:
             report = models.LabReport.objects.create(appointment=validated_data.get('appointment'),
                                                      report_details=validated_data.get('report_details'))
         report_file_data = {
@@ -2895,8 +2888,7 @@ class LabReportFileViewset(mixins.CreateModelMixin,
 
     def lab_report_permission(self, user, appointment):
         return auth_models.GenericLabAdmin.objects.filter(user=user, lab=appointment.lab,
-                                                          permission_type=auth_models.GenericLabAdmin.APPOINTMENT,
-                                                          write_permission=True).exists()
+                                                          is_disabled=False).exists()
 
     @transaction.non_atomic_requests
     def list(self, request, *args, **kwargs):
@@ -2930,13 +2922,7 @@ class DoctorLabAppointmentsViewSet(viewsets.GenericViewSet):
         lab_appointment = LabAppointment.objects.select_for_update().get(id=lab_appointment.id)
 
         if lab_appointment.lab.manageable_lab_admins.filter(user=request.user,
-                                                            is_disabled=False,
-                                                            write_permission=True).exists() or \
-                (lab_appointment.lab.network is not None and
-                 lab_appointment.lab.network.manageable_lab_network_admins.filter(
-                     user=request.user,
-                     is_disabled=False,
-                     write_permission=True).exists()):
+                                                            is_disabled=False).exists():
             lab_appointment.action_completed()
             lab_appointment_serializer = diagnostic_serializer.LabAppointmentRetrieveSerializer(lab_appointment,
                                                                                                 context={

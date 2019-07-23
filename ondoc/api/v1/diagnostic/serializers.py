@@ -1414,18 +1414,6 @@ class LabReportSerializer(serializers.Serializer):
     report_details = serializers.CharField(allow_blank=True, allow_null=True, required=False, max_length=300)
     name = serializers.FileField()
 
-    def validate_appointment(self, value):
-        request = self.context.get('request')
-
-        if not LabAppointment.objects.filter(Q(id=value.id), (
-                Q(lab__network__isnull=True, lab__manageable_lab_admins__user=request.user,
-                  lab__manageable_lab_admins__is_disabled=False) |
-                Q(lab__network__isnull=False,
-                  lab__network__manageable_lab_network_admins__user=request.user,
-                  lab__network__manageable_lab_network_admins__is_disabled=False))).exists():
-            raise serializers.ValidationError("User is not authorized to upload report.")
-        return value
-
 
 class LabEntitySerializer(serializers.ModelSerializer):
 
