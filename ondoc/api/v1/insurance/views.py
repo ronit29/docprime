@@ -486,7 +486,7 @@ class InsuranceProfileViewSet(viewsets.GenericViewSet):
                         resp['is_endorsement_allowed'] = False
                         break
                 resp['is_endorsement_exist'] = is_endorsement_exist
-                if user_insurance.status != UserInsurance.ACTIVE:
+                if not user_insurance.status in [UserInsurance.ACTIVE, UserInsurance.ONHOLD]:
                     resp['is_endorsement_exist'] = False
                     resp['is_endorsement_allowed'] = False
             else:
