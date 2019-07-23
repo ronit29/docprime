@@ -121,6 +121,9 @@
                     <td class="custom_deal_price">
                         <input class="custom_deal_price input-sm"  type="text" name="custom_deal_price" >
                     </td>
+                    <td class="insurance_agreed_price">
+                        <input class="insurance_agreed_price input-sm"  type="text" name="insurance_agreed_price" >
+                    </td>
                     <td class="edit">
                         <button class="edit-row btn btn-danger hidden">Edit</button>
                         <button class="save-row btn btn-primary">Save</button>
@@ -271,6 +274,8 @@
                 var custom_agreed_price = tr.find('td .custom_agreed_price').val();
                 //var deal_price = tr.find('td.deal_price').html();
                 var custom_deal_price = tr.find('td .custom_deal_price').val();
+                var custom_insurance_price = tr.find('td .insurance_agreed_price').val();
+                console.log(custom_insurance_price);
                 var id = tr.attr('data-id');
                 var testid = tr.attr('data-test-id');
                 if(typeof id == 'undefined')
@@ -282,7 +287,7 @@
                  {
 
 
-                     var dataString = 'id='+id +'&enabled='+enabled + '&lab_pricing_group='+lab_pricing_group + '&test='+testid + '&mrp='+mrp + '&custom_agreed_price='+custom_agreed_price + '&custom_deal_price='+custom_deal_price;
+                     var dataString = 'id='+id +'&enabled='+enabled + '&lab_pricing_group='+lab_pricing_group + '&test='+testid + '&mrp='+mrp + '&custom_agreed_price='+custom_agreed_price + '&custom_deal_price='+custom_deal_price + '&insurance_agreed_price='+custom_insurance_price;
                       jQuery.ajax({
                             data: dataString,
                             type: "POST",
