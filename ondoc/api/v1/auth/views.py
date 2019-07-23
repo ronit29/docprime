@@ -32,7 +32,7 @@ from ondoc.authentication.models import (OtpVerifications, NotificationEndpoint,
                                          AgentToken, DoctorNumber, LastLoginTimestamp, UserProfileEmailUpdate)
 from ondoc.notification.models import SmsNotification, EmailNotification
 from ondoc.account.models import PgTransaction, ConsumerAccount, ConsumerTransaction, Order, ConsumerRefund, OrderLog, \
-    UserReferrals, UserReferred, PgLogs
+    UserReferrals, UserReferred, PgLogs, PaymentProcessStatus
 from ondoc.account.mongo_models import PgLogs as mongo_pglogs
 from django.contrib.auth import get_user_model
 from django.shortcuts import get_object_or_404
@@ -63,7 +63,7 @@ import jwt
 from ondoc.insurance.models import InsuranceTransaction, UserInsurance, InsuredMembers
 from decimal import Decimal
 from ondoc.web.models import ContactUs
-from ondoc.notification.tasks import send_pg_acknowledge, save_pg_response
+from ondoc.notification.tasks import send_pg_acknowledge, save_pg_response, save_payment_status
 
 from ondoc.ratings_review import models as rate_models
 from django.contrib.contenttypes.models import ContentType
@@ -1216,10 +1216,20 @@ class TransactionViewSet(viewsets.GenericViewSet):
             except Exception as e:
                 logger.error("Cannot decode pg data - " + str(e))
 
+            try:
+                pg_resp_code = int(response.get('statusCode'))
+            except:
+                logger.error("ValueError : statusCode is not type integer")
+                pg_resp_code = None
+
             # log pg data
             try:
+                args = {'order_id': response.get("orderId"), 'status_code': pg_resp_code}
+                status_type = PaymentProcessStatus.get_status_type(pg_resp_code, response.get('txStatus'))
+
                 PgLogs.objects.create(decoded_response=response, coded_response=coded_response)
                 save_pg_response.apply_async((mongo_pglogs.TXN_RESPONSE, response.get("orderId"), None, response, None), eta=timezone.localtime(), )
+                save_payment_status.apply_async((status_type, args), eta=timezone.localtime(), )
             except Exception as e:
                 logger.error("Cannot log pg response - " + str(e))
 
@@ -1234,7 +1244,8 @@ class TransactionViewSet(viewsets.GenericViewSet):
                             pg_txn.status_type = response.get('txStatus')
                             pg_txn.payment_mode = response.get("paymentMode")
                             pg_txn.bank_name = response.get('bankName')
-                            pg_txn.transaction_id = response.get('bankTxId')
+                            pg_txn.transaction_id = response.get('pgTxId')
+                            pg_txn.bank_id = response.get('bankTxId')
                             #pg_txn.payment_captured = True
                             pg_txn.save()
                         send_pg_acknowledge.apply_async((pg_txn.order_id, pg_txn.order_no,), countdown=1)
@@ -1248,12 +1259,6 @@ class TransactionViewSet(viewsets.GenericViewSet):
             # response = request.data
             success_in_process = False
             processed_data = {}
-
-            try:
-                pg_resp_code = int(response.get('statusCode'))
-            except:
-                logger.error("ValueError : statusCode is not type integer")
-                pg_resp_code = None
 
             order_obj = Order.objects.select_for_update().filter(pk=response.get("orderId")).first()
             convert_cod_to_prepaid = False
@@ -1333,6 +1338,7 @@ class TransactionViewSet(viewsets.GenericViewSet):
         return HttpResponseRedirect(redirect_to=REDIRECT_URL)
 
     def form_pg_transaction_data(self, response, order_obj):
+        from ondoc.api.v1.utils import format_return_value
         data = dict()
         user_id = order_obj.get_user_id()
         user = get_object_or_404(User, pk=user_id)
@@ -1344,17 +1350,17 @@ class TransactionViewSet(viewsets.GenericViewSet):
         data['type'] = PgTransaction.CREDIT
         data['amount'] = order_obj.amount
 
-        data['payment_mode'] = response.get('paymentMode')
+        data['payment_mode'] = format_return_value(response.get('paymentMode'))
         data['response_code'] = response.get('responseCode')
-        data['bank_id'] = response.get('bankTxId')
+        data['bank_id'] = format_return_value(response.get('bankTxId'))
         transaction_time = parse(response.get("txDate"))
         data['transaction_date'] = transaction_time
-        data['bank_name'] = response.get('bankName')
+        data['bank_name'] = format_return_value(response.get('bankName'))
         data['currency'] = response.get('currency')
         data['status_code'] = response.get('statusCode')
-        data['pg_name'] = response.get('pgGatewayName')
+        data['pg_name'] = format_return_value(response.get('pgGatewayName'))
         data['status_type'] = response.get('txStatus')
-        data['transaction_id'] = response.get('pgTxId') if not response.get('pgTxId') == 'null' else None
+        data['transaction_id'] = format_return_value(response.get('pgTxId'))
         data['pb_gateway_name'] = response.get('pbGatewayName')
 
         return data

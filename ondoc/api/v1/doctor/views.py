@@ -2922,7 +2922,8 @@ class OfflineCustomerViewSet(viewsets.GenericViewSet):
                         patient_profile['encrypt_phone_number'] = mob.encrypted_number
                     patient_profile['encrypt_numbers'] = phone_number
         # patient_profile['patient_numbers'] = phone_number
-
+        mrp = appnt.fees if appnt.fees else 0
+        # mrp = appnt.mrp if appnt.payment_type == appnt.COD else mrp_fees
         ret_obj = {}
         ret_obj['patient_name'] = patient_name
         # ret_obj['patient_number'] = phone_number
@@ -2939,11 +2940,8 @@ class OfflineCustomerViewSet(viewsets.GenericViewSet):
         ret_obj['hospital_name'] = appnt.hospital.name
         ret_obj['time_slot_start'] = appnt.time_slot_start
         ret_obj['status'] = appnt.status
-        # ret_obj['mrp'] = appnt.mrp
-        # ret_obj['payment_type'] = appnt.payment_type
-        ret_obj['fees'] = appnt.fees
         #RAJIV YADAV
-        ret_obj['mrp'] = appnt.fees
+        ret_obj['mrp'] = mrp
         ret_obj['hospital'] = HospitalModelSerializer(appnt.hospital).data
         ret_obj['doctor'] = AppointmentRetrieveDoctorSerializer(appnt.doctor).data
         ret_obj['is_docprime'] = False
@@ -3729,8 +3727,9 @@ class OfflineCustomerViewSet(viewsets.GenericViewSet):
                 is_docprime = True
                 effective_price = app.effective_price
                 # mrp = app.mrp
+                mrp_fees = app.fees if app.fees else 0
                 #RAJIV YADAV
-                mrp = app.fees if app.fees else 0
+                mrp = app.mrp if app.payment_type == app.COD else mrp_fees
                 payment_type = app.payment_type
                 deal_price = app.deal_price
                 mask_number = app.mask_number.all()
