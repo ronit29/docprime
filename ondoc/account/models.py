@@ -2164,6 +2164,7 @@ class MerchantPayout(TimeStampedModel):
                 if appt and appt.get_merchant:
                     self.paid_to = appt.get_merchant
 
+    @transaction.atomic
     def get_advance_amount_obj(self):
         adv_amt_obj = AdvanceMerchantAmount.objects.select_for_update().filter(merchant_id=self.paid_to_id).first()
         return adv_amt_obj
@@ -2182,6 +2183,7 @@ class MerchantPayout(TimeStampedModel):
 
         return None
 
+    @transaction.atomic
     def update_payout_for_advance_available(self):
         adv_amt_obj = self.get_advance_amount_obj()
         balance = self.get_advance_balance()

@@ -306,7 +306,7 @@ def set_order_dummy_transaction(self, order_id, user_id):
         url = settings.PG_DUMMY_TRANSACTION_URL
         insurance_data = order_row.get_insurance_data_for_pg()
 
-        if appointment.__class__.__name__ in [LabAppointment, OpdAppointment]:
+        if appointment.__class__.__name__ in ['LabAppointment', 'OpdAppointment']:
             if appointment.insurance and not insurance_data:
                 raise Exception("refOrderId, insurerCode, refOrderNo details not found for order id {}".format(order_row.id))
                 MerchantPayoutLog.create_log(None, "refOrderId, insurerCode and refOrderNo not found for order id {}".format(order_row.id))
