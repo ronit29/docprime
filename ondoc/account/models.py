@@ -482,8 +482,8 @@ class Order(TimeStampedModel):
             all_txn = self.txn.all()
         elif self.dummy_txn.exists():
             all_txn = self.dummy_txn.all()
-        elif self.parent and self.parent.dummy_txn.exists():
-            all_txn = self.parent.dummy_txn.all()
+        # elif self.parent and self.parent.dummy_txn.exists():
+        #     all_txn = self.parent.dummy_txn.all()
         return all_txn
 
     @classmethod

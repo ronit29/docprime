@@ -469,6 +469,7 @@ class MerchantPayoutForm(forms.ModelForm):
 
 class MerchantPayoutResource(resources.ModelResource):
     appointment_id = fields.Field()
+    merchant = fields.Field()
 
     def export(self, queryset=None, *args, **kwargs):
         queryset = self.get_queryset(**kwargs)
@@ -479,11 +480,16 @@ class MerchantPayoutResource(resources.ModelResource):
         date_range = [datetime.datetime.strptime(kwargs.get('from_date'), '%Y-%m-%d').date(), datetime.datetime.strptime(
                                         kwargs.get('to_date'), '%Y-%m-%d').date()]
         payout_status = kwargs.get('payout_status')
+        booking_type = kwargs.get('booking_type')
 
         payouts = MerchantPayout.objects.filter(created_at__date__range=date_range)
         if payout_status:
             if [str(x[0]) for x in MerchantPayout.STATUS_CHOICES]:
                 payouts = payouts.filter(status=payout_status)
+
+        if booking_type:
+            if [str(x[0]) for x in MerchantPayout.BookingTypeChoices]:
+                payouts = payouts.filter(booking_type=booking_type)
 
         payouts = payouts.order_by('-updated_at')
         return payouts
@@ -498,15 +504,28 @@ class MerchantPayoutResource(resources.ModelResource):
     def dehydrate_status(self, merchant_payout):
         return dict(MerchantPayout.STATUS_CHOICES)[merchant_payout.status]
 
+    def dehydrate_booking_type(self, merchant_payout):
+        if merchant_payout.booking_type:
+            return dict(MerchantPayout.BookingTypeChoices)[merchant_payout.booking_type]
+
+        return ''
+
+    def dehydrate_merchant(self, merchant_payout):
+        if merchant_payout.paid_to:
+            merchant = Merchant.objects.filter(id=merchant_payout.paid_to_id).first()
+            if merchant:
+                return "{}-{}".format(merchant.beneficiary_name, merchant.id)
+
+        return ''
+
     class Meta:
         model = MerchantPayout
         fields = ('id', 'payment_mode', 'payout_ref_id', 'charged_amount', 'payable_amount', 'payout_approved',
-                  'status', 'payout_time', 'retry_count', 'paid_to', 'utr_no', 'type', 'amount_paid',
-                  'content_type', 'object_id', 'appointment_id')
+                  'status', 'payout_time', 'paid_to', 'utr_no', 'type', 'amount_paid',
+                  'content_type', 'object_id', 'appointment_id', 'booking_type', 'merchant')
 
-        export_order = ('id', 'payment_mode', 'payout_ref_id', 'charged_amount', 'payable_amount', 'payout_approved',
-                  'status', 'payout_time', 'retry_count', 'paid_to', 'utr_no', 'type', 'amount_paid',
-                  'content_type', 'object_id', 'appointment_id')
+        export_order = ('appointment_id', 'booking_type', 'id', 'payment_mode', 'payout_ref_id', 'charged_amount', 'payable_amount', 'payout_approved',
+                  'status', 'payout_time', 'merchant', 'paid_to', 'utr_no', 'type', 'amount_paid', 'content_type', 'object_id')
 
 
 class MerchantPayoutAdmin(MediaImportMixin, VersionAdmin):
@@ -517,7 +536,7 @@ class MerchantPayoutAdmin(MediaImportMixin, VersionAdmin):
     model = MerchantPayout
     fields = ['id','booking_type', 'payment_mode','charged_amount', 'updated_at', 'created_at', 'payable_amount', 'tds_amount', 'status', 'payout_time', 'paid_to',
               'appointment_id', 'get_billed_to', 'get_merchant', 'process_payout', 'type', 'utr_no', 'amount_paid','api_response','pg_status','status_api_response', 'duplicate_of', 'recreate_payout']
-    list_display = ('id', 'status', 'payable_amount', 'appointment_id', 'doc_lab_name','booking_type')
+    list_display = ('id', 'status', 'payable_amount', 'appointment_id', 'doc_lab_name', 'booking_type')
     search_fields = ['name', 'id', 'appointment_id']
     list_filter = ['status', 'booking_type']
 
@@ -617,6 +636,7 @@ class MerchantPayoutAdmin(MediaImportMixin, VersionAdmin):
         kwargs['from_date'] = kwargs.get('request').POST.get('from_date')
         kwargs['to_date'] = kwargs.get('request').POST.get('to_date')
         kwargs['payout_status'] = kwargs.get('request').POST.get('payout_status')
+        kwargs['booking_type'] = kwargs.get('request').POST.get('booking_type')
         resource_class = self.get_export_resource_class()
         data = resource_class(**self.get_export_resource_kwargs(kwargs.get('request'))).export(queryset, *args,
                                                                                                **kwargs)

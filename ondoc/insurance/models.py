@@ -624,7 +624,12 @@ class UserInsurance(auth_model.TimeStampedModel, MerchantPayoutMixin):
 
         return math.floor(hours)
 
+    @property
+    def get_merchant(self):
+        if self.insurance_plan and self.insurance_plan.insurer and self.insurance_plan.insurer.merchant:
+            return "{}-{}".format(self.insurance_plan.insurer.merchant.beneficiary_name, self.insurance_plan.insurer.merchant.id)
 
+        return ''
 
     @cached_property
     def master_policy(self):
