@@ -79,8 +79,44 @@ class DoctorBillingViewSet(viewsets.GenericViewSet):
             'name': merchants.merchant.beneficiary_name if merchants.merchant and merchants.merchant.beneficiary_name else '',
             'ifsc': merchants.merchant.ifsc_code if merchants.merchant and merchants.merchant.ifsc_code else ''}
 
+    def get_lab_entities(self, user):
+        lab_entities = dict()
+
+        queryset = auth_models.GenericLabAdmin.objects.select_related('lab', 'lab_network').prefetch_related(
+            'lab__merchant', 'lab__merchant__merchant').filter(user=user,
+                                    is_disabled=False,
+                                    lab__is_live=True)
+        for admin in queryset.all():
+            merchant_dict = None
+            lname = admin.lab.name
+            for merchants in admin.lab.merchant.all():
+                if merchants.verified:
+                    merchant_dict = self.get_merchant_dict(merchants)
+
+            if not lab_entities.get(lname):
+                lab_entities[lname] = {'type': 'lab',
+                                       'id': admin.lab.id,
+                                       'super_user_permission': admin.super_user_permission,
+                                       'permission_type': auth_models.GenericLabAdmin.ALL if admin.super_user_permission else admin.permission_type,
+                                       'merchant': merchant_dict
+                                       }
+            else:
+                if not lab_entities[lname]['super_user_permission']:
+                    if admin.super_user_permission:
+                        lab_entities[lname]['super_user_permission'] = True
+                        lab_entities[lname]['permission_type'] = auth_models.GenericAdmin.ALL
+                    elif lab_entities[lname]['permission_type'] != admin.permission_type:
+                        lab_entities[lname]['permission_type'] = auth_models.GenericAdmin.ALL
+
+        return lab_entities
+
     def list(self, request):
         user = request.user
+
+        lab_entities = dict()
+        if request.query_params and 'type' in request.query_params and request.query_params.get('type') == 'doc_lab':
+            lab_entities = self.get_lab_entities(user)
+
         queryset = auth_models.GenericAdmin.objects.select_related('doctor', 'hospital')\
                                                    .prefetch_related('hospital__hospital_doctors', 'hospital__hospital_doctors__doctor',
                                                                      'hospital__merchant', 'hospital__merchant__merchant',
@@ -194,7 +230,7 @@ class DoctorBillingViewSet(viewsets.GenericViewSet):
                             if not update:
                                 doc = self.get_hos_dict(admin, admin.permission_type)
                                 entities[hname]['assoc'].append(doc)
-        return Response(entities)
+        return Response({**entities, **lab_entities})
 
 
 class HospitalProviderDataViewSet(viewsets.GenericViewSet):

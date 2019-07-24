@@ -4,7 +4,7 @@ from django.contrib.auth.admin import UserAdmin
 from reversion.admin import VersionAdmin
 from django import forms
 from ondoc.authentication.models import (StaffProfile)
-from ondoc.authentication.models import UserNumberUpdate
+from ondoc.authentication.models import UserNumberUpdate, UserProfile
 from django.db import transaction
 from django.utils import timezone
 
@@ -147,3 +147,10 @@ class UserNumberUpdateAdmin(admin.ModelAdmin):
                 return ['is_successfull', 'old_number']
             else:
                 return ['is_successfull', 'old_number']
+
+
+class UserProfileAdmin(admin.ModelAdmin):
+    list_display = ('name', 'email',)
+
+    search_fields = ['email', 'name']
+    autocomplete_fields = ['user']

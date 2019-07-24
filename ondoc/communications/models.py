@@ -271,8 +271,10 @@ class SMSNotification:
             body_template = "sms/appointment_cancelled_patient.txt"
         elif notification_type == NotificationAction.PRESCRIPTION_UPLOADED:
             body_template = "sms/prescription_uploaded.txt"
-        elif notification_type == NotificationAction.APPOINTMENT_REMINDER_PROVIDER_SMS:
-            body_template = "sms/appointment_reminder.txt"
+        elif notification_type == NotificationAction.DOCPRIME_APPOINTMENT_REMINDER_PROVIDER_SMS:
+            body_template = "sms/docprime_appointment_reminder.txt"
+        elif notification_type == NotificationAction.OPD_DAILY_SCHEDULE:
+            body_template = "sms/provider/opd_daily_schedule.txt"
 
         elif notification_type == NotificationAction.PROVIDER_ENCRYPTION_ENABLED:
             body_template = "sms/provider/provider_encryption_enabled.txt"
@@ -1268,6 +1270,7 @@ class PUSHNotification:
         context.pop("instance", None)
         context.pop('time_slot_start', None)
         context.pop('hospitals_not_required_unique_code', None)
+        context.pop('procedures', None)
         if user:
             target_app = user.user_type
             push_noti = PushNotification.objects.create(
@@ -1392,7 +1395,7 @@ class OpdNotification(Notification):
 
             whtsapp_notification = WHTSAPPNotification(notification_type, context)
             whtsapp_notification.send(all_receivers.get('sms_receivers', []))
-        elif notification_type == NotificationAction.APPOINTMENT_REMINDER_PROVIDER_SMS:
+        elif notification_type == NotificationAction.DOCPRIME_APPOINTMENT_REMINDER_PROVIDER_SMS:
             sms_notification = SMSNotification(notification_type, context)
             sms_notification.send(all_receivers.get('sms_receivers', []))
         elif notification_type == NotificationAction.COD_TO_PREPAID:
@@ -1445,7 +1448,7 @@ class OpdNotification(Notification):
             doctor_spocs_app_recievers = GenericAdmin.get_appointment_admins(instance)
             # receivers.extend(doctor_spocs)
             receivers.append(instance.user)
-        elif notification_type in [NotificationAction.APPOINTMENT_REMINDER_PROVIDER_SMS]:
+        elif notification_type in [NotificationAction.DOCPRIME_APPOINTMENT_REMINDER_PROVIDER_SMS]:
             spocs_to_be_communicated = doctor_spocs
             doctor_spocs_app_recievers = GenericAdmin.get_appointment_admins(instance)
         receivers = list(set(receivers))

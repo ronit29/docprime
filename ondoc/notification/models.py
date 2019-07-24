@@ -86,7 +86,7 @@ class NotificationAction:
 
     LAB_LOGO_CHANGE_MAIL = 70
     PRICING_ALERT_EMAIL = 72
-    APPOINTMENT_REMINDER_PROVIDER_SMS = 77
+    DOCPRIME_APPOINTMENT_REMINDER_PROVIDER_SMS = 69
     PROVIDER_ENCRYPTION_ENABLED = 78
     PROVIDER_ENCRYPTION_DISABLED = 79
     LOGIN_OTP = 80
@@ -96,6 +96,7 @@ class NotificationAction:
     COD_TO_PREPAID = 91
     COD_TO_PREPAID_REQUEST = 92
 
+    OPD_DAILY_SCHEDULE = 98
     USERPROFILE_EMAIL_UPDATE = 99
     LAB_CONFIRMATION_CHECK_AFTER_APPOINTMENT = 93
     LAB_CONFIRMATION_SECOND_CHECK_AFTER_APPOINTMENT = 94
@@ -133,11 +134,12 @@ class NotificationAction:
         (IPD_PROCEDURE_MAIL, 'IPD Procedure Mail'),
         (PRICING_ALERT_EMAIL, 'Pricing Change Mail'),
         (LAB_LOGO_CHANGE_MAIL, 'Lab Logo Change Mail'),
-        (APPOINTMENT_REMINDER_PROVIDER_SMS, 'Appointment Reminder Provider SMS'),
+        (DOCPRIME_APPOINTMENT_REMINDER_PROVIDER_SMS, 'Docprime Appointment Reminder Provider SMS'),
         (LOGIN_OTP, 'Login OTP'),
         (CHAT_NOTIFICATION, "Push Notification from chat"),
         (COD_TO_PREPAID, 'COD to Prepaid'),
-        (COD_TO_PREPAID_REQUEST, 'COD To Prepaid Request')
+        (COD_TO_PREPAID_REQUEST, 'COD To Prepaid Request'),
+        (OPD_DAILY_SCHEDULE, 'OPD Daily Schedule')
     )
 
     OPD_APPOINTMENT = "opd_appointment"
