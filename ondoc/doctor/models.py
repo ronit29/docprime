@@ -3412,13 +3412,11 @@ class OpdAppointment(auth_model.TimeStampedModel, CouponsMixin, OpdAppointmentIn
         profile = self.profile
         last_appointment = None
 
-        previous_appointments = OpdAppointment.objects.filter(~Q(status=OpdAppointment.CANCELLED) &
-                                                              (Q(appointment_type=OpdAppointment.REGULAR) |
-                                                               Q(appointment_type__isnull=True)),
-                                                              doctor=doctor,
-                                                              profile=profile, hospital=hospital,
-                                                              insurance__isnull=False).order_by('-id')
-
+        previous_appointments = OpdAppointment.objects.filter(~Q(appointment_type=OpdAppointment.FOLLOWUP) &
+                                                              Q(doctor=doctor) &
+                                                              Q(profile=profile) & Q(hospital=hospital) &
+                                                              Q(insurance__isnull=False)).exclude(
+                                                              status=OpdAppointment.CANCELLED, id=self.id).order_by('-id')
         if not previous_appointments:
             return False
         last_appointment = previous_appointments.first()
