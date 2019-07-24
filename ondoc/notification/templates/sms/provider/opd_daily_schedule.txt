@@ -1,0 +1,3 @@
+Good Morning,
+You have {{ no_of_appointments }} confirmed appointments scheduled for today ({{ curr_date|date:"D, jS F Y" }}) at {{ hospital_name }} on Docprime Partners app!
+To view more details, click here: https://dlinkprovider.docprime.com/hKWM
