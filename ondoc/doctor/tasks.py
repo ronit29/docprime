@@ -167,7 +167,7 @@ def doctors_daily_schedule():
         admins = hospital_admins_dict[hospital]
         sms_sent = list()
         for admin in admins:
-            if admin.phone_number in sms_sent:
+            if admin.phone_number in sms_sent or not (admin.phone_number >= 1000000000 and admin.phone_number <= 9999999999):
                 continue
             receiver = [{'user': None, 'phone_number': admin.phone_number}]
             hospital_admin_combo = str(hospital.id) + '-' + str(admin.id)
