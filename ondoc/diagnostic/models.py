@@ -1798,19 +1798,13 @@ class LabAppointment(TimeStampedModel, CouponsMixin, LabAppointmentInvoiceMixin,
                 if all([x.is_cancellable for x in self.tests.all()]):
                     allowed += [self.CANCELLED]
         if user_type == User.DOCTOR and self.time_slot_start.date() >= current_datetime.date():
-            perm_queryset = auth_model.GenericLabAdmin.objects.filter(is_disabled=False, user=request.user)
-            if perm_queryset.first():
-                doc_permission = perm_queryset.first()
-                if doc_permission.write_permission or doc_permission.super_user_permission:
-                    if self.status in [self.BOOKED, self.RESCHEDULED_PATIENT]:
-                        allowed = [self.ACCEPTED, self.RESCHEDULED_LAB]
-                    elif self.status == self.ACCEPTED:
-                        allowed = [self.RESCHEDULED_LAB, self.COMPLETED]
-                    elif self.status == self.RESCHEDULED_LAB:
-                        allowed = [self.ACCEPTED]
+            if self.status in [self.BOOKED, self.RESCHEDULED_PATIENT]:
+                allowed = [self.ACCEPTED, self.RESCHEDULED_LAB]
+            elif self.status == self.ACCEPTED:
+                allowed = [self.RESCHEDULED_LAB, self.COMPLETED]
+            elif self.status == self.RESCHEDULED_LAB:
+                allowed = [self.ACCEPTED]
 
-            # if self.status in [self.BOOKED]:
-            #     allowed = [self.COMPLETED]
         return allowed
 
     def is_to_send_notification(self, database_instance):
