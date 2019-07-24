@@ -1397,11 +1397,11 @@ class TransactionViewSet(viewsets.GenericViewSet):
                     ", order id - {}.".format(booking_type, order_obj.user.id, order_obj.user.phone_number, order_obj.id)
 
         # Push the order failure case to matrix.
-
-        push_order_to_matrix.apply_async(({'order_id': order_obj.id},), countdown=5)
+        # push_order_to_matrix.apply_async(({'order_id': order_obj.id},), countdown=5)
 
         for email in settings.ORDER_FAILURE_EMAIL_ID:
             EmailNotification.publish_ops_email(email, html_body, 'Payment failure for order')
+
 
 class UserTransactionViewSet(viewsets.GenericViewSet):
     serializer_class = serializers.UserTransactionModelSerializer

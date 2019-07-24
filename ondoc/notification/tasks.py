@@ -74,6 +74,8 @@ def send_ipd_procedure_lead_mail(data):
         return
     if instance.matrix_lead_id:
         return
+    if not instance.is_valid:
+        return
     try:
         if send_email:
             emails = settings.IPD_PROCEDURE_CONTACT_DETAILS

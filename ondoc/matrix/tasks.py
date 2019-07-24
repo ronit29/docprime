@@ -568,6 +568,14 @@ def push_order_to_matrix(self, data):
         if order_obj.parent:
             raise Exception("should not push child order in case of payment failure - " + str(order_id))
 
+        if order_obj and order_obj.user and order_obj.product_id == Order.DOCTOR_PRODUCT_ID:
+            if order_obj.action_data.get('hospital'):
+                from ondoc.doctor.models import Hospital
+                ho = Hospital.objects.filter(id=order_obj.action_data.get('hospital')).first()
+                if ho and ho.has_ipd_doctors():
+                    if not order_obj.user.is_valid_lead(order_obj.created_at):
+                        pass
+
         phone_number = order_obj.user.phone_number
         name = order_obj.user.full_name
         # appointment_details = order_obj.appointment_details()
@@ -1267,3 +1275,36 @@ def create_ipd_lead_from_lab_appointment(self, data):
     data['source'] = IpdProcedureLead.CRM
     obj_created = IpdProcedureLead(**data)
     obj_created.save()
+
+
+@task(bind=True, max_retries=2)
+def create_ipd_lead_from_order(self, data):
+    from ondoc.procedure.models import IpdProcedureLead
+    obj_id = data.get('obj_id')
+    if not obj_id:
+        logger.error("[CELERY ERROR: Incorrect values provided.]")
+        raise ValueError()
+    obj = Order.objects.filter(id=obj_id).first()
+    if not obj:
+        return
+
+    data = obj.convert_ipd_lead_data()
+    data['source'] = IpdProcedureLead.DROPOFF
+    obj_created = IpdProcedureLead(**data)
+    obj_created.save()
+
+
+@task(bind=True, max_retries=2)
+def check_for_ipd_lead_validity(self, data):
+    from ondoc.diagnostic.models import LabAppointment
+    from ondoc.procedure.models import IpdProcedureLead
+    obj_id = data.get('obj_id')
+    if not obj_id:
+        logger.error("[CELERY ERROR: Incorrect values provided.]")
+        raise ValueError()
+    obj = IpdProcedureLead.objects.filter(id=obj_id).first()
+    if not obj:
+        return
+    if not obj.is_valid:
+        return
+    obj.validate_lead()

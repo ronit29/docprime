@@ -2296,6 +2296,7 @@ class IpdProcedureLeadSerializer(serializers.ModelSerializer):
     requested_date_time = serializers.DateTimeField(required=False, default=None, allow_null=True)
     matrix_city = serializers.PrimaryKeyRelatedField(queryset=MatrixMappedCity.objects.all(),
                                                      required=False, allow_null=True)
+    is_valid = serializers.BooleanField(default=True, required=False)
 
     class Meta:
         model = IpdProcedureLead
