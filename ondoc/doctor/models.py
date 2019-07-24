@@ -1329,6 +1329,9 @@ class Doctor(auth_model.TimeStampedModel, auth_model.QCModel, SearchKey, auth_mo
         doctor_with_gyno_specialization = DoctorPracticeSpecialization.objects. \
             filter(specialization_id__in=list(specializaion_ids)).values_list('doctor_id', flat=True)
 
+        if not self.id in doctor_with_gyno_specialization:
+            return True
+
         if doctor_with_gyno_specialization:
             count = OpdAppointment.objects.filter(~Q(status=OpdAppointment.CANCELLED),
                                                   doctor_id__in=doctor_with_gyno_specialization,
@@ -1348,6 +1351,9 @@ class Doctor(auth_model.TimeStampedModel, auth_model.QCModel, SearchKey, auth_mo
         specializaion_ids = set(json.loads(settings.ONCOLOGIST_SPECIALIZATION_IDS))
         doctor_with_onco_specialization = DoctorPracticeSpecialization.objects. \
             filter(specialization_id__in=list(specializaion_ids)).values_list('doctor_id', flat=True)
+
+        if not self.id in doctor_with_onco_specialization:
+            return True
 
         if doctor_with_onco_specialization:
             count = OpdAppointment.objects.filter(~Q(status=OpdAppointment.CANCELLED),
