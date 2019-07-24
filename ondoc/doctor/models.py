@@ -1323,14 +1323,14 @@ class Doctor(auth_model.TimeStampedModel, auth_model.QCModel, SearchKey, auth_mo
 
     def is_gyno_limit_breach(self, insurance):
         if not insurance:
-            return False
+            return True
         count = 0
         specializaion_ids = set(json.loads(settings.GYNECOLOGIST_SPECIALIZATION_IDS))
         doctor_with_gyno_specialization = DoctorPracticeSpecialization.objects. \
             filter(specialization_id__in=list(specializaion_ids)).values_list('doctor_id', flat=True)
 
         if not self.id in doctor_with_gyno_specialization:
-            return True
+            return False
 
         if doctor_with_gyno_specialization:
             count = OpdAppointment.objects.filter(~Q(status=OpdAppointment.CANCELLED),
@@ -1340,20 +1340,20 @@ class Doctor(auth_model.TimeStampedModel, auth_model.QCModel, SearchKey, auth_mo
                                                   user=insurance.user).count()
 
         if count >= int(settings.INSURANCE_GYNECOLOGIST_LIMIT):
-            return False
-        else:
             return True
+        else:
+            return False
 
     def is_onco_limit_breach(self, insurance):
         if not insurance:
-            return False
+            return True
         count = 0
         specializaion_ids = set(json.loads(settings.ONCOLOGIST_SPECIALIZATION_IDS))
         doctor_with_onco_specialization = DoctorPracticeSpecialization.objects. \
             filter(specialization_id__in=list(specializaion_ids)).values_list('doctor_id', flat=True)
 
         if not self.id in doctor_with_onco_specialization:
-            return True
+            return False
 
         if doctor_with_onco_specialization:
             count = OpdAppointment.objects.filter(~Q(status=OpdAppointment.CANCELLED),
@@ -1363,9 +1363,9 @@ class Doctor(auth_model.TimeStampedModel, auth_model.QCModel, SearchKey, auth_mo
                                                   user=insurance.user).count()
 
         if count >= int(settings.INSURANCE_ONCOLOGIST_LIMIT):
-            return False
-        else:
             return True
+        else:
+            return False
 
     class Meta:
         db_table = "doctor"
