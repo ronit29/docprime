@@ -1224,7 +1224,7 @@ class TransactionViewSet(viewsets.GenericViewSet):
 
             # log pg data
             try:
-                args = {'order_id': response.get("orderId"), 'status_code': pg_resp_code}
+                args = {'order_id': response.get("orderId"), 'status_code': pg_resp_code, 'source': 'callback/cron'}
                 status_type = PaymentProcessStatus.get_status_type(pg_resp_code, response.get('txStatus'))
 
                 PgLogs.objects.create(decoded_response=response, coded_response=coded_response)

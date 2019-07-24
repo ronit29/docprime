@@ -2286,6 +2286,7 @@ class PaymentProcessStatus(TimeStampedModel):
     AUTHORIZE = 2
     SUCCESS = 3
     FAILURE = 4
+    RELEASE = 5
 
     STATUS_CHOICES = [(INITIATED, "Initiated"), (AUTHORIZE, "Authorize"),
                       (SUCCESS, "Success"), (FAILURE, "Failure")]
@@ -2321,10 +2322,19 @@ class PaymentProcessStatus(TimeStampedModel):
 
     @classmethod
     def get_status_type(cls, status_code, txStatus):
-        if status_code == 1:
-            if txStatus == 'TXN_AUTHORIZE':
+        try:
+            status_code = int(status_code)
+        except KeyError:
+            logger.error("ValueError : statusCode is not type integer")
+            status_code = None
+
+        if status_code and status_code in (1, 20):
+            if txStatus == 'TXN_AUTHORIZE' or txStatus == '27':
                 return PaymentProcessStatus.AUTHORIZE
             else:
                 return PaymentProcessStatus.SUCCESS
+
+        if status_code and status_code == 22 and txStatus == 'TXN_RELEASE':
+            return PaymentProcessStatus.RELEASE
 
         return PaymentProcessStatus.FAILURE
