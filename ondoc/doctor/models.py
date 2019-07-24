@@ -2932,7 +2932,7 @@ class OpdAppointment(auth_model.TimeStampedModel, CouponsMixin, OpdAppointmentIn
         procedures = [
             {"name": str(procedure["name"]), "mrp": str(procedure["mrp"]),
              "deal_price": str(procedure["deal_price"]),
-             "dp_price": 0 if not procedure["agreed_price"] else None,
+             "dp_price": "Free" if not procedure["agreed_price"] else None,
              "convenience_charges": procedure["deal_price"] if not procedure["agreed_price"] else None,
              "discount": str(procedure["discount"]), "agreed_price": str(procedure["agreed_price"])} for procedure in
             procedures]
