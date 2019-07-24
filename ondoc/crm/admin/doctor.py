@@ -1475,9 +1475,8 @@ class DoctorOpdAppointmentForm(RefundableAppointmentForm):
         # if self.request.user.groups.filter(name=constants['OPD_APPOINTMENT_MANAGEMENT_TEAM']).exists() and cleaned_data.get('status') == OpdAppointment.BOOKED:
         #     raise forms.ValidationError("Form cant be Saved with Booked Status.")
         if self.instance.status in [OpdAppointment.ACCEPTED, OpdAppointment.COMPLETED] and self.instance.is_followup_appointment() \
-            and not self.instance.appointment_type in [OpdAppointment.FOLLOWUP, OpdAppointment.REGULAR]:
+            and (not self.instance.appointment_type in [OpdAppointment.FOLLOWUP, OpdAppointment.REGULAR]):
             raise forms.ValidationError("Please select Appointment type for Follow up Appointment!!")
-
 
         if cleaned_data.get('start_date') and cleaned_data.get('start_time'):
                 date_time_field = str(cleaned_data.get('start_date')) + " " + str(cleaned_data.get('start_time'))
