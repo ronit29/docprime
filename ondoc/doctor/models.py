@@ -1321,6 +1321,40 @@ class Doctor(auth_model.TimeStampedModel, auth_model.QCModel, SearchKey, auth_mo
         #         return False
         return True
 
+    def is_gyno_limit_breach(self):
+        count = 0
+        specializaion_ids = set(json.loads(settings.GYNECOLOGIST_SPECIALIZATION_IDS))
+        doctor_with_gyno_specialization = DoctorPracticeSpecialization.objects. \
+            filter(specialization_id__in=list(specializaion_ids)).values_list('doctor_id', flat=True)
+
+        if doctor_with_gyno_specialization:
+            count = OpdAppointment.objects.filter(~Q(status=OpdAppointment.CANCELLED),
+                                                  doctor_id__in=doctor_with_gyno_specialization,
+                                                  payment_type=OpdAppointment.INSURANCE,
+                                                  user=self.user).count()
+
+        if count >= int(settings.INSURANCE_GYNECOLOGIST_LIMIT):
+            return False
+        else:
+            return True
+
+    def is_onco_limit_breach(self):
+        count = 0
+        specializaion_ids = set(json.loads(settings.ONCOLOGIST_SPECIALIZATION_IDS))
+        doctor_with_onco_specialization = DoctorPracticeSpecialization.objects. \
+            filter(specialization_id__in=list(specializaion_ids)).values_list('doctor_id', flat=True)
+
+        if doctor_with_onco_specialization:
+            count = OpdAppointment.objects.filter(~Q(status=OpdAppointment.CANCELLED),
+                                                  doctor_id__in=doctor_with_onco_specialization,
+                                                  payment_type=OpdAppointment.INSURANCE,
+                                                  user=self.user).count()
+
+        if count >= int(settings.INSURANCE_ONCOLOGIST_LIMIT):
+            return False
+        else:
+            return True
+
     class Meta:
         db_table = "doctor"
 

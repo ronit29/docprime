@@ -3,7 +3,7 @@ from pyodbc import Date
 
 from django.contrib.gis.geos import Point
 from django.utils import timezone
-
+from django.conf import settings
 from ondoc.api.v1.doctor.serializers import DoctorProfileUserViewSerializer
 from ondoc.api.v1.procedure.serializers import DoctorClinicProcedureSerializer
 from ondoc.api.v1.ratings.serializers import GoogleRatingsGraphSerializer
@@ -579,15 +579,32 @@ class DoctorSearchHelper:
                 # Insurance is not valid for the procedures hence negating the procedure request.
 
                 is_insurance_covered = False
+                insurance_error = None
                 insurance_data_dict = kwargs.get('insurance_data')
                 if doctor_clinic.hospital.enabled_for_prepaid and enable_online_booking and doctor.is_insurance_enabled and doctor.is_doctor_specialization_insured() and insurance_data_dict and min_price.get("mrp") is not None and \
                         min_price["mrp"] <= insurance_data_dict['insurance_threshold_amount'] and \
                         not (request.query_params.get('procedure_ids') or request.query_params.get('procedure_category_ids')):
                     is_insurance_covered = True
 
+                if request and request.user and request.user.active_insurance and \
+                        not doctor.is_gyno_limit_breach(request.user.active_insurance) and is_insurance_covered:
+                    is_insurance_covered = True
+                else:
+                    is_insurance_covered = False
+                    insurance_error = "Gynocologist limit exceeded of limit {}".format(settings.INSURANCE_GYNECOLOGIST_LIMIT)
+
+                if request and request.user and request.user.active_insurance and \
+                        not doctor.is_onco_limit_breach(request.user.active_insurance) and is_insurance_covered:
+                    is_insurance_covered = True
+                else:
+                    is_insurance_covered = False
+                    insurance_error = "Gynocologist limit exceeded of limit {}".format(
+                        settings.INSURANCE_ONCOLOGIST_LIMIT)
+
                 hospitals = [{
                     "enabled_for_online_booking": enable_online_booking,
                     "is_insurance_covered": is_insurance_covered,
+                    "insurance_limit_message": insurance_error,
                     "insurance_threshold_amount": insurance_data_dict['insurance_threshold_amount'],
                     "is_user_insured": insurance_data_dict['is_user_insured'],
                     "welcome_calling_done": doctor_clinic.hospital.welcome_calling_done,
