@@ -201,6 +201,7 @@ class EventCreateViewSet(GenericViewSet):
         new_cookie = json.dumps(new_cookie, cls=UUIDEncoder)
         return new_cookie
 
+
 class UUIDEncoder(json.JSONEncoder):
     def default(self, obj):
         if isinstance(obj, UUID):

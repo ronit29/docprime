@@ -29,7 +29,7 @@ from ondoc.diagnostic.models import (Lab, LabNetwork, LabTest, LabTestType, LabS
                                      TestParameterChat)
 from ondoc.coupon.models import Coupon, UserSpecificCoupon, RandomGeneratedCoupon
 from ondoc.lead.models import HospitalLead, DoctorLead, SearchLead
-from ondoc.account.models import ConsumerAccount, MerchantPayout, Order
+from ondoc.account.models import ConsumerAccount, MerchantPayout, Order, MerchantPayoutBulkProcess
 from ondoc.location.admin import EntityUrlsAdmin
 from ondoc.location.models import EntityUrls, CompareSEOUrls
 from ondoc.notification import models as notifcation_model
@@ -40,7 +40,8 @@ from ondoc.procedure.models import Procedure, ProcedureCategory, CommonProcedure
     IpdCostEstimateRoomType, UploadCostEstimateData, PotentialIpdCity
 from ondoc.subscription_plan.models import Plan, PlanFeature, UserPlanMapping
 from .common import Cities, CitiesAdmin, MatrixCityMapping, MatrixCityAdmin, MerchantAdmin, MerchantPayoutAdmin, \
-    PaymentOptionsAdmin, MatrixMappedStateAdmin, MatrixMappedCityAdmin, GlobalNonBookableAdmin, UserConfigAdmin, BlacklistUserAdmin, BlockedStatesAdmin
+    PaymentOptionsAdmin, MatrixMappedStateAdmin, MatrixMappedCityAdmin, GlobalNonBookableAdmin, UserConfigAdmin, \
+    BlacklistUserAdmin, BlockedStatesAdmin, MerchantPayoutBulkProcessAdmin
 from .lead import HospitalLeadAdmin, DoctorLeadAdmin, SearchLeadAdmin
 from .doctor import (DoctorAdmin, MedicalServiceAdmin, SpecializationAdmin, QualificationAdmin, LanguageAdmin,
                      CollegeAdmin, MedicalConditionAdmin, HealthTipAdmin, DoctorClinicAdmin,
@@ -51,7 +52,7 @@ from .doctor import (DoctorAdmin, MedicalServiceAdmin, SpecializationAdmin, Qual
                      UploadDoctorDataAdmin, DoctorLeaveAdmin, SimilarSpecializationGroupAdmin)
 from .aboutdoctor import AboutDoctorAdmin
 from .hospital import HospitalAdmin, CommonHospitalAdmin, GenericQuestionAnswerAdmin
-from .user import CustomUserAdmin, UserNumberUpdateAdmin
+from .user import CustomUserAdmin, UserNumberUpdateAdmin, UserProfileAdmin
 from .hospital_network import HospitalNetworkAdmin
 from .lab import LabAdmin, LabTestAdmin, LabTestTypeAdmin, AvailableLabTestAdmin, CommonDiagnosticConditionAdmin, \
     LabAppointmentAdmin, CommonTestAdmin, TestParameterAdmin, CommonPackageAdmin, LabTestCategoryAdmin, \
@@ -110,7 +111,7 @@ admin.site.index_title = 'CRM Administration'
 
 admin.site.register(OtpVerifications)
 # admin.site.register(OpdAppointment)
-admin.site.register(UserProfile)
+admin.site.register(UserProfile, UserProfileAdmin)
 admin.site.register(ReviewCompliments, ReviewComplimentsAdmin)
 admin.site.register(Banner, BannerAdmin)
 
@@ -220,6 +221,7 @@ admin.site.register(CommonProcedure)
 admin.site.register(DemoElastic, DemoElasticAdmin)
 admin.site.register(Merchant, MerchantAdmin)
 admin.site.register(MerchantPayout, MerchantPayoutAdmin)
+admin.site.register(MerchantPayoutBulkProcess, MerchantPayoutBulkProcessAdmin)
 # admin.site.register(AssociatedMerchant)
 admin.site.register(DoctorMobileOtp)
 admin.site.register(NewDynamic, NewDynamicAdmin)
