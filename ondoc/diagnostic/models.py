@@ -2056,10 +2056,7 @@ class LabAppointment(TimeStampedModel, CouponsMixin, LabAppointmentInvoiceMixin,
         if self.payment_type in [OpdAppointment.COD]:
             raise Exception("Cannot create payout for COD appointments")
 
-        if self.payment_type == OpdAppointment.INSURANCE and self.insurance_agreed_price:
-            payout_amount = self.insurance_agreed_price
-        else:
-            payout_amount = self.agreed_price
+        payout_amount = self.agreed_price
         if self.is_home_pickup:
             payout_amount += self.home_pickup_charges
 

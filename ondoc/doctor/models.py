@@ -2760,10 +2760,7 @@ class OpdAppointment(auth_model.TimeStampedModel, CouponsMixin, OpdAppointmentIn
     def save_merchant_payout(self):
         if self.payment_type in [OpdAppointment.COD]:
             raise Exception("Cannot create payout for COD appointments")
-        if self.payment_type in (OpdAppointment.INSURANCE) and self.insurance_fees:
-            payout_amount = self.insurance_fees
-        else:
-            payout_amount = self.fees
+        payout_amount = self.fees
         tds = self.get_tds_amount()
 
         # Update Net Revenue
