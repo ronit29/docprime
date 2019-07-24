@@ -3412,22 +3412,11 @@ class OpdAppointment(auth_model.TimeStampedModel, CouponsMixin, OpdAppointmentIn
         profile = self.profile
         last_appointment = None
 
-        # if type == "payout":
-        #     completed_appointment = OpdAppointment.objects.filter(doctor=doctor, profile=profile, hospital=hospital,
-        #                                                           status=OpdAppointment.COMPLETED,
-        #                                                           created_at__lt=self.created_at,
-        #                                                           insurance__isnull=False).order_by('-id')
-        #     if not completed_appointment:
-        #         return False
-        #     last_appointment = completed_appointment.first()
-
-        # if type == "crm":
         previous_appointments = OpdAppointment.objects.filter(~Q(status=OpdAppointment.CANCELLED) &
                                                               (Q(appointment_type=OpdAppointment.REGULAR) |
                                                                Q(appointment_type__isnull=True)),
                                                               doctor=doctor,
                                                               profile=profile, hospital=hospital,
-                                                              created_at__lt=self.created_at,
                                                               insurance__isnull=False).order_by('-id')
 
         if not previous_appointments:
