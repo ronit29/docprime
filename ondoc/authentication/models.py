@@ -360,7 +360,8 @@ class User(AbstractBaseUser, PermissionsMixin):
 
     @cached_property
     def onhold_insurance(self):
-        onhold_insurance = self.purchased_insurance.filter().order_by('-id').first()
+        from ondoc.insurance.models import UserInsurance
+        onhold_insurance = self.purchased_insurance.filter(status=UserInsurance.ONHOLD).order_by('-id').first()
         return onhold_insurance if onhold_insurance else None
 
     @cached_property
