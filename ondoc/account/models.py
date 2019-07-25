@@ -2282,14 +2282,16 @@ class PgStatusCode(TimeStampedModel):
 
 
 class PaymentProcessStatus(TimeStampedModel):
-    INITIATED = 1
+    INITIATE = 1
     AUTHORIZE = 2
     SUCCESS = 3
     FAILURE = 4
-    RELEASE = 5
+    CAPTURE = 5
+    RELEASE = 6
 
-    STATUS_CHOICES = [(INITIATED, "Initiated"), (AUTHORIZE, "Authorize"),
-                      (SUCCESS, "Success"), (FAILURE, "Failure")]
+    STATUS_CHOICES = [(INITIATE, "Initiate"), (AUTHORIZE, "Authorize"),
+                      (SUCCESS, "Success"), (FAILURE, "Failure"),
+                      (CAPTURE, "Capture"), (RELEASE, "Release")]
 
     user = models.ForeignKey(User, on_delete=models.DO_NOTHING, null=True)
     order = models.ForeignKey(Order, on_delete=models.DO_NOTHING, null=True)
@@ -2328,11 +2330,14 @@ class PaymentProcessStatus(TimeStampedModel):
             logger.error("ValueError : statusCode is not type integer")
             status_code = None
 
-        if status_code and status_code in (1, 20):
+        if status_code and status_code == 1:
             if txStatus == 'TXN_AUTHORIZE' or txStatus == '27':
                 return PaymentProcessStatus.AUTHORIZE
             else:
                 return PaymentProcessStatus.SUCCESS
+
+        if status_code and status_code == 20 and txStatus == 'TXN_SUCCESS':
+            return PaymentProcessStatus.CAPTURE
 
         if status_code and status_code == 22 and txStatus == 'TXN_RELEASE':
             return PaymentProcessStatus.RELEASE

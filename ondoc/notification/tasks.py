@@ -1273,7 +1273,7 @@ def send_capture_payment_request(self, product_id, appointment_id):
             resp_data = response.json()
             save_pg_response.apply_async((PgLogs.TXN_CAPTURED, order.id, txn_obj.id, resp_data, req_data,), eta=timezone.localtime(), )
 
-            args = {'order_id': resp_data.get("orderId"), 'status_code': resp_data.get('statusCode'), 'source': 'capture'}
+            args = {'order_id': order.id, 'status_code': resp_data.get('statusCode'), 'source': 'CAPTURE'}
             status_type = PaymentProcessStatus.get_status_type(resp_data.get('statusCode'), resp_data.get('txStatus'))
             save_payment_status.apply_async((status_type, args), eta=timezone.localtime(), )
             if response.status_code == status.HTTP_200_OK:
@@ -1343,7 +1343,7 @@ def send_release_payment_request(self, product_id, appointment_id):
                 resp_data = response.json()
                 save_pg_response.apply_async((PgLogs.TXN_RELEASED, order.id, txn_obj.id, resp_data, req_data,), eta=timezone.localtime(), )
 
-                args = {'order_id': resp_data.get("orderId"), 'status_code': resp_data.get('statusCode'), 'source': 'release'}
+                args = {'order_id': order.id, 'status_code': resp_data.get('statusCode'), 'source': 'RELEASE'}
                 status_type = PaymentProcessStatus.get_status_type(resp_data.get('statusCode'),
                                                                    resp_data.get('txStatus'))
                 save_payment_status.apply_async((status_type, args), eta=timezone.localtime(), )

@@ -1603,6 +1603,7 @@ class PrescriptionInline(nested_admin.NestedTabularInline):
 
 class DoctorOpdAppointmentAdmin(admin.ModelAdmin):
     form = DoctorOpdAppointmentForm
+    change_form_template = 'appointment_change_form.html'
     search_fields = ['id', 'profile__name', 'profile__phone_number', 'doctor__name', 'hospital__name']
     list_display = ('booking_id', 'get_doctor', 'get_profile', 'status', 'time_slot_start', 'effective_price',
                     'get_insurance','get_appointment_type', 'created_at', 'updated_at')
@@ -1610,6 +1611,18 @@ class DoctorOpdAppointmentAdmin(admin.ModelAdmin):
     date_hierarchy = 'created_at'
     list_display_links = ('booking_id', 'get_insurance',)
     inlines = [PrescriptionInline, FraudInline]
+
+    def response_change(self, request, obj):
+        if "_capture-payment" in request.POST:
+            if (request.user.is_superuser or request.user.groups.filter(
+                    name=constants['SUPER_QC_GROUP']).exists()):
+                notification_tasks.send_capture_payment_request.apply_async(
+                    (Order.DOCTOR_PRODUCT_ID, obj.id), eta=timezone.localtime(), )
+                messages.success(request, ('Payment capture requested successfully.'))
+            else:
+                messages.error(request, ('You do not have access to perform this action.'))
+            return HttpResponseRedirect(".")
+        return super().response_change(request, obj)
 
     def get_appointment_type(self, obj):
         if obj.is_followup_appointment():
