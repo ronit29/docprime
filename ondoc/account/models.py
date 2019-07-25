@@ -1599,7 +1599,7 @@ class MerchantPayout(TimeStampedModel):
 
         if self.id and not self.is_insurance_premium_payout() and hasattr(self,'process_payout') and self.process_payout and self.status==self.PENDING and self.type==self.AUTOMATIC:
             self.type = self.AUTOMATIC
-
+            self.update_billed_to_content_type()
             # if not self.content_object:
             #     self.content_object = self.get_billed_to()
             # if not self.paid_to:
@@ -1638,29 +1638,7 @@ class MerchantPayout(TimeStampedModel):
         super().save(*args, **kwargs)
 
         if first_instance:
-            self.update_billed_to_content_type()
             MerchantPayout.objects.filter(id=self.id).update(payout_ref_id=self.id)
-
-            appointment = self.get_corrosponding_appointment()
-
-            if appointment.payment_type == 1 and self.merchant_has_advance_payment():
-                self.update_payout_for_advance_available()
-
-            if appointment and appointment.insurance and self.id and not self.is_insurance_premium_payout() and self.status==self.PENDING:
-                self.type = self.AUTOMATIC
-                # if not self.content_object:
-                #     self.content_object = self.get_billed_to()
-                # if not self.paid_to:
-                #     self.paid_to = self.get_merchant()
-
-                try:
-                    has_txn, order_data, appointment = self.has_transaction()
-                    if not has_txn:
-                        transaction.on_commit(lambda: set_order_dummy_transaction.apply_async((order_data.id, appointment.user_id,)))
-                except Exception as e:
-                    logger.error(str(e))
-            # self.payout_ref_id = self.id
-            # self.save()
 
     # @classmethod
     # def creating_pending_insurance_transactions(cls):
@@ -2149,20 +2127,21 @@ class MerchantPayout(TimeStampedModel):
 
     def update_billed_to_content_type(self):
         merchant = self.get_merchant()
-        current_associated_merchant = AssociatedMerchant.objects.filter(merchant_id=merchant.id, object_id=self.object_id, content_type_id=self.content_type_id).first()
-        if current_associated_merchant and current_associated_merchant.verified:
-            pass
-        else:
-            appt = self.get_appointment()
-            if appt and appt.get_billed_to:
-                billed_to = appt.get_billed_to
-                self.content_object = billed_to
+        if merchant:
+            current_associated_merchant = AssociatedMerchant.objects.filter(merchant_id=merchant.id, object_id=self.object_id, content_type_id=self.content_type_id).first()
+            if current_associated_merchant and current_associated_merchant.verified:
+                pass
+            else:
+                appt = self.get_appointment()
+                if appt and appt.get_billed_to:
+                    billed_to = appt.get_billed_to
+                    self.content_object = billed_to
 
-            content_type = ContentType.objects.get_for_model(billed_to)
-            am = AssociatedMerchant.objects.filter(content_type_id=content_type, object_id=billed_to.id).first()
-            if am and not am.merchant_id == self.paid_to_id:
-                if appt and appt.get_merchant:
-                    self.paid_to = appt.get_merchant
+                content_type = ContentType.objects.get_for_model(billed_to)
+                am = AssociatedMerchant.objects.filter(content_type_id=content_type, object_id=billed_to.id).first()
+                if am and not am.merchant_id == self.paid_to_id:
+                    if appt and appt.get_merchant:
+                        self.paid_to = appt.get_merchant
 
     @transaction.atomic
     def get_advance_amount_obj(self):
@@ -2198,6 +2177,7 @@ class MerchantPayout(TimeStampedModel):
                 self.payable_amount = remaining_amt
                 adv_amt_obj.amount = 0.0
             adv_amt_obj.save()
+            self.save()
 
     class Meta:
         db_table = "merchant_payout"
