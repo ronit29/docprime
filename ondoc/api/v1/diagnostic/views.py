@@ -2397,6 +2397,8 @@ class LabAppointmentView(mixins.CreateModelMixin,
 
         user_insurance = UserInsurance.get_user_insurance(request.user)
         if user_insurance:
+            if user_insurance.status == UserInsurance.ONHOLD:
+                return Response(status=status.HTTP_400_BAD_REQUEST, data={'error': 'Your documents from the last claim are under verification.Please write to customercare@docprime.com for more information'})
             insurance_validate_dict = user_insurance.validate_insurance(validated_data)
             data['is_appointment_insured'] = insurance_validate_dict['is_insured']
             data['insurance_id'] = insurance_validate_dict['insurance_id']
@@ -2552,6 +2554,10 @@ class LabAppointmentView(mixins.CreateModelMixin,
         user = request.user
         balance = 0
         cashback_balance = 0
+
+        if user and user.active_insurance and user.active_insurance.status == UserInsurance.ONHOLD:
+            return Response(status=status.HTTP_400_BAD_REQUEST, data={'error': 'There is some problem, Please try again later'})
+
 
         if use_wallet:
             consumer_account = account_models.ConsumerAccount.objects.get_or_create(user=user)

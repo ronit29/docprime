@@ -245,6 +245,9 @@ class CartViewSet(viewsets.GenericViewSet):
         if not user.is_authenticated:
             return Response({"status": 0}, status.HTTP_401_UNAUTHORIZED)
 
+        if user.onhold_insurance:
+            return Response(data={"error": "Your documents from the last claim are under verification.Please write to customercare@docprime.com for more information"}, status=status.HTTP_400_BAD_REQUEST)
+
         use_wallet = int(request.query_params.get('use_wallet', 1))
         cart_items = Cart.objects.filter(user=user, deleted_at__isnull=True)
         items_to_process = []

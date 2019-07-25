@@ -60,7 +60,7 @@ from ondoc.ratings_review import models as ratings_models
 # from ondoc.api.v1.common import serializers as common_serializers
 from ondoc.common.models import AppointmentHistory, AppointmentMaskNumber, Remark, GlobalNonBookable, \
     SyncBookingAnalytics, CompletedBreakupMixin, RefundDetails, MatrixMappedState, \
-    MatrixMappedCity, TdsDeductionMixin, MatrixDataMixin, MerchantPayoutMixin
+    MatrixMappedCity, TdsDeductionMixin, MatrixDataMixin, MerchantPayoutMixin, Fraud
 import reversion
 from decimal import Decimal
 from django.utils.text import slugify
@@ -1959,6 +1959,17 @@ class LabAppointment(TimeStampedModel, CouponsMixin, LabAppointmentInvoiceMixin,
         #     logger.error("Error in auto cancel flow - " + str(e))
         print('all lab appointment tasks completed')
 
+    @property
+    def is_fraud_appointment(self):
+        if not self.insurance:
+            return False
+        content_type = ContentType.objects.get_for_model(LabAppointment)
+        appointment = Fraud.objects.filter(content_type=content_type, object_id=self.id).first()
+        if appointment:
+            return True
+        else:
+            return False
+
     def get_pickup_address(self):
         if not self.address:
             return ""
@@ -2005,7 +2016,8 @@ class LabAppointment(TimeStampedModel, CouponsMixin, LabAppointmentInvoiceMixin,
             # while completing appointment
             if database_instance and database_instance.status != self.status and self.status == self.COMPLETED:
                 # add a merchant_payout entry
-                if self.merchant_payout is None and self.payment_type not in [OpdAppointment.COD]:
+                if self.merchant_payout is None and self.payment_type not in [OpdAppointment.COD] and \
+                        not self.is_fraud_appointment:
                     self.save_merchant_payout()
                 # credit cashback if any
                 if self.cashback is not None and self.cashback > 0:
