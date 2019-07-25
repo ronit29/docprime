@@ -3412,12 +3412,20 @@ class OpdAppointment(auth_model.TimeStampedModel, CouponsMixin, OpdAppointmentIn
         profile = self.profile
         last_appointment = None
 
-        previous_appointments = OpdAppointment.objects.filter(~Q(appointment_type=OpdAppointment.FOLLOWUP) &
-                                                              ~Q(status=OpdAppointment.CANCELLED) &
-                                                              Q(doctor=doctor) &
-                                                              Q(profile=profile) & Q(hospital=hospital) &
-                                                              Q(insurance__isnull=False) &
-                                                              Q(created_at__lt=self.created_at)).order_by('-id')
+        # previous_appointments = OpdAppointment.objects.filter(~Q(appointment_type=OpdAppointment.FOLLOWUP) &
+        #                                                       ~Q(status=OpdAppointment.CANCELLED) &
+        #                                                       Q(doctor=doctor) &
+        #                                                       Q(profile=profile) & Q(hospital=hospital) &
+        #                                                       Q(insurance__isnull=False) &
+        #                                                       Q(created_at__lt=self.created_at)).order_by('-id')
+
+        previous_appointments = OpdAppointment.objects.filter(~Q(status=OpdAppointment.CANCELLED) &
+                                                              (Q(appointment_type=OpdAppointment.REGULAR) |
+                                                               Q(appointment_type__isnull=True)),
+                                                              doctor=doctor,
+                                                              profile=profile, hospital=hospital,
+                                                              created_at__lt=self.created_at,
+                                                              insurance__isnull=False).order_by('-id')
         if not previous_appointments:
             return False
         last_appointment = previous_appointments.first()
