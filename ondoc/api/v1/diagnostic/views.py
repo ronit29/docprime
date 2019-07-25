@@ -3562,15 +3562,17 @@ class LabTestCategoryLandingUrlViewSet(viewsets.GenericViewSet):
             deal_price = 0
             min = 0
             for avl in test.availablelabs.all():
-                if avl.custom_deal_price:
-                    deal_price = avl.custom_deal_price
-                    deal_price_list.append(deal_price)
-                else:
-                    deal_price = avl.computed_deal_price
-                    deal_price_list.append(deal_price)
+                if avl.enabled == True:
+                    if avl.custom_deal_price:
+                        deal_price = avl.custom_deal_price
+                        deal_price_list.append(deal_price)
+                    else:
+                        deal_price = avl.computed_deal_price
+                        deal_price_list.append(deal_price)
 
-                for x in avl.lab_pricing_group.labs.all():
-                    count += 1
+                    for x in avl.lab_pricing_group.labs.all():
+                        if x.is_live == True:
+                            count += 1
             if len(deal_price_list) >= 1:
                 min = deal_price_list[0]
             # if not min:
