@@ -29,6 +29,7 @@ urlpatterns = [
     path('invoice/<str:encoded_filename>', views.PartnersAppInvoicePDF.as_view({'get': 'download_pdf'}), name='invoice-pdf'),
     path('ecs/create', views.PartnerEConsultationViewSet.as_view({'post': 'create'}), name='ecs_create'),
     path('ecs/list', views.PartnerEConsultationViewSet.as_view({'get': 'list'}), name='ecs_list'),
+    path('ecs/share', views.PartnerEConsultationViewSet.as_view({'get': 'share'}), name='ecs_share'),
 ]
 
 

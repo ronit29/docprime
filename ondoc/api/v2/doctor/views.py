@@ -1139,7 +1139,6 @@ class PartnerEConsultationViewSet(viewsets.GenericViewSet):
         queryset = prov_models.EConsultation.objects.select_related('doctor', 'offline_patient', 'online_patient')\
                                                     .filter(created_by=request.user).all()
         if id:
-            # serializer = serializers.EConsultListSerializer(queryset.filter(id=id), context={'request': request})
             queryset = queryset.filter(id=id)
         serializer = serializers.EConsultListSerializer(queryset, context={'request': request}, many=True)
         return Response(serializer.data)
