@@ -3539,57 +3539,62 @@ class LabTestCategoryLandingUrlViewSet(viewsets.GenericViewSet):
         url = parameters.get('url')
         if not url:
             return Response(status=status.HTTP_400_BAD_REQUEST)
-        obj = LabTestCategoryLandingURLS.objects.select_related('url', 'test').\
+        query = LabTestCategoryLandingURLS.objects.select_related('url', 'test').\
             prefetch_related('test__lab_tests', 'test__lab_tests__availablelabs',
                              'test__lab_tests__availablelabs__lab_pricing_group',
-                             'test__lab_tests__availablelabs__lab_pricing_group__labs').filter(url=url).first()
+                             'test__lab_tests__availablelabs__lab_pricing_group__labs').filter(url__url=url)
+
         resp = dict()
-        if obj.url.url not in resp:
-            url_data = []
-            resp[obj.url.url] = url_data
-        else:
-            url_data = resp[obj.url.url]
-        url_data_obj = {}
-        url_data_obj['lab_test_cat_name'] = obj.test.name
-        url_data_obj['lab_test_cat_id'] = obj.test.id
+        for obj in query:
+            if obj.url.url not in resp:
+                url_data = []
+                resp[obj.url.url] = url_data
+            else:
+                url_data = resp[obj.url.url]
 
-        lab_tests = []
-        url_data_obj['lab_test_tests'] = lab_tests
-        # count = 0
-        for test in obj.test.lab_tests.all():
-            count = 0
-            deal_price_list = []
-            deal_price = 0
-            min = 0
-            for avl in test.availablelabs.all():
-                if avl.enabled == True:
-                    if avl.custom_deal_price:
-                        deal_price = avl.custom_deal_price
-                        deal_price_list.append(deal_price)
-                    else:
-                        deal_price = avl.computed_deal_price
-                        deal_price_list.append(deal_price)
+            # url_data = []
+            url_data_obj = {}
+            url_data_obj['lab_test_cat_name'] = obj.test.name
+            url_data_obj['lab_test_cat_id'] = obj.test.id
 
-                    for x in avl.lab_pricing_group.labs.all():
-                        if x.is_live == True:
-                            count += 1
-            if len(deal_price_list) >= 1:
-                min = deal_price_list[0]
-            # if not min:
-            #     min = 0
-            for price in deal_price_list:
-                if not price == None:
-                    if price <= min:
-                        deal_price = price
-                    else:
-                        deal_price = min
+            lab_tests = []
+            url_data_obj['lab_test_tests'] = lab_tests
+            # count = 0
+            for test in obj.test.lab_tests.all():
+                count = 0
+                deal_price_list = []
+                deal_price = 0
+                min = 0
+                for avl in test.availablelabs.all():
+                    if avl.enabled == True:
+                        if avl.custom_deal_price:
+                            deal_price = avl.custom_deal_price
+                            deal_price_list.append(deal_price)
+                        else:
+                            deal_price = avl.computed_deal_price
+                            deal_price_list.append(deal_price)
 
-            test_obj = {}
-            test_obj['name'] = test.name
-            test_obj['id'] = test.id
-            test_obj['count'] = count
-            test_obj['deal_price'] = deal_price
-            lab_tests.append(test_obj)
-        url_data.append(url_data_obj)
-        return Response(resp)
+                        for x in avl.lab_pricing_group.labs.all():
+                            if x.is_live == True:
+                                count += 1
+                if len(deal_price_list) >= 1:
+                    min = deal_price_list[0]
+                # if not min:
+                #     min = 0
+                for price in deal_price_list:
+                    if not price == None:
+                        if price <= min:
+                            deal_price = price
+                        else:
+                            deal_price = min
+
+                test_obj = {}
+                test_obj['name'] = test.name
+                test_obj['id'] = test.id
+                test_obj['count'] = count
+                test_obj['deal_price'] = deal_price
+                lab_tests.append(test_obj)
+            url_data.append(url_data_obj)
+
+        return Response({'url': list(resp.keys())[0], 'all_categories': list(resp.values())[0]})
 
