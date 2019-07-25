@@ -865,7 +865,7 @@ class FraudForm(forms.ModelForm):
                 self.fields['reason'].widget.attrs['readonly'] = True
 
 
-class FraudInline(GenericTabularInline):
+class FraudInline(GenericTabularInline, nested_admin.NestedGenericTabularInline):
     can_delete = False
     form = FraudForm
     extra = 0
