@@ -1474,7 +1474,7 @@ class DoctorOpdAppointmentForm(RefundableAppointmentForm):
         # Appointments are now made with CREATED status.
         # if self.request.user.groups.filter(name=constants['OPD_APPOINTMENT_MANAGEMENT_TEAM']).exists() and cleaned_data.get('status') == OpdAppointment.BOOKED:
         #     raise forms.ValidationError("Form cant be Saved with Booked Status.")
-        if self.instance.status in [OpdAppointment.ACCEPTED, OpdAppointment.COMPLETED] and self.instance.is_followup_appointment() \
+        if self.instance.status in [OpdAppointment.ACCEPTED] and self.instance.is_followup_appointment() \
             and (not self.instance.appointment_type in [OpdAppointment.FOLLOWUP, OpdAppointment.REGULAR]):
             raise forms.ValidationError("Please select Appointment type for Follow up Appointment!!")
 
@@ -1908,6 +1908,8 @@ class DoctorOpdAppointmentAdmin(admin.ModelAdmin):
             return super(DoctorOpdAppointmentAdmin, self).save_formset(request, form, formset, change)
         instances = formset.save(commit=False)
         for instance in instances:
+            if formset.instance.status == OpdAppointment.COMPLETED:
+                return forms.ValidationError('Notes and Completed Status can not be save together.')
             if not instance.pk:
                 instance.user = request.user
                 return super(DoctorOpdAppointmentAdmin, self).save_formset(request, form, formset, change)
