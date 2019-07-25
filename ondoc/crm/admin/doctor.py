@@ -1908,8 +1908,6 @@ class DoctorOpdAppointmentAdmin(admin.ModelAdmin):
             return super(DoctorOpdAppointmentAdmin, self).save_formset(request, form, formset, change)
         instances = formset.save(commit=False)
         for instance in instances:
-            if formset.instance.status == OpdAppointment.COMPLETED:
-                return forms.ValidationError('Notes and Completed Status can not be save together.')
             if not instance.pk:
                 instance.user = request.user
                 return super(DoctorOpdAppointmentAdmin, self).save_formset(request, form, formset, change)
