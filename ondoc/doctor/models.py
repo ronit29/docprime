@@ -1519,6 +1519,7 @@ class DoctorClinicTiming(auth_model.TimeStampedModel):
     mrp = models.PositiveSmallIntegerField(blank=False, null=True)
     type = models.IntegerField(default=1, choices=TYPE_CHOICES)
     cod_deal_price = models.PositiveSmallIntegerField(blank=True, null=True)
+    insurance_fees = models.PositiveSmallIntegerField(blank=True, null=True)
     # followup_duration = models.PositiveSmallIntegerField(blank=False, null=True)
     # followup_charges = models.PositiveSmallIntegerField(blank=False, null=True)
 
@@ -2201,6 +2202,7 @@ class OpdAppointment(auth_model.TimeStampedModel, CouponsMixin, OpdAppointmentIn
     CANCELLATION_TYPE_CHOICES = [(PATIENT_CANCELLED, 'Patient Cancelled'), (AGENT_CANCELLED, 'Agent Cancelled'),
                                  (AUTO_CANCELLED, 'Auto Cancelled')]
 
+    SMS_APPOINTMENT_REMINDER_TIME = 5
     MAX_FREE_BOOKINGS_ALLOWED = 3
 
     REGULAR = 1
@@ -2660,10 +2662,10 @@ class OpdAppointment(auth_model.TimeStampedModel, CouponsMixin, OpdAppointmentIn
 
         if old_instance and old_instance.status != self.ACCEPTED and self.status == self.ACCEPTED:
             try:
-                notification_tasks.appointment_reminder_sms_provider.apply_async(
+                notification_tasks.docprime_appointment_reminder_sms_provider.apply_async(
                     (self.id, str(math.floor(self.updated_at.timestamp()))),
                     eta=self.time_slot_start - datetime.timedelta(
-                        minutes=int(settings.PROVIDER_SMS_APPOINTMENT_REMINDER_TIME)), )
+                        minutes=int(self.SMS_APPOINTMENT_REMINDER_TIME)), )
                 notification_tasks.opd_send_otp_before_appointment.apply_async(
                     (self.id, str(math.floor(self.time_slot_start.timestamp()))),
                     eta=self.time_slot_start - datetime.timedelta(
@@ -2760,7 +2762,6 @@ class OpdAppointment(auth_model.TimeStampedModel, CouponsMixin, OpdAppointmentIn
     def save_merchant_payout(self):
         if self.payment_type in [OpdAppointment.COD]:
             raise Exception("Cannot create payout for COD appointments")
-
         payout_amount = self.fees
         tds = self.get_tds_amount()
 
@@ -2952,7 +2953,7 @@ class OpdAppointment(auth_model.TimeStampedModel, CouponsMixin, OpdAppointmentIn
         procedures = [
             {"name": str(procedure["name"]), "mrp": str(procedure["mrp"]),
              "deal_price": str(procedure["deal_price"]),
-             "dp_price": 0 if not procedure["agreed_price"] else None,
+             "dp_price": "Free" if not procedure["agreed_price"] else None,
              "convenience_charges": procedure["deal_price"] if not procedure["agreed_price"] else None,
              "discount": str(procedure["discount"]), "agreed_price": str(procedure["agreed_price"])} for procedure in
             procedures]
@@ -3008,13 +3009,14 @@ class OpdAppointment(auth_model.TimeStampedModel, CouponsMixin, OpdAppointmentIn
                     effective_price = doctor_clinic_timing.deal_price - coupon_discount
             deal_price = doctor_clinic_timing.deal_price
             mrp = doctor_clinic_timing.mrp
-            fees = doctor_clinic_timing.fees
+            fees = doctor_clinic_timing.insurance_fees if doctor_clinic_timing.insurance_fees and doctor_clinic_timing.insurance_fees > 0 else doctor_clinic_timing.fees
         else:
             total_deal_price, total_agreed_price, total_mrp = cls.get_procedure_prices(procedures, doctor,
                                                                                         selected_hospital,
                                                                                         doctor_clinic_timing)
             if data.get("payment_type") == cls.INSURANCE:
                 effective_price = total_deal_price
+                fees = doctor_clinic_timing.fees
             elif data.get("payment_type") in [cls.PREPAID]:
                 coupon_discount, coupon_cashback, coupon_list, random_coupon_list = Coupon.get_total_deduction(data, total_deal_price)
                 if coupon_discount >= total_deal_price:
@@ -3041,7 +3043,8 @@ class OpdAppointment(auth_model.TimeStampedModel, CouponsMixin, OpdAppointmentIn
             "consultation" : {
                 "deal_price": doctor_clinic_timing.deal_price,
                 "mrp": doctor_clinic_timing.mrp,
-                "fees": doctor_clinic_timing.fees
+                "fees": doctor_clinic_timing.fees,
+                "insurance_fees": doctor_clinic_timing.insurance_fees
             },
             "coupon_data" : { "random_coupon_list" : random_coupon_list }
         }
@@ -3964,6 +3967,8 @@ class OfflineOPDAppointments(auth_model.TimeStampedModel):
     REMINDER = 8
     SEND_MAP_LINK = 9
 
+    SMS_APPOINTMENT_REMINDER_TIME = 60         # minutes before appointment
+
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     STATUS_CHOICES = [(CREATED, 'Created'), (BOOKED, 'Booked'),
                       (RESCHEDULED_DOCTOR, 'Rescheduled by Doctor'),
@@ -4038,12 +4043,27 @@ class OfflineOPDAppointments(auth_model.TimeStampedModel):
             logger.error("Failed to Push Offline Appointment Rescehdule Message SMS Task " + str(e))
 
     @staticmethod
+    def schedule_appointment_reminder_sms(sms_obj):
+        try:
+            default_text = "Appointment reminder: Dear %s, your appointment with %s at %s is scheduled on %s. Please make sure you reach the clinic premises on time." % (
+                sms_obj['name'], sms_obj['appointment'].doctor.get_display_name(), sms_obj['appointment'].hospital.name,
+                sms_obj['appointment'].time_slot_start.strftime("%B %d, %Y %I:%M %p"))
+            notification_tasks.offline_appointment_reminder_sms_patient.apply_async(
+                kwargs={'appointment_id': sms_obj['appointment'].id,
+                        'time_slot_start_timestamp': sms_obj['appointment'].time_slot_start.timestamp(),
+                        'number': sms_obj['phone_number'], 'text': default_text, 'type': 'Appointment RESCHEDULE'},
+                eta=sms_obj['appointment'].time_slot_start - datetime.timedelta(minutes=int(OfflineOPDAppointments.SMS_APPOINTMENT_REMINDER_TIME)))
+        except Exception as e:
+            logger.error("Failed to Push Offline Appointment Reminder Message SMS Task " + str(e))
+
+    @staticmethod
     def after_commit_create_sms(sms_list):
         for sms_obj in sms_list:
             if sms_obj:
                 if sms_obj.get('display_welcome_message'):
                     OfflinePatients.welcome_message_sms(sms_obj)
                 OfflineOPDAppointments.appointment_add_sms(sms_obj)
+                OfflineOPDAppointments.schedule_appointment_reminder_sms(sms_obj)
 
     @staticmethod
     def after_commit_update_sms(sms_list):
@@ -4056,6 +4076,7 @@ class OfflineOPDAppointments(auth_model.TimeStampedModel):
                     OfflineOPDAppointments.appointment_add_sms(sms_obj)
                 elif sms_obj.get('action_reschedule') and sms_obj['action_reschedule']:
                     OfflineOPDAppointments.appointment_reschedule_sms(sms_obj)
+                    OfflineOPDAppointments.schedule_appointment_reminder_sms(sms_obj)
 
     def get_prescriptions(self, request):
 
@@ -4071,7 +4092,6 @@ class OfflineOPDAppointments(auth_model.TimeStampedModel):
         resp['files']= files
 
         return resp
-
 
 
 class SearchScore(auth_model.TimeStampedModel):
@@ -4291,9 +4311,9 @@ class PartnersAppInvoice(auth_model.TimeStampedModel):
         context["consultation_fees"] = self.consultation_fees
         context["invoice_items"] = self.get_invoice_items(selected_invoice_items)
         context["sub_total_amount"] = str(self.sub_total_amount)
-        context["tax_percentage"] = self.tax_percentage.normalize() if self.tax_percentage else None
+        context["tax_percentage"] = str(Decimal(self.tax_percentage.normalize())) if self.tax_percentage else None
         context["tax_amount"] = str(self.tax_amount) if self.tax_amount else "-"
-        context["discount_percentage"] = self.discount_percentage.normalize() if self.discount_percentage else None
+        context["discount_percentage"] = str(Decimal(self.discount_percentage.normalize())) if self.discount_percentage else None
         context["discount_amount"] = str(self.discount_amount) if self.discount_amount else "-"
         context["total_amount"] = str(self.total_amount)
         return context
@@ -4302,11 +4322,11 @@ class PartnersAppInvoice(auth_model.TimeStampedModel):
         invoice_items = list()
         for item in selected_invoice_items:
             if item['invoice_item'].get('tax_percentage'):
-                tax = str(item['invoice_item']['tax_amount']) + ' (' + str(item['invoice_item']['tax_percentage'].normalize()) + '%)'
+                tax = str(item['invoice_item']['tax_amount']) + ' (' + str(Decimal(item['invoice_item']['tax_percentage']).normalize()) + '%)'
             else:
                 tax = str(item['invoice_item']['tax_amount'])
             if item['invoice_item'].get('discount_percentage'):
-                discount = str(item['invoice_item']['discount_amount']) + ' (' + str(item['invoice_item']['discount_percentage'].normalize()) + '%)'
+                discount = str(item['invoice_item']['discount_amount']) + ' (' + str(Decimal(item['invoice_item']['discount_percentage']).normalize()) + '%)'
             else:
                 discount = str(item['invoice_item']['discount_amount'])
             invoice_items.append({"name": item['invoice_item']['item'],

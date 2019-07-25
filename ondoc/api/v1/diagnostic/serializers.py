@@ -376,7 +376,7 @@ class AvailableLabTestPackageSerializer(serializers.ModelSerializer):
         model = AvailableLabTest
         fields = ('test_id', 'mrp', 'test', 'agreed_price', 'deal_price', 'enabled', 'is_home_collection_enabled',
                   'package', 'parameters', 'is_package', 'number_of_tests', 'why', 'pre_test_info', 'expected_tat',
-                  'hide_price', 'included_in_user_plan', 'insurance', 'is_price_zero')
+                  'hide_price', 'included_in_user_plan', 'insurance', 'is_price_zero', 'insurance_agreed_price')
 
 class AvailableLabTestSerializer(serializers.ModelSerializer):
     test = LabTestSerializer()
@@ -446,7 +446,7 @@ class AvailableLabTestSerializer(serializers.ModelSerializer):
     class Meta:
         model = AvailableLabTest
         fields = ('test_id', 'mrp', 'test', 'agreed_price', 'deal_price', 'enabled', 'is_home_collection_enabled',
-                  'insurance', 'is_package', 'included_in_user_plan', 'is_price_zero')
+                  'insurance', 'is_package', 'included_in_user_plan', 'is_price_zero', 'insurance_agreed_price')
 
     def get_is_package(self, obj):
         return obj.test.is_package
@@ -1413,18 +1413,6 @@ class LabReportSerializer(serializers.Serializer):
     appointment = serializers.PrimaryKeyRelatedField(queryset=LabAppointment.objects.all())
     report_details = serializers.CharField(allow_blank=True, allow_null=True, required=False, max_length=300)
     name = serializers.FileField()
-
-    def validate_appointment(self, value):
-        request = self.context.get('request')
-
-        if not LabAppointment.objects.filter(Q(id=value.id), (
-                Q(lab__network__isnull=True, lab__manageable_lab_admins__user=request.user,
-                  lab__manageable_lab_admins__is_disabled=False) |
-                Q(lab__network__isnull=False,
-                  lab__network__manageable_lab_network_admins__user=request.user,
-                  lab__network__manageable_lab_network_admins__is_disabled=False))).exists():
-            raise serializers.ValidationError("User is not authorized to upload report.")
-        return value
 
 
 class LabEntitySerializer(serializers.ModelSerializer):

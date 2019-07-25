@@ -732,7 +732,9 @@ class Command(BaseCommand):
         content_types = ContentType.objects.get_for_models(IpdCostEstimateRoomType, IpdProcedureCostEstimate,
                                                            IpdCostEstimateRoomTypeMapping,
                                                            IpdProcedureLeadCostEstimateMapping,
-                                                           UploadCostEstimateData, VirtualAppointment)
+                                                           UploadCostEstimateData, VirtualAppointment,
+                                                           SimilarSpecializationGroup, PracticeSpecialization,
+                                                           SpecializationDepartment, SpecializationField)
         for cl, ct in content_types.items():
             permissions = Permission.objects.filter(
                 Q(content_type=ct),

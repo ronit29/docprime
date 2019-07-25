@@ -376,7 +376,7 @@ class UserSpecificCouponAdmin(MediaImportMixin):
     # from import_export.tmp_storages import MediaStorage
 
     resource_class = UserSpecificCouponResource
-    # tmp_storage_class = MediaStorage
+    autocomplete_fields = ['user']
 
 
 class RandomGeneratedCouponAdmin(ImportExportModelAdmin):
