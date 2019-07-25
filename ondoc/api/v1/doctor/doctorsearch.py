@@ -586,14 +586,14 @@ class DoctorSearchHelper:
                         not (request.query_params.get('procedure_ids') or request.query_params.get('procedure_category_ids')):
                     is_insurance_covered = True
 
-                if request and request.user and request.user.active_insurance and \
+                if request and request.user and not request.user.is_anonymous and request.user.active_insurance and \
                         not doctor.is_gyno_limit_breach(request.user.active_insurance) and is_insurance_covered:
                     is_insurance_covered = True
                 else:
                     is_insurance_covered = False
                     insurance_error = "You have already utilised {} Gynaecologist consultations available in your OPD Insurance Plan.".format(settings.INSURANCE_GYNECOLOGIST_LIMIT)
 
-                if request and request.user and request.user.active_insurance and \
+                if request and request.user and not request.user.is_anonymous and request.user.active_insurance and \
                         not doctor.is_onco_limit_breach(request.user.active_insurance) and is_insurance_covered:
                     is_insurance_covered = True
                 else:
