@@ -1519,6 +1519,7 @@ class DoctorClinicTiming(auth_model.TimeStampedModel):
     mrp = models.PositiveSmallIntegerField(blank=False, null=True)
     type = models.IntegerField(default=1, choices=TYPE_CHOICES)
     cod_deal_price = models.PositiveSmallIntegerField(blank=True, null=True)
+    insurance_fees = models.PositiveSmallIntegerField(blank=True, null=True)
     # followup_duration = models.PositiveSmallIntegerField(blank=False, null=True)
     # followup_charges = models.PositiveSmallIntegerField(blank=False, null=True)
 
@@ -2759,7 +2760,6 @@ class OpdAppointment(auth_model.TimeStampedModel, CouponsMixin, OpdAppointmentIn
     def save_merchant_payout(self):
         if self.payment_type in [OpdAppointment.COD]:
             raise Exception("Cannot create payout for COD appointments")
-
         payout_amount = self.fees
         tds = self.get_tds_amount()
 
@@ -2932,7 +2932,7 @@ class OpdAppointment(auth_model.TimeStampedModel, CouponsMixin, OpdAppointmentIn
         procedures = [
             {"name": str(procedure["name"]), "mrp": str(procedure["mrp"]),
              "deal_price": str(procedure["deal_price"]),
-             "dp_price": 0 if not procedure["agreed_price"] else None,
+             "dp_price": "Free" if not procedure["agreed_price"] else None,
              "convenience_charges": procedure["deal_price"] if not procedure["agreed_price"] else None,
              "discount": str(procedure["discount"]), "agreed_price": str(procedure["agreed_price"])} for procedure in
             procedures]
@@ -2988,13 +2988,14 @@ class OpdAppointment(auth_model.TimeStampedModel, CouponsMixin, OpdAppointmentIn
                     effective_price = doctor_clinic_timing.deal_price - coupon_discount
             deal_price = doctor_clinic_timing.deal_price
             mrp = doctor_clinic_timing.mrp
-            fees = doctor_clinic_timing.fees
+            fees = doctor_clinic_timing.insurance_fees if doctor_clinic_timing.insurance_fees and doctor_clinic_timing.insurance_fees > 0 else doctor_clinic_timing.fees
         else:
             total_deal_price, total_agreed_price, total_mrp = cls.get_procedure_prices(procedures, doctor,
                                                                                         selected_hospital,
                                                                                         doctor_clinic_timing)
             if data.get("payment_type") == cls.INSURANCE:
                 effective_price = total_deal_price
+                fees = doctor_clinic_timing.fees
             elif data.get("payment_type") in [cls.PREPAID]:
                 coupon_discount, coupon_cashback, coupon_list, random_coupon_list = Coupon.get_total_deduction(data, total_deal_price)
                 if coupon_discount >= total_deal_price:
@@ -3021,7 +3022,8 @@ class OpdAppointment(auth_model.TimeStampedModel, CouponsMixin, OpdAppointmentIn
             "consultation" : {
                 "deal_price": doctor_clinic_timing.deal_price,
                 "mrp": doctor_clinic_timing.mrp,
-                "fees": doctor_clinic_timing.fees
+                "fees": doctor_clinic_timing.fees,
+                "insurance_fees": doctor_clinic_timing.insurance_fees
             },
             "coupon_data" : { "random_coupon_list" : random_coupon_list }
         }
