@@ -13,6 +13,7 @@ class LabTestTable(tables.Table):
     MRP_TEMPLATE = '<input disabled id="mrp" class="mrp input-sm" maxlength="10" name="mrp" type="number" value={{ value|default_if_none:"" }} >'
     CUSTOM_AGREED_TEMPLATE = '''<input disabled  class="custom_agreed_price input-sm" maxlength="10" name="custom_agreed_price" type="number" value={{ value|default_if_none:"" }} >'''
     CUSTOM_DEAL_TEMPLATE = '''<input disabled  class="custom_deal_price input-sm"  maxlength="10" name="custom_deal_price" type="number" value={{ value|default_if_none:"" }} >'''
+    CUSTOM_INSURANCE_AGREED_TEMPLATE = '''<input disabled  class="insurance_agreed_price input-sm"  maxlength="10" name="insurance_agreed_price" type="number" value={{ value|default_if_none:"" }} >'''
 
     id = tables.Column(attrs={'td': {'class': 'hidden'}, 'th': {'class': 'hidden'}},
                        orderable=False)
@@ -25,9 +26,11 @@ class LabTestTable(tables.Table):
     custom_agreed_price = tables.TemplateColumn(CUSTOM_AGREED_TEMPLATE)
     computed_deal_price = tables.Column()
     custom_deal_price = tables.TemplateColumn(CUSTOM_DEAL_TEMPLATE)
+    insurance_agreed_price = tables.TemplateColumn(CUSTOM_INSURANCE_AGREED_TEMPLATE)
     edit = tables.TemplateColumn('<button class="edit-row btn btn-danger">Edit</button><button class="save-row btn btn-primary hidden">Save</button>',
                                  verbose_name=u'Edit',
                                  orderable=False)
+
 
     def render_enabled(self, record):
         if record.enabled:
@@ -39,7 +42,7 @@ class LabTestTable(tables.Table):
     class Meta:
         model = AvailableLabTest
         template_name = 'table.html'
-        fields = ('id', 'enabled', 'test', 'mrp', 'computed_agreed_price', 'custom_agreed_price', 'computed_deal_price', 'custom_deal_price', 'edit')
+        fields = ('id', 'enabled', 'test', 'mrp', 'computed_agreed_price', 'custom_agreed_price', 'computed_deal_price', 'custom_deal_price', 'insurance_agreed_price', 'edit')
         row_attrs = {'data-id': lambda record: record.pk, 'data-test-id': lambda record: record.test.id}
         attrs = {'class':'table table-condensed table-striped'}
 

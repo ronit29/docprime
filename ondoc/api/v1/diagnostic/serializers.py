@@ -376,7 +376,7 @@ class AvailableLabTestPackageSerializer(serializers.ModelSerializer):
         model = AvailableLabTest
         fields = ('test_id', 'mrp', 'test', 'agreed_price', 'deal_price', 'enabled', 'is_home_collection_enabled',
                   'package', 'parameters', 'is_package', 'number_of_tests', 'why', 'pre_test_info', 'expected_tat',
-                  'hide_price', 'included_in_user_plan', 'insurance', 'is_price_zero')
+                  'hide_price', 'included_in_user_plan', 'insurance', 'is_price_zero', 'insurance_agreed_price')
 
 class AvailableLabTestSerializer(serializers.ModelSerializer):
     test = LabTestSerializer()
@@ -446,7 +446,7 @@ class AvailableLabTestSerializer(serializers.ModelSerializer):
     class Meta:
         model = AvailableLabTest
         fields = ('test_id', 'mrp', 'test', 'agreed_price', 'deal_price', 'enabled', 'is_home_collection_enabled',
-                  'insurance', 'is_package', 'included_in_user_plan', 'is_price_zero')
+                  'insurance', 'is_package', 'included_in_user_plan', 'is_price_zero', 'insurance_agreed_price')
 
     def get_is_package(self, obj):
         return obj.test.is_package

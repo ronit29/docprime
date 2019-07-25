@@ -342,6 +342,10 @@ class IpdProcedureLead(auth_model.TimeStampedModel):
         elif self.data and self.data.get('lab_appointment_id', None):
             appointment_obj = LabAppointment.objects.filter(id=self.data.get('lab_appointment_id')).first()
 
+        latest_virtual_appointment = self.virtual_appointment.all().order_by('-id').first()
+        if latest_virtual_appointment:
+            appointment_obj = latest_virtual_appointment
+
         if appointment_obj:
             appointment_time = appointment_obj.time_slot_start.timestamp()
 
