@@ -200,17 +200,6 @@ class DoctorClinicIpdProcedureInline(nested_admin.NestedTabularInline):
     autocomplete_fields = ['ipd_procedure']
 
 
-class PotentialDoctorClinicIpdProcedureResource(resources.ModelResource):
-
-    class Meta:
-        model = DoctorClinicIpdProcedure
-        fields = ('ipd_procedure', 'doctor_clinic')
-
-
-class DoctorClinicIpdProcedureAdmin(ImportExportModelAdmin):
-    resource_class = PotentialDoctorClinicIpdProcedureResource
-
-
 class DoctorClinicTimingInline(nested_admin.NestedTabularInline):
     model = DoctorClinicTiming
     form = DoctorClinicTimingForm
