@@ -3056,6 +3056,8 @@ class OpdAppointment(auth_model.TimeStampedModel, CouponsMixin, OpdAppointmentIn
         if data.get("payment_type") == cls.COD:
             effective_price = 0
             coupon_discount, coupon_cashback, coupon_list, random_coupon_list = 0, 0, [], []
+            deal_price = doctor_clinic_timing.dct_cod_deal_price()
+
 
         return {
             "deal_price": deal_price,
@@ -3069,6 +3071,8 @@ class OpdAppointment(auth_model.TimeStampedModel, CouponsMixin, OpdAppointmentIn
                 "deal_price": doctor_clinic_timing.deal_price,
                 "mrp": doctor_clinic_timing.mrp,
                 "fees": doctor_clinic_timing.fees,
+                "cod_deal_price": doctor_clinic_timing.dct_cod_deal_price(),
+                "is_enabled_for_cod": doctor_clinic_timing.is_enabled_for_cod(),
                 "insurance_fees": doctor_clinic_timing.insurance_fees
             },
             "coupon_data" : { "random_coupon_list" : random_coupon_list }
