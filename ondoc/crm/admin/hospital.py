@@ -14,7 +14,8 @@ from .common import *
 from ondoc.crm.constants import constants
 from django.utils.safestring import mark_safe
 from django.contrib.admin import SimpleListFilter
-from ondoc.authentication.models import GenericAdmin, User, QCModel, DoctorNumber, AssociatedMerchant, SPOCDetails
+from ondoc.authentication.models import GenericAdmin, User, QCModel, DoctorNumber, AssociatedMerchant, SPOCDetails, \
+    GenericQuestionAnswer
 from ondoc.authentication.admin import SPOCDetailsInline
 from django import forms
 from ondoc.api.v1.utils import GenericAdminEntity
@@ -428,13 +429,38 @@ class HospCityFilter(SimpleListFilter):
             return queryset.filter(city__iexact=self.value()).distinct()
 
 
+class QuestionAnswerInline(GenericTabularInline):
+    model = GenericQuestionAnswer
+    extra = 0
+    can_delete = True
+    verbose_name = "FAQ"
+    verbose_name_plural = "FAQs"
+    fields = ['add_or_change_link', 'preview']
+    readonly_fields = ['add_or_change_link', 'preview']
+
+    def add_or_change_link(self, obj):
+        if obj and obj.id:
+            url = reverse('admin:authentication_genericquestionanswer_change', kwargs={"object_id": obj.id})
+        else:
+            url = reverse('admin:authentication_genericquestionanswer_add')
+        final_url = "<a href='{}' target=_blank>Click Here</a>".format(url)
+        return mark_safe(final_url)
+    add_or_change_link.short_description = "Link"
+
+    def preview(self, obj):
+        result = None
+        if obj and obj.id:
+            result = "{}".format(obj.question)
+        return result
+
+
 class HospitalAdmin(admin.GeoModelAdmin, VersionAdmin, ActionAdmin, QCPemAdmin):
     list_filter = ('data_status', 'welcome_calling_done', 'enabled_for_online_booking', 'enabled', CreatedByFilter,
                    HospCityFilter)
-    readonly_fields = ('source', 'batch', 'associated_doctors', 'is_live', 'matrix_lead_id', 'city', 'state',)
+    readonly_fields = ('source', 'batch', 'associated_doctors', 'is_live', 'matrix_lead_id', 'city', 'state', 'live_seo_url')
     exclude = ('search_key', 'live_at', 'qc_approved_at', 'disabled_at', 'physical_agreement_signed_at',
                'welcome_calling_done_at', 'provider_encrypt', 'provider_encrypted_by', 'encryption_hint', 'encrypted_hospital_id', 'is_big_hospital')
-    list_display = ('name', 'city', 'is_live', 'updated_at', 'data_status', 'welcome_calling_done', 'doctor_count',
+    list_display = ('name', 'locality', 'city', 'is_live', 'updated_at', 'data_status', 'welcome_calling_done', 'doctor_count',
                     'list_created_by', 'list_assigned_to')
     form = HospitalForm
     search_fields = ['name']
@@ -452,6 +478,7 @@ class HospitalAdmin(admin.GeoModelAdmin, VersionAdmin, ActionAdmin, QCPemAdmin):
         HospitalImageInline,
         HospitalDocumentInline,
         HospitalCertificationInline,
+        QuestionAnswerInline,
         GenericAdminInline,
         SPOCDetailsInline,
         AssociatedMerchantInline,
@@ -494,6 +521,22 @@ class HospitalAdmin(admin.GeoModelAdmin, VersionAdmin, ActionAdmin, QCPemAdmin):
             return mark_safe(html)
         else:
             return ''
+
+    def live_seo_url(self, instance):
+        if instance.id:
+            from ondoc.location.models import EntityUrls
+            entity_obj = EntityUrls.objects.filter(sitemap_identifier=EntityUrls.SitemapIdentifier.HOSPITAL_PAGE,
+                                                   is_valid=True, entity_id=instance.id).first()
+            hospital_url = None
+            if entity_obj:
+                hospital_url = "{}/{}".format(settings.BASE_URL, entity_obj.url)
+            if hospital_url:
+                html = "<ul style='margin-left:0px !important'>"
+                html += "<li><a target='_blank' href='{}'>Link</a></li>".format(hospital_url)
+                html += "</ul>"
+                return mark_safe(html)
+
+        return ''
 
     def save_model(self, request, obj, form, change):
         if not obj.created_by:
@@ -646,3 +689,15 @@ class CommonHospitalAdmin(admin.ModelAdmin):
     class Meta:
         model = CommonHospital
         fields = '__all__'
+
+
+class GenericQuestionAnswerForm(forms.ModelForm):
+
+    class Media:
+        extend = True
+        js = ('https://cdn.ckeditor.com/4.11.4/standard-all/ckeditor.js', 'q_a/js/init.js')
+        css = {'all': ('q_a/css/style.css',)}
+
+
+class GenericQuestionAnswerAdmin(admin.ModelAdmin):
+    form = GenericQuestionAnswerForm
