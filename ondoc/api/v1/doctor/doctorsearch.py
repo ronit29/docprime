@@ -598,7 +598,7 @@ class DoctorSearchHelper:
                     is_insurance_covered = True
                 else:
                     is_insurance_covered = False
-                    insurance_error = "Gynocologist limit exceeded of limit {}".format(
+                    insurance_error = "Oncologist limit exceeded of limit {}".format(
                         settings.INSURANCE_ONCOLOGIST_LIMIT)
 
                 hospitals = [{
