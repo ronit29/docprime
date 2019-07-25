@@ -264,15 +264,18 @@ class IpdProcedureLead(auth_model.TimeStampedModel):
     def app_commit_tasks(self, send_lead_email, update_status_in_matrix=False, check_for_validity=False):
         from ondoc.notification.tasks import send_ipd_procedure_lead_mail
         from ondoc.matrix.tasks import update_onboarding_qcstatus_to_matrix, check_for_ipd_lead_validity
+        from django.utils import timezone
         send_ipd_procedure_lead_mail({'obj_id': self.id, 'send_email': send_lead_email})
         if update_status_in_matrix:
             update_onboarding_qcstatus_to_matrix.apply_async(({'obj_type': self.__class__.__name__, 'obj_id': self.id}
                                                               ,), countdown=5)
         if check_for_validity:
-            check_for_ipd_lead_validity.apply_async(({'obj_type': self.__class__.__name__, 'obj_id': self.id},))
+            check_for_ipd_lead_validity.apply_async(({'obj_type': self.__class__.__name__, 'obj_id': self.id},),
+                                                    eta=timezone.now() + timezone.timedelta(
+                                                        minutes=settings.LEAD_VALIDITY_BUFFER_TIME))
 
     def validate_lead(self):
-        if self.user and self.user.is_valid_lead(self.created_at):
+        if self.user and self.user.is_valid_lead(self.created_at, check_ipd_lead=True):
             self.is_valid = True
             self.save()
 
