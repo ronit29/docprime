@@ -125,9 +125,11 @@
                         Platform Convenience Charges
                     </th>
                     {% endif %}
+                    {% if instance.fees %}
                     <th style="border: 1px solid black;">
                         Discount
                     </th>
+                    {% endif %}
                     <th style="border: 1px solid black;">
                         Grand Total
                     </th>
@@ -155,9 +157,11 @@
                         {{procedure.convenience_charges}}
                     </td>
                     {% endif %}
+                    {% if instance.fees %}
                     <td style="border: 1px solid black;text-align: center;">
                         {{procedure.discount}}
                     </td>
+                    {% endif %}
                     <td style="border: 1px solid black;text-align: center;">
                         {{procedure.deal_price}}
                     </td>
@@ -167,7 +171,7 @@
 		{% if show_amounts %}
                 {% if coupon_discount %}
                 <tr>
-                    <td colspan="{% if not instance.fees %}6{% else %}4{% endif %}" style="border: 1px solid black;text-align: center;">
+                    <td colspan="{% if not instance.fees %}5{% else %}4{% endif %}" style="border: 1px solid black;text-align: center;">
                         Coupon Discount
                     </td>
                     <td style="border: 1px solid black;text-align: center;">
@@ -176,7 +180,7 @@
                 </tr>
                 {% endif %}
                 <tr>
-                    <td colspan="{% if not instance.fees %}6{% else %}4{% endif %}" style="border: 1px solid black;text-align: center;">
+                    <td colspan="{% if not instance.fees %}5{% else %}4{% endif %}" style="border: 1px solid black;text-align: center;">
                         {% if instance.payment_type == 2 %}
                                 Amount To Be Paid
                             {% else %}

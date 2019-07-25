@@ -1389,6 +1389,7 @@ class AvailableLabTest(TimeStampedModel):
     supplier_price = models.DecimalField(default=None, max_digits=10, decimal_places=2, null=True, blank=True)
     desired_docprime_price = models.DecimalField(default=None, max_digits=10, decimal_places=2, null=True, blank=True)
     rating = GenericRelation(ratings_models.RatingsReview)
+    insurance_agreed_price = models.DecimalField(max_digits=10, decimal_places=2, default=None, null=True, blank=True)
 
     def get_deal_price(self):
         return self.custom_deal_price if self.custom_deal_price else self.computed_deal_price
@@ -1798,19 +1799,13 @@ class LabAppointment(TimeStampedModel, CouponsMixin, LabAppointmentInvoiceMixin,
                 if all([x.is_cancellable for x in self.tests.all()]):
                     allowed += [self.CANCELLED]
         if user_type == User.DOCTOR and self.time_slot_start.date() >= current_datetime.date():
-            perm_queryset = auth_model.GenericLabAdmin.objects.filter(is_disabled=False, user=request.user)
-            if perm_queryset.first():
-                doc_permission = perm_queryset.first()
-                if doc_permission.write_permission or doc_permission.super_user_permission:
-                    if self.status in [self.BOOKED, self.RESCHEDULED_PATIENT]:
-                        allowed = [self.ACCEPTED, self.RESCHEDULED_LAB]
-                    elif self.status == self.ACCEPTED:
-                        allowed = [self.RESCHEDULED_LAB, self.COMPLETED]
-                    elif self.status == self.RESCHEDULED_LAB:
-                        allowed = [self.ACCEPTED]
+            if self.status in [self.BOOKED, self.RESCHEDULED_PATIENT]:
+                allowed = [self.ACCEPTED, self.RESCHEDULED_LAB]
+            elif self.status == self.ACCEPTED:
+                allowed = [self.RESCHEDULED_LAB, self.COMPLETED]
+            elif self.status == self.RESCHEDULED_LAB:
+                allowed = [self.ACCEPTED]
 
-            # if self.status in [self.BOOKED]:
-            #     allowed = [self.COMPLETED]
         return allowed
 
     def is_to_send_notification(self, database_instance):
@@ -2397,12 +2392,14 @@ class LabAppointment(TimeStampedModel, CouponsMixin, LabAppointmentInvoiceMixin,
                                                                                      total_deal_price=Sum(
                                                                                          deal_price_calculation),
                                                                                      total_agreed_price=Sum(
-                                                                                         agreed_price_calculation))
-        total_agreed = total_deal_price = total_mrp = effective_price = home_pickup_charges = 0
+                                                                                         agreed_price_calculation),
+                                                                                     total_insurance_agreed_price=Sum('insurance_agreed_price'))
+        total_insurance_agreed_price = total_agreed = total_deal_price = total_mrp = effective_price = home_pickup_charges = 0
         if temp_lab_test:
             total_mrp = temp_lab_test[0].get("total_mrp", 0)
             total_agreed = temp_lab_test[0].get("total_agreed_price", 0)
             total_deal_price = temp_lab_test[0].get("total_deal_price", 0)
+            total_insurance_agreed_price = temp_lab_test[0].get("total_insurance_agreed_price", 0)
             effective_price = total_deal_price
             if data["is_home_pickup"] and data["lab"].is_home_collection_enabled:
                 effective_price += data["lab"].home_pickup_charges
@@ -2422,6 +2419,7 @@ class LabAppointment(TimeStampedModel, CouponsMixin, LabAppointmentInvoiceMixin,
 
         if data.get("payment_type") in [OpdAppointment.INSURANCE]:
             effective_price = effective_price
+            total_agreed = total_insurance_agreed_price if total_insurance_agreed_price > 0 else total_agreed
             coupon_discount, coupon_cashback, coupon_list, random_coupon_list = 0, 0, [], []
 
         return {

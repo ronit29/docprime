@@ -524,7 +524,7 @@ class UserProfile(TimeStampedModel):
     
     profile_image = models.ImageField(upload_to='users/images', height_field=None, width_field=None, blank=True, null=True)
     whatsapp_optin = models.NullBooleanField(default=None) # optin check of the whatsapp
-    whatsapp_is_declined = models.BooleanField(default=False) # flag to whether show whatsapp pop up or not.
+    whatsapp_is_declined = models.BooleanField(default=False)  # flag to whether show whatsapp pop up or not.
 
     def __str__(self):
         return "{}-{}".format(self.name, self.id)
@@ -1684,6 +1684,13 @@ class Merchant(TimeStampedModel):
     INPROCESS = 2
     COMPLETE = 3
     FAILURE = 4
+    NEFT = 0
+    IFT = 1
+    IMPS = 2
+
+    PAYMENT_CHOICES = ( (NEFT,'NEFT'),(IFT, 'IFT'),
+         (IMPS, 'IMPS'))
+
     CREATION_STATUS_CHOICES = ((NOT_INITIATED, 'Not Initiated'),
         (INITIATED,'Initiated'),(INPROCESS, 'In Progress'),
          (COMPLETE, 'Complete'), (FAILURE, 'Failure')
@@ -1717,6 +1724,7 @@ class Merchant(TimeStampedModel):
     pg_status = models.PositiveIntegerField(choices=CREATION_STATUS_CHOICES, default=NOT_INITIATED, editable=False)
     api_response = JSONField(blank=True, null=True, editable=False)
     enable_for_tds_deduction = models.BooleanField(default=False)
+    payment_type = models.PositiveIntegerField(choices=PAYMENT_CHOICES, null=True, blank=True)
 
     class Meta:
         db_table = 'merchant'
@@ -1726,8 +1734,8 @@ class Merchant(TimeStampedModel):
 
     def save(self, *args, **kwargs):
         if self.verified_by_finance and (self.pg_status == self.NOT_INITIATED or self.pg_status == self.FAILURE):
-            pass
-            #self.create_in_pg()
+            #pass
+            self.create_in_pg()
 
         super().save(*args, **kwargs)
 
@@ -1760,7 +1768,7 @@ class Merchant(TimeStampedModel):
         request_payload["IFSC"] = self.ifsc_code
         request_payload["Bene_A/c No"] = self.account_number
         request_payload["Bene Bank"] = None
-        request_payload["PaymentType"] = None
+        request_payload["PaymentType"] = self.PAYMENT_CHOICES[self.payment_type][1] if self.payment_type else None
         request_payload["isBulk"] = "0"
 
         #from ondoc.api.v1.utils import payout_checksum
@@ -1774,10 +1782,19 @@ class Merchant(TimeStampedModel):
                                                                               'Content-Type': 'application/json'})
 
         if response.status_code == status.HTTP_200_OK:
-            resp_data = response.json()
-            self.api_response = resp_data
-            if resp_data.get('StatusCode') and resp_data.get('StatusCode') in [1,2,3,4]:
-                self.pg_status = resp_data.get('StatusCode')
+            self.api_response = response.json()
+
+            if response.json():
+                for data in response.json():
+                    if data.get('StatusCode') and data.get('StatusCode') > 0:
+                        if self.pg_status == 0:
+                            self.pg_status = data.get('StatusCode')
+                        elif data.get('StatusCode') < self.pg_status:
+                            self.pg_status = data.get('StatusCode')
+
+            # if resp_data.get('StatusCode') and resp_data.get('StatusCode') in [1,2,3,4]:
+            #     self.pg_status = resp_data.get('StatusCode')
+
 
     @classmethod
     def get_abbreviation(cls, state_name):
@@ -1822,7 +1839,7 @@ class Merchant(TimeStampedModel):
 
     @classmethod
     def update_status_from_pg(cls):
-        merchant = Merchant.objects.filter(pg_status__in=[cls.NOT_INITIATED, cls.INITIATED, cls.INPROCESS, cls.FAILURE])
+        merchant = Merchant.objects.filter(pg_status__in=[cls.NOT_INITIATED, cls.INITIATED, cls.INPROCESS, cls.FAILURE], verified_by_finance=True)
         for data in merchant:
             resp_data = None
             request_payload = {"beneCode": str(data.pk)}
@@ -1831,11 +1848,19 @@ class Merchant(TimeStampedModel):
             response = requests.post(url, data=json.dumps(request_payload), headers={'auth': bene_status_token,
                                                                                      'Content-Type': 'application/json'})
             if response.status_code == status.HTTP_200_OK:
-                resp_data = response.json()
-                data.api_response = resp_data
-                if resp_data.get('statusCode') and resp_data.get('statusCode') in [cls.INITIATED, cls.INPROCESS]:
-                    data.pg_status = resp_data.get('statusCode')
+                data.api_response = response.json()
+                status_code = set()
+                if response.json():
+                    for resp in response.json():
+                        if resp.get('statusCode'):
+                            status_code.add(resp.get('statusCode'))
+                    data.pg_status = min(status_code) if status_code else data.pg_status
                     data.save()
+
+                # data.api_response = resp_data[0]
+                # if resp_data[0].get('statusCode') and resp_data[0].get('statusCode') in [cls.INITIATED, cls.INPROCESS]:
+                #     data.pg_status = resp_data[0].get('statusCode')
+                #     data.save()
 
 
 class MerchantNetRevenue(TimeStampedModel):

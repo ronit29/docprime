@@ -1061,7 +1061,7 @@ class PgTransaction(TimeStampedModel):
         return encrypted_message_digest
 
     def is_preauth(self):
-        return self.status_type == 'TXN_AUTHORIZE'
+        return self.status_type == 'TXN_AUTHORIZE' or self.status_type == '27'
 
     class Meta:
         db_table = "pg_transaction"
