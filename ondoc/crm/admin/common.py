@@ -535,7 +535,7 @@ class MerchantPayoutAdmin(MediaImportMixin, VersionAdmin):
     form = MerchantPayoutForm
     model = MerchantPayout
     fields = ['id','booking_type', 'payment_mode','charged_amount', 'updated_at', 'created_at', 'payable_amount', 'tds_amount', 'status', 'payout_time', 'paid_to',
-              'appointment_id', 'get_billed_to', 'get_merchant', 'process_payout', 'type', 'utr_no', 'amount_paid','api_response','pg_status','status_api_response', 'duplicate_of', 'recreate_payout']
+              'appointment_id', 'get_billed_to', 'get_merchant', 'process_payout', 'type', 'utr_no', 'amount_paid','api_response','pg_status','status_api_response', 'duplicate_of', 'recreate_payout', 'remarks']
     list_display = ('id', 'status', 'payable_amount', 'appointment_id', 'doc_lab_name', 'booking_type')
     search_fields = ['name', 'id', 'appointment_id']
     list_filter = ['status', 'booking_type']
@@ -563,7 +563,7 @@ class MerchantPayoutAdmin(MediaImportMixin, VersionAdmin):
         if obj and obj.status == MerchantPayout.PENDING:
             editable_fields += ['type', 'amount_paid','payment_mode']
         if not obj or not obj.utr_no:
-            editable_fields += ['utr_no']
+            editable_fields += ['utr_no', 'remarks']
 
         readonly = [f.name for f in self.model._meta.fields if f.name not in editable_fields]
         return base + readonly
