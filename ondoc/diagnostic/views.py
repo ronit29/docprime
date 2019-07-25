@@ -101,6 +101,7 @@ def availablelabtestajaxsave(request):
                     record.custom_agreed_price = data.get('custom_agreed_price')
                     record.custom_deal_price = data.get('custom_deal_price')
                     record.enabled = data.get('enabled')
+                    record.insurance_agreed_price = data.get('insurance_agreed_price')
                     record.save()
                     # return JsonResponse({'success': 1, 'id': id, 'computed_agreed_price': data['computed_agreed_price'],'computed_deal_price': data['computed_deal_price']})
                     return JsonResponse({'success': 1, 'id': id, 'computed_agreed_price': record.computed_agreed_price,'computed_deal_price': record.computed_deal_price})
