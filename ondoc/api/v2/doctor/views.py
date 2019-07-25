@@ -2,6 +2,7 @@ from uuid import UUID
 from ondoc.doctor import models as doc_models
 from ondoc.diagnostic import models as lab_models
 from ondoc.authentication import models as auth_models
+from ondoc.provider import models as prov_models
 from ondoc.matrix.tasks import decrypted_invoice_pdfs, decrypted_prescription_pdfs
 from django.utils.safestring import mark_safe
 from . import serializers
@@ -1112,14 +1113,42 @@ class PartnersAppInvoicePDF(viewsets.GenericViewSet):
 
 class PartnerEConsultationViewSet(viewsets.GenericViewSet):
 
+    authentication_classes = (JWTAuthentication,)
+    permission_classes = (IsAuthenticated, v1_utils.IsDoctor)
+
+    def get_queryset(self):
+        return None
+
     def create(self, request):
         serializer = serializers.EConsultCreateBodySerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         valid_data = serializer.validated_data
-        resp = {}
+        e_obj = prov_models.EConsultation(doctor=valid_data['doctor_obj'], created_by=request.user,
+                                  fees=valid_data['fees'], validity=valid_data.get('validity', None))
+        if valid_data.get('offline_p') and valid_data['offline_p']:
+            e_obj.offline_patient = valid_data['patient_obj']
+        else:
+            e_obj.online_patient = valid_data['patient_obj']
+
+        e_obj.save()
+        resp_data = serializers.EConsultListSerializer(e_obj, context={'request': request})
+        return Response(resp_data.data)
 
     def list(self, request):
-        pass
+        id = request.query_params.get('id')
+        queryset = prov_models.EConsultation.objects.select_related('doctor', 'offline_patient', 'online_patient')\
+                                                    .filter(created_by=request.user).all()
+        if id:
+            # serializer = serializers.EConsultListSerializer(queryset.filter(id=id), context={'request': request})
+            queryset = queryset.filter(id=id)
+        serializer = serializers.EConsultListSerializer(queryset, context={'request': request}, many=True)
+        return Response(serializer.data)
 
-    def get(self, request):
-        pass
+    def share(self, request):
+        consult_id = request.query_params.get('id')
+        if not consult_id:
+            return Response({"error": "Consultation ID not provided"}, status=status.HTTP_400_BAD_REQUEST)
+        consultation = prov_models.EConsultation.objects.filter(id=consult_id).first()
+        if not consultation:
+            return Response({"error": "Consultation not Found"}, status=status.HTTP_404_NOT_FOUND)
+        return Response({})

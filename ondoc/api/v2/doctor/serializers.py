@@ -17,6 +17,8 @@ from ondoc.api.v1.diagnostic import serializers as v1_diagnostic_serailizers
 from dateutil.relativedelta import relativedelta
 from django.utils import timezone
 logger = logging.getLogger(__name__)
+from uuid import UUID
+from ondoc.provider import models as provider_models
 User = get_user_model()
 
 
@@ -597,10 +599,60 @@ class EConsultCreateBodySerializer(serializers.Serializer):
     validity = serializers.IntegerField(max_value=256, allow_null=True, required=False)
     doctor = serializers.IntegerField()
     patient = serializers.CharField()
-    fees = serializers.FloatField()
+    fees = serializers.FloatField(required=False)
 
     def validate(self, attrs):
         super().validate(attrs)
-        patient = doc_models.OfflinePatients.objects.filter()
-            raise serializers.ValidationError("valid invoice id is required")
+        attrs['offline_p'] = True
+        try:
+            patient_id = UUID(attrs.get('patient'), version=4)
+            patient = doc_models.OfflinePatients.objects.filter(id=patient_id).first()
+            attrs['offline_p'] = True
+        except ValueError:
+            patient_id = attrs.get('patient')
+            patient = UserProfile.objects.filter(id=patient_id).first()
+            attrs['offline_p'] = False
+        if not patient:
+            raise serializers.ValidationError("Patient not Found!")
+        attrs['patient_obj'] = patient
+        doc = doc_models.Doctor.objects.filter(id=attrs.get('doctor')).first()
+        if not doc:
+            raise serializers.ValidationError("Doctor not Found!")
+        attrs['doctor_obj'] = doc
         return attrs
+
+
+class EConsultListSerializer(serializers.ModelSerializer):
+    doctor_name = serializers.ReadOnlyField(source='doctor.name')
+    patient_name = serializers.SerializerMethodField()
+    status = serializers.SerializerMethodField()
+    patient_id = serializers.SerializerMethodField()
+
+    def get_patient_type(self, obj):
+        patient = None
+        if obj.offline_patient:
+            patient = obj.offline_patient
+        elif obj.online_patient:
+            patient = obj.online_patient
+        return patient
+
+    def get_patient_name(self, obj):
+        patient = self.get_patient_type(obj)
+        return str(patient.name)
+
+    def get_patient_id(self, obj):
+        patient = self.get_patient_type(obj)
+        return str(patient.id)
+
+    def get_status(self, obj):
+        status = 'past'
+        time_passed = timezone.now() - obj.created_at
+        if obj.validity and obj.validity > time_passed.days:
+            status = 'current'
+        return status
+
+    class Meta:
+        model = provider_models.EConsultation
+        fields = ('id', 'doctor_name', 'doctor_id', 'patient_id', 'patient_name', 'fees', 'validity', 'payment_status',
+                        'created_at', 'link', 'status')
+

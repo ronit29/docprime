@@ -4,7 +4,7 @@ from ondoc.authentication import models as auth_models
 # Create your models here.
 
 
-class EConsultation(auth_models.TimeStampedModel):
+class EConsultation(auth_models.TimeStampedModel, auth_models.CreatedByModel):
 
     PAYMENT_ACCEPTED = 1
     PAYMENT_PENDING = 0
