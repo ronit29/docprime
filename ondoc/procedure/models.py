@@ -236,7 +236,7 @@ class IpdProcedureLead(auth_model.TimeStampedModel):
         if self.matrix_city and not self.city:
             self.city = self.matrix_city.name
         if (self.first_name or self.last_name) and not self.name:
-            self.name = self.first_name + " " + self.last_name
+            self.name = self.first_name if self.first_name else "" + " " + self.last_name if self.last_name else ""
         if self.phone_number and not self.user:
             self.user = User.objects.filter(phone_number=self.phone_number, user_type=User.CONSUMER).first()
         send_lead_email = False
@@ -246,7 +246,7 @@ class IpdProcedureLead(auth_model.TimeStampedModel):
         if not self.id:
             send_lead_email = True
             push_to_history = True
-            if not self.is_valid:
+            if self.is_valid is not None and not self.is_valid:
                 check_for_validity = True
         else:
             database_obj = self.__class__.objects.filter(id=self.id).first()
@@ -264,15 +264,12 @@ class IpdProcedureLead(auth_model.TimeStampedModel):
     def app_commit_tasks(self, send_lead_email, update_status_in_matrix=False, check_for_validity=False):
         from ondoc.notification.tasks import send_ipd_procedure_lead_mail
         from ondoc.matrix.tasks import update_onboarding_qcstatus_to_matrix, check_for_ipd_lead_validity
-        from django.utils import timezone
         send_ipd_procedure_lead_mail({'obj_id': self.id, 'send_email': send_lead_email})
         if update_status_in_matrix:
             update_onboarding_qcstatus_to_matrix.apply_async(({'obj_type': self.__class__.__name__, 'obj_id': self.id}
                                                               ,), countdown=5)
         if check_for_validity:
-            check_for_ipd_lead_validity.apply_async(({'obj_type': self.__class__.__name__, 'obj_id': self.id}
-                                                     ,), eta=timezone.now() + timezone.timedelta(minutes=settings.LEAD_VALIDITY_BUFFER_TIME))
-
+            check_for_ipd_lead_validity.apply_async(({'obj_type': self.__class__.__name__, 'obj_id': self.id},))
 
     def validate_lead(self):
         if self.user and self.user.is_valid_lead(self.created_at):
