@@ -446,7 +446,7 @@ class DoctorSearchHelper:
                            "dc.id as doctor_clinic_id,  d.search_key, " \
                            "dct.id as doctor_clinic_timing_id,practicing_since, " \
                            "d.enabled_for_online_booking and dc.enabled_for_online_booking and h.enabled_for_online_booking as enabled_for_online_booking, " \
-                           "is_license_verified, priority,deal_price, h.welcome_calling_done, " \
+                           "is_license_verified, dc.priority,deal_price, h.welcome_calling_done, " \
                            "dc.hospital_id as hospital_id, d.search_score FROM doctor d " \
                            "INNER JOIN doctor_clinic dc ON d.id = dc.doctor_id and dc.enabled=true and d.is_live=true " \
                            "and d.is_test_doctor is False and d.is_internal is False " \
@@ -501,7 +501,7 @@ class DoctorSearchHelper:
             return
         for doctor_clinic_timing in doctor_clinic.availability.all():
             if doctor_clinic_timing.id == doctor_availability_mapping[doctor_clinic.doctor.id]:
-                return doctor_clinic_timing.dct_cod_deal_price(), doctor_clinic_timing.deal_price, doctor_clinic_timing.mrp
+                return doctor_clinic_timing.insurance_fees, doctor_clinic_timing.dct_cod_deal_price(), doctor_clinic_timing.deal_price, doctor_clinic_timing.mrp
                 # return doctor_hospital.deal_price
         return None
 
@@ -533,7 +533,7 @@ class DoctorSearchHelper:
             doctor_clinics = [doctor_clinic for doctor_clinic in doctor.doctor_clinics.all() if
                               doctor_clinic.hospital_id == doctor_clinic_mapping[doctor_clinic.doctor_id]]
             doctor_clinic = doctor_clinics[0]
-            filtered_cod_deal_price, filtered_deal_price, filtered_mrp = self.get_doctor_fees(doctor_clinic, doctor_availability_mapping)
+            filtered_insurance_fees, filtered_cod_deal_price, filtered_deal_price, filtered_mrp = self.get_doctor_fees(doctor_clinic, doctor_availability_mapping)
             # filtered_fees = self.get_doctor_fees(doctor, doctor_availability_mapping)
             min_deal_price = None
             min_price = dict()
@@ -692,6 +692,7 @@ class DoctorSearchHelper:
                 "deal_price": filtered_deal_price,
                 "cod_deal_price": filtered_cod_deal_price,
                 "enabled_for_cod": doctor_clinic.is_enabled_for_cod(),
+                "insurance_fees": filtered_insurance_fees,
                 "mrp": filtered_mrp,
                 "is_live": doctor.is_live,
                 "is_gold": is_gold,

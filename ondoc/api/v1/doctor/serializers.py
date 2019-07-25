@@ -8,7 +8,7 @@ from collections import defaultdict, OrderedDict
 from ondoc.api.v1.procedure.serializers import DoctorClinicProcedureSerializer, OpdAppointmentProcedureMappingSerializer
 from ondoc.api.v1.ratings.serializers import RatingsGraphSerializer
 from ondoc.cart.models import Cart
-from ondoc.common.models import Feature
+from ondoc.common.models import Feature, MatrixMappedCity
 from ondoc.doctor.models import (OpdAppointment, Doctor, Hospital, DoctorHospital, DoctorClinicTiming,
                                  DoctorAssociation,
                                  DoctorAward, DoctorDocument, DoctorEmail, DoctorExperience, DoctorImage,
@@ -17,7 +17,7 @@ from ondoc.doctor.models import (OpdAppointment, Doctor, Hospital, DoctorHospita
                                  CommonMedicalCondition, CommonSpecialization,
                                  DoctorPracticeSpecialization, DoctorClinic, OfflineOPDAppointments, OfflinePatients,
                                  CancellationReason, HealthInsuranceProvider, HospitalDocument, HospitalNetworkDocument,
-                                 AppointmentHistory, HospitalNetwork, ProviderEncrypt)
+                                 AppointmentHistory, HospitalNetwork, ProviderEncrypt, SimilarSpecializationGroup)
 from ondoc.diagnostic import models as lab_models
 from ondoc.authentication.models import UserProfile, DoctorNumber, GenericAdmin, GenericLabAdmin
 from django.db.models import Avg
@@ -558,7 +558,7 @@ class DoctorHospitalSerializer(serializers.ModelSerializer):
         fields = ('doctor', 'hospital_name', 'address','short_address', 'hospital_id', 'start', 'end', 'day', 'deal_price',
                   'discounted_fees', 'hospital_thumbnail', 'mrp', 'lat', 'long', 'id','enabled_for_online_booking',
                   'insurance', 'show_contact', 'enabled_for_cod', 'enabled_for_prepaid', 'is_price_zero', 'cod_deal_price', 'hospital_city',
-                  'url', 'fees')
+                  'url', 'fees', 'insurance_fees')
 
         # fields = ('doctor', 'hospital_name', 'address', 'hospital_id', 'start', 'end', 'day', 'deal_price', 'fees',
         #           'discounted_fees', 'hospital_thumbnail', 'mrp',)
@@ -852,6 +852,18 @@ class DoctorListSerializer(serializers.Serializer):
     gender = serializers.ChoiceField(choices=GENDER_CHOICES, required=False)
     availability = CommaSepratedToListField(required=False,  max_length=50, typecast_to=str)
     avg_ratings = CommaSepratedToListField(required=False,  max_length=50, typecast_to=str)
+    group_ids = CommaSepratedToListField(required=False,  max_length=50, typecast_to=str)
+
+    def validate(self, attrs):
+        if attrs.get('group_ids'):
+            q = SimilarSpecializationGroup.objects.prefetch_related('specializations').filter(
+                id__in=attrs.get('group_ids'))
+            temp = set()
+            for x in q:
+                for y in x.specializations.all():
+                    temp.add(str(y.id))
+            attrs['specialization_ids'] = list(temp)
+        return attrs
 
     def validate_hospital_id(self, attrs):
         try:
@@ -862,6 +874,16 @@ class DoctorListSerializer(serializers.Serializer):
         except:
             raise serializers.ValidationError('Invalid Hospital IDs')
         raise serializers.ValidationError('Invalid Hospital IDs')
+
+    def validate_group_ids(self, attrs):
+        try:
+            temp_attrs = [int(attr) for attr in attrs]
+            temp_attrs = set(temp_attrs)
+            if SimilarSpecializationGroup.objects.filter(id__in=temp_attrs, show_on_front_end=True).count() == len(temp_attrs):
+                return attrs
+        except:
+            raise serializers.ValidationError('Invalid Group IDs')
+        raise serializers.ValidationError('Invalid Group IDs')
 
     def validate_ipd_procedure_ids(self, attrs):
         try:
@@ -1403,8 +1425,14 @@ class DoctorAppointmentRetrieveSerializer(OpdAppointmentSerializer):
     hospital = HospitalModelSerializer()
     doctor = AppointmentRetrieveDoctorSerializer()
     mask_data = serializers.SerializerMethodField()
-    mrp = serializers.ReadOnlyField(source='fees')
+    # mrp = serializers.ReadOnlyField(source='fees')
+    mrp = serializers.SerializerMethodField()
     is_docprime = serializers.ReadOnlyField(default=True)
+
+    def get_mrp(self, obj):
+        mrp_fees = obj.fees if obj.fees else 0
+        mrp = obj.mrp if obj.payment_type == obj.COD else mrp_fees
+        return mrp
 
     def get_mask_data(self, obj):
         mask_number = obj.mask_number.all()[0] if obj.mask_number.all() else None
@@ -1970,23 +1998,27 @@ class TopHospitalForIpdProcedureSerializer(serializers.ModelSerializer):
 
 class HospitalDetailIpdProcedureSerializer(TopHospitalForIpdProcedureSerializer):
 
-    about = serializers.SerializerMethodField()
-    services = serializers.SerializerMethodField()
-    images = serializers.SerializerMethodField()
-    ipd_procedure_categories = serializers.SerializerMethodField()
-    other_network_hospitals = serializers.SerializerMethodField()
-    doctors = serializers.SerializerMethodField()
-    rating_graph = serializers.SerializerMethodField()
-    rating = serializers.SerializerMethodField()
-    display_rating_widget = serializers.SerializerMethodField()
-    opd_timings = serializers.SerializerMethodField()
-    contact_number = serializers.SerializerMethodField()
-    specialization_doctors = serializers.SerializerMethodField()
-    offers = serializers.SerializerMethodField()
-    show_popup = serializers.SerializerMethodField()
-    force_popup = serializers.SerializerMethodField()
-    new_about = serializers.SerializerMethodField()
-    all_specializations = serializers.SerializerMethodField()
+    about = serializers.SerializerMethodField(read_only=True)
+    services = serializers.SerializerMethodField(read_only=True)
+    images = serializers.SerializerMethodField(read_only=True)
+    ipd_procedure_categories = serializers.SerializerMethodField(read_only=True)
+    other_network_hospitals = serializers.SerializerMethodField(read_only=True)
+    doctors = serializers.SerializerMethodField(read_only=True)
+    rating_graph = serializers.SerializerMethodField(read_only=True)
+    rating = serializers.SerializerMethodField(read_only=True)
+    display_rating_widget = serializers.SerializerMethodField(read_only=True)
+    opd_timings = serializers.SerializerMethodField(read_only=True)
+    contact_number = serializers.SerializerMethodField(read_only=True)
+    specialization_doctors = serializers.SerializerMethodField(read_only=True)
+    offers = serializers.SerializerMethodField(read_only=True)
+    show_popup = serializers.SerializerMethodField(read_only=True)
+    force_popup = serializers.SerializerMethodField(read_only=True)
+    new_about = serializers.SerializerMethodField(read_only=True)
+    all_specializations = serializers.SerializerMethodField(read_only=True)
+    all_doctors = serializers.SerializerMethodField(read_only=True)
+    all_cities = serializers.SerializerMethodField(read_only=True)
+    question_answers = serializers.SerializerMethodField(read_only=True)
+    all_specialization_groups = serializers.SerializerMethodField(read_only=True)
 
     class Meta(TopHospitalForIpdProcedureSerializer.Meta):
         model = Hospital
@@ -1998,14 +2030,51 @@ class HospitalDetailIpdProcedureSerializer(TopHospitalForIpdProcedureSerializer)
                                                                      'contact_number', 'specialization_doctors',
                                                                      'offers', 'is_ipd_hospital', 'new_about',
                                                                      'show_popup', 'force_popup', 'enabled_for_prepaid',
-                                                                     'all_specializations')
+                                                                     'all_specializations', 'all_doctors', 'all_cities',
+                                                                     'question_answers', 'all_specialization_groups')
+
+    def get_question_answers(self, obj):
+        q = obj.question_answer.all()
+        return [{'id': x.id, 'name': x.question, 'answer': x.answer} for x in q]
+
+    def get_all_doctors(self, obj):
+        q = Doctor.objects.filter(is_live=True, doctor_clinics__enabled=True, doctor_clinics__hospital=obj).distinct().order_by('name')
+        return [{'id': x.id, 'name': x.name} for x in q]
+
+    def get_all_cities(self, obj):
+        return obj.get_all_cities()
 
     def get_all_specializations(self, obj):
         from ondoc.doctor.models import PracticeSpecialization
         from ondoc.api.v2.doctor.serializers import PracticeSpecializationSerializer
-        q = PracticeSpecialization.objects.filter(specialization__doctor__doctor_clinics__hospital=obj).distinct()
+        q = PracticeSpecialization.objects.filter(specialization__doctor__is_live=True,
+                                                  specialization__doctor__doctor_clinics__enabled=True,
+                                                  specialization__doctor__doctor_clinics__hospital=obj).order_by(
+            '-priority').distinct()
         return PracticeSpecializationSerializer(q, many=True).data
 
+    def get_all_specialization_groups(self, obj):
+        from ondoc.doctor.models import SimilarSpecializationGroup
+        from itertools import groupby
+        all_specilization_groups = list(
+            SimilarSpecializationGroup.objects.filter(specializations__specialization__doctor__is_live=True,
+                                                      specializations__specialization__doctor__doctor_clinics__enabled=True,
+                                                      specializations__specialization__doctor__doctor_clinics__hospital=obj,
+                                                      show_on_front_end=True).order_by(
+                '-specializations__priority').values('id', 'name', 'specializations'))
+        result = []
+        all_specilization_groups = sorted(all_specilization_groups, key=lambda a: a['id'])
+        for key, the_group in groupby(all_specilization_groups, key=lambda a: a['id']):
+            temp_group = list(the_group)
+            if len(temp_group) > 0:
+                one_ans = {}
+                one_ans['id'], one_ans['name'] = temp_group[0]['id'], temp_group[0]['name']
+                sepc = set()
+                for o in temp_group:
+                    sepc.add(o['specializations'])
+                one_ans['specialization_ids'] = list(sepc)
+                result.append(one_ans)
+        return result
 
     def get_show_popup(self, obj):
         request = self.context.get('request')
@@ -2068,16 +2137,25 @@ class HospitalDetailIpdProcedureSerializer(TopHospitalForIpdProcedureSerializer)
             doctor_clinic_ipd_mappings__doctor_clinic__enabled=True,
             doctor_clinic_ipd_mappings__doctor_clinic__hospital=obj,
             is_enabled=True).distinct()
+        procedure_ids = [x.id for x in queryset]
+        entity = self.context.get('entity', None)
+        city = None
+        ipd_entity_dict = {}
+        if entity:
+            city = entity.locality_value
+        if city:
+            ipd_entity_dict = IpdProcedure.get_locality_dict(procedure_ids, city=city)
         for ipd_procedure in queryset:
             for category_mapping in ipd_procedure.ipd_category_mappings.all():
                 if category_mapping.category.id in result:
                     result[category_mapping.category.id]['ipd_procedures'].append(
-                        {'id': ipd_procedure.id, 'name': ipd_procedure.name})
+                        {'id': ipd_procedure.id, 'name': ipd_procedure.name, 'url': ipd_entity_dict.get(ipd_procedure.id, None)})
                 else:
                     result[category_mapping.category.id] = {'id': category_mapping.category.id,
                                                             'name': category_mapping.category.name,
                                                             'ipd_procedures': [
-                                                                {'id': ipd_procedure.id, 'name': ipd_procedure.name}]}
+                                                                {'id': ipd_procedure.id, 'name': ipd_procedure.name,
+                                                                 'url': ipd_entity_dict.get(ipd_procedure.id, None)}]}
         return list(result.values())
 
     def get_other_network_hospitals(self, obj):
@@ -2213,6 +2291,11 @@ class IpdProcedureLeadSerializer(serializers.ModelSerializer):
     num_of_chats = serializers.IntegerField(min_value=0, required=False, default=None, allow_null=True)
     comments = serializers.CharField(required=False, default=None, allow_blank=True, allow_null=True)
     data = serializers.JSONField(required=False, default=None, allow_null=True)
+    first_name = serializers.CharField(max_length=100, required=False, allow_null=True, allow_blank=True)
+    last_name = serializers.CharField(max_length=100, required=False, allow_null=True, allow_blank=True)
+    requested_date_time = serializers.DateTimeField(required=False, default=None, allow_null=True)
+    matrix_city = serializers.PrimaryKeyRelatedField(queryset=MatrixMappedCity.objects.all(),
+                                                     required=False, allow_null=True)
 
     class Meta:
         model = IpdProcedureLead
@@ -2285,6 +2368,22 @@ class IpdLeadUpdateSerializer(serializers.Serializer):
 
     def validate(self, attrs):
         if not IpdProcedureLead.objects.filter(matrix_lead_id=attrs.get('matrix_lead_id')).exists():
+            raise serializers.ValidationError('Invalid Lead ID.')
+        return attrs
+
+
+class IpdLeadUpdateSerializerPopUp(serializers.Serializer):
+    id = serializers.IntegerField()
+    requested_date_time = serializers.DateTimeField(required=False, allow_null=True)
+    dob = serializers.DateField(required=False, allow_null=True)
+    hospital = serializers.PrimaryKeyRelatedField(queryset=Hospital.objects.filter(is_live=True), required=False, allow_null=True)
+    doctor = serializers.PrimaryKeyRelatedField(queryset=Doctor.objects.filter(is_live=True), required=False, allow_null=True)
+    city = serializers.CharField(required=False, allow_null=True, allow_blank=True)
+    matrix_city = serializers.PrimaryKeyRelatedField(queryset=MatrixMappedCity.objects.all(),
+                                                     required=False, allow_null=True)
+
+    def validate(self, attrs):
+        if not IpdProcedureLead.objects.filter(id=attrs.get('id')).exists():
             raise serializers.ValidationError('Invalid Lead ID.')
         return attrs
 

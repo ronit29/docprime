@@ -517,7 +517,7 @@ class UserProfile(TimeStampedModel):
     
     profile_image = models.ImageField(upload_to='users/images', height_field=None, width_field=None, blank=True, null=True)
     whatsapp_optin = models.NullBooleanField(default=None) # optin check of the whatsapp
-    whatsapp_is_declined = models.BooleanField(default=False) # flag to whether show whatsapp pop up or not.
+    whatsapp_is_declined = models.BooleanField(default=False)  # flag to whether show whatsapp pop up or not.
 
     def __str__(self):
         return "{}-{}".format(self.name, self.id)
@@ -1285,7 +1285,7 @@ class GenericAdmin(TimeStampedModel, CreatedByModel):
 
     @staticmethod
     def create_users_from_generic_admins():
-        all_admins_without_users = GenericAdmin.objects.filter(user__isnull=True, entity_type=GenericAdmin.HOSPITAL)[:100]
+        all_admins_without_users = GenericAdmin.objects.filter(user__isnull=True, entity_type=GenericAdmin.HOSPITAL).order_by('-updated_at')[:100]
         admins_phone_numbers = all_admins_without_users.values_list('phone_number', flat=True)
         users_for_admins = User.objects.filter(phone_number__in=admins_phone_numbers, user_type=User.DOCTOR)
         users_admin_dict = dict()
@@ -1677,6 +1677,13 @@ class Merchant(TimeStampedModel):
     INPROCESS = 2
     COMPLETE = 3
     FAILURE = 4
+    NEFT = 0
+    IFT = 1
+    IMPS = 2
+
+    PAYMENT_CHOICES = ( (NEFT,'NEFT'),(IFT, 'IFT'),
+         (IMPS, 'IMPS'))
+
     CREATION_STATUS_CHOICES = ((NOT_INITIATED, 'Not Initiated'),
         (INITIATED,'Initiated'),(INPROCESS, 'In Progress'),
          (COMPLETE, 'Complete'), (FAILURE, 'Failure')
@@ -1710,6 +1717,7 @@ class Merchant(TimeStampedModel):
     pg_status = models.PositiveIntegerField(choices=CREATION_STATUS_CHOICES, default=NOT_INITIATED, editable=False)
     api_response = JSONField(blank=True, null=True, editable=False)
     enable_for_tds_deduction = models.BooleanField(default=False)
+    payment_type = models.PositiveIntegerField(choices=PAYMENT_CHOICES, null=True, blank=True)
 
     class Meta:
         db_table = 'merchant'
@@ -1719,8 +1727,8 @@ class Merchant(TimeStampedModel):
 
     def save(self, *args, **kwargs):
         if self.verified_by_finance and (self.pg_status == self.NOT_INITIATED or self.pg_status == self.FAILURE):
-            pass
-            #self.create_in_pg()
+            #pass
+            self.create_in_pg()
 
         super().save(*args, **kwargs)
 
@@ -1753,7 +1761,7 @@ class Merchant(TimeStampedModel):
         request_payload["IFSC"] = self.ifsc_code
         request_payload["Bene_A/c No"] = self.account_number
         request_payload["Bene Bank"] = None
-        request_payload["PaymentType"] = None
+        request_payload["PaymentType"] = self.PAYMENT_CHOICES[self.payment_type][1] if self.payment_type else None
         request_payload["isBulk"] = "0"
 
         #from ondoc.api.v1.utils import payout_checksum
@@ -1767,10 +1775,19 @@ class Merchant(TimeStampedModel):
                                                                               'Content-Type': 'application/json'})
 
         if response.status_code == status.HTTP_200_OK:
-            resp_data = response.json()
-            self.api_response = resp_data
-            if resp_data.get('StatusCode') and resp_data.get('StatusCode') in [1,2,3,4]:
-                self.pg_status = resp_data.get('StatusCode')
+            self.api_response = response.json()
+
+            if response.json():
+                for data in response.json():
+                    if data.get('StatusCode') and data.get('StatusCode') > 0:
+                        if self.pg_status == 0:
+                            self.pg_status = data.get('StatusCode')
+                        elif data.get('StatusCode') < self.pg_status:
+                            self.pg_status = data.get('StatusCode')
+
+            # if resp_data.get('StatusCode') and resp_data.get('StatusCode') in [1,2,3,4]:
+            #     self.pg_status = resp_data.get('StatusCode')
+
 
     @classmethod
     def get_abbreviation(cls, state_name):
@@ -1815,7 +1832,7 @@ class Merchant(TimeStampedModel):
 
     @classmethod
     def update_status_from_pg(cls):
-        merchant = Merchant.objects.filter(pg_status__in=[cls.NOT_INITIATED, cls.INITIATED, cls.INPROCESS, cls.FAILURE])
+        merchant = Merchant.objects.filter(pg_status__in=[cls.NOT_INITIATED, cls.INITIATED, cls.INPROCESS, cls.FAILURE], verified_by_finance=True)
         for data in merchant:
             resp_data = None
             request_payload = {"beneCode": str(data.pk)}
@@ -1824,11 +1841,19 @@ class Merchant(TimeStampedModel):
             response = requests.post(url, data=json.dumps(request_payload), headers={'auth': bene_status_token,
                                                                                      'Content-Type': 'application/json'})
             if response.status_code == status.HTTP_200_OK:
-                resp_data = response.json()
-                data.api_response = resp_data
-                if resp_data.get('statusCode') and resp_data.get('statusCode') in [cls.INITIATED, cls.INPROCESS]:
-                    data.pg_status = resp_data.get('statusCode')
+                data.api_response = response.json()
+                status_code = set()
+                if response.json():
+                    for resp in response.json():
+                        if resp.get('statusCode'):
+                            status_code.add(resp.get('statusCode'))
+                    data.pg_status = min(status_code) if status_code else data.pg_status
                     data.save()
+
+                # data.api_response = resp_data[0]
+                # if resp_data[0].get('statusCode') and resp_data[0].get('statusCode') in [cls.INITIATED, cls.INPROCESS]:
+                #     data.pg_status = resp_data[0].get('statusCode')
+                #     data.save()
 
 
 class MerchantNetRevenue(TimeStampedModel):
@@ -1939,7 +1964,7 @@ class PhysicalAgreementSigned(models.Model):
 class RefundMixin(object):
 
     @transaction.atomic
-    def action_refund(self, refund_flag=1):
+    def action_refund(self, refund_flag=1, initiate_refund=1):
         from ondoc.doctor.models import OpdAppointment
         from ondoc.account.models import ConsumerAccount
         from ondoc.common.models import RefundDetails
@@ -1957,7 +1982,7 @@ class RefundMixin(object):
             consumer_account.credit_cancellation(self, product_id, wallet_refund, cashback_refund)
             if refund_flag:
                 ctx_obj = consumer_account.debit_refund()
-                ConsumerRefund.initiate_refund(self.user, ctx_obj)
+                ConsumerRefund.initiate_refund(self.user, ctx_obj) if initiate_refund else None
 
     def can_agent_refund(self, user):
         from ondoc.crm.constants import constants
@@ -2038,3 +2063,132 @@ class UserNumberUpdate(TimeStampedModel):
 
     class Meta:
         db_table = "user_number_updates"
+
+
+class UserProfileEmailUpdate(TimeStampedModel):
+    profile = models.ForeignKey(UserProfile, on_delete=models.DO_NOTHING, related_name="email_updates")
+    old_email = models.CharField(max_length=256, blank=False)
+    new_email = models.CharField(max_length=256, blank=False)
+    otp_verified = models.BooleanField(default=False)
+    is_successfull = models.BooleanField(default=False)
+    otp = models.IntegerField(null=True, blank=True)
+    otp_expiry = models.DateTimeField(default=None, null=True)
+
+    def __str__(self):
+        return str(self.profile)
+
+    def is_request_alive(self):
+        return timezone.now() <= self.otp_expiry
+
+    @classmethod
+    def can_be_changed(cls, user, new_email):
+        return not UserProfile.objects.filter(email=new_email).exclude(user=user).exists()
+
+    def send_otp_email(self):
+        from ondoc.notification.tasks import send_userprofile_email_update_otp
+        send_userprofile_email_update_otp.apply_async((self.id,))
+
+    def after_commit_tasks(self, send_otp=False):
+        if send_otp:
+            self.send_otp_email()
+
+    @classmethod
+    def initiate(cls, profile, email):
+        obj = cls(profile=profile, new_email=email, old_email=profile.email, otp=random.choice(range(100000, 999999)),
+                  otp_expiry=(timezone.now() + timedelta(minutes=30)))
+        obj.save()
+        return obj
+
+    def process_email_change(self, otp, process_immediate=False):
+        if process_immediate:
+            if otp and self.otp != otp:
+                return False
+
+            self.otp_verified = True
+            self.profile.email = self.new_email
+            self.is_successfull = True
+            self.profile.save()
+            self.save()
+        else:
+            self.otp_verified = True
+            self.save()
+
+        return True
+
+    def save(self, *args, **kwargs):
+        send_otp = False
+
+        # Instance comming First time.
+        if not self.id:
+            send_otp = True
+
+        super().save(*args, **kwargs)
+
+        transaction.on_commit(lambda: self.after_commit_tasks(send_otp=send_otp))
+
+    class Meta:
+        db_table = "userprofile_email_updates"
+
+
+class PaymentMixin(object):
+
+    def capture_payment(self):
+        from ondoc.notification import tasks as notification_tasks
+        notification_tasks.send_capture_payment_request.apply_async(
+            (self.PRODUCT_ID, self.id), eta=timezone.localtime(), )
+
+    def release_payment(self):
+        from ondoc.notification import tasks as notification_tasks
+        notification_tasks.send_release_payment_request.apply_async(
+            (self.PRODUCT_ID, self.id), eta=timezone.localtime(), )
+
+    def preauth_process(self, refund_flag=1):
+        from ondoc.account.models import Order
+        from ondoc.account.models import PgTransaction
+        initiate_refund = 1
+        order = Order.objects.filter(product_id=self.PRODUCT_ID,
+                                         reference_id=self.id).first()
+        if order:
+            order_parent = order.parent
+            txn_obj = PgTransaction.objects.filter(order=order_parent).first() if order_parent else None
+
+            if txn_obj and txn_obj.is_preauth():
+                if refund_flag:
+                    if order_parent.orders.count() > 1:
+                        self.capture_payment()
+                    else:
+                        self.release_payment()
+                        initiate_refund = 0
+                else:
+                    #if order_parent.orders.count() > 1:
+                    self.capture_payment()
+                    initiate_refund = 0
+                    # raise Exception('Preauth booked appointment can not be rebooked.')
+
+        return initiate_refund
+
+    def get_transaction(self):
+        from ondoc.account.models import Order
+        from ondoc.account.models import PgTransaction
+        child_order = Order.objects.filter(reference_id=self.id, product_id=self.PRODUCT_ID).first()
+        parent_order = None
+        pg_transaction = None
+
+        if child_order:
+            parent_order = child_order.parent
+
+        if parent_order:
+            pg_transaction = PgTransaction.objects.filter(order_id=parent_order.id).first()
+
+        return pg_transaction
+
+
+class GenericQuestionAnswer(TimeStampedModel):
+    question = models.TextField(null=False, verbose_name='Question')
+    answer = models.TextField(null=True, verbose_name='Answer')
+    content_type = models.ForeignKey(ContentType, on_delete=models.DO_NOTHING)
+    object_id = models.BigIntegerField()
+    content_object = GenericForeignKey()
+
+    class Meta:
+        db_table = "generic_question_answer"

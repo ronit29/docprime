@@ -1,7 +1,7 @@
 from rest_framework import serializers
 from ondoc.authentication.models import (OtpVerifications, User, UserProfile, Notification, NotificationEndpoint,
                                          DoctorNumber, Address, GenericAdmin, UserSecretKey,
-                                         UserPermission, Address, GenericAdmin, GenericLabAdmin)
+                                         UserPermission, Address, GenericAdmin, GenericLabAdmin, UserProfileEmailUpdate)
 from ondoc.doctor.models import DoctorMobile, ProviderSignupLead, Hospital
 from ondoc.common.models import AppointmentHistory
 from ondoc.doctor.models import DoctorMobile
@@ -38,8 +38,6 @@ class OTPVerificationSerializer(serializers.Serializer):
     otp = serializers.IntegerField(min_value=100000, max_value=999999)
 
     def validate(self, attrs):
-        if attrs.get('phone_number') in [9870395617]:
-            return attrs
         # if not User.objects.filter(phone_number=attrs['phone_number'], user_type=User.CONSUMER).exists():
         #     raise serializers.ValidationError('User does not exist')
 
@@ -558,3 +556,40 @@ class TokenFromUrlKeySerializer(serializers.Serializer):
         if not (attrs.get('auth_token') or attrs.get('key')):
             raise serializers.ValidationError('neither auth_token nor key found')
         return attrs
+
+
+class ProfileEmailUpdateInitSerializer(serializers.Serializer):
+    profile = serializers.PrimaryKeyRelatedField(queryset=UserProfile.objects.all(), allow_null=False)
+    email = serializers.EmailField(max_length=256, required=True)
+
+    def validate(self, attrs):
+        request = self.context.get('request')
+        user = request.user
+        email = attrs.get('email')
+        profile = attrs.get('profile')
+
+        if not UserProfileEmailUpdate.can_be_changed(user, email):
+            raise serializers.ValidationError('Email is being used by another user.')
+
+        if not UserProfile.objects.filter(id=profile.id, user=user).exists():
+            raise serializers.ValidationError('Given profile is not valid family profile.')
+
+        return attrs
+
+
+class ProfileEmailUpdateProcessSerializer(serializers.Serializer):
+    profile = serializers.PrimaryKeyRelatedField(queryset=UserProfile.objects.all(), allow_null=False)
+    otp = serializers.IntegerField(min_value=100000, max_value=999999, required=True)
+    id = serializers.IntegerField(required=True, min_value=1)
+    process_immediately = serializers.BooleanField(default=False, required=False)
+
+    def validate(self, attrs):
+        request = self.context.get('request')
+        user = request.user
+        profile = attrs.get('profile')
+
+        if not UserProfile.objects.filter(id=profile.id, user=user).exists():
+            raise serializers.ValidationError('Given profile is not valid family profile.')
+
+        return attrs
+
