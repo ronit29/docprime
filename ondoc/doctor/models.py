@@ -3413,10 +3413,11 @@ class OpdAppointment(auth_model.TimeStampedModel, CouponsMixin, OpdAppointmentIn
         last_appointment = None
 
         previous_appointments = OpdAppointment.objects.filter(~Q(appointment_type=OpdAppointment.FOLLOWUP) &
+                                                              ~Q(status=OpdAppointment.CANCELLED) &
                                                               Q(doctor=doctor) &
                                                               Q(profile=profile) & Q(hospital=hospital) &
-                                                              Q(insurance__isnull=False)).exclude(
-                                                              status=OpdAppointment.CANCELLED, id=self.id).order_by('-id')
+                                                              Q(insurance__isnull=False) &
+                                                              Q(created_at__lt=self.created_at)).order_by('-id')
         if not previous_appointments:
             return False
         last_appointment = previous_appointments.first()
