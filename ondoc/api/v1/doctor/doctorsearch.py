@@ -591,15 +591,14 @@ class DoctorSearchHelper:
                     is_insurance_covered = True
                 else:
                     is_insurance_covered = False
-                    insurance_error = "Gynocologist limit exceeded of limit {}".format(settings.INSURANCE_GYNECOLOGIST_LIMIT)
+                    insurance_error = "You have already utilised {} Gynaecologist consultations available in your OPD Insurance Plan.".format(settings.INSURANCE_GYNECOLOGIST_LIMIT)
 
                 if request and request.user and request.user.active_insurance and \
                         not doctor.is_onco_limit_breach(request.user.active_insurance) and is_insurance_covered:
                     is_insurance_covered = True
                 else:
                     is_insurance_covered = False
-                    insurance_error = "Gynocologist limit exceeded of limit {}".format(
-                        settings.INSURANCE_ONCOLOGIST_LIMIT)
+                    insurance_error = "You have already utilised {} Oncologist consultations available in your OPD Insurance Plan.".format(settings.INSURANCE_ONCOLOGIST_LIMIT)
 
                 hospitals = [{
                     "enabled_for_online_booking": enable_online_booking,
