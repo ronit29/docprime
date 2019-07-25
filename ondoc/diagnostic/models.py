@@ -2431,7 +2431,7 @@ class LabAppointment(TimeStampedModel, CouponsMixin, LabAppointmentInvoiceMixin,
 
         if data.get("payment_type") in [OpdAppointment.INSURANCE]:
             effective_price = effective_price
-            total_agreed = total_insurance_agreed_price if total_insurance_agreed_price > 0 else total_agreed
+            total_agreed = total_insurance_agreed_price if  total_insurance_agreed_price and total_insurance_agreed_price > 0 else total_agreed
             coupon_discount, coupon_cashback, coupon_list, random_coupon_list = 0, 0, [], []
 
         return {
