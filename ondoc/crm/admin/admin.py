@@ -29,7 +29,8 @@ from ondoc.diagnostic.models import (Lab, LabNetwork, LabTest, LabTestType, LabS
                                      TestParameterChat)
 from ondoc.coupon.models import Coupon, UserSpecificCoupon, RandomGeneratedCoupon
 from ondoc.lead.models import HospitalLead, DoctorLead, SearchLead
-from ondoc.account.models import ConsumerAccount, MerchantPayout, Order, MerchantPayoutBulkProcess
+from ondoc.account.models import ConsumerAccount, MerchantPayout, Order, MerchantPayoutBulkProcess, \
+    AdvanceMerchantPayout, AdvanceMerchantAmount
 from ondoc.location.admin import EntityUrlsAdmin
 from ondoc.location.models import EntityUrls, CompareSEOUrls
 from ondoc.notification import models as notifcation_model
@@ -41,7 +42,7 @@ from ondoc.procedure.models import Procedure, ProcedureCategory, CommonProcedure
 from ondoc.subscription_plan.models import Plan, PlanFeature, UserPlanMapping
 from .common import Cities, CitiesAdmin, MatrixCityMapping, MatrixCityAdmin, MerchantAdmin, MerchantPayoutAdmin, \
     PaymentOptionsAdmin, MatrixMappedStateAdmin, MatrixMappedCityAdmin, GlobalNonBookableAdmin, UserConfigAdmin, \
-    BlacklistUserAdmin, BlockedStatesAdmin, MerchantPayoutBulkProcessAdmin
+    BlacklistUserAdmin, BlockedStatesAdmin, MerchantPayoutBulkProcessAdmin, AdvanceMerchantPayoutAdmin, AdvanceMerchantAmountAdmin
 from .lead import HospitalLeadAdmin, DoctorLeadAdmin, SearchLeadAdmin
 from .doctor import (DoctorAdmin, MedicalServiceAdmin, SpecializationAdmin, QualificationAdmin, LanguageAdmin,
                      CollegeAdmin, MedicalConditionAdmin, HealthTipAdmin, DoctorClinicAdmin,
@@ -222,6 +223,9 @@ admin.site.register(DemoElastic, DemoElasticAdmin)
 admin.site.register(Merchant, MerchantAdmin)
 admin.site.register(MerchantPayout, MerchantPayoutAdmin)
 admin.site.register(MerchantPayoutBulkProcess, MerchantPayoutBulkProcessAdmin)
+admin.site.register(AdvanceMerchantPayout, AdvanceMerchantPayoutAdmin)
+admin.site.register(AdvanceMerchantAmount, AdvanceMerchantAmountAdmin)
+
 # admin.site.register(AssociatedMerchant)
 admin.site.register(DoctorMobileOtp)
 admin.site.register(NewDynamic, NewDynamicAdmin)

@@ -13,7 +13,7 @@ from dateutil import tz
 from django.conf import settings
 from django.utils.dateparse import parse_datetime
 from ondoc.authentication.models import Merchant, AssociatedMerchant, QCModel
-from ondoc.account.models import MerchantPayout, MerchantPayoutBulkProcess
+from ondoc.account.models import MerchantPayout, MerchantPayoutBulkProcess, PayoutMapping
 from ondoc.common.models import Cities, MatrixCityMapping, PaymentOptions, Remark, MatrixMappedCity, MatrixMappedState, \
     GlobalNonBookable, UserConfig, BlacklistUser, BlockedStates, Fraud
 from import_export import resources, fields
@@ -591,14 +591,27 @@ class MerchantPayoutAdmin(MediaImportMixin, VersionAdmin):
         return ''
 
     def appointment_id(self, instance):
-        appt = instance.get_appointment()
-        if appt:
-            content_type = ContentType.objects.get_for_model(appt.__class__)
-            change_url = reverse('admin:%s_%s_change' % (content_type.app_label, content_type.model), args=[appt.id])
-            html = '''<a href='%s' target=_blank>%s</a>''' % (change_url, appt.id)
-            return mark_safe(html)
+        if instance.booking_type == 3:
+            pm = PayoutMapping.objects.filter(payout_id=instance.id).first()
+            if pm:
+                ui = UserInsurance.objects.filter(id=pm.object_id).first()
+                if ui:
+                    content_type = ContentType.objects.get_for_model(ui.__class__)
+                    change_url = reverse('admin:%s_%s_change' % (content_type.app_label, content_type.model),
+                                     args=[ui.id])
+                    html = '''<a href='%s' target=_blank>%s</a>''' % (change_url, ui.id)
+                    return mark_safe(html)
 
-        return None
+            return None
+        else:
+            appt = instance.get_appointment()
+            if appt:
+                content_type = ContentType.objects.get_for_model(appt.__class__)
+                change_url = reverse('admin:%s_%s_change' % (content_type.app_label, content_type.model), args=[appt.id])
+                html = '''<a href='%s' target=_blank>%s</a>''' % (change_url, appt.id)
+                return mark_safe(html)
+
+            return None
 
     def get_billed_to(self, instance):
         billed_to = instance.get_billed_to()
@@ -907,3 +920,17 @@ class MerchantPayoutBulkProcessAdmin(admin.ModelAdmin):
         if obj:  # editing an existing object
             return self.readonly_fields + ('payout_ids',)
         return self.readonly_fields
+
+
+class AdvanceMerchantPayoutAdmin(admin.ModelAdmin):
+    fields = ['id', 'booking_type', 'charged_amount', 'payable_amount', 'tds_amount', 'status',  'paid_to', 'type', 'utr_no']
+    list_display = ('id', 'status', 'payable_amount', 'booking_type')
+    search_fields = ['id']
+    list_filter = ['status', 'booking_type']
+    readonly_fields = ('id', 'booking_type', 'charged_amount', 'payable_amount', 'tds_amount', 'status',  'paid_to', 'type', 'utr_no')
+
+
+class AdvanceMerchantAmountAdmin(admin.ModelAdmin):
+    fields = ['id', 'total_amount', 'amount', 'merchant_id']
+    list_display = ('id', 'total_amount', 'amount', 'merchant_id')
+    readonly_fields = ['id', 'total_amount', 'amount', 'merchant_id']

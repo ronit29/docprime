@@ -69,7 +69,7 @@ from ondoc.articles.models import Article, ArticleLinkedUrl, LinkedArticle, Arti
 
 from ondoc.authentication.models import BillingAccount, SPOCDetails, GenericAdmin, User, Merchant, AssociatedMerchant, \
     DoctorNumber, UserNumberUpdate, GenericQuestionAnswer
-from ondoc.account.models import MerchantPayout, MerchantPayoutBulkProcess
+from ondoc.account.models import MerchantPayout, MerchantPayoutBulkProcess, AdvanceMerchantAmount, AdvanceMerchantPayout
 from ondoc.seo.models import Sitemap, NewDynamic
 from ondoc.elastic.models import DemoElastic
 from ondoc.location.models import EntityUrls, CompareLabPackagesSeoUrls, CompareSEOUrls, CityLatLong
@@ -929,7 +929,7 @@ class Command(BaseCommand):
 
             group.permissions.add(*permissions)
 
-        content_types = ContentType.objects.get_for_models(MerchantPayout, UserInsurance, InsurerAccount)
+        content_types = ContentType.objects.get_for_models(MerchantPayout, UserInsurance, InsurerAccount, AdvanceMerchantAmount, AdvanceMerchantPayout)
 
         for cl, ct in content_types.items():
             permissions = Permission.objects.filter(

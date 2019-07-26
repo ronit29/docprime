@@ -730,14 +730,11 @@ class Order(TimeStampedModel):
         self.change_payment_status(Order.PAYMENT_ACCEPTED)
 
         # if order is done without PG transaction, then make an async task to create a dummy transaction and set it.
-        # if insurance_ids or user_plan_ids:
-	if not self.getTransactions():
-		try:
-		    transaction.on_commit(
-		        lambda: set_order_dummy_transaction.apply_async((self.id, self.get_user_id(),),
-		                                                        countdown=5))
-		except Exception as e:
-		    logger.error(str(e))
+        if not self.getTransactions():
+            try:
+                transaction.on_commit(lambda: set_order_dummy_transaction.apply_async((self.id, self.get_user_id(),), countdown=5))
+            except Exception as e:
+                logger.error(str(e))
 
         money_pool = MoneyPool.objects.create(wallet=total_wallet_used, cashback=total_cashback_used, logs=[])
 
@@ -2109,7 +2106,7 @@ class MerchantPayout(TimeStampedModel):
 
     def recreate_failed_payouts(self):
         # # recreate payout only when status is failed
-        if self.status == self.FAILED_FROM_DETAIL or self.status == self.FAILED_FROM_QUEUE:
+        if self.status == self.FAILED_FROM_DETAIL or self.status == self.FAILED_FROM_QUEUE or self.merchant_has_advance_payment():
             new_obj = MerchantPayout(recreated_from=self)
             new_obj.payable_amount = self.payable_amount
             new_obj.charged_amount = self.charged_amount
@@ -2354,7 +2351,7 @@ class PaymentProcessStatus(TimeStampedModel):
 class AdvanceMerchantAmount(TimeStampedModel):
     merchant = models.ForeignKey(Merchant, on_delete=models.DO_NOTHING, null=False, blank=False)
     amount = models.DecimalField(max_digits=10, decimal_places=2, default=None, null=True, blank=True)
-    total_balance = models.DecimalField(max_digits=10, decimal_places=2, default=None, null=True, blank=True)
+    total_amount = models.DecimalField(max_digits=10, decimal_places=2, default=None, null=True, blank=True)
 
     class Meta:
         db_table = "advance_merchant_amount"
@@ -2425,11 +2422,11 @@ class AdvanceMerchantPayout(TimeStampedModel):
                 adv_amt_obj = AdvanceMerchantAmount.objects.filter(merchant_id=mp.paid_to_id).first()
                 if adv_amt_obj and adv_amt_obj.amount:
                     adv_amt_obj.amount = decimal.Decimal(adv_amt_obj.amount) + mp.payable_amount
-                    adv_amt_obj.total_balance = decimal.Decimal(adv_amt_obj.amount) + mp.payable_amount
+                    adv_amt_obj.total_amount = decimal.Decimal(adv_amt_obj.amount) + mp.payable_amount
                 else:
                     adv_amt_obj = AdvanceMerchantAmount(merchant_id=mp.paid_to_id)
                     adv_amt_obj.amount = mp.payable_amount
-                    adv_amt_obj.total_balance = mp.payable_amount
+                    adv_amt_obj.total_amount = mp.payable_amount
                 adv_amt_obj.save()
                 print("payout id " + str(mp.id) + " saved")
 
