@@ -48,7 +48,7 @@ from ondoc.doctor.models import (Doctor, DoctorQualification,
                                  GoogleDetailing, VisitReason, VisitReasonMapping, PracticeSpecializationContent,
                                  PatientMobile, DoctorMobileOtp,
                                  UploadDoctorData, CancellationReason, Prescription, PrescriptionFile,
-                                 SimilarSpecializationGroup, SimilarSpecializationGroupMapping)
+                                 SimilarSpecializationGroup, SimilarSpecializationGroupMapping, PurchaseOrderCreation)
 
 from ondoc.authentication.models import User
 from .common import *
@@ -2290,3 +2290,25 @@ class SimilarSpecializationGroupInline(admin.TabularInline):
 class SimilarSpecializationGroupAdmin(VersionAdmin):
     inlines = [SimilarSpecializationGroupInline]
     list_display = ['id', 'name']
+
+
+class PurchaseOrderCreationForm(forms.ModelForm):
+    def clean(self):
+        cleaned_data = self.cleaned_data
+        if not (cleaned_data.get('proof_of_payment') or cleaned_data.get('proof_of_payment_image')):
+            raise forms.ValidationError('Either enter proof of payment or upload proof of payment image')
+        if cleaned_data.get('provider_type') == 'lab' and cleaned_data.get('provider_name_hospital'):
+            raise forms.ValidationError('Cannot choose Hospital, Please select a Lab')
+        if cleaned_data.get('provider_type') == 'hospital' and cleaned_data.get('provider_name_lab'):
+            raise forms.ValidationError('Cannot choose Lab, Please select a Hospital')
+
+        return super().clean()
+
+
+class PurchaseOrderCreationAdmin(admin.ModelAdmin):
+    model = PurchaseOrderCreation
+    form = PurchaseOrderCreationForm
+    list_display = ['provider_type', 'active_till', 'provider_name_lab', 'provider_name_hospital']
+    autocomplete_fields = ['provider_name_lab', 'provider_name_hospital']
+    search_fields = ['provider_name_lab__name', 'provider_name_hospital__name']
+    readonly_fields = ['provider_name', ]

@@ -34,6 +34,7 @@ from django.utils import timezone
 from ondoc.authentication import models as auth_model
 from ondoc.authentication.models import SPOCDetails, RefundMixin, MerchantTdsDeduction, PaymentMixin
 from ondoc.bookinganalytics.models import DP_OpdConsultsAndTests
+# from ondoc.diagnostic.models import Lab
 from ondoc.location import models as location_models
 from ondoc.account.models import Order, ConsumerAccount, ConsumerTransaction, PgTransaction, ConsumerRefund, \
     MerchantPayout, UserReferred, MoneyPool, Invoice
@@ -4502,22 +4503,42 @@ class SimilarSpecializationGroupMapping(models.Model):
 
 
 class PurchaseOrderCreation(auth_model.TimeStampedModel):
-    HOSPITAL = 1
-    LAB = 2
+    from ondoc.diagnostic.models import Lab
+    HOSPITAL = 'HOSPITAL'
+    LAB = 'LAB'
     provider_choices = (('hospital', HOSPITAL), ('lab', LAB))
-    provider_type = models.IntegerField(choices=provider_choices)
-    provider_name = models.CharField(max_length=500)
+    provider_type = models.CharField(choices=provider_choices, max_length=10)
+    provider_name_lab = models.ForeignKey(Lab, on_delete=models.DO_NOTHING, default='', null=True, blank=True)
+    provider_name_hospital = models.ForeignKey(Hospital, on_delete=models.DO_NOTHING, default='', null=True, blank=True)
+    provider_name = models.CharField(max_length=500, default='')
     gst_number = models.CharField(max_length=1000)
     total_amount_paid = models.IntegerField(help_text='Inclusive of GST')
     active_till = models.DateTimeField()
     appointment_count = models.IntegerField()
     agreement_details = models.TextField()
-    invoice_no = models.CharField(max_length=1000, null=True, blank=True, help_text='Either enter a valid invoice number or upload the invoice image')
-    invoice_image = models.FileField(upload_to='qrcode', validators=[
+    proof_of_payment = models.CharField(max_length=1000, null=True, blank=True, help_text='Either enter a valid invoice number or upload the invoice image')
+    proof_of_payment_image = models.FileField(upload_to='qrcode', validators=[
         FileExtensionValidator(allowed_extensions=['pdf', 'jfif', 'jpg', 'jpeg', 'png'])], null=True, blank=True)
 
+
+    def __str__(self):
+        if self.provider_name_hospital:
+            return self.provider_name_hospital.name
+        else:
+            return self.provider_name_lab.name
+
+    def save(self, force_insert=False, force_update=False, using=None, update_fields=None):
+        if self.provider_name_hospital:
+            self.provider_name = self.provider_name_hospital
+            super().save(force_insert, force_update, using, update_fields)
+        else:
+            self.provider_name = self.provider_name_lab
+            super().save(force_insert, force_update, using, update_fields)
 
 
     class Meta:
         db_table = 'purchase_order_creation'
+
+
+
 
