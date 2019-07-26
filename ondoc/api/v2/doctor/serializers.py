@@ -351,7 +351,7 @@ class GeneralInvoiceItemsSerializer(serializers.Serializer):
     description = serializers.CharField(max_length=500, required=False, allow_null=True, allow_blank=True)
     tax_amount = serializers.DecimalField(max_digits=10, decimal_places=2, required=False, allow_null=True)
     tax_percentage = serializers.DecimalField(max_digits=5, decimal_places=2, required=False, allow_null=True,
-                                              min_value=0, max_value=100)
+                                              min_value=0)
     discount_amount = serializers.DecimalField(max_digits=10, decimal_places=2, required=False, allow_null=True)
     discount_percentage = serializers.DecimalField(max_digits=5, decimal_places=2, required=False, allow_null=True,
                                                    min_value=0, max_value=100)
@@ -471,7 +471,7 @@ class PartnersAppInvoiceSerialier(serializers.Serializer):
     invoice_title = serializers.CharField(max_length=300, required=False, allow_blank=True)
     tax_amount = serializers.DecimalField(max_digits=10, decimal_places=2, required=False, allow_null=True)
     tax_percentage = serializers.DecimalField(max_digits=5, decimal_places=2, required=False, allow_null=True,
-                                              min_value=0, max_value=100)
+                                              min_value=0)
     discount_amount = serializers.DecimalField(max_digits=10, decimal_places=2, required=False, allow_null=True)
     discount_percentage = serializers.DecimalField(max_digits=5, decimal_places=2, required=False, allow_null=True,
                                                    min_value=0, max_value=100)
@@ -487,16 +487,16 @@ class PartnersAppInvoiceSerialier(serializers.Serializer):
         received_discount_amount = attrs.get('discount_amount')
         received_total_amount = attrs['total_amount']
 
-        if attrs.get('payment_status') == doc_models.PartnersAppInvoice.PAID and not attrs.get('payment_type'):
-            raise serializers.ValidationError('payment type is required for payment status - paid')
+        if attrs.get('payment_status') == doc_models.PartnersAppInvoice.PAID:
+            attrs['due_date'] = None
+            if not attrs.get('payment_type'):
+                raise serializers.ValidationError('payment type is required for payment status - paid')
         if attrs.get('payment_status') == doc_models.PartnersAppInvoice.PENDING and not attrs.get('due_date'):
             raise serializers.ValidationError('due date is required for payment status - pending')
         if attrs.get('generate_invoice') and not attrs.get('invoice_title'):
             raise serializers.ValidationError('invoice title is missing for invoice generation')
         if ( attrs.get("is_encrypted") or attrs.get("invoice_serial_id") ) and not ( attrs.get("is_encrypted") and attrs.get("invoice_serial_id") ):
             raise serializers.ValidationError("is_encrypted and invoice_serial_id both are required together.")
-        if attrs.get('is_encrypted') and attrs.get('generate_invoice'):
-            raise serializers.ValidationError('generate_invoice not possible for encrypted_data')
         if attrs.get('appointment_id'):
             attrs['appointment'] = attrs.pop('appointment_id')
 
@@ -584,3 +584,10 @@ class UpdatePartnersAppInvoiceSerializer(serializers.Serializer):
         if not attrs.get('invoice_id').is_valid:
             raise serializers.ValidationError("valid invoice id is required")
         return attrs
+
+
+class ProviderEncryptResponseModelSerializer(serializers.ModelSerializer):
+
+    class Meta:
+        model = doc_models.ProviderEncrypt
+        fields = "__all__"

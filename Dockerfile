@@ -28,6 +28,7 @@ RUN ln -s /usr/bin/google-chrome-stable /usr/bin/chrome
 #install Microsoft ODBC Driver for debian 9
 RUN curl https://packages.microsoft.com/keys/microsoft.asc | apt-key add -
 RUN curl https://packages.microsoft.com/config/debian/9/prod.list > /etc/apt/sources.list.d/mssql-release.list
+RUN unlink /usr/lib/apt/methods/https
 RUN ln -s  /usr/lib/apt/methods/http /usr/lib/apt/methods/https
 RUN apt-get update && ACCEPT_EULA=Y apt-get install msodbcsql17 -y
 RUN echo 'export PATH="$PATH:/opt/mssql-tools/bin"' >> ~/.bash_profile

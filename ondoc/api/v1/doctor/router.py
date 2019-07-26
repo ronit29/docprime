@@ -5,7 +5,7 @@ from .views import (DoctorAppointmentsViewSet, DoctorProfileView, DoctorHospital
                     DoctorAppointmentNoAuthViewSet, DoctorContactNumberViewSet, DoctorFeedbackViewSet,
                     HospitalAutocomplete, CreateAdminViewSet, OfflineCustomerViewSet, HospitalNetworkListViewset,
                     AppointmentMessageViewset, IpdProcedureViewSet, HospitalViewSet, IpdProcedureSyncViewSet,
-                    PracticeSpecializationAutocomplete)
+                    PracticeSpecializationAutocomplete, SimilarSpecializationGroupAutocomplete)
 
 urlpatterns = [
     path('appointment', DoctorAppointmentsViewSet.as_view({'get': 'list'}), name='appointment-list'),
@@ -47,6 +47,7 @@ urlpatterns = [
     path('feedback', DoctorFeedbackViewSet.as_view({'post': 'feedback'}), name='doctor-feedback'),
     path('hospital-autocomplete', HospitalAutocomplete.as_view(), name='hospital-autocomplete'),
     path('practicespecialization-autocomplete', PracticeSpecializationAutocomplete.as_view(), name='practicespecialization-autocomplete'),
+    path('similarspecializationgroup-autocomplete', SimilarSpecializationGroupAutocomplete.as_view(), name='similarspecializationgroup-autocomplete'),
     path('create_admin', CreateAdminViewSet.as_view({'post': 'create'}), name='create_admin'),
     path('update_admin', CreateAdminViewSet.as_view({'post': 'update'}), name='update_admin'),
     path('delete_admin', CreateAdminViewSet.as_view({'post': 'delete'}), name='delete_admin'),
@@ -72,6 +73,7 @@ urlpatterns = [
     path('hospitals', HospitalViewSet.as_view({'get': 'list'}), name='hospitals_list'),
     path('hospital_by_url', HospitalViewSet.as_view({'get': 'retrieve_by_url'}), name='hospital_detail_by_url'),
     path('ipd_procedure/create_lead', IpdProcedureViewSet.as_view({'post': 'create_lead'}), name='ipd_procedure_lead'),
+    path('ipd_procedure/update_lead', IpdProcedureViewSet.as_view({'post': 'update_lead'}), name='ipd_procedure_lead_update'),
     path('ipd_procedure/sync_lead', IpdProcedureSyncViewSet.as_view({'post': 'sync_lead'}), name='ipd_procedure_sync_lead'),
     path('licence/update', DoctorProfileView.as_view({'post': 'licence_update'}), name='licence_update'),
 ]
