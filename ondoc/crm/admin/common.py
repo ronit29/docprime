@@ -458,7 +458,7 @@ class MerchantPayoutForm(forms.ModelForm):
 
         recreate_payout = self.cleaned_data.get('recreate_payout')
         if recreate_payout:
-            if self.instance.status not in [6, 7] or self.instance.merchant_has_advance_payment():
+            if self.instance.status not in [6, 7] and not self.instance.merchant_has_advance_payment():
                 raise forms.ValidationError("Only failed or advance paid payout can be re-created.")
 
         if self.instance.status in [3, 4, 5]:
