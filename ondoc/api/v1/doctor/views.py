@@ -4513,7 +4513,7 @@ class IpdProcedureViewSet(viewsets.GenericViewSet):
         alphabet = request.query_params.get('alphabet')
         city = request.query_params.get('city')
         if city:
-            city_match(city)
+            city = city_match(city)
         if not alphabet or not re.match(r'^[a-zA-Z]$', alphabet):
             return Response(status=status.HTTP_400_BAD_REQUEST)
         response = {}

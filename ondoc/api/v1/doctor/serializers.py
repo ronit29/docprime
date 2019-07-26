@@ -1923,7 +1923,7 @@ class TopHospitalForIpdProcedureSerializer(serializers.ModelSerializer):
         model = Hospital
         fields = ('id', 'name', 'distance', 'certifications', 'bed_count', 'logo', 'avg_rating',
                   'count_of_insurance_provider', 'multi_speciality', 'address', 'short_address','open_today',
-                  'insurance_provider', 'established_in', 'long', 'lat', 'url', 'locality_url', 'name_city')
+                  'insurance_provider', 'established_in', 'long', 'lat', 'url', 'locality_url', 'name_city', 'operational_since')
 
     def get_name_city(self, obj):
         result = obj.name
