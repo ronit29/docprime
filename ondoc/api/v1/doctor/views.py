@@ -246,6 +246,8 @@ class DoctorAppointmentsViewSet(OndocViewSet):
         # data['is_appointment_insured'], data['insurance_id'], data[
         #     'insurance_message'] = Cart.check_for_insurance(validated_data,request)
         if user_insurance:
+            if user_insurance.status == UserInsurance.ONHOLD:
+                return Response(status=status.HTTP_400_BAD_REQUEST, data={'error': 'Your documents from the last claim are under verification.Please write to customercare@docprime.com for more information'})
             hospital = validated_data.get('hospital')
             doctor = validated_data.get('doctor')
 
@@ -353,6 +355,9 @@ class DoctorAppointmentsViewSet(OndocViewSet):
         user = request.user
         balance = 0
         cashback_balance = 0
+
+        if user and user.active_insurance and user.active_insurance.status == UserInsurance.ONHOLD:
+            return Response(status=status.HTTP_400_BAD_REQUEST, data={'error': 'There is some problem, Please try again later'})
 
         if use_wallet:
             consumer_account = account_models.ConsumerAccount.objects.get_or_create(user=user)

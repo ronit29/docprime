@@ -1325,6 +1325,52 @@ class Doctor(auth_model.TimeStampedModel, auth_model.QCModel, SearchKey, auth_mo
         #         return False
         return True
 
+    def is_gyno_limit_breach(self, insurance):
+        if not insurance:
+            return True
+        count = 0
+        specializaion_ids = set(json.loads(settings.GYNECOLOGIST_SPECIALIZATION_IDS))
+        doctor_with_gyno_specialization = DoctorPracticeSpecialization.objects. \
+            filter(specialization_id__in=list(specializaion_ids)).values_list('doctor_id', flat=True)
+
+        if not self.id in doctor_with_gyno_specialization:
+            return False
+
+        if doctor_with_gyno_specialization:
+            count = OpdAppointment.objects.filter(~Q(status=OpdAppointment.CANCELLED),
+                                                  doctor_id__in=doctor_with_gyno_specialization,
+                                                  payment_type=OpdAppointment.INSURANCE,
+                                                  insurance=insurance,
+                                                  user=insurance.user).count()
+
+        if count >= int(settings.INSURANCE_GYNECOLOGIST_LIMIT):
+            return True
+        else:
+            return False
+
+    def is_onco_limit_breach(self, insurance):
+        if not insurance:
+            return True
+        count = 0
+        specializaion_ids = set(json.loads(settings.ONCOLOGIST_SPECIALIZATION_IDS))
+        doctor_with_onco_specialization = DoctorPracticeSpecialization.objects. \
+            filter(specialization_id__in=list(specializaion_ids)).values_list('doctor_id', flat=True)
+
+        if not self.id in doctor_with_onco_specialization:
+            return False
+
+        if doctor_with_onco_specialization:
+            count = OpdAppointment.objects.filter(~Q(status=OpdAppointment.CANCELLED),
+                                                  doctor_id__in=doctor_with_onco_specialization,
+                                                  payment_type=OpdAppointment.INSURANCE,
+                                                  insurance=insurance,
+                                                  user=insurance.user).count()
+
+        if count >= int(settings.INSURANCE_ONCOLOGIST_LIMIT):
+            return True
+        else:
+            return False
+
     class Meta:
         db_table = "doctor"
 
@@ -2735,7 +2781,7 @@ class OpdAppointment(auth_model.TimeStampedModel, CouponsMixin, OpdAppointmentIn
             if database_instance and database_instance.status != self.status and self.status == self.COMPLETED:
                 # add a merchant_payout entry
                 if self.merchant_payout is None and self.payment_type not in [OpdAppointment.COD] and  \
-                        (self.appointment_type != OpdAppointment.FOLLOWUP or not self.is_fraud_appointment):
+                        not(self.appointment_type == OpdAppointment.FOLLOWUP or self.is_fraud_appointment):
                     self.save_merchant_payout()
 
                 # credit cashback if any
@@ -3015,6 +3061,8 @@ class OpdAppointment(auth_model.TimeStampedModel, CouponsMixin, OpdAppointmentIn
         if data.get("payment_type") == cls.COD:
             effective_price = 0
             coupon_discount, coupon_cashback, coupon_list, random_coupon_list = 0, 0, [], []
+            deal_price = doctor_clinic_timing.dct_cod_deal_price()
+
 
         return {
             "deal_price": deal_price,
@@ -3028,6 +3076,8 @@ class OpdAppointment(auth_model.TimeStampedModel, CouponsMixin, OpdAppointmentIn
                 "deal_price": doctor_clinic_timing.deal_price,
                 "mrp": doctor_clinic_timing.mrp,
                 "fees": doctor_clinic_timing.fees,
+                "cod_deal_price": doctor_clinic_timing.dct_cod_deal_price(),
+                "is_enabled_for_cod": doctor_clinic_timing.is_enabled_for_cod(),
                 "insurance_fees": doctor_clinic_timing.insurance_fees
             },
             "coupon_data" : { "random_coupon_list" : random_coupon_list }
@@ -3374,16 +3424,13 @@ class OpdAppointment(auth_model.TimeStampedModel, CouponsMixin, OpdAppointmentIn
         profile = self.profile
         last_appointment = None
 
-        # if type == "payout":
-        #     completed_appointment = OpdAppointment.objects.filter(doctor=doctor, profile=profile, hospital=hospital,
-        #                                                           status=OpdAppointment.COMPLETED,
-        #                                                           created_at__lt=self.created_at,
-        #                                                           insurance__isnull=False).order_by('-id')
-        #     if not completed_appointment:
-        #         return False
-        #     last_appointment = completed_appointment.first()
+        # previous_appointments = OpdAppointment.objects.filter(~Q(appointment_type=OpdAppointment.FOLLOWUP) &
+        #                                                       ~Q(status=OpdAppointment.CANCELLED) &
+        #                                                       Q(doctor=doctor) &
+        #                                                       Q(profile=profile) & Q(hospital=hospital) &
+        #                                                       Q(insurance__isnull=False) &
+        #                                                       Q(created_at__lt=self.created_at)).order_by('-id')
 
-        # if type == "crm":
         previous_appointments = OpdAppointment.objects.filter(~Q(status=OpdAppointment.CANCELLED) &
                                                               (Q(appointment_type=OpdAppointment.REGULAR) |
                                                                Q(appointment_type__isnull=True)),
@@ -3391,7 +3438,6 @@ class OpdAppointment(auth_model.TimeStampedModel, CouponsMixin, OpdAppointmentIn
                                                               profile=profile, hospital=hospital,
                                                               created_at__lt=self.created_at,
                                                               insurance__isnull=False).order_by('-id')
-
         if not previous_appointments:
             return False
         last_appointment = previous_appointments.first()
