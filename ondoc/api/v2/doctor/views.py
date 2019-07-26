@@ -1151,3 +1151,32 @@ class PartnerEConsultationViewSet(viewsets.GenericViewSet):
         if not consultation:
             return Response({"error": "Consultation not Found"}, status=status.HTTP_404_NOT_FOUND)
         return Response({})
+
+
+class ConsumerEConsultationViewSet(viewsets.GenericViewSet):
+
+    authentication_classes = (JWTAuthentication,)
+    permission_classes = (IsAuthenticated,)
+
+    def get_queryset(self):
+        return None
+
+    def list(self, request):
+        id = request.query_params.get('id')
+        queryset = prov_models.EConsultation.objects.select_related('doctor', 'offline_patient', 'online_patient')\
+                                                    .filter(Q(online_patient__isnull=True,
+                                                              offline_tient=request.user)).all()
+        if id:
+            queryset = queryset.filter(id=id)
+        serializer = serializers.EConsultListSerializer(queryset, context={'request': request}, many=True)
+        return Response(serializer.data)
+
+    def pay(self, request):
+        consult_id = request.query_params.get('id')
+        if not consult_id:
+            return Response({"error": "Consultation ID not provided"}, status=status.HTTP_400_BAD_REQUEST)
+        consultation = prov_models.EConsultation.objects.filter(id=consult_id).first()
+        if not consultation:
+            return Response({"error": "Consultation not Found"}, status=status.HTTP_404_NOT_FOUND)
+        return Response({})
+
