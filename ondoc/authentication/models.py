@@ -348,11 +348,12 @@ class User(AbstractBaseUser, PermissionsMixin):
                                                              created_at__lte=date_time_to_be_checked + timezone.timedelta(
                                                                  minutes=settings.LEAD_AND_APPOINTMENT_BUFFER_TIME)).exists()
         if check_ipd_lead and not any_appointments:
-            any_appointments = IpdProcedureLead.objects.filter(user=self, is_valid=True,
-                                                               created_at__lte=date_time_to_be_checked,
-                                                               created_at__gte=date_time_to_be_checked - timezone.timedelta(
-                                                                   minutes=settings.LEAD_AND_APPOINTMENT_BUFFER_TIME)).exists()
-
+            count = IpdProcedureLead.objects.filter(user=self, is_valid=True,
+                                                    created_at__lte=date_time_to_be_checked,
+                                                    created_at__gte=date_time_to_be_checked - timezone.timedelta(
+                                                        minutes=settings.LEAD_AND_APPOINTMENT_BUFFER_TIME)).count()
+            if count > 1:
+                any_appointments = True
         return not any_appointments
 
     @cached_property
