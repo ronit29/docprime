@@ -121,7 +121,7 @@ class InsuranceGynocologist:
                                                   user=user).count()
 
         if count >= int(settings.INSURANCE_GYNECOLOGIST_LIMIT):
-            error = "Gynocologist limit exceeded of limit {}".format(settings.INSURANCE_GYNECOLOGIST_LIMIT)
+            error = "You have already utilised {} Gynaecologist consultations available in your OPD Insurance Plan.".format(settings.INSURANCE_GYNECOLOGIST_LIMIT)
         return count, error
 
 
@@ -581,6 +581,8 @@ class UserInsurance(auth_model.TimeStampedModel, MerchantPayoutMixin):
     cancel_customer_type = models.PositiveIntegerField(choices=CANCEL_CUSTOMER_TYPE_CHOICES, default=OTHER)
     cancel_initiate_by = models.PositiveIntegerField(choices=CANCEL_BY_CHOICES, null=True, blank=True)
     appointment_status = models.PositiveIntegerField(choices=APPOINTMENT_STATUS_CHOICES, null=True, blank=True)
+    # onhold_reason = models.CharField(max_length=200, blank=True, null=True, default=None)
+    onhold_reason = models.TextField(max_length=200, blank=True, null=True)
     notes = GenericRelation(GenericNotes)
 
     def __str__(self):
@@ -812,7 +814,7 @@ class UserInsurance(auth_model.TimeStampedModel, MerchantPayoutMixin):
                                                   user=self.user).count()
 
         if count >= int(settings.INSURANCE_GYNECOLOGIST_LIMIT):
-            error = "Gynocologist limit exceeded of limit {}".format(settings.INSURANCE_GYNECOLOGIST_LIMIT)
+            error = "You have already utilised {} Gynaecologist consultations available in your OPD Insurance Plan.".format(settings.INSURANCE_GYNECOLOGIST_LIMIT)
 
         return count, error
 
@@ -835,7 +837,7 @@ class UserInsurance(auth_model.TimeStampedModel, MerchantPayoutMixin):
                                                   user=self.user).count()
 
         if count >= int(settings.INSURANCE_ONCOLOGIST_LIMIT):
-            error = "Oncologist limit exceeded of limit {}".format(settings.INSURANCE_ONCOLOGIST_LIMIT)
+            error = "You have already utilised {} Oncologist consultations available in your OPD Insurance Plan.".format(settings.INSURANCE_ONCOLOGIST_LIMIT)
 
         return count, error
 
@@ -973,14 +975,16 @@ class UserInsurance(auth_model.TimeStampedModel, MerchantPayoutMixin):
         db_table = "user_insurance"
 
     def is_valid(self):
-        if self.expiry_date >= timezone.now() and self.status == self.ACTIVE:
+        if self.expiry_date >= timezone.now() and (self.status == self.ACTIVE or self.status == self.ONHOLD):
             return True
         else:
             return False
 
     def is_profile_valid(self):
-        if self.expiry_date >= timezone.now() and (self.status == self.ACTIVE or self.status == self.ONHOLD or
-                                                       self.status == self.CANCEL_INITIATE):
+        # if self.expiry_date >= timezone.now() and (self.status == self.ACTIVE or self.status == self.ONHOLD or
+        #                                                self.status == self.CANCEL_INITIATE):
+        if self.expiry_date >= timezone.now() and (self.status == self.ACTIVE or self.status == self.CANCEL_INITIATE
+                                                   or self.status == self.ONHOLD):
             return True
         else:
             return False
@@ -2175,10 +2179,18 @@ class EndorsementRequest(auth_model.TimeStampedModel):
 
         endorsed_members_count = user_insurance.endorse_members.filter((Q(mail_status=EndorsementRequest.MAIL_PENDING) | Q(mail_status__isnull=True)), ~Q(status=EndorsementRequest.PENDING)).count()
         endorsed_approved_members_count = user_insurance.endorse_members.filter((Q(mail_status=EndorsementRequest.MAIL_PENDING) | Q(mail_status__isnull=True)), Q(status=EndorsementRequest.APPROVED)).count()
+
+        pending_members = user_insurance.endorse_members.filter(Q(mail_status=EndorsementRequest.MAIL_PENDING) |
+                                                              Q(mail_status__isnull=True))
+        for member in pending_members:
+            member.mail_status = EndorsementRequest.MAIL_SENT
+            member.save()
         if total_endorsement_members == endorsed_approved_members_count:
             try:
+
                 user_insurance.generate_pdf()
-                EndorsementRequest.process_endorsment_notifications(EndorsementRequest.APPROVED, user_insurance.user)
+                EndorsementRequest.process_endorsment_notifications(EndorsementRequest.APPROVED,
+                                                                    user_insurance.user)
             except Exception as e:
                 logger.error('Insurance coi pdf cannot be generated. %s' % str(e))
 
@@ -2187,14 +2199,10 @@ class EndorsementRequest(auth_model.TimeStampedModel):
         if total_endorsement_members == endorsed_members_count:
             try:
                 user_insurance.generate_pdf()
-                EndorsementRequest.process_endorsment_notifications(EndorsementRequest.PARTIAL_APPROVED, user_insurance.user)
+                EndorsementRequest.process_endorsment_notifications(EndorsementRequest.PARTIAL_APPROVED,
+                                                                    user_insurance.user)
             except Exception as e:
                 logger.error('Insurance coi pdf cannot be generated. %s' % str(e))
-        pending_members = user_insurance.endorse_members.filter(Q(mail_status=EndorsementRequest.MAIL_PENDING) |
-                                                              Q(mail_status__isnull=True))
-        for member in pending_members:
-            member.mail_status = EndorsementRequest.MAIL_SENT
-            member.save()
 
     def reject_endorsement(self):
         user_insurance = self.insurance

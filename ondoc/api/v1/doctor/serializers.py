@@ -511,6 +511,7 @@ class DoctorHospitalSerializer(serializers.ModelSerializer):
         resp = Doctor.get_insurance_details(user)
 
         # enabled for online booking check
+        resp['error_message'] = ""
         doctor_clinic = obj.doctor_clinic
         doctor = doctor_clinic.doctor
         hospital = doctor_clinic.hospital
@@ -535,8 +536,10 @@ class DoctorHospitalSerializer(serializers.ModelSerializer):
                     resp['is_insurance_covered'] = True
                 if specialization == InsuranceDoctorSpecializations.SpecializationMapping.GYNOCOLOGIST and doctor_specialization_count_dict.get(specialization, {}).get('count') >= settings.INSURANCE_GYNECOLOGIST_LIMIT:
                     resp['is_insurance_covered'] = False
+                    resp['error_message'] = "You have already utilised {} Gynaecologist consultations available in your OPD Insurance Plan.".format(settings.INSURANCE_GYNOLOGIST_LIMIT)
                 elif specialization == InsuranceDoctorSpecializations.SpecializationMapping.ONCOLOGIST and doctor_specialization_count_dict.get(specialization, {}).get('count') >= settings.INSURANCE_ONCOLOGIST_LIMIT:
                     resp['is_insurance_covered'] = False
+                    resp['error_message'] = "You have already utilised {} Onccologist consultations available in your OPD Insurance Plan.".format(settings.INSURANCE_ONCOLOGIST_LIMIT)
                 else:
                     resp['is_insurance_covered'] = True
 
