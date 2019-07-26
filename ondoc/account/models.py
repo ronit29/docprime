@@ -2353,6 +2353,7 @@ class PaymentProcessStatus(TimeStampedModel):
 class AdvanceMerchantAmount(TimeStampedModel):
     merchant = models.ForeignKey(Merchant, on_delete=models.DO_NOTHING, null=False, blank=False)
     amount = models.DecimalField(max_digits=10, decimal_places=2, default=None, null=True, blank=True)
+    total_balance = models.DecimalField(max_digits=10, decimal_places=2, default=None, null=True, blank=True)
 
     class Meta:
         db_table = "advance_merchant_amount"
@@ -2423,9 +2424,11 @@ class AdvanceMerchantPayout(TimeStampedModel):
                 adv_amt_obj = AdvanceMerchantAmount.objects.filter(merchant_id=mp.paid_to_id).first()
                 if adv_amt_obj and adv_amt_obj.amount:
                     adv_amt_obj.amount = decimal.Decimal(adv_amt_obj.amount) + mp.payable_amount
+                    adv_amt_obj.total_balance = decimal.Decimal(adv_amt_obj.amount) + mp.payable_amount
                 else:
                     adv_amt_obj = AdvanceMerchantAmount(merchant_id=mp.paid_to_id)
                     adv_amt_obj.amount = mp.payable_amount
+                    adv_amt_obj.total_balance = mp.payable_amount
                 adv_amt_obj.save()
                 print("payout id " + str(mp.id) + " saved")
 
