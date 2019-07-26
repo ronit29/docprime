@@ -731,12 +731,13 @@ class Order(TimeStampedModel):
 
         # if order is done without PG transaction, then make an async task to create a dummy transaction and set it.
         # if insurance_ids or user_plan_ids:
-        try:
-            transaction.on_commit(
-                lambda: set_order_dummy_transaction.apply_async((self.id, self.get_user_id(),),
-                                                                countdown=5))
-        except Exception as e:
-            logger.error(str(e))
+	if not self.getTransactions():
+		try:
+		    transaction.on_commit(
+		        lambda: set_order_dummy_transaction.apply_async((self.id, self.get_user_id(),),
+		                                                        countdown=5))
+		except Exception as e:
+		    logger.error(str(e))
 
         money_pool = MoneyPool.objects.create(wallet=total_wallet_used, cashback=total_cashback_used, logs=[])
 
