@@ -438,6 +438,7 @@ class DoctorSearchHelper:
             else:
                 search_distance = " and case when (%(max_distance)s) >= 0  then St_dwithin( St_setsrid(St_point((%(longitude)s), (%(latitude)s)), 4326), h.location, (%(max_distance)s))" \
                            " else St_dwithin( St_setsrid(St_point((%(longitude)s), (%(latitude)s)), 4326), h.location, h.search_distance ) end "
+
             if min_distance>0:
                 min_dist_cond = " and St_dwithin(St_setsrid(St_point((%(longitude)s), (%(latitude)s)), 4326 ), h.location, (%(min_distance)s)) = false "
 
