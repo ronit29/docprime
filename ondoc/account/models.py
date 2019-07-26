@@ -32,6 +32,7 @@ from django.contrib.contenttypes.fields import GenericForeignKey
 from django.contrib.contenttypes.models import ContentType
 import string
 import random
+import decimal
 
 logger = logging.getLogger(__name__)
 
@@ -482,8 +483,8 @@ class Order(TimeStampedModel):
             all_txn = self.txn.all()
         elif self.dummy_txn.exists():
             all_txn = self.dummy_txn.all()
-        elif self.parent and self.parent.dummy_txn.exists():
-            all_txn = self.parent.dummy_txn.all()
+        # elif self.parent and self.parent.dummy_txn.exists():
+        #     all_txn = self.parent.dummy_txn.all()
         return all_txn
 
     @classmethod
@@ -731,9 +732,7 @@ class Order(TimeStampedModel):
         # if order is done without PG transaction, then make an async task to create a dummy transaction and set it.
         if not self.getTransactions():
             try:
-                transaction.on_commit(
-                    lambda: set_order_dummy_transaction.apply_async((self.id, self.get_user_id(),),
-                                                                    countdown=5))
+                transaction.on_commit(lambda: set_order_dummy_transaction.apply_async((self.id, self.get_user_id(),), countdown=5))
             except Exception as e:
                 logger.error(str(e))
 
@@ -1588,6 +1587,7 @@ class MerchantPayout(TimeStampedModel):
     booking_type = models.IntegerField(null=True, blank=True, choices=BookingTypeChoices)
     tds_amount = models.DecimalField(max_digits=10, decimal_places=2, default=None, null=True, blank=True)
     recreated_from = models.ForeignKey('self', on_delete=models.DO_NOTHING, null=True, blank=True)
+    remarks = models.TextField(max_length=100, null=True, blank=True)
 
     def save(self, *args, **kwargs):
 
@@ -1598,11 +1598,10 @@ class MerchantPayout(TimeStampedModel):
         if self.id and not self.is_insurance_premium_payout() and hasattr(self,'process_payout') and self.process_payout and self.status==self.PENDING and self.type==self.AUTOMATIC:
             self.type = self.AUTOMATIC
             self.update_billed_to_content_type()
-
             # if not self.content_object:
             #     self.content_object = self.get_billed_to()
-            if not self.paid_to:
-                self.paid_to = self.get_merchant()
+            # if not self.paid_to:
+            #     self.paid_to = self.get_merchant()
 
             try:
                 has_txn, order_data, appointment = self.has_transaction()
@@ -1638,24 +1637,6 @@ class MerchantPayout(TimeStampedModel):
 
         if first_instance:
             MerchantPayout.objects.filter(id=self.id).update(payout_ref_id=self.id)
-
-            appointment = self.get_corrosponding_appointment()
-
-            if appointment and appointment.insurance and self.id and not self.is_insurance_premium_payout() and self.status==self.PENDING:
-                self.type = self.AUTOMATIC
-                # if not self.content_object:
-                #     self.content_object = self.get_billed_to()
-                # if not self.paid_to:
-                #     self.paid_to = self.get_merchant()
-
-                try:
-                    has_txn, order_data, appointment = self.has_transaction()
-                    if not has_txn:
-                        transaction.on_commit(lambda: set_order_dummy_transaction.apply_async((order_data.id, appointment.user_id,)))
-                except Exception as e:
-                    logger.error(str(e))
-            # self.payout_ref_id = self.id
-            # self.save()
 
     # @classmethod
     # def creating_pending_insurance_transactions(cls):
@@ -2125,7 +2106,7 @@ class MerchantPayout(TimeStampedModel):
 
     def recreate_failed_payouts(self):
         # # recreate payout only when status is failed
-        if self.status == self.FAILED_FROM_DETAIL or self.status == self.FAILED_FROM_QUEUE:
+        if self.status == self.FAILED_FROM_DETAIL or self.status == self.FAILED_FROM_QUEUE or self.merchant_has_advance_payment():
             new_obj = MerchantPayout(recreated_from=self)
             new_obj.payable_amount = self.payable_amount
             new_obj.charged_amount = self.charged_amount
@@ -2144,20 +2125,58 @@ class MerchantPayout(TimeStampedModel):
 
     def update_billed_to_content_type(self):
         merchant = self.get_merchant()
-        current_associated_merchant = AssociatedMerchant.objects.filter(merchant_id=merchant.id, object_id=self.object_id, content_type_id=self.content_type_id).first()
-        if current_associated_merchant and current_associated_merchant.verified:
-            pass
-        else:
-            appt = self.get_appointment()
-            if appt and appt.get_billed_to:
-                billed_to = appt.get_billed_to
-                self.content_object = billed_to
+        if merchant:
+            current_associated_merchant = AssociatedMerchant.objects.filter(merchant_id=merchant.id, object_id=self.object_id, content_type_id=self.content_type_id).first()
+            if current_associated_merchant and current_associated_merchant.verified:
+                pass
+            else:
+                appt = self.get_appointment()
+                if appt and appt.get_billed_to:
+                    billed_to = appt.get_billed_to
+                    self.content_object = billed_to
 
-            content_type = ContentType.objects.get_for_model(billed_to)
-            am = AssociatedMerchant.objects.filter(content_type_id=content_type, object_id=billed_to.id).first()
-            if am and not am.merchant_id == self.paid_to_id:
-                if appt and appt.get_merchant:
-                    self.paid_to = appt.get_merchant
+                content_type = ContentType.objects.get_for_model(billed_to)
+                am = AssociatedMerchant.objects.filter(content_type_id=content_type, object_id=billed_to.id).first()
+                if am and not am.merchant_id == self.paid_to_id:
+                    if appt and appt.get_merchant:
+                        self.paid_to = appt.get_merchant
+
+    @transaction.atomic
+    def get_advance_amount_obj(self):
+        adv_amt_obj = AdvanceMerchantAmount.objects.select_for_update().filter(merchant_id=self.paid_to_id).first()
+        return adv_amt_obj
+
+    def merchant_has_advance_payment(self):
+        adv_amt_obj = self.get_advance_amount_obj()
+        if adv_amt_obj and adv_amt_obj.amount > 0:
+            return True
+
+        return False
+
+    def get_advance_balance(self):
+        adv_amt_obj = self.get_advance_amount_obj()
+        if adv_amt_obj:
+            return adv_amt_obj.amount
+
+        return None
+
+    @transaction.atomic
+    def update_payout_for_advance_available(self):
+        adv_amt_obj = self.get_advance_amount_obj()
+        balance = self.get_advance_balance()
+        if balance > 0:
+            if balance >= self.payable_amount:
+                self.status = self.PAID
+                self.remarks = "Marked as Paid from advance payout"
+                adv_amt_obj.amount = balance - self.payable_amount
+            elif balance < self.payable_amount:
+                remaining_amt = self.payable_amount - balance
+                self.remarks = "Total payable {}, Paid {} from advance payout".format(self.payable_amount, balance)
+                self.payable_amount = remaining_amt
+                adv_amt_obj.amount = 0.0
+            adv_amt_obj.save()
+            self.payout_ref_id = self.id
+            self.save()
 
     class Meta:
         db_table = "merchant_payout"
@@ -2272,7 +2291,6 @@ class MerchantPayoutBulkProcess(TimeStampedModel):
             logger.error("Error in processing bulk payout - with exception - " + str(e))
 
 
-
 class PgStatusCode(TimeStampedModel):
     code = models.PositiveSmallIntegerField(default=1)
     message = models.TextField(blank=False, null=False)
@@ -2328,3 +2346,90 @@ class PaymentProcessStatus(TimeStampedModel):
                 return PaymentProcessStatus.SUCCESS
 
         return PaymentProcessStatus.FAILURE
+
+
+class AdvanceMerchantAmount(TimeStampedModel):
+    merchant = models.ForeignKey(Merchant, on_delete=models.DO_NOTHING, null=False, blank=False)
+    amount = models.DecimalField(max_digits=10, decimal_places=2, default=None, null=True, blank=True)
+    total_amount = models.DecimalField(max_digits=10, decimal_places=2, default=None, null=True, blank=True)
+
+    class Meta:
+        db_table = "advance_merchant_amount"
+
+
+class AdvanceMerchantPayout(TimeStampedModel):
+    PENDING = 1
+    ATTEMPTED = 2
+    PAID = 3
+    INITIATED = 4
+    INPROCESS = 5
+    FAILED_FROM_QUEUE = 6
+    FAILED_FROM_DETAIL = 7
+    AUTOMATIC = 1
+    MANUAL = 2
+
+    DoctorPayout = Order.DOCTOR_PRODUCT_ID
+    LabPayout = Order.LAB_PRODUCT_ID
+    InsurancePremium = Order.INSURANCE_PRODUCT_ID
+    BookingTypeChoices = [(DoctorPayout, 'Doctor Booking'), (LabPayout, 'Lab Booking'),
+                          (InsurancePremium, 'Insurance Purchase')]
+
+    NEFT = "NEFT"
+    IMPS = "IMPS"
+    IFT = "IFT"
+    INTRABANK_IDENTIFIER = "KKBK"
+    STATUS_CHOICES = [(PENDING, 'Pending'), (ATTEMPTED, 'ATTEMPTED'), (PAID, 'Paid'), (INITIATED, 'Initiated'),
+                      (INPROCESS, 'In Process'), (FAILED_FROM_QUEUE, 'Failed from Queue'),
+                      (FAILED_FROM_DETAIL, 'Failed from Detail')]
+    PAYMENT_MODE_CHOICES = [(NEFT, 'NEFT'), (IMPS, 'IMPS'), (IFT, 'IFT')]
+    TYPE_CHOICES = [(AUTOMATIC, 'Automatic'), (MANUAL, 'Manual')]
+
+    payment_mode = models.CharField(max_length=100, blank=True, null=True, choices=PAYMENT_MODE_CHOICES)
+    payout_ref_id = models.IntegerField(null=True, unique=True)
+    charged_amount = models.DecimalField(max_digits=10, decimal_places=2)
+    payable_amount = models.DecimalField(max_digits=10, decimal_places=2)
+    payout_approved = models.BooleanField(default=False)
+    status = models.PositiveIntegerField(default=PENDING, choices=STATUS_CHOICES)
+    payout_time = models.DateTimeField(null=True, blank=True)
+    request_data = JSONField(blank=True, default='', editable=False)
+    api_response = JSONField(blank=True, null=True)
+    status_api_response = JSONField(blank=True, default='', editable=False)
+    retry_count = models.PositiveIntegerField(default=0)
+    paid_to = models.ForeignKey(Merchant, on_delete=models.DO_NOTHING, null=True)
+    utr_no = models.CharField(max_length=500, blank=True, default='')
+    pg_status = models.CharField(max_length=500, blank=True, default='')
+    type = models.PositiveIntegerField(default=None, choices=TYPE_CHOICES, null=True, blank=True)
+    amount_paid = models.DecimalField(max_digits=10, decimal_places=2, default=None, null=True, blank=True)
+    content_type = models.ForeignKey(ContentType, on_delete=models.CASCADE, null=True, blank=True)
+    object_id = models.PositiveIntegerField(null=True, blank=True)
+    content_object = GenericForeignKey()
+    booking_type = models.IntegerField(null=True, blank=True, choices=BookingTypeChoices)
+    tds_amount = models.DecimalField(max_digits=10, decimal_places=2, default=None, null=True, blank=True)
+    recreated_from = models.ForeignKey('self', on_delete=models.DO_NOTHING, null=True, blank=True)
+
+    class Meta:
+        db_table = "advance_merchant_payout"
+
+    @classmethod
+    def copy_nodel2_merchant_payouts(cls, payout_ids):
+        mps = MerchantPayout.objects.filter(id__in=payout_ids)
+        for mp in mps:
+            with transaction.atomic():
+                advance_payout_obj = AdvanceMerchantPayout(id=mp.id)
+                advance_payout_obj.__dict__ = mp.__dict__.copy()
+                advance_payout_obj.save()
+                # Save total amount
+                adv_amt_obj = AdvanceMerchantAmount.objects.filter(merchant_id=mp.paid_to_id).first()
+                if adv_amt_obj and adv_amt_obj.amount:
+                    adv_amt_obj.amount = decimal.Decimal(adv_amt_obj.amount) + mp.payable_amount
+                    adv_amt_obj.total_amount = decimal.Decimal(adv_amt_obj.amount) + mp.payable_amount
+                else:
+                    adv_amt_obj = AdvanceMerchantAmount(merchant_id=mp.paid_to_id)
+                    adv_amt_obj.amount = mp.payable_amount
+                    adv_amt_obj.total_amount = mp.payable_amount
+                adv_amt_obj.save()
+                print("payout id " + str(mp.id) + " saved")
+
+
+
+

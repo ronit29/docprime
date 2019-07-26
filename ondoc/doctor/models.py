@@ -2737,6 +2737,8 @@ class OpdAppointment(auth_model.TimeStampedModel, CouponsMixin, OpdAppointmentIn
             except Exception as e:
                 logger.error(str(e))
 
+        if old_instance and old_instance.status != self.COMPLETED and self.status == self.COMPLETED:
+            self.check_merchant_payout_action()
         # try:
         #     if self.status not in [OpdAppointment.COMPLETED, OpdAppointment.CANCELLED, OpdAppointment.ACCEPTED]:
         #         countdown = self.get_auto_cancel_delay(self)
@@ -2818,13 +2820,16 @@ class OpdAppointment(auth_model.TimeStampedModel, CouponsMixin, OpdAppointmentIn
         self.update_net_revenues(tds)
 
         payout_data = {
-            "charged_amount" : self.effective_price,
-            "payable_amount" : payout_amount,
-            "booking_type"  : Order.DOCTOR_PRODUCT_ID,
-            "tds_amount" : tds
+            "charged_amount": self.effective_price,
+            "payable_amount": payout_amount,
+            "booking_type": Order.DOCTOR_PRODUCT_ID,
+            "tds_amount": tds
         }
 
-        merchant_payout = MerchantPayout.objects.create(**payout_data)
+        merchant_payout = MerchantPayout(**payout_data)
+        merchant_payout.paid_to = self.get_merchant
+        merchant_payout.content_object = self.get_billed_to
+        merchant_payout.save()
         self.merchant_payout = merchant_payout
 
         # TDS Deduction
@@ -2832,6 +2837,22 @@ class OpdAppointment(auth_model.TimeStampedModel, CouponsMixin, OpdAppointmentIn
             merchant = self.get_merchant
             MerchantTdsDeduction.objects.create(merchant=merchant, tds_deducted=tds, financial_year=settings.CURRENT_FINANCIAL_YEAR,
                                                 merchant_payout=merchant_payout)
+
+    def check_merchant_payout_action(self):
+        from ondoc.notification.tasks import set_order_dummy_transaction
+        # check for advance payment
+        merchant_payout = self.merchant_payout
+        if merchant_payout:
+            if self.payment_type == 1 and merchant_payout.merchant_has_advance_payment():
+                merchant_payout.update_payout_for_advance_available()
+
+            if self.insurance and merchant_payout.id and not merchant_payout.is_insurance_premium_payout() and merchant_payout.status == merchant_payout.PENDING:
+                try:
+                    has_txn, order_data, appointment = merchant_payout.has_transaction()
+                    if not has_txn:
+                        transaction.on_commit(lambda: set_order_dummy_transaction.apply_async((order_data.id, appointment.user_id,)))
+                except Exception as e:
+                    logger.error(str(e))
 
     def doc_payout_amount(self):
         amount = 0
