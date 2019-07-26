@@ -2177,6 +2177,7 @@ class MerchantPayout(TimeStampedModel):
                 self.payable_amount = remaining_amt
                 adv_amt_obj.amount = 0.0
             adv_amt_obj.save()
+            self.payout_ref_id = self.id
             self.save()
 
     class Meta:
