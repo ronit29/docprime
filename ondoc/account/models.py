@@ -2148,7 +2148,7 @@ class MerchantPayout(TimeStampedModel):
 
     def merchant_has_advance_payment(self):
         adv_amt_obj = self.get_advance_amount_obj()
-        if adv_amt_obj:
+        if adv_amt_obj and adv_amt_obj.amount > 0:
             return True
 
         return False
