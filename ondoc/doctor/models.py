@@ -4498,3 +4498,26 @@ class SimilarSpecializationGroupMapping(models.Model):
 
     class Meta:
         db_table = "similar_specialization_group_mapping"
+
+
+
+class PurchaseOrderCreation(auth_model.TimeStampedModel):
+    HOSPITAL = 1
+    LAB = 2
+    provider_choices = (('hospital', HOSPITAL), ('lab', LAB))
+    provider_type = models.IntegerField(choices=provider_choices)
+    provider_name = models.CharField(max_length=500)
+    gst_number = models.CharField(max_length=1000)
+    total_amount_paid = models.IntegerField(help_text='Inclusive of GST')
+    active_till = models.DateTimeField()
+    appointment_count = models.IntegerField()
+    agreement_details = models.TextField()
+    invoice_no = models.CharField(max_length=1000, null=True, blank=True, help_text='Either enter a valid invoice number or upload the invoice image')
+    invoice_image = models.FileField(upload_to='qrcode', validators=[
+        FileExtensionValidator(allowed_extensions=['pdf', 'jfif', 'jpg', 'jpeg', 'png'])], null=True, blank=True)
+
+
+
+    class Meta:
+        db_table = 'purchase_order_creation'
+
