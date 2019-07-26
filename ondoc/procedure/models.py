@@ -253,7 +253,7 @@ class IpdProcedureLead(auth_model.TimeStampedModel):
             if database_obj and self.status != database_obj.status:
                 update_status_in_matrix = True
                 push_to_history = True
-        super().save(*args, **kwargs)
+        # super().save(*args, **kwargs)
         if push_to_history:
             AppointmentHistory.create(content_object=self)
         super().save(*args, **kwargs)
