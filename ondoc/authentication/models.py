@@ -378,6 +378,12 @@ class User(AbstractBaseUser, PermissionsMixin):
         return active_insurance if active_insurance and active_insurance.is_valid() else None
 
     @cached_property
+    def onhold_insurance(self):
+        from ondoc.insurance.models import UserInsurance
+        onhold_insurance = self.purchased_insurance.filter(status=UserInsurance.ONHOLD).order_by('-id').first()
+        return onhold_insurance if onhold_insurance else None
+
+    @cached_property
     def recent_opd_appointment(self):
         return self.appointments.filter(created_at__gt=timezone.now() - timezone.timedelta(days=90)).order_by('-id')
 
