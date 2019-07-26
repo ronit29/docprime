@@ -3767,6 +3767,7 @@ class PracticeSpecialization(auth_model.TimeStampedModel, SearchKey):
     doctor_count = models.PositiveIntegerField(default=0, null=True)
     is_insurance_enabled = models.BooleanField(default=True)
     priority = models.PositiveIntegerField(default=0, null=True)
+    search_distance = models.FloatField(default=None, blank=True, null=True)
 
     class Meta:
         db_table = 'practice_specialization'
