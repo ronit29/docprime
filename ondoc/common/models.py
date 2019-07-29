@@ -1,6 +1,6 @@
 from django.contrib.postgres.fields import JSONField
 from django.core.validators import FileExtensionValidator, MinValueValidator, MaxValueValidator
-from django.db import models
+from django.db import models, transaction
 from weasyprint import HTML, CSS
 import string
 import random
@@ -734,3 +734,53 @@ class VirtualAppointment(TimeStampedModel):
 
     class Meta:
         db_table = 'virtual_appointment'
+
+    def save(self, *args, **kwargs):
+        database_instance = None
+        if self.id:
+            database_instance = self.__class__.objects.filter(pk=self.id).first()
+        push_to_matrix = False
+        if (not database_instance) or (database_instance and database_instance.time_slot_start != database_instance):
+            push_to_matrix = True
+        super().save(*args, **kwargs)
+        transaction.on_commit(lambda: self.app_commit_tasks(push_to_matrix=push_to_matrix))
+
+    def app_commit_tasks(self, push_to_matrix):
+        from ondoc.procedure.models import IpdProcedureLead
+        if push_to_matrix:
+            if isinstance(self.content_object, IpdProcedureLead) and hasattr(self.content_object, 'app_commit_tasks'):
+                self.content_object.app_commit_tasks(send_lead_email=False, update_status_in_matrix=True)
+
+
+class MerchantPayoutMixin(object):
+
+    def create_payout_from_appointment(self):
+        from ondoc.doctor.models import OpdAppointment
+        if self.status == self.COMPLETED and self.merchant_payout is None and self.payment_type not in [OpdAppointment.COD]:
+            self.save_merchant_payout()
+            self.update_payout_id(self.merchant_payout_id)
+
+    def update_payout_id(self, payout_id):
+        from ondoc.doctor.models import OpdAppointment
+        from ondoc.diagnostic.models import LabAppointment
+        from ondoc.insurance.models import UserInsurance
+
+        if self.__class__.__name__ == 'OpdAppointment':
+            OpdAppointment.objects.filter(id=self.id).update(merchant_payout_id=payout_id)
+        elif self.__class__.__name__ == 'LabAppointment':
+            LabAppointment.objects.filter(id=self.id).update(merchant_payout_id=payout_id)
+        elif self.__class__.__name__ == 'UserInsurance':
+            UserInsurance.objects.filter(id=self.id).update(merchant_payout_id=payout_id)
+
+
+class Fraud(auth_model.TimeStampedModel):
+    content_type = models.ForeignKey(ContentType, on_delete=models.DO_NOTHING)
+    object_id = models.PositiveIntegerField()
+    content_object = GenericForeignKey()
+    user = models.ForeignKey(auth_model.User, on_delete=models.SET_NULL, null=True, blank=True)
+    reason = models.TextField(max_length=300)
+
+    class Meta:
+        db_table = 'fraud'
+        unique_together = ('content_type', 'object_id',)
+

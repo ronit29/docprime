@@ -947,16 +947,21 @@ class LabAppointmentAdmin(nested_admin.NestedModelAdmin):
     form = LabAppointmentForm
     search_fields = ['id']
     list_display = (
-        'booking_id', 'get_profile', 'get_lab', 'status', 'reports_uploaded', 'time_slot_start', 'effective_price', 'get_profile_email',
-        'get_profile_age', 'get_insurance', 'is_prescription_uploaded', 'created_at', 'updated_at', 'get_lab_test_name')
+        'booking_id', 'get_profile', 'get_lab', 'status', 'reports_uploaded', 'time_slot_start', 'effective_price',
+        'get_profile_email', 'get_profile_age', 'get_insurance', 'is_prescription_uploaded',
+        'get_is_fraud', 'created_at', 'updated_at', 'get_lab_test_name')
     list_filter = ('status', 'payment_type')
     date_hierarchy = 'created_at'
     list_display_links = ('booking_id', 'get_insurance',)
 
-    inlines = [
-        LabReportInline,
-        LabPrescriptionInline
-    ]
+    inlines = [LabReportInline, LabPrescriptionInline, FraudInline]
+
+    def get_is_fraud(self, obj):
+        if obj.is_fraud_appointment:
+            return "True"
+        else:
+            return "False"
+    get_is_fraud.short_description = 'Is Fraud'
 
     def get_insurance(self, obj):
         if obj.insurance:
@@ -1271,6 +1276,16 @@ class LabAppointmentAdmin(nested_admin.NestedModelAdmin):
 
     def user_id(self, obj):
         return obj.user.id
+
+    def save_formset(self, request, form, formset, change):
+        if formset.model != Fraud:
+            return super(LabAppointmentAdmin, self).save_formset(request, form, formset, change)
+        instances = formset.save(commit=False)
+        for instance in instances:
+            if not instance.pk:
+                instance.user = request.user
+                return super(LabAppointmentAdmin, self).save_formset(request, form, formset, change)
+        formset.save_m2m()
 
     @transaction.atomic
     def save_model(self, request, obj, form, change):

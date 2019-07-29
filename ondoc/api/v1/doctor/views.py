@@ -89,6 +89,7 @@ import random
 from ondoc.prescription import models as pres_models
 from ondoc.api.v1.prescription import serializers as pres_serializers
 from django.template.defaultfilters import slugify
+from packaging.version import parse
 
 class CreateAppointmentPermission(permissions.BasePermission):
     message = 'creating appointment is not allowed.'
@@ -245,6 +246,8 @@ class DoctorAppointmentsViewSet(OndocViewSet):
         # data['is_appointment_insured'], data['insurance_id'], data[
         #     'insurance_message'] = Cart.check_for_insurance(validated_data,request)
         if user_insurance:
+            if user_insurance.status == UserInsurance.ONHOLD:
+                return Response(status=status.HTTP_400_BAD_REQUEST, data={'error': 'Your documents from the last claim are under verification.Please write to customercare@docprime.com for more information'})
             hospital = validated_data.get('hospital')
             doctor = validated_data.get('doctor')
 
@@ -293,7 +296,7 @@ class DoctorAppointmentsViewSet(OndocViewSet):
             cart_item.save()
         else:
             cart_item, is_new = Cart.objects.update_or_create(id=cart_item_id, deleted_at__isnull=True, product_id=account_models.Order.DOCTOR_PRODUCT_ID,
-                                                  user=request.user,defaults={"data": data})
+                                                  user=request.user, defaults={"data": data})
 
         resp = None
         if hasattr(request, 'agent') and request.agent:
@@ -352,6 +355,9 @@ class DoctorAppointmentsViewSet(OndocViewSet):
         user = request.user
         balance = 0
         cashback_balance = 0
+
+        if user and user.active_insurance and user.active_insurance.status == UserInsurance.ONHOLD:
+            return Response(status=status.HTTP_400_BAD_REQUEST, data={'error': 'There is some problem, Please try again later'})
 
         if use_wallet:
             consumer_account = account_models.ConsumerAccount.objects.get_or_create(user=user)
@@ -984,6 +990,7 @@ class DoctorProfileUserViewSet(viewsets.GenericViewSet):
 
         hospital = None
         potential_ipd = False
+        all_cities = []
         all_ipd_cities = set(PotentialIpdCity.objects.all().values_list('city', flat=True))
         if doctor_clinics:
             for doc_clinic in doctor_clinics:
@@ -991,6 +998,8 @@ class DoctorProfileUserViewSet(viewsets.GenericViewSet):
                     if doc_clinic.hospital.is_live and doc_clinic.hospital.matrix_city and doc_clinic.hospital.matrix_city.id in all_ipd_cities:
                         potential_ipd = True
                     hospital = doc_clinic.hospital
+                    if not all_cities:
+                        all_cities = hospital.get_all_cities()
                     hosp_reviews_dict = dict()
                     hosp_reviews_dict[hospital.pk] = dict()
                     hosp_reviews_dict[hospital.pk]['google_rating'] = list()
@@ -1024,6 +1033,7 @@ class DoctorProfileUserViewSet(viewsets.GenericViewSet):
 
         response_data['google_rating'] = google_rating
         response_data['potential_ipd'] = potential_ipd
+        response_data['all_cities'] = all_cities
         return Response(response_data)
 
 
@@ -1847,6 +1857,7 @@ class DoctorListViewSet(viewsets.GenericViewSet):
                             resp['parent_url'] = parent_url
 
         specializations = list(models.PracticeSpecialization.objects.filter(id__in=validated_data.get('specialization_ids',[])).values('id','name'))
+        specialization_groups = list(models.SimilarSpecializationGroup.objects.filter(id__in=validated_data.get('group_ids', [])).values('id', 'name'))
         if validated_data.get('url'):
             canonical_url = validated_data.get('url')
         else:
@@ -1910,7 +1921,8 @@ class DoctorListViewSet(viewsets.GenericViewSet):
                          'procedures': procedures, 'procedure_categories': procedure_categories,
                          'ratings': ratings, 'reviews': reviews, 'ratings_title': ratings_title,
                          'bottom_content': bottom_content, 'canonical_url': canonical_url,
-                         'ipd_procedures': ipd_procedures, 'hospital': hospital_req_data})
+                         'ipd_procedures': ipd_procedures, 'hospital': hospital_req_data,
+                         'specialization_groups': specialization_groups})
 
     def get_schema(self, request, response):
 
@@ -2916,7 +2928,8 @@ class OfflineCustomerViewSet(viewsets.GenericViewSet):
                         patient_profile['encrypt_phone_number'] = mob.encrypted_number
                     patient_profile['encrypt_numbers'] = phone_number
         # patient_profile['patient_numbers'] = phone_number
-
+        mrp = appnt.fees if appnt.fees else 0
+        # mrp = appnt.mrp if appnt.payment_type == appnt.COD else mrp_fees
         ret_obj = {}
         ret_obj['patient_name'] = patient_name
         # ret_obj['patient_number'] = phone_number
@@ -2933,11 +2946,8 @@ class OfflineCustomerViewSet(viewsets.GenericViewSet):
         ret_obj['hospital_name'] = appnt.hospital.name
         ret_obj['time_slot_start'] = appnt.time_slot_start
         ret_obj['status'] = appnt.status
-        # ret_obj['mrp'] = appnt.mrp
-        # ret_obj['payment_type'] = appnt.payment_type
-        ret_obj['fees'] = appnt.fees
         #RAJIV YADAV
-        ret_obj['mrp'] = appnt.fees
+        ret_obj['mrp'] = mrp
         ret_obj['hospital'] = HospitalModelSerializer(appnt.hospital).data
         ret_obj['doctor'] = AppointmentRetrieveDoctorSerializer(appnt.doctor).data
         ret_obj['is_docprime'] = False
@@ -3537,7 +3547,7 @@ class OfflineCustomerViewSet(viewsets.GenericViewSet):
         ELIGIBLE = 2
         INITIATED = 3
         PROCESSED = 4
-        billing_status = None
+        billing_status = utr_number = None
         if app.time_slot_start <= timezone.now() and \
                 app.status not in [models.OpdAppointment.COMPLETED, models.OpdAppointment.CANCELLED,
                                    models.OpdAppointment.BOOKED]:
@@ -3552,10 +3562,13 @@ class OfflineCustomerViewSet(viewsets.GenericViewSet):
         elif app.status == models.OpdAppointment.COMPLETED and (
                 app.merchant_payout and app.merchant_payout.status == account_models.MerchantPayout.PAID):
             billing_status = PROCESSED
-        return billing_status
+            if app.merchant_payout and app.merchant_payout.utr_no:
+                utr_number = app.merchant_payout.utr_no
+        return (billing_status, utr_number)
 
-    def get_lab_appointment_list(self, request, user):
+    def get_lab_appointment_list(self, request, user, valid_data):
         from ondoc.diagnostic import models as lab_models
+        from ondoc.api.v1.diagnostic.serializers import LabAppointmentTestMappingSerializer
         mask_data = None
         response = []
         manageable_lab_list = auth_models.GenericLabAdmin.objects.filter(is_disabled=False, user=user) \
@@ -3565,8 +3578,10 @@ class OfflineCustomerViewSet(viewsets.GenericViewSet):
                                                         .prefetch_related('lab__lab_documents', 'mask_number',
                                                                           'profile__insurance',
                                                                           'profile__insurance__user_insurance',
-                                                                          'appointment_prescriptions')\
+                                                                          'appointment_prescriptions', 'test_mappings',
+                                                                          'test_mappings__test', 'reports', 'reports__files')\
                                                         .filter(lab_id__in=manageable_lab_list) \
+                                                        .exclude(status=lab_models.LabAppointment.CREATED)\
                                                         .annotate(pem_type=Case(When(Q(lab__manageable_lab_admins__user=user) &
                                                                  Q(lab__manageable_lab_admins__super_user_permission=True) &
                                                                  Q(lab__manageable_lab_admins__is_disabled=False), then=Value(3)),
@@ -3587,14 +3602,36 @@ class OfflineCustomerViewSet(viewsets.GenericViewSet):
                                                             default=Value(1),
                                                             output_field=IntegerField()
                                                             )
-                                                        )
+                                                        ).distinct('id')
+
+        appointment_id = valid_data.get('appointment_id')
+        if appointment_id:
+            appointment_queryset = appointment_queryset.filter(id=appointment_id)
+
         for app in appointment_queryset:
+            address = ''
             mask_number = app.mask_number.all()
             if mask_number and mask_number[0]:
                 mask_data = mask_number[0].build_data()
+            if app.address:
+                ad = app.address.get('address') if app.address.get('address') else ''
+                loc = app.address.get('locality') if app.address.get('locality') else ''
+                address = ad + ' ' + loc
+            rep_dict = {}
+            files = []
+            for rep in app.reports.all():
+                for file in rep.files.all():
+                    url = request.build_absolute_uri(file.name.url) if file.name else None
+                    files.append(url)
+                rep_dict = {
+                    "updated_at": rep.updated_at,
+                    "details": rep.report_details,
+                    "files": files
+                }
             patient_profile = auth_serializers.UserProfileSerializer(app.profile, context={'request': request}).data
             patient_profile['profile_id'] = app.profile.id if hasattr(app, 'profile') else None
             patient_thumbnail = patient_profile['profile_image']
+            billing_status, utr_number = self.get_app_billing_status(app)
             ret_obj = {}
             ret_obj['id'] = app.id
             ret_obj['deal_price'] = app.deal_price
@@ -3613,14 +3650,19 @@ class OfflineCustomerViewSet(viewsets.GenericViewSet):
             ret_obj['mrp'] = app.price
             ret_obj['mask_data'] = mask_data
             ret_obj['payment_type'] = app.payment_type
-            ret_obj['billing_status'] = self.get_app_billing_status(app)
+            ret_obj['billing_status'] = billing_status
+            ret_obj['utr_number'] = utr_number
             ret_obj['profile'] = patient_profile
             ret_obj['permission_type'] = app.pem_type
             ret_obj['is_docprime'] = True
             ret_obj['patient_thumbnail'] = patient_thumbnail
             ret_obj['type'] = 'lab'
+            ret_obj['address'] = address
+            ret_obj['is_home_pickup'] = app.is_home_pickup
+            ret_obj['home_pickup_charges'] = app.home_pickup_charges
             ret_obj['prescriptions'] = app.get_prescriptions(request)
-            # ret_obj['invoice'] = invoice_data
+            ret_obj['lab_test'] = LabAppointmentTestMappingSerializer(app.test_mappings.all(), many=True).data
+            ret_obj['reports'] = rep_dict
             response.append(ret_obj)
         return response
 
@@ -3633,10 +3675,13 @@ class OfflineCustomerViewSet(viewsets.GenericViewSet):
 
         type = valid_data.get('type')
         if type == serializers.OfflineAppointmentFilterSerializer.LAB:
-            lab_data = self.get_lab_appointment_list(request, request.user)
+            lab_data = self.get_lab_appointment_list(request, request.user, valid_data)
+            if not lab_data:
+                return Response({"status": 0, "error": "data not found"}, status=status.HTTP_404_NOT_FOUND)
             return Response(lab_data)
 
-        online_queryset = get_opd_pem_queryset(request.user, models.OpdAppointment)\
+        online_queryset = get_opd_pem_queryset(request.user, models.OpdAppointment) \
+            .exclude(status=models.OpdAppointment.CREATED)\
             .select_related('profile', 'merchant_payout')\
             .prefetch_related('prescriptions', 'prescriptions__prescription_file', 'mask_number',
                               'profile__insurance', 'profile__insurance__user_insurance', 'eprescription').distinct('id', 'time_slot_start')
@@ -3683,11 +3728,17 @@ class OfflineCustomerViewSet(viewsets.GenericViewSet):
         for app in final_data:
             instance = ONLINE if isinstance(app, models.OpdAppointment) else OFFLINE
             patient_name = is_docprime = effective_price = deal_price = patient_thumbnail = prescription = None
+            if instance == OFFLINE and (hasattr(app.user, 'encrypted_name') and app.user.encrypted_name) and (
+                    (request.META.get('HTTP_PLATFORM') == 'android' and not parse(request.META.get(
+                        'HTTP_APP_VERSION')) > parse(settings.LIST_APPOINTMENTS_VERSION_CHECK_ANDROID_GT[0])) or
+                    (request.META.get('HTTP_PLATFORM') == 'ios' and not parse(request.META.get(
+                        'HTTP_APP_VERSION')) > parse(settings.LIST_APPOINTMENTS_VERSION_CHECK_IOS_GT[0]))):
+                continue
             error_flag = False
             error_message = ''
             phone_number = []
             allowed_actions = []
-            payout_amount = billing_status = None
+            payout_amount = billing_status = utr_number = None
             mask_data = None
             mrp = None
             payment_type = None
@@ -3723,8 +3774,9 @@ class OfflineCustomerViewSet(viewsets.GenericViewSet):
                 is_docprime = True
                 effective_price = app.effective_price
                 # mrp = app.mrp
+                mrp_fees = app.fees if app.fees else 0
                 #RAJIV YADAV
-                mrp = app.fees if app.fees else 0
+                mrp = app.mrp if app.payment_type == app.COD else mrp_fees
                 payment_type = app.payment_type
                 deal_price = app.deal_price
                 mask_number = app.mask_number.all()
@@ -3736,7 +3788,7 @@ class OfflineCustomerViewSet(viewsets.GenericViewSet):
                 patient_profile['profile_id'] = app.profile.id if hasattr(app, 'profile') else None
                 patient_thumbnail = patient_profile['profile_image']
                 patient_name = app.profile.name if hasattr(app, 'profile') else None
-                billing_status = self.get_app_billing_status(app)
+                billing_status, utr_number = self.get_app_billing_status(app)
                 payout_amount = app.merchant_payout.payable_amount if app.merchant_payout else app.fees
                 prescription = app.get_prescriptions(request)
             doc_number = None
@@ -3765,6 +3817,7 @@ class OfflineCustomerViewSet(viewsets.GenericViewSet):
             ret_obj['mask_data'] = mask_data
             ret_obj['payment_type'] = payment_type
             ret_obj['billing_status'] = billing_status
+            ret_obj['utr_number'] = utr_number
             ret_obj['profile'] = patient_profile
             ret_obj['permission_type'] = app.pem_type
             ret_obj['hospital'] = HospitalModelSerializer(app.hospital).data
@@ -4139,6 +4192,7 @@ class HospitalViewSet(viewsets.GenericViewSet):
                                                          'network__hospital_network_documents',
                                                          'hospitalcertification_set',
                                                          'hosp_availability',
+                                                         'question_answer',
                                                          'hospitalspeciality_set', Prefetch('hospitalimage_set',
                                                                                             HospitalImage.objects.all().order_by(
                                                                                                 '-cover_image'))).filter(
@@ -4189,8 +4243,7 @@ class HospitalViewSet(viewsets.GenericViewSet):
                     description += " " + entity.sublocality_value
 
                 title += ' | Book Appointment, Check Doctors List, Reviews, Contact Number'
-                description += """: Get free booking on first appointment.\
-                 Check {} Doctors List, Reviews, Contact Number, Address, Procedures and more.""".format(hospital_obj.name)
+                description += """: Get free booking on first appointment. Check {} Doctors List, Reviews, Contact Number, Address, Procedures and more.""".format(hospital_obj.name)
             canonical_url = entity.url
         else:
             response['breadcrumb'] = None
@@ -4446,6 +4499,14 @@ class IpdProcedureViewSet(viewsets.GenericViewSet):
         obj_created = IpdProcedureLead(**validated_data)
         obj_created.save()
         return Response(serializers.IpdProcedureLeadSerializer(obj_created).data)
+
+    def update_lead(self, request):
+        serializer = serializers.IpdLeadUpdateSerializerPopUp(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        validated_data = serializer.validated_data
+        temp_id = validated_data.pop('id')
+        IpdProcedureLead.objects.filter(id=temp_id).update(**validated_data)
+        return Response({'message': 'Success'})
 
     def list_by_alphabet(self, request):
         import re

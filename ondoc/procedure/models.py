@@ -221,7 +221,7 @@ class IpdProcedureLead(auth_model.TimeStampedModel):
     requested_date_time = models.DateTimeField(blank=True, null=True, default=None)
     first_name = models.CharField(max_length=100, blank=True, null=True, default=None)
     last_name = models.CharField(max_length=100, blank=True, null=True, default=None)
-
+    matrix_city = models.ForeignKey(MatrixMappedCity, related_name='ipd_lead_in', null=True, default=None, on_delete=models.SET_NULL)
 
     # ADMIN :Is_OpDInsured, Specialization List, appointment list
     # DEFAULTS??
@@ -230,6 +230,8 @@ class IpdProcedureLead(auth_model.TimeStampedModel):
         db_table = "ipd_procedure_lead"
 
     def save(self, *args, **kwargs):
+        if self.matrix_city and not self.city:
+            self.city = self.matrix_city.name
         if (self.first_name or self.last_name) and not self.name:
             self.name = self.first_name + " " + self.last_name
         if self.phone_number and not self.user:
@@ -305,16 +307,17 @@ class IpdProcedureLead(auth_model.TimeStampedModel):
             request_data.update({'LabAppointments': self.user.recent_lab_appointment.count()})
         if self.comments:
             request_data.update({'UserComment': self.comments})
-        utm_tags = self.data.get('utm_tags', None)
-        if utm_tags:
-            if utm_tags.get('utm_medium', None):
-                request_data.update({'UTMMedium': utm_tags.get('utm_medium')})
-            if utm_tags.get('utm_campaign', None):
-                request_data.update({'UtmCampaign': utm_tags.get('utm_campaign')})
-            if utm_tags.get('utm_source', None):
-                request_data.update({'UtmSource': utm_tags.get('utm_source')})
-            if utm_tags.get('utm_term', None):
-                request_data.update({'UtmTerm': utm_tags.get('utm_term')})
+        if self.data:
+            utm_tags = self.data.get('utm_tags', None)
+            if utm_tags:
+                if utm_tags.get('utm_medium', None):
+                    request_data.update({'UTMMedium': utm_tags.get('utm_medium')})
+                if utm_tags.get('utm_campaign', None):
+                    request_data.update({'UtmCampaign': utm_tags.get('utm_campaign')})
+                if utm_tags.get('utm_source', None):
+                    request_data.update({'UtmSource': utm_tags.get('utm_source')})
+                if utm_tags.get('utm_term', None):
+                    request_data.update({'UtmTerm': utm_tags.get('utm_term')})
 
     def is_user_insured(self):
         result = False
@@ -338,6 +341,10 @@ class IpdProcedureLead(auth_model.TimeStampedModel):
             appointment_obj = OpdAppointment.objects.filter(id=self.data.get('opd_appointment_id')).first()
         elif self.data and self.data.get('lab_appointment_id', None):
             appointment_obj = LabAppointment.objects.filter(id=self.data.get('lab_appointment_id')).first()
+
+        latest_virtual_appointment = self.virtual_appointment.all().order_by('-id').first()
+        if latest_virtual_appointment:
+            appointment_obj = latest_virtual_appointment
 
         if appointment_obj:
             appointment_time = appointment_obj.time_slot_start.timestamp()

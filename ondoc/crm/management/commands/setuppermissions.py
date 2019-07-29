@@ -5,7 +5,7 @@ from django.db.models import Q
 
 from ondoc.banner.models import Banner, SliderLocation, BannerLocation, EmailBanner, RecommenderThrough, Recommender
 from ondoc.common.models import PaymentOptions, UserConfig, Feature, Service, Remark, MatrixMappedCity, \
-    MatrixMappedState, GenericNotes, BlacklistUser, BlockedStates, VirtualAppointment
+    MatrixMappedState, GenericNotes, BlacklistUser, BlockedStates, VirtualAppointment, Fraud
 from ondoc.corporate_booking.models import CorporateDeal, Corporates, CorporateDocument
 from ondoc.coupon.models import Coupon, UserSpecificCoupon, RandomGeneratedCoupon
 from ondoc.crm.constants import constants
@@ -68,8 +68,8 @@ from ondoc.ratings_review import models as rating_models
 from ondoc.articles.models import Article, ArticleLinkedUrl, LinkedArticle, ArticleContentBox, ArticleCategory
 
 from ondoc.authentication.models import BillingAccount, SPOCDetails, GenericAdmin, User, Merchant, AssociatedMerchant, \
-    DoctorNumber, UserNumberUpdate
-from ondoc.account.models import MerchantPayout
+    DoctorNumber, UserNumberUpdate, GenericQuestionAnswer
+from ondoc.account.models import MerchantPayout, MerchantPayoutBulkProcess, AdvanceMerchantAmount, AdvanceMerchantPayout
 from ondoc.seo.models import Sitemap, NewDynamic
 from ondoc.elastic.models import DemoElastic
 from ondoc.location.models import EntityUrls, CompareLabPackagesSeoUrls, CompareSEOUrls, CityLatLong
@@ -477,7 +477,7 @@ class Command(BaseCommand):
 
             group.permissions.add(*permissions)
 
-        content_types = ContentType.objects.get_for_models(ArticleLinkedUrl, LinkedArticle, NewDynamic)
+        content_types = ContentType.objects.get_for_models(ArticleLinkedUrl, LinkedArticle, NewDynamic, GenericQuestionAnswer)
 
         for cl, ct in content_types.items():
             permissions = Permission.objects.filter(
@@ -588,7 +588,7 @@ class Command(BaseCommand):
         content_types = ContentType.objects.get_for_models(PaymentOptions, EntityUrls, Feature, Service, Doctor,
                                                            HealthInsuranceProvider, IpdProcedureCategory, Plan,
                                                            PlanFeature, PlanFeatureMapping, UserPlanMapping, UploadImage,
-                                                           Offer, VirtualAppointment, SimilarSpecializationGroup)
+                                                           Offer, VirtualAppointment, SimilarSpecializationGroup, MatrixMappedCity)
 
         for cl, ct in content_types.items():
             permissions = Permission.objects.filter(
@@ -732,7 +732,9 @@ class Command(BaseCommand):
         content_types = ContentType.objects.get_for_models(IpdCostEstimateRoomType, IpdProcedureCostEstimate,
                                                            IpdCostEstimateRoomTypeMapping,
                                                            IpdProcedureLeadCostEstimateMapping,
-                                                           UploadCostEstimateData, VirtualAppointment)
+                                                           UploadCostEstimateData, VirtualAppointment,
+                                                           SimilarSpecializationGroup, PracticeSpecialization,
+                                                           SpecializationDepartment, SpecializationField)
         for cl, ct in content_types.items():
             permissions = Permission.objects.filter(
                 Q(content_type=ct),
@@ -927,11 +929,21 @@ class Command(BaseCommand):
 
             group.permissions.add(*permissions)
 
-        content_types = ContentType.objects.get_for_models(MerchantPayout, UserInsurance, InsurerAccount)
+        content_types = ContentType.objects.get_for_models(MerchantPayout, UserInsurance, InsurerAccount, AdvanceMerchantAmount, AdvanceMerchantPayout)
 
         for cl, ct in content_types.items():
             permissions = Permission.objects.filter(
                 Q(content_type=ct),
+                Q(codename='change_' + ct.model))
+
+            group.permissions.add(*permissions)
+
+        content_types = ContentType.objects.get_for_models(MerchantPayoutBulkProcess)
+
+        for cl, ct in content_types.items():
+            permissions = Permission.objects.filter(
+                Q(content_type=ct),
+                Q(codename='add_' + ct.model) |
                 Q(codename='change_' + ct.model))
 
             group.permissions.add(*permissions)
@@ -1020,7 +1032,7 @@ class Command(BaseCommand):
                                                            UserInsurance, InsuranceDeal, InsuranceLead,
                                                            InsuranceTransaction, InsuranceDiseaseResponse,
                                                            InsuredMembers, InsurerPolicyNumber, InsuranceCancelMaster,
-                                                           EndorsementRequest, InsuredMemberDocument,
+                                                           EndorsementRequest, InsuredMemberDocument, Fraud,
                                                            InsuredMemberHistory, UserBank, UserBankDocument,
                                                            GenericNotes, InsurerAccountTransfer, UserNumberUpdate)
 

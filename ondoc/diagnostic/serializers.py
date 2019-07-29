@@ -8,10 +8,11 @@ class AjaxAvailableLabTestSerializer(serializers.ModelSerializer):
     mrp = serializers.DecimalField(max_digits=10, decimal_places=2)
     custom_agreed_price = serializers.DecimalField(max_digits=10, decimal_places=2, required=False, allow_null=True)    
     custom_deal_price = serializers.DecimalField(max_digits=10, decimal_places=2, required=False, allow_null=True)
+    insurance_agreed_price = serializers.DecimalField(max_digits=10, decimal_places=2, required=False, allow_null=True)
 
     class Meta:
         model = AvailableLabTest
-        fields = ('id', 'lab_pricing_group', 'enabled', 'test', 'mrp', 'custom_agreed_price', 'custom_deal_price')
+        fields = ('id', 'lab_pricing_group', 'enabled', 'test', 'mrp', 'custom_agreed_price', 'custom_deal_price', 'insurance_agreed_price')
         validators = [
             UniqueTogetherValidator(
                 queryset=AvailableLabTest.objects.all(),
