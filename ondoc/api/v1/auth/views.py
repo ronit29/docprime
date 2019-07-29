@@ -2184,7 +2184,8 @@ class TokenFromUrlKey(viewsets.GenericViewSet):
 
 class ProfileEmailUpdateViewset(viewsets.GenericViewSet):
     authentication_classes = (JWTAuthentication, )
-    permission_classes = (IsAuthenticated, IsNotAgent)
+    # permission_classes = (IsAuthenticated, IsNotAgent)
+    permission_classes = (IsAuthenticated, )
 
     def create(self, request):
         request_data = request.data

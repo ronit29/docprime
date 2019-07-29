@@ -282,6 +282,7 @@ def set_order_dummy_transaction(self, order_id, user_id):
     from ondoc.diagnostic.models import LabAppointment
     from ondoc.account.models import User
     from ondoc.account.mongo_models import PgLogs
+    from ondoc.account.models import MerchantPayoutLog
     req_data = dict()
     try:
         order_row = Order.objects.filter(id=order_id).first()
@@ -308,7 +309,12 @@ def set_order_dummy_transaction(self, order_id, user_id):
         url = settings.PG_DUMMY_TRANSACTION_URL
         insurance_data = order_row.get_insurance_data_for_pg()
 
-        name  = ''
+        if appointment.__class__.__name__ in ['LabAppointment', 'OpdAppointment']:
+            if appointment.insurance and not order_row.is_parent() and not insurance_data:
+                MerchantPayoutLog.create_log(None, "refOrderId, insurerCode and refOrderNo not found for order id {}".format(order_row.id))
+                raise Exception("refOrderId, insurerCode, refOrderNo details not found for order id {}".format(order_row.id))
+
+        name = ''
         if isinstance(appointment, OpdAppointment) or isinstance(appointment, LabAppointment):
             name = appointment.profile.name
 
