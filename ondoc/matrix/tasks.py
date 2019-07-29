@@ -1310,4 +1310,7 @@ def check_for_ipd_lead_validity(self, data):
         return
     if obj.is_valid:
         return
-    obj.validate_lead()
+    try:
+        obj.validate_lead()
+    except Exception as e:
+        pass

@@ -236,7 +236,7 @@ class IpdProcedureLead(auth_model.TimeStampedModel):
         if self.matrix_city and not self.city:
             self.city = self.matrix_city.name
         if (self.first_name or self.last_name) and not self.name:
-            self.name = self.first_name if self.first_name else "" + " " + self.last_name if self.last_name else ""
+            self.name = (self.first_name if self.first_name else "") + " " + (self.last_name if self.last_name else "")
         if self.phone_number and not self.user:
             self.user = User.objects.filter(phone_number=self.phone_number, user_type=User.CONSUMER).first()
         send_lead_email = False

@@ -352,7 +352,7 @@ class User(AbstractBaseUser, PermissionsMixin):
                                                     created_at__lte=date_time_to_be_checked,
                                                     created_at__gte=date_time_to_be_checked - timezone.timedelta(
                                                         minutes=settings.LEAD_AND_APPOINTMENT_BUFFER_TIME)).count()
-            if count > 1:
+            if count > 0:
                 any_appointments = True
         return not any_appointments
 
