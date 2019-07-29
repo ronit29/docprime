@@ -54,6 +54,7 @@ class Coupon(auth_model.TimeStampedModel):
     test = models.ManyToManyField("diagnostic.LabTest", blank=True)
     test_categories = models.ManyToManyField("diagnostic.LabTestCategory", blank=True)
     doctors = models.ManyToManyField("doctor.Doctor", blank=True)
+    doctors_exclude = models.ManyToManyField("doctor.Doctor", blank=True, related_name='doctors_exclude')
     hospitals = models.ManyToManyField("doctor.Hospital", blank=True)
     specializations = models.ManyToManyField("doctor.PracticeSpecialization", blank=True)
     procedures = models.ManyToManyField("procedure.Procedure", blank=True)
@@ -342,8 +343,6 @@ class RandomGeneratedCoupon(auth_model.TimeStampedModel):
         db_table = "random_generated_coupon"
 
 
-
-
 class CouponRecommender():
 
     def __init__(self, user, profile, type, product_id, coupon_code, cart_item_id):
@@ -559,6 +558,7 @@ class CouponRecommender():
 
             if doctor_id:
                 coupons = list(filter(lambda x: len(x.doctors.all()) == 0 or doctor_id in list(map(lambda y: y.id, x.doctors.all())), coupons))
+                coupons = list(filter(lambda x: len(x.doctors_exclude.all()) == 0 or doctor_id not in list(map(lambda y: y.id, x.doctors_exclude.all())), coupons))
                 coupons_list = list(coupons)
                 for coupon in coupons:
                     keep_coupon = False
