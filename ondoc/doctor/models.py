@@ -964,19 +964,21 @@ class Doctor(auth_model.TimeStampedModel, auth_model.QCModel, SearchKey, auth_mo
         return resp
 
     def update_deal_price(self):        
-        # will update only this doctor prices and will be called on save    
-        query = '''update doctor_clinic_timing set deal_price = least(
-                    greatest(floor(
-                    case when fees <=0 then mrp*.4 
-                    when mrp<=2000 then
-                    case when (least(fees*1.5, .9*mrp) - fees) >100 then least(fees*1.5, .9*mrp) 
-                    else least(fees+100, mrp) end
-                    else 
-                    case when (least(fees*1.5, fees+.5*(mrp-fees)) - fees )>100
-                    then least(fees*1.5, fees+.5*(mrp-fees))
-                    else
-                    least(fees+100, mrp) end 	
-                    end  /5)*5, fees), mrp) where doctor_clinic_id in (
+        # will update only this doctor prices and will be called on save
+        query = '''update doctor_clinic_timing set deal_price = 
+					case when (custom_deal_price > 0 )
+					then custom_deal_price else floor(				 
+                    case when fees =0 then
+						case when mrp <300 then least((0.5*mrp)/0.75, mrp)
+						else  least( 0.5*mrp + 75 , mrp)
+						end 
+					else
+					case when mrp<300 then 
+					least(greatest(greatest(fees+60, 0.7*mrp), mrp-200)/0.75,mrp)
+					else least(greatest(greatest(fees+60, 0.7*mrp), mrp-200)+75, mrp)
+					end  end)
+					end
+					where doctor_clinic_id in (
                     select id from doctor_clinic where doctor_id=%s and hospital_id!=3560) '''
 
         update_doctor_deal_price = RawSql(query, [self.pk]).execute()
@@ -991,18 +993,20 @@ class Doctor(auth_model.TimeStampedModel, auth_model.QCModel, SearchKey, auth_mo
     @classmethod
     def update_all_deal_price(cls):
         # will update all doctors prices
-        query = '''update doctor_clinic_timing set deal_price = least(
-                    greatest(floor(
-                    case when fees <=0 then mrp*.4 
-                    when mrp<=2000 then
-                    case when (least(fees*1.5, .9*mrp) - fees) >100 then least(fees*1.5, .9*mrp) 
-                    else least(fees+100, mrp) end
-                    else 
-                    case when (least(fees*1.5, fees+.5*(mrp-fees)) - fees )>100
-                    then least(fees*1.5, fees+.5*(mrp-fees))
-                    else
-                    least(fees+100, mrp) end 	
-                    end  /5)*5, fees), mrp) where doctor_clinic_id  in (select id from doctor_clinic where hospital_id!=3560 ) '''
+        query = '''update doctor_clinic_timing set deal_price = 
+					case when (custom_deal_price > 0 )
+					then custom_deal_price else floor(				 
+                    case when fees =0 then
+						case when mrp <300 then least((0.5*mrp)/0.75, mrp)
+						else  least( 0.5*mrp + 75 , mrp)
+						end 
+					else
+					case when mrp<300 then 
+					least(greatest(greatest(fees+60, 0.7*mrp), mrp-200)/0.75,mrp)
+					else least(greatest(greatest(fees+60, 0.7*mrp), mrp-200)+75, mrp)
+					end  end)
+					end
+					 where doctor_clinic_id  in (select id from doctor_clinic where hospital_id!=3560 )  '''
 
         update_all_doctor_deal_price = RawSql(query, []).execute()
 
@@ -1574,6 +1578,7 @@ class DoctorClinicTiming(auth_model.TimeStampedModel):
     type = models.IntegerField(default=1, choices=TYPE_CHOICES)
     cod_deal_price = models.PositiveSmallIntegerField(blank=True, null=True)
     insurance_fees = models.PositiveSmallIntegerField(blank=True, null=True)
+    custom_deal_price = models.PositiveSmallIntegerField(blank=True, null=True)
     # followup_duration = models.PositiveSmallIntegerField(blank=False, null=True)
     # followup_charges = models.PositiveSmallIntegerField(blank=False, null=True)
 
@@ -2740,6 +2745,8 @@ class OpdAppointment(auth_model.TimeStampedModel, CouponsMixin, OpdAppointmentIn
             except Exception as e:
                 logger.error(str(e))
 
+        if old_instance and old_instance.status != self.COMPLETED and self.status == self.COMPLETED:
+            self.check_merchant_payout_action()
         # try:
         #     if self.status not in [OpdAppointment.COMPLETED, OpdAppointment.CANCELLED, OpdAppointment.ACCEPTED]:
         #         countdown = self.get_auto_cancel_delay(self)
@@ -2821,13 +2828,16 @@ class OpdAppointment(auth_model.TimeStampedModel, CouponsMixin, OpdAppointmentIn
         self.update_net_revenues(tds)
 
         payout_data = {
-            "charged_amount" : self.effective_price,
-            "payable_amount" : payout_amount,
-            "booking_type"  : Order.DOCTOR_PRODUCT_ID,
-            "tds_amount" : tds
+            "charged_amount": self.effective_price,
+            "payable_amount": payout_amount,
+            "booking_type": Order.DOCTOR_PRODUCT_ID,
+            "tds_amount": tds
         }
 
-        merchant_payout = MerchantPayout.objects.create(**payout_data)
+        merchant_payout = MerchantPayout(**payout_data)
+        merchant_payout.paid_to = self.get_merchant
+        merchant_payout.content_object = self.get_billed_to
+        merchant_payout.save()
         self.merchant_payout = merchant_payout
 
         # TDS Deduction
@@ -2835,6 +2845,22 @@ class OpdAppointment(auth_model.TimeStampedModel, CouponsMixin, OpdAppointmentIn
             merchant = self.get_merchant
             MerchantTdsDeduction.objects.create(merchant=merchant, tds_deducted=tds, financial_year=settings.CURRENT_FINANCIAL_YEAR,
                                                 merchant_payout=merchant_payout)
+
+    def check_merchant_payout_action(self):
+        from ondoc.notification.tasks import set_order_dummy_transaction
+        # check for advance payment
+        merchant_payout = self.merchant_payout
+        if merchant_payout:
+            if self.payment_type == 1 and merchant_payout.merchant_has_advance_payment():
+                merchant_payout.update_payout_for_advance_available()
+
+            if self.insurance and merchant_payout.id and not merchant_payout.is_insurance_premium_payout() and merchant_payout.status == merchant_payout.PENDING:
+                try:
+                    has_txn, order_data, appointment = merchant_payout.has_transaction()
+                    if not has_txn:
+                        transaction.on_commit(lambda: set_order_dummy_transaction.apply_async((order_data.id, appointment.user_id,)))
+                except Exception as e:
+                    logger.error(str(e))
 
     def doc_payout_amount(self):
         amount = 0
@@ -3775,6 +3801,7 @@ class PracticeSpecialization(auth_model.TimeStampedModel, SearchKey):
     doctor_count = models.PositiveIntegerField(default=0, null=True)
     is_insurance_enabled = models.BooleanField(default=True)
     priority = models.PositiveIntegerField(default=0, null=True)
+    search_distance = models.FloatField(default=None, blank=True, null=True)
 
     class Meta:
         db_table = 'practice_specialization'
