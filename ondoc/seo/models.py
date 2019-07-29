@@ -64,6 +64,7 @@ class NewDynamic(TimeStampedModel):
     url_value = models.TextField(null=False, blank=True)
     is_enabled = models.BooleanField(default=False)
     meta_title = models.CharField(max_length=5000, default='', blank=True)
+    h1_title = models.CharField(max_length=5000, default=None, null=True, blank=True)
     meta_description = models.CharField(max_length=5000, default='', blank=True)
 
     class Meta:

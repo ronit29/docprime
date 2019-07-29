@@ -31,7 +31,8 @@ from ondoc.account import models as account_models
 from ondoc.location.models import EntityUrls, EntityAddress, DefaultRating
 from ondoc.procedure.models import Procedure, ProcedureCategory, CommonProcedureCategory, ProcedureToCategoryMapping, \
     get_selected_and_other_procedures, CommonProcedure, CommonIpdProcedure, IpdProcedure, DoctorClinicIpdProcedure, \
-    IpdProcedureFeatureMapping, IpdProcedureDetail, SimilarIpdProcedureMapping, IpdProcedureLead, Offer
+    IpdProcedureFeatureMapping, IpdProcedureDetail, SimilarIpdProcedureMapping, IpdProcedureLead, Offer, \
+    PotentialIpdCity
 from ondoc.seo.models import NewDynamic
 from . import serializers
 from ondoc.api.v2.doctor import serializers as v2_serializers
@@ -72,8 +73,7 @@ from rest_framework.throttling import AnonRateThrottle
 from ondoc.matrix.tasks import push_order_to_matrix
 from dal import autocomplete
 from django.contrib.staticfiles.templatetags.staticfiles import static
-from django.db.models import Avg
-from django.db.models import Count
+from django.db.models import Count, IntegerField, Avg
 from ondoc.insurance.models import InsuranceThreshold
 import logging
 from ondoc.api.v1.auth import serializers as auth_serializers
@@ -89,6 +89,7 @@ import random
 from ondoc.prescription import models as pres_models
 from ondoc.api.v1.prescription import serializers as pres_serializers
 from django.template.defaultfilters import slugify
+from packaging.version import parse
 
 class CreateAppointmentPermission(permissions.BasePermission):
     message = 'creating appointment is not allowed.'
@@ -245,6 +246,8 @@ class DoctorAppointmentsViewSet(OndocViewSet):
         # data['is_appointment_insured'], data['insurance_id'], data[
         #     'insurance_message'] = Cart.check_for_insurance(validated_data,request)
         if user_insurance:
+            if user_insurance.status == UserInsurance.ONHOLD:
+                return Response(status=status.HTTP_400_BAD_REQUEST, data={'error': 'Your documents from the last claim are under verification.Please write to customercare@docprime.com for more information'})
             hospital = validated_data.get('hospital')
             doctor = validated_data.get('doctor')
 
@@ -293,7 +296,7 @@ class DoctorAppointmentsViewSet(OndocViewSet):
             cart_item.save()
         else:
             cart_item, is_new = Cart.objects.update_or_create(id=cart_item_id, deleted_at__isnull=True, product_id=account_models.Order.DOCTOR_PRODUCT_ID,
-                                                  user=request.user,defaults={"data": data})
+                                                  user=request.user, defaults={"data": data})
 
         resp = None
         if hasattr(request, 'agent') and request.agent:
@@ -352,6 +355,9 @@ class DoctorAppointmentsViewSet(OndocViewSet):
         user = request.user
         balance = 0
         cashback_balance = 0
+
+        if user and user.active_insurance and user.active_insurance.status == UserInsurance.ONHOLD:
+            return Response(status=status.HTTP_400_BAD_REQUEST, data={'error': 'There is some problem, Please try again later'})
 
         if use_wallet:
             consumer_account = account_models.ConsumerAccount.objects.get_or_create(user=user)
@@ -846,7 +852,7 @@ class DoctorProfileUserViewSet(viewsets.GenericViewSet):
         coupon_code = request.query_params.get('coupon_code', None)
         doctor = (models.Doctor.objects
                   .prefetch_related('languages__language',
-                                    'doctor_clinics__hospital',
+                                    'doctor_clinics__hospital__matrix_city',
                                     'doctor_clinics__procedures_from_doctor_clinic__procedure__parent_categories_mapping',
                                     'qualifications__qualification',
                                     'qualifications__specialization',
@@ -878,9 +884,16 @@ class DoctorProfileUserViewSet(viewsets.GenericViewSet):
         spec_ids = list()
         spec_url_dict = dict()
 
+        from ondoc.procedure.models import PotentialIpdLeadPracticeSpecialization
+        all_potential_spec = set(PotentialIpdLeadPracticeSpecialization.objects.all().values_list('practice_specialization', flat=True))
+        is_congot = False
+
         for dps in doctor.doctorpracticespecializations.all():
             general_specialization.append(dps.specialization)
             spec_ids.append(dps.specialization.id)
+            if dps.specialization.id in all_potential_spec:
+                is_congot = True
+
         if spec_ids and entity:
             spec_urls = EntityUrls.objects.filter(specialization_id__in=spec_ids, sublocality_value=entity.sublocality_value,
                                           locality_value=entity.locality_value, is_valid=True, entity_type='Doctor', url_type='SEARCHURL')
@@ -904,6 +917,7 @@ class DoctorProfileUserViewSet(viewsets.GenericViewSet):
 
         hospital = None
         response_data['about_web'] = None
+        response_data['is_congot'] = is_congot
         google_rating = dict()
         date = None
 
@@ -975,10 +989,17 @@ class DoctorProfileUserViewSet(viewsets.GenericViewSet):
                     response_data['doctors']['doctors_url'] = None
 
         hospital = None
+        potential_ipd = False
+        all_cities = []
+        all_ipd_cities = set(PotentialIpdCity.objects.all().values_list('city', flat=True))
         if doctor_clinics:
             for doc_clinic in doctor_clinics:
                 if doc_clinic and doc_clinic.hospital:
+                    if doc_clinic.hospital.is_live and doc_clinic.hospital.matrix_city and doc_clinic.hospital.matrix_city.id in all_ipd_cities:
+                        potential_ipd = True
                     hospital = doc_clinic.hospital
+                    if not all_cities:
+                        all_cities = hospital.get_all_cities()
                     hosp_reviews_dict = dict()
                     hosp_reviews_dict[hospital.pk] = dict()
                     hosp_reviews_dict[hospital.pk]['google_rating'] = list()
@@ -1011,6 +1032,8 @@ class DoctorProfileUserViewSet(viewsets.GenericViewSet):
                     google_rating.update(hosp_reviews_dict)
 
         response_data['google_rating'] = google_rating
+        response_data['potential_ipd'] = potential_ipd
+        response_data['all_cities'] = all_cities
         return Response(response_data)
 
 
@@ -1834,6 +1857,7 @@ class DoctorListViewSet(viewsets.GenericViewSet):
                             resp['parent_url'] = parent_url
 
         specializations = list(models.PracticeSpecialization.objects.filter(id__in=validated_data.get('specialization_ids',[])).values('id','name'))
+        specialization_groups = list(models.SimilarSpecializationGroup.objects.filter(id__in=validated_data.get('group_ids', [])).values('id', 'name'))
         if validated_data.get('url'):
             canonical_url = validated_data.get('url')
         else:
@@ -1889,7 +1913,7 @@ class DoctorListViewSet(viewsets.GenericViewSet):
             reviews = validated_data.get('reviews')
         hospital_req_data = {}
         if validated_data.get('hospital_id'):
-            hospital_req_data = Hospital.objects.filter(id=validated_data.get('hospital_id')).values('id', 'name').first()
+            hospital_req_data = Hospital.objects.filter(id__in=validated_data.get('hospital_id')).values('id', 'name').first()
 
         return Response({"result": response, "count": result_count,
                          'specializations': specializations, 'conditions': conditions, "seo": seo,
@@ -1897,7 +1921,8 @@ class DoctorListViewSet(viewsets.GenericViewSet):
                          'procedures': procedures, 'procedure_categories': procedure_categories,
                          'ratings': ratings, 'reviews': reviews, 'ratings_title': ratings_title,
                          'bottom_content': bottom_content, 'canonical_url': canonical_url,
-                         'ipd_procedures': ipd_procedures, 'hospital': hospital_req_data})
+                         'ipd_procedures': ipd_procedures, 'hospital': hospital_req_data,
+                         'specialization_groups': specialization_groups})
 
     def get_schema(self, request, response):
 
@@ -2416,6 +2441,15 @@ class PracticeSpecializationAutocomplete(autocomplete.Select2QuerySetView):
         return qs
 
 
+class SimilarSpecializationGroupAutocomplete(autocomplete.Select2QuerySetView):
+    def get_queryset(self):
+        qs = models.SimilarSpecializationGroup.objects.all()
+
+        if self.q:
+            qs = qs.filter(name__icontains=self.q).order_by('name')
+        return qs
+
+
 
 class CreateAdminViewSet(viewsets.GenericViewSet):
 
@@ -2894,7 +2928,8 @@ class OfflineCustomerViewSet(viewsets.GenericViewSet):
                         patient_profile['encrypt_phone_number'] = mob.encrypted_number
                     patient_profile['encrypt_numbers'] = phone_number
         # patient_profile['patient_numbers'] = phone_number
-
+        mrp = appnt.fees if appnt.fees else 0
+        # mrp = appnt.mrp if appnt.payment_type == appnt.COD else mrp_fees
         ret_obj = {}
         ret_obj['patient_name'] = patient_name
         # ret_obj['patient_number'] = phone_number
@@ -2911,11 +2946,8 @@ class OfflineCustomerViewSet(viewsets.GenericViewSet):
         ret_obj['hospital_name'] = appnt.hospital.name
         ret_obj['time_slot_start'] = appnt.time_slot_start
         ret_obj['status'] = appnt.status
-        # ret_obj['mrp'] = appnt.mrp
-        # ret_obj['payment_type'] = appnt.payment_type
-        ret_obj['fees'] = appnt.fees
         #RAJIV YADAV
-        ret_obj['mrp'] = appnt.fees
+        ret_obj['mrp'] = mrp
         ret_obj['hospital'] = HospitalModelSerializer(appnt.hospital).data
         ret_obj['doctor'] = AppointmentRetrieveDoctorSerializer(appnt.doctor).data
         ret_obj['is_docprime'] = False
@@ -3510,24 +3542,153 @@ class OfflineCustomerViewSet(viewsets.GenericViewSet):
         else:
             return Response([])
 
-    def list_appointments(self, request):
-        ONLINE = 1
-        OFFLINE = 2
+    def get_app_billing_status(self, app):
         INCOMPLETE = 1
         ELIGIBLE = 2
         INITIATED = 3
         PROCESSED = 4
+        billing_status = utr_number = None
+        if app.time_slot_start <= timezone.now() and \
+                app.status not in [models.OpdAppointment.COMPLETED, models.OpdAppointment.CANCELLED,
+                                   models.OpdAppointment.BOOKED]:
+            billing_status = INCOMPLETE
+        elif app.status == models.OpdAppointment.COMPLETED and (
+                not app.merchant_payout or app.merchant_payout.status not in \
+                [account_models.MerchantPayout.ATTEMPTED, account_models.MerchantPayout.PAID]):
+            billing_status = ELIGIBLE
+        elif app.status == models.OpdAppointment.COMPLETED and (
+                app.merchant_payout and app.merchant_payout.status == account_models.MerchantPayout.ATTEMPTED):
+            billing_status = INITIATED
+        elif app.status == models.OpdAppointment.COMPLETED and (
+                app.merchant_payout and app.merchant_payout.status == account_models.MerchantPayout.PAID):
+            billing_status = PROCESSED
+            if app.merchant_payout and app.merchant_payout.utr_no:
+                utr_number = app.merchant_payout.utr_no
+        return (billing_status, utr_number)
+
+    def get_lab_appointment_list(self, request, user, valid_data):
+        from ondoc.diagnostic import models as lab_models
+        from ondoc.api.v1.diagnostic.serializers import LabAppointmentTestMappingSerializer
+        mask_data = None
+        response = []
+        manageable_lab_list = auth_models.GenericLabAdmin.objects.filter(is_disabled=False, user=user) \
+            .values_list('lab', flat=True)
+        appointment_queryset = lab_models.LabAppointment.objects\
+                                                        .select_related('lab', 'merchant_payout', 'profile')\
+                                                        .prefetch_related('lab__lab_documents', 'mask_number',
+                                                                          'profile__insurance',
+                                                                          'profile__insurance__user_insurance',
+                                                                          'appointment_prescriptions', 'test_mappings',
+                                                                          'test_mappings__test', 'reports', 'reports__files')\
+                                                        .filter(lab_id__in=manageable_lab_list) \
+                                                        .exclude(status=lab_models.LabAppointment.CREATED)\
+                                                        .annotate(pem_type=Case(When(Q(lab__manageable_lab_admins__user=user) &
+                                                                 Q(lab__manageable_lab_admins__super_user_permission=True) &
+                                                                 Q(lab__manageable_lab_admins__is_disabled=False), then=Value(3)),
+                                                            When(Q(lab__manageable_lab_admins__user=user) &
+                                                                 Q(lab__manageable_lab_admins__super_user_permission=False) &
+                                                                 Q(
+                                                                     lab__manageable_lab_admins__permission_type=auth_models.GenericAdmin.BILLINNG) &
+                                                                 ~Q(
+                                                                     lab__manageable_lab_admins__permission_type=auth_models.GenericAdmin.APPOINTMENT) &
+                                                                 Q(lab__manageable_lab_admins__is_disabled=False), then=Value(2)),
+                                                            When(Q(lab__manageable_lab_admins__user=user) &
+                                                                 Q(lab__manageable_lab_admins__super_user_permission=False) &
+                                                                 Q(
+                                                                     lab__manageable_lab_admins__permission_type=auth_models.GenericAdmin.BILLINNG) &
+                                                                 Q(
+                                                                     lab__manageable_lab_admins__permission_type=auth_models.GenericAdmin.APPOINTMENT) &
+                                                                 Q(lab__manageable_lab_admins__is_disabled=False), then=Value(3)),
+                                                            default=Value(1),
+                                                            output_field=IntegerField()
+                                                            )
+                                                        ).distinct('id')
+
+        appointment_id = valid_data.get('appointment_id')
+        if appointment_id:
+            appointment_queryset = appointment_queryset.filter(id=appointment_id)
+
+        for app in appointment_queryset:
+            address = ''
+            mask_number = app.mask_number.all()
+            if mask_number and mask_number[0]:
+                mask_data = mask_number[0].build_data()
+            if app.address:
+                ad = app.address.get('address') if app.address.get('address') else ''
+                loc = app.address.get('locality') if app.address.get('locality') else ''
+                address = ad + ' ' + loc
+            rep_dict = {}
+            files = []
+            for rep in app.reports.all():
+                for file in rep.files.all():
+                    url = request.build_absolute_uri(file.name.url) if file.name else None
+                    files.append(url)
+                rep_dict = {
+                    "updated_at": rep.updated_at,
+                    "details": rep.report_details,
+                    "files": files
+                }
+            patient_profile = auth_serializers.UserProfileSerializer(app.profile, context={'request': request}).data
+            patient_profile['profile_id'] = app.profile.id if hasattr(app, 'profile') else None
+            patient_thumbnail = patient_profile['profile_image']
+            billing_status, utr_number = self.get_app_billing_status(app)
+            ret_obj = {}
+            ret_obj['id'] = app.id
+            ret_obj['deal_price'] = app.deal_price
+            ret_obj['payout_amount'] = app.merchant_payout.payable_amount if app.merchant_payout else app.agreed_price
+            ret_obj['effective_price'] = app.effective_price
+            ret_obj['allowed_action'] = app.allowed_action(User.DOCTOR, request)
+            ret_obj['patient_name'] = app.profile.name if hasattr(app, 'profile') else None
+            ret_obj['updated_at'] = app.updated_at
+            ret_obj['created_at'] = app.created_at
+            ret_obj['lab_name'] = app.lab.name
+            ret_obj['lab_id'] = app.lab.id
+            ret_obj['lab_thumbnail'] = request.build_absolute_uri(
+                    app.lab.get_thumbnail()) if app.lab.get_thumbnail() else None
+            ret_obj['time_slot_start'] = app.time_slot_start
+            ret_obj['status'] = app.status
+            ret_obj['mrp'] = app.price
+            ret_obj['mask_data'] = mask_data
+            ret_obj['payment_type'] = app.payment_type
+            ret_obj['billing_status'] = billing_status
+            ret_obj['utr_number'] = utr_number
+            ret_obj['profile'] = patient_profile
+            ret_obj['permission_type'] = app.pem_type
+            ret_obj['is_docprime'] = True
+            ret_obj['patient_thumbnail'] = patient_thumbnail
+            ret_obj['type'] = 'lab'
+            ret_obj['address'] = address
+            ret_obj['is_home_pickup'] = app.is_home_pickup
+            ret_obj['home_pickup_charges'] = app.home_pickup_charges
+            ret_obj['prescriptions'] = app.get_prescriptions(request)
+            ret_obj['lab_test'] = LabAppointmentTestMappingSerializer(app.test_mappings.all(), many=True).data
+            ret_obj['reports'] = rep_dict
+            response.append(ret_obj)
+        return response
+
+    def list_appointments(self, request):
+        ONLINE = 1
+        OFFLINE = 2
         serializer = serializers.OfflineAppointmentFilterSerializer(data=request.query_params)
         serializer.is_valid(raise_exception=True)
         valid_data = serializer.validated_data
-        online_queryset = get_opd_pem_queryset(request.user, models.OpdAppointment)\
+
+        type = valid_data.get('type')
+        if type == serializers.OfflineAppointmentFilterSerializer.LAB:
+            lab_data = self.get_lab_appointment_list(request, request.user, valid_data)
+            if not lab_data:
+                return Response({"status": 0, "error": "data not found"}, status=status.HTTP_404_NOT_FOUND)
+            return Response(lab_data)
+
+        online_queryset = get_opd_pem_queryset(request.user, models.OpdAppointment) \
+            .exclude(status=models.OpdAppointment.CREATED)\
             .select_related('profile', 'merchant_payout')\
             .prefetch_related('prescriptions', 'prescriptions__prescription_file', 'mask_number',
                               'profile__insurance', 'profile__insurance__user_insurance', 'eprescription').distinct('id', 'time_slot_start')
 
         offline_queryset = get_opd_pem_queryset(request.user, models.OfflineOPDAppointments)\
             .select_related('user')\
-            .prefetch_related('user__patient_mobiles', 'eprescription', 'offline_prescription', 'partners_app_invoice').distinct('id')
+                .prefetch_related('user__patient_mobiles', 'eprescription', 'offline_prescription', 'partners_app_invoice').distinct('id')
         start_date = valid_data.get('start_date')
         end_date = valid_data.get('end_date')
         updated_at = valid_data.get('updated_at')
@@ -3567,11 +3728,17 @@ class OfflineCustomerViewSet(viewsets.GenericViewSet):
         for app in final_data:
             instance = ONLINE if isinstance(app, models.OpdAppointment) else OFFLINE
             patient_name = is_docprime = effective_price = deal_price = patient_thumbnail = prescription = None
+            if instance == OFFLINE and (hasattr(app.user, 'encrypted_name') and app.user.encrypted_name) and (
+                    (request.META.get('HTTP_PLATFORM') == 'android' and not parse(request.META.get(
+                        'HTTP_APP_VERSION')) > parse(settings.LIST_APPOINTMENTS_VERSION_CHECK_ANDROID_GT[0])) or
+                    (request.META.get('HTTP_PLATFORM') == 'ios' and not parse(request.META.get(
+                        'HTTP_APP_VERSION')) > parse(settings.LIST_APPOINTMENTS_VERSION_CHECK_IOS_GT[0]))):
+                continue
             error_flag = False
             error_message = ''
             phone_number = []
             allowed_actions = []
-            payout_amount = billing_status = None
+            payout_amount = billing_status = utr_number = None
             mask_data = None
             mrp = None
             payment_type = None
@@ -3607,8 +3774,9 @@ class OfflineCustomerViewSet(viewsets.GenericViewSet):
                 is_docprime = True
                 effective_price = app.effective_price
                 # mrp = app.mrp
+                mrp_fees = app.fees if app.fees else 0
                 #RAJIV YADAV
-                mrp = app.fees if app.fees else 0
+                mrp = app.mrp if app.payment_type == app.COD else mrp_fees
                 payment_type = app.payment_type
                 deal_price = app.deal_price
                 mask_number = app.mask_number.all()
@@ -3617,23 +3785,10 @@ class OfflineCustomerViewSet(viewsets.GenericViewSet):
                 allowed_actions = app.allowed_action(User.DOCTOR, request)
                 # phone_number.append({"phone_number": app.user.phone_number, "is_default": True})
                 patient_profile = auth_serializers.UserProfileSerializer(app.profile, context={'request': request}).data
-                patient_thumbnail = patient_profile['profile_image']
-                patient_profile['user_id'] = app.user.id if app.user else None
                 patient_profile['profile_id'] = app.profile.id if hasattr(app, 'profile') else None
-                # patient_profile['phone_numbers'] = phone_number
+                patient_thumbnail = patient_profile['profile_image']
                 patient_name = app.profile.name if hasattr(app, 'profile') else None
-                if app.time_slot_start <= timezone.now() and \
-                        app.status not in [models.OpdAppointment.COMPLETED, models.OpdAppointment.CANCELLED, models.OpdAppointment.BOOKED]:
-                    billing_status = INCOMPLETE
-                elif app.status == models.OpdAppointment.COMPLETED and (not app.merchant_payout or app.merchant_payout.status not in \
-                        [account_models.MerchantPayout.ATTEMPTED, account_models.MerchantPayout.PAID]):
-                    billing_status = ELIGIBLE
-                elif app.status == models.OpdAppointment.COMPLETED and (app.merchant_payout and app.merchant_payout.status == account_models.MerchantPayout.ATTEMPTED):
-                    billing_status = INITIATED
-                elif app.status == models.OpdAppointment.COMPLETED and (
-                        app.merchant_payout and app.merchant_payout.status == account_models.MerchantPayout.PAID):
-                    billing_status = PROCESSED
-
+                billing_status, utr_number = self.get_app_billing_status(app)
                 payout_amount = app.merchant_payout.payable_amount if app.merchant_payout else app.fees
                 prescription = app.get_prescriptions(request)
             doc_number = None
@@ -3662,6 +3817,7 @@ class OfflineCustomerViewSet(viewsets.GenericViewSet):
             ret_obj['mask_data'] = mask_data
             ret_obj['payment_type'] = payment_type
             ret_obj['billing_status'] = billing_status
+            ret_obj['utr_number'] = utr_number
             ret_obj['profile'] = patient_profile
             ret_obj['permission_type'] = app.pem_type
             ret_obj['hospital'] = HospitalModelSerializer(app.hospital).data
@@ -3896,7 +4052,7 @@ class HospitalViewSet(viewsets.GenericViewSet):
         if entity:
             breadcrumb = deepcopy(entity.breadcrumb) if isinstance(entity.breadcrumb, list) else []
             breadcrumb.insert(0, {"title": "Home", "url": "/", "link_title": "Home"})
-            # breadcrumb.insert(1, {"title": "Hospitals", "url": "hospitals", "link_title": "Hospitals"})
+            breadcrumb.insert(1, {"title": "Hospitals", "url": "hospitals", "link_title": "Hospitals"})
             locality = entity.sublocality_value
             city = entity.locality_value
             url = entity.url
@@ -4015,7 +4171,7 @@ class HospitalViewSet(viewsets.GenericViewSet):
                     is_valid='t')
                 if valid_entity_url_qs.exists():
                     corrected_url = valid_entity_url_qs[0].url
-                    return Response(status=status.HTTP_301_MOVED_PERMANENTLY, data={'url': corrected_url})
+                    return Response(status=status.HTTP_301_MOVED_PERMANENTLY, data={'url': corrected_url, 'status': 301})
                 else:
                     return Response(status=status.HTTP_404_NOT_FOUND)
 
@@ -4030,11 +4186,13 @@ class HospitalViewSet(viewsets.GenericViewSet):
         serializer.is_valid(raise_exception=True)
         validated_data = serializer.validated_data
         hospital_obj = Hospital.objects.prefetch_related('service', 'network',
+                                                         'hosp_availability',
                                                          'hospital_documents',
                                                          'hospital_helpline_numbers',
                                                          'network__hospital_network_documents',
                                                          'hospitalcertification_set',
                                                          'hosp_availability',
+                                                         'question_answer',
                                                          'hospitalspeciality_set', Prefetch('hospitalimage_set',
                                                                                             HospitalImage.objects.all().order_by(
                                                                                                 '-cover_image'))).filter(
@@ -4046,6 +4204,7 @@ class HospitalViewSet(viewsets.GenericViewSet):
         title = None
         description = None
         canonical_url = None
+        h1_title = None
 
         if not entity:
             entity = EntityUrls.objects.filter(entity_id=hospital_obj.id,
@@ -4054,15 +4213,16 @@ class HospitalViewSet(viewsets.GenericViewSet):
                 entity = entity[0]
 
         hosp_serializer = serializers.HospitalDetailIpdProcedureSerializer(hospital_obj, context={'request': request,
-                                                                                    'validated_data': validated_data,
-                                                                                    "entity": entity}).data
+                                                                                                  'validated_data': validated_data,
+                                                                                                  "entity": entity}).data
+
         response = hosp_serializer
         if entity:
             response['url'] = entity.url
             if entity.breadcrumb:
                 breadcrumb = [{'url': '/', 'title': 'Home', 'link_title': 'Home'}
-                              # {"title": "Hospitals", "url": "hospitals", "link_title": "Hospitals"}
-]
+                    , {"title": "Hospitals", "url": "hospitals", "link_title": "Hospitals"}
+                              ]
                 if entity.locality_value:
                     # breadcrumb.append({'url': request.build_absolute_uri('/'+ entity.locality_value), 'title': entity.locality_value, 'link_title': entity.locality_value})
                     breadcrumb = breadcrumb + entity.breadcrumb
@@ -4071,7 +4231,7 @@ class HospitalViewSet(viewsets.GenericViewSet):
                 response['breadcrumb'] = breadcrumb
             else:
                 breadcrumb = [{'url': '/', 'title': 'Home', 'link_title': 'Home'},
-                              # {"title": "Hospitals", "url": "hospitals", "link_title": "Hospitals"},
+                              {"title": "Hospitals", "url": "hospitals", "link_title": "Hospitals"},
                               {'title': hospital_obj.name, 'url': None, 'link_title': None}]
                 response['breadcrumb'] = breadcrumb
 
@@ -4083,8 +4243,7 @@ class HospitalViewSet(viewsets.GenericViewSet):
                     description += " " + entity.sublocality_value
 
                 title += ' | Book Appointment, Check Doctors List, Reviews, Contact Number'
-                description += """: Get free booking on first appointment.\
-                 Check {} Doctors List, Reviews, Contact Number, Address, Procedures and more.""".format(hospital_obj.name)
+                description += """: Get free booking on first appointment. Check {} Doctors List, Reviews, Contact Number, Address, Procedures and more.""".format(hospital_obj.name)
             canonical_url = entity.url
         else:
             response['breadcrumb'] = None
@@ -4094,10 +4253,125 @@ class HospitalViewSet(viewsets.GenericViewSet):
                 title = new_dynamic.meta_title
             if new_dynamic.meta_description:
                 description = new_dynamic.meta_description
-        response['seo'] = {'title': title, "description": description}
+            if new_dynamic.h1_title:
+                h1_title = new_dynamic.h1_title
+        schema = self.build_schema_for_hospital(hosp_serializer, hospital_obj, canonical_url)
+        response['seo'] = {'title': title, "description": description, "schema": schema, "h1_title": h1_title}
         response['canonical_url'] = canonical_url
 
         return Response(response)
+
+
+    def build_schema_for_hospital(self, serialized_data, hospital, url):
+        try:
+            from ondoc.doctor.models import HospitalTiming
+            min_fee, max_fee = None, None
+            for x in serialized_data.get("doctors", {}).get("result", []):
+                if not min_fee or min_fee > x["deal_price"]:
+                    min_fee = x["deal_price"]
+                if not max_fee or max_fee < x["deal_price"]:
+                    max_fee = x["deal_price"]
+            fee_range = None
+            if min_fee and max_fee and min_fee != max_fee:
+                fee_range = "INR {} - INR {}".format(min_fee, max_fee)
+            elif min_fee or max_fee:
+                fee_range = "INR {}".format(min_fee if min_fee else max_fee)
+
+            def time_float_to_str(t):
+                h, m, s = 0, 0, 0
+                h = t // 1
+                m = int((t * 10) % 10)
+                if m == 5:
+                    m = 30
+                result = "{:0>2}:{:0>2}:{:0>2}".format(h, m, s)
+                return result
+
+            available_days = {}
+            opens_at, closes_at = None, None
+            num_day = dict(HospitalTiming.DAY_CHOICES)
+            for x in hospital.hosp_availability.all():
+                available_days[x.day] = num_day[x.day]
+                if not opens_at and not closes_at:
+                    opens_at = time_float_to_str(x.start)
+                    closes_at = time_float_to_str(x.end)
+
+            schema = {
+                "@type": "Hospital",
+                "@context": "https://schema.org/",
+                "currenciesAccepted": "INR",
+                "priceRange": fee_range,
+                "name": serialized_data['name'],
+                "url": "{}/{}".format(settings.BASE_URL, url) if url and isinstance(url, str) else None,
+                "medicalSpecialty": "Multi-Speciality" if serialized_data["multi_speciality"] else None,
+                "description": serialized_data['new_about'] if serialized_data['new_about'] else serialized_data[
+                    'about'],
+                "telephone": serialized_data["contact_number"],
+                "logo": serialized_data["logo"],
+                "geo": {
+                    "@type": "GeoCoordinates",
+                    "@context": "https://schema.org",
+                    "latitude": serialized_data['lat'],
+                    "longitude": serialized_data['long']
+                } if serialized_data['lat'] and serialized_data['long'] else None,
+                "hasMap": {
+                    "@type": "Map",
+                    "@context": "https://schema.org",
+                    "url": "https://maps.google.com/maps?f=d&amp;hl=en&amp;addr={},{}".format(serialized_data['lat'],
+                                                                                              serialized_data['long'])
+                },
+                "image": serialized_data["images"][0]["original"] if len(serialized_data["images"]) > 0 else None,
+                "photo": [{
+                    "@type": "CreativeWork",
+                    "@context": "https://schema.org",
+                    "url": x["original"]
+                } for x in serialized_data["images"]],
+                "address": {
+                    "@type": "PostalAddress",
+                    "@context": "https://schema.org",
+                    "streetAddress": hospital.get_hos_address(),
+                    "addressLocality": hospital.city,
+                    "addressRegion": hospital.state,
+                    "postalCode": hospital.pin_code
+                },
+                "availableService": {
+                    "@type": "MedicalTherapy",
+                    "@context": "https://schema.org",
+                    "name": [y["name"] for x in serialized_data['ipd_procedure_categories'] for y in
+                             x["ipd_procedures"]]
+                },
+                "member": [x["new_schema"] for x in serialized_data["doctors"]["result"]],
+                "aggregateRating": {
+                    "@type": "AggregateRating",
+                    "@context": "https://schema.org",
+                    "worstRating": "1",
+                    "ratingValue": serialized_data.get('rating_graph', {}).get('avg_rating'),
+                    "bestRating": "5",
+                    "ratingCount": serialized_data.get('rating_graph', {}).get('rating_count'),
+                },
+                "review": [
+                    {
+                        "@type": "Review",
+                        "reviewBody": x["compliment"],
+                        "datePublished": x["date"],
+                        "author": {
+                            "@type": "Person",
+                            "name": x["user_name"]
+                        }
+                    } for x in serialized_data["rating"]
+                ],
+                "openingHoursSpecification": [
+                    {
+                        "@type": "OpeningHoursSpecification",
+                        "dayOfWeek": list(available_days.values()),
+                        "opens": opens_at,
+                        "closes": closes_at
+                    }
+                ],
+            }
+        except Exception as e:
+            logger.error(str(e))
+            schema = None
+        return schema
 
 
 class IpdProcedureViewSet(viewsets.GenericViewSet):
@@ -4135,9 +4409,13 @@ class IpdProcedureViewSet(viewsets.GenericViewSet):
         serializer.is_valid(raise_exception=True)
         validated_data = serializer.validated_data
         ipd_procedure = IpdProcedure.objects.prefetch_related(
-            Prefetch('feature_mappings', IpdProcedureFeatureMapping.objects.select_related('feature').all().order_by('-feature__priority')),
-            Prefetch('ipdproceduredetail_set', IpdProcedureDetail.objects.select_related('detail_type').all().order_by('-detail_type__priority')),
-            Prefetch('similar_ipds', SimilarIpdProcedureMapping.objects.select_related('similar_ipd_procedure').all().order_by('-order')),
+            Prefetch('feature_mappings',
+                     IpdProcedureFeatureMapping.objects.select_related('feature').all().order_by('-feature__priority')),
+            Prefetch('ipdproceduredetail_set',
+                     IpdProcedureDetail.objects.select_related('detail_type').all().order_by('-detail_type__priority')),
+            Prefetch('similar_ipds',
+                     SimilarIpdProcedureMapping.objects.select_related('similar_ipd_procedure').all().order_by(
+                         '-order')),
             Prefetch('ipd_offers', Offer.objects.select_related('coupon', 'hospital', 'network').filter(is_live=True)),
         ).filter(is_enabled=True, id=pk).first()
         if ipd_procedure is None:
@@ -4186,16 +4464,22 @@ class IpdProcedureViewSet(viewsets.GenericViewSet):
         if city:
             breadcrumb.append({"title": "{} Cost in {}".format(ipd_procedure.name, city), "url": None, "link_title": None})
 
+        near_by = validated_data.get('near_by', False)
+        hospital_request_data = {}
+        doctor_search_parameters = {'ipd_procedure_ids': str(pk),
+                                    'longitude': validated_data.get('long'),
+                                    'latitude': validated_data.get('lat'),
+                                    'sort_on': 'experience',
+                                    'city': city,
+                                    'restrict_result_count': 3}
+        if near_by:
+            hospital_request_data.update({'max_distance': 1000000})
+            doctor_search_parameters.update({'max_distance': 1000000})
         hospital_view_set = HospitalViewSet()
-        hospital_result = hospital_view_set.list(request, pk, 2)
+        hospital_result = hospital_view_set.list(request, pk, 2, request_data=hospital_request_data)
         doctor_result_data = {}
         doctor_list_viewset = DoctorListViewSet()
-        doctor_result = doctor_list_viewset.list(request, parameters={'ipd_procedure_ids': str(pk),
-                                                                      'longitude': validated_data.get('long'),
-                                                                      'latitude': validated_data.get('lat'),
-                                                                      'sort_on': 'experience',
-                                                                      'city': city,
-                                                                      'restrict_result_count': 3})
+        doctor_result = doctor_list_viewset.list(request, parameters=doctor_search_parameters)
         doctor_result_data = doctor_result.data
         ipd_procedure_serializer = serializers.IpdProcedureDetailSerializer(ipd_procedure, context={'request': request,
                                                                                                     'similar_ipds_entity_dict': similar_ipds_entity_dict,
@@ -4215,6 +4499,14 @@ class IpdProcedureViewSet(viewsets.GenericViewSet):
         obj_created = IpdProcedureLead(**validated_data)
         obj_created.save()
         return Response(serializers.IpdProcedureLeadSerializer(obj_created).data)
+
+    def update_lead(self, request):
+        serializer = serializers.IpdLeadUpdateSerializerPopUp(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        validated_data = serializer.validated_data
+        temp_id = validated_data.pop('id')
+        IpdProcedureLead.objects.filter(id=temp_id).update(**validated_data)
+        return Response({'message': 'Success'})
 
     def list_by_alphabet(self, request):
         import re

@@ -3,10 +3,11 @@ from django.contrib.postgres.fields import JSONField
 from django.forms import model_to_dict
 from django.utils.functional import cached_property
 
-from ondoc.authentication.models import TimeStampedModel, User, UserProfile, Merchant
+from ondoc.authentication.models import TimeStampedModel, User, UserProfile, Merchant, AssociatedMerchant
 from ondoc.account.tasks import refund_curl_task
+from ondoc.coupon.models import Coupon
 from ondoc.notification.models import AppNotification, NotificationAction
-from ondoc.notification.tasks import process_payout
+from ondoc.notification.tasks import process_payout, save_pg_response
 # from ondoc.diagnostic.models import LabAppointment
 # from ondoc.matrix.tasks import push_order_to_matrix
 from django.db import transaction
@@ -24,12 +25,14 @@ import json
 import logging
 import requests
 import datetime
+import itertools
 from decimal import Decimal
 from ondoc.notification.tasks import set_order_dummy_transaction
 from django.contrib.contenttypes.fields import GenericForeignKey
 from django.contrib.contenttypes.models import ContentType
 import string
 import random
+import decimal
 
 logger = logging.getLogger(__name__)
 
@@ -88,7 +91,7 @@ class Order(TimeStampedModel):
         if self.product_id == Order.INSURANCE_PRODUCT_ID:
             user_insurance = UserInsurance.objects.filter(order=self).first()
             if user_insurance:
-                data['merchCode'] = str(user_insurance.insurance_plan.insurer.insurer_merchant_code)
+                data['insurerCode'] = str(user_insurance.insurance_plan.insurer.insurer_merchant_code)
         elif (self.product_id in (self.DOCTOR_PRODUCT_ID,self.LAB_PRODUCT_ID)):
             if not self.is_parent() and self.booked_using_insurance():
             # if self.is_parent():
@@ -102,7 +105,7 @@ class Order(TimeStampedModel):
                     insurance_order_transaction = transactions[0]
                     data['refOrderId'] = str(insurance_order_transaction.order_id)
                     data['refOrderNo'] = str(insurance_order_transaction.order_no)
-                    data['merchCode'] = str(user_insurance.insurance_plan.insurer.insurer_merchant_code)
+                    data['insurerCode'] = str(user_insurance.insurance_plan.insurer.insurer_merchant_code)
 
         return data
 
@@ -116,7 +119,7 @@ class Order(TimeStampedModel):
         if self.is_parent():
             raise Exception('Not implemented for parent orders')
         appt = self.getAppointment()
-        if appt and appt.insurance_id:
+        if appt and hasattr(appt, 'insurance_id') and appt.insurance_id:
             return True
         return False
 
@@ -173,7 +176,7 @@ class Order(TimeStampedModel):
             opd_obj.payment_type = OpdAppointment.PREPAID
             # self.action_data['appointment_id'] = self.reference_id
             self.action_data['payment_type'] = OpdAppointment.PREPAID
-            self.action_data['effective_price'] = self.action_data['deal_price']  # TODO : SHASHANK_SINGH set to correct price
+            self.action_data['effective_price'] = self.action_data['deal_price']
             opd_obj.effective_price = Decimal(self.action_data['deal_price'])
             opd_obj.is_cod_to_prepaid = True
             opd_obj.save()
@@ -480,6 +483,8 @@ class Order(TimeStampedModel):
             all_txn = self.txn.all()
         elif self.dummy_txn.exists():
             all_txn = self.dummy_txn.all()
+        # elif self.parent and self.parent.dummy_txn.exists():
+        #     all_txn = self.parent.dummy_txn.all()
         return all_txn
 
     @classmethod
@@ -727,9 +732,7 @@ class Order(TimeStampedModel):
         # if order is done without PG transaction, then make an async task to create a dummy transaction and set it.
         if not self.getTransactions():
             try:
-                transaction.on_commit(
-                    lambda: set_order_dummy_transaction.apply_async((self.id, self.get_user_id(),),
-                                                                    countdown=5))
+                transaction.on_commit(lambda: set_order_dummy_transaction.apply_async((self.id, self.get_user_id(),), countdown=5))
             except Exception as e:
                 logger.error(str(e))
 
@@ -809,6 +812,84 @@ class Order(TimeStampedModel):
         return deal_price
 
 
+    @cached_property
+    def get_amount_without_pg_coupon(self):
+        from ondoc.doctor.models import OpdAppointment
+        from ondoc.diagnostic.models import LabAppointment
+
+        amount = self.amount
+        used_pgspecific_coupons = self.used_pgspecific_coupons
+        used_pgspecific_coupons_ids = list(map(lambda x: x.id, used_pgspecific_coupons)) if used_pgspecific_coupons else []
+        if self.is_parent():
+            for order in self.orders.all():
+                if self.product_id == Order.DOCTOR_PRODUCT_ID or self.product_id == Order.LAB_PRODUCT_ID:
+                    if self.product_id == Order.DOCTOR_PRODUCT_ID:
+                        obj = OpdAppointment()
+                    elif self.product_id == Order.LAB_PRODUCT_ID:
+                        obj = LabAppointment()
+                    order_coupons_ids = order.action_data['coupon']
+                    for coupon_id in order_coupons_ids:
+                        if coupon_id in used_pgspecific_coupons_ids:
+                            coupon = Coupon.objects.filter(pk=coupon_id).first()
+                            if coupon:
+                                amount += obj.get_discount(coupon, Decimal(order.action_data['deal_price']))
+        return amount
+
+
+    def used_coupons(self):
+        coupons_ids = []
+        if self.is_parent():
+            for order in self.orders.all():
+                coupons_ids.append(order.action_data.get('coupon'))
+        else:
+            coupons_ids.append(self.action_data.get('coupon'))
+
+        coupons_ids = list(itertools.chain(*coupons_ids))
+        coupons = Coupon.objects.filter(pk__in=coupons_ids)
+        return coupons
+
+    @cached_property
+    def used_pgspecific_coupons(self):
+        used_pgspecific_coupons = None
+        used_coupons = self.used_coupons()
+        if used_coupons:
+            used_pgspecific_coupons = list(filter(lambda x: x.payment_option, used_coupons))
+
+        return used_pgspecific_coupons
+
+    def update_fields_after_coupon_remove(self):
+        from ondoc.doctor.models import OpdAppointment
+        from ondoc.diagnostic.models import LabAppointment
+
+        amount = self.amount
+        if self.is_parent():
+            used_pgspecific_coupons = self.used_pgspecific_coupons
+            if used_pgspecific_coupons:
+                used_pgspecific_coupons_ids = list(map(lambda x: x.id, used_pgspecific_coupons))
+                for order in self.orders.all():
+                    if order.product_id == Order.DOCTOR_PRODUCT_ID or order.product_id == Order.LAB_PRODUCT_ID:
+                        if order.action_data:
+                            if self.product_id == Order.DOCTOR_PRODUCT_ID:
+                                obj = OpdAppointment()
+                            elif self.product_id == Order.LAB_PRODUCT_ID:
+                                obj = LabAppointment()
+                            order_coupons_ids = order.action_data['coupon']
+                            for coupon_id in order_coupons_ids:
+                                if coupon_id in used_pgspecific_coupons_ids:
+                                    coupon = Coupon.objects.filter(pk=coupon_id).first()
+                                    if coupon:
+                                        pg_coupon_discount = obj.get_discount(coupon, Decimal(order.action_data['deal_price']))
+                                        amount += pg_coupon_discount
+                                        order.action_data['effective_price'] = str(Decimal(order.action_data['effective_price']) + pg_coupon_discount)
+                                        order.action_data['discount'] = str(Decimal(order.action_data['discount']) - pg_coupon_discount)
+                                        order.action_data['coupon'].remove(coupon_id)
+                                        order.save()
+                self.amount = amount
+                self.save()
+
+        return True
+
+
 class PgTransaction(TimeStampedModel):
     PG_REFUND_SUCCESS_OK_STATUS = '1'
     PG_REFUND_FAILURE_OK_STATUS = '0'
@@ -841,20 +922,27 @@ class PgTransaction(TimeStampedModel):
     status_code = models.IntegerField()
     pg_name = models.CharField(max_length=100, null=True, blank=True)
     status_type = models.CharField(max_length=50)
-    transaction_id = models.CharField(max_length=100, unique=True)
+    transaction_id = models.CharField(max_length=100, null=True, unique=True)
     pb_gateway_name = models.CharField(max_length=100, null=True, blank=True)
+    payment_captured = models.BooleanField(default=False)
 
     @transaction.atomic
     def save(self, *args, **kwargs):
         """
             Save PG transaction and credit consumer account, with amount paid at PaymentGateway.
         """
+        update_consumer_account = False
+        if self.id is None:
+            update_consumer_account = True
+
         super(PgTransaction, self).save(*args, **kwargs)
-        consumer_account = ConsumerAccount.objects.get_or_create(user=self.user)
-        consumer_account = ConsumerAccount.objects.select_for_update().get(user=self.user)
-        pg_data = vars(self)
-        pg_data['user'] = self.user
-        consumer_account.credit_payment(pg_data, pg_data['amount'])
+
+        if update_consumer_account:
+            consumer_account = ConsumerAccount.objects.get_or_create(user=self.user)
+            consumer_account = ConsumerAccount.objects.select_for_update().get(user=self.user)
+            pg_data = vars(self)
+            pg_data['user'] = self.user
+            consumer_account.credit_payment(pg_data, pg_data['amount'])
 
     @classmethod
     def get_transactions(cls, user, amount):
@@ -952,6 +1040,9 @@ class PgTransaction(TimeStampedModel):
 
         encrypted_message_digest = encrypted_message_object.hexdigest()
         return encrypted_message_digest
+
+    def is_preauth(self):
+        return self.status_type == 'TXN_AUTHORIZE' or self.status_type == '27'
 
     class Meta:
         db_table = "pg_transaction"
@@ -1448,26 +1539,29 @@ class OrderLog(TimeStampedModel):
     class Meta:
         db_table = "order_log"
 
+
 class MerchantPayout(TimeStampedModel):    
 
     PENDING = 1
     ATTEMPTED = 2
     PAID = 3
+    INITIATED = 4
+    INPROCESS = 5
+    FAILED_FROM_QUEUE = 6
+    FAILED_FROM_DETAIL = 7
     AUTOMATIC = 1
     MANUAL = 2
-
 
     DoctorPayout = Order.DOCTOR_PRODUCT_ID
     LabPayout = Order.LAB_PRODUCT_ID
     InsurancePremium = Order.INSURANCE_PRODUCT_ID
     BookingTypeChoices = [(DoctorPayout,'Doctor Booking'),(LabPayout,'Lab Booking'),(InsurancePremium,'Insurance Purchase')]
 
-
     NEFT = "NEFT"
     IMPS = "IMPS"
     IFT = "IFT"
     INTRABANK_IDENTIFIER = "KKBK"
-    STATUS_CHOICES = [(PENDING, 'Pending'), (ATTEMPTED, 'ATTEMPTED'), (PAID, 'Paid')]
+    STATUS_CHOICES = [(PENDING, 'Pending'), (ATTEMPTED, 'ATTEMPTED'), (PAID, 'Paid'), (INITIATED, 'Initiated'), (INPROCESS, 'In Process'), (FAILED_FROM_QUEUE, 'Failed from Queue'), (FAILED_FROM_DETAIL, 'Failed from Detail')]
     PAYMENT_MODE_CHOICES = [(NEFT, 'NEFT'), (IMPS, 'IMPS'), (IFT, 'IFT')]    
     TYPE_CHOICES = [(AUTOMATIC, 'Automatic'), (MANUAL, 'Manual')]
 
@@ -1491,6 +1585,9 @@ class MerchantPayout(TimeStampedModel):
     object_id = models.PositiveIntegerField(null=True, blank=True)
     content_object = GenericForeignKey()
     booking_type = models.IntegerField(null=True, blank=True, choices=BookingTypeChoices)
+    tds_amount = models.DecimalField(max_digits=10, decimal_places=2, default=None, null=True, blank=True)
+    recreated_from = models.ForeignKey('self', on_delete=models.DO_NOTHING, null=True, blank=True)
+    remarks = models.TextField(max_length=100, null=True, blank=True)
 
     def save(self, *args, **kwargs):
 
@@ -1500,16 +1597,18 @@ class MerchantPayout(TimeStampedModel):
 
         if self.id and not self.is_insurance_premium_payout() and hasattr(self,'process_payout') and self.process_payout and self.status==self.PENDING and self.type==self.AUTOMATIC:
             self.type = self.AUTOMATIC
-            if not self.content_object:
-                self.content_object = self.get_billed_to()
-            if not self.paid_to:
-                self.paid_to = self.get_merchant()
+            self.update_billed_to_content_type()
+            # if not self.content_object:
+            #     self.content_object = self.get_billed_to()
+            # if not self.paid_to:
+            #     self.paid_to = self.get_merchant()
 
             try:
                 has_txn, order_data, appointment = self.has_transaction()
                 if has_txn:
-                    if self.status == self.PENDING:
-                        self.status = self.ATTEMPTED
+                    # # Moved this to process payout
+                    # if self.status == self.PENDING:
+                    #     self.status = self.ATTEMPTED
                     transaction.on_commit(lambda: process_payout.apply_async((self.id,), countdown=3))
                 else:
                     transaction.on_commit(lambda: set_order_dummy_transaction.apply_async((order_data.id, appointment.user_id,), countdown=5))
@@ -1522,13 +1621,10 @@ class MerchantPayout(TimeStampedModel):
         if self.utr_no and self.booking_type == self.InsurancePremium and self.paid_to != Merchant.objects.filter(id=settings.DOCPRIME_NODAL2_MERCHANT).first():
             self.create_insurance_transaction()
 
-
         if (not first_instance and self.status != self.PENDING) and not self.booking_type == self.InsurancePremium:
             from ondoc.matrix.tasks import push_appointment_to_matrix
 
-            appointment = self.lab_appointment.all().first()
-            if not appointment:
-                appointment = self.opd_appointment.all().first()
+            appointment = self.get_corrosponding_appointment()
 
             if appointment and appointment.__class__.__name__ == 'LabAppointment':
                 transaction.on_commit(lambda: push_appointment_to_matrix.apply_async(({'type': 'LAB_APPOINTMENT', 'appointment_id': appointment.id, 'product_id': 5,
@@ -1541,8 +1637,6 @@ class MerchantPayout(TimeStampedModel):
 
         if first_instance:
             MerchantPayout.objects.filter(id=self.id).update(payout_ref_id=self.id)
-            # self.payout_ref_id = self.id
-            # self.save()
 
     # @classmethod
     # def creating_pending_insurance_transactions(cls):
@@ -1550,6 +1644,15 @@ class MerchantPayout(TimeStampedModel):
     #     for p in pending:
     #         if p.utr_no:
     #             p.create_insurance_transaction()
+
+    def get_corrosponding_appointment(self):
+        appointment = None
+        if self.booking_type == Order.DOCTOR_PRODUCT_ID:
+            appointment = self.opd_appointment.all().first()
+        elif self.booking_type == Order.LAB_PRODUCT_ID:
+            appointment = self.lab_appointment.all().first()
+
+        return appointment
 
     def should_create_insurance_transaction(self):
         from ondoc.insurance.models import InsuranceTransaction
@@ -1570,6 +1673,13 @@ class MerchantPayout(TimeStampedModel):
             all_payouts = [x.payout for x in all_payouts]
             transfers = InsuranceTransaction.objects.filter(user_insurance=user_insurance,\
              transaction_type=InsuranceTransaction.CREDIT, reason=InsuranceTransaction.PREMIUM_PAYOUT)
+
+            if not transfers:
+                return True
+
+            if not all_payouts and transfers:
+                return False
+
             transfers = list(transfers)
 
             for transfer in transfers:
@@ -1588,12 +1698,10 @@ class MerchantPayout(TimeStampedModel):
                         transfer._removed = True
                         payout._removed = True
 
-            all_payouts = [x for x in all_payouts if not x._removed]
-            transfers = [x for x in transfers if not x._removed]
+            all_payouts = [x for x in all_payouts if hasattr(x, '_removed') and not x._removed]
+            transfers = [x for x in transfers if hasattr(x, '_removed') and not x._removed]
             if len(transfers)==0 and (transferred_amount+self.payable_amount)<=premium_amount:
                 return True
-
-
 
     def create_insurance_transaction(self):
         from ondoc.insurance.models import UserInsurance, InsuranceTransaction
@@ -1629,6 +1737,13 @@ class MerchantPayout(TimeStampedModel):
         pms = PayoutMapping.objects.filter(payout=self).first()
         user_insurance = pms.content_object
         return user_insurance
+
+    def update_status(self, status):
+        if status == 'attempted':
+            self.status = self.ATTEMPTED
+        elif status == 'initiated':
+            self.status = self.INITIATED
+        self.save()
 
     @staticmethod
     def get_merchant_payout_info(obj):
@@ -1677,6 +1792,7 @@ class MerchantPayout(TimeStampedModel):
         if len(trans)>1:
             raise Exception('multiple transactions found')
 
+        # TO DO - Check for TDS
         if trans and trans[0].amount == self.payable_amount:
             return trans
 
@@ -1698,6 +1814,7 @@ class MerchantPayout(TimeStampedModel):
         return False
 
     def get_or_create_insurance_premium_transaction(self):
+        from ondoc.account.mongo_models import PgLogs as PgLogsMongo
         #transaction already created no need to proceed
         transaction = None
         transaction = self.get_insurance_premium_transactions()
@@ -1745,10 +1862,13 @@ class MerchantPayout(TimeStampedModel):
                 "buCallbackFailureUrl": ""
             }
             if not self.is_nodal_transfer():
-                req_data["merchCode"] = "apolloDummy"
+                req_data["insurerCode"] = "apolloDummy"
 
+            for key in req_data:
+                req_data[key] = str(req_data[key])
 
             response = requests.post(url, data=json.dumps(req_data), headers=headers)
+            save_pg_response.apply_async((PgLogsMongo.DUMMY_TXN, user_insurance.order.id, None, response.json(), req_data,), eta=timezone.localtime(), )
             if response.status_code == status.HTTP_200_OK:
                 resp_data = response.json()
                 #logger.error(resp_data)
@@ -1930,8 +2050,8 @@ class MerchantPayout(TimeStampedModel):
 
     def update_status_from_pg(self):
         with transaction.atomic():
-            if self.pg_status=='SETTLEMENT_COMPLETED' or self.utr_no or self.type ==self.MANUAL:
-                return
+            # if self.pg_status=='SETTLEMENT_COMPLETED' or self.utr_no or self.type ==self.MANUAL:
+            #     return
 
             order_no = None
             url = settings.SETTLEMENT_DETAILS_API
@@ -1944,25 +2064,26 @@ class MerchantPayout(TimeStampedModel):
                 order_no = self.get_pg_order_no()
 
             if order_no:
-                req_data = {"orderNo":order_no}
+                req_data = {"orderNo": order_no}
                 req_data["hash"] = self.create_checksum(req_data)
 
-                headers = {"auth": settings.SETTLEMENT_AUTH,
-                           "Content-Type": "application/json"}
+                headers = {"auth": settings.SETTLEMENT_AUTH, "Content-Type": "application/json"}
 
                 response = requests.post(url, data=json.dumps(req_data), headers=headers)
                 if response.status_code == status.HTTP_200_OK:
                     resp_data = response.json()
                     self.status_api_response = resp_data
-                    if resp_data.get('ok') == 1 and len(resp_data.get('settleDetails'))>0:
+                    if resp_data.get('ok') == 1 and len(resp_data.get('settleDetails')) > 0:
                         details = resp_data.get('settleDetails')
                         for d in details:
                             if d.get('refNo') == str(self.payout_ref_id) or\
-                                    (not self.payout_ref_id and d.get('orderNo')==order_no):
-                                self.utr_no = d.get('utrNo','')
-                                self.pg_status = d.get('txStatus','')
+                                    (not self.payout_ref_id and d.get('orderNo') == order_no):
+                                self.utr_no = d.get('utrNo', '')
+                                self.pg_status = d.get('txStatus', '')
                                 if self.utr_no:
                                     self.status = self.PAID
+                                if d.get('txStatus', '') == "SETTLEMENT_FAILURE":
+                                    self.status = self.FAILED_FROM_DETAIL
                                 break
                     self.save()
 
@@ -1983,6 +2104,80 @@ class MerchantPayout(TimeStampedModel):
         checksum_hash = checksum_hash.hexdigest()
         return checksum_hash
 
+    def recreate_failed_payouts(self):
+        # # recreate payout only when status is failed
+        if self.status == self.FAILED_FROM_DETAIL or self.status == self.FAILED_FROM_QUEUE or self.merchant_has_advance_payment():
+            new_obj = MerchantPayout(recreated_from=self)
+            new_obj.payable_amount = self.payable_amount
+            new_obj.charged_amount = self.charged_amount
+            new_obj.booking_type = self.booking_type
+            new_obj.tds_amount = self.tds_amount
+            if self.booking_type == self.InsurancePremium:
+                new_obj.content_type_id = self.content_type_id
+                new_obj.object_id = self.object_id
+                new_obj.type = MerchantPayout.AUTOMATIC
+                new_obj.paid_to = self.paid_to
+            new_obj.save()
+
+            # update appointment payout id
+            appointment = self.get_appointment()
+            appointment.update_payout_id(new_obj.id)
+
+    def update_billed_to_content_type(self):
+        merchant = self.get_merchant()
+        if merchant:
+            current_associated_merchant = AssociatedMerchant.objects.filter(merchant_id=merchant.id, object_id=self.object_id, content_type_id=self.content_type_id).first()
+            if current_associated_merchant and current_associated_merchant.verified:
+                pass
+            else:
+                appt = self.get_appointment()
+                if appt and appt.get_billed_to:
+                    billed_to = appt.get_billed_to
+                    self.content_object = billed_to
+
+                content_type = ContentType.objects.get_for_model(billed_to)
+                am = AssociatedMerchant.objects.filter(content_type_id=content_type, object_id=billed_to.id).first()
+                if am and not am.merchant_id == self.paid_to_id:
+                    if appt and appt.get_merchant:
+                        self.paid_to = appt.get_merchant
+
+    @transaction.atomic
+    def get_advance_amount_obj(self):
+        adv_amt_obj = AdvanceMerchantAmount.objects.select_for_update().filter(merchant_id=self.paid_to_id).first()
+        return adv_amt_obj
+
+    def merchant_has_advance_payment(self):
+        adv_amt_obj = self.get_advance_amount_obj()
+        if adv_amt_obj and adv_amt_obj.amount > 0:
+            return True
+
+        return False
+
+    def get_advance_balance(self):
+        adv_amt_obj = self.get_advance_amount_obj()
+        if adv_amt_obj:
+            return adv_amt_obj.amount
+
+        return None
+
+    @transaction.atomic
+    def update_payout_for_advance_available(self):
+        adv_amt_obj = self.get_advance_amount_obj()
+        balance = self.get_advance_balance()
+        if balance > 0:
+            if balance >= self.payable_amount:
+                self.status = self.PAID
+                self.remarks = "Marked as Paid from advance payout"
+                adv_amt_obj.amount = balance - self.payable_amount
+            elif balance < self.payable_amount:
+                remaining_amt = self.payable_amount - balance
+                self.remarks = "Total payable {}, Paid {} from advance payout".format(self.payable_amount, balance)
+                self.payable_amount = remaining_amt
+                adv_amt_obj.amount = 0.0
+            adv_amt_obj.save()
+            self.payout_ref_id = self.id
+            self.save()
+
     class Meta:
         db_table = "merchant_payout"
 
@@ -1995,6 +2190,7 @@ class PayoutMapping(TimeStampedModel):
 
     class Meta:
         db_table = "payout_mapping"
+
 
 class UserReferrals(TimeStampedModel):
     SIGNUP_CASHBACK = 50
@@ -2049,3 +2245,191 @@ class PgLogs(TimeStampedModel):
 
     class Meta:
         db_table = "pg_log"
+
+
+class MerchantPayoutLog(TimeStampedModel):
+    merchant_payout = models.ForeignKey(MerchantPayout, on_delete=models.DO_NOTHING, null=True)
+    error = models.TextField(null=True, blank=True)
+    is_fixed = models.BooleanField(default=False)
+    req_data = JSONField(blank=True, null=True)
+    res_data = JSONField(blank=True, null=True)
+    endpoint = models.TextField(null=True, blank=True)
+
+    class Meta:
+        db_table = "merchant_payout_log"
+
+    @classmethod
+    def create_log(cls, payout, error, **kwargs):
+        payout_log = MerchantPayoutLog(merchant_payout=payout)
+        payout_log.error = error
+        payout_log.save()
+
+
+class MerchantPayoutBulkProcess(TimeStampedModel):
+    payout_ids = models.TextField(null=False, blank=False, help_text="Enter comma separated payout ids here.")
+
+    class Meta:
+        db_table = "merchant_payout_bulk_process"
+
+    def save(self, *args, **kwargs):
+        super().save(*args, **kwargs)
+        transaction.on_commit(lambda: self.after_commit_tasks())
+
+    def after_commit_tasks(self):
+        # payout_ids_list = list()
+        payout_ids = self.payout_ids
+        if payout_ids:
+            payout_ids_list = self.payout_ids.split(',')
+        try:
+            merchant_payouts = MerchantPayout.objects.filter(id__in=payout_ids_list)
+            for mp in merchant_payouts:
+                if mp.id and not mp.is_insurance_premium_payout() and mp.status == mp.PENDING:
+                    mp.type = mp.AUTOMATIC
+                    mp.process_payout = True
+                    mp.save()
+        except Exception as e:
+            logger.error("Error in processing bulk payout - with exception - " + str(e))
+
+
+class PgStatusCode(TimeStampedModel):
+    code = models.PositiveSmallIntegerField(default=1)
+    message = models.TextField(blank=False, null=False)
+
+    class Meta:
+        db_table = "pg_status_code"
+
+
+class PaymentProcessStatus(TimeStampedModel):
+    INITIATED = 1
+    AUTHORIZE = 2
+    SUCCESS = 3
+    FAILURE = 4
+
+    STATUS_CHOICES = [(INITIATED, "Initiated"), (AUTHORIZE, "Authorize"),
+                      (SUCCESS, "Success"), (FAILURE, "Failure")]
+
+    user = models.ForeignKey(User, on_delete=models.DO_NOTHING, null=True)
+    order = models.ForeignKey(Order, on_delete=models.DO_NOTHING, null=True)
+    current_status = models.PositiveSmallIntegerField(default=1, editable=False, choices=STATUS_CHOICES)
+    status_code = models.PositiveSmallIntegerField(null=True, blank=True)
+    source = models.CharField(blank=True, max_length=50, null=True)
+
+    class Meta:
+        db_table = "payment_process_status"
+
+    @classmethod
+    def save_payment_status(cls, current_status, args):
+        user_id = args.get('user_id')
+        order_id = args.get('order_id')
+        status_code = args.get('status_code')
+        source = args.get('source')
+
+        if order_id:
+            payment_process_status = PaymentProcessStatus.objects.filter(order_id=order_id).first()
+            if not payment_process_status:
+                payment_process_status = PaymentProcessStatus(order_id=order_id)
+
+            if user_id:
+                payment_process_status.user_id = user_id
+            payment_process_status.status_code = status_code
+            payment_process_status.source = source
+            payment_process_status.current_status = current_status
+
+            payment_process_status.save()
+
+    @classmethod
+    def get_status_type(cls, status_code, txStatus):
+        if status_code == 1:
+            if txStatus == 'TXN_AUTHORIZE':
+                return PaymentProcessStatus.AUTHORIZE
+            else:
+                return PaymentProcessStatus.SUCCESS
+
+        return PaymentProcessStatus.FAILURE
+
+
+class AdvanceMerchantAmount(TimeStampedModel):
+    merchant = models.ForeignKey(Merchant, on_delete=models.DO_NOTHING, null=False, blank=False)
+    amount = models.DecimalField(max_digits=10, decimal_places=2, default=None, null=True, blank=True)
+    total_amount = models.DecimalField(max_digits=10, decimal_places=2, default=None, null=True, blank=True)
+
+    class Meta:
+        db_table = "advance_merchant_amount"
+
+
+class AdvanceMerchantPayout(TimeStampedModel):
+    PENDING = 1
+    ATTEMPTED = 2
+    PAID = 3
+    INITIATED = 4
+    INPROCESS = 5
+    FAILED_FROM_QUEUE = 6
+    FAILED_FROM_DETAIL = 7
+    AUTOMATIC = 1
+    MANUAL = 2
+
+    DoctorPayout = Order.DOCTOR_PRODUCT_ID
+    LabPayout = Order.LAB_PRODUCT_ID
+    InsurancePremium = Order.INSURANCE_PRODUCT_ID
+    BookingTypeChoices = [(DoctorPayout, 'Doctor Booking'), (LabPayout, 'Lab Booking'),
+                          (InsurancePremium, 'Insurance Purchase')]
+
+    NEFT = "NEFT"
+    IMPS = "IMPS"
+    IFT = "IFT"
+    INTRABANK_IDENTIFIER = "KKBK"
+    STATUS_CHOICES = [(PENDING, 'Pending'), (ATTEMPTED, 'ATTEMPTED'), (PAID, 'Paid'), (INITIATED, 'Initiated'),
+                      (INPROCESS, 'In Process'), (FAILED_FROM_QUEUE, 'Failed from Queue'),
+                      (FAILED_FROM_DETAIL, 'Failed from Detail')]
+    PAYMENT_MODE_CHOICES = [(NEFT, 'NEFT'), (IMPS, 'IMPS'), (IFT, 'IFT')]
+    TYPE_CHOICES = [(AUTOMATIC, 'Automatic'), (MANUAL, 'Manual')]
+
+    payment_mode = models.CharField(max_length=100, blank=True, null=True, choices=PAYMENT_MODE_CHOICES)
+    payout_ref_id = models.IntegerField(null=True, unique=True)
+    charged_amount = models.DecimalField(max_digits=10, decimal_places=2)
+    payable_amount = models.DecimalField(max_digits=10, decimal_places=2)
+    payout_approved = models.BooleanField(default=False)
+    status = models.PositiveIntegerField(default=PENDING, choices=STATUS_CHOICES)
+    payout_time = models.DateTimeField(null=True, blank=True)
+    request_data = JSONField(blank=True, default='', editable=False)
+    api_response = JSONField(blank=True, null=True)
+    status_api_response = JSONField(blank=True, default='', editable=False)
+    retry_count = models.PositiveIntegerField(default=0)
+    paid_to = models.ForeignKey(Merchant, on_delete=models.DO_NOTHING, null=True)
+    utr_no = models.CharField(max_length=500, blank=True, default='')
+    pg_status = models.CharField(max_length=500, blank=True, default='')
+    type = models.PositiveIntegerField(default=None, choices=TYPE_CHOICES, null=True, blank=True)
+    amount_paid = models.DecimalField(max_digits=10, decimal_places=2, default=None, null=True, blank=True)
+    content_type = models.ForeignKey(ContentType, on_delete=models.CASCADE, null=True, blank=True)
+    object_id = models.PositiveIntegerField(null=True, blank=True)
+    content_object = GenericForeignKey()
+    booking_type = models.IntegerField(null=True, blank=True, choices=BookingTypeChoices)
+    tds_amount = models.DecimalField(max_digits=10, decimal_places=2, default=None, null=True, blank=True)
+    recreated_from = models.ForeignKey('self', on_delete=models.DO_NOTHING, null=True, blank=True)
+
+    class Meta:
+        db_table = "advance_merchant_payout"
+
+    @classmethod
+    def copy_nodel2_merchant_payouts(cls, payout_ids):
+        mps = MerchantPayout.objects.filter(id__in=payout_ids)
+        for mp in mps:
+            with transaction.atomic():
+                advance_payout_obj = AdvanceMerchantPayout(id=mp.id)
+                advance_payout_obj.__dict__ = mp.__dict__.copy()
+                advance_payout_obj.save()
+                # Save total amount
+                adv_amt_obj = AdvanceMerchantAmount.objects.filter(merchant_id=mp.paid_to_id).first()
+                if adv_amt_obj and adv_amt_obj.amount:
+                    adv_amt_obj.amount = decimal.Decimal(adv_amt_obj.amount) + mp.payable_amount
+                    adv_amt_obj.total_amount = decimal.Decimal(adv_amt_obj.amount) + mp.payable_amount
+                else:
+                    adv_amt_obj = AdvanceMerchantAmount(merchant_id=mp.paid_to_id)
+                    adv_amt_obj.amount = mp.payable_amount
+                    adv_amt_obj.total_amount = mp.payable_amount
+                adv_amt_obj.save()
+                print("payout id " + str(mp.id) + " saved")
+
+
+
+

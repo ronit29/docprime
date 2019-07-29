@@ -361,8 +361,8 @@ class LabList(viewsets.ReadOnlyModelViewSet):
         package_count = RawSql(package_count_query, params).fetch_all()
         result_count = package_count[0].get('count', 0)
         temp_categories_ids = package_count[0].get('category_ids', [])
-        # if temp_categories_ids:
-        #     category_ids = temp_categories_ids
+        if not temp_categories_ids:
+            temp_categories_ids = []
         # if filter_query:
         #     filter_query = ' and '+filter_query
         package_search_query = package_search_query.format(filter_query=filter_query, sort_query=sort_query, offset=offset, limit=page_size)
@@ -1502,12 +1502,14 @@ class LabList(viewsets.ReadOnlyModelViewSet):
             group_filter.append("price<=(%(max_price)s)")
             filtering_params['max_price'] = max_price
 
-        if is_insurance and ids and self.request.user and not self.request.user.is_anonymous and \
-                self.request.user.active_insurance:
+        if is_insurance and ids and request and request.user and not request.user.is_anonymous and \
+                request.user.active_insurance:
             # filtering_query.append("mrp<=(%(insurance_threshold_amount)s)")
             if not hasattr(request, 'agent'):
-                group_filter.append("(case when covered_under_insurance then agreed_price<=insurance_cutoff_price or insurance_cutoff_price is null else false end  )")
-        elif not is_insurance and ids and request.user and not request.user.is_anonymous and request.user.active_insurance:
+                group_filter.append("(case when covered_under_insurance and insurance_agreed_price >0 then insurance_agreed_price<=insurance_cutoff_price "
+                                    " when covered_under_insurance and  (insurance_agreed_price is null or  insurance_agreed_price=0 ) then agreed_price<=insurance_cutoff_price or insurance_cutoff_price is null else false end  )")
+        elif not is_insurance and ids and request and request.user and not request.user.is_anonymous and \
+                request.user.active_insurance:
             if not hasattr(request, 'agent'):
                 group_filter.append("( case when covered_under_insurance then agreed_price<=insurance_cutoff_price or insurance_cutoff_price is null else true end  )")
 
@@ -1570,18 +1572,19 @@ class LabList(viewsets.ReadOnlyModelViewSet):
             query = ''' select * from (select id,network_id, name ,price, count, mrp, pickup_charges, distance, order_priority, new_network_rank, rank,
             max(new_network_rank) over(partition by 1) result_count
             from ( 
-            select test_type, agreed_price, id, rating_data, network_id, name ,price, count, mrp, pickup_charges, distance, order_priority, 
+            select insurance_home_pickup, test_type, agreed_price, insurance_agreed_price,  id, rating_data, network_id, name ,price, count, mrp, pickup_charges, distance, order_priority, 
                         dense_rank() over(order by network_rank) as new_network_rank, rank from
                         (
-                        select test_type, agreed_price, id, rating_data, network_id, rank() over(partition by coalesce(network_id,random()) order by order_rank) as rank,
+                        select insurance_home_pickup, test_type, agreed_price, insurance_agreed_price, id, rating_data, network_id, rank() over(partition by coalesce(network_id,random()) order by order_rank) as rank,
                          min (order_rank) OVER (PARTITION BY coalesce(network_id,random())) network_rank,
                          name ,price, count, mrp, pickup_charges, distance, order_priority from
-                        (select test_type, agreed_price, id, rating_data, network_id,  
+                        (select insurance_home_pickup, test_type, agreed_price, insurance_agreed_price, id, rating_data, network_id,  
                         name ,price, test_count as count, total_mrp as mrp,pickup_charges, distance, 
                         ROW_NUMBER () OVER (ORDER BY {order} ) order_rank,
                         max_order_priority as order_priority
                         from (
-                        select max(lt.insurance_cutoff_price) as insurance_cutoff_price , 
+                        select case when (bool_and(home_collection_possible) and is_home_collection_enabled) then true else false end as insurance_home_pickup, 
+                        max(lt.insurance_cutoff_price) as insurance_cutoff_price , 
                         case when sum(mrp)<=(%(insurance_threshold_amount)s) and is_insurance_enabled=true then true else false end as covered_under_insurance,
                         max(lt.test_type) as test_type, lb.*, sum(mrp) total_mrp, count(*) as test_count,
                         case when bool_and(home_collection_possible)=True and is_home_collection_enabled=True 
@@ -1589,7 +1592,7 @@ class LabList(viewsets.ReadOnlyModelViewSet):
                         end as pickup_charges,
                         sum(case when custom_deal_price is null then computed_deal_price else custom_deal_price end)as price,
                         max(case when custom_agreed_price is null then computed_agreed_price else
-                        custom_agreed_price end) as agreed_price,
+                        custom_agreed_price end) as agreed_price, max(insurance_agreed_price) as insurance_agreed_price,
                         max(ST_Distance(location,St_setsrid(St_point((%(longitude)s), (%(latitude)s)), 4326))) as distance,
                         max(order_priority) as max_order_priority from lab lb {lab_timing_join} inner join available_lab_test avlt on
                         lb.lab_pricing_group_id = avlt.lab_pricing_group_id 
@@ -1643,8 +1646,9 @@ class LabList(viewsets.ReadOnlyModelViewSet):
         return lab_search_result
 
     def apply_search_sort(self, parameters):
+
         if parameters.get('ids') and  parameters.get('is_user_insured') and not parameters.get('sort_on'):
-            return ' case when (test_type in (2,3)) then ((case when network_id=43 then -1 end) , agreed_price ) end, case when (test_type=1) then distance  end '
+            return ' case when (test_type in (2,3)) and insurance_home_pickup=true and pickup_charges=0  then (insurance_home_pickup ,(case when network_id=43 then -1 end) , agreed_price )	end, distance '
         order_by = parameters.get("sort_on")
         if order_by is not None:
             if order_by == "fees" and parameters.get('ids'):
@@ -1708,7 +1712,12 @@ class LabList(viewsets.ReadOnlyModelViewSet):
                         deal_price=test.custom_deal_price
                     else:
                         deal_price=test.computed_deal_price
-                    tests[obj.id].append({"id": test.test_id, "name": test.test.name, "deal_price": deal_price, "mrp": test.mrp, "number_of_tests": test.test.number_of_tests, 'categories': test.test.get_all_categories_detail(), "url": test.test.url})
+                    tests[obj.id].append(
+                        {"id": test.test_id, "name": test.test.name, "deal_price": deal_price, "mrp": test.mrp,
+                         "number_of_tests": test.test.number_of_tests,
+                         'categories': test.test.get_all_categories_detail(), "url": test.test.url,
+                         "insurance_agreed_price": test.insurance_agreed_price
+                         })
 
         # day_now = timezone.now().weekday()
         # days_array = [i for i in range(7)]
@@ -1830,8 +1839,17 @@ class LabList(viewsets.ReadOnlyModelViewSet):
                     key = random.randint(10, 1000000000)
                 lab_network[key] = res
             else:
-                existing['other_labs'].append(res)
-
+                if insurance_data_dict and insurance_data_dict.get('is_user_insured'):
+                    if res.get('distance') < existing.get('distance'):
+                        temp = existing
+                        existing = res
+                        if not existing.get('other_labs'):
+                            existing['other_labs'] = []
+                        existing['other_labs'].append(temp)
+                    else:
+                        existing['other_labs'].append(res)
+                else:
+                    existing['other_labs'].append(res)
         return lab_network.values()
 
 
@@ -2379,6 +2397,8 @@ class LabAppointmentView(mixins.CreateModelMixin,
 
         user_insurance = UserInsurance.get_user_insurance(request.user)
         if user_insurance:
+            if user_insurance.status == UserInsurance.ONHOLD:
+                return Response(status=status.HTTP_400_BAD_REQUEST, data={'error': 'Your documents from the last claim are under verification.Please write to customercare@docprime.com for more information'})
             insurance_validate_dict = user_insurance.validate_insurance(validated_data)
             data['is_appointment_insured'] = insurance_validate_dict['is_insured']
             data['insurance_id'] = insurance_validate_dict['insurance_id']
@@ -2534,6 +2554,10 @@ class LabAppointmentView(mixins.CreateModelMixin,
         user = request.user
         balance = 0
         cashback_balance = 0
+
+        if user and user.active_insurance and user.active_insurance.status == UserInsurance.ONHOLD:
+            return Response(status=status.HTTP_400_BAD_REQUEST, data={'error': 'There is some problem, Please try again later'})
+
 
         if use_wallet:
             consumer_account = account_models.ConsumerAccount.objects.get_or_create(user=user)
@@ -2840,15 +2864,10 @@ class LabReportFileViewset(mixins.CreateModelMixin,
         request = self.request
         if request.user.user_type == User.DOCTOR:
             user = request.user
-            return (models.LabReportFile.objects.filter(
-                Q(report__appointment__lab__manageable_lab_admins__user=user,
-                  report__appointment__lab__manageable_lab_admins__permission_type=auth_models.GenericLabAdmin.APPOINTMENT,
-                  report__appointment__lab__manageable_lab_admins__is_disabled=False) |
-                Q(report__appointment__lab__network__manageable_lab_network_admins__user=request.user,
-                  report__appointment__lab__network__manageable_lab_network_admins__permission_type=auth_models.GenericLabAdmin.APPOINTMENT,
-                  report__appointment__lab__network__manageable_lab_network_admins__is_disabled=False)).distinct())
-
-            # return models.PrescriptionFile.objects.filter(prescription__appointment__doctor=request.user.doctor)
+            return models.LabReportFile.objects.filter(
+                                         report__appointment__lab__manageable_lab_admins__user=user,
+                                         report__appointment__lab__manageable_lab_admins__is_disabled=False
+                                        ).distinct()
         elif request.user.user_type == User.CONSUMER:
             return models.LabReportFile.objects.filter(report__appointment__user=request.user)
         else:
@@ -2860,10 +2879,8 @@ class LabReportFileViewset(mixins.CreateModelMixin,
         validated_data = serializer.validated_data
         if not self.lab_report_permission(request.user, validated_data.get('appointment')):
             return Response([])
-        if models.LabReport.objects.filter(appointment=validated_data.get('appointment')).exists():
-            report = models.LabReport.objects.filter(
-                appointment=validated_data.get('appointment')).first()
-        else:
+        report = models.LabReport.objects.filter(appointment=validated_data.get('appointment')).first()
+        if not report:
             report = models.LabReport.objects.create(appointment=validated_data.get('appointment'),
                                                      report_details=validated_data.get('report_details'))
         report_file_data = {
@@ -2878,8 +2895,7 @@ class LabReportFileViewset(mixins.CreateModelMixin,
 
     def lab_report_permission(self, user, appointment):
         return auth_models.GenericLabAdmin.objects.filter(user=user, lab=appointment.lab,
-                                                          permission_type=auth_models.GenericLabAdmin.APPOINTMENT,
-                                                          write_permission=True).exists()
+                                                          is_disabled=False).exists()
 
     @transaction.non_atomic_requests
     def list(self, request, *args, **kwargs):
@@ -2913,13 +2929,7 @@ class DoctorLabAppointmentsViewSet(viewsets.GenericViewSet):
         lab_appointment = LabAppointment.objects.select_for_update().get(id=lab_appointment.id)
 
         if lab_appointment.lab.manageable_lab_admins.filter(user=request.user,
-                                                            is_disabled=False,
-                                                            write_permission=True).exists() or \
-                (lab_appointment.lab.network is not None and
-                 lab_appointment.lab.network.manageable_lab_network_admins.filter(
-                     user=request.user,
-                     is_disabled=False,
-                     write_permission=True).exists()):
+                                                            is_disabled=False).exists():
             lab_appointment.action_completed()
             lab_appointment_serializer = diagnostic_serializer.LabAppointmentRetrieveSerializer(lab_appointment,
                                                                                                 context={
@@ -3091,7 +3101,7 @@ class TestDetailsViewset(viewsets.GenericViewSet):
             parameters['long'] = params.get('long')
 
         parameters['ids'] = ",".join(test_ids)
-        parameters['max_distance'] = 15
+        parameters['max_distance'] = 20
         parameters['min_distance'] = 0
 
         kwargs['parameters'] = parameters

@@ -110,3 +110,78 @@ def update_hosp_google_avg_rating():
 def update_flags():
     from ondoc.doctor.models import Hospital
     Hospital.update_is_big_hospital()
+
+@task()
+def doctors_daily_schedule():
+    from ondoc.doctor.models import Hospital, OpdAppointment, OfflineOPDAppointments
+    from ondoc.authentication.models import GenericAdmin
+    from ondoc.communications.models import SMSNotification
+    from ondoc.notification.models import NotificationAction
+    from django.conf import settings
+    import datetime, json
+
+    curr_date = datetime.datetime.now()
+
+    offline_appointments = OfflineOPDAppointments.objects.select_related('hospital', 'user') \
+                                                         .prefetch_related('hospital__manageable_hospitals',
+                                                                           'user__patient_mobiles') \
+                                                         .filter(time_slot_start__date=curr_date.date(),
+                                                                 hospital__network_type=Hospital.NON_NETWORK_HOSPITAL,
+                                                                 hospital__is_live=True) \
+                                                         .exclude(status__in=[OfflineOPDAppointments.CANCELLED,
+                                                                              OfflineOPDAppointments.COMPLETED],
+                                                                  hospital__id__in=json.loads(settings.DAILY_SCHEDULE_EXCLUDE_HOSPITALS))
+
+    docprime_appointments = OpdAppointment.objects.select_related('profile') \
+                                                  .prefetch_related('hospital__manageable_hospitals') \
+                                                  .filter(time_slot_start__date=curr_date.date(),
+                                                          hospital__network_type=Hospital.NON_NETWORK_HOSPITAL,
+                                                          hospital__is_live=True) \
+                                                  .exclude(status__in=[OpdAppointment.CANCELLED,
+                                                                       OpdAppointment.COMPLETED],
+                                                           hospital__id__in=json.loads(settings.DAILY_SCHEDULE_EXCLUDE_HOSPITALS))
+    hospital_admins_dict = dict()
+    hospital_admin_appointments_dict = dict()
+    appointments_list = [*offline_appointments, *docprime_appointments]
+    for appointment in appointments_list:
+        if hasattr(appointment, 'profile'):
+            patient_number = appointment.profile.phone_number
+        else:
+            patient_numbers = appointment.user.patient_mobiles.all()
+            patient_number = patient_numbers[0] if patient_numbers else None
+            for number in patient_numbers:
+                if number.is_default:
+                    patient_number = number
+        for admin in appointment.hospital.manageable_hospitals.all():
+            if (admin.super_user_permission) or \
+                    (admin.permission_type == GenericAdmin.APPOINTMENT and
+                     ((not admin.doctor) or (admin.doctor and appointment.doctor == admin.doctor))):
+                if appointment.hospital not in hospital_admins_dict:
+                    hospital_admins_dict[appointment.hospital] = {admin}
+                else:
+                    hospital_admins_dict[appointment.hospital].add(admin)
+                hospital_admin_combo = str(appointment.hospital.id)+'-'+str(admin.id)
+                if hospital_admin_combo not in hospital_admin_appointments_dict:
+                    hospital_admin_appointments_dict[hospital_admin_combo] = {(appointment, patient_number)}
+                else:
+                    hospital_admin_appointments_dict[hospital_admin_combo].add((appointment, patient_number))
+
+    for hospital in hospital_admins_dict:
+        admins = hospital_admins_dict[hospital]
+        sms_sent = list()
+        for admin in admins:
+            if admin.phone_number in sms_sent or not (int(admin.phone_number) >= 1000000000 and int(admin.phone_number) <= 9999999999):
+                continue
+            receiver = [{'user': None, 'phone_number': admin.phone_number}]
+            hospital_admin_combo = str(hospital.id) + '-' + str(admin.id)
+            appointments_and_numbers = hospital_admin_appointments_dict[hospital_admin_combo]
+            if appointments_and_numbers:
+                context = {
+                    "curr_date": curr_date,
+                    "hospital_name": hospital.name,
+                    "no_of_appointments": len(appointments_and_numbers),
+                    # "appointments_and_numbers": appointments_and_numbers
+                }
+                sms_notification = SMSNotification(notification_type=NotificationAction.OPD_DAILY_SCHEDULE, context=context)
+                sms_notification.send(receiver)
+                sms_sent.append(admin.phone_number)
