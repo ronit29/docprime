@@ -34,6 +34,7 @@ class ChatConsultation(TimeStampedModel):
         (PAYMENT_PENDING, 'Payment Pending'),
     )
 
+    id = models.BigAutoField(primary_key=True)
     plan_id = models.PositiveIntegerField(default=1)
     user = models.ForeignKey(User, on_delete=models.DO_NOTHING, related_name="chat_consultation")
     status = models.PositiveSmallIntegerField(default=BOOKED, choices=STATUS_CHOICES)

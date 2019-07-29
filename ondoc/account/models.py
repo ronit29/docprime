@@ -255,6 +255,7 @@ class Order(TimeStampedModel):
         appointment_obj = None
         order_dict = dict()
         amount = None
+        promotional_amount = 0
         total_balance = consumer_account.get_total_balance()
 
         if self.action == Order.OPD_APPOINTMENT_CREATE:
@@ -337,6 +338,7 @@ class Order(TimeStampedModel):
                 }
         elif self.action == Order.CHAT_CONSULTATION_CREATE:
             if total_balance >= appointment_data.get("effective_price"):
+                amount = Decimal(appointment_data.get("amount"))
                 promotional_amount = consultation_data.pop('promotional_amount')
                 appointment_obj = ChatConsultation(**consultation_data)
                 appointment_obj.save()
@@ -344,7 +346,6 @@ class Order(TimeStampedModel):
                     "reference_id": appointment_obj.id,
                     "payment_status": Order.PAYMENT_ACCEPTED
                 }
-                amount = appointment_obj.effective_price
 
         if order_dict:
             self.update_order(order_dict)

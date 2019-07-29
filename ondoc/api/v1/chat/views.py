@@ -258,21 +258,21 @@ class ChatOrderViewSet(viewsets.GenericViewSet):
 
         wallet_balance = consumer_account.balance
         cashback_balance = consumer_account.cashback
-        total_balance = wallet_balance # 50
-        # total_balance = wallet_balance + cashback_balance
+        total_balance = wallet_balance + cashback_balance
 
-        amount_to_paid = amount  # 100
+        amount_to_paid = amount
 
         if use_wallet and total_balance >= amount:
-            cashback_amount = 0
-            amount_to_paid = max(0, amount - total_balance)
-            # cashback_amount = max(0, amount_to_paid - cashback_balance)
+            cashback_amount = min(cashback_balance, amount_to_paid)
             wallet_amount = max(0, amount_to_paid - cashback_amount)
+            amount_to_paid = max(0, amount_to_paid - total_balance)
             process_immediately = True
         elif use_wallet and total_balance < amount:
-            cashback_amount = 0
-            amount_to_paid = amount - total_balance  # 50
-            wallet_amount = max(0, amount_to_paid - cashback_amount)
+            cashback_amount = min(amount_to_paid, cashback_balance)
+            wallet_amount = 0
+            if cashback_amount < amount_to_paid:
+                wallet_amount = min(wallet_balance, amount_to_paid - cashback_amount)
+            amount_to_paid = max(0, amount_to_paid - total_balance)
             process_immediately = False
         else:
             cashback_amount = 0
@@ -281,7 +281,7 @@ class ChatOrderViewSet(viewsets.GenericViewSet):
 
         action = Order.CHAT_CONSULTATION_CREATE
         action_data = {"user": user.id, "plan_id": plan_id, "extra_details": details, "effective_price": float(amount_to_paid),
-                       "amount": float(amount), "cashback": cashback_amount, "promotional_amount": float(promotional_amount)}
+                       "amount": float(amount), "cashback": float(cashback_amount), "promotional_amount": float(promotional_amount)}
 
         pg_order = Order.objects.create(
             amount=float(amount_to_paid),
