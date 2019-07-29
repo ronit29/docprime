@@ -507,19 +507,19 @@ class WHTSAPPNotification:
             data.append(self.context.get('instance').hospital.get_hos_address())
             data.append(datetime.strftime(aware_time_zone(self.context.get('instance').time_slot_start), '%d-%m-%Y %H:%M'))
 
-        elif notification_type == NotificationAction.APPOINTMENT_BOOKED and (not user or user.user_type == User.DOCTOR):
-            body_template = "appointment_booked_doctor"
-
-            data.append(self.context.get('patient_name'))
-            data.append(self.context.get('doctor_name'))
-            data.append(self.context.get('instance').hospital.name)
-            data.append(datetime.strftime(aware_time_zone(self.context.get('instance').time_slot_start), '%d-%m-%Y'))
-            data.append(datetime.strftime(aware_time_zone(self.context.get('instance').time_slot_start), '%H:%M'))
-            data.append(self.context.get('instance').id)
-            data.append(self.context.get('patient_name'))
-            data.append(self.context.get('instance').profile.phone_number)
-            data.append(self.context.get('doctor_name'))
-            data.append(datetime.strftime(aware_time_zone(self.context.get('instance').time_slot_start), '%d-%m-%Y %H:%M'))
+        # elif notification_type == NotificationAction.APPOINTMENT_BOOKED and (not user or user.user_type == User.DOCTOR):
+        #     body_template = "appointment_booked_doctor"
+        #
+        #     data.append(self.context.get('patient_name'))
+        #     data.append(self.context.get('doctor_name'))
+        #     data.append(self.context.get('instance').hospital.name)
+        #     data.append(datetime.strftime(aware_time_zone(self.context.get('instance').time_slot_start), '%d-%m-%Y'))
+        #     data.append(datetime.strftime(aware_time_zone(self.context.get('instance').time_slot_start), '%H:%M'))
+        #     data.append(self.context.get('instance').id)
+        #     data.append(self.context.get('patient_name'))
+        #     data.append(self.context.get('instance').profile.phone_number)
+        #     data.append(self.context.get('doctor_name'))
+        #     data.append(datetime.strftime(aware_time_zone(self.context.get('instance').time_slot_start), '%d-%m-%Y %H:%M'))
 
         elif notification_type == NotificationAction.APPOINTMENT_RESCHEDULED_BY_PATIENT and user and user.user_type == User.CONSUMER:
             body_template = "opd_appointment_rescheduled_patient_initiated_to_patient"
