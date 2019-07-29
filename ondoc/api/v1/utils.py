@@ -441,7 +441,7 @@ def payment_details(request, order):
             if order.action_data.get('profile_detail'):
                 profile_name = order.action_data.get('profile_detail').get('name', "")
 
-    if order.product_id == Order.SUBSCRIPTION_PLAN_PRODUCT_ID:
+    if order.product_id == Order.SUBSCRIPTION_PLAN_PRODUCT_ID or order.product_id == Order.CHAT_PRODUCT_ID:
         isPreAuth = '0'
 
     if isPreAuth == '1':

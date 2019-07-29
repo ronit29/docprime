@@ -314,6 +314,7 @@ class User(AbstractBaseUser, PermissionsMixin):
     is_staff = models.BooleanField(verbose_name= 'Staff Status', default=False, help_text= 'Designates whether the user can log into this admin site.')
     date_joined = models.DateTimeField(auto_now_add=True)
     auto_created = models.BooleanField(default=False)
+    source = models.CharField(blank=True, max_length=50, null=True)
 
     def __hash__(self):
         return self.id
