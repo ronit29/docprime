@@ -481,7 +481,8 @@ class InsuranceThreshold(auth_model.TimeStampedModel, LiveMixin):
         # Age validation for child in days
         #TODO INSURANCE check max age
         if member['member_type'] == "child":
-            if child_min_age <= days_diff and math.ceil(days_diff/365) <= child_max_age:
+            # if child_min_age <= days_diff and math.ceil(days_diff/365) <= child_max_age:
+            if child_min_age <= days_diff and years_diff <= child_max_age:
                 is_dob_valid = True
             else:
                 message = {"message": "Child Age should be more than " + str(child_min_age) + " days or less than" +
