@@ -56,6 +56,7 @@ class Coupon(auth_model.TimeStampedModel):
     doctors = models.ManyToManyField("doctor.Doctor", blank=True)
     doctors_exclude = models.ManyToManyField("doctor.Doctor", blank=True, related_name='doctors_exclude')
     hospitals = models.ManyToManyField("doctor.Hospital", blank=True)
+    hospitals_exclude = models.ManyToManyField("doctor.Hospital", blank=True, related_name='hospitals_exclude')
     specializations = models.ManyToManyField("doctor.PracticeSpecialization", blank=True)
     procedures = models.ManyToManyField("procedure.Procedure", blank=True)
     procedure_categories = models.ManyToManyField("procedure.ProcedureCategory", blank=True)
@@ -551,6 +552,9 @@ class CouponRecommender():
                 hospital_city = getattr(hospital, 'city') if hasattr(hospital, 'city') else hospital.get('city')
                 coupons = list(
                     filter(lambda x: len(x.hospitals.all()) == 0 or hospital_id in list(map(lambda y: y.id, x.hospitals.all())), coupons))
+                coupons = list(
+                    filter(lambda x: len(x.hospitals_exclude.all()) == 0 or hospital_id not in list(
+                        map(lambda y: y.id, x.hospitals_exclude.all())), coupons))
                 coupons = list(filter(lambda x: x.cities == None or hospital_city in x.cities, coupons))
             else:
                 coupons = list(filter(lambda x: len(x.hospitals.all()) == 0, coupons))

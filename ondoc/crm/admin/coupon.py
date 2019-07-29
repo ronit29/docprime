@@ -249,6 +249,7 @@ class CouponForm(forms.ModelForm):
             'doctors': autocomplete.ModelSelect2Multiple(url='doctors-autocomplete', forward=['hospitals', 'specializations', 'procedures', 'procedure_categories']),
             'doctors_exclude': autocomplete.ModelSelect2Multiple(url='doctors-autocomplete'),
             'hospitals': autocomplete.ModelSelect2Multiple(url='hospitals-autocomplete', forward=['doctors', 'specializations', 'procedures', 'procedure_categories']),
+            'hospitals_exclude': autocomplete.ModelSelect2Multiple(url='hospitals-autocomplete'),
             'specializations': autocomplete.ModelSelect2Multiple(url='specializations-autocomplete', forward=['doctors', 'hospitals', 'procedures', 'procedure_categories']),
             'procedures': autocomplete.ModelSelect2Multiple(url='procedures-autocomplete', forward=['doctors', 'hospitals', 'specializations', 'procedure_categories']),
             'procedure_categories': autocomplete.ModelSelect2Multiple(url='procedure-categories-autocomplete', forward=['doctors', 'hospitals', 'specializations', 'procedures'])
