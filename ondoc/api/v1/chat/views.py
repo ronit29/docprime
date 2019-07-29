@@ -210,11 +210,15 @@ class ChatUserViewSet(viewsets.GenericViewSet):
         if not user:
             return JsonResponse(response, status=400)
 
+        consumer_account = ConsumerAccount.objects.get_or_create(user=user)
+        wallet_balance = consumer_account[0].get_total_balance()
+
         token_object = JWTAuthentication.generate_token(user)
 
         response = {
             "token": token_object['token'],
-            "payload": token_object['payload']
+            "payload": token_object['payload'],
+            "wallet_balance": wallet_balance
         }
 
         return Response(response, status=status.HTTP_200_OK)
