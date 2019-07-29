@@ -1,1 +1,1 @@
-Matrix Lead ID has been generated for Provider with phone number - {{ data.PrimaryNo }}
+Provider App Signup Lead Created - {{ data.PrimaryNo }}
