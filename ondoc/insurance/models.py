@@ -1280,16 +1280,21 @@ class UserInsurance(auth_model.TimeStampedModel, MerchantPayoutMixin):
 
     def validate_lab_insurance(self, appointment_data, user_insurance):
         from ondoc.diagnostic.models import AvailableLabTest
+        from ondoc.diagnostic.models import LabTest
         lab = appointment_data['lab']
         lab_mrp_check_list = []
         if not lab.is_insurance_enabled:
             return False, None, 'Lab is not covered under insurance'
         threshold = InsuranceThreshold.objects.filter(insurance_plan_id=user_insurance.insurance_plan_id).first()
+        plan = InsurancePlans.objects.filter(id=user_insurance.insurance_plan_id).first()
         threshold_lab = threshold.lab_amount_limit
         if appointment_data['test_ids']:
             for test in appointment_data['test_ids']:
                 lab_test = AvailableLabTest.objects.filter(lab_pricing_group__labs=appointment_data["lab"],
                                                            test=test, enabled=True).first()
+                test = LabTest.objects.filter(id=test).first()
+                if test.is_package and plan.plan_usages and plan.plan_usages.get('package_disabled'):
+                    return False, user_insurance.id, "Packages not covered for this plan"
                 if not lab_test:
                     return False, user_insurance.id, 'Price not available for Test'
                 mrp = lab_test.mrp
@@ -1302,6 +1307,7 @@ class UserInsurance(auth_model.TimeStampedModel, MerchantPayoutMixin):
                 return True, user_insurance.id, ''
             else:
                 return False, None, ''
+
         else:
             return False, None, ''
 
