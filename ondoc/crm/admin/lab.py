@@ -964,9 +964,13 @@ class LabAppointmentAdmin(nested_admin.NestedModelAdmin):
         if "_capture-payment" in request.POST:
             if (request.user.is_superuser or request.user.groups.filter(
                     name=constants['SUPER_QC_GROUP']).exists()):
-                notification_tasks.send_capture_payment_request.apply_async(
-                    (Order.LAB_PRODUCT_ID, obj.id), eta=timezone.localtime(), )
-                messages.success(request, ('Payment capture requested successfully.'))
+                txn_obj = obj.get_transaction()
+                if txn_obj and txn_obj.is_preauth():
+                    notification_tasks.send_capture_payment_request.apply_async(
+                        (Order.LAB_PRODUCT_ID, obj.id), eta=timezone.localtime(), )
+                    messages.success(request, ('Payment capture requested successfully.'))
+                else:
+                    messages.error(request, ('Appointment transaction is not in authorize state.'))
             else:
                 messages.error(request, ('You do not have access to perform this action.'))
             return HttpResponseRedirect(".")
