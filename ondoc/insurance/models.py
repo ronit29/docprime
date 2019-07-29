@@ -1298,7 +1298,6 @@ class UserInsurance(auth_model.TimeStampedModel, MerchantPayoutMixin):
             for test in appointment_data['test_ids']:
                 lab_test = AvailableLabTest.objects.filter(lab_pricing_group__labs=appointment_data["lab"],
                                                            test=test, enabled=True).first()
-                test = LabTest.objects.filter(id=test).first()
                 if test.is_package and plan.plan_usages and plan.plan_usages.get('package_disabled'):
                     return False, user_insurance.id, "Packages not covered for this plan"
                 if not lab_test:
