@@ -1,1 +1,0 @@
-Dear {{ patient_name }}, you have been successfully added as a patient to {{ hospital_name }}. In case of any query, please reach out to the {{ hospital_name }}.

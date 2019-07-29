@@ -1,1 +1,0 @@
-Appointment reminder: Dear {{ patient_name }}, your appointment with {{ doctor_name }} at {{ hospital_name }} is scheduled on {{ time_slot_start|date:"D jS F Y" }}. Please make sure you reach the clinic premises on time.
