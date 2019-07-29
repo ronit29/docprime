@@ -420,12 +420,25 @@ class DoctorSearchHelper:
         else:
             sp_cond = ''
             min_dist_cond = ''
+            search_distance =''
             rank_part = " Row_number() OVER( partition BY d.id  ORDER BY " \
                 "St_distance(St_setsrid(St_point((%(longitude)s), (%(latitude)s)), 4326 ), h.location),dct.deal_price ASC) rnk " \
 
             if len(specialization_ids)>0 or len(condition_ids)>0:
                 sp_cond = " LEFT JOIN doctor_practice_specialization ds on ds.doctor_id = d.id " \
                        " LEFT JOIN practice_specialization gs on ds.specialization_id = gs.id "
+
+            if sp_cond:
+                search_distance = " and case when gs.search_distance is not null then " \
+                                  "St_dwithin( St_setsrid(St_point((%(longitude)s), (%(latitude)s)), 4326), h.location, gs.search_distance )" \
+                                  "else case when (%(max_distance)s) >= 0  then " \
+                                  "St_dwithin( St_setsrid(St_point((%(longitude)s), (%(latitude)s)), 4326), h.location, (%(max_distance)s))" \
+                                " else St_dwithin( St_setsrid(St_point((%(longitude)s), (%(latitude)s)), 4326), h.location, h.search_distance ) end " \
+                                  "end"
+            else:
+                search_distance = " and case when (%(max_distance)s) >= 0  then St_dwithin( St_setsrid(St_point((%(longitude)s), (%(latitude)s)), 4326), h.location, (%(max_distance)s))" \
+                           " else St_dwithin( St_setsrid(St_point((%(longitude)s), (%(latitude)s)), 4326), h.location, h.search_distance ) end "
+
             if min_distance>0:
                 min_dist_cond = " and St_dwithin(St_setsrid(St_point((%(longitude)s), (%(latitude)s)), 4326 ), h.location, (%(min_distance)s)) = false "
 
@@ -457,13 +470,12 @@ class DoctorSearchHelper:
                            "AND (%(ist_time)s) BETWEEN dl.start_time and dl.end_time " \
                            "{sp_cond} " \
                            "WHERE {filtering_params} " \
-                           "and case when (%(max_distance)s) >= 0  then St_dwithin( St_setsrid(St_point((%(longitude)s), (%(latitude)s)), 4326), h.location, (%(max_distance)s))" \
-                           " else St_dwithin( St_setsrid(St_point((%(longitude)s), (%(latitude)s)), 4326), h.location, h.search_distance ) end" \
+                           " {search_distance} " \
                            "{min_dist_cond}" \
                            " )x " \
                            "where {rank_by} ORDER BY {order_by_field}".format(rank_part=rank_part, sp_cond=sp_cond, \
                                                                               filtering_params=filtering_params.get(
-                                                                                  'string'), \
+                                                                                  'string'), search_distance=search_distance,\
                                                                               min_dist_cond=min_dist_cond,
                                                                               order_by_field=order_by_field, \
                                                                               rank_by=rank_by, ipd_query=ipd_query)
@@ -586,14 +598,14 @@ class DoctorSearchHelper:
                         not (request.query_params.get('procedure_ids') or request.query_params.get('procedure_category_ids')):
                     is_insurance_covered = True
 
-                if request and request.user and request.user.active_insurance and \
+                if request and request.user and not request.user.is_anonymous and request.user.active_insurance and \
                         not doctor.is_gyno_limit_breach(request.user.active_insurance) and is_insurance_covered:
                     is_insurance_covered = True
                 else:
                     is_insurance_covered = False
                     insurance_error = "You have already utilised {} Gynaecologist consultations available in your OPD Insurance Plan.".format(settings.INSURANCE_GYNECOLOGIST_LIMIT)
 
-                if request and request.user and request.user.active_insurance and \
+                if request and request.user and not request.user.is_anonymous and request.user.active_insurance and \
                         not doctor.is_onco_limit_breach(request.user.active_insurance) and is_insurance_covered:
                     is_insurance_covered = True
                 else:
