@@ -1281,24 +1281,6 @@ def create_ipd_lead_from_lab_appointment(self, data):
 
 
 @task(bind=True, max_retries=2)
-def create_ipd_lead_from_order(self, data):
-    from ondoc.procedure.models import IpdProcedureLead
-    obj_id = data.get('obj_id')
-    if not obj_id:
-        logger.error("[CELERY ERROR: Incorrect values provided.]")
-        raise ValueError()
-    obj = Order.objects.filter(id=obj_id).first()
-    if not obj:
-        return
-
-    data = obj.convert_ipd_lead_data()
-    data['source'] = IpdProcedureLead.DROPOFF
-    data['is_valid'] = False
-    obj_created = IpdProcedureLead(**data)
-    obj_created.save()
-
-
-@task(bind=True, max_retries=2)
 def check_for_ipd_lead_validity(self, data):
     from ondoc.procedure.models import IpdProcedureLead
     obj_id = data.get('obj_id')

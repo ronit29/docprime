@@ -83,23 +83,6 @@ class Order(TimeStampedModel):
     def __str__(self):
         return "{}".format(self.id)
 
-    def convert_ipd_lead_data(self):
-        result = {}
-        result['hospital_id'] = self.action_data.get('hospital')
-        # result['lab'] = self.lab
-        result['user'] = self.user
-        # result['payment_amount'] = self.deal_price
-        if self.user:
-            result['name'] = self.user.full_name
-            result['phone_number'] = self.user.phone_number
-            result['email'] = self.user.email
-            default_user_profile = self.user.get_default_profile()
-            if default_user_profile:
-                result['gender'] = default_user_profile.gender
-                result['dob'] = default_user_profile.dob
-        result['data'] = {'order_id': self.id}
-        return result
-
     def get_insurance_data_for_pg(self):
         from ondoc.insurance.models import UserInsurance
 
