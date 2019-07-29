@@ -758,7 +758,8 @@ def create_or_update_lead_on_matrix(self, data):
                 obj.matrix_lead_id = int(obj.matrix_lead_id)
                 obj.save()
                 if lead_source == 'ProviderApp':
-                    receivers = [{"user": None, "email": "navneetsingh@docprime.com"}]
+                    receivers = [{"user": None, "email": "navneetsingh@docprime.com"},
+                                 {"user": None, "email": "sanatmanhas@docprime.com"}]
                     # receivers = [{"user": None, "email": "kabeer@docprime.com"},
                     #              {"user": None, "email": "simranjeet@docprime.com"},
                     #              {"user": None, "email": "prithvijeet@docprime.com"},
