@@ -30,6 +30,7 @@ urlpatterns = [
     path('ecs/create', views.PartnerEConsultationViewSet.as_view({'post': 'create'}), name='ecs_create'),
     path('ecs/list', views.PartnerEConsultationViewSet.as_view({'get': 'list'}), name='ecs_list'),
     path('ecs/share', views.PartnerEConsultationViewSet.as_view({'get': 'share'}), name='ecs_share'),
+    path('pecs/pay', views.ConsumerEConsultationViewSet.as_view({'post': 'pcs_payment'}), name='pecs_pay'),
 ]
 
 
