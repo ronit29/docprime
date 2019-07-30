@@ -1,3 +1,13 @@
+{% if instance.payment_type == 2 %}
+We have received your pay at clinic (cash) doctor appointment request. Below are the details:
+Patient Name : {{patient_name|capfirst}}
+Doctor Name : Dr. {{doctor_name|capfirst}}
+{{clinic_or_hospital}} : {{instance.hospital.name|capfirst}}
+{{clinic_or_hospital}} Address : {{instance.hospital.get_hos_address}}
+Appointment Date and Time : {{instance.time_slot_start|date:"D jS F Y"}} || {{instance.time_slot_start|date:"h:i A"}}
+Amount to be paid: {{cod_amount}}
+You will receive a confirmation email and message once the appointment is confirmed.
+{% else %}
 We have received your doctor appointment request. Below are the details:
 Appointment ID : {{instance.id}}
 Patient Name : {{patient_name|capfirst}}
@@ -6,5 +16,4 @@ Doctor Name : Dr. {{doctor_name|capfirst}}
 {{clinic_or_hospital}} Address : {{instance.hospital.get_hos_address}}
 Appointment Date and Time : {{instance.time_slot_start|date:"D jS F Y"}} || {{instance.time_slot_start|date:"h:i A"}}
 You will receive a confirmation email and message once the appointment is confirmed.
-{% if instance.payment_type == 2 %}
-Please pay Rs {{cod_amount}} at the center at the time of appointment. You will receive a confirmation email and message once the appointment is confirmed.{% endif %}
+{% endif %}
