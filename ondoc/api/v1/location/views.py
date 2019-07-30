@@ -1,6 +1,7 @@
 from django.contrib.contenttypes.models import ContentType
 from django.contrib.gis.geos import GEOSGeometry
 from django.db import transaction
+from django.db.models import F
 from django_extensions.db.fields import json
 from ondoc.doctor.models import DoctorPracticeSpecialization, PracticeSpecialization
 from ondoc.location import models as location_models
@@ -795,6 +796,17 @@ class SearchUrlsViewSet(viewsets.GenericViewSet):
         # return Response({"cities": result})
 
         return Response(sql_urls)
+
+    def list_localities_for_hospitals(self, request):
+        city = request.query_params.get('city')
+        if not city:
+            return Response(status=status.HTTP_400_BAD_REQUEST)
+
+        entity = location_models.EntityUrls.objects.filter(locality_value__iexact=city, is_valid=True,
+                                                           sitemap_identifier=location_models.EntityUrls.SitemapIdentifier.HOSPITALS_LOCALITY_CITY).order_by(
+            '-count').values('url', name=F('sublocality_value'))
+
+        return Response(entity)
 
     def list_urls_by_city(self, request, city):
         if not city:
