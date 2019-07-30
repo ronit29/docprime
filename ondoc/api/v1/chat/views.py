@@ -197,7 +197,7 @@ class ChatUserViewSet(viewsets.GenericViewSet):
         if request.method != 'POST':
             return JsonResponse(response, status=405)
 
-        serializer = serializers.ChatLoginSerializer(data=request.POST)
+        serializer = serializers.ChatLoginSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         data = serializer.validated_data
         profile_data = {}
