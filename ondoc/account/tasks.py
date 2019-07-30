@@ -404,7 +404,7 @@ def set_order_dummy_transaction(self, order_id, user_id):
                 req_data[key] = str(req_data[key])
 
             response = requests.post(url, data=json.dumps(req_data), headers=headers)
-            save_pg_response.apply_async((PgLogs.DUMMY_TXN, user_insurance.order.id, None, response.json(), req_data,), eta=timezone.localtime(), )
+            save_pg_response.apply_async((PgLogs.DUMMY_TXN, user_insurance.order.id, None, response.json(), req_data, user.id, ), eta=timezone.localtime(), )
             if response.status_code == status.HTTP_200_OK:
                 resp_data = response.json()
                 if resp_data.get("ok") is not None and resp_data.get("ok") == 1:

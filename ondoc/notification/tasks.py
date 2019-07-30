@@ -335,7 +335,7 @@ def set_order_dummy_transaction(self, order_id, user_id):
             req_data[key] = str(req_data[key])
 
         response = requests.post(url, data=json.dumps(req_data), headers=headers)
-        save_pg_response.apply_async((PgLogs.DUMMY_TXN, order_id, None, response.json(), req_data,), eta=timezone.localtime(), )
+        save_pg_response.apply_async((PgLogs.DUMMY_TXN, order_id, None, response.json(), req_data, user_id,), eta=timezone.localtime(), )
         if response.status_code == status.HTTP_200_OK:
             resp_data = response.json()
             #logger.error(resp_data)
@@ -1269,7 +1269,7 @@ def send_capture_payment_request(self, product_id, appointment_id):
             }
 
             response = requests.post(url, data=json.dumps(req_data), headers=headers)
-            save_pg_response.apply_async((PgLogs.TXN_CAPTURED, order.id, txn_obj.id, response.json(), req_data,), eta=timezone.localtime(), )
+            save_pg_response.apply_async((PgLogs.TXN_CAPTURED, order.id, txn_obj.id, response.json(), req_data, order.user_id), eta=timezone.localtime(), )
             if response.status_code == status.HTTP_200_OK:
                 resp_data = response.json()
                 if resp_data.get("ok") is not None and resp_data.get("ok") == '1':
@@ -1335,7 +1335,7 @@ def send_release_payment_request(self, product_id, appointment_id):
                 }
 
                 response = requests.post(url, data=json.dumps(req_data), headers=headers)
-                save_pg_response.apply_async((PgLogs.TXN_RELEASED, order.id, txn_obj.id, response.json(), req_data,), eta=timezone.localtime(), )
+                save_pg_response.apply_async((PgLogs.TXN_RELEASED, order.id, txn_obj.id, response.json(), req_data, order.user_id), eta=timezone.localtime(), )
                 if response.status_code == status.HTTP_200_OK:
                     resp_data = response.json()
                     if resp_data.get("ok") is not None and resp_data.get("ok") == '1':
@@ -1354,10 +1354,10 @@ def send_release_payment_request(self, product_id, appointment_id):
 
 
 @task(bind=True)
-def save_pg_response(self, log_type, order_id, txn_id, response, request):
+def save_pg_response(self, log_type, order_id, txn_id, response, request, user_id):
     try:
         from ondoc.account.mongo_models import PgLogs
-        PgLogs.save_pg_response(log_type, order_id, txn_id, response, request)
+        PgLogs.save_pg_response(log_type, order_id, txn_id, response, request, user_id)
     except Exception as e:
         logger.error("Error in saving pg response to mongo database - " + json.dumps(response) + " with exception - " + str(e))
         self.retry([txn_id, response], countdown=300)

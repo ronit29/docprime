@@ -1232,7 +1232,7 @@ class TransactionViewSet(viewsets.GenericViewSet):
                 status_type = PaymentProcessStatus.get_status_type(pg_resp_code, response.get('txStatus'))
 
                 PgLogs.objects.create(decoded_response=response, coded_response=coded_response)
-                save_pg_response.apply_async((mongo_pglogs.TXN_RESPONSE, response.get("orderId"), None, response, None), eta=timezone.localtime(), )
+                save_pg_response.apply_async((mongo_pglogs.TXN_RESPONSE, response.get("orderId"), None, response, None, response.get('customerId')), eta=timezone.localtime(), )
                 save_payment_status.apply_async((status_type, args), eta=timezone.localtime(), )
             except Exception as e:
                 logger.error("Cannot log pg response - " + str(e))

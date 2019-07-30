@@ -16,6 +16,7 @@ from django.db import transaction
 from . import serializers
 from django.conf import settings
 import requests, re, json, jwt, decimal
+from django.utils import timezone
 
 User = get_user_model()
 
@@ -237,7 +238,8 @@ class ChatUserViewSet(viewsets.GenericViewSet):
         response = {
             "token": token_object['token'],
             "payload": token_object['payload'],
-            "wallet_balance": wallet_balance
+            "wallet_balance": wallet_balance,
+            "is_user_insured": user.active_insurance if user.active_insurance else False
         }
 
         return Response(response, status=status.HTTP_200_OK)
@@ -248,11 +250,16 @@ class ChatOrderViewSet(viewsets.GenericViewSet):
     @classmethod
     @transaction.atomic()
     def create_order(self, request):
+        from ondoc.notification.tasks import save_pg_response
+        from ondoc.account.mongo_models import PgLogs
         user = request.user
         data = request.data
 
         if user and user.is_anonymous:
             return Response({"status": 0}, status.HTTP_401_UNAUTHORIZED)
+
+        save_pg_response.apply_async((PgLogs.CHAT_ORDER_REQUEST, None, None, None, request.data, user.id),
+                                     eta=timezone.localtime(), )
 
         details = data.get('details', {})
         plan_id = data.get('plan_id')

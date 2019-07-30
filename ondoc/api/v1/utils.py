@@ -507,7 +507,7 @@ def payment_details(request, order):
 
     args = {'user_id': user.id, 'order_id': order.id}
     save_payment_status.apply_async((PaymentProcessStatus.INITIATED, args),eta=timezone.localtime(), )
-    save_pg_response.apply_async((PgLogs.TXN_REQUEST, order.id, None, None, pgdata), eta=timezone.localtime(), )
+    save_pg_response.apply_async((PgLogs.TXN_REQUEST, order.id, None, None, pgdata, user.id), eta=timezone.localtime(), )
     return pgdata, payment_required
 
 
