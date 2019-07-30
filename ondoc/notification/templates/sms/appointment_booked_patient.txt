@@ -1,5 +1,6 @@
 {% if instance.payment_type == 2 %}
-We have received your pay at clinic (cash) doctor appointment request. Below are the details:
+We have received your pay at clinic (cash) doctor appointment request:
+Appointment Id: {{instance.id}}
 Patient Name : {{patient_name|capfirst}}
 Doctor Name : Dr. {{doctor_name|capfirst}}
 {{clinic_or_hospital}} : {{instance.hospital.name|capfirst}}
