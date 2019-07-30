@@ -3543,14 +3543,17 @@ class LabTestCategoryLandingUrlViewSet(viewsets.GenericViewSet):
     def category_landing_url(self, request):
 
         parameters = request.query_params
+        title = None
         url = parameters.get('url')
         if not url:
             return Response(status=status.HTTP_400_BAD_REQUEST)
         query = LabTestCategoryLandingURLS.objects.select_related('url', 'test').\
             prefetch_related('test__lab_tests', 'test__lab_tests__availablelabs',
                              'test__lab_tests__availablelabs__lab_pricing_group',
-                             'test__lab_tests__availablelabs__lab_pricing_group__labs').filter(url__url=url)
+                             'test__lab_tests__availablelabs__lab_pricing_group__labs').filter(url__url=url).order_by('-priority')
 
+        if not query.count() >= 1:
+            return Response(status=status.HTTP_400_BAD_REQUEST)
         resp = dict()
         for obj in query:
             if obj.url.url not in resp:
@@ -3567,7 +3570,9 @@ class LabTestCategoryLandingUrlViewSet(viewsets.GenericViewSet):
             lab_tests = []
             url_data_obj['lab_test_tests'] = lab_tests
             # count = 0
+            test_count = 0
             for test in obj.test.lab_tests.all():
+                test_count += 1
                 count = 0
                 deal_price_list = []
                 deal_price = 0
@@ -3601,7 +3606,15 @@ class LabTestCategoryLandingUrlViewSet(viewsets.GenericViewSet):
                 test_obj['count'] = count
                 test_obj['deal_price'] = deal_price
                 lab_tests.append(test_obj)
+            url_data_obj['No._of_tests'] = test_count
             url_data.append(url_data_obj)
+            title = obj.url.title if obj.url.title else None
+        meta_title = None
+        meta_description = None
+        new_dynamic = NewDynamic.objects.filter(url_value=url)
+        for x in new_dynamic:
+            meta_title = x.meta_title
+            meta_description = x.meta_description
 
-        return Response({'url': list(resp.keys())[0], 'all_categories': list(resp.values())[0]})
+        return Response({'url': list(resp.keys())[0], 'title': title, 'all_categories': list(resp.values())[0], 'meta_title': meta_title, 'meta_description': meta_description})
 
