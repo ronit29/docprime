@@ -447,6 +447,7 @@ class DoctorHospitalSerializer(serializers.ModelSerializer):
     short_address = serializers.ReadOnlyField(source='doctor_clinic.hospital.get_short_address')
     hospital_id = serializers.ReadOnlyField(source='doctor_clinic.hospital.pk')
     hospital_city = serializers.ReadOnlyField(source='doctor_clinic.hospital.city')
+    is_ipd_hospital = serializers.ReadOnlyField(source='doctor_clinic.hospital.is_ipd_hospital')
     hospital_thumbnail = serializers.SerializerMethodField()
     day = serializers.SerializerMethodField()
     discounted_fees = serializers.IntegerField(read_only=True, allow_null=True, source='deal_price')
@@ -561,7 +562,7 @@ class DoctorHospitalSerializer(serializers.ModelSerializer):
         fields = ('doctor', 'hospital_name', 'address','short_address', 'hospital_id', 'start', 'end', 'day', 'deal_price',
                   'discounted_fees', 'hospital_thumbnail', 'mrp', 'lat', 'long', 'id','enabled_for_online_booking',
                   'insurance', 'show_contact', 'enabled_for_cod', 'enabled_for_prepaid', 'is_price_zero', 'cod_deal_price', 'hospital_city',
-                  'url', 'fees', 'insurance_fees')
+                  'url', 'fees', 'insurance_fees', 'is_ipd_hospital')
 
         # fields = ('doctor', 'hospital_name', 'address', 'hospital_id', 'start', 'end', 'day', 'deal_price', 'fees',
         #           'discounted_fees', 'hospital_thumbnail', 'mrp',)
@@ -1918,12 +1919,14 @@ class TopHospitalForIpdProcedureSerializer(serializers.ModelSerializer):
     url = serializers.SerializerMethodField()
     locality_url = serializers.SerializerMethodField()
     name_city = serializers.SerializerMethodField()
+    h1_title = serializers.SerializerMethodField()
 
     class Meta:
         model = Hospital
         fields = ('id', 'name', 'distance', 'certifications', 'bed_count', 'logo', 'avg_rating',
                   'count_of_insurance_provider', 'multi_speciality', 'address', 'short_address','open_today',
-                  'insurance_provider', 'established_in', 'long', 'lat', 'url', 'locality_url', 'name_city', 'operational_since')
+                  'insurance_provider', 'established_in', 'long', 'lat', 'url', 'locality_url', 'name_city', 'operational_since',
+                  'h1_title')
 
     def get_name_city(self, obj):
         result = obj.name
@@ -1938,6 +1941,16 @@ class TopHospitalForIpdProcedureSerializer(serializers.ModelSerializer):
     def get_url(self, obj):
         entity_url = self.context.get('hosp_entity_dict', {})
         return entity_url.get(obj.id)
+
+    def get_h1_title(self, obj):
+        entity_url = self.context.get('hosp_entity_dict', {})
+        new_dynamic_dict = self.context.get('new_dynamic_dict', {})
+        url = entity_url.get(obj.id)
+        if url:
+            new_dynamic_obj = new_dynamic_dict.get(url)
+            if new_dynamic_obj and new_dynamic_obj.h1_title:
+                return new_dynamic_obj.h1_title
+        return None
 
     def get_lat(self, obj):
         if obj.location:

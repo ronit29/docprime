@@ -156,8 +156,8 @@ def advanced_doctor_search_view(request):
         hospital = forms.ModelMultipleChoiceField(queryset=Hospital.objects.filter(is_live=True), widget=autocomplete.ModelSelect2Multiple(url='hospital-autocomplete'))
         # specialization = forms.ModelMultipleChoiceField(queryset=PracticeSpecialization.objects.all(),
         #                                                 widget=Select2MultipleWidget)
-        # specialization = forms.ModelMultipleChoiceField(queryset=PracticeSpecialization.objects.all(),
-        #                                                 widget=autocomplete.ModelSelect2Multiple(url='practicespecialization-autocomplete'))
+        specialization = forms.ModelMultipleChoiceField(queryset=PracticeSpecialization.objects.all(),
+                                                        widget=autocomplete.ModelSelect2Multiple(url='practicespecialization-autocomplete'))
         group = forms.ModelMultipleChoiceField(queryset=SimilarSpecializationGroup.objects.all(), label="Group of Specializations",
                                                widget=autocomplete.ModelSelect2Multiple(url='similarspecializationgroup-autocomplete'))
 
@@ -166,10 +166,10 @@ def advanced_doctor_search_view(request):
         form = SearchDataForm(request.POST, request.FILES)
         if form.is_valid():
             messages.add_message(request, messages.SUCCESS, "Link Created")
+            practice_specs_exact = ",".join(list(set([str(x) for x in form.cleaned_data['group'].all().values_list('specializations', flat=True)] + [str(x) for x in form.cleaned_data['specialization'].all().values_list('id', flat=True)])))
             required_link = '{}/opd/searchresults?specializations={}&conditions=&lat=&long=&sort_on=&sort_order=&availability=&gender=&avg_ratings=&doctor_name=&hospital_name=&locationType=autoComplete&procedure_ids=&procedure_category_ids=&hospital_id={}&ipd_procedures=&is_insured=false&locality=&sub_locality=&sits_at_hospital=false&sits_at_clinic=false'.format(
                 settings.CONSUMER_APP_DOMAIN,
-                # ",".join([str(x) for x in form.cleaned_data['specialization'].all().values_list('id', flat=True)]),
-                ",".join([str(x) for x in form.cleaned_data['group'].all().values_list('specializations', flat=True)]),
+                practice_specs_exact,
                 ",".join([str(x) for x in form.cleaned_data['hospital'].all().values_list('id', flat=True)]))
             return render(request, 'doctorSearch.html', {'form': form, 'required_link': required_link})
     else:
