@@ -1,6 +1,7 @@
 from django.contrib import admin
 from ondoc.integrations.models import IntegratorMapping
-from ondoc.integrations.models import IntegratorProfileMapping, IntegratorReport, IntegratorTestMapping, IntegratorTestParameterMapping
+from ondoc.integrations.models import IntegratorProfileMapping, IntegratorReport, IntegratorTestMapping, \
+    IntegratorTestParameterMapping, IntegratorDoctorMappings, IntegratorHospitalMappings
 from ondoc.diagnostic.models import LabTest, Lab, LabPricingGroup, AvailableLabTest
 from django import forms
 from django.conf import settings
@@ -96,3 +97,22 @@ class IntegratorTestParameterMappingAdmin(admin.ModelAdmin):
     list_display = ['integrator_test_name', 'integrator_class_name']
     readonly_fields = ('integrator_test_name',)
     autocomplete_fields = ['test_parameter']
+
+
+class IntegratorDoctorMappingsAdmin(admin.ModelAdmin):
+    model = IntegratorDoctorMappings
+    list_display = ('first_name', 'last_name', 'is_active', 'integrator_class_name')
+    fields = ('first_name', 'middle_name', 'last_name', 'hospital_name', 'city', 'is_active', 'qualification', 'specialities', 'address',
+              'primary_contact', 'secondary_contact', 'emergency_contact', 'helpline_sos', 'integrator_class_name',
+              'integrator_doctor_id', 'integrator_hospital_id', 'integrator_doctor_data', 'doctor_clinic')
+    readonly_fields = ('first_name', 'middle_name', 'last_name', 'hospital_name', 'city', 'qualification', 'specialities', 'address',
+                       'primary_contact', 'secondary_contact', 'emergency_contact', 'helpline_sos', 'integrator_class_name',
+                       'integrator_doctor_id', 'integrator_hospital_id', 'integrator_doctor_data')
+    autocomplete_fields = ['doctor_clinic']
+
+
+class IntegratorHospitalMappingsAdmin(admin.ModelAdmin):
+    model = IntegratorHospitalMappings
+    list_display = ('integrator_class_name', 'integrator_hospital_name', 'is_active')
+    fields = ('hospital', 'integrator_hospital_name', 'is_active', 'integrator_class_name')
+    autocomplete_fields = ['hospital']

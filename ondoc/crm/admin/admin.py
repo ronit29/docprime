@@ -96,9 +96,9 @@ from ondoc.seo.models import SeoLabNetwork
 from ondoc.elastic.models import DemoElastic
 from .elastic import DemoElasticAdmin
 from ondoc.banner.models import Banner, SliderLocation, BannerLocation, EmailBanner, Recommender
-from .integrations import IntegratorMapping, IntegratorMappingAdmin
-from .integrations import IntegratorProfileMapping, IntegratorProfileMappingAdmin
-from .integrations import IntegratorReport, IntegratorReportAdmin
+from .integrations import IntegratorMapping, IntegratorMappingAdmin, IntegratorHospitalMappings, IntegratorDoctorMappings
+from .integrations import IntegratorProfileMapping, IntegratorProfileMappingAdmin, IntegratorHospitalMappingsAdmin
+from .integrations import IntegratorReport, IntegratorReportAdmin, IntegratorDoctorMappingsAdmin
 from .integrations import IntegratorTestMapping, IntegratorTestMappingAdmin
 from .integrations import IntegratorTestParameterMapping, IntegratorTestParameterMappingAdmin
 
@@ -236,8 +236,11 @@ admin.site.register(UploadDoctorData, UploadDoctorDataAdmin)
 admin.site.register(SimilarSpecializationGroup, SimilarSpecializationGroupAdmin)
 admin.site.register(UploadCostEstimateData, UploadCostEstimateDataAdmin)
 admin.site.register(SliderLocation, SliderLocationAdmin)
+admin.site.register(DoctorClinic, DoctorClinicAdmin)
 admin.site.register(IntegratorMapping, IntegratorMappingAdmin)
 admin.site.register(IntegratorProfileMapping, IntegratorProfileMappingAdmin)
+admin.site.register(IntegratorDoctorMappings, IntegratorDoctorMappingsAdmin)
+admin.site.register(IntegratorHospitalMappings, IntegratorHospitalMappingsAdmin)
 admin.site.register(GlobalNonBookable, GlobalNonBookableAdmin)
 admin.site.register(IpdProcedure, IpdProcedureAdmin)
 admin.site.register(IpdProcedureSynonym, IpdProcedureSynonymAdmin)
