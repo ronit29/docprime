@@ -572,7 +572,8 @@ class Order(TimeStampedModel):
                 visitor_info=visitor_info
             )
             push_order_to_matrix.apply_async(
-                ({'order_id': pg_order.id},), countdown=5)
+                ({'order_id': pg_order.id},),
+                eta=timezone.now() + timezone.timedelta(minutes=settings.LEAD_VALIDITY_BUFFER_TIME))
         # building separate orders for all fulfillments
         fulfillment_data = copy.deepcopy(fulfillment_data)
         order_list = []
