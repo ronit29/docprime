@@ -15,23 +15,24 @@ def get_doctor_detail_from_google(place_sheet_obj, cache):
     try:
         # For doctor_clinic_address.
         if not place_sheet_obj.doctor_place_search:
-            # Hitting the google api for find the place for doctor_clinic_address.
+            # Hitting the google api for find the place for doctor_clinic_address.            
             request_parameter = place_sheet_obj.doctor_clinic_address
-            key = hashlib.md5(request_parameter.encode('utf-8')).hexdigest()
-            response = cache.get(key)
+            if request_parameter:
+                key = hashlib.md5(request_parameter.encode('utf-8')).hexdigest()
+                response = cache.get(key)
 
-            if not response:
-                response = requests.get('https://maps.googleapis.com/maps/api/place/findplacefromtext/json?inputtype=textquery&input=' + request_parameter,
-                                        params={'key': api_key})
-                cache[key] = response
-            if response.status_code != status.HTTP_200_OK or not response.ok:
-                print("[ERROR] Google API for fetching doctor_clinic_address place id.")
-                print("[ERROR] %s", response.reason)
-                return False
-            else:
-                doctor_place_search_data = response.json()
-                place_sheet_obj.doctor_place_search = json.dumps(doctor_place_search_data)
-                place_sheet_obj.save()
+                if not response:
+                    response = requests.get('https://maps.googleapis.com/maps/api/place/findplacefromtext/json?inputtype=textquery&input=' + request_parameter,
+                                            params={'key': api_key})
+                    cache[key] = response
+                if response.status_code != status.HTTP_200_OK or not response.ok:
+                    print("[ERROR] Google API for fetching doctor_clinic_address place id.")
+                    print("[ERROR] %s", response.reason)
+                    return False
+                else:
+                    doctor_place_search_data = response.json()
+                    place_sheet_obj.doctor_place_search = json.dumps(doctor_place_search_data)
+                    place_sheet_obj.save()
         else:
             doctor_place_search_data = json.loads(place_sheet_obj.doctor_place_search)
 
@@ -95,22 +96,23 @@ def get_clinic_detail_from_google(place_sheet_obj, cache):
         if not place_sheet_obj.clinic_place_search:
             # Hitting the google api for find the place for clinic_address.
             request_parameter = place_sheet_obj.clinic_address
-            key = hashlib.md5(request_parameter.encode('utf-8')).hexdigest()
-            response = cache.get(key)
-            if not response:
-                response = requests.get(
-                    'https://maps.googleapis.com/maps/api/place/findplacefromtext/json?inputtype=textquery&input=' + request_parameter,
-                    params={'key':api_key})
-                cache[key] = response
+            if request_parameter:
+                key = hashlib.md5(request_parameter.encode('utf-8')).hexdigest()
+                response = cache.get(key)
+                if not response:
+                    response = requests.get(
+                        'https://maps.googleapis.com/maps/api/place/findplacefromtext/json?inputtype=textquery&input=' + request_parameter,
+                        params={'key':api_key})
+                    cache[key] = response
 
-            if response.status_code != status.HTTP_200_OK or not response.ok:
-                print("[ERROR] Google API for fetching clinic_address place id.")
-                print("[ERROR] %s", response.reason)
-                return False
-            else:
-                clinic_place_search_data = response.json()
-                place_sheet_obj.clinic_place_search = json.dumps(clinic_place_search_data)
-                place_sheet_obj.save()
+                if response.status_code != status.HTTP_200_OK or not response.ok:
+                    print("[ERROR] Google API for fetching clinic_address place id.")
+                    print("[ERROR] %s", response.reason)
+                    return False
+                else:
+                    clinic_place_search_data = response.json()
+                    place_sheet_obj.clinic_place_search = json.dumps(clinic_place_search_data)
+                    place_sheet_obj.save()
         else:
             clinic_place_search_data = json.loads(place_sheet_obj.clinic_place_search)
 

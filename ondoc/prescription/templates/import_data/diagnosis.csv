@@ -1,0 +1,4443 @@
+name,source_type
+Breast Neoplasms,2
+Hypertension,2
+Coronary Artery Disease,2
+Lung Neoplasms,2
+Myocardial Infarction,2
+HIV Infections,2
+Coronary Disease,2
+Asthma,2
+Adenocarcinoma,2
+Dementia,2
+Prostatic Neoplasms,2
+Skin Neoplasms,2
+Obesity,2
+Carcinoma-Squamous Cell,2
+Pain,2
+Liver Neoplasms,2
+Arthritis-Rheumatoid,2
+Schizophrenia,2
+Diabetes Mellitus-Type 2,2
+Brain Neoplasms,2
+Heart Failure,2
+Postoperative Complications,2
+Kidney Failure-Chronic,2
+Alzheimer Disease,2
+Diabetes Mellitus,2
+Stomach Neoplasms,2
+Diabetes Mellitus-Type 1,2
+Ovarian Neoplasms,2
+Melanoma,2
+Kidney Diseases,2
+Myocardial Ischemia,2
+Depressive Disorder,2
+Epilepsy,2
+Carcinoma,2
+Cerebral Infarction,2
+Tuberculosis-Pulmonary,2
+Acquired Immunodeficiency Syndrome,2
+Uterine Cervical Neoplasms,2
+Lung Diseases,2
+Kidney Neoplasms,2
+Alcoholism,2
+Colorectal Neoplasms,2
+Carcinoma-Hepatocellular,2
+Colonic Neoplasms,2
+Parkinson Disease,2
+Bacterial Infections,2
+Liver Diseases,2
+Pancreatic Neoplasms,2
+Lupus Erythematosus-Systemic,2
+Dog Diseases,2
+Arteriosclerosis,2
+Liver Cirrhosis,2
+Arrhythmias-Cardiac,2
+Skin Diseases,2
+Brain Diseases,2
+Leukemia,2
+Multiple Sclerosis,2
+Substance-Related Disorders,2
+Urinary Bladder Neoplasms,2
+Inflammation,2
+Heart Diseases,2
+Pregnancy Complications,2
+Lymphoma,2
+Cognition Disorders,2
+Thrombosis,2
+Head and Neck Neoplasms,2
+Stroke,2
+Autoimmune Diseases,2
+Cattle Diseases,2
+Pancreatitis,2
+Bone Neoplasms,2
+Brain Injuries,2
+Osteoporosis,2
+Sepsis,2
+Brain Ischemia,2
+Thyroid Neoplasms,2
+Burns,2
+Hepatitis C,2
+Diabetes Mellitus-Experimental,2
+Cerebrovascular Disorders,2
+Adenoma,2
+Cystic Fibrosis,2
+Multiple Myeloma,2
+Neoplasms-Experimental,2
+Tuberculosis,2
+Hodgkin Disease,2
+Carcinoma-Non-Small-Cell Lung,2
+Ischemia,2
+Seizures,2
+Uterine Neoplasms,2
+Esophageal Neoplasms,2
+Leukemia-Myeloid-Acute,2
+Staphylococcal Infections,2
+Acute Kidney Injury,2
+Psoriasis,2
+Crohn Disease,2
+Lymphoma-Non-Hodgkin,2
+Bipolar Disorder,2
+Hemorrhage,2
+Abnormalities-Multiple,2
+Mental Retardation,2
+Gastrointestinal Hemorrhage,2
+Neoplasm Recurrence-Local,2
+Glioma,2
+Hypersensitivity,2
+Atrial Fibrillation,2
+Pneumonia,2
+Fractures-Bone,2
+Helicobacter Infections,2
+Calcinosis,2
+Psychotic Disorders,2
+Heart Defects-Congenital,2
+Spinal Cord Injuries,2
+Common Cold,2
+Angina Pectoris,2
+Pulmonary Embolism,2
+Urinary Tract Infections,2
+Hepatitis,2
+Colitis-Ulcerative,2
+Fetal Diseases,2
+Rectal Neoplasms,2
+Cysts,2
+Hepatitis B,2
+Glomerulonephritis,2
+Gallstones,2
+Glaucoma,2
+Leukemia-Myeloid,2
+Respiratory Tract Infections,2
+Anemia,2
+Infection,2
+Hypertension-Pulmonary,2
+Mouth Neoplasms,2
+Horse Diseases,2
+Infant-Newborn-Diseases,2
+Arterial Occlusive Diseases,2
+Precursor Cell Lymphoblastic Leukemia-Lymphoma,2
+Respiratory Insufficiency,2
+Gastrointestinal Diseases,2
+Toxemia,2
+Malaria,2
+Leukemia-Lymphoid,2
+Testicular Neoplasms,2
+Cardiomyopathies,2
+Hyperthyroidism,2
+Streptococcal Infections,2
+Sarcoidosis,2
+Carcinoma-Renal Cell,2
+Pre-Eclampsia,2
+Hypothyroidism,2
+Peptic Ulcer,2
+Osteoarthritis,2
+Migraine Disorders,2
+Hyperlipidemias,2
+Cerebral Hemorrhage,2
+Arthritis,2
+Neuroblastoma,2
+Down Syndrome,2
+Attention Deficit Disorder with Hyperactivity,2
+Precancerous Conditions,2
+Pituitary Neoplasms,2
+Neoplasms-Multiple Primary,2
+Infertility-Female,2
+Amyloidosis,2
+Foreign Bodies,2
+Muscular Diseases,2
+Peripheral Nervous System Diseases,2
+Lung Diseases-Obstructive,2
+Laryngeal Neoplasms,2
+Intestinal Obstruction,2
+Stress Disorders-Post-Traumatic,2
+Heart Arrest,2
+Pulmonary Disease-Chronic Obstructive,2
+Pregnancy Complications-Infectious,2
+Cytomegalovirus Infections,2
+Vascular Diseases,2
+Cataract,2
+Stomach Ulcer,2
+Hemophilia A,2
+Cholelithiasis,2
+Hypercholesterolemia,2
+Anemia-Sickle Cell,2
+Duodenal Ulcer,2
+Hepatitis C-Chronic,2
+Shock-Septic,2
+Intracranial Aneurysm,2
+Scleroderma-Diffuse,2
+Cat Diseases,2
+Poultry Diseases,2
+Anxiety Disorders,2
+Ventricular Dysfunction-Left,2
+Gastroesophageal Reflux,2
+Peritonitis,2
+Periodontal Diseases,2
+Swine Diseases,2
+AIDS-Related Opportunistic Infections,2
+Scleroderma-Systemic,2
+Depressive Disorder-Major,2
+Infertility-Male,2
+Adrenal Gland Neoplasms,2
+Cross Infection,2
+Sarcoma,2
+Neovascularization-Pathologic,2
+Leprosy,2
+Thrombophlebitis,2
+Wounds-Nonpenetrating,2
+Thrombocytopenia,2
+Mammary Neoplasms-Experimental,2
+Abscess,2
+Carcinoma-Small Cell,2
+Autistic Disorder,2
+Soft Tissue Neoplasms,2
+Cell Transformation-Neoplastic,2
+Uremia,2
+Endometriosis,2
+Malocclusion,2
+Sheep Diseases,2
+Rheumatic Diseases,2
+Pain-Postoperative,2
+Carcinoma-Transitional Cell,2
+Celiac Disease,2
+Candidiasis,2
+Hypoglycemia,2
+Heart Block,2
+Dental Caries,2
+Ischemic Attack-Transient,2
+Influenza-Human,2
+Deafness,2
+Cardiomegaly,2
+Vision Disorders,2
+Angiolymphoid Hyperplasia with Eosinophilia,2
+Carotid Artery Diseases,2
+Respiratory Distress Syndrome-Adult,2
+Endocarditis-Bacterial,2
+Idiopathic Pulmonary Fibrosis,2
+Granuloma,2
+Leukemia-Myelogenous-Chronic-BCR-ABL Positive,2
+Drug Hypersensitivity,2
+Bronchitis,2
+Venous Thrombosis,2
+Diabetic Nephropathies,2
+Osteomyelitis,2
+Pulmonary Fibrosis,2
+Headache,2
+Dermatitis-Contact,2
+Hemangioma,2
+Prostatic Hyperplasia,2
+Drug-Induced Liver Injury,2
+Cholestasis,2
+Radiation Injuries,2
+Retinal Diseases,2
+Muscular Dystrophies,2
+Dermatitis-Atopic,2
+Mycoses,2
+Child Behavior Disorders,2
+Craniocerebral Trauma,2
+Gastritis,2
+Liver Neoplasms-Experimental,2
+Lymphoma-B-Cell,2
+Nephrotic Syndrome,2
+Escherichia coli Infections,2
+Erectile Dysfunction,2
+Atherosclerosis,2
+Reperfusion Injury,2
+Diabetic Retinopathy,2
+Periodontitis,2
+Substance Withdrawal Syndrome,2
+Leukemia-Lymphocytic-Chronic-B-Cell,2
+Meningitis,2
+Endometrial Neoplasms,2
+Subarachnoid Hemorrhage,2
+Bone Diseases,2
+Emphysema,2
+Metabolic Syndrome X,2
+Tachycardia,2
+Anaphylaxis,2
+Infant-Premature-Diseases,2
+Myasthenia Gravis,2
+Osteosarcoma,2
+Hematoma,2
+Graves Disease,2
+Leiomyoma,2
+Mouth Diseases,2
+Bacteremia,2
+Joint Diseases,2
+Amyotrophic Lateral Sclerosis,2
+Heart Neoplasms,2
+Glioblastoma,2
+Genital Diseases-Female,2
+Cardiomyopathy-Dilated,2
+Spinal Diseases,2
+Inflammatory Bowel Diseases,2
+Hyperglycemia,2
+Aneurysm,2
+Kidney Calculi,2
+Sleep Apnea Syndromes,2
+Nasopharyngeal Neoplasms,2
+Cardiomyopathy-Hypertrophic,2
+Thyroid Diseases,2
+Otitis Media,2
+HIV Seropositivity,2
+Central Nervous System Diseases,2
+Fatty Liver,2
+Pseudomonas Infections,2
+Chromosome Aberrations,2
+Immunologic Deficiency Syndromes,2
+Airway Obstruction,2
+Genetic Predisposition to Disease,2
+Gastrointestinal Neoplasms,2
+Herpes Simplex,2
+Meningioma,2
+Appendicitis,2
+Hepatitis A,2
+Athletic Injuries,2
+Pheochromocytoma,2
+Myelodysplastic Syndromes,2
+Pulmonary Edema,2
+Tumor Virus Infections,2
+Lymphoma-Large B-Cell-Diffuse,2
+Colitis,2
+Syphilis,2
+Memory Disorders,2
+Aortic Aneurysm,2
+Teratoma,2
+Growth Disorders,2
+Rhinitis-Allergic-Seasonal,2
+Sinusitis,2
+Anemia-Aplastic,2
+Hearing Loss-Sensorineural,2
+Dislocations,2
+Cerebral Palsy,2
+Lymphatic Diseases,2
+Nutrition Disorders,2
+Pregnancy Complications-Cardiovascular,2
+Encephalitis,2
+Blood Coagulation Disorders,2
+Sleep Disorders,2
+Anorexia Nervosa,2
+Diabetic Neuropathies,2
+Malaria-Falciparum,2
+Leukemia-Experimental,2
+Colonic Diseases,2
+Urinary Incontinence,2
+Intestinal Diseases,2
+Spondylitis-Ankylosing,2
+Vasculitis,2
+Myocarditis,2
+Eosinophilia,2
+Neutropenia,2
+Thromboembolism,2
+Chlamydia Infections,2
+Sjogren's Syndrome,2
+Diabetic Angiopathies,2
+Ventricular Fibrillation,2
+Hypertension-Renal,2
+Carcinoma-Papillary,2
+Mesothelioma,2
+Hydrocephalus,2
+Fish Diseases,2
+Low Back Pain,2
+Food Hypersensitivity,2
+Peripheral Arterial Disease,2
+Arteriovenous Fistula,2
+Hyperparathyroidism,2
+Hypertension-Portal,2
+Obsessive-Compulsive Disorder,2
+Drug Eruptions,2
+Hypotension,2
+Neoplasm Metastasis,2
+Brain Damage-Chronic,2
+Meningeal Neoplasms,2
+Papillomavirus Infections,2
+Pleural Effusion,2
+Breast Diseases,2
+Polycystic Ovary Syndrome,2
+Paralysis,2
+Peripheral Vascular Diseases,2
+Personality Disorders,2
+Thalassemia,2
+Back Pain,2
+Macular Degeneration,2
+Learning Disorders,2
+Dermatitis-Allergic Contact,2
+Aspergillosis,2
+Astrocytoma,2
+Deglutition Disorders,2
+Movement Disorders,2
+Mediastinal Neoplasms,2
+Aortic Valve Stenosis,2
+Pyelonephritis,2
+Carcinoma in Situ,2
+Mitral Valve Insufficiency,2
+Mitral Valve Stenosis,2
+Acidosis,2
+Nevus,2
+Hepatitis B-Chronic,2
+Fetal Growth Retardation,2
+Surgical Wound Infection,2
+Lipoma,2
+Aneurysm-Dissecting,2
+Schistosomiasis,2
+Hearing Disorders,2
+Intervertebral Disk Displacement,2
+Cleft Palate,2
+Lymphatic Metastasis,2
+Genital Neoplasms-Female,2
+Eye Neoplasms,2
+Hypercalcemia,2
+Developmental Disabilities,2
+Pancreatic Diseases,2
+Aortic Diseases,2
+Pulmonary Emphysema,2
+Spinal Cord Diseases,2
+Congenital Abnormalities,2
+Graft vs Host Disease,2
+Shock-Hemorrhagic,2
+Carcinoma-Basal Cell,2
+Huntington Disease,2
+Stomach Diseases,2
+Temporomandibular Joint Disorders,2
+Glaucoma-Open-Angle,2
+Sleep Apnea-Obstructive,2
+Gonorrhea,2
+Blindness,2
+Tachycardia-Ventricular,2
+Carcinoma-Ductal-Breast,2
+Neurilemmoma,2
+Epilepsy-Temporal Lobe,2
+Shock,2
+Acne Vulgaris,2
+Hypertrophy-Left Ventricular,2
+Peritoneal Neoplasms,2
+Scoliosis,2
+Fistula,2
+Carcinoma-Ehrlich Tumor,2
+Carcinoid Tumor,2
+Arthritis-Infectious,2
+Cushing Syndrome,2
+Neoplasms-Radiation-Induced,2
+Respiratory Distress Syndrome-Newborn,2
+Hypersensitivity-Immediate,2
+Arthritis-Juvenile Rheumatoid,2
+Neurotic Disorders,2
+Pneumothorax,2
+Carotid Stenosis,2
+Behcet Syndrome,2
+Uveitis,2
+Encephalomyelitis-Autoimmune-Experimental,2
+Gastroenteritis,2
+Sarcoma-Kaposi,2
+Fibroma,2
+Hematologic Diseases,2
+Hepatitis-Viral-Human,2
+Proteinuria,2
+Varicose Veins,2
+Urticaria,2
+Abdominal Injuries,2
+Neuromuscular Diseases,2
+Intestinal Neoplasms,2
+Anemia-Hemolytic,2
+Intestinal Perforation,2
+Esophageal and Gastric Varices,2
+Metabolism-Inborn Errors,2
+Biliary Tract Diseases,2
+Lead Poisoning,2
+Neurofibromatosis 1,2
+Herpesviridae Infections,2
+Ureteral Obstruction,2
+Hernia-Diaphragmatic,2
+Bronchial Neoplasms,2
+Fibrosarcoma,2
+Urinary Calculi,2
+Dental Plaque,2
+Sarcoma-Experimental,2
+Disseminated Intravascular Coagulation,2
+Cholecystitis,2
+Delirium-Dementia-Amnestic-Cognitive Disorders,2
+Demyelinating Diseases,2
+Eating Disorders,2
+Osteoporosis-Postmenopausal,2
+Hypersensitivity-Delayed,2
+Echinococcosis,2
+Phobic Disorders,2
+Brain Edema,2
+Ascites,2
+Intraoperative Complications,2
+Hepatic Encephalopathy,2
+Opportunistic Infections,2
+Pregnancy in Diabetics,2
+Knee Injuries,2
+Heart Valve Diseases,2
+Radiation Injuries-Experimental,2
+Retinal Detachment,2
+Burkitt Lymphoma,2
+Respiratory Hypersensitivity,2
+Bile Duct Neoplasms,2
+Primary Ovarian Insufficiency,2
+Poliomyelitis,2
+Bone Resorption,2
+Thoracic Injuries,2
+Pleural Neoplasms,2
+Genetic Diseases-Inborn,2
+Neurodegenerative Diseases,2
+Nerve Compression Syndromes,2
+Salmonella Infections,2
+Mood Disorders,2
+Pneumonia-Bacterial,2
+Renal Artery Obstruction,2
+Cough,2
+Gout,2
+Herpes Zoster,2
+Spinal Neoplasms,2
+Lung Diseases-Fungal,2
+Neoplasms-Second Primary,2
+Urination Disorders,2
+Facial Paralysis,2
+Choristoma,2
+Gonadal Dysgenesis,2
+Strabismus,2
+Myocardial Reperfusion Injury,2
+Lyme Disease,2
+Hemochromatosis,2
+Puerperal Disorders,2
+Corneal Diseases,2
+Coma,2
+Angina-Unstable,2
+Syncope,2
+Rodent Diseases,2
+Heart Septal Defects-Atrial,2
+Toxoplasmosis,2
+Dizziness,2
+Paraplegia,2
+Papilloma,2
+Dyspnea,2
+Typhoid Fever,2
+Alcoholic Intoxication,2
+Ophthalmoplegia,2
+Duodenal Diseases,2
+Aortic Aneurysm-Abdominal,2
+Antiphospholipid Syndrome,2
+Agranulocytosis,2
+Esophageal Diseases,2
+Pemphigus,2
+Wilms Tumor,2
+Liver Cirrhosis-Biliary,2
+beta-Thalassemia,2
+Chagas Disease,2
+Cicatrix,2
+Dermatitis-Occupational,2
+Pigmentation Disorders,2
+Urinary Bladder Diseases,2
+Urologic Diseases,2
+Lymphoproliferative Disorders,2
+Nerve Degeneration,2
+Sleep Initiation and Maintenance Disorders,2
+Chronic Disease,2
+Epilepsies-Partial,2
+Foot Diseases,2
+Thymus Neoplasms,2
+Renal Insufficiency,2
+Retroperitoneal Neoplasms,2
+Acromegaly,2
+Aphasia,2
+Intracranial Embolism and Thrombosis,2
+Joint Instability,2
+Pregnancy-Ectopic,2
+Autonomic Nervous System Diseases,2
+Carcinoma-Bronchogenic,2
+Eye Injuries,2
+Retinal Degeneration,2
+Nose Neoplasms,2
+Rheumatic Heart Disease,2
+Wounds-Gunshot,2
+Myopia,2
+Osteoarthritis-Knee,2
+Rhinitis-Allergic-Perennial,2
+Porphyrias,2
+Poisoning,2
+Bird Diseases,2
+Anemia-Hypochromic,2
+Spinal Cord Neoplasms,2
+Intestinal Fistula,2
+Myositis,2
+Dystonia,2
+Rhabdomyosarcoma,2
+Bronchial Diseases,2
+Arthritis-Experimental,2
+Neoplasms-Germ Cell and Embryonal,2
+Salivary Gland Neoplasms,2
+Aortic Valve Insufficiency,2
+Cerebellar Neoplasms,2
+Spinal Cord Compression,2
+Brucellosis,2
+Abortion-Spontaneous,2
+Coronary Stenosis,2
+Substance Abuse-Intravenous,2
+Wounds-Penetrating,2
+Speech Disorders,2
+Coronary Vessel Anomalies,2
+Infectious Mononucleosis,2
+Plasmacytoma,2
+Pneumonia-Pneumocystis,2
+Vaccinia,2
+Melanoma-Experimental,2
+Pneumococcal Infections,2
+Rheumatic Fever,2
+Amenorrhea,2
+Obstetric Labor-Premature,2
+Leiomyosarcoma,2
+Embolism,2
+Somatoform Disorders,2
+Hamartoma,2
+Hematologic Neoplasms,2
+Abnormalities-Drug-Induced,2
+Cleft Lip,2
+Aneurysm-False,2
+Turner Syndrome,2
+Rhinitis,2
+Dermatomycoses,2
+Bundle-Branch Block,2
+Hemiplegia,2
+Wegener Granulomatosis,2
+Orbital Neoplasms,2
+Arteriovenous Malformations,2
+Hyponatremia,2
+Leukemia-Promyelocytic-Acute,2
+Fibromyalgia,2
+Abdominal Neoplasms,2
+Dyslexia,2
+Muscular Atrophy,2
+Mandibular Neoplasms,2
+Pregnancy Complications-Hematologic,2
+Hearing Loss,2
+Cervical Intraepithelial Neoplasia,2
+Neuralgia,2
+Multiple Trauma,2
+Nevus-Pigmented,2
+Leishmaniasis-Visceral,2
+Communicable Diseases,2
+Parotid Neoplasms,2
+Hypertension-Renovascular,2
+Pericarditis,2
+Protein-Energy Malnutrition,2
+Gram-Negative Bacterial Infections,2
+Hypogonadism,2
+Optic Nerve Diseases,2
+Phenylketonurias,2
+Intracranial Arteriovenous Malformations,2
+Brain Abscess,2
+Albuminuria,2
+Panic Disorder,2
+Hypoxia-Brain,2
+Sexually Transmitted Diseases,2
+Tibial Fractures,2
+Thyroiditis-Autoimmune,2
+Retinitis Pigmentosa,2
+Gram-Positive Bacterial Infections,2
+Hyperlipoproteinemia Type II,2
+Dyskinesia-Drug-Induced,2
+Fetal Death,2
+Amebiasis,2
+Dermatomyositis,2
+Malabsorption Syndromes,2
+Carcinoma-Intraductal-Noninfiltrating,2
+Spinal Fractures,2
+Tongue Neoplasms,2
+Polyps,2
+Retinoblastoma,2
+Giant Cell Arteritis,2
+Infertility,2
+Splenic Diseases,2
+Graft Occlusion-Vascular,2
+Status Epilepticus,2
+Sexual Dysfunction-Physiological,2
+Lung Diseases-Interstitial,2
+Barrett Esophagus,2
+Vulvar Neoplasms,2
+Skin Diseases-Vesiculobullous,2
+Hyperaldosteronism,2
+Myxoma,2
+Hematuria,2
+Long QT Syndrome,2
+Mycobacterium Infections,2
+Hand Dermatoses,2
+Adenocarcinoma-Mucinous,2
+Measles,2
+Vertigo,2
+Leg Ulcer,2
+Mastitis-Bovine,2
+Histiocytoma,2
+Bronchial Hyperreactivity,2
+Intussusception,2
+Diverticulum,2
+Meningitis-Bacterial,2
+Pregnancy Complications-Neoplastic,2
+Glomerulonephritis-IGA,2
+Histiocytoma-Benign Fibrous,2
+Lymphedema,2
+Amino Acid Metabolism-Inborn Errors,2
+Gallbladder Neoplasms,2
+Bradycardia,2
+Femoral Fractures,2
+Obstetric Labor Complications,2
+Alopecia,2
+Jaundice,2
+Enterocolitis-Pseudomembranous,2
+Keratitis,2
+Thymoma,2
+Purpura-Thrombocytopenic,2
+Tremor,2
+Hydronephrosis,2
+Death-Sudden,2
+Facial Dermatoses,2
+Cryptococcosis,2
+Diabetes Insipidus,2
+Eczema,2
+Carpal Tunnel Syndrome,2
+Pain-Intractable,2
+Lymphoma-T-Cell,2
+Parathyroid Neoplasms,2
+Mucocutaneous Lymph Node Syndrome,2
+Pruritus,2
+Goiter,2
+Erythroblastosis-Fetal,2
+Mandibular Diseases,2
+Hallucinations,2
+Skull Fractures,2
+Metabolic Diseases,2
+Vesico-Ureteral Reflux,2
+Pharyngitis,2
+Paraneoplastic Syndromes,2
+Amnesia,2
+Foreign-Body Migration,2
+Heart Septal Defects-Ventricular,2
+Sudden Infant Death,2
+Rectal Diseases,2
+Hyperalgesia,2
+Paranasal Sinus Neoplasms,2
+Tetanus,2
+Skin Ulcer,2
+Asphyxia Neonatorum,2
+Hypokalemia,2
+Anemia-Hemolytic-Autoimmune,2
+Pericardial Effusion,2
+Erythema,2
+Cystitis,2
+Amblyopia,2
+Hepatolenticular Degeneration,2
+Laryngeal Diseases,2
+Dehydration,2
+Chickenpox,2
+Heart Aneurysm,2
+Salmonella Infections-Animal,2
+Neurocirculatory Asthenia,2
+Wound Infection,2
+Histiocytosis-Langerhans-Cell,2
+Vitamin D Deficiency,2
+Hemangiosarcoma,2
+Cryptorchidism,2
+Cerebellar Diseases,2
+Neoplasms-Hormone-Dependent,2
+Dermatitis,2
+Keratosis,2
+Gingivitis,2
+Esophageal Stenosis,2
+Endophthalmitis,2
+Hepatitis-Chronic,2
+Multiple Organ Failure,2
+Fatigue Syndrome-Chronic,2
+Tendon Injuries,2
+Acute Coronary Syndrome,2
+Coronary Thrombosis,2
+Tuberculosis-Meningeal,2
+Schistosomiasis mansoni,2
+Obesity-Morbid,2
+Raynaud Disease,2
+Hypopituitarism,2
+Nephritis,2
+Tuberous Sclerosis,2
+Hyperinsulinism,2
+Language Disorders,2
+Cardiac Output-Low,2
+Photosensitivity Disorders,2
+Myotonic Dystrophy,2
+Muscle Weakness,2
+Purpura-Thrombocytopenic-Idiopathic,2
+Disorders of Sex Development,2
+Tonsillitis,2
+Meniere Disease,2
+Cellulitis,2
+Urinary Bladder-Neurogenic,2
+Hemangioma-Cavernous,2
+Jaundice-Neonatal,2
+Orbital Diseases,2
+Dysentery-Bacillary,2
+Prosthesis-Related Infections,2
+Listeriosis,2
+Sarcoma-Ewing's,2
+Antisocial Personality Disorder,2
+Skull Neoplasms,2
+Cocaine-Related Disorders,2
+Anemia-Iron-Deficiency,2
+Heroin Dependence,2
+Polyarteritis Nodosa,2
+Intestinal Diseases-Parasitic,2
+Perceptual Disorders,2
+Li-Fraumeni Syndrome,2
+Aortic Coarctation,2
+Uterine Diseases,2
+Adrenal Hyperplasia-Congenital,2
+Ileal Diseases,2
+Borderline Personality Disorder,2
+Tobacco Use Disorder,2
+Ossification-Heterotopic,2
+Osteitis Deformans,2
+Pulmonary Heart Disease,2
+Ureteral Calculi,2
+Polycystic Kidney Diseases,2
+Ductus Arteriosus-Patent,2
+Aortic Rupture,2
+Agammaglobulinemia,2
+Primary Myelofibrosis,2
+Community-Acquired Infections,2
+Abortion-Habitual,2
+Hemolytic-Uremic Syndrome,2
+Choriocarcinoma,2
+Cardiac Tamponade,2
+Spinal Injuries,2
+Temporomandibular Joint Dysfunction Syndrome,2
+Infarction,2
+Pharyngeal Neoplasms,2
+Rhabdomyolysis,2
+Nephritis-Interstitial,2
+Bacteriuria,2
+Collagen Diseases,2
+Intermittent Claudication,2
+Otitis Media with Effusion,2
+Tinnitus,2
+Facial Neoplasms,2
+Hematoma-Subdural,2
+Silicosis,2
+Polycythemia Vera,2
+Bone Diseases-Metabolic,2
+Opioid-Related Disorders,2
+Burns-Chemical,2
+Creutzfeldt-Jakob Syndrome,2
+Fragile X Syndrome,2
+von Willebrand Diseases,2
+Prostatitis,2
+Epstein-Barr Virus Infections,2
+Osteonecrosis,2
+Leukemia L1210,2
+Medulloblastoma,2
+Liver Cirrhosis-Alcoholic,2
+Uterine Hemorrhage,2
+Pelvic Neoplasms,2
+Embolism-Air,2
+Lichen Planus,2
+Hip Dislocation-Congenital,2
+Diabetes-Gestational,2
+Meningoencephalitis,2
+Neural Tube Defects,2
+Gallbladder Diseases,2
+Diseases in Twins,2
+Myeloproliferative Disorders,2
+Rubella,2
+Optic Neuritis,2
+Mycosis Fungoides,2
+Adenoma-Islet Cell,2
+Respiration Disorders,2
+Parkinsonian Disorders,2
+Tachycardia-Supraventricular,2
+Dwarfism,2
+Fecal Incontinence,2
+Mycobacterium Infections-Atypical,2
+Myoclonus,2
+Ear Diseases,2
+Intestinal Polyps,2
+Dysgerminoma,2
+Synovitis,2
+Heart Injuries,2
+Delirium,2
+Enteritis,2
+Marfan Syndrome,2
+Diabetic Ketoacidosis,2
+Venous Insufficiency,2
+Pneumoconiosis,2
+Nystagmus-Pathologic,2
+Urinary Incontinence-Stress,2
+Apnea,2
+Enterobacteriaceae Infections,2
+Eyelid Diseases,2
+Polyradiculoneuropathy,2
+Duodenal Neoplasms,2
+Leukemia-Erythroblastic-Acute,2
+Shock-Cardiogenic,2
+Lupus Nephritis,2
+Colonic Polyps,2
+Paraproteinemias,2
+Campylobacter Infections,2
+Choroid Neoplasms,2
+Neoplasm Invasiveness,2
+Endocarditis,2
+Diabetic Foot,2
+Muscle Spasticity,2
+Histoplasmosis,2
+Wolff-Parkinson-White Syndrome,2
+Diabetes Complications,2
+Hearing Loss-Noise-Induced,2
+Pressure Ulcer,2
+Purpura-Thrombotic Thrombocytopenic,2
+Chondrosarcoma,2
+Lymphoma-Follicular,2
+Thoracic Neoplasms,2
+Leishmaniasis-Cutaneous,2
+Pleural Diseases,2
+Genital Diseases-Male,2
+Sexual Dysfunctions-Psychological,2
+Quadriplegia,2
+Colonic Diseases-Functional,2
+Bone Diseases-Developmental,2
+Polyneuropathies,2
+Haemophilus Infections,2
+Voice Disorders,2
+Adrenal Cortex Neoplasms,2
+Maxillary Neoplasms,2
+Aneurysm-Ruptured,2
+Monkey Diseases,2
+Skin Diseases-Infectious,2
+Tourette Syndrome,2
+Angioedema,2
+Hypocalcemia,2
+Polycythemia,2
+Malocclusion-Angle Class II,2
+Ulcer,2
+Gaucher Disease,2
+Death-Sudden-Cardiac,2
+Vitamin B 12 Deficiency,2
+Adrenal Gland Diseases,2
+Thrombophilia,2
+Osteochondrodysplasias,2
+Basal Ganglia Diseases,2
+Kidney Diseases-Cystic,2
+Vitiligo,2
+Actinomycosis,2
+Oligospermia,2
+Parkinson Disease-Secondary,2
+Meningococcal Infections,2
+Connective Tissue Diseases,2
+Eye Infections-Bacterial,2
+Purpura-Schoenlein-Henoch,2
+Language Development Disorders,2
+Adenomatous Polyposis Coli,2
+Tuberculosis-Osteoarticular,2
+Mitral Valve Prolapse,2
+Anemia-Pernicious,2
+Hypotension-Orthostatic,2
+Esophageal Achalasia,2
+Orthomyxoviridae Infections,2
+Bites and Stings,2
+Starvation,2
+Liver Diseases-Alcoholic,2
+Trigeminal Neuralgia,2
+Ovarian Diseases,2
+Waldenstrom Macroglobulinemia,2
+Nail Diseases,2
+Menstruation Disturbances,2
+Refractive Errors,2
+Filariasis,2
+Sex Chromosome Aberrations,2
+Hyperkalemia,2
+Lymphoma-B-Cell-Marginal Zone,2
+Parotitis,2
+Cholangiocarcinoma,2
+Ear Neoplasms,2
+Fanconi Syndrome,2
+Anus Neoplasms,2
+Hypertrichosis,2
+Adrenal Insufficiency,2
+Mycoplasma Infections,2
+Echinococcosis-Hepatic,2
+Tachycardia-Paroxysmal,2
+Muscular Dystrophy-Animal,2
+Hip Fractures,2
+Central Nervous System Neoplasms,2
+Femur Head Necrosis,2
+Esophagitis,2
+Leukemia-Lymphoma-Adult T-Cell,2
+Glomerulosclerosis-Focal Segmental,2
+Carcinoma-Adenoid Cystic,2
+Bone Marrow Diseases,2
+Osteogenesis Imperfecta,2
+Liver Cirrhosis-Experimental,2
+Bronchiectasis,2
+Leukemia-Hairy Cell,2
+Psychoses-Substance-Induced,2
+Leishmaniasis,2
+Ataxia,2
+Aortic Aneurysm-Thoracic,2
+Enuresis,2
+Carbon Monoxide Poisoning,2
+Choroidal Neovascularization,2
+Atrial Flutter,2
+Nasal Polyps,2
+Liver Abscess,2
+Foot Dermatoses,2
+Leg Injuries,2
+Pelvic Infection,2
+Condylomata Acuminata,2
+Cholestasis-Intrahepatic,2
+Xanthomatosis,2
+Coronary Vasospasm,2
+Glucose Intolerance,2
+Whooping Cough,2
+Irritable Bowel Syndrome,2
+Facial Pain,2
+Peptic Ulcer Hemorrhage,2
+Hemoptysis,2
+Rickets,2
+Peripheral Nervous System Neoplasms,2
+Compartment Syndromes,2
+Intracranial Arteriosclerosis,2
+Tuberculosis-Lymph Node,2
+Dementia-Vascular,2
+Urethritis,2
+Hand Injuries,2
+Puberty-Precocious,2
+Lymphangioma,2
+Osteochondritis,2
+Ocular Hypertension,2
+Critical Illness,2
+Malignant Hyperthermia,2
+Neuroma-Acoustic,2
+Protein Deficiency,2
+Conjunctivitis,2
+Disease,2
+Hydatidiform Mole,2
+Premenstrual Syndrome,2
+Ovarian Cysts,2
+Pelvic Inflammatory Disease,2
+Legionnaires' Disease,2
+Dengue,2
+Cholera,2
+Motor Neuron Disease,2
+Snake Bites,2
+Cholangitis,2
+Hernia-Inguinal,2
+Hypertriglyceridemia,2
+Fractures-Spontaneous,2
+Liver Failure,2
+Gastrointestinal Stromal Tumors,2
+Spasm,2
+Gastric Outlet Obstruction,2
+Klebsiella Infections,2
+Vaginal Neoplasms,2
+Magnesium Deficiency,2
+Penile Neoplasms,2
+Addison Disease,2
+Neuroendocrine Tumors,2
+Insect Bites and Stings,2
+Peritoneal Diseases,2
+Esophagitis-Peptic,2
+Cerebellar Ataxia,2
+Corneal Ulcer,2
+Chorea,2
+Ureteral Diseases,2
+Infarction-Middle Cerebral Artery,2
+Hypoxia-Ischemia-Brain,2
+Testicular Diseases,2
+Vocal Cord Paralysis,2
+Respiratory Syncytial Virus Infections,2
+Multiple Sclerosis-Relapsing-Remitting,2
+Hyperparathyroidism-Secondary,2
+Osteomalacia,2
+Placenta Diseases,2
+Trichinellosis,2
+Reflex Sympathetic Dystrophy,2
+Glucosephosphate Dehydrogenase Deficiency,2
+Vitamin A Deficiency,2
+Nose Diseases,2
+Coronary Restenosis,2
+Stomatitis,2
+Jaw Diseases,2
+Pneumonia-Viral,2
+Spinal Dysraphism,2
+Herpes Genitalis,2
+Trypanosomiasis-African,2
+Pharyngeal Diseases,2
+Radius Fractures,2
+Lymphadenitis,2
+Ascariasis,2
+Arthritis-Reactive,2
+Liver Failure-Acute,2
+Purpura,2
+Tinea,2
+Tooth Fractures,2
+Epidermal Cyst,2
+Toxoplasmosis-Animal,2
+Splenic Neoplasms,2
+Systemic Inflammatory Response Syndrome,2
+Asbestosis,2
+Stuttering,2
+Warts,2
+Sciatica,2
+Mediastinal Diseases,2
+Hyperhomocysteinemia,2
+Mesenteric Vascular Occlusion,2
+AIDS Dementia Complex,2
+Colorectal Neoplasms-Hereditary Nonpolyposis,2
+Brain Concussion,2
+Giardiasis,2
+Malnutrition,2
+Foodborne Diseases,2
+Endotoxemia,2
+Splenomegaly,2
+Labyrinth Diseases,2
+Tracheal Stenosis,2
+Tetralogy of Fallot,2
+Tooth Abnormalities,2
+Color Vision Defects,2
+Thyroid Nodule,2
+Uveal Neoplasms,2
+Familial Mediterranean Fever,2
+Thyroiditis,2
+Dermoid Cyst,2
+Arthritis-Psoriatic,2
+Takayasu Arteritis,2
+Germinoma,2
+Charcot-Marie-Tooth Disease,2
+Rotavirus Infections,2
+Jejunal Diseases,2
+Scleroderma-Localized,2
+Pancreatic Cyst,2
+Hyperventilation,2
+Dyslipidemias,2
+Asphyxia,2
+Fetal Membranes-Premature Rupture,2
+Hypergammaglobulinemia,2
+Cysticercosis,2
+Uterine Cervical Diseases,2
+Simian Acquired Immunodeficiency Syndrome,2
+Odontogenic Tumors,2
+Rabies,2
+Varicose Ulcer,2
+Cranial Nerve Neoplasms,2
+Sweat Gland Neoplasms,2
+Pseudotumor Cerebri,2
+Blood Platelet Disorders,2
+Shock-Traumatic,2
+Mandibular Fractures,2
+Ankle Injuries,2
+Macular Edema,2
+Agricultural Workers' Diseases,2
+Hemophilia B,2
+Osteolysis,2
+Candidiasis-Oral,2
+Diphtheria,2
+Carbon Tetrachloride Poisoning,2
+Leptospirosis,2
+Pleurisy,2
+Pulmonary Valve Stenosis,2
+Alveolitis-Extrinsic Allergic,2
+Bronchial Spasm,2
+Coxsackievirus Infections,2
+Urethral Diseases,2
+Mucormycosis,2
+Pemphigoid-Bullous,2
+Foreign-Body Reaction,2
+Exophthalmos,2
+Tendinopathy,2
+Fabry Disease,2
+Paranasal Sinus Diseases,2
+Retinopathy of Prematurity,2
+Severe Acute Respiratory Syndrome,2
+Insulinoma,2
+Pulmonary Atelectasis,2
+Ichthyosis,2
+Hypoparathyroidism,2
+Solitary Pulmonary Nodule,2
+Coronary Aneurysm,2
+Arteritis,2
+Ureteral Neoplasms,2
+Muscular Dystrophy-Duchenne,2
+Retinal Vein Occlusion,2
+Blood Protein Disorders,2
+Psychomotor Disorders,2
+Goat Diseases,2
+Clostridium Infections,2
+Shoulder Dislocation,2
+Lipidoses,2
+Bone Cysts,2
+Tooth Diseases,2
+Hemorrhagic Disorders,2
+Lung Abscess,2
+Hemoglobinuria-Paroxysmal,2
+Calculi,2
+Pneumonia-Pneumococcal,2
+Urologic Neoplasms,2
+Translocation-Genetic,2
+Lymphoma-T-Cell-Cutaneous,2
+Ependymoma,2
+Liposarcoma,2
+Hernia,2
+Ectodermal Dysplasia,2
+Hemoglobinopathies,2
+Hyperkinesis,2
+Adenocarcinoma-Papillary,2
+Cardiac Complexes-Premature,2
+Pituitary Diseases,2
+Prion Diseases,2
+Ventricular Dysfunction-Right,2
+Angiomatosis,2
+Klinefelter Syndrome,2
+Hirsutism,2
+Cecal Diseases,2
+Cholestasis-Extrahepatic,2
+Neuritis,2
+Wrist Injuries,2
+Contracture,2
+Femoral Neck Fractures,2
+Fetal Alcohol Syndrome,2
+Liver Abscess-Amebic,2
+Pneumonia-Mycoplasma,2
+Nocardia Infections,2
+Syringomyelia,2
+Meckel Diverticulum,2
+Renal Osteodystrophy,2
+Strongyloidiasis,2
+Hyperprolactinemia,2
+Cryoglobulinemia,2
+Adenoma-Pleomorphic,2
+Cryptosporidiosis,2
+Ataxia Telangiectasia,2
+Whiplash Injuries,2
+Thoracic Diseases,2
+Exanthema,2
+Folic Acid Deficiency,2
+Sleep Deprivation,2
+Guillain-Barre Syndrome,2
+Vulvar Diseases,2
+Parvoviridae Infections,2
+Prenatal Exposure Delayed Effects,2
+Granulomatous Disease-Chronic,2
+Radiculopathy,2
+Eclampsia,2
+Epidermal Necrolysis-Toxic,2
+Xeroderma Pigmentosum,2
+Osteoarthritis-Hip,2
+Humeral Fractures,2
+Pneumonia-Aspiration,2
+Epilepsy-Absence,2
+Varicocele,2
+Tooth-Impacted,2
+Deficiency Diseases,2
+Candidiasis-Vulvovaginal,2
+Conjunctivitis-Allergic,2
+Retinitis,2
+Eyelid Neoplasms,2
+Penile Diseases,2
+Vestibular Diseases,2
+Adenoviridae Infections,2
+Cystadenoma,2
+Mammary Neoplasms-Animal,2
+Scrapie,2
+Finger Injuries,2
+Yersinia Infections,2
+Brain Death,2
+Budd-Chiari Syndrome,2
+Urinary Bladder Neck Obstruction,2
+Retinal Hemorrhage,2
+Nematode Infections,2
+Alveolar Bone Loss,2
+Splenic Rupture,2
+Mitochondrial Diseases,2
+Hyperemia,2
+Corneal Dystrophies-Hereditary,2
+Fanconi Anemia,2
+Head Injuries-Closed,2
+Mercury Poisoning,2
+Carcinoma-Pancreatic Ductal,2
+Morphine Dependence,2
+Paraganglioma,2
+Abortion-Veterinary,2
+Hematoma-Epidural-Cranial,2
+Leukopenia,2
+Scalp Dermatoses,2
+Neoplastic Cells-Circulating,2
+Anus Diseases,2
+Thyrotoxicosis,2
+Meningitis-Meningococcal,2
+Sarcoidosis-Pulmonary,2
+Vaginal Diseases,2
+Water-Electrolyte Imbalance,2
+Astigmatism,2
+Chondroma,2
+Stomatitis-Aphthous,2
+Embolism-Fat,2
+Epilepsy-Tonic-Clonic,2
+Tracheal Diseases,2
+Tuberculosis-Gastrointestinal,2
+Myxedema,2
+Muscular Atrophy-Spinal,2
+Sensation Disorders,2
+Duodenal Obstruction,2
+Mucocele,2
+Transposition of Great Vessels,2
+Craniofacial Abnormalities,2
+Uterine Cervical Dysplasia,2
+Neck Pain,2
+Ocular Motility Disorders,2
+Uveitis-Anterior,2
+Narcolepsy,2
+Oropharyngeal Neoplasms,2
+Hyperlipoproteinemias,2
+Hirschsprung Disease,2
+Olfaction Disorders,2
+Lipodystrophy,2
+Mycobacterium avium-intracellulare Infection,2
+Polycystic Kidney-Autosomal Dominant,2
+Carcinoma-Medullary,2
+Torticollis,2
+Spasms-Infantile,2
+Pyloric Stenosis,2
+Tongue Diseases,2
+Epistaxis,2
+Alopecia Areata,2
+Infant Nutrition Disorders,2
+Cholangitis-Sclerosing,2
+Salivary Gland Diseases,2
+Acidosis-Renal Tubular,2
+Hepatitis-Autoimmune,2
+Tuberculosis-Spinal,2
+Ileal Neoplasms,2
+Enterovirus Infections,2
+Bronchial Fistula,2
+Prader-Willi Syndrome,2
+Telangiectasis,2
+Ehlers-Danlos Syndrome,2
+Vaginitis,2
+Mediastinal Emphysema,2
+Fasciitis,2
+Arteriosclerosis Obliterans,2
+Eye Foreign Bodies,2
+HTLV-I Infections,2
+Giant Cell Tumors,2
+Pleural Effusion-Malignant,2
+Telangiectasia-Hereditary Hemorrhagic,2
+Altitude Sickness,2
+Alkalosis,2
+Schizophrenia-Paranoid,2
+Methemoglobinemia,2
+Keratitis-Dendritic,2
+Sinus Thrombosis-Intracranial,2
+Insulin Resistance,2
+Jaw Neoplasms,2
+Cartilage Diseases,2
+Paresthesia,2
+Otosclerosis,2
+Restless Legs Syndrome,2
+Melanosis,2
+Spondylitis,2
+Diffuse Cerebral Sclerosis of Schilder,2
+Tricuspid Valve Insufficiency,2
+Leukoencephalopathy-Progressive Multifocal,2
+Laryngitis,2
+Acidosis-Lactic,2
+Arthralgia,2
+Bile Duct Diseases,2
+Neoplasms-Unknown Primary,2
+Wounds-Stab,2
+Glomerulonephritis-Membranous,2
+Neurotoxicity Syndromes,2
+Retroperitoneal Fibrosis,2
+Hemangiopericytoma,2
+Meningomyelocele,2
+Urinary Retention,2
+Postoperative Hemorrhage,2
+Aneurysm-Infected,2
+Common Bile Duct Neoplasms,2
+Mastocytosis,2
+Necrosis,2
+Mumps,2
+Neurofibroma,2
+Depression-Postpartum,2
+Hyperbilirubinemia,2
+Leukemia-T-Cell,2
+Iron Overload,2
+Fetal Hypoxia,2
+Thrombocythemia-Essential,2
+Hip Dislocation,2
+Tuberculosis-Multidrug-Resistant,2
+Skin Diseases-Bacterial,2
+Onychomycosis,2
+Cerebral Ventricle Neoplasms,2
+Hair Diseases,2
+Fractures-Stress,2
+Child Development Disorders-Pervasive,2
+Helminthiasis,2
+Pericarditis-Constrictive,2
+Marijuana Abuse,2
+Thrombocytosis,2
+Blood Group Incompatibility,2
+Paresis,2
+Cumulative Trauma Disorders,2
+Biliary Fistula,2
+Bronchopulmonary Dysplasia,2
+Retinal Perforations,2
+Chylothorax,2
+Neuroleptic Malignant Syndrome,2
+Gangrene,2
+Viremia,2
+Spinal Osteophytosis,2
+Brain Infarction,2
+Encephalitis-Viral,2
+Pulmonary Eosinophilia,2
+Conjunctival Diseases,2
+Epidermolysis Bullosa,2
+Decompression Sickness,2
+Urogenital Neoplasms,2
+Retroviridae Infections,2
+Giant Lymph Node Hyperplasia,2
+Craniopharyngioma,2
+Sigmoid Neoplasms,2
+Prostatic Diseases,2
+Immune Complex Diseases,2
+Dermatitis Herpetiformis,2
+Sarcoma-Synovial,2
+Esophageal Perforation,2
+Leukocytosis,2
+Genital Neoplasms-Male,2
+Vitamin E Deficiency,2
+Q Fever,2
+Carcinosarcoma,2
+Carcinoma-Lobular,2
+Epilepsies-Myoclonic,2
+Polymyalgia Rheumatica,2
+Postpartum Hemorrhage,2
+Vertebrobasilar Insufficiency,2
+Vascular Neoplasms,2
+Prediabetic State,2
+Keratoconus,2
+Meningitis-Pneumococcal,2
+Hemangioendothelioma,2
+Tuberculosis-Miliary,2
+Osteopetrosis,2
+Keloid,2
+Pregnancy-Tubal,2
+Eye Abnormalities,2
+Lymphoma-AIDS-Related,2
+Erythema Nodosum,2
+Retinal Neoplasms,2
+Papilledema,2
+Facies,2
+Blepharoptosis,2
+Leukemia-Monocytic-Acute,2
+Fungemia,2
+Dysentery-Amebic,2
+Menorrhagia,2
+Lactose Intolerance,2
+Intracranial Embolism,2
+Subacute Sclerosing Panencephalitis,2
+Lupus Erythematosus-Discoid,2
+Cluster Headache,2
+Lipid Metabolism-Inborn Errors,2
+Sprains and Strains,2
+Onchocerciasis,2
+Trichomonas Vaginitis,2
+Spinal Stenosis,2
+Contusions,2
+Trophoblastic Neoplasms,2
+Microcephaly,2
+Common Bile Duct Diseases,2
+Blister,2
+Gambling,2
+Intracranial Hemorrhages,2
+Adjustment Disorders,2
+Facial Injuries,2
+Endometrial Hyperplasia,2
+Dissociative Disorders,2
+Hemoperitoneum,2
+Dry Eye Syndromes,2
+Craniosynostoses,2
+Birth Injuries,2
+Carcinoma 256-Walker,2
+Lacrimal Apparatus Diseases,2
+Granuloma-Plasma Cell,2
+Ameloblastoma,2
+Osteoma-Osteoid,2
+Phlebitis,2
+Pancreatitis-Acute Necrotizing,2
+Encephalomyelitis,2
+Eosinophilic Granuloma,2
+Carbohydrate Metabolism-Inborn Errors,2
+Zollinger-Ellison Syndrome,2
+Epilepsy-Generalized,2
+Pancreatic Pseudocyst,2
+Moyamoya Disease,2
+Psychomotor Agitation,2
+Histiocytosis-Non-Langerhans-Cell,2
+Neoplasms-Glandular and Epithelial,2
+Inappropriate ADH Syndrome,2
+Peptic Ulcer Perforation,2
+Optic Atrophy,2
+Uterine Rupture,2
+Xerostomia,2
+Gingival Diseases,2
+Tracheal Neoplasms,2
+Arm Injuries,2
+Fallopian Tube Diseases,2
+Dysmenorrhea,2
+Hemorrhoids,2
+Anuria,2
+Severe Combined Immunodeficiency,2
+Neurosyphilis,2
+Glycogen Storage Disease,2
+Fibrocystic Breast Disease,2
+Empyema,2
+Femoral Neoplasms,2
+Fibrous Dysplasia of Bone,2
+Gynecomastia,2
+Influenza in Birds,2
+Glomerulonephritis-Membranoproliferative,2
+Bronchiolitis,2
+Oligodendroglioma,2
+Seizures-Febrile,2
+Choroid Diseases,2
+Sick Sinus Syndrome,2
+Leukoplakia-Oral,2
+Neoplasms-Muscle Tissue,2
+Combat Disorders,2
+Myelitis,2
+Gait Disorders-Neurologic,2
+Lipomatosis,2
+Cranial Nerve Diseases,2
+Goiter-Nodular,2
+Appendiceal Neoplasms,2
+Surgical Wound Dehiscence,2
+Sigmoid Diseases,2
+Encephalocele,2
+Cerebral Arterial Diseases,2
+Dental Pulp Diseases,2
+Friedreich Ataxia,2
+Myocardial Stunning,2
+Kyphosis,2
+Coccidioidomycosis,2
+von Hippel-Lindau Disease,2
+Eye Burns,2
+Maxillary Diseases,2
+Vaginosis-Bacterial,2
+Rett Syndrome,2
+Trachoma,2
+Intracranial Hypertension,2
+Sarcoma 180,2
+Schizotypal Personality Disorder,2
+Mastitis,2
+Cholesteatoma,2
+Arnold-Chiari Malformation,2
+Adenocarcinoma-Bronchiolo-Alveolar,2
+Conjunctival Neoplasms,2
+Uterine Prolapse,2
+Bezoars,2
+Ganglioneuroma,2
+Superior Vena Cava Syndrome,2
+Brain Diseases-Metabolic,2
+Apraxias,2
+Scabies,2
+Fasciitis-Necrotizing,2
+Priapism,2
+Thromboangiitis Obliterans,2
+Protein-Losing Enteropathies,2
+Chordoma,2
+Babesiosis,2
+Angina Pectoris-Variant,2
+Aortic Arch Syndromes,2
+Erythema Multiforme,2
+Paraganglioma-Extra-Adrenal,2
+Tuberculosis-Cutaneous,2
+Asthma-Exercise-Induced,2
+Multiple Endocrine Neoplasia,2
+Synovial Cyst,2
+Pseudarthrosis,2
+Urinary Fistula,2
+Digestive System Neoplasms,2
+Mediastinitis,2
+Anthrax,2
+Biliary Tract Neoplasms,2
+Spermatic Cord Torsion,2
+Diverticulum-Colon,2
+Polymyositis,2
+Whipple Disease,2
+Urinary Bladder-Overactive,2
+Agoraphobia,2
+Paranoid Disorders,2
+Tuberculosis-Renal,2
+Pyoderma,2
+Tracheoesophageal Fistula,2
+Nasal Obstruction,2
+Torsades de Pointes,2
+Self Mutilation,2
+Anemia-Macrocytic,2
+Diplopia,2
+Lip Neoplasms,2
+Empyema-Pleural,2
+Premature Birth,2
+Malaria-Vivax,2
+Arrhythmia-Sinus,2
+Trisomy,2
+Confusion,2
+Liver Diseases-Parasitic,2
+Fallopian Tube Neoplasms,2
+Eye Infections-Fungal,2
+Vasculitis-Leukocytoclastic-Cutaneous,2
+Acrodermatitis,2
+Acute-Phase Reaction,2
+Otitis Externa,2
+Tachycardia-Atrioventricular Nodal Reentry,2
+Seminoma,2
+Vasospasm-Intracranial,2
+Myosarcoma,2
+Nephrosis-Lipoid,2
+Supranuclear Palsy-Progressive,2
+Odontogenic Cysts,2
+Cystadenocarcinoma,2
+Esophageal Fistula,2
+Carotid Artery Thrombosis,2
+Prolactinoma,2
+Pancytopenia,2
+Osteoma,2
+Short Bowel Syndrome,2
+Anodontia,2
+Palatal Neoplasms,2
+Spondylolisthesis,2
+Polyradiculopathy,2
+Jejunal Neoplasms,2
+Stevens-Johnson Syndrome,2
+Hyperpigmentation,2
+Urethral Neoplasms,2
+Diverticulitis-Colonic,2
+Lactation Disorders,2
+Hernia-Ventral,2
+Keratoderma-Palmoplantar,2
+Hemosiderosis,2
+Hemorrhagic Fever with Renal Syndrome,2
+Venous Thromboembolism,2
+Hernia-Hiatal,2
+Adenocarcinoma-Follicular,2
+Thiamine Deficiency,2
+Tooth Discoloration,2
+Keratoconjunctivitis,2
+Dermatitis-Exfoliative,2
+Bronchiolitis Obliterans,2
+Botulism,2
+Ventricular Outflow Obstruction,2
+Corneal Opacity,2
+Soft Tissue Infections,2
+Electric Injuries,2
+Affective Disorders-Psychotic,2
+Adenocarcinoma-Clear Cell,2
+Hypertension-Malignant,2
+Spinocerebellar Degenerations,2
+Cat-Scratch Disease,2
+Osteitis,2
+Renal Insufficiency-Chronic,2
+Lewy Body Disease,2
+Rosacea,2
+Nephrosis,2
+Fascioliasis,2
+Pneumoperitoneum,2
+Lymphocytosis,2
+Bacteroides Infections,2
+Bursitis,2
+Lymphoma-Mantle-Cell,2
+Protozoan Infections,2
+Neuronal Ceroid-Lipofuscinoses,2
+Maxillofacial Injuries,2
+Neoplasm-Residual,2
+Hearing Loss-Sudden,2
+Dwarfism-Pituitary,2
+Bronchopulmonary Sequestration,2
+Chorioretinitis,2
+Blast Injuries,2
+Tuberculosis-Female Genital,2
+Glaucoma-Angle-Closure,2
+Lameness-Animal,2
+Reye Syndrome,2
+Retinal Artery Occlusion,2
+Paraphilias,2
+Muscle Neoplasms,2
+Breast Neoplasms-Male,2
+Kwashiorkor,2
+Foot-and-Mouth Disease,2
+Intestinal Pseudo-Obstruction,2
+Mycetoma,2
+Leprosy-Lepromatous,2
+Hemianopsia,2
+Churg-Strauss Syndrome,2
+Rectal Fistula,2
+Galactosemias,2
+Otitis Media-Suppurative,2
+Adrenoleukodystrophy,2
+Puerperal Infection,2
+Facial Asymmetry,2
+Lymphopenia,2
+Chagas Cardiomyopathy,2
+Chondrocalcinosis,2
+Gastritis-Atrophic,2
+Hearing Loss-Conductive,2
+Anti-Glomerular Basement Membrane Disease,2
+Meningocele,2
+Blastomycosis,2
+Acute Lung Injury,2
+Periodontal Pocket,2
+Clubfoot,2
+Disorders of Excessive Somnolence,2
+Lupus Erythematosus-Cutaneous,2
+Mucopolysaccharidoses,2
+Red-Cell Aplasia-Pure,2
+Diabetic Coma,2
+Meningitis-Aseptic,2
+Tooth Erosion,2
+Gas Gangrene,2
+Acinetobacter Infections,2
+Shoulder Pain,2
+Granuloma-Foreign-Body,2
+Hyaline Membrane Disease,2
+Leg Dermatoses,2
+Focal Infection-Dental,2
+Malocclusion-Angle Class III,2
+Agnosia,2
+Vascular Fistula,2
+Glomus Tumor,2
+Dermatitis-Seborrheic,2
+Paratuberculosis,2
+Pancreatitis-Chronic,2
+Subcutaneous Emphysema,2
+Fractures-Closed,2
+Paraparesis-Tropical Spastic,2
+Fractures-Ununited,2
+Carcinoma-Merkel Cell,2
+Aspergillosis-Allergic Bronchopulmonary,2
+Meningitis-Viral,2
+Angiomyolipoma,2
+Transsexualism,2
+Unconsciousness,2
+Catatonia,2
+Psychoses-Alcoholic,2
+Leydig Cell Tumor,2
+Nephritis-Hereditary,2
+Tonsillar Neoplasms,2
+Mediastinal Cyst,2
+Iris Diseases,2
+Granuloma-Giant Cell,2
+Cecal Neoplasms,2
+Carcinoma-Neuroendocrine,2
+Eye Injuries-Penetrating,2
+Spherocytosis-Hereditary,2
+Hypernatremia,2
+Pregnancy Complications-Parasitic,2
+Folliculitis,2
+Anencephaly,2
+Root Resorption,2
+Arachnidism,2
+Hernia-Umbilical,2
+Gingival Neoplasms,2
+Blast Crisis,2
+Retinal Neovascularization,2
+Adenovirus Infections-Human,2
+Smallpox,2
+Hypopharyngeal Neoplasms,2
+Cystadenocarcinoma-Serous,2
+Sickle Cell Trait,2
+Hysteria,2
+Hydrops Fetalis,2
+Myiasis,2
+Situs Inversus,2
+Tenosynovitis,2
+Niemann-Pick Diseases,2
+Anemia-Hemolytic-Congenital,2
+Myositis Ossificans,2
+Tuberculosis-Pleural,2
+Osteoarthropathy-Secondary Hypertrophic,2
+Carcinoma-Endometrioid,2
+Alcohol-Related Disorders,2
+Mitochondrial Myopathies,2
+Cystitis-Interstitial,2
+Megacolon,2
+Tularemia,2
+Coccidiosis,2
+Pulpitis,2
+Tooth Abrasion,2
+Pasteurella Infections,2
+Discitis,2
+Hypereosinophilic Syndrome,2
+Common Variable Immunodeficiency,2
+Extravasation of Diagnostic and Therapeutic Materials,2
+Urethral Stricture,2
+Impulse Control Disorders,2
+Elephantiasis-Filarial,2
+Tuberculoma,2
+Pyoderma Gangrenosum,2
+Gastric Fistula,2
+Chorioamnionitis,2
+Conversion Disorder,2
+Hyperhidrosis,2
+Gliosis,2
+Pneumatosis Cystoides Intestinalis,2
+Toxoplasmosis-Congenital,2
+Androgen-Insensitivity Syndrome,2
+Vitamin B 6 Deficiency,2
+Paracoccidioidomycosis,2
+Hemothorax,2
+Dysgammaglobulinemia,2
+Plaque-Amyloid,2
+Endocarditis-Subacute Bacterial,2
+Neuroma,2
+Heart Rupture,2
+Hypophosphatemia-Familial,2
+Parotid Diseases,2
+Darier Disease,2
+Endometritis,2
+Achondroplasia,2
+Tissue Adhesions,2
+Fibrosis,2
+Uterine Cervicitis,2
+Arachnoid Cysts,2
+Lacrimal Duct Obstruction,2
+Pulmonary Alveolar Proteinosis,2
+Bronchopneumonia,2
+Cerebrospinal Fluid Rhinorrhea,2
+Thoracic Outlet Syndrome,2
+Granulosa Cell Tumor,2
+alpha-Thalassemia,2
+Spinocerebellar Ataxias,2
+Schistosomiasis haematobia,2
+Bartter Syndrome,2
+Headache Disorders,2
+Cardiovascular Abnormalities,2
+Malaria-Cerebral,2
+Lymphocytic Choriomeningitis,2
+Postgastrectomy Syndromes,2
+Abdominal Abscess,2
+Tuberculosis-Urogenital,2
+Spina Bifida Occulta,2
+Intracranial Thrombosis,2
+AIDS-Related Complex,2
+Lichen Planus-Oral,2
+Lung Diseases-Parasitic,2
+Syncope-Vasovagal,2
+Orchitis,2
+Mixed Connective Tissue Disease,2
+Cytomegalovirus Retinitis,2
+Amphetamine-Related Disorders,2
+Trichomonas Infections,2
+Milk Hypersensitivity,2
+Echinococcosis-Pulmonary,2
+Biliary Atresia,2
+Polyomavirus Infections,2
+Acid-Base Imbalance,2
+Zoonoses,2
+Maxillary Sinusitis,2
+Hepatomegaly,2
+Jaundice-Obstructive,2
+Hypothalamic Diseases,2
+Leukemia P388,2
+Motor Skills Disorders,2
+Pseudoxanthoma Elasticum,2
+Anemia-Sideroblastic,2
+Neck Injuries,2
+Multiple System Atrophy,2
+Cadmium Poisoning,2
+Osteosclerosis,2
+Heart Septal Defects,2
+Pseudopseudohypoparathyroidism,2
+Melioidosis,2
+Meningitis-Haemophilus,2
+Respirovirus Infections,2
+Trypanosomiasis,2
+Rickettsia Infections,2
+Esotropia,2
+Neuroectodermal Tumors-Primitive-Peripheral,2
+Horner Syndrome,2
+Urinary Bladder Calculi,2
+Hand Deformities-Congenital,2
+Vibrio Infections,2
+Paramyxoviridae Infections,2
+DiGeorge Syndrome,2
+Mesenchymoma,2
+Epididymitis,2
+Encephalitis-Tick-Borne,2
+Anovulation,2
+Toothache,2
+Muscle Hypotonia,2
+Dupuytren Contracture,2
+Keratoacanthoma,2
+Afibrinogenemia,2
+Mushroom Poisoning,2
+Dentin Sensitivity,2
+Salpingitis,2
+Plague,2
+Abortion-Threatened,2
+Leukemia-Myelomonocytic-Acute,2
+Peutz-Jeghers Syndrome,2
+Craniofacial Dysostosis,2
+Peritonitis-Tuberculous,2
+Hydrocephalus-Normal Pressure,2
+Child Nutrition Disorders,2
+Proctitis,2
+Neuroectodermal Tumors-Primitive,2
+Hepatitis-Alcoholic,2
+Dystonic Disorders,2
+Immunoblastic Lymphadenopathy,2
+Subclavian Steal Syndrome,2
+Periapical Periodontitis,2
+Syphilis-Congenital,2
+Gingival Hyperplasia,2
+Toxoplasmosis-Ocular,2
+Catalepsy,2
+Ovarian Hyperstimulation Syndrome,2
+Paget Disease-Extramammary,2
+Cutaneous Fistula,2
+Lymphoma-Large-Cell-Anaplastic,2
+Neurocysticercosis,2
+Polychondritis-Relapsing,2
+Urinary Bladder Fistula,2
+Aggressive Periodontitis,2
+Williams Syndrome,2
+Kidney Tubular Necrosis-Acute,2
+Hepatitis-Viral-Animal,2
+Diverticulitis,2
+Urethral Obstruction,2
+Metrorrhagia,2
+Noonan Syndrome,2
+Rib Fractures,2
+Maxillary Sinus Neoplasms,2
+Fibromuscular Dysplasia,2
+Epilepsy-Complex Partial,2
+Conduct Disorder,2
+Theileriasis,2
+Sezary Syndrome,2
+Adenoma-Oxyphilic,2
+Placenta Previa,2
+Takotsubo Cardiomyopathy,2
+Congenital Hypothyroidism,2
+Multiple Sclerosis-Chronic Progressive,2
+Laryngostenosis,2
+Dental Occlusion-Traumatic,2
+Tetany,2
+Adenoma-Bile Duct,2
+Legg-Perthes Disease,2
+Epiphyses-Slipped,2
+Skin Diseases-Vascular,2
+Nerve Sheath Neoplasms,2
+Exocrine Pancreatic Insufficiency,2
+Consciousness Disorders,2
+Munchausen Syndrome,2
+West Nile Fever,2
+Endomyocardial Fibrosis,2
+Glycogen Storage Disease Type I,2
+Lip Diseases,2
+Dysarthria,2
+Multiple Endocrine Neoplasia Type 1,2
+Central Nervous System Vascular Malformations,2
+Mucopolysaccharidosis I,2
+Mastoiditis,2
+Pseudohypoparathyroidism,2
+Esophageal Motility Disorders,2
+Respiratory Paralysis,2
+Marek Disease,2
+Attention Deficit and Disruptive Behavior Disorders,2
+Enterocolitis,2
+Homocystinuria,2
+Bruxism,2
+Aphasia-Broca,2
+Scotoma,2
+Hookworm Infections,2
+Werner Syndrome,2
+Factitious Disorders,2
+Coloboma,2
+Tension-Type Headache,2
+Sciatic Neuropathy,2
+Frostbite,2
+Granular Cell Tumor,2
+Chromosome Disorders,2
+Bovine Virus Diarrhea-Mucosal Disease,2
+Pneumocephalus,2
+Muscle Cramp,2
+Alcohol Withdrawal Delirium,2
+Adrenocortical Hyperfunction,2
+Burns-Electric,2
+Neoplastic Syndromes-Hereditary,2
+Optic Neuropathy-Ischemic,2
+Proteus Infections,2
+Hepatitis-Animal,2
+Latex Hypersensitivity,2
+Bowen's Disease,2
+Meningitis-Cryptococcal,2
+Esophageal Atresia,2
+Fractures-Open,2
+Hepatitis D,2
+Hypospadias,2
+Phyllodes Tumor,2
+Fissure in Ano,2
+Tooth Avulsion,2
+Hyperplasia,2
+Keratitis-Herpetic,2
+HELLP Syndrome,2
+Pterygium,2
+Female Urogenital Diseases,2
+Orbital Fractures,2
+Leukemia-Radiation-Induced,2
+Malignant Carcinoid Syndrome,2
+Wernicke Encephalopathy,2
+Galactorrhea,2
+Hemarthrosis,2
+Precursor B-Cell Lymphoblastic Leukemia-Lymphoma,2
+Microphthalmos,2
+Nervous System Neoplasms,2
+Duodenitis,2
+Hernia-Diaphragmatic-Traumatic,2
+Carotid Artery Injuries,2
+Oculomotor Nerve Diseases,2
+Articulation Disorders,2
+Tooth-Supernumerary,2
+Encephalomyelitis-Acute Disseminated,2
+Adnexal Diseases,2
+Penile Induration,2
+Otorhinolaryngologic Neoplasms,2
+Sporotrichosis,2
+Dirofilariasis,2
+Sweet Syndrome,2
+Staphylococcal Skin Infections,2
+Opisthorchiasis,2
+Adenofibroma,2
+Vision-Low,2
+Ascorbic Acid Deficiency,2
+Arrhythmogenic Right Ventricular Dysplasia,2
+Skin Diseases-Parasitic,2
+Newcastle Disease,2
+Entamoebiasis,2
+Hearing Loss-Bilateral,2
+Psittacosis,2
+Herpes Zoster Ophthalmicus,2
+Migraine with Aura,2
+Panniculitis,2
+Schistosomiasis japonica,2
+Genetic Diseases-X-Linked,2
+Mast-Cell Sarcoma,2
+Carcinoma-Lewis Lung,2
+Cystinuria,2
+Ulna Fractures,2
+Lice Infestations,2
+Asperger Syndrome,2
+Periapical Diseases,2
+Tuberculosis-Bovine,2
+Nephrocalcinosis,2
+Actinomycetales Infections,2
+Carcinoma-Signet Ring Cell,2
+Bulimia Nervosa,2
+Intestinal Atresia,2
+Chlamydophila Infections,2
+Pseudorabies,2
+Hepatitis E,2
+Thalamic Diseases,2
+Brachial Plexus Neuritis,2
+Albinism,2
+Soft Tissue Injuries,2
+Ankylosis,2
+Rhabdomyoma,2
+Seasonal Affective Disorder,2
+Encephalitis-Japanese,2
+Lupus Vulgaris,2
+Preleukemia,2
+Glycogen Storage Disease Type II,2
+Respiratory Tract Neoplasms,2
+Muscle Rigidity,2
+Acidosis-Respiratory,2
+Adenoma-Sweat Gland,2
+Eye Infections-Viral,2
+Adenolymphoma,2
+Sarcoma-Yoshida,2
+Pemphigoid-Benign Mucous Membrane,2
+Sebaceous Gland Neoplasms,2
+Hand Deformities-Acquired,2
+Myofascial Pain Syndromes,2
+Cholesteatoma-Middle Ear,2
+Leukodystrophy-Metachromatic,2
+Placental Insufficiency,2
+Lymphohistiocytosis-Hemophagocytic,2
+Plant Poisoning,2
+Pneumonia-Staphylococcal,2
+Urticaria Pigmentosa,2
+Lymphoma-T-Cell-Peripheral,2
+Hypesthesia,2
+Anemia-Megaloblastic,2
+Malacoplakia,2
+Toxocariasis,2
+Basal Cell Nevus Syndrome,2
+Acanthosis Nigricans,2
+Cystinosis,2
+Dystocia,2
+Brucellosis-Bovine,2
+Corynebacterium Infections,2
+Pinealoma,2
+Skull Base Neoplasms,2
+Cicatrix-Hypertrophic,2
+Hypochondriasis,2
+Pancreatic Fistula,2
+Heat Exhaustion,2
+Acrocephalosyndactylia,2
+Hyperemesis Gravidarum,2
+Ebstein Anomaly,2
+Supratentorial Neoplasms,2
+Essential Tremor,2
+Periapical Abscess,2
+Mandibulofacial Dysostosis,2
+Nervous System Malformations,2
+Hereditary Sensory and Motor Neuropathy,2
+Radiodermatitis,2
+Osteochondromatosis,2
+Scarlet Fever,2
+Arthrogryposis,2
+alpha 1-Antitrypsin Deficiency,2
+Enterocolitis-Necrotizing,2
+Lymphangioma-Cystic,2
+Still's Disease-Adult-Onset,2
+Vascular Headaches,2
+Lysosomal Storage Diseases,2
+Arthropathy-Neurogenic,2
+Neurodermatitis,2
+Exfoliation Syndrome,2
+Siderosis,2
+Taste Disorders,2
+Glycosuria,2
+Carotid Body Tumor,2
+Fetofetal Transfusion,2
+Parasitemia,2
+Paraneoplastic Endocrine Syndromes,2
+Fibrous Dysplasia-Polyostotic,2
+Hepatoblastoma,2
+Schizophrenia-Childhood,2
+Prostatic Intraepithelial Neoplasia,2
+Leukemia-B-Cell,2
+Bronchiolitis-Viral,2
+Wiskott-Aldrich Syndrome,2
+Myelitis-Transverse,2
+Mouth-Edentulous,2
+Myoglobinuria,2
+Status Asthmaticus,2
+Persistent Vegetative State,2
+Gastroparesis,2
+Reflex-Abnormal,2
+Trichuriasis,2
+Aortitis,2
+Ileitis,2
+Dental Leakage,2
+Hyperopia,2
+Failure to Thrive,2
+Tic Disorders,2
+Paratyphoid Fever,2
+Osteochondroma,2
+Sialadenitis,2
+Avian Leukosis,2
+Foot Deformities-Congenital,2
+Eye Infections-Parasitic,2
+Fibroadenoma,2
+Abruptio Placentae,2
+Salmonella Food Poisoning,2
+MELAS Syndrome,2
+Chylous Ascites,2
+Dental Pulp Necrosis,2
+Rh Isoimmunization,2
+Decerebrate State,2
+Drowning,2
+Leg Length Inequality,2
+Auditory Perceptual Disorders,2
+Hyperandrogenism,2
+Tennis Elbow,2
+Encephalopathy-Bovine Spongiform,2
+Choledochal Cyst,2
+Diverticulosis-Esophageal,2
+Dementia-Multi-Infarct,2
+Lesch-Nyhan Syndrome,2
+Heat Stress Disorders,2
+Molluscum Contagiosum,2
+Strongylida Infections,2
+Hyperparathyroidism-Primary,2
+Hyperuricemia,2
+Calcium Metabolism Disorders,2
+Syndactyly,2
+Water Intoxication,2
+Exostoses-Multiple Hereditary,2
+Branchioma,2
+Facial Nerve Diseases,2
+Aphakia-Postcataract,2
+Scleritis,2
+Ventricular Premature Complexes,2
+Phantom Limb,2
+Leukemia-Myelomonocytic-Chronic,2
+Hematemesis,2
+Hypoventilation,2
+Klippel-Trenaunay-Weber Syndrome,2
+Rhabdoid Tumor,2
+Exostoses,2
+Jaw-Edentulous,2
+Arachnoiditis,2
+Disease Susceptibility,2
+Hemobilia,2
+Foot Injuries,2
+HIV-Associated Lipodystrophy Syndrome,2
+Mesonephroma,2
+Blepharospasm,2
+Neoplasms-Squamous Cell,2
+Neuromyelitis Optica,2
+Leukomalacia-Periventricular,2
+Scurvy,2
+Mitochondrial Encephalomyopathies,2
+Brachial Plexus Neuropathies,2
+Carotid Artery-Internal-Dissection,2
+Tinea Capitis,2
+Gigantism,2
+Polyendocrinopathies-Autoimmune,2
+Ectromelia,2
+Cerebral Amyloid Angiopathy,2
+Diverticulum-Esophageal,2
+Fusobacterium Infections,2
+Goiter-Endemic,2
+Tooth Eruption-Ectopic,2
+Microvascular Angina,2
+Communication Disorders,2
+Duodenogastric Reflux,2
+Barotrauma,2
+Cestode Infections,2
+Synovitis-Pigmented Villonodular,2
+Menkes Kinky Hair Syndrome,2
+Oral Hemorrhage,2
+Oral Ulcer,2
+Histiocytosis-Sinus,2
+Fluorosis-Dental,2
+Foramen Ovale-Patent,2
+Candidiasis-Cutaneous,2
+Erysipelas,2
+Fibromatosis-Aggressive,2
+Puberty-Delayed,2
+Hypersplenism,2
+Helminthiasis-Animal,2
+Adenoma-Chromophobe,2
+Parathyroid Diseases,2
+Toxoplasmosis-Cerebral,2
+Myotonia,2
+Overdose,2
+Taeniasis,2
+Bronchogenic Cyst,2
+Hepatic Veno-Occlusive Disease,2
+Dyskinesias,2
+Carcinoma-Mucoepidermoid,2
+Polyuria,2
+Classical Swine Fever,2
+Brugada Syndrome,2
+Hyperbilirubinemia-Hereditary,2
+Arterio-Arterial Fistula,2
+Panniculitis-Nodular Nonsuppurative,2
+Dysautonomia-Familial,2
+Tuberculosis-Ocular,2
+Progeria,2
+Testicular Hydrocele,2
+Communicable Diseases-Emerging,2
+Mucolipidoses,2
+Adenocarcinoma-Scirrhous,2
+Carcinoma-Adenosquamous,2
+Holoprosencephaly,2
+Persistent Fetal Circulation Syndrome,2
+Angelman Syndrome,2
+Potassium Deficiency,2
+Sturge-Weber Syndrome,2
+Hemangioma-Capillary,2
+Vitamin K Deficiency,2
+Polyhydramnios,2
+Foot Deformities-Acquired,2
+Limb Deformities-Congenital,2
+Caliciviridae Infections,2
+Croup,2
+Hydrothorax,2
+Placenta Accreta,2
+Psoas Abscess,2
+Encephalitis-Arbovirus,2
+Leukemia-Megakaryoblastic-Acute,2
+Polyradiculoneuropathy-Chronic Inflammatory Demyelinating,2
+Fetal Macrosomia,2
+Cystadenoma-Mucinous,2
+Small Cell Lung Carcinoma,2
+Shoulder Fractures,2
+Lymphangioleiomyomatosis,2
+Night Blindness,2
+Beckwith-Wiedemann Syndrome,2
+Intracranial Hypotension,2
+Erythema Infectiosum,2
+Ventricular Dysfunction,2
+Distemper,2
+Spinal Muscular Atrophies of Childhood,2
+Anus-Imperforate,2
+Nails-Malformed,2
+Neurofibromatosis 2,2
+Cryptogenic Organizing Pneumonia,2
+Athetosis,2
+Protozoan Infections-Animal,2
+Neurofibromatoses,2
+Giant Cell Tumor of Bone,2
+Farmer's Lung,2
+Tooth Mobility,2
+Hyphema,2
+Kartagener Syndrome,2
+Encephalitis-Herpes Simplex,2
+Parasitic Diseases-Animal,2
+Dumping Syndrome,2
+Uveomeningoencephalitic Syndrome,2
+Maple Syrup Urine Disease,2
+Multiple Endocrine Neoplasia Type 2a,2
+Empty Sella Syndrome,2
+Dermatitis-Irritant,2
+Foot Ulcer,2
+Epiglottitis,2
+Spastic Paraplegia-Hereditary,2
+Optic Atrophies-Hereditary,2
+Thyroglossal Cyst,2
+Skin Diseases-Papulosquamous,2
+Alcohol Amnestic Disorder,2
+Sleep Disorders-Circadian Rhythm,2
+Trematode Infections,2
+Shoulder Impingement Syndrome,2
+Epilepsy-Frontal Lobe,2
+Vertebral Artery Dissection,2
+Ehrlichiosis,2
+Oxyuriasis,2
+Leiomyomatosis,2
+Dysplastic Nevus Syndrome,2
+Prognathism,2
+Heart Rupture-Post-Infarction,2
+Impotence-Vasculogenic,2
+Cell Transformation-Viral,2
+Porphyria Cutanea Tarda,2
+Hypophosphatemia,2
+Leukemia-Plasma Cell,2
+Myoepithelioma,2
+Hypopigmentation,2
+Prurigo,2
+Periarthritis,2
+Presbycusis,2
+Purine-Pyrimidine Metabolism-Inborn Errors,2
+Anxiety-Separation,2
+Submandibular Gland Neoplasms,2
+Choline Deficiency,2
+Nephrosclerosis,2
+Xanthogranuloma-Juvenile,2
+Arbovirus Infections,2
+Fetomaternal Transfusion,2
+Coronavirus Infections,2
+Dental Calculus,2
+Herpes Labialis,2
+Hymenolepiasis,2
+Smoke Inhalation Injury,2
+Mucopolysaccharidosis IV,2
+Paralyses-Familial Periodic,2
+Hepatorenal Syndrome,2
+Choroiditis,2
+Picornaviridae Infections,2
+Facial Neuralgia,2
+Dacryocystitis,2
+Hyperlipidemia-Familial Combined,2
+Needlestick Injuries,2
+Leigh Disease,2
+Chondrodysplasia Punctata,2
+Velopharyngeal Insufficiency,2
+Hemorrhagic Fevers-Viral,2
+Leishmaniasis-Mucocutaneous,2
+Chronic Periodontitis,2
+Tooth Loss,2
+Ciliary Motility Disorders,2
+Epidermolysis Bullosa Dystrophica,2
+Lentigo,2
+Nasopharyngeal Diseases,2
+Flatfoot,2
+Mucopolysaccharidosis II,2
+Lichenoid Eruptions,2
+Tinea Pedis,2
+Myositis-Inclusion Body,2
+Complex Regional Pain Syndromes,2
+Hashimoto Disease,2
+Hypertension-Pregnancy-Induced,2
+Hypolipoproteinemias,2
+Burns-Inhalation,2
+Multiple Personality Disorder,2
+Rectal Prolapse,2
+Deltaretrovirus Infections,2
+Graves Ophthalmopathy,2
+Tooth-Unerupted,2
+Scrub Typhus,2
+Leukodystrophy-Globoid Cell,2
+Tay-Sachs Disease,2
+Dental Enamel Hypoplasia,2
+Syphilis-Cutaneous,2
+Vascular Malformations,2
+Dyslexia-Acquired,2
+Carcinoma-Large Cell,2
+Colitis-Ischemic,2
+Sarcoma-Avian,2
+Rare Diseases,2
+Factor VII Deficiency,2
+Mite Infestations,2
+Dextrocardia,2
+Tooth Injuries,2
+Vitreoretinopathy-Proliferative,2
+Embolism-Cholesterol,2
+Tuberculosis-Hepatic,2
+Cystadenocarcinoma-Papillary,2
+Kidney Papillary Necrosis,2
+Pneumopericardium,2
+Endarteritis,2
+Paragonimiasis,2
+Protein S Deficiency,2
+Tracheitis,2
+Adams-Stokes Syndrome,2
+Hyperlipoproteinemia Type IV,2
+Arthritis-Gouty,2
+Otitis,2
+Chondroblastoma,2
+Dermatofibrosarcoma,2
+Cheilitis,2
+Mutism,2
+Heavy Chain Disease,2
+Synostosis,2
+POEMS Syndrome,2
+Blepharitis,2
+Epidural Abscess,2
+Vitreous Hemorrhage,2
+Focal Nodular Hyperplasia,2
+Calciphylaxis,2
+Jaw-Edentulous-Partially,2
+Hoarseness,2
+Hypoprothrombinemias,2
+Atrophy,2
+Jaw Abnormalities,2
+Fat Necrosis,2
+Acanthamoeba Keratitis,2
+Feline Acquired Immunodeficiency Syndrome,2
+Porcine Reproductive and Respiratory Syndrome,2
+Hamartoma Syndrome-Multiple,2
+Encephalomalacia,2
+Atrioventricular Block,2
+Lichen Sclerosus et Atrophicus,2
+Dysentery,2
+Stomach Rupture,2
+Bone Marrow Neoplasms,2
+Melena,2
+Ketosis,2
+Tachycardia-Ectopic Atrial,2
+Coronary Occlusion,2
+Gilbert Disease,2
+Stomach Volvulus,2
+Hypokinesia,2
+Corneal Edema,2
+Focal Infection,2
+Cleidocranial Dysplasia,2
+Ureterocele,2
+Alphavirus Infections,2
+Myotonia Congenita,2
+Thrombasthenia,2
+Amnesia-Retrograde,2
+Dengue Hemorrhagic Fever,2
+Adenomatous Polyps,2
+Submandibular Gland Diseases,2
+Trypanosomiasis-Bovine,2
+Pneumonia-Ventilator-Associated,2
+Chromoblastomycosis,2
+Dentigerous Cyst,2
+Forearm Injuries,2
+Rheumatoid Nodule,2
+Tinea Versicolor,2
+Postpoliomyelitis Syndrome,2
+Vasculitis-Central Nervous System,2
+Anemia-Refractory,2
+Lambert-Eaton Myasthenic Syndrome,2
+Pica,2
+Trichotillomania,2
+Angiofibroma,2
+Tooth Demineralization,2
+Optic Nerve Injuries,2
+Endodermal Sinus Tumor,2
+Pseudomyxoma Peritonei,2
+Hyperammonemia,2
+Hemangioblastoma,2
+Endocrine Gland Neoplasms,2
+Serum Sickness,2
+Rocky Mountain Spotted Fever,2
+Lymphomatoid Granulomatosis,2
+Achlorhydria,2
+Hypovolemia,2
+Conjunctivitis-Bacterial,2
+Microsporidiosis,2
+Bone Cysts-Aneurysmal,2
+Dystonia Musculorum Deformans,2
+Pancreatitis-Alcoholic,2
+Cystic Adenomatoid Malformation of Lung-Congenital,2
+Polydactyly,2
+Sleep Apnea-Central,2
+Dysthymic Disorder,2
+Brain Stem Neoplasms,2
+Presbyopia,2
+Endocardial Fibroelastosis,2
+Neurasthenia,2
+Anaplasmosis,2
+Reoviridae Infections,2
+Spondylarthropathies,2
+Avitaminosis,2
+Spondylolysis,2
+Porphyria-Acute Intermittent,2
+Stomatitis-Denture,2
+Hypertrophy-Right Ventricular,2
+Lymphogranuloma Venereum,2
+Pierre Robin Syndrome,2
+Uveal Diseases,2
+Leukoplakia,2
+Lung Injury,2
+Dandy-Walker Syndrome,2
+Alkaptonuria,2
+Boutonneuse Fever,2
+Roseolovirus Infections,2
+Optic Atrophy-Hereditary-Leber,2
+Multiple Chemical Sensitivity,2
+Impetigo,2
+Carcinoma-Ductal,2
+Embolism-Amniotic Fluid,2
+Pregnancy-Abdominal,2
+Chediak-Higashi Syndrome,2
+Activated Protein C Resistance,2
+Neoplasms-Nerve Tissue,2
+Hereditary Sensory and Autonomic Neuropathies,2
+Granuloma Annulare,2
+Osteoradionecrosis,2
+Leprosy-Tuberculoid,2
+Superinfection,2
+Arsenic Poisoning,2
+Xerophthalmia,2
+Somatosensory Disorders,2
+Vulvovaginitis,2
+Typhus-Epidemic Louse-Borne,2
+Central Nervous System Infections,2
+Sarcoma-Myeloid,2
+Postoperative Nausea and Vomiting,2
+Abortion-Septic,2
+Vesicovaginal Fistula,2
+Lithiasis,2
+Rhabdomyosarcoma-Embryonal,2
+Weil Disease,2
+Radicular Cyst,2
+Hemangioma-Cavernous-Central Nervous System,2
+Leukemic Infiltration,2
+Cardiomyopathy-Alcoholic,2
+Drug Toxicity,2
+Gonadal Dysgenesis-46-Y,2
+Embolism-Paradoxical,2
+Bell Palsy,2
+Angiodysplasia,2
+Tumor Lysis Syndrome,2
+Crush Syndrome,2
+Rhinoscleroma,2
+Anomia,2
+Oligohydramnios,2
+Agraphia,2
+Hyperglycemic Hyperosmolar Nonketotic Coma,2
+Granuloma-Pyogenic,2
+Leukemia L5178,2
+Ileus,2
+Adrenocortical Carcinoma,2
+Klippel-Feil Syndrome,2
+Exotropia,2
+ACTH Syndrome-Ectopic,2
+Burning Mouth Syndrome,2
+Spinal Cord Ischemia,2
+Trismus,2
+Splenic Infarction,2
+Colonic Pseudo-Obstruction,2
+Albinism-Oculocutaneous,2
+Hemangioendothelioma-Epithelioid,2
+Riboflavin Deficiency,2
+Osteolysis-Essential,2
+Hypoplastic Left Heart Syndrome,2
+Meconium Aspiration Syndrome,2
+Adrenocortical Adenoma,2
+Pituitary Apoplexy,2
+Hypoproteinemia,2
+Thyroid Crisis,2
+Borrelia Infections,2
+Gastrinoma,2
+Tricuspid Valve Stenosis,2
+IgA Deficiency,2
+Thymus Hyperplasia,2
+Hypertrophy,2
+Fatty Liver-Alcoholic,2
+DNA Virus Infections,2
+Ochronosis,2
+Larva Migrans,2
+Paraneoplastic Syndromes-Nervous System,2
+Fecal Impaction,2
+Neoplasms-Neuroepithelial,2
+Kearns-Sayre Syndrome,2
+Cerebrospinal Fluid Otorrhea,2
+Leukorrhea,2
+Histiocytic Necrotizing Lymphadenitis,2
+Jaw Cysts,2
+Intestinal Volvulus,2
+Akathisia-Drug-Induced,2
+Torsion Abnormality,2
+Optic Nerve Neoplasms,2
+Melkersson-Rosenthal Syndrome,2
+Twins-Conjoined,2
+Hypophosphatasia,2
+Serotonin Syndrome,2
+Heat Stroke,2
+Aphasia-Wernicke,2
+Vitamin B Deficiency,2
+Leukemia-Myeloid-Chronic-Phase,2
+Olivopontocerebellar Atrophies,2
+Pseudolymphoma,2
+Glycogen Storage Disease Type V,2
+Biliary Dyskinesia,2
+Malocclusion-Angle Class I,2
+Lacerations,2
+Cutis Laxa,2
+Carcinoma-Embryonal,2
+Cardiomyopathy-Restrictive,2
+Odontoma,2
+Cockayne Syndrome,2
+Sunburn,2
+Fluoride Poisoning,2
+Tick Infestations,2
+Cystadenocarcinoma-Mucinous,2
+Burkholderia Infections,2
+Stomatitis-Herpetic,2
+Ganglioglioma,2
+Subphrenic Abscess,2
+Glomus Jugulare Tumor,2
+Cochlear Diseases,2
+Abducens Nerve Diseases,2
+Ancylostomiasis,2
+Hallux Valgus,2
+Autoimmune Diseases of the Nervous System,2
+Bronchitis-Chronic,2
+Frontotemporal Dementia,2
+Balanitis,2
+Bacteroidaceae Infections,2
+Borna Disease,2
+Amelogenesis Imperfecta,2
+Vestibulocochlear Nerve Diseases,2
+Epilepsy-Post-Traumatic,2
+Corneal Neovascularization,2
+Lens Diseases,2
+Pulmonary Atresia,2
+Constriction-Pathologic,2
+Wallerian Degeneration,2
+Larva Migrans-Visceral,2
+Glucagonoma,2
+Subdural Effusion,2
+Pyelonephritis-Xanthogranulomatous,2
+Hypohidrosis,2
+Colles' Fracture,2
+Peritonsillar Abscess,2
+Bluetongue,2
+Epilepsy-Reflex,2
+De Lange Syndrome,2
+Factor V Deficiency,2
+Mesenteric Cyst,2
+Tooth-Nonvital,2
+Bloom Syndrome,2
+Yersinia pseudotuberculosis Infections,2
+Radiation Pneumonitis,2
+Machado-Joseph Disease,2
+Pulmonary Valve Insufficiency,2
+Felty's Syndrome,2
+Sialorrhea,2
+Azoospermia,2
+Hyperoxaluria,2
+Cystadenoma-Serous,2
+Carcinoma-Verrucous,2
+Bladder Exstrophy,2
+Incontinentia Pigmenti,2
+Periostitis,2
+Skin Diseases-Viral,2
+Myelinolysis-Central Pontine,2
+Anemia-Refractory-with Excess of Blasts,2
+Histiocytosis,2
+Suppuration,2
+AIDS-Associated Nephropathy,2
+Thecoma,2
+Hyperostosis-Diffuse Idiopathic Skeletal,2
+Lymphangiectasis,2
+Pellagra,2
+Dyspareunia,2
+Ureaplasma Infections,2
+Poxviridae Infections,2
+Environmental Illness,2
+Scleral Diseases,2
+Legionellosis,2
+Salivary Duct Calculi,2
+Neuritis-Autoimmune-Experimental,2
+Eye Diseases-Hereditary,2
+Gliosarcoma,2
+Elliptocytosis-Hereditary,2
+Furunculosis,2
+Sertoli Cell Tumor,2
+Hemifacial Spasm,2
+Waardenburg's Syndrome,2
+Diabetes Insipidus-Nephrogenic,2
+Anemia-Hemolytic-Congenital Nonspherocytic,2
+Pilomatrixoma,2
+Keratoconjunctivitis Sicca,2
+Hyperoxaluria-Primary,2
+Monoclonal Gammopathy of Undetermined Significance,2
+Periapical Granuloma,2
+Phagocyte Bactericidal Dysfunction,2
+Chondromatosis-Synovial,2
+Carotid-Cavernous Sinus Fistula,2
+Muscle Hypertonia,2
+Gingivitis-Necrotizing Ulcerative,2
+Chancroid,2
+Ectoparasitic Infestations,2
+Funnel Chest,2
+Nose Deformities-Acquired,2
+Urogenital Abnormalities,2
+Kernicterus,2
+Necrobiosis Lipoidica,2
+Persian Gulf Syndrome,2
+Lathyrism,2
+Encopresis,2
+Empyema-Subdural,2
+Uveitis-Posterior,2
+Swayback,2
+Hernia-Abdominal,2
+Iliac Aneurysm,2
+Carcinoma-Acinar Cell,2
+Nevus-Blue,2
+Central Nervous System Cysts,2
+Osteoarthropathy-Primary Hypertrophic,2
+Pulmonary Veno-Occlusive Disease,2
+Hyperesthesia,2
+Anophthalmos,2
+Retinal Necrosis Syndrome-Acute,2
+Micronuclei-Chromosome-Defective,2
+Tuberculoma-Intracranial,2
+Murine Acquired Immunodeficiency Syndrome,2
+Rhabdomyosarcoma-Alveolar,2
+Laryngismus,2
+Bird Fancier's Lung,2
+Rhinitis-Atrophic,2
+Eisenmenger Complex,2
+Hypothalamic Neoplasms,2
+Tauopathies,2
+Vulvitis,2
+MPTP Poisoning,2
+Leukemoid Reaction,2
+Hearing Loss-High-Frequency,2
+Lupus Vasculitis-Central Nervous System,2
+Dermatitis-Photoallergic,2
+Clonorchiasis,2
+Port-Wine Stain,2
+Job's Syndrome,2
+Paronychia,2
+Acantholysis,2
+Bites-Human,2
+Neisseriaceae Infections,2
+Gardner Syndrome,2
+Echovirus Infections,2
+Lymphocele,2
+Facial Hemiatrophy,2
+Urolithiasis,2
+Pupil Disorders,2
+Eye Hemorrhage,2
+Carcinoma-Papillary-Follicular,2
+Abortion-Missed,2
+Lyme Neuroborreliosis,2
+Syphilis-Cardiovascular,2
+Gestational Trophoblastic Neoplasms,2
+Neoplasms-Vascular Tissue,2
+Stiff-Person Syndrome,2
+Lens Subluxation,2
+Paget's Disease-Mammary,2
+Porokeratosis,2
+Papilloma-Inverted,2
+Amputation-Traumatic,2
+Histiocytic Sarcoma,2
+Osteochondritis Dissecans,2
+Refsum Disease,2
+Tuberculosis-Male Genital,2
+Neoplasms-Fibrous Tissue,2
+Meningitis-Listeria,2
+Gastritis-Hypertrophic,2
+Ophthalmia-Sympathetic,2
+Ecchymosis,2
+Eye Infections,2
+Poliomyelitis-Bulbar,2
+Brain Stem Infarctions,2
+Aortic Stenosis-Subvalvular,2
+Mucopolysaccharidosis III,2
+Erysipelothrix Infections,2
+Lordosis,2
+Choledocholithiasis,2
+Hepatopulmonary Syndrome,2
+Shy-Drager Syndrome,2
+Uterine Perforation,2
+Malformations of Cortical Development,2
+Fournier Gangrene,2
+Diastema,2
+Amyloid Neuropathies,2
+Lymphangiectasis-Intestinal,2
+Bile Reflux,2
+Smith-Lemli-Opitz Syndrome,2
+Hernia-Femoral,2
+Tuberculosis-Cardiovascular,2
+Pedophilia,2
+Phosphorus Metabolism Disorders,2
+Adrenal Cortex Diseases,2
+Granuloma-Lethal Midline,2
+Protein C Deficiency,2
+Neonatal Abstinence Syndrome,2
+Pityriasis,2
+Sclerosis,2
+Leprosy-Borderline,2
+Pilonidal Sinus,2
+Adenoma-Liver Cell,2
+Spondylarthritis,2
+Mallory-Weiss Syndrome,2
+Asthenopia,2
+Jaundice-Chronic Idiopathic,2
+Tuberculosis-Laryngeal,2
+Goldenhar Syndrome,2
+Cri-du-Chat Syndrome,2
+Hyperlipoproteinemia Type III,2
+Encephalomyelitis-Equine,2
+Tooth Resorption,2
+Head Injuries-Penetrating,2
+Lymphangitis,2
+Actinobacillus Infections,2
+Pneumonia-Lipid,2
+Iridocyclitis,2
+Nail-Patella Syndrome,2
+Yellow Fever,2
+Cataplexy,2
+Bulbar Palsy-Progressive,2
+Plaque-Atherosclerotic,2
+Peroxisomal Disorders,2
+Epiretinal Membrane,2
+Kidney Cortex Necrosis,2
+Hemoglobinuria,2
+Superior Mesenteric Artery Syndrome,2
+Orbital Pseudotumor,2
+Pityriasis Rubra Pilaris,2
+Laryngeal Edema,2
+Erythromelalgia,2
+Factor XIII Deficiency,2
+Keratosis-Seborrheic,2
+Anemia-Dyserythropoietic-Congenital,2
+Anemia-Neonatal,2
+Factor XI Deficiency,2
+Rupture-Spontaneous,2
+Hyperostosis-Cortical-Congenital,2
+Foot Deformities,2
+Hidradenitis Suppurativa,2
+Sex Cord-Gonadal Stromal Tumors,2
+Neoplasm Regression-Spontaneous,2
+Gastroschisis,2
+Oliguria,2
+Infectious Bovine Rhinotracheitis,2
+Neoplasms-Connective Tissue,2
+Fibroma-Ossifying,2
+Ocular Hypotension,2
+Genomic Instability,2
+Precursor T-Cell Lymphoblastic Leukemia-Lymphoma,2
+Capgras Syndrome,2
+HTLV-II Infections,2
+Mastocytosis-Systemic,2
+Angiokeratoma,2
+Limbic Encephalitis,2
+Uterine Cervical Incompetence,2
+Vaginal Fistula,2
+Pancoast Syndrome,2
+Gangliosidoses,2
+Heart Failure-Systolic,2
+Retropharyngeal Abscess,2
+Zygomycosis,2
+Mouth Breathing,2
+Acute Disease,2
+Neurocytoma,2
+Osteitis Fibrosa Cystica,2
+Shwartzman Phenomenon,2
+Hantavirus Infections,2
+Gingival Recession,2
+Bartonella Infections,2
+Erythema Chronicum Migrans,2
+Gastric Dilatation,2
+Goiter-Substernal,2
+Hyperostosis,2
+Cor Triatriatum,2
+Abetalipoproteinemia,2
+Zygomatic Fractures,2
+Hemoglobin SC Disease,2
+Cardiovirus Infections,2
+Actinomycosis-Cervicofacial,2
+HIV Wasting Syndrome,2
+Brenner Tumor,2
+Anterior Compartment Syndrome,2
+Pouchitis,2
+CADASIL,2
+REM Sleep Behavior Disorder,2
+Facial Nerve Injuries,2
+Trigeminal Nerve Diseases,2
+Sertoli-Leydig Cell Tumor,2
+Neurocutaneous Syndromes,2
+Hematoma-Epidural-Spinal,2
+Adenoma-Villous,2
+Arthus Reaction,2
+Silicotuberculosis,2
+Ophthalmoplegia-Chronic Progressive External,2
+Lateral Medullary Syndrome,2
+Hematoma-Subdural-Chronic,2
+Amniotic Band Syndrome,2
+Alagille Syndrome,2
+Zellweger Syndrome,2
+Jaw Fractures,2
+Maxillary Fractures,2
+Oral Submucous Fibrosis,2
+Dermatitis-Phototoxic,2
+Immune Reconstitution Inflammatory Syndrome,2
+Sarcoma-Endometrial Stromal,2
+Diaphragmatic Eventration,2
+Periodontal Attachment Loss,2
+Skin Abnormalities,2
+Thyroiditis-Subacute,2
+Nevus-Epithelioid and Spindle Cell,2
+Conjunctivitis-Inclusion,2
+Metaplasia,2
+Strongyle Infections-Equine,2
+Salivary Gland Calculi,2
+Cheyne-Stokes Respiration,2
+Sinoatrial Block,2
+Choroid Plexus Neoplasms,2
+Tympanic Membrane Perforation,2
+Fasciculation,2
+Relapsing Fever,2
+Leukemia-Prolymphocytic,2
+Gastroenteritis-Transmissible-of Swine,2
+Mixed Tumor-Mullerian,2
+Polycystic Kidney-Autosomal Recessive,2
+Congenital Disorders of Glycosylation,2
+Parapsoriasis,2
+Central Nervous System Viral Diseases,2
+Mouth Abnormalities,2
+Popliteal Cyst,2
+Enchondromatosis,2
+Renal Tubular Transport-Inborn Errors,2
+Pre-Excitation Syndromes,2
+Struma Ovarii,2
+Miller Fisher Syndrome,2
+PC12 Cells,2
+Migraine without Aura,2
+Duane Retraction Syndrome,2
+Peanut Hypersensitivity,2
+Labor Pain,2
+Tangier Disease,2
+Respiratory Tract Fistula,2
+Cardiomyopathy-Hypertrophic-Familial,2
+Kallmann Syndrome,2
+Near Drowning,2
+Gingival Overgrowth,2
+Rothmund-Thomson Syndrome,2
+Histiocytoma-Malignant Fibrous,2
+Iritis,2
+Tick-Borne Diseases,2
+Sexually Transmitted Diseases-Bacterial,2
+Medullary Sponge Kidney,2
+Candidiasis-Chronic Mucocutaneous,2
+Alcohol-Induced Disorders-Nervous System,2
+Diffuse Axonal Injury,2
+Blindness-Cortical,2
+Prune Belly Syndrome,2
+Skin Diseases-Genetic,2
+Diaper Rash,2
+Fractures-Compression,2
+Pneumocystis Infections,2
+Berylliosis,2
+Brain Injury-Chronic,2
+Hypertensive Encephalopathy,2
+Anisakiasis,2
+Sprue-Tropical,2
+Epilepsy-Rolandic,2
+Aniridia,2
+Serratia Infections,2
+Rubinstein-Taybi Syndrome,2
+Muscular Dystrophy-Facioscapulohumeral,2
+Meningitis-Fungal,2
+Joint Deformities-Acquired,2
+Angiomatosis-Bacillary,2
+Loiasis,2
+Epidural Neoplasms,2
+Papillon-Lefevre Disease,2
+Hip Dysplasia-Canine,2
+Epidermolysis Bullosa Simplex,2
+Togaviridae Infections,2
+Urachal Cyst,2
+Retrognathism,2
+Muscular Dystrophies-Limb-Girdle,2
+Amyloid Neuropathies-Familial,2
+Brain Diseases-Metabolic-Inborn,2
+Apudoma,2
+Tooth Migration,2
+Laurence-Moon Syndrome,2
+Oophoritis,2
+Abnormalities-Severe Teratoid,2
+Hypertelorism,2
+Endolymphatic Hydrops,2
+Sick Building Syndrome,2
+Argyria,2
+Beriberi,2
+Dictyocaulus Infections,2
+Micrognathism,2
+Myopathies-Nemaline,2
+Enzootic Bovine Leukosis,2
+Myelolipoma,2
+Mental Retardation-X-Linked,2
+Slow Virus Diseases,2
+Infratentorial Neoplasms,2
+Hypokalemic Periodic Paralysis,2
+Heart Failure-Diastolic,2
+Factor X Deficiency,2
+Hemorrhagic Fever-Ebola,2
+Capillary Leak Syndrome,2
+Ganglion Cysts,2
+Teratocarcinoma,2
+Iris Neoplasms,2
+Dentinogenesis Imperfecta,2
+Sweat Gland Diseases,2
+Pericarditis-Tuberculous,2
+Myoma,2
+Sweating-Gustatory,2
+Pituitary ACTH Hypersecretion,2
+Bordetella Infections,2
+Esthesioneuroblastoma-Olfactory,2
+Choanal Atresia,2
+Liposarcoma-Myxoid,2
+Open Bite,2
+Obesity Hypoventilation Syndrome,2
+Rickettsiaceae Infections,2
+Melanoma-Amelanotic,2
+Dyskeratosis Congenita,2
+Obesity-Abdominal,2
+Pseudohypoaldosteronism,2
+Embryo Loss,2
+Hypotrichosis,2
+Lipomatosis-Multiple Symmetrical,2
+Ergotism,2
+Chromosome Breakage,2
+Tuberculosis-Oral,2
+Ecthyma-Contagious,2
+Myopathies-Structural-Congenital,2
+Rectovaginal Fistula,2
+Myoclonic Epilepsy-Juvenile,2
+Catheter-Related Infections,2
+Periodontal Abscess,2
+Fibrous Dysplasia-Monostotic,2
+Mucositis,2
+Retinal Drusen,2
+Hyperbilirubinemia-Neonatal,2
+Anthracosilicosis,2
+Angioid Streaks,2
+Epidermolysis Bullosa Acquisita,2
+Neoplasms-Basal Cell,2
+Somnambulism,2
+Angiomyoma,2
+Orofaciodigital Syndromes,2
+Chronobiology Disorders,2
+Nephrolithiasis,2
+Kaposi Varicelliform Eruption,2
+Wolfram Syndrome,2
+Tarsal Tunnel Syndrome,2
+Spirochaetales Infections,2
+Epidermodysplasia Verruciformis,2
+Equine Infectious Anemia,2
+Eosinophilia-Myalgia Syndrome,2
+Mesenteric Lymphadenitis,2
+Dry Socket,2
+Pemphigoid Gestationis,2
+Lipoid Proteinosis of Urbach and Wiethe,2
+Shock-Surgical,2
+Megacolon-Toxic,2
+Neuralgia-Postherpetic,2
+Shaken Baby Syndrome,2
+Uterine Inertia,2
+Lightning Injuries,2
+Hemorrhagic Fever-American,2
+Peroneal Neuropathies,2
+Wasting Syndrome,2
+Scheuermann Disease,2
+Prosopagnosia,2
+Chromosomal Instability,2
+Dens in Dente,2
+Headache Disorders-Primary,2
+Hyperostosis Frontalis Interna,2
+Labyrinthitis,2
+Sandhoff Disease,2
+Postphlebitic Syndrome,2
+Epidermolysis Bullosa-Junctional,2
+Fasciitis-Plantar,2
+Macroglossia,2
+Sarcoma-Clear Cell,2
+Proctocolitis,2
+Myopia-Degenerative,2
+Favism,2
+Pyuria,2
+Trauma-Nervous System,2
+Dentin-Secondary,2
+Monosomy,2
+Rhinosporidiosis,2
+Bone Malalignment,2
+Byssinosis,2
+Earache,2
+Causalgia,2
+Pantothenate Kinase-Associated Neurodegeneration,2
+Bernard-Soulier Syndrome,2
+Multiple Endocrine Neoplasia Type 2b,2
+Pneumonia-Progressive Interstitial-of Sheep,2
+Cherubism,2
+Ethmoid Sinusitis,2
+Tics,2
+Hyperlipoproteinemia Type I,2
+Bone Diseases-Infectious,2
+Neurogenic Inflammation,2
+Tabes Dorsalis,2
+Osteoblastoma,2
+Solitary Fibrous Tumors,2
+Ossification of Posterior Longitudinal Ligament,2
+Aphakia,2
+Mydriasis,2
+Hyperphosphatemia,2
+African Swine Fever,2
+Hand-Foot and Mouth Disease,2
+Melorheostosis,2
+Retinoschisis,2
+Thyroid Hormone Resistance Syndrome,2
+Hemolysis,2
+Tuberculosis-Splenic,2
+Lymphangiomyoma,2
+Bardet-Biedl Syndrome,2
+Heredodegenerative Disorders-Nervous System,2
+Diabetes Insipidus-Neurogenic,2
+Nonodontogenic Cysts,2
+Adenomyoma,2
+Acrospiroma,2
+Pain Insensitivity-Congenital,2
+Splenosis,2
+Leukemia-Myeloid-Chronic-Atypical-BCR-ABL Negative,2
+Fused Teeth,2
+Posterior Leukoencephalopathy Syndrome,2
+Glaucoma-Neovascular,2
+Balkan Nephropathy,2
+Crigler-Najjar Syndrome,2
+Granuloma Inguinale,2
+Trichostrongyloidiasis,2
+Gingival Hemorrhage,2
+Truncus Arteriosus-Persistent,2
+Mucinoses,2
+Euthyroid Sick Syndromes,2
+Tooth Attrition,2
+Exanthema Subitum,2
+Panuveitis,2
+Tuberculosis-Endocrine,2
+Central Nervous System Fungal Infections,2
+Leukemia-Basophilic-Acute,2
+Dysphonia,2
+Alkalosis-Respiratory,2
+Tachycardia-Sinus,2
+Vitamin K Deficiency Bleeding,2
+Iron Metabolism Disorders,2
+Latent Tuberculosis,2
+Lymphomatoid Papulosis,2
+Neurofibroma-Plexiform,2
+Ichthyosis-Lamellar,2
+Mucopolysaccharidosis VI,2
+Iatrogenic Disease,2
+Root Caries,2
+Hematoma-Subdural-Acute,2
+Pulmonary Blastoma,2
+Ellis-Van Creveld Syndrome,2
+Scimitar Syndrome,2
+Sphenoid Sinusitis,2
+Elephantiasis,2
+Dental Fistula,2
+Rhinitis-Vasomotor,2
+Fructose Intolerance,2
+Scleredema Adultorum,2
+Proteus Syndrome,2
+Cholecystitis-Acute,2
+Digestive System Abnormalities,2
+Lecithin Acyltransferase Deficiency,2
+Hypobetalipoproteinemias,2
+Rupture,2
+Ulnar Nerve Compression Syndromes,2
+Anisometropia,2
+Vitreous Detachment,2
+Abnormalities-Radiation-Induced,2
+Fractures-Comminuted,2
+Peliosis Hepatis,2
+Fibromatosis-Gingival,2
+Choroid Hemorrhage,2
+Ectropion,2
+Pleuropneumonia-Contagious,2
+Syringoma,2
+Meigs Syndrome,2
+Poland Syndrome,2
+Spinal Curvatures,2
+Oculocerebrorenal Syndrome,2
+Ventricular Septal Rupture,2
+Gas Poisoning,2
+Carcinoid Heart Disease,2
+Craniomandibular Disorders,2
+Hydatidiform Mole-Invasive,2
+Blastocystis Infections,2
+Porphyrias-Hepatic,2
+Amnesia-Transient Global,2
+Neuroectodermal Tumors,2
+Musculoskeletal Abnormalities,2
+Nocturnal Myoclonus Syndrome,2
+Retinal Vasculitis,2
+Malignant Catarrh,2
+Phimosis,2
+Factor XII Deficiency,2
+Erdheim-Chester Disease,2
+Dilatation-Pathologic,2
+Hantavirus Pulmonary Syndrome,2
+Caroli Disease,2
+Akinetic Mutism,2
+Oligomenorrhea,2
+Stress Disorders-Traumatic,2
+Hutchinson's Melanotic Freckle,2
+Glossitis,2
+Intervertebral Disk Degeneration,2
+Vulvar Lichen Sclerosus,2
+Glycogen Storage Disease Type III,2
+Schizophrenia-Catatonic,2
+Coronaviridae Infections,2
+Patellofemoral Pain Syndrome,2
+Laboratory Infection,2
+Acquired Hyperostosis Syndrome,2
+Respiratory Aspiration,2
+Ulnar Neuropathies,2
+Flaviviridae Infections,2
+Carcinoma-Basosquamous,2
+Frontal Sinusitis,2
+Vestibular Neuronitis,2
+Sphingolipidoses,2
+Kuru,2
+Myasthenic Syndromes-Congenital,2
+Hemorrhagic Fever-Crimean,2
+Sparganosis,2
+Vipoma,2
+Panniculitis-Peritoneal,2
+Hearing Loss-Central,2
+Nocturnal Enuresis,2
+Hyperkeratosis-Epidermolytic,2
+Ape Diseases,2
+Esophageal Cyst,2
+Aphasia-Primary Progressive,2
+Optic Disk Drusen,2
+Waterhouse-Friderichsen Syndrome,2
+Paralysis-Obstetric,2
+Callosities,2
+Yaws,2
+Conjunctivitis-Viral,2
+Dysostoses,2
+Dental Deposits,2
+Mononeuropathies,2
+Nails-Ingrown,2
+Nephrogenic Fibrosing Dermopathy,2
+Uniparental Disomy,2
+Pick Disease of the Brain,2
+Hypoalbuminemia,2
+Mandibular Injuries,2
+Firesetting Behavior,2
+Lentivirus Infections,2
+Lymphoma-Large-Cell-Immunoblastic,2
+Reactive Attachment Disorder,2
+Treponemal Infections,2
+Cementoma,2
+Thanatophoric Dysplasia,2
+Auditory Diseases-Central,2
+Renal Aminoacidurias,2
+IgG Deficiency,2
+Pasteurellosis-Pneumonic,2
+Sexually Transmitted Diseases-Viral,2
+Carcinoma-Islet Cell,2
+Dental Pulp Calcification,2
+Hernia-Obturator,2
+Heartwater Disease,2
+Tuberculosis-Avian,2
+Platybasia,2
+Frontotemporal Lobar Degeneration,2
+Edema-Cardiac,2
+Pemphigus-Benign Familial,2
+Leukocyte-Adhesion Deficiency Syndrome,2
+Rhabdoviridae Infections,2
+Cystadenoma-Papillary,2
+Adenocarcinoma-Sebaceous,2
+Osteopoikilosis,2
+Albinism-Ocular,2
+Ichthyosiform Erythroderma-Congenital,2
+Fractures-Malunited,2
+Diphyllobothriasis,2
+Malaria-Avian,2
+CREST Syndrome,2
+Aniseikonia,2
+Vaginal Discharge,2
+Syphilis-Latent,2
+Dracunculiasis,2
+Pyelitis,2
+Transvestism,2
+Manganese Poisoning,2
+Carcinoma-Krebs 2,2
+Blind Loop Syndrome,2
+Gerstmann-Straussler-Scheinker Disease,2
+Enophthalmos,2
+Staphylococcal Scalded Skin Syndrome,2
+Rinderpest,2
+Granuloma-Respiratory Tract,2
+Abortion-Incomplete,2
+Herpes Zoster Oticus,2
+Fibromatosis-Abdominal,2
+Foot Rot,2
+Hip Injuries,2
+Camurati-Engelmann Syndrome,2
+Anemia-Myelophthisic,2
+Lymphangiosarcoma,2
+Dental Fissures,2
+Demyelinating Autoimmune Diseases-CNS,2
+Paraparesis-Spastic,2
+Median Neuropathy,2
+Fuchs' Endothelial Dystrophy,2
+Typhus-Endemic Flea-Borne,2
+Paraparesis,2
+Angioedemas-Hereditary,2
+Schizoid Personality Disorder,2
+Arenaviridae Infections,2
+Meige Syndrome,2
+Hypoglossal Nerve Diseases,2
+Serositis,2
+Stereotypic Movement Disorder,2
+Shared Paranoid Disorder,2
+Empyema-Tuberculous,2
+Thyroiditis-Suppurative,2
+Gangliosidosis-GM1,2
+Tachycardia-Ectopic Junctional,2
+Diverticulum-Stomach,2
+Aleutian Mink Disease,2
+Keratosis-Actinic,2
+Autonomic Dysreflexia,2
+Plasma Cell Granuloma-Pulmonary,2
+Hemoglobin C Disease,2
+Mixed Tumor-Malignant,2
+Trochlear Nerve Diseases,2
+Illusions,2
+Mycoplasmatales Infections,2
+Somatostatinoma,2
+Intestinal Polyposis,2
+Adie Syndrome,2
+Hydranencephaly,2
+Blood Coagulation Disorders-Inherited,2
+Back Injuries,2
+Ludwig's Angina,2
+Mercury Poisoning-Nervous System,2
+Urinary Incontinence-Urge,2
+T-Lymphocytopenia-Idiopathic CD4-Positive,2
+Angiolipoma,2
+Myofibromatosis,2
+Tietze's Syndrome,2
+Nystagmus-Congenital,2
+Atrial Premature Complexes,2
+Mucopolysaccharidosis VII,2
+Porphyria-Erythropoietic,2
+Rubella Syndrome-Congenital,2
+Adenoma-Acidophil,2
+Noma,2
+Myoclonic Epilepsies-Progressive,2
+Cranial Nerve Injuries,2
+Central Nervous System Bacterial Infections,2
+Lymphoma-Extranodal NK-T-Cell,2
+Uveitis-Intermediate,2
+Endocardial Cushion Defects,2
+Zenker Diverticulum,2
+Emergencies,2
+Blood Loss-Surgical,2
+Enterobiasis,2
+Muscular Dystrophy-Emery-Dreifuss,2
+Canavan Disease,2
+Post-Concussion Syndrome,2
+Liver Abscess-Pyogenic,2
+Furcation Defects,2
+Leukoencephalitis-Acute Hemorrhagic,2
+Blepharophimosis,2
+Amyloidosis-Familial,2
+Ecthyma,2
+RNA Virus Infections,2
+Lassa Fever,2
+Focal Dermal Hypoplasia,2
+Anemia-Diamond-Blackfan,2
+Xanthomatosis-Cerebrotendinous,2
+Eunuchism,2
+Linitis Plastica,2
+Papilloma-Intraductal,2
+Ornithine Carbamoyltransferase Deficiency Disease,2
+Radial Neuropathy,2
+Uterine Cervical Erosion,2
+Hypervitaminosis A,2
+Encephalitozoonosis,2
+Porphyria-Hepatoerythropoietic,2
+Glossalgia,2
+Tyrosinemias,2
+Feeding and Eating Disorders of Childhood,2
+Cyclothymic Disorder,2
+Ophthalmia Neonatorum,2
+Rift Valley Fever,2
+Nephroma-Mesoblastic,2
+Smooth Muscle Tumor,2
+Nelson Syndrome,2
+Leukoaraiosis,2
+Sarcoma-Alveolar Soft Part,2
+MERRF Syndrome,2
+Tuberculosis-Central Nervous System,2
+Spirurida Infections,2
+Trophoblastic Tumor-Placental Site,2
+Carcinoma-Giant Cell,2
+Headache Disorders-Secondary,2
+Extensively Drug-Resistant Tuberculosis,2
+Paraneoplastic Cerebellar Degeneration,2
+Joint Loose Bodies,2
+Fetal Resorption,2
+Pelger-Huet Anomaly,2
+Pityriasis Rosea,2
+Bunyaviridae Infections,2
+Oroantral Fistula,2
+Hypoaldosteronism,2
+Fractures-Cartilage,2
+Stress Disorders-Traumatic-Acute,2
+Schizophrenia-Disorganized,2
+Leukemia-Prolymphocytic-T-Cell,2
+Chromosome Inversion,2
+Chancre,2
+Ranula,2
+Chondrosarcoma-Mesenchymal,2
+Odontodysplasia,2
+Neurologic Manifestations,2
+Entropion,2
+Panophthalmitis,2
+Gingival Hypertrophy,2
+Femoral Neuropathy,2
+Hematocolpos,2
+Pelvic Organ Prolapse,2
+Encephalomyelitis-Venezuelan Equine,2
+Carcinoma-Skin Appendage,2
+Pulmonary Aspergillosis,2
+Gonadal Dysgenesis-Mixed,2
+Double Outlet Right Ventricle,2
+Spondylosis,2
+Mikulicz' Disease,2
+Landau-Kleffner Syndrome,2
+Dermatitis-Toxicodendron,2
+Optic Nerve Glioma,2
+Channelopathies,2
+Adenomatoid Tumor,2
+Pulmonary Adenomatosis-Ovine,2
+Necatoriasis,2
+Maxillofacial Abnormalities,2
+Parkinson Disease-Postencephalitic,2
+Hereditary Central Nervous System Demyelinating Diseases,2
+Hermanski-Pudlak Syndrome,2
+Afferent Loop Syndrome,2
+Choroideremia,2
+Purpura-Hyperglobulinemic,2
+Egg Hypersensitivity,2
+Nevus of Ota,2
+Hemopneumothorax,2
+Antithrombin III Deficiency,2
+Neuroaspergillosis,2
+Sarcocystosis,2
+Pruritus Ani,2
+Pyruvate Dehydrogenase Complex Deficiency Disease,2
+Leukoencephalopathies,2
+Leriche Syndrome,2
+Persistent Hyperinsulinemia Hypoglycemia of Infancy,2
+Periodontal Cyst,2
+Brown-Sequard Syndrome,2
+Multicystic Dysplastic Kidney,2
+Parturient Paresis,2
+Compulsive Personality Disorder,2
+Echinostomiasis,2
+Middle Lobe Syndrome,2
+Feline Infectious Peritonitis,2
+Ganglioneuroblastoma,2
+Epilepsy-Benign Neonatal,2
+Sjogren-Larsson Syndrome,2
+Glucose Metabolism Disorders,2
+Patellar Dislocation,2
+Adenosarcoma,2
+Glycosuria-Renal,2
+Diabetes Mellitus-Lipoatrophic,2
+Yang Deficiency,2
+Flavivirus Infections,2
+Niemann-Pick Disease-Type C,2
+Dysgeusia,2
+Onchocerciasis-Ocular,2
+Usher Syndromes,2
+Mucinosis-Follicular,2
+Histrionic Personality Disorder,2
+Neoplasms-Adnexal and Skin Appendage,2
+Paraneoplastic Polyneuropathy,2
+Pleuropneumonia,2
+Myasthenia Gravis-Autoimmune-Experimental,2
+Hyperthyroxinemia,2
+Anti-Neutrophil Cytoplasmic Antibody-Associated Vasculitis,2
+XYY Karyotype,2
+Acalculous Cholecystitis,2
+Parasomnias,2
+Hematometra,2
+Convalescence,2
+Bacillaceae Infections,2
+Vagus Nerve Diseases,2
+Korsakoff Syndrome,2
+Pruritus Vulvae,2
+Scleroderma-Limited,2
+Pityriasis Lichenoides,2
+Disease Models-Animal,2
+Knee Dislocation,2
+Osteoporotic Fractures,2
+Mobius Syndrome,2
+Pyomyositis,2
+Krukenberg Tumor,2
+Carcinoma-Brown-Pearce,2
+Bone Demineralization-Pathologic,2
+Diverticulosis-Colonic,2
+Ear Deformities-Acquired,2
+Pelizaeus-Merzbacher Disease,2
+Ichthyosis-X-Linked,2
+Hyperlipoproteinemia Type V,2
+Delayed Graft Function,2
+Erythroplasia,2
+Hypophosphatemic Rickets-X-Linked Dominant,2
+Hearing Loss-Unilateral,2
+alpha-Mannosidosis,2
+Primate Diseases,2
+Gait Ataxia,2
+Ventricular Remodeling,2
+Myotonic Disorders,2
+Sialometaplasia-Necrotizing,2
+Metal Metabolism-Inborn Errors,2
+Cholecystolithiasis,2
+Gingival Pocket,2
+Sarcopenia,2
+Branchio-Oto-Renal Syndrome,2
+Eczema-Dyshidrotic,2
+Sleep Bruxism,2
+Invasive Pulmonary Aspergillosis,2
+Epispadias,2
+Panniculitis-Lupus Erythematosus,2
+Parakeratosis,2
+Hyperacusis,2
+Seroma,2
+Isaacs Syndrome,2
+Muscular Disorders-Atrophic,2
+Dentin Dysplasia,2
+Amnesia-Anterograde,2
+Staphylococcal Food Poisoning,2
+Fibroma-Desmoplastic,2
+Epilepsia Partialis Continua,2
+Leukoplakia-Hairy,2
+Neoplasms-Complex and Mixed,2
+Dyspnea-Paroxysmal,2
+Ageusia,2
+Adrenogenital Syndrome,2
+Carbuncle,2
+Citrullinemia,2
+Hydrophthalmos,2
+Menopause-Premature,2
+Alexander Disease,2
+Ectopia Lentis,2
+Placenta-Retained,2
+Monteggia's Fracture,2
+Flail Chest,2
+Keratoconjunctivitis-Infectious,2
+Photophobia,2
+Hidradenitis,2
+Lipid Metabolism Disorders,2
+Follicular Cyst,2
+Gastric Antral Vascular Ectasia,2
+Postpericardiotomy Syndrome,2
+Glossitis-Benign Migratory,2
+Intracranial Hemorrhage-Hypertensive,2
+Sneddon Syndrome,2
+Orbital Cellulitis,2
+Acneiform Eruptions,2
+Autolysis,2
+Peste-des-Petits-Ruminants,2
+Neurothekeoma,2
+Gonadoblastoma,2
+Hydrarthrosis,2
+Pericoronitis,2
+Alcohol Withdrawal Seizures,2
+Dyssomnias,2
+Isolated Noncompaction of the Ventricular Myocardium,2
+Chilblains,2
+Dipetalonema Infections,2
+Mesothelioma-Cystic,2
+Neoplasms-Cystic-Mucinous-and Serous,2
+Cracked Tooth Syndrome,2
+Myocardial Bridging,2
+Out-of-Hospital Cardiac Arrest,2
+Dermatitis-Perioral,2
+Immunoproliferative Small Intestinal Disease,2
+Colitis-Collagenous,2
+Retrobulbar Hemorrhage,2
+Coagulation Protein Disorders,2
+Phencyclidine Abuse,2
+Myxosarcoma,2
+Sagittal Sinus Thrombosis,2
+Asthenozoospermia,2
+Odontogenic Cyst-Calcifying,2
+Venereal Tumors-Veterinary,2
+Esophageal Spasm-Diffuse,2
+Lafora Disease,2
+Acrodynia,2
+Glycogen Storage Disease Type IV,2
+Hepadnaviridae Infections,2
+Tracheobronchomegaly,2
+Cavernous Sinus Thrombosis,2
+Erysipeloid,2
+Circoviridae Infections,2
+Growth Hormone-Secreting Pituitary Adenoma,2
+Nasopharyngitis,2
+Aphonia,2
+Hyperglycinemia-Nonketotic,2
+Gitelman Syndrome,2
+Breech Presentation,2
+Ectromelia-Infectious,2
+Sarcoma 37,2
+Equinus Deformity,2
+Infarction-Posterior Cerebral Artery,2
+Platelet Storage Pool Deficiency,2
+Cafe-au-Lait Spots,2
+Salivary Gland Fistula,2
+Respiratory System Abnormalities,2
+Amaurosis Fugax,2
+Leukemia-Neutrophilic-Chronic,2
+Edema Disease of Swine,2
+Inert Gas Narcosis,2
+Glanders,2
+Adrenal Rest Tumor,2
+Oral Fistula,2
+Cerebral Hemorrhage-Traumatic,2
+Cervical Rib Syndrome,2
+Buruli Ulcer,2
+Feline Panleukopenia,2
+Fowlpox,2
+Leukemia-Biphenotypic-Acute,2
+Rectocele,2
+Miosis,2
+Marburg Virus Disease,2
+Dental Pulp Exposure,2
+Hydropneumothorax,2
+Anisocoria,2
+Digestive System Fistula,2
+Optic Atrophy-Autosomal Dominant,2
+Apraxia-Ideomotor,2
+Pregnancy-Prolonged,2
+Sadism,2
+Encephalitis-St. Louis,2
+Trichostrongylosis,2
+Neuroectodermal Tumor-Melanotic,2
+Protoporphyria-Erythropoietic,2
+Tolosa-Hunt Syndrome,2
+Thrombotic Microangiopathies,2
+Nut Hypersensitivity,2
+Isochromosomes,2
+Exhibitionism,2
+Hallermann's Syndrome,2
+Intertrigo,2
+Hydroa Vacciniforme,2
+Wheat Hypersensitivity,2
+Mastocytosis-Cutaneous,2
+Papilloma-Choroid Plexus,2
+Hearing Loss-Functional,2
+Glossopharyngeal Nerve Diseases,2
+Insulin Coma,2
+Aortopulmonary Septal Defect,2
+Multiple Pulmonary Nodules,2
+Hyperostosis-Sternocostoclavicular,2
+Wasting Disease-Chronic,2
+Piebaldism,2
+Masochism,2
+Haemonchiasis,2
+Myofibroma,2
+Plummer-Vinson Syndrome,2
+Gerstmann Syndrome,2
+Central Serous Chorioretinopathy,2
+Schnitzler Syndrome,2
+Erythema Induratum,2
+Enterotoxemia,2
+Rheumatic Nodule,2
+Postcholecystectomy Syndrome,2
+Intracranial Arterial Diseases,2
+Post-Traumatic Headache,2
+Jet Lag Syndrome,2
+Yin Deficiency,2
+Alcohol-Induced Disorders,2
+Leukemia-Large Granular Lymphocytic,2
+Plagiocephaly-Nonsynostotic,2
+Basal Ganglia Cerebrovascular Disease,2
+Hartnup Disease,2
+Freemartinism,2
+Rat-Bite Fever,2
+Leukemia-Feline,2
+Enoplida Infections,2
+Klatskin's Tumor,2
+Myopathy-Central Core,2
+Drug-Induced Liver Injury-Chronic,2
+Post-Dural Puncture Headache,2
+Retropneumoperitoneum,2
+Central Nervous System Protozoal Infections,2
+Sarcoma-Small Cell,2
+Hidrocystoma,2
+Meningism,2
+Cubital Tunnel Syndrome,2
+Uterine Inversion,2
+Wolman Disease,2
+Encephalitis-Varicella Zoster,2
+Neuroschistosomiasis,2
+Intracranial Hemorrhage-Traumatic,2
+Encephalitis-California,2
+Astroviridae Infections,2
+Balantidiasis,2
+Neoplasms-Adipose Tissue,2
+Ainhum,2
+Muscular Dystrophy-Oculopharyngeal,2
+Granuloma-Laryngeal,2
+Myoclonic Cerebellar Dyssynergia,2
+Binge-Eating Disorder,2
+Birnaviridae Infections,2
+Neuromuscular Junction Diseases,2
+Kleine-Levin Syndrome,2
+Thrombocytopenia-Neonatal Alloimmune,2
+Corneal Wavefront Aberration,2
+Cytochrome-c Oxidase Deficiency,2
+Leiomyoma-Epithelioid,2
+Opsoclonus-Myoclonus Syndrome,2
+Short Rib-Polydactyly Syndrome,2
+Steatorrhea,2
+Perinephritis,2
+Miliaria,2
+Body Dysmorphic Disorders,2
+Swine Vesicular Disease,2
+ACTH-Secreting Pituitary Adenoma,2
+Ventilator-Induced Lung Injury,2
+Infarction-Anterior Cerebral Artery,2
+Moraxellaceae Infections,2
+African Horse Sickness,2
+Pleurodynia-Epidemic,2
+Nevus-Intradermal,2
+Spina Bifida Cystica,2
+Lead Poisoning-Nervous System-Childhood,2
+Lymphatic Abnormalities,2
+Mycotoxicosis,2
+Phlebotomus Fever,2
+Ephemeral Fever,2
+Ascaridiasis,2
+Pyloric Stenosis-Hypertrophic,2
+Septo-Optic Dysplasia,2
+Gyrate Atrophy,2
+Low Tension Glaucoma,2
+Wissler's Syndrome,2
+High Pressure Neurological Syndrome,2
+Tricuspid Atresia,2
+Vascular System Injuries,2
+Retrograde Degeneration,2
+Cowpox,2
+Hepatitis D-Chronic,2
+Regurgitation-Gastric,2
+Wet Macular Degeneration,2
+Fetal Nutrition Disorders,2
+Rhinophyma,2
+Pneumonia of Swine-Mycoplasmal,2
+Perivascular Epithelioid Cell Neoplasms,2
+Distal Myopathies,2
+Positive-Pressure Respiration-Intrinsic,2
+Hematoma-Subdural-Intracranial,2
+Leukemia-Myelomonocytic-Juvenile,2
+Colitis-Microscopic,2
+Cardiac Output-High,2
+Neoplasms-Fibroepithelial,2
+Upper Extremity Deformities-Congenital,2
+Focal Epithelial Hyperplasia,2
+Fucosidosis,2
+Sleep Disorders-Intrinsic,2
+Chromosome Fragility,2
+Mansonelliasis,2
+Langer-Giedion Syndrome,2
+Breast Cyst,2
+Chalazion,2
+LEOPARD Syndrome,2
+Tonic Pupil,2
+Retinal Dysplasia,2
+Cholesterol Ester Storage Disease,2
+Porcine Postweaning Multisystemic Wasting Syndrome,2
+Catastrophic Illness,2
+Swine Erysipelas,2
+Lymphoma-Primary Effusion,2
+Anal Gland Neoplasms,2
+Hip Contracture,2
+Microstomia,2
+Meningitis-Escherichia coli,2
+Hand Deformities,2
+Hand-Arm Vibration Syndrome,2
+Keratoderma-Palmoplantar-Diffuse,2
+Parovarian Cyst,2
+No-Reflow Phenomenon,2
+Adiposis Dolorosa,2
+Paranoid Personality Disorder,2
+Border Disease,2
+HIV Enteropathy,2
+Glioma-Subependymal,2
+Laron Syndrome,2
+Phenylketonuria-Maternal,2
+Necrobiotic Disorders,2
+Eosinophilic Esophagitis,2
+Ichthyosis Vulgaris,2
+Sclerema Neonatorum,2
+Hyperamylasemia,2
+Conjunctivitis-Acute Hemorrhagic,2
+Meningeal Carcinomatosis,2
+Trigger Finger Disorder,2
+Spermatocele,2
+Hematoma-Subdural-Spinal,2
+Dependent Personality Disorder,2
+Osteophyte,2
+Lung-Hyperlucent,2
+Pain-Referred,2
+Sex Chromosome Disorders,2
+Henipavirus Infections,2
+Peritoneal Fibrosis,2
+Lateral Sinus Thrombosis,2
+Neuroaxonal Dystrophies,2
+Echolalia,2
+Trench Fever,2
+Cyclosporiasis,2
+Pulmonary Subvalvular Stenosis,2
+Postthrombotic Syndrome,2
+Hemostatic Disorders,2
+Lichen Nitidus,2
+Leukemia-Myeloid-Accelerated Phase,2
+Acanthoma,2
+Anastomotic Leak,2
+Cystocele,2
+Pre-Excitation-Mahaim-Type,2
+Posterior Tibial Tendon Dysfunction,2
+Brain Hemorrhage-Traumatic,2
+Arcus Senilis,2
+Primary Graft Dysfunction,2
+Neoplasms-Post-Traumatic,2
+Glycogen Storage Disease Type VII,2
+Enteritis-Transmissible-of Turkeys,2
+Hypodermyiasis,2
+Mastocytoma,2
+Osteosarcoma-Juxtacortical,2
+Subarachnoid Hemorrhage-Traumatic,2
+Myokymia,2
+Lead Poisoning-Nervous System,2
+Gonadal Dysgenesis-46-X,2
+Nijmegen Breakage Syndrome,2
+Myxomatosis-Infectious,2
+Leishmaniasis-Diffuse Cutaneous,2
+Solitary Fibrous Tumor-Pleural,2
+Pachyonychia Congenita,2
+Gonadal Disorders,2
+Tick Toxicoses,2
+Tooth Ankylosis,2
+Tachycardia-Sinoatrial Nodal Reentry,2
+Systemic Vasculitis,2
+Microscopic Polyangiitis,2
+Scleromyxedema,2
+Sebaceous Gland Diseases,2
+Leukemia-Mast-Cell,2
+Unverricht-Lundborg Syndrome,2
+Insomnia-Fatal Familial,2
+Lutembacher Syndrome,2
+Overnutrition,2
+Central Nervous System Helminthiasis,2
+Leber Congenital Amaurosis,2
+Aortic Stenosis-Supravalvular,2
+Sublingual Gland Neoplasms,2
+Pseudobulbar Palsy,2
+Skull Fracture-Depressed,2
+Hereditary Autoinflammatory Diseases,2
+Macrophage Activation Syndrome,2
+Dendritic Cell Sarcoma-Follicular,2
+Central Nervous System Venous Angioma,2
+Caplan Syndrome,2
+Hepatic Insufficiency,2
+Postural Orthostatic Tachycardia Syndrome,2
+Hyperpituitarism,2
+Ciguatera Poisoning,2
+Tinea Favosa,2
+Mixed Tumor-Mesodermal,2
+Pulmonary Sclerosing Hemangioma,2
+Idiopathic Interstitial Pneumonias,2
+Sea-Blue Histiocyte Syndrome,2
+SUNCT Syndrome,2
+Tongue-Fissured,2
+Trigeminal Autonomic Cephalalgias,2
+Denys-Drash Syndrome,2
+Decalcification-Pathologic,2
+Colitis-Lymphocytic,2
+Tibial Neuropathy,2
+Pars Planitis,2
+Tick Paralysis,2
+Arterivirus Infections,2
+Adenoma-Basophil,2
+End Stage Liver Disease,2
+Thyroid Dysgenesis,2
+Rigor Mortis,2
+Neoplasms-Gonadal Tissue,2
+Kluver-Bucy Syndrome,2
+Spinal Cord Vascular Diseases,2
+Accessory Nerve Diseases,2
+Lissencephaly,2
+Sulfhemoglobinemia,2
+Candidemia,2
+Visna,2
+WAGR Syndrome,2
+Neurofibrosarcoma,2
+Skull Fracture-Basilar,2
+Aortic Valve Prolapse,2
+Anterior Wall Myocardial Infarction,2
+X-Linked Combined Immunodeficiency Diseases,2
+Proteostasis Deficiencies,2
+Prosthesis Failure,2
+Flavobacteriaceae Infections,2
+Geotrichosis,2
+Chondrodysplasia Punctata-Rhizomelic,2
+Tooth Wear,2
+Neointima,2
+Lower Extremity Deformities-Congenital,2
+Sphincter of Oddi Dysfunction,2
+Nesidioblastosis,2
+Alcoholic Neuropathy,2
+Livedo Reticularis,2
+Coprophagia,2
+Central Nervous System Parasitic Infections,2
+Neoplasms-Connective and Soft Tissue,2
+Anterior Spinal Artery Syndrome,2
+Lead Poisoning-Nervous System-Adult,2
+Discrete Subaortic Stenosis,2
+Tricuspid Valve Prolapse,2
+Leukostasis,2
+Acne Keloid,2
+Acute Generalized Exanthematous Pustulosis,2
+Immunoproliferative Disorders,2
+Hepatitis-Infectious Canine,2
+Enterocolitis-Neutropenic,2
+Tongue-Hairy,2
+Orthostatic Intolerance,2
+Gangliosidoses-GM2,2
+Neuroacanthocytosis,2
+Classical Lissencephalies and Subcortical Band Heterotopias,2
+Endoleak,2
+Fox-Fordyce Disease,2
+Monieziasis,2
+Endometrial Stromal Tumors,2
+Parasystole,2
+Wandering Spleen,2
+Ectodermal Dysplasia 1-Anhidrotic,2
+Cryopyrin-Associated Periodic Syndromes,2
+DNA Repair-Deficiency Disorders,2
+Erythrasma,2
+Monkeypox,2
+Ascaridida Infections,2
+Dientamoebiasis,2
+Paroxysmal Hemicrania,2
+Hematocele,2
+Prenatal Injuries,2
+Andersen Syndrome,2
+Prehypertension,2
+Lipodystrophy-Congenital Generalized,2
+Bovine Respiratory Disease Complex,2
+Glycogen Storage Disease Type IIb,2
+Sleep Paralysis,2
+Sleep-Wake Transition Disorders,2
+Ovotesticular Disorders of Sex Development,2
+Blue Toe Syndrome,2
+Purpura Fulminans,2
+Wolf-Hirschhorn Syndrome,2
+Lingual Thyroid,2
+Skin Diseases-Metabolic,2
+Hemorrhagic Septicemia-Viral,2
+Oesophagostomiasis,2
+Nervous System Autoimmune Disease-Experimental,2
+Basal Ganglia Hemorrhage,2
+Putaminal Hemorrhage,2
+Synkinesis,2
+Paraphimosis,2
+Leukocyte Disorders,2
+Lipodystrophy-Familial Partial,2
+Blackwater Fever,2
+Choriocarcinoma-Non-gestational,2
+Neoplasms-Mesothelial,2
+Metatarsalgia,2
+Primary Dysautonomias,2
+Acrocallosal Syndrome,2
+Levocardia,2
+Upper Extremity Deep Vein Thrombosis,2
+Immersion Foot,2
+Candidiasis-Invasive,2
+Histiocytic Disorders-Malignant,2
+Coma-Post-Head Injury,2
+Coffin-Lowry Syndrome,2
+Night Terrors,2
+Eye Manifestations,2
+Diabetic Cardiomyopathies,2
+Biotinidase Deficiency,2
+Louping Ill,2
+Tarlov Cysts,2
+Lymphoma-Primary Cutaneous Anaplastic Large Cell,2
+Mesial Movement of Teeth,2
+Sialic Acid Storage Disease,2
+Cerebrovascular Trauma,2
+Sexual Infantilism,2
+Chiari-Frommel Syndrome,2
+Malignant Atrophic Papulosis,2
+Pinta,2
+Visceral Prolapse,2
+Steroid Metabolism-Inborn Errors,2
+Piedra,2
+Encephalomyelitis-Enzootic Porcine,2
+Dicrocoeliasis,2
+Isosporiasis,2
+Paralysis-Hyperkalemic Periodic,2
+Cerebral Amyloid Angiopathy-Familial,2
+Epilepsy-Partial-Motor,2
+Sleep Arousal Disorders,2
+Vaginismus,2
+Accelerated Idioventricular Rhythm,2
+Multiple Carboxylase Deficiency,2
+Fructose Metabolism-Inborn Errors,2
+White Muscle Disease,2
+Chlamydiaceae Infections,2
+Hearing Loss-Mixed Conductive-Sensorineural,2
+Alexia-Pure,2
+Geographic Atrophy,2
+Hemospermia,2
+Crisscross Heart,2
+Romano-Ward Syndrome,2
+Steatitis,2
+Silver-Russell Syndrome,2
+Asthma-Aspirin-Induced,2
+Striatonigral Degeneration,2
+Aphasia-Conduction,2
+Vulvodynia,2
+Epidermitis-Exudative-of Swine,2
+Granulomatosis-Orofacial,2
+Fascioloidiasis,2
+Nevus-Sebaceous of Jadassohn,2
+Oral Manifestations,2
+Lysosomal Storage Diseases-Nervous System,2
+Vein of Galen Malformations,2
+Corneal Endothelial Cell Loss,2
+Screw Worm Infection,2
+Inflammatory Breast Neoplasms,2
+Hajdu-Cheney Syndrome,2
+Gait Apraxia,2
+REM Sleep Parasomnias,2
+Parametritis,2
+Multiple Acyl Coenzyme A Dehydrogenase Deficiency,2
+Death,2
+Acute Radiation Syndrome,2
+Pneumovirus Infections,2
+Bulbo-Spinal Atrophy-X-Linked,2
+Central Cord Syndrome,2
+Azotemia,2
+Gynatresia,2
+Actinobacillosis,2
+Setariasis,2
+Leukemia-Eosinophilic-Acute,2
+Adamantinoma,2
+De Quervain Disease,2
+Epilepsy-Partial-Sensory,2
+Sinus Pericranii,2
+Morning Sickness,2
+Inferior Wall Myocardial Infarction,2
+Autoimmune Lymphoproliferative Syndrome,2
+Sunstroke,2
+Lemierre Syndrome,2
+Leprosy-Multibacillary,2
+Rubulavirus Infections,2
+Hallux Rigidus,2
+Macrostomia,2
+Periventricular Nodular Heterotopia,2
+Hydrocolpos,2
+Jervell-Lange Nielsen Syndrome,2
+Fructose-1--Diphosphatase Deficiency,2
+Hordeolum,2
+Pneumonia-Rickettsial,2
+Vesicular Exanthema of Swine,2
+Morbillivirus Infections,2
+Ostertagiasis,2
+Luteoma,2
+Osteochondrosis,2
+Femoracetabular Impingement,2
+Emphysematous Cholecystitis,2
+Anthracosis,2
+Pneumonia-Atypical Interstitial-of Cattle,2
+Mevalonate Kinase Deficiency,2
+von Willebrand Disease-Type 2,2
+Hyper-IgM Immunodeficiency Syndrome,2
+Uveoparotid Fever,2
+Neoplasms-Ductal-Lobular-and Medullary,2
+Heel Spur,2
+Porphyria-Variegate,2
+Anaplasmataceae Infections,2
+Neoplasms-Plasma Cell,2
+Muir-Torre Syndrome,2
+Acro-Osteolysis,2
+Hypercementosis,2
+Reflex-Babinski,2
+Chromosome Duplication,2
+Lumpy Skin Disease,2
+Filoviridae Infections,2
+Herpangina,2
+Adenomatosis-Pulmonary,2
+Peri-Implantitis,2
+Lethargy,2
+Ureterolithiasis,2
+Vulvar Vestibulitis,2
+Acatalasia,2
+Skin Diseases-Eczematous,2
+Intra-Articular Fractures,2
+Vesicular Stomatitis,2
+Anaplasia,2
+TDP-43 Proteinopathies,2
+Carney Complex,2
+Typhlitis,2
+Niemann-Pick Disease-Type B,2
+Pyruvate Carboxylase Deficiency Disease,2
+Hypersomnolence-Idiopathic,2
+Tachycardia-Reciprocating,2
+Trichothiodystrophy Syndromes,2
+Pyruvate Metabolism-Inborn Errors,2
+Refeeding Syndrome,2
+Chondromatosis,2
+Laryngomalacia,2
+Loeys-Dietz Syndrome,2
+Carbamoyl-Phosphate Synthase I Deficiency Disease,2
+Abducens Nerve Injury,2
+Cogan Syndrome,2
+Propionic Acidemia,2
+Periprosthetic Fractures,2
+Hemorrhagic Septicemia,2
+Birt-Hogg-Dube Syndrome,2
+Female Athlete Triad Syndrome,2
+Massive Hepatic Necrosis,2
+Silo Filler's Disease,2
+Neuronal Migration Disorders,2
+46-XY Disorders of Sex Development,2
+Lown-Ganong-Levine Syndrome,2
+Tendon Entrapment,2
+Urea Cycle Disorders-Inborn,2
+Subacute Combined Degeneration,2
+Retinal Telangiectasis,2
+Cadaver,2
+AIDS Arteritis-Central Nervous System,2
+Dendritic Cell Sarcoma-Interdigitating,2
+Glomus Tympanicum Tumor,2
+Tracheomalacia,2
+Acute Chest Syndrome,2
+Susac Syndrome,2
+Pure Autonomic Failure,2
+Marchiafava-Bignami Disease,2
+Vitelliform Macular Dystrophy,2
+Retinal Dystrophies,2
+von Willebrand Disease-Type 1,2
+Keratoderma-Palmoplantar-Epidermolytic,2
+Airway Remodeling,2
+Passive-Aggressive Personality Disorder,2
+Sexual and Gender Disorders,2
+Bifidobacteriales Infections,2
+Chondromalacia Patellae,2
+Tracheobronchomalacia,2
+Hallux Limitus,2
+Hammer Toe Syndrome,2
+Costello Syndrome,2
+Brain Stem Hemorrhage-Traumatic,2
+Frasier Syndrome,2
+Myelodysplastic-Myeloproliferative Diseases,2
+Shellfish Poisoning,2
+Decapitation,2
+Voyeurism,2
+Kyasanur Forest Disease,2
+Trombiculiasis,2
+Mucoepidermoid Tumor,2
+Nevus-Halo,2
+Overbite,2
+Hyperargininemia,2
+Stupor,2
+Nuchal Cord,2
+Ectopia Cordis,2
+Ectodermal Dysplasia-Hypohidrotic-Autosomal Recessive,2
+Netherton Syndrome,2
+Glycogen Storage Disease Type VI,2
+Mineralocorticoid Excess Syndrome-Apparent,2
+Onycholysis,2
+Neglected Diseases,2
+Colorado Tick Fever,2
+Rhabditida Infections,2
+Neoplasms-Bone Tissue,2
+Osteoarthritis-Spine,2
+Coproporphyria-Hereditary,2
+Leukoedema-Oral,2
+Pulmonary Infarction,2
+Nocturnal Paroxysmal Dystonia,2
+Persistent Hyperplastic Primary Vitreous,2
+Diurnal Enuresis,2
+Pubic Symphysis Diastasis,2
+Yellow Nail Syndrome,2
+Hypobetalipoproteinemia-Familial-Apolipoprotein B,2
+Fusobacteriaceae Infections,2
+Pasteurellaceae Infections,2
+Mongolian Spot,2
+Nevus-Spindle Cell,2
+Sacroiliitis,2
+Failed Back Surgery Syndrome,2
+Eye Pain,2
+Holocarboxylase Synthetase Deficiency,2
+Hypoalphalipoproteinemias,2
+Encephalomyelitis-Eastern Equine,2
+Adenomyoepithelioma,2
+Campomelic Dysplasia,2
+Deaf-Blind Disorders,2
+Heavy Metal Poisoning-Nervous System,2
+Corneal Perforation,2
+Sinus Arrest-Cardiac,2
+Amino Acid Transport Disorders-Inborn,2
+Nairobi Sheep Disease,2
+Zoster Sine Herpete,2
+Orbital Myositis,2
+Capsule Opacification,2
+Pyometra,2
+Jacobsen Distal 11q Deletion Syndrome,2
+Hyper-IgM Immunodeficiency Syndrome-Type 1,2
+Leprosy-Paucibacillary,2
+22q11 Deletion Syndrome,2
+Neurogenic Bowel,2
+Retrocochlear Diseases,2
+Primary Progressive Nonfluent Aphasia,2
+Olfactory Nerve Diseases,2
+Alstrom Syndrome,2
+Hereditary Angioedema Types I and II,2
+Morgellons Disease,2
+Postmortem Changes,2
+Lymphatic Vessel Tumors,2
+Eccrine Porocarcinoma,2
+Mulibrey Nanism,2
+Bone Diseases-Endocrine,2
+Myasthenia Gravis-Neonatal,2
+Aicardi Syndrome,2
+Pyonephrosis,2
+Dent Disease,2
+Postpartum Thyroiditis,2
+Arteriolosclerosis,2
+CHARGE Syndrome,2
+Accessory Atrioventricular Bundle,2
+Hemorrhagic Syndrome-Bovine,2
+Dourine,2
+Langerhans Cell Sarcoma,2
+Poroma,2
+Spinal Osteochondrosis,2
+Hallux Varus,2
+Ischemic Contracture,2
+Salivary Calculi,2
+Niemann-Pick Disease-Type A,2
+Monckeberg Medial Calcific Sclerosis,2
+Dihydropyrimidine Dehydrogenase Deficiency,2
+Reticuloendotheliosis-Avian,2
+Uveitis-Suppurative,2
+Desulfovibrionaceae Infections,2
+Pestivirus Infections,2
+Mesomycetozoea Infections,2
+Ciliophora Infections,2
+Colloid Cysts,2
+Desmoplastic Small Round Cell Tumor,2
+Pontine Glioma,2
+Arachnodactyly,2
+Cerebral Ventriculitis,2
+Smith-Magenis Syndrome,2
+Piriformis Muscle Syndrome,2
+Sertoli Cell-Only Syndrome,2
+Cephalopelvic Disproportion,2
+Vasa Previa,2
+Granulomatous Mastitis,2
+Leukokeratosis-Hereditary Mucosal,2
+Poult Enteritis Mortality Syndrome,2
+Pneumonia of Calves-Enzootic,2
+Mastocytoma-Skin,2
+Neoplasm Seeding,2
+Aberrant Crypt Foci,2
+Bronchomalacia,2
+Macrocephaly,2
+Hypertensive Retinopathy,2
+Liddle Syndrome,2
+Trilogy of Fallot,2
+Commotio Cordis,2
+von Willebrand Disease-Type 3,2
+Gray Platelet Syndrome,2
+Glycogen Storage Disease Type VIII,2
+Cardiovascular Infections,2
+Pallister-Hall Syndrome,2
+Leukemia-Prolymphocytic-B-Cell,2
+Odontogenic Tumor-Squamous,2
+Genu Varum,2
+Chorea Gravidarum,2
+Corneal Dystrophy-Juvenile Epithelial of Meesmann,2
+Vasoplegia,2
+beta-Mannosidosis,2
+Anticipation-Genetic,2
+Implant Capsular Contracture,2
+Inhalant Abuse,2
+Multiple Sulfatase Deficiency Disease,2
+Balanitis Xerotica Obliterans,2
+Barth Syndrome,2
+Necrobiotic Xanthogranuloma,2
+Anetoderma,2
+Nondisjunction-Genetic,2
+Exsanguination,2
+Encephalomyelitis-Western Equine,2
+Hemorrhagic Fever-Omsk,2
+Antley-Bixler Syndrome Phenotype,2
+Kashin-Beck Disease,2
+Donohue Syndrome,2
+Farber Lipogranulomatosis,2
+Pentalogy of Cantrell,2
+Alien Hand Syndrome,2
+Heart Valve Prolapse,2
+Chloracne,2
+Syndrome,2
+Asymptomatic Diseases,2
+Intraoperative Awareness,2
+Delayed Emergence from Anesthesia,2
+Elimination Disorders,2
+Torovirus Infections,2
+Flea Infestations,2
+Enteropathy-Associated T-Cell Lymphoma,2
+Argininosuccinic Aciduria,2
+Walker-Warburg Syndrome,2
+Genetic Diseases-Y-Linked,2
+Erythrokeratodermia Variabilis,2
+Conducted Energy Weapon Injuries,2
+Bartonellaceae Infections,2
+Secernentea Infections,2
+Stomatognathic System Abnormalities,2
+Cobblestone Lissencephaly,2
+Iridocorneal Endothelial Syndrome,2
+Trichiasis,2
+46-XX Disorders of Sex Development,2
+Echogenic Bowel,2
+delta-Thalassemia,2
+Ectodermal Dysplasia 3-Anhidrotic,2
+Monilethrix,2
+Ichthyosis Bullosa of Siemens,2
+Hyalinosis-Systemic,2
+Loose Anagen Hair Syndrome,2
+Piscirickettsiaceae Infections,2
+Digital Dermatitis,2
+Toxascariasis,2
+Gnathostomiasis,2
+Tungiasis,2
+Sister Mary Joseph's Nodule,2
+Pycnodysostosis,2
+Genu Valgum,2
+Rheumatoid Vasculitis,2
+Mirizzi Syndrome,2
+Periodontal Atrophy,2
+Hyperlysinemias,2
+46-XX Testicular Disorders of Sex Development,2
+Ventricular Flutter,2
+Hereditary Angioedema Type III,2
+Anemia-Hypoplastic-Congenital,2
+Prolidase Deficiency,2
+Sotos Syndrome,2
+Necrolytic Migratory Erythema,2
+Prolapse,2
+Mononegavirales Infections,2
+Avulavirus Infections,2
+Pythiosis,2
+Pagetoid Reticulosis,2
+Medial Tibial Stress Syndrome,2
+Plagiocephaly,2
+Post-Exercise Hypotension,2
+Diffuse Neurofibrillary Tangles with Calcification,2
+Fraser Syndrome,2
+Posterior Capsular Rupture-Ocular,2
+Aspermia,2
+Sex Chromosome Disorders of Sex Development,2
+Pyelectasis,2
+Single Umbilical Artery,2
+Lingual Goiter,2
+Hyperthyroxinemia-Familial Dysalbuminemic,2
+Aspartylglucosaminuria,2
+Iliotibial Band Syndrome,2
+Nidovirales Infections,2
+Euglenozoa Infections,2
+Composite Lymphoma,2
+Lynch Syndrome II,2
+Bunion-Tailor's,2
+Sarcoglycanopathies,2
+Diverticulosis-Stomach,2
+Pancreatitis-Graft,2
+Refsum Disease-Infantile,2
+Giant Axonal Neuropathy,2
+Contrecoup Injury,2
+Coronary-Subclavian Steal Syndrome,2
+Mink Viral Enteritis,2
+Oxyurida Infections,2
+Cocarcinogenesis,2
+Weill-Marchesani Syndrome,2
+Infantile Apparent Life-Threatening Event,2
+Perimeningeal Infections,2
+Slit Ventricle Syndrome,2
+Anterior Capsular Rupture-Ocular,2
+Pyelocystitis,2
+Mannosidase Deficiency Diseases,2
+White Heifer Disease,2
+Tetrasomy,2
+Milk Sickness,2
+Intrauterine Device Migration,2

@@ -1,6 +1,9 @@
 from django.contrib import admin
-from ondoc.banner.models import Banner, SliderLocation
+from django.contrib.admin import TabularInline
+
+from ondoc.banner.models import Banner, SliderLocation, BannerLocation, Recommender, EmailBanner, RecommenderThrough
 from django import forms
+from django.contrib.contenttypes.admin import GenericTabularInline
 
 
 class BannerForm(forms.ModelForm):
@@ -61,11 +64,19 @@ class BannerForm(forms.ModelForm):
                 raise forms.ValidationError('Cannot input duplicate values in field url_params -> {}'.format(resp))
 
 
+class BannerLocationInline(admin.TabularInline):
+
+    model = BannerLocation
+    extra = 0
+    can_delete = True
+    show_change_link = False
+
 
 class BannerAdmin(admin.ModelAdmin):
 
     model = Banner
     form = BannerForm
+    inlines = [BannerLocationInline]
     list_display = ['title', 'priority', 'location', 'start_date', 'end_date', 'enable']
     readonly_fields = ['event_name']
     list_filter = ['enable']
@@ -75,3 +86,28 @@ class SliderLocationAdmin(admin.ModelAdmin):
 
     model = SliderLocation
     list_display = ['name']
+
+
+class RecommenderAdmin(admin.ModelAdmin):
+
+    model = Recommender
+
+    def get_form(self, request, obj=None, **kwargs):
+        form = super().get_form(request, obj=obj, **kwargs)
+        return form
+
+
+class RecommenderInline(GenericTabularInline):
+    can_delete = True
+    extra = 0
+    # form = SPOCDetailsForm
+    model = RecommenderThrough
+    show_change_link = False
+    fields = ['recommender']
+
+class EmailBannerAdmin(admin.ModelAdmin):
+
+    model = EmailBanner
+    inlines = (RecommenderInline, )
+
+

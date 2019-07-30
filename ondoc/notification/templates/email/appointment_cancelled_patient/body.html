@@ -74,13 +74,15 @@
                     <td style="color: #3f3f3f; font-size: 16px; font-weight: 500;">
                         The appointment for {{patient_name|capfirst}} with Dr. {{doctor_name|capfirst}} on
                         {{instance.time_slot_start|date:"d/m/y"}} at {{instance.time_slot_start|date:"h:i a"}} has been
-                        cancelled as per your request.
+                        cancelled.
                     </td>
                     {% endif %}
                 </tr>
                 <tr>
                     <td style="color: #3f3f3f; font-size: 16px; font-weight: 500;">
+                        {% if instance.payment_type == 1 %}
                         Refund, if applicable, will be credited within 5-7 working days.
+                        {% endif %}
                     </td>
                 </tr>
                 <tr>
@@ -145,7 +147,7 @@
 
                 <tr>
                     <td style="color:#3f3f3f;font-size:16px;font-weight:500;padding-top:10px">
-                        In case of any queries please contact us at our toll free number 1800-123-9419.
+                        In case of any queries please contact us at customercare@docprime.com .
                     </td>
                 </tr>
                 <tr>

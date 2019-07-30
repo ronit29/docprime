@@ -83,7 +83,7 @@ class ArticleRetrieveSerializer(serializers.ModelSerializer):
 
     def get_icon(self, obj):
         request = self.context.get('request')
-        return request.build_absolute_uri(obj.icon.url) if hasattr(obj, 'icon') and obj.icon.name else None
+        return request.build_absolute_uri(obj.icon.url) if hasattr(obj, 'icon') and obj.icon and obj.icon.url else None
 
     def get_seo(self, obj):
         request = self.context.get('request')
@@ -175,9 +175,10 @@ class ArticleRetrieveSerializer(serializers.ModelSerializer):
             obj.append(self.format_widget(search_widget_tag))
 
     def get_recent_articles(self, obj):
+        request = self.context.get('request')
         article_data = Article.objects.prefetch_related('category', 'author').exclude(pk=obj.id).filter(is_published=True)
         recent_articles_data = article_data.order_by('-updated_at')[:10]
-        recent_articles = ArticleListSerializer(recent_articles_data, many=True).data
+        recent_articles = ArticleListSerializer(recent_articles_data, many=True,context={'request': request}).data
         recent_articles_dict = {'title': 'Recent Articles', 'items': recent_articles}
         return recent_articles_dict
 
@@ -195,7 +196,7 @@ class ArticleListSerializer(serializers.ModelSerializer):
 
     def get_icon(self, obj):
         request = self.context.get('request')
-        return request.build_absolute_uri(obj.icon.url) if hasattr(obj, 'icon') and obj.icon.name else None
+        return request.build_absolute_uri(obj.icon.url) if hasattr(obj, 'icon') and obj.icon and obj.icon.url else None
 
     def get_url(self, obj):
         return obj.url if hasattr(obj, 'url') else None

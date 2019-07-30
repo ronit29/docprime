@@ -1,6 +1,9 @@
+from dal import autocomplete
 from rest_framework import status
 from django.shortcuts import render
 from django.contrib import messages
+
+from ondoc.doctor.models import SimilarSpecializationGroup
 from .forms import OnlineLeadsForm, CareersForm, SearchDataForm
 from django.http import HttpResponseRedirect, HttpResponse, HttpResponsePermanentRedirect, JsonResponse
 from django.conf import settings
@@ -88,6 +91,7 @@ def user_appointment_via_agent(request):
             or request.user.groups.filter(name=constants['OPD_APPOINTMENT_MANAGEMENT_TEAM']).exists()):
         return HttpResponseRedirect('%s' % settings.ADMIN_BASE_URL)
     api_domain = '%s%s' % ('', '/api/v1/admin/agent/user/login')
+    # api_domain = '%s%s' % (settings.CONSUMER_APP_DOMAIN, '/api/v1/admin/agent/user/login')
     appDomain = '%s%s' % (settings.CONSUMER_APP_DOMAIN, '/agent/login')
     return render(request, 'agentLogin.html', {'apiDomain': api_domain, 'appDomain': appDomain, 'user_type':User.CONSUMER})
 
@@ -141,3 +145,33 @@ def upload_search_data(request):
             error = True
 
     return render(request, 'search-data.html', {'form': form, 'error': error})
+
+
+def advanced_doctor_search_view(request):
+    from ondoc.doctor.models import Hospital, PracticeSpecialization
+    from django_select2.forms import Select2MultipleWidget
+
+    class SearchDataForm(forms.Form):
+        # hospital = forms.ModelMultipleChoiceField(queryset=Hospital.objects.filter(is_live=True), widget=Select2MultipleWidget)
+        hospital = forms.ModelMultipleChoiceField(queryset=Hospital.objects.filter(is_live=True), widget=autocomplete.ModelSelect2Multiple(url='hospital-autocomplete'))
+        # specialization = forms.ModelMultipleChoiceField(queryset=PracticeSpecialization.objects.all(),
+        #                                                 widget=Select2MultipleWidget)
+        # specialization = forms.ModelMultipleChoiceField(queryset=PracticeSpecialization.objects.all(),
+        #                                                 widget=autocomplete.ModelSelect2Multiple(url='practicespecialization-autocomplete'))
+        group = forms.ModelMultipleChoiceField(queryset=SimilarSpecializationGroup.objects.all(), label="Group of Specializations",
+                                               widget=autocomplete.ModelSelect2Multiple(url='similarspecializationgroup-autocomplete'))
+
+    from django.contrib import messages
+    if request.method == "POST":
+        form = SearchDataForm(request.POST, request.FILES)
+        if form.is_valid():
+            messages.add_message(request, messages.SUCCESS, "Link Created")
+            required_link = '{}/opd/searchresults?specializations={}&conditions=&lat=&long=&sort_on=&sort_order=&availability=&gender=&avg_ratings=&doctor_name=&hospital_name=&locationType=autoComplete&procedure_ids=&procedure_category_ids=&hospital_id={}&ipd_procedures=&is_insured=false&locality=&sub_locality=&sits_at_hospital=false&sits_at_clinic=false'.format(
+                settings.CONSUMER_APP_DOMAIN,
+                # ",".join([str(x) for x in form.cleaned_data['specialization'].all().values_list('id', flat=True)]),
+                ",".join([str(x) for x in form.cleaned_data['group'].all().values_list('specializations', flat=True)]),
+                ",".join([str(x) for x in form.cleaned_data['hospital'].all().values_list('id', flat=True)]))
+            return render(request, 'doctorSearch.html', {'form': form, 'required_link': required_link})
+    else:
+        form = SearchDataForm()
+    return render(request, 'doctorSearch.html', {'form': form})

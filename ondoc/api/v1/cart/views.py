@@ -79,7 +79,7 @@ class CartViewSet(viewsets.GenericViewSet):
                 valid_data.get('data').update(
                     {'included_in_user_plan': included_in_user_plan, 'user_plan': user_plan_id})
                 valid_data.get('data')['payment_type'] = OpdAppointment.PLAN
-        # TODO: SHASHANK_SINGH dont do this
+
         if not included_in_user_plan:
             valid_data.get('data').update(
                 {'included_in_user_plan': included_in_user_plan, 'user_plan': user_plan_id})
@@ -131,7 +131,9 @@ class CartViewSet(viewsets.GenericViewSet):
                     item.data['is_appointment_insured'] = False
                     item.data['insurance_id'] = None
                     item.data['insurance_message'] = ""
-                    # item.data['payment_type'] = OpdAppointment.PREPAID
+                    item.data['payment_type'] = OpdAppointment.PREPAID
+                    raise Exception('Insurance expired.')
+
                 if not insurance_doctor and cart_data.get('is_appointment_insured') and user_insurance and user_insurance.is_valid():
                     is_lab_insured, insurance_id, insurance_message = user_insurance.validate_lab_insurance(
                         validated_data, user_insurance)
@@ -144,7 +146,9 @@ class CartViewSet(viewsets.GenericViewSet):
                         item.data['is_appointment_insured'] = False
                         item.data['insurance_id'] = None
                         item.data['insurance_message'] = ""
-                        # item.data['payment_type'] = OpdAppointment.PREPAID
+                        item.data['payment_type'] = OpdAppointment.PREPAID
+                        raise Exception('Appointment is no more covered in Insurance.')
+
                 if insurance_doctor and cart_data.get('is_appointment_insured') and user_insurance and user_insurance.is_valid():
                     is_doctor_insured, insurance_id, insurance_message = user_insurance.validate_doctor_insurance(
                         validated_data, user_insurance)
@@ -152,6 +156,9 @@ class CartViewSet(viewsets.GenericViewSet):
                         item.data['is_appointment_insured'] = False
                         item.data['insurance_id'] = None
                         item.data['insurance_message'] = ""
+                        item.data['payment_type'] = OpdAppointment.PREPAID
+                        raise Exception('Appointment is no more covered in Insurance.')
+
                         # item.data['payment_type'] = OpdAppointment.PREPAID
                     if not specialization_count_dict:
                         item.data['is_appointment_insured'] = True
@@ -182,6 +189,10 @@ class CartViewSet(viewsets.GenericViewSet):
                                 item.data['insurance_id'] = None
                                 item.data['insurance_message'] = "Gynecologist limit exceeded of limit {}".format(
                                     settings.INSURANCE_GYNECOLOGIST_LIMIT)
+
+                                raise Exception('Gynecologist limit exceeded.')
+                                # if cart_data.get('is_appointment_insured'):
+                                #     item.data['payment_type'] = OpdAppointment.PREPAID
                                 # item.data['payment_type'] = OpdAppointment.PREPAID
 
                             if onco_count > int(
@@ -190,6 +201,10 @@ class CartViewSet(viewsets.GenericViewSet):
                                 item.data['insurance_id'] = None
                                 item.data['insurance_message'] = "Oncologist limit exceeded of limit {}".format(
                                     settings.INSURANCE_ONCOLOGIST_LIMIT)
+
+                                raise Exception('Oncology limit exceeded.')
+                                # if cart_data.get('is_appointment_insured'):
+                                #     item.data['payment_type'] = OpdAppointment.PREPAID
                                 # item.data['payment_type'] = OpdAppointment.PREPAID
 
                 price_data = item.get_price_details(validated_data)
@@ -206,6 +221,8 @@ class CartViewSet(viewsets.GenericViewSet):
                     "coupon_cashback" : price_data["coupon_cashback"],
                     "home_pickup_charges" : price_data.get("home_pickup_charges", 0),
                     "consultation" : price_data.get("consultation", None),
+                    "cod_deal_price": price_data.get("consultation", {}).get('cod_deal_price'),
+                    "is_enabled_for_cod" : price_data.get("consultation", {}).get('is_enabled_for_cod'),
                     "is_price_zero": True if price_data['fees'] is not None and price_data['fees']==0 else False
                 })
             except Exception as e:
@@ -216,7 +233,8 @@ class CartViewSet(viewsets.GenericViewSet):
                     "errors": str(e),
                     "product_id": item.product_id,
                     "data": serializers.CartItemSerializer(item, context={"validated_data":None}).data,
-                    "actual_data": item.data
+                    "actual_data": item.data,
+                    "consultation": None,
                 })
 
         # items = sorted(items, key=lambda x: 0 if x["valid"] else -1)
@@ -228,6 +246,9 @@ class CartViewSet(viewsets.GenericViewSet):
         user = request.user
         if not user.is_authenticated:
             return Response({"status": 0}, status.HTTP_401_UNAUTHORIZED)
+
+        if user.onhold_insurance:
+            return Response(data={"error": "Your documents from the last claim are under verification.Please write to customercare@docprime.com for more information"}, status=status.HTTP_400_BAD_REQUEST)
 
         use_wallet = int(request.query_params.get('use_wallet', 1))
         cart_items = Cart.objects.filter(user=user, deleted_at__isnull=True)

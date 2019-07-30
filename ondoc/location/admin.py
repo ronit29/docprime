@@ -13,4 +13,4 @@ admin.site.register(CityLatLong)
 
 class EntityUrlsAdmin(AutoComplete, VersionAdmin):
     model = EntityUrls
-    search_fields = ['url']
+    search_fields = ['url', 'url_value']

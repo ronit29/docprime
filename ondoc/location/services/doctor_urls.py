@@ -38,14 +38,14 @@ class DoctorURL():
                  updated_at,  sublocality_latitude, sublocality_longitude, locality_latitude, 
                  locality_longitude, locality_id, sublocality_id,
                  locality_value, sublocality_value, is_valid, locality_location, sublocality_location, location, entity_id, 
-                 specialization_id, specialization, breadcrumb)
+                 specialization_id, specialization, breadcrumb, bookable_doctors_count)
 
                  select %d as sequence ,a.extras, a.sitemap_identifier,getslug(a.url) as url, a.count, a.entity_type,
                   a.url_type, now() as created_at, now() as updated_at,
                   a.sublocality_latitude, a.sublocality_longitude, a.locality_latitude, a.locality_longitude,
                   a.locality_id, a.sublocality_id, a.locality_value, a.sublocality_value, a.is_valid, 
                   a.locality_location, a.sublocality_location, a.location, entity_id, 
-                  specialization_id, specialization, breadcrumb from temp_url a
+                  specialization_id, specialization, breadcrumb, bookable_doctors_count from temp_url a
                   ''' %seq
 
 
@@ -57,7 +57,7 @@ class DoctorURL():
         cleanup = '''delete from entity_urls where id in (select id from 
         (select eu.*, row_number() over(partition by url order by is_valid desc, sequence desc) rownum from entity_urls eu  
         )x where rownum>1
-        ) '''                           
+        ) '''
 
         RawSql(query, []).execute()
         RawSql(update_query, []).execute()
@@ -79,25 +79,47 @@ class DoctorURL():
     def create_search_urls(self):
 
         q1 = '''insert into temp_url (specialization_id, search_slug, count, sublocality_id, locality_id, 
-                    sitemap_identifier, entity_type, url_type, is_valid, created_at, updated_at )
-                    select dps.specialization_id,search_slug, count(distinct d.id) count,
+                    sitemap_identifier, entity_type, url_type, is_valid, created_at, updated_at,bookable_doctors_count )
+                   select specialization_id, search_slug, count, sublocality_id,locality_id,sitemap_identifier,
+                    entity_type, url_type, is_valid, now(), now(),
+                    json_build_object('bookable_doctors_count',bookable_doctors_count,'bookable_doctors_2km',bookable_doctors_2km)
+                    as bookable_doctors_count
+                    from (                    
+                    select  dps.specialization_id,search_slug, count(distinct d.id) count, ea.centroid,
+                    COUNT(DISTINCT CASE WHEN d.enabled_for_online_booking=True and dc.enabled_for_online_booking=True
+                    and h.enabled_for_online_booking=True then d.id else null END) as bookable_doctors_count,
+                    COUNT(DISTINCT CASE WHEN d.enabled_for_online_booking=True and dc.enabled_for_online_booking=True
+                    and h.enabled_for_online_booking=True 
+                    and ST_DWithin(ea.centroid::geography,h.location::geography,2000)then d.id else null end) as bookable_doctors_2km,
                     case when ea.type = 'SUBLOCALITY' then ea.id end as sublocality_id,
                     case when ea.type = 'LOCALITY' then ea.id end as locality_id,
                     case when ea.type = 'LOCALITY' then 'SPECIALIZATION_CITY' else 'SPECIALIZATION_LOCALITY_CITY' end as sitemap_identifier,
-                    'Doctor' as entity_type, 'SEARCHURL' url_type, True as is_valid, now(), now()
+                    'Doctor' as entity_type, 'SEARCHURL' url_type, True as is_valid
                     from entity_address ea inner join hospital h on ((ea.type = 'LOCALITY' and 
                     ST_DWithin(ea.centroid::geography,h.location::geography,15000)) OR 
                     (ea.type = 'SUBLOCALITY' and ST_DWithin(ea.centroid::geography,h.location::geography,5000))) and h.is_live=true
-                    and ea.type IN ('SUBLOCALITY' , 'LOCALITY') and ea.use_in_url=true
-                    inner join doctor_clinic dc on dc.hospital_id = h.id
+                    and ea.type IN ('SUBLOCALITY' , 'LOCALITY') and ea.use_in_url=true 
+                    inner join doctor_clinic dc on dc.hospital_id = h.id 
                     and dc.enabled=true inner join doctor d on dc.doctor_id= d.id and d.is_live=true
                     inner join doctor_practice_specialization dps on dps.doctor_id = d.id 
                     where ea.id>=%d and ea.id<%d
-                    group by dps.specialization_id, ea.id having count(distinct d.id)>=3'''
+                    group by dps.specialization_id, ea.id having count(distinct d.id)>=3) a'''
 
         q2 = '''insert into temp_url (search_slug, count, sublocality_id, locality_id, 
-                      sitemap_identifier, entity_type, url_type, is_valid, created_at, updated_at )
+                      sitemap_identifier, entity_type, url_type, is_valid, created_at, updated_at, bookable_doctors_count)
+                      
+                    select search_slug, count, sublocality_id,locality_id,sitemap_identifier,
+                    entity_type, url_type, is_valid, now(), now(),
+                    json_build_object('bookable_doctors_count',bookable_doctors_count,'bookable_doctors_2km',bookable_doctors_2km)
+                    as bookable_doctors_count
+                    from (
+                    
                     select search_slug, count(distinct d.id) count,
+                    COUNT(DISTINCT CASE WHEN d.enabled_for_online_booking=True and dc.enabled_for_online_booking=True
+                    and h.enabled_for_online_booking=True then d.id else null END) as bookable_doctors_count,
+                    COUNT(DISTINCT CASE WHEN d.enabled_for_online_booking=True and dc.enabled_for_online_booking=True
+                    and h.enabled_for_online_booking=True 
+                    and ST_DWithin(ea.centroid::geography,h.location::geography,2000)then d.id else null end) as bookable_doctors_2km,
                     case when ea.type = 'SUBLOCALITY' then ea.id end as sublocality_id,
                     case when ea.type = 'LOCALITY' then ea.id end as locality_id,
                     case when ea.type = 'LOCALITY' then 'DOCTORS_CITY' else 'DOCTORS_LOCALITY_CITY' end as sitemap_identifier,
@@ -105,11 +127,11 @@ class DoctorURL():
                     from entity_address ea inner join hospital h on ((ea.type = 'LOCALITY' and 
                     ST_DWithin(ea.centroid::geography,h.location::geography,15000)) OR 
                     (ea.type = 'SUBLOCALITY' and ST_DWithin(ea.centroid::geography,h.location::geography,5000))) and h.is_live=true
-                    and ea.type IN ('SUBLOCALITY' , 'LOCALITY') and ea.use_in_url=true
-                    inner join doctor_clinic dc on dc.hospital_id = h.id
+                    and ea.type IN ('SUBLOCALITY' , 'LOCALITY') and ea.use_in_url=true 
+                    inner join doctor_clinic dc on dc.hospital_id = h.id 
                     and dc.enabled=true inner join doctor d on dc.doctor_id= d.id and d.is_live=true
                     where ea.id>=%d and ea.id<%d
-                    group by ea.id having count(distinct d.id)>=3'''            
+                    group by ea.id having count(distinct d.id)>=3)a'''
 
         start = self.min_ea
         while start < self.max_ea:
@@ -642,3 +664,163 @@ class PageUrlCache():
     #             if ent.entity_id == entity_id:
     #                 deletions.append(ent.id)
     #     return deletions
+
+
+class IpdProcedureSeo:
+
+    def __init__(self):
+        query = '''select nextval('entity_url_version_seq') as inc;'''
+        seq = RawSql(query, []).fetch_all()
+        self.sequence = seq[0]['inc']
+        RawSql('truncate table temp_url', []).execute()
+
+        ea_limit = RawSql('select min(id) min, max(id) max from entity_address', []).fetch_all()
+
+        self.min_ea = ea_limit[0]['min']
+        self.max_ea = ea_limit[0]['max']
+        self.step = 2000
+
+    def create(self):
+        self.create_search_urls()
+        # self.create_doctor_page_urls()
+        # self.update_breadcrumbs()
+        self.insert_search_urls()
+
+    def insert_search_urls(self):
+        seq = self.sequence
+
+        query = '''insert into entity_urls(sequence,extras, sitemap_identifier, url, count, entity_type, 
+                 url_type,  created_at, 
+                 updated_at,  sublocality_latitude, sublocality_longitude, locality_latitude, 
+                 locality_longitude, locality_id, sublocality_id,
+                 locality_value, sublocality_value, is_valid, locality_location, sublocality_location, location, entity_id, 
+                 specialization_id, specialization, breadcrumb, ipd_procedure_id, ipd_procedure)
+
+                 select %d as sequence ,a.extras, a.sitemap_identifier, getslug(a.url) as a_url, a.count, a.entity_type,
+                  a.url_type, now() as created_at, now() as updated_at,
+                  a.sublocality_latitude, a.sublocality_longitude, a.locality_latitude, a.locality_longitude,
+                  a.locality_id, a.sublocality_id, a.locality_value, a.sublocality_value, a.is_valid, 
+                  a.locality_location, a.sublocality_location, a.location, entity_id, 
+                  specialization_id, specialization, breadcrumb, a.ipd_procedure_id, a.ipd_procedure from temp_url a
+                  ''' % seq
+
+        update_query = '''update entity_urls set is_valid=false where sitemap_identifier 
+                           in ('IPD_PROCEDURE_CITY', 'IPD_PROCEDURE_HOSPITAL_CITY', 
+                           'IPD_PROCEDURE_DOCTOR_CITY') and sequence< %d''' % seq
+
+        cleanup = '''delete from entity_urls where id in (select id from 
+        (select eu.*, row_number() over(partition by url order by is_valid desc, sequence desc) rownum from entity_urls eu  
+        )x where rownum>1
+        ) '''
+
+        RawSql(query, []).execute()
+        RawSql(update_query, []).execute()
+        RawSql(cleanup, []).execute()
+
+        return True
+
+    def create_search_urls(self):
+
+        q2 = '''insert into temp_url (ipd_procedure_id, ipd_procedure, search_slug, locality_id, 
+                      sitemap_identifier, entity_type, url_type, is_valid, created_at, updated_at )
+                    select ipdp.id, ipdp.name, search_slug,
+                    case when ea.type = 'LOCALITY' then ea.id end as locality_id,
+                    case when ea.type = 'LOCALITY' then 'IPD_PROCEDURE_CITY' end as sitemap_identifier,
+                    'IpdProcedure' as entity_type, 'PAGEURL' url_type, True as is_valid, now(), now()
+                    from entity_address ea 
+                    inner join hospital h on (ea.type = 'LOCALITY' and 
+                    ST_DWithin(ea.centroid::geography,h.location::geography,15000)) and h.is_live=true
+                    and ea.type IN ('LOCALITY') and ea.use_in_url=true
+                    inner join doctor_clinic dc on dc.hospital_id = h.id and dc.enabled=true 
+                    inner join doctor_clinic_ipd_procedure dcip on dcip.doctor_clinic_id = dc.id
+                    inner join ipd_procedure ipdp on ipdp.id = dcip.ipd_procedure_id and ipdp.is_enabled=True
+                    inner join doctor d on dc.doctor_id= d.id and d.is_live=true
+                    where ea.id>=%d and ea.id<%d
+                    group by ea.id, ipdp.id'''
+
+        start = self.min_ea
+        while start < self.max_ea:
+            # query = q1 % (start, start + self.step)
+            # RawSql(query, []).execute()
+            query = q2 % (start, start + self.step)
+            RawSql(query, []).execute()
+
+            start = start + self.step
+
+        RawSql('''update temp_url tu set locality_id = (select parent_id from entity_address where id = tu.sublocality_id)
+                where locality_id is null and sublocality_id is not null''', []).execute()
+
+        RawSql('''delete from temp_url where locality_id is null''', []).execute()
+
+        RawSql(
+            '''delete from temp_url where locality_id in (select id from entity_address where use_in_url is false)''',
+            []).execute()
+
+        RawSql(
+            '''delete from temp_url where sublocality_id in (select id from entity_address where use_in_url is false)''',
+            []).execute()
+
+        RawSql('''UPDATE temp_url 
+                SET locality_latitude = st_y(centroid::geometry), locality_longitude = st_x(centroid::geometry),
+                locality_value = ea.alternative_value, locality_location = centroid
+                FROM entity_address ea
+                WHERE locality_id = ea.id ''', []).execute()
+        RawSql('''update temp_url set location = locality_location where location is null''', []).execute()
+
+        update_spec_extras_query = '''update  temp_url 
+                                  set extras = 
+                                   json_build_object('ipd_procedure_id', ipd_procedure_id, 'location_json',
+                                   json_build_object('locality_id', locality_id, 'locality_value', locality_value, 'locality_latitude', 
+                                   locality_latitude,'locality_longitude', locality_longitude), 'ipd_procedure', ipd_procedure)
+                                  where sitemap_identifier in ('IPD_PROCEDURE_CITY')'''
+        RawSql(update_spec_extras_query, []).execute()
+
+        copy_for_hospitals = '''insert into temp_url (ipd_procedure_id, ipd_procedure, search_slug, locality_id, 
+                      sitemap_identifier, entity_type, url_type, is_valid, created_at, updated_at, 
+                      locality_latitude, locality_longitude, locality_value, locality_location, location, extras) 
+            select ipd_procedure_id, ipd_procedure, search_slug, locality_id, 
+                      'IPD_PROCEDURE_HOSPITAL_CITY' as sitemap_identifier, 'Hospital', 'SEARCHURL' as url_type, is_valid, 
+                      now(), now(), locality_latitude, locality_longitude, locality_value
+                      , locality_location, location, extras from temp_url where sitemap_identifier = 'IPD_PROCEDURE_CITY' '''
+        RawSql(copy_for_hospitals, []).execute()
+
+        copy_for_doctors = '''insert into temp_url (ipd_procedure_id, ipd_procedure, search_slug, locality_id, 
+                              sitemap_identifier, entity_type, url_type, is_valid, created_at, updated_at, 
+                              locality_latitude, locality_longitude, locality_value, locality_location, location, extras) 
+                    select ipd_procedure_id, ipd_procedure, search_slug, locality_id, 
+                                  'IPD_PROCEDURE_DOCTOR_CITY' as sitemap_identifier, 'Doctor', 'SEARCHURL' as url_type, is_valid, 
+                              now(), now(), locality_latitude, locality_longitude, locality_value
+                              , locality_location, location, extras from temp_url where sitemap_identifier = 'IPD_PROCEDURE_CITY' '''
+        RawSql(copy_for_doctors, []).execute()
+
+        # IPD_PROCEDURE_COST_IN_IPDP
+        update_urls_query = '''update temp_url set url =  
+                    slugify_url(concat(ipd_procedure,'-cost-in-', search_slug, '-ipdp'))
+                    where sitemap_identifier in ('IPD_PROCEDURE_CITY')'''
+        RawSql(update_urls_query, []).execute()
+
+        # IPD_PROCEDURE_HOSPITAL_CITY_IPDHP
+        update_urls_query_2 = '''update temp_url set url =  
+                            slugify_url(concat(ipd_procedure,'-hospitals-in-', search_slug, '-ipdhp'))
+                            where sitemap_identifier in ('IPD_PROCEDURE_HOSPITAL_CITY')'''
+        RawSql(update_urls_query_2, []).execute()
+
+        # IPD_PROCEDURE_DOCTOR_CITY_IPDDP
+        update_urls_query_3 = '''update temp_url set url =  
+                                    slugify_url(concat(ipd_procedure,'-doctors-in-', search_slug, '-ipddp'))
+                                    where sitemap_identifier in ('IPD_PROCEDURE_DOCTOR_CITY')'''
+        RawSql(update_urls_query_3, []).execute()
+
+
+        RawSql('''delete from temp_url where id in (select id from (select tu.*,
+                row_number() over(partition by tu.url order by ea.child_count desc nulls last, tu.count desc nulls last) rownum
+                from temp_url tu inner join entity_address ea on 
+                case when tu.sublocality_id is not null then tu.sublocality_id else tu.locality_id end = ea.id 
+                )x where rownum>1)
+                ''', []).execute()
+
+        return 'success'
+
+
+
+

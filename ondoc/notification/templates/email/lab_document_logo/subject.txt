@@ -1,0 +1,1 @@
+Logo changed for lab - {{instance.lab.name}}

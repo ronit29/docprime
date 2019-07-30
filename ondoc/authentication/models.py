@@ -1,7 +1,8 @@
 from django.conf import settings
 from django.db import models, transaction
 from django.contrib.gis.db import models as geo_models
-from django.db.models import Q, Prefetch
+from django.db.models import Q, Prefetch, F, CharField
+from django.db.models.functions import Cast
 from django.contrib.staticfiles.templatetags.staticfiles import static
 from django.contrib.auth.models import AbstractBaseUser, PermissionsMixin, BaseUserManager
 from django.core.validators import MaxValueValidator, MinValueValidator
@@ -17,7 +18,7 @@ import random, string
 from django.contrib.contenttypes.fields import GenericForeignKey, GenericRelation
 from django.contrib.contenttypes.models import ContentType
 from django.utils.functional import cached_property
-from datetime import date, timedelta, datetime
+from datetime import date, datetime, timedelta
 from safedelete import SOFT_DELETE
 from safedelete.models import SafeDeleteModel
 import reversion
@@ -27,7 +28,8 @@ import json
 from rest_framework import status
 from collections import OrderedDict
 from django.utils.text import slugify
-
+import logging
+logger = logging.getLogger(__name__)
 
 class Image(models.Model):
     # name = models.ImageField(height_field='height', width_field='width')
@@ -37,6 +39,53 @@ class Image(models.Model):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.__original_name = self.name
+
+    def use_image_name(self):
+        return False
+
+    def auto_generate_thumbnails(self):
+        return False
+
+    def crop_existing_image(self, width, height):
+        if not hasattr(self, 'name'):
+            return
+        if not self.name:
+            return
+        if not hasattr(self, 'get_image_name'):
+            return
+        # from django.core.files.storage import get_storage_class
+        # default_storage_class = get_storage_class()
+        # storage_instance = default_storage_class()
+
+        path = "{}".format(self.get_image_name())
+        # if storage_instance.exists(path):
+        #     return
+        if self.name.closed:
+            self.name.open()
+        with Img.open(self.name) as img:
+            img = img.copy()
+            img.thumbnail(tuple([width, height]), Img.LANCZOS)
+            if img.mode != 'RGB':
+                img = img.convert('RGB')
+            new_image_io = BytesIO()
+            img.save(new_image_io, format='JPEG')
+            in_memory_file = InMemoryUploadedFile(new_image_io, None, path + ".jpg", 'image/jpeg', new_image_io.tell(),
+                                                  None)
+            self.cropped_image = in_memory_file
+            self.save()
+
+    def create_thumbnail(self):
+        if not hasattr(self, 'cropped_image'):
+            return
+        if not (hasattr(self, 'auto_generate_thumbnails') and self.auto_generate_thumbnails()):
+            return
+        if self.cropped_image:
+            return
+        from ondoc.doctor.models import DoctorImage
+        size = DoctorImage.image_sizes[0]
+        width = size[0]
+        height = size[1]
+        self.crop_existing_image(width, height)
 
     def get_thumbnail_path(self, path, prefix):
         first, last = path.rsplit('/', 1)
@@ -60,8 +109,8 @@ class Image(models.Model):
             size = img.size
             #new_size = ()
 
-            if max(size)>max_allowed:
-                size = tuple(math.floor(ti/(max(size)/max_allowed)) for ti in size)
+            if max(size) > max_allowed:
+                size = tuple(math.floor(ti / (max(size) / max_allowed)) for ti in size)
 
             img = img.resize(size, Img.ANTIALIAS)
 
@@ -69,7 +118,9 @@ class Image(models.Model):
                 img = img.convert('RGB')
 
             md5_hash = hashlib.md5(img.tobytes()).hexdigest()
-            #if img.multiple_chunks():
+            if hasattr(self, 'use_image_name') and self.use_image_name() and hasattr(self, 'get_image_name'):
+                md5_hash = self.get_image_name()
+            # if img.multiple_chunks():
             #    for chunk in img.chunks():
             #       hash.update(chunk)
             # else:    
@@ -77,15 +128,12 @@ class Image(models.Model):
 
             new_image_io = BytesIO()
             img.save(new_image_io, format='JPEG')
-
-
-            #im = img.save(md5_hash+'.jpg')
+            # im = img.save(md5_hash+'.jpg')
             self.name = InMemoryUploadedFile(new_image_io, None, md5_hash+".jpg", 'image/jpeg',
                                   new_image_io.tell(), None)
 
             # self.name = InMemoryUploadedFile(output, 'ImageField', md5_hash+".jpg", 'image/jpeg',
             #                                     output.len, None)
-
             # self.name = img
             # img.thumbnail((self.image.width/1.5,self.image.height/1.5), Img.ANTIALIAS)
             # output = StringIO.StringIO()
@@ -99,6 +147,9 @@ class Image(models.Model):
         abstract = True
 
 class Document(models.Model):
+
+    def use_image_name(self):
+        return False
 
     def get_thumbnail_path(self, path, prefix):
         first, last = path.rsplit('/', 1)
@@ -136,6 +187,8 @@ class Document(models.Model):
                     img = img.convert('RGB')
 
                 md5_hash = hashlib.md5(img.tobytes()).hexdigest()
+                if hasattr(self, 'use_image_name') and self.use_image_name() and hasattr(self, 'get_image_name'):
+                    md5_hash = self.get_image_name()
                 #if img.multiple_chunks():
                 #    for chunk in img.chunks():
                 #       hash.update(chunk)
@@ -158,7 +211,6 @@ class Document(models.Model):
                 name, extension = os.path.splitext(self.name.name)
                 filename = hash+extension
                 self.name.file.seek(0,2)
-
                 self.name = InMemoryUploadedFile(self.name.file, None, filename, None,
                     self.name.file.tell(), None)
 
@@ -283,10 +335,42 @@ class User(AbstractBaseUser, PermissionsMixin):
         # return str(self.phone_number)
 
     # @property
+
+    @cached_property
+    def show_ipd_popup(self):
+        from ondoc.procedure.models import IpdProcedureLead
+        lead = IpdProcedureLead.objects.filter(phone_number=self.phone_number,
+                                               created_at__gt=timezone.now() - timezone.timedelta(hours=1)).first()
+        if lead:
+            return False
+        return True
+
+    @cached_property
+    def force_ipd_popup(self):
+        from ondoc.procedure.models import IpdProcedureLead
+        lead = IpdProcedureLead.objects.filter(phone_number=self.phone_number).exists()
+        if lead:
+            return False
+        return True
+
     @cached_property
     def active_insurance(self):
         active_insurance = self.purchased_insurance.filter().order_by('id').last()
         return active_insurance if active_insurance and active_insurance.is_valid() else None
+
+    @cached_property
+    def onhold_insurance(self):
+        from ondoc.insurance.models import UserInsurance
+        onhold_insurance = self.purchased_insurance.filter(status=UserInsurance.ONHOLD).order_by('-id').first()
+        return onhold_insurance if onhold_insurance else None
+
+    @cached_property
+    def recent_opd_appointment(self):
+        return self.appointments.filter(created_at__gt=timezone.now() - timezone.timedelta(days=90)).order_by('-id')
+
+    @cached_property
+    def recent_lab_appointment(self):
+        return self.lab_appointments.filter(created_at__gt=timezone.now() - timezone.timedelta(days=90)).order_by('-id')
 
     def get_phone_number_for_communication(self):
         from ondoc.communications.models import unique_phone_numbers
@@ -439,10 +523,16 @@ class UserProfile(TimeStampedModel):
     
     profile_image = models.ImageField(upload_to='users/images', height_field=None, width_field=None, blank=True, null=True)
     whatsapp_optin = models.NullBooleanField(default=None) # optin check of the whatsapp
-    whatsapp_is_declined = models.BooleanField(default=False) # flag to whether show whatsapp pop up or not.
+    whatsapp_is_declined = models.BooleanField(default=False)  # flag to whether show whatsapp pop up or not.
 
     def __str__(self):
         return "{}-{}".format(self.name, self.id)
+
+    @cached_property
+    def is_insured_profile(self):
+        insured_member_profile = self.insurance.filter().order_by('-id').first()
+        response = True if insured_member_profile and insured_member_profile.user_insurance.is_valid() else False
+        return response
 
     def get_thumbnail(self):
         if self.profile_image:
@@ -486,6 +576,45 @@ class UserProfile(TimeStampedModel):
                                                       new_image_io.tell(), None)
         super().save(*args, **kwargs)
 
+    def update_profile_post_endorsement(self, endorsed_data):
+        self.name = endorsed_data.first_name + " " + endorsed_data.middle_name + " " + endorsed_data.last_name
+        self.email = endorsed_data.email
+        if endorsed_data.gender == 'f':
+            self.gender = UserProfile.FEMALE
+        elif endorsed_data.gender == 'm':
+            self.gender = UserProfile.MALE
+        else:
+            self.gender = UserProfile.OTHER
+        if endorsed_data.phone_number:
+            self.phone_number = endorsed_data.phone_number
+        else:
+            self.phone_number = self.user.phone_number
+        self.dob = endorsed_data.dob
+        self.save()
+
+    def is_insurance_package_limit_exceed(self):
+        from ondoc.diagnostic.models import LabAppointment
+        from ondoc.doctor.models import OpdAppointment
+        user = self.user
+        insurance = None
+        if user.is_authenticated:
+            insurance = user.active_insurance
+        if not insurance or not self.is_insured_profile:
+            return False
+        package_count = 0
+        previous_insured_lab_bookings = LabAppointment.objects.prefetch_related('tests').filter(insurance=insurance, profile=self).exclude(status=OpdAppointment.CANCELLED)
+        for booking in previous_insured_lab_bookings:
+            all_tests = booking.tests.all()
+            for test in all_tests:
+                if test.is_package:
+                    package_count += 1
+
+        if package_count >= insurance.insurance_plan.plan_usages.get('member_package_limit'):
+            return True
+        else:
+            return False
+
+
     class Meta:
         db_table = "user_profile"
 
@@ -496,6 +625,9 @@ class OtpVerifications(TimeStampedModel):
     code = models.CharField(max_length=10)
     country_code = models.CharField(max_length=10)
     is_expired = models.BooleanField(default=False)
+    otp_request_source = models.CharField(null=True, max_length=200, blank=True)
+    via_whatsapp = models.NullBooleanField(null=True)
+    via_sms = models.NullBooleanField(null=True)
 
     def __str__(self):
         return self.phone_number
@@ -509,9 +641,9 @@ class OtpVerifications(TimeStampedModel):
         result = "OTP for login is {}.\nDon't share this code with others."
         if platform == "android" and version:
             if (user_type == 'doctor' or is_doc) and parse(version) > parse("2.100.4"):
-                result = "<#>\n" + result + "\n" + settings.PROVIDER_ANDROID_MESSAGE_HASH
+                result = "<#> " + result + "\nMessage ID: " + settings.PROVIDER_ANDROID_MESSAGE_HASH
             elif parse(version) > parse("1.1"):
-                result = "<#>\n" + result + "\n" + settings.CONSUMER_ANDROID_MESSAGE_HASH
+                result = "<#> " + result + "\nMessage ID: " + settings.CONSUMER_ANDROID_MESSAGE_HASH
         return result
 
 
@@ -741,11 +873,11 @@ class GenericLabAdmin(TimeStampedModel, CreatedByModel):
 
     @classmethod
     def update_user_lab_admin(cls, phone_number):
-        user = User.objects.filter(phone_number=phone_number, user_type=User.DOCTOR)
-        if user.exists():
+        user = User.objects.filter(phone_number=phone_number, user_type=User.DOCTOR).first()
+        if user:
             admin = GenericLabAdmin.objects.filter(phone_number=phone_number, user__isnull=True)
             if admin.exists():
-                admin.update(user=user.first())
+                admin.update(user=user)
 
     @classmethod
     def get_user_admin_obj(cls, user):
@@ -811,6 +943,43 @@ class GenericLabAdmin(TimeStampedModel, CreatedByModel):
                                )
 
 
+class GenericAdminManager(models.Manager):
+
+    def bulk_create(self, objs, **kwargs):
+        phone_numbers = list()
+        hospitals = list()
+        for obj in objs:
+            if obj.phone_number not in phone_numbers:
+                phone_numbers.append(obj.phone_number)
+            if obj.hospital not in hospitals:
+                hospitals.append(obj.hospital)
+        all_admins = GenericAdmin.objects.prefetch_related('hospital', 'hospital__hospital_doctor_number')\
+                                         .filter(phone_number__in=phone_numbers, hospital__in=hospitals)\
+                                         .order_by('-super_user_permission')
+        for obj in objs:
+            for admin in all_admins:
+                if admin.hospital != obj.hospital or int(admin.phone_number) != int(obj.phone_number):
+                    continue
+                if admin.super_user_permission:
+                    objs.remove(obj)
+                    break
+                elif obj.super_user_permission and admin.hospital == obj.hospital and int(admin.phone_number) == int(obj.phone_number):
+                    if not admin.doctor_number_exists():
+                        admin.delete()
+                elif not obj.super_user_permission and admin.permission_type == obj.permission_type:
+                    if not admin.doctor:
+                        objs.remove(obj)
+                    elif admin.doctor:
+                        if not obj.doctor:
+                            if not admin.doctor_number_exists():
+                                admin.doctor = None
+                                admin.save()
+                                objs.remove(obj)
+                        elif obj.doctor and admin.doctor == obj.doctor:
+                            objs.remove(obj)
+        return super().bulk_create(objs, **kwargs)
+
+
 class GenericAdmin(TimeStampedModel, CreatedByModel):
     APPOINTMENT = 1
     BILLINNG = 2
@@ -820,6 +989,7 @@ class GenericAdmin(TimeStampedModel, CreatedByModel):
     OTHER = 3
     CRM = 1
     APP = 2
+    objects = GenericAdminManager()
     entity_choices = ((OTHER, 'Other'), (DOCTOR, 'Doctor'), (HOSPITAL, 'Hospital'),)
     source_choices = ((CRM, 'CRM'), (APP, 'App'),)
     user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='manages', null=True, blank=True)
@@ -1099,6 +1269,49 @@ class GenericAdmin(TimeStampedModel, CreatedByModel):
             if admin.user:
                 admin_users.append(admin.user)
         return admin_users
+
+    @staticmethod
+    def get_manageable_hospitals(user):
+        manageable_hosp_list = GenericAdmin.objects.filter(Q(is_disabled=False, user=user),
+                                                           (Q(permission_type=GenericAdmin.APPOINTMENT)
+                                                            |
+                                                            Q(super_user_permission=True))) \
+                                                   .values_list('hospital', flat=True)
+        return list(manageable_hosp_list)
+
+    def doctor_number_exists(self):
+        # Ensure 'hospital' and 'hospital__doctor_number' is prefetched
+        doctor_number_exists = False
+        if self.doctor and self.hospital.hospital_doctor_number.all():
+            for doc_num in self.hospital.hospital_doctor_number.all():
+                if doc_num.doctor == self.doctor and doc_num.phone_number == self.phone_number:
+                    doctor_number_exists = True
+                    break
+        return doctor_number_exists
+
+    @staticmethod
+    def create_users_from_generic_admins():
+        all_admins_without_users = GenericAdmin.objects.filter(user__isnull=True, entity_type=GenericAdmin.HOSPITAL).order_by('-updated_at')[:100]
+        admins_phone_numbers = all_admins_without_users.values_list('phone_number', flat=True)
+        users_for_admins = User.objects.filter(phone_number__in=admins_phone_numbers, user_type=User.DOCTOR)
+        users_admin_dict = dict()
+        for user in users_for_admins:
+            users_admin_dict[user.phone_number] = user
+        # users_phone_numbers = users_for_admins.values_list('phone_number', flat=True)
+
+        users_to_be_created = list()
+        try:
+            for admin in all_admins_without_users:
+                if admin.phone_number in users_admin_dict:
+                    admin.user = users_admin_dict[admin.phone_number]
+                    admin.save()
+                else:
+                    users_to_be_created.append(User(phone_number=admin.phone_number, user_type=User.DOCTOR,
+                                                           auto_created=True))
+            User.objects.bulk_create(users_to_be_created)
+        except Exception as e:
+            logger.error(str(e))
+            print("Error while bulk creating Users. ERROR :: {}".format(str(e)))
 
 
 class BillingAccount(models.Model):
@@ -1405,6 +1618,37 @@ class SPOCDetails(TimeStampedModel):
     #         admin_to_be_deleted.delete()
     #     return super(SPOCDetails, self).delete(*args, **kwargs)
 
+    @staticmethod
+    def create_appointment_admins_from_spocs():
+        from ondoc.diagnostic.models import Hospital
+
+        all_spocs = SPOCDetails.objects
+        all_spocs_hospitals = all_spocs.filter(content_type=ContentType.objects.get_for_model(Hospital))
+        spocs_with_admins = SPOCDetails.objects.prefetch_related('content_object',
+                                                                 'content_object__manageable_hospitals').annotate(
+            chr_number=Cast('number', CharField())).filter(content_type=ContentType.objects.get_for_model(Hospital),
+                                                           hospital_spocs__manageable_hospitals__phone_number=F(
+                                                               'chr_number')).filter(
+            Q(hospital_spocs__manageable_hospitals__permission_type=GenericAdmin.APPOINTMENT) | Q(
+                hospital_spocs__manageable_hospitals__super_user_permission=True))
+        spocs_without_admins = all_spocs_hospitals.exclude(
+            Q(id__in=spocs_with_admins) | Q(number__isnull=True) | Q(number__lt=1000000000) | Q(
+                number__gt=9999999999)).values('name', 'number',
+                                               'hospital_spocs')
+        admins_to_be_created = list()
+        for spoc in spocs_without_admins:
+            if len(spoc['name']) > 100:
+                continue
+            admins_to_be_created.append(
+                GenericAdmin(name=spoc['name'], phone_number=str(spoc['number']), hospital_id=spoc['hospital_spocs'],
+                             permission_type=GenericAdmin.APPOINTMENT, entity_type=GenericAdmin.HOSPITAL,
+                             auto_created_from_SPOCs=True))
+        try:
+            GenericAdmin.objects.bulk_create(admins_to_be_created)
+        except Exception as e:
+            logger.error(str(e))
+            print("Error while bulk creating SPOCs. ERROR :: {}".format(str(e)))
+
     def __str__(self):
         return self.name
 
@@ -1439,6 +1683,13 @@ class Merchant(TimeStampedModel):
     INPROCESS = 2
     COMPLETE = 3
     FAILURE = 4
+    NEFT = 0
+    IFT = 1
+    IMPS = 2
+
+    PAYMENT_CHOICES = ( (NEFT,'NEFT'),(IFT, 'IFT'),
+         (IMPS, 'IMPS'))
+
     CREATION_STATUS_CHOICES = ((NOT_INITIATED, 'Not Initiated'),
         (INITIATED,'Initiated'),(INPROCESS, 'In Progress'),
          (COMPLETE, 'Complete'), (FAILURE, 'Failure')
@@ -1471,6 +1722,8 @@ class Merchant(TimeStampedModel):
     mobile = models.CharField(max_length=200, null=False, blank= True)
     pg_status = models.PositiveIntegerField(choices=CREATION_STATUS_CHOICES, default=NOT_INITIATED, editable=False)
     api_response = JSONField(blank=True, null=True, editable=False)
+    enable_for_tds_deduction = models.BooleanField(default=False)
+    payment_type = models.PositiveIntegerField(choices=PAYMENT_CHOICES, null=True, blank=True)
 
     class Meta:
         db_table = 'merchant'
@@ -1480,8 +1733,8 @@ class Merchant(TimeStampedModel):
 
     def save(self, *args, **kwargs):
         if self.verified_by_finance and (self.pg_status == self.NOT_INITIATED or self.pg_status == self.FAILURE):
-            pass
-            #self.create_in_pg()
+            #pass
+            self.create_in_pg()
 
         super().save(*args, **kwargs)
 
@@ -1514,7 +1767,7 @@ class Merchant(TimeStampedModel):
         request_payload["IFSC"] = self.ifsc_code
         request_payload["Bene_A/c No"] = self.account_number
         request_payload["Bene Bank"] = None
-        request_payload["PaymentType"] = None
+        request_payload["PaymentType"] = self.PAYMENT_CHOICES[self.payment_type][1] if self.payment_type else None
         request_payload["isBulk"] = "0"
 
         #from ondoc.api.v1.utils import payout_checksum
@@ -1528,10 +1781,19 @@ class Merchant(TimeStampedModel):
                                                                               'Content-Type': 'application/json'})
 
         if response.status_code == status.HTTP_200_OK:
-            resp_data = response.json()
-            self.api_response = resp_data
-            if resp_data.get('StatusCode') and resp_data.get('StatusCode') in [1,2,3,4]:
-                self.pg_status = resp_data.get('StatusCode')
+            self.api_response = response.json()
+
+            if response.json():
+                for data in response.json():
+                    if data.get('StatusCode') and data.get('StatusCode') > 0:
+                        if self.pg_status == 0:
+                            self.pg_status = data.get('StatusCode')
+                        elif data.get('StatusCode') < self.pg_status:
+                            self.pg_status = data.get('StatusCode')
+
+            # if resp_data.get('StatusCode') and resp_data.get('StatusCode') in [1,2,3,4]:
+            #     self.pg_status = resp_data.get('StatusCode')
+
 
     @classmethod
     def get_abbreviation(cls, state_name):
@@ -1576,7 +1838,7 @@ class Merchant(TimeStampedModel):
 
     @classmethod
     def update_status_from_pg(cls):
-        merchant = Merchant.objects.filter(pg_status__in=[cls.NOT_INITIATED, cls.INITIATED, cls.INPROCESS, cls.FAILURE])
+        merchant = Merchant.objects.filter(pg_status__in=[cls.NOT_INITIATED, cls.INITIATED, cls.INPROCESS, cls.FAILURE], verified_by_finance=True)
         for data in merchant:
             resp_data = None
             request_payload = {"beneCode": str(data.pk)}
@@ -1585,11 +1847,46 @@ class Merchant(TimeStampedModel):
             response = requests.post(url, data=json.dumps(request_payload), headers={'auth': bene_status_token,
                                                                                      'Content-Type': 'application/json'})
             if response.status_code == status.HTTP_200_OK:
-                resp_data = response.json()
-                data.api_response = resp_data
-                if resp_data.get('statusCode') and resp_data.get('statusCode') in [cls.INITIATED, cls.INPROCESS]:
-                    data.pg_status = resp_data.get('statusCode')
+                data.api_response = response.json()
+                status_code = set()
+                if response.json():
+                    for resp in response.json():
+                        if resp.get('statusCode'):
+                            status_code.add(resp.get('statusCode'))
+                    data.pg_status = min(status_code) if status_code else data.pg_status
                     data.save()
+
+                # data.api_response = resp_data[0]
+                # if resp_data[0].get('statusCode') and resp_data[0].get('statusCode') in [cls.INITIATED, cls.INPROCESS]:
+                #     data.pg_status = resp_data[0].get('statusCode')
+                #     data.save()
+
+
+class MerchantNetRevenue(TimeStampedModel):
+
+    # CURRENT_FINANCIAL_YEAR = '2019-2020'
+
+    merchant = models.ForeignKey(Merchant, on_delete=models.CASCADE, related_name='net_revenue')
+    total_revenue = models.DecimalField(max_digits=10, decimal_places=2, default=None, null=True, blank=True)
+    financial_year = models.CharField(max_length=20, null=True, blank=True)
+    tds_deducted = models.DecimalField(max_digits=10, decimal_places=2, default=None, null=True, blank=True)
+
+    class Meta:
+        db_table = 'merchant_net_revenue'
+
+
+class MerchantTdsDeduction(TimeStampedModel):
+
+    # CURRENT_FINANCIAL_YEAR = '2019-2020'
+
+    merchant = models.ForeignKey(Merchant, on_delete=models.CASCADE, related_name='tds_deduction')
+    financial_year = models.CharField(max_length=20, null=True, blank=True)
+    tds_deducted = models.DecimalField(max_digits=10, decimal_places=2, default=None, null=True, blank=True)
+    merchant_payout = models.ForeignKey("account.MerchantPayout", on_delete=models.CASCADE, related_name='tds')
+
+    class Meta:
+        db_table = 'merchant_tds_deduction'
+
 
 class AssociatedMerchant(TimeStampedModel):
 
@@ -1673,7 +1970,7 @@ class PhysicalAgreementSigned(models.Model):
 class RefundMixin(object):
 
     @transaction.atomic
-    def action_refund(self, refund_flag=1):
+    def action_refund(self, refund_flag=1, initiate_refund=1):
         from ondoc.doctor.models import OpdAppointment
         from ondoc.account.models import ConsumerAccount
         from ondoc.common.models import RefundDetails
@@ -1691,7 +1988,7 @@ class RefundMixin(object):
             consumer_account.credit_cancellation(self, product_id, wallet_refund, cashback_refund)
             if refund_flag:
                 ctx_obj = consumer_account.debit_refund()
-                ConsumerRefund.initiate_refund(self.user, ctx_obj)
+                ConsumerRefund.initiate_refund(self.user, ctx_obj) if initiate_refund else None
 
     def can_agent_refund(self, user):
         from ondoc.crm.constants import constants
@@ -1705,3 +2002,199 @@ class RefundMixin(object):
         return not ConsumerTransaction.valid_appointment_for_cancellation(self.id, product_id)
         # return ConsumerRefund.objects.filter(consumer_transaction__reference_id=self.id,
         #                               consumer_transaction__product_id=product_id).first()
+
+
+class LastLoginTimestamp(TimeStampedModel):
+
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name="last_login_timestamp")
+    last_login = models.DateTimeField(auto_now=True)
+    source = models.CharField(max_length=100)
+
+    def __str__(self):
+        return self.user
+
+    class Meta:
+        db_table = "last_login_timestamp"
+
+
+class UserNumberUpdate(TimeStampedModel):
+    user = models.ForeignKey(User, on_delete=models.DO_NOTHING, related_name="number_updates", limit_choices_to={'user_type': 3})
+    old_number = models.CharField(max_length=10, blank=False, null=True, default=None)
+    new_number = models.CharField(max_length=10, blank=False, null=True, default=None)
+    is_successfull = models.BooleanField(default=False)
+    otp = models.IntegerField(null=True, blank=True)
+    otp_expiry = models.DateTimeField(default=None, null=True)
+
+    def __str__(self):
+        return str(self.user)
+
+    @classmethod
+    def can_be_changed(cls, new_number):
+        return not User.objects.filter(phone_number=new_number).exists()
+
+    def after_commit_tasks(self, send_otp=False):
+        from ondoc.notification.tasks import send_user_number_update_otp
+        if send_otp:
+            send_user_number_update_otp.apply_async((self.id,))
+
+    def save(self, *args, **kwargs):
+        if not self.is_successfull:
+            send_otp = False
+
+            # Instance comming First time.
+            if not self.id:
+                self.old_number = self.user.phone_number
+                self.otp_expiry = timezone.now() + timedelta(minutes=30)
+
+                self.otp = random.choice(range(100000, 999999))
+                send_otp = True
+
+            elif hasattr(self, '_process_update') and self._process_update:
+
+                profiles = self.user.profiles.filter(phone_number=self.user.phone_number)
+                for profile in profiles:
+                    profile.phone_number = self.new_number
+                    profile.save()
+
+                self.user.phone_number = self.new_number
+
+                self.user.save()
+                self.is_successfull = True
+
+            super().save(*args, **kwargs)
+
+            transaction.on_commit(lambda: self.after_commit_tasks(send_otp=send_otp))
+        else:
+            pass
+
+    class Meta:
+        db_table = "user_number_updates"
+
+
+class UserProfileEmailUpdate(TimeStampedModel):
+    profile = models.ForeignKey(UserProfile, on_delete=models.DO_NOTHING, related_name="email_updates")
+    old_email = models.CharField(max_length=256, blank=False)
+    new_email = models.CharField(max_length=256, blank=False)
+    otp_verified = models.BooleanField(default=False)
+    is_successfull = models.BooleanField(default=False)
+    otp = models.IntegerField(null=True, blank=True)
+    otp_expiry = models.DateTimeField(default=None, null=True)
+
+    def __str__(self):
+        return str(self.profile)
+
+    def is_request_alive(self):
+        return timezone.now() <= self.otp_expiry
+
+    @classmethod
+    def can_be_changed(cls, user, new_email):
+        return not UserProfile.objects.filter(email=new_email).exclude(user=user).exists()
+
+    def send_otp_email(self):
+        from ondoc.notification.tasks import send_userprofile_email_update_otp
+        send_userprofile_email_update_otp.apply_async((self.id,))
+
+    def after_commit_tasks(self, send_otp=False):
+        if send_otp:
+            self.send_otp_email()
+
+    @classmethod
+    def initiate(cls, profile, email):
+        obj = cls(profile=profile, new_email=email, old_email=profile.email, otp=random.choice(range(100000, 999999)),
+                  otp_expiry=(timezone.now() + timedelta(minutes=30)))
+        obj.save()
+        return obj
+
+    def process_email_change(self, otp, process_immediate=False):
+        if process_immediate:
+            if otp and self.otp != otp:
+                return False
+
+            self.otp_verified = True
+            self.profile.email = self.new_email
+            self.is_successfull = True
+            self.profile.save()
+            self.save()
+        else:
+            self.otp_verified = True
+            self.save()
+
+        return True
+
+    def save(self, *args, **kwargs):
+        send_otp = False
+
+        # Instance comming First time.
+        if not self.id:
+            send_otp = True
+
+        super().save(*args, **kwargs)
+
+        transaction.on_commit(lambda: self.after_commit_tasks(send_otp=send_otp))
+
+    class Meta:
+        db_table = "userprofile_email_updates"
+
+
+class PaymentMixin(object):
+
+    def capture_payment(self):
+        from ondoc.notification import tasks as notification_tasks
+        notification_tasks.send_capture_payment_request.apply_async(
+            (self.PRODUCT_ID, self.id), eta=timezone.localtime(), )
+
+    def release_payment(self):
+        from ondoc.notification import tasks as notification_tasks
+        notification_tasks.send_release_payment_request.apply_async(
+            (self.PRODUCT_ID, self.id), eta=timezone.localtime(), )
+
+    def preauth_process(self, refund_flag=1):
+        from ondoc.account.models import Order
+        from ondoc.account.models import PgTransaction
+        initiate_refund = 1
+        order = Order.objects.filter(product_id=self.PRODUCT_ID,
+                                         reference_id=self.id).first()
+        if order:
+            order_parent = order.parent
+            txn_obj = PgTransaction.objects.filter(order=order_parent).first() if order_parent else None
+
+            if txn_obj and txn_obj.is_preauth():
+                if refund_flag:
+                    if order_parent.orders.count() > 1:
+                        self.capture_payment()
+                    else:
+                        self.release_payment()
+                        initiate_refund = 0
+                else:
+                    #if order_parent.orders.count() > 1:
+                    self.capture_payment()
+                    initiate_refund = 0
+                    # raise Exception('Preauth booked appointment can not be rebooked.')
+
+        return initiate_refund
+
+    def get_transaction(self):
+        from ondoc.account.models import Order
+        from ondoc.account.models import PgTransaction
+        child_order = Order.objects.filter(reference_id=self.id, product_id=self.PRODUCT_ID).first()
+        parent_order = None
+        pg_transaction = None
+
+        if child_order:
+            parent_order = child_order.parent
+
+        if parent_order:
+            pg_transaction = PgTransaction.objects.filter(order_id=parent_order.id).first()
+
+        return pg_transaction
+
+
+class GenericQuestionAnswer(TimeStampedModel):
+    question = models.TextField(null=False, verbose_name='Question')
+    answer = models.TextField(null=True, verbose_name='Answer')
+    content_type = models.ForeignKey(ContentType, on_delete=models.DO_NOTHING)
+    object_id = models.BigIntegerField()
+    content_object = GenericForeignKey()
+
+    class Meta:
+        db_table = "generic_question_answer"

@@ -1,13 +1,24 @@
-The appointment for {{patient_name|capfirst}} with {{lab_name|capfirst}} on {{instance.time_slot_start|date:"D jS F Y"}} at {{instance.time_slot_start|date:"h:i A"}} has been confirmed.
+{% if instance.is_home_pickup %}
+Your appointment with {{lab_name|capfirst}} for home sample collection is confirmed on {{instance.time_slot_start|date:"D jS F Y"}} at {{instance.time_slot_start|date:"h:i A"}}.  Please share unique confirmation code and appointment id with the lab representative.
 
-The booking details are as below :
+Unique Confirmation Code: {{instance.otp}}
+Appointment Id: {{instance.id}}
+Patient Name: {{patient_name|capfirst}}
+Home Sample Address: {{instance.get_pickup_address}}
+
+{% else %}
+
+Your appointment with {{lab_name|capfirst}} is confirmed for {{instance.time_slot_start|date:"D jS F Y"}} at {{instance.time_slot_start|date:"h:i A"}}. Please share unique confirmation code and appointment id with the lab.
+
 Unique Confirmation Code : {{instance.otp}}
-Share this code with the lab at the time of your appointment.
-Booking ID : {{instance.id}}
+Appointment ID : {{instance.id}}
 Patient Name : {{patient_name|capfirst}}
-Lab Name : {{lab_name|capfirst}}
-{% if instance.is_home_pickup %}Home Pick up Address : {{instance.get_pickup_address}}{% else %}Lab Address : {{instance.lab.get_lab_address}}{% endif %}
-Appointment Date and Time : {{instance.time_slot_start|date:"D jS F Y"}} || {{instance.time_slot_start|date:"h:i A"}}
-Helpline Toll Free Number : 1800-123-9419
+Lab Address : {{instance.lab.get_lab_address}}
 
-Thanks for choosing docprime.com
+{% endif %}
+
+PS: This is a cashless appointment. Therefore, you are not required to pay for the service booked through us.
+
+
+Thanks,
+Team Docprime.com

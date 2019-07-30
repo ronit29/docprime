@@ -1,5 +1,8 @@
 from rest_framework import serializers
+from rest_framework.fields import UUIDField
 from django.contrib.auth import get_user_model
+from django.core.validators import MaxValueValidator, MinValueValidator
+from django.db.models import Q
 import logging
 from django.conf import settings
 from ondoc.authentication.models import (OtpVerifications, User, UserProfile, Notification, NotificationEndpoint,
@@ -159,8 +162,12 @@ class ProviderSignupValidations:
         lab_admin_exists = ProviderSignupValidations.lab_admin_exists(attrs)
         return (admin_exists or lab_admin_exists or provider_signup_lead_exists)
 
+
 class GenerateOtpSerializer(serializers.Serializer):
     phone_number = serializers.IntegerField(min_value=5000000000,max_value=9999999999)
+    via_sms = serializers.BooleanField(default=True, required=False)
+    via_whatsapp = serializers.BooleanField(default=False, required=False)
+    request_source = serializers.CharField(required=False, max_length=200)
 
     def validate(self, attrs):
         if ProviderSignupValidations.user_exists(attrs):
@@ -207,9 +214,46 @@ class ConsentIsDocprimeSerializer(serializers.Serializer):
         return attrs
 
 
+class EncryptedHospitalsSerializer(serializers.Serializer):
+    hospital_id = serializers.PrimaryKeyRelatedField(queryset=doc_models.Hospital.objects.all())
+    encrypted_hospital_id = serializers.CharField(required=False, allow_blank=True)
+
+
+class ConsentIsEncryptSerializer(serializers.Serializer):
+    is_encrypted = serializers.BooleanField(required=False)
+    hospitals = serializers.ListField(child=EncryptedHospitalsSerializer(many=False))
+    hint = serializers.CharField(required=False, allow_blank=True)
+    encryption_key = serializers.CharField(required=False, allow_blank=True)
+    # decrypt = serializers.BooleanField(required=False)
+    email = serializers.EmailField(required=False, allow_blank=True, max_length=100)
+    phone_numbers = serializers.ListField(child=serializers.IntegerField(validators=[MaxValueValidator(9999999999), MinValueValidator(1000000000)]), allow_empty=True, required=False)
+    google_drive = serializers.EmailField(required=False, allow_blank=True, max_length=100)
+    is_consent_received = serializers.BooleanField()
+
+    def validate(self, attrs):
+        if attrs:
+            if 'is_encrypted' in attrs and not attrs.get('is_encrypted'):
+                if not attrs.get('encryption_key'):
+                    raise serializers.ValidationError('Encryption Key Not Found!')
+                else:
+                    for hospital in attrs['hospitals']:
+                        if not (hasattr(hospital['hospital_id'], 'encrypt_details') and hospital['hospital_id'].encrypt_details.is_valid):
+                            raise serializers.ValidationError('decrypt called for unencrypted hospital')
+            else:
+                existing_valid_details_indexes = list()
+                for index, hospital in enumerate(attrs['hospitals']):
+                    if hasattr(hospital['hospital_id'], 'encrypt_details') and hospital['hospital_id'].encrypt_details.is_valid:
+                        existing_valid_details_indexes.append(index)
+                for index in sorted(existing_valid_details_indexes, reverse=True):
+                    del attrs['hospitals'][index]
+                if not attrs['hospitals']:
+                    raise serializers.ValidationError('encrypted data already present for given hospitals')
+        return attrs
+
 class BulkCreateDoctorSerializer(serializers.Serializer):
     name = serializers.CharField(max_length=200)
     online_consultation_fees = serializers.IntegerField(required=False, min_value=0, allow_null=True)
+    license = serializers.CharField(max_length=200, allow_blank=True, required=False)
     phone_number = serializers.IntegerField(required=False, min_value=5000000000, max_value=9999999999, allow_null=True)
     is_appointment = serializers.BooleanField(default=False)
     is_billing = serializers.BooleanField(default=False)
@@ -259,7 +303,7 @@ class CreateHospitalSerializer(serializers.Serializer):
 class DoctorModelSerializer(serializers.ModelSerializer):
     class Meta:
         model = doc_models.Doctor
-        fields = ('id', 'name', 'online_consultation_fees', 'source_type')
+        fields = ('id', 'name', 'online_consultation_fees', 'source_type', 'license')
 
 
 class HospitalModelSerializer(serializers.ModelSerializer):
@@ -298,3 +342,252 @@ class UpdateHospitalConsent(serializers.Serializer):
         # if attrs.get('hospital_id').is_listed_on_docprime is True:
         #     raise serializers.ValidationError('hospital already listed on docprime')
         return attrs
+
+
+class GeneralInvoiceItemsSerializer(serializers.Serializer):
+    id = serializers.CharField(max_length=300)
+    item = serializers.CharField(max_length=200)
+    base_price = serializers.DecimalField(max_digits=10, decimal_places=2)
+    description = serializers.CharField(max_length=500, required=False, allow_null=True, allow_blank=True)
+    tax_amount = serializers.DecimalField(max_digits=10, decimal_places=2, required=False, allow_null=True)
+    tax_percentage = serializers.DecimalField(max_digits=5, decimal_places=2, required=False, allow_null=True,
+                                              min_value=0)
+    discount_amount = serializers.DecimalField(max_digits=10, decimal_places=2, required=False, allow_null=True)
+    discount_percentage = serializers.DecimalField(max_digits=5, decimal_places=2, required=False, allow_null=True,
+                                                   min_value=0, max_value=100)
+    hospital_ids = serializers.ListField(child=serializers.IntegerField())
+    doctor_id = serializers.PrimaryKeyRelatedField(queryset=doc_models.Doctor.objects.all(), required=False)
+
+    def validate(self, attrs):
+        request = self.context.get("request")
+        user = request.user if request else None
+        doctor = attrs.get("doctor_id")
+        hospital_ids = set(attrs.get("hospital_ids"))
+        hospitals = doc_models.Hospital.objects.filter(id__in=hospital_ids)
+        general_invoice_item = doc_models.GeneralInvoiceItems.objects.filter(id=attrs.get('id')).first()
+        received_tax_amount = attrs.get('tax_amount')
+        received_discount_amount = attrs.get('discount_amount')
+
+        if len(hospitals) != len(hospital_ids):
+            raise serializers.ValidationError("one or more invalid hospital ids not found")
+        manageable_hospitals = doc_models.Hospital.objects.filter(manageable_hospitals__user=request.user).distinct()
+        if not (set(hospitals) <= set(manageable_hospitals)):
+            raise serializers.ValidationError("hospital_ids include hospitals not manageable by current user")
+        attrs['hospitals'] = hospitals
+
+        if not doctor:
+            admin = GenericAdmin.objects.filter(Q(user=user, hospital__in=hospitals),
+                                                Q(Q(super_user_permission=True) |
+                                                  Q(permission_type=GenericAdmin.APPOINTMENT)))
+        else:
+            if not doc_models.DoctorClinic.objects.filter(doctor=doctor, hospital__in=hospitals).exists():
+                raise serializers.ValidationError("doctor_id not available in any of the hospital_ids")
+            admin = GenericAdmin.objects.filter(Q(user=user, hospital__in=hospitals),
+                                                Q(Q(super_user_permission=True) |
+                                                  Q(Q(permission_type=GenericAdmin.APPOINTMENT),
+                                                    Q(doctor__isnull=True) | Q(doctor=doctor))))
+        if user and not admin.exists():
+            raise serializers.ValidationError('user not admin for given hospitals or the appointment doctor_id, if present')
+        attrs['user'] = user if user else None
+
+        if general_invoice_item:
+            attrs['general_invoice_item'] = general_invoice_item
+
+        if attrs.get('tax_percentage'):
+            calculated_tax_amount = attrs.get('base_price') * attrs.get('tax_percentage', 0) / 100
+            calculated_tax_amount = round(calculated_tax_amount, doc_models.GeneralInvoiceItems.DECIMAL_PLACES)
+            if not received_tax_amount:
+                raise serializers.ValidationError("tax_amount is also required with tax_percentage")
+            elif received_tax_amount != calculated_tax_amount:
+                raise serializers.ValidationError("incorrect tax amount for given tax percentage")
+
+        if attrs.get('discount_percentage'):
+            calculated_discount_amount = (attrs.get('base_price') + attrs.get('tax_amount', 0)) * attrs.get('discount_percentage', 0) / 100
+            calculated_discount_amount = round(calculated_discount_amount, doc_models.GeneralInvoiceItems.DECIMAL_PLACES)
+            if not received_discount_amount:
+                raise serializers.ValidationError("discount_amount is also required with discount_percentage")
+            elif received_discount_amount != calculated_discount_amount:
+                raise serializers.ValidationError("incorrect discount amount for given discount percentage")
+
+        if (attrs.get('base_price') + attrs.get('tax_amount', 0) - attrs.get('discount_amount', 0)) < 0:
+            raise serializers.ValidationError("calculated price is negative, too much discount")
+
+        return attrs
+
+
+class GeneralInvoiceItemsModelSerializer(serializers.ModelSerializer):
+
+    class Meta:
+        model = doc_models.GeneralInvoiceItems
+        fields = ('id', 'item', 'base_price', 'description', 'tax_amount', 'tax_percentage', 'discount_amount',
+                  'discount_percentage', 'hospitals')
+
+
+class SelectedInvoiceItemsSerializer(serializers.Serializer):
+    invoice_item = serializers.PrimaryKeyRelatedField(queryset=doc_models.GeneralInvoiceItems.objects.all())
+    quantity = serializers.IntegerField(min_value=1)
+    calculated_price = serializers.DecimalField(max_digits=10, decimal_places=2)
+
+    def validate(self, attrs):
+        invoice_item = attrs['invoice_item']
+        quantity = attrs['quantity']
+        calculated_price = attrs['calculated_price']
+        rounded_calculated_price = round(calculated_price, doc_models.GeneralInvoiceItems.DECIMAL_PLACES)
+
+        computed_price = invoice_item.get_computed_price()
+        rounded_computed_price = round(quantity * computed_price, doc_models.GeneralInvoiceItems.DECIMAL_PLACES)
+
+        if rounded_calculated_price != rounded_computed_price:
+            raise serializers.ValidationError(
+                'calculated price for invoice_item with ID - {} is incorrect or not in coordination with item computed price'.format(
+                    invoice_item.id))
+
+        return attrs
+
+
+
+class SelectedInvoiceItemsJSONSerializer(serializers.Serializer):
+    invoice_item = GeneralInvoiceItemsModelSerializer(many=False)
+    quantity = serializers.IntegerField(min_value=1)
+    calculated_price = serializers.DecimalField(max_digits=10, decimal_places=2)
+
+
+class SelectedInvoiceItemsModelSerializer(serializers.ModelSerializer):
+
+    class Meta:
+        model = doc_models.SelectedInvoiceItems
+        fields = '__all__'
+
+
+class PartnersAppInvoiceSerialier(serializers.Serializer):
+    appointment_id = serializers.PrimaryKeyRelatedField(queryset=doc_models.OfflineOPDAppointments.objects.all())
+    consultation_fees = serializers.IntegerField(min_value=0)
+    selected_invoice_items = serializers.ListField(child=SelectedInvoiceItemsSerializer(many=False), required=False,
+                                                   allow_empty=True)
+    payment_status = serializers.ChoiceField(choices=doc_models.PartnersAppInvoice.PAYMENT_STATUS)
+    payment_type = serializers.ChoiceField(choices=doc_models.PartnersAppInvoice.PAYMENT_CHOICES, required=False, allow_null=True)
+    due_date = serializers.DateField(required=False, allow_null=True)
+    sub_total_amount = serializers.DecimalField(max_digits=10, decimal_places=2)
+    invoice_title = serializers.CharField(max_length=300, required=False, allow_blank=True)
+    tax_amount = serializers.DecimalField(max_digits=10, decimal_places=2, required=False, allow_null=True)
+    tax_percentage = serializers.DecimalField(max_digits=5, decimal_places=2, required=False, allow_null=True,
+                                              min_value=0)
+    discount_amount = serializers.DecimalField(max_digits=10, decimal_places=2, required=False, allow_null=True)
+    discount_percentage = serializers.DecimalField(max_digits=5, decimal_places=2, required=False, allow_null=True,
+                                                   min_value=0, max_value=100)
+    total_amount = serializers.DecimalField(max_digits=10, decimal_places=2)
+    generate_invoice = serializers.BooleanField(default=False)
+    is_encrypted = serializers.BooleanField(required=False, default=False)
+    invoice_serial_id = serializers.CharField(required=False, max_length=100)
+
+    def validate(self, attrs):
+        selected_invoice_items = attrs.get('selected_invoice_items')
+        received_subtotal_amount = attrs['sub_total_amount']
+        received_tax_amount = attrs.get('tax_amount')
+        received_discount_amount = attrs.get('discount_amount')
+        received_total_amount = attrs['total_amount']
+
+        if attrs.get('payment_status') == doc_models.PartnersAppInvoice.PAID:
+            attrs['due_date'] = None
+            if not attrs.get('payment_type'):
+                raise serializers.ValidationError('payment type is required for payment status - paid')
+        if attrs.get('payment_status') == doc_models.PartnersAppInvoice.PENDING and not attrs.get('due_date'):
+            raise serializers.ValidationError('due date is required for payment status - pending')
+        if attrs.get('generate_invoice') and not attrs.get('invoice_title'):
+            raise serializers.ValidationError('invoice title is missing for invoice generation')
+        if ( attrs.get("is_encrypted") or attrs.get("invoice_serial_id") ) and not ( attrs.get("is_encrypted") and attrs.get("invoice_serial_id") ):
+            raise serializers.ValidationError("is_encrypted and invoice_serial_id both are required together.")
+        if attrs.get('appointment_id'):
+            attrs['appointment'] = attrs.pop('appointment_id')
+
+        computed_subtotal_amount = attrs['consultation_fees']
+        if selected_invoice_items:
+            for item in selected_invoice_items:
+                computed_subtotal_amount += item['calculated_price']
+        if received_subtotal_amount != computed_subtotal_amount:
+            raise serializers.ValidationError("sub_total_amount is incorrect or not in accordance with the item's calculated_price sum")
+
+        if attrs.get('tax_percentage'):
+            computed_tax_amount= received_subtotal_amount * attrs.get('tax_percentage', 0) / 100
+            computed_tax_amount = round(computed_tax_amount, doc_models.PartnersAppInvoice.DECIMAL_PLACES)
+            if not received_tax_amount:
+                raise serializers.ValidationError("tax_amount is also required with tax_percentage")
+            elif received_tax_amount != computed_tax_amount:
+                raise serializers.ValidationError("incorrect tax amount for given tax percentage")
+
+        if attrs.get('discount_percentage'):
+            computed_discount_amount = (received_subtotal_amount + attrs.get('tax_amount', 0)) * attrs.get('discount_percentage', 0) / 100
+            computed_discount_amount = round(computed_discount_amount, doc_models.GeneralInvoiceItems.DECIMAL_PLACES)
+            if not received_discount_amount:
+                raise serializers.ValidationError("discount_amount is also required with discount_percentage")
+            elif received_discount_amount != computed_discount_amount:
+                raise serializers.ValidationError("incorrect discount amount for given discount percentage")
+
+        computed_total_amount = computed_subtotal_amount + attrs.get('tax_amount') - attrs.get('discount_amount')
+        if received_total_amount != computed_total_amount:
+            raise serializers.ValidationError("incorrect total amount received for given data")
+
+        if received_total_amount < 0:
+            raise serializers.ValidationError("total amount is negative, too much discount")
+
+        return attrs
+
+
+class PartnersAppInvoiceModelSerialier(serializers.ModelSerializer):
+    appointment_id = serializers.PrimaryKeyRelatedField(read_only=True, pk_field=UUIDField(format='hex_verbose'))
+
+    class Meta:
+        model = doc_models.PartnersAppInvoice
+        fields = ('id', 'created_at', 'updated_at', 'invoice_serial_id', 'consultation_fees', 'selected_invoice_items',
+                  'payment_status', 'payment_type', 'due_date', 'invoice_title', 'sub_total_amount', 'tax_amount',
+                  'tax_percentage', 'discount_amount', 'discount_percentage', 'total_amount', 'is_invoice_generated',
+                  'is_valid', 'is_edited', 'edited_by', 'appointment_id', 'encoded_url', 'is_encrypted')
+
+
+class ListInvoiceItemsSerializer(serializers.Serializer):
+    hospital_id = serializers.PrimaryKeyRelatedField(queryset=doc_models.Hospital.objects.all(), required=False)
+    doctor_id = serializers.PrimaryKeyRelatedField(queryset=doc_models.Doctor.objects.all(), required=False)
+
+    def validate(self, attrs):
+        request = self.context.get("request")
+        user = request.user if request else None
+        hospital = attrs.get('hospital_id')
+        doctor = attrs.get('doctor_id')
+        # hospital = attrs['appointment_id'].hospital
+        # doctor = attrs['appointment_id'].doctor
+        if doctor and not hospital:
+            raise serializers.ValidationError("hospital_id is required if doctor_id is present")
+        if hospital and doctor:
+            if not doc_models.DoctorClinic.objects.filter(doctor=doctor, hospital=hospital).exists():
+                raise serializers.ValidationError("doctor_id not available in given hospital_id")
+            admin = GenericAdmin.objects.filter(Q(user=user, hospital=hospital),
+                                                Q(Q(super_user_permission=True) |
+                                                  Q(Q(permission_type=GenericAdmin.APPOINTMENT),
+                                                    Q(doctor__isnull=True) | Q(doctor=doctor))))
+        elif hospital:
+            admin = GenericAdmin.objects.filter(Q(user=user, hospital=hospital),
+                                                Q(Q(super_user_permission=True) |
+                                                  Q(permission_type=GenericAdmin.APPOINTMENT)))
+        if hospital and user and not admin.exists():
+            raise serializers.ValidationError('user not admin for given data')
+        # if admin.exists:
+        #     attrs['admin'] = admin
+        return attrs
+
+
+class UpdatePartnersAppInvoiceSerializer(serializers.Serializer):
+    invoice_id = serializers.PrimaryKeyRelatedField(queryset=doc_models.PartnersAppInvoice.objects.all())
+    data = PartnersAppInvoiceSerialier(many=False)
+
+    def validate(self, attrs):
+        super().validate(attrs)
+        if not attrs.get('invoice_id').is_valid:
+            raise serializers.ValidationError("valid invoice id is required")
+        return attrs
+
+
+class ProviderEncryptResponseModelSerializer(serializers.ModelSerializer):
+
+    class Meta:
+        model = doc_models.ProviderEncrypt
+        fields = "__all__"

@@ -3,6 +3,7 @@ import json
 from django.contrib.contenttypes.fields import GenericForeignKey
 from django.contrib.contenttypes.models import ContentType
 from django.core.files.uploadedfile import SimpleUploadedFile
+from django.core.validators import FileExtensionValidator
 from django.db import models
 from django.contrib.postgres.fields import JSONField, ArrayField
 from django.forms.models import model_to_dict
@@ -19,6 +20,7 @@ from weasyprint import HTML
 from django.conf import settings
 from num2words import num2words
 import datetime
+from datetime import timedelta
 import pytz
 import logging
 import string
@@ -59,6 +61,15 @@ class NotificationAction:
     LAB_INVOICE = 11
 
     INSURANCE_CONFIRMED=15
+    INSURANCE_ENDORSMENT_APPROVED=82
+    INSURANCE_ENDORSMENT_REJECTED=83
+    INSURANCE_ENDORSMENT_PENDING=84
+    INSURANCE_ENDORSMENT_PARTIAL_APPROVED=85
+    INSURANCE_CANCELLATION_APPROVED=86
+    INSURANCE_CANCEL_INITIATE = 73
+    INSURANCE_CANCELLATION=74
+    INSURANCE_FLOAT_LIMIT=75
+    INSURANCE_MIS=76
     OPD_OTP_BEFORE_APPOINTMENT = 30
     LAB_OTP_BEFORE_APPOINTMENT = 31
     OPD_CONFIRMATION_CHECK_AFTER_APPOINTMENT = 32
@@ -71,7 +82,27 @@ class NotificationAction:
     CASHBACK_CREDITED = 55
 
     IPD_PROCEDURE_MAIL = 60
+    IPD_PROCEDURE_COST_ESTIMATE = 61
 
+    LAB_LOGO_CHANGE_MAIL = 70
+    PRICING_ALERT_EMAIL = 72
+    DOCPRIME_APPOINTMENT_REMINDER_PROVIDER_SMS = 69
+    PROVIDER_ENCRYPTION_ENABLED = 78
+    PROVIDER_ENCRYPTION_DISABLED = 79
+    LOGIN_OTP = 80
+    REQUEST_ENCRYPTION_KEY = 81
+    CHAT_NOTIFICATION = 87
+
+    COD_TO_PREPAID = 91
+    COD_TO_PREPAID_REQUEST = 92
+
+    OPD_DAILY_SCHEDULE = 98
+    USERPROFILE_EMAIL_UPDATE = 99
+    LAB_CONFIRMATION_CHECK_AFTER_APPOINTMENT = 93
+    LAB_CONFIRMATION_SECOND_CHECK_AFTER_APPOINTMENT = 94
+    LAB_FEEDBACK_AFTER_APPOINTMENT = 95
+
+    CONTACT_US_EMAIL = 65
     NOTIFICATION_TYPE_CHOICES = (
         (APPOINTMENT_ACCEPTED, "Appointment Accepted"),
         (APPOINTMENT_CANCELLED, "Appointment Cancelled"),
@@ -94,10 +125,21 @@ class NotificationAction:
         (DOCTOR_INVOICE, "Doctor Invoice"),
         (LAB_INVOICE, "Lab Invoice"),
         (INSURANCE_CONFIRMED, "Insurance Confirmed"),
+        (INSURANCE_ENDORSMENT_APPROVED, "Insurance endorsment completed."),
+        (INSURANCE_ENDORSMENT_REJECTED, "Insurance endorsment rejected."),
+        (INSURANCE_ENDORSMENT_PENDING, "Insurance endorsment received."),
         (CASHBACK_CREDITED, "Cashback Credited"),
         (REFUND_BREAKUP, 'Refund break up'),
         (REFUND_COMPLETED, 'Refund Completed'),
-        (IPD_PROCEDURE_MAIL, 'IPD Procedure Mail')
+        (IPD_PROCEDURE_MAIL, 'IPD Procedure Mail'),
+        (PRICING_ALERT_EMAIL, 'Pricing Change Mail'),
+        (LAB_LOGO_CHANGE_MAIL, 'Lab Logo Change Mail'),
+        (DOCPRIME_APPOINTMENT_REMINDER_PROVIDER_SMS, 'Docprime Appointment Reminder Provider SMS'),
+        (LOGIN_OTP, 'Login OTP'),
+        (CHAT_NOTIFICATION, "Push Notification from chat"),
+        (COD_TO_PREPAID, 'COD to Prepaid'),
+        (COD_TO_PREPAID_REQUEST, 'COD To Prepaid Request'),
+        (OPD_DAILY_SCHEDULE, 'OPD Daily Schedule')
     )
 
     OPD_APPOINTMENT = "opd_appointment"
@@ -245,7 +287,7 @@ class NotificationAction:
             patient_name = instance.profile.name if instance.profile.name else ""
             doctor_name = instance.doctor.name if instance.doctor.name else ""
             if instance.cancellation_type != instance.AUTO_CANCELLED:
-                body = "Appointment with Dr. {} at {}, {} has been cancelled as per your request.".format(
+                body = "Appointment with Dr. {} at {}, {} has been cancelled.".format(
                     doctor_name, time_slot_start.strftime("%I:%M %P"),
                     time_slot_start.strftime("%d/%m/%y")
                 )
@@ -744,6 +786,108 @@ class EmailNotification(TimeStampedModel, EmailNotificationOpdMixin, EmailNotifi
             publish_message(message)
         return booking_url
 
+    @classmethod
+    def send_endorsement_request_url(cls, token, email):
+        booking_url = "{}/agent/booking?token={}".format(settings.CONSUMER_APP_DOMAIN, token)
+        booking_url = booking_url + "&callbackurl=insurance/insurance-user-details-review?is_endorsement=true"
+        short_url = generate_short_url(booking_url)
+        html_body = "Your Endorsement Request url is - {} . Please confirm to process".format(short_url)
+        email_subject = "Insurance Endorsement Request"
+        if email:
+            email_noti = {
+                "email": email,
+                "content": html_body,
+                "email_subject": email_subject
+            }
+            message = {
+                "data": email_noti,
+                "type": "email"
+            }
+            message = json.dumps(message)
+            publish_message(message)
+        return booking_url
+
+    @classmethod
+    def send_insurance_float_alert_email(cls, email, html_body):
+        email_subject = 'ALERT!!! Insurance Float amount is on the limit.'
+        if email:
+            email_obj = cls.objects.create(email=email, notification_type=NotificationAction.INSURANCE_FLOAT_LIMIT,
+                                                          content=html_body,email_subject=email_subject, cc=[], bcc=[])
+            email_obj.save()
+
+            email_noti = {
+                "email": email,
+                "content": html_body,
+                "email_subject": email_subject
+            }
+            message = {
+                "data": email_noti,
+                "type": "email"
+            }
+            message = json.dumps(message)
+            publish_message(message)
+
+    @classmethod
+    def send_insurance_mis(cls, attachment):
+        email_subject = 'Insurance MIS'
+        html_body = 'Insurance MIS. Please find the attached MIS.'
+        emails = settings.INSURANCE_MIS_EMAILS
+        to_email = emails[0]
+        cc_emails = emails[1:]
+        email_obj = cls.objects.create(attachments=attachment, email=to_email, notification_type=NotificationAction.INSURANCE_MIS,
+                                       content=html_body, email_subject=email_subject, cc=cc_emails, bcc=[])
+        email_obj.save()
+
+        message = {
+            "data": model_to_dict(email_obj),
+            "type": "email"
+        }
+        message = json.dumps(message)
+        publish_message(message)
+
+    @classmethod
+    def send_contact_us_notification_email(cls, content_type, obj_id, email, html_body, mobile_number):
+        email_subject = 'CONTACT US - A New Message Received ({})'.format(mobile_number)
+        if email:
+            email_obj = cls.objects.create(email=email, notification_type=NotificationAction.CONTACT_US_EMAIL,
+                                           content=html_body, email_subject=email_subject, cc=[], bcc=[],
+                                           content_type=content_type, object_id=obj_id)
+            email_obj.save()
+
+            email_noti = {
+                "email": email,
+                "content": html_body,
+                "email_subject": email_subject
+            }
+            message = {
+                "data": email_noti,
+                "type": "email"
+            }
+            message = json.dumps(message)
+            publish_message(message)
+
+    @classmethod
+    def send_userprofile_email_update(cls, obj):
+        from django.utils.safestring import mark_safe
+        email = obj.new_email
+        name = obj.profile.name
+
+        profile_type = 'Insurance' if obj.profile.is_insured_profile else 'User'
+
+        email_subject = 'Docprime : Profile Email update otp'
+        html_body = mark_safe('<p>Dear  {name},</p><p>Please enter the OTP mentioned below to verify the new email ID for {profile_type} profile</p><p>OTP: {otp}</p><p>Thanks</p><p>Team Docprime </p>'.format(profile_type=profile_type, name=str(name.title()), otp=str(obj.otp)))
+        # html_body = 'Please find the otp for email change. %s' % str(obj.otp)
+        email_obj = cls.objects.create(email=email, notification_type=NotificationAction.USERPROFILE_EMAIL_UPDATE,
+                                       content=html_body, email_subject=email_subject, cc=[], bcc=[])
+        email_obj.save()
+
+        message = {
+            "data": model_to_dict(email_obj),
+            "type": "email"
+        }
+        message = json.dumps(message)
+        publish_message(message)
+
 
 class SmsNotificationOpdMixin:
 
@@ -852,10 +996,14 @@ class SmsNotification(TimeStampedModel, SmsNotificationOpdMixin, SmsNotification
             publish_message(message)
 
     @classmethod
-    def send_booking_url(cls, token, phone_number):
+    def send_booking_url(cls, token, phone_number, name):
         booking_url = "{}/agent/booking?token={}".format(settings.CONSUMER_APP_DOMAIN, token)
         short_url = generate_short_url(booking_url)
-        html_body = "Your booking url is - {} . Please pay to confirm".format(short_url)
+        html_body = "Dear {}, \n" \
+                    "Please click on the link to review your appointment details and make an online payment.\n" \
+                    "{}\n"\
+                    "Thanks,\n" \
+                    "Team Docprime".format(name, short_url)
         if phone_number:
             sms_noti = {
                 "phone_number": phone_number,
@@ -889,12 +1037,32 @@ class SmsNotification(TimeStampedModel, SmsNotificationOpdMixin, SmsNotification
         return booking_url
 
     @classmethod
+    def send_endorsement_request_url(cls, token, phone_number):
+        booking_url = "{}/agent/booking?token={}".format(settings.CONSUMER_APP_DOMAIN, token)
+        booking_url = booking_url + "&callbackurl=insurance/insurance-user-details-review?is_endorsement=true"
+        short_url = generate_short_url(booking_url)
+        html_body = "Your Insurance Endorsement request url is - {} . Please confirm to process".format(short_url)
+        if phone_number:
+            sms_notification = {
+                "phone_number": phone_number,
+                "content": html_body,
+            }
+            message = {
+                "data": sms_notification,
+                "type": "sms"
+            }
+            message = json.dumps(message)
+            publish_message(message)
+        return booking_url
+
+    @classmethod
+    @classmethod
     def send_cart_url(cls, token, phone_number, order_id):
-        callback_url = "payment/{}?refs=lab".format(order_id)
+        callback_url = "{}/payment/{}?refs=lab".format(settings.CONSUMER_APP_DOMAIN, order_id)
         payment_page_url = "{}/agent/booking?token={}&agent=false&callbackurl={}".format(settings.CONSUMER_APP_DOMAIN,
                                                                                          token, callback_url)
-        # short_url = generate_short_url(payment_page_url)
-        html_body = "Your booking url is - {} . Please pay to confirm".format(payment_page_url)
+        short_url = generate_short_url(payment_page_url)
+        html_body = "Your booking url is - {} . Please pay to confirm".format(short_url)
         if phone_number:
             sms_noti = {
                 "phone_number": phone_number,
@@ -906,7 +1074,7 @@ class SmsNotification(TimeStampedModel, SmsNotificationOpdMixin, SmsNotification
             }
             message = json.dumps(message)
             publish_message(message)
-        return payment_page_url
+        return short_url
 
     @classmethod
     def send_app_download_link(cls, phone_number, context):
@@ -946,6 +1114,45 @@ class WhtsappNotification(TimeStampedModel):
     template_name = models.CharField(max_length=100, null=False, blank=False)
     notification_type = models.PositiveIntegerField(choices=NotificationAction.NOTIFICATION_TYPE_CHOICES)
     payload = JSONField(null=False, blank=False, default={})
+    extras = JSONField(null=False, blank=False, default={})
+
+    @classmethod
+    def send_login_otp(cls, phone_number, request_source, **kwargs):
+
+        from ondoc.sms.backends.backend import create_otp
+        via_sms = kwargs.get('via_sms')
+        via_whatsapp = kwargs.get('via_whatsapp')
+        otp = create_otp(phone_number, "{}", call_source=request_source, return_otp=True, via_sms=via_sms, via_whatsapp=via_whatsapp)
+
+        template_name = 'docprime_otp_web'
+        if request_source == 'docprimechat':
+            template_name = 'docprime_otp_verification'
+
+        whatsapp_message = {"media": {},
+                            "message": "",
+                            "template": {
+                                "name": template_name,
+                                "params": [otp]
+                            },
+                            "message_type": "HSM",
+                            "phone_number": phone_number
+                            }
+
+        extra = {'call_source': request_source}
+        whatsapp_noti = WhtsappNotification.objects.create(
+            phone_number=phone_number,
+            notification_type=NotificationAction.LOGIN_OTP,
+            template_name='docprime_otp_verification',
+            payload=whatsapp_message,
+            extras=extra
+        )
+
+        whatsapp_payload = {
+                "data": whatsapp_noti.payload,
+                "type": "social_message"
+            }
+
+        publish_message(json.dumps(whatsapp_payload))
 
     class Meta:
         db_table = "whtsapp_notification"

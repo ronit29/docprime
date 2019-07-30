@@ -1,0 +1,294 @@
+{% load static %}
+{% load invoice_tags %}
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml">
+<head>
+    <title>Appointment Confirmed</title>
+    <meta http-equiv="Content-Type" content="text/html; charset=UTF-8"/>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+    <link href="https://fonts.googleapis.com/css?family=Quicksand:300,400,500,700" rel="stylesheet">
+</head>
+<body style="margin: 0; padding: 0; width: 100%; font-family: 'Quicksand', sans-serif;">
+<table align="center" cellpadding="0" cellspacing="0" style="width: 100%; max-width: 600px; margin: auto;">
+    <tbody>
+    <tr>
+        <td>
+            <table style="padding: 0 15px 40px; background-color: #ececec; width: 100%;">
+                <tbody>
+                <tr>
+                    <td>
+                        <table cellpadding="0" cellspacing="0" style="width: 100%; padding-top: 20px;">
+                            <tbody>
+                            <tr>
+                                <td>
+                                    <img src="{{'notification/images/checked-orange.png'|get_absolute_url}}">
+                                </td>
+                                <td style="text-align: right;">
+                                    <img src="{{'notification/images/logo.png'|get_absolute_url}}">
+                                </td>
+                            </tr>
+                            </tbody>
+                        </table>
+                    </td>
+                </tr>
+                <tr>
+                    <td>
+                        <table cellpadding="0" cellspacing="0" style="width: 100%; padding-top: 16px;">
+                            <tbody>
+                            <tr>
+                                <td style="color: #0b0a0a; font-size: 16px; font-weight: 600;">
+                                    Payment Received
+                                </td>
+                            </tr>
+                            <tr>
+                                <td style="color: #0b0a0a; font-size: 14px; font-weight: 500; padding-top: 4px;">
+                                    {{instance.updated_at|date:'M d, Y'}}
+                                </td>
+                            </tr>
+                            </tbody>
+                        </table>
+                    </td>
+                </tr>
+                </tbody>
+            </table>
+        </td>
+    </tr>
+
+
+    <tr>
+        <td>
+            <table cellpadding="0" cellspacing="0" style="width: 100%; padding: 20px 15px 0;">
+                <tbody>
+                <tr>
+                    <td style="color: #3f3f3f; font-size: 16px; font-weight: 500;">
+                        Greetings from Docprime.com!<br/>We have received your payment amounting
+                        Rs. {{instance.effective_price}} against the Booking ID {{instance.id}} .
+                        Your appointment with Dr. {{doctor_name|capfirst}}, on
+                        {{instance.time_slot_start|date:"D jS F Y"}} at {{instance.time_slot_start|date:"h:i A"}}
+                        will now be a cashless visit.
+                        We request you to not pay for your booked service during your visit.
+                    </td>
+                </tr>
+                </tbody>
+            </table>
+        </td>
+    </tr>
+    <tr>
+        <td>
+            <table cellpadding="0" cellspacing="0"
+                   style="width:100%;padding:20px 15px 30px;">
+                <tbody>
+                <tr>
+                    <td>
+                        <table cellpadding="0" cellspacing="0" style="width:100%;">
+                            <tbody>
+                            <tr>
+                                <td style="color:#000000;font-size:16px;font-weight:700;padding-top:16px;width:40%">
+                                    Booking ID
+                                </td>
+                                <td style="color:#3f3f3f;font-size:16px;font-weight:500;padding-top:16px">
+                                    {{instance.id}}
+                                </td>
+                            </tr>
+                            <tr>
+                                <td style="color:#000000;font-size:16px;font-weight:700;padding-top:16px;width:40%">
+                                    Patient
+                                </td>
+                                <td style="color:#3f3f3f;font-size:16px;font-weight:500;padding-top:16px">
+                                    {{patient_name|capfirst}}
+                                </td>
+                            </tr>
+                            <tr>
+                                <td style="color:#000000;font-size:16px;font-weight:700;padding-top:16px;width:40%">
+                                    Doctor
+                                </td>
+                                <td style="color:#3f3f3f;font-size:16px;font-weight:500;padding-top:16px">
+                                    Dr. {{doctor_name|capfirst}}
+                                </td>
+                            </tr>
+                            <tr>
+                                <td style="color:#000000;font-size:16px;font-weight:700;padding-top:16px;width:40%">
+                                    Clinic
+                                </td>
+                                <td style="color:#3f3f3f;font-size:16px;font-weight:500;padding-top:16px">
+                                    {{instance.hospital.name|capfirst}}
+                                </td>
+                            </tr>
+                            <tr>
+                                <td style="color:#000000;font-size:16px;font-weight:700;padding-top:16px;width:40%">
+                                    Clinic Address
+                                </td>
+                                <td style="color:#3f3f3f;font-size:16px;font-weight:500;padding-top:16px">
+                                    {{instance.hospital.get_hos_address}}
+                                </td>
+                            </tr>
+                            <tr>
+                                <td style="color:#000000;font-size:16px;font-weight:700;padding-top:16px;width:40%">
+                                    Date and Time
+                                </td>
+                                <td style="color:#3f3f3f;font-size:16px;font-weight:500;padding-top:16px">
+                                    {{instance.time_slot_start|date:"D jS F Y"}} ||
+                                    {{instance.time_slot_start|date:"h:i A"}}
+                                </td>
+                            </tr>
+                            </tbody>
+                        </table>
+                    </td>
+                </tr>
+                <tr>
+                    <td>
+                        <table cellpadding="0" cellspacing="0"
+                               style="width: 100%;padding:16px 0 16px 0">
+                            <tbody>
+                            <tr>
+                                <td style="color:#000000;font-size:16px;font-weight:700;width:40%">
+                                    Service(s) Included
+                                </td>
+                            </tr>
+                            </tbody>
+                        </table>
+                    </td>
+                </tr>
+                <tr>
+                    <td style="padding-top: 5px;">
+                        <table align="center" cellpadding="0" cellspacing="0"
+                               style="width: 100%;border-collapse: collapse;border: 1px solid black;">
+                            <thead>
+                            <tr>
+                                <th style="border: 1px solid black;">
+                                    S.No.
+                                </th>
+                                <th style="border: 1px solid black;">
+                                    Particulars
+                                </th>
+                                <th style="border: 1px solid black;">
+                                    MRP
+                                </th>
+                                <th style="border: 1px solid black;">
+                                    Discount
+                                </th>
+                                <th style="border: 1px solid black;">
+                                    Grand Total
+                                </th>
+                            </tr>
+                            </thead>
+                            <tbody>
+                            {% for procedure in procedures %}
+                            <tr>
+                                <td style="border: 1px solid black;text-align: center;color:#3f3f3f;font-size:16px;font-weight:500;">
+                                    {{forloop.counter}}
+                                </td>
+                                <td style="border: 1px solid black;text-align: center;color:#3f3f3f;font-size:16px;font-weight:500;">
+                                    {{procedure.name|capfirst}}
+                                </td>
+                                <td style="border: 1px solid black;text-align: center;color:#3f3f3f;font-size:16px;font-weight:500;">
+                                    {{procedure.mrp}}
+                                </td>
+                                <td style="border: 1px solid black;text-align: center;color:#3f3f3f;font-size:16px;font-weight:500;">
+                                    {{procedure.discount}}
+                                </td>
+                                <td style="border: 1px solid black;text-align: center;color:#3f3f3f;font-size:16px;font-weight:500;">
+                                    {{procedure.deal_price}}
+                                </td>
+                            </tr>
+                            {% endfor %}
+                            {% if coupon_discount %}
+                            <tr>
+                                <td colspan="4"
+                                    style="border: 1px solid black;text-align: center;color:#000000;font-size:16px;font-weight:700;">
+                                    Coupon Discount
+                                </td>
+                                <td style="border: 1px solid black;text-align: center;color:#3f3f3f;font-size:16px;font-weight:500;">
+                                    {{coupon_discount}}
+                                </td>
+                            </tr>
+                            {% endif %}
+                            <tr>
+                                <td colspan="4"
+                                    style="border: 1px solid black;text-align: center;color:#000000;font-size:16px;font-weight:700;">
+                                    {% if instance.payment_type == 2 %}
+                                    Amount To Be Paid
+                                    {% else %}
+                                    Amount Paid
+                                    {% endif %}
+                                </td>
+                                <td style="border: 1px solid black;text-align: center;color:#3f3f3f;font-size:16px;font-weight:500;">
+                                    {% if instance.payment_type == 2 %}
+                                    {{cod_amount}}
+                                    {% else %}
+                                    {{instance.effective_price}}
+                                    {% endif %}
+
+                                </td>
+                            </tr>
+                            </tbody>
+                        </table>
+                    </td>
+                </tr>
+                <tr>
+                    <td style="color:#3f3f3f;font-size:16px;font-weight:500;padding-top:30px">
+                        In case of any queries please contact us at customercare@docprime.com .
+                    </td>
+                </tr>
+                <tr>
+                    <td style="color:#3f3f3f;font-size:16px;font-weight:500;padding-top:10px">
+                        Thanks for choosing docprime.com
+                    </td>
+                </tr>
+                </tbody>
+            </table>
+        </td>
+    </tr>
+    {{email_banners|safe}}
+    <tr>
+        <td>
+            <table cellpadding="0" cellspacing="0" style="width:100%;padding:20px 15px 40px">
+                <tbody>
+                <tr>
+                    <td style="font-size:14px;font-weight:500;color:#757575;text-align:center; border-top: 1px solid #d3d3d3;">
+                        This is a system-generated e-mail. Please do not reply to this e-mail. For any support
+                        please write to customercare@docprime.com.
+                    </td>
+                </tr>
+                </tbody>
+            </table>
+        </td>
+    </tr>
+
+    <tr>
+        <td>
+            <table cellpadding="0" cellspacing="0" style="width: 100%; padding: 10px 15px; background-color: #f78631;">
+                <tbody>
+                <tr>
+                    <td style="font-size: 14px; color: #fafafa; width: 55%">
+                        All Rights Reserved
+                    </td>
+                    <td style="width: 9%; text-align: right;">
+                        <a href="https://www.youtube.com/channel/UCL_6Tstix2ACaBk0jwf_1ug" target="_blank"><img
+                                src="{{'notification/images/youtube-email.png'|get_absolute_url}}"></a>
+                    </td>
+                    <td style="width: 9%; text-align: right;">
+                        <a href="https://www.instagram.com/docprimeIndia/" target="_blank"><img
+                                src="{{'notification/images/instagram-email.png'|get_absolute_url}}"></a>
+                    </td>
+                    <td style="width: 9%; text-align: right;">
+                        <a href="https://www.facebook.com/DocPrimeIndia" target="_blank"><img
+                                src="{{'notification/images/facebook-email.png'|get_absolute_url}}"></a>
+                    </td>
+                    <td style="width: 9%; text-align: right;">
+                        <a href="https://twitter.com/DocPrimeindia" target="_blank"><img
+                                src="{{'notification/images/twitter-email.png'|get_absolute_url}}"></a>
+                    </td>
+                    <td style="width: 9%; text-align: right;">
+                        <a href="https://www.linkedin.com/company/docprime/" target="_blank"><img
+                                src="{{'notification/images/linkedin-email.png'|get_absolute_url}}"></a>
+                    </td>
+                </tr>
+                </tbody>
+            </table>
+        </td>
+    </tr>
+    </tbody>
+</table>
+</body>
+</html>

@@ -16,6 +16,8 @@ import json
 import logging
 from collections import OrderedDict
 import datetime
+from django.db.models import Q
+from django.utils import timezone
 
 logger = logging.getLogger(__name__)
 
@@ -92,7 +94,7 @@ def dump_to_elastic():
                 return str(obj)
             raise TypeError("Object of type '%s' is not JSON serializable" % type(obj).__name__)
 
-        batch_size = 10000
+        batch_size = 5000
         with transaction.atomic():
             with connection.connection.cursor(name='elasticdata', cursor_factory=psycopg2.extras.RealDictCursor) as cursor:
                 cursor.itersize = batch_size
@@ -240,8 +242,12 @@ def update_ben_status_from_pg():
 @task()
 def update_merchant_payout_pg_status():
     from ondoc.account.models import MerchantPayout
-    payouts = MerchantPayout.objects.all()
+    # payouts = MerchantPayout.objects.all().order_by('-id')
+    # payouts = MerchantPayout.objects.filter(Q(pg_status='SETTLEMENT_COMPLETED')|Q(utr_no__gt='')|Q(utr_no__isnull=False)|Q(type=2))
+
+    payouts = MerchantPayout.objects.filter((Q(pg_status='SETTLEMENT_COMPLETED') & Q(utr_no='')) | Q(status=MerchantPayout.INPROCESS) | Q(type=2))
     for p in payouts:
+        p.refresh_from_db()
         p.update_status_from_pg()
     return True
 
@@ -329,6 +335,8 @@ def set_order_dummy_transaction(self, order_id, user_id):
     from ondoc.account.models import Order, DummyTransactions
     from ondoc.insurance.models import UserInsurance
     from ondoc.account.models import User
+    from ondoc.account.mongo_models import PgLogs
+    from ondoc.notification.tasks import save_pg_response
     try:
         if not settings.PAYOUTS_ENABLED:
             return
@@ -392,7 +400,11 @@ def set_order_dummy_transaction(self, order_id, user_id):
             if insurer_code:
                 req_data['insurerCode'] = insurer_code
 
+            for key in req_data:
+                req_data[key] = str(req_data[key])
+
             response = requests.post(url, data=json.dumps(req_data), headers=headers)
+            save_pg_response.apply_async((PgLogs.DUMMY_TXN, user_insurance.order.id, None, response.json(), req_data,), eta=timezone.localtime(), )
             if response.status_code == status.HTTP_200_OK:
                 resp_data = response.json()
                 if resp_data.get("ok") is not None and resp_data.get("ok") == 1:
@@ -464,7 +476,6 @@ def process_payout(payout_id):
         if not order_data:
              raise Exception("Order not found for given payout " + str(payout_data))
 
-
         all_txn = order_data.getTransactions()
 
         if not all_txn or all_txn.count() == 0:
@@ -530,3 +541,49 @@ def integrator_order_summary():
 def get_thyrocare_reports():
     from ondoc.integrations.Integrators import Thyrocare
     Thyrocare.get_generated_report()
+
+@task()
+def create_appointment_admins_from_spocs():
+    from ondoc.authentication.models import SPOCDetails, GenericAdmin
+    SPOCDetails.create_appointment_admins_from_spocs()
+    GenericAdmin.create_users_from_generic_admins()
+
+@task()
+def add_net_revenue_for_merchant():
+    from ondoc.doctor.models import OpdAppointment
+    from ondoc.diagnostic.models import LabAppointment
+    opd_appointments_count = OpdAppointment.objects.count()
+    opd_appointments = OpdAppointment.objects.filter(status=OpdAppointment.COMPLETED)[0:opd_appointments_count]
+    appointment_wise_revenue(opd_appointments)
+    print('Opd Appointment Done')
+
+    lab_appointments_count = LabAppointment.objects.count()
+    lab_appointments = LabAppointment.objects.filter(status=LabAppointment.COMPLETED)[0:lab_appointments_count]
+    appointment_wise_revenue(lab_appointments)
+    print('Lab Appointment Done')
+
+
+def appointment_wise_revenue(all_appointments):
+    from ondoc.authentication.models import MerchantNetRevenue
+    with transaction.atomic():
+        for appointment in all_appointments.iterator(chunk_size=100):
+            created_at = datetime.datetime.strptime(appointment.created_at.strftime("%Y-%m-%d"), "%Y-%m-%d")
+            financial_year_end = datetime.datetime.strptime('2019-03-31', "%Y-%m-%d")
+
+            if created_at <= financial_year_end:
+                financial_year = "2018-2019"
+            else:
+                financial_year = '2019-2020'
+
+            # Create net revenue
+            booking_net_revenue = appointment.get_booking_revenue()
+            merchant = appointment.get_merchant
+            if merchant:
+                # print(booking_net_revenue)
+                net_revenue_obj = MerchantNetRevenue.objects.filter(merchant=merchant, financial_year=financial_year).first()
+                if net_revenue_obj:
+                    net_revenue_obj.total_revenue += booking_net_revenue
+                    net_revenue_obj.save()
+                else:
+                    MerchantNetRevenue.objects.create(merchant=merchant, total_revenue=booking_net_revenue,
+                                                      financial_year=financial_year)

@@ -5,7 +5,7 @@ from ondoc.authentication import models as auth_models
 from ondoc.account.models import Order
 from ondoc.authentication.models import UserProfile
 from ondoc.cart.models import Cart
-from ondoc.coupon.models import Coupon
+from ondoc.coupon.models import Coupon, RandomGeneratedCoupon
 from ondoc.diagnostic.models import LabTest, AvailableLabTest, Lab, LabPricingGroup
 from django.db.models import F, Case, When, Value, IntegerField
 
@@ -106,13 +106,19 @@ class CartItemSerializer(serializers.ModelSerializer):
 
 
     def get_coupons(self, obj):
-        coupon_data = Coupon.objects.filter(code__in=obj.data.get('coupon_code', []))\
-                                    .annotate(is_cashback=Case(When(coupon_type=Coupon.DISCOUNT, then=Value(0)),
-                                                              When(coupon_type=Coupon.CASHBACK, then=Value(1)), output_field=IntegerField()))\
-                                    .values('code', 'id', 'is_cashback')
+        coupon_data = RandomGeneratedCoupon.get_coupons(obj.data.get('coupon_code', []))
+        if coupon_data:
+            coupon_data = coupon_data.annotate(is_cashback=Case(When(coupon_type=Coupon.DISCOUNT, then=Value(0)),
+                                                                When(coupon_type=Coupon.CASHBACK, then=Value(1)), output_field=IntegerField())
+                                               )\
+                                .values('code', 'id', 'is_cashback', 'random_coupon_code')
 
-        if coupon_data.exists():
-            return coupon_data
+        if coupon_data and coupon_data.exists():
+            coupon_list = []
+            for c in coupon_data:
+                c["code"] = c["random_coupon_code"] or c["code"]
+                coupon_list.append(c)
+            return coupon_list
         return None
 
     class Meta:

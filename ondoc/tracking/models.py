@@ -81,8 +81,14 @@ class TrackingEvent(auth_models.TimeStampedModel):
         if action not in cls.ACTION_EVENTS:
             return None
 
+        Category = 'ConsumerApp'
+        if kwargs.get("visitor_info"):
+            visitor_info = kwargs.get("visitor_info")
+            if visitor_info and visitor_info.get("from_app", False):
+                Category = 'DocprimeApp'
+
         event_data = {
-            'Category': 'ConsumerApp', 'Action': action, 'CustomerID': user.id,
+            'Category': Category, 'Action': action, 'CustomerID': user.id,
             'leadid': kwargs.get("appointmentId", None), 'event': cls.ACTION_EVENTS[action]
         }
 
@@ -115,3 +121,11 @@ class MigrateTracker(auth_models.TimeStampedModel):
 
     class Meta:
         db_table = 'migrate_tracker'
+
+
+class TrackingSaveLogs(auth_models.TimeStampedModel):
+
+    data = JSONField(null=True)
+
+    class Meta:
+        db_table = 'tracking_logs'

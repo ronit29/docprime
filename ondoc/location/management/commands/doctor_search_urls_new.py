@@ -11,8 +11,12 @@ from ondoc.location.services.doctor_urls import DoctorURL
 #         print("Failed")
 
 
+def doctor_urls():
+    url_creator = DoctorURL()
+    url_creator.create()
+
+
 class Command(BaseCommand):
     def handle(self, **options):
-        url_creator = DoctorURL()
-        url_creator.create()
+        doctor_urls()
         #doctor_search_urls_temp_table()

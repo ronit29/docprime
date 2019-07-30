@@ -1,7 +1,8 @@
 from django.urls import path
 from .views import (LabTestList, LabList, LabAppointmentView, SearchPageViewSet, LabTimingListView,
                     AvailableTestViewSet, LabReportFileViewset, DoctorLabAppointmentsViewSet,
-                    DoctorLabAppointmentsNoAuthViewSet, TestDetailsViewset, LabTestCategoryListViewSet)
+                    DoctorLabAppointmentsNoAuthViewSet, TestDetailsViewset, LabTestCategoryListViewSet,
+                    CompareLabPackagesViewSet, DigitalReports)
 
 # from rest_framework.routers import DefaultRouter
 #
@@ -42,6 +43,8 @@ urlpatterns = [
          name='lab-timing'),
     path('labtiming_new', LabTimingListView.as_view({'get': 'list_new'}),
          name='lab-timing-new'),
+    path('labtiming_v2', LabTimingListView.as_view({'get': 'list_v2'}),
+         name='lab-timing-v2'),
     path('labtest/<int:lab_id>', AvailableTestViewSet.as_view({'get': 'retrieve'}),
          name='lab-available-test'),
     path('lab-report-file', LabReportFileViewset.as_view({'get': 'list'}), name='lab-upload-list'),
@@ -54,4 +57,8 @@ urlpatterns = [
     path('test/details_by_url', TestDetailsViewset.as_view({'get': 'retrieve_test_by_url'}), name='test-details-by-url'),
     path('test/list_by_alphabet', TestDetailsViewset.as_view({'get':'list_by_alphabet'}), name='list-test-by-alphabet'),
     path('test/category', LabTestCategoryListViewSet.as_view({'get': 'list'}), name='test-category'),
+    path('compare_lab_packages', CompareLabPackagesViewSet.as_view({'post': 'retrieve'}), name='lab_packages_comparison'),
+    path('compare_lab_packages_by_url', CompareLabPackagesViewSet.as_view({'post': 'retrieve_by_url'}), name='lab_packages_comparison_by_url'),
+    # path('digital/report/<int:booking_id>', DigitalReports.as_view({'get': 'retrieve'}), name='digital_report'),
+
 ]

@@ -34,7 +34,8 @@ class SubscriptionPlanListViewSet(viewsets.GenericViewSet):
             enabled=True).order_by('deal_price'))
         plan_feature_queryset = list(PlanFeature.objects.prefetch_related('test__test__parameter').filter(enabled=True))
         plans_data = serializers.PlanWithFeatureSerializer(plan_queryset, many=True,
-                                                           context={"plan_feature_queryset": plan_feature_queryset}).data
+                                                           context={"plan_feature_queryset": plan_feature_queryset,
+                                                                    'request': request}).data
         feature_data = serializers.PlanFeatureSerializer(plan_feature_queryset, many=True).data
         return Response({'plans': plans_data, 'feature_details': feature_data})
 

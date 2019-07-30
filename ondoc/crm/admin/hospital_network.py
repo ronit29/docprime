@@ -110,6 +110,11 @@ class HospitalNetworkForm(FormCleanMixin):
     operational_since = forms.ChoiceField(choices=hospital_operational_since_choices, required=False)
     about = forms.CharField(widget=forms.Textarea, required=False)
 
+    class Media:
+        extend = True
+        js = ('https://cdn.ckeditor.com/ckeditor5/10.1.0/classic/ckeditor.js', 'hospital_network/js/init.js')
+        css = {'all': ('hospital_network/css/style.css',)}
+
     class Meta:
         widgets = {
             'matrix_state': autocomplete.ModelSelect2(url='matrix-state-autocomplete'),

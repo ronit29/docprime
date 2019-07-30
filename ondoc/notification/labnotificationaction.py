@@ -91,7 +91,7 @@ class LabNotificationAction(NotificationAction):
             patient_name = instance.profile.name if instance.profile.name else ""
             lab_name = instance.lab.name.title() if instance.lab.name else ""
             if instance.cancellation_type != instance.AUTO_CANCELLED:
-                body = "Appointment with Lab - {} at {}, {} has been cancelled as per your request.".format(
+                body = "Appointment with Lab - {} at {}, {} has been cancelled.".format(
                         lab_name, time_slot_start.strftime("%I:%M %P"),
                         time_slot_start.strftime("%d/%m/%y")
                 )

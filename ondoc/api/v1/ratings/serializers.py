@@ -180,8 +180,8 @@ class RatingsModelSerializer(serializers.ModelSerializer):
                 if obj.appointment_id == ap.id:
                     app = ap
                     break
-            if app:
-                profile = app.profile
+        if app:
+            profile = app.profile
         else:
             for pro in obj.user.profiles.all():
                 if pro.is_default_user:

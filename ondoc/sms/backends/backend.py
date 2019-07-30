@@ -18,7 +18,8 @@ class NodeJsSmsBackend(object):
             "data": {
                 "phone_number": phone_no,
                 "content": quote(message),
-                "retry": retry_send
+                "retry": retry_send,
+                "sms_type": "otp"
             }
         }
         publish_message(json.dumps(payload))
@@ -49,9 +50,11 @@ class SmsBackend(BaseSmsBackend):
     def send_message(self, message, phone_no):
         return self.send(message, phone_no)
 
-    def send_otp(self, message, phone_no, retry_send=False):
-
-        message = create_otp(phone_no, message)
+    def send_otp(self, message, phone_no, retry_send=False, **kwargs):
+        call_source = kwargs.get('call_source')
+        via_sms = kwargs.get('via_sms')
+        via_whatsapp = kwargs.get('via_whatsapp')
+        message = create_otp(phone_no, message, call_source=call_source, via_sms=via_sms, via_whatsapp=via_whatsapp)
         return self.send(message, phone_no, retry_send)
 
 class ConsoleSmsBackend(BaseSmsBackend):
@@ -61,9 +64,12 @@ class ConsoleSmsBackend(BaseSmsBackend):
         self.print(message)
         return True
 
-    def send_otp(self, message, phone_no, retry_send=False):
+    def send_otp(self, message, phone_no, retry_send=False, **kwargs):
 
-        message = create_otp(phone_no, message)
+        call_source = kwargs.get('call_source')
+        via_sms = kwargs.get('via_sms')
+        via_whatsapp = kwargs.get('via_whatsapp')
+        message = create_otp(phone_no, message, call_source=call_source, via_sms=via_sms, via_whatsapp=via_whatsapp)
         self.print(message)
         return True
 
@@ -76,9 +82,12 @@ class WhitelistedSmsBackend(BaseSmsBackend):
         else:
             return self.print(message)
 
-    def send_otp(self, message, phone_no, retry_send=False):
+    def send_otp(self, message, phone_no, retry_send=False, **kwargs):
 
-        message = create_otp(phone_no, message)
+        call_source = kwargs.get('call_source')
+        via_sms = kwargs.get('via_sms')
+        via_whatsapp = kwargs.get('via_whatsapp')
+        message = create_otp(phone_no, message, call_source=call_source, via_sms=via_sms, via_whatsapp=via_whatsapp)
         if self.is_number_whitelisted(phone_no):
             return self.send(message, phone_no, retry_send)
         else:
@@ -90,7 +99,11 @@ class WhitelistedSmsBackend(BaseSmsBackend):
         return False
 
 
-def create_otp(phone_no, message):
+def create_otp(phone_no, message, **kwargs):
+    call_source = kwargs.get('call_source')
+    return_otp = kwargs.get('return_otp', False)
+    via_sms = kwargs.get('via_sms')
+    via_whatsapp = kwargs.get('via_whatsapp')
     otpEntry = (OtpVerifications.objects.filter(phone_number=phone_no, is_expired=False,
                                                 created_at__gte=timezone.now() - relativedelta(
                                                     minutes=OtpVerifications.OTP_EXPIRY_TIME)).first())
@@ -99,7 +112,11 @@ def create_otp(phone_no, message):
     else:
         OtpVerifications.objects.filter(phone_number=phone_no).update(is_expired=True)
         otp = randint(100000,999999)
-        otpEntry = OtpVerifications(phone_number=phone_no, code=otp, country_code="+91")
+        otpEntry = OtpVerifications(phone_number=phone_no, code=otp, country_code="+91", otp_request_source=call_source, via_sms=via_sms, via_whatsapp=via_whatsapp)
         otpEntry.save()
+
+    if return_otp:
+        return otp
+
     message = message.format(str(otp))
     return message

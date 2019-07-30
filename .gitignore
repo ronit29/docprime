@@ -21,3 +21,4 @@ deploy.sh
 .DS_Store
 ondoc/.DS_Store
 celerybeat-schedule
+/push_to_bit.sh

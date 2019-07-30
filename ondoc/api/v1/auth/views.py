@@ -20,7 +20,7 @@ from rest_framework.authtoken.models import Token
 from django.db.models import F, Sum, Max, Q, Prefetch, Case, When, Count
 from django.forms.models import model_to_dict
 
-from ondoc.common.models import UserConfig, PaymentOptions, AppointmentHistory
+from ondoc.common.models import UserConfig, PaymentOptions, AppointmentHistory, BlacklistUser, BlockedStates
 from ondoc.common.utils import get_all_upcoming_appointments
 from ondoc.coupon.models import UserSpecificCoupon, Coupon
 from ondoc.lead.models import UserLead
@@ -29,10 +29,11 @@ from ondoc.doctor.models import DoctorMobile, Doctor, HospitalNetwork, Hospital,
                                 DoctorClinicTiming, ProviderSignupLead
 from ondoc.authentication.models import (OtpVerifications, NotificationEndpoint, Notification, UserProfile,
                                          Address, AppointmentTransaction, GenericAdmin, UserSecretKey, GenericLabAdmin,
-                                         AgentToken, DoctorNumber)
+                                         AgentToken, DoctorNumber, LastLoginTimestamp, UserProfileEmailUpdate)
 from ondoc.notification.models import SmsNotification, EmailNotification
 from ondoc.account.models import PgTransaction, ConsumerAccount, ConsumerTransaction, Order, ConsumerRefund, OrderLog, \
-    UserReferrals, UserReferred, PgLogs
+    UserReferrals, UserReferred, PgLogs, PaymentProcessStatus
+from ondoc.account.mongo_models import PgLogs as mongo_pglogs
 from django.contrib.auth import get_user_model
 from django.shortcuts import get_object_or_404
 from ondoc.api.pagination import paginate_queryset
@@ -62,7 +63,7 @@ import jwt
 from ondoc.insurance.models import InsuranceTransaction, UserInsurance, InsuredMembers
 from decimal import Decimal
 from ondoc.web.models import ContactUs
-from ondoc.notification.tasks import send_pg_acknowledge
+from ondoc.notification.tasks import send_pg_acknowledge, save_pg_response, save_payment_status
 
 from ondoc.ratings_review import models as rate_models
 from django.contrib.contenttypes.models import ContentType
@@ -95,7 +96,14 @@ class LoginOTP(GenericViewSet):
 
         data = serializer.validated_data
         phone_number = data['phone_number']
+
+        blocked_state = BlacklistUser.get_state_by_number(phone_number, BlockedStates.States.LOGIN)
+        if blocked_state:
+            return Response({'error': blocked_state.message}, status=status.HTTP_400_BAD_REQUEST)
         req_type = request.query_params.get('type')
+        via_sms = data.get('via_sms', True)
+        via_whatsapp = data.get('via_whatsapp', False)
+        call_source = data.get('request_source')
         retry_send = request.query_params.get('retry', False)
         otp_message = OtpVerifications.get_otp_message(request.META.get('HTTP_PLATFORM'), req_type, version=request.META.get('HTTP_APP_VERSION'))
         if req_type == 'doctor':
@@ -112,14 +120,14 @@ class LoginOTP(GenericViewSet):
 
             if lab_queryset.exists() or doctor_queryset.exists() or provider_signup_queryset.exists():
                 response['exists'] = 1
-                send_otp(otp_message, phone_number, retry_send)
+                send_otp(otp_message, phone_number, retry_send, via_sms=via_sms, via_whatsapp=via_whatsapp, call_source=call_source)
 
             # if queryset.exists():
             #     response['exists'] = 1
             #     send_otp("OTP for DocPrime login is {}", phone_number)
 
         else:
-            send_otp(otp_message, phone_number, retry_send)
+            send_otp(otp_message, phone_number, retry_send, via_sms=via_sms, via_whatsapp=via_whatsapp, call_source=call_source)
             if User.objects.filter(phone_number=phone_number, user_type=User.CONSUMER).exists():
                 response['exists'] = 1
 
@@ -235,6 +243,9 @@ class UserViewset(GenericViewSet):
 
         token_object = JWTAuthentication.generate_token(user)
         expire_otp(data['phone_number'])
+
+        if data.get("source"):
+            LastLoginTimestamp.objects.create(user=user, source=data.get("source"))
 
         response = {
             "login": 1,
@@ -438,9 +449,20 @@ class UserProfileViewSet(mixins.CreateModelMixin, mixins.ListModelMixin,
 
         insured_member_obj = InsuredMembers.objects.filter(profile__id=obj.id).last()
         insured_member_profile = None
+        insured_member_status = None
         if insured_member_obj:
             insured_member_profile = insured_member_obj.profile
-        if obj and hasattr(obj, 'id') and obj.id and insured_member_profile:
+            insured_member_status = insured_member_obj.user_insurance.status
+        # if obj and hasattr(obj, 'id') and obj.id and insured_member_profile:
+
+        if request.user and request.user.active_insurance and data.get('is_default_user') and data.get('is_default_user') != obj.is_default_user:
+            return Response({
+                "request_errors": {"code": "invalid",
+                                   "message": "Any Profile or user associated with the insurance cannot change default user."
+                                   }})
+
+        if obj and hasattr(obj, 'id') and obj.id and insured_member_profile and not (insured_member_status == UserInsurance.CANCELLED or
+                                                              insured_member_status == UserInsurance.EXPIRED):
 
             whatsapp_optin = data.get('whatsapp_optin')
             whatsapp_is_declined = data.get('whatsapp_is_declined')
@@ -460,7 +482,16 @@ class UserProfileViewSet(mixins.CreateModelMixin, mixins.ListModelMixin,
                                        "message": "Profile cannot be changed which are covered under insurance."
                                        }
                 }, status=status.HTTP_400_BAD_REQUEST)
-
+        if data.get('is_default_user', None):
+            UserProfile.objects.filter(user=obj.user).update(is_default_user=False)
+        else:
+            primary_profile = UserProfile.objects.filter(user=obj.user, is_default_user=True).first()
+            if not primary_profile or obj.id == primary_profile.id:
+                return Response({
+                    "request_errors": {"code": "invalid",
+                                       "message": "Atleast one profile should be selected as primary."
+                                       }
+                }, status=status.HTTP_400_BAD_REQUEST)
         serializer.save()
         return Response(serializer.data)
 
@@ -544,20 +575,20 @@ class UserAppointmentsViewSet(OndocViewSet):
         if lab_serializer.data:
             combined_data.extend(lab_serializer.data)
         combined_data = sorted(combined_data, key=lambda x: x['time_slot_start'], reverse=True)
-        temp_dict = dict()
-        for data in combined_data:
-            if not temp_dict.get(data["status"]):
-                temp_dict[data["status"]] = [data]
-            else:
-                temp_dict[data["status"]].append(data)
-        combined_data = list()
-        status_six_data = list()
-        for k, v in sorted(temp_dict.items(), key=lambda x: x[0]):
-            if k==6:
-                status_six_data.extend(v)
-            else:
-                combined_data.extend(v)
-        combined_data.extend(status_six_data)
+        # temp_dict = dict()
+        # for data in combined_data:
+        #     if not temp_dict.get(data["status"]):
+        #         temp_dict[data["status"]] = [data]
+        #     else:
+        #         temp_dict[data["status"]].append(data)
+        # combined_data = list()
+        # status_six_data = list()
+        # for k, v in sorted(temp_dict.items(), key=lambda x: x[0]):
+        #     if k==6:
+        #         status_six_data.extend(v)
+        #     else:
+        #         combined_data.extend(v)
+        # combined_data.extend(status_six_data)
         combined_data = combined_data[:200]
         return Response(combined_data)
 
@@ -588,6 +619,8 @@ class UserAppointmentsViewSet(OndocViewSet):
         query_input_serializer.is_valid(raise_exception=True)
         source = ''
         responsible_user = None
+        if validated_data.get('source', None):
+            source = validated_data.get('source')
         if query_input_serializer.validated_data.get('source', None):
             source = query_input_serializer.validated_data.get('source')
         if request.user and hasattr(request.user, 'user_type'):
@@ -999,6 +1032,7 @@ class UserAppointmentsViewSet(OndocViewSet):
         return serializer
 
 
+
 class AddressViewsSet(viewsets.ModelViewSet):
     serializer_class = serializers.AddressSerializer
     authentication_classes = (JWTAuthentication, )
@@ -1019,17 +1053,29 @@ class AddressViewsSet(viewsets.ModelViewSet):
         loc_position = utils.get_location(data.get('locality_location_lat'), data.get('locality_location_long'))
         land_position = utils.get_location(data.get('landmark_location_lat'), data.get('landmark_location_long'))
         address = None
-        if not Address.objects.filter(user=request.user).filter(**validated_data).filter(
-                locality_location__distance_lte=(loc_position, 0),
-                landmark_location__distance_lte=(land_position, 0)).exists():
-            validated_data["locality_location"] = loc_position
-            validated_data["landmark_location"] = land_position
-            validated_data['user'] = request.user
-            address = Address.objects.create(**validated_data)
+        if land_position is None:
+            if not Address.objects.filter(user=request.user).filter(**validated_data).filter(
+                    locality_location__distance_lte=(loc_position, 0)).exists():
+                validated_data["locality_location"] = loc_position
+                validated_data["landmark_location"] = land_position
+                validated_data['user'] = request.user
+                address = Address.objects.create(**validated_data)
         else:
-            address = Address.objects.filter(user=request.user).filter(**validated_data).filter(
-                locality_location__distance_lte=(loc_position, 0),
-                landmark_location__distance_lte=(land_position, 0)).first()
+            if not Address.objects.filter(user=request.user).filter(**validated_data).filter(
+                    locality_location__distance_lte=(loc_position, 0),
+                    landmark_location__distance_lte=(land_position, 0)).exists() and not address:
+                validated_data["locality_location"] = loc_position
+                validated_data["landmark_location"] = land_position
+                validated_data['user'] = request.user
+                address = Address.objects.create(**validated_data)
+        if not address:
+            if land_position is None:
+                address = Address.objects.filter(user=request.user).filter(**validated_data).filter(
+                    locality_location__distance_lte=(loc_position, 0)).first()
+            else:
+                address = Address.objects.filter(user=request.user).filter(**validated_data).filter(
+                    locality_location__distance_lte=(loc_position, 0),
+                    landmark_location__distance_lte=(land_position, 0)).first()
         serializer = serializers.AddressSerializer(address)
         return Response(serializer.data)
 
@@ -1153,7 +1199,7 @@ class TransactionViewSet(viewsets.GenericViewSet):
         SUCCESS_REDIRECT_URL = settings.BASE_URL + "/order/summary/%s"
         LAB_REDIRECT_URL = settings.BASE_URL + "/lab/appointment"
         OPD_REDIRECT_URL = settings.BASE_URL + "/opd/appointment"
-        PLAN_REDIRECT_URL = settings.BASE_URL + "/prime/success?user_plan="  # TODO: SHASHANK_SINGH is it OK?
+        PLAN_REDIRECT_URL = settings.BASE_URL + "/prime/success?user_plan="
 
         try:
             response = None
@@ -1170,9 +1216,20 @@ class TransactionViewSet(viewsets.GenericViewSet):
             except Exception as e:
                 logger.error("Cannot decode pg data - " + str(e))
 
+            try:
+                pg_resp_code = int(response.get('statusCode'))
+            except:
+                logger.error("ValueError : statusCode is not type integer")
+                pg_resp_code = None
+
             # log pg data
             try:
+                args = {'order_id': response.get("orderId"), 'status_code': pg_resp_code}
+                status_type = PaymentProcessStatus.get_status_type(pg_resp_code, response.get('txStatus'))
+
                 PgLogs.objects.create(decoded_response=response, coded_response=coded_response)
+                save_pg_response.apply_async((mongo_pglogs.TXN_RESPONSE, response.get("orderId"), None, response, None), eta=timezone.localtime(), )
+                save_payment_status.apply_async((status_type, args), eta=timezone.localtime(), )
             except Exception as e:
                 logger.error("Cannot log pg response - " + str(e))
 
@@ -1182,6 +1239,15 @@ class TransactionViewSet(viewsets.GenericViewSet):
                 if response and response.get("orderNo"):
                     pg_txn = PgTransaction.objects.filter(order_no__iexact=response.get("orderNo")).first()
                     if pg_txn:
+                        if pg_txn.is_preauth():
+                            pg_txn.status_code = response.get('statusCode')
+                            pg_txn.status_type = response.get('txStatus')
+                            pg_txn.payment_mode = response.get("paymentMode")
+                            pg_txn.bank_name = response.get('bankName')
+                            pg_txn.transaction_id = response.get('pgTxId')
+                            pg_txn.bank_id = response.get('bankTxId')
+                            #pg_txn.payment_captured = True
+                            pg_txn.save()
                         send_pg_acknowledge.apply_async((pg_txn.order_id, pg_txn.order_no,), countdown=1)
                         REDIRECT_URL = (SUCCESS_REDIRECT_URL % pg_txn.order_id) + "?payment_success=true"
                         return HttpResponseRedirect(redirect_to=REDIRECT_URL)
@@ -1194,14 +1260,21 @@ class TransactionViewSet(viewsets.GenericViewSet):
             success_in_process = False
             processed_data = {}
 
-            try:
-                pg_resp_code = int(response.get('statusCode'))
-            except:
-                logger.error("ValueError : statusCode is not type integer")
-                pg_resp_code = None
-
             order_obj = Order.objects.select_for_update().filter(pk=response.get("orderId")).first()
+            convert_cod_to_prepaid = False
+            try:
+                if order_obj and response and order_obj.amount != Decimal(
+                        response.get('txAmount')) and order_obj.is_cod_order and order_obj.get_deal_price_without_coupon <= Decimal(response.get('txAmount')):
+                    convert_cod_to_prepaid = True
+                    order_obj.amount = Decimal(response.get('txAmount'))
+                    order_obj.save()
+            except:
+                pass
+
             if pg_resp_code == 1 and order_obj:
+                if response.get("couponUsed") and response.get("couponUsed") == "false":
+                    order_obj.update_fields_after_coupon_remove()
+
                 response_data = None
                 resp_serializer = serializers.TransactionSerializer(data=response)
                 if resp_serializer.is_valid():
@@ -1218,7 +1291,7 @@ class TransactionViewSet(viewsets.GenericViewSet):
 
                         try:
                             with transaction.atomic():
-                                processed_data = order_obj.process_pg_order()
+                                processed_data = order_obj.process_pg_order(convert_cod_to_prepaid)
                                 success_in_process = True
                         except Exception as e:
                             logger.error("Error in processing order - " + str(e))
@@ -1265,6 +1338,7 @@ class TransactionViewSet(viewsets.GenericViewSet):
         return HttpResponseRedirect(redirect_to=REDIRECT_URL)
 
     def form_pg_transaction_data(self, response, order_obj):
+        from ondoc.api.v1.utils import format_return_value
         data = dict()
         user_id = order_obj.get_user_id()
         user = get_object_or_404(User, pk=user_id)
@@ -1276,17 +1350,17 @@ class TransactionViewSet(viewsets.GenericViewSet):
         data['type'] = PgTransaction.CREDIT
         data['amount'] = order_obj.amount
 
-        data['payment_mode'] = response.get('paymentMode')
+        data['payment_mode'] = format_return_value(response.get('paymentMode'))
         data['response_code'] = response.get('responseCode')
-        data['bank_id'] = response.get('bankTxId')
+        data['bank_id'] = format_return_value(response.get('bankTxId'))
         transaction_time = parse(response.get("txDate"))
         data['transaction_date'] = transaction_time
-        data['bank_name'] = response.get('bankName')
+        data['bank_name'] = format_return_value(response.get('bankName'))
         data['currency'] = response.get('currency')
         data['status_code'] = response.get('statusCode')
-        data['pg_name'] = response.get('pgGatewayName')
+        data['pg_name'] = format_return_value(response.get('pgGatewayName'))
         data['status_type'] = response.get('txStatus')
-        data['transaction_id'] = response.get('pgTxId')
+        data['transaction_id'] = format_return_value(response.get('pgTxId'))
         data['pb_gateway_name'] = response.get('pbGatewayName')
 
         return data
@@ -1317,9 +1391,10 @@ class TransactionViewSet(viewsets.GenericViewSet):
         return amount, obj
 
     def send_failure_ops_email(self, order_obj):
-        html_body = "Payment failed for user with " \
+        booking_type = "Insurance " if order_obj.product_id == Order.INSURANCE_PRODUCT_ID else ""
+        html_body = "{}Payment failed for user with " \
                     "user id - {} and phone number - {}" \
-                    ", order id - {}.".format(order_obj.user.id, order_obj.user.phone_number, order_obj.id)
+                    ", order id - {}.".format(booking_type, order_obj.user.id, order_obj.user.phone_number, order_obj.id)
 
         # Push the order failure case to matrix.
 
@@ -1465,67 +1540,33 @@ class HospitalDoctorAppointmentPermissionViewSet(GenericViewSet):
     authentication_classes = (JWTAuthentication, )
     permission_classes = (IsAuthenticated, IsDoctor,)
 
-    # building = models.CharField(max_length=1000, blank=True)
-    # sublocality = models.CharField(max_length=100, blank=True)
-    # locality = models.CharField(max_length=100, blank=True)
-    # city = models.CharField(max_length=100)
-    # state = models.CharField(max_length=100, blank=True)
-    # country = models.CharField(max_length=100)
-
     @transaction.non_atomic_requests
     def list(self, request):
         user = request.user
+        manageable_hosp_list = GenericAdmin.get_manageable_hospitals(user)
         doc_hosp_queryset = (DoctorClinic.objects
                              .select_related('doctor', 'hospital')
                              .prefetch_related('doctor__manageable_doctors', 'hospital__manageable_hospitals')
-                             .filter(Q(doctor__is_live=True, hospital__is_live=True) |
-                                     Q(doctor__source_type=Doctor.PROVIDER, hospital__source_type=Hospital.PROVIDER))
+                             .filter(Q(Q(doctor__is_live=True) | Q(doctor__source_type=Doctor.PROVIDER)),
+                                     Q(Q(hospital__is_live=True) | Q(hospital__source_type=Hospital.PROVIDER)))
                              .annotate(doctor_gender=F('doctor__gender'),
                                        hospital_building=F('hospital__building'),
                                        hospital_name=F('hospital__name'),
                                        doctor_name=F('doctor__name'),
                                        doctor_source_type=F('doctor__source_type'),
                                        doctor_is_live=F('doctor__is_live'),
+                                       license=F('doctor__license'),
+                                       is_license_verified=F('doctor__is_license_verified'),
                                        hospital_source_type=F('hospital__source_type'),
                                        hospital_is_live=F('hospital__is_live'),
                                        online_consultation_fees=F('doctor__online_consultation_fees')
                                        )
-                             .filter(
-                                    Q(
-                                        Q(doctor__manageable_doctors__user=user,
-                                          doctor__manageable_doctors__hospital=F('hospital'),
-                                          doctor__manageable_doctors__is_disabled=False,
-                                          doctor__manageable_doctors__permission_type__in=[GenericAdmin.APPOINTMENT, GenericAdmin.ALL],
-                                          doctor__manageable_doctors__write_permission=True) |
-                                        Q(doctor__manageable_doctors__user=user,
-                                          doctor__manageable_doctors__hospital__isnull=True,
-                                          doctor__manageable_doctors__is_disabled=False,
-                                          doctor__manageable_doctors__permission_type__in=[GenericAdmin.APPOINTMENT, GenericAdmin.ALL],
-                                          doctor__manageable_doctors__write_permission=True) |
-                                        Q(hospital__manageable_hospitals__doctor__isnull=True,
-                                          hospital__manageable_hospitals__user=user,
-                                          hospital__manageable_hospitals__is_disabled=False,
-                                          hospital__manageable_hospitals__permission_type__in=[GenericAdmin.APPOINTMENT, GenericAdmin.ALL],
-                                          hospital__manageable_hospitals__write_permission=True)
-                                    )|
-                                        Q(
-                                            Q(doctor__manageable_doctors__user=user,
-                                             doctor__manageable_doctors__super_user_permission=True,
-                                             doctor__manageable_doctors__is_disabled=False,
-                                             doctor__manageable_doctors__entity_type=GenericAdminEntity.DOCTOR,)|
-                                            Q(hospital__manageable_hospitals__user=user,
-                                              hospital__manageable_hospitals__super_user_permission=True,
-                                              hospital__manageable_hospitals__is_disabled=False,
-                                              hospital__manageable_hospitals__entity_type=GenericAdminEntity.HOSPITAL)
-                                    ))
+                             .filter(hospital_id__in=manageable_hosp_list)
                              .values('hospital', 'doctor', 'hospital_name', 'doctor_name', 'doctor_gender',
-                                     'doctor_source_type', 'hospital_source_type', 'online_consultation_fees',
-                                     'doctor_is_live', 'hospital_is_live').distinct('hospital', 'doctor')
+                                     'doctor_source_type', 'doctor_is_live', 'license',
+                                     'is_license_verified', 'hospital_source_type', 'hospital_is_live',
+                                     'online_consultation_fees').distinct('hospital', 'doctor')
                              )
-
-        # all_docs = [doc_hosp_queryset
-        # all_hospitals = doc_hosp_queryset
-
 
         return Response(doc_hosp_queryset)
 
@@ -1720,8 +1761,10 @@ class OrderViewSet(GenericViewSet):
         from_app = params.get("from_app", False)
         app_version = params.get("app_version", "1.0")
 
-        order_obj = Order.objects.filter(pk=pk, payment_status=Order.PAYMENT_PENDING).first()
-        if not order_obj.validate_user(user):
+        order_obj = Order.objects.filter(pk=pk).first()
+
+        if not (order_obj and order_obj.validate_user(user) and (
+                order_obj.payment_status == Order.PAYMENT_PENDING or order_obj.is_cod_order)):
             return Response({"status": 0}, status.HTTP_404_NOT_FOUND)
 
         resp = dict()
@@ -1831,8 +1874,11 @@ class SendBookingUrlViewSet(GenericViewSet):
         if purchase_type == 'insurance':
             SmsNotification.send_insurance_booking_url(token=token, phone_number=str(user_profile.phone_number))
             EmailNotification.send_insurance_booking_url(token=token, email=user_profile.email)
+        elif purchase_type == 'endorsement':
+            SmsNotification.send_endorsement_request_url(token=token, phone_number=str(user_profile.phone_number))
+            EmailNotification.send_endorsement_request_url(token=token, email=user_profile.email)
         else:
-            booking_url = SmsNotification.send_booking_url(token=token, phone_number=str(user_profile.phone_number))
+            booking_url = SmsNotification.send_booking_url(token=token, phone_number=str(user_profile.phone_number), name=user_profile.name)
             EmailNotification.send_booking_url(token=token, email=user_profile.email)
 
         return Response({"status": 1})
@@ -1918,10 +1964,14 @@ class OrderDetailViewSet(GenericViewSet):
     @transaction.non_atomic_requests
     def summary(self, request, order_id):
         from ondoc.api.v1.cart import serializers as cart_serializers
+        from ondoc.api.v1.utils import convert_datetime_str_to_iso_str
 
         if not order_id:
             return Response(status=status.HTTP_400_BAD_REQUEST)
         order_data = Order.objects.filter(id=order_id).first()
+
+        if not order_data:
+            return Response({"message": "Invalid order ID"}, status.HTTP_404_NOT_FOUND)
 
         if not order_data.validate_user(request.user):
             return Response({"status": 0}, status.HTTP_404_NOT_FOUND)
@@ -1930,6 +1980,7 @@ class OrderDetailViewSet(GenericViewSet):
             return Response(status=status.HTTP_404_NOT_FOUND)
 
         processed_order_data = []
+        valid_for_cod_to_prepaid = order_data.is_cod_order
         child_orders = order_data.orders.all()
 
         class OrderCartItemMapper():
@@ -1938,19 +1989,38 @@ class OrderDetailViewSet(GenericViewSet):
                 self.order = order_obj
 
         for order in child_orders:
+            cod_deal_price = None
+            enabled_for_cod = False
+            # opd_appoint = OpdAppointment.objects.filter(id=order.reference_id)[0]
+            opd_appoint = OpdAppointment.objects.filter(id=order.reference_id).first()
+            if opd_appoint:
+                start_time = opd_appoint.time_slot_start
+                day = start_time.weekday()
+
+            if opd_appoint and opd_appoint.payment_type == OpdAppointment.COD:
+                # doc_clinic_timing = DoctorClinicTiming.objects.filter(day=day, doctor_clinic__doctor=opd_appoint.doctor, doctor_clinic__hospital=opd_appoint.hospital)[0]
+                doc_clinic_timing = DoctorClinicTiming.objects.filter(day=day, doctor_clinic__doctor=opd_appoint.doctor,
+                                                                      doctor_clinic__hospital=opd_appoint.hospital).first()
+                if doc_clinic_timing:
+                    cod_deal_price = doc_clinic_timing.dct_cod_deal_price()
+                    enabled_for_cod = doc_clinic_timing.is_enabled_for_cod()
+
             item = OrderCartItemMapper(order)
+            temp_time_slot_start = convert_datetime_str_to_iso_str(order.action_data["time_slot_start"])
             curr = {
-                "mrp" : order.action_data["mrp"] if "mrp" in order.action_data else order.action_data["agreed_price"],
+                "mrp": order.action_data["mrp"] if "mrp" in order.action_data else order.action_data["agreed_price"],
                 "deal_price": order.action_data["deal_price"],
                 "effective_price": order.action_data["effective_price"],
-                "data" : cart_serializers.CartItemSerializer(item, context={"validated_data" : None}).data,
-                "booking_id" : order.reference_id,
-                "time_slot_start" : order.action_data["time_slot_start"],
-                "payment_type" : order.action_data["payment_type"]
+                "data": cart_serializers.CartItemSerializer(item, context={"validated_data": None}).data,
+                "booking_id": order.reference_id,
+                "time_slot_start": temp_time_slot_start,
+                "payment_type": order.action_data["payment_type"],
+                "cod_deal_price": cod_deal_price,
+                "enabled_for_cod": enabled_for_cod
             }
             processed_order_data.append(curr)
 
-        return Response({"data": processed_order_data})
+        return Response({"data": processed_order_data, "valid_for_cod_to_prepaid": valid_for_cod_to_prepaid})
 
 
 class UserTokenViewSet(GenericViewSet):
@@ -2145,6 +2215,62 @@ class TokenFromUrlKey(viewsets.GenericViewSet):
             if obj:
                 obj.is_consumed = True
                 obj.save()
+                LastLoginTimestamp.objects.create(user=obj.user, source="d_sms")
                 return Response({'status': 1, 'token': obj.token})
             else:
-                return Response({'status': 0, 'token': None, 'message': 'key not found'})
+                return Response({'status': 0, 'token': None, 'message': 'key not found'}, status=status.HTTP_404_NOT_FOUND)
+
+
+class ProfileEmailUpdateViewset(viewsets.GenericViewSet):
+    authentication_classes = (JWTAuthentication, )
+    permission_classes = (IsAuthenticated, IsNotAgent)
+
+    def create(self, request):
+        request_data = request.data
+
+        serializer = serializers.ProfileEmailUpdateInitSerializer(data=request_data, context={'request': request})
+        serializer.is_valid(raise_exception=True)
+        data = serializer.validated_data
+
+        obj = UserProfileEmailUpdate.objects.filter(profile=data['profile'], old_email=data['profile'].email,
+                                                    new_email=data['email']).filter(~Q(otp=None)).order_by('id').last()
+        if obj and obj.is_request_alive():
+            obj.send_otp_email()
+            return Response({'success': True, 'id': obj.id})
+
+        obj_id = None
+
+        try:
+            obj = UserProfileEmailUpdate.initiate(data['profile'], data['email'])
+            obj_id = obj.id
+        except Exception as e:
+            logger.error(str(e))
+            return Response({'success': False})
+
+        return Response({'success': True, 'id': obj_id})
+
+    def update_email(self, request):
+        request_data = request.data
+
+        serializer = serializers.ProfileEmailUpdateProcessSerializer(data=request_data, context={'request': request})
+        serializer.is_valid(raise_exception=True)
+        data = serializer.validated_data
+
+        obj = UserProfileEmailUpdate.objects.filter(profile=data['profile'], id=data['id'], is_successfull=False).first()
+        if not obj:
+            return Response(status=status.HTTP_400_BAD_REQUEST)
+
+        if obj.otp_verified:
+            return Response({'success': True, 'message': 'OTP verified successfully.'})
+
+        if not obj.is_request_alive():
+            return Response(status=status.HTTP_400_BAD_REQUEST, data={'success': False, 'message': 'Given otp has been expired.'})
+
+        if obj.otp != data['otp']:
+            return Response(data={'success': False, 'message': 'Please enter a valid OTP.'})
+
+        is_changed = obj.process_email_change(obj.otp, data.get('process_immediately', False))
+        if not is_changed:
+            return Response({'success': False})
+
+        return Response({'success': True, 'message': 'OTP verified successfully.'})
