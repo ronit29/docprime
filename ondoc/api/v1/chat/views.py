@@ -1,6 +1,6 @@
 from ondoc.account.models import ConsumerAccount, Order
 from ondoc.api.v1.utils import payment_details
-from ondoc.authentication.models import UserSecretKey
+from ondoc.authentication.models import UserSecretKey, UserProfile
 from ondoc.chat import models
 from ondoc.doctor import models as doc_models
 from ondoc.authentication import models as auth_models
@@ -189,6 +189,7 @@ class ChatReferralViewSet(viewsets.GenericViewSet):
 class ChatUserViewSet(viewsets.GenericViewSet):
     authentication_classes = (ChatAuthentication,)
 
+    @transaction.atomic()
     def user_login_via_chat(self, request):
         from django.http import JsonResponse
         response = {'login': 0}
@@ -198,17 +199,35 @@ class ChatUserViewSet(viewsets.GenericViewSet):
         serializer = serializers.ChatLoginSerializer(data=request.POST)
         serializer.is_valid(raise_exception=True)
         data = serializer.validated_data
+        profile_data = {}
 
-        user = User.objects.filter(phone_number=data['phone_number'], user_type=User.CONSUMER).first()
+        user = User.objects.filter(phone_number=data.get('phone_number'), user_type=User.CONSUMER).first()
         if not user:
-            user = User.objects.create(phone_number=data['phone_number'],
+            user = User.objects.create(phone_number=data.get('phone_number'),
                                        is_phone_number_verified=False,
                                        user_type=User.CONSUMER,
                                        auto_created=True,
+                                       email=data.get('email'),
                                        source='Chat')
 
         if not user:
             return JsonResponse(response, status=400)
+
+        profile_data['name'] = data.get('name')
+        profile_data['phone_number'] = user.phone_number
+        profile_data['gender'] = data.get('gender')
+        profile_data['user'] = user
+        user_profiles = UserProfile.objects.filter(user=user)
+        if not user_profiles.exists():
+            profile_data.update({
+                "is_default_user": True
+            })
+
+        if not bool(re.match(r"^[a-zA-Z ]+$", data.get('name'))):
+            return Response({"error": "Invalid Name"}, status=status.HTTP_400_BAD_REQUEST)
+
+        if profile_data.get('is_default_user') or not UserProfile.objects.filter(name__iexact=profile_data['name'], user=user).exists():
+            user_profile = UserProfile.objects.create(**profile_data)
 
         consumer_account = ConsumerAccount.objects.get_or_create(user=user)
         wallet_balance = consumer_account[0].get_total_balance()
@@ -240,6 +259,7 @@ class ChatOrderViewSet(viewsets.GenericViewSet):
         use_wallet = data.get('use_wallet', True)
         amount = data.get('amount', 0)
         promotional_amount = data.get('promotional_amount', 0)
+        rid = data.get('rid')
         error = False
 
         try:
@@ -285,7 +305,7 @@ class ChatOrderViewSet(viewsets.GenericViewSet):
 
         action = Order.CHAT_CONSULTATION_CREATE
         action_data = {"user": user.id, "plan_id": plan_id, "extra_details": details, "effective_price": float(amount_to_paid),
-                       "amount": float(amount), "cashback": float(cashback_amount), "promotional_amount": float(promotional_amount)}
+                       "amount": float(amount), "cashback": float(cashback_amount), "promotional_amount": float(promotional_amount), "room_id": rid}
 
         pg_order = Order.objects.create(
             amount=float(amount_to_paid),

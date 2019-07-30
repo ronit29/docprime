@@ -525,7 +525,7 @@ def get_pg_secret_client_key(order):
     from ondoc.account.models import Order
     secret_key = client_key = ""
 
-    if order.product_id == Order.DOCTOR_PRODUCT_ID or order.product_id == Order.SUBSCRIPTION_PLAN_PRODUCT_ID:
+    if order.product_id in [Order.DOCTOR_PRODUCT_ID, Order.SUBSCRIPTION_PLAN_PRODUCT_ID, Order.CHAT_PRODUCT_ID]:
         secret_key = settings.PG_SECRET_KEY_P1
         client_key = settings.PG_CLIENT_KEY_P1
     elif order.product_id == Order.LAB_PRODUCT_ID:
