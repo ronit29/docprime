@@ -447,6 +447,7 @@ class DoctorHospitalSerializer(serializers.ModelSerializer):
     short_address = serializers.ReadOnlyField(source='doctor_clinic.hospital.get_short_address')
     hospital_id = serializers.ReadOnlyField(source='doctor_clinic.hospital.pk')
     hospital_city = serializers.ReadOnlyField(source='doctor_clinic.hospital.city')
+    is_ipd_hospital = serializers.ReadOnlyField(source='doctor_clinic.hospital.is_ipd_hospital')
     hospital_thumbnail = serializers.SerializerMethodField()
     day = serializers.SerializerMethodField()
     discounted_fees = serializers.IntegerField(read_only=True, allow_null=True, source='deal_price')
@@ -561,7 +562,7 @@ class DoctorHospitalSerializer(serializers.ModelSerializer):
         fields = ('doctor', 'hospital_name', 'address','short_address', 'hospital_id', 'start', 'end', 'day', 'deal_price',
                   'discounted_fees', 'hospital_thumbnail', 'mrp', 'lat', 'long', 'id','enabled_for_online_booking',
                   'insurance', 'show_contact', 'enabled_for_cod', 'enabled_for_prepaid', 'is_price_zero', 'cod_deal_price', 'hospital_city',
-                  'url', 'fees', 'insurance_fees')
+                  'url', 'fees', 'insurance_fees', 'is_ipd_hospital')
 
         # fields = ('doctor', 'hospital_name', 'address', 'hospital_id', 'start', 'end', 'day', 'deal_price', 'fees',
         #           'discounted_fees', 'hospital_thumbnail', 'mrp',)
@@ -2311,6 +2312,7 @@ class IpdProcedureLeadSerializer(serializers.ModelSerializer):
     requested_date_time = serializers.DateTimeField(required=False, default=None, allow_null=True)
     matrix_city = serializers.PrimaryKeyRelatedField(queryset=MatrixMappedCity.objects.all(),
                                                      required=False, allow_null=True)
+    is_valid = serializers.BooleanField(default=True, required=False)
 
     class Meta:
         model = IpdProcedureLead
