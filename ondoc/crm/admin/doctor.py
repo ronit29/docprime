@@ -1607,6 +1607,7 @@ class PrescriptionInline(nested_admin.NestedTabularInline):
 
 class DoctorOpdAppointmentAdmin(admin.ModelAdmin):
     form = DoctorOpdAppointmentForm
+    change_form_template = 'appointment_change_form.html'
     search_fields = ['id', 'profile__name', 'profile__phone_number', 'doctor__name', 'hospital__name']
     list_display = ('booking_id', 'get_doctor', 'get_profile', 'status', 'time_slot_start', 'effective_price',
                     'get_insurance', 'get_appointment_type', 'get_is_fraud', 'created_at', 'updated_at',)
@@ -1621,6 +1622,22 @@ class DoctorOpdAppointmentAdmin(admin.ModelAdmin):
         else:
             return "False"
     get_is_fraud.short_description = 'Is Fraud'
+
+    def response_change(self, request, obj):
+        if "_capture-payment" in request.POST:
+            if (request.user.is_superuser or request.user.groups.filter(
+                    name=constants['SUPER_QC_GROUP']).exists()):
+                txn_obj = obj.get_transaction()
+                if txn_obj and txn_obj.is_preauth():
+                    notification_tasks.send_capture_payment_request.apply_async(
+                        (Order.DOCTOR_PRODUCT_ID, obj.id), eta=timezone.localtime(), )
+                    messages.success(request, ('Payment capture requested successfully.'))
+                else:
+                    messages.error(request, ('Appointment transaction is not in authorize state.'))
+            else:
+                messages.error(request, ('You do not have access to perform this action.'))
+            return HttpResponseRedirect(".")
+        return super().response_change(request, obj)
 
     def get_appointment_type(self, obj):
         if obj.is_followup_appointment():
