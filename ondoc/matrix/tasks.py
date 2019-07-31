@@ -769,14 +769,13 @@ def create_or_update_lead_on_matrix(self, data):
                 obj.matrix_lead_id = int(obj.matrix_lead_id)
                 obj.save()
                 if lead_source == 'ProviderApp':
-                    receivers = [{"user": None, "email": "navneetsingh@docprime.com"},
+                    receivers = [{"user": None, "email": "kabeer@docprime.com"},
+                                 {"user": None, "email": "simranjeet@docprime.com"},
+                                 {"user": None, "email": "prithvijeet@docprime.com"},
                                  {"user": None, "email": "sanat@docprime.com"}]
-                    # receivers = [{"user": None, "email": "kabeer@docprime.com"},
-                    #              {"user": None, "email": "simranjeet@docprime.com"},
-                    #              {"user": None, "email": "prithvijeet@docprime.com"},
-                    #              {"user": None, "email": "sanat@docprime.com"}]
+                    email_notification = EMAILNotification(NotificationAction.PROVIDER_MATRIX_LEAD_EMAIL,
+                                                           context={"data": request_data})
                     try:
-                        email_notification = EMAILNotification(NotificationAction.PROVIDER_MATRIX_LEAD_EMAIL, context={"data": request_data})
                         email_notification.send(receivers)
                     except Exception as e:
                         logger.error("Error in Celery. Failed to send email notifications - " + str(e))
