@@ -505,8 +505,8 @@ def payment_details(request, order):
     pgdata.update(filtered_pgdata)
     pgdata['hash'] = PgTransaction.create_pg_hash(pgdata, secret_key, client_key)
 
-    args = {'user_id': user.id, 'order_id': order.id}
-    save_payment_status.apply_async((PaymentProcessStatus.INITIATED, args),eta=timezone.localtime(), )
+    args = {'user_id': user.id, 'order_id': order.id, 'source': 'ORDER_CREATE'}
+    save_payment_status.apply_async((PaymentProcessStatus.INITIATE, args),eta=timezone.localtime(), )
     save_pg_response.apply_async((PgLogs.TXN_REQUEST, order.id, None, None, pgdata), eta=timezone.localtime(), )
     return pgdata, payment_required
 
