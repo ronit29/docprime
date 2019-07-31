@@ -3606,7 +3606,7 @@ class LabTestCategoryLandingUrlViewSet(viewsets.GenericViewSet):
                 test_obj['count'] = count
                 test_obj['deal_price'] = deal_price
                 lab_tests.append(test_obj)
-            url_data_obj['No._of_tests'] = test_count
+            url_data_obj['No_of_tests'] = test_count
             url_data.append(url_data_obj)
             title = obj.url.title if obj.url.title else None
         meta_title = None
