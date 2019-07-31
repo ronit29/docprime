@@ -34,7 +34,7 @@ class ChatLoginSerializer(serializers.Serializer):
     name = serializers.CharField(max_length=100)
     gender = serializers.ChoiceField(choices=GENDER_CHOICES)
     # age = serializers.SerializerMethodField()
-    # dob = serializers.DateField(allow_null=True, required=False)
+    dob = serializers.DateField(allow_null=True, required=True)
     is_default_user = serializers.BooleanField(required=False)
     email = serializers.EmailField(required=False, allow_null=True, allow_blank=True)
 

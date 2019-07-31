@@ -218,17 +218,27 @@ class ChatUserViewSet(viewsets.GenericViewSet):
         profile_data['phone_number'] = user.phone_number
         profile_data['gender'] = data.get('gender')
         profile_data['user'] = user
-        user_profiles = UserProfile.objects.filter(user=user)
-        if not user_profiles.exists():
-            profile_data.update({
-                "is_default_user": True
-            })
+        profile_data['dob'] = data.get('dob')
+        user_profiles = user.profiles.all()
 
         if not bool(re.match(r"^[a-zA-Z ]+$", data.get('name'))):
             return Response({"error": "Invalid Name"}, status=status.HTTP_400_BAD_REQUEST)
 
-        if profile_data.get('is_default_user') or not UserProfile.objects.filter(name__iexact=profile_data['name'], user=user).exists():
-            user_profile = UserProfile.objects.create(**profile_data)
+        if user_profiles:
+            user_profiles = list(filter(lambda x: x.name.lower() == profile_data['name'].lower(), user_profiles))
+            if user_profiles:
+                user_profile = user_profiles[0]
+                user_profile.phone_number = profile_data['phone_number'] if not user_profile.phone_number else None
+                user_profile.gender = profile_data['gender'] if not user_profile.gender else None
+                user_profile.dob = profile_data['dob'] if not user_profile.dob else None
+                user_profile.save()
+            else:
+                UserProfile.objects.create(**profile_data)
+        else:
+            profile_data.update({
+                "is_default_user": True
+            })
+            UserProfile.objects.create(**profile_data)
 
         consumer_account = ConsumerAccount.objects.get_or_create(user=user)
         wallet_balance = consumer_account[0].get_total_balance()
