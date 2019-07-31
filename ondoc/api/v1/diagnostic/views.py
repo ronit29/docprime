@@ -1506,7 +1506,8 @@ class LabList(viewsets.ReadOnlyModelViewSet):
                 request.user.active_insurance:
             # filtering_query.append("mrp<=(%(insurance_threshold_amount)s)")
             if not hasattr(request, 'agent'):
-                group_filter.append("(case when covered_under_insurance then agreed_price<=insurance_cutoff_price or insurance_cutoff_price is null else false end  )")
+                group_filter.append("(case when covered_under_insurance and insurance_agreed_price >0 then insurance_agreed_price<=insurance_cutoff_price "
+                                    " when covered_under_insurance and  (insurance_agreed_price is null or  insurance_agreed_price=0 ) then agreed_price<=insurance_cutoff_price or insurance_cutoff_price is null else false end  )")
         elif not is_insurance and ids and request and request.user and not request.user.is_anonymous and \
                 request.user.active_insurance:
             if not hasattr(request, 'agent'):
@@ -1571,13 +1572,13 @@ class LabList(viewsets.ReadOnlyModelViewSet):
             query = ''' select * from (select id,network_id, name ,price, count, mrp, pickup_charges, distance, order_priority, new_network_rank, rank,
             max(new_network_rank) over(partition by 1) result_count
             from ( 
-            select insurance_home_pickup, test_type, agreed_price, id, rating_data, network_id, name ,price, count, mrp, pickup_charges, distance, order_priority, 
+            select insurance_home_pickup, test_type, agreed_price, insurance_agreed_price,  id, rating_data, network_id, name ,price, count, mrp, pickup_charges, distance, order_priority, 
                         dense_rank() over(order by network_rank) as new_network_rank, rank from
                         (
-                        select insurance_home_pickup, test_type, agreed_price, id, rating_data, network_id, rank() over(partition by coalesce(network_id,random()) order by order_rank) as rank,
+                        select insurance_home_pickup, test_type, agreed_price, insurance_agreed_price, id, rating_data, network_id, rank() over(partition by coalesce(network_id,random()) order by order_rank) as rank,
                          min (order_rank) OVER (PARTITION BY coalesce(network_id,random())) network_rank,
                          name ,price, count, mrp, pickup_charges, distance, order_priority from
-                        (select insurance_home_pickup, test_type, agreed_price, id, rating_data, network_id,  
+                        (select insurance_home_pickup, test_type, agreed_price, insurance_agreed_price, id, rating_data, network_id,  
                         name ,price, test_count as count, total_mrp as mrp,pickup_charges, distance, 
                         ROW_NUMBER () OVER (ORDER BY {order} ) order_rank,
                         max_order_priority as order_priority
@@ -1591,7 +1592,7 @@ class LabList(viewsets.ReadOnlyModelViewSet):
                         end as pickup_charges,
                         sum(case when custom_deal_price is null then computed_deal_price else custom_deal_price end)as price,
                         max(case when custom_agreed_price is null then computed_agreed_price else
-                        custom_agreed_price end) as agreed_price,
+                        custom_agreed_price end) as agreed_price, max(insurance_agreed_price) as insurance_agreed_price,
                         max(ST_Distance(location,St_setsrid(St_point((%(longitude)s), (%(latitude)s)), 4326))) as distance,
                         max(order_priority) as max_order_priority from lab lb {lab_timing_join} inner join available_lab_test avlt on
                         lb.lab_pricing_group_id = avlt.lab_pricing_group_id 
@@ -1711,7 +1712,12 @@ class LabList(viewsets.ReadOnlyModelViewSet):
                         deal_price=test.custom_deal_price
                     else:
                         deal_price=test.computed_deal_price
-                    tests[obj.id].append({"id": test.test_id, "name": test.test.name, "deal_price": deal_price, "mrp": test.mrp, "number_of_tests": test.test.number_of_tests, 'categories': test.test.get_all_categories_detail(), "url": test.test.url})
+                    tests[obj.id].append(
+                        {"id": test.test_id, "name": test.test.name, "deal_price": deal_price, "mrp": test.mrp,
+                         "number_of_tests": test.test.number_of_tests,
+                         'categories': test.test.get_all_categories_detail(), "url": test.test.url,
+                         "insurance_agreed_price": test.insurance_agreed_price
+                         })
 
         # day_now = timezone.now().weekday()
         # days_array = [i for i in range(7)]
@@ -2391,6 +2397,8 @@ class LabAppointmentView(mixins.CreateModelMixin,
 
         user_insurance = UserInsurance.get_user_insurance(request.user)
         if user_insurance:
+            if user_insurance.status == UserInsurance.ONHOLD:
+                return Response(status=status.HTTP_400_BAD_REQUEST, data={'error': 'Your documents from the last claim are under verification.Please write to customercare@docprime.com for more information'})
             insurance_validate_dict = user_insurance.validate_insurance(validated_data)
             data['is_appointment_insured'] = insurance_validate_dict['is_insured']
             data['insurance_id'] = insurance_validate_dict['insurance_id']
@@ -2546,6 +2554,10 @@ class LabAppointmentView(mixins.CreateModelMixin,
         user = request.user
         balance = 0
         cashback_balance = 0
+
+        if user and user.active_insurance and user.active_insurance.status == UserInsurance.ONHOLD:
+            return Response(status=status.HTTP_400_BAD_REQUEST, data={'error': 'There is some problem, Please try again later'})
+
 
         if use_wallet:
             consumer_account = account_models.ConsumerAccount.objects.get_or_create(user=user)
