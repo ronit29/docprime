@@ -769,13 +769,10 @@ def create_or_update_lead_on_matrix(self, data):
                 obj.matrix_lead_id = int(obj.matrix_lead_id)
                 obj.save()
                 if lead_source == 'ProviderApp':
-                    receivers = [{"user": None, "email": "navneetsingh@docprime.com"},
-                                 {"user": None, "email": "sanat@docprime.com"},
-                                 {"user": None, "email": "himanshubajaj@docprime.com"}]
-                    # receivers = [{"user": None, "email": "kabeer@docprime.com"},
-                    #              {"user": None, "email": "simranjeet@docprime.com"},
-                    #              {"user": None, "email": "prithvijeet@docprime.com"},
-                    #              {"user": None, "email": "sanat@docprime.com"}]
+                    receivers = [{"user": None, "email": "kabeer@docprime.com"},
+                                 {"user": None, "email": "simranjeet@docprime.com"},
+                                 {"user": None, "email": "prithvijeet@docprime.com"},
+                                 {"user": None, "email": "sanat@docprime.com"}]
                     email_notification = EMAILNotification(NotificationAction.PROVIDER_MATRIX_LEAD_EMAIL,
                                                            context={"data": request_data})
                     try:
