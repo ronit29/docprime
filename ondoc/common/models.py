@@ -121,6 +121,9 @@ class AppointmentHistory(TimeStampedModel):
         if hasattr(obj, "_source"):
             source = obj._source
 
+        if not user and not source:
+            return 
+
         content_type = ContentType.objects.get_for_model(obj)
         cls(content_type=content_type, object_id=obj.id, status=obj.status, user=user, source=source).save()
 
