@@ -76,20 +76,20 @@ DATABASES = {
 
 DATABASES['default']['ENGINE'] = 'django.contrib.gis.db.backends.postgis'
 
-try:
-    if env('MSSQL_HOST') and env('MSSQL_USERNAME') and env('MSSQL_PASSWORD'):
-        DATABASES['sql_server'] = {
-             'ENGINE': 'sql_server.pyodbc',
-             'HOST': env('MSSQL_HOST'),
-             'USER': env('MSSQL_USERNAME'),
-             'PASSWORD': env('MSSQL_PASSWORD'),
-             'NAME': env('MSSQL_DB'),
-             'OPTIONS': {
-                  'driver' : 'ODBC Driver 17 for SQL Server'
-            }
-        }
-except Exception as e:
-    print(str(e))
+# try:
+#     if env('MSSQL_HOST') and env('MSSQL_USERNAME') and env('MSSQL_PASSWORD'):
+#         DATABASES['sql_server'] = {
+#              'ENGINE': 'sql_server.pyodbc',
+#              'HOST': env('MSSQL_HOST'),
+#              'USER': env('MSSQL_USERNAME'),
+#              'PASSWORD': env('MSSQL_PASSWORD'),
+#              'NAME': env('MSSQL_DB'),
+#              'OPTIONS': {
+#                   'driver' : 'ODBC Driver 17 for SQL Server'
+#             }
+#         }
+# except Exception as e:
+#     print(str(e))
 
 
 
