@@ -802,11 +802,18 @@ class SearchUrlsViewSet(viewsets.GenericViewSet):
         if not city:
             return Response(status=status.HTTP_400_BAD_REQUEST)
 
+
         entity = location_models.EntityUrls.objects.filter(locality_value__iexact=city, is_valid=True,
                                                            sitemap_identifier=location_models.EntityUrls.SitemapIdentifier.HOSPITALS_LOCALITY_CITY).order_by(
             '-count').values('url', name=F('sublocality_value'))
+        entity_city = location_models.EntityUrls.objects.filter(locality_value__iexact=city, is_valid=True,
+                                                                sitemap_identifier=location_models.EntityUrls.SitemapIdentifier.HOSPITALS_CITY).order_by(
+            '-count').values('url', name=F('locality_value')).first()
 
-        return Response(entity)
+        if not entity_city or not entity:
+            return Response(status=status.HTTP_400_BAD_REQUEST)
+
+        return Response({'name': entity_city.get('name'), 'url': entity_city.get('url'), 'result': entity})
 
     def list_urls_by_city(self, request, city):
         if not city:

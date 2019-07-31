@@ -4118,7 +4118,7 @@ class HospitalViewSet(viewsets.GenericViewSet):
                 Point(float(long),
                       float(lat)),
                 D(m=max_distance))).annotate(
-            distance=Distance('location', pnt)).order_by('distance')
+            distance=Distance('location', pnt)).order_by('-is_ipd_hospital', 'distance')
         if provider_ids:
             hospital_queryset = hospital_queryset.filter(health_insurance_providers__id__in=provider_ids)
         if ipd_pk:
