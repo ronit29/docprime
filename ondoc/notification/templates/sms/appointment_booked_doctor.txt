@@ -21,7 +21,7 @@ Doctor Name : Dr. {{doctor_name|capfirst}}
 Hospital/Clinic Name: {{hospital_name|capfirst}}
 Hospital/Clinic Address: {{hospital_address|capfirst}}
 Appointment Date and Time : {{instance.time_slot_start|date:"D jS F Y"}} || {{instance.time_slot_start|date:"h:i A"}}
-{% else %}
+
 Please note that the consultation needs to be done on Credit Basis.
 Please do not ask for consultation fees from the customer.
 {% endif %}{% if provider_login_url %}
