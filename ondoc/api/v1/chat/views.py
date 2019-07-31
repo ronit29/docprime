@@ -249,7 +249,7 @@ class ChatUserViewSet(viewsets.GenericViewSet):
             "token": token_object['token'],
             "payload": token_object['payload'],
             "wallet_balance": wallet_balance,
-            "is_user_insured": user.active_insurance if user.active_insurance else False
+            "is_user_insured": bool(user.active_insurance)
         }
 
         return Response(response, status=status.HTTP_200_OK)
