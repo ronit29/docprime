@@ -269,7 +269,9 @@ class CouponForm(forms.ModelForm):
         test = cleaned_data.get('test')
         test_categories = cleaned_data.get('test_categories')
         doctors = cleaned_data.get('doctors')
+        doctors_exclude = cleaned_data.get('doctors_exclude')
         hospitals = cleaned_data.get('hospitals')
+        hospitals_exclude = cleaned_data.get('hospitals_exclude')
         specializations = cleaned_data.get('specializations')
         procedures = cleaned_data.get('procedures')
         procedure_categories = cleaned_data.get('procedure_categories')
@@ -286,7 +288,7 @@ class CouponForm(forms.ModelForm):
             raise forms.ValidationError('Please enter either lab specific data or doctor specific data')
         if (lab_network or lab or test or test_categories) and type != Coupon.LAB:
             raise forms.ValidationError('Type \'Lab\' not selected for lab specific coupon')
-        if (doctors or hospitals or specializations or procedures or procedure_categories) and type != Coupon.DOCTOR:
+        if (doctors or doctors_exclude or hospitals or hospitals_exclude or specializations or procedures or procedure_categories) and type != Coupon.DOCTOR:
             raise forms.ValidationError('Type \'Doctor\' not selected for doctor specific coupon')
 
 

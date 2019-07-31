@@ -889,7 +889,13 @@ class CouponsMixin(object):
         if coupon_obj.doctors.exists() and (not doctor or doctor not in coupon_obj.doctors.all()):
             return False
 
+        if coupon_obj.doctors_exclude.exists() and (not doctor or doctor in coupon_obj.doctors_exclude.all()):
+            return False
+
         if coupon_obj.hospitals.exists() and (not hospital or hospital not in coupon_obj.hospitals.all()):
+            return False
+
+        if coupon_obj.hospitals_exclude.exists() and (not hospital or hospital in coupon_obj.hospitals_exclude.all()):
             return False
 
         if coupon_obj.procedures.exists():
