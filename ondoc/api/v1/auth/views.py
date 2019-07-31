@@ -1201,9 +1201,9 @@ class TransactionViewSet(viewsets.GenericViewSet):
         OPD_REDIRECT_URL = settings.BASE_URL + "/opd/appointment"
         PLAN_REDIRECT_URL = settings.BASE_URL + "/prime/success?user_plan="
 
-        CHAT_ERROR_REDIRECT_URL = settings.BASE_URL + "mobileviewchat?payment=fail&error_message=%s" % "Error processing payment, please try again."
+        CHAT_ERROR_REDIRECT_URL = settings.BASE_URL + "/mobileviewchat?payment=fail&error_message=%s" % "Error processing payment, please try again."
         CHAT_REDIRECT_URL = CHAT_ERROR_REDIRECT_URL
-        CHAT_SUCCESS_REDIRECT_URL = settings.BASE_URL + "mobileviewchat?payment=success&order_id=%s"
+        CHAT_SUCCESS_REDIRECT_URL = settings.BASE_URL + "/mobileviewchat?payment=success&order_id=%s"
 
         try:
             response = None
