@@ -967,8 +967,7 @@ class LabAppointmentAdmin(nested_admin.NestedModelAdmin):
 
     def response_change(self, request, obj):
         if "_capture-payment" in request.POST:
-            if (request.user.is_superuser or request.user.groups.filter(
-                    name=constants['SUPER_QC_GROUP']).exists()):
+            if request.user.is_superuser:
                 txn_obj = obj.get_transaction()
                 if txn_obj and txn_obj.is_preauth():
                     notification_tasks.send_capture_payment_request.apply_async(
