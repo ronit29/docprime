@@ -60,7 +60,7 @@ from ondoc.ratings_review import models as ratings_models
 # from ondoc.api.v1.common import serializers as common_serializers
 from ondoc.common.models import AppointmentHistory, AppointmentMaskNumber, Remark, GlobalNonBookable, \
     SyncBookingAnalytics, CompletedBreakupMixin, RefundDetails, MatrixMappedState, \
-    MatrixMappedCity, TdsDeductionMixin, MatrixDataMixin, MerchantPayoutMixin
+    MatrixMappedCity, TdsDeductionMixin, MatrixDataMixin, MerchantPayoutMixin, Fraud
 import reversion
 from decimal import Decimal
 from django.utils.text import slugify
@@ -1389,6 +1389,7 @@ class AvailableLabTest(TimeStampedModel):
     supplier_price = models.DecimalField(default=None, max_digits=10, decimal_places=2, null=True, blank=True)
     desired_docprime_price = models.DecimalField(default=None, max_digits=10, decimal_places=2, null=True, blank=True)
     rating = GenericRelation(ratings_models.RatingsReview)
+    insurance_agreed_price = models.DecimalField(max_digits=10, decimal_places=2, default=None, null=True, blank=True)
 
     def get_deal_price(self):
         return self.custom_deal_price if self.custom_deal_price else self.computed_deal_price
@@ -1946,6 +1947,8 @@ class LabAppointment(TimeStampedModel, CouponsMixin, LabAppointmentInvoiceMixin,
             except Exception as e:
                 logger.error(str(e))
 
+        if old_instance and old_instance.status != self.COMPLETED and self.status == self.COMPLETED:
+            self.check_merchant_payout_action()
         # Do not delete below commented code
         # try:
         #     prev_app_dict = {'id': self.id,
@@ -1957,6 +1960,17 @@ class LabAppointment(TimeStampedModel, CouponsMixin, LabAppointmentInvoiceMixin,
         # except Exception as e:
         #     logger.error("Error in auto cancel flow - " + str(e))
         print('all lab appointment tasks completed')
+
+    @property
+    def is_fraud_appointment(self):
+        if not self.insurance:
+            return False
+        content_type = ContentType.objects.get_for_model(LabAppointment)
+        appointment = Fraud.objects.filter(content_type=content_type, object_id=self.id).first()
+        if appointment:
+            return True
+        else:
+            return False
 
     def get_pickup_address(self):
         if not self.address:
@@ -2004,7 +2018,8 @@ class LabAppointment(TimeStampedModel, CouponsMixin, LabAppointmentInvoiceMixin,
             # while completing appointment
             if database_instance and database_instance.status != self.status and self.status == self.COMPLETED:
                 # add a merchant_payout entry
-                if self.merchant_payout is None and self.payment_type not in [OpdAppointment.COD]:
+                if self.merchant_payout is None and self.payment_type not in [OpdAppointment.COD] and \
+                        not self.is_fraud_appointment:
                     self.save_merchant_payout()
                 # credit cashback if any
                 if self.cashback is not None and self.cashback > 0:
@@ -2070,7 +2085,10 @@ class LabAppointment(TimeStampedModel, CouponsMixin, LabAppointmentInvoiceMixin,
             "tds_amount": tds
         }
 
-        merchant_payout = MerchantPayout.objects.create(**payout_data)
+        merchant_payout = MerchantPayout(**payout_data)
+        merchant_payout.paid_to = self.get_merchant
+        merchant_payout.content_object = self.get_billed_to
+        merchant_payout.save()
         self.merchant_payout = merchant_payout
 
         # TDS Deduction
@@ -2079,6 +2097,22 @@ class LabAppointment(TimeStampedModel, CouponsMixin, LabAppointmentInvoiceMixin,
             MerchantTdsDeduction.objects.create(merchant=merchant, tds_deducted=tds,
                                                 financial_year=settings.CURRENT_FINANCIAL_YEAR,
                                                 merchant_payout=merchant_payout)
+
+    def check_merchant_payout_action(self):
+        from ondoc.notification.tasks import set_order_dummy_transaction
+        # check for advance payment
+        merchant_payout = self.merchant_payout
+        if merchant_payout:
+            if self.payment_type == 1 and merchant_payout.merchant_has_advance_payment():
+                merchant_payout.update_payout_for_advance_available()
+
+            if self.insurance and merchant_payout.id and not merchant_payout.is_insurance_premium_payout() and merchant_payout.status == merchant_payout.PENDING:
+                try:
+                    has_txn, order_data, appointment = merchant_payout.has_transaction()
+                    if not has_txn:
+                        transaction.on_commit(lambda: set_order_dummy_transaction.apply_async((order_data.id, appointment.user_id,)))
+                except Exception as e:
+                    logger.error(str(e))
 
     def get_auto_cancel_delay(self, app_obj):
         delay = settings.AUTO_CANCEL_LAB_DELAY * 60
@@ -2391,12 +2425,14 @@ class LabAppointment(TimeStampedModel, CouponsMixin, LabAppointmentInvoiceMixin,
                                                                                      total_deal_price=Sum(
                                                                                          deal_price_calculation),
                                                                                      total_agreed_price=Sum(
-                                                                                         agreed_price_calculation))
-        total_agreed = total_deal_price = total_mrp = effective_price = home_pickup_charges = 0
+                                                                                         agreed_price_calculation),
+                                                                                     total_insurance_agreed_price=Sum('insurance_agreed_price'))
+        total_insurance_agreed_price = total_agreed = total_deal_price = total_mrp = effective_price = home_pickup_charges = 0
         if temp_lab_test:
             total_mrp = temp_lab_test[0].get("total_mrp", 0)
             total_agreed = temp_lab_test[0].get("total_agreed_price", 0)
             total_deal_price = temp_lab_test[0].get("total_deal_price", 0)
+            total_insurance_agreed_price = temp_lab_test[0].get("total_insurance_agreed_price", 0)
             effective_price = total_deal_price
             if data["is_home_pickup"] and data["lab"].is_home_collection_enabled:
                 effective_price += data["lab"].home_pickup_charges
@@ -2416,6 +2452,7 @@ class LabAppointment(TimeStampedModel, CouponsMixin, LabAppointmentInvoiceMixin,
 
         if data.get("payment_type") in [OpdAppointment.INSURANCE]:
             effective_price = effective_price
+            total_agreed = total_insurance_agreed_price if  total_insurance_agreed_price and total_insurance_agreed_price > 0 else total_agreed
             coupon_discount, coupon_cashback, coupon_list, random_coupon_list = 0, 0, [], []
 
         return {

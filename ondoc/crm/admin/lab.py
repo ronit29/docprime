@@ -53,6 +53,7 @@ from ondoc.location.models import EntityUrls
 logger = logging.getLogger(__name__)
 from django.urls import reverse
 from django.utils.html import format_html_join, format_html
+from ondoc.notification import tasks as notification_tasks
 
 
 class LabTestResource(resources.ModelResource):
@@ -945,18 +946,39 @@ class LabPrescriptionInline(nested_admin.NestedGenericTabularInline):
 
 class LabAppointmentAdmin(nested_admin.NestedModelAdmin):
     form = LabAppointmentForm
+    change_form_template = 'appointment_change_form.html'
     search_fields = ['id']
     list_display = (
-        'booking_id', 'get_profile', 'get_lab', 'status', 'reports_uploaded', 'time_slot_start', 'effective_price', 'get_profile_email',
-        'get_profile_age', 'get_insurance', 'is_prescription_uploaded', 'created_at', 'updated_at', 'get_lab_test_name')
+        'booking_id', 'get_profile', 'get_lab', 'status', 'reports_uploaded', 'time_slot_start', 'effective_price',
+        'get_profile_email', 'get_profile_age', 'get_insurance', 'is_prescription_uploaded',
+        'get_is_fraud', 'created_at', 'updated_at', 'get_lab_test_name')
     list_filter = ('status', 'payment_type')
     date_hierarchy = 'created_at'
     list_display_links = ('booking_id', 'get_insurance',)
 
-    inlines = [
-        LabReportInline,
-        LabPrescriptionInline
-    ]
+    inlines = [LabReportInline, LabPrescriptionInline, FraudInline]
+
+    def get_is_fraud(self, obj):
+        if obj.is_fraud_appointment:
+            return "True"
+        else:
+            return "False"
+    get_is_fraud.short_description = 'Is Fraud'
+
+    def response_change(self, request, obj):
+        if "_capture-payment" in request.POST:
+            if request.user.is_superuser:
+                txn_obj = obj.get_transaction()
+                if txn_obj and txn_obj.is_preauth():
+                    notification_tasks.send_capture_payment_request.apply_async(
+                        (Order.LAB_PRODUCT_ID, obj.id), eta=timezone.localtime(), )
+                    messages.success(request, ('Payment capture requested successfully.'))
+                else:
+                    messages.error(request, ('Appointment transaction is not in authorize state.'))
+            else:
+                messages.error(request, ('You do not have access to perform this action.'))
+            return HttpResponseRedirect(".")
+        return super().response_change(request, obj)
 
     def get_insurance(self, obj):
         if obj.insurance:

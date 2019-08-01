@@ -1,6 +1,6 @@
 from django.contrib.postgres.fields import JSONField
 from django.core.validators import FileExtensionValidator, MinValueValidator, MaxValueValidator
-from django.db import models
+from django.db import models, transaction
 from weasyprint import HTML, CSS
 import string
 import random
@@ -120,6 +120,9 @@ class AppointmentHistory(TimeStampedModel):
             user = obj._responsible_user
         if hasattr(obj, "_source"):
             source = obj._source
+
+        if not user and not source:
+            return 
 
         content_type = ContentType.objects.get_for_model(obj)
         cls(content_type=content_type, object_id=obj.id, status=obj.status, user=user, source=source).save()
@@ -734,6 +737,22 @@ class VirtualAppointment(TimeStampedModel):
 
     class Meta:
         db_table = 'virtual_appointment'
+
+    def save(self, *args, **kwargs):
+        database_instance = None
+        if self.id:
+            database_instance = self.__class__.objects.filter(pk=self.id).first()
+        push_to_matrix = False
+        if (not database_instance) or (database_instance and database_instance.time_slot_start != database_instance):
+            push_to_matrix = True
+        super().save(*args, **kwargs)
+        transaction.on_commit(lambda: self.app_commit_tasks(push_to_matrix=push_to_matrix))
+
+    def app_commit_tasks(self, push_to_matrix):
+        from ondoc.procedure.models import IpdProcedureLead
+        if push_to_matrix:
+            if isinstance(self.content_object, IpdProcedureLead) and hasattr(self.content_object, 'app_commit_tasks'):
+                self.content_object.app_commit_tasks(send_lead_email=False, update_status_in_matrix=True)
 
 
 class MerchantPayoutMixin(object):

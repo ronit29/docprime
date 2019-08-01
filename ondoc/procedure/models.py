@@ -166,21 +166,23 @@ class IpdProcedureLead(auth_model.TimeStampedModel):
     COST_ESTIMATE = "Costestimate"
     DOCP_APP = "DocprimeApp"
     SEO_DP = "seo_dp"
+    DROPOFF = "dropoff"
 
     SOURCE_CHOICES = [(DOCPRIMECHAT, 'DocPrime Chat'),
                       (CRM, 'CRM'),
                       (DOCPRIMEWEB, "DocPrime Web"),
                       (COST_ESTIMATE, "Cost Estimate"),
                       (DOCP_APP, "Docprime Consumer App"),
-                      (SEO_DP, "SEO Doctor Profile")]
+                      (SEO_DP, "SEO Doctor Profile"),
+                      (DROPOFF, "DropOff")]
 
     STATUS_CHOICES = [(None, "--Select--"), (NEW, 'NEW'), (COST_REQUESTED, 'COST_REQUESTED'),
-                      (COST_SHARED, 'COST_SHARED'), (OPD, 'OPD'), (VALID, 'VALID'), (CONTACTED, 'CONTACTED'),
-                      (PLANNED, 'PLANNED'), (NOT_INTERESTED, 'NOT_INTERESTED'), (COMPLETED, 'COMPLETED'),
-                      (IPD_CONFIRMATION, "IPD_CONFIRM")]
+    (COST_SHARED, 'COST_SHARED'), (OPD, 'OPD'), (VALID, 'VALID'), (CONTACTED, 'CONTACTED'),
+    (PLANNED, 'PLANNED'), (NOT_INTERESTED, 'NOT_INTERESTED'), (COMPLETED, 'COMPLETED'),
+    (IPD_CONFIRMATION, "IPD_CONFIRM")]
 
     PAYMENT_TYPE_CHOICES = [(None, "--Select--"), (CASH, 'CASH'), (INSURANCE, 'INSURANCE'),
-                            (GOVERNMENT_PANEL, 'GOVERNMENT_PANEL')]
+    (GOVERNMENT_PANEL, 'GOVERNMENT_PANEL')]
 
     ipd_procedure = models.ForeignKey(IpdProcedure, on_delete=models.SET_NULL, null=True, blank=True)
     hospital = models.ForeignKey(Hospital, on_delete=models.SET_NULL, null=True, blank=True)
@@ -222,6 +224,7 @@ class IpdProcedureLead(auth_model.TimeStampedModel):
     first_name = models.CharField(max_length=100, blank=True, null=True, default=None)
     last_name = models.CharField(max_length=100, blank=True, null=True, default=None)
     matrix_city = models.ForeignKey(MatrixMappedCity, related_name='ipd_lead_in', null=True, default=None, on_delete=models.SET_NULL)
+    is_valid = models.NullBooleanField(default=True)
 
     # ADMIN :Is_OpDInsured, Specialization List, appointment list
     # DEFAULTS??
@@ -230,37 +233,53 @@ class IpdProcedureLead(auth_model.TimeStampedModel):
         db_table = "ipd_procedure_lead"
 
     def save(self, *args, **kwargs):
+        if self.is_valid is None:
+            self.is_valid = True
         if self.matrix_city and not self.city:
             self.city = self.matrix_city.name
         if (self.first_name or self.last_name) and not self.name:
-            self.name = self.first_name + " " + self.last_name
+            self.name = (self.first_name if self.first_name else "") + " " + (self.last_name if self.last_name else "")
         if self.phone_number and not self.user:
-            self.user = User.objects.filter(phone_number=self.phone_number).first()
+            self.user = User.objects.filter(phone_number=self.phone_number, user_type=User.CONSUMER).first()
         send_lead_email = False
         update_status_in_matrix = False
         push_to_history = False
+        check_for_validity = False
         if not self.id:
             send_lead_email = True
             push_to_history = True
+            if self.is_valid is not None and not self.is_valid:
+                check_for_validity = True
         else:
             database_obj = self.__class__.objects.filter(id=self.id).first()
             if database_obj and self.status != database_obj.status:
                 update_status_in_matrix = True
                 push_to_history = True
-        super().save(*args, **kwargs)
+        # super().save(*args, **kwargs)
         if push_to_history:
             AppointmentHistory.create(content_object=self)
         super().save(*args, **kwargs)
         transaction.on_commit(lambda: self.app_commit_tasks(send_lead_email=send_lead_email,
-                                                            update_status_in_matrix=update_status_in_matrix))
+                                                            update_status_in_matrix=update_status_in_matrix,
+                                                            check_for_validity=check_for_validity))
 
-    def app_commit_tasks(self, send_lead_email, update_status_in_matrix=False):
+    def app_commit_tasks(self, send_lead_email, update_status_in_matrix=False, check_for_validity=False):
         from ondoc.notification.tasks import send_ipd_procedure_lead_mail
-        from ondoc.matrix.tasks import update_onboarding_qcstatus_to_matrix
+        from ondoc.matrix.tasks import update_onboarding_qcstatus_to_matrix, check_for_ipd_lead_validity
+        from django.utils import timezone
         send_ipd_procedure_lead_mail({'obj_id': self.id, 'send_email': send_lead_email})
         if update_status_in_matrix:
             update_onboarding_qcstatus_to_matrix.apply_async(({'obj_type': self.__class__.__name__, 'obj_id': self.id}
                                                               ,), countdown=5)
+        if check_for_validity:
+            check_for_ipd_lead_validity.apply_async(({'obj_type': self.__class__.__name__, 'obj_id': self.id},),
+                                                    eta=timezone.now() + timezone.timedelta(
+                                                        minutes=settings.LEAD_VALIDITY_BUFFER_TIME))
+
+    def validate_lead(self):
+        if self.user and self.user.is_valid_lead(self.created_at, check_ipd_lead=True):
+            self.is_valid = True
+            self.save()
 
     @staticmethod
     def is_valid_hospital_for_lead(hospital):
@@ -341,6 +360,10 @@ class IpdProcedureLead(auth_model.TimeStampedModel):
             appointment_obj = OpdAppointment.objects.filter(id=self.data.get('opd_appointment_id')).first()
         elif self.data and self.data.get('lab_appointment_id', None):
             appointment_obj = LabAppointment.objects.filter(id=self.data.get('lab_appointment_id')).first()
+
+        latest_virtual_appointment = self.virtual_appointment.all().order_by('-id').first()
+        if latest_virtual_appointment:
+            appointment_obj = latest_virtual_appointment
 
         if appointment_obj:
             appointment_time = appointment_obj.time_slot_start.timestamp()
