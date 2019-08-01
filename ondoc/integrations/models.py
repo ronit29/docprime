@@ -145,6 +145,40 @@ class IntegratorReport(TimeStampedModel):
     xml_url = models.TextField(null=True, blank=True)
     json_data = JSONField(null=True, default={})
 
+    def get_transformed_report(self):
+        from collections import OrderedDict
+        json_data = self.json_data
+        response = {}
+
+        if json_data.__class__.__name__ == 'list' and json_data:
+            response['name'] = json_data[0].get('NAME')
+            response['tests'] = {}
+            for test_json in json_data:
+                integrator_test = IntegratorTestMapping.objects.filter(integrator_test_name=test_json['TESTS']).first()
+                if not integrator_test:
+                    continue
+
+                response['tests'][integrator_test.test.id] = {}
+
+                test_parameter_list = list()
+                test_parameter_list.extend(test_json['RED'])
+                test_parameter_list.extend(test_json['WHITE'])
+
+                test_parameter_list_dict = OrderedDict()
+                for tp in test_parameter_list:
+                    test_parameter_list_dict[tp.get('TEST_CODE')] = tp
+                
+                parameter_dict = {}
+
+                test_parameter_code_list = list(map(lambda x: x.get('TEST_CODE'), test_parameter_list))
+                integrator_test_parameter_mappings = IntegratorTestParameterMapping.objects.filter(integrator_test_name__in=[test_parameter_code_list])
+                for it in integrator_test_parameter_mappings:
+                    parameter_dict[it.id] = test_parameter_list_dict.get(it.integrator_test_name)
+
+                response['tests'][integrator_test.test.id]['parameters'] = parameter_dict
+
+        return response
+
     class Meta:
         db_table = 'integrator_report'
 
