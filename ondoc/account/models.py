@@ -103,9 +103,10 @@ class Order(TimeStampedModel):
                     if not transactions:
                         raise Exception('No transactions found for appointment insurance.')
                     insurance_order_transaction = transactions[0]
-                    data['refOrderId'] = str(insurance_order_transaction.order_id)
-                    data['refOrderNo'] = str(insurance_order_transaction.order_no)
-                    data['insurerCode'] = str(user_insurance.insurance_plan.insurer.insurer_merchant_code)
+                    # data['refOrderId'] = str(insurance_order_transaction.order_id)
+                    # data['refOrderNo'] = str(insurance_order_transaction.order_no)
+                    # data['insurerCode'] = str(user_insurance.insurance_plan.insurer.insurer_merchant_code)
+                    data['insurerCode'] = "advancePay"
 
         return data
 
@@ -2438,7 +2439,7 @@ class AdvanceMerchantPayout(TimeStampedModel):
                 adv_amt_obj = AdvanceMerchantAmount.objects.filter(merchant_id=mp.paid_to_id).first()
                 if adv_amt_obj and adv_amt_obj.amount:
                     adv_amt_obj.amount = decimal.Decimal(adv_amt_obj.amount) + mp.payable_amount
-                    adv_amt_obj.total_amount = decimal.Decimal(adv_amt_obj.amount) + mp.payable_amount
+                    adv_amt_obj.total_amount = decimal.Decimal(adv_amt_obj.total_amount) + mp.payable_amount
                 else:
                     adv_amt_obj = AdvanceMerchantAmount(merchant_id=mp.paid_to_id)
                     adv_amt_obj.amount = mp.payable_amount
