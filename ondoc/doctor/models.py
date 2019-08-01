@@ -3979,6 +3979,13 @@ class OfflinePatients(auth_model.TimeStampedModel):
     def __repr__(self):
         return self.name
 
+    def get_patient_mobile(self):
+        patient_numbers = self.patient_mobiles.all()
+        patient_number = patient_numbers[0]
+        for number in self.patient_mobiles.all():
+            if number.is_default:
+                patient_number = number
+        return patient_number
 
     @staticmethod
     def welcome_message_sms(sms_obj):

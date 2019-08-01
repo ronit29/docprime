@@ -114,6 +114,7 @@ class NotificationAction:
     OFFLINE_APPOINTMENT_REMINDER_PROVIDER_SMS = 117
     OFFLINE_PATIENT_WELCOME_MESSAGE = 118
 
+    E_CONSULT_SHARE = 130
 
     NOTIFICATION_TYPE_CHOICES = (
         (APPOINTMENT_ACCEPTED, "Appointment Accepted"),
@@ -139,6 +140,8 @@ class NotificationAction:
         (OFFLINE_OPD_APPOINTMENT_COMPLETED, "Offline OPD Appointment Completed"),
         (DOCPRIME_APPOINTMENT_REMINDER_PROVIDER_SMS, 'Docprime Appointment Reminder Provider SMS'),
         (OFFLINE_APPOINTMENT_REMINDER_PROVIDER_SMS, 'Offline Appointment Reminder Provider SMS'),
+
+        (E_CONSULT_SHARE, 'E Consult Share'),
 
         (PRESCRIPTION_UPLOADED, "Prescription Uploaded"),
         (PAYMENT_PENDING, "Payment Pending"),

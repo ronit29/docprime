@@ -28,6 +28,8 @@ from django.utils import timezone
 
 from ondoc.diagnostic.models import LabAppointment
 from ondoc.doctor.models import OpdAppointment
+from ondoc.communications.models import SMSNotification
+from ondoc.notification.models import NotificationAction
 from ondoc.api.v1.doctor import serializers as doctor_serializers
 from ondoc.api.v1.diagnostic import serializers as diagnostic_serializers
 
@@ -1146,8 +1148,21 @@ class PartnerEConsultationViewSet(viewsets.GenericViewSet):
     def share(self, request):
         consult_id = request.query_params.get('id')
         if not consult_id:
-            return Response({"error": "Consultation ID not provided"}, status=status.HTTP_400_BAD_REQUEST)
+            return Response({"status": 0, "error": "Consultation ID not provided"}, status=status.HTTP_400_BAD_REQUEST)
         consultation = prov_models.EConsultation.objects.filter(id=consult_id).first()
         if not consultation:
-            return Response({"error": "Consultation not Found"}, status=status.HTTP_404_NOT_FOUND)
-        return Response({})
+            return Response({"status": 0, "error": "Consultation not Found"}, status=status.HTTP_404_NOT_FOUND)
+        if not consultation.link:
+            return Response({"status": 0, "error": "Consultation Link not Found"}, status=status.HTTP_404_NOT_FOUND)
+        if consultation.offline_patient:
+            patient_number = str(consultation.offline_patient.get_patient_mobile())
+        else:
+            patient_number = consultation.online_patient.phone_number
+        receivers = [{"user": None, "phone_number": patient_number}]
+        try:
+            sms_obj = SMSNotification(notification_type=NotificationAction.E_CONSULT_SHARE, context={'link': consultation.link})
+            sms_obj.send(receivers=receivers)
+        except Exception as e:
+            logger.error(str(e))
+            return Response({"status": 0, "message": "Error updating invoice - " + str(e)}, status.HTTP_400_BAD_REQUEST)
+        return Response({"status": 1, "message": "e-consultation link shared"})

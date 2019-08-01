@@ -370,6 +370,9 @@ class SMSNotification:
         elif notification_type == NotificationAction.OFFLINE_PATIENT_WELCOME_MESSAGE:
             body_template = "sms/offline_opd_appointment/welcome_message.txt"
 
+        elif notification_type == NotificationAction.E_CONSULT_SHARE:
+            body_template = "sms/econsult/link_share.txt"
+
         return body_template
 
     def trigger(self, receiver, template, context):
