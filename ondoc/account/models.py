@@ -2422,7 +2422,7 @@ class AdvanceMerchantPayout(TimeStampedModel):
                 adv_amt_obj = AdvanceMerchantAmount.objects.filter(merchant_id=mp.paid_to_id).first()
                 if adv_amt_obj and adv_amt_obj.amount:
                     adv_amt_obj.amount = decimal.Decimal(adv_amt_obj.amount) + mp.payable_amount
-                    adv_amt_obj.total_amount = decimal.Decimal(adv_amt_obj.amount) + mp.payable_amount
+                    adv_amt_obj.total_amount = decimal.Decimal(adv_amt_obj.total_amount) + mp.payable_amount
                 else:
                     adv_amt_obj = AdvanceMerchantAmount(merchant_id=mp.paid_to_id)
                     adv_amt_obj.amount = mp.payable_amount
