@@ -1206,9 +1206,9 @@ class UserInsurance(auth_model.TimeStampedModel, MerchantPayoutMixin):
             return None
         return policy_number_obj
 
-    def validate_insurance(self, appointment_data):
+    def validate_insurance(self, appointment_data, **kwargs):
         from ondoc.doctor.models import OpdAppointment
-
+        is_agent = True if kwargs.get('is_agent') else False
         response_dict = {
             'is_insured': False,
             'insurance_id': None,
@@ -1241,12 +1241,12 @@ class UserInsurance(auth_model.TimeStampedModel, MerchantPayoutMixin):
             return response_dict
 
         if not 'doctor' in appointment_data:
-            is_insured, insurance_id, insurance_message = user_insurance.validate_lab_insurance(appointment_data, user_insurance)
+            is_insured, insurance_id, insurance_message = user_insurance.validate_lab_insurance(appointment_data, is_agent=is_agent)
             response_dict['is_insured'] = is_insured
             response_dict['insurance_message'] = insurance_message
 
         else:
-            is_insured, insurance_id, insurance_message = user_insurance.validate_doctor_insurance(appointment_data, user_insurance)
+            is_insured, insurance_id, insurance_message = user_insurance.validate_doctor_insurance(appointment_data)
             response_dict['is_insured'] = is_insured
             response_dict['insurance_message'] = insurance_message
 
@@ -1284,44 +1284,43 @@ class UserInsurance(auth_model.TimeStampedModel, MerchantPayoutMixin):
 
         return response_dict
 
-    def validate_lab_insurance(self, appointment_data, user_insurance, **kwargs):
+    def validate_lab_insurance(self, appointment_data, **kwargs):
         from ondoc.diagnostic.models import AvailableLabTest
-        from ondoc.diagnostic.models import LabTest
         lab = appointment_data['lab']
         lab_mrp_check_list = []
         if not lab.is_insurance_enabled:
             return False, None, 'Lab is not covered under insurance'
-        threshold = InsuranceThreshold.objects.filter(insurance_plan_id=user_insurance.insurance_plan_id).first()
-        plan = InsurancePlans.objects.filter(id=user_insurance.insurance_plan_id).first()
+        threshold = InsuranceThreshold.objects.filter(insurance_plan_id=self.insurance_plan_id).first()
+        plan = InsurancePlans.objects.filter(id=self.insurance_plan_id).first()
         threshold_lab = threshold.lab_amount_limit
         if appointment_data['test_ids']:
             for test in appointment_data['test_ids']:
                 lab_test = AvailableLabTest.objects.filter(lab_pricing_group__labs=appointment_data["lab"],
                                                            test=test, enabled=True).first()
                 if test.is_package and plan and plan.plan_usages and plan.plan_usages.get('package_disabled') and not kwargs.get('is_agent'):
-                    return False, user_insurance.id, "Packages not covered for this plan"
+                    return False, self.id, "Packages not covered for this plan"
                 if not lab_test:
-                    return False, user_insurance.id, 'Price not available for Test'
+                    return False, self.id, 'Price not available for Test'
                 mrp = lab_test.mrp
                 if mrp <= threshold_lab:
                     is_lab_insured = True
                 else:
-                    return False, user_insurance.id, "Test mrp is higher than insurance threshold"
+                    return False, self.id, "Test mrp is higher than insurance threshold"
                 lab_mrp_check_list.append(is_lab_insured)
             if not False in lab_mrp_check_list:
-                return True, user_insurance.id, ''
+                return True, self.id, ''
             else:
                 return False, None, ''
 
         else:
             return False, None, ''
 
-    def validate_doctor_insurance(self, appointment_data, user_insurance):
+    def validate_doctor_insurance(self, appointment_data):
         is_insured = True
-        insurance_id = user_insurance.id
+        insurance_id = self.id
         insurance_message = ""
         from ondoc.doctor.models import OpdAppointment
-        threshold = InsuranceThreshold.objects.filter(insurance_plan_id=user_insurance.insurance_plan_id).first()
+        threshold = InsuranceThreshold.objects.filter(insurance_plan_id=self.insurance_plan_id).first()
         threshold_opd = threshold.opd_amount_limit
         # profile = appointment_data.get('profile', None)
         # user = profile.user
@@ -1370,7 +1369,8 @@ class UserInsurance(auth_model.TimeStampedModel, MerchantPayoutMixin):
         return result
 
     def validate_insurance_for_cart(self, appointment_data, cart_items, request):
-        insurance_validate_dict = self.validate_insurance(appointment_data)
+        is_agent = True if hasattr(request.user, 'agent') else False
+        insurance_validate_dict = self.validate_insurance(appointment_data, is_agent=is_agent)
         is_insured = insurance_validate_dict['is_insured']
         insurance_id = insurance_validate_dict['insurance_id']
         insurance_message = insurance_validate_dict['insurance_message']
@@ -1414,14 +1414,6 @@ class UserInsurance(auth_model.TimeStampedModel, MerchantPayoutMixin):
                     return False, self.id, "Gynocologist limit exceeded of limit {}".format(int(settings.INSURANCE_GYNECOLOGIST_LIMIT))
                 if onco_count >= int(settings.INSURANCE_ONCOLOGIST_LIMIT) and specialization == InsuranceDoctorSpecializations.SpecializationMapping.ONCOLOGIST:
                     return False, self.id, "Oncologist limit exceeded of limit {}".format(int(settings.INSURANCE_ONCOLOGIST_LIMIT))
-            elif cart_item.product_id == Order.LAB_PRODUCT_ID:
-                is_agent = True if hasattr(request.user, 'agent') else False
-                if user and user.active_insurance:
-                    is_appointment_insured, appointment_insurance_id, insurance_message = user.active_insurance.validate_lab_insurance(appointment_data, user.active_insurance, is_agent=is_agent)
-                if user and user.active_insurance and is_appointment_insured:
-                    return True, self.id, ""
-                else:
-                    return False, None, "Lab Test not Insured"
             else:
                 return is_insured, insurance_id, insurance_message
 

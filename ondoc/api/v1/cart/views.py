@@ -140,7 +140,7 @@ class CartViewSet(viewsets.GenericViewSet):
                     is_agent = False
                 if not insurance_doctor and cart_data.get('is_appointment_insured') and user_insurance and user_insurance.is_valid():
                     is_lab_insured, insurance_id, insurance_message = user_insurance.validate_lab_insurance(
-                        validated_data, user_insurance, is_agent=is_agent)
+                        validated_data, is_agent=is_agent)
                     if is_lab_insured:
                         item.data['is_appointment_insured'] = True
                         item.data['insurance_id'] = insurance_id
@@ -155,7 +155,7 @@ class CartViewSet(viewsets.GenericViewSet):
 
                 if insurance_doctor and cart_data.get('is_appointment_insured') and user_insurance and user_insurance.is_valid():
                     is_doctor_insured, insurance_id, insurance_message = user_insurance.validate_doctor_insurance(
-                        validated_data, user_insurance)
+                        validated_data)
                     if not is_doctor_insured:
                         item.data['is_appointment_insured'] = False
                         item.data['insurance_id'] = None
