@@ -29,6 +29,9 @@ from rest_framework import status
 from collections import OrderedDict
 from django.utils.text import slugify
 import logging
+
+from ondoc.notification.models import WhtsappNotification, NotificationAction
+
 logger = logging.getLogger(__name__)
 
 class Image(models.Model):
@@ -648,6 +651,18 @@ class OtpVerifications(TimeStampedModel):
     otp_request_source = models.CharField(null=True, max_length=200, blank=True)
     via_whatsapp = models.NullBooleanField(null=True)
     via_sms = models.NullBooleanField(null=True)
+
+    def can_send(self):
+        request_window = timezone.now() - timezone.timedelta(minutes=1)
+        if self.is_expired:
+            return True
+
+        if WhtsappNotification.objects.filter(notification_type=NotificationAction.LOGIN_OTP,
+                                              created_at__gte=request_window,
+                                              phone_number=self.phone_number).exists():
+            return False
+
+        return True
 
     def __str__(self):
         return self.phone_number

@@ -97,6 +97,10 @@ class LoginOTP(GenericViewSet):
         data = serializer.validated_data
         phone_number = data['phone_number']
 
+        otp_obj = OtpVerifications.objects.filter(phone_number=phone_number).order_by('-id').first()
+        if not otp_obj.can_send():
+            return Response({'success': False})
+
         blocked_state = BlacklistUser.get_state_by_number(phone_number, BlockedStates.States.LOGIN)
         if blocked_state:
             return Response({'error': blocked_state.message}, status=status.HTTP_400_BAD_REQUEST)
