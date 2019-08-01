@@ -74,6 +74,8 @@ def send_ipd_procedure_lead_mail(data):
         return
     if instance.matrix_lead_id:
         return
+    if not instance.is_valid:
+        return
     try:
         if send_email:
             emails = settings.IPD_PROCEDURE_CONTACT_DETAILS
@@ -280,6 +282,7 @@ def set_order_dummy_transaction(self, order_id, user_id):
     from ondoc.diagnostic.models import LabAppointment
     from ondoc.account.models import User
     from ondoc.account.mongo_models import PgLogs
+    from ondoc.account.models import MerchantPayoutLog
     req_data = dict()
     try:
         order_row = Order.objects.filter(id=order_id).first()
@@ -306,7 +309,12 @@ def set_order_dummy_transaction(self, order_id, user_id):
         url = settings.PG_DUMMY_TRANSACTION_URL
         insurance_data = order_row.get_insurance_data_for_pg()
 
-        name  = ''
+        if appointment.__class__.__name__ in ['LabAppointment', 'OpdAppointment']:
+            if appointment.insurance and not order_row.is_parent() and not insurance_data:
+                MerchantPayoutLog.create_log(None, "refOrderId, insurerCode and refOrderNo not found for order id {}".format(order_row.id))
+                raise Exception("refOrderId, insurerCode, refOrderNo details not found for order id {}".format(order_row.id))
+
+        name = ''
         if isinstance(appointment, OpdAppointment) or isinstance(appointment, LabAppointment):
             name = appointment.profile.name
 
@@ -360,12 +368,16 @@ def set_order_dummy_transaction(self, order_id, user_id):
         self.retry([order_id, user_id], countdown=300)
 
 @task
-def send_offline_appointment_message(number, text, type):
-    data = {}
-    data['phone_number'] = number
-    data['text'] = mark_safe(text)
+def send_offline_appointment_message(**kwargs):
+    from ondoc.communications.models import OfflineOpdAppointments
+    appointment = kwargs.get('appointment')
+    notification_type = kwargs.get('notification_type')
+    receivers = kwargs.get('receivers')
     try:
-        notification_models.SmsNotification.send_rating_link(data)
+        offline_opd_appointment_comm = OfflineOpdAppointments(appointment=appointment,
+                                                              notification_type=notification_type,
+                                                              receivers=receivers)
+        offline_opd_appointment_comm.send()
     except Exception as e:
         logger.error("Error sending " + str(type) + " message - " + str(e))
 
@@ -783,10 +795,13 @@ def docprime_appointment_reminder_sms_provider(appointment_id, appointment_updat
 
 
 @task()
-def offline_appointment_reminder_sms_patient(appointment_id, time_slot_start_timestamp, **kwargs):
+def offline_appointment_reminder_sms_patient(appointment_id, time_slot_start_timestamp, number):
     from ondoc.doctor.models import OfflineOPDAppointments
+    from ondoc.communications.models import SMSNotification, OfflineOpdAppointments
     try:
-        instance = OfflineOPDAppointments.objects.filter(id=appointment_id).first()
+        instance = OfflineOPDAppointments.objects.select_related('user', 'doctor', 'hospital')\
+                                                 .prefetch_related('hospital__assoc_doctors')\
+                                                 .filter(id=appointment_id).first()
         if not instance or \
                 not instance.user or \
                 math.floor(instance.time_slot_start.timestamp()) != time_slot_start_timestamp \
@@ -796,10 +811,15 @@ def offline_appointment_reminder_sms_patient(appointment_id, time_slot_start_tim
             #                                                previous_appointment_date_time,
             #                                                str(math.floor(instance.time_slot_start.timestamp()))))
             return
-        data = {}
-        data['phone_number'] = kwargs.get('number')
-        data['text'] = mark_safe(kwargs.get('text'))
-        notification_models.SmsNotification.send_rating_link(data)
+        receivers = [{"user": None, "phone_number": number}]
+        offline_opd_comm_obj = OfflineOpdAppointments(appointment=instance,
+                                                      notification_type=NotificationAction.OFFLINE_APPOINTMENT_REMINDER_PROVIDER_SMS,
+                                                      receivers=receivers)
+        offline_opd_comm_obj.send()
+        # data = {}
+        # data['phone_number'] = kwargs.get('number')
+        # data['text'] = mark_safe(kwargs.get('text'))
+        # notification_models.SmsNotification.send_rating_link(data)
     except Exception as e:
         logger.error(str(e))
 
@@ -1233,7 +1253,7 @@ def send_contactus_notification(obj_id):
 def send_capture_payment_request(self, product_id, appointment_id):
     from ondoc.doctor.models import OpdAppointment
     from ondoc.diagnostic.models import LabAppointment
-    from ondoc.account.models import Order, PgTransaction
+    from ondoc.account.models import Order, PgTransaction, PaymentProcessStatus
     from ondoc.account.mongo_models import PgLogs
     req_data = dict()
     if product_id == Order.DOCTOR_PRODUCT_ID:
@@ -1269,9 +1289,14 @@ def send_capture_payment_request(self, product_id, appointment_id):
             }
 
             response = requests.post(url, data=json.dumps(req_data), headers=headers)
-            save_pg_response.apply_async((PgLogs.TXN_CAPTURED, order.id, txn_obj.id, response.json(), req_data,), eta=timezone.localtime(), )
+
+            resp_data = response.json()
+            save_pg_response.apply_async((PgLogs.TXN_CAPTURED, order.id, txn_obj.id, resp_data, req_data,), eta=timezone.localtime(), )
+
+            args = {'order_id': order.id, 'status_code': resp_data.get('statusCode'), 'source': 'CAPTURE'}
+            status_type = PaymentProcessStatus.get_status_type(resp_data.get('statusCode'), resp_data.get('txStatus'))
+            save_payment_status.apply_async((status_type, args), eta=timezone.localtime(), )
             if response.status_code == status.HTTP_200_OK:
-                resp_data = response.json()
                 if resp_data.get("ok") is not None and resp_data.get("ok") == '1':
                     txn_obj.status_code = resp_data.get('statusCode')
                     txn_obj.status_type = resp_data.get('txStatus')
@@ -1295,7 +1320,7 @@ def send_capture_payment_request(self, product_id, appointment_id):
 def send_release_payment_request(self, product_id, appointment_id):
     from ondoc.doctor.models import OpdAppointment
     from ondoc.diagnostic.models import LabAppointment
-    from ondoc.account.models import Order, PgTransaction
+    from ondoc.account.models import Order, PgTransaction, PaymentProcessStatus
     from ondoc.account.mongo_models import PgLogs
     req_data = dict()
     if product_id == Order.DOCTOR_PRODUCT_ID:
@@ -1335,9 +1360,14 @@ def send_release_payment_request(self, product_id, appointment_id):
                 }
 
                 response = requests.post(url, data=json.dumps(req_data), headers=headers)
-                save_pg_response.apply_async((PgLogs.TXN_RELEASED, order.id, txn_obj.id, response.json(), req_data,), eta=timezone.localtime(), )
+                resp_data = response.json()
+                save_pg_response.apply_async((PgLogs.TXN_RELEASED, order.id, txn_obj.id, resp_data, req_data,), eta=timezone.localtime(), )
+
+                args = {'order_id': order.id, 'status_code': resp_data.get('statusCode'), 'source': 'RELEASE'}
+                status_type = PaymentProcessStatus.get_status_type(resp_data.get('statusCode'),
+                                                                   resp_data.get('txStatus'))
+                save_payment_status.apply_async((status_type, args), eta=timezone.localtime(), )
                 if response.status_code == status.HTTP_200_OK:
-                    resp_data = response.json()
                     if resp_data.get("ok") is not None and resp_data.get("ok") == '1':
                         txn_obj.status_code = resp_data.get('statusCode')
                         txn_obj.status_type = 'TXN_RELEASE'
