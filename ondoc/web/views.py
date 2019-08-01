@@ -153,13 +153,17 @@ def advanced_doctor_search_view(request):
 
     class SearchDataForm(forms.Form):
         # hospital = forms.ModelMultipleChoiceField(queryset=Hospital.objects.filter(is_live=True), widget=Select2MultipleWidget)
-        hospital = forms.ModelMultipleChoiceField(queryset=Hospital.objects.filter(is_live=True), widget=autocomplete.ModelSelect2Multiple(url='hospital-autocomplete'))
+        hospital = forms.ModelMultipleChoiceField(queryset=Hospital.objects.filter(is_live=True),
+                                                  widget=autocomplete.ModelSelect2Multiple(url='hospital-autocomplete'), required=False)
         # specialization = forms.ModelMultipleChoiceField(queryset=PracticeSpecialization.objects.all(),
         #                                                 widget=Select2MultipleWidget)
         specialization = forms.ModelMultipleChoiceField(queryset=PracticeSpecialization.objects.all(),
-                                                        widget=autocomplete.ModelSelect2Multiple(url='practicespecialization-autocomplete'))
-        group = forms.ModelMultipleChoiceField(queryset=SimilarSpecializationGroup.objects.all(), label="Group of Specializations",
-                                               widget=autocomplete.ModelSelect2Multiple(url='similarspecializationgroup-autocomplete'))
+                                                        widget=autocomplete.ModelSelect2Multiple(
+                                                            url='practicespecialization-autocomplete'), required=False)
+        group = forms.ModelMultipleChoiceField(queryset=SimilarSpecializationGroup.objects.all(),
+                                               label="Group of Specializations",
+                                               widget=autocomplete.ModelSelect2Multiple(
+                                                   url='similarspecializationgroup-autocomplete'), required=False)
 
     from django.contrib import messages
     if request.method == "POST":
