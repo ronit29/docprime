@@ -257,11 +257,12 @@ class SMSNotification:
     def get_template(self, user):
         notification_type = self.notification_type
         body_template = ''
-        if notification_type == NotificationAction.APPOINTMENT_ACCEPTED or \
-                notification_type == NotificationAction.OPD_OTP_BEFORE_APPOINTMENT:
+        if notification_type == NotificationAction.APPOINTMENT_ACCEPTED:
             body_template = "sms/appointment_accepted.txt"
         elif notification_type == NotificationAction.APPOINTMENT_BOOKED and user and user.user_type == User.CONSUMER:
             body_template = "sms/appointment_booked_patient.txt"
+        elif notification_type == NotificationAction.OPD_OTP_BEFORE_APPOINTMENT:
+            body_template = "sms/appointment_accepted_reminder.txt"
         elif notification_type == NotificationAction.APPOINTMENT_BOOKED and (not user or user.user_type == User.DOCTOR):
             body_template = "sms/appointment_booked_doctor.txt"
         elif notification_type == NotificationAction.APPOINTMENT_RESCHEDULED_BY_PATIENT and user and user.user_type == User.CONSUMER:

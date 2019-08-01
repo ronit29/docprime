@@ -1,0 +1,1 @@
+Appointment ID: {{instance.id}} - Gentle reminder for your appointment with Dr.{{doctor_name|capfirst}} at {{instance.time_slot_start|date:"h:i A"}} today.
