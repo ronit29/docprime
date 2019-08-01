@@ -334,7 +334,27 @@ class User(AbstractBaseUser, PermissionsMixin):
         #     return self.staffprofile.name
         # return str(self.phone_number)
 
-    # @property
+    def is_valid_lead(self, date_time_to_be_checked, check_lab_appointment=False, check_ipd_lead=False):
+        # If this user has booked an appointment with specific period from date_time_to_be_checked, then
+        # the lead is valid else invalid.
+        from ondoc.doctor.models import OpdAppointment
+        from ondoc.diagnostic.models import LabAppointment
+        from ondoc.procedure.models import IpdProcedureLead
+        any_appointments = OpdAppointment.objects.filter(user=self, created_at__gte=date_time_to_be_checked,
+                                                         created_at__lte=date_time_to_be_checked + timezone.timedelta(
+                                                             minutes=settings.LEAD_AND_APPOINTMENT_BUFFER_TIME)).exists()
+        if check_lab_appointment and not any_appointments:
+            any_appointments = LabAppointment.objects.filter(user=self, created_at__gte=date_time_to_be_checked,
+                                                             created_at__lte=date_time_to_be_checked + timezone.timedelta(
+                                                                 minutes=settings.LEAD_AND_APPOINTMENT_BUFFER_TIME)).exists()
+        if check_ipd_lead and not any_appointments:
+            count = IpdProcedureLead.objects.filter(user=self, is_valid=True,
+                                                    created_at__lte=date_time_to_be_checked,
+                                                    created_at__gte=date_time_to_be_checked - timezone.timedelta(
+                                                        minutes=settings.LEAD_AND_APPOINTMENT_BUFFER_TIME)).count()
+            if count > 0:
+                any_appointments = True
+        return not any_appointments
 
     @cached_property
     def show_ipd_popup(self):
