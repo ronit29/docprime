@@ -722,6 +722,7 @@ def send_insurance_float_limit_notifications(self, data):
 
 def request_payout(req_data, order_data):
     from ondoc.api.v1.utils import create_payout_checksum
+    from ondoc.account.mongo_models import PgLogs
 
     req_data["checkSum"] = create_payout_checksum(req_data["payload"], order_data.product_id)
     headers = {
@@ -733,7 +734,7 @@ def request_payout(req_data, order_data):
 
     response = requests.post(url, data=json.dumps(req_data), headers=headers)
     resp_data = response.json()
-
+    save_pg_response.apply_async((PgLogs.PAYOUT_PROCESS, order_data.id, None, resp_data, req_data,), eta=timezone.localtime(), )
     if response.status_code == status.HTTP_200_OK:
         if resp_data.get("ok") is not None and resp_data.get("ok") == '1':
             success_payout = False
