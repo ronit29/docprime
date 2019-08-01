@@ -103,10 +103,10 @@ class Order(TimeStampedModel):
                     if not transactions:
                         raise Exception('No transactions found for appointment insurance.')
                     insurance_order_transaction = transactions[0]
-                    # data['refOrderId'] = str(insurance_order_transaction.order_id)
-                    # data['refOrderNo'] = str(insurance_order_transaction.order_no)
-                    # data['insurerCode'] = str(user_insurance.insurance_plan.insurer.insurer_merchant_code)
-                    data['insurerCode'] = "advancePay"
+                    data['refOrderId'] = str(insurance_order_transaction.order_id)
+                    data['refOrderNo'] = str(insurance_order_transaction.order_no)
+                    data['insurerCode'] = str(user_insurance.insurance_plan.insurer.insurer_merchant_code)
+                    #data['insurerCode'] = "advancePay"
 
         return data
 
