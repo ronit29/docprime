@@ -30,7 +30,6 @@ from collections import OrderedDict
 from django.utils.text import slugify
 import logging
 
-from ondoc.notification.models import WhtsappNotification, NotificationAction
 
 logger = logging.getLogger(__name__)
 
@@ -653,6 +652,7 @@ class OtpVerifications(TimeStampedModel):
     via_sms = models.NullBooleanField(null=True)
 
     def can_send(self):
+        from ondoc.notification.models import WhtsappNotification, NotificationAction
         request_window = timezone.now() - timezone.timedelta(minutes=1)
         if self.is_expired:
             return True
