@@ -1369,7 +1369,7 @@ class UserInsurance(auth_model.TimeStampedModel, MerchantPayoutMixin):
                 result = False
         return result
 
-    def validate_insurance_for_cart(self, appointment_data, cart_items):
+    def validate_insurance_for_cart(self, appointment_data, cart_items, request):
         insurance_validate_dict = self.validate_insurance(appointment_data)
         is_insured = insurance_validate_dict['is_insured']
         insurance_id = insurance_validate_dict['insurance_id']
@@ -1379,7 +1379,7 @@ class UserInsurance(auth_model.TimeStampedModel, MerchantPayoutMixin):
         onco_count = 0
         doctor = appointment_data.get('doctor', None)
         user = appointment_data.get('profile').user
-        if not is_insured or not doctor:
+        if not is_insured:
             return is_insured, insurance_id, insurance_message
 
         specialization_result = InsuranceDoctorSpecializations.get_doctor_insurance_specializations(doctor)
@@ -1414,6 +1414,14 @@ class UserInsurance(auth_model.TimeStampedModel, MerchantPayoutMixin):
                     return False, self.id, "Gynocologist limit exceeded of limit {}".format(int(settings.INSURANCE_GYNECOLOGIST_LIMIT))
                 if onco_count >= int(settings.INSURANCE_ONCOLOGIST_LIMIT) and specialization == InsuranceDoctorSpecializations.SpecializationMapping.ONCOLOGIST:
                     return False, self.id, "Oncologist limit exceeded of limit {}".format(int(settings.INSURANCE_ONCOLOGIST_LIMIT))
+            elif cart_item.product_id == Order.LAB_PRODUCT_ID:
+                is_agent = True if hasattr(request.user, 'agent') else False
+                if user and user.active_insurance:
+                    is_appointment_insured, appointment_insurance_id, insurance_message = user.active_insurance.validate_lab_insurance(appointment_data, user.active_insurance, is_agent=is_agent)
+                if user and user.active_insurance and is_appointment_insured:
+                    return True, self.id, ""
+                else:
+                    return False, None, "Lab Test not Insured"
             else:
                 return is_insured, insurance_id, insurance_message
 
