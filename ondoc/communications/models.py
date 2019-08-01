@@ -12,7 +12,7 @@ from django.db.models import F, Q
 
 from ondoc.api.v1.utils import util_absolute_url, util_file_name, generate_short_url
 from ondoc.banner.models import EmailBanner
-from ondoc.doctor.models import OpdAppointment, Hospital
+from ondoc.doctor.models import OpdAppointment, Hospital, OfflineOPDAppointments
 from ondoc.diagnostic.models import LabAppointment
 from ondoc.common.models import UserConfig
 from django.core.files.uploadedfile import SimpleUploadedFile, TemporaryUploadedFile, InMemoryUploadedFile
@@ -239,6 +239,15 @@ class Notification:
             LabAppointment.CANCELLED: NotificationAction.LAB_APPOINTMENT_CANCELLED,
             LabAppointment.COMPLETED: NotificationAction.LAB_INVOICE
         }
+    OFFLINE_OPD_NOTIFICATION_TYPE_MAPPING = \
+        {
+            OfflineOPDAppointments.BOOKED: NotificationAction.OFFLINE_OPD_APPOINTMENT_BOOKED,
+            OfflineOPDAppointments.ACCEPTED: NotificationAction.OFFLINE_OPD_APPOINTMENT_ACCEPTED,
+            OfflineOPDAppointments.RESCHEDULED_DOCTOR: NotificationAction.OFFLINE_OPD_APPOINTMENT_RESCHEDULED_DOCTOR,
+            OfflineOPDAppointments.NO_SHOW: NotificationAction.OFFLINE_OPD_APPOINTMENT_NO_SHOW,
+            OfflineOPDAppointments.CANCELLED: NotificationAction.OFFLINE_OPD_APPOINTMENT_CANCELLED,
+            OfflineOPDAppointments.COMPLETED: NotificationAction.OFFLINE_OPD_INVOICE
+        }
 
 
 class SMSNotification:
@@ -347,6 +356,20 @@ class SMSNotification:
     #        body_template = "sms/lab/lab_confirmation_second_check.txt"
     #    elif notification_type == NotificationAction.LAB_FEEDBACK_AFTER_APPOINTMENT:
     #        body_template = "sms/lab/lab_feedback.txt"
+
+        elif notification_type == NotificationAction.OFFLINE_OPD_APPOINTMENT_ACCEPTED:
+            body_template = "sms/offline_opd_appointment/appointment_accepted.txt"
+        elif notification_type == NotificationAction.OFFLINE_OPD_APPOINTMENT_CANCELLED:
+            body_template = "sms/offline_opd_appointment/appointment_cancelled.txt"
+        elif notification_type == NotificationAction.OFFLINE_OPD_APPOINTMENT_RESCHEDULED_DOCTOR:
+            body_template = "sms/offline_opd_appointment/appointment_rescheduled_doctor.txt"
+        elif notification_type == NotificationAction.OFFLINE_APPOINTMENT_REMINDER_PROVIDER_SMS:
+            body_template = "sms/offline_opd_appointment/schedule_appointment_reminder_sms.txt"
+        elif notification_type == NotificationAction.OFFLINE_OPD_APPOINTMENT_COMPLETED:
+            body_template = "sms/offline_opd_appointment/appointment_completed.txt"
+        elif notification_type == NotificationAction.OFFLINE_PATIENT_WELCOME_MESSAGE:
+            body_template = "sms/offline_opd_appointment/welcome_message.txt"
+
         return body_template
 
     def trigger(self, receiver, template, context):
@@ -433,7 +456,6 @@ class SMSNotification:
             else:
                 unique_key_found = True
         expiration_time = datetime.fromtimestamp(payload.get('exp'))
-        # ClickLoginToken.objects.create(user=user, token=token, expiration_time=expiration_time, url_key=url_key)
         click_login_token_obj = ClickLoginToken(user=user, token=token, expiration_time=expiration_time, url_key=url_key)
         provider_login_url = settings.PROVIDER_APP_DOMAIN + "/sms/login?key=" + url_key + \
                                         "&url=/sms-redirect/" + appointment_type + "/appointment/" + str(appointment.id)
@@ -1951,4 +1973,81 @@ class IpdLeadNotification(Notification):
         all_receivers['sms_receivers'] = phone_numbers
         all_receivers['email_receivers'] = emails
 
+        return all_receivers
+
+
+class OfflineOpdAppointments(Notification):
+
+    def __init__(self, appointment, notification_type=None, **kwargs):
+        self.appointment = appointment
+        if notification_type:
+            self.notification_type = notification_type
+        else:
+            self.notification_type = self.OFFLINE_OPD_NOTIFICATION_TYPE_MAPPING[appointment.status]
+        if kwargs.get('receivers'):
+            self.receivers = kwargs.get('receivers')
+
+    def get_context(self):
+        patient_name = self.appointment.user.name.title()
+        doctor_name = self.appointment.doctor.name
+        doctor_display_name = self.appointment.doctor.get_display_name()
+
+        est = pytz.timezone(settings.TIME_ZONE)
+        time_slot_start = self.appointment.time_slot_start.astimezone(est)
+
+        clinic_or_hospital = "Clinic"
+        if self.appointment.hospital.assoc_doctors.filter(enabled=True).count() > 10:
+            clinic_or_hospital = "Hospital"
+        context = {
+            "doctor_name": doctor_name,
+            "doctor_display_name": doctor_display_name,
+            "hospital_address": self.appointment.hospital.get_hos_address(),
+            "hospital_name": self.appointment.hospital.name,
+            "patient_name": patient_name,
+            "id": self.appointment.id,
+            "instance": self.appointment,
+            "clinic_or_hospital": clinic_or_hospital,
+            "action_type": NotificationAction.OFFLINE_OPD_APPOINTMENT,
+            "action_id": self.appointment.id,
+            "time_slot_start": time_slot_start,
+            "welcome_message": self.appointment.user.welcome_message
+        }
+        return context
+
+    def send(self):
+        context = self.get_context()
+        notification_type = self.notification_type
+        all_receivers = self.receivers if hasattr(self, 'receivers') else self.get_receivers()
+        if notification_type == NotificationAction.OFFLINE_OPD_APPOINTMENT_ACCEPTED:
+            sms_notification = SMSNotification(notification_type, context)
+            sms_notification.send(all_receivers.get('sms_receivers', []))
+        elif notification_type == NotificationAction.OFFLINE_OPD_APPOINTMENT_CANCELLED:
+            sms_notification = SMSNotification(notification_type, context)
+            sms_notification.send(all_receivers.get('sms_receivers', []))
+        elif notification_type == NotificationAction.OFFLINE_OPD_APPOINTMENT_RESCHEDULED_DOCTOR:
+            sms_notification = SMSNotification(notification_type, context)
+            sms_notification.send(all_receivers.get('sms_receivers', []))
+        elif notification_type == NotificationAction.OFFLINE_OPD_APPOINTMENT_NO_SHOW:
+            sms_notification = SMSNotification(notification_type, context)
+            sms_notification.send(all_receivers.get('sms_receivers', []))
+        elif notification_type == NotificationAction.OFFLINE_OPD_APPOINTMENT_COMPLETED:
+            sms_notification = SMSNotification(notification_type, context)
+            sms_notification.send(all_receivers.get('sms_receivers', []))
+        elif notification_type == NotificationAction.OFFLINE_PATIENT_WELCOME_MESSAGE:
+            sms_notification = SMSNotification(notification_type, context)
+            sms_notification.send(all_receivers.get('sms_receivers', []))
+        else:
+            email_notification = EMAILNotification(notification_type, context)
+            sms_notification = SMSNotification(notification_type, context)
+            app_notification = APPNotification(notification_type, context)
+            push_notification = PUSHNotification(notification_type, context)
+            whtsapp_notification = WHTSAPPNotification(notification_type, context)
+            email_notification.send(all_receivers.get('email_receivers', []))
+            sms_notification.send(all_receivers.get('sms_receivers', []))
+            app_notification.send(all_receivers.get('app_receivers', []))
+            whtsapp_notification.send(all_receivers.get('sms_receivers', []))
+            push_notification.send(all_receivers.get('push_receivers', []))
+
+    def get_receivers(self):
+        all_receivers = list()
         return all_receivers

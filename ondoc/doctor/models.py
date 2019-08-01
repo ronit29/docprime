@@ -45,6 +45,7 @@ from ondoc.doctor.tasks import doc_app_auto_cancel
 # from ondoc.account import models as account_model
 from ondoc.insurance import models as insurance_model
 from ondoc.payout import models as payout_model
+# from ondoc.communications.models import OfflineOpdAppointments
 from ondoc.notification import models as notification_models
 from ondoc.notification import tasks as notification_tasks
 from django.contrib.contenttypes.fields import GenericRelation
@@ -3983,10 +3984,20 @@ class OfflinePatients(auth_model.TimeStampedModel):
     def welcome_message_sms(sms_obj):
         if sms_obj:
             try:
-                default_text = '''Dear %s, you have been successfully added as a patient to %s. In case of any query, please reach out to the %s.''' \
-                               % (sms_obj['name'], sms_obj['appointment'].hospital.name, sms_obj['appointment'].hospital.name)
-                text = sms_obj['welcome_message'] if sms_obj['welcome_message'] else default_text
-                notification_tasks.send_offline_appointment_message.apply_async(kwargs={'number': sms_obj['phone_number'], 'text': text, 'type': 'Welcome SMS'}, countdown=1)
+                instance = sms_obj['appointment']
+                receivers = [{"user": None, "phone_number": sms_obj['phone_number']}]
+                # offline_opd_appointment_comm = communication_models.OfflineOpdAppointments(appointment=instance,
+                #                                                                            notification_type=NotificationAction.OFFLINE_PATIENT_WELCOME_MESSAGE,
+                #                                                                            receivers=receivers)
+                # offline_opd_appointment_comm.send()
+                # default_text = '''Dear %s, you have been successfully added as a patient to %s. In case of any query, please reach out to the %s.''' \
+                #                % (sms_obj['name'], sms_obj['appointment'].hospital.name, sms_obj['appointment'].hospital.name)
+                # text = sms_obj['welcome_message'] if sms_obj['welcome_message'] else default_text
+                # notification_tasks.send_offline_appointment_message.apply_async(kwargs={'number': sms_obj['phone_number'], 'text': text, 'type': 'Welcome SMS'}, countdown=1)
+                notification_tasks.send_offline_appointment_message.apply_async(kwargs={'appointment': instance,
+                                                                                        'notification_type': NotificationAction.OFFLINE_PATIENT_WELCOME_MESSAGE,
+                                                                                        'receivers': receivers},
+                                                                                countdown=1)
             except Exception as e:
                 logger.error("Failed to Push Offline Welcome Message SMS Task "+ str(e))
 
@@ -4048,63 +4059,107 @@ class OfflineOPDAppointments(auth_model.TimeStampedModel):
     @staticmethod
     def appointment_add_sms(sms_obj):
         try:
-            default_text = '''Dear %s, your appointment has been confirmed with %s at %s on %s.''' % (
-                sms_obj['name'], sms_obj['appointment'].doctor.get_display_name(), sms_obj['appointment'].hospital.name,
-                sms_obj['appointment'].time_slot_start.strftime("%B %d, %Y %I:%M %p"))
-            notification_tasks.send_offline_appointment_message.apply_async(
-                kwargs={'number': sms_obj['phone_number'], 'text': default_text, 'type': 'Appointment ADD'},
-                countdown=1)
+            instance = sms_obj['appointment']
+            receivers = [{"user": None, "phone_number": sms_obj['phone_number']}]
+            # offline_opd_appointment_comm = communication_models.OfflineOpdAppointments(appointment=instance,
+            #                                                                            notification_type=NotificationAction.OFFLINE_OPD_APPOINTMENT_ACCEPTED,
+            #                                                                            receivers=receivers)
+            # offline_opd_appointment_comm.send()
+            # default_text = '''Dear %s, your appointment has been confirmed with %s at %s on %s.''' % (
+            #     sms_obj['name'], sms_obj['appointment'].doctor.get_display_name(), sms_obj['appointment'].hospital.name,
+            #     sms_obj['appointment'].time_slot_start.strftime("%B %d, %Y %I:%M %p"))
+            # communication_models.SMSNotification(NotificationAction.OFFLINE_OPD_APPOINTMENT_ACCEPTED, context)
+            # notification_tasks.send_offline_appointment_message.apply_async(
+            #     kwargs={'number': sms_obj['phone_number'], 'text': default_text, 'type': 'Appointment ADD'},
+            #     countdown=1)
+            notification_tasks.send_offline_appointment_message.apply_async(kwargs={'appointment': instance,
+                                                                                    'notification_type': NotificationAction.OFFLINE_OPD_APPOINTMENT_ACCEPTED,
+                                                                                    'receivers': receivers},
+                                                                            countdown=1)
         except Exception as e:
             logger.error("Failed to Push Offline Appointment Add Message SMS Task " + str(e))
 
     @staticmethod
     def appointment_cancel_sms(sms_obj):
         try:
-            cancel_time = aware_time_zone(sms_obj['old_appointment'].time_slot_start)
-            default_text = "Dear %s, your appointment with %s at %s for %s has been cancelled. In case of any query, please reach out to the clinic." % (
-                              sms_obj['name'], sms_obj['old_appointment'].doctor.get_display_name(), sms_obj['old_appointment'].hospital.name,
-                              cancel_time.strftime("%B %d, %Y %I:%M %p"))
-            notification_tasks.send_offline_appointment_message.apply_async(
-                kwargs={'number': sms_obj['phone_number'], 'text': default_text, 'type': 'Appointment CANCEL'},
-                countdown=1)
+            instance = sms_obj['appointment']
+            receivers = [{"user": None, "phone_number": sms_obj['phone_number']}]
+            # offline_opd_appointment_comm = communication_models.OfflineOpdAppointments(appointment=instance,
+            #                                                                            notification_type=NotificationAction.OFFLINE_OPD_APPOINTMENT_CANCELLED,
+            #                                                                            receivers=receivers)
+            # offline_opd_appointment_comm.send()
+            # cancel_time = aware_time_zone(sms_obj['old_appointment'].time_slot_start)
+            # default_text = "Dear %s, your appointment with %s at %s for %s has been cancelled. In case of any query, please reach out to the clinic." % (
+            #                   sms_obj['name'], sms_obj['old_appointment'].doctor.get_display_name(), sms_obj['old_appointment'].hospital.name,
+            #                   cancel_time.strftime("%B %d, %Y %I:%M %p"))
+            # notification_tasks.send_offline_appointment_message.apply_async(
+            #     kwargs={'number': sms_obj['phone_number'], 'text': default_text, 'type': 'Appointment CANCEL'},
+            #     countdown=1)
+            notification_tasks.send_offline_appointment_message.apply_async(kwargs={'appointment': instance,
+                                                                                    'notification_type': NotificationAction.OFFLINE_OPD_APPOINTMENT_CANCELLED,
+                                                                                    'receivers': receivers},
+                                                                            countdown=1)
+
         except Exception as e:
             logger.error("Failed to Push Offline Appointment Cancel Message SMS Task " + str(e))
 
     @staticmethod
     def appointment_complete_sms(sms_obj):
         try:
-            default_text = "Dear %s, your appointment with %s at %s is complete. In case of any query, please reach out to the %s." % \
-                           (sms_obj['name'], sms_obj['appointment'].doctor.get_display_name(),
-                            sms_obj['appointment'].hospital.name, sms_obj['appointment'].hospital.name)
-            notification_tasks.send_offline_appointment_message.apply_async(
-                kwargs={'number': sms_obj['phone_number'], 'text': default_text, 'type': 'Appointment COMPLETE'},
-                countdown=1)
+            instance = sms_obj['appointment']
+            receivers = [{"user": None, "phone_number": sms_obj['phone_number']}]
+            # offline_opd_appointment_comm = communication_models.OfflineOpdAppointments(appointment=instance,
+            #                                                                            notification_type=NotificationAction.OFFLINE_OPD_APPOINTMENT_COMPLETED,
+            #                                                                            receivers=receivers)
+            # offline_opd_appointment_comm.send()
+            # default_text = "Dear %s, your appointment with %s at %s is complete. In case of any query, please reach out to the %s." % \
+            #                (sms_obj['name'], sms_obj['appointment'].doctor.get_display_name(),
+            #                 sms_obj['appointment'].hospital.name, sms_obj['appointment'].hospital.name)
+            # notification_tasks.send_offline_appointment_message.apply_async(
+            #     kwargs={'number': sms_obj['phone_number'], 'text': default_text, 'type': 'Appointment COMPLETE'},
+            #     countdown=1)
+            notification_tasks.send_offline_appointment_message.apply_async(kwargs={'appointment': instance,
+                                                                                    'notification_type': NotificationAction.OFFLINE_OPD_APPOINTMENT_COMPLETED,
+                                                                                    'receivers': receivers},
+                                                                            countdown=1)
         except Exception as e:
             logger.error("Failed to Push Offline Appointment Cancel Message SMS Task " + str(e))
 
     @staticmethod
     def appointment_reschedule_sms(sms_obj):
         try:
-            default_text = "Dear %s, your appointment with %s at %s has been rescheduled to %s. In case of any query, please reach out to the clinic." % (
-                              sms_obj['name'], sms_obj['appointment'].doctor.get_display_name(), sms_obj['appointment'].hospital.name,
-                              sms_obj['appointment'].time_slot_start.strftime("%B %d, %Y %I:%M %p"))
-            notification_tasks.send_offline_appointment_message.apply_async(
-                kwargs={'number': sms_obj['phone_number'], 'text': default_text, 'type': 'Appointment RESCHEDULE'},
-                countdown=1)
+            instance = sms_obj['appointment']
+            receivers = [{"user": None, "phone_number": sms_obj['phone_number']}]
+            # offline_opd_appointment_comm = communication_models.OfflineOpdAppointments(appointment=instance,
+            #                                                                            notification_type=NotificationAction.OFFLINE_OPD_APPOINTMENT_RESCHEDULED_DOCTOR,
+            #                                                                            receivers=receivers)
+            # offline_opd_appointment_comm.send()
+            # default_text = "Dear %s, your appointment with %s at %s has been rescheduled to %s. In case of any query, please reach out to the clinic." % (
+            #                   sms_obj['name'], sms_obj['appointment'].doctor.get_display_name(), sms_obj['appointment'].hospital.name,
+            #                   sms_obj['appointment'].time_slot_start.strftime("%B %d, %Y %I:%M %p"))
+            # notification_tasks.send_offline_appointment_message.apply_async(
+            #     kwargs={'number': sms_obj['phone_number'], 'text': default_text, 'type': 'Appointment RESCHEDULE'},
+            #     countdown=1)
+            notification_tasks.send_offline_appointment_message.apply_async(kwargs={'appointment': instance,
+                                                                                    'notification_type': NotificationAction.OFFLINE_OPD_APPOINTMENT_RESCHEDULED_DOCTOR,
+                                                                                    'receivers': receivers},
+                                                                            countdown=1)
         except Exception as e:
             logger.error("Failed to Push Offline Appointment Rescehdule Message SMS Task " + str(e))
 
     @staticmethod
     def schedule_appointment_reminder_sms(sms_obj):
         try:
-            default_text = "Appointment reminder: Dear %s, your appointment with %s at %s is scheduled on %s. Please make sure you reach the clinic premises on time." % (
-                sms_obj['name'], sms_obj['appointment'].doctor.get_display_name(), sms_obj['appointment'].hospital.name,
-                sms_obj['appointment'].time_slot_start.strftime("%B %d, %Y %I:%M %p"))
+            # default_text = "Appointment reminder: Dear %s, your appointment with %s at %s is scheduled on %s. Please make sure you reach the clinic premises on time." % (
+            #     sms_obj['name'], sms_obj['appointment'].doctor.get_display_name(), sms_obj['appointment'].hospital.name,
+            #     sms_obj['appointment'].time_slot_start.strftime("%B %d, %Y %I:%M %p"))
             notification_tasks.offline_appointment_reminder_sms_patient.apply_async(
                 kwargs={'appointment_id': sms_obj['appointment'].id,
                         'time_slot_start_timestamp': sms_obj['appointment'].time_slot_start.timestamp(),
-                        'number': sms_obj['phone_number'], 'text': default_text, 'type': 'Appointment RESCHEDULE'},
-                eta=sms_obj['appointment'].time_slot_start - datetime.timedelta(minutes=int(OfflineOPDAppointments.SMS_APPOINTMENT_REMINDER_TIME)))
+                        'number': sms_obj['phone_number']},
+                # , 'text': default_text, 'type': 'Appointment RESCHEDULE'},
+                eta=sms_obj['appointment'].time_slot_start - datetime.timedelta(
+                    minutes=int(OfflineOPDAppointments.SMS_APPOINTMENT_REMINDER_TIME)))
         except Exception as e:
             logger.error("Failed to Push Offline Appointment Reminder Message SMS Task " + str(e))
 
