@@ -98,7 +98,7 @@ class LoginOTP(GenericViewSet):
         phone_number = data['phone_number']
 
         otp_obj = OtpVerifications.objects.filter(phone_number=phone_number).order_by('-id').first()
-        if not otp_obj.can_send():
+        if data.get('via_whatsapp', False) and not otp_obj.can_send():
             return Response({'success': False})
 
         blocked_state = BlacklistUser.get_state_by_number(phone_number, BlockedStates.States.LOGIN)
