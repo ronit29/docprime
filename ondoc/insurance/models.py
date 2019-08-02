@@ -1368,8 +1368,8 @@ class UserInsurance(auth_model.TimeStampedModel, MerchantPayoutMixin):
                 result = False
         return result
 
-    def validate_insurance_for_cart(self, appointment_data, cart_items, request):
-        is_agent = True if hasattr(request.user, 'agent') else False
+    def validate_insurance_for_cart(self, appointment_data, cart_items, **kwargs):
+        is_agent = True if kwargs.get('is_agent') else False
         insurance_validate_dict = self.validate_insurance(appointment_data, is_agent=is_agent)
         is_insured = insurance_validate_dict['is_insured']
         insurance_id = insurance_validate_dict['insurance_id']
