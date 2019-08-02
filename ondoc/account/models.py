@@ -105,7 +105,8 @@ class Order(TimeStampedModel):
                     insurance_order_transaction = transactions[0]
                     data['refOrderId'] = str(insurance_order_transaction.order_id)
                     data['refOrderNo'] = str(insurance_order_transaction.order_no)
-                    data['insurerCode'] = str(user_insurance.insurance_plan.insurer.insurer_merchant_code)
+                    #data['insurerCode'] = str(user_insurance.insurance_plan.insurer.insurer_merchant_code)
+                    #data['insurerCode'] = "advancePay"
 
         return data
 
@@ -2301,13 +2302,16 @@ class PgStatusCode(TimeStampedModel):
 
 
 class PaymentProcessStatus(TimeStampedModel):
-    INITIATED = 1
+    INITIATE = 1
     AUTHORIZE = 2
     SUCCESS = 3
     FAILURE = 4
+    CAPTURE = 5
+    RELEASE = 6
 
-    STATUS_CHOICES = [(INITIATED, "Initiated"), (AUTHORIZE, "Authorize"),
-                      (SUCCESS, "Success"), (FAILURE, "Failure")]
+    STATUS_CHOICES = [(INITIATE, "Initiate"), (AUTHORIZE, "Authorize"),
+                      (SUCCESS, "Success"), (FAILURE, "Failure"),
+                      (CAPTURE, "Capture"), (RELEASE, "Release")]
 
     user = models.ForeignKey(User, on_delete=models.DO_NOTHING, null=True)
     order = models.ForeignKey(Order, on_delete=models.DO_NOTHING, null=True)
@@ -2340,11 +2344,23 @@ class PaymentProcessStatus(TimeStampedModel):
 
     @classmethod
     def get_status_type(cls, status_code, txStatus):
-        if status_code == 1:
-            if txStatus == 'TXN_AUTHORIZE':
+        try:
+            status_code = int(status_code)
+        except KeyError:
+            logger.error("ValueError : statusCode is not type integer")
+            status_code = None
+
+        if status_code and status_code == 1:
+            if txStatus == 'TXN_AUTHORIZE' or txStatus == '27':
                 return PaymentProcessStatus.AUTHORIZE
             else:
                 return PaymentProcessStatus.SUCCESS
+
+        if status_code and status_code == 20 and txStatus == 'TXN_SUCCESS':
+            return PaymentProcessStatus.CAPTURE
+
+        if status_code and status_code == 22 and txStatus == 'TXN_RELEASE':
+            return PaymentProcessStatus.RELEASE
 
         return PaymentProcessStatus.FAILURE
 
@@ -2423,7 +2439,7 @@ class AdvanceMerchantPayout(TimeStampedModel):
                 adv_amt_obj = AdvanceMerchantAmount.objects.filter(merchant_id=mp.paid_to_id).first()
                 if adv_amt_obj and adv_amt_obj.amount:
                     adv_amt_obj.amount = decimal.Decimal(adv_amt_obj.amount) + mp.payable_amount
-                    adv_amt_obj.total_amount = decimal.Decimal(adv_amt_obj.amount) + mp.payable_amount
+                    adv_amt_obj.total_amount = decimal.Decimal(adv_amt_obj.total_amount) + mp.payable_amount
                 else:
                     adv_amt_obj = AdvanceMerchantAmount(merchant_id=mp.paid_to_id)
                     adv_amt_obj.amount = mp.payable_amount
