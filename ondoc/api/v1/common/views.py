@@ -10,8 +10,7 @@ from django.contrib.gis.geos import Point, GEOSGeometry
 from django.conf import settings
 from django.utils import timezone
 
-from ondoc.api.v1.article.serializers import CommentSerializer
-from ondoc.api.v1.common.serializers import SearchLeadSerializer
+from ondoc.api.v1.common.serializers import SearchLeadSerializer, CommentSerializer
 from django.utils.dateparse import parse_datetime
 from weasyprint import HTML
 from django.http import HttpResponse
@@ -1214,7 +1213,8 @@ class CommentViewSet(viewsets.ModelViewSet):
         object_id = data.get('hospital')
         object = Hospital.objects.filter(id=object_id).first()
         if object:
-            comments = self.queryset.filter(object_pk=object.id)
-
+            comments = FluentComment.objects.filter(object_pk=str(object.id), parent_id=None, is_public=True)
             serializer = CommentSerializer(comments, many=True, context={'request': request})
             return Response(serializer.data)
+
+        return Response({})
