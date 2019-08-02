@@ -1,5 +1,6 @@
 from decimal import Decimal
 
+from celery.task import task
 from django.contrib.gis.db.models.functions import Distance
 from django.contrib.gis.geos import GEOSGeometry
 from django.db.models import Window
@@ -4575,5 +4576,20 @@ class PurchaseOrderCreation(auth_model.TimeStampedModel):
         db_table = 'purchase_order_creation'
 
 
+
+
+    # def after_commit_purchase_order(self, obj):
+    #     if self.id:
+    #         if self.id.provider_name_hospital:
+    #             if self.provider_name_hospital.hospital_appointments.all()
+
+
+
+@task()
+def purchase_order_creation_counter_automation(purchase_order_id, ):
+    from ondoc.doctor.models import PurchaseOrderCreation
+    from ondoc.doctor.models import Hospital
+
+    instance = PurchaseOrderCreation.objects.filter(id=purchase_order_id)
 
 
