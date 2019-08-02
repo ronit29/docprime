@@ -537,7 +537,7 @@ class DoctorHospitalSerializer(serializers.ModelSerializer):
                     resp['is_insurance_covered'] = True
                 if specialization == InsuranceDoctorSpecializations.SpecializationMapping.GYNOCOLOGIST and doctor_specialization_count_dict.get(specialization, {}).get('count') >= settings.INSURANCE_GYNECOLOGIST_LIMIT:
                     resp['is_insurance_covered'] = False
-                    resp['error_message'] = "You have already utilised {} Gynaecologist consultations available in your OPD Insurance Plan.".format(settings.INSURANCE_GYNOLOGIST_LIMIT)
+                    resp['error_message'] = "You have already utilised {} Gynaecologist consultations available in your OPD Insurance Plan.".format(settings.INSURANCE_GYNECOLOGIST_LIMIT)
                 elif specialization == InsuranceDoctorSpecializations.SpecializationMapping.ONCOLOGIST and doctor_specialization_count_dict.get(specialization, {}).get('count') >= settings.INSURANCE_ONCOLOGIST_LIMIT:
                     resp['is_insurance_covered'] = False
                     resp['error_message'] = "You have already utilised {} Onccologist consultations available in your OPD Insurance Plan.".format(settings.INSURANCE_ONCOLOGIST_LIMIT)

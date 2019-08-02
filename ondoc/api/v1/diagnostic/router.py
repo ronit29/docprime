@@ -2,7 +2,7 @@ from django.urls import path
 from .views import (LabTestList, LabList, LabAppointmentView, SearchPageViewSet, LabTimingListView,
                     AvailableTestViewSet, LabReportFileViewset, DoctorLabAppointmentsViewSet,
                     DoctorLabAppointmentsNoAuthViewSet, TestDetailsViewset, LabTestCategoryListViewSet,
-                    CompareLabPackagesViewSet, DigitalReports)
+                    CompareLabPackagesViewSet, DigitalReports, LabTestCategoryLandingUrlViewSet)
 
 # from rest_framework.routers import DefaultRouter
 #
@@ -60,5 +60,6 @@ urlpatterns = [
     path('compare_lab_packages', CompareLabPackagesViewSet.as_view({'post': 'retrieve'}), name='lab_packages_comparison'),
     path('compare_lab_packages_by_url', CompareLabPackagesViewSet.as_view({'post': 'retrieve_by_url'}), name='lab_packages_comparison_by_url'),
     # path('digital/report/<int:booking_id>', DigitalReports.as_view({'get': 'retrieve'}), name='digital_report'),
+    path('lab-test-category-landing-urls', LabTestCategoryLandingUrlViewSet.as_view({'get': 'category_landing_url'}), name='lab_test_category_landing_urls'),
 
 ]
