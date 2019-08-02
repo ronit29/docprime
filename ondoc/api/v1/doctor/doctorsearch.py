@@ -38,8 +38,8 @@ class DoctorSearchHelper:
     def get_filtering_params(self):
         """Helper function that prepare dynamic query for filtering"""
         params = {}
-        hospital_type_mapping = {hospital_type[1]: hospital_type[0] for hospital_type in
-                                 models.Hospital.HOSPITAL_TYPE_CHOICES}
+        # hospital_type_mapping = {hospital_type[1]: hospital_type[0] for hospital_type in
+        #                          models.Hospital.HOSPITAL_TYPE_CHOICES}
 
         filtering_params = []
 
@@ -49,7 +49,7 @@ class DoctorSearchHelper:
         procedure_ids = self.query_params.get("procedure_ids", [])# NEW_LOGIC
         ipd_procedure_ids = self.query_params.get("ipd_procedure_ids", [])
         procedure_category_ids = self.query_params.get("procedure_category_ids", [])  # NEW_LOGIC
-        sits_at_hosp_types = self.query_params.get("sits_at", [])
+        # sits_at_hosp_types = self.query_params.get("sits_at", [])
 
         counter = 1
         if self.query_params.get('hospital_id') is not None:
@@ -92,20 +92,20 @@ class DoctorSearchHelper:
                 sp_str+')'
             )
 
-        counter = 1
-        if self.query_params.get("sits_at"):
-            sits_at_str = 'hospital_type IN('
-            for hosp_type in sits_at_hosp_types:
-
-                if counter != 1:
-                    sits_at_str += ', '
-                sits_at_str = sits_at_str + '%(' + 'sits_at' + str(counter) + ')s'
-                params['sits_at' + str(counter)] = hospital_type_mapping.get(hosp_type)
-                counter += 1
-
-            filtering_params.append(
-                sits_at_str + ')'
-            )
+        # counter = 1
+        # if self.query_params.get("sits_at"):
+        #     sits_at_str = 'hospital_type IN('
+        #     for hosp_type in sits_at_hosp_types:
+        #
+        #         if counter != 1:
+        #             sits_at_str += ', '
+        #         sits_at_str = sits_at_str + '%(' + 'sits_at' + str(counter) + ')s'
+        #         params['sits_at' + str(counter)] = hospital_type_mapping.get(hosp_type)
+        #         counter += 1
+        #
+        #     filtering_params.append(
+        #         sits_at_str + ')'
+        #     )
             # filtering_params.append(
             #     "hospital_type IN (%(sits_at)s)"
             # )

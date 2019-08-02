@@ -1530,6 +1530,7 @@ class DoctorListViewSet(viewsets.GenericViewSet):
             order_by_field, rank_by = doctor_search_helper.get_ordering_params()
             query_string = doctor_search_helper.prepare_raw_query(filtering_params,
                                                                   order_by_field, rank_by)
+            # query_string['query'] = paginate_raw_query(request, query_string['query'])
             doctor_search_result = RawSql(query_string.get('query'),
                                          query_string.get('params')).fetch_all()
 
@@ -4561,3 +4562,37 @@ class IpdProcedureSyncViewSet(viewsets.GenericViewSet):
             to_be_updated_dict['planned_date'] = temp_planned_date
         IpdProcedureLead.objects.filter(matrix_lead_id=validated_data.get('matrix_lead_id')).update(**to_be_updated_dict)
         return Response({'message': 'Success'})
+
+
+class HospitalsFilteredList(viewsets.GenericViewSet):
+
+    def list(self, request):
+        starts_with = request.query_params.get('starts_with')
+        hospital = Hospital.objects.prefetch_related('hospital_doctors').filter(enabled_for_online_booking=True,
+                                                                        hospital_doctors__enabled_for_online_booking=True,
+                                                                        hospital_doctors__doctor__enabled_for_online_booking=True).annotate(
+                                                                doctors_count=Count('hospital_doctors')).order_by('-doctors_count')
+        return None
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

@@ -829,14 +829,14 @@ class DoctorListSerializer(serializers.Serializer):
     NEXT_3_DAYS = 3
     AVAILABILITY_CHOICES = ((TODAY, 'Today'), (TOMORROW, "Tomorrow"), (NEXT_3_DAYS, "Next 3 days"),)
 
-    SITTING_CHOICES = [type_choice[1] for type_choice in Hospital.HOSPITAL_TYPE_CHOICES]
+    # SITTING_CHOICES = [type_choice[1] for type_choice in Hospital.HOSPITAL_TYPE_CHOICES]
     specialization_ids = CommaSepratedToListField(required=False, max_length=500, typecast_to=str, allow_blank=True)
     condition_ids = CommaSepratedToListField(required=False, max_length=500, typecast_to=str)
     procedure_ids = CommaSepratedToListField(required=False, max_length=500, typecast_to=str)
     procedure_category_ids = CommaSepratedToListField(required=False, max_length=500, typecast_to=str)
     longitude = serializers.FloatField(default=77.071848)
     latitude = serializers.FloatField(default=28.450367)
-    sits_at = CommaSepratedToListField(required=False, max_length=100, typecast_to=str)
+    # sits_at = CommaSepratedToListField(required=False, max_length=100, typecast_to=str)
     sort_on = serializers.ChoiceField(choices=SORT_CHOICES, required=False)
     min_fees = serializers.IntegerField(required=False)
     max_fees = serializers.IntegerField(required=False)
@@ -928,10 +928,10 @@ class DoctorListSerializer(serializers.Serializer):
             raise serializers.ValidationError("Invalid specialization Id.")
         return value
 
-    def validate_sits_at(self, value):
-        if not set(value).issubset(set(self.SITTING_CHOICES)):
-            raise serializers.ValidationError("Not a Valid Choice")
-        return value
+    # def validate_sits_at(self, value):
+    #     if not set(value).issubset(set(self.SITTING_CHOICES)):
+    #         raise serializers.ValidationError("Not a Valid Choice")
+    #     return value
 
     def validate_availability(self, value):
         if not set(value).issubset(set([str(avl_choice[0]) for avl_choice in self.AVAILABILITY_CHOICES])):
