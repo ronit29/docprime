@@ -9,7 +9,7 @@ from import_export.admin import ImportExportModelAdmin
 from import_export import resources
 from ondoc.authentication.models import User, UserProfile
 from django.utils.crypto import get_random_string
-
+from ondoc.crm.admin.common import MediaImportMixin
 
 class LabNetworkAutocomplete(autocomplete.Select2QuerySetView):
 
@@ -247,7 +247,9 @@ class CouponForm(forms.ModelForm):
             'test': autocomplete.ModelSelect2Multiple(url='test-autocomplete', forward=['lab', 'lab_network', 'test_categories']),
             'test_categories': autocomplete.ModelSelect2Multiple(url='test-categories-autocomplete', forward=['lab', 'lab_network', 'test']),
             'doctors': autocomplete.ModelSelect2Multiple(url='doctors-autocomplete', forward=['hospitals', 'specializations', 'procedures', 'procedure_categories']),
+            'doctors_exclude': autocomplete.ModelSelect2Multiple(url='doctors-autocomplete'),
             'hospitals': autocomplete.ModelSelect2Multiple(url='hospitals-autocomplete', forward=['doctors', 'specializations', 'procedures', 'procedure_categories']),
+            'hospitals_exclude': autocomplete.ModelSelect2Multiple(url='hospitals-autocomplete'),
             'specializations': autocomplete.ModelSelect2Multiple(url='specializations-autocomplete', forward=['doctors', 'hospitals', 'procedures', 'procedure_categories']),
             'procedures': autocomplete.ModelSelect2Multiple(url='procedures-autocomplete', forward=['doctors', 'hospitals', 'specializations', 'procedure_categories']),
             'procedure_categories': autocomplete.ModelSelect2Multiple(url='procedure-categories-autocomplete', forward=['doctors', 'hospitals', 'specializations', 'procedures'])
@@ -267,7 +269,9 @@ class CouponForm(forms.ModelForm):
         test = cleaned_data.get('test')
         test_categories = cleaned_data.get('test_categories')
         doctors = cleaned_data.get('doctors')
+        doctors_exclude = cleaned_data.get('doctors_exclude')
         hospitals = cleaned_data.get('hospitals')
+        hospitals_exclude = cleaned_data.get('hospitals_exclude')
         specializations = cleaned_data.get('specializations')
         procedures = cleaned_data.get('procedures')
         procedure_categories = cleaned_data.get('procedure_categories')
@@ -284,7 +288,7 @@ class CouponForm(forms.ModelForm):
             raise forms.ValidationError('Please enter either lab specific data or doctor specific data')
         if (lab_network or lab or test or test_categories) and type != Coupon.LAB:
             raise forms.ValidationError('Type \'Lab\' not selected for lab specific coupon')
-        if (doctors or hospitals or specializations or procedures or procedure_categories) and type != Coupon.DOCTOR:
+        if (doctors or doctors_exclude or hospitals or hospitals_exclude or specializations or procedures or procedure_categories) and type != Coupon.DOCTOR:
             raise forms.ValidationError('Type \'Doctor\' not selected for doctor specific coupon')
 
 
@@ -371,8 +375,12 @@ class UserSpecificCouponResource(resources.ModelResource):
         fields = ('phone_number', 'coupon', 'id', 'user', 'count')
 
 
-class UserSpecificCouponAdmin(ImportExportModelAdmin):
+class UserSpecificCouponAdmin(MediaImportMixin):
+
+    # from import_export.tmp_storages import MediaStorage
+
     resource_class = UserSpecificCouponResource
+    autocomplete_fields = ['user']
 
 
 class RandomGeneratedCouponAdmin(ImportExportModelAdmin):

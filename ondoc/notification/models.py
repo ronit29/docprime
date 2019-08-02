@@ -86,7 +86,7 @@ class NotificationAction:
 
     LAB_LOGO_CHANGE_MAIL = 70
     PRICING_ALERT_EMAIL = 72
-    APPOINTMENT_REMINDER_PROVIDER_SMS = 77
+    DOCPRIME_APPOINTMENT_REMINDER_PROVIDER_SMS = 69
     PROVIDER_ENCRYPTION_ENABLED = 78
     PROVIDER_ENCRYPTION_DISABLED = 79
     LOGIN_OTP = 80
@@ -96,7 +96,13 @@ class NotificationAction:
     COD_TO_PREPAID = 91
     COD_TO_PREPAID_REQUEST = 92
 
+    OPD_DAILY_SCHEDULE = 98
+    USERPROFILE_EMAIL_UPDATE = 99
+    LAB_CONFIRMATION_CHECK_AFTER_APPOINTMENT = 93
+    LAB_CONFIRMATION_SECOND_CHECK_AFTER_APPOINTMENT = 94
+    LAB_FEEDBACK_AFTER_APPOINTMENT = 95
 
+    CONTACT_US_EMAIL = 65
     NOTIFICATION_TYPE_CHOICES = (
         (APPOINTMENT_ACCEPTED, "Appointment Accepted"),
         (APPOINTMENT_CANCELLED, "Appointment Cancelled"),
@@ -128,11 +134,12 @@ class NotificationAction:
         (IPD_PROCEDURE_MAIL, 'IPD Procedure Mail'),
         (PRICING_ALERT_EMAIL, 'Pricing Change Mail'),
         (LAB_LOGO_CHANGE_MAIL, 'Lab Logo Change Mail'),
-        (APPOINTMENT_REMINDER_PROVIDER_SMS, 'Appointment Reminder Provider SMS'),
+        (DOCPRIME_APPOINTMENT_REMINDER_PROVIDER_SMS, 'Docprime Appointment Reminder Provider SMS'),
         (LOGIN_OTP, 'Login OTP'),
         (CHAT_NOTIFICATION, "Push Notification from chat"),
         (COD_TO_PREPAID, 'COD to Prepaid'),
-        (COD_TO_PREPAID_REQUEST, 'COD To Prepaid Request')
+        (COD_TO_PREPAID_REQUEST, 'COD To Prepaid Request'),
+        (OPD_DAILY_SCHEDULE, 'OPD Daily Schedule')
     )
 
     OPD_APPOINTMENT = "opd_appointment"
@@ -838,6 +845,49 @@ class EmailNotification(TimeStampedModel, EmailNotificationOpdMixin, EmailNotifi
         message = json.dumps(message)
         publish_message(message)
 
+    @classmethod
+    def send_contact_us_notification_email(cls, content_type, obj_id, email, html_body, mobile_number):
+        email_subject = 'CONTACT US - A New Message Received ({})'.format(mobile_number)
+        if email:
+            email_obj = cls.objects.create(email=email, notification_type=NotificationAction.CONTACT_US_EMAIL,
+                                           content=html_body, email_subject=email_subject, cc=[], bcc=[],
+                                           content_type=content_type, object_id=obj_id)
+            email_obj.save()
+
+            email_noti = {
+                "email": email,
+                "content": html_body,
+                "email_subject": email_subject
+            }
+            message = {
+                "data": email_noti,
+                "type": "email"
+            }
+            message = json.dumps(message)
+            publish_message(message)
+
+    @classmethod
+    def send_userprofile_email_update(cls, obj):
+        from django.utils.safestring import mark_safe
+        email = obj.new_email
+        name = obj.profile.name
+
+        profile_type = 'Insurance' if obj.profile.is_insured_profile else 'User'
+
+        email_subject = 'Docprime : Profile Email update otp'
+        html_body = mark_safe('<p>Dear  {name},</p><p>Please enter the OTP mentioned below to verify the new email ID for {profile_type} profile</p><p>OTP: {otp}</p><p>Thanks</p><p>Team Docprime </p>'.format(profile_type=profile_type, name=str(name.title()), otp=str(obj.otp)))
+        # html_body = 'Please find the otp for email change. %s' % str(obj.otp)
+        email_obj = cls.objects.create(email=email, notification_type=NotificationAction.USERPROFILE_EMAIL_UPDATE,
+                                       content=html_body, email_subject=email_subject, cc=[], bcc=[])
+        email_obj.save()
+
+        message = {
+            "data": model_to_dict(email_obj),
+            "type": "email"
+        }
+        message = json.dumps(message)
+        publish_message(message)
+
 
 class SmsNotificationOpdMixin:
 
@@ -946,10 +996,14 @@ class SmsNotification(TimeStampedModel, SmsNotificationOpdMixin, SmsNotification
             publish_message(message)
 
     @classmethod
-    def send_booking_url(cls, token, phone_number):
+    def send_booking_url(cls, token, phone_number, name):
         booking_url = "{}/agent/booking?token={}".format(settings.CONSUMER_APP_DOMAIN, token)
         short_url = generate_short_url(booking_url)
-        html_body = "Your booking url is - {} . Please pay to confirm".format(short_url)
+        html_body = "Dear {}, \n" \
+                    "Please click on the link to review your appointment details and make an online payment.\n" \
+                    "{}\n"\
+                    "Thanks,\n" \
+                    "Team Docprime".format(name, short_url)
         if phone_number:
             sms_noti = {
                 "phone_number": phone_number,

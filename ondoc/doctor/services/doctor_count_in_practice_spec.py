@@ -2,7 +2,8 @@ from ondoc.api.v1.utils import RawSql
 
 
 class DoctorSearchScore:
-    def update_doctors_count(self):
+    @classmethod
+    def update_doctors_count(cls):
         RawSql('''update practice_specialization ps set doctor_count=
                 coalesce((select doctor_count from 
                 (select ps.id specialization_id, count(distinct d.id) as doctor_count from doctor d inner join 

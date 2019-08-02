@@ -10,7 +10,7 @@ from ondoc.crm.admin.procedure import ProcedureCategoryAdmin, ProcedureAdmin, Ip
     IpdProcedureDetailTypeAdmin, IpdProcedureSynonymAdmin, IpdProcedureSynonymMappingAdmin, \
     IpdProcedurePracticeSpecializationAdmin, IpdProcedureLeadAdmin, OfferAdmin, \
     PotentialIpdLeadPracticeSpecializationAdmin, IpdProcedureCostEstimateAdmin, \
-    IpdCostEstimateRoomTypeAdmin, UploadCostEstimateDataAdmin
+    IpdCostEstimateRoomTypeAdmin, UploadCostEstimateDataAdmin, PotentialIpdCityAdmin
 from ondoc.crm.admin.subscription_plan import SubscriptionPlanAdmin, SubscriptionPlanFeatureAdmin, UserPlanMappingAdmin
 from ondoc.doctor.models import (Doctor, Language, MedicalService, Specialization, College, Qualification, Hospital,
                                  HospitalNetwork, DoctorOnboardingToken, OpdAppointment,
@@ -20,7 +20,7 @@ from ondoc.doctor.models import (Doctor, Language, MedicalService, Specializatio
                                  VisitReason, CancellationReason, PracticeSpecializationContent, OfflinePatients,
                                  OfflineOPDAppointments,
                                  DoctorMobileOtp, UploadDoctorData, DoctorLeave, HealthInsuranceProvider,
-                                 CommonHospital)
+                                 CommonHospital, SimilarSpecializationGroup)
 
 from ondoc.diagnostic.models import (Lab, LabNetwork, LabTest, LabTestType, LabService,
                                      AvailableLabTest, LabAppointment, CommonTest, CommonDiagnosticCondition,
@@ -29,7 +29,8 @@ from ondoc.diagnostic.models import (Lab, LabNetwork, LabTest, LabTestType, LabS
                                      TestParameterChat)
 from ondoc.coupon.models import Coupon, UserSpecificCoupon, RandomGeneratedCoupon
 from ondoc.lead.models import HospitalLead, DoctorLead, SearchLead
-from ondoc.account.models import ConsumerAccount, MerchantPayout, Order
+from ondoc.account.models import ConsumerAccount, MerchantPayout, Order, MerchantPayoutBulkProcess, \
+    AdvanceMerchantPayout, AdvanceMerchantAmount
 from ondoc.location.admin import EntityUrlsAdmin
 from ondoc.location.models import EntityUrls, CompareSEOUrls
 from ondoc.notification import models as notifcation_model
@@ -37,10 +38,11 @@ from ondoc.procedure.models import Procedure, ProcedureCategory, CommonProcedure
     IpdProcedureCategory, CommonIpdProcedure, IpdProcedureDetail, IpdProcedureDetailType, IpdProcedureSynonym, \
     IpdProcedureSynonymMapping, IpdProcedurePracticeSpecialization, IpdProcedureLead, Offer, \
     PotentialIpdLeadPracticeSpecialization, IpdProcedureCostEstimate, \
-    IpdCostEstimateRoomType, UploadCostEstimateData
+    IpdCostEstimateRoomType, UploadCostEstimateData, PotentialIpdCity
 from ondoc.subscription_plan.models import Plan, PlanFeature, UserPlanMapping
 from .common import Cities, CitiesAdmin, MatrixCityMapping, MatrixCityAdmin, MerchantAdmin, MerchantPayoutAdmin, \
-    PaymentOptionsAdmin, MatrixMappedStateAdmin, MatrixMappedCityAdmin, GlobalNonBookableAdmin, UserConfigAdmin, BlacklistUserAdmin, BlockedStatesAdmin
+    PaymentOptionsAdmin, MatrixMappedStateAdmin, MatrixMappedCityAdmin, GlobalNonBookableAdmin, UserConfigAdmin, \
+    BlacklistUserAdmin, BlockedStatesAdmin, MerchantPayoutBulkProcessAdmin, AdvanceMerchantPayoutAdmin, AdvanceMerchantAmountAdmin
 from .lead import HospitalLeadAdmin, DoctorLeadAdmin, SearchLeadAdmin
 from .doctor import (DoctorAdmin, MedicalServiceAdmin, SpecializationAdmin, QualificationAdmin, LanguageAdmin,
                      CollegeAdmin, MedicalConditionAdmin, HealthTipAdmin, DoctorClinicAdmin,
@@ -48,10 +50,10 @@ from .doctor import (DoctorAdmin, MedicalServiceAdmin, SpecializationAdmin, Qual
                      SpecializationFieldAdmin, SpecializationDepartmentAdmin, PracticeSpecializationAdmin,
                      CompetitorInfoImportAdmin, VisitReasonAdmin, PracticeSpecializationContentAdmin,
                      OfflinePatientAdmin,
-                     UploadDoctorDataAdmin, DoctorLeaveAdmin)
+                     UploadDoctorDataAdmin, DoctorLeaveAdmin, SimilarSpecializationGroupAdmin)
 from .aboutdoctor import AboutDoctorAdmin
-from .hospital import HospitalAdmin, CommonHospitalAdmin
-from .user import CustomUserAdmin, UserNumberUpdateAdmin
+from .hospital import HospitalAdmin, CommonHospitalAdmin, GenericQuestionAnswerAdmin
+from .user import CustomUserAdmin, UserNumberUpdateAdmin, UserProfileAdmin
 from .hospital_network import HospitalNetworkAdmin
 from .lab import LabAdmin, LabTestAdmin, LabTestTypeAdmin, AvailableLabTestAdmin, CommonDiagnosticConditionAdmin, \
     LabAppointmentAdmin, CommonTestAdmin, TestParameterAdmin, CommonPackageAdmin, LabTestCategoryAdmin, \
@@ -62,7 +64,7 @@ from .notification import (EmailNotificationAdmin, SmsNotificationAdmin,
 from .report import ReportAdmin
 from .coupon import CouponAdmin, UserSpecificCouponAdmin, RandomGeneratedCouponAdmin
 from ondoc.reports import models as report_models
-from ondoc.authentication.models import GenericLabAdmin, UserNumberUpdate
+from ondoc.authentication.models import GenericLabAdmin, UserNumberUpdate, GenericQuestionAnswer
 
 from ondoc.web.models import OnlineLead, Career, ContactUs
 from django.contrib.auth import get_user_model
@@ -110,7 +112,7 @@ admin.site.index_title = 'CRM Administration'
 
 admin.site.register(OtpVerifications)
 # admin.site.register(OpdAppointment)
-admin.site.register(UserProfile)
+admin.site.register(UserProfile, UserProfileAdmin)
 admin.site.register(ReviewCompliments, ReviewComplimentsAdmin)
 admin.site.register(Banner, BannerAdmin)
 
@@ -220,6 +222,10 @@ admin.site.register(CommonProcedure)
 admin.site.register(DemoElastic, DemoElasticAdmin)
 admin.site.register(Merchant, MerchantAdmin)
 admin.site.register(MerchantPayout, MerchantPayoutAdmin)
+admin.site.register(MerchantPayoutBulkProcess, MerchantPayoutBulkProcessAdmin)
+admin.site.register(AdvanceMerchantPayout, AdvanceMerchantPayoutAdmin)
+admin.site.register(AdvanceMerchantAmount, AdvanceMerchantAmountAdmin)
+
 # admin.site.register(AssociatedMerchant)
 admin.site.register(DoctorMobileOtp)
 admin.site.register(NewDynamic, NewDynamicAdmin)
@@ -227,6 +233,7 @@ admin.site.register(EntityUrls, EntityUrlsAdmin)
 admin.site.register(PaymentOptions, PaymentOptionsAdmin)
 admin.site.register(UserConfig, UserConfigAdmin)
 admin.site.register(UploadDoctorData, UploadDoctorDataAdmin)
+admin.site.register(SimilarSpecializationGroup, SimilarSpecializationGroupAdmin)
 admin.site.register(UploadCostEstimateData, UploadCostEstimateDataAdmin)
 admin.site.register(SliderLocation, SliderLocationAdmin)
 admin.site.register(IntegratorMapping, IntegratorMappingAdmin)
@@ -241,6 +248,7 @@ admin.site.register(IpdProcedurePracticeSpecialization, IpdProcedurePracticeSpec
 admin.site.register(IpdProcedureLead, IpdProcedureLeadAdmin)
 admin.site.register(Offer, OfferAdmin)
 admin.site.register(PotentialIpdLeadPracticeSpecialization, PotentialIpdLeadPracticeSpecializationAdmin)
+admin.site.register(PotentialIpdCity, PotentialIpdCityAdmin)
 admin.site.register(IpdProcedureCostEstimate, IpdProcedureCostEstimateAdmin)
 admin.site.register(IpdCostEstimateRoomType, IpdCostEstimateRoomTypeAdmin)
 admin.site.register(Feature, FeatureAdmin)
@@ -269,3 +277,4 @@ admin.site.register(BlacklistUser, BlacklistUserAdmin)
 admin.site.register(BlockedStates, BlockedStatesAdmin )
 admin.site.register(BankHolidays)
 admin.site.register(UserNumberUpdate, UserNumberUpdateAdmin)
+admin.site.register(GenericQuestionAnswer, GenericQuestionAnswerAdmin)

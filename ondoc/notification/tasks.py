@@ -9,13 +9,14 @@ import traceback
 from collections import OrderedDict
 from io import BytesIO
 
+import pytz
 from django.db import transaction
 from django.forms import model_to_dict
 from django.utils import timezone
 from openpyxl import load_workbook
 
-from ondoc.api.v1.utils import aware_time_zone, util_absolute_url
-from ondoc.authentication.models import UserNumberUpdate
+from ondoc.api.v1.utils import aware_time_zone, util_absolute_url, pg_seamless_hash
+from ondoc.authentication.models import UserNumberUpdate, UserProfileEmailUpdate
 from ondoc.common.models import AppointmentMaskNumber
 from ondoc.notification.labnotificationaction import LabNotificationAction
 from ondoc.notification import models as notification_models
@@ -72,6 +73,8 @@ def send_ipd_procedure_lead_mail(data):
     if not instance:
         return
     if instance.matrix_lead_id:
+        return
+    if not instance.is_valid:
         return
     try:
         if send_email:
@@ -156,8 +159,8 @@ def send_lab_notifications(appointment_id):
 def send_opd_notifications_refactored(appointment_id, notification_type=None):
     from ondoc.doctor.models import OpdAppointment
     from ondoc.communications.models import OpdNotification
+    instance = OpdAppointment.objects.filter(id=appointment_id).first()
     try:
-        instance = OpdAppointment.objects.filter(id=appointment_id).first()
         if not instance or not instance.user:
             return
         if instance.status == OpdAppointment.COMPLETED:
@@ -173,10 +176,10 @@ def send_opd_notifications_refactored(appointment_id, notification_type=None):
                 counter = counter + 1
                 is_masking_done = generate_appointment_masknumber(
                     ({'type': 'OPD_APPOINTMENT', 'appointment': instance}))
-        opd_notification = OpdNotification(instance, notification_type)
-        opd_notification.send()
     except Exception as e:
         logger.error(str(e))
+    opd_notification = OpdNotification(instance, notification_type)
+    opd_notification.send()
 
 
 @task
@@ -278,6 +281,8 @@ def set_order_dummy_transaction(self, order_id, user_id):
     from ondoc.doctor.models import OpdAppointment
     from ondoc.diagnostic.models import LabAppointment
     from ondoc.account.models import User
+    from ondoc.account.mongo_models import PgLogs
+    from ondoc.account.models import MerchantPayoutLog
     req_data = dict()
     try:
         order_row = Order.objects.filter(id=order_id).first()
@@ -304,7 +309,12 @@ def set_order_dummy_transaction(self, order_id, user_id):
         url = settings.PG_DUMMY_TRANSACTION_URL
         insurance_data = order_row.get_insurance_data_for_pg()
 
-        name  = ''
+        if appointment.__class__.__name__ in ['LabAppointment', 'OpdAppointment']:
+            if appointment.insurance and not order_row.is_parent() and not insurance_data:
+                MerchantPayoutLog.create_log(None, "refOrderId, insurerCode and refOrderNo not found for order id {}".format(order_row.id))
+                raise Exception("refOrderId, insurerCode, refOrderNo details not found for order id {}".format(order_row.id))
+
+        name = ''
         if isinstance(appointment, OpdAppointment) or isinstance(appointment, LabAppointment):
             name = appointment.profile.name
 
@@ -329,7 +339,11 @@ def set_order_dummy_transaction(self, order_id, user_id):
 
         req_data.update(insurance_data)
 
+        for key in req_data:
+            req_data[key] = str(req_data[key])
+
         response = requests.post(url, data=json.dumps(req_data), headers=headers)
+        save_pg_response.apply_async((PgLogs.DUMMY_TXN, order_id, None, response.json(), req_data,), eta=timezone.localtime(), )
         if response.status_code == status.HTTP_200_OK:
             resp_data = response.json()
             #logger.error(resp_data)
@@ -474,7 +488,7 @@ def send_appointment_location_message(number, hospital_lat, hospital_long):
 
 @task()
 def process_payout(payout_id):
-    from ondoc.account.models import MerchantPayout, Order
+    from ondoc.account.models import MerchantPayout, Order, MerchantPayoutLog
     from ondoc.account.models import DummyTransactions
     from ondoc.doctor.models import OpdAppointment
 
@@ -488,17 +502,15 @@ def process_payout(payout_id):
         if payout_data.status == payout_data.PAID:
             raise Exception("Payment already done for this payout")
 
-
         default_payment_mode = payout_data.get_default_payment_mode()
         appointment = payout_data.get_appointment()
-        if not appointment :
+        if not appointment:
             raise Exception("Insufficient Data " + str(payout_data))
 
         if not payout_data.booking_type == payout_data.InsurancePremium:
             if appointment.payment_type in [OpdAppointment.COD]:
                 raise Exception("Cannot process payout for COD appointments")
 
-        
         billed_to = payout_data.get_billed_to()
         merchant = payout_data.get_merchant()
         order_data = None
@@ -514,21 +526,19 @@ def process_payout(payout_id):
             if not associated_merchant.verified:
                 raise Exception("Associated Merchant not verified. " + str(payout_data))
 
-
         # assuming 1 to 1 relation between Order and Appointment
         order_data = Order.objects.filter(reference_id=appointment.id).order_by('-id').first()
 
         if not order_data:
-             raise Exception("Order not found for given payout " + str(payout_data))
-
+            raise Exception("Order not found for given payout " + str(payout_data))
 
         all_txn = order_data.getTransactions()
 
         if not all_txn or all_txn.count() == 0:
             raise Exception("No transactions found for given payout " + str(payout_data))
 
-        req_data = { "payload" : [], "checkSum" : "" }
-        req_data2 = { "payload" : [], "checkSum" : "" }
+        req_data = {"payload": [], "checkSum": ""}
+        req_data2 = {"payload": [], "checkSum": ""}
 
         idx = 0
         for txn in all_txn:
@@ -540,7 +550,7 @@ def process_payout(payout_id):
             curr_txn["txnAmount"] = str(txn.amount)
             curr_txn["settledAmount"] = str(payout_data.payable_amount)
             curr_txn["merchantCode"] = merchant.id
-            if txn.transaction_id:
+            if txn.transaction_id and txn.transaction_id != 'null':
                 curr_txn["pgtxId"] = txn.transaction_id
             curr_txn["refNo"] = payout_data.payout_ref_id
             curr_txn["bookingId"] = appointment.id
@@ -552,9 +562,9 @@ def process_payout(payout_id):
                 curr_txn2["txnAmount"] = str(0)
                 curr_txn2["idx"] = len(req_data2.get('payload'))
                 req_data2["payload"].append(curr_txn2)
-
+        payout_data.update_status('initiated')
         payout_status = None
-        if len(req_data2.get('payload'))>0:
+        if len(req_data2.get('payload')) > 0:
             payout_status = request_payout(req_data2, order_data)
             payout_data.request_data = req_data2
 
@@ -562,17 +572,23 @@ def process_payout(payout_id):
             payout_status = request_payout(req_data, order_data)
             payout_data.request_data = req_data
 
-        if payout_status:            
+        if payout_status:
             payout_data.api_response = payout_status.get("response")
             if payout_status.get("status"):
                 payout_data.payout_time = datetime.datetime.now()
-                payout_data.status = payout_data.PAID
+                # # Removed PAID status and add add initiated status when payout processed
+                # payout_data.status = payout_data.PAID
+                payout_data.status = payout_data.INPROCESS
             else:
                 payout_data.retry_count += 1
+                payout_data.status = payout_data.FAILED_FROM_QUEUE
 
             payout_data.save()
 
     except Exception as e:
+        # update payout status
+        payout_data.update_status('attempted')
+        MerchantPayoutLog.create_log(payout_data, str(e))
         logger.error("Error in processing payout - with exception - " + str(e))
 
 
@@ -706,6 +722,7 @@ def send_insurance_float_limit_notifications(self, data):
 
 def request_payout(req_data, order_data):
     from ondoc.api.v1.utils import create_payout_checksum
+    from ondoc.account.mongo_models import PgLogs
 
     req_data["checkSum"] = create_payout_checksum(req_data["payload"], order_data.product_id)
     headers = {
@@ -717,7 +734,7 @@ def request_payout(req_data, order_data):
 
     response = requests.post(url, data=json.dumps(req_data), headers=headers)
     resp_data = response.json()
-
+    save_pg_response.apply_async((PgLogs.PAYOUT_PROCESS, order_data.id, None, resp_data, req_data,), eta=timezone.localtime(), )
     if response.status_code == status.HTTP_200_OK:
         if resp_data.get("ok") is not None and resp_data.get("ok") == '1':
             success_payout = False
@@ -728,8 +745,7 @@ def request_payout(req_data, order_data):
 
             if success_payout:
                 return {"status": 1, "response": resp_data}
-            
-    
+
     logger.error("payout failed for request data - " + str(req_data))
     return {"status" : 0, "response" : resp_data}
 
@@ -755,7 +771,7 @@ def opd_send_otp_before_appointment(appointment_id, previous_appointment_date_ti
         logger.error(str(e))
 
 @task()
-def appointment_reminder_sms_provider(appointment_id, appointment_updated_at):
+def docprime_appointment_reminder_sms_provider(appointment_id, appointment_updated_at):
     from ondoc.doctor.models import OpdAppointment
     from ondoc.communications.models import OpdNotification
     try:
@@ -769,8 +785,30 @@ def appointment_reminder_sms_provider(appointment_id, appointment_updated_at):
             #                                                previous_appointment_date_time,
             #                                                str(math.floor(instance.time_slot_start.timestamp()))))
             return
-        opd_notification = OpdNotification(instance, NotificationAction.APPOINTMENT_REMINDER_PROVIDER_SMS)
+        opd_notification = OpdNotification(instance, NotificationAction.DOCPRIME_APPOINTMENT_REMINDER_PROVIDER_SMS)
         opd_notification.send()
+    except Exception as e:
+        logger.error(str(e))
+
+
+@task()
+def offline_appointment_reminder_sms_patient(appointment_id, time_slot_start_timestamp, **kwargs):
+    from ondoc.doctor.models import OfflineOPDAppointments
+    try:
+        instance = OfflineOPDAppointments.objects.filter(id=appointment_id).first()
+        if not instance or \
+                not instance.user or \
+                math.floor(instance.time_slot_start.timestamp()) != time_slot_start_timestamp \
+                or instance.status != OfflineOPDAppointments.ACCEPTED:
+            # logger.error(
+            #     'instance : {}, time : {}, str: {}'.format(str(model_to_dict(instance)),
+            #                                                previous_appointment_date_time,
+            #                                                str(math.floor(instance.time_slot_start.timestamp()))))
+            return
+        data = {}
+        data['phone_number'] = kwargs.get('number')
+        data['text'] = mark_safe(kwargs.get('text'))
+        notification_models.SmsNotification.send_rating_link(data)
     except Exception as e:
         logger.error(str(e))
 
@@ -794,6 +832,31 @@ def opd_send_after_appointment_confirmation(appointment_id, previous_appointment
         if instance.status == OpdAppointment.COMPLETED and not instance.is_rated:
             opd_notification = OpdNotification(instance, NotificationAction.OPD_FEEDBACK_AFTER_APPOINTMENT)
             opd_notification.send()
+    except Exception as e:
+        logger.error(str(e))
+
+
+
+@task()
+def lab_send_after_appointment_confirmation(appointment_id, previous_appointment_date_time, second=False):
+    from ondoc.diagnostic.models import LabAppointment
+    from ondoc.communications.models import LabNotification
+
+    try:
+        instance = LabAppointment.objects.filter(id=appointment_id).first()
+        if not instance or \
+                not instance.user or \
+                str(math.floor(instance.time_slot_start.timestamp())) != previous_appointment_date_time:
+            return
+        if instance.status == LabAppointment.ACCEPTED:
+            if not second:
+                lab_notification = LabNotification(instance, NotificationAction.LAB_CONFIRMATION_CHECK_AFTER_APPOINTMENT)
+            else:
+                lab_notification = LabNotification(instance, NotificationAction.LAB_CONFIRMATION_SECOND_CHECK_AFTER_APPOINTMENT)
+            lab_notification.send()
+        if instance.status == LabAppointment.COMPLETED and not instance.is_rated:
+            lab_notification = LabNotification(instance, NotificationAction.LAB_FEEDBACK_AFTER_APPOINTMENT)
+            lab_notification.send()
     except Exception as e:
         logger.error(str(e))
 
@@ -1125,3 +1188,205 @@ def send_user_number_update_otp(obj_id):
         logger.error("Could not send otp for user number update.")
 
     return
+
+
+@task()
+def send_userprofile_email_update_otp(obj_id):
+    from ondoc.notification.models import EmailNotification
+    obj = UserProfileEmailUpdate.objects.filter(id=obj_id).first()
+    if not obj:
+        return
+
+    EmailNotification.send_userprofile_email_update(obj)
+
+    return
+
+
+@task()
+def send_contactus_notification(obj_id):
+    from ondoc.notification.models import EmailNotification
+    from ondoc.web.models import ContactUs
+    from django.contrib.contenttypes.models import ContentType
+    obj = ContactUs.objects.filter(id=obj_id).first()
+
+    if not obj:
+        return
+
+    emails = settings.CONTACTUS_EMAILS
+
+    html_body = "{name} ( {email}-{mobile} ) has sent message {message}" \
+        .format(name=obj.name, email=obj.email, mobile=obj.mobile, message={obj.message})
+
+    mobile_number = None
+    if obj.mobile:
+        mobile_number = obj.mobile
+
+    if obj.from_app:
+        html_body += " from mobile app."
+    else:
+        html_body += "."
+
+    content_type = ContentType.objects.get_for_model(obj)
+    date = timezone.now() - timedelta(days=1)
+    is_already_sent = EmailNotification.objects.filter(created_at__gte=date,
+                                                       notification_type=NotificationAction.CONTACT_US_EMAIL,
+                                                       content_type=content_type,
+                                                       object_id=obj.id).exists()
+
+    if not is_already_sent:
+        for email in emails:
+            EmailNotification.send_contact_us_notification_email(content_type, obj.id, email, html_body, mobile_number)
+
+
+@task(bind=True, max_retries=5)
+def send_capture_payment_request(self, product_id, appointment_id):
+    from ondoc.doctor.models import OpdAppointment
+    from ondoc.diagnostic.models import LabAppointment
+    from ondoc.account.models import Order, PgTransaction, PaymentProcessStatus
+    from ondoc.account.mongo_models import PgLogs
+    req_data = dict()
+    if product_id == Order.DOCTOR_PRODUCT_ID:
+        obj = OpdAppointment
+    if product_id == Order.LAB_PRODUCT_ID:
+        obj = LabAppointment
+    try:
+        order = Order.objects.filter(product_id=product_id, reference_id=appointment_id).first()
+
+        appointment = order.getAppointment()
+        if not appointment:
+            raise Exception("No Appointment found.")
+
+        if order and not order.is_parent():
+            order = order.parent
+
+        txn_obj = PgTransaction.objects.filter(order=order).first()
+
+        # if not appointment.status == obj.CANCELLED:
+        if txn_obj and txn_obj.is_preauth():
+            url = settings.PG_CAPTURE_PAYMENT_URL
+            token = settings.PG_SEAMLESS_CAPTURE_AUTH_TOKEN
+
+            req_data = {
+                "orderNo": txn_obj.order_no,
+                "orderId": str(order.id),
+                "hash": pg_seamless_hash(order, txn_obj.order_no)
+            }
+
+            headers = {
+                "auth": token,
+                "Content-Type": "application/json"
+            }
+
+            response = requests.post(url, data=json.dumps(req_data), headers=headers)
+
+            resp_data = response.json()
+            save_pg_response.apply_async((PgLogs.TXN_CAPTURED, order.id, txn_obj.id, resp_data, req_data,), eta=timezone.localtime(), )
+
+            args = {'order_id': order.id, 'status_code': resp_data.get('statusCode'), 'source': 'CAPTURE'}
+            status_type = PaymentProcessStatus.get_status_type(resp_data.get('statusCode'), resp_data.get('txStatus'))
+            save_payment_status.apply_async((status_type, args), eta=timezone.localtime(), )
+            if response.status_code == status.HTTP_200_OK:
+                if resp_data.get("ok") is not None and resp_data.get("ok") == '1':
+                    txn_obj.status_code = resp_data.get('statusCode')
+                    txn_obj.status_type = resp_data.get('txStatus')
+                    txn_obj.payment_mode = resp_data.get("paymentMode")
+                    txn_obj.bank_name = resp_data.get('bankName')
+                    txn_obj.transaction_id = resp_data.get('pgTxId')
+                    txn_obj.bank_id = resp_data.get('bankTxId')
+                    txn_obj.payment_captured = True
+                else:
+                    txn_obj.payment_captured = False
+                    logger.error("Error in capture the payment with data - " + json.dumps(req_data) + " with error message - " + resp_data.get('statusMsg', ''))
+                txn_obj.save()
+            else:
+                raise Exception("Retry on invalid Http response status - " + str(response.content))
+
+    except Exception as e:
+        logger.error("Error in payment capture with data - " + json.dumps(req_data) + " with exception - " + str(e))
+        self.retry([product_id, appointment_id], countdown=300)
+
+@task(bind=True, max_retries=5)
+def send_release_payment_request(self, product_id, appointment_id):
+    from ondoc.doctor.models import OpdAppointment
+    from ondoc.diagnostic.models import LabAppointment
+    from ondoc.account.models import Order, PgTransaction, PaymentProcessStatus
+    from ondoc.account.mongo_models import PgLogs
+    req_data = dict()
+    if product_id == Order.DOCTOR_PRODUCT_ID:
+        obj = OpdAppointment
+    if product_id == Order.LAB_PRODUCT_ID:
+        obj = LabAppointment
+    try:
+        order = Order.objects.filter(product_id=product_id, reference_id=appointment_id).first()
+
+        appointment = order.getAppointment()
+        if not appointment:
+            raise Exception("No Appointment found.")
+
+        if order and not order.is_parent():
+            order = order.parent
+
+        txn_obj = PgTransaction.objects.filter(order=order).first()
+
+        # if appointment.status == obj.CANCELLED:
+        if txn_obj and txn_obj.is_preauth():
+
+            tz = pytz.timezone(settings.TIME_ZONE)
+            if datetime.datetime.now(tz) < (txn_obj.transaction_date + datetime.timedelta(
+                    hours=int(settings.PAYMENT_AUTO_CAPTURE_DURATION))).astimezone(tz):
+                url = settings.PG_RELEASE_PAYMENT_URL
+                token = settings.PG_SEAMLESS_RELEASE_AUTH_TOKEN
+
+                req_data = {
+                    "orderNo": txn_obj.order_no,
+                    "orderId": str(order.id),
+                    "hash": pg_seamless_hash(order, txn_obj.order_no)
+                }
+
+                headers = {
+                    "auth": token,
+                    "Content-Type": "application/json"
+                }
+
+                response = requests.post(url, data=json.dumps(req_data), headers=headers)
+                resp_data = response.json()
+                save_pg_response.apply_async((PgLogs.TXN_RELEASED, order.id, txn_obj.id, resp_data, req_data,), eta=timezone.localtime(), )
+
+                args = {'order_id': order.id, 'status_code': resp_data.get('statusCode'), 'source': 'RELEASE'}
+                status_type = PaymentProcessStatus.get_status_type(resp_data.get('statusCode'),
+                                                                   resp_data.get('txStatus'))
+                save_payment_status.apply_async((status_type, args), eta=timezone.localtime(), )
+                if response.status_code == status.HTTP_200_OK:
+                    if resp_data.get("ok") is not None and resp_data.get("ok") == '1':
+                        txn_obj.status_code = resp_data.get('statusCode')
+                        txn_obj.status_type = 'TXN_RELEASE'
+                        txn_obj.save()
+                    else:
+                        logger.error("Error in releasing the payment with data - " + json.dumps(
+                            req_data) + " with error message - " + resp_data.get('statusMsg', ''))
+                else:
+                    raise Exception("Retry on invalid Http response status - " + str(response.content))
+
+    except Exception as e:
+        logger.error("Error in payment release with data - " + json.dumps(req_data) + " with exception - " + str(e))
+        self.retry([product_id, appointment_id], countdown=300)
+
+
+@task(bind=True)
+def save_pg_response(self, log_type, order_id, txn_id, response, request):
+    try:
+        from ondoc.account.mongo_models import PgLogs
+        PgLogs.save_pg_response(log_type, order_id, txn_id, response, request)
+    except Exception as e:
+        logger.error("Error in saving pg response to mongo database - " + json.dumps(response) + " with exception - " + str(e))
+        self.retry([txn_id, response], countdown=300)
+
+
+@task(bind=True)
+def save_payment_status(self, current_status, args):
+    try:
+        from ondoc.account.models import PaymentProcessStatus
+
+        PaymentProcessStatus.save_payment_status(current_status, args)
+    except Exception as e:
+       logger.error("Error in saving payment status - " + json.dumps(args) + " with exception - " + str(e))

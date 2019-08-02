@@ -28,7 +28,7 @@ from django.template.loader import render_to_string
 
 from ondoc.procedure.models import IpdProcedure, IpdProcedureLead
 from . import serializers
-from ondoc.common.models import Cities, PaymentOptions, UserConfig, DeviceDetails
+from ondoc.common.models import Cities, PaymentOptions, UserConfig, DeviceDetails, LastUsageTimestamp, AppointmentHistory
 from ondoc.common.utils import send_email, send_sms
 from ondoc.authentication.backends import JWTAuthentication, WhatsappAuthentication
 from django.core.files.uploadedfile import SimpleUploadedFile, TemporaryUploadedFile, InMemoryUploadedFile
@@ -991,21 +991,49 @@ class AllUrlsViewset(viewsets.GenericViewSet):
 class DeviceDetailsSave(viewsets.GenericViewSet):
 
     def save(self, request):
-        serializer = serializers.DeviceDetailsSerializer(data=request.data)
-        serializer.is_valid(raise_exception=True)
-        validated_data = serializer.validated_data
         user = request.user if request.user and request.user.is_authenticated else None
-        device_details_queryset = DeviceDetails.objects.filter(device_id=validated_data.get('device_id'))
-        device_details = device_details_queryset.first()
+
+        last_usage_serializer = serializers.LastUsageTimestampSerializer(data=request.data)
+        last_usage_serializer.is_valid(raise_exception=True)
+        last_usage_validated_data = last_usage_serializer.validated_data
+
+        add_or_update_device_details = False
+        add_or_update_usage_time = True
+        device_validated_data = None
+        if last_usage_validated_data['source'] == AppointmentHistory.DOC_APP:
+            device_serializer = serializers.DeviceDetailsSerializer(data=request.data)
+            device_serializer.is_valid(raise_exception=True)
+            device_validated_data = device_serializer.validated_data
+            if 'device_id' in device_validated_data and device_validated_data.get('device_id'):
+                add_or_update_device_details = True
+                if 'last_ping_time' in device_validated_data and len(device_validated_data) == 2:
+                    add_or_update_usage_time = False
+
         try:
-            if device_details:
-                device_details_queryset.update(**validated_data, user=user, updated_at=datetime.datetime.now())
-            else:
-                DeviceDetails.objects.create(**validated_data, user=user)
+            if add_or_update_device_details and device_validated_data:
+                device_details_queryset = DeviceDetails.objects.filter(device_id=device_validated_data.get('device_id'))
+                device_details = device_details_queryset.first()
+                if device_details:
+                    device_details_queryset.update(**device_validated_data, user=user)
+                else:
+                    if not 'data' in device_validated_data:
+                        device_validated_data['data'] = {}
+                    device_details = DeviceDetails.objects.create(**device_validated_data, user=user)
+                last_usage_validated_data['device_id'] = device_details.id
+
+            if user and add_or_update_usage_time:
+                last_usage_queryset = LastUsageTimestamp.objects.filter(phone_number=user.phone_number)
+                last_usage_details = last_usage_queryset.first()
+                last_usage_validated_data['phone_number'] = int(user.phone_number)
+                last_usage_validated_data['last_app_open_timestamp'] = datetime.datetime.now()
+                if last_usage_details:
+                    last_usage_queryset.update(**last_usage_validated_data)
+                else:
+                    LastUsageTimestamp.objects.create(**last_usage_validated_data)
         except Exception as e:
-            logger.error("Something went wrong while saving device details - " + str(e))
-            return Response("Error adding device details - " + str(e), status=status.HTTP_500_INTERNAL_SERVER_ERROR)
-        return Response({"status": 1, "message": "device details added"}, status=status.HTTP_200_OK)
+            logger.error("Something went wrong while saving last_usage_timestmap and device details - " + str(e))
+            return Response("Error adding last_usage_timestmap and device details - " + str(e), status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+        return Response({"status": 1, "message": "last_usage_timestmap and device details added"}, status=status.HTTP_200_OK)
 
 
 class AppointmentPrerequisiteViewSet(viewsets.GenericViewSet):
