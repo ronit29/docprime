@@ -1,3 +1,3 @@
-Hi,
-The link to your e-consultation is:
+Hi {{ patient_name }},
+Please complete the payment for your e-consultation with the link below:
 {{ link }}

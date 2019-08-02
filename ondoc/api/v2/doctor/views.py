@@ -1155,12 +1155,16 @@ class PartnerEConsultationViewSet(viewsets.GenericViewSet):
         if not consultation.link:
             return Response({"status": 0, "error": "Consultation Link not Found"}, status=status.HTTP_404_NOT_FOUND)
         if consultation.offline_patient:
+            patient_name = consultation.offline_patient.name
             patient_number = str(consultation.offline_patient.get_patient_mobile())
         else:
+            patient_name = consultation.online_patient.name
             patient_number = consultation.online_patient.phone_number
         receivers = [{"user": None, "phone_number": patient_number}]
+        context = {'patient_name': patient_name,
+                   'link': consultation.link}
         try:
-            sms_obj = SMSNotification(notification_type=NotificationAction.E_CONSULT_SHARE, context={'link': consultation.link})
+            sms_obj = SMSNotification(notification_type=NotificationAction.E_CONSULT_SHARE, context=context)
             sms_obj.send(receivers=receivers)
         except Exception as e:
             logger.error(str(e))
