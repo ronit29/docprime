@@ -1185,7 +1185,7 @@ class CommentViewSet(viewsets.ModelViewSet):
             if parent:
                 object = parent.content_object
 
-            elif object_id and data.get('hospital'):
+            elif object_id and data.get('type') == 'hospital':
                 object = Hospital.objects.filter(id=object_id).first()
             if not object:
                 return Response(status=status.HTTP_404_NOT_FOUND, data={'error': '{} not found.' %object._meta.db_table})
