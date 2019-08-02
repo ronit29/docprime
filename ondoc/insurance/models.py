@@ -1379,7 +1379,7 @@ class UserInsurance(auth_model.TimeStampedModel, MerchantPayoutMixin):
         onco_count = 0
         doctor = appointment_data.get('doctor', None)
         user = appointment_data.get('profile').user
-        if not is_insured:
+        if not is_insured or not doctor:
             return is_insured, insurance_id, insurance_message
 
         specialization_result = InsuranceDoctorSpecializations.get_doctor_insurance_specializations(doctor)
