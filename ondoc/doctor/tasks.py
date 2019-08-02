@@ -129,8 +129,8 @@ def doctors_daily_schedule():
                                                                  hospital__network_type=Hospital.NON_NETWORK_HOSPITAL,
                                                                  hospital__is_live=True) \
                                                          .exclude(status__in=[OfflineOPDAppointments.CANCELLED,
-                                                                              OfflineOPDAppointments.COMPLETED],
-                                                                  hospital__id__in=json.loads(settings.DAILY_SCHEDULE_EXCLUDE_HOSPITALS))
+                                                                              OfflineOPDAppointments.COMPLETED]) \
+                                                         .exclude(hospital__id__in=json.loads(settings.DAILY_SCHEDULE_EXCLUDE_HOSPITALS))
 
     docprime_appointments = OpdAppointment.objects.select_related('profile') \
                                                   .prefetch_related('hospital__manageable_hospitals') \
@@ -138,8 +138,8 @@ def doctors_daily_schedule():
                                                           hospital__network_type=Hospital.NON_NETWORK_HOSPITAL,
                                                           hospital__is_live=True) \
                                                   .exclude(status__in=[OpdAppointment.CANCELLED,
-                                                                       OpdAppointment.COMPLETED],
-                                                           hospital__id__in=json.loads(settings.DAILY_SCHEDULE_EXCLUDE_HOSPITALS))
+                                                                       OpdAppointment.COMPLETED]) \
+                                                  .exclude(hospital__id__in=json.loads(settings.DAILY_SCHEDULE_EXCLUDE_HOSPITALS))
     hospital_admins_dict = dict()
     hospital_admin_appointments_dict = dict()
     appointments_list = [*offline_appointments, *docprime_appointments]
@@ -170,7 +170,7 @@ def doctors_daily_schedule():
         admins = hospital_admins_dict[hospital]
         sms_sent = list()
         for admin in admins:
-            if admin.phone_number in sms_sent or not (admin.phone_number >= 1000000000 and admin.phone_number <= 9999999999):
+            if admin.phone_number in sms_sent or not (int(admin.phone_number) >= 1000000000 and int(admin.phone_number) <= 9999999999):
                 continue
             receiver = [{'user': None, 'phone_number': admin.phone_number}]
             hospital_admin_combo = str(hospital.id) + '-' + str(admin.id)

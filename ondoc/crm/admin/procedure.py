@@ -381,7 +381,8 @@ class IpdProcedureLeadAdmin(VersionAdmin):
     autocomplete_fields = ['doctor', 'hospital', 'insurer', 'tpa', 'ipd_procedure']
     exclude = ['user', 'lat', 'long']
     readonly_fields = ['phone_number', 'id', 'matrix_lead_id', 'comments', 'data', 'source', 'current_age',
-                       'related_speciality', 'is_insured', 'insurance_details', 'opd_appointments', 'lab_appointments']
+                       'related_speciality', 'is_insured', 'insurance_details', 'opd_appointments', 'lab_appointments',
+                       'is_automatically_potential']
     inlines = [IpdProcedureLeadCostEstimateMappingInline, VirtualAppointmentInline]
 
     fieldsets = (
@@ -391,7 +392,7 @@ class IpdProcedureLeadAdmin(VersionAdmin):
         }),
         ('Lead Info', {
             # 'classes': ('collapse',),
-            'fields': ('matrix_lead_id', 'comments', 'data', 'ipd_procedure', 'related_speciality',
+            'fields': ('matrix_lead_id', 'is_automatically_potential', 'comments', 'data', 'ipd_procedure', 'related_speciality',
                        'hospital', 'doctor', 'hospital_reference_id', 'source', 'status', 'planned_date', 'requested_date_time',
                        'payment_type', 'payment_amount', 'insurer', 'tpa', 'num_of_chats', 'remarks'),
         }),
@@ -466,6 +467,12 @@ class IpdProcedureLeadAdmin(VersionAdmin):
         if not result and obj.age:
             result = str(obj.age)
         return result
+
+    def is_automatically_potential(self, obj):
+        if obj:
+            return obj.is_potential_ipd()
+        return False
+    is_automatically_potential.short_description = "Has Lead been marked potential by the system?"
 
 
 class OfferAdminForm(forms.ModelForm):
