@@ -1157,15 +1157,16 @@ class CommentViewSet(viewsets.ModelViewSet):
         parent_id = None
         object_id = None
         comment = data['comment']
-        if comment and data.get('hospital'):
+        type = data['type']
+        if comment and type == 'hospital':
             user_email = data['email']
             try:
                 validate_email(user_email)
             except ValidationError as e:
                 return Response(status=status.HTTP_400_BAD_REQUEST, data={'error': format(e.messages[0])})
             user_name = data['name']
-            if data.get('hospital'):
-                object_id = data['hospital']
+            if data.get('id'):
+                object_id = data['id']
 
             if user and user.user_type == User.CONSUMER:
                 user_name = user.full_name
@@ -1210,8 +1211,10 @@ class CommentViewSet(viewsets.ModelViewSet):
 
     def list(self, request):
         data = request.GET
-        object_id = data.get('hospital')
-        object = Hospital.objects.filter(id=object_id).first()
+        type = data.get('type')
+        if type == 'hospital':
+            id = data.get('id')
+            object = Hospital.objects.filter(id=id).first()
         if object:
             comments = FluentComment.objects.filter(object_pk=str(object.id), parent_id=None, is_public=True)
             serializer = CommentSerializer(comments, many=True, context={'request': request})

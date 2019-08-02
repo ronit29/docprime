@@ -99,7 +99,14 @@ class CommentSerializer(serializers.ModelSerializer):
         return None
 
     def get_author(self, obj):
-        return 'docprime'
+        author_details = dict()
+        author_details['name'] = 'docprime'
+        author_details['experience'] = None
+        author_details['profile_img'] = None
+        author_details['speciality'] = None
+        author_details['rating'] = None
+        author_details['url'] = None
+        return author_details
 
     class Meta:
         model = FluentComment
