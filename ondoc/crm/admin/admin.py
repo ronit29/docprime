@@ -26,7 +26,7 @@ from ondoc.diagnostic.models import (Lab, LabNetwork, LabTest, LabTestType, LabS
                                      AvailableLabTest, LabAppointment, CommonTest, CommonDiagnosticCondition,
                                      LabPricingGroup,
                                      TestParameter, CommonPackage, LabTestCategory, LabTestGroup, LabTestGroupMapping,
-                                     TestParameterChat)
+                                     TestParameterChat, LabTestCategoryUrls)
 from ondoc.coupon.models import Coupon, UserSpecificCoupon, RandomGeneratedCoupon
 from ondoc.integrations.models import IntegratorLabTestParameterMapping
 from ondoc.lead.models import HospitalLead, DoctorLead, SearchLead
@@ -39,7 +39,8 @@ from ondoc.procedure.models import Procedure, ProcedureCategory, CommonProcedure
     IpdProcedureCategory, CommonIpdProcedure, IpdProcedureDetail, IpdProcedureDetailType, IpdProcedureSynonym, \
     IpdProcedureSynonymMapping, IpdProcedurePracticeSpecialization, IpdProcedureLead, Offer, \
     PotentialIpdLeadPracticeSpecialization, IpdProcedureCostEstimate, \
-    IpdCostEstimateRoomType, UploadCostEstimateData, PotentialIpdCity
+    IpdCostEstimateRoomType, UploadCostEstimateData, DoctorClinicIpdProcedure, PotentialIpdCity
+
 from ondoc.subscription_plan.models import Plan, PlanFeature, UserPlanMapping
 from .common import Cities, CitiesAdmin, MatrixCityMapping, MatrixCityAdmin, MerchantAdmin, MerchantPayoutAdmin, \
     PaymentOptionsAdmin, MatrixMappedStateAdmin, MatrixMappedCityAdmin, GlobalNonBookableAdmin, UserConfigAdmin, \
@@ -58,7 +59,7 @@ from .user import CustomUserAdmin, UserNumberUpdateAdmin, UserProfileAdmin
 from .hospital_network import HospitalNetworkAdmin
 from .lab import LabAdmin, LabTestAdmin, LabTestTypeAdmin, AvailableLabTestAdmin, CommonDiagnosticConditionAdmin, \
     LabAppointmentAdmin, CommonTestAdmin, TestParameterAdmin, CommonPackageAdmin, LabTestCategoryAdmin, \
-    LabTestGroupAdmin, LabTestGroupMappingAdmin, TestParameterChatAdmin
+    LabTestGroupAdmin, LabTestGroupMappingAdmin, TestParameterChatAdmin, LabTestCategoryUrlsAdmin
 from .lab_network import LabNetworkAdmin
 from .notification import (EmailNotificationAdmin, SmsNotificationAdmin,
                            PushNotificationAdmin, AppNotificationAdmin)
@@ -277,6 +278,7 @@ admin.site.register(ThirdPartyAdministrator, ThirdPartyAdministratorAdmin)
 admin.site.register(BlacklistUser, BlacklistUserAdmin)
 admin.site.register(BlockedStates, BlockedStatesAdmin )
 admin.site.register(BankHolidays)
+admin.site.register(LabTestCategoryUrls, LabTestCategoryUrlsAdmin)
 admin.site.register(UserNumberUpdate, UserNumberUpdateAdmin)
 admin.site.register(GenericQuestionAnswer, GenericQuestionAnswerAdmin)
 

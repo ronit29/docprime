@@ -1,3 +1,4 @@
+import json
 import operator
 from copy import deepcopy
 from itertools import groupby
@@ -15,7 +16,8 @@ from ondoc.ratings_review import models as rating_models
 from ondoc.diagnostic.models import (LabTest, AvailableLabTest, Lab, LabAppointment, LabTiming, PromotedLab,
                                      CommonDiagnosticCondition, CommonTest, CommonPackage,
                                      FrequentlyAddedTogetherTests, TestParameter, ParameterLabTest, QuestionAnswer,
-                                     LabPricingGroup, LabTestCategory, LabTestCategoryMapping, LabTestThresholds)
+                                     LabPricingGroup, LabTestCategory, LabTestCategoryMapping, LabTestThresholds,
+                                     LabTestCategoryLandingURLS, LabTestCategoryUrls)
 from ondoc.account import models as account_models
 from ondoc.authentication.models import UserProfile, Address
 from ondoc.insurance.models import UserInsurance, InsuranceThreshold
@@ -1648,7 +1650,8 @@ class LabList(viewsets.ReadOnlyModelViewSet):
     def apply_search_sort(self, parameters):
 
         if parameters.get('ids') and  parameters.get('is_user_insured') and not parameters.get('sort_on'):
-            return ' case when (test_type in (2,3)) and insurance_home_pickup=true and pickup_charges=0  then (insurance_home_pickup ,(case when network_id=43 then -1 end) , agreed_price )	end, distance '
+            return ' case when (test_type in (2,3)) and insurance_home_pickup=true and pickup_charges=0  then (insurance_home_pickup ,(case when network_id=43 then -1 end) ,' \
+                   ' case when insurance_agreed_price is not null then insurance_agreed_price else agreed_price end ) end, distance '
         order_by = parameters.get("sort_on")
         if order_by is not None:
             if order_by == "fees" and parameters.get('ids'):
@@ -3530,3 +3533,84 @@ class CompareLabPackagesViewSet(viewsets.ReadOnlyModelViewSet):
             discounted_price = deal_price if not search_coupon else search_coupon.get_search_coupon_discounted_price(deal_price)
 
         return discounted_price
+
+class LabTestCategoryLandingUrlViewSet(viewsets.GenericViewSet):
+
+    def category_landing_url(self, request):
+
+        parameters = request.query_params
+        title = None
+        url = parameters.get('url')
+        if not url:
+            return Response(status=status.HTTP_400_BAD_REQUEST)
+        query = LabTestCategoryLandingURLS.objects.select_related('url', 'test').\
+            prefetch_related('test__lab_tests', 'test__lab_tests__availablelabs',
+                             'test__lab_tests__availablelabs__lab_pricing_group',
+                             'test__lab_tests__availablelabs__lab_pricing_group__labs').filter(url__url=url).order_by('-priority')
+
+        if not query.count() >= 1:
+            return Response(status=status.HTTP_400_BAD_REQUEST)
+        resp = dict()
+        for obj in query:
+            if obj.url.url not in resp:
+                url_data = []
+                resp[obj.url.url] = url_data
+            else:
+                url_data = resp[obj.url.url]
+
+            # url_data = []
+            url_data_obj = {}
+            url_data_obj['lab_test_cat_name'] = obj.test.name
+            url_data_obj['lab_test_cat_id'] = obj.test.id
+
+            lab_tests = []
+            url_data_obj['lab_test_tests'] = lab_tests
+            # count = 0
+            test_count = 0
+            for test in obj.test.lab_tests.all():
+                test_count += 1
+                count = 0
+                deal_price_list = []
+                deal_price = 0
+                min = 0
+                for avl in test.availablelabs.all():
+                    if avl.enabled == True:
+                        if avl.custom_deal_price:
+                            deal_price = avl.custom_deal_price
+                            deal_price_list.append(deal_price)
+                        else:
+                            deal_price = avl.computed_deal_price
+                            deal_price_list.append(deal_price)
+
+                        for x in avl.lab_pricing_group.labs.all():
+                            if x.is_live == True:
+                                count += 1
+                if len(deal_price_list) >= 1:
+                    min = deal_price_list[0]
+                # if not min:
+                #     min = 0
+                for price in deal_price_list:
+                    if not price == None:
+                        if price <= min:
+                            deal_price = price
+                        else:
+                            deal_price = min
+
+                test_obj = {}
+                test_obj['name'] = test.name
+                test_obj['id'] = test.id
+                test_obj['count'] = count
+                test_obj['deal_price'] = deal_price
+                lab_tests.append(test_obj)
+            url_data_obj['No_of_tests'] = test_count
+            url_data.append(url_data_obj)
+            title = obj.url.title if obj.url.title else None
+        meta_title = None
+        meta_description = None
+        new_dynamic = NewDynamic.objects.filter(url_value=url)
+        for x in new_dynamic:
+            meta_title = x.meta_title
+            meta_description = x.meta_description
+
+        return Response({'url': list(resp.keys())[0], 'title': title, 'all_categories': list(resp.values())[0], 'meta_title': meta_title, 'meta_description': meta_description})
+
