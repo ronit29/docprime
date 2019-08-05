@@ -22,7 +22,7 @@ from ondoc.insurance.models import UserInsurance, InsuredMembers
 from ondoc.notification import tasks as notification_tasks
 #from ondoc.doctor.models import Hospital, DoctorClinic,Doctor,  OpdAppointment
 from ondoc.doctor.models import DoctorClinic, OpdAppointment, DoctorAssociation, DoctorQualification, Doctor, Hospital, \
-    HealthInsuranceProvider, ProviderSignupLead, HospitalImage, CommonHospital
+    HealthInsuranceProvider, ProviderSignupLead, HospitalImage, CommonHospital, PracticeSpecialization
 from ondoc.notification.models import EmailNotification
 from django.utils.safestring import mark_safe
 from ondoc.coupon.models import Coupon, CouponRecommender
@@ -1914,6 +1914,14 @@ class DoctorListViewSet(viewsets.GenericViewSet):
         hospital_req_data = {}
         if validated_data.get('hospital_id'):
             hospital_req_data = Hospital.objects.filter(id__in=validated_data.get('hospital_id')).values('id', 'name').first()
+
+        if validated_data.get('specialization_ids'):
+            spec = PracticeSpecialization.objects.filter(id=validated_data['specialization_ids'])
+            if spec.is_similar_specialization:
+                departments = spec.department
+                doctors = doctor_data.objects.filter(doctorpracticespecializations__specialization__in=departments.specialization)\
+                    .annotate(bookable_doctors=Q(doctor_clinics__enabled_for_online_booking=True,
+                                           enabled_for_online_booking=True, doctor_clinics__hospital__enabled_for_online_booking=True))
 
         return Response({"result": response, "count": result_count,
                          'specializations': specializations, 'conditions': conditions, "seo": seo,
