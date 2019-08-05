@@ -1917,7 +1917,7 @@ class DoctorListViewSet(viewsets.GenericViewSet):
             hospital_req_data = Hospital.objects.filter(id__in=validated_data.get('hospital_id')).values('id',
                                                                                                          'name').first()
 
-        similar_specializations = dict()
+        similar_specializations = list()
         if validated_data.get('specialization_ids') and len(validated_data.get('specialization_ids')) == 1:
             spec = PracticeSpecialization.objects.filter(id=validated_data['specialization_ids'][0]).first()
             department_spec_list = list()
@@ -1942,7 +1942,10 @@ class DoctorListViewSet(viewsets.GenericViewSet):
                     flat=True))
                 if similar_specializations_ids:
                     specialization_department = SpecializationDepartmentMapping.objects.filter(
-                        specialization__id__in=similar_specializations_ids, department__id__in=departent_ids_list).values('specialization_id', 'specialization__name', 'department_id', 'department__name')
+                        specialization__id__in=similar_specializations_ids, department__id__in=departent_ids_list).values('specialization__id', 'specialization__name', 'department__id', 'department__name')
+                    for data in specialization_department:
+                        similar_specializations.append({'specialization_id': data.get('specialization__id'), 'department_id':data.get('department__id'),
+                                                        'specialization_name': data.get('specialization__name'), 'department__name': data.get('department__name')})
 
         return Response({"result": response, "count": result_count,
                          'specializations': specializations, 'conditions': conditions, "seo": seo,
