@@ -247,6 +247,7 @@ class Hospital(auth_model.TimeStampedModel, auth_model.CreatedByModel, auth_mode
     # ratings = GenericRelation(ratings_models.RatingsReview, related_query_name='hospital_ratings')
     city_search_key = models.CharField(db_index=True, editable=False, max_length=100, default="", null=True, blank=True)
     enabled_for_cod = models.BooleanField(default=False)
+    enabled_poc = models.BooleanField(default=False)
     enabled_for_prepaid = models.BooleanField(default=True)
     is_location_verified = models.BooleanField(verbose_name='Location Verified', default=False)
     auto_ivr_enabled = models.BooleanField(default=True)
@@ -2229,6 +2230,56 @@ class OpdAppointmentInvoiceMixin(object):
         return invoices
 
 
+class PurchaseOrderCreation(auth_model.TimeStampedModel):
+    HOSPITAL = 'HOSPITAL'
+    LAB = 'LAB'
+    provider_choices = (('hospital', HOSPITAL), ('lab', LAB))
+    provider_type = models.CharField(choices=provider_choices, max_length=10)
+    provider_name_lab = models.ForeignKey("diagnostic.Lab", on_delete=models.DO_NOTHING, default='', null=True, blank=True)
+    provider_name_hospital = models.ForeignKey(Hospital, on_delete=models.DO_NOTHING, default='', null=True, blank=True)
+    provider_name = models.CharField(max_length=500, default='')
+    gst_number = models.CharField(max_length=1000)
+    total_amount_paid = models.IntegerField(help_text='Inclusive of GST')
+    start_date = models.DateField(default=None)
+    end_date = models.DateField(default=None)
+    appointment_booked_count = models.IntegerField(default=0)
+    total_appointment_count = models.IntegerField(default=0)
+    is_enabled = models.BooleanField(default=False)
+    current_appointment_count = models.IntegerField(default=0)
+    agreement_details = models.TextField()
+    proof_of_payment = models.CharField(max_length=1000, null=True, blank=True, help_text='Either enter a valid invoice number or upload the invoice image')
+    proof_of_payment_image = models.FileField(upload_to='qrcode', validators=[
+        FileExtensionValidator(allowed_extensions=['pdf', 'jfif', 'jpg', 'jpeg', 'png'])], null=True, blank=True)
+
+
+    def __str__(self):
+        if self.provider_name_hospital:
+            return self.provider_name_hospital.name
+        else:
+            return self.provider_name_lab.name
+
+    def save(self, force_insert=False, force_update=False, using=None, update_fields=None):
+        if self.provider_name_hospital:
+            self.provider_name = self.provider_name_hospital
+            super().save(force_insert, force_update, using, update_fields)
+        else:
+            self.provider_name = self.provider_name_lab
+            super().save(force_insert, force_update, using, update_fields)
+
+
+    class Meta:
+        db_table = 'purchase_order_creation'
+
+
+# @task()
+# def purchase_order_creation_counter_automation(purchase_order_id, ):
+#     from ondoc.doctor.models import PurchaseOrderCreation
+#     from ondoc.doctor.models import Hospital
+#
+#     instance = PurchaseOrderCreation.objects.filter(id=purchase_order_id)
+
+
+
 @reversion.register()
 class OpdAppointment(auth_model.TimeStampedModel, CouponsMixin, OpdAppointmentInvoiceMixin, RefundMixin, CompletedBreakupMixin, MatrixDataMixin, TdsDeductionMixin, PaymentMixin, MerchantPayoutMixin):
     PRODUCT_ID = Order.DOCTOR_PRODUCT_ID
@@ -2293,6 +2344,7 @@ class OpdAppointment(auth_model.TimeStampedModel, CouponsMixin, OpdAppointmentIn
     payment_type = models.PositiveSmallIntegerField(choices=PAY_CHOICES, default=PREPAID)
     insurance = models.ForeignKey(insurance_model.UserInsurance, blank=True, null=True, default=None,
                                   on_delete=models.DO_NOTHING)
+    purchase_order = models.ForeignKey(PurchaseOrderCreation, on_delete=models.DO_NOTHING, null=True, blank=True)
     outstanding = models.ForeignKey(Outstanding, blank=True, null=True, on_delete=models.SET_NULL)
     matrix_lead_id = models.IntegerField(null=True)
     is_rated = models.BooleanField(default=False)
@@ -4540,61 +4592,3 @@ class SimilarSpecializationGroupMapping(models.Model):
 
     class Meta:
         db_table = "similar_specialization_group_mapping"
-
-
-
-class PurchaseOrderCreation(auth_model.TimeStampedModel):
-    from ondoc.diagnostic.models import Lab
-    HOSPITAL = 'HOSPITAL'
-    LAB = 'LAB'
-    provider_choices = (('hospital', HOSPITAL), ('lab', LAB))
-    provider_type = models.CharField(choices=provider_choices, max_length=10)
-    provider_name_lab = models.ForeignKey(Lab, on_delete=models.DO_NOTHING, default='', null=True, blank=True)
-    provider_name_hospital = models.ForeignKey(Hospital, on_delete=models.DO_NOTHING, default='', null=True, blank=True)
-    provider_name = models.CharField(max_length=500, default='')
-    gst_number = models.CharField(max_length=1000)
-    total_amount_paid = models.IntegerField(help_text='Inclusive of GST')
-    active_till = models.DateTimeField()
-    appointment_count = models.IntegerField()
-    agreement_details = models.TextField()
-    proof_of_payment = models.CharField(max_length=1000, null=True, blank=True, help_text='Either enter a valid invoice number or upload the invoice image')
-    proof_of_payment_image = models.FileField(upload_to='qrcode', validators=[
-        FileExtensionValidator(allowed_extensions=['pdf', 'jfif', 'jpg', 'jpeg', 'png'])], null=True, blank=True)
-
-
-    def __str__(self):
-        if self.provider_name_hospital:
-            return self.provider_name_hospital.name
-        else:
-            return self.provider_name_lab.name
-
-    def save(self, force_insert=False, force_update=False, using=None, update_fields=None):
-        if self.provider_name_hospital:
-            self.provider_name = self.provider_name_hospital
-            super().save(force_insert, force_update, using, update_fields)
-        else:
-            self.provider_name = self.provider_name_lab
-            super().save(force_insert, force_update, using, update_fields)
-
-
-    class Meta:
-        db_table = 'purchase_order_creation'
-
-
-
-
-    # def after_commit_purchase_order(self, obj):
-    #     if self.id:
-    #         if self.id.provider_name_hospital:
-    #             if self.provider_name_hospital.hospital_appointments.all()
-
-
-
-@task()
-def purchase_order_creation_counter_automation(purchase_order_id, ):
-    from ondoc.doctor.models import PurchaseOrderCreation
-    from ondoc.doctor.models import Hospital
-
-    instance = PurchaseOrderCreation.objects.filter(id=purchase_order_id)
-
-

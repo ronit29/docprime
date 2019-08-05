@@ -2324,7 +2324,7 @@ class PurchaseOrderCreationForm(forms.ModelForm):
 class PurchaseOrderCreationAdmin(admin.ModelAdmin):
     model = PurchaseOrderCreation
     form = PurchaseOrderCreationForm
-    list_display = ['provider_type', 'active_till', 'provider_name_lab', 'provider_name_hospital']
+    list_display = ['provider_type', 'start_date', 'end_date', 'provider_name_lab', 'provider_name_hospital']
     autocomplete_fields = ['provider_name_lab', 'provider_name_hospital']
     search_fields = ['provider_name_lab__name', 'provider_name_hospital__name']
     readonly_fields = ['provider_name', ]
