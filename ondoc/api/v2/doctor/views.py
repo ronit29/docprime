@@ -1178,5 +1178,6 @@ class ConsumerEConsultationViewSet(viewsets.GenericViewSet):
         consultation = prov_models.EConsultation.objects.filter(id=consult_id).first()
         if not consultation:
             return Response({"error": "Consultation not Found"}, status=status.HTTP_404_NOT_FOUND)
+
         return Response({})
 
