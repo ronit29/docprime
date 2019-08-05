@@ -2248,7 +2248,7 @@ class PurchaseOrderCreation(auth_model.TimeStampedModel):
     current_appointment_count = models.IntegerField(default=0)
     agreement_details = models.TextField()
     proof_of_payment = models.CharField(max_length=1000, null=True, blank=True, help_text='Either enter a valid invoice number or upload the invoice image')
-    proof_of_payment_image = models.FileField(upload_to='qrcode', validators=[
+    proof_of_payment_image = models.FileField(upload_to='purchaseorder', validators=[
         FileExtensionValidator(allowed_extensions=['pdf', 'jfif', 'jpg', 'jpeg', 'png'])], null=True, blank=True)
 
 
@@ -2271,14 +2271,13 @@ class PurchaseOrderCreation(auth_model.TimeStampedModel):
         db_table = 'purchase_order_creation'
 
 
-# @task()
-# def purchase_order_creation_counter_automation(purchase_order_id, ):
-#     from ondoc.doctor.models import PurchaseOrderCreation
-#     from ondoc.doctor.models import Hospital
-#
-#     instance = PurchaseOrderCreation.objects.filter(id=purchase_order_id)
+@task()
+def purchase_order_creation_counter_automation(purchase_order_id):
 
-
+    instance = PurchaseOrderCreation.objects.filter(id=purchase_order_id).first()
+    if instance:
+        if instance.start_date < instance.end_date:
+            instance.is_enabled = True
 
 @reversion.register()
 class OpdAppointment(auth_model.TimeStampedModel, CouponsMixin, OpdAppointmentInvoiceMixin, RefundMixin, CompletedBreakupMixin, MatrixDataMixin, TdsDeductionMixin, PaymentMixin, MerchantPayoutMixin):
