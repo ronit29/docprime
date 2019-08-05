@@ -60,7 +60,8 @@ from ondoc.reports import models as report_models
 from ondoc.prescription.models import AppointmentPrescription
 
 from ondoc.diagnostic.models import LabPricing
-from ondoc.integrations.models import IntegratorMapping, IntegratorProfileMapping, IntegratorReport, IntegratorTestMapping, IntegratorTestParameterMapping
+from ondoc.integrations.models import IntegratorMapping, IntegratorProfileMapping, IntegratorReport, \
+    IntegratorTestMapping, IntegratorTestParameterMapping, IntegratorLabTestParameterMapping
 from ondoc.subscription_plan.models import Plan, PlanFeature, PlanFeatureMapping, UserPlanMapping
 
 from ondoc.web.models import Career, OnlineLead, UploadImage
@@ -613,7 +614,8 @@ class Command(BaseCommand):
         group.permissions.clear()
 
         content_types = ContentType.objects.get_for_models(IntegratorMapping, IntegratorProfileMapping, LabTest, LabNetwork,
-                                                           IntegratorReport, IntegratorTestMapping, IntegratorTestParameterMapping)
+                                                           IntegratorReport, IntegratorTestMapping, IntegratorTestParameterMapping,
+                                                           IntegratorLabTestParameterMapping)
 
         for cl, ct in content_types.items():
             permissions = Permission.objects.filter(

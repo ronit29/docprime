@@ -2,9 +2,34 @@ from django.core.management import BaseCommand
 from ondoc.integrations.Integrators import Thyrocare
 from django.conf import settings
 from ondoc.integrations.models import IntegratorLabTestParameterMapping
+import requests
 
 
 def map_test_parameters():
+    dictionary = {}
+    resp = requests.get('https://www.thyrocare.com/APIS/master.svc/Or3OLzFDGzLF7Apwjsp05KPe3Sski7)QAomi@RBhXRrVcGyko7hIzQ==/all/products')
+    data = resp.json()
+    data = data['MASTERS']
+    offers = data['OFFER']
+    profile = data['PROFILE']
+    tests = data['TESTS']
+
+    for offer in offers:
+        for child in offer['childs']:
+            if not dictionary.get(child['code']):
+                  dictionary[child['code']] = child['name']
+    offers = profile
+    for offer in offers:
+        for child in offer['childs']:
+            if not dictionary.get(child['code']):
+                dictionary[child['code']] = child['name']
+
+    offers = tests
+    for offer in offers:
+        if not dictionary.get(offer['code']):
+            dictionary[offer['code']] = offer['name']
+
+    # print(dictionary)
 
     integrator_test_codes = ["%TSA", "A/GR", "ABAS", "ABAS", "ABAS", "ABAS", "ABAS", "ABAS", "ABAS", "ABAS", "ABAS", "ABAS", "ABAS",
           "ABAS", "ABAS", "ABAS", "ABAS", "ABAS", "ABAS", "ABAS", "ABAS", "ABAS", "ABAS", "ABAS", "ABG", "AC_A", "AC_G",
@@ -87,7 +112,9 @@ def map_test_parameters():
     unique_test_paramters = list(set(integrator_test_codes))
 
     for parameter in unique_test_paramters:
-        obj = IntegratorLabTestParameterMapping(integrator_class_name=Thyrocare.__name__, integrator_test_parameter_code=parameter)
+        name = dictionary.get(parameter)
+        obj = IntegratorLabTestParameterMapping(integrator_class_name=Thyrocare.__name__,
+                                                integrator_test_parameter_code=parameter, integrator_test_name=name)
         obj.save()
 
 
