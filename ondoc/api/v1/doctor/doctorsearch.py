@@ -295,7 +295,7 @@ class DoctorSearchHelper:
         bucket_size=8000
 
         if self.query_params.get('is_user_insured') and not self.query_params.get('sort_on'):
-            return "  distance ASC, fees ASC ", "rnk=1"
+            return "  enabled_for_online_booking DESC, distance ASC, fees ASC ", "rnk=1"
 
         if self.count_of_procedure:
             order_by_field = ' distance, total_price '
@@ -420,12 +420,25 @@ class DoctorSearchHelper:
         else:
             sp_cond = ''
             min_dist_cond = ''
+            search_distance =''
             rank_part = " Row_number() OVER( partition BY d.id  ORDER BY " \
                 "St_distance(St_setsrid(St_point((%(longitude)s), (%(latitude)s)), 4326 ), h.location),dct.deal_price ASC) rnk " \
 
             if len(specialization_ids)>0 or len(condition_ids)>0:
                 sp_cond = " LEFT JOIN doctor_practice_specialization ds on ds.doctor_id = d.id " \
                        " LEFT JOIN practice_specialization gs on ds.specialization_id = gs.id "
+
+            if sp_cond:
+                search_distance = " and case when gs.search_distance is not null then " \
+                                  "St_dwithin( St_setsrid(St_point((%(longitude)s), (%(latitude)s)), 4326), h.location, gs.search_distance )" \
+                                  "else case when (%(max_distance)s) >= 0  then " \
+                                  "St_dwithin( St_setsrid(St_point((%(longitude)s), (%(latitude)s)), 4326), h.location, (%(max_distance)s))" \
+                                " else St_dwithin( St_setsrid(St_point((%(longitude)s), (%(latitude)s)), 4326), h.location, h.search_distance ) end " \
+                                  "end"
+            else:
+                search_distance = " and case when (%(max_distance)s) >= 0  then St_dwithin( St_setsrid(St_point((%(longitude)s), (%(latitude)s)), 4326), h.location, (%(max_distance)s))" \
+                           " else St_dwithin( St_setsrid(St_point((%(longitude)s), (%(latitude)s)), 4326), h.location, h.search_distance ) end "
+
             if min_distance>0:
                 min_dist_cond = " and St_dwithin(St_setsrid(St_point((%(longitude)s), (%(latitude)s)), 4326 ), h.location, (%(min_distance)s)) = false "
 
@@ -457,13 +470,12 @@ class DoctorSearchHelper:
                            "AND (%(ist_time)s) BETWEEN dl.start_time and dl.end_time " \
                            "{sp_cond} " \
                            "WHERE {filtering_params} " \
-                           "and case when (%(max_distance)s) >= 0  then St_dwithin( St_setsrid(St_point((%(longitude)s), (%(latitude)s)), 4326), h.location, (%(max_distance)s))" \
-                           " else St_dwithin( St_setsrid(St_point((%(longitude)s), (%(latitude)s)), 4326), h.location, h.search_distance ) end" \
+                           " {search_distance} " \
                            "{min_dist_cond}" \
                            " )x " \
                            "where {rank_by} ORDER BY {order_by_field}".format(rank_part=rank_part, sp_cond=sp_cond, \
                                                                               filtering_params=filtering_params.get(
-                                                                                  'string'), \
+                                                                                  'string'), search_distance=search_distance,\
                                                                               min_dist_cond=min_dist_cond,
                                                                               order_by_field=order_by_field, \
                                                                               rank_by=rank_by, ipd_query=ipd_query)

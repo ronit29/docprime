@@ -54,7 +54,9 @@ class Coupon(auth_model.TimeStampedModel):
     test = models.ManyToManyField("diagnostic.LabTest", blank=True)
     test_categories = models.ManyToManyField("diagnostic.LabTestCategory", blank=True)
     doctors = models.ManyToManyField("doctor.Doctor", blank=True)
+    doctors_exclude = models.ManyToManyField("doctor.Doctor", blank=True, related_name='doctors_exclude')
     hospitals = models.ManyToManyField("doctor.Hospital", blank=True)
+    hospitals_exclude = models.ManyToManyField("doctor.Hospital", blank=True, related_name='hospitals_exclude')
     specializations = models.ManyToManyField("doctor.PracticeSpecialization", blank=True)
     procedures = models.ManyToManyField("procedure.Procedure", blank=True)
     procedure_categories = models.ManyToManyField("procedure.ProcedureCategory", blank=True)
@@ -342,8 +344,6 @@ class RandomGeneratedCoupon(auth_model.TimeStampedModel):
         db_table = "random_generated_coupon"
 
 
-
-
 class CouponRecommender():
 
     def __init__(self, user, profile, type, product_id, coupon_code, cart_item_id):
@@ -552,6 +552,9 @@ class CouponRecommender():
                 hospital_city = getattr(hospital, 'city') if hasattr(hospital, 'city') else hospital.get('city')
                 coupons = list(
                     filter(lambda x: len(x.hospitals.all()) == 0 or hospital_id in list(map(lambda y: y.id, x.hospitals.all())), coupons))
+                coupons = list(
+                    filter(lambda x: len(x.hospitals_exclude.all()) == 0 or hospital_id not in list(
+                        map(lambda y: y.id, x.hospitals_exclude.all())), coupons))
                 coupons = list(filter(lambda x: x.cities == None or hospital_city in x.cities, coupons))
             else:
                 coupons = list(filter(lambda x: len(x.hospitals.all()) == 0, coupons))
@@ -559,6 +562,7 @@ class CouponRecommender():
 
             if doctor_id:
                 coupons = list(filter(lambda x: len(x.doctors.all()) == 0 or doctor_id in list(map(lambda y: y.id, x.doctors.all())), coupons))
+                coupons = list(filter(lambda x: len(x.doctors_exclude.all()) == 0 or doctor_id not in list(map(lambda y: y.id, x.doctors_exclude.all())), coupons))
                 coupons_list = list(coupons)
                 for coupon in coupons:
                     keep_coupon = False
