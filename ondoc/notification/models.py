@@ -105,6 +105,19 @@ class NotificationAction:
     LAB_FEEDBACK_AFTER_APPOINTMENT = 95
 
     CONTACT_US_EMAIL = 65
+
+    OFFLINE_OPD_APPOINTMENT_BOOKED = 110
+    OFFLINE_OPD_APPOINTMENT_ACCEPTED = 111
+    OFFLINE_OPD_APPOINTMENT_CANCELLED = 112
+    OFFLINE_OPD_APPOINTMENT_RESCHEDULED_DOCTOR = 113
+    OFFLINE_OPD_APPOINTMENT_NO_SHOW = 114
+    OFFLINE_OPD_INVOICE = 115
+    OFFLINE_OPD_APPOINTMENT_COMPLETED = 116
+    OFFLINE_APPOINTMENT_REMINDER_PROVIDER_SMS = 117
+    OFFLINE_PATIENT_WELCOME_MESSAGE = 118
+
+    E_CONSULT_SHARE = 130
+
     NOTIFICATION_TYPE_CHOICES = (
         (APPOINTMENT_ACCEPTED, "Appointment Accepted"),
         (APPOINTMENT_CANCELLED, "Appointment Cancelled"),
@@ -121,11 +134,24 @@ class NotificationAction:
         (LAB_REPORT_UPLOADED, "Lab Report Uploaded"),
         (LAB_REPORT_SEND_VIA_CRM, "Send Lab Reports via CRM"),
 
+        (OFFLINE_OPD_APPOINTMENT_BOOKED, "Offline OPD Appointment Booked"),
+        (OFFLINE_OPD_APPOINTMENT_ACCEPTED, "Offline OPD Appointment Accepted"),
+        (OFFLINE_OPD_APPOINTMENT_CANCELLED, "Offline OPD Appointment Cancelled"),
+        (OFFLINE_OPD_APPOINTMENT_RESCHEDULED_DOCTOR, "Offline OPD Appointment Rescheduled by Doctor"),
+        (OFFLINE_OPD_APPOINTMENT_NO_SHOW, "Offline OPD Appointment No Show"),
+        (OFFLINE_OPD_APPOINTMENT_COMPLETED, "Offline OPD Appointment Completed"),
+        (DOCPRIME_APPOINTMENT_REMINDER_PROVIDER_SMS, 'Docprime Appointment Reminder Provider SMS'),
+        (OFFLINE_APPOINTMENT_REMINDER_PROVIDER_SMS, 'Offline Appointment Reminder Provider SMS'),
+
+        (E_CONSULT_SHARE, 'E Consult Share'),
+
         (PRESCRIPTION_UPLOADED, "Prescription Uploaded"),
         (PAYMENT_PENDING, "Payment Pending"),
         (RECEIPT, "Receipt"),
         (DOCTOR_INVOICE, "Doctor Invoice"),
         (LAB_INVOICE, "Lab Invoice"),
+        (OFFLINE_OPD_INVOICE, "Offline OPD Invoice"),
+
         (INSURANCE_CONFIRMED, "Insurance Confirmed"),
         (INSURANCE_ENDORSMENT_APPROVED, "Insurance endorsment completed."),
         (INSURANCE_ENDORSMENT_REJECTED, "Insurance endorsment rejected."),
@@ -147,13 +173,14 @@ class NotificationAction:
         (COD_TO_PREPAID_REQUEST, 'COD To Prepaid Request'),
         (OPD_DAILY_SCHEDULE, 'OPD Daily Schedule')
     )
-
     OPD_APPOINTMENT = "opd_appointment"
     LAB_APPOINTMENT = "lab_appoingment"
+    OFFLINE_OPD_APPOINTMENT = "offline_opd_appointment"
 
     ACTION_TYPE_CHOICES = (
         (OPD_APPOINTMENT, 'Opd Appointment'),
         (LAB_APPOINTMENT, 'Lab Appointment'),
+        (OFFLINE_OPD_APPOINTMENT, 'Offline Opd Appointment'),
     )
 
     @classmethod
