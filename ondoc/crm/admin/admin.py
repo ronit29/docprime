@@ -28,6 +28,7 @@ from ondoc.diagnostic.models import (Lab, LabNetwork, LabTest, LabTestType, LabS
                                      TestParameter, CommonPackage, LabTestCategory, LabTestGroup, LabTestGroupMapping,
                                      TestParameterChat)
 from ondoc.coupon.models import Coupon, UserSpecificCoupon, RandomGeneratedCoupon
+from ondoc.integrations.models import IntegratorLabTestParameterMapping
 from ondoc.lead.models import HospitalLead, DoctorLead, SearchLead
 from ondoc.account.models import ConsumerAccount, MerchantPayout, Order, MerchantPayoutBulkProcess, \
     AdvanceMerchantPayout, AdvanceMerchantAmount
@@ -96,7 +97,7 @@ from ondoc.seo.models import SeoLabNetwork
 from ondoc.elastic.models import DemoElastic
 from .elastic import DemoElasticAdmin
 from ondoc.banner.models import Banner, SliderLocation, BannerLocation, EmailBanner, Recommender
-from .integrations import IntegratorMapping, IntegratorMappingAdmin
+from .integrations import IntegratorMapping, IntegratorMappingAdmin, IntegratorLabTestParameterMappingAdmin
 from .integrations import IntegratorProfileMapping, IntegratorProfileMappingAdmin
 from .integrations import IntegratorReport, IntegratorReportAdmin
 from .integrations import IntegratorTestMapping, IntegratorTestMappingAdmin
@@ -278,3 +279,5 @@ admin.site.register(BlockedStates, BlockedStatesAdmin )
 admin.site.register(BankHolidays)
 admin.site.register(UserNumberUpdate, UserNumberUpdateAdmin)
 admin.site.register(GenericQuestionAnswer, GenericQuestionAnswerAdmin)
+
+admin.site.register(IntegratorLabTestParameterMapping, IntegratorLabTestParameterMappingAdmin)

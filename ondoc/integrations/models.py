@@ -272,3 +272,13 @@ class IntegratorTestParameterMapping(TimeStampedModel):
 
     class Meta:
         db_table = 'integrator_test_parameter_mapping'
+
+
+class IntegratorLabTestParameterMapping(TimeStampedModel):
+    integrator_class_name = models.CharField(max_length=40, null=False, blank=False)
+    integrator_test_parameter_code = models.CharField(max_length=60, null=True, blank=True, unique=True)
+    test_parameter = models.ForeignKey(TestParameter, related_name='integrator_mapped_test_parameters', on_delete=models.DO_NOTHING, null=True)
+
+    class Meta:
+        db_table = 'integrator_lab_test_parameter_mapping'
+        unique_together = (('integrator_class_name', 'integrator_test_parameter_code'), )
