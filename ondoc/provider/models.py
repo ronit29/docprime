@@ -40,11 +40,11 @@ class EConsultation(auth_models.TimeStampedModel, auth_models.CreatedByModel):
         balance = consumer_account.balance
         cashback_balance = consumer_account.cashback
         total_balance = balance + cashback_balance
-        deal_price = data['price']
+        deal_price = data.price
         coupon_discount, coupon_cashback, coupon_list, random_coupon_list = coupon_models.Coupon.get_total_deduction(data, deal_price)
         payable_amount = max(0, deal_price - coupon_discount - coupon_cashback)
 
-        product_id = acc_models.Order.SUBSCRIPTION_PLAN_PRODUCT_ID
+        product_id = acc_models.Order.PROVIDER_ECONSULT_PRODUCT_ID
         if total_balance >= payable_amount:
             # cashback_amount = min(cashback_balance, payable_amount)
             cashback_amount = 0
@@ -78,24 +78,16 @@ class EConsultation(auth_models.TimeStampedModel, auth_models.CreatedByModel):
                 # visitor_info=visitor_info
             )
 
-        action = acc_models.Order.SUBSCRIPTION_PLAN_BUY
+        action = acc_models.Order.PROVIDER_ECONSULT_PRODUCT_ID
         # Snapshot of plan and its features
         # if_subscription_plan_contains_anything_except_test
-        extra_details = {"id": plan.id,
-                         "name": plan.name,
-                         "mrp": str(plan.mrp),
-                         "deal_price": str(plan.deal_price),
+        extra_details = {"id": data.id,
+                         "doc_name": data.doctor.name,
+                         "deal_price": str(data.price),
                          "payable_amount": str(payable_amount),
-                         "unlimited_online_consultation": plan.unlimited_online_consultation,
-                         "priority_queue": plan.priority_queue,
-                         "features": [{"id": feature_mapping.feature.id, "name": feature_mapping.feature.name,
-                                       "count": feature_mapping.count, "test":
-                                           feature_mapping.feature.test.id,
-                                       "test_name": feature_mapping.feature.test.name} for feature_mapping in
-                                      plan.feature_mappings.filter(enabled=True)]}
+                         }
 
-        action_data = {"user": user.id, "plan": plan.id, "extra_details": extra_details, "coupon": coupon_list,
-                       "coupon_data": {"random_coupon_list": random_coupon_list}}
+        action_data = {"user": user.id, "plan": data.id, "extra_details": extra_details}
         child_order = acc_models.Order.objects.create(
             product_id=product_id,
             action=action,
