@@ -430,41 +430,46 @@ class MerchantPayoutForm(forms.ModelForm):
         if any(self.errors):
             return
 
-        if self.cleaned_data.get('type', None) == MerchantPayout.MANUAL and not self.cleaned_data.get('utr_no', None):
-            raise forms.ValidationError("Enter UTR Number if payout type is manual.")
-        if not self.cleaned_data.get('type', None) == MerchantPayout.MANUAL and (self.cleaned_data.get('utr_no', None) or self.cleaned_data.get('amount_paid', None)):
-            raise forms.ValidationError("No need for UTR Number/Amount Paid if payout type is not manual.")
+        request = self.request
+        user_groups = request.user.groups.values_list('name', flat=True)
+        if 'qc_merchant_team' in user_groups and 'merchant_team' not in user_groups:
+            raise forms.ValidationError("You are not authorized to perform this action.")
+        else:
+            if self.cleaned_data.get('type', None) == MerchantPayout.MANUAL and not self.cleaned_data.get('utr_no', None):
+                raise forms.ValidationError("Enter UTR Number if payout type is manual.")
+            if not self.cleaned_data.get('type', None) == MerchantPayout.MANUAL and (self.cleaned_data.get('utr_no', None) or self.cleaned_data.get('amount_paid', None)):
+                raise forms.ValidationError("No need for UTR Number/Amount Paid if payout type is not manual.")
 
-        process_payout = self.cleaned_data.get('process_payout')
-        if process_payout:
-            if not self.instance.get_merchant():
-                raise forms.ValidationError("No verified merchant found to process payments")
+            process_payout = self.cleaned_data.get('process_payout')
+            if process_payout:
+                if not self.instance.get_merchant():
+                    raise forms.ValidationError("No verified merchant found to process payments")
 
-            merchant = self.instance.get_merchant()
-            if not merchant.verified_by_finance or not merchant.enabled:
-                raise forms.ValidationError("Merchant is not verified or is not enabled.")
+                merchant = self.instance.get_merchant()
+                if not merchant.verified_by_finance or not merchant.enabled:
+                    raise forms.ValidationError("Merchant is not verified or is not enabled.")
 
-            billed_to = self.instance.get_billed_to()
-            if not billed_to:
-                raise forms.ValidationError("Billing entity not defined.")
+                billed_to = self.instance.get_billed_to()
+                if not billed_to:
+                    raise forms.ValidationError("Billing entity not defined.")
 
-            if not self.instance.booking_type == self.instance.InsurancePremium:
-                associated_merchant = billed_to.merchant.first()
-                if not associated_merchant.verified:
-                    raise forms.ValidationError("Associated Merchant not verified.")
+                if not self.instance.booking_type == self.instance.InsurancePremium:
+                    associated_merchant = billed_to.merchant.first()
+                    if not associated_merchant.verified:
+                        raise forms.ValidationError("Associated Merchant not verified.")
 
-            if self.instance.status not in [1]:
-                raise forms.ValidationError("Only pending payouts can be processed.")
+                if self.instance.status not in [1]:
+                    raise forms.ValidationError("Only pending payouts can be processed.")
 
-        recreate_payout = self.cleaned_data.get('recreate_payout')
-        if recreate_payout:
-            if self.instance.status not in [6, 7] and not self.instance.merchant_has_advance_payment():
-                raise forms.ValidationError("Only failed or advance paid payout can be re-created.")
+            recreate_payout = self.cleaned_data.get('recreate_payout')
+            if recreate_payout:
+                if self.instance.status not in [6, 7] and not self.instance.merchant_has_advance_payment():
+                    raise forms.ValidationError("Only failed or advance paid payout can be re-created.")
 
-        if self.instance.status in [3, 4, 5]:
-            raise forms.ValidationError("This payout is already under process or completed.")
+            if self.instance.status in [3, 4, 5]:
+                raise forms.ValidationError("This payout is already under process or completed.")
 
-        return self.cleaned_data
+            return self.cleaned_data
 
 
 class MerchantPayoutResource(resources.ModelResource):
@@ -558,15 +563,23 @@ class MerchantPayoutAdmin(MediaImportMixin, VersionAdmin):
         return queryset, use_distinct
 
     def get_readonly_fields(self, request, obj=None):
-        base = ['appointment_id', 'get_billed_to', 'get_merchant','booking_type', 'duplicate_of']
-        editable_fields = ['payout_approved']
-        if obj and obj.status == MerchantPayout.PENDING:
-            editable_fields += ['type', 'amount_paid','payment_mode']
-        if not obj or not obj.utr_no:
-            editable_fields += ['utr_no', 'remarks']
+        user_groups = request.user.groups.values_list('name', flat=True)
+        if 'qc_merchant_team' in user_groups and 'merchant_team' not in user_groups:
+            return ['id', 'booking_type', 'payment_mode', 'charged_amount', 'updated_at', 'created_at',
+                    'payable_amount', 'tds_amount', 'status', 'payout_time', 'paid_to',
+                    'appointment_id', 'get_billed_to', 'get_merchant', 'type', 'utr_no',
+                    'amount_paid', 'api_response', 'pg_status', 'status_api_response', 'duplicate_of',
+                    'remarks']
+        else:
+            base = ['appointment_id', 'get_billed_to', 'get_merchant', 'booking_type', 'duplicate_of']
+            editable_fields = ['payout_approved']
+            if obj and obj.status == MerchantPayout.PENDING:
+                editable_fields += ['type', 'amount_paid', 'payment_mode']
+            if not obj or not obj.utr_no:
+                editable_fields += ['utr_no', 'remarks']
 
-        readonly = [f.name for f in self.model._meta.fields if f.name not in editable_fields]
-        return base + readonly
+            readonly = [f.name for f in self.model._meta.fields if f.name not in editable_fields]
+            return base + readonly
 
     def save_model(self, request, obj, form, change):
         obj.process_payout = form.cleaned_data.get('process_payout')
@@ -656,6 +669,12 @@ class MerchantPayoutAdmin(MediaImportMixin, VersionAdmin):
         export_data = file_format.export_data(data)
         return export_data
         # return super().get_export_data(file_format, queryset, *args, **kwargs)
+
+    def get_form(self, request, obj=None, **kwargs):
+        kwargs['form'] = MerchantPayoutForm
+        form = super().get_form(request, obj=obj, **kwargs)
+        form.request = request
+        return form
 
 
 class AssociatedMerchantInline(GenericTabularInline, nested_admin.NestedTabularInline):

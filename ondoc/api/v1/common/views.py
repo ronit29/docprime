@@ -1,17 +1,23 @@
 # from hardcopy import bytestring_to_pdf
+from django.contrib.contenttypes.models import ContentType
+from django.core.exceptions import ValidationError
+from django.core.validators import validate_email
+from fluent_comments.models import FluentComment
 from rest_framework.permissions import IsAuthenticated
 from rest_framework import mixins, viewsets, status
 from rest_framework.response import Response
 from django.contrib.gis.geos import Point, GEOSGeometry
 from django.conf import settings
 from django.utils import timezone
-from ondoc.api.v1.common.serializers import SearchLeadSerializer
+
+from ondoc.api.v1.common.serializers import SearchLeadSerializer, CommentSerializer
 from django.utils.dateparse import parse_datetime
 from weasyprint import HTML
 from django.http import HttpResponse
 
 from ondoc.api.v1.insurance.serializers import InsuranceCityEligibilitySerializer
 from ondoc.api.v1.utils import html_to_pdf, generate_short_url
+from ondoc.authentication.models import User
 from ondoc.diagnostic.models import Lab
 from ondoc.doctor.models import (Doctor, DoctorPracticeSpecialization, PracticeSpecialization, DoctorMobile, Qualification,
                                  Specialization, College, DoctorQualification, DoctorExperience, DoctorAward,
@@ -1135,3 +1141,83 @@ class DepartmentRouting(viewsets.GenericViewSet):
             return Response({'error': str(e)}, status=status.HTTP_400_BAD_REQUEST)
 
         return Response(resp)
+
+
+class CommentViewSet(viewsets.ModelViewSet):
+    queryset = FluentComment.objects.filter(is_public=True)
+    serializer_class = CommentSerializer
+
+    def create(self, request, *args, **kwzargs):
+        user = None
+        if request.user.is_authenticated:
+            user = request.user
+
+        data = self.request.data
+
+        parent_id = None
+        object_id = None
+        comment = data['comment']
+        type = data['type']
+        if comment and type == 'hospital':
+            user_email = data['email']
+            try:
+                validate_email(user_email)
+            except ValidationError as e:
+                return Response(status=status.HTTP_400_BAD_REQUEST, data={'error': format(e.messages[0])})
+            user_name = data['name']
+            if data.get('id'):
+                object_id = data['id']
+
+            if user and user.user_type == User.CONSUMER:
+                user_name = user.full_name
+                user_email = user.get_default_email
+
+            if not user_name:
+                user_name = 'Anonymous'
+
+            if 'parent' in data:
+                parent_id = data['parent']
+
+            parent = None
+            object = None
+            if parent_id:
+                parent = FluentComment.objects.filter(id=parent_id).first()
+            if parent:
+                object = parent.content_object
+
+            elif object_id and data.get('type') == 'hospital':
+                object = Hospital.objects.filter(id=object_id).first()
+            if not object:
+                return Response(status=status.HTTP_404_NOT_FOUND, data={'error': '{} not found.' %object._meta.db_table})
+
+            content_type = ContentType.objects.get(model=object._meta.db_table).pk
+            comment = FluentComment.objects.create(object_pk=object.id,
+                                   comment=comment,
+                                   content_type_id=content_type,
+                                   site_id=settings.SITE_ID, parent_id=parent.id if parent else None, user_name=user_name,
+                                   user_email=user_email, user=user, is_public=False)
+
+            serializer = CommentSerializer(comment, context={'request': request})
+
+            response = {}
+            response['status'] = 1
+            response['message'] = 'Comment posted successfully'
+            response['comment'] = serializer.data
+
+            return Response(response)
+
+        else:
+            return Response(status=status.HTTP_400_BAD_REQUEST, data={'error': 'Comment not found.'})
+
+    def list(self, request):
+        data = request.GET
+        type = data.get('type')
+        if type == 'hospital':
+            id = data.get('id')
+            object = Hospital.objects.filter(id=id).first()
+        if object:
+            comments = FluentComment.objects.filter(object_pk=str(object.id), parent_id=None, is_public=True)
+            serializer = CommentSerializer(comments, many=True, context={'request': request})
+            return Response(serializer.data)
+
+        return Response({})

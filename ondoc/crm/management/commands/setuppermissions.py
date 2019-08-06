@@ -71,7 +71,8 @@ from ondoc.articles.models import Article, ArticleLinkedUrl, LinkedArticle, Arti
 
 from ondoc.authentication.models import BillingAccount, SPOCDetails, GenericAdmin, User, Merchant, AssociatedMerchant, \
     DoctorNumber, UserNumberUpdate, GenericQuestionAnswer
-from ondoc.account.models import MerchantPayout, MerchantPayoutBulkProcess, AdvanceMerchantAmount, AdvanceMerchantPayout
+from ondoc.account.models import MerchantPayout, MerchantPayoutBulkProcess, AdvanceMerchantAmount, \
+    AdvanceMerchantPayout
 from ondoc.seo.models import Sitemap, NewDynamic
 from ondoc.elastic.models import DemoElastic
 from ondoc.location.models import EntityUrls, CompareLabPackagesSeoUrls, CompareSEOUrls, CityLatLong
@@ -462,6 +463,9 @@ class Command(BaseCommand):
         # creating group for blocked state and blacklist users.
         self.create_blocked_state_group()
 
+        # Creating group for read only payout access
+        self.create_qc_merchant_team()
+
         #Create XL Data Export Group
         Group.objects.get_or_create(name=constants['DATA_EXPORT_GROUP'])
 
@@ -490,7 +494,7 @@ class Command(BaseCommand):
 
             group.permissions.add(*permissions)
 
-        content_types = ContentType.objects.get_for_models(Hospital)
+        content_types = ContentType.objects.get_for_models(Hospital, EntityUrls)
         for cl, ct in content_types.items():
             permissions = Permission.objects.filter(
                 Q(content_type=ct),
@@ -951,6 +955,18 @@ class Command(BaseCommand):
 
             group.permissions.add(*permissions)
 
+    def create_qc_merchant_team(self):
+        group, created = Group.objects.get_or_create(name=constants['QC_MERCHANT_TEAM'])
+        group.permissions.clear()
+
+        content_types = ContentType.objects.get_for_models(MerchantPayout)
+
+        for cl, ct in content_types.items():
+            permissions = Permission.objects.filter(
+                Q(content_type=ct),
+                Q(codename='change_' + ct.model))
+
+            group.permissions.add(*permissions)
 
     def create_elastic_group(self):
 
