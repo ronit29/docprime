@@ -1918,6 +1918,7 @@ class DoctorListViewSet(viewsets.GenericViewSet):
                                                                                                          'name').first()
 
         similar_specializations = list()
+        similar_spec_department = list()
         if validated_data.get('specialization_ids') and len(validated_data.get('specialization_ids')) == 1:
             spec = PracticeSpecialization.objects.filter(id=validated_data['specialization_ids'][0]).first()
             department_spec_list = list()
@@ -1928,14 +1929,20 @@ class DoctorListViewSet(viewsets.GenericViewSet):
                     if department_spec_mapping:
                         department_spec_list.extend(department_spec_mapping.values_list('specialization', flat=True))
                     departent_ids_list.append(department.id)
+                    similar_spec_department.append({'department_id': department.id, 'department_name': department.name})
             if department_spec_list:
                 department_spec_list = set(department_spec_list)
-                doctors = doctor_data.filter(
-                    doctorpracticespecializations__specialization__id__in=department_spec_list).annotate(
-                    bookable_doctors_count=Count(Q(doctor_clinics__enabled_for_online_booking=True,
-                                                   enabled_for_online_booking=True,
-                                                   doctor_clinics__hospital__enabled_for_online_booking=True))).filter(
-                    bookable_doctors_count__gt=0)
+                doctors = Doctor.objects.prefetch_related("doctor_clinics", "doctor_clinics__hospital",
+                                                          "doctorpracticespecializations",
+                                                          "doctorpracticespecializations__specialization",
+                                                          "doctorpracticespecializations__specialization__department",
+                                                          "doctorpracticespecializations__specialization__department__departments",
+                                                          "doctorpracticespecializations__specialization__department__departments__specializationdepartmentmapping").\
+                                                          filter(doctorpracticespecializations__specialization__id__in=department_spec_list).annotate(
+                                                          bookable_doctors_count=Count(Q(doctor_clinics__enabled_for_online_booking=True,
+                                                          enabled_for_online_booking=True,
+                                                          doctor_clinics__hospital__enabled_for_online_booking=True))).filter(
+                                                          bookable_doctors_count__gt=0)
 
                 similar_specializations_ids = set(doctors.values_list(
                     'doctorpracticespecializations__specialization__department__departments__specializationdepartmentmapping__specialization',
@@ -1945,7 +1952,7 @@ class DoctorListViewSet(viewsets.GenericViewSet):
                         specialization__id__in=similar_specializations_ids, department__id__in=departent_ids_list).values('specialization__id', 'specialization__name', 'department__id', 'department__name')
                     for data in specialization_department:
                         similar_specializations.append({'specialization_id': data.get('specialization__id'), 'department_id':data.get('department__id'),
-                                                        'specialization_name': data.get('specialization__name'), 'department__name': data.get('department__name')})
+                                                        'specialization_name': data.get('specialization__name'), 'department_name': data.get('department__name')})
 
         return Response({"result": response, "count": result_count,
                          'specializations': specializations, 'conditions': conditions, "seo": seo,
@@ -1955,7 +1962,8 @@ class DoctorListViewSet(viewsets.GenericViewSet):
                          'bottom_content': bottom_content, 'canonical_url': canonical_url,
                          'ipd_procedures': ipd_procedures, 'hospital': hospital_req_data,
                          'specialization_groups': specialization_groups,
-                         'similar_specializations': similar_specializations})
+                         'similar_specializations': similar_specializations,
+                         'similar_specialization_department': similar_spec_department})
 
     def get_schema(self, request, response):
 
