@@ -168,13 +168,14 @@ class Hospital(auth_model.TimeStampedModel, auth_model.CreatedByModel, auth_mode
     PHONE_RINGING_BUT_COULD_NOT_CONNECT = 10
     WELCOME_CALLING = 1
     ESCALATION = 2
+    INSURANCE = 3
     DISABLED_REASONS_CHOICES = (
         ("", "Select"), (INCORRECT_CONTACT_DETAILS, "Incorrect contact details"),
         (MOU_AGREEMENT_NEEDED, "MoU agreement needed"), (HOSPITAL_NOT_INTERESTED, "Hospital not interested for tie-up"),
         (CHARGES_ISSUES, "Issue in discount % / consultation charges"),
         (PHONE_RINGING_BUT_COULD_NOT_CONNECT, "Phone ringing but could not connect"),
         (DUPLICATE, "Duplicate"), (OTHERS, "Others (please specify)"))
-    DISABLED_AFTER_CHOICES = (("", "Select"), (WELCOME_CALLING, "Welcome Calling"), (ESCALATION, "Escalation"))
+    DISABLED_AFTER_CHOICES = (("", "Select"), (WELCOME_CALLING, "Welcome Calling"), (ESCALATION, "Escalation"), (INSURANCE, "INSURANCE"))
     AGENT = 1
     PROVIDER = 2
     SOURCE_TYPE_CHOICES = ((AGENT, "Agent"), (PROVIDER, "Provider"))
@@ -2388,6 +2389,11 @@ class OpdAppointment(auth_model.TimeStampedModel, CouponsMixin, OpdAppointmentIn
                 mime_type = get_file_mime_type(file)
                 file_url = pf.name.url
                 resp.append({"url": file_url, "type": mime_type})
+
+        for pres in self.eprescription.all():
+            file = pres.prescription_file
+            resp.append({"url": file.url, "type": get_file_mime_type(file)})
+
         return resp
 
 
@@ -3148,7 +3154,7 @@ class OpdAppointment(auth_model.TimeStampedModel, CouponsMixin, OpdAppointmentIn
         insurance_id = None
         user_insurance = UserInsurance.objects.filter(user=user).last()
         if user_insurance and user_insurance.is_valid():
-            is_appointment_insured, insurance_id, insurance_message = user_insurance.validate_doctor_insurance(data, user_insurance)
+            is_appointment_insured, insurance_id, insurance_message = user_insurance.validate_doctor_insurance(data)
 
         if is_appointment_insured and cart_data.get('is_appointment_insured', None):
             payment_type = OpdAppointment.INSURANCE
