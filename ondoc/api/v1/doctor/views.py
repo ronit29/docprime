@@ -1946,12 +1946,16 @@ class DoctorListViewSet(viewsets.GenericViewSet):
                     'doctorpracticespecializations__specialization__department__departments__specializationdepartmentmapping__specialization',
                     flat=True))
                 if similar_specializations_ids:
-                    if validated_data.get('specialization_ids') in similar_specializations_ids:
-                        similar_specializations_ids.remove(validated_data.get('specialization_ids'))
+                    if int(validated_data['specialization_ids'][0]) in similar_specializations_ids:
+                        similar_specializations_ids.remove(int(validated_data['specialization_ids'][0]))
                     specialization_department = SpecializationDepartmentMapping.objects.filter(
-                        specialization__id__in=similar_specializations_ids, department__id__in=departent_ids_list).values('specialization__id', 'specialization__name', 'department__id', 'department__name')
+                        specialization__id__in=similar_specializations_ids,
+                        department__id__in=departent_ids_list).values('specialization__id', 'specialization__name', 'department__id', 'department__name')
+                    check_spec_ids = set()
                     for data in specialization_department:
-                        similar_specializations.append({'specialization_id': data.get('specialization__id'), 'department_id':data.get('department__id'),
+                        if not data.get('specialization__id') in check_spec_ids:
+                            check_spec_ids.add(data.get('specialization__id'))
+                            similar_specializations.append({'specialization_id': data.get('specialization__id'), 'department_id': data.get('department__id'),
                                                         'specialization_name': data.get('specialization__name'), 'department_name': data.get('department__name')})
 
         return Response({"result": response, "count": result_count,
