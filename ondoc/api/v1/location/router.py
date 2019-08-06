@@ -14,4 +14,5 @@ urlpatterns = [
     path('static-speciality-footer', SearchUrlsViewSet.as_view({'get': 'top_specialities_in_top_cities'}),
          name='top_specialities_in_top_cities'),
     path('city-inventory-hospitals', SearchUrlsViewSet.as_view({'get': 'list_cities_for_hospitals'}), name='list-all-cities'),
+    path('locality-inventory-hospitals', SearchUrlsViewSet.as_view({'get': 'list_localities_for_hospitals'}), name='list-all-localities'),
 ]

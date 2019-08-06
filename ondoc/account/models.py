@@ -105,7 +105,8 @@ class Order(TimeStampedModel):
                     insurance_order_transaction = transactions[0]
                     data['refOrderId'] = str(insurance_order_transaction.order_id)
                     data['refOrderNo'] = str(insurance_order_transaction.order_no)
-                    data['insurerCode'] = str(user_insurance.insurance_plan.insurer.insurer_merchant_code)
+                    #data['insurerCode'] = str(user_insurance.insurance_plan.insurer.insurer_merchant_code)
+                    #data['insurerCode'] = "advancePay"
 
         return data
 
@@ -2049,20 +2050,35 @@ class MerchantPayout(TimeStampedModel):
             if all_txn:
                 return all_txn[0].order_no
 
+    def get_order_id(self):
+        order_id = None
+        appointment = self.get_appointment()
+        if not appointment:
+            return None
+        order_data = Order.objects.filter(reference_id=appointment.id).order_by('-id').first()
+        if order_data:
+            order_id = order_data.id
+
+        return order_id
+
     def update_status_from_pg(self):
+        from ondoc.account.mongo_models import PgLogs as PgLogsMongo
         with transaction.atomic():
             # if self.pg_status=='SETTLEMENT_COMPLETED' or self.utr_no or self.type ==self.MANUAL:
             #     return
 
             order_no = None
+            order_id = None
             url = settings.SETTLEMENT_DETAILS_API
             if self.is_insurance_premium_payout():
                 txn = self.get_insurance_premium_transactions()
                 if txn:
                     order_no = txn[0].order_no
+                    order_id = txn[0].order_id
 
             else:
                 order_no = self.get_pg_order_no()
+                order_id = self.get_order_id()
 
             if order_no:
                 req_data = {"orderNo": order_no}
@@ -2071,6 +2087,8 @@ class MerchantPayout(TimeStampedModel):
                 headers = {"auth": settings.SETTLEMENT_AUTH, "Content-Type": "application/json"}
 
                 response = requests.post(url, data=json.dumps(req_data), headers=headers)
+                if order_id:
+                    save_pg_response.apply_async((PgLogsMongo.PAYOUT_SETTLEMENT_DETAIL, order_no, None, response.json(), req_data,), eta=timezone.localtime(),)
                 if response.status_code == status.HTTP_200_OK:
                     resp_data = response.json()
                     self.status_api_response = resp_data
@@ -2301,13 +2319,16 @@ class PgStatusCode(TimeStampedModel):
 
 
 class PaymentProcessStatus(TimeStampedModel):
-    INITIATED = 1
+    INITIATE = 1
     AUTHORIZE = 2
     SUCCESS = 3
     FAILURE = 4
+    CAPTURE = 5
+    RELEASE = 6
 
-    STATUS_CHOICES = [(INITIATED, "Initiated"), (AUTHORIZE, "Authorize"),
-                      (SUCCESS, "Success"), (FAILURE, "Failure")]
+    STATUS_CHOICES = [(INITIATE, "Initiate"), (AUTHORIZE, "Authorize"),
+                      (SUCCESS, "Success"), (FAILURE, "Failure"),
+                      (CAPTURE, "Capture"), (RELEASE, "Release")]
 
     user = models.ForeignKey(User, on_delete=models.DO_NOTHING, null=True)
     order = models.ForeignKey(Order, on_delete=models.DO_NOTHING, null=True)
@@ -2340,11 +2361,23 @@ class PaymentProcessStatus(TimeStampedModel):
 
     @classmethod
     def get_status_type(cls, status_code, txStatus):
-        if status_code == 1:
-            if txStatus == 'TXN_AUTHORIZE':
+        try:
+            status_code = int(status_code)
+        except KeyError:
+            logger.error("ValueError : statusCode is not type integer")
+            status_code = None
+
+        if status_code and status_code == 1:
+            if txStatus == 'TXN_AUTHORIZE' or txStatus == '27':
                 return PaymentProcessStatus.AUTHORIZE
             else:
                 return PaymentProcessStatus.SUCCESS
+
+        if status_code and status_code == 20 and txStatus == 'TXN_SUCCESS':
+            return PaymentProcessStatus.CAPTURE
+
+        if status_code and status_code == 22 and txStatus == 'TXN_RELEASE':
+            return PaymentProcessStatus.RELEASE
 
         return PaymentProcessStatus.FAILURE
 
@@ -2423,7 +2456,7 @@ class AdvanceMerchantPayout(TimeStampedModel):
                 adv_amt_obj = AdvanceMerchantAmount.objects.filter(merchant_id=mp.paid_to_id).first()
                 if adv_amt_obj and adv_amt_obj.amount:
                     adv_amt_obj.amount = decimal.Decimal(adv_amt_obj.amount) + mp.payable_amount
-                    adv_amt_obj.total_amount = decimal.Decimal(adv_amt_obj.amount) + mp.payable_amount
+                    adv_amt_obj.total_amount = decimal.Decimal(adv_amt_obj.total_amount) + mp.payable_amount
                 else:
                     adv_amt_obj = AdvanceMerchantAmount(merchant_id=mp.paid_to_id)
                     adv_amt_obj.amount = mp.payable_amount

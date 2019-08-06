@@ -4053,7 +4053,7 @@ class HospitalViewSet(viewsets.GenericViewSet):
         if entity:
             breadcrumb = deepcopy(entity.breadcrumb) if isinstance(entity.breadcrumb, list) else []
             breadcrumb.insert(0, {"title": "Home", "url": "/", "link_title": "Home"})
-            breadcrumb.insert(1, {"title": "Hospitals", "url": "hospitals", "link_title": "Hospitals"})
+            breadcrumb.insert(1, {"title": "Hospitals in India", "url": "hospitals", "link_title": "Hospitals in India"})
             locality = entity.sublocality_value
             city = entity.locality_value
             url = entity.url
@@ -4119,7 +4119,7 @@ class HospitalViewSet(viewsets.GenericViewSet):
                 Point(float(long),
                       float(lat)),
                 D(m=max_distance))).annotate(
-            distance=Distance('location', pnt)).order_by('distance')
+            distance=Distance('location', pnt)).order_by('-is_ipd_hospital', 'distance')
         if provider_ids:
             hospital_queryset = hospital_queryset.filter(health_insurance_providers__id__in=provider_ids)
         if ipd_pk:
@@ -4222,7 +4222,7 @@ class HospitalViewSet(viewsets.GenericViewSet):
             response['url'] = entity.url
             if entity.breadcrumb:
                 breadcrumb = [{'url': '/', 'title': 'Home', 'link_title': 'Home'}
-                    , {"title": "Hospitals", "url": "hospitals", "link_title": "Hospitals"}
+                    , {"title": "Hospitals in India", "url": "hospitals", "link_title": "Hospitals in India"}
                               ]
                 if entity.locality_value:
                     # breadcrumb.append({'url': request.build_absolute_uri('/'+ entity.locality_value), 'title': entity.locality_value, 'link_title': entity.locality_value})
@@ -4232,7 +4232,7 @@ class HospitalViewSet(viewsets.GenericViewSet):
                 response['breadcrumb'] = breadcrumb
             else:
                 breadcrumb = [{'url': '/', 'title': 'Home', 'link_title': 'Home'},
-                              {"title": "Hospitals", "url": "hospitals", "link_title": "Hospitals"},
+                              {"title": "Hospitals in India", "url": "hospitals", "link_title": "Hospitals in India"},
                               {'title': hospital_obj.name, 'url': None, 'link_title': None}]
                 response['breadcrumb'] = breadcrumb
 
@@ -4519,7 +4519,7 @@ class IpdProcedureViewSet(viewsets.GenericViewSet):
         alphabet = request.query_params.get('alphabet')
         city = request.query_params.get('city')
         if city:
-            city_match(city)
+            city = city_match(city)
         if not alphabet or not re.match(r'^[a-zA-Z]$', alphabet):
             return Response(status=status.HTTP_400_BAD_REQUEST)
         response = {}
