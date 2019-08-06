@@ -1,6 +1,7 @@
 from ondoc.articles.models import MedicineSpecialization
 from ondoc.doctor.models import PracticeSpecialization
 import random
+from django.conf import settings
 
 
 class ArticleFooterWidget():
@@ -21,12 +22,13 @@ class ArticleFooterWidget():
 
     @property
     def doctor_appointment_widget(self):
+        medicine_top_specializations = [int(i) for i in settings.MEDICINE_TOP_SPECIALIZATIONS]
         top_specializations = {
-            "Obstetrician & Gynecologist": 363,
-            "Dermatologist": 291,
-            "Orthopedist": 414,
-            "Dentist": 279,
-            "General Physician": 329
+            "Obstetrician & Gynecologist": medicine_top_specializations[0],
+            "Dermatologist": medicine_top_specializations[1],
+            "Orthopedist": medicine_top_specializations[2],
+            "Dentist": medicine_top_specializations[3],
+            "General Physician": medicine_top_specializations[4]
         }
 
         resp = dict()
@@ -49,7 +51,8 @@ class ArticleFooterWidget():
                     article_specializations[specialization.name] = specialization.id
 
                 for ts_key in top_specializations.keys():
-                    article_specializations[ts_key] = top_specializations[ts_key]
+                    if not top_specializations[ts_key] in ms_specialization_ids:
+                        article_specializations[ts_key] = top_specializations[ts_key]
 
                     if len(article_specializations) >= specializations_to_show:
                         break
@@ -68,12 +71,13 @@ class ArticleFooterWidget():
     @property
     def lab_test_widget(self):
         resp = dict()
+        medicine_top_tests = [int(i) for i in settings.MEDICINE_TOP_TESTS]
         top_tests = {
-            "Ultrasound whole abdomen": 11554,
-            "CBC Hemogram": 9333,
-            "Lipid Profile": 10809,
-            "Thyroid Profile": 11359,
-            "Liver function test": 10815
+            "Ultrasound whole abdomen": medicine_top_tests[0],
+            "CBC Hemogram": medicine_top_tests[1],
+            "Lipid Profile": medicine_top_tests[2],
+            "Thyroid Profile": medicine_top_tests[3],
+            "Liver function test": medicine_top_tests[4]
         }
         title = "Book lab tests"
         discount = "50% off"
