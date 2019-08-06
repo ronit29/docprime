@@ -656,3 +656,16 @@ class EConsultListSerializer(serializers.ModelSerializer):
         fields = ('id', 'doctor_name', 'doctor_id', 'patient_id', 'patient_name', 'fees', 'validity', 'payment_status',
                         'created_at', 'link', 'status')
 
+
+class EConsultSerializer(serializers.Serializer):
+    id = serializers.IntegerField(min_value=1)
+
+    def validate(self, attrs):
+        consult_id = attrs['id']
+        consultation = provider_models.EConsultation.objects.filter(id=consult_id,
+                                                                    status__in=[provider_models.EConsultation.BOOKED,
+                                                                                provider_models.EConsultation.CREATED])
+        if not consultation:
+            raise serializers.ValidationError('Valid consultation not found for given id')
+        attrs['consultation'] = consultation
+        return attrs
