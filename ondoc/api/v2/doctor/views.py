@@ -1126,7 +1126,8 @@ class PartnerEConsultationViewSet(viewsets.GenericViewSet):
         serializer.is_valid(raise_exception=True)
         valid_data = serializer.validated_data
         e_obj = prov_models.EConsultation(doctor=valid_data['doctor_obj'], created_by=request.user,
-                                  fees=valid_data['fees'], validity=valid_data.get('validity', None))
+                                          fees=valid_data['fees'], validity=valid_data.get('validity', None),
+                                          status=prov_models.EConsultation.CREATED)
         if valid_data.get('offline_p') and valid_data['offline_p']:
             e_obj.offline_patient = valid_data['patient_obj']
         else:
@@ -1139,19 +1140,20 @@ class PartnerEConsultationViewSet(viewsets.GenericViewSet):
     def list(self, request):
         id = request.query_params.get('id')
         queryset = prov_models.EConsultation.objects.select_related('doctor', 'offline_patient', 'online_patient')\
-                                                    .filter(created_by=request.user).all()
+                                                    .filter(created_by=request.user)\
+                                                    .exclude(status__in=[prov_models.EConsultation.CANCELLED,
+                                                                         prov_models.EConsultation.COMPLETED,
+                                                                         prov_models.EConsultation.EXPIRED])
         if id:
             queryset = queryset.filter(id=id)
         serializer = serializers.EConsultListSerializer(queryset, context={'request': request}, many=True)
         return Response(serializer.data)
 
     def share(self, request):
-        consult_id = request.query_params.get('id')
-        if not consult_id:
-            return Response({"status": 0, "error": "Consultation ID not provided"}, status=status.HTTP_400_BAD_REQUEST)
-        consultation = prov_models.EConsultation.objects.filter(id=consult_id).first()
-        if not consultation:
-            return Response({"status": 0, "error": "Consultation not Found"}, status=status.HTTP_404_NOT_FOUND)
+        serializer = serializers.EConsultSerializer(data=request.query_params)
+        serializer.is_valid(raise_exception=True)
+        valid_data = serializer.validated_data
+        consultation = valid_data['consultation']
         if not consultation.link:
             return Response({"status": 0, "error": "Consultation Link not Found"}, status=status.HTTP_404_NOT_FOUND)
         if consultation.offline_patient:
@@ -1170,3 +1172,16 @@ class PartnerEConsultationViewSet(viewsets.GenericViewSet):
             logger.error(str(e))
             return Response({"status": 0, "message": "Error updating invoice - " + str(e)}, status.HTTP_400_BAD_REQUEST)
         return Response({"status": 1, "message": "e-consultation link shared"})
+
+    def complete(self, request):
+        serializer = serializers.EConsultSerializer(data=request.query_params)
+        serializer.is_valid(raise_exception=True)
+        valid_data = serializer.validated_data
+        consultation = valid_data['consultation']
+        consultation.status = prov_models.EConsultation.COMPLETED
+        try:
+            consultation.save()
+        except Exception as e:
+            logger.error('Error changing the status of EConsultation to completed - ' + str(e))
+            return Response({'status': 0, 'message': 'Error changing the status of EConsultation to completed - ' + str(e)})
+        return Response({'status': 1, 'message': 'EConsultation completed successfully'})
