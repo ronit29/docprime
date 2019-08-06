@@ -1,3 +1,5 @@
+import copy
+
 from django.contrib.gis.db import models
 from django.contrib.contenttypes.fields import GenericForeignKey
 from django.contrib.contenttypes.models import ContentType
@@ -692,6 +694,22 @@ class EntityUrls(TimeStampedModel):
     def __str__(self):
         return self.url
 
+    def save(self, *args, **kwargs):
+        database_instance = None
+        if self.is_valid and self.sitemap_identifier == self.SitemapIdentifier.HOSPITAL_PAGE:
+            if self.id:
+                database_instance = self.__class__.objects.filter(pk=self.id).first()
+            if database_instance:
+                if database_instance.url != self.url:
+                    data = dict(database_instance.__dict__)
+                    data.pop('id', None)
+                    data.pop('_state', None)
+                    data.pop('is_valid', None)
+                    data = copy.deepcopy(data)
+                    data['is_valid'] = False
+                    temp_instance = EntityUrls(**data)
+                    temp_instance.save()
+        super().save(*args, **kwargs)
 
     @property
     def additional_info(self):
