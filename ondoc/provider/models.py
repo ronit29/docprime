@@ -34,8 +34,8 @@ class EConsultation(auth_models.TimeStampedModel, auth_models.CreatedByModel):
     merchant_payout = models.ForeignKey(acct_mdoels.MerchantPayout, related_name="econsultations", on_delete=models.SET_NULL, null=True)
 
     @classmethod
-    def update_consultation(cls, data):
-        pass
+    def update_consultation(self, data):
+        self.payment_status = self.PAYMENT_ACCEPTED
 
     def __str__(self):
         return str(self.id)

@@ -1197,7 +1197,7 @@ class ConsumerEConsultationViewSet(viewsets.GenericViewSet):
         user = request.user
         data = request.data
 
-        consult_id = data.get('id')
+        consult_id = data.get('consult_id')
         if not consult_id:
             return Response({"error": "Consultation ID not provided"}, status=status.HTTP_400_BAD_REQUEST)
         consultation = prov_models.EConsultation.objects.select_related('offline_patient', 'online_patient').filter(id=consult_id).first()
@@ -1248,9 +1248,9 @@ class ConsumerEConsultationViewSet(viewsets.GenericViewSet):
 
         action = Order.PROVIDER_ECONSULT_PAY
         profile = consultation.online_patient if consultation.online_patient else consultation.offline_patient
-        action_data = {"user": user.id, "extra_details": details, "doc": consultation.doctor, "coupon": data.get('coupon'),
-                       "effective_price": float(amount_to_paid), "profile": profile, "validity": consultation.validity,
-                       "price": float(amount), "cashback": float(cashback_amount), "coupon_data": consultation.coupon_data}
+        action_data = {"user": user.id, "extra_details": details, "doc_id": consultation.doctor.id, "coupon": data.get('coupon'),
+                       "effective_price": float(amount_to_paid), "profile": str(profile.id), "validity": consultation.validity,
+                       "price": float(amount), "cashback": float(cashback_amount)}
 
         pg_order = Order.objects.create(
             amount=float(amount_to_paid),

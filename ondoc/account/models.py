@@ -749,7 +749,7 @@ class Order(TimeStampedModel):
             except Exception as e:
                 logger.error(str(e))
 
-        if not opd_appointment_ids and not lab_appointment_ids and not insurance_ids and not user_plan_ids:
+        if not opd_appointment_ids and not lab_appointment_ids and not insurance_ids and not user_plan_ids and not econsult_ids:
             raise Exception("Could not process entire order")
 
         # mark order processed:
