@@ -97,6 +97,10 @@ class LoginOTP(GenericViewSet):
         data = serializer.validated_data
         phone_number = data['phone_number']
 
+        otp_obj = OtpVerifications.objects.filter(phone_number=phone_number).order_by('-id').first()
+        if data.get('via_whatsapp', False) and otp_obj and not otp_obj.can_send():
+            return Response({'success': False})
+
         blocked_state = BlacklistUser.get_state_by_number(phone_number, BlockedStates.States.LOGIN)
         if blocked_state:
             return Response({'error': blocked_state.message}, status=status.HTTP_400_BAD_REQUEST)
@@ -1224,7 +1228,7 @@ class TransactionViewSet(viewsets.GenericViewSet):
 
             # log pg data
             try:
-                args = {'order_id': response.get("orderId"), 'status_code': pg_resp_code}
+                args = {'order_id': response.get("orderId"), 'status_code': pg_resp_code, 'source': response.get("source")}
                 status_type = PaymentProcessStatus.get_status_type(pg_resp_code, response.get('txStatus'))
 
                 PgLogs.objects.create(decoded_response=response, coded_response=coded_response)
@@ -1397,11 +1401,11 @@ class TransactionViewSet(viewsets.GenericViewSet):
                     ", order id - {}.".format(booking_type, order_obj.user.id, order_obj.user.phone_number, order_obj.id)
 
         # Push the order failure case to matrix.
-
-        push_order_to_matrix.apply_async(({'order_id': order_obj.id},), countdown=5)
+        # push_order_to_matrix.apply_async(({'order_id': order_obj.id},), countdown=5)
 
         for email in settings.ORDER_FAILURE_EMAIL_ID:
             EmailNotification.publish_ops_email(email, html_body, 'Payment failure for order')
+
 
 class UserTransactionViewSet(viewsets.GenericViewSet):
     serializer_class = serializers.UserTransactionModelSerializer
@@ -2223,7 +2227,8 @@ class TokenFromUrlKey(viewsets.GenericViewSet):
 
 class ProfileEmailUpdateViewset(viewsets.GenericViewSet):
     authentication_classes = (JWTAuthentication, )
-    permission_classes = (IsAuthenticated, IsNotAgent)
+    # permission_classes = (IsAuthenticated, IsNotAgent)
+    permission_classes = (IsAuthenticated, )
 
     def create(self, request):
         request_data = request.data

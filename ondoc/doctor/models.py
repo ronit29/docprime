@@ -287,6 +287,7 @@ class Hospital(auth_model.TimeStampedModel, auth_model.CreatedByModel, auth_mode
     @staticmethod
     def get_top_hospitals_data(request, lat=28.450367, long=77.071848):
         from ondoc.api.v1.doctor.serializers import TopHospitalForIpdProcedureSerializer
+        from ondoc.seo.models import NewDynamic
         result = []
         queryset = CommonHospital.objects.all().values_list('hospital', 'network')
         top_hospital_ids = list(set([x[0] for x in queryset if x[0] is not None]))
@@ -323,9 +324,16 @@ class Hospital(auth_model.TimeStampedModel, auth_model.CreatedByModel, auth_mode
         hosp_entity_dict, hosp_locality_entity_dict = Hospital.get_hosp_and_locality_dict(temp_hospital_ids,
                                                                                           EntityUrls.SitemapIdentifier.HOSPITALS_LOCALITY_CITY)
 
+        entity_queryset = EntityUrls.objects.filter(is_valid=True, sitemap_identifier=EntityUrls.SitemapIdentifier.HOSPITAL_PAGE,
+                                                    entity_id__in = temp_hospital_ids)
+        entity_queryset_dict = {x.entity_id: x for x in entity_queryset}
+        all_entity_urls = list(set([x.url for x in entity_queryset]))
+        new_dynamic_qs = NewDynamic.objects.filter(url_value__in=all_entity_urls)
+        new_dynamic_dict = {x.url_value: x for x in new_dynamic_qs}
         result = TopHospitalForIpdProcedureSerializer(hosp_queryset, many=True, context={'request': request,
                                                                                          'hosp_entity_dict': hosp_entity_dict,
-                                                                                         'hosp_locality_entity_dict': hosp_locality_entity_dict}).data
+                                                                                         'hosp_locality_entity_dict': hosp_locality_entity_dict,
+                                                                                         'new_dynamic_dict':new_dynamic_dict}).data
         return result
 
 
@@ -2380,6 +2388,11 @@ class OpdAppointment(auth_model.TimeStampedModel, CouponsMixin, OpdAppointmentIn
                 mime_type = get_file_mime_type(file)
                 file_url = pf.name.url
                 resp.append({"url": file_url, "type": mime_type})
+
+        for pres in self.eprescription.all():
+            file = pres.prescription_file
+            resp.append({"url": file.url, "type": get_file_mime_type(file)})
+
         return resp
 
 
@@ -3140,7 +3153,7 @@ class OpdAppointment(auth_model.TimeStampedModel, CouponsMixin, OpdAppointmentIn
         insurance_id = None
         user_insurance = UserInsurance.objects.filter(user=user).last()
         if user_insurance and user_insurance.is_valid():
-            is_appointment_insured, insurance_id, insurance_message = user_insurance.validate_doctor_insurance(data, user_insurance)
+            is_appointment_insured, insurance_id, insurance_message = user_insurance.validate_doctor_insurance(data)
 
         if is_appointment_insured and cart_data.get('is_appointment_insured', None):
             payment_type = OpdAppointment.INSURANCE

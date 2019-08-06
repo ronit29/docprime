@@ -1,6 +1,8 @@
 from django.contrib.contenttypes.models import ContentType
 from django.contrib.gis.geos import GEOSGeometry
 from django.db import transaction
+from django.db.models import F, CharField, Value
+from django.db.models.functions import Concat
 from django_extensions.db.fields import json
 from ondoc.doctor.models import DoctorPracticeSpecialization, PracticeSpecialization
 from ondoc.location import models as location_models
@@ -795,6 +797,23 @@ class SearchUrlsViewSet(viewsets.GenericViewSet):
         # return Response({"cities": result})
 
         return Response(sql_urls)
+
+    def list_localities_for_hospitals(self, request):
+        city = request.query_params.get('city')
+        if not city:
+            return Response(status=status.HTTP_400_BAD_REQUEST)
+
+        entity = location_models.EntityUrls.objects.filter(locality_value__iexact=city, is_valid=True,
+                                                           sitemap_identifier=location_models.EntityUrls.SitemapIdentifier.HOSPITALS_LOCALITY_CITY).order_by(
+            '-count').values('url', name=Concat(Value('Hospitals in '), F('sublocality_value'), output_field=CharField()))
+        entity_city = location_models.EntityUrls.objects.filter(locality_value__iexact=city, is_valid=True,
+                                                                sitemap_identifier=location_models.EntityUrls.SitemapIdentifier.HOSPITALS_CITY).order_by(
+            '-count').values('url', name=Concat(Value('Hospitals in '), F('locality_value'), output_field=CharField())).first()
+
+        if not entity_city or not entity:
+            return Response(status=status.HTTP_400_BAD_REQUEST)
+
+        return Response({'name': entity_city.get('name'), 'url': entity_city.get('url'), 'result': entity})
 
     def list_urls_by_city(self, request, city):
         if not city:
