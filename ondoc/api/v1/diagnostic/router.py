@@ -61,5 +61,4 @@ urlpatterns = [
     path('compare_lab_packages_by_url', CompareLabPackagesViewSet.as_view({'post': 'retrieve_by_url'}), name='lab_packages_comparison_by_url'),
     # path('digital/report/<int:booking_id>', DigitalReports.as_view({'get': 'retrieve'}), name='digital_report'),
     path('lab-test-category-landing-urls', LabTestCategoryLandingUrlViewSet.as_view({'get': 'category_landing_url'}), name='lab_test_category_landing_urls'),
-
 ]
