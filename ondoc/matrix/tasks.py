@@ -1308,3 +1308,48 @@ def check_for_ipd_lead_validity(self, data):
         obj.validate_lead()
     except Exception as e:
         pass
+
+
+@task(bind=True, max_retries=2)
+def push_appointment_to_spo(self, data):
+    from ondoc.diagnostic.models import LabAppointment
+    try:
+        appointment_id = data.get('appointment_id', None)
+        if not appointment_id:
+            raise Exception("Appointment id not found, could not push to Matrix")
+
+        product_id = data.get('product_id')
+        sub_product_id = data.get('sub_product_id')
+
+        order_product_id = 2
+        appointment = LabAppointment.objects.filter(pk=appointment_id).first()
+        if not appointment:
+            raise Exception("Appointment could not found against id - " + str(appointment_id))
+
+        appointment_order = Order.objects.filter(product_id=order_product_id, reference_id=appointment_id).first()
+        # request_data = appointment.get_matrix_data(appointment_order, product_id, sub_product_id)
+        request_data = appointment.get_spo_data(appointment_order, product_id, sub_product_id)
+
+        url = settings.SPO_LEAD_URL
+        spo_api_token = settings.SPO_AUTH_TOKEN
+        response = requests.post(url, data=json.dumps(request_data), headers={'Authorization': spo_api_token,
+                                                                              'Content-Type': 'application/json'})
+
+        if response.status_code != status.HTTP_200_OK or not response.ok:
+            logger.error(json.dumps(request_data))
+            logger.info("[ERROR] Appointment could not be published to the SPO system")
+            logger.info("[ERROR] %s", response.reason)
+
+            countdown_time = (2 ** self.request.retries) * 60 * 10
+            logging.error("Appointment sync with the SPO System failed with response - " + str(response.content))
+            print(countdown_time)
+            self.retry([data], countdown=countdown_time)
+
+        resp_data = response.json()
+
+        if not resp_data.get('Id', None):
+            logger.error(json.dumps(request_data))
+            raise Exception("[ERROR] Id not recieved from the matrix while pushing appointment lead.")
+
+    except Exception as e:
+        logger.error("Error in Celery. Failed pushing Appointment to the SPO- " + str(e))

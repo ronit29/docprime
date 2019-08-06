@@ -53,7 +53,7 @@ from django.contrib.contenttypes.fields import GenericRelation
 from django.contrib.contenttypes.fields import GenericForeignKey
 from django.contrib.contenttypes.models import ContentType
 from ondoc.matrix.tasks import push_appointment_to_matrix, push_onboarding_qcstatus_to_matrix, \
-    create_ipd_lead_from_lab_appointment
+    create_ipd_lead_from_lab_appointment, push_appointment_to_spo
 from ondoc.integrations.task import push_lab_appointment_to_integrator, get_integrator_order_status
 from ondoc.location import models as location_models
 from ondoc.ratings_review import models as ratings_models
@@ -1850,6 +1850,12 @@ class LabAppointment(TimeStampedModel, CouponsMixin, LabAppointmentInvoiceMixin,
         else:
             return False
 
+    def booked_by_spo(self):
+        if self.spo_data:
+            return True
+
+        return False
+
     def app_commit_tasks(self, old_instance, push_to_matrix, push_to_integrator):
         if old_instance is None:
             try:
@@ -1865,6 +1871,13 @@ class LabAppointment(TimeStampedModel, CouponsMixin, LabAppointmentInvoiceMixin,
                       'sub_product_id': 2},), countdown=5)
             except Exception as e:
                 logger.error(str(e))
+
+            if self.booked_by_spo:
+                try:
+                    push_appointment_to_spo.apply_async(({'type': 'LAB_APPOINTMENT', 'appointment_id': self.id, 'product_id': 5,
+                                                        'sub_product_id': 2},), countdown=5)
+                except Exception as e:
+                    logger.error(str(e))
 
         is_thyrocare_enabled = False
         if not self.created_by_native():
@@ -2824,6 +2837,26 @@ class LabAppointment(TimeStampedModel, CouponsMixin, LabAppointmentInvoiceMixin,
                 result['dob'] = default_user_profile.dob
         result['data'] = {'lab_appointment_id': self.id}
         return result
+
+    def get_spo_data(self, order, product_id, sub_product_id):
+
+        appointment_details = self.get_matrix_appointment_data(order)
+        appointment_details['DocPrimeUserId'] = self.user.id
+        appointment_details['LeadID'] = self.matrix_lead_id if self.matrix_lead_id else 0
+        appointment_details['Name'] = self.profile.name
+        appointment_details['PrimaryNo'] = self.user.phone_number
+        appointment_details['LeadSource'] = 'DocPrime'
+        appointment_details['EmailId'] = self.profile.email
+        appointment_details['Gender'] = 1 if self.profile.gender == 'm' else 2 if self.profile.gender == 'f' else 0
+        appointment_details['CityId'] = 0
+        appointment_details['ProductId'] = product_id
+        appointment_details['SubProductId'] = sub_product_id
+        appointment_details['UtmTerm'] = self.spo_data.get('utm_term', '')
+        appointment_details['UtmMedium'] = self.spo_data.get('utm_medium', '')
+        appointment_details['UtmCampaign'] = self.spo_data.get('utm_campaign', '')
+        appointment_details['UtmSource'] = self.spo_data.get('utm_source', '')
+
+        return appointment_details
 
     def __str__(self):
         return "{}, {}".format(self.profile.name if self.profile else "", self.lab.name)
