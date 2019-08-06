@@ -1918,7 +1918,6 @@ class DoctorListViewSet(viewsets.GenericViewSet):
                                                                                                          'name').first()
 
         similar_specializations = list()
-        similar_spec_department = list()
         if validated_data.get('specialization_ids') and len(validated_data.get('specialization_ids')) == 1:
             spec = PracticeSpecialization.objects.filter(id=validated_data['specialization_ids'][0]).first()
             department_spec_list = list()
@@ -1929,7 +1928,6 @@ class DoctorListViewSet(viewsets.GenericViewSet):
                     if department_spec_mapping:
                         department_spec_list.extend(department_spec_mapping.values_list('specialization', flat=True))
                     departent_ids_list.append(department.id)
-                    similar_spec_department.append({'department_id': department.id, 'department_name': department.name})
             if department_spec_list:
                 department_spec_list = set(department_spec_list)
                 doctors = Doctor.objects.prefetch_related("doctor_clinics", "doctor_clinics__hospital",
@@ -1962,8 +1960,7 @@ class DoctorListViewSet(viewsets.GenericViewSet):
                          'bottom_content': bottom_content, 'canonical_url': canonical_url,
                          'ipd_procedures': ipd_procedures, 'hospital': hospital_req_data,
                          'specialization_groups': specialization_groups,
-                         'similar_specializations': similar_specializations,
-                         'similar_specialization_department': similar_spec_department})
+                         'similar_specializations': similar_specializations})
 
     def get_schema(self, request, response):
 
