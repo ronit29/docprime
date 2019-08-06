@@ -44,7 +44,8 @@ from ondoc.procedure.models import Procedure, ProcedureCategory, CommonProcedure
 from ondoc.subscription_plan.models import Plan, PlanFeature, UserPlanMapping
 from .common import Cities, CitiesAdmin, MatrixCityMapping, MatrixCityAdmin, MerchantAdmin, MerchantPayoutAdmin, \
     PaymentOptionsAdmin, MatrixMappedStateAdmin, MatrixMappedCityAdmin, GlobalNonBookableAdmin, UserConfigAdmin, \
-    BlacklistUserAdmin, BlockedStatesAdmin, MerchantPayoutBulkProcessAdmin, AdvanceMerchantPayoutAdmin, AdvanceMerchantAmountAdmin
+    BlacklistUserAdmin, BlockedStatesAdmin, MerchantPayoutBulkProcessAdmin, AdvanceMerchantPayoutAdmin, \
+    AdvanceMerchantAmountAdmin
 from .lead import HospitalLeadAdmin, DoctorLeadAdmin, SearchLeadAdmin
 from .doctor import (DoctorAdmin, MedicalServiceAdmin, SpecializationAdmin, QualificationAdmin, LanguageAdmin,
                      CollegeAdmin, MedicalConditionAdmin, HealthTipAdmin, DoctorClinicAdmin,
