@@ -2079,20 +2079,35 @@ class MerchantPayout(TimeStampedModel):
             if all_txn:
                 return all_txn[0].order_no
 
+    def get_order_id(self):
+        order_id = None
+        appointment = self.get_appointment()
+        if not appointment:
+            return None
+        order_data = Order.objects.filter(reference_id=appointment.id).order_by('-id').first()
+        if order_data:
+            order_id = order_data.id
+
+        return order_id
+
     def update_status_from_pg(self):
+        from ondoc.account.mongo_models import PgLogs as PgLogsMongo
         with transaction.atomic():
             # if self.pg_status=='SETTLEMENT_COMPLETED' or self.utr_no or self.type ==self.MANUAL:
             #     return
 
             order_no = None
+            order_id = None
             url = settings.SETTLEMENT_DETAILS_API
             if self.is_insurance_premium_payout():
                 txn = self.get_insurance_premium_transactions()
                 if txn:
                     order_no = txn[0].order_no
+                    order_id = txn[0].order_id
 
             else:
                 order_no = self.get_pg_order_no()
+                order_id = self.get_order_id()
 
             if order_no:
                 req_data = {"orderNo": order_no}
@@ -2101,6 +2116,8 @@ class MerchantPayout(TimeStampedModel):
                 headers = {"auth": settings.SETTLEMENT_AUTH, "Content-Type": "application/json"}
 
                 response = requests.post(url, data=json.dumps(req_data), headers=headers)
+                if order_id:
+                    save_pg_response.apply_async((PgLogsMongo.PAYOUT_SETTLEMENT_DETAIL, order_no, None, response.json(), req_data,), eta=timezone.localtime(),)
                 if response.status_code == status.HTTP_200_OK:
                     resp_data = response.json()
                     self.status_api_response = resp_data

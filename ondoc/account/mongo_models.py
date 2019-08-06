@@ -21,6 +21,7 @@ class PgLogs(DynamicDocument, TimeStampedModel):
     TXN_RELEASED = 4
     DUMMY_TXN = 5
     PAYOUT_PROCESS = 6
+    PAYOUT_SETTLEMENT_DETAIL = 7
 
     ECONSULT_ORDER_REQUEST = 8
 
