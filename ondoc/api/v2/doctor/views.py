@@ -23,7 +23,7 @@ from ondoc.procedure.models import Procedure
 from django.contrib.auth import get_user_model
 from django.conf import settings
 import datetime, logging, re, random, jwt, os, hashlib
-import json
+import json, decimal
 from django.utils import timezone
 
 from ondoc.diagnostic.models import LabAppointment
@@ -1188,13 +1188,94 @@ class ConsumerEConsultationViewSet(viewsets.GenericViewSet):
         serializer = serializers.EConsultListSerializer(queryset, context={'request': request}, many=True)
         return Response(serializer.data)
 
-    def pay(self, request):
-        consult_id = request.query_params.get('id')
+    @classmethod
+    @transaction.atomic()
+    def create_order(self, request):
+        from ondoc.notification.tasks import save_pg_response
+        from ondoc.account.mongo_models import PgLogs
+        from ondoc.account.models import ConsumerAccount, Order
+        user = request.user
+        data = request.data
+
+        consult_id = data.get('id')
         if not consult_id:
             return Response({"error": "Consultation ID not provided"}, status=status.HTTP_400_BAD_REQUEST)
-        consultation = prov_models.EConsultation.objects.filter(id=consult_id).first()
+        consultation = prov_models.EConsultation.objects.select_related('offline_patient', 'online_patient').filter(id=consult_id).first()
         if not consultation:
             return Response({"error": "Consultation not Found"}, status=status.HTTP_404_NOT_FOUND)
 
-        return Response({})
+        if user and user.is_anonymous:
+            return Response({"status": 0}, status.HTTP_401_UNAUTHORIZED)
+
+        save_pg_response.apply_async((PgLogs.ECONSULT_ORDER_REQUEST, None, None, None, consult_id, user.id),
+                                     eta=timezone.localtime(), )
+
+        doc = consultation.doctor
+        use_wallet = data.get('use_wallet', True)
+        amount = consultation.fees
+        # promotional_amount = data.get('promotional_amount', 0)
+        error = False
+        resp = {}
+        details = {}
+        process_immediately = False
+        product_id = Order.PROVIDER_ECONSULT_PRODUCT_ID
+
+        consumer_account = ConsumerAccount.objects.get_or_create(user=user)
+        consumer_account = ConsumerAccount.objects.select_for_update().get(user=user)
+
+        wallet_balance = consumer_account.balance
+        cashback_balance = consumer_account.cashback
+        total_balance = wallet_balance + cashback_balance
+
+        amount_to_paid = amount
+
+        if use_wallet and total_balance >= amount:
+            cashback_amount = min(cashback_balance, amount_to_paid)
+            wallet_amount = max(0, amount_to_paid - cashback_amount)
+            amount_to_paid = max(0, amount_to_paid - total_balance)
+            process_immediately = True
+        elif use_wallet and total_balance < amount:
+            cashback_amount = min(amount_to_paid, cashback_balance)
+            wallet_amount = 0
+            if cashback_amount < amount_to_paid:
+                wallet_amount = min(wallet_balance, amount_to_paid - cashback_amount)
+            amount_to_paid = max(0, amount_to_paid - total_balance)
+            process_immediately = False
+        else:
+            cashback_amount = 0
+            wallet_amount = 0
+            process_immediately = False
+
+        action = Order.PROVIDER_ECONSULT_PAY
+        profile = consultation.online_patient if consultation.online_patient else consultation.offline_patient
+        action_data = {"user": user.id, "extra_details": details, "doc": consultation.doctor, "coupon": data.get('coupon'),
+                       "effective_price": float(amount_to_paid), "profile": profile, "validity": consultation.validity,
+                       "price": float(amount), "cashback": float(cashback_amount), "coupon_data": consultation.coupon_data}
+
+        pg_order = Order.objects.create(
+            amount=float(amount_to_paid),
+            action=action,
+            action_data=action_data,
+            wallet_amount=wallet_amount,
+            cashback_amount=cashback_amount,
+            payment_status=Order.PAYMENT_PENDING,
+            user=user,
+            product_id=product_id
+        )
+
+        if process_immediately:
+            consultation_ids = pg_order.process_pg_order()
+            resp["status"] = 1
+            resp["payment_required"] = False
+            resp["data"] = {
+                "orderId": pg_order.id,
+                "type": consultation_ids.get("type", "econsult"),
+                "id": consultation_ids.get("id", None)
+            }
+        else:
+            resp["status"] = 1
+            resp['data'], resp["payment_required"] = v1_utils.payment_details(request, pg_order)
+
+        return Response(resp, status=status.HTTP_200_OK)
+
 

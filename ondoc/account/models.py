@@ -44,6 +44,8 @@ class Order(TimeStampedModel):
     LAB_APPOINTMENT_CREATE = 4
     INSURANCE_CREATE = 5
     SUBSCRIPTION_PLAN_BUY = 6
+
+    PROVIDER_ECONSULT_PAY = 8
     PAYMENT_ACCEPTED = 1
     PAYMENT_PENDING = 0
     PAYMENT_FAILURE = 3
@@ -61,6 +63,7 @@ class Order(TimeStampedModel):
     LAB_PRODUCT_ID = 2
     INSURANCE_PRODUCT_ID = 3
     SUBSCRIPTION_PLAN_PRODUCT_ID = 4
+
     PROVIDER_ECONSULT_PRODUCT_ID = 6
     PRODUCT_IDS = [(DOCTOR_PRODUCT_ID, "Doctor Appointment"), (LAB_PRODUCT_ID, "LAB_PRODUCT_ID"),
                    (INSURANCE_PRODUCT_ID, "INSURANCE_PRODUCT_ID"),(SUBSCRIPTION_PLAN_PRODUCT_ID, "SUBSCRIPTION_PLAN_PRODUCT_ID")]
@@ -188,10 +191,12 @@ class Order(TimeStampedModel):
     def process_order(self, convert_cod_to_prepaid=False):
         from ondoc.doctor.models import OpdAppointment
         from ondoc.diagnostic.models import LabAppointment
+        from ondoc.provider.models import EConsultation
         from ondoc.api.v1.doctor.serializers import OpdAppTransactionModelSerializer
         from ondoc.api.v1.diagnostic.serializers import LabAppTransactionModelSerializer
         from ondoc.api.v1.insurance.serializers import UserInsuranceSerializer
         from ondoc.api.v1.diagnostic.serializers import PlanTransactionModelSerializer
+        from ondoc.api.v2.doctor.serializers import EConsultTransactionModelSerializer
         from ondoc.subscription_plan.models import UserPlanMapping
         from ondoc.insurance.models import UserInsurance, InsuranceTransaction
 
@@ -238,6 +243,10 @@ class Order(TimeStampedModel):
             user_insurance_data = serializer.validated_data
         elif self.product_id == self.SUBSCRIPTION_PLAN_PRODUCT_ID:
             serializer = PlanTransactionModelSerializer(data=appointment_data)
+            serializer.is_valid(raise_exception=True)
+            appointment_data = serializer.validated_data
+        elif self.product_id == self.PROVIDER_ECONSULT_PRODUCT_ID:
+            serializer = EConsultTransactionModelSerializer(data=appointment_data)
             serializer.is_valid(raise_exception=True)
             appointment_data = serializer.validated_data
 
@@ -327,6 +336,14 @@ class Order(TimeStampedModel):
                     "reference_id": appointment_obj.id,
                     "payment_status": Order.PAYMENT_ACCEPTED
                 }
+        elif self.action == Order.PROVIDER_ECONSULT_PAY:
+            if total_balance >= appointment_data["effective_price"] or payment_not_required:
+                appointment_obj = EConsultation.update_consultation(appointment_data)
+                order_dict = {
+                    "reference_id": appointment_obj.id,
+                    "payment_status": Order.PAYMENT_ACCEPTED
+                }
+                amount = appointment_obj.effective_price
 
         if order_dict:
             self.update_order(order_dict)
@@ -650,6 +667,8 @@ class Order(TimeStampedModel):
         from ondoc.insurance.models import UserInsurance
         from ondoc.subscription_plan.models import UserPlanMapping
         from ondoc.insurance.models import InsuranceDoctorSpecializations
+
+        from ondoc.provider.models import EConsultation
         orders_to_process = []
         if self.orders.exists():
             orders_to_process = self.orders.all()
@@ -661,6 +680,8 @@ class Order(TimeStampedModel):
         lab_appointment_ids = []
         insurance_ids = []
         user_plan_ids = []
+
+        econsult_ids = []
         user = self.user
         user_insurance_obj = user.active_insurance
 
@@ -713,7 +734,7 @@ class Order(TimeStampedModel):
                 elif order.product_id == Order.SUBSCRIPTION_PLAN_PRODUCT_ID:
                     user_plan_ids.append(curr_app.id)
                 elif order.product_id == Order.PROVIDER_ECONSULT_PRODUCT_ID:
-                    user_plan_ids.append(curr_app.id)
+                    econsult_ids.append(curr_app.id)
 
                 total_cashback_used += curr_cashback
                 total_wallet_used += curr_wallet
@@ -751,12 +772,14 @@ class Order(TimeStampedModel):
             UserInsurance.objects.filter(id__in=insurance_ids).update(money_pool=money_pool)
         if user_plan_ids:
             UserPlanMapping.objects.filter(id__in=user_plan_ids).update(money_pool=money_pool)
+        if econsult_ids:
+            EConsultation.objects.filter(id__in=econsult_ids).update(money_pool=money_pool)
 
-        resp = { "opd" : opd_appointment_ids , "lab" : lab_appointment_ids, "plan": user_plan_ids,
-                 "insurance": insurance_ids, "type" : "all", "id" : None }
+        resp = {"opd": opd_appointment_ids , "lab": lab_appointment_ids, "plan": user_plan_ids,
+                 "insurance": insurance_ids, "econsultation": econsult_ids, "type": "all", "id": None }
         # Handle backward compatibility, in case of single booking, return the booking id
 
-        if (len(opd_appointment_ids) + len(lab_appointment_ids) + len(user_plan_ids) + len(insurance_ids)) == 1:
+        if (len(opd_appointment_ids) + len(lab_appointment_ids) + len(user_plan_ids) + len(insurance_ids) + len(econsult_ids)) == 1:
             result_type = "all"
             result_id = None
             if len(opd_appointment_ids) > 0:
@@ -771,6 +794,9 @@ class Order(TimeStampedModel):
             elif len(insurance_ids) > 0:
                 result_type = "insurance"
                 result_id = insurance_ids[0]
+            elif len(econsult_ids) > 0:
+                result_type = "econsultation"
+                result_id = econsult_ids[0]
             # resp["type"] = "doctor" if len(opd_appointment_ids) > 0 else "lab"
             # resp["id"] = opd_appointment_ids[0] if len(opd_appointment_ids) > 0 else lab_appointment_ids[0]
             resp["type"] = result_type

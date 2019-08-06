@@ -22,6 +22,8 @@ class PgLogs(DynamicDocument, TimeStampedModel):
     DUMMY_TXN = 5
     PAYOUT_PROCESS = 6
 
+    ECONSULT_ORDER_REQUEST = 8
+
     id = UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     order_id = LongField(null=True, blank=True, editable=False)
     pg_transaction_id = LongField(null=True, blank=True, editable=False)
