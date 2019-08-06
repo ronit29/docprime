@@ -100,7 +100,7 @@ class CommentSerializer(serializers.ModelSerializer):
 
     def get_author(self, obj):
         author_details = dict()
-        author_details['name'] = 'docprime'
+        author_details['name'] = obj.user_name if obj.user_name else 'Anonymous'
         author_details['experience'] = None
         author_details['profile_img'] = None
         author_details['speciality'] = None
