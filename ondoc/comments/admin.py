@@ -101,8 +101,8 @@ class CustomCommentsAdmin(CommentsAdminBase):
 
     def author(self, comment):
         if comment:
-            if comment.content_type and comment.content_type==ContentType.objects.get(model="hospital"):
-                return "docprime"
+            if comment.content_type and comment.content_type == ContentType.objects.get(model="hospital"):
+                return comment.user_name if comment and comment.user_name else 'Anonymous'
             elif comment.content_object and comment.content_object.author.id:
                 author = comment.content_object.author
                 author_id = author.id
