@@ -168,13 +168,14 @@ class Hospital(auth_model.TimeStampedModel, auth_model.CreatedByModel, auth_mode
     PHONE_RINGING_BUT_COULD_NOT_CONNECT = 10
     WELCOME_CALLING = 1
     ESCALATION = 2
+    INSURANCE = 3
     DISABLED_REASONS_CHOICES = (
         ("", "Select"), (INCORRECT_CONTACT_DETAILS, "Incorrect contact details"),
         (MOU_AGREEMENT_NEEDED, "MoU agreement needed"), (HOSPITAL_NOT_INTERESTED, "Hospital not interested for tie-up"),
         (CHARGES_ISSUES, "Issue in discount % / consultation charges"),
         (PHONE_RINGING_BUT_COULD_NOT_CONNECT, "Phone ringing but could not connect"),
         (DUPLICATE, "Duplicate"), (OTHERS, "Others (please specify)"))
-    DISABLED_AFTER_CHOICES = (("", "Select"), (WELCOME_CALLING, "Welcome Calling"), (ESCALATION, "Escalation"))
+    DISABLED_AFTER_CHOICES = (("", "Select"), (WELCOME_CALLING, "Welcome Calling"), (ESCALATION, "Escalation"), (INSURANCE, "INSURANCE"))
     AGENT = 1
     PROVIDER = 2
     SOURCE_TYPE_CHOICES = ((AGENT, "Agent"), (PROVIDER, "Provider"))
