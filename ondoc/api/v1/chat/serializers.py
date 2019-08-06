@@ -46,4 +46,4 @@ class ChatTransactionModelSerializer(serializers.Serializer):
     effective_price = serializers.DecimalField(max_digits=10, decimal_places=2)
     amount = serializers.DecimalField(max_digits=10, decimal_places=2)
     cashback = serializers.DecimalField(max_digits=10, decimal_places=2)
-    promotional_amount = serializers.DecimalField(max_digits=10, decimal_places=2, validators=[MinValueValidator(Decimal('0.01'))])
+    promotional_amount = serializers.DecimalField(max_digits=10, decimal_places=2, validators=[MinValueValidator(Decimal('0.00'))])
