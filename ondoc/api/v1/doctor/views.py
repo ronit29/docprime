@@ -2110,18 +2110,14 @@ class DoctorListViewSet(viewsets.GenericViewSet):
     def hosp_filtered_list(self, request, *args, **kwargs):
         if (request.query_params.get('procedure_ids') or request.query_params.get('procedure_category_ids')) \
                 and request.query_params.get('is_insurance'):
-            return Response({"result": [], "count": 0,
-                         'specializations': [], 'conditions': [], "seo": {},
-                         "breadcrumb": [], 'search_content': "",
-                         'procedures': [], 'procedure_categories': []})
+            return Response({"result": [], "count": 0})
 
         parameters = request.query_params
-        if kwargs.get("parameters"):
-            parameters = kwargs.get("parameters")
-        restrict_result_count = parameters.get('restrict_result_count', None)
         serializer = serializers.DoctorListSerializer(data=parameters, context={"request": request})
         serializer.is_valid(raise_exception=True)
         validated_data = serializer.validated_data
+        result_count = None
+        response = list()
 
         # Insurance check for logged in user
         logged_in_user = request.user
@@ -2152,26 +2148,25 @@ class DoctorListViewSet(viewsets.GenericViewSet):
             doctor_search_result = RawSql(query_string.get('query'),
                                          query_string.get('params')).fetch_all()
 
-            result_count = len(doctor_search_result)
-            # sa
-            # saved_search_result = models.DoctorSearchResult.objects.create(results=doctor_search_result,
-            #                                                                result_count=result_count)
         else:
             saved_search_result = get_object_or_404(models.DoctorSearchResult, pk=validated_data.get("search_id"))
-        doctor_ids = paginate_queryset([data.get("doctor_id") for data in doctor_search_result], request)
-        temp_hospital_ids = paginate_queryset([data.get("hospital_id") for data in doctor_search_result], request)
 
-        hosp_entity_dict, hosp_locality_entity_dict = Hospital.get_hosp_and_locality_dict(temp_hospital_ids,
-                                                                                          EntityUrls.SitemapIdentifier.DOCTORS_LOCALITY_CITY)
-        return Response({})
+        temp_hospital_ids = set(data.get("hospital_id") for data in doctor_search_result)
+        result_count = len(temp_hospital_ids)
+        hosp_entity = EntityUrls.objects.filter(is_valid=True,
+                                                        sitemap_identifier=EntityUrls.SitemapIdentifier.HOSPITAL_PAGE,
+                                                        entity_id__in=temp_hospital_ids)
+        entity_data = dict()
+        for data in hosp_entity:
+            entity_data[data.entity_id] = dict()
+            entity_data[data.entity_id]['url'] = data.url
 
+        hospitals = Hospital.objects.filter(id__in=temp_hospital_ids)
 
-        #
-        # if validated_data.get('hospital_id'):
-        #     hospital_req_data = Hospital.objects.filter(id__in=validated_data.get('hospital_id')).values('id', 'name').first()
-        #
-        # return Response({"result": response, "count": result_count,
-        #                  "breadcrumb": breadcrumb,  'hospital': hospital_req_data})
+        for data in hospitals:
+            response.append({'id':data.id, 'name': data.name, 'url': entity_data[data.id]['url']})
+
+        return Response({"result": response, "count": result_count})
 
 
 class DoctorAvailabilityTimingViewSet(viewsets.ViewSet):
