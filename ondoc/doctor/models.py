@@ -4538,12 +4538,3 @@ class SimilarSpecializationGroupMapping(models.Model):
 
     class Meta:
         db_table = "similar_specialization_group_mapping"
-
-
-class OpdFollowupAppointment(models.Model):
-    REGULAR = 1
-    FOLLOWUP = 2
-    FOLLOWUP_CHOICES = [(REGULAR, 'Regular'), (FOLLOWUP, 'Followup')]
-    appointment = models.ForeignKey(OpdAppointment, on_delete=models.DO_NOTHING)
-    system_follow_up = models.BooleanField(verbose_name='System Generated Followup', default=False)
-    agent_appointment_type = models.PositiveSmallIntegerField(blank=True, null=True, choices=FOLLOWUP_CHOICES)

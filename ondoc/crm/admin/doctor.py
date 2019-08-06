@@ -48,7 +48,7 @@ from ondoc.doctor.models import (Doctor, DoctorQualification,
                                  GoogleDetailing, VisitReason, VisitReasonMapping, PracticeSpecializationContent,
                                  PatientMobile, DoctorMobileOtp,
                                  UploadDoctorData, CancellationReason, Prescription, PrescriptionFile,
-                                 SimilarSpecializationGroup, SimilarSpecializationGroupMapping, OpdFollowupAppointment)
+                                 SimilarSpecializationGroup, SimilarSpecializationGroupMapping)
 
 from ondoc.authentication.models import User
 from .common import *
@@ -1474,8 +1474,8 @@ class DoctorOpdAppointmentForm(RefundableAppointmentForm):
         # Appointments are now made with CREATED status.
         # if self.request.user.groups.filter(name=constants['OPD_APPOINTMENT_MANAGEMENT_TEAM']).exists() and cleaned_data.get('status') == OpdAppointment.BOOKED:
         #     raise forms.ValidationError("Form cant be Saved with Booked Status.")
-        if self.instance.status in [OpdAppointment.ACCEPTED] and self.instance.is_followup_appointment() \
-            and (not self.instance.appointment_type in [OpdAppointment.FOLLOWUP, OpdAppointment.REGULAR]):
+        if cleaned_data.get('status') in [OpdAppointment.ACCEPTED] and self.instance.is_followup_appointment() \
+            and self.instance.appointment_type is None:
             raise forms.ValidationError("Please select Appointment type for Follow up Appointment!!")
 
         if cleaned_data.get('start_date') and cleaned_data.get('start_time'):
@@ -1596,14 +1596,6 @@ class PrescriptionFileInline(nested_admin.NestedTabularInline):
     can_delete = True
     show_change_link = True
 
-
-# class OpdFollowupAppointmentInline(admin.TabularInline):
-#     model = OpdFollowupAppointment
-#     can_delete = False
-#     extra = 0
-#     show_change_link = True
-
-
 class PrescriptionInline(nested_admin.NestedTabularInline):
     model = Prescription
     extra = 0
@@ -1617,7 +1609,7 @@ class DoctorOpdAppointmentAdmin(admin.ModelAdmin):
     change_form_template = 'appointment_change_form.html'
     search_fields = ['id', 'profile__name', 'profile__phone_number', 'doctor__name', 'hospital__name']
     list_display = ('booking_id', 'get_doctor', 'get_profile', 'status', 'time_slot_start', 'effective_price',
-                    'get_insurance', 'get_system_appointment_type', 'get_is_fraud', 'created_at', 'updated_at',)
+                    'get_insurance', 'get_system_appointment_type', 'get_is_fraud', 'created_at', 'updated_at')
     list_filter = ('status', 'payment_type')
     date_hierarchy = 'created_at'
     list_display_links = ('booking_id', 'get_insurance',)
@@ -1651,14 +1643,6 @@ class DoctorOpdAppointmentAdmin(admin.ModelAdmin):
         else:
             return "Regular"
     get_system_appointment_type.short_description = 'System Appointment Type'
-
-    # def get_agent_appointment_type(self, obj):
-    #     opd_followup_obj = OpdFollowupAppointment.objects.filter(appointment=obj).first()
-    #     if opd_followup_obj:
-    #         return opd_followup_obj.agent_appointment_type
-    #     else:
-    #         None
-    # get_agent_appointment_type.short_description = 'Agent Appointment Type'
 
     def get_insurance(self, obj):
         if obj.insurance:
@@ -1732,7 +1716,7 @@ class DoctorOpdAppointmentAdmin(admin.ModelAdmin):
                 'payment_type', 'admin_information', 'insurance', 'outstanding',
                 'status', 'cancel_type', 'cancellation_reason', 'cancellation_comments',
                 'start_date', 'start_time', 'invoice_urls', 'payment_type', 'payout_info', 'refund_initiated',
-                'status_change_comments', 'get_system_appointment_type', 'hospital_reference_id', 'send_credit_letter',
+                'status_change_comments', 'get_system_appointment_type', 'appointment_type', 'hospital_reference_id', 'send_credit_letter',
                 'send_cod_to_prepaid_request')
 
         if request.user.groups.filter(name=constants['APPOINTMENT_OTP_TEAM']).exists() or request.user.is_superuser:
