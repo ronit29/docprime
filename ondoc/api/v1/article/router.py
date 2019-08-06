@@ -1,4 +1,6 @@
 from django.urls import path
+from django.conf.urls import url
+from ondoc.articles.admin import MedicineAutocomplete
 from .views import ArticleViewSet, ArticleCategoryViewSet, TopArticleCategoryViewSet, CommentViewSet
 
 urlpatterns = [
@@ -8,5 +10,5 @@ urlpatterns = [
     path('detail', ArticleViewSet.as_view({'get': 'retrieve'}), name='article-details'),
     path('comment/post', CommentViewSet.as_view({'post': 'create'}), name='post-comment'),
     path('comment/list', CommentViewSet.as_view({'get': 'list'}), name='list-comment'),
-
+    url(r'^medicine-autocomplete/$', MedicineAutocomplete.as_view(), name='medicine-autocomplete'),
 ]
