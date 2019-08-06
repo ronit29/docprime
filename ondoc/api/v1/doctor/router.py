@@ -78,4 +78,5 @@ urlpatterns = [
     path('licence/update', DoctorProfileView.as_view({'post': 'licence_update'}), name='licence_update'),
     path('hospitals/list', HospitalsFilteredList.as_view({'get': 'list'}), name='hospitals_filtered_list'),
     path('hospital/filter', DoctorListViewSet.as_view({'get': 'hosp_filtered_list'}), name='hospital-filter-in-doctor-search'),
+    path('speciality/filter', DoctorListViewSet.as_view({'get': 'speciality_filtered_list'}), name='speciality-filter-in-doctor-search'),
 ]
