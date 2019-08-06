@@ -1530,7 +1530,7 @@ class DoctorListViewSet(viewsets.GenericViewSet):
             order_by_field, rank_by = doctor_search_helper.get_ordering_params()
             query_string = doctor_search_helper.prepare_raw_query(filtering_params,
                                                                   order_by_field, rank_by)
-            # query_string['query'] = paginate_raw_query(request, query_string['query'])
+            query_string['query'] = paginate_raw_query(request, query_string['query'])
             doctor_search_result = RawSql(query_string.get('query'),
                                          query_string.get('params')).fetch_all()
 
@@ -1540,8 +1540,10 @@ class DoctorListViewSet(viewsets.GenericViewSet):
             #                                                                result_count=result_count)
         else:
             saved_search_result = get_object_or_404(models.DoctorSearchResult, pk=validated_data.get("search_id"))
-        doctor_ids = paginate_queryset([data.get("doctor_id") for data in doctor_search_result], request)
-        temp_hospital_ids = paginate_queryset([data.get("hospital_id") for data in doctor_search_result], request)
+        # doctor_ids = paginate_queryset([data.get("doctor_id") for data in doctor_search_result], request)
+        # temp_hospital_ids = paginate_queryset([data.get("hospital_id") for data in doctor_search_result], request)
+        doctor_ids = [data.get("doctor_id") for data in doctor_search_result]
+        temp_hospital_ids = [data.get("hospital_id") for data in doctor_search_result]
         hosp_entity_dict, hosp_locality_entity_dict = Hospital.get_hosp_and_locality_dict(temp_hospital_ids,
                                                                                           EntityUrls.SitemapIdentifier.DOCTORS_LOCALITY_CITY)
         preserved = Case(*[When(pk=pk, then=pos) for pos, pk in enumerate(doctor_ids)])
@@ -2103,6 +2105,73 @@ class DoctorListViewSet(viewsets.GenericViewSet):
         return Response(data={"result": result, "count": result_count,
                          'specializations': specializations, 'conditions': conditions,
                          'procedures': procedures, 'procedure_categories': procedure_categories})
+
+    @transaction.non_atomic_requests
+    def hosp_filtered_list(self, request, *args, **kwargs):
+        if (request.query_params.get('procedure_ids') or request.query_params.get('procedure_category_ids')) \
+                and request.query_params.get('is_insurance'):
+            return Response({"result": [], "count": 0,
+                         'specializations': [], 'conditions': [], "seo": {},
+                         "breadcrumb": [], 'search_content': "",
+                         'procedures': [], 'procedure_categories': []})
+
+        parameters = request.query_params
+        if kwargs.get("parameters"):
+            parameters = kwargs.get("parameters")
+        restrict_result_count = parameters.get('restrict_result_count', None)
+        serializer = serializers.DoctorListSerializer(data=parameters, context={"request": request})
+        serializer.is_valid(raise_exception=True)
+        validated_data = serializer.validated_data
+
+        # Insurance check for logged in user
+        logged_in_user = request.user
+        insurance_threshold = InsuranceThreshold.objects.all().order_by('-opd_amount_limit').first()
+        insurance_data_dict = {
+            'is_user_insured': False,
+            'insurance_threshold_amount': insurance_threshold.opd_amount_limit if insurance_threshold else 5000
+        }
+
+        if logged_in_user.is_authenticated and not logged_in_user.is_anonymous:
+            user_insurance = logged_in_user.purchased_insurance.filter().order_by('id').last()
+            if user_insurance and user_insurance.is_valid():
+                insurance_threshold = user_insurance.insurance_plan.threshold.filter().first()
+                if insurance_threshold:
+                    insurance_data_dict['insurance_threshold_amount'] = 0 if insurance_threshold.opd_amount_limit is None else \
+                        insurance_threshold.opd_amount_limit
+                    insurance_data_dict['is_user_insured'] = True
+
+        validated_data['insurance_threshold_amount'] = insurance_data_dict['insurance_threshold_amount']
+        validated_data['is_user_insured'] = insurance_data_dict['is_user_insured']
+
+        doctor_search_helper = DoctorSearchHelper(validated_data)
+        if not validated_data.get("search_id"):
+            filtering_params = doctor_search_helper.get_filtering_params()
+            order_by_field, rank_by = doctor_search_helper.get_ordering_params()
+            query_string = doctor_search_helper.prepare_raw_query(filtering_params,
+                                                                  order_by_field, rank_by)
+            doctor_search_result = RawSql(query_string.get('query'),
+                                         query_string.get('params')).fetch_all()
+
+            result_count = len(doctor_search_result)
+            # sa
+            # saved_search_result = models.DoctorSearchResult.objects.create(results=doctor_search_result,
+            #                                                                result_count=result_count)
+        else:
+            saved_search_result = get_object_or_404(models.DoctorSearchResult, pk=validated_data.get("search_id"))
+        doctor_ids = paginate_queryset([data.get("doctor_id") for data in doctor_search_result], request)
+        temp_hospital_ids = paginate_queryset([data.get("hospital_id") for data in doctor_search_result], request)
+
+        hosp_entity_dict, hosp_locality_entity_dict = Hospital.get_hosp_and_locality_dict(temp_hospital_ids,
+                                                                                          EntityUrls.SitemapIdentifier.DOCTORS_LOCALITY_CITY)
+        return Response({})
+
+
+        #
+        # if validated_data.get('hospital_id'):
+        #     hospital_req_data = Hospital.objects.filter(id__in=validated_data.get('hospital_id')).values('id', 'name').first()
+        #
+        # return Response({"result": response, "count": result_count,
+        #                  "breadcrumb": breadcrumb,  'hospital': hospital_req_data})
 
 
 class DoctorAvailabilityTimingViewSet(viewsets.ViewSet):

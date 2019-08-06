@@ -77,4 +77,5 @@ urlpatterns = [
     path('ipd_procedure/sync_lead', IpdProcedureSyncViewSet.as_view({'post': 'sync_lead'}), name='ipd_procedure_sync_lead'),
     path('licence/update', DoctorProfileView.as_view({'post': 'licence_update'}), name='licence_update'),
     path('hospitals/list', HospitalsFilteredList.as_view({'get': 'list'}), name='hospitals_filtered_list'),
+    path('hospital/filter', DoctorListViewSet.as_view({'get': 'hosp_filtered_list'}), name='hospital-filter-in-doctor-search'),
 ]
