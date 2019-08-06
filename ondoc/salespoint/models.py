@@ -25,7 +25,6 @@ class SalesPoint(TimeStampedModel):
 
         return False
 
-
     class Meta:
         db_table = 'salespoint'
 
