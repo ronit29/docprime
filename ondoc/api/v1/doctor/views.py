@@ -1946,6 +1946,8 @@ class DoctorListViewSet(viewsets.GenericViewSet):
                     'doctorpracticespecializations__specialization__department__departments__specializationdepartmentmapping__specialization',
                     flat=True))
                 if similar_specializations_ids:
+                    if validated_data.get('specialization_ids') in similar_specializations_ids:
+                        similar_specializations_ids.remove(validated_data.get('specialization_ids'))
                     specialization_department = SpecializationDepartmentMapping.objects.filter(
                         specialization__id__in=similar_specializations_ids, department__id__in=departent_ids_list).values('specialization__id', 'specialization__name', 'department__id', 'department__name')
                     for data in specialization_department:
