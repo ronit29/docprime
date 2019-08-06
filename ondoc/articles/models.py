@@ -5,7 +5,7 @@ import datetime
 from django.contrib.contenttypes.models import ContentType
 from django.urls import reverse
 
-from ondoc.doctor.models import Doctor
+from ondoc.doctor.models import Doctor, PracticeSpecialization
 
 
 class ArticleCategory(TimeStampedModel):
@@ -121,3 +121,16 @@ class LinkedArticle(TimeStampedModel):
     class Meta:
         db_table = 'linked_articles'
         unique_together = (('article', 'linked_article'),)
+
+
+class MedicineSpecialization(TimeStampedModel):
+    medicine = models.ForeignKey(Article, on_delete=models.CASCADE)
+    specialization = models.ForeignKey(PracticeSpecialization, on_delete=models.CASCADE, null=True,
+                                       blank=True)
+
+    def __str__(self):
+        return self.medicine.title + " " + self.specialization.name
+
+    class Meta:
+        db_table = "medicine_specialization"
+

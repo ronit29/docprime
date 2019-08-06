@@ -1,5 +1,10 @@
 from django.contrib.gis import admin
-from .models import Article, ArticleImage, ArticleCategory, ArticleLinkedUrl, LinkedArticle, ArticleContentBox
+from import_export import resources, fields
+from import_export.admin import ImportExportMixin
+from import_export.formats import base_formats
+
+from .models import Article, ArticleImage, ArticleCategory, ArticleLinkedUrl, LinkedArticle, ArticleContentBox, \
+    MedicineSpecialization
 from reversion.admin import VersionAdmin
 from django.contrib.admin import ModelAdmin, TabularInline
 from django.utils.safestring import mark_safe
@@ -91,10 +96,25 @@ class ArticleImageAdmin(ModelAdmin):
     readonly_fields = ['image_tag']
 
 
+class MedicineSpecializationResource(resources.ModelResource):
+    class Meta:
+        model = MedicineSpecialization
+        fields = ('medicine', 'specialization', 'id')
+
+
+class MedicineSpecializationAdmin(ImportExportMixin, VersionAdmin):
+    model = MedicineSpecialization
+    formats = (base_formats.XLS, )
+    resource_class = MedicineSpecializationResource
+    list_display = ('medicine', 'specialization', )
+    search_fields = ('medicine__title', 'specialization__name', )
+
+
 admin.site.register(Article, ArticleAdmin)
 admin.site.register(ArticleImage, ArticleImageAdmin)
 admin.site.register(ArticleCategory)
 admin.site.register(ArticleContentBox)
+admin.site.register(MedicineSpecialization, MedicineSpecializationAdmin)
 
 # class FluentCommentsInline(TabularInline):
 #     model = Comment
