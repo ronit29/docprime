@@ -39,7 +39,8 @@ from ondoc.diagnostic.models import (Lab, LabTiming, LabImage, GenericLabAdmin,
                                      TestParameter, ParameterLabTest, LabTestPackage, LabReportFile, LabReport,
                                      CommonPackage, LabTestCategory, LabTestCategoryMapping,
                                      LabTestRecommendedCategoryMapping, QuestionAnswer, FrequentlyAddedTogetherTests,
-                                     LabTestGroup, LabTestGroupMapping, LabTestGroupTiming)
+                                     LabTestGroup, LabTestGroupMapping, LabTestGroupTiming, LabTestCategoryLandingURLS,
+                                     LabTestCategoryUrls)
 
 from ondoc.insurance.models import (Insurer, InsurancePlans, InsuranceThreshold, InsuranceCity, StateGSTCode,
                                     InsuranceDistrict, InsuranceTransaction, InsuranceDeal, InsuranceDisease,
@@ -60,7 +61,8 @@ from ondoc.reports import models as report_models
 from ondoc.prescription.models import AppointmentPrescription
 
 from ondoc.diagnostic.models import LabPricing
-from ondoc.integrations.models import IntegratorMapping, IntegratorProfileMapping, IntegratorReport, IntegratorTestMapping, IntegratorTestParameterMapping
+from ondoc.integrations.models import IntegratorMapping, IntegratorProfileMapping, IntegratorReport, \
+    IntegratorTestMapping, IntegratorTestParameterMapping, IntegratorLabTestParameterMapping
 from ondoc.subscription_plan.models import Plan, PlanFeature, PlanFeatureMapping, UserPlanMapping
 
 from ondoc.web.models import Career, OnlineLead, UploadImage
@@ -579,7 +581,7 @@ class Command(BaseCommand):
                                                            EmailBanner, RecommenderThrough, Recommender,
                                                            IpdProcedurePracticeSpecialization, CityLatLong, CommonHospital,
                                                            PotentialIpdLeadPracticeSpecialization, PotentialIpdCity,
-                                                           SimilarSpecializationGroupMapping)
+                                                           SimilarSpecializationGroupMapping, LabTestCategoryLandingURLS, LabTestCategoryUrls)
         for cl, ct in content_types.items():
             permissions = Permission.objects.filter(
                 Q(content_type=ct),
@@ -617,7 +619,8 @@ class Command(BaseCommand):
         group.permissions.clear()
 
         content_types = ContentType.objects.get_for_models(IntegratorMapping, IntegratorProfileMapping, LabTest, LabNetwork,
-                                                           IntegratorReport, IntegratorTestMapping, IntegratorTestParameterMapping)
+                                                           IntegratorReport, IntegratorTestMapping, IntegratorTestParameterMapping,
+                                                           IntegratorLabTestParameterMapping)
 
         for cl, ct in content_types.items():
             permissions = Permission.objects.filter(
