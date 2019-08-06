@@ -18,7 +18,8 @@ from dateutil import tz
 from django.conf import settings
 from django.utils import timezone
 import pytz
-import datetime
+# import datetime
+from datetime import datetime
 from django.db import transaction
 import logging
 from dal import autocomplete
@@ -1589,12 +1590,12 @@ class DoctorOpdAppointmentForm(RefundableAppointmentForm):
         return cleaned_data
 
 
-
 class PrescriptionFileInline(nested_admin.NestedTabularInline):
     model = PrescriptionFile
     extra = 0
     can_delete = True
     show_change_link = True
+
 
 class PrescriptionInline(nested_admin.NestedTabularInline):
     model = Prescription
@@ -1604,8 +1605,43 @@ class PrescriptionInline(nested_admin.NestedTabularInline):
     inlines = [PrescriptionFileInline]
 
 
-class DoctorOpdAppointmentAdmin(admin.ModelAdmin):
+class AllOpdAppointmentResource(resources.ModelResource):
+    id = fields.Field()
+    def export(self, queryset=None, *args, **kwargs):
+        queryset = self.get_queryset(**kwargs)
+        fetched_queryset = list(queryset)
+        return super().export(fetched_queryset)
+
+    def get_queryset(self, **kwargs):
+        id = fields.Field()
+        request = kwargs.get('request')
+        date_range = [datetime.datetime.strptime(kwargs.get('from_date'), '%Y-%m-%d').date(), datetime.datetime.strptime(
+                                        kwargs.get('to_date'), '%Y-%m-%d').date()]
+        if request and (request.user.is_member_of(constants['INSURANCE_GROUP']) or request.user.is_member_of(constants['SUPER_INSURANCE_GROUP'])):
+            appointments = OpdAppointment.objects.filter(~Q(status=OpdAppointment.CANCELLED),
+                                                        created_at__date__range=date_range,
+                                                        insurance__isnull=False).order_by('-id')
+
+        return appointments
+
+    class Meta:
+        model = OpdAppointment
+        fields = ()
+        export_order = ('id')
+
+    def dehydrate_id(self, appd):
+        return str(appd.id)
+
+
+class FollowupAppointmentResource(resources.ModelResource):
+    pass
+
+
+class DoctorOpdAppointmentAdmin(ExportMixin, admin.ModelAdmin):
     form = DoctorOpdAppointmentForm
+    export_template_name = "export_opd_appointment_report.html"
+    formats = (base_formats.XLS,)
+    resource_class = (AllOpdAppointmentResource, FollowupAppointmentResource)
     change_form_template = 'appointment_change_form.html'
     search_fields = ['id', 'profile__name', 'profile__phone_number', 'doctor__name', 'hospital__name']
     list_display = ('booking_id', 'get_doctor', 'get_profile', 'status', 'time_slot_start', 'effective_price',
@@ -1656,6 +1692,27 @@ class DoctorOpdAppointmentAdmin(admin.ModelAdmin):
 
     def get_queryset(self, request):
         return super(DoctorOpdAppointmentAdmin, self).get_queryset(request).select_related('doctor', 'hospital', 'hospital__network')
+
+    def get_export_queryset(self, request):
+        super().get_export_queryset(request)
+
+    def get_export_data(self, file_format, queryset, *args, **kwargs):
+        """
+        Returns file_format representation for given queryset.
+        """
+        kwargs['from_date'] = kwargs.get('request').POST.get('from_date')
+        kwargs['to_date'] = kwargs.get('request').POST.get('to_date')
+        kwargs['appointment_type'] = kwargs.get('request').POST.get('appointment_type')
+        request = kwargs.pop("request")
+        kwargs['request'] = request
+        resource_class = self.get_export_resource_class()
+        # data = resource_class(**self.get_export_resource_kwargs(request)).export(queryset, *args, **kwargs)
+        if kwargs['appointment_type'] == 'All':
+            data = resource_class[0](**self.get_export_resource_kwargs(request)).export(queryset, *args, **kwargs)
+        elif kwargs['appointment_type'] == 'Followup':
+            data = resource_class[1](**self.get_export_resource_kwargs(request)).export(queryset, *args, **kwargs)
+        export_data = file_format.export_data(data)
+        return export_data
 
     @transaction.non_atomic_requests
     def change_view(self, request, object_id, form_url='', extra_context=None):

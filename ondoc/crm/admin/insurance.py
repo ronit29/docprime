@@ -939,7 +939,6 @@ class UserInsuranceAdmin(ImportExportMixin, admin.ModelAdmin):
         if not def_prof:
             return str(first_name)
 
-
     def get_queryset(self, request):
         qs = super().get_queryset(request)
         qs = qs.select_related('user', 'insurance_plan').prefetch_related('user__profiles')
