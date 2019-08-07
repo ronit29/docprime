@@ -1607,6 +1607,14 @@ class PrescriptionInline(nested_admin.NestedTabularInline):
 
 class AllOpdAppointmentResource(resources.ModelResource):
     id = fields.Field()
+    doctor_name = fields.Field()
+    appointment_date = fields.Field()
+    appointment_time = fields.Field()
+    clinic = fields.Field()
+    insurance_id = fields.Field()
+    agent_appointment_type = fields.Field()
+    system_appointment_type = fields.Field()
+
     def export(self, queryset=None, *args, **kwargs):
         queryset = self.get_queryset(**kwargs)
         fetched_queryset = list(queryset)
@@ -1617,20 +1625,51 @@ class AllOpdAppointmentResource(resources.ModelResource):
         request = kwargs.get('request')
         date_range = [datetime.datetime.strptime(kwargs.get('from_date'), '%Y-%m-%d').date(), datetime.datetime.strptime(
                                         kwargs.get('to_date'), '%Y-%m-%d').date()]
-        if request and (request.user.is_member_of(constants['INSURANCE_GROUP']) or request.user.is_member_of(constants['SUPER_INSURANCE_GROUP'])):
-            appointments = OpdAppointment.objects.filter(~Q(status=OpdAppointment.CANCELLED),
-                                                        created_at__date__range=date_range,
-                                                        insurance__isnull=False).order_by('-id')
+        # if request and (request.user.is_member_of(constants['INSURANCE_GROUP']) or request.user.is_member_of(constants['SUPER_INSURANCE_GROUP'])):
+            # appointments = OpdAppointment.objects.filter(~Q(status=OpdAppointment.CANCELLED),
+            #                                             created_at__date__range=date_range,
+            #                                             insurance__isnull=False).order_by('-id')
+        appointments = OpdAppointment.objects.filter(created_at__date__range=date_range).order_by('-id')
 
         return appointments
 
     class Meta:
         model = OpdAppointment
         fields = ()
-        export_order = ('id')
+        export_order = ('id', 'doctor_name', 'appointment_date', 'appointment_time', 'clinic', 'insurance_id',
+                        'agent_appointment_type', 'system_appointment_type')
 
     def dehydrate_id(self, appd):
         return str(appd.id)
+
+    def dehydrate_doctor_name(self, appd):
+        doctor_obj = appd.doctor
+        if doctor_obj:
+            return str(doctor_obj.name)
+        else:
+            return ""
+
+    def dehydrate_appointment_date(self, appd):
+        return str(appd.time_slot_start.date()) if appd.time_slot_start else ""
+
+    def dehydrate_appointment_time(self, appd):
+        return str(appd.time_slot_start.time()) if appd.time_slot_start else ""
+
+    def dehydrate_clinic(self, appd):
+        return str(appd.hospital.name) if appd.hospital else ""
+
+    def dehydrate_insurance_id(self, appd):
+        return str(appd.insurance_id) if appd.insurance_id else ""
+
+    def dehydrate_agent_appointment_type(self, appd):
+        return str(appd.appointment_type) if appd.appointment_type else ""
+
+    def dehydrate_system_appointment_type(self, appd):
+        if appd.is_followup_appointment():
+            return "FOLLOWUP"
+        else:
+            return "REGULAR"
+
 
 
 class FollowupAppointmentResource(resources.ModelResource):
