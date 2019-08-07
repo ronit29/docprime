@@ -2168,7 +2168,7 @@ class DoctorListViewSet(viewsets.GenericViewSet):
                                      hospital_doctors__doctor__enabled_for_online_booking=True))).order_by('-bookable_doctors_count')
 
         for data in hospitals:
-            response.append({'id':data.id, 'name': data.name, 'url': entity_data[data.id]['url']})
+            response.append({'id':data.id, 'name': data.name, 'url': entity_data[data.id]['url'] if entity_data and entity_data[data.id] and entity_data[data.id]['url'] else None})
 
         return Response({"result": response, "count": result_count})
 
