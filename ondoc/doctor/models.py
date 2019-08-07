@@ -168,17 +168,19 @@ class Hospital(auth_model.TimeStampedModel, auth_model.CreatedByModel, auth_mode
     PHONE_RINGING_BUT_COULD_NOT_CONNECT = 10
     WELCOME_CALLING = 1
     ESCALATION = 2
+    INSURANCE = 3
     DISABLED_REASONS_CHOICES = (
         ("", "Select"), (INCORRECT_CONTACT_DETAILS, "Incorrect contact details"),
         (MOU_AGREEMENT_NEEDED, "MoU agreement needed"), (HOSPITAL_NOT_INTERESTED, "Hospital not interested for tie-up"),
         (CHARGES_ISSUES, "Issue in discount % / consultation charges"),
         (PHONE_RINGING_BUT_COULD_NOT_CONNECT, "Phone ringing but could not connect"),
         (DUPLICATE, "Duplicate"), (OTHERS, "Others (please specify)"))
-    DISABLED_AFTER_CHOICES = (("", "Select"), (WELCOME_CALLING, "Welcome Calling"), (ESCALATION, "Escalation"))
+    DISABLED_AFTER_CHOICES = (("", "Select"), (WELCOME_CALLING, "Welcome Calling"), (ESCALATION, "Escalation"), (INSURANCE, "INSURANCE"))
     AGENT = 1
     PROVIDER = 2
     SOURCE_TYPE_CHOICES = ((AGENT, "Agent"), (PROVIDER, "Provider"))
     name = models.CharField(max_length=200)
+    seo_title = models.CharField(max_length=200, null=True, blank=True)
     location = models.PointField(geography=True, srid=4326, blank=True, null=True)
     location_error = models.PositiveIntegerField(blank=True, null=True)
     operational_since = models.PositiveSmallIntegerField(blank=True, null=True, validators=[MinValueValidator(1800)])
@@ -334,7 +336,7 @@ class Hospital(auth_model.TimeStampedModel, auth_model.CreatedByModel, auth_mode
         result = TopHospitalForIpdProcedureSerializer(hosp_queryset, many=True, context={'request': request,
                                                                                          'hosp_entity_dict': hosp_entity_dict,
                                                                                          'hosp_locality_entity_dict': hosp_locality_entity_dict,
-                                                                                         'new_dynamic_dict':new_dynamic_dict}).data
+                                                                                         'new_dynamic_dict': new_dynamic_dict}).data
         return result
 
 
@@ -560,7 +562,8 @@ class Hospital(auth_model.TimeStampedModel, auth_model.CreatedByModel, auth_mode
         # if self.is_live and self.id and self.location:
         #     if Hospital.objects.filter(location__distance_lte=(self.location, 0), id=self.id).exists():
         #         build_url = False
-
+        if not self.seo_title and self.name:
+            self.seo_title = self.name
         push_to_matrix = False
         update_status_in_matrix = False
         if self.id:
