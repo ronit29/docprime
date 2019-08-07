@@ -1173,6 +1173,19 @@ class PartnerEConsultationViewSet(viewsets.GenericViewSet):
             return Response({"status": 0, "message": "Error updating invoice - " + str(result.get('error'))}, status.HTTP_400_BAD_REQUEST)
         return Response({"status": 1, "message": "e-consultation link shared"})
 
+    def complete(self, request):
+        serializer = serializers.EConsultSerializer(data=request.query_params)
+        serializer.is_valid(raise_exception=True)
+        valid_data = serializer.validated_data
+        e_consultation = valid_data['e_consultation']
+        e_consultation.status = prov_models.EConsultation.COMPLETED
+        try:
+            e_consultation.save()
+        except Exception as e:
+            logger.error(str(e))
+            return Response({'status': 0, 'message': 'Error changing the status of EConsultation to completed - ' + str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+        resp_data = serializers.EConsultListSerializer(e_consultation, context={'request': request})
+        return Response({'status': 1, 'message': 'EConsultation completed successfully', 'data': resp_data.data})
 
 class ConsumerEConsultationViewSet(viewsets.GenericViewSet):
 
@@ -1197,7 +1210,6 @@ class ConsumerEConsultationViewSet(viewsets.GenericViewSet):
         serializer = serializers.EConsultListSerializer(queryset, context={'request': request}, many=True)
         return Response(serializer.data)
 
-    @classmethod
     @transaction.atomic()
     def create_order(self, request):
         from ondoc.notification.tasks import save_pg_response
@@ -1287,16 +1299,4 @@ class ConsumerEConsultationViewSet(viewsets.GenericViewSet):
 
         return Response(resp, status=status.HTTP_200_OK)
 
-    def complete(self, request):
-        serializer = serializers.EConsultSerializer(data=request.query_params)
-        serializer.is_valid(raise_exception=True)
-        valid_data = serializer.validated_data
-        e_consultation = valid_data['e_consultation']
-        e_consultation.status = prov_models.EConsultation.COMPLETED
-        try:
-            e_consultation.save()
-        except Exception as e:
-            logger.error(str(e))
-            return Response({'status': 0, 'message': 'Error changing the status of EConsultation to completed - ' + str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
-        resp_data = serializers.EConsultListSerializer(e_consultation, context={'request': request})
-        return Response({'status': 1, 'message': 'EConsultation completed successfully', 'data': resp_data.data})
+
