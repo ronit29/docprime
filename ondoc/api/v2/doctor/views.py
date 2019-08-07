@@ -1183,7 +1183,7 @@ class PartnerEConsultationViewSet(viewsets.GenericViewSet):
             e_consultation.save()
         except Exception as e:
             logger.error('Error changing the status of EConsultation to completed - ' + str(e))
-            return Response({'status': 0, 'message': 'Error changing the status of EConsultation to completed - ' + str(e)})
+            return Response({'status': 0, 'message': 'Error changing the status of EConsultation to completed - ' + str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
         resp_data = serializers.EConsultListSerializer(e_consultation, context={'request': request})
         return Response({'status': 1, 'message': 'EConsultation completed successfully',
                          'data': resp_data.data})
