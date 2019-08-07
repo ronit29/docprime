@@ -1153,18 +1153,18 @@ class PartnerEConsultationViewSet(viewsets.GenericViewSet):
         serializer = serializers.EConsultSerializer(data=request.query_params)
         serializer.is_valid(raise_exception=True)
         valid_data = serializer.validated_data
-        consultation = valid_data['consultation']
-        if not consultation.link:
+        e_consultation = valid_data['e_consultation']
+        if not e_consultation.link:
             return Response({"status": 0, "error": "Consultation Link not Found"}, status=status.HTTP_404_NOT_FOUND)
-        if consultation.offline_patient:
-            patient_name = consultation.offline_patient.name
-            patient_number = str(consultation.offline_patient.get_patient_mobile())
+        if e_consultation.offline_patient:
+            patient_name = e_consultation.offline_patient.name
+            patient_number = str(e_consultation.offline_patient.get_patient_mobile())
         else:
-            patient_name = consultation.online_patient.name
-            patient_number = consultation.online_patient.phone_number
+            patient_name = e_consultation.online_patient.name
+            patient_number = e_consultation.online_patient.phone_number
         receivers = [{"user": None, "phone_number": patient_number}]
         context = {'patient_name': patient_name,
-                   'link': consultation.link}
+                   'link': e_consultation.link}
         try:
             sms_obj = SMSNotification(notification_type=NotificationAction.E_CONSULT_SHARE, context=context)
             sms_obj.send(receivers=receivers)
@@ -1177,11 +1177,13 @@ class PartnerEConsultationViewSet(viewsets.GenericViewSet):
         serializer = serializers.EConsultSerializer(data=request.query_params)
         serializer.is_valid(raise_exception=True)
         valid_data = serializer.validated_data
-        consultation = valid_data['consultation']
-        consultation.status = prov_models.EConsultation.COMPLETED
+        e_consultation = valid_data['e_consultation']
+        e_consultation.status = prov_models.EConsultation.COMPLETED
         try:
-            consultation.save()
+            e_consultation.save()
         except Exception as e:
             logger.error('Error changing the status of EConsultation to completed - ' + str(e))
             return Response({'status': 0, 'message': 'Error changing the status of EConsultation to completed - ' + str(e)})
-        return Response({'status': 1, 'message': 'EConsultation completed successfully'})
+        resp_data = serializers.EConsultListSerializer(e_consultation, context={'request': request})
+        return Response({'status': 1, 'message': 'EConsultation completed successfully',
+                         'data': resp_data.data})

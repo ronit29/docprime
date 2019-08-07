@@ -662,10 +662,10 @@ class EConsultSerializer(serializers.Serializer):
 
     def validate(self, attrs):
         consult_id = attrs['id']
-        consultation = provider_models.EConsultation.objects.filter(id=consult_id,
+        e_consultation = provider_models.EConsultation.objects.filter(id=consult_id,
                                                                     status__in=[provider_models.EConsultation.BOOKED,
                                                                                 provider_models.EConsultation.CREATED])
-        if not consultation:
+        if not e_consultation:
             raise serializers.ValidationError('Valid consultation not found for given id')
-        attrs['consultation'] = consultation
+        attrs['e_consultation'] = e_consultation
         return attrs
