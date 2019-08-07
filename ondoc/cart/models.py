@@ -152,14 +152,19 @@ class Cart(auth_model.TimeStampedModel, auth_model.SoftDeleteModel):
         return str(self.id)
 
     @classmethod
-    def check_for_insurance(cls, validated_data, request):
+    def check_for_insurance(cls, validated_data, **kwargs):
         from ondoc.insurance.models import UserInsurance
-        user_insurance = UserInsurance.get_user_insurance(request.user)
+        user = kwargs.get('user')
+        if not user:
+            return False, None, ""
+        booked_by = kwargs.get('booked_by', 'user')
+        user_insurance = UserInsurance.get_user_insurance(user)
         is_appointment_insured = False
         insurance_id = None
         insurance_message = ""
-        cart_items = Cart.objects.filter(user=request.user, deleted_at__isnull=True)
-        is_agent = True if hasattr(request.user, 'agent') else False
+        cart_items = Cart.objects.filter(user=user, deleted_at__isnull=True)
+        # is_agent = True if hasattr(request, 'agent') else False
         if user_insurance and user_insurance.is_valid():
-            is_appointment_insured, insurance_id, insurance_message = user_insurance.validate_insurance_for_cart(validated_data, cart_items, is_agent=is_agent)
+            is_appointment_insured, insurance_id, insurance_message = user_insurance.validate_insurance_for_cart(
+                validated_data, cart_items, booked_by=booked_by)
         return is_appointment_insured, insurance_id, insurance_message

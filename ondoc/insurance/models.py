@@ -1208,7 +1208,7 @@ class UserInsurance(auth_model.TimeStampedModel, MerchantPayoutMixin):
 
     def validate_insurance(self, appointment_data, **kwargs):
         from ondoc.doctor.models import OpdAppointment
-        is_agent = True if kwargs.get('is_agent') else False
+        booked_by = kwargs.get('booked_by')
         response_dict = {
             'is_insured': False,
             'insurance_id': None,
@@ -1241,7 +1241,7 @@ class UserInsurance(auth_model.TimeStampedModel, MerchantPayoutMixin):
             return response_dict
 
         if not 'doctor' in appointment_data:
-            is_insured, insurance_id, insurance_message = user_insurance.validate_lab_insurance(appointment_data, is_agent=is_agent)
+            is_insured, insurance_id, insurance_message = user_insurance.validate_lab_insurance(appointment_data, booked_by=booked_by)
             response_dict['is_insured'] = is_insured
             response_dict['insurance_message'] = insurance_message
 
@@ -1297,7 +1297,8 @@ class UserInsurance(auth_model.TimeStampedModel, MerchantPayoutMixin):
             for test in appointment_data['test_ids']:
                 lab_test = AvailableLabTest.objects.filter(lab_pricing_group__labs=appointment_data["lab"],
                                                            test=test, enabled=True).first()
-                if test.is_package and plan and plan.plan_usages and plan.plan_usages.get('package_disabled') and kwargs.get('is_agent'):
+                if test.is_package and plan and plan.plan_usages and plan.plan_usages.get('package_disabled') and \
+                        kwargs.get('booked_by') == 'user':
                     return False, self.id, "Packages not covered for this plan"
                 if not lab_test:
                     return False, self.id, 'Price not available for Test'
@@ -1369,8 +1370,8 @@ class UserInsurance(auth_model.TimeStampedModel, MerchantPayoutMixin):
         return result
 
     def validate_insurance_for_cart(self, appointment_data, cart_items, **kwargs):
-        is_agent = True if kwargs.get('is_agent') else False
-        insurance_validate_dict = self.validate_insurance(appointment_data, is_agent=is_agent)
+        booked_by = kwargs.get('booked_by')
+        insurance_validate_dict = self.validate_insurance(appointment_data, booked_by=booked_by)
         is_insured = insurance_validate_dict['is_insured']
         insurance_id = insurance_validate_dict['insurance_id']
         insurance_message = insurance_validate_dict['insurance_message']

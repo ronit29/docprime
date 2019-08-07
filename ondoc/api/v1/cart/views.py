@@ -47,8 +47,9 @@ class CartViewSet(viewsets.GenericViewSet):
             cart_item_id = serialized_data.get('cart_item').id if serialized_data.get('cart_item') else None
             self.update_plan_details(request, serialized_data, valid_data)
 
+        booked_by = 'agent' if hasattr(request, 'agent') else 'user'
         valid_data['data']['is_appointment_insured'], valid_data['data']['insurance_id'], valid_data['data'][
-            'insurance_message'] = Cart.check_for_insurance(serialized_data, request)
+            'insurance_message'] = Cart.check_for_insurance(serialized_data, user=user, booked_by=booked_by)
 
         if valid_data['data']['is_appointment_insured']:
             valid_data['data']['payment_type'] = OpdAppointment.INSURANCE
@@ -133,10 +134,10 @@ class CartViewSet(viewsets.GenericViewSet):
                     item.data['insurance_message'] = ""
                     item.data['payment_type'] = OpdAppointment.PREPAID
                     raise Exception('Insurance expired.')
-                is_agent = True if hasattr(request.user, 'agent') else False
+                # is_agent = True if hasattr(request, 'agent') else False
                 if not insurance_doctor and cart_data.get('is_appointment_insured') and user_insurance and user_insurance.is_valid():
                     is_lab_insured, insurance_id, insurance_message = user_insurance.validate_lab_insurance(
-                        validated_data, is_agent=is_agent)
+                        validated_data)
                     if is_lab_insured:
                         item.data['is_appointment_insured'] = True
                         item.data['insurance_id'] = insurance_id
