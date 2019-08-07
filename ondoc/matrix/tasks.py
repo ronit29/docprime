@@ -1327,29 +1327,27 @@ def push_appointment_to_spo(self, data):
             raise Exception("Appointment could not found against id - " + str(appointment_id))
 
         appointment_order = Order.objects.filter(product_id=order_product_id, reference_id=appointment_id).first()
-        # request_data = appointment.get_matrix_data(appointment_order, product_id, sub_product_id)
         request_data = appointment.get_spo_data(appointment_order, product_id, sub_product_id)
 
         url = settings.SPO_LEAD_URL
         spo_api_token = settings.SPO_AUTH_TOKEN
         response = requests.post(url, data=json.dumps(request_data), headers={'Authorization': spo_api_token,
                                                                               'Content-Type': 'application/json'})
-
         if response.status_code != status.HTTP_200_OK or not response.ok:
-            logger.error(json.dumps(request_data))
-            logger.info("[ERROR] Appointment could not be published to the SPO system")
-            logger.info("[ERROR] %s", response.reason)
+            logger.error("[ERROR-SPO] Failed to push appointment details - " + str(json.dumps(request_data)))
 
             countdown_time = (2 ** self.request.retries) * 60 * 10
-            logging.error("Appointment sync with the SPO System failed with response - " + str(response.content))
-            print(countdown_time)
             self.retry([data], countdown=countdown_time)
-
-        resp_data = response.json()
-
-        if not resp_data.get('Id', None):
-            logger.error(json.dumps(request_data))
-            raise Exception("[ERROR] Id not recieved from the matrix while pushing appointment lead.")
+        else:
+            # TO DO - Need to update after api response change
+            resp_data = response.json()
+            if not resp_data['error']:
+                pass
+            else:
+                spo_resp = resp_data.get('data', None)
+                if spo_resp and spo_resp['error']:
+                    logger.error("[ERROR-SPO] Appointment could not be published to the SPO system - " + str(json.dumps(request_data)))
+                    logger.info("[ERROR-SPO] %s", spo_resp)
 
     except Exception as e:
         logger.error("Error in Celery. Failed pushing Appointment to the SPO- " + str(e))
