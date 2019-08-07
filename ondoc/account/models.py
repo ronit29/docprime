@@ -502,7 +502,7 @@ class Order(TimeStampedModel):
         fulfillment_data = []
         for item in cart_items:
             validated_data = item.validate(request)
-            fd = item.get_fulfillment_data(validated_data)
+            fd = item.get_fulfillment_data(validated_data, request)
             fd["cart_item_id"] = item.id
             fulfillment_data.append(fd)
         return fulfillment_data
