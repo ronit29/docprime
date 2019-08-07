@@ -505,8 +505,8 @@ def payment_details(request, order):
     pgdata.update(filtered_pgdata)
     pgdata['hash'] = PgTransaction.create_pg_hash(pgdata, secret_key, client_key)
 
-    args = {'user_id': user.id, 'order_id': order.id}
-    save_payment_status.apply_async((PaymentProcessStatus.INITIATED, args),eta=timezone.localtime(), )
+    args = {'user_id': user.id, 'order_id': order.id, 'source': 'ORDER_CREATE'}
+    save_payment_status.apply_async((PaymentProcessStatus.INITIATE, args),eta=timezone.localtime(), )
     save_pg_response.apply_async((PgLogs.TXN_REQUEST, order.id, None, None, pgdata), eta=timezone.localtime(), )
     return pgdata, payment_required
 
@@ -889,7 +889,13 @@ class CouponsMixin(object):
         if coupon_obj.doctors.exists() and (not doctor or doctor not in coupon_obj.doctors.all()):
             return False
 
+        if doctor and (coupon_obj.doctors_exclude.exists() and (not doctor or doctor in coupon_obj.doctors_exclude.all())):
+            return False
+
         if coupon_obj.hospitals.exists() and (not hospital or hospital not in coupon_obj.hospitals.all()):
+            return False
+
+        if hospital and (coupon_obj.hospitals_exclude.exists() and (not hospital or hospital in coupon_obj.hospitals_exclude.all())):
             return False
 
         if coupon_obj.procedures.exists():

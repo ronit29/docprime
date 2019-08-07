@@ -537,7 +537,7 @@ class DoctorHospitalSerializer(serializers.ModelSerializer):
                     resp['is_insurance_covered'] = True
                 if specialization == InsuranceDoctorSpecializations.SpecializationMapping.GYNOCOLOGIST and doctor_specialization_count_dict.get(specialization, {}).get('count') >= settings.INSURANCE_GYNECOLOGIST_LIMIT:
                     resp['is_insurance_covered'] = False
-                    resp['error_message'] = "You have already utilised {} Gynaecologist consultations available in your OPD Insurance Plan.".format(settings.INSURANCE_GYNOLOGIST_LIMIT)
+                    resp['error_message'] = "You have already utilised {} Gynaecologist consultations available in your OPD Insurance Plan.".format(settings.INSURANCE_GYNECOLOGIST_LIMIT)
                 elif specialization == InsuranceDoctorSpecializations.SpecializationMapping.ONCOLOGIST and doctor_specialization_count_dict.get(specialization, {}).get('count') >= settings.INSURANCE_ONCOLOGIST_LIMIT:
                     resp['is_insurance_covered'] = False
                     resp['error_message'] = "You have already utilised {} Onccologist consultations available in your OPD Insurance Plan.".format(settings.INSURANCE_ONCOLOGIST_LIMIT)
@@ -1919,12 +1919,14 @@ class TopHospitalForIpdProcedureSerializer(serializers.ModelSerializer):
     url = serializers.SerializerMethodField()
     locality_url = serializers.SerializerMethodField()
     name_city = serializers.SerializerMethodField()
+    h1_title = serializers.SerializerMethodField()
 
     class Meta:
         model = Hospital
         fields = ('id', 'name', 'distance', 'certifications', 'bed_count', 'logo', 'avg_rating',
                   'count_of_insurance_provider', 'multi_speciality', 'address', 'short_address','open_today',
-                  'insurance_provider', 'established_in', 'long', 'lat', 'url', 'locality_url', 'name_city')
+                  'insurance_provider', 'established_in', 'long', 'lat', 'url', 'locality_url', 'name_city', 'operational_since',
+                  'h1_title', 'is_ipd_hospital', 'seo_title')
 
     def get_name_city(self, obj):
         result = obj.name
@@ -1939,6 +1941,16 @@ class TopHospitalForIpdProcedureSerializer(serializers.ModelSerializer):
     def get_url(self, obj):
         entity_url = self.context.get('hosp_entity_dict', {})
         return entity_url.get(obj.id)
+
+    def get_h1_title(self, obj):
+        entity_url = self.context.get('hosp_entity_dict', {})
+        new_dynamic_dict = self.context.get('new_dynamic_dict', {})
+        url = entity_url.get(obj.id)
+        if url:
+            new_dynamic_obj = new_dynamic_dict.get(url)
+            if new_dynamic_obj and new_dynamic_obj.h1_title:
+                return new_dynamic_obj.h1_title
+        return None
 
     def get_lat(self, obj):
         if obj.location:

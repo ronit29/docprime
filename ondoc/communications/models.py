@@ -469,8 +469,10 @@ class WHTSAPPNotification:
         notification_type = self.notification_type
         body_template = ''
         data = []
-        if notification_type == NotificationAction.APPOINTMENT_ACCEPTED or \
-                notification_type == NotificationAction.OPD_OTP_BEFORE_APPOINTMENT:
+        # if notification_type == NotificationAction.APPOINTMENT_ACCEPTED or \
+        #         notification_type == NotificationAction.OPD_OTP_BEFORE_APPOINTMENT:
+
+        if notification_type == NotificationAction.APPOINTMENT_ACCEPTED:
             body_template = "appointment_accepted_opd_patient"
 
             data.append(self.context.get('patient_name'))
@@ -495,17 +497,17 @@ class WHTSAPPNotification:
             else:
                 data.append(" ")
 
-        elif notification_type == NotificationAction.APPOINTMENT_BOOKED and user and user.user_type == User.CONSUMER:
-            body_template = "opd_appointment_booking_patient"
-
-            data.append(self.context.get('patient_name'))
-            data.append(self.context.get('doctor_name'))
-            data.append(self.context.get('instance').id)
-            data.append(self.context.get('patient_name'))
-            data.append(self.context.get('doctor_name'))
-            data.append(self.context.get('instance').hospital.name)
-            data.append(self.context.get('instance').hospital.get_hos_address())
-            data.append(datetime.strftime(aware_time_zone(self.context.get('instance').time_slot_start), '%d-%m-%Y %H:%M'))
+        # elif notification_type == NotificationAction.APPOINTMENT_BOOKED and user and user.user_type == User.CONSUMER:
+        #     body_template = "opd_appointment_booking_patient"
+        #
+        #     data.append(self.context.get('patient_name'))
+        #     data.append(self.context.get('doctor_name'))
+        #     data.append(self.context.get('instance').id)
+        #     data.append(self.context.get('patient_name'))
+        #     data.append(self.context.get('doctor_name'))
+        #     data.append(self.context.get('instance').hospital.name)
+        #     data.append(self.context.get('instance').hospital.get_hos_address())
+        #     data.append(datetime.strftime(aware_time_zone(self.context.get('instance').time_slot_start), '%d-%m-%Y %H:%M'))
 
         # elif notification_type == NotificationAction.APPOINTMENT_BOOKED and (not user or user.user_type == User.DOCTOR):
         #     body_template = "appointment_booked_doctor"
@@ -521,16 +523,16 @@ class WHTSAPPNotification:
         #     data.append(self.context.get('doctor_name'))
         #     data.append(datetime.strftime(aware_time_zone(self.context.get('instance').time_slot_start), '%d-%m-%Y %H:%M'))
 
-        elif notification_type == NotificationAction.APPOINTMENT_RESCHEDULED_BY_PATIENT and user and user.user_type == User.CONSUMER:
-            body_template = "opd_appointment_rescheduled_patient_initiated_to_patient"
-
-            data.append(self.context.get('patient_name'))
-            data.append(self.context.get('doctor_name'))
-            data.append(self.context.get('instance').hospital.name)
-            data.append(self.context.get('instance').id)
-            data.append(self.context.get('patient_name'))
-            data.append(self.context.get('doctor_name'))
-            data.append(datetime.strftime(aware_time_zone(self.context.get('instance').time_slot_start), '%d-%m-%Y %H:%M'))
+        # elif notification_type == NotificationAction.APPOINTMENT_RESCHEDULED_BY_PATIENT and user and user.user_type == User.CONSUMER:
+        #     body_template = "opd_appointment_rescheduled_patient_initiated_to_patient"
+        #
+        #     data.append(self.context.get('patient_name'))
+        #     data.append(self.context.get('doctor_name'))
+        #     data.append(self.context.get('instance').hospital.name)
+        #     data.append(self.context.get('instance').id)
+        #     data.append(self.context.get('patient_name'))
+        #     data.append(self.context.get('doctor_name'))
+        #     data.append(datetime.strftime(aware_time_zone(self.context.get('instance').time_slot_start), '%d-%m-%Y %H:%M'))
 
         # elif notification_type == NotificationAction.APPOINTMENT_RESCHEDULED_BY_PATIENT and (not user or user.user_type == User.DOCTOR):
         #     body_template = "appointment_rescheduled_patient_initiated_to_doctor"
@@ -544,85 +546,87 @@ class WHTSAPPNotification:
         #     data.append(self.context.get('doctor_name'))
         #     data.append(datetime.strftime(aware_time_zone(self.context.get('instance').time_slot_start), '%d-%m-%Y %H:%M'))
 
-        elif notification_type == NotificationAction.APPOINTMENT_RESCHEDULED_BY_DOCTOR and user and user.user_type == User.CONSUMER:
-            body_template = "opd_appointment_rescheduled_patient_initiated_to_patient"
+        # elif notification_type == NotificationAction.APPOINTMENT_RESCHEDULED_BY_DOCTOR and user and user.user_type == User.CONSUMER:
+        #     body_template = "opd_appointment_rescheduled_patient_initiated_to_patient"
+        #
+        #     data.append(self.context.get('patient_name'))
+        #     data.append(self.context.get('doctor_name'))
+        #     data.append(self.context.get('instance').hospital.name)
+        #     data.append(self.context.get('instance').id)
+        #     data.append(self.context.get('patient_name'))
+        #     data.append(self.context.get('doctor_name'))
+        #     data.append(datetime.strftime(aware_time_zone(self.context.get('instance').time_slot_start), '%d-%m-%Y %H:%M'))
 
-            data.append(self.context.get('patient_name'))
-            data.append(self.context.get('doctor_name'))
-            data.append(self.context.get('instance').hospital.name)
-            data.append(self.context.get('instance').id)
-            data.append(self.context.get('patient_name'))
-            data.append(self.context.get('doctor_name'))
-            data.append(datetime.strftime(aware_time_zone(self.context.get('instance').time_slot_start), '%d-%m-%Y %H:%M'))
+        # elif notification_type == NotificationAction.APPOINTMENT_CANCELLED and (not user or user.user_type == User.DOCTOR):
+        #     body_template = "appointment_cancelled_doctor"
+        #
+        #     data.append(self.context.get('doctor_name'))
+        #     data.append(datetime.strftime(aware_time_zone(self.context.get('instance').time_slot_start), '%H:%M'))
+        #     data.append(datetime.strftime(aware_time_zone(self.context.get('instance').time_slot_start), '%d-%m-%Y'))
+        #     data.append(self.context.get('instance').hospital.name)
+        #     data.append(self.context.get('instance').id)
+        #     data.append(self.context.get('patient_name'))
+        #     data.append(self.context.get('doctor_name'))
+        #
+        # elif notification_type == NotificationAction.APPOINTMENT_CANCELLED and user and user.user_type == User.CONSUMER:
+        #     instance = self.context.get('instance')
+        #
+        #     if instance.payment_type in [OpdAppointment.COD, OpdAppointment.INSURANCE]:
+        #         body_template = "appointment_cancelled_doctor"
+        #
+        #         data.append(self.context.get('doctor_name'))
+        #         data.append(
+        #             datetime.strftime(aware_time_zone(self.context.get('instance').time_slot_start), '%d-%m-%Y'))
+        #         data.append(datetime.strftime(aware_time_zone(self.context.get('instance').time_slot_start), '%H:%M'))
+        #         data.append(self.context.get('instance').hospital.name)
+        #         data.append(self.context.get('instance').id)
+        #         data.append(self.context.get('patient_name'))
+        #         data.append(self.context.get('doctor_name'))
+        #
+        #     else:
+        #
+        #         body_template = "opd_appointment_cancellation_patient"
+        #
+        #         data.append(self.context.get('patient_name'))
+        #         data.append(self.context.get('doctor_name'))
+        #         data.append(datetime.strftime(aware_time_zone(self.context.get('instance').time_slot_start), '%d-%m-%Y'))
+        #         data.append(datetime.strftime(aware_time_zone(self.context.get('instance').time_slot_start), '%H:%M'))
+        #         data.append(self.context.get('instance').id)
+        #         data.append(self.context.get('patient_name'))
+        #         data.append(self.context.get('doctor_name'))
+        #
+        # elif notification_type == NotificationAction.PRESCRIPTION_UPLOADED:
+        #     body_template = "prescription_uploaded"
+        #
+        #     data.append(self.context.get('doctor_name'))
+        #     data.append(self.context.get('patient_name'))
+        #
+        # elif notification_type == NotificationAction.OPD_CONFIRMATION_CHECK_AFTER_APPOINTMENT:
+        #     body_template = 'appointment_confirmation_check'
+        #
+        #     data.append(self.context.get('patient_name'))
+        #     data.append(self.context.get('instance').id)
+        #     data.append(self.context.get('doctor_name'))
+        #     data.append(datetime.strftime(aware_time_zone(self.context.get('instance').time_slot_start), '%d-%m-%Y'))
+        #     data.append(datetime.strftime(aware_time_zone(self.context.get('instance').time_slot_start), '%H:%M'))
+        #     data.append(self.context.get('opd_appointment_complete_url'))
+        #     data.append(self.context.get('reschdule_appointment_bypass_url'))
+        #
+        # elif notification_type == NotificationAction.OPD_CONFIRMATION_SECOND_CHECK_AFTER_APPOINTMENT:
+        #     body_template = 'appointment_confirmation_second_check'
+        #
+        #     data.append(self.context.get('patient_name'))
+        #     data.append(self.context.get('instance').id)
+        #     data.append(self.context.get('doctor_name'))
+        #     data.append(datetime.strftime(aware_time_zone(self.context.get('instance').time_slot_start), '%d-%m-%Y'))
+        #     data.append(datetime.strftime(aware_time_zone(self.context.get('instance').time_slot_start), '%H:%M'))
+        #     data.append(self.context.get('opd_appointment_complete_url'))
+        #     data.append(self.context.get('reschdule_appointment_bypass_url'))
 
-        elif notification_type == NotificationAction.APPOINTMENT_CANCELLED and (not user or user.user_type == User.DOCTOR):
-            body_template = "appointment_cancelled_doctor"
+        # elif notification_type == NotificationAction.LAB_APPOINTMENT_ACCEPTED or \
+        #         notification_type == NotificationAction.LAB_OTP_BEFORE_APPOINTMENT:
 
-            data.append(self.context.get('doctor_name'))
-            data.append(datetime.strftime(aware_time_zone(self.context.get('instance').time_slot_start), '%H:%M'))
-            data.append(datetime.strftime(aware_time_zone(self.context.get('instance').time_slot_start), '%d-%m-%Y'))
-            data.append(self.context.get('instance').hospital.name)
-            data.append(self.context.get('instance').id)
-            data.append(self.context.get('patient_name'))
-            data.append(self.context.get('doctor_name'))
-
-        elif notification_type == NotificationAction.APPOINTMENT_CANCELLED and user and user.user_type == User.CONSUMER:
-            instance = self.context.get('instance')
-
-            if instance.payment_type in [OpdAppointment.COD, OpdAppointment.INSURANCE]:
-                body_template = "appointment_cancelled_doctor"
-
-                data.append(self.context.get('doctor_name'))
-                data.append(
-                    datetime.strftime(aware_time_zone(self.context.get('instance').time_slot_start), '%d-%m-%Y'))
-                data.append(datetime.strftime(aware_time_zone(self.context.get('instance').time_slot_start), '%H:%M'))
-                data.append(self.context.get('instance').hospital.name)
-                data.append(self.context.get('instance').id)
-                data.append(self.context.get('patient_name'))
-                data.append(self.context.get('doctor_name'))
-
-            else:
-
-                body_template = "opd_appointment_cancellation_patient"
-
-                data.append(self.context.get('patient_name'))
-                data.append(self.context.get('doctor_name'))
-                data.append(datetime.strftime(aware_time_zone(self.context.get('instance').time_slot_start), '%d-%m-%Y'))
-                data.append(datetime.strftime(aware_time_zone(self.context.get('instance').time_slot_start), '%H:%M'))
-                data.append(self.context.get('instance').id)
-                data.append(self.context.get('patient_name'))
-                data.append(self.context.get('doctor_name'))
-
-        elif notification_type == NotificationAction.PRESCRIPTION_UPLOADED:
-            body_template = "prescription_uploaded"
-
-            data.append(self.context.get('doctor_name'))
-            data.append(self.context.get('patient_name'))
-
-        elif notification_type == NotificationAction.OPD_CONFIRMATION_CHECK_AFTER_APPOINTMENT:
-            body_template = 'appointment_confirmation_check'
-
-            data.append(self.context.get('patient_name'))
-            data.append(self.context.get('instance').id)
-            data.append(self.context.get('doctor_name'))
-            data.append(datetime.strftime(aware_time_zone(self.context.get('instance').time_slot_start), '%d-%m-%Y'))
-            data.append(datetime.strftime(aware_time_zone(self.context.get('instance').time_slot_start), '%H:%M'))
-            data.append(self.context.get('opd_appointment_complete_url'))
-            data.append(self.context.get('reschdule_appointment_bypass_url'))
-
-        elif notification_type == NotificationAction.OPD_CONFIRMATION_SECOND_CHECK_AFTER_APPOINTMENT:
-            body_template = 'appointment_confirmation_second_check'
-
-            data.append(self.context.get('patient_name'))
-            data.append(self.context.get('instance').id)
-            data.append(self.context.get('doctor_name'))
-            data.append(datetime.strftime(aware_time_zone(self.context.get('instance').time_slot_start), '%d-%m-%Y'))
-            data.append(datetime.strftime(aware_time_zone(self.context.get('instance').time_slot_start), '%H:%M'))
-            data.append(self.context.get('opd_appointment_complete_url'))
-            data.append(self.context.get('reschdule_appointment_bypass_url'))
-
-        elif notification_type == NotificationAction.LAB_APPOINTMENT_ACCEPTED or \
-                notification_type == NotificationAction.LAB_OTP_BEFORE_APPOINTMENT:
+        elif notification_type == NotificationAction.LAB_APPOINTMENT_ACCEPTED:
 
             instance = self.context.get('instance')
             if not instance.is_home_pickup:
@@ -646,25 +650,25 @@ class WHTSAPPNotification:
             else:
                 pass
 
-        elif notification_type == NotificationAction.LAB_APPOINTMENT_BOOKED and user and user.user_type == User.CONSUMER:
-            instance = self.context.get('instance')
-            if not instance.is_home_pickup:
-                body_template = "appointment_booked_patient"
-
-                data.append(self.context.get('patient_name'))
-                data.append(self.context.get('lab_name'))
-                data.append(datetime.strftime(aware_time_zone(self.context.get('instance').time_slot_start), '%d-%m-%Y'))
-                data.append(datetime.strftime(aware_time_zone(self.context.get('instance').time_slot_start), '%H:%M'))
-                data.append(self.context.get('instance').id)
-                data.append(self.context.get('patient_name'))
-                data.append(self.context.get('lab_name'))
-                if instance.lab and instance.lab.get_lab_address():
-                    data.append(instance.lab.get_lab_address())
-                else:
-                    data.append("NA")
-                data.append(datetime.strftime(aware_time_zone(self.context.get('instance').time_slot_start), '%d-%m-%Y %H:%M'))
-            else:
-                pass
+        # elif notification_type == NotificationAction.LAB_APPOINTMENT_BOOKED and user and user.user_type == User.CONSUMER:
+        #     instance = self.context.get('instance')
+        #     if not instance.is_home_pickup:
+        #         body_template = "appointment_booked_patient"
+        #
+        #         data.append(self.context.get('patient_name'))
+        #         data.append(self.context.get('lab_name'))
+        #         data.append(datetime.strftime(aware_time_zone(self.context.get('instance').time_slot_start), '%d-%m-%Y'))
+        #         data.append(datetime.strftime(aware_time_zone(self.context.get('instance').time_slot_start), '%H:%M'))
+        #         data.append(self.context.get('instance').id)
+        #         data.append(self.context.get('patient_name'))
+        #         data.append(self.context.get('lab_name'))
+        #         if instance.lab and instance.lab.get_lab_address():
+        #             data.append(instance.lab.get_lab_address())
+        #         else:
+        #             data.append("NA")
+        #         data.append(datetime.strftime(aware_time_zone(self.context.get('instance').time_slot_start), '%d-%m-%Y %H:%M'))
+        #     else:
+        #         pass
 
         # elif notification_type == NotificationAction.LAB_APPOINTMENT_BOOKED and (not user or user.user_type == User.DOCTOR):
         #     body_template = "appointment_booked_lab"
@@ -679,134 +683,133 @@ class WHTSAPPNotification:
         #     data.append(self.context.get('lab_name'))
         #     data.append(datetime.strftime(aware_time_zone(self.context.get('instance').time_slot_start), '%d-%m-%Y %H:%M'))
 
-        elif notification_type == NotificationAction.LAB_APPOINTMENT_RESCHEDULED_BY_PATIENT and user and user.user_type == User.CONSUMER:
-            body_template = "appointment_rescheduled_patient_initiated_to_patient"
+        # elif notification_type == NotificationAction.LAB_APPOINTMENT_RESCHEDULED_BY_PATIENT and user and user.user_type == User.CONSUMER:
+        #     body_template = "appointment_rescheduled_patient_initiated_to_patient"
+        #
+        #     data.append(self.context.get('patient_name'))
+        #     data.append(self.context.get('lab_name'))
+        #     data.append(self.context.get('instance').id)
+        #     data.append(datetime.strftime(aware_time_zone(self.context.get('instance').time_slot_start), '%d-%m-%Y %H:%M'))
+        #     data.append(self.context.get('patient_name'))
+        #     data.append(self.context.get('lab_name'))
+        #
+        # elif notification_type == NotificationAction.LAB_APPOINTMENT_RESCHEDULED_BY_PATIENT and (not user or user.user_type == User.DOCTOR):
+        #     body_template = "appointment_rescheduled_patient_initiated_to_lab"
+        #
+        #
+        #     data.append(self.context.get('patient_name'))
+        #     data.append(self.context.get('lab_name'))
+        #     data.append(self.context.get('instance').id)
+        #     data.append(datetime.strftime(aware_time_zone(self.context.get('instance').time_slot_start), '%d-%m-%Y %H:%M'))
+        #     data.append(self.context.get('patient_name'))
+        #     data.append(self.context.get('instance').profile.phone_number)
+        #     data.append(self.context.get('lab_name'))
+        #
+        # elif notification_type == NotificationAction.LAB_APPOINTMENT_RESCHEDULED_BY_LAB and user and user.user_type == User.CONSUMER:
+        #     body_template = "appointment_rescheduled_lab_initiated_to_patient"
+        #
+        #     data.append(self.context.get('lab_name'))
+        #     data.append(datetime.strftime(aware_time_zone(self.context.get('instance').time_slot_start), '%d-%m-%Y %H:%M'))
+        #
+        # elif notification_type == NotificationAction.LAB_APPOINTMENT_CANCELLED and user and user.user_type == User.CONSUMER:
+        #
+        #     instance = self.context.get('instance')
+        #
+        #     if instance.payment_type in [OpdAppointment.COD, OpdAppointment.INSURANCE]:
+        #         body_template = "labappointment_cancellation_patient_v1"
+        #
+        #         data.append(self.context.get('patient_name'))
+        #         data.append(
+        #             datetime.strftime(aware_time_zone(self.context.get('instance').time_slot_start), '%d-%m-%Y'))
+        #         data.append(datetime.strftime(aware_time_zone(self.context.get('instance').time_slot_start), '%H:%M'))
+        #         data.append(self.context.get('lab_name'))
+        #         data.append(self.context.get('instance').id)
+        #         data.append(self.context.get('patient_name'))
+        #         data.append(self.context.get('lab_name'))
+        #         data.append(
+        #             datetime.strftime(aware_time_zone(self.context.get('instance').time_slot_start), '%d-%m-%Y %H:%M'))
+        #
+        #     else:
+        #         body_template = "labappointment_cancel_without_insurance_patient"
+        #
+        #         data.append(self.context.get('patient_name'))
+        #         data.append(
+        #             datetime.strftime(aware_time_zone(self.context.get('instance').time_slot_start), '%d-%m-%Y'))
+        #         data.append(datetime.strftime(aware_time_zone(self.context.get('instance').time_slot_start), '%H:%M'))
+        #         data.append(self.context.get('lab_name'))
+        #         data.append(self.context.get('instance').id)
+        #         data.append(self.context.get('patient_name'))
+        #         data.append(self.context.get('lab_name'))
+        #         data.append(
+        #             datetime.strftime(aware_time_zone(self.context.get('instance').time_slot_start), '%d-%m-%Y %H:%M'))
+        #
+        # elif notification_type == NotificationAction.LAB_APPOINTMENT_CANCELLED and (not user or user.user_type == User.DOCTOR):
+        #     body_template = "appointment_cancelled_lab"
+        #
+        #     data.append(self.context.get('patient_name'))
+        #     data.append(self.context.get('lab_name'))
+        #     data.append(datetime.strftime(aware_time_zone(self.context.get('instance').time_slot_start), '%d-%m-%Y'))
+        #     data.append(datetime.strftime(aware_time_zone(self.context.get('instance').time_slot_start), '%H:%M'))
+        #     data.append(self.context.get('instance').id)
+        #     data.append(self.context.get('patient_name'))
+        #     data.append(self.context.get('lab_name'))
+        #
+        # elif notification_type == NotificationAction.LAB_REPORT_UPLOADED:
+        #     body_template = "lab_report_uploaded"
+        #
+        #     data.append(self.context.get('lab_name'))
+        #     data.append(self.context.get('patient_name'))
+        #
+        # elif notification_type == NotificationAction.OPD_FEEDBACK_AFTER_APPOINTMENT:
+        #     body_template = "opd_after_completion"
+        #
+        #     data.append(self.context.get('patient_name'))
+        #     data.append(self.context.get('doctor_name'))
+        #     data.append(self.context.get('opd_appointment_feedback_url'))
+        #
+        # elif notification_type == NotificationAction.REFUND_BREAKUP:
+        #     body_template = "appointment_refund_breakup"
+        #
+        #     data.append(self.context.get('amount'))
+        #     if self.context.get('booking_id'):
+        #         data.append('for you booking id %d' % self.context.get('instance').id)
+        #     else:
+        #         data.append('.')
+        #
+        #     if self.context.get('ctrnx_id'):
+        #         data.append('The transaction ID for this refund is : DPRF%s' % str(self.context.get('ctrnx_id')))
+        #     else:
+        #         data.append(' ')
+        #
+        # elif notification_type == NotificationAction.LAB_REPORT_SEND_VIA_CRM:
+        #     instance = self.context.get('instance')
+        #     if instance.is_thyrocare:
+        #         body_template = "labappointment_thyrocare_report_v1"
+        #
+        #         data.append(self.context.get('instance').id)
+        #         data.append(self.context.get('patient_name'))
+        #         data.append(self.context.get('lab_name'))
+        #         lab_reports = []
+        #         for report in self.context.get('reports', []):
+        #             temp_short_url = generate_short_url(report)
+        #             lab_reports.append(temp_short_url)
+        #         data.append(", ".join(lab_reports))
+        #         data.append(self.context.get('chat_url'))
+        #
+        #     else:
+        #         body_template = "labappointment_report_v1"
+        #
+        #         data.append(self.context.get('instance').id)
+        #         data.append(self.context.get('patient_name'))
+        #         data.append(self.context.get('lab_name'))
+        #         lab_reports = []
+        #         for report in self.context.get('reports', []):
+        #             temp_short_url = generate_short_url(report)
+        #             lab_reports.append(temp_short_url)
+        #         data.append(", ".join(lab_reports))
 
-            data.append(self.context.get('patient_name'))
-            data.append(self.context.get('lab_name'))
-            data.append(self.context.get('instance').id)
-            data.append(datetime.strftime(aware_time_zone(self.context.get('instance').time_slot_start), '%d-%m-%Y %H:%M'))
-            data.append(self.context.get('patient_name'))
-            data.append(self.context.get('lab_name'))
-
-        elif notification_type == NotificationAction.LAB_APPOINTMENT_RESCHEDULED_BY_PATIENT and (not user or user.user_type == User.DOCTOR):
-            body_template = "appointment_rescheduled_patient_initiated_to_lab"
-
-
-            data.append(self.context.get('patient_name'))
-            data.append(self.context.get('lab_name'))
-            data.append(self.context.get('instance').id)
-            data.append(datetime.strftime(aware_time_zone(self.context.get('instance').time_slot_start), '%d-%m-%Y %H:%M'))
-            data.append(self.context.get('patient_name'))
-            data.append(self.context.get('instance').profile.phone_number)
-            data.append(self.context.get('lab_name'))
-
-        elif notification_type == NotificationAction.LAB_APPOINTMENT_RESCHEDULED_BY_LAB and user and user.user_type == User.CONSUMER:
-            body_template = "appointment_rescheduled_lab_initiated_to_patient"
-
-            data.append(self.context.get('lab_name'))
-            data.append(datetime.strftime(aware_time_zone(self.context.get('instance').time_slot_start), '%d-%m-%Y %H:%M'))
-
-        elif notification_type == NotificationAction.LAB_APPOINTMENT_CANCELLED and user and user.user_type == User.CONSUMER:
-
-            instance = self.context.get('instance')
-
-            if instance.payment_type in [OpdAppointment.COD, OpdAppointment.INSURANCE]:
-                body_template = "labappointment_cancellation_patient_v1"
-
-                data.append(self.context.get('patient_name'))
-                data.append(
-                    datetime.strftime(aware_time_zone(self.context.get('instance').time_slot_start), '%d-%m-%Y'))
-                data.append(datetime.strftime(aware_time_zone(self.context.get('instance').time_slot_start), '%H:%M'))
-                data.append(self.context.get('lab_name'))
-                data.append(self.context.get('instance').id)
-                data.append(self.context.get('patient_name'))
-                data.append(self.context.get('lab_name'))
-                data.append(
-                    datetime.strftime(aware_time_zone(self.context.get('instance').time_slot_start), '%d-%m-%Y %H:%M'))
-
-            else:
-                body_template = "labappointment_cancel_without_insurance_patient"
-
-                data.append(self.context.get('patient_name'))
-                data.append(
-                    datetime.strftime(aware_time_zone(self.context.get('instance').time_slot_start), '%d-%m-%Y'))
-                data.append(datetime.strftime(aware_time_zone(self.context.get('instance').time_slot_start), '%H:%M'))
-                data.append(self.context.get('lab_name'))
-                data.append(self.context.get('instance').id)
-                data.append(self.context.get('patient_name'))
-                data.append(self.context.get('lab_name'))
-                data.append(
-                    datetime.strftime(aware_time_zone(self.context.get('instance').time_slot_start), '%d-%m-%Y %H:%M'))
-
-        elif notification_type == NotificationAction.LAB_APPOINTMENT_CANCELLED and (not user or user.user_type == User.DOCTOR):
-            body_template = "appointment_cancelled_lab"
-
-            data.append(self.context.get('patient_name'))
-            data.append(self.context.get('lab_name'))
-            data.append(datetime.strftime(aware_time_zone(self.context.get('instance').time_slot_start), '%d-%m-%Y'))
-            data.append(datetime.strftime(aware_time_zone(self.context.get('instance').time_slot_start), '%H:%M'))
-            data.append(self.context.get('instance').id)
-            data.append(self.context.get('patient_name'))
-            data.append(self.context.get('lab_name'))
-
-        elif notification_type == NotificationAction.LAB_REPORT_UPLOADED:
-            body_template = "lab_report_uploaded"
-
-            data.append(self.context.get('lab_name'))
-            data.append(self.context.get('patient_name'))
-
-        elif notification_type == NotificationAction.OPD_FEEDBACK_AFTER_APPOINTMENT:
-            body_template = "opd_after_completion"
-
-            data.append(self.context.get('patient_name'))
-            data.append(self.context.get('doctor_name'))
-            data.append(self.context.get('opd_appointment_feedback_url'))
-
-        elif notification_type == NotificationAction.REFUND_BREAKUP:
-            body_template = "appointment_refund_breakup"
-
-            data.append(self.context.get('amount'))
-            if self.context.get('booking_id'):
-                data.append('for you booking id %d' % self.context.get('instance').id)
-            else:
-                data.append('.')
-
-            if self.context.get('ctrnx_id'):
-                data.append('The transaction ID for this refund is : DPRF%s' % str(self.context.get('ctrnx_id')))
-            else:
-                data.append(' ')
-
-        elif notification_type == NotificationAction.LAB_REPORT_SEND_VIA_CRM:
-            instance = self.context.get('instance')
-            if instance.is_thyrocare:
-                body_template = "labappointment_thyrocare_report_v1"
-
-                data.append(self.context.get('instance').id)
-                data.append(self.context.get('patient_name'))
-                data.append(self.context.get('lab_name'))
-                lab_reports = []
-                for report in self.context.get('reports', []):
-                    temp_short_url = generate_short_url(report)
-                    lab_reports.append(temp_short_url)
-                data.append(", ".join(lab_reports))
-                data.append(self.context.get('chat_url'))
-
-            else:
-                body_template = "labappointment_report_v1"
-
-                data.append(self.context.get('instance').id)
-                data.append(self.context.get('patient_name'))
-                data.append(self.context.get('lab_name'))
-                lab_reports = []
-                for report in self.context.get('reports', []):
-                    temp_short_url = generate_short_url(report)
-                    lab_reports.append(temp_short_url)
-                data.append(", ".join(lab_reports))
-
-        elif notification_type == NotificationAction.IPD_PROCEDURE_COST_ESTIMATE:
-            # todo - get access permission from whatsapp
-            pass
+        # elif notification_type == NotificationAction.IPD_PROCEDURE_COST_ESTIMATE:
+        #     pass
             # body_template = "cost_estimate"
             #
             # data.append(self.context.get('instance'))
@@ -978,6 +981,9 @@ class EMAILNotification:
                      "path": util_absolute_url(invoices[0].file.url)}]})
             body_template = "email/doctor_invoice/body.html"
             subject_template = "email/doctor_invoice/subject.txt"
+        elif notification_type == NotificationAction.PROVIDER_MATRIX_LEAD_EMAIL:
+            body_template = "email/provider/matrix_lead_creation/body.html"
+            subject_template = "email/provider/matrix_lead_creation/subject.txt"
         elif notification_type == NotificationAction.LAB_APPOINTMENT_ACCEPTED:
             body_template = "email/lab/appointment_accepted/body.html"
             subject_template = "email/lab/appointment_accepted/subject.txt"
