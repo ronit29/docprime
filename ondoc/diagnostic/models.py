@@ -2511,7 +2511,11 @@ class LabAppointment(TimeStampedModel, CouponsMixin, LabAppointmentInvoiceMixin,
             effective_price = 0.0
         else:
             insurance_id = None
-            payment_type = OpdAppointment.PREPAID
+            if data["payment_type"] == OpdAppointment.INSURANCE:
+                payment_type = OpdAppointment.PREPAID
+            else:
+                payment_type = data["payment_type"]
+
 
         fulfillment_data = {
             "lab": data["lab"],
