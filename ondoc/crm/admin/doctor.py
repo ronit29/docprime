@@ -1605,8 +1605,10 @@ class PrescriptionInline(nested_admin.NestedTabularInline):
     inlines = [PrescriptionFileInline]
 
 
-class AllOpdAppointmentResource(resources.ModelResource):
+class InsuredOpdAppointmentResource(resources.ModelResource):
     id = fields.Field()
+    patient_name = fields.Field()
+    booking_date = fields.Field()
     doctor_name = fields.Field()
     appointment_date = fields.Field()
     appointment_time = fields.Field()
@@ -1621,26 +1623,30 @@ class AllOpdAppointmentResource(resources.ModelResource):
         return super().export(fetched_queryset)
 
     def get_queryset(self, **kwargs):
-        id = fields.Field()
         request = kwargs.get('request')
         date_range = [datetime.datetime.strptime(kwargs.get('from_date'), '%Y-%m-%d').date(), datetime.datetime.strptime(
                                         kwargs.get('to_date'), '%Y-%m-%d').date()]
         # if request and (request.user.is_member_of(constants['INSURANCE_GROUP']) or request.user.is_member_of(constants['SUPER_INSURANCE_GROUP'])):
-            # appointments = OpdAppointment.objects.filter(~Q(status=OpdAppointment.CANCELLED),
-            #                                             created_at__date__range=date_range,
-            #                                             insurance__isnull=False).order_by('-id')
-        appointments = OpdAppointment.objects.filter(created_at__date__range=date_range).order_by('-id')
+        appointments = OpdAppointment.objects.filter(~Q(status=OpdAppointment.CANCELLED),
+                                                    created_at__date__range=date_range,
+                                                    insurance__isnull=False).order_by('-id')
 
         return appointments
 
     class Meta:
         model = OpdAppointment
         fields = ()
-        export_order = ('id', 'doctor_name', 'appointment_date', 'appointment_time', 'clinic', 'insurance_id',
-                        'agent_appointment_type', 'system_appointment_type')
+        export_order = ('id', 'patient_name', 'doctor_name', 'appointment_date', 'appointment_time',
+                        'agent_appointment_type', 'system_appointment_type', 'booking_date', 'clinic', 'insurance_id',)
 
     def dehydrate_id(self, appd):
         return str(appd.id)
+
+    def dehydrate_patient_name(self, appd):
+        return str(appd.profile.name) if appd.profile and appd.profile.name else ""
+
+    def dehydrate_booking_date(self, appd):
+        return str(appd.created_at.date())
 
     def dehydrate_doctor_name(self, appd):
         doctor_obj = appd.doctor
@@ -1662,7 +1668,12 @@ class AllOpdAppointmentResource(resources.ModelResource):
         return str(appd.insurance_id) if appd.insurance_id else ""
 
     def dehydrate_agent_appointment_type(self, appd):
-        return str(appd.appointment_type) if appd.appointment_type else ""
+        if appd.appointment_type and appd.appointment_type == OpdAppointment.REGULAR:
+            return "REGULAR"
+        elif appd.appointment_type and appd.appointment_type == OpdAppointment.FOLLOWUP:
+            return "FOLLOWUP"
+        else:
+            return ""
 
     def dehydrate_system_appointment_type(self, appd):
         if appd.is_followup_appointment():
@@ -1671,16 +1682,11 @@ class AllOpdAppointmentResource(resources.ModelResource):
             return "REGULAR"
 
 
-
-class FollowupAppointmentResource(resources.ModelResource):
-    pass
-
-
 class DoctorOpdAppointmentAdmin(ExportMixin, admin.ModelAdmin):
     form = DoctorOpdAppointmentForm
     export_template_name = "export_opd_appointment_report.html"
     formats = (base_formats.XLS,)
-    resource_class = (AllOpdAppointmentResource, FollowupAppointmentResource)
+    resource_class = (InsuredOpdAppointmentResource,)
     change_form_template = 'appointment_change_form.html'
     search_fields = ['id', 'profile__name', 'profile__phone_number', 'doctor__name', 'hospital__name']
     list_display = ('booking_id', 'get_doctor', 'get_profile', 'status', 'time_slot_start', 'effective_price',
@@ -1746,10 +1752,10 @@ class DoctorOpdAppointmentAdmin(ExportMixin, admin.ModelAdmin):
         kwargs['request'] = request
         resource_class = self.get_export_resource_class()
         # data = resource_class(**self.get_export_resource_kwargs(request)).export(queryset, *args, **kwargs)
-        if kwargs['appointment_type'] == 'All':
+        # if kwargs['appointment_type'] == 'All':
+        #     data = resource_class[0](**self.get_export_resource_kwargs(request)).export(queryset, *args, **kwargs)
+        if kwargs['appointment_type'] == 'Insurance':
             data = resource_class[0](**self.get_export_resource_kwargs(request)).export(queryset, *args, **kwargs)
-        elif kwargs['appointment_type'] == 'Followup':
-            data = resource_class[1](**self.get_export_resource_kwargs(request)).export(queryset, *args, **kwargs)
         export_data = file_format.export_data(data)
         return export_data
 
