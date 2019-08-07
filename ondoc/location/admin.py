@@ -23,7 +23,7 @@ class EntityUrlsAdminForm(forms.ModelForm):
         if self.instance.id and self.instance.sitemap_identifier == self.instance.SitemapIdentifier.HOSPITAL_PAGE:
             if not value.get('url', "").endswith("-hpp"):
                 raise forms.ValidationError("Invalid URL for hospital.")
-        if EntityUrls.objects.filter(url=value.get('url'), is_valid=True).exists():
+        if EntityUrls.objects.filter(url=value.get('url')).exists():
             raise forms.ValidationError("Entered URL already exists.")
         return value
 
