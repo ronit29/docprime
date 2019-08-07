@@ -5,6 +5,10 @@ from ondoc.common import models as common_models
 from ondoc.account import models as acct_mdoels
 from django.contrib.contenttypes.fields import GenericRelation
 from django.contrib.postgres.fields import JSONField
+import logging
+logger = logging.getLogger(__name__)
+from django.conf import settings
+from ondoc.api.v1 import utils as v1_utils
 
 # Create your models here.
 
@@ -52,6 +56,37 @@ class EConsultation(auth_models.TimeStampedModel, auth_models.CreatedByModel):
     def update_consultation(self, data):
         self.payment_status = self.PAYMENT_ACCEPTED
         self.status = self.BOOKED
+
+    def send_sms_link(self, patient, patient_number):
+        from ondoc.authentication.backends import JWTAuthentication
+        from ondoc.communications.models import  SMSNotification, NotificationAction
+
+        link = None
+
+        if not self.link:
+            if not patient.user:
+                user = auth_models.User.objects.create(phone_number=patient_number, user_type=auth_models.User.CONSUMER, auto_created=True)
+            else:
+                user = patient.user
+            agent_token = JWTAuthentication.generate_token(user)
+            token = agent_token['token'] if 'token' in agent_token else None
+            url = settings.BASE_URL + "/econsult?id=" + str(self.id) + "&token=" + token.decode("utf-8")
+            link = v1_utils.generate_short_url(url)
+            # self.link = link
+            EConsultation.objects.filter(id=self.id).update(link=link)
+        else:
+            link = self.link
+
+        receivers = [{"user": None, "phone_number": patient_number}]
+        context = {'patient_name': patient.name,
+                   'link': link}
+        try:
+            sms_obj = SMSNotification(notification_type=NotificationAction.E_CONSULT_SHARE, context=context)
+            sms_obj.send(receivers=receivers)
+        except Exception as e:
+            logger.error(str(e))
+            return {'error': str(e)}
+
 
     def __str__(self):
         return str(self.id)

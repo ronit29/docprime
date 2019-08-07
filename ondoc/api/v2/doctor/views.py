@@ -1130,10 +1130,16 @@ class PartnerEConsultationViewSet(viewsets.GenericViewSet):
                                           status=prov_models.EConsultation.CREATED)
         if valid_data.get('offline_p') and valid_data['offline_p']:
             e_obj.offline_patient = valid_data['patient_obj']
+            patient_number = str(valid_data['patient_obj'].get_patient_mobile())
+
         else:
             e_obj.online_patient = valid_data['patient_obj']
+            patient_number = valid_data['patient_obj'].phone_number
 
         e_obj.save()
+        e_obj.send_sms_link(valid_data['patient_obj'], patient_number)
+
+
         resp_data = serializers.EConsultListSerializer(e_obj, context={'request': request})
 
         return Response(resp_data.data)
@@ -1152,23 +1158,19 @@ class PartnerEConsultationViewSet(viewsets.GenericViewSet):
         serializer.is_valid(raise_exception=True)
         valid_data = serializer.validated_data
         e_consultation = valid_data['e_consultation']
+        patient = None
         if not e_consultation.link:
             return Response({"status": 0, "error": "Consultation Link not Found"}, status=status.HTTP_404_NOT_FOUND)
         if e_consultation.offline_patient:
-            patient_name = e_consultation.offline_patient.name
+            patient = e_consultation.offline_patient
             patient_number = str(e_consultation.offline_patient.get_patient_mobile())
         else:
-            patient_name = e_consultation.online_patient.name
+            patient = e_consultation.online_patient
             patient_number = e_consultation.online_patient.phone_number
-        receivers = [{"user": None, "phone_number": patient_number}]
-        context = {'patient_name': patient_name,
-                   'link': e_consultation.link}
-        try:
-            sms_obj = SMSNotification(notification_type=NotificationAction.E_CONSULT_SHARE, context=context)
-            sms_obj.send(receivers=receivers)
-        except Exception as e:
-            logger.error(str(e))
-            return Response({"status": 0, "message": "Error updating invoice - " + str(e)}, status.HTTP_400_BAD_REQUEST)
+
+        result = e_consultation.send_sms_link(patient, patient_number)
+        if result.get('error'):
+            return Response({"status": 0, "message": "Error updating invoice - " + str(result.get('error'))}, status.HTTP_400_BAD_REQUEST)
         return Response({"status": 1, "message": "e-consultation link shared"})
 
 
