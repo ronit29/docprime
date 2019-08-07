@@ -30,9 +30,9 @@ urlpatterns = [
     path('ecs/create', views.PartnerEConsultationViewSet.as_view({'post': 'create'}), name='ecs_create'),
     path('ecs/list', views.PartnerEConsultationViewSet.as_view({'get': 'list'}), name='ecs_list'),
     path('ecs/share', views.PartnerEConsultationViewSet.as_view({'get': 'share'}), name='ecs_share'),
+    path('ecs/complete', views.PartnerEConsultationViewSet.as_view({'post': 'complete'}), name='ecs_complete'),
     path('pecs/pay', views.ConsumerEConsultationViewSet.as_view({'post': 'create_order'}), name='pecs_pay'),
     path('pecs/list', views.ConsumerEConsultationViewSet.as_view({'post': 'list'}), name='pecs_list'),
-    path('ecs/complete', views.PartnerEConsultationViewSet.as_view({'post': 'complete'}), name='ecs_complete'),
 ]
 
 

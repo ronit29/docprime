@@ -40,7 +40,7 @@ class EConsultation(auth_models.TimeStampedModel, auth_models.CreatedByModel):
     offline_patient = models.ForeignKey(doc_models.OfflinePatients, on_delete=models.SET_NULL, null=True)
     online_patient = models.ForeignKey(auth_models.UserProfile, on_delete=models.SET_NULL, null=True)
     fees = models.DecimalField(max_digits=10, decimal_places=2)
-    validity = models.PositiveIntegerField(null=True, blank=True)
+    validity = models.DateTimeField(null=True, blank=True)
     link = models.CharField(max_length=256, null=True, blank=True)
     status = models.PositiveSmallIntegerField(default=CREATED, choices=STATUS_CHOICES)
 

@@ -596,7 +596,7 @@ class ProviderEncryptResponseModelSerializer(serializers.ModelSerializer):
 
 
 class EConsultCreateBodySerializer(serializers.Serializer):
-    validity = serializers.IntegerField(max_value=256, allow_null=True, required=False)
+    validity = serializers.DateTimeField(allow_null=True, required=False)
     doctor = serializers.IntegerField()
     patient = serializers.CharField()
     fees = serializers.FloatField(required=False)
@@ -638,7 +638,7 @@ class EConsultListSerializer(serializers.ModelSerializer):
 
     def get_patient_name(self, obj):
         patient = self.get_patient_type(obj)
-        return str(patient.name)
+        return ''.join(e for e in patient.name if e.isalnum() or e==' ')
 
     def get_patient_id(self, obj):
         patient = self.get_patient_type(obj)
@@ -646,15 +646,14 @@ class EConsultListSerializer(serializers.ModelSerializer):
 
     def get_validity_status(self, obj):
         validity_status = 'past'
-        time_passed = timezone.now() - obj.created_at
-        if obj.validity and obj.validity > time_passed.days:
+        if obj.validity and obj.validity > timezone.now():
             validity_status = 'current'
         return validity_status
 
     class Meta:
         model = provider_models.EConsultation
         fields = ('id', 'doctor_name', 'doctor_id', 'patient_id', 'patient_name', 'fees', 'validity', 'payment_status',
-                        'created_at', 'link', 'status', 'validity_status')
+                        'created_at', 'link', 'status', 'validity_status', 'validity')
 
 
 class EConsultTransactionModelSerializer(serializers.Serializer):
