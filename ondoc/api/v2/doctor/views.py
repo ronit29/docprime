@@ -1140,10 +1140,7 @@ class PartnerEConsultationViewSet(viewsets.GenericViewSet):
     def list(self, request):
         id = request.query_params.get('id')
         queryset = prov_models.EConsultation.objects.select_related('doctor', 'offline_patient', 'online_patient')\
-                                                    .filter(created_by=request.user)\
-                                                    .exclude(status__in=[prov_models.EConsultation.CANCELLED,
-                                                                         prov_models.EConsultation.COMPLETED,
-                                                                         prov_models.EConsultation.EXPIRED])
+                                                    .filter(created_by=request.user)
         if id:
             queryset = queryset.filter(id=id)
         serializer = serializers.EConsultListSerializer(queryset, context={'request': request}, many=True)
