@@ -23,7 +23,7 @@ from ondoc.notification import tasks as notification_tasks
 #from ondoc.doctor.models import Hospital, DoctorClinic,Doctor,  OpdAppointment
 from ondoc.doctor.models import DoctorClinic, OpdAppointment, DoctorAssociation, DoctorQualification, Doctor, Hospital, \
     HealthInsuranceProvider, ProviderSignupLead, HospitalImage, CommonHospital, PracticeSpecialization, \
-    SpecializationDepartmentMapping
+    SpecializationDepartmentMapping, DoctorPracticeSpecialization
 from ondoc.notification.models import EmailNotification
 from django.utils.safestring import mark_safe
 from ondoc.coupon.models import Coupon, CouponRecommender
@@ -1922,6 +1922,7 @@ class DoctorListViewSet(viewsets.GenericViewSet):
             spec = PracticeSpecialization.objects.filter(id=validated_data['specialization_ids'][0]).first()
             department_spec_list = list()
             departent_ids_list = list()
+            similar_specializations_ids = list()
             if spec and spec.is_similar_specialization:
                 for department in spec.department.all():
                     department_spec_mapping = department.specializationdepartmentmapping_set.all()
@@ -1930,27 +1931,26 @@ class DoctorListViewSet(viewsets.GenericViewSet):
                     departent_ids_list.append(department.id)
             if department_spec_list:
                 department_spec_list = set(department_spec_list)
-                doctors = Doctor.objects.prefetch_related("doctor_clinics", "doctor_clinics__hospital",
-                                                          "doctorpracticespecializations",
-                                                          "doctorpracticespecializations__specialization",
-                                                          "doctorpracticespecializations__specialization__department",
-                                                          "doctorpracticespecializations__specialization__department__departments",
-                                                          "doctorpracticespecializations__specialization__department__departments__specializationdepartmentmapping").\
-                                                          filter(doctorpracticespecializations__specialization__id__in=department_spec_list).annotate(
-                                                          bookable_doctors_count=Count(Q(doctor_clinics__enabled_for_online_booking=True,
-                                                          enabled_for_online_booking=True,
-                                                          doctor_clinics__hospital__enabled_for_online_booking=True))).filter(
-                                                          bookable_doctors_count__gt=0)
+                doctors_spec_ids = DoctorPracticeSpecialization.objects.filter(specialization__id__in=department_spec_list).prefetch_related(
+                    "doctor__doctor_clinics", "doctor__doctor_clinics__hospital",
+                    "specialization", "specialization__department",
+                     "specialization__department__departments",
+                    "specialization__department__departments__specializationdepartmentmapping").annotate(bookable_doctors_count=Count(Q(doctor__enabled_for_online_booking=True,
+                                                                              doctor__doctor_clinics__hospital__enabled_for_online_booking=True,
+                                                                              doctor__doctor_clinics__enabled_for_online_booking=True)),
+                                                                            specialization_id=F('specialization__department__departments__specializationdepartmentmapping__specialization')
+                                                                             ).filter(bookable_doctors_count__gt=0).order_by('-bookable_doctors_count').values_list('specialization_id', flat=True)
+                for id in doctors_spec_ids:
+                    if not id in similar_specializations_ids:
+                        similar_specializations_ids.append(id)
 
-                similar_specializations_ids = set(doctors.values_list(
-                    'doctorpracticespecializations__specialization__department__departments__specializationdepartmentmapping__specialization',
-                    flat=True))
                 if similar_specializations_ids:
                     if int(validated_data['specialization_ids'][0]) in similar_specializations_ids:
                         similar_specializations_ids.remove(int(validated_data['specialization_ids'][0]))
+                    spec_ids_preserved = Case(*[When(pk=pk, then=pos) for pos, pk in enumerate(similar_specializations_ids)])
                     specialization_department = SpecializationDepartmentMapping.objects.filter(
                         specialization__id__in=similar_specializations_ids,
-                        department__id__in=departent_ids_list).values('specialization__id', 'specialization__name', 'department__id', 'department__name')
+                        department__id__in=departent_ids_list).order_by(spec_ids_preserved).values('specialization__id', 'specialization__name', 'department__id', 'department__name')
                     check_spec_ids = set()
                     for data in specialization_department:
                         if not data.get('specialization__id') in check_spec_ids:
