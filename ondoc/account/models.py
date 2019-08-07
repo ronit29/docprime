@@ -58,7 +58,11 @@ class Order(TimeStampedModel):
                       (OPD_APPOINTMENT_CREATE, "Opd Create"),
                       (LAB_APPOINTMENT_CREATE, "Lab Create"),
                       (LAB_APPOINTMENT_RESCHEDULE, "Lab Reschedule"),
-                      (INSURANCE_CREATE, "Insurance Create"),(SUBSCRIPTION_PLAN_BUY, "Subscription Plan Buy"))
+                      (INSURANCE_CREATE, "Insurance Create"),
+                      (SUBSCRIPTION_PLAN_BUY, "Subscription Plan Buy"),
+
+                      (PROVIDER_ECONSULT_PAY, "Provider Econsult Pay"),
+                      )
     DOCTOR_PRODUCT_ID = 1
     LAB_PRODUCT_ID = 2
     INSURANCE_PRODUCT_ID = 3
@@ -66,7 +70,10 @@ class Order(TimeStampedModel):
 
     PROVIDER_ECONSULT_PRODUCT_ID = 6
     PRODUCT_IDS = [(DOCTOR_PRODUCT_ID, "Doctor Appointment"), (LAB_PRODUCT_ID, "LAB_PRODUCT_ID"),
-                   (INSURANCE_PRODUCT_ID, "INSURANCE_PRODUCT_ID"),(SUBSCRIPTION_PLAN_PRODUCT_ID, "SUBSCRIPTION_PLAN_PRODUCT_ID")]
+                   (INSURANCE_PRODUCT_ID, "INSURANCE_PRODUCT_ID"),
+                   (SUBSCRIPTION_PLAN_PRODUCT_ID, "SUBSCRIPTION_PLAN_PRODUCT_ID"),
+                   (PROVIDER_ECONSULT_PRODUCT_ID, "Provider Econsult"),
+                   ]
 
     product_id = models.SmallIntegerField(choices=PRODUCT_IDS, blank=True, null=True)
     reference_id = models.BigIntegerField(blank=True, null=True)

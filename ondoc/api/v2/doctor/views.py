@@ -1187,7 +1187,12 @@ class ConsumerEConsultationViewSet(viewsets.GenericViewSet):
         id = request.query_params.get('id')
         queryset = prov_models.EConsultation.objects.select_related('doctor', 'offline_patient', 'online_patient')\
                                                     .filter(Q(online_patient__isnull=True,
-                                                              offline_patient__user=request.user)).all()
+                                                              offline_patient__user=request.user)
+                                                            |
+                                                            Q(online_patient__isnull=False,
+                                                              online_patient__user=request.user)
+                                                            ).all()
+
         if id:
             queryset = queryset.filter(id=id)
         serializer = serializers.EConsultListSerializer(queryset, context={'request': request}, many=True)
@@ -1212,7 +1217,7 @@ class ConsumerEConsultationViewSet(viewsets.GenericViewSet):
         if user and user.is_anonymous:
             return Response({"status": 0}, status.HTTP_401_UNAUTHORIZED)
 
-        save_pg_response.apply_async((PgLogs.ECONSULT_ORDER_REQUEST, None, None, None, consult_id, user.id),
+        save_pg_response.apply_async((PgLogs.ECONSULT_ORDER_REQUEST, None, None, None, data, user.id),
                                      eta=timezone.localtime(), )
 
         doc = consultation.doctor

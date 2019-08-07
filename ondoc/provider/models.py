@@ -51,6 +51,7 @@ class EConsultation(auth_models.TimeStampedModel, auth_models.CreatedByModel):
     @classmethod
     def update_consultation(self, data):
         self.payment_status = self.PAYMENT_ACCEPTED
+        self.status = self.BOOKED
 
     def __str__(self):
         return str(self.id)
