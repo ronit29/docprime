@@ -1931,14 +1931,14 @@ class DoctorListViewSet(viewsets.GenericViewSet):
                     departent_ids_list.append(department.id)
             if department_spec_list:
                 department_spec_list = set(department_spec_list)
-                doctors_spec_ids = DoctorPracticeSpecialization.objects.filter(specialization__id__in=department_spec_list).prefetch_related(
-                    "doctor__doctor_clinics", "doctor__doctor_clinics__hospital",
-                    "specialization", "specialization__department",
-                     "specialization__department__departments",
-                    "specialization__department__departments__specializationdepartmentmapping").annotate(bookable_doctors_count=Count(Q(doctor__enabled_for_online_booking=True,
-                                                                              doctor__doctor_clinics__hospital__enabled_for_online_booking=True,
-                                                                              doctor__doctor_clinics__enabled_for_online_booking=True)),
-                                                                            specialization_id=F('specialization__department__departments__specializationdepartmentmapping__specialization')
+                doctors_spec_ids = PracticeSpecialization.objects.filter(id__in=department_spec_list).prefetch_related(
+                    "specialization__doctor__doctor_clinics", "doctor__doctor_clinics__hospital", "specialization__doctor"
+                    "specialization", "department",
+                     "department__departments",
+                    "department__departments__specializationdepartmentmapping").annotate(bookable_doctors_count=Count(Q(specialization__doctor__enabled_for_online_booking=True,
+                                                                                specialization__doctor__doctor_clinics__hospital__enabled_for_online_booking=True,
+                                                                            specialization__doctor__doctor_clinics__enabled_for_online_booking=True)),
+                                                                            specialization_id=F('department__departments__specializationdepartmentmapping__specialization')
                                                                              ).filter(bookable_doctors_count__gt=0).order_by('-bookable_doctors_count').values_list('specialization_id', flat=True)
                 for id in doctors_spec_ids:
                     if not id in similar_specializations_ids:
@@ -1947,16 +1947,16 @@ class DoctorListViewSet(viewsets.GenericViewSet):
                 if similar_specializations_ids:
                     if int(validated_data['specialization_ids'][0]) in similar_specializations_ids:
                         similar_specializations_ids.remove(int(validated_data['specialization_ids'][0]))
-                    spec_ids_preserved = Case(*[When(pk=pk, then=pos) for pos, pk in enumerate(similar_specializations_ids)])
                     specialization_department = SpecializationDepartmentMapping.objects.filter(
                         specialization__id__in=similar_specializations_ids,
-                        department__id__in=departent_ids_list).order_by(spec_ids_preserved).values('specialization__id', 'specialization__name', 'department__id', 'department__name')
-                    check_spec_ids = set()
+                        department__id__in=departent_ids_list).values('specialization__id', 'specialization__name', 'department__id', 'department__name')
+                    spec_dept_details = dict()
                     for data in specialization_department:
-                        if not data.get('specialization__id') in check_spec_ids:
-                            check_spec_ids.add(data.get('specialization__id'))
-                            similar_specializations.append({'specialization_id': data.get('specialization__id'), 'department_id': data.get('department__id'),
-                                                        'specialization_name': data.get('specialization__name'), 'department_name': data.get('department__name')})
+                        if not spec_dept_details.get(data.get('specialization__id')):
+                            spec_dept_details[data.get('specialization__id')] = {'specialization_id': data.get('specialization__id'), 'department_id': data.get('department__id'),
+                                                        'specialization_name': data.get('specialization__name'), 'department_name': data.get('department__name')}
+                    for id in similar_specializations_ids:
+                        similar_specializations.append(spec_dept_details[id] if spec_dept_details.get(id) else None)
 
         return Response({"result": response, "count": result_count,
                          'specializations': specializations, 'conditions': conditions, "seo": seo,
