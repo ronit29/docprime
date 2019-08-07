@@ -625,7 +625,7 @@ class EConsultCreateBodySerializer(serializers.Serializer):
 class EConsultListSerializer(serializers.ModelSerializer):
     doctor_name = serializers.ReadOnlyField(source='doctor.name')
     patient_name = serializers.SerializerMethodField()
-    status = serializers.SerializerMethodField()
+    validity_status = serializers.SerializerMethodField()
     patient_id = serializers.SerializerMethodField()
 
     def get_patient_type(self, obj):
@@ -644,17 +644,17 @@ class EConsultListSerializer(serializers.ModelSerializer):
         patient = self.get_patient_type(obj)
         return str(patient.id)
 
-    def get_status(self, obj):
-        status = 'past'
+    def get_validity_status(self, obj):
+        validity_status = 'past'
         time_passed = timezone.now() - obj.created_at
         if obj.validity and obj.validity > time_passed.days:
-            status = 'current'
-        return status
+            validity_status = 'current'
+        return validity_status
 
     class Meta:
         model = provider_models.EConsultation
         fields = ('id', 'doctor_name', 'doctor_id', 'patient_id', 'patient_name', 'fees', 'validity', 'payment_status',
-                        'created_at', 'link', 'status')
+                        'created_at', 'link', 'status', 'validity_status')
 
 
 class EConsultSerializer(serializers.Serializer):
@@ -663,8 +663,8 @@ class EConsultSerializer(serializers.Serializer):
     def validate(self, attrs):
         consult_id = attrs['id']
         e_consultation = provider_models.EConsultation.objects.filter(id=consult_id,
-                                                                    status__in=[provider_models.EConsultation.BOOKED,
-                                                                                provider_models.EConsultation.CREATED])
+                                                                      status__in=[provider_models.EConsultation.BOOKED,
+                                                                                  provider_models.EConsultation.CREATED]).first()
         if not e_consultation:
             raise serializers.ValidationError('Valid consultation not found for given id')
         attrs['e_consultation'] = e_consultation
