@@ -1956,7 +1956,8 @@ class DoctorListViewSet(viewsets.GenericViewSet):
                             spec_dept_details[data.get('specialization__id')] = {'specialization_id': data.get('specialization__id'), 'department_id': data.get('department__id'),
                                                         'specialization_name': data.get('specialization__name'), 'department_name': data.get('department__name')}
                     for id in similar_specializations_ids:
-                        similar_specializations.append(spec_dept_details[id] if spec_dept_details.get(id) else None)
+                        if spec_dept_details.get(id):
+                            similar_specializations.append(spec_dept_details[id])
 
         return Response({"result": response, "count": result_count,
                          'specializations': specializations, 'conditions': conditions, "seo": seo,
