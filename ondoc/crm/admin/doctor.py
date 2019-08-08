@@ -32,7 +32,7 @@ from ondoc.notification.models import NotificationAction
 from ondoc.procedure.models import DoctorClinicProcedure, Procedure, DoctorClinicIpdProcedure
 
 logger = logging.getLogger(__name__)
-
+import ondoc.notification as notification_models
 from ondoc.account.models import Order, Invoice
 from django.contrib.contenttypes.admin import GenericTabularInline
 from ondoc.authentication.models import GenericAdmin, SPOCDetails, AssociatedMerchant, Merchant, QCModel
@@ -1476,7 +1476,7 @@ class DoctorOpdAppointmentForm(RefundableAppointmentForm):
         # if self.request.user.groups.filter(name=constants['OPD_APPOINTMENT_MANAGEMENT_TEAM']).exists() and cleaned_data.get('status') == OpdAppointment.BOOKED:
         #     raise forms.ValidationError("Form cant be Saved with Booked Status.")
         if cleaned_data.get('status') in [OpdAppointment.ACCEPTED] and self.instance.is_followup_appointment() \
-            and self.instance.appointment_type is None:
+            and cleaned_data.get('appointment_type') is None:
             raise forms.ValidationError("Please select Appointment type for Follow up Appointment!!")
 
         if cleaned_data.get('start_date') and cleaned_data.get('start_time'):
@@ -2061,7 +2061,12 @@ class DoctorOpdAppointmentAdmin(ExportMixin, admin.ModelAdmin):
                 obj._refund_reason = form.cleaned_data.get('refund_reason', '')
                 obj.action_refund()
             else:
+                if self.is_followup_appointment():
+                    notification_models.EmailNotification.ops_notification_alert(self, email_list=settings.INSURANCE_OPS_EMAIL,
+                                                                             product=Order.DOCTOR_PRODUCT_ID,
+                                                                             alert_type=notification_models.EmailNotification.FOLLOWUP_APPOINTMENT)
                 super().save_model(request, obj, form, change)
+
 
     class Media:
         js = (
