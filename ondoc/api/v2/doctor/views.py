@@ -1279,7 +1279,7 @@ class ConsumerEConsultationViewSet(viewsets.GenericViewSet):
         pg_order = Order.objects.create(
             amount=float(amount_to_paid),
             action=action,
-            action_data=action_data,
+            action_data=json.dumps(action_data, default=str),
             wallet_amount=wallet_amount,
             cashback_amount=cashback_amount,
             payment_status=Order.PAYMENT_PENDING,
