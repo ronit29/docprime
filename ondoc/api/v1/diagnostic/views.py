@@ -2435,11 +2435,12 @@ class LabAppointmentView(mixins.CreateModelMixin,
         serializer.is_valid(raise_exception=True)
         validated_data = serializer.validated_data
 
+        booked_by = 'agent' if hasattr(request, 'agent') else 'user'
         user_insurance = UserInsurance.get_user_insurance(request.user)
         if user_insurance:
             if user_insurance.status == UserInsurance.ONHOLD:
                 return Response(status=status.HTTP_400_BAD_REQUEST, data={'error': 'Your documents from the last claim are under verification.Please write to customercare@docprime.com for more information'})
-            insurance_validate_dict = user_insurance.validate_insurance(validated_data)
+            insurance_validate_dict = user_insurance.validate_insurance(validated_data, booked_by=booked_by)
             data['is_appointment_insured'] = insurance_validate_dict['is_insured']
             data['insurance_id'] = insurance_validate_dict['insurance_id']
             data['insurance_message'] = insurance_validate_dict['insurance_message']
