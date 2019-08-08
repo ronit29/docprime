@@ -1940,9 +1940,9 @@ class DoctorListViewSet(viewsets.GenericViewSet):
                                                                         "specialization__doctor__doctor_clinics__hospital", "specialization__doctor",
                                                                         "specialization").annotate(bookable_doctors_count=Count(Q(specialization__doctor__enabled_for_online_booking=True,
                                                                          specialization__doctor__doctor_clinics__hospital__enabled_for_online_booking=True,
-                                                                        specialization__doctor__doctor_clinics__enabled_for_online_booking=True))).\
-                                                                        filter(bookable_doctors_count__gt=0, specialization__doctor__is_live=True,
-                                                                        specialization__doctor__doctor_clinics__hospital__is_live=True).order_by('-bookable_doctors_count').values_list('id', flat=True)
+                                                                        specialization__doctor__doctor_clinics__enabled_for_online_booking=True,
+                                                                        specialization__doctor__is_live=True, specialization__doctor__doctor_clinics__hospital__is_live=True))).\
+                                                                        filter(bookable_doctors_count__gt=0).order_by('-bookable_doctors_count').values_list('id', flat=True)
                 for id in doctors_spec_ids:
                     if not id in similar_specializations_ids:
                         similar_specializations_ids.append(id)
