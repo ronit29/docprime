@@ -70,6 +70,7 @@ class NotificationAction:
     INSURANCE_CANCELLATION=74
     INSURANCE_FLOAT_LIMIT=75
     INSURANCE_MIS=76
+    FOLLOWUP_APPOINTMENT=77
     OPD_OTP_BEFORE_APPOINTMENT = 30
     LAB_OTP_BEFORE_APPOINTMENT = 31
     OPD_CONFIRMATION_CHECK_AFTER_APPOINTMENT = 32
@@ -130,6 +131,7 @@ class NotificationAction:
         (INSURANCE_ENDORSMENT_APPROVED, "Insurance endorsment completed."),
         (INSURANCE_ENDORSMENT_REJECTED, "Insurance endorsment rejected."),
         (INSURANCE_ENDORSMENT_PENDING, "Insurance endorsment received."),
+        (FOLLOWUP_APPOINTMENT, "OPD Followup Appointment received."),
         (CASHBACK_CREDITED, "Cashback Credited"),
         (REFUND_BREAKUP, 'Refund break up'),
         (REFUND_COMPLETED, 'Refund Completed'),
@@ -697,7 +699,11 @@ class EmailNotification(TimeStampedModel, EmailNotificationOpdMixin, EmailNotifi
                     user_number=data_obj.get("user_number"), lab_name=data_obj.get("lab_name"),
                     test_names=data_obj.get("test_names"), time_of_appointment=data_obj.get("time_of_appointment"),
                     order_id=data_obj.get("order_id"), transaction_time=data_obj.get("transaction_time"))
-
+        elif alert_type == cls.FOLLOWUP_APPOINTMENT:
+            url = settings.ADMIN_BASE_URL + "/admin/doctor/opdappointment/" + str(data_obj.id) + "/change"
+            html_body = "Doctor Followup Appointment received for id   - {id}, You can change the appointment type with" \
+                        "given url {url}".format(id=data_obj.id, url=url)
+            email_subject = "Followup Appointment Received - {id}".format(id=data_obj.id)
         if email_list:
             for e_id in email_list:
                 cls.publish_ops_email(e_id, html_body, email_subject)

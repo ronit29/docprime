@@ -2729,6 +2729,10 @@ class OpdAppointment(auth_model.TimeStampedModel, CouponsMixin, OpdAppointmentIn
 
         if old_instance and old_instance.status != self.ACCEPTED and self.status == self.ACCEPTED:
             try:
+                if self.is_followup_appointment():
+                    notification_models.EmailNotification.ops_notification_alert(self, email_list=settings.INSURANCE_OPS_EMAIL,
+                                                                             product=Order.DOCTOR_PRODUCT_ID,
+                                                                             alert_type=notification_models.EmailNotification.FOLLOWUP_APPOINTMENT)
                 notification_tasks.docprime_appointment_reminder_sms_provider.apply_async(
                     (self.id, str(math.floor(self.updated_at.timestamp()))),
                     eta=self.time_slot_start - datetime.timedelta(
