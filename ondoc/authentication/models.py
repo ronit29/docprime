@@ -543,6 +543,7 @@ class UserProfile(TimeStampedModel):
     is_otp_verified = models.BooleanField(default=False)
     is_default_user = models.BooleanField(default=False)
     dob = models.DateField(blank=True, null=True)
+    source = models.CharField(blank=True, max_length=50, null=True)
     
     profile_image = models.ImageField(upload_to='users/images', height_field=None, width_field=None, blank=True, null=True)
     whatsapp_optin = models.NullBooleanField(default=None) # optin check of the whatsapp
