@@ -1936,9 +1936,10 @@ class DoctorListViewSet(viewsets.GenericViewSet):
                     "department__departments__specializationdepartmentmapping").
                     annotate( specialization_id=F('department__departments__specializationdepartmentmapping__specialization')).values_list('specialization_id', flat=True))
 
-                doctors_spec_ids = PracticeSpecialization.objects.filter(id__in=spec_dept_mapping_spec_ids).prefetch_related("specialization__doctor__doctor_clinics", "doctor__doctor_clinics__hospital",
-                                    "specialization__doctor", "specialization").annotate(bookable_doctors_count=Count(Q(specialization__doctor__enabled_for_online_booking=True,
-                                                                                specialization__doctor__doctor_clinics__hospital__enabled_for_online_booking=True,
+                doctors_spec_ids = PracticeSpecialization.objects.filter(id__in=spec_dept_mapping_spec_ids).prefetch_related("specialization__doctor__doctor_clinics",
+                                                                        "specialization__doctor__doctor_clinics__hospital", "specialization__doctor",
+                                                                        "specialization").annotate(bookable_doctors_count=Count(Q(specialization__doctor__enabled_for_online_booking=True,
+                                                                         specialization__doctor__doctor_clinics__hospital__enabled_for_online_booking=True,
                                                                             specialization__doctor__doctor_clinics__enabled_for_online_booking=True))).filter(bookable_doctors_count__gt=0).order_by('-bookable_doctors_count').values_list('id', flat=True)
                 for id in doctors_spec_ids:
                     if not id in similar_specializations_ids:
