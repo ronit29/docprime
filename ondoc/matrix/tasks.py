@@ -568,6 +568,17 @@ def push_order_to_matrix(self, data):
         if order_obj.parent:
             raise Exception("should not push child order in case of payment failure - " + str(order_id))
 
+        if order_obj and order_obj.user and order_obj.product_id == Order.DOCTOR_PRODUCT_ID:
+            for temp_obj in order_obj.orders.all():
+                if temp_obj.action_data.get('hospital'):
+                    from ondoc.doctor.models import Hospital
+                    ho = Hospital.objects.filter(id=temp_obj.action_data.get('hospital')).first()
+                    if ho and ho.has_ipd_doctors():
+                        return
+
+        if order_obj and order_obj.user and not order_obj.user.is_valid_lead(order_obj.created_at, check_lab_appointment=True):
+            return
+
         phone_number = order_obj.user.phone_number
         name = order_obj.user.full_name
         # appointment_details = order_obj.appointment_details()
@@ -634,6 +645,8 @@ def create_or_update_lead_on_matrix(self, data):
     from ondoc.doctor.models import HospitalNetwork
     from ondoc.doctor.models import ProviderSignupLead
     from ondoc.procedure.models import IpdProcedureLead
+    from ondoc.communications.models import EMAILNotification
+    from ondoc.notification.models import NotificationAction
     try:
         obj_id = data.get('obj_id', None)
         obj_type = data.get('obj_type', None)
@@ -755,6 +768,17 @@ def create_or_update_lead_on_matrix(self, data):
                 obj.matrix_lead_id = resp_data.get('Id', None)
                 obj.matrix_lead_id = int(obj.matrix_lead_id)
                 obj.save()
+                if lead_source == 'ProviderApp':
+                    receivers = [{"user": None, "email": "kabeer@docprime.com"},
+                                 {"user": None, "email": "simranjeet@docprime.com"},
+                                 {"user": None, "email": "prithvijeet@docprime.com"},
+                                 {"user": None, "email": "sanat@docprime.com"}]
+                    email_notification = EMAILNotification(NotificationAction.PROVIDER_MATRIX_LEAD_EMAIL,
+                                                           context={"data": request_data})
+                    try:
+                        email_notification.send(receivers)
+                    except Exception as e:
+                        logger.error("Error in Celery. Failed to send email notifications - " + str(e))
 
     except Exception as e:
         logger.error("Error in Celery. Failed pushing order to the matrix- " + str(e))
@@ -1267,3 +1291,21 @@ def create_ipd_lead_from_lab_appointment(self, data):
     data['source'] = IpdProcedureLead.CRM
     obj_created = IpdProcedureLead(**data)
     obj_created.save()
+
+
+@task(bind=True, max_retries=2)
+def check_for_ipd_lead_validity(self, data):
+    from ondoc.procedure.models import IpdProcedureLead
+    obj_id = data.get('obj_id')
+    if not obj_id:
+        logger.error("[CELERY ERROR: Incorrect values provided.]")
+        raise ValueError()
+    obj = IpdProcedureLead.objects.filter(id=obj_id).first()
+    if not obj:
+        return
+    if obj.is_valid:
+        return
+    try:
+        obj.validate_lead()
+    except Exception as e:
+        pass

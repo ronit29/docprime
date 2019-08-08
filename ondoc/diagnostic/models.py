@@ -60,7 +60,7 @@ from ondoc.ratings_review import models as ratings_models
 # from ondoc.api.v1.common import serializers as common_serializers
 from ondoc.common.models import AppointmentHistory, AppointmentMaskNumber, Remark, GlobalNonBookable, \
     SyncBookingAnalytics, CompletedBreakupMixin, RefundDetails, MatrixMappedState, \
-    MatrixMappedCity, TdsDeductionMixin, MatrixDataMixin, MerchantPayoutMixin
+    MatrixMappedCity, TdsDeductionMixin, MatrixDataMixin, MerchantPayoutMixin, Fraud
 import reversion
 from decimal import Decimal
 from django.utils.text import slugify
@@ -1947,6 +1947,8 @@ class LabAppointment(TimeStampedModel, CouponsMixin, LabAppointmentInvoiceMixin,
             except Exception as e:
                 logger.error(str(e))
 
+        if old_instance and old_instance.status != self.COMPLETED and self.status == self.COMPLETED:
+            self.check_merchant_payout_action()
         # Do not delete below commented code
         # try:
         #     prev_app_dict = {'id': self.id,
@@ -1958,6 +1960,17 @@ class LabAppointment(TimeStampedModel, CouponsMixin, LabAppointmentInvoiceMixin,
         # except Exception as e:
         #     logger.error("Error in auto cancel flow - " + str(e))
         print('all lab appointment tasks completed')
+
+    @property
+    def is_fraud_appointment(self):
+        if not self.insurance:
+            return False
+        content_type = ContentType.objects.get_for_model(LabAppointment)
+        appointment = Fraud.objects.filter(content_type=content_type, object_id=self.id).first()
+        if appointment:
+            return True
+        else:
+            return False
 
     def get_pickup_address(self):
         if not self.address:
@@ -2005,7 +2018,8 @@ class LabAppointment(TimeStampedModel, CouponsMixin, LabAppointmentInvoiceMixin,
             # while completing appointment
             if database_instance and database_instance.status != self.status and self.status == self.COMPLETED:
                 # add a merchant_payout entry
-                if self.merchant_payout is None and self.payment_type not in [OpdAppointment.COD]:
+                if self.merchant_payout is None and self.payment_type not in [OpdAppointment.COD] and \
+                        not self.is_fraud_appointment:
                     self.save_merchant_payout()
                 # credit cashback if any
                 if self.cashback is not None and self.cashback > 0:
@@ -2071,7 +2085,10 @@ class LabAppointment(TimeStampedModel, CouponsMixin, LabAppointmentInvoiceMixin,
             "tds_amount": tds
         }
 
-        merchant_payout = MerchantPayout.objects.create(**payout_data)
+        merchant_payout = MerchantPayout(**payout_data)
+        merchant_payout.paid_to = self.get_merchant
+        merchant_payout.content_object = self.get_billed_to
+        merchant_payout.save()
         self.merchant_payout = merchant_payout
 
         # TDS Deduction
@@ -2080,6 +2097,22 @@ class LabAppointment(TimeStampedModel, CouponsMixin, LabAppointmentInvoiceMixin,
             MerchantTdsDeduction.objects.create(merchant=merchant, tds_deducted=tds,
                                                 financial_year=settings.CURRENT_FINANCIAL_YEAR,
                                                 merchant_payout=merchant_payout)
+
+    def check_merchant_payout_action(self):
+        from ondoc.notification.tasks import set_order_dummy_transaction
+        # check for advance payment
+        merchant_payout = self.merchant_payout
+        if merchant_payout:
+            if self.payment_type == 1 and merchant_payout.merchant_has_advance_payment():
+                merchant_payout.update_payout_for_advance_available()
+
+            if self.insurance and merchant_payout.id and not merchant_payout.is_insurance_premium_payout() and merchant_payout.status == merchant_payout.PENDING:
+                try:
+                    has_txn, order_data, appointment = merchant_payout.has_transaction()
+                    if not has_txn:
+                        transaction.on_commit(lambda: set_order_dummy_transaction.apply_async((order_data.id, appointment.user_id,)))
+                except Exception as e:
+                    logger.error(str(e))
 
     def get_auto_cancel_delay(self, app_obj):
         delay = settings.AUTO_CANCEL_LAB_DELAY * 60
@@ -2435,7 +2468,7 @@ class LabAppointment(TimeStampedModel, CouponsMixin, LabAppointmentInvoiceMixin,
         }
 
     @classmethod
-    def create_fulfillment_data(cls, user, data, price_data):
+    def create_fulfillment_data(cls, user, data, price_data, request):
         from ondoc.api.v1.auth.serializers import AddressSerializer
         from ondoc.insurance.models import UserInsurance
 
@@ -2468,15 +2501,21 @@ class LabAppointment(TimeStampedModel, CouponsMixin, LabAppointmentInvoiceMixin,
 
         is_appointment_insured = False
         insurance_id = None
+        booked_by = 'agent' if hasattr(request, 'agent') else 'user'
         user_insurance = UserInsurance.objects.filter(user=user).order_by('-id').first()
         if user_insurance and user_insurance.is_valid():
-            is_appointment_insured, insurance_id, insurance_message = user_insurance.validate_lab_insurance(data, user_insurance)
+            is_appointment_insured, insurance_id, insurance_message = user_insurance.validate_lab_insurance(data, booked_by=booked_by)
 
         if is_appointment_insured and cart_data.get('is_appointment_insured', None):
             payment_type = OpdAppointment.INSURANCE
             effective_price = 0.0
         else:
             insurance_id = None
+            if data["payment_type"] == OpdAppointment.INSURANCE:
+                payment_type = OpdAppointment.PREPAID
+            else:
+                payment_type = data["payment_type"]
+
 
         fulfillment_data = {
             "lab": data["lab"],
@@ -3216,3 +3255,30 @@ class LabTestThresholds(TimeStampedModel):
 
     class Meta:
         db_table = 'lab_test_thresholds'
+
+
+class LabTestCategoryUrls(TimeStampedModel):
+    url = models.SlugField(blank=False, null=True, max_length=2000, db_index=True, unique=True)
+    title = models.CharField(max_length=2000, default='')
+    latitude = models.FloatField(null=True, blank=True)
+    longitude = models.FloatField(null=True, blank=True)
+    radius = models.FloatField(null=True, blank=True)
+
+    class Meta:
+        db_table = 'lab_test_category_urls'
+
+    def save(self, *args, **kwargs):
+        self.url = self.url.lower()
+        if not self.url.endswith('tpcp'):
+            self.url = self.url + '-tpcp'
+
+        super(LabTestCategoryUrls, self).save(*args, **kwargs)
+
+
+class LabTestCategoryLandingURLS(TimeStampedModel):
+    url = models.ForeignKey(LabTestCategoryUrls, related_name="lab_category_url", on_delete=models.CASCADE)
+    test = models.ForeignKey(LabTestCategory, related_name="compare_lab", on_delete=models.CASCADE)
+    priority = models.IntegerField(default=0)
+
+    class Meta:
+        db_table = "lab_test_category_landing_urls"

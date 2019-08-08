@@ -3,7 +3,7 @@ from pyodbc import Date
 
 from django.contrib.gis.geos import Point
 from django.utils import timezone
-
+from django.conf import settings
 from ondoc.api.v1.doctor.serializers import DoctorProfileUserViewSerializer
 from ondoc.api.v1.procedure.serializers import DoctorClinicProcedureSerializer
 from ondoc.api.v1.ratings.serializers import GoogleRatingsGraphSerializer
@@ -295,7 +295,7 @@ class DoctorSearchHelper:
         bucket_size=8000
 
         if self.query_params.get('is_user_insured') and not self.query_params.get('sort_on'):
-            return "  distance ASC, fees ASC ", "rnk=1"
+            return "  enabled_for_online_booking DESC, distance ASC, fees ASC ", "rnk=1"
 
         if self.count_of_procedure:
             order_by_field = ' distance, total_price '
@@ -420,12 +420,25 @@ class DoctorSearchHelper:
         else:
             sp_cond = ''
             min_dist_cond = ''
+            search_distance =''
             rank_part = " Row_number() OVER( partition BY d.id  ORDER BY " \
                 "St_distance(St_setsrid(St_point((%(longitude)s), (%(latitude)s)), 4326 ), h.location),dct.deal_price ASC) rnk " \
 
             if len(specialization_ids)>0 or len(condition_ids)>0:
                 sp_cond = " LEFT JOIN doctor_practice_specialization ds on ds.doctor_id = d.id " \
                        " LEFT JOIN practice_specialization gs on ds.specialization_id = gs.id "
+
+            if sp_cond:
+                search_distance = " and case when gs.search_distance is not null then " \
+                                  "St_dwithin( St_setsrid(St_point((%(longitude)s), (%(latitude)s)), 4326), h.location, gs.search_distance )" \
+                                  "else case when (%(max_distance)s) >= 0  then " \
+                                  "St_dwithin( St_setsrid(St_point((%(longitude)s), (%(latitude)s)), 4326), h.location, (%(max_distance)s))" \
+                                " else St_dwithin( St_setsrid(St_point((%(longitude)s), (%(latitude)s)), 4326), h.location, h.search_distance ) end " \
+                                  "end"
+            else:
+                search_distance = " and case when (%(max_distance)s) >= 0  then St_dwithin( St_setsrid(St_point((%(longitude)s), (%(latitude)s)), 4326), h.location, (%(max_distance)s))" \
+                           " else St_dwithin( St_setsrid(St_point((%(longitude)s), (%(latitude)s)), 4326), h.location, h.search_distance ) end "
+
             if min_distance>0:
                 min_dist_cond = " and St_dwithin(St_setsrid(St_point((%(longitude)s), (%(latitude)s)), 4326 ), h.location, (%(min_distance)s)) = false "
 
@@ -457,13 +470,12 @@ class DoctorSearchHelper:
                            "AND (%(ist_time)s) BETWEEN dl.start_time and dl.end_time " \
                            "{sp_cond} " \
                            "WHERE {filtering_params} " \
-                           "and case when (%(max_distance)s) >= 0  then St_dwithin( St_setsrid(St_point((%(longitude)s), (%(latitude)s)), 4326), h.location, (%(max_distance)s))" \
-                           " else St_dwithin( St_setsrid(St_point((%(longitude)s), (%(latitude)s)), 4326), h.location, h.search_distance ) end" \
+                           " {search_distance} " \
                            "{min_dist_cond}" \
                            " )x " \
                            "where {rank_by} ORDER BY {order_by_field}".format(rank_part=rank_part, sp_cond=sp_cond, \
                                                                               filtering_params=filtering_params.get(
-                                                                                  'string'), \
+                                                                                  'string'), search_distance=search_distance,\
                                                                               min_dist_cond=min_dist_cond,
                                                                               order_by_field=order_by_field, \
                                                                               rank_by=rank_by, ipd_query=ipd_query)
@@ -579,15 +591,30 @@ class DoctorSearchHelper:
                 # Insurance is not valid for the procedures hence negating the procedure request.
 
                 is_insurance_covered = False
+                insurance_error = None
                 insurance_data_dict = kwargs.get('insurance_data')
                 if doctor_clinic.hospital.enabled_for_prepaid and enable_online_booking and doctor.is_insurance_enabled and doctor.is_doctor_specialization_insured() and insurance_data_dict and min_price.get("mrp") is not None and \
                         min_price["mrp"] <= insurance_data_dict['insurance_threshold_amount'] and \
                         not (request.query_params.get('procedure_ids') or request.query_params.get('procedure_category_ids')):
                     is_insurance_covered = True
 
+                if request and request.user and not request.user.is_anonymous and request.user.active_insurance and \
+                        not doctor.is_gyno_limit_breach(request.user.active_insurance) and is_insurance_covered:
+                    is_insurance_covered = True
+                else:
+                    is_insurance_covered = False
+                    insurance_error = "You have already utilised {} Gynaecologist consultations available in your OPD Insurance Plan.".format(settings.INSURANCE_GYNECOLOGIST_LIMIT)
+
+                if request and request.user and not request.user.is_anonymous and request.user.active_insurance and \
+                        not doctor.is_onco_limit_breach(request.user.active_insurance) and is_insurance_covered:
+                    is_insurance_covered = True
+                else:
+                    is_insurance_covered = False
+                    insurance_error = "You have already utilised {} Oncologist consultations available in your OPD Insurance Plan.".format(settings.INSURANCE_ONCOLOGIST_LIMIT)
                 hospitals = [{
                     "enabled_for_online_booking": enable_online_booking,
                     "is_insurance_covered": is_insurance_covered,
+                    "insurance_limit_message": insurance_error,
                     "insurance_threshold_amount": insurance_data_dict['insurance_threshold_amount'],
                     "is_user_insured": insurance_data_dict['is_user_insured'],
                     "welcome_calling_done": doctor_clinic.hospital.welcome_calling_done,

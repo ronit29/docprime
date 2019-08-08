@@ -245,7 +245,7 @@ def update_merchant_payout_pg_status():
     # payouts = MerchantPayout.objects.all().order_by('-id')
     # payouts = MerchantPayout.objects.filter(Q(pg_status='SETTLEMENT_COMPLETED')|Q(utr_no__gt='')|Q(utr_no__isnull=False)|Q(type=2))
 
-    payouts = MerchantPayout.objects.filter((Q(pg_status='SETTLEMENT_COMPLETED') & Q(utr_no='')) | Q(status=MerchantPayout.INPROCESS) | Q(type=2))
+    payouts = MerchantPayout.objects.filter((Q(status=MerchantPayout.PAID) & Q(utr_no='')) | (Q(pg_status='SETTLEMENT_COMPLETED') & Q(utr_no='')) | Q(status=MerchantPayout.INPROCESS) | Q(type=2))
     for p in payouts:
         p.refresh_from_db()
         p.update_status_from_pg()

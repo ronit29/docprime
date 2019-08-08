@@ -168,17 +168,19 @@ class Hospital(auth_model.TimeStampedModel, auth_model.CreatedByModel, auth_mode
     PHONE_RINGING_BUT_COULD_NOT_CONNECT = 10
     WELCOME_CALLING = 1
     ESCALATION = 2
+    INSURANCE = 3
     DISABLED_REASONS_CHOICES = (
         ("", "Select"), (INCORRECT_CONTACT_DETAILS, "Incorrect contact details"),
         (MOU_AGREEMENT_NEEDED, "MoU agreement needed"), (HOSPITAL_NOT_INTERESTED, "Hospital not interested for tie-up"),
         (CHARGES_ISSUES, "Issue in discount % / consultation charges"),
         (PHONE_RINGING_BUT_COULD_NOT_CONNECT, "Phone ringing but could not connect"),
         (DUPLICATE, "Duplicate"), (OTHERS, "Others (please specify)"))
-    DISABLED_AFTER_CHOICES = (("", "Select"), (WELCOME_CALLING, "Welcome Calling"), (ESCALATION, "Escalation"))
+    DISABLED_AFTER_CHOICES = (("", "Select"), (WELCOME_CALLING, "Welcome Calling"), (ESCALATION, "Escalation"), (INSURANCE, "INSURANCE"))
     AGENT = 1
     PROVIDER = 2
     SOURCE_TYPE_CHOICES = ((AGENT, "Agent"), (PROVIDER, "Provider"))
     name = models.CharField(max_length=200)
+    seo_title = models.CharField(max_length=200, null=True, blank=True)
     location = models.PointField(geography=True, srid=4326, blank=True, null=True)
     location_error = models.PositiveIntegerField(blank=True, null=True)
     operational_since = models.PositiveSmallIntegerField(blank=True, null=True, validators=[MinValueValidator(1800)])
@@ -288,6 +290,7 @@ class Hospital(auth_model.TimeStampedModel, auth_model.CreatedByModel, auth_mode
     @staticmethod
     def get_top_hospitals_data(request, lat=28.450367, long=77.071848):
         from ondoc.api.v1.doctor.serializers import TopHospitalForIpdProcedureSerializer
+        from ondoc.seo.models import NewDynamic
         result = []
         queryset = CommonHospital.objects.all().values_list('hospital', 'network')
         top_hospital_ids = list(set([x[0] for x in queryset if x[0] is not None]))
@@ -324,9 +327,16 @@ class Hospital(auth_model.TimeStampedModel, auth_model.CreatedByModel, auth_mode
         hosp_entity_dict, hosp_locality_entity_dict = Hospital.get_hosp_and_locality_dict(temp_hospital_ids,
                                                                                           EntityUrls.SitemapIdentifier.HOSPITALS_LOCALITY_CITY)
 
+        entity_queryset = EntityUrls.objects.filter(is_valid=True, sitemap_identifier=EntityUrls.SitemapIdentifier.HOSPITAL_PAGE,
+                                                    entity_id__in = temp_hospital_ids)
+        entity_queryset_dict = {x.entity_id: x for x in entity_queryset}
+        all_entity_urls = list(set([x.url for x in entity_queryset]))
+        new_dynamic_qs = NewDynamic.objects.filter(url_value__in=all_entity_urls)
+        new_dynamic_dict = {x.url_value: x for x in new_dynamic_qs}
         result = TopHospitalForIpdProcedureSerializer(hosp_queryset, many=True, context={'request': request,
                                                                                          'hosp_entity_dict': hosp_entity_dict,
-                                                                                         'hosp_locality_entity_dict': hosp_locality_entity_dict}).data
+                                                                                         'hosp_locality_entity_dict': hosp_locality_entity_dict,
+                                                                                         'new_dynamic_dict': new_dynamic_dict}).data
         return result
 
 
@@ -552,7 +562,8 @@ class Hospital(auth_model.TimeStampedModel, auth_model.CreatedByModel, auth_mode
         # if self.is_live and self.id and self.location:
         #     if Hospital.objects.filter(location__distance_lte=(self.location, 0), id=self.id).exists():
         #         build_url = False
-
+        if not self.seo_title and self.name:
+            self.seo_title = self.name
         push_to_matrix = False
         update_status_in_matrix = False
         if self.id:
@@ -956,19 +967,21 @@ class Doctor(auth_model.TimeStampedModel, auth_model.QCModel, SearchKey, auth_mo
         return resp
 
     def update_deal_price(self):        
-        # will update only this doctor prices and will be called on save    
-        query = '''update doctor_clinic_timing set deal_price = least(
-                    greatest(floor(
-                    case when fees <=0 then mrp*.4 
-                    when mrp<=2000 then
-                    case when (least(fees*1.5, .9*mrp) - fees) >100 then least(fees*1.5, .9*mrp) 
-                    else least(fees+100, mrp) end
-                    else 
-                    case when (least(fees*1.5, fees+.5*(mrp-fees)) - fees )>100
-                    then least(fees*1.5, fees+.5*(mrp-fees))
-                    else
-                    least(fees+100, mrp) end 	
-                    end  /5)*5, fees), mrp) where doctor_clinic_id in (
+        # will update only this doctor prices and will be called on save
+        query = '''update doctor_clinic_timing set deal_price = 
+					case when (custom_deal_price > 0 )
+					then custom_deal_price else floor(				 
+                    case when fees =0 then
+						case when mrp <300 then least((0.5*mrp)/0.75, mrp)
+						else  least( 0.5*mrp + 75 , mrp)
+						end 
+					else
+					case when mrp<300 then 
+					least(greatest(greatest(fees+60, 0.7*mrp), mrp-200)/0.75,mrp)
+					else least(greatest(greatest(fees+60, 0.7*mrp), mrp-200)+75, mrp)
+					end  end)
+					end
+					where doctor_clinic_id in (
                     select id from doctor_clinic where doctor_id=%s and hospital_id!=3560) '''
 
         update_doctor_deal_price = RawSql(query, [self.pk]).execute()
@@ -983,18 +996,20 @@ class Doctor(auth_model.TimeStampedModel, auth_model.QCModel, SearchKey, auth_mo
     @classmethod
     def update_all_deal_price(cls):
         # will update all doctors prices
-        query = '''update doctor_clinic_timing set deal_price = least(
-                    greatest(floor(
-                    case when fees <=0 then mrp*.4 
-                    when mrp<=2000 then
-                    case when (least(fees*1.5, .9*mrp) - fees) >100 then least(fees*1.5, .9*mrp) 
-                    else least(fees+100, mrp) end
-                    else 
-                    case when (least(fees*1.5, fees+.5*(mrp-fees)) - fees )>100
-                    then least(fees*1.5, fees+.5*(mrp-fees))
-                    else
-                    least(fees+100, mrp) end 	
-                    end  /5)*5, fees), mrp) where doctor_clinic_id  in (select id from doctor_clinic where hospital_id!=3560 ) '''
+        query = '''update doctor_clinic_timing set deal_price = 
+					case when (custom_deal_price > 0 )
+					then custom_deal_price else floor(				 
+                    case when fees =0 then
+						case when mrp <300 then least((0.5*mrp)/0.75, mrp)
+						else  least( 0.5*mrp + 75 , mrp)
+						end 
+					else
+					case when mrp<300 then 
+					least(greatest(greatest(fees+60, 0.7*mrp), mrp-200)/0.75,mrp)
+					else least(greatest(greatest(fees+60, 0.7*mrp), mrp-200)+75, mrp)
+					end  end)
+					end
+					 where doctor_clinic_id  in (select id from doctor_clinic where hospital_id!=3560 )  '''
 
         update_all_doctor_deal_price = RawSql(query, []).execute()
 
@@ -1321,6 +1336,52 @@ class Doctor(auth_model.TimeStampedModel, auth_model.QCModel, SearchKey, auth_mo
         #         return False
         return True
 
+    def is_gyno_limit_breach(self, insurance):
+        if not insurance:
+            return True
+        count = 0
+        specializaion_ids = set(json.loads(settings.GYNECOLOGIST_SPECIALIZATION_IDS))
+        doctor_with_gyno_specialization = DoctorPracticeSpecialization.objects. \
+            filter(specialization_id__in=list(specializaion_ids)).values_list('doctor_id', flat=True)
+
+        if not self.id in doctor_with_gyno_specialization:
+            return False
+
+        if doctor_with_gyno_specialization:
+            count = OpdAppointment.objects.filter(~Q(status=OpdAppointment.CANCELLED),
+                                                  doctor_id__in=doctor_with_gyno_specialization,
+                                                  payment_type=OpdAppointment.INSURANCE,
+                                                  insurance=insurance,
+                                                  user=insurance.user).count()
+
+        if count >= int(settings.INSURANCE_GYNECOLOGIST_LIMIT):
+            return True
+        else:
+            return False
+
+    def is_onco_limit_breach(self, insurance):
+        if not insurance:
+            return True
+        count = 0
+        specializaion_ids = set(json.loads(settings.ONCOLOGIST_SPECIALIZATION_IDS))
+        doctor_with_onco_specialization = DoctorPracticeSpecialization.objects. \
+            filter(specialization_id__in=list(specializaion_ids)).values_list('doctor_id', flat=True)
+
+        if not self.id in doctor_with_onco_specialization:
+            return False
+
+        if doctor_with_onco_specialization:
+            count = OpdAppointment.objects.filter(~Q(status=OpdAppointment.CANCELLED),
+                                                  doctor_id__in=doctor_with_onco_specialization,
+                                                  payment_type=OpdAppointment.INSURANCE,
+                                                  insurance=insurance,
+                                                  user=insurance.user).count()
+
+        if count >= int(settings.INSURANCE_ONCOLOGIST_LIMIT):
+            return True
+        else:
+            return False
+
     class Meta:
         db_table = "doctor"
 
@@ -1520,6 +1581,7 @@ class DoctorClinicTiming(auth_model.TimeStampedModel):
     type = models.IntegerField(default=1, choices=TYPE_CHOICES)
     cod_deal_price = models.PositiveSmallIntegerField(blank=True, null=True)
     insurance_fees = models.PositiveSmallIntegerField(blank=True, null=True)
+    custom_deal_price = models.PositiveSmallIntegerField(blank=True, null=True)
     # followup_duration = models.PositiveSmallIntegerField(blank=False, null=True)
     # followup_charges = models.PositiveSmallIntegerField(blank=False, null=True)
 
@@ -2329,6 +2391,11 @@ class OpdAppointment(auth_model.TimeStampedModel, CouponsMixin, OpdAppointmentIn
                 mime_type = get_file_mime_type(file)
                 file_url = pf.name.url
                 resp.append({"url": file_url, "type": mime_type})
+
+        for pres in self.eprescription.all():
+            file = pres.prescription_file
+            resp.append({"url": file.url, "type": get_file_mime_type(file)})
+
         return resp
 
 
@@ -2686,6 +2753,8 @@ class OpdAppointment(auth_model.TimeStampedModel, CouponsMixin, OpdAppointmentIn
             except Exception as e:
                 logger.error(str(e))
 
+        if old_instance and old_instance.status != self.COMPLETED and self.status == self.COMPLETED:
+            self.check_merchant_payout_action()
         # try:
         #     if self.status not in [OpdAppointment.COMPLETED, OpdAppointment.CANCELLED, OpdAppointment.ACCEPTED]:
         #         countdown = self.get_auto_cancel_delay(self)
@@ -2730,7 +2799,7 @@ class OpdAppointment(auth_model.TimeStampedModel, CouponsMixin, OpdAppointmentIn
             if database_instance and database_instance.status != self.status and self.status == self.COMPLETED:
                 # add a merchant_payout entry
                 if self.merchant_payout is None and self.payment_type not in [OpdAppointment.COD] and  \
-                        (self.appointment_type != OpdAppointment.FOLLOWUP or not self.is_fraud_appointment):
+                        not(self.appointment_type == OpdAppointment.FOLLOWUP or self.is_fraud_appointment):
                     self.save_merchant_payout()
 
                 # credit cashback if any
@@ -2767,13 +2836,16 @@ class OpdAppointment(auth_model.TimeStampedModel, CouponsMixin, OpdAppointmentIn
         self.update_net_revenues(tds)
 
         payout_data = {
-            "charged_amount" : self.effective_price,
-            "payable_amount" : payout_amount,
-            "booking_type"  : Order.DOCTOR_PRODUCT_ID,
-            "tds_amount" : tds
+            "charged_amount": self.effective_price,
+            "payable_amount": payout_amount,
+            "booking_type": Order.DOCTOR_PRODUCT_ID,
+            "tds_amount": tds
         }
 
-        merchant_payout = MerchantPayout.objects.create(**payout_data)
+        merchant_payout = MerchantPayout(**payout_data)
+        merchant_payout.paid_to = self.get_merchant
+        merchant_payout.content_object = self.get_billed_to
+        merchant_payout.save()
         self.merchant_payout = merchant_payout
 
         # TDS Deduction
@@ -2781,6 +2853,22 @@ class OpdAppointment(auth_model.TimeStampedModel, CouponsMixin, OpdAppointmentIn
             merchant = self.get_merchant
             MerchantTdsDeduction.objects.create(merchant=merchant, tds_deducted=tds, financial_year=settings.CURRENT_FINANCIAL_YEAR,
                                                 merchant_payout=merchant_payout)
+
+    def check_merchant_payout_action(self):
+        from ondoc.notification.tasks import set_order_dummy_transaction
+        # check for advance payment
+        merchant_payout = self.merchant_payout
+        if merchant_payout:
+            if self.payment_type == 1 and merchant_payout.merchant_has_advance_payment():
+                merchant_payout.update_payout_for_advance_available()
+
+            if self.insurance and merchant_payout.id and not merchant_payout.is_insurance_premium_payout() and merchant_payout.status == merchant_payout.PENDING:
+                try:
+                    has_txn, order_data, appointment = merchant_payout.has_transaction()
+                    if not has_txn:
+                        transaction.on_commit(lambda: set_order_dummy_transaction.apply_async((order_data.id, appointment.user_id,)))
+                except Exception as e:
+                    logger.error(str(e))
 
     def doc_payout_amount(self):
         amount = 0
@@ -3010,6 +3098,8 @@ class OpdAppointment(auth_model.TimeStampedModel, CouponsMixin, OpdAppointmentIn
         if data.get("payment_type") == cls.COD:
             effective_price = 0
             coupon_discount, coupon_cashback, coupon_list, random_coupon_list = 0, 0, [], []
+            deal_price = doctor_clinic_timing.dct_cod_deal_price()
+
 
         return {
             "deal_price": deal_price,
@@ -3023,6 +3113,8 @@ class OpdAppointment(auth_model.TimeStampedModel, CouponsMixin, OpdAppointmentIn
                 "deal_price": doctor_clinic_timing.deal_price,
                 "mrp": doctor_clinic_timing.mrp,
                 "fees": doctor_clinic_timing.fees,
+                "cod_deal_price": doctor_clinic_timing.dct_cod_deal_price(),
+                "is_enabled_for_cod": doctor_clinic_timing.is_enabled_for_cod(),
                 "insurance_fees": doctor_clinic_timing.insurance_fees
             },
             "coupon_data" : { "random_coupon_list" : random_coupon_list }
@@ -3064,7 +3156,7 @@ class OpdAppointment(auth_model.TimeStampedModel, CouponsMixin, OpdAppointmentIn
         insurance_id = None
         user_insurance = UserInsurance.objects.filter(user=user).last()
         if user_insurance and user_insurance.is_valid():
-            is_appointment_insured, insurance_id, insurance_message = user_insurance.validate_doctor_insurance(data, user_insurance)
+            is_appointment_insured, insurance_id, insurance_message = user_insurance.validate_doctor_insurance(data)
 
         if is_appointment_insured and cart_data.get('is_appointment_insured', None):
             payment_type = OpdAppointment.INSURANCE
@@ -3369,16 +3461,13 @@ class OpdAppointment(auth_model.TimeStampedModel, CouponsMixin, OpdAppointmentIn
         profile = self.profile
         last_appointment = None
 
-        # if type == "payout":
-        #     completed_appointment = OpdAppointment.objects.filter(doctor=doctor, profile=profile, hospital=hospital,
-        #                                                           status=OpdAppointment.COMPLETED,
-        #                                                           created_at__lt=self.created_at,
-        #                                                           insurance__isnull=False).order_by('-id')
-        #     if not completed_appointment:
-        #         return False
-        #     last_appointment = completed_appointment.first()
+        # previous_appointments = OpdAppointment.objects.filter(~Q(appointment_type=OpdAppointment.FOLLOWUP) &
+        #                                                       ~Q(status=OpdAppointment.CANCELLED) &
+        #                                                       Q(doctor=doctor) &
+        #                                                       Q(profile=profile) & Q(hospital=hospital) &
+        #                                                       Q(insurance__isnull=False) &
+        #                                                       Q(created_at__lt=self.created_at)).order_by('-id')
 
-        # if type == "crm":
         previous_appointments = OpdAppointment.objects.filter(~Q(status=OpdAppointment.CANCELLED) &
                                                               (Q(appointment_type=OpdAppointment.REGULAR) |
                                                                Q(appointment_type__isnull=True)),
@@ -3386,7 +3475,6 @@ class OpdAppointment(auth_model.TimeStampedModel, CouponsMixin, OpdAppointmentIn
                                                               profile=profile, hospital=hospital,
                                                               created_at__lt=self.created_at,
                                                               insurance__isnull=False).order_by('-id')
-
         if not previous_appointments:
             return False
         last_appointment = previous_appointments.first()
@@ -3721,6 +3809,7 @@ class PracticeSpecialization(auth_model.TimeStampedModel, SearchKey):
     doctor_count = models.PositiveIntegerField(default=0, null=True)
     is_insurance_enabled = models.BooleanField(default=True)
     priority = models.PositiveIntegerField(default=0, null=True)
+    search_distance = models.FloatField(default=None, blank=True, null=True)
 
     class Meta:
         db_table = 'practice_specialization'

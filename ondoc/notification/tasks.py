@@ -74,6 +74,8 @@ def send_ipd_procedure_lead_mail(data):
         return
     if instance.matrix_lead_id:
         return
+    if not instance.is_valid:
+        return
     try:
         if send_email:
             emails = settings.IPD_PROCEDURE_CONTACT_DETAILS
@@ -280,6 +282,7 @@ def set_order_dummy_transaction(self, order_id, user_id):
     from ondoc.diagnostic.models import LabAppointment
     from ondoc.account.models import User
     from ondoc.account.mongo_models import PgLogs
+    from ondoc.account.models import MerchantPayoutLog
     req_data = dict()
     try:
         order_row = Order.objects.filter(id=order_id).first()
@@ -306,7 +309,12 @@ def set_order_dummy_transaction(self, order_id, user_id):
         url = settings.PG_DUMMY_TRANSACTION_URL
         insurance_data = order_row.get_insurance_data_for_pg()
 
-        name  = ''
+        if appointment.__class__.__name__ in ['LabAppointment', 'OpdAppointment']:
+            if appointment.insurance and not order_row.is_parent() and not insurance_data:
+                MerchantPayoutLog.create_log(None, "refOrderId, insurerCode and refOrderNo not found for order id {}".format(order_row.id))
+                raise Exception("refOrderId, insurerCode, refOrderNo details not found for order id {}".format(order_row.id))
+
+        name = ''
         if isinstance(appointment, OpdAppointment) or isinstance(appointment, LabAppointment):
             name = appointment.profile.name
 
@@ -714,6 +722,7 @@ def send_insurance_float_limit_notifications(self, data):
 
 def request_payout(req_data, order_data):
     from ondoc.api.v1.utils import create_payout_checksum
+    from ondoc.account.mongo_models import PgLogs
 
     req_data["checkSum"] = create_payout_checksum(req_data["payload"], order_data.product_id)
     headers = {
@@ -725,7 +734,7 @@ def request_payout(req_data, order_data):
 
     response = requests.post(url, data=json.dumps(req_data), headers=headers)
     resp_data = response.json()
-
+    save_pg_response.apply_async((PgLogs.PAYOUT_PROCESS, order_data.id, None, resp_data, req_data, None), eta=timezone.localtime(), )
     if response.status_code == status.HTTP_200_OK:
         if resp_data.get("ok") is not None and resp_data.get("ok") == '1':
             success_payout = False
@@ -1233,7 +1242,7 @@ def send_contactus_notification(obj_id):
 def send_capture_payment_request(self, product_id, appointment_id):
     from ondoc.doctor.models import OpdAppointment
     from ondoc.diagnostic.models import LabAppointment
-    from ondoc.account.models import Order, PgTransaction
+    from ondoc.account.models import Order, PgTransaction, PaymentProcessStatus
     from ondoc.account.mongo_models import PgLogs
     req_data = dict()
     if product_id == Order.DOCTOR_PRODUCT_ID:
@@ -1269,9 +1278,14 @@ def send_capture_payment_request(self, product_id, appointment_id):
             }
 
             response = requests.post(url, data=json.dumps(req_data), headers=headers)
-            save_pg_response.apply_async((PgLogs.TXN_CAPTURED, order.id, txn_obj.id, response.json(), req_data, order.user_id), eta=timezone.localtime(), )
+
+            resp_data = response.json()
+            save_pg_response.apply_async((PgLogs.TXN_CAPTURED, order.id, txn_obj.id, resp_data, req_data, order.user_id,), eta=timezone.localtime(), )
+
+            args = {'order_id': order.id, 'status_code': resp_data.get('statusCode'), 'source': 'CAPTURE'}
+            status_type = PaymentProcessStatus.get_status_type(resp_data.get('statusCode'), resp_data.get('txStatus'))
+            save_payment_status.apply_async((status_type, args), eta=timezone.localtime(), )
             if response.status_code == status.HTTP_200_OK:
-                resp_data = response.json()
                 if resp_data.get("ok") is not None and resp_data.get("ok") == '1':
                     txn_obj.status_code = resp_data.get('statusCode')
                     txn_obj.status_type = resp_data.get('txStatus')
@@ -1295,7 +1309,7 @@ def send_capture_payment_request(self, product_id, appointment_id):
 def send_release_payment_request(self, product_id, appointment_id):
     from ondoc.doctor.models import OpdAppointment
     from ondoc.diagnostic.models import LabAppointment
-    from ondoc.account.models import Order, PgTransaction
+    from ondoc.account.models import Order, PgTransaction, PaymentProcessStatus
     from ondoc.account.mongo_models import PgLogs
     req_data = dict()
     if product_id == Order.DOCTOR_PRODUCT_ID:
@@ -1335,9 +1349,14 @@ def send_release_payment_request(self, product_id, appointment_id):
                 }
 
                 response = requests.post(url, data=json.dumps(req_data), headers=headers)
-                save_pg_response.apply_async((PgLogs.TXN_RELEASED, order.id, txn_obj.id, response.json(), req_data, order.user_id), eta=timezone.localtime(), )
+                resp_data = response.json()
+                save_pg_response.apply_async((PgLogs.TXN_RELEASED, order.id, txn_obj.id, resp_data, req_data, order.user_id,), eta=timezone.localtime(), )
+
+                args = {'order_id': order.id, 'status_code': resp_data.get('statusCode'), 'source': 'RELEASE'}
+                status_type = PaymentProcessStatus.get_status_type(resp_data.get('statusCode'),
+                                                                   resp_data.get('txStatus'))
+                save_payment_status.apply_async((status_type, args), eta=timezone.localtime(), )
                 if response.status_code == status.HTTP_200_OK:
-                    resp_data = response.json()
                     if resp_data.get("ok") is not None and resp_data.get("ok") == '1':
                         txn_obj.status_code = resp_data.get('statusCode')
                         txn_obj.status_type = 'TXN_RELEASE'

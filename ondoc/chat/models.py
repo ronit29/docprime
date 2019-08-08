@@ -48,6 +48,3 @@ class ChatConsultation(TimeStampedModel):
 
     class Meta:
         db_table = "chat_consultation"
-
-    def create_consultation(self, consultation_data):
-        pass

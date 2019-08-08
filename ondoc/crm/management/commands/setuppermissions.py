@@ -39,7 +39,8 @@ from ondoc.diagnostic.models import (Lab, LabTiming, LabImage, GenericLabAdmin,
                                      TestParameter, ParameterLabTest, LabTestPackage, LabReportFile, LabReport,
                                      CommonPackage, LabTestCategory, LabTestCategoryMapping,
                                      LabTestRecommendedCategoryMapping, QuestionAnswer, FrequentlyAddedTogetherTests,
-                                     LabTestGroup, LabTestGroupMapping, LabTestGroupTiming)
+                                     LabTestGroup, LabTestGroupMapping, LabTestGroupTiming, LabTestCategoryLandingURLS,
+                                     LabTestCategoryUrls)
 
 from ondoc.insurance.models import (Insurer, InsurancePlans, InsuranceThreshold, InsuranceCity, StateGSTCode,
                                     InsuranceDistrict, InsuranceTransaction, InsuranceDeal, InsuranceDisease,
@@ -60,7 +61,8 @@ from ondoc.reports import models as report_models
 from ondoc.prescription.models import AppointmentPrescription
 
 from ondoc.diagnostic.models import LabPricing
-from ondoc.integrations.models import IntegratorMapping, IntegratorProfileMapping, IntegratorReport, IntegratorTestMapping, IntegratorTestParameterMapping
+from ondoc.integrations.models import IntegratorMapping, IntegratorProfileMapping, IntegratorReport, \
+    IntegratorTestMapping, IntegratorTestParameterMapping, IntegratorLabTestParameterMapping
 from ondoc.subscription_plan.models import Plan, PlanFeature, PlanFeatureMapping, UserPlanMapping
 
 from ondoc.web.models import Career, OnlineLead, UploadImage
@@ -69,7 +71,8 @@ from ondoc.articles.models import Article, ArticleLinkedUrl, LinkedArticle, Arti
 
 from ondoc.authentication.models import BillingAccount, SPOCDetails, GenericAdmin, User, Merchant, AssociatedMerchant, \
     DoctorNumber, UserNumberUpdate, GenericQuestionAnswer
-from ondoc.account.models import MerchantPayout, MerchantPayoutBulkProcess
+from ondoc.account.models import MerchantPayout, MerchantPayoutBulkProcess, AdvanceMerchantAmount, \
+    AdvanceMerchantPayout
 from ondoc.seo.models import Sitemap, NewDynamic
 from ondoc.elastic.models import DemoElastic
 from ondoc.location.models import EntityUrls, CompareLabPackagesSeoUrls, CompareSEOUrls, CityLatLong
@@ -460,6 +463,9 @@ class Command(BaseCommand):
         # creating group for blocked state and blacklist users.
         self.create_blocked_state_group()
 
+        # Creating group for read only payout access
+        self.create_qc_merchant_team()
+
         #Create XL Data Export Group
         Group.objects.get_or_create(name=constants['DATA_EXPORT_GROUP'])
 
@@ -488,7 +494,7 @@ class Command(BaseCommand):
 
             group.permissions.add(*permissions)
 
-        content_types = ContentType.objects.get_for_models(Hospital)
+        content_types = ContentType.objects.get_for_models(Hospital, EntityUrls)
         for cl, ct in content_types.items():
             permissions = Permission.objects.filter(
                 Q(content_type=ct),
@@ -575,7 +581,7 @@ class Command(BaseCommand):
                                                            EmailBanner, RecommenderThrough, Recommender,
                                                            IpdProcedurePracticeSpecialization, CityLatLong, CommonHospital,
                                                            PotentialIpdLeadPracticeSpecialization, PotentialIpdCity,
-                                                           SimilarSpecializationGroupMapping)
+                                                           SimilarSpecializationGroupMapping, LabTestCategoryLandingURLS, LabTestCategoryUrls)
         for cl, ct in content_types.items():
             permissions = Permission.objects.filter(
                 Q(content_type=ct),
@@ -613,7 +619,8 @@ class Command(BaseCommand):
         group.permissions.clear()
 
         content_types = ContentType.objects.get_for_models(IntegratorMapping, IntegratorProfileMapping, LabTest, LabNetwork,
-                                                           IntegratorReport, IntegratorTestMapping, IntegratorTestParameterMapping)
+                                                           IntegratorReport, IntegratorTestMapping, IntegratorTestParameterMapping,
+                                                           IntegratorLabTestParameterMapping)
 
         for cl, ct in content_types.items():
             permissions = Permission.objects.filter(
@@ -929,7 +936,7 @@ class Command(BaseCommand):
 
             group.permissions.add(*permissions)
 
-        content_types = ContentType.objects.get_for_models(MerchantPayout, UserInsurance, InsurerAccount)
+        content_types = ContentType.objects.get_for_models(MerchantPayout, UserInsurance, InsurerAccount, AdvanceMerchantAmount, AdvanceMerchantPayout)
 
         for cl, ct in content_types.items():
             permissions = Permission.objects.filter(
@@ -948,6 +955,18 @@ class Command(BaseCommand):
 
             group.permissions.add(*permissions)
 
+    def create_qc_merchant_team(self):
+        group, created = Group.objects.get_or_create(name=constants['QC_MERCHANT_TEAM'])
+        group.permissions.clear()
+
+        content_types = ContentType.objects.get_for_models(MerchantPayout)
+
+        for cl, ct in content_types.items():
+            permissions = Permission.objects.filter(
+                Q(content_type=ct),
+                Q(codename='change_' + ct.model))
+
+            group.permissions.add(*permissions)
 
     def create_elastic_group(self):
 

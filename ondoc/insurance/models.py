@@ -121,7 +121,7 @@ class InsuranceGynocologist:
                                                   user=user).count()
 
         if count >= int(settings.INSURANCE_GYNECOLOGIST_LIMIT):
-            error = "Gynocologist limit exceeded of limit {}".format(settings.INSURANCE_GYNECOLOGIST_LIMIT)
+            error = "You have already utilised {} Gynaecologist consultations available in your OPD Insurance Plan.".format(settings.INSURANCE_GYNECOLOGIST_LIMIT)
         return count, error
 
 
@@ -481,7 +481,8 @@ class InsuranceThreshold(auth_model.TimeStampedModel, LiveMixin):
         # Age validation for child in days
         #TODO INSURANCE check max age
         if member['member_type'] == "child":
-            if child_min_age <= days_diff and math.ceil(days_diff/365) <= child_max_age:
+            # if child_min_age <= days_diff and math.ceil(days_diff/365) <= child_max_age:
+            if child_min_age <= days_diff and years_diff <= child_max_age:
                 is_dob_valid = True
             else:
                 message = {"message": "Child Age should be more than " + str(child_min_age) + " days or less than" +
@@ -581,6 +582,8 @@ class UserInsurance(auth_model.TimeStampedModel, MerchantPayoutMixin):
     cancel_customer_type = models.PositiveIntegerField(choices=CANCEL_CUSTOMER_TYPE_CHOICES, default=OTHER)
     cancel_initiate_by = models.PositiveIntegerField(choices=CANCEL_BY_CHOICES, null=True, blank=True)
     appointment_status = models.PositiveIntegerField(choices=APPOINTMENT_STATUS_CHOICES, null=True, blank=True)
+    # onhold_reason = models.CharField(max_length=200, blank=True, null=True, default=None)
+    onhold_reason = models.TextField(max_length=200, blank=True, null=True)
     notes = GenericRelation(GenericNotes)
 
     def __str__(self):
@@ -624,7 +627,12 @@ class UserInsurance(auth_model.TimeStampedModel, MerchantPayoutMixin):
 
         return math.floor(hours)
 
+    @property
+    def get_merchant(self):
+        if self.insurance_plan and self.insurance_plan.insurer and self.insurance_plan.insurer.merchant:
+            return "{}-{}".format(self.insurance_plan.insurer.merchant.beneficiary_name, self.insurance_plan.insurer.merchant.id)
 
+        return ''
 
     @cached_property
     def master_policy(self):
@@ -812,7 +820,7 @@ class UserInsurance(auth_model.TimeStampedModel, MerchantPayoutMixin):
                                                   user=self.user).count()
 
         if count >= int(settings.INSURANCE_GYNECOLOGIST_LIMIT):
-            error = "Gynocologist limit exceeded of limit {}".format(settings.INSURANCE_GYNECOLOGIST_LIMIT)
+            error = "You have already utilised {} Gynaecologist consultations available in your OPD Insurance Plan.".format(settings.INSURANCE_GYNECOLOGIST_LIMIT)
 
         return count, error
 
@@ -835,7 +843,7 @@ class UserInsurance(auth_model.TimeStampedModel, MerchantPayoutMixin):
                                                   user=self.user).count()
 
         if count >= int(settings.INSURANCE_ONCOLOGIST_LIMIT):
-            error = "Oncologist limit exceeded of limit {}".format(settings.INSURANCE_ONCOLOGIST_LIMIT)
+            error = "You have already utilised {} Oncologist consultations available in your OPD Insurance Plan.".format(settings.INSURANCE_ONCOLOGIST_LIMIT)
 
         return count, error
 
@@ -973,14 +981,16 @@ class UserInsurance(auth_model.TimeStampedModel, MerchantPayoutMixin):
         db_table = "user_insurance"
 
     def is_valid(self):
-        if self.expiry_date >= timezone.now() and self.status == self.ACTIVE:
+        if self.expiry_date >= timezone.now() and (self.status == self.ACTIVE or self.status == self.ONHOLD):
             return True
         else:
             return False
 
     def is_profile_valid(self):
-        if self.expiry_date >= timezone.now() and (self.status == self.ACTIVE or self.status == self.ONHOLD or
-                                                       self.status == self.CANCEL_INITIATE):
+        # if self.expiry_date >= timezone.now() and (self.status == self.ACTIVE or self.status == self.ONHOLD or
+        #                                                self.status == self.CANCEL_INITIATE):
+        if self.expiry_date >= timezone.now() and (self.status == self.ACTIVE or self.status == self.CANCEL_INITIATE
+                                                   or self.status == self.ONHOLD):
             return True
         else:
             return False
@@ -1196,9 +1206,9 @@ class UserInsurance(auth_model.TimeStampedModel, MerchantPayoutMixin):
             return None
         return policy_number_obj
 
-    def validate_insurance(self, appointment_data):
+    def validate_insurance(self, appointment_data, **kwargs):
         from ondoc.doctor.models import OpdAppointment
-
+        booked_by = kwargs.get('booked_by')
         response_dict = {
             'is_insured': False,
             'insurance_id': None,
@@ -1231,12 +1241,12 @@ class UserInsurance(auth_model.TimeStampedModel, MerchantPayoutMixin):
             return response_dict
 
         if not 'doctor' in appointment_data:
-            is_insured, insurance_id, insurance_message = user_insurance.validate_lab_insurance(appointment_data, user_insurance)
+            is_insured, insurance_id, insurance_message = user_insurance.validate_lab_insurance(appointment_data, booked_by=booked_by)
             response_dict['is_insured'] = is_insured
             response_dict['insurance_message'] = insurance_message
 
         else:
-            is_insured, insurance_id, insurance_message = user_insurance.validate_doctor_insurance(appointment_data, user_insurance)
+            is_insured, insurance_id, insurance_message = user_insurance.validate_doctor_insurance(appointment_data)
             response_dict['is_insured'] = is_insured
             response_dict['insurance_message'] = insurance_message
 
@@ -1274,39 +1284,44 @@ class UserInsurance(auth_model.TimeStampedModel, MerchantPayoutMixin):
 
         return response_dict
 
-    def validate_lab_insurance(self, appointment_data, user_insurance):
+    def validate_lab_insurance(self, appointment_data, **kwargs):
         from ondoc.diagnostic.models import AvailableLabTest
         lab = appointment_data['lab']
         lab_mrp_check_list = []
         if not lab.is_insurance_enabled:
             return False, None, 'Lab is not covered under insurance'
-        threshold = InsuranceThreshold.objects.filter(insurance_plan_id=user_insurance.insurance_plan_id).first()
+        threshold = InsuranceThreshold.objects.filter(insurance_plan_id=self.insurance_plan_id).first()
+        plan = InsurancePlans.objects.filter(id=self.insurance_plan_id).first()
         threshold_lab = threshold.lab_amount_limit
         if appointment_data['test_ids']:
             for test in appointment_data['test_ids']:
                 lab_test = AvailableLabTest.objects.filter(lab_pricing_group__labs=appointment_data["lab"],
                                                            test=test, enabled=True).first()
+                if test.is_package and plan and plan.plan_usages and plan.plan_usages.get('package_disabled') and \
+                        kwargs.get('booked_by') == 'user':
+                    return False, self.id, "Packages not covered for this plan"
                 if not lab_test:
-                    return False, user_insurance.id, 'Price not available for Test'
+                    return False, self.id, 'Price not available for Test'
                 mrp = lab_test.mrp
                 if mrp <= threshold_lab:
                     is_lab_insured = True
                 else:
-                    return False, user_insurance.id, "Test mrp is higher than insurance threshold"
+                    return False, self.id, "Test mrp is higher than insurance threshold"
                 lab_mrp_check_list.append(is_lab_insured)
             if not False in lab_mrp_check_list:
-                return True, user_insurance.id, ''
+                return True, self.id, ''
             else:
                 return False, None, ''
+
         else:
             return False, None, ''
 
-    def validate_doctor_insurance(self, appointment_data, user_insurance):
+    def validate_doctor_insurance(self, appointment_data):
         is_insured = True
-        insurance_id = user_insurance.id
+        insurance_id = self.id
         insurance_message = ""
         from ondoc.doctor.models import OpdAppointment
-        threshold = InsuranceThreshold.objects.filter(insurance_plan_id=user_insurance.insurance_plan_id).first()
+        threshold = InsuranceThreshold.objects.filter(insurance_plan_id=self.insurance_plan_id).first()
         threshold_opd = threshold.opd_amount_limit
         # profile = appointment_data.get('profile', None)
         # user = profile.user
@@ -1354,8 +1369,9 @@ class UserInsurance(auth_model.TimeStampedModel, MerchantPayoutMixin):
                 result = False
         return result
 
-    def validate_insurance_for_cart(self, appointment_data, cart_items):
-        insurance_validate_dict = self.validate_insurance(appointment_data)
+    def validate_insurance_for_cart(self, appointment_data, cart_items, **kwargs):
+        booked_by = kwargs.get('booked_by')
+        insurance_validate_dict = self.validate_insurance(appointment_data, booked_by=booked_by)
         is_insured = insurance_validate_dict['is_insured']
         insurance_id = insurance_validate_dict['insurance_id']
         insurance_message = insurance_validate_dict['insurance_message']
@@ -2175,10 +2191,18 @@ class EndorsementRequest(auth_model.TimeStampedModel):
 
         endorsed_members_count = user_insurance.endorse_members.filter((Q(mail_status=EndorsementRequest.MAIL_PENDING) | Q(mail_status__isnull=True)), ~Q(status=EndorsementRequest.PENDING)).count()
         endorsed_approved_members_count = user_insurance.endorse_members.filter((Q(mail_status=EndorsementRequest.MAIL_PENDING) | Q(mail_status__isnull=True)), Q(status=EndorsementRequest.APPROVED)).count()
+
+        pending_members = user_insurance.endorse_members.filter(Q(mail_status=EndorsementRequest.MAIL_PENDING) |
+                                                              Q(mail_status__isnull=True))
+        for member in pending_members:
+            member.mail_status = EndorsementRequest.MAIL_SENT
+            member.save()
         if total_endorsement_members == endorsed_approved_members_count:
             try:
+
                 user_insurance.generate_pdf()
-                EndorsementRequest.process_endorsment_notifications(EndorsementRequest.APPROVED, user_insurance.user)
+                EndorsementRequest.process_endorsment_notifications(EndorsementRequest.APPROVED,
+                                                                    user_insurance.user)
             except Exception as e:
                 logger.error('Insurance coi pdf cannot be generated. %s' % str(e))
 
@@ -2187,14 +2211,10 @@ class EndorsementRequest(auth_model.TimeStampedModel):
         if total_endorsement_members == endorsed_members_count:
             try:
                 user_insurance.generate_pdf()
-                EndorsementRequest.process_endorsment_notifications(EndorsementRequest.PARTIAL_APPROVED, user_insurance.user)
+                EndorsementRequest.process_endorsment_notifications(EndorsementRequest.PARTIAL_APPROVED,
+                                                                    user_insurance.user)
             except Exception as e:
                 logger.error('Insurance coi pdf cannot be generated. %s' % str(e))
-        pending_members = user_insurance.endorse_members.filter(Q(mail_status=EndorsementRequest.MAIL_PENDING) |
-                                                              Q(mail_status__isnull=True))
-        for member in pending_members:
-            member.mail_status = EndorsementRequest.MAIL_SENT
-            member.save()
 
     def reject_endorsement(self):
         user_insurance = self.insurance
