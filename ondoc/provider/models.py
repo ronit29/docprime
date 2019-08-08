@@ -88,6 +88,7 @@ class EConsultation(auth_models.TimeStampedModel, auth_models.CreatedByModel):
         except Exception as e:
             logger.error(str(e))
             return {'error': str(e)}
+        return {}
 
 
     def __str__(self):
