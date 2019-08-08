@@ -1,8 +1,9 @@
 import base64
 
+from django.contrib.admin.utils import quote, unquote
 from django.forms.utils import ErrorList
 from reversion.admin import VersionAdmin
-from django.core.exceptions import FieldDoesNotExist, MultipleObjectsReturned
+from django.core.exceptions import FieldDoesNotExist, MultipleObjectsReturned, PermissionDenied
 from django.contrib.admin import SimpleListFilter
 from django.utils.safestring import mark_safe
 from django.conf.urls import url
@@ -22,6 +23,8 @@ import datetime
 from django.db import transaction
 import logging
 from dal import autocomplete
+from reversion.models import Version
+
 from ondoc.api.v1.utils import GenericAdminEntity, util_absolute_url, util_file_name
 from ondoc.common.models import AppointmentHistory
 from django.contrib import messages
@@ -1120,6 +1123,33 @@ class DoctorAdmin(AutoComplete, ImportExportMixin, VersionAdmin, ActionAdmin, QC
     #     if obj and obj.id and obj.data_status == obj.QC_APPROVED:
     #         res = [x for x in res if not isinstance(x, RemarkInline)]
     #     return res
+
+    def history_view(self, request, object_id, extra_context=None):
+        """Renders the history view."""
+        # Check if user has change permissions for model
+        if not self.has_change_permission(request):
+            raise PermissionDenied
+        opts = self.model._meta
+        action_list = [
+            {
+                "revision": version.revision,
+                "url": reverse(
+                    "%s:%s_%s_revision" % (self.admin_site.name, opts.app_label, opts.model_name),
+                    args=(quote(version.object_id), version.id)
+                ),
+                "changed_fields": version.revision.version_set.all()[
+                    0].field_dict if version.revision and version.revision.version_set.all() else None,
+            }
+            for version
+            in self._reversion_order_version_queryset(Version.objects.get_for_object_reference(
+                self.model,
+                unquote(object_id),  # Underscores in primary key get quoted to "_5F"
+            ).select_related("revision__user"))
+        ]
+        # Compile the context.
+        context = {"action_list": action_list}
+        context.update(extra_context or {})
+        return super(VersionAdmin, self).history_view(request, object_id, context)
 
     def has_delete_permission(self, request, obj=None):
         return super().has_delete_permission(request, obj)
