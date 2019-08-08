@@ -3811,6 +3811,7 @@ class PracticeSpecialization(auth_model.TimeStampedModel, SearchKey):
     is_insurance_enabled = models.BooleanField(default=True)
     priority = models.PositiveIntegerField(default=0, null=True)
     search_distance = models.FloatField(default=None, blank=True, null=True)
+    is_similar_specialization = models.BooleanField(default=True)
 
     class Meta:
         db_table = 'practice_specialization'
