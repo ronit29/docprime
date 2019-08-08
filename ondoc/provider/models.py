@@ -68,6 +68,8 @@ class EConsultation(auth_models.TimeStampedModel, auth_models.CreatedByModel):
                 user = auth_models.User.objects.filter(phone_number=patient_number, user_type=auth_models.User.CONSUMER).first()
                 if not user:
                     user = auth_models.User.objects.create(phone_number=patient_number, user_type=auth_models.User.CONSUMER, auto_created=True)
+                patient.user = user
+                patient.save()
             else:
                 user = patient.user
             agent_token = JWTAuthentication.generate_token(user)
