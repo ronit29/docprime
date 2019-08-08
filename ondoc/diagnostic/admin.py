@@ -1,4 +1,6 @@
 from django.contrib import admin
+
+from ondoc.common.admin import CustomVersionAdmin
 from .models import LabOnboardingToken, Lab, AvailableLabTest, LabTestPricingGroup, LabPricingGroup
 from django_tables2 import RequestConfig
 import django_tables2 as tables
@@ -33,7 +35,7 @@ class LabPricingForm(forms.ModelForm):
         if(rdp and rap and rdp<rap):
             raise forms.ValidationError("Deal price percent cannot be less than agreed price percent")
 
-class LabPricingGroupAdmin(admin.ModelAdmin):
+class LabPricingGroupAdmin(CustomVersionAdmin):
     change_form_template = 'labtest.html'
     add_form_template = 'admin/change_form.html'
     form = LabPricingForm

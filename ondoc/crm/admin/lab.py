@@ -24,6 +24,7 @@ import pytz
 from django.contrib import messages
 from ondoc.account.models import Order, Invoice
 from ondoc.api.v1.utils import util_absolute_url, util_file_name, datetime_to_formated_string
+from ondoc.common.admin import CustomVersionAdmin
 from ondoc.common.models import AppointmentHistory
 from ondoc.doctor.models import Hospital, CancellationReason
 from ondoc.diagnostic.models import (LabTiming, LabImage,
@@ -559,7 +560,7 @@ class LabTestGroupTimingInline(admin.TabularInline):
     show_change_link = False
 
 
-class LabAdmin(ImportExportMixin, admin.GeoModelAdmin, VersionAdmin, ActionAdmin, QCPemAdmin):
+class LabAdmin(ImportExportMixin, admin.GeoModelAdmin, CustomVersionAdmin, ActionAdmin, QCPemAdmin):
     change_list_template = 'superuser_import_export.html'
     resource_class = LabResource
     list_display = ('name', 'lab_logo', 'updated_at', 'onboarding_status', 'data_status', 'welcome_calling_done',
