@@ -946,7 +946,7 @@ class LabPrescriptionInline(nested_admin.NestedGenericTabularInline):
         return readonly_fields
 
 
-class LabAppointmentAdmin(nested_admin.NestedModelAdmin):
+class LabAppointmentAdmin(nested_admin.NestedModelAdmin, CustomVersionAdmin):
     form = LabAppointmentForm
     change_form_template = 'appointment_change_form.html'
     search_fields = ['id']
