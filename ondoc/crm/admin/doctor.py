@@ -2061,10 +2061,6 @@ class DoctorOpdAppointmentAdmin(ExportMixin, admin.ModelAdmin):
                 obj._refund_reason = form.cleaned_data.get('refund_reason', '')
                 obj.action_refund()
             else:
-                if self.is_followup_appointment():
-                    notification_models.EmailNotification.ops_notification_alert(self, email_list=settings.INSURANCE_OPS_EMAIL,
-                                                                             product=Order.DOCTOR_PRODUCT_ID,
-                                                                             alert_type=notification_models.EmailNotification.FOLLOWUP_APPOINTMENT)
                 super().save_model(request, obj, form, change)
 
 
