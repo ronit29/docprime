@@ -2468,7 +2468,7 @@ class LabAppointment(TimeStampedModel, CouponsMixin, LabAppointmentInvoiceMixin,
         }
 
     @classmethod
-    def create_fulfillment_data(cls, user, data, price_data):
+    def create_fulfillment_data(cls, user, data, price_data, request):
         from ondoc.api.v1.auth.serializers import AddressSerializer
         from ondoc.insurance.models import UserInsurance
 
@@ -2501,15 +2501,21 @@ class LabAppointment(TimeStampedModel, CouponsMixin, LabAppointmentInvoiceMixin,
 
         is_appointment_insured = False
         insurance_id = None
+        booked_by = 'agent' if hasattr(request, 'agent') else 'user'
         user_insurance = UserInsurance.objects.filter(user=user).order_by('-id').first()
         if user_insurance and user_insurance.is_valid():
-            is_appointment_insured, insurance_id, insurance_message = user_insurance.validate_lab_insurance(data)
+            is_appointment_insured, insurance_id, insurance_message = user_insurance.validate_lab_insurance(data, booked_by=booked_by)
 
         if is_appointment_insured and cart_data.get('is_appointment_insured', None):
             payment_type = OpdAppointment.INSURANCE
             effective_price = 0.0
         else:
             insurance_id = None
+            if data["payment_type"] == OpdAppointment.INSURANCE:
+                payment_type = OpdAppointment.PREPAID
+            else:
+                payment_type = data["payment_type"]
+
 
         fulfillment_data = {
             "lab": data["lab"],

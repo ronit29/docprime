@@ -119,7 +119,7 @@ class Cart(auth_model.TimeStampedModel, auth_model.SoftDeleteModel):
 
         return price_data
 
-    def get_fulfillment_data(self, validated_data):
+    def get_fulfillment_data(self, validated_data, request):
         from ondoc.doctor.models import OpdAppointment
         from ondoc.diagnostic.models import LabAppointment
 
@@ -131,7 +131,7 @@ class Cart(auth_model.TimeStampedModel, auth_model.SoftDeleteModel):
         if self.product_id == Order.DOCTOR_PRODUCT_ID:
             fulfillment_data = OpdAppointment.create_fulfillment_data(self.user, validated_data, price_data)
         elif self.product_id == Order.LAB_PRODUCT_ID:
-            fulfillment_data = LabAppointment.create_fulfillment_data(self.user, validated_data, price_data)
+            fulfillment_data = LabAppointment.create_fulfillment_data(self.user, validated_data, price_data, request)
 
         return fulfillment_data
 

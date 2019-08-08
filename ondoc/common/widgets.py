@@ -91,7 +91,7 @@ class ArticleFooterWidget():
     def health_package_widget(self):
         resp = dict()
         title_first = "Book fully body checkup starting"
-        price = "Rs 499"
+        price = "Rs 549"
         title_last = "with 60 tests covering heart, liver, lipid, iron, thyroid etc."
         resp["widget_type"] = 'HealthPackage'
         resp["title_first"] = title_first
