@@ -1341,13 +1341,13 @@ def push_appointment_to_spo(self, data):
         else:
             # TO DO - Need to update after api response change
             resp_data = response.json()
-            if not resp_data['error']:
-                pass
-            else:
+            if not resp_data.get('data', '') == 'Lead Update Successfully.':
                 spo_resp = resp_data.get('data', None)
                 if spo_resp and spo_resp['error']:
                     logger.error("[ERROR-SPO] Appointment could not be published to the SPO system - " + str(json.dumps(request_data)))
                     logger.info("[ERROR-SPO] %s", spo_resp)
+            else:
+                return True
 
     except Exception as e:
         logger.error("Error in Celery. Failed pushing Appointment to the SPO- " + str(e))
