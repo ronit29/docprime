@@ -2165,7 +2165,8 @@ class DoctorListViewSet(viewsets.GenericViewSet):
         hospitals = Hospital.objects.filter(id__in=temp_hospital_ids).prefetch_related('hospital_doctors').annotate(
             bookable_doctors_count=Count(Q(enabled_for_online_booking=True,
                                      hospital_doctors__enabled_for_online_booking=True,
-                                     hospital_doctors__doctor__enabled_for_online_booking=True))).order_by('-bookable_doctors_count')
+                                     hospital_doctors__doctor__enabled_for_online_booking=True,
+                                    hospital_doctors__doctor__is_live=True, hospital__is_live=True))).order_by('-bookable_doctors_count')
 
         for data in hospitals:
             response.append({'id':data.id, 'name': data.name, 'url': entity_data[data.id]['url'] if entity_data and entity_data[data.id] and entity_data[data.id]['url'] else None})
