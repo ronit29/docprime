@@ -70,7 +70,6 @@ class NotificationAction:
     INSURANCE_CANCELLATION=74
     INSURANCE_FLOAT_LIMIT=75
     INSURANCE_MIS=76
-    FOLLOWUP_APPOINTMENT=77
     OPD_OTP_BEFORE_APPOINTMENT = 30
     LAB_OTP_BEFORE_APPOINTMENT = 31
     OPD_CONFIRMATION_CHECK_AFTER_APPOINTMENT = 32
@@ -131,7 +130,6 @@ class NotificationAction:
         (INSURANCE_ENDORSMENT_APPROVED, "Insurance endorsment completed."),
         (INSURANCE_ENDORSMENT_REJECTED, "Insurance endorsment rejected."),
         (INSURANCE_ENDORSMENT_PENDING, "Insurance endorsment received."),
-        (FOLLOWUP_APPOINTMENT, "OPD Followup Appointment received."),
         (CASHBACK_CREDITED, "Cashback Credited"),
         (REFUND_BREAKUP, 'Refund break up'),
         (REFUND_COMPLETED, 'Refund Completed'),
@@ -584,6 +582,7 @@ class EmailNotificationLabMixin:
 class EmailNotification(TimeStampedModel, EmailNotificationOpdMixin, EmailNotificationLabMixin):
     OPS_APPOINTMENT_NOTIFICATION = 1
     OPS_PAYMENT_NOTIFICATION = 2
+    FOLLOWUP_APPOINTMENT = 3
 
     user = models.ForeignKey(User, on_delete=models.CASCADE, null=True, blank=True)
     content = models.TextField()
