@@ -458,8 +458,8 @@ class MerchantPayoutForm(forms.ModelForm):
                     if not associated_merchant.verified:
                         raise forms.ValidationError("Associated Merchant not verified.")
 
-                if self.instance.status not in [1]:
-                    raise forms.ValidationError("Only pending payouts can be processed.")
+                if self.instance.status not in [1, 2]:
+                    raise forms.ValidationError("Only pending and attempted payouts can be processed.")
 
             recreate_payout = self.cleaned_data.get('recreate_payout')
             if recreate_payout:
@@ -475,6 +475,7 @@ class MerchantPayoutForm(forms.ModelForm):
 class MerchantPayoutResource(resources.ModelResource):
     appointment_id = fields.Field()
     merchant = fields.Field()
+    verified_by_finance = fields.Field()
 
     def export(self, queryset=None, *args, **kwargs):
         queryset = self.get_queryset(**kwargs)
@@ -523,14 +524,22 @@ class MerchantPayoutResource(resources.ModelResource):
 
         return ''
 
+    def dehydrate_verified_by_finance(self, merchant_payout):
+        if merchant_payout.paid_to:
+            merchant = Merchant.objects.filter(id=merchant_payout.paid_to_id).first()
+            if merchant and merchant.verified_by_finance:
+                return 1
+
+        return 0
+
     class Meta:
         model = MerchantPayout
         fields = ('id', 'payment_mode', 'payout_ref_id', 'charged_amount', 'payable_amount', 'payout_approved',
                   'status', 'payout_time', 'paid_to', 'utr_no', 'type', 'amount_paid',
-                  'content_type', 'object_id', 'appointment_id', 'booking_type', 'merchant')
+                  'content_type', 'object_id', 'appointment_id', 'booking_type', 'merchant', 'verified_by_finance')
 
         export_order = ('appointment_id', 'booking_type', 'id', 'payment_mode', 'payout_ref_id', 'charged_amount', 'payable_amount', 'payout_approved',
-                  'status', 'payout_time', 'merchant', 'paid_to', 'utr_no', 'type', 'amount_paid', 'content_type', 'object_id')
+                  'status', 'payout_time', 'merchant', 'paid_to', 'verified_by_finance', 'utr_no', 'type', 'amount_paid', 'content_type', 'object_id')
 
 
 class MerchantPayoutAdmin(MediaImportMixin, VersionAdmin):
