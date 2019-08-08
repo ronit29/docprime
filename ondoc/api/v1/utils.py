@@ -441,7 +441,7 @@ def payment_details(request, order):
             if order.action_data.get('profile_detail'):
                 profile_name = order.action_data.get('profile_detail').get('name', "")
 
-    if order.product_id == Order.SUBSCRIPTION_PLAN_PRODUCT_ID:
+    if order.product_id in [Order.SUBSCRIPTION_PLAN_PRODUCT_ID, Order.CHAT_PRODUCT_ID]:
         isPreAuth = '0'
 
     if isPreAuth == '1':
@@ -507,7 +507,7 @@ def payment_details(request, order):
 
     args = {'user_id': user.id, 'order_id': order.id, 'source': 'ORDER_CREATE'}
     save_payment_status.apply_async((PaymentProcessStatus.INITIATE, args),eta=timezone.localtime(), )
-    save_pg_response.apply_async((PgLogs.TXN_REQUEST, order.id, None, None, pgdata), eta=timezone.localtime(), )
+    save_pg_response.apply_async((PgLogs.TXN_REQUEST, order.id, None, None, pgdata, user.id), eta=timezone.localtime(), )
     return pgdata, payment_required
 
 
@@ -525,7 +525,7 @@ def get_pg_secret_client_key(order):
     from ondoc.account.models import Order
     secret_key = client_key = ""
 
-    if order.product_id == Order.DOCTOR_PRODUCT_ID or order.product_id == Order.SUBSCRIPTION_PLAN_PRODUCT_ID:
+    if order.product_id in [Order.DOCTOR_PRODUCT_ID, Order.SUBSCRIPTION_PLAN_PRODUCT_ID, Order.CHAT_PRODUCT_ID]:
         secret_key = settings.PG_SECRET_KEY_P1
         client_key = settings.PG_CLIENT_KEY_P1
     elif order.product_id == Order.LAB_PRODUCT_ID:
