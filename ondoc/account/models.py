@@ -2088,7 +2088,7 @@ class MerchantPayout(TimeStampedModel):
 
                 response = requests.post(url, data=json.dumps(req_data), headers=headers)
                 if order_id:
-                    save_pg_response.apply_async((PgLogsMongo.PAYOUT_SETTLEMENT_DETAIL, order_no, None, response.json(), req_data,), eta=timezone.localtime(),)
+                    save_pg_response.apply_async((PgLogsMongo.PAYOUT_SETTLEMENT_DETAIL, order_id, None, response.json(), req_data,), eta=timezone.localtime(),)
                 if response.status_code == status.HTTP_200_OK:
                     resp_data = response.json()
                     self.status_api_response = resp_data
