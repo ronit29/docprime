@@ -1926,7 +1926,7 @@ class TopHospitalForIpdProcedureSerializer(serializers.ModelSerializer):
         fields = ('id', 'name', 'distance', 'certifications', 'bed_count', 'logo', 'avg_rating',
                   'count_of_insurance_provider', 'multi_speciality', 'address', 'short_address','open_today',
                   'insurance_provider', 'established_in', 'long', 'lat', 'url', 'locality_url', 'name_city', 'operational_since',
-                  'h1_title', 'is_ipd_hospital', 'seo_title')
+                  'h1_title', 'is_ipd_hospital', 'seo_title', 'network_id')
 
     def get_name_city(self, obj):
         result = obj.name
@@ -2185,12 +2185,35 @@ class HospitalDetailIpdProcedureSerializer(TopHospitalForIpdProcedureSerializer)
         result = []
         if not obj.network:
             return result
-        for temp_hospital in obj.network.assoc_hospitals.all():
+        other_hospitals = list(obj.network.assoc_hospitals.all())
+        other_hospital_ids = [x.id for x in other_hospitals]
+        hosp_entity_dict, hosp_locality_entity_dict = Hospital.get_hosp_and_locality_dict(other_hospital_ids,
+                                                                                          EntityUrls.SitemapIdentifier.HOSPITALS_LOCALITY_CITY)
+
+        request = self.context.get('request')
+        network_icon = None
+        if request:
+            if obj.network:
+                for document in obj.network.hospital_network_documents.all():
+                    if document.document_type == HospitalNetworkDocument.LOGO:
+                        network_icon = request.build_absolute_uri(document.name.url) if document.name else None
+                        break
+        for temp_hospital in other_hospitals:
+            temp_icon = None
+            for document in obj.hospital_documents.all():
+                if document.document_type == HospitalDocument.LOGO:
+                    temp_icon = request.build_absolute_uri(document.name.url) if document.name else None
+                    break
+            if temp_icon:
+                icon = temp_icon
+            else:
+                icon = network_icon
             if not temp_hospital.id == obj.id:
                 result.append(
                     {'id': temp_hospital.id, 'name': temp_hospital.name, 'address': temp_hospital.get_hos_address(),
                      'lat': temp_hospital.location.y if temp_hospital.location else None,
-                     'long': temp_hospital.location.x if temp_hospital.location else None})
+                     'long': temp_hospital.location.x if temp_hospital.location else None,
+                     'url': hosp_entity_dict.get(temp_hospital.id), 'icon': icon})
         return result
 
     def get_doctors(self, obj):
