@@ -2730,6 +2730,10 @@ class OpdAppointment(auth_model.TimeStampedModel, CouponsMixin, OpdAppointmentIn
 
         if old_instance and old_instance.status != self.ACCEPTED and self.status == self.ACCEPTED:
             try:
+                if self.is_followup_appointment():
+                    notification_models.EmailNotification.ops_notification_alert(self, email_list=settings.INSURANCE_OPS_EMAIL,
+                                                                             product=Order.DOCTOR_PRODUCT_ID,
+                                                                             alert_type=notification_models.EmailNotification.FOLLOWUP_APPOINTMENT)
                 notification_tasks.docprime_appointment_reminder_sms_provider.apply_async(
                     (self.id, str(math.floor(self.updated_at.timestamp()))),
                     eta=self.time_slot_start - datetime.timedelta(
@@ -3310,7 +3314,7 @@ class OpdAppointment(auth_model.TimeStampedModel, CouponsMixin, OpdAppointmentIn
                 if self.profile_detail.get('dob', None) else ''
         except Exception as e:
             pass
-
+        opd_appointment_type = 'FOLLOWUP' if self.is_followup_appointment() else 'REGULAR'
         merchant_payout = self.merchant_payout_data()
         accepted_history = self.appointment_accepted_history()
         user_insurance = self.insurance
@@ -3374,7 +3378,8 @@ class OpdAppointment(auth_model.TimeStampedModel, CouponsMixin, OpdAppointmentIn
             "RefundPaymentMode": float(refund_data['original_payment_mode_refund']) if refund_data['original_payment_mode_refund'] else None,
             "RefundToWallet": float(refund_data['promotional_wallet_refund']) if refund_data['promotional_wallet_refund'] else None,
             "RefundInitiationDate": int(refund_data['refund_initiated_at']) if refund_data['refund_initiated_at'] else None,
-            "RefundURN": refund_data['refund_urn']
+            "RefundURN": refund_data['refund_urn'],
+            "OPD_AppointmentType": opd_appointment_type
         }
         return appointment_details
 
