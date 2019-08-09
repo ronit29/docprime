@@ -52,7 +52,7 @@ class DoctorSearchHelper:
         # sits_at_hosp_types = self.query_params.get("sits_at", [])
 
         counter = 1
-        if self.query_params.get('hospital_id') is not None:
+        if self.query_params.get('hospital_id') is not None and self.query_params.get('hospital_id') is not "":
             hosp_str = 'h.id IN('
             for id in self.query_params.get('hospital_id'):
 
