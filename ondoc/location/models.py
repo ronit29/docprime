@@ -710,6 +710,20 @@ class EntityUrls(TimeStampedModel):
                     data['is_valid'] = False
                     temp_instance = EntityUrls(**data)
                     temp_instance.save()
+                    from ondoc.seo.models import NewDynamic
+                    new_dyanmic_obj = NewDynamic.objects.filter(url_value=database_instance.url, is_enabled=True).first()
+                    if new_dyanmic_obj:
+                        new_dyanmic_obj.is_enabled = False
+                        new_dyanmic_obj.save()
+                        new_dynamic_data = dict(new_dyanmic_obj.__dict__)
+                        new_dynamic_data.pop('id', None)
+                        new_dynamic_data.pop('_state', None)
+                        new_dynamic_data.pop('is_enabled', None)
+                        new_dynamic_data = copy.deepcopy(new_dynamic_data)
+                        new_dynamic_data['is_enabled'] = True
+                        new_dynamic_data['url_value'] = self.url
+                        temp_instance1 = NewDynamic(**new_dynamic_data)
+                        temp_instance1.save()
         super().save(*args, **kwargs)
 
     @property
