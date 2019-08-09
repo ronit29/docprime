@@ -1,5 +1,6 @@
 from decimal import Decimal
 
+from celery.task import task
 from django.contrib.gis.db.models.functions import Distance
 from django.contrib.gis.geos import GEOSGeometry
 from django.db.models import Window
@@ -34,6 +35,7 @@ from django.utils import timezone
 from ondoc.authentication import models as auth_model
 from ondoc.authentication.models import SPOCDetails, RefundMixin, MerchantTdsDeduction, PaymentMixin
 from ondoc.bookinganalytics.models import DP_OpdConsultsAndTests
+# from ondoc.diagnostic.models import Lab
 from ondoc.location import models as location_models
 from ondoc.account.models import Order, ConsumerAccount, ConsumerTransaction, PgTransaction, ConsumerRefund, \
     MerchantPayout, UserReferred, MoneyPool, Invoice
@@ -247,6 +249,7 @@ class Hospital(auth_model.TimeStampedModel, auth_model.CreatedByModel, auth_mode
     # ratings = GenericRelation(ratings_models.RatingsReview, related_query_name='hospital_ratings')
     city_search_key = models.CharField(db_index=True, editable=False, max_length=100, default="", null=True, blank=True)
     enabled_for_cod = models.BooleanField(default=False)
+    enabled_poc = models.BooleanField(default=False)
     enabled_for_prepaid = models.BooleanField(default=True)
     is_location_verified = models.BooleanField(verbose_name='Location Verified', default=False)
     auto_ivr_enabled = models.BooleanField(default=True)
@@ -2231,6 +2234,80 @@ class OpdAppointmentInvoiceMixin(object):
         return invoices
 
 
+class PurchaseOrderCreation(auth_model.TimeStampedModel):
+    HOSPITAL = 'HOSPITAL'
+    LAB = 'LAB'
+    PAY_AT_CLINIC = 'Pay at Clinic'
+    SPONSOR_LISTING = 'Sponsor Listing'
+    product_choices = (('Pay at Clinic', PAY_AT_CLINIC), ('Sponsor Listing', SPONSOR_LISTING))
+    provider_choices = (('hospital', HOSPITAL), ('lab', LAB))
+    provider_type = models.CharField(choices=provider_choices, max_length=10)
+    product_type = models.CharField(choices=product_choices, max_length=100, default=PAY_AT_CLINIC)
+    provider_name_lab = models.ForeignKey("diagnostic.Lab", on_delete=models.DO_NOTHING, default='', null=True, blank=True)
+    provider_name_hospital = models.ForeignKey(Hospital, on_delete=models.DO_NOTHING, default='', null=True, blank=True, related_name='hospitalpurchaseorder')
+    provider_name = models.CharField(max_length=500, default='')
+    gst_number = models.CharField(max_length=1000)
+    total_amount_paid = models.IntegerField(help_text='Inclusive of GST')
+    start_date = models.DateField(null=True, blank=True)
+    end_date = models.DateField(null=True, blank=True)
+    appointment_booked_count = models.IntegerField(default=0)
+    total_appointment_count = models.IntegerField(default=0)
+    is_enabled = models.BooleanField(default=False)
+    current_appointment_count = models.IntegerField(default=0)
+    agreement_details = models.TextField()
+    proof_of_payment = models.CharField(max_length=1000, null=True, blank=True, help_text='Either enter a valid invoice number or upload the invoice image')
+    proof_of_payment_image = models.FileField(upload_to='purchaseorder', validators=[
+        FileExtensionValidator(allowed_extensions=['pdf', 'jfif', 'jpg', 'jpeg', 'png'])], null=True, blank=True)
+
+
+    def __str__(self):
+        if self.provider_name_hospital:
+            return self.provider_name_hospital.name
+        else:
+            return self.provider_name_lab.name
+
+    def save(self, force_insert=False, force_update=False, using=None, update_fields=None):
+        if self.provider_name_hospital:
+            self.provider_name = self.provider_name_hospital
+        elif self.provider_name_lab:
+            self.provider_name = self.provider_name_lab
+        save_now = False
+        if not self.id:
+            save_now =True
+            if self.product_type == self.PAY_AT_CLINIC :
+                # self.is_enabled = True
+                self.appointment_booked_count = 0
+                self.current_appointment_count = self.total_appointment_count
+                if self.provider_name_hospital:
+                    self.provider_name_hospital.enabled_poc = True
+                    self.provider_name_hospital.enabled_for_cod = True
+                    self.provider_name_hospital.save()
+
+        if self.is_enabled == True and self.provider_name_hospital.enabled_poc == True and self.current_appointment_count == 0:
+            self.disable_cod_functionality()
+
+        super().save(force_insert, force_update, using, update_fields)
+        if save_now:
+            notification_tasks.purchase_order_creation_counter_automation.apply_async((self.id, ), eta=self.start_date, )
+            notification_tasks.purchase_order_closing_counter_automation.apply_async((self.id, ), eta=self.end_date, )
+
+    def disable_cod_functionality(self):
+        x = PurchaseOrderCreation.objects.filter(is_enabled=True,
+                                                 provider_name_hospital=self.provider_name_hospital,
+                                                 start_date__lte=timezone.now().date(),
+                                                 end_date__gte=timezone.now().date()
+                                                 ).exclude(id=self.id).count()
+        if x==0:
+            self.provider_name_hospital.enabled_poc = False
+            self.provider_name_hospital.enabled_for_cod = False
+            self.provider_name_hospital.save()
+
+
+
+    class Meta:
+        db_table = 'purchase_order_creation'
+
+
 @reversion.register()
 class OpdAppointment(auth_model.TimeStampedModel, CouponsMixin, OpdAppointmentInvoiceMixin, RefundMixin, CompletedBreakupMixin, MatrixDataMixin, TdsDeductionMixin, PaymentMixin, MerchantPayoutMixin):
     PRODUCT_ID = Order.DOCTOR_PRODUCT_ID
@@ -2295,6 +2372,7 @@ class OpdAppointment(auth_model.TimeStampedModel, CouponsMixin, OpdAppointmentIn
     payment_type = models.PositiveSmallIntegerField(choices=PAY_CHOICES, default=PREPAID)
     insurance = models.ForeignKey(insurance_model.UserInsurance, blank=True, null=True, default=None,
                                   on_delete=models.DO_NOTHING)
+    purchase_order = models.ForeignKey(PurchaseOrderCreation, on_delete=models.DO_NOTHING, null=True, blank=True, related_name='opdpurchaseorder')
     outstanding = models.ForeignKey(Outstanding, blank=True, null=True, on_delete=models.SET_NULL)
     matrix_lead_id = models.IntegerField(null=True)
     is_rated = models.BooleanField(default=False)
@@ -2819,6 +2897,31 @@ class OpdAppointment(auth_model.TimeStampedModel, CouponsMixin, OpdAppointmentIn
             push_to_history = True
         elif self.id is None:
             push_to_history = True
+
+        if not self.id:
+            if self.hospital.enabled_for_cod:
+                # TODO: Add check for valid POC object (date)
+                x = self.hospital.hospitalpurchaseordercreation.filter(is_enabled=True, start_date__lte=timezone.now(), end_date__gte=timezone.now()).order_by('id').first()
+                if x:
+                    self.purchase_order = x
+
+        if self.purchase_order:
+            to_save = False
+            if (not database_instance or database_instance.status != self.status):
+                if self.status == 2:
+                    self.purchase_order.appointment_booked_count += 1
+                    to_save = True
+                elif self.status == 7 and self.purchase_order.current_appointment_count != 0:
+                    self.purchase_order.current_appointment_count = self.purchase_order.current_appointment_count - 1
+                    to_save = True
+                elif self.status == 7 and self.purchase_order.current_appointment_count == 0:
+                    # self.purchase_order.provider_name_hospital.enabled_for_cod = False
+                    self.purchase_order.is_enabled = False
+                    self.purchase_order.current_appointment_count = self.purchase_order.current_appointment_count - 1
+                    to_save = True
+                if to_save:
+                    self.purchase_order.save()
+
 
         super().save(*args, **kwargs)
 

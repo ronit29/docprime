@@ -571,6 +571,7 @@ class LabAdmin(ImportExportMixin, admin.GeoModelAdmin, VersionAdmin, ActionAdmin
                'radiology_agreed_price_percentage', 'radiology_deal_price_percentage', 'live_at',
                'onboarded_at', 'qc_approved_at', 'disabled_at', 'welcome_calling_done_at')
     # autocomplete_fields = ['related_hospital']
+    search_fields = ['provider_name_lab']
 
     def has_delete_permission(self, request, obj=None):
         return super().has_delete_permission(request, obj)

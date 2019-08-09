@@ -31,6 +31,8 @@ from django.utils import timezone
 from ondoc.common.helper import Choices
 from django.conf import settings
 
+# from ondoc.doctor.models import PurchaseOrderCreation, PracticeSpecialization
+
 
 class Cities(models.Model):
     name = models.CharField(max_length=48, db_index=True)
@@ -787,3 +789,18 @@ class Fraud(auth_model.TimeStampedModel):
         db_table = 'fraud'
         unique_together = ('content_type', 'object_id',)
 
+
+class SponsorListingURL(auth_model.TimeStampedModel):
+    poc = models.ForeignKey("doctor.PurchaseOrderCreation", on_delete=models.CASCADE, null=True, blank=True, related_name='poc_sponsorlisting')
+    seo_url = models.CharField(max_length=500, null=True, blank=True)
+    start_date = models.DateField(null=True, blank=True)
+    end_date = models.DateField(null=True, blank=True)
+    is_enabled = models.BooleanField(default=False)
+
+
+class SponsorListingSpecialization(auth_model.TimeStampedModel):
+    poc = models.ForeignKey("doctor.PurchaseOrderCreation", on_delete=models.CASCADE, related_name='poc_specialization', null=True)
+    specialization = models.ForeignKey("doctor.PracticeSpecialization", on_delete=models.SET_NULL, null=True, blank=True, related_name='listing_specialization')
+    latitude = models.FloatField()
+    longitude = models.FloatField()
+    radius = models.FloatField()
