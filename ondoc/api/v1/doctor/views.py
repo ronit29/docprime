@@ -22,7 +22,8 @@ from ondoc.insurance.models import UserInsurance, InsuredMembers
 from ondoc.notification import tasks as notification_tasks
 #from ondoc.doctor.models import Hospital, DoctorClinic,Doctor,  OpdAppointment
 from ondoc.doctor.models import DoctorClinic, OpdAppointment, DoctorAssociation, DoctorQualification, Doctor, Hospital, \
-    HealthInsuranceProvider, ProviderSignupLead, HospitalImage, CommonHospital
+    HealthInsuranceProvider, ProviderSignupLead, HospitalImage, CommonHospital, PracticeSpecialization, \
+    SpecializationDepartmentMapping, DoctorPracticeSpecialization
 from ondoc.notification.models import EmailNotification
 from django.utils.safestring import mark_safe
 from ondoc.coupon.models import Coupon, CouponRecommender
@@ -1913,7 +1914,53 @@ class DoctorListViewSet(viewsets.GenericViewSet):
             reviews = validated_data.get('reviews')
         hospital_req_data = {}
         if validated_data.get('hospital_id'):
-            hospital_req_data = Hospital.objects.filter(id__in=validated_data.get('hospital_id')).values('id', 'name').first()
+            hospital_req_data = Hospital.objects.filter(id__in=validated_data.get('hospital_id')).values('id',
+                                                                                                         'name').first()
+
+        similar_specializations = list()
+        if validated_data.get('specialization_ids') and len(validated_data.get('specialization_ids')) == 1:
+            spec = PracticeSpecialization.objects.filter(id=validated_data['specialization_ids'][0]).first()
+            department_spec_list = list()
+            departent_ids_list = list()
+            similar_specializations_ids = list()
+            if spec and spec.is_similar_specialization:
+                for department in spec.department.all():
+                    department_spec_mapping = department.specializationdepartmentmapping_set.all()
+                    if department_spec_mapping:
+                        department_spec_list.extend(department_spec_mapping.values_list('specialization', flat=True))
+                    departent_ids_list.append(department.id)
+            if department_spec_list:
+                department_spec_list = set(department_spec_list)
+                spec_dept_mapping_spec_ids = set(PracticeSpecialization.objects.filter(id__in=department_spec_list).prefetch_related(
+                    "department", "department__departments",
+                    "department__departments__specializationdepartmentmapping").
+                    annotate( specialization_id=F('department__departments__specializationdepartmentmapping__specialization')).values_list('specialization_id', flat=True))
+
+                doctors_spec_ids = PracticeSpecialization.objects.filter(id__in=spec_dept_mapping_spec_ids).prefetch_related("specialization__doctor__doctor_clinics",
+                                                                        "specialization__doctor__doctor_clinics__hospital", "specialization__doctor",
+                                                                        "specialization").annotate(bookable_doctors_count=Count(Q(specialization__doctor__enabled_for_online_booking=True,
+                                                                         specialization__doctor__doctor_clinics__hospital__enabled_for_online_booking=True,
+                                                                        specialization__doctor__doctor_clinics__enabled_for_online_booking=True,
+                                                                        specialization__doctor__is_live=True, specialization__doctor__doctor_clinics__hospital__is_live=True))).\
+                                                                        filter(bookable_doctors_count__gt=0).order_by('-bookable_doctors_count').values_list('id', flat=True)
+                for id in doctors_spec_ids:
+                    if not id in similar_specializations_ids:
+                        similar_specializations_ids.append(id)
+
+                if similar_specializations_ids:
+                    if int(validated_data['specialization_ids'][0]) in similar_specializations_ids:
+                        similar_specializations_ids.remove(int(validated_data['specialization_ids'][0]))
+                    specialization_department = SpecializationDepartmentMapping.objects.filter(
+                        specialization__id__in=similar_specializations_ids,
+                        department__id__in=departent_ids_list).values('specialization__id', 'specialization__name', 'department__id', 'department__name')
+                    spec_dept_details = dict()
+                    for data in specialization_department:
+                        if not spec_dept_details.get(data.get('specialization__id')):
+                            spec_dept_details[data.get('specialization__id')] = {'specialization_id': data.get('specialization__id'), 'department_id': data.get('department__id'),
+                                                        'specialization_name': data.get('specialization__name'), 'department_name': data.get('department__name')}
+                    for id in similar_specializations_ids:
+                        if spec_dept_details.get(id):
+                            similar_specializations.append(spec_dept_details[id])
 
         return Response({"result": response, "count": result_count,
                          'specializations': specializations, 'conditions': conditions, "seo": seo,
@@ -1922,7 +1969,8 @@ class DoctorListViewSet(viewsets.GenericViewSet):
                          'ratings': ratings, 'reviews': reviews, 'ratings_title': ratings_title,
                          'bottom_content': bottom_content, 'canonical_url': canonical_url,
                          'ipd_procedures': ipd_procedures, 'hospital': hospital_req_data,
-                         'specialization_groups': specialization_groups})
+                         'specialization_groups': specialization_groups,
+                         'similar_specializations': similar_specializations})
 
     def get_schema(self, request, response):
 

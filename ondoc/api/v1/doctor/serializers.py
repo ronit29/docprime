@@ -29,7 +29,7 @@ from django.contrib.staticfiles.templatetags.staticfiles import static
 from ondoc.api.v1.auth.serializers import UserProfileSerializer
 from ondoc.api.v1.ratings import serializers as rating_serializer
 from ondoc.api.v1.utils import is_valid_testing_data, form_time_slot, GenericAdminEntity, util_absolute_url, \
-    util_file_name, aware_time_zone
+    util_file_name, aware_time_zone, is_valid_ckeditor_text
 from django.utils import timezone
 from django.contrib.auth import get_user_model
 import math
@@ -2116,15 +2116,22 @@ class HospitalDetailIpdProcedureSerializer(TopHospitalForIpdProcedureSerializer)
                                         parameters={'hospital_id': str(obj.id), 'longitude': validated_data.get('long'),
                                                     'latitude': validated_data.get('lat'), 'sort_on': 'experience',
                                                     'restrict_result_count': 3, 'specialization_ids' : specialization_ids}).data
+
     def get_about(self, obj):
-        if obj.network:
-            return obj.network.about
-        return obj.about
+        result = None
+        if obj.about:
+            result = obj.about
+        if not result and obj.network:
+            result = obj.network.about
+        return result
 
     def get_new_about(self, obj):
-        if obj.network:
-            return obj.network.new_about
-        return obj.new_about
+        result = None
+        if is_valid_ckeditor_text(obj.new_about):
+            result = obj.new_about
+        if not result and obj.network and is_valid_ckeditor_text(obj.network.new_about):
+            result = obj.network.new_about
+        return result
 
     def get_opd_timings(self, obj):
         return obj.opd_timings
@@ -2260,10 +2267,9 @@ class HospitalDetailIpdProcedureSerializer(TopHospitalForIpdProcedureSerializer)
         return False
 
     def get_offers(self, obj):
-        if obj.network:
+        query_set = Offer.objects.filter(is_live=True, hospital=obj)
+        if not query_set and obj.network:
             query_set = Offer.objects.filter(is_live=True, network=obj.network)
-        else:
-            query_set = Offer.objects.filter(is_live=True, hospital=obj)
         return OfferSerializer(query_set, many=True).data
 
 
