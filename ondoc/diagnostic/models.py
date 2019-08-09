@@ -3120,6 +3120,7 @@ class LabPricing(Lab):
         default_permissions = []
 
 
+@reversion.register()
 class LabReport(auth_model.TimeStampedModel):
     appointment = models.ForeignKey(LabAppointment, related_name='reports', on_delete=models.CASCADE)
     report_details = models.TextField(max_length=300, blank=True, null=True)
@@ -3173,6 +3174,7 @@ class LabTestGroup(auth_model.TimeStampedModel):
         return "{}".format(self.name)
 
 
+@reversion.register()
 class LabAppointmentTestMapping(models.Model):
     appointment = models.ForeignKey(LabAppointment, on_delete=models.CASCADE, related_name='test_mappings')
     test = models.ForeignKey(LabTest, on_delete=models.CASCADE, related_name='lab_appointment_mappings')

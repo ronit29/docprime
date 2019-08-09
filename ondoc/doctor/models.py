@@ -3563,6 +3563,7 @@ class OpdAppointment(auth_model.TimeStampedModel, CouponsMixin, OpdAppointmentIn
         return self.hospital == artemis_hospital if artemis_hospital else False
 
 
+@reversion.register()
 class OpdAppointmentProcedureMapping(models.Model):
     opd_appointment = models.ForeignKey(OpdAppointment, on_delete=models.CASCADE, related_name='procedure_mappings')
     procedure = models.ForeignKey('procedure.Procedure', on_delete=models.CASCADE, related_name='opd_appointment_mappings')
@@ -3612,6 +3613,7 @@ class DoctorLeave(auth_model.TimeStampedModel):
         return self.INTERVAL_MAPPING.get((str(self.start_time), str(self.end_time)))
 
 
+@reversion.register()
 class Prescription(auth_model.TimeStampedModel):
     appointment = models.ForeignKey(OpdAppointment, related_name='prescriptions', on_delete=models.CASCADE)
     prescription_details = models.TextField(max_length=300, blank=True, null=True)
