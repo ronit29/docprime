@@ -26,7 +26,6 @@ from reversion_compare.admin import CompareVersionAdmin
 
 from ondoc.account.models import Order, Invoice
 from ondoc.api.v1.utils import util_absolute_url, util_file_name, datetime_to_formated_string
-from ondoc.common.admin import CustomVersionAdmin
 from ondoc.common.models import AppointmentHistory
 from ondoc.doctor.models import Hospital, CancellationReason
 from ondoc.diagnostic.models import (LabTiming, LabImage,
@@ -948,7 +947,7 @@ class LabPrescriptionInline(nested_admin.NestedGenericTabularInline):
         return readonly_fields
 
 
-class LabAppointmentAdmin(nested_admin.NestedModelAdmin, CustomVersionAdmin):
+class LabAppointmentAdmin(nested_admin.NestedModelAdmin, CompareVersionAdmin):
     form = LabAppointmentForm
     change_form_template = 'appointment_change_form.html'
     search_fields = ['id']

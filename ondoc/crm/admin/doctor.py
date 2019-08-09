@@ -1,9 +1,8 @@
 import base64
 
-from django.contrib.admin.utils import quote, unquote
 from django.forms.utils import ErrorList
 from reversion.admin import VersionAdmin
-from django.core.exceptions import FieldDoesNotExist, MultipleObjectsReturned, PermissionDenied
+from django.core.exceptions import FieldDoesNotExist, MultipleObjectsReturned
 from django.contrib.admin import SimpleListFilter
 from django.utils.safestring import mark_safe
 from django.conf.urls import url
@@ -23,11 +22,9 @@ import datetime
 from django.db import transaction
 import logging
 from dal import autocomplete
-from reversion.models import Version
 from reversion_compare.admin import CompareVersionAdmin
 
 from ondoc.api.v1.utils import GenericAdminEntity, util_absolute_url, util_file_name
-from ondoc.common.admin import CustomVersionAdmin
 from ondoc.common.models import AppointmentHistory
 from django.contrib import messages
 from django.http import HttpResponseRedirect
@@ -1610,7 +1607,7 @@ class PrescriptionInline(nested_admin.NestedTabularInline):
     inlines = [PrescriptionFileInline]
 
 
-class DoctorOpdAppointmentAdmin(CustomVersionAdmin):
+class DoctorOpdAppointmentAdmin(CompareVersionAdmin):
     form = DoctorOpdAppointmentForm
     change_form_template = 'appointment_change_form.html'
     search_fields = ['id', 'profile__name', 'profile__phone_number', 'doctor__name', 'hospital__name']

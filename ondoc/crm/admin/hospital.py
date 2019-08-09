@@ -6,7 +6,8 @@ from reversion.admin import VersionAdmin
 from django.db.models import Q
 import datetime
 
-from ondoc.common.admin import CustomVersionAdmin
+from reversion_compare.admin import CompareVersionAdmin
+
 from ondoc.crm.admin.doctor import CreatedByFilter
 from ondoc.doctor.models import (HospitalImage, HospitalDocument, HospitalAward, Doctor,
                                  HospitalAccreditation, HospitalCertification, HospitalSpeciality, HospitalNetwork,
@@ -25,6 +26,7 @@ import nested_admin
 from .common import AssociatedMerchantInline, RemarkInline
 from django.contrib import messages
 from django.http import HttpResponseRedirect
+
 
 import logging
 logger = logging.getLogger(__name__)
@@ -456,7 +458,7 @@ class QuestionAnswerInline(GenericTabularInline):
         return result
 
 
-class HospitalAdmin(admin.GeoModelAdmin, CustomVersionAdmin, ActionAdmin, QCPemAdmin):
+class HospitalAdmin(admin.GeoModelAdmin, CompareVersionAdmin, ActionAdmin, QCPemAdmin):
     list_filter = ('data_status', 'welcome_calling_done', 'enabled_for_online_booking', 'enabled', CreatedByFilter,
                    HospCityFilter)
     readonly_fields = ('source', 'batch', 'associated_doctors', 'is_live', 'matrix_lead_id', 'city', 'state', 'live_seo_url', 'edit_url')
