@@ -28,7 +28,7 @@ import re
 from django.contrib.postgres.fields import ArrayField
 from django.db.models import Prefetch
 from django.db import transaction
-
+import reversion
 
 logger = logging.getLogger(__name__)
 
@@ -71,6 +71,7 @@ class CompareSEOUrls(TimeStampedModel):
         super(CompareSEOUrls, self).save(*args, **kwargs)
 
 
+@reversion.register()
 class CompareLabPackagesSeoUrls(TimeStampedModel):
     url = models.ForeignKey(CompareSEOUrls, related_name="compare_url", on_delete=models.CASCADE)
     lab = models.ForeignKey('diagnostic.Lab', related_name="compare_lab", on_delete=models.CASCADE)

@@ -22,6 +22,8 @@ from django.utils.timezone import make_aware
 from django.utils.html import format_html_join
 import pytz
 from django.contrib import messages
+from reversion_compare.admin import CompareVersionAdmin
+
 from ondoc.account.models import Order, Invoice
 from ondoc.api.v1.utils import util_absolute_url, util_file_name, datetime_to_formated_string
 from ondoc.common.admin import CustomVersionAdmin
@@ -560,7 +562,7 @@ class LabTestGroupTimingInline(admin.TabularInline):
     show_change_link = False
 
 
-class LabAdmin(ImportExportMixin, admin.GeoModelAdmin, CustomVersionAdmin, ActionAdmin, QCPemAdmin):
+class LabAdmin(ImportExportMixin, admin.GeoModelAdmin, CompareVersionAdmin, ActionAdmin, QCPemAdmin):
     change_list_template = 'superuser_import_export.html'
     resource_class = LabResource
     list_display = ('name', 'lab_logo', 'updated_at', 'onboarding_status', 'data_status', 'welcome_calling_done',

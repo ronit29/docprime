@@ -1386,6 +1386,7 @@ class Doctor(auth_model.TimeStampedModel, auth_model.QCModel, SearchKey, auth_mo
         db_table = "doctor"
 
 
+@reversion.register()
 class DoctorSticker(auth_model.TimeStampedModel):
     image_base_path = 'doctor/stickers'
     doctor = models.ForeignKey(Doctor, related_name="stickers", on_delete=models.CASCADE)
@@ -1463,6 +1464,7 @@ class GeneralSpecialization(auth_model.TimeStampedModel, UniqueNameModel, Search
         db_table = "general_specialization"
 
 
+@reversion.register()
 class DoctorSpecialization(auth_model.TimeStampedModel):
     doctor = models.ForeignKey(Doctor, related_name="doctorspecializations", on_delete=models.CASCADE)
     specialization = models.ForeignKey(GeneralSpecialization, on_delete=models.CASCADE, blank=False, null=False)
@@ -1615,6 +1617,7 @@ class DoctorClinicTiming(auth_model.TimeStampedModel):
         super().save(*args, **kwargs)
 
 
+@reversion.register()
 class DoctorHospital(auth_model.TimeStampedModel):
     DAY_CHOICES = [(0, "Monday"), (1, "Tuesday"), (2, "Wednesday"), (3, "Thursday"), (4, "Friday"), (5, "Saturday"), (6, "Sunday")]
     doctor = models.ForeignKey(Doctor, related_name="availability", on_delete=models.CASCADE)
@@ -4024,6 +4027,7 @@ class PatientMobile(auth_model.TimeStampedModel):
         db_table = "patient_mobile"
 
 
+@reversion.register()
 class OfflineOPDAppointments(auth_model.TimeStampedModel):
     CREATED = 1
     BOOKED = 2

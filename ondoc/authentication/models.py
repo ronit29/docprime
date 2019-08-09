@@ -751,6 +751,7 @@ class Address(TimeStampedModel):
         return str(self.user)
 
 
+@reversion.register()
 class UserPermission(TimeStampedModel):
     APPOINTMENT = 'appointment'
     BILLINNG = 'billing'
@@ -831,6 +832,7 @@ class AppointmentTransaction(TimeStampedModel):
         return "{}-{}".format(self.id, self.appointment)
 
 
+@reversion.register()
 class LabUserPermission(TimeStampedModel):
     APPOINTMENT = 'appointment'
     BILLINNG = 'billing'
