@@ -894,6 +894,7 @@ class Doctor(auth_model.TimeStampedModel, auth_model.QCModel, SearchKey, auth_mo
     rating_data = JSONField(blank=True, null=True)
     qr_code = GenericRelation(QRCode, related_name="qrcode")
     priority_score = models.IntegerField(default=0, null=False, blank=False)
+    is_ipd_doctor = models.NullBooleanField(default=None)
 
     def __str__(self):
         return '{} ({})'.format(self.name, self.id)
@@ -3815,6 +3816,7 @@ class PracticeSpecialization(auth_model.TimeStampedModel, SearchKey):
     is_insurance_enabled = models.BooleanField(default=True)
     priority = models.PositiveIntegerField(default=0, null=True)
     search_distance = models.FloatField(default=None, blank=True, null=True)
+    is_similar_specialization = models.BooleanField(default=True)
 
     class Meta:
         db_table = 'practice_specialization'

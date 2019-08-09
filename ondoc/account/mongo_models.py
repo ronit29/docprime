@@ -22,19 +22,24 @@ class PgLogs(DynamicDocument, TimeStampedModel):
     DUMMY_TXN = 5
     PAYOUT_PROCESS = 6
     PAYOUT_SETTLEMENT_DETAIL = 7
+    CHAT_ORDER_REQUEST = 8
 
     id = UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     order_id = LongField(null=True, blank=True, editable=False)
     pg_transaction_id = LongField(null=True, blank=True, editable=False)
+    user_id = LongField(null=True, blank=True, editable=False)
     logs = ListField()
 
     @classmethod
-    def save_pg_response(cls, log_type=0, order_id=None, txn_id=None, response=None, request=None):
+    def save_pg_response(cls, log_type=0, order_id=None, txn_id=None, response=None, request=None, user_id=None):
         if settings.MONGO_STORE:
-            pg_log = PgLogs.objects.filter(order_id=order_id).first()
+            pg_log = None
+            if order_id:
+                pg_log = PgLogs.objects.filter(order_id=order_id).first()
             if not pg_log:
                 pg_log = PgLogs(order_id=order_id,
                                 pg_transaction_id=txn_id,
+                                user_id=user_id,
                                 created_at=timezone.localtime(),
                                 updated_at=timezone.localtime())
             if request:
