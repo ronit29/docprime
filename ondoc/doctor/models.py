@@ -2277,6 +2277,11 @@ class PurchaseOrderCreation(auth_model.TimeStampedModel):
             if self.product_type == self.PAY_AT_CLINIC:
                 self.appointment_booked_count = 0
                 self.current_appointment_count = self.total_appointment_count
+                if self.start_date <= timezone.now().date() and self.end_date > timezone.now().date():
+                    self.is_enabled = True
+                    # self.provider_name_hospital.enabled_for_cod = True
+                    # self.provider_name_hospital.enabled_poc = True
+                    Hospital.objects.filter(id=self.provider_name_hospital.id, enabled_for_cod=True, enabled_poc=True)
 
         if self.is_enabled == True and self.provider_name_hospital.enabled_poc == True and self.current_appointment_count <= 0:
             self.disable_cod_functionality()
