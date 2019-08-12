@@ -457,7 +457,7 @@ class QuestionAnswerInline(GenericTabularInline):
 class HospitalAdmin(admin.GeoModelAdmin, VersionAdmin, ActionAdmin, QCPemAdmin):
     list_filter = ('data_status', 'welcome_calling_done', 'enabled_for_online_booking', 'enabled', CreatedByFilter,
                    HospCityFilter)
-    readonly_fields = ('source', 'batch', 'associated_doctors', 'is_live', 'matrix_lead_id', 'city', 'state', 'live_seo_url')
+    readonly_fields = ('source', 'batch', 'associated_doctors', 'is_live', 'matrix_lead_id', 'city', 'state', 'live_seo_url', 'edit_url')
     exclude = ('search_key', 'live_at', 'qc_approved_at', 'disabled_at', 'physical_agreement_signed_at',
                'welcome_calling_done_at', 'provider_encrypt', 'provider_encrypted_by', 'encryption_hint', 'encrypted_hospital_id', 'is_big_hospital')
     list_display = ('name', 'locality', 'city', 'is_live', 'updated_at', 'data_status', 'welcome_calling_done', 'doctor_count',
@@ -487,7 +487,7 @@ class HospitalAdmin(admin.GeoModelAdmin, VersionAdmin, ActionAdmin, QCPemAdmin):
     map_width = 200
     map_template = 'admin/gis/gmap.html'
     extra_js = ['js/admin/GoogleMap.js',
-                'https://maps.googleapis.com/maps/api/js?key=AIzaSyBqDAVDFBQzI5JMgaXcqJq431QPpJtNiZE&callback=initGoogleMap']
+                'https://maps.googleapis.com/maps/api/js?key=AIzaSyClYPAOTREfAZ-95eRbU6hDVHU0p3XygoY&callback=initGoogleMap']
 
     # def get_inline_instances(self, request, obj=None):
     #     res = super().get_inline_instances(request, obj)
@@ -536,6 +536,21 @@ class HospitalAdmin(admin.GeoModelAdmin, VersionAdmin, ActionAdmin, QCPemAdmin):
                 html += "</ul>"
                 return mark_safe(html)
 
+        return ''
+
+    def edit_url(self, instance):
+        if instance.id:
+            from ondoc.location.models import EntityUrls
+            entity_obj = EntityUrls.objects.filter(sitemap_identifier=EntityUrls.SitemapIdentifier.HOSPITAL_PAGE,
+                                                   is_valid=True, entity_id=instance.id).first()
+            hospital_url = None
+            if entity_obj:
+                hospital_url = reverse('admin:location_entityurls_change', kwargs={"object_id": entity_obj.id})
+            if hospital_url:
+                html = "<ul style='margin-left:0px !important'>"
+                html += "<li><a target='_blank' href='{}'>Link</a></li>".format(hospital_url)
+                html += "</ul>"
+                return mark_safe(html)
         return ''
 
     def save_model(self, request, obj, form, change):

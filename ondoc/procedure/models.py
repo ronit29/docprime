@@ -302,7 +302,8 @@ class IpdProcedureLead(auth_model.TimeStampedModel):
                 #                                             hospital__is_live=True,
                 #                                             enabled=True).exists()
                 result2 = False
-            result = result1 and result2
+            result3 = self.doctor.is_ipd_doctor
+            result = result1 and (result2 or result3)
         return result
 
     def update_idp_data(self, request_data):
@@ -337,6 +338,10 @@ class IpdProcedureLead(auth_model.TimeStampedModel):
                     request_data.update({'UtmSource': utm_tags.get('utm_source')})
                 if utm_tags.get('utm_term', None):
                     request_data.update({'UtmTerm': utm_tags.get('utm_term')})
+        if self.requested_date_time:
+            request_data.update({'Requested_Datetime': int(self.requested_date_time.timestamp())})
+        if self.dob:
+            request_data.update({'DOB': int(self.dob.timestamp())})
 
     def is_user_insured(self):
         result = False

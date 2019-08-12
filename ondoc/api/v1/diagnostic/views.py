@@ -2398,11 +2398,12 @@ class LabAppointmentView(mixins.CreateModelMixin,
         serializer.is_valid(raise_exception=True)
         validated_data = serializer.validated_data
 
+        booked_by = 'agent' if hasattr(request, 'agent') else 'user'
         user_insurance = UserInsurance.get_user_insurance(request.user)
         if user_insurance:
             if user_insurance.status == UserInsurance.ONHOLD:
                 return Response(status=status.HTTP_400_BAD_REQUEST, data={'error': 'Your documents from the last claim are under verification.Please write to customercare@docprime.com for more information'})
-            insurance_validate_dict = user_insurance.validate_insurance(validated_data)
+            insurance_validate_dict = user_insurance.validate_insurance(validated_data, booked_by=booked_by)
             data['is_appointment_insured'] = insurance_validate_dict['is_insured']
             data['insurance_id'] = insurance_validate_dict['insurance_id']
             data['insurance_message'] = insurance_validate_dict['insurance_message']
@@ -3231,6 +3232,21 @@ class DigitalReports(viewsets.GenericViewSet):
             return Response(status=status.HTTP_400_BAD_REQUEST,
                             data={'error': 'No response found from integrator for this appointment.'})
 
+        integrator_report = IntegratorReport.objects.filter(integrator_response_id=integrator_response.id).first()
+        if not integrator_report:
+            return Response(status=status.HTTP_400_BAD_REQUEST,
+                            data={'error': 'No report found from integrator for this appointment.'})
+
+        user_age = appointment_obj.profile.get_age()
+
+        report_json = integrator_report.get_transformed_report()
+
+        response['colour_count_dict'] = {
+            LabTestThresholds.Colour.RED.lower(): 0,
+            LabTestThresholds.Colour.ORANGE.lower(): 0,
+            LabTestThresholds.Colour.GREEN.lower(): 0
+        }
+
         booked_tests_or_packages = appointment_obj.test_mappings.all()
         booked_tests_or_packages = list(map(lambda tp: tp.test, booked_tests_or_packages))
         booked_tests = list()
@@ -3244,24 +3260,6 @@ class DigitalReports(viewsets.GenericViewSet):
         response['profiles_count'] = len(booked_tests)
         profiles = list()
 
-        response['colour_count_dict'] = {
-            LabTestThresholds.Colour.RED.lower(): 0,
-            LabTestThresholds.Colour.ORANGE.lower(): 0,
-            LabTestThresholds.Colour.GREEN.lower(): 0
-        }
-
-        user_age = appointment_obj.profile.get_age()
-
-        integrator_report = IntegratorReport.objects.filter(integrator_response_id=integrator_response.id).first()
-        if not integrator_report:
-            return Response(status=status.HTTP_400_BAD_REQUEST,
-                            data={'error': 'No report found from integrator for this appointment.'})
-
-        report_json = integrator_report.json_data
-        report_parameter_array = list()
-
-        # booked_tests = [LabTest.objects.get(id=11361)]
-
         for booked_test in booked_tests:
             profile_dict = dict()
             profile_dict['name'] = booked_test.name
@@ -3273,22 +3271,20 @@ class DigitalReports(viewsets.GenericViewSet):
                 parameter_dict = dict()
                 parameter_dict['name'] = parameter.name
                 parameter_dict['details'] = parameter.details
-                integrator_parameter_obj = parameter.integrator_mapped_parameters.filter().first()
+                # integrator_parameter_obj = parameter.integrator_mapped_parameters.filter().first()
 
-                #TODO: get value from report json and remove below line.
-                value = 16
+                value = report_json['tests'][booked_test.id]['parameters'][str(parameter.id)]['TEST_VALUE']
 
                 threshold_qs = parameter.parameter_thresholds.all()
-                if user_age:
-                    valid_threshold = threshold_qs.filter(min_value__lte=value, max_value__gte=value,
-                                                          min_age__lte=appointment_obj.profile.get_age(),
-                                                          max_age__gte=appointment_obj.profile.get_age(),
-                                                          gender=appointment_obj.profile.gender).first()
-                else:
-                    valid_threshold = threshold_qs.filter(min_value__lte=value,
-                                                          max_value__gte=value,
-                                                          gender=appointment_obj.profile.gender).first()
+                valid_threshold = threshold_qs.filter(min_value__lte=value, max_value__gte=value)
 
+                if user_age:
+                    temp_valid_threshold = threshold_qs.filter(min_age__lte=appointment_obj.profile.get_age(),
+                                                               max_age__gte=appointment_obj.profile.get_age())
+                    if temp_valid_threshold.exists():
+                        valid_threshold = temp_valid_threshold
+
+                valid_threshold = valid_threshold.first()
                 if not valid_threshold:
                     return Response(status=status.HTTP_400_BAD_REQUEST)
 
