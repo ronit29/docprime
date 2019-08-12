@@ -2243,8 +2243,8 @@ class PurchaseOrderCreation(auth_model.TimeStampedModel):
     provider_choices = (('hospital', HOSPITAL), ('lab', LAB))
     provider_type = models.CharField(choices=provider_choices, max_length=10)
     product_type = models.CharField(choices=product_choices, max_length=100, default=PAY_AT_CLINIC)
-    provider_name_lab = models.ForeignKey("diagnostic.Lab", on_delete=models.DO_NOTHING, default='', null=True, blank=True)
-    provider_name_hospital = models.ForeignKey(Hospital, on_delete=models.DO_NOTHING, default='', null=True, blank=True, related_name='hospitalpurchaseorder')
+    provider_name_lab = models.ForeignKey("diagnostic.Lab", on_delete=models.DO_NOTHING, null=True, blank=True)
+    provider_name_hospital = models.ForeignKey(Hospital, on_delete=models.DO_NOTHING, null=True, blank=True, related_name='hospitalpurchaseorder')
     provider_name = models.CharField(max_length=500, default='')
     gst_number = models.CharField(max_length=1000)
     total_amount_paid = models.IntegerField(help_text='Inclusive of GST')
@@ -2274,23 +2274,14 @@ class PurchaseOrderCreation(auth_model.TimeStampedModel):
         save_now = False
         if not self.id:
             save_now =True
-            if self.product_type == self.PAY_AT_CLINIC :
-                # self.is_enabled = True
+            if self.product_type == self.PAY_AT_CLINIC:
                 self.appointment_booked_count = 0
                 self.current_appointment_count = self.total_appointment_count
-                if self.provider_name_hospital:
-                    self.provider_name_hospital.enabled_poc = True
-                    self.provider_name_hospital.enabled_for_cod = True
-                    self.provider_name_hospital.save()
 
         if self.is_enabled == True and self.provider_name_hospital.enabled_poc == True and self.current_appointment_count <= 0:
             self.disable_cod_functionality()
 
         super().save(force_insert, force_update, using, update_fields)
-
-        if self.delete():
-            self.provider_name_hospital.enabled_for_cod = False
-            self.provider_name_hospital.save()
 
         if save_now:
             notification_tasks.purchase_order_creation_counter_automation.apply_async((self.id, ), eta=self.start_date, ) # task to enable Pay-at-clinic functionality in hospital
@@ -2304,9 +2295,7 @@ class PurchaseOrderCreation(auth_model.TimeStampedModel):
                                                  ).exclude(id=self.id).count()  # Queryset to find the remaining POC objects for a particular
                                                                                 # Hospital that is still enabled/live
         if remaining_poc_objects == 0:
-            self.provider_name_hospital.enabled_poc = False
-            self.provider_name_hospital.enabled_for_cod = False
-            self.provider_name_hospital.save()
+            Hospital.objects.filter(id=self.provider_name_hospital.id, enabled_for_cod=False, enabled_poc=False).update()
             self.is_enabled = False
             self.save()
 
@@ -2925,7 +2914,7 @@ class OpdAppointment(auth_model.TimeStampedModel, CouponsMixin, OpdAppointmentIn
                 elif self.status == 7 and self.purchase_order.current_appointment_count > 0:
                     self.purchase_order.current_appointment_count = self.purchase_order.current_appointment_count - 1
                     to_save = True
-                elif self.status == 7 and self.purchase_order.current_appointment_count <= 0:
+                elif self.status == 7 and self.purchase_order.current_appointment_count == 1:
                     # self.purchase_order.provider_name_hospital.enabled_for_cod = False
                     self.purchase_order.is_enabled = False
                     self.purchase_order.current_appointment_count = self.purchase_order.current_appointment_count - 1
