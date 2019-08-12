@@ -452,7 +452,7 @@ class DoctorSearchHelper:
             else:
                 ipd_query = ""
 
-            query_string = "SELECT x.doctor_id, x.hospital_id, doctor_clinic_id, doctor_clinic_timing_id " \
+            query_string = "SELECT count(*) OVER() AS result_count, x.doctor_id, x.hospital_id, doctor_clinic_id, doctor_clinic_timing_id " \
                            "FROM (select {rank_part}, " \
                            "St_distance(St_setsrid(St_point((%(longitude)s), (%(latitude)s)), 4326), h.location) distance, " \
                            "d.id as doctor_id, dct.fees as fees, " \
