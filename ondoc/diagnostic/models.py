@@ -2501,17 +2501,19 @@ class LabAppointment(TimeStampedModel, CouponsMixin, LabAppointmentInvoiceMixin,
 
         is_appointment_insured = False
         insurance_id = None
-        insurance_resp = dict()
         booked_by = 'agent' if hasattr(request, 'agent') else 'user'
         user_insurance = UserInsurance.objects.filter(user=user).order_by('-id').first()
         if user_insurance and user_insurance.is_valid():
             insurance_resp = user_insurance.validate_insurance(data, booked_by=booked_by)
+            if insurance_resp.get('is_insured', False):
+                is_appointment_insured = True
+                insurance_id = insurance_resp.get('insurance_id', None)
 
-        if insurance_resp.get('is_insured') or cart_data.get('is_appointment_insured', None):
-            payment_type = OpdAppointment.INSURANCE
-            insurance_id = insurance_resp.get('insurance_id', None)
+        if is_appointment_insured or cart_data.get('is_appointment_insured', None):
+            payment_type = OpdAppointment.INSURANCEs
             effective_price = 0.0
         else:
+            is_appointment_insured = False
             insurance_id = None
             if data["payment_type"] == OpdAppointment.INSURANCE:
                 payment_type = OpdAppointment.PREPAID
