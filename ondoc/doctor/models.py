@@ -2279,26 +2279,25 @@ class PurchaseOrderCreation(auth_model.TimeStampedModel):
                     self.provider_name_hospital.enabled_for_cod = True
                     self.provider_name_hospital.save()
 
-        if self.is_enabled == True and self.provider_name_hospital.enabled_poc == True and self.current_appointment_count == 0:
+        if self.is_enabled == True and self.provider_name_hospital.enabled_poc == True and self.current_appointment_count <= 0:
             self.disable_cod_functionality()
 
         super().save(force_insert, force_update, using, update_fields)
+
         if save_now:
             notification_tasks.purchase_order_creation_counter_automation.apply_async((self.id, ), eta=self.start_date, )
             notification_tasks.purchase_order_closing_counter_automation.apply_async((self.id, ), eta=self.end_date, )
 
     def disable_cod_functionality(self):
-        x = PurchaseOrderCreation.objects.filter(is_enabled=True,
+        remaining_poc_objects = PurchaseOrderCreation.objects.filter(is_enabled=True,
                                                  provider_name_hospital=self.provider_name_hospital,
                                                  start_date__lte=timezone.now().date(),
                                                  end_date__gte=timezone.now().date()
                                                  ).exclude(id=self.id).count()
-        if x==0:
+        if remaining_poc_objects == 0:
             self.provider_name_hospital.enabled_poc = False
             self.provider_name_hospital.enabled_for_cod = False
             self.provider_name_hospital.save()
-            self.is_enabled = False
-
 
 
     class Meta:
