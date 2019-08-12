@@ -416,11 +416,16 @@ class DoctorURL():
             doc_locality = None
             hospital = None
 
-            practice_specializations = doctor.doctorpracticespecializations.all().order_by('specialization__breadcrumb_priority')
-            sp_dict = OrderedDict()
+	        #practice_specializations = doctor.doctorpracticespecializations.all().order_by('specialization__breadcrumb_priority')
+            #sp_dict = OrderedDict()
+            #for sp in practice_specializations:
+            #    sp_dict[sp.specialization_id] = sp.specialization.name
+
+            practice_specializations = doctor.doctorpracticespecializations.all()
+            sp_dict = dict()
             for sp in practice_specializations:
                 sp_dict[sp.specialization_id] = sp.specialization.name
-            # sp_dict = OrderedDict(sorted(sp_dict.items()))
+            sp_dict = OrderedDict(sorted(sp_dict.items()))
             specializations = list(sp_dict.values())
             specialization_ids = list(sp_dict.keys())
 
@@ -432,7 +437,7 @@ class DoctorURL():
 
             top_specialization = None
             if practice_specializations:
-                top_specialization = practice_specializations.first()
+                top_specialization = practice_specializations.order_by('specialization__breadcrumb_priority').first()
 
             # top_specialization = None
             # for ps in practice_specializations:
