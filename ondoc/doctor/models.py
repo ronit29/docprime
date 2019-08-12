@@ -2264,9 +2264,9 @@ class PurchaseOrderCreation(auth_model.TimeStampedModel):
 
     def save(self, force_insert=False, force_update=False, using=None, update_fields=None):
         if self.provider_name_hospital:
-            self.provider_name = self.provider_name_hospital
+            self.provider_name = self.provider_name_hospital.name
         elif self.provider_name_lab:
-            self.provider_name = self.provider_name_lab
+            self.provider_name = self.provider_name_lab.name
         save_now = False
         if not self.id:
             save_now =True
