@@ -2301,7 +2301,9 @@ class PurchaseOrderCreation(auth_model.TimeStampedModel):
                                                  ).exclude(id=self.id).count()  # Queryset to find the remaining POC objects for a particular
                                                                                 # Hospital that is still enabled/live
         if remaining_poc_objects == 0:
-            Hospital.objects.filter(id=self.provider_name_hospital.id, enabled_for_cod=False, enabled_poc=False).update()
+            self.provider_name_hospital.enabled_poc = False
+            self.provider_name_hospital.enabled_for_cod = False
+            self.provider_name_hospital.save()
             self.is_enabled = False
             self.save()
 
@@ -2920,7 +2922,7 @@ class OpdAppointment(auth_model.TimeStampedModel, CouponsMixin, OpdAppointmentIn
                 elif self.status == 7 and self.purchase_order.current_appointment_count > 0:
                     self.purchase_order.current_appointment_count = self.purchase_order.current_appointment_count - 1
                     to_save = True
-                elif self.status == 7 and self.purchase_order.current_appointment_count == 1:
+                elif self.status == 7 and self.purchase_order.current_appointment_count <= 1:
                     # self.purchase_order.provider_name_hospital.enabled_for_cod = False
                     self.purchase_order.is_enabled = False
                     self.purchase_order.current_appointment_count = self.purchase_order.current_appointment_count - 1
