@@ -2792,6 +2792,9 @@ class LabTimingListView(mixins.ListModelMixin,
         date = params.get('date')
         integration_dict = None
 
+        global_non_bookables = GlobalNonBookable.get_non_bookables(GlobalNonBookable.LAB)
+        total_leaves = global_non_bookables
+
         lab_timings = dict()
         if lab:
             lab_obj = Lab.objects.filter(id=int(lab), is_live=True).first()
@@ -2801,7 +2804,7 @@ class LabTimingListView(mixins.ListModelMixin,
 
             if not integration_dict:
                 if lab_obj:
-                    lab_timings = lab_obj.get_timing_v2(for_home_pickup)
+                    lab_timings = lab_obj.get_timing_v2(for_home_pickup, total_leaves)
             else:
                 class_name = integration_dict['class_name']
                 integrator_obj = service.create_integrator_obj(class_name)
@@ -2817,6 +2820,140 @@ class LabTimingListView(mixins.ListModelMixin,
                 "tomorrow_min": None,
                 "today_max": None
             }
+
+        return Response(resp_data)
+
+    @transaction.non_atomic_requests
+    def list_v3(self, request, *args, **kwargs):
+        from ondoc.integrations import service
+        params = request.query_params
+
+        for_home_pickup = True if int(params.get('pickup', 0)) else False
+        lab = params.get('lab')
+        test_ids = params.get('test_ids', '')
+        test_ids = test_ids.split(',')
+        radiology_tests = []
+        pathology_tests = []
+
+        intersect_resp = {
+            "timeslots": {},
+            "upcoming_slots": {},
+            "is_thyrocare": False
+        }
+        pathology_resp = intersect_resp
+        radiology_resp = {'tests': []}
+        lab_timings = dict()
+        test_timings = dict()
+        pincode = params.get('pincode')
+        date = params.get('date')
+        integration_dict = None
+
+        global_non_bookables = GlobalNonBookable.get_non_bookables(GlobalNonBookable.LAB)
+        total_leaves = global_non_bookables
+
+        if lab:
+            lab_obj = Lab.objects.filter(id=int(lab), is_live=True).first()
+            if lab_obj and lab_obj.network and lab_obj.network.id:
+                if lab_obj.network.id == settings.THYROCARE_NETWORK_ID and settings.THYROCARE_INTEGRATION_ENABLED:
+                    integration_dict = IntegratorMapping.get_if_third_party_integration(network_id=lab_obj.network.id)
+
+            tests = LabTest.objects.filter(id__in=test_ids)
+            for test in tests:
+                if test.test_type == LabTest.PATHOLOGY:
+                    pathology_tests.append(test)
+                if test.test_type == LabTest.RADIOLOGY:
+                    radiology_tests.append(test)
+
+            if lab_obj:
+                if not integration_dict:
+                    if pathology_tests:
+                        lab_timings = lab_obj.get_timing_v2(for_home_pickup, total_leaves)
+                else:
+                    class_name = integration_dict['class_name']
+                    integrator_obj = service.create_integrator_obj(class_name)
+                    lab_timings = integrator_obj.get_appointment_slots(pincode, date, is_home_pickup=for_home_pickup)
+                pathology_resp = {"timeslots": lab_timings.get('time_slots', []),
+                                  "upcoming_slots": lab_timings.get('upcoming_slots', []),
+                                  "is_thyrocare": lab_timings.get('is_thyrocare', False)}
+
+                if radiology_tests:
+                    for radiology_test in radiology_tests:
+                        test_timings = lab_obj.get_radiology_timing(radiology_test, total_leaves)
+                        pathology_test_resp = {"timeslots": test_timings.get('time_slots', []),
+                                               "upcoming_slots": test_timings.get('upcoming_slots', []),
+                                               "is_thyrocare": test_timings.get('is_thyrocare', False)}
+                        timing_obj = {'name': radiology_test.name, 'timings': pathology_test_resp}
+                        radiology_resp['tests'].append(timing_obj)
+
+                if pathology_tests and radiology_tests and not for_home_pickup:
+                    for slot_date in pathology_resp['timeslots']:
+                        intersect_resp['timeslots'].update({slot_date: []})
+                        time_separtors = ['AM', 'PM']
+                        for i in range(len(time_separtors)):
+                            intersect_resp['timeslots'][slot_date].append({
+                                'type': time_separtors[i],
+                                'title': time_separtors[i],
+                                'timing': []
+                            })
+                            if pathology_resp['timeslots'][slot_date] and pathology_resp['timeslots'][slot_date][i]['timing']:
+                                has_intersection = True
+                                radiology_date_time_slots = []
+                                for radiology_test_resp in radiology_resp['tests']:
+                                    if radiology_test_resp['timings']['timeslots'][slot_date] and radiology_test_resp['timings']['timeslots'][slot_date][i]['timing']:
+                                        radiology_date_time_slots.append(radiology_test_resp['timings']['timeslots'][slot_date][i]['timing'])
+                                    else:
+                                        has_intersection = False
+                                    if not has_intersection:
+                                        break
+                                if has_intersection:
+                                    intersect_data = list()
+                                    intersect_dicts = list()
+                                    intersect_dicts.append(pathology_resp['timeslots'][slot_date][i]['timing'])
+                                    for radiology_date_time_slot in radiology_date_time_slots:
+                                        intersect_dicts.append(radiology_date_time_slot)
+                                    for intersect_dict in intersect_dicts:
+                                        if not intersect_data:
+                                            intersect_data = intersect_dict
+                                        else:
+                                            intersect_data = list([x for x in intersect_data if x in intersect_dict])
+                                    intersect_resp['timeslots'][slot_date][i]['timing'].append(intersect_data)
+                                else:
+                                    intersect_resp['timeslots'][slot_date][i]['timing'] = []
+
+        resp_data = {
+            'all': intersect_resp,
+            'radiology': radiology_resp,
+            'pathology': pathology_resp
+        }
+
+        if hasattr(request, "agent") and request.agent:
+            resp_data = {
+                'all': {
+                    'timeslots': intersect_resp['timeslots'],
+                    'today_min': None,
+                    'tomorrow_min': None,
+                    'today_max': None
+                },
+                'pathology': {
+                    'timeslots': pathology_resp['timeslots'],
+                    'today_min': None,
+                    'tomorrow_min': None,
+                    'today_max': None
+                }
+            }
+
+            if radiology_resp:
+                agent_radiology_resp = {'radiology': []}
+                for radiology_test_resp in radiology_resp['tests']:
+                    agent_radiology_test_resp = {
+                                                    'name': radiology_test_resp['name'],
+                                                    'timeslots': radiology_test_resp['timings']['timeslots'],
+                                                    'today_min': None,
+                                                    'tomorrow_min': None,
+                                                    'today_max': None
+                                                }
+                    agent_radiology_resp['radiology'].append(agent_radiology_test_resp)
+                resp_data.update(agent_radiology_resp)
 
         return Response(resp_data)
 
