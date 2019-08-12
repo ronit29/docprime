@@ -1571,9 +1571,12 @@ class UserInsurance(auth_model.TimeStampedModel, MerchantPayoutMixin):
         elif daily_count and insurance_appointment_stats['used_daily_count'] + 1 > daily_count:
             response['created_state'] = True
 
-        if response['created_state'] and prescription_required and \
-                not AppointmentPrescription.prescription_exist_for_date(self.user, timezone.now().date()):
+        if prescription_required and not AppointmentPrescription.prescription_exist_for_date(self.user, timezone.now().date()):
             response['prescription_needed'] = True
+
+        # if response['created_state'] and prescription_required and \
+        #         not AppointmentPrescription.prescription_exist_for_date(self.user, timezone.now().date()):
+        #     response['prescription_needed'] = True
 
         return response
 
