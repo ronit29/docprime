@@ -2919,12 +2919,15 @@ class OpdAppointment(auth_model.TimeStampedModel, CouponsMixin, OpdAppointmentIn
                     self.purchase_order.save()
 
 
-        super().save(*args, **kwargs)
+        # super().save(*args, **kwargs)
 
         if push_to_history:
             AppointmentHistory.create(content_object=self)
 
         transaction.on_commit(lambda: self.after_commit_tasks(database_instance, push_to_matrix))
+
+        super().save(*args, **kwargs)
+
 
     def save_merchant_payout(self):
         if self.payment_type in [OpdAppointment.COD]:
