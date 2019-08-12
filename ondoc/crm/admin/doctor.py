@@ -2425,6 +2425,8 @@ class PurchaseOrderCreationForm(forms.ModelForm):
             raise forms.ValidationError('Enter a valid start date')
         if cleaned_data.get('end_date') < timezone.now() or cleaned_data.get('end_date') < cleaned_data.get('start_date'):
             raise forms.ValidationError('Enter a valid end date')
+        if not cleaned_data.get('start_date') and cleaned_data.get('end_date'):
+            raise forms.ValidationError('Start date and End date are mandatory')
 
         return super().clean()
 
@@ -2436,11 +2438,11 @@ class PurchaseOrderCreationAdmin(admin.ModelAdmin):
                     'appointment_booked_count', 'current_appointment_count']
     autocomplete_fields = ['provider_name_lab', 'provider_name_hospital']
     search_fields = ['provider_name_lab__name', 'provider_name_hospital__name']
-    readonly_fields = ['provider_name', 'appointment_booked_count', 'current_appointment_count']
+    # readonly_fields = ['provider_name', 'appointment_booked_count', 'current_appointment_count']
 
     def get_readonly_fields(self, request, obj=None):
         read_only_fields = ['provider_name', 'appointment_booked_count', 'current_appointment_count']
-        if self.id:
-            read_only_fields += ['start_date', 'end_date', 'total_appointment_count', 'provider_name_hospital']
+        if obj and obj.id:
+            read_only_fields += ['start_date', 'end_date', 'total_appointment_count', 'provider_name_hospital', 'total_amount_paid']
 
         return read_only_fields
