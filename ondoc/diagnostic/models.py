@@ -2501,6 +2501,7 @@ class LabAppointment(TimeStampedModel, CouponsMixin, LabAppointmentInvoiceMixin,
 
         is_appointment_insured = False
         insurance_id = None
+        insurance_resp = dict()
         booked_by = 'agent' if hasattr(request, 'agent') else 'user'
         user_insurance = UserInsurance.objects.filter(user=user).order_by('-id').first()
         if user_insurance and user_insurance.is_valid():
