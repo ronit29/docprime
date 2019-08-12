@@ -1514,8 +1514,6 @@ class DoctorClinic(auth_model.TimeStampedModel, auth_model.WelcomeCallingDone):
         res_data = {"time_slots": slots, "upcoming_slots": upcoming_slots}
         return res_data
 
-
-
     def get_timings_v2(self, total_leaves, blocks=[]):
         clinic_timings = self.availability.order_by("start")
         booking_details = dict()
@@ -1531,6 +1529,36 @@ class DoctorClinic(auth_model.TimeStampedModel, auth_model.WelcomeCallingDone):
         timing_response = {"timeslots": clinic_timings, "upcoming_slots": upcoming_slots}
         return timing_response
 
+    def is_part_of_integration(self):
+        from ondoc.integrations.models import IntegratorDoctorMappings
+        integration_dict = IntegratorDoctorMappings.get_if_third_party_integration(doctor_clinic_id=self.id)
+        if integration_dict:
+            return True
+
+        return False
+
+    def get_integration_dict(self):
+        from ondoc.integrations.models import IntegratorDoctorMappings
+        if self.is_part_of_integration():
+            return IntegratorDoctorMappings.get_if_third_party_integration(doctor_clinic_id=self.id)
+
+        return None
+
+    def get_available_slots(self, time_slot_start):
+        from ondoc.integrations.models import IntegratorDoctorMappings
+        from ondoc.integrations import service
+        date = time_slot_start.strftime("%Y-%m-%d")
+        integration_dict = IntegratorDoctorMappings.get_if_third_party_integration(doctor_clinic_id=self.id)
+        if integration_dict:
+            pincode = None
+            class_name = integration_dict['class_name']
+            integrator_obj_id = integration_dict['id']
+            integrator_obj = service.create_integrator_obj(class_name)
+            data = integrator_obj.get_appointment_slots(pincode, date, integrator_obj_id=integrator_obj_id)
+            if data:
+                return data['timeslots']
+
+            return None
 
 
 class DoctorClinicTiming(auth_model.TimeStampedModel):

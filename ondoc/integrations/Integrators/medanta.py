@@ -35,3 +35,79 @@ class Medanta(BaseIntegrator):
             print(doc_data)
             defaults = {'integrator_doctor_data': doc_data, 'integrator_class_name': Medanta.__name__, 'first_name': doc_data['DoctorName']}
             IntegratorDoctorMappings.objects.update_or_create(integrator_doctor_id=doc_data['ID'], defaults=defaults)
+
+    def _get_appointment_slots(self, pincode, date, **kwargs):
+
+        dc_obj = kwargs.get('dc_obj', None)
+        doctor_id = None
+        if dc_obj:
+            doc_mapping = IntegratorDoctorMappings.objects.filter(doctor_clinic_id=dc_obj.id, is_active=True).first()
+            if doc_mapping:
+                doctor_id = doc_mapping.integrator_doctor_id
+
+        if doctor_id:
+            converted_date = datetime.strptime(date, "%Y-%m-%d").strftime("%Y/%m/%d")
+            consultation_type = "In Person"
+            url = "https://www.medantaeclinic.org/rest/api/user/patient/availablity?consultationType=%s&doctor=%s" \
+                  "&fromDate=%s&toDate=%s" % (consultation_type, doctor_id, converted_date, converted_date)
+
+            response = requests.get(url)
+            if response.status_code != status.HTTP_200_OK or not response.ok:
+                logger.info("[ERROR-MEDANTA] Failed to get timeslots.")
+                return None
+
+            resp_data = response.json()
+            print(resp_data)
+            if resp_data['status'] == 'SUCCESS':
+                available_slots = resp_data["data"]['availability']
+                if available_slots:
+                    all_slots = set()
+                    for avlbl_slot in available_slots:
+                        slots = avlbl_slot['slots']
+                        if slots:
+                            slots = slots.split(',')
+                            for s in slots:
+                                start = s.split("-")[0].strip()
+                                end = s.split("-")[1].strip()
+                                all_slots.add(start)
+                                all_slots.add(end)
+
+                    sorted_slots = sorted(all_slots)
+                    resp_list = self.time_slot_extraction(sorted_slots, date)
+                else:
+                    resp_list = dict()
+                    resp_list[date] = list()
+            else:
+                resp_list = dict()
+                resp_list[date] = list()
+
+            res_data = {"timeslots": resp_list, "upcoming_slots": [], "is_medanta": True}
+            return res_data
+
+    def time_slot_extraction(self, slots, date):
+        am_timings, pm_timings = list(), list()
+        am_dict, pm_dict = dict(), dict()
+        time_dict = dict()
+        for slot in slots:
+            hour, minutes = slot.split(":")
+            hour, minutes = float(hour), int(minutes)
+            minutes = float("%0.2f" % (minutes / 60))
+            value = hour + minutes
+            data = {"text": slot, "value": value, "price": None, "is_available": True, "on_call": False}
+
+            if value >= 12.0:
+                pm_timings.append(data)
+            else:
+                am_timings.append(data)
+
+        am_dict["title"] = "AM"
+        am_dict["type"] = "AM"
+        am_dict["timing"] = am_timings
+        pm_dict["title"] = "PM"
+        pm_dict["type"] = "PM"
+        pm_dict["timing"] = pm_timings
+
+        time_dict[date] = list()
+        time_dict[date].append(am_dict)
+        time_dict[date].append(pm_dict)
+        return time_dict
