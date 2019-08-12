@@ -1406,15 +1406,15 @@ class EndorsementRequestAdmin(admin.ModelAdmin):
         user = request.user
         obj._user = user if user and not user.is_anonymous else None
 
-        if request.user.is_member_of(constants['SUPER_INSURANCE_GROUP']) or request.user.is_member_of(constants['INSURANCE_GROUP']):
-            super().save_model(request, obj, form, change)
+        # if request.user.is_member_of(constants['SUPER_INSURANCE_GROUP']) or request.user.is_member_of(constants['INSURANCE_GROUP']):
+        #     super().save_model(request, obj, form, change)
 
-            if obj.status == EndorsementRequest.APPROVED:
-                obj.process_endorsement()
-            elif obj.status == EndorsementRequest.REJECT:
-                obj.reject_endorsement()
-            if obj.mail_coi_to_customer:
-                obj.process_coi()
+        if obj.status == EndorsementRequest.APPROVED:
+            obj.process_endorsement()
+        elif obj.status == EndorsementRequest.REJECT:
+            obj.reject_endorsement()
+        if obj.mail_coi_to_customer:
+            obj.process_coi()
 
 
 class InsuredMemberHistoryAdmin(admin.ModelAdmin):
