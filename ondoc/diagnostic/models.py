@@ -2510,7 +2510,7 @@ class LabAppointment(TimeStampedModel, CouponsMixin, LabAppointmentInvoiceMixin,
                 insurance_id = insurance_resp.get('insurance_id', None)
 
         if is_appointment_insured or cart_data.get('is_appointment_insured', None):
-            payment_type = OpdAppointment.INSURANCEs
+            payment_type = OpdAppointment.INSURANCE
             effective_price = 0.0
         else:
             is_appointment_insured = False
