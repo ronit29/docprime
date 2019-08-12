@@ -2897,7 +2897,7 @@ class OpdAppointment(auth_model.TimeStampedModel, CouponsMixin, OpdAppointmentIn
         if not self.id:
             if self.hospital.enabled_for_cod:
                 # TODO: Add check for valid POC object (date)
-                x = self.hospital.hospitalpurchaseordercreation.filter(is_enabled=True, start_date__lte=timezone.now(), end_date__gte=timezone.now()).order_by('id').first()
+                x = self.hospital.hospitalpurchaseorder.filter(is_enabled=True, start_date__lte=timezone.now(), end_date__gte=timezone.now()).order_by('id').first()
                 if x:
                     self.purchase_order = x
 
