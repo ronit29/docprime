@@ -2253,7 +2253,7 @@ class PurchaseOrderCreation(auth_model.TimeStampedModel):
     appointment_booked_count = models.IntegerField(default=0)
     total_appointment_count = models.IntegerField(default=0)
     is_enabled = models.BooleanField(default=False)
-    current_appointment_count = models.IntegerField(default=0)
+    current_appointment_count = models.IntegerField(default=0) # Count to establish how many appointments for a particular provider are still left, the counter keeps decreasing. Look at Save() for further logic.
     agreement_details = models.TextField()
     proof_of_payment = models.CharField(max_length=1000, null=True, blank=True, help_text='Either enter a valid invoice number or upload the invoice image')
     proof_of_payment_image = models.FileField(upload_to='purchaseorder', validators=[
@@ -2288,20 +2288,27 @@ class PurchaseOrderCreation(auth_model.TimeStampedModel):
 
         super().save(force_insert, force_update, using, update_fields)
 
+        if self.id.delete():
+            self.provider_name_hospital.enabled_for_cod = False
+            self.provider_name_hospital.save()
+
         if save_now:
-            notification_tasks.purchase_order_creation_counter_automation.apply_async((self.id, ), eta=self.start_date, )
-            notification_tasks.purchase_order_closing_counter_automation.apply_async((self.id, ), eta=self.end_date, )
+            notification_tasks.purchase_order_creation_counter_automation.apply_async((self.id, ), eta=self.start_date, ) # task to enable Pay-at-clinic functionality in hospital
+            notification_tasks.purchase_order_closing_counter_automation.apply_async((self.id, ), eta=self.end_date, )    # task to disable Pay-at-clinic functionality in hospital
 
     def disable_cod_functionality(self):
         remaining_poc_objects = PurchaseOrderCreation.objects.filter(is_enabled=True,
                                                  provider_name_hospital=self.provider_name_hospital,
                                                  start_date__lte=timezone.now().date(),
                                                  end_date__gte=timezone.now().date()
-                                                 ).exclude(id=self.id).count()
+                                                 ).exclude(id=self.id).count()  # Queryset to find the remaining POC objects for a particular
+                                                                                # Hospital that is still enabled/live
         if remaining_poc_objects == 0:
             self.provider_name_hospital.enabled_poc = False
             self.provider_name_hospital.enabled_for_cod = False
             self.provider_name_hospital.save()
+            self.is_enabled = False
+            self.save()
 
 
     class Meta:

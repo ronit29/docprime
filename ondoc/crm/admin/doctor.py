@@ -2419,8 +2419,12 @@ class PurchaseOrderCreationForm(forms.ModelForm):
             raise forms.ValidationError('Cannot choose Hospital, Please select a Lab')
         if cleaned_data.get('provider_type') == 'hospital' and cleaned_data.get('provider_name_lab'):
             raise forms.ValidationError('Cannot choose Lab, Please select a Hospital')
-        if cleaned_data.get('start_date') >=  cleaned_data.get('end_date'):
+        if cleaned_data.get('start_date') >= cleaned_data.get('end_date'):
             raise forms.ValidationError('Start date cannot be greater than end date')
+        if cleaned_data.get('start_date') < timezone.now():
+            raise forms.ValidationError('Enter a valid start date')
+        if cleaned_data.get('end_date') < timezone.now() or cleaned_data.get('end_date') < cleaned_data.get('start_date'):
+            raise forms.ValidationError('Enter a valid end date')
 
         return super().clean()
 
@@ -2433,3 +2437,10 @@ class PurchaseOrderCreationAdmin(admin.ModelAdmin):
     autocomplete_fields = ['provider_name_lab', 'provider_name_hospital']
     search_fields = ['provider_name_lab__name', 'provider_name_hospital__name']
     readonly_fields = ['provider_name', 'appointment_booked_count', 'current_appointment_count']
+
+    def get_readonly_fields(self, request, obj=None):
+        read_only_fields = ['provider_name', 'appointment_booked_count', 'current_appointment_count']
+        if self.id:
+            read_only_fields += ['start_date', 'end_date', 'total_appointment_count', 'provider_name_hospital']
+
+        return read_only_fields
