@@ -992,7 +992,8 @@ class LabAppointmentAdmin(nested_admin.NestedModelAdmin):
     get_insurance.short_description = 'Insurance'
 
     def is_prescription_uploaded(self, obj):
-        is_prescription = AppointmentPrescription.is_prescription_uploaded_for_appointment(obj)
+        # is_prescription = AppointmentPrescription.is_prescription_uploaded_for_appointment(obj)
+        is_prescription = obj.get_all_uploaded_prescriptions()
         if is_prescription:
             return str(True)
         else:
