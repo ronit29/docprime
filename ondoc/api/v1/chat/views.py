@@ -1,3 +1,6 @@
+from ondoc.account.models import ConsumerAccount, Order
+from ondoc.api.v1.utils import payment_details
+from ondoc.authentication.models import UserSecretKey, UserProfile
 from ondoc.chat import models
 from ondoc.doctor import models as doc_models
 from ondoc.authentication import models as auth_models
@@ -5,14 +8,15 @@ from ondoc.api.v1.doctor import serializers as doc_serializers
 from rest_framework import mixins, viewsets, status
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.authentication import TokenAuthentication
-from ondoc.authentication.backends import JWTAuthentication
+from ondoc.authentication.backends import JWTAuthentication, ChatAuthentication
 from django.shortcuts import get_object_or_404
 from rest_framework.response import Response
 from django.contrib.auth import get_user_model
 from django.db import transaction
 from . import serializers
 from django.conf import settings
-import requests, re, json
+import requests, re, json, jwt, decimal
+from django.utils import timezone
 
 User = get_user_model()
 
@@ -181,3 +185,168 @@ class ChatReferralViewSet(viewsets.GenericViewSet):
             return Response({"status": 1, "code": code})
         else:
             return Response({"status": 0, "code": 'Referral Code not Found'})
+
+
+class ChatUserViewSet(viewsets.GenericViewSet):
+    authentication_classes = (ChatAuthentication,)
+
+    @transaction.atomic()
+    def user_login_via_chat(self, request):
+        from django.http import JsonResponse
+        response = {'login': 0}
+        if request.method != 'POST':
+            return JsonResponse(response, status=405)
+
+        serializer = serializers.ChatLoginSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        data = serializer.validated_data
+        profile_data = {}
+
+        user = User.objects.filter(phone_number=data.get('phone_number'), user_type=User.CONSUMER).first()
+        if not user:
+            user = User.objects.create(phone_number=data.get('phone_number'),
+                                       is_phone_number_verified=False,
+                                       user_type=User.CONSUMER,
+                                       auto_created=True,
+                                       email=data.get('email'),
+                                       source='Chat')
+
+        if not user:
+            return JsonResponse(response, status=400)
+
+        profile_data['name'] = data.get('name')
+        profile_data['phone_number'] = user.phone_number
+        profile_data['gender'] = data.get('gender')
+        profile_data['user'] = user
+        profile_data['dob'] = data.get('dob')
+        profile_data['source'] = 'Chat'
+        user_profiles = user.profiles.all()
+
+        if not bool(re.match(r"^[a-zA-Z ]+$", data.get('name'))):
+            return Response({"error": "Invalid Name"}, status=status.HTTP_400_BAD_REQUEST)
+
+        if user_profiles:
+            user_profiles = list(filter(lambda x: x.name.lower() == profile_data['name'].lower(), user_profiles))
+            if user_profiles:
+                user_profile = user_profiles[0]
+                user_profile.phone_number = profile_data['phone_number'] if not user_profile.phone_number else None
+                user_profile.gender = profile_data['gender'] if not user_profile.gender else None
+                user_profile.dob = profile_data['dob'] if not user_profile.dob else None
+                user_profile.save()
+            else:
+                UserProfile.objects.create(**profile_data)
+        else:
+            profile_data.update({
+                "is_default_user": True
+            })
+            UserProfile.objects.create(**profile_data)
+
+        consumer_account = ConsumerAccount.objects.get_or_create(user=user)
+        wallet_balance = consumer_account[0].get_total_balance()
+
+        token_object = JWTAuthentication.generate_token(user)
+
+        response = {
+            "token": token_object['token'],
+            "payload": token_object['payload'],
+            "wallet_balance": wallet_balance,
+            "is_user_insured": bool(user.active_insurance)
+        }
+
+        return Response(response, status=status.HTTP_200_OK)
+
+
+class ChatOrderViewSet(viewsets.GenericViewSet):
+
+    @classmethod
+    @transaction.atomic()
+    def create_order(self, request):
+        from ondoc.notification.tasks import save_pg_response
+        from ondoc.account.mongo_models import PgLogs
+        user = request.user
+        data = request.data
+
+        if user and user.is_anonymous:
+            return Response({"status": 0}, status.HTTP_401_UNAUTHORIZED)
+
+        save_pg_response.apply_async((PgLogs.CHAT_ORDER_REQUEST, None, None, None, request.data, user.id),
+                                     eta=timezone.localtime(), )
+
+        details = data.get('details', {})
+        plan_id = data.get('plan_id')
+        use_wallet = data.get('use_wallet', True)
+        amount = data.get('amount', 0)
+        promotional_amount = data.get('promotional_amount', 0)
+        rid = data.get('rid')
+        error = False
+
+        try:
+            amount = decimal.Decimal(amount)
+            promotional_amount = decimal.Decimal(promotional_amount)
+            details["promotional_amount"] = float(promotional_amount)
+            details = json.dumps(details)
+        except:
+            error = True
+
+        if error:
+            return Response({"status": 0}, status.HTTP_400_BAD_REQUEST)
+
+        resp = {}
+        process_immediately = False
+        product_id = Order.CHAT_PRODUCT_ID
+
+        consumer_account = ConsumerAccount.objects.get_or_create(user=user)
+        consumer_account = ConsumerAccount.objects.select_for_update().get(user=user)
+
+        wallet_balance = consumer_account.balance
+        cashback_balance = consumer_account.cashback
+        total_balance = wallet_balance + cashback_balance
+
+        amount_to_paid = amount
+
+        if use_wallet and total_balance >= amount:
+            cashback_amount = min(cashback_balance, amount_to_paid)
+            wallet_amount = max(0, amount_to_paid - cashback_amount)
+            amount_to_paid = max(0, amount_to_paid - total_balance)
+            process_immediately = True
+        elif use_wallet and total_balance < amount:
+            cashback_amount = min(amount_to_paid, cashback_balance)
+            wallet_amount = 0
+            if cashback_amount < amount_to_paid:
+                wallet_amount = min(wallet_balance, amount_to_paid - cashback_amount)
+            amount_to_paid = max(0, amount_to_paid - total_balance)
+            process_immediately = False
+        else:
+            cashback_amount = 0
+            wallet_amount = 0
+            process_immediately = False
+
+        action = Order.CHAT_CONSULTATION_CREATE
+        action_data = {"user": user.id, "plan_id": plan_id, "extra_details": details, "effective_price": float(amount_to_paid),
+                       "amount": float(amount), "cashback": float(cashback_amount), "promotional_amount": float(promotional_amount), "room_id": rid}
+
+        pg_order = Order.objects.create(
+            amount=float(amount_to_paid),
+            action=action,
+            action_data=action_data,
+            wallet_amount=wallet_amount,
+            cashback_amount=cashback_amount,
+            payment_status=Order.PAYMENT_PENDING,
+            user=user,
+            product_id=product_id
+        )
+
+        if process_immediately:
+            consultation_ids = pg_order.process_pg_order()
+            resp["status"] = 1
+            resp["payment_required"] = False
+            resp["data"] = {
+                "orderId": pg_order.id,
+                "type": consultation_ids.get("type", "chat"),
+                "id": consultation_ids.get("id", None)
+            }
+        else:
+            resp["status"] = 1
+            resp['data'], resp["payment_required"] = payment_details(request, pg_order)
+
+        return Response(resp, status=status.HTTP_200_OK)

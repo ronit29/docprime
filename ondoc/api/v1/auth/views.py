@@ -1204,7 +1204,11 @@ class TransactionViewSet(viewsets.GenericViewSet):
         LAB_REDIRECT_URL = settings.BASE_URL + "/lab/appointment"
         OPD_REDIRECT_URL = settings.BASE_URL + "/opd/appointment"
         PLAN_REDIRECT_URL = settings.BASE_URL + "/prime/success?user_plan="
-        ECONSULT_REDIRECT_URL = settings.BASE_URL + "/dummy/econsult"
+        ECONSULT_REDIRECT_URL = settings.BASE_URL + "/econsult?order_id=%s&payment=success"
+
+        CHAT_ERROR_REDIRECT_URL = settings.BASE_URL + "/mobileviewchat?payment=fail&error_message=%s" % "Error processing payment, please try again."
+        CHAT_REDIRECT_URL = CHAT_ERROR_REDIRECT_URL
+        CHAT_SUCCESS_REDIRECT_URL = settings.BASE_URL + "/mobileviewchat?payment=success&order_id=%s"
 
         try:
             response = None
@@ -1233,13 +1237,12 @@ class TransactionViewSet(viewsets.GenericViewSet):
                 status_type = PaymentProcessStatus.get_status_type(pg_resp_code, response.get('txStatus'))
 
                 PgLogs.objects.create(decoded_response=response, coded_response=coded_response)
-                save_pg_response.apply_async((mongo_pglogs.TXN_RESPONSE, response.get("orderId"), None, response, None, request.user.id), eta=timezone.localtime(), )
+                save_pg_response.apply_async((mongo_pglogs.TXN_RESPONSE, response.get("orderId"), None, response, None, response.get('customerId')), eta=timezone.localtime(), )
                 save_payment_status.apply_async((status_type, args), eta=timezone.localtime(), )
             except Exception as e:
                 logger.error("Cannot log pg response - " + str(e))
 
-
-            ## Check if already processes
+            # Check if already processes
             try:
                 if response and response.get("orderNo"):
                     pg_txn = PgTransaction.objects.filter(order_no__iexact=response.get("orderNo")).first()
@@ -1254,10 +1257,14 @@ class TransactionViewSet(viewsets.GenericViewSet):
                             #pg_txn.payment_captured = True
                             pg_txn.save()
                         send_pg_acknowledge.apply_async((pg_txn.order_id, pg_txn.order_no,), countdown=1)
-                        REDIRECT_URL = (SUCCESS_REDIRECT_URL % pg_txn.order_id) + "?payment_success=true"
-                        return HttpResponseRedirect(redirect_to=REDIRECT_URL)
+                        if pg_txn.product_id == Order.CHAT_PRODUCT_ID:
+                            CHAT_REDIRECT_URL = CHAT_SUCCESS_REDIRECT_URL % pg_txn.order_id
+                            return HttpResponseRedirect(redirect_to=CHAT_REDIRECT_URL)
+                        else:
+                            REDIRECT_URL = (SUCCESS_REDIRECT_URL % pg_txn.order_id) + "?payment_success=true"
+                            return HttpResponseRedirect(redirect_to=REDIRECT_URL)
             except Exception as e:
-               logger.error("Error in sending pg acknowledge - " + str(e))
+                logger.error("Error in sending pg acknowledge - " + str(e))
 
 
             # For testing only
@@ -1328,7 +1335,9 @@ class TransactionViewSet(viewsets.GenericViewSet):
                 elif processed_data.get("type") == "plan":
                     REDIRECT_URL = PLAN_REDIRECT_URL + str(processed_data.get("id", "")) + "&payment_success=true"
                 elif processed_data.get("type") == "econsultation":
-                    REDIRECT_URL = ECONSULT_REDIRECT_URL + str(processed_data.get("id", "")) + "&payment_success=true"
+                    REDIRECT_URL = ECONSULT_REDIRECT_URL % order_obj.id
+                elif processed_data.get('type') == "chat":
+                    CHAT_REDIRECT_URL = CHAT_SUCCESS_REDIRECT_URL % order_obj.id
         except Exception as e:
             logger.error("Error - " + str(e))
 
@@ -1340,8 +1349,9 @@ class TransactionViewSet(viewsets.GenericViewSet):
         except Exception as e:
             logger.error("Error in sending pg acknowledge - " + str(e))
 
-
         # return Response({"url": REDIRECT_URL})
+        if order_obj.product_id == Order.CHAT_PRODUCT_ID:
+            return HttpResponseRedirect(redirect_to=CHAT_REDIRECT_URL)
         return HttpResponseRedirect(redirect_to=REDIRECT_URL)
 
     def form_pg_transaction_data(self, response, order_obj):
