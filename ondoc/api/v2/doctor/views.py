@@ -1192,8 +1192,8 @@ class PartnerEConsultationViewSet(viewsets.GenericViewSet):
 
 class ConsumerEConsultationViewSet(viewsets.GenericViewSet):
 
-    authentication_classes = (JWTAuthentication,)
-    permission_classes = (IsAuthenticated,)
+    # authentication_classes = (JWTAuthentication,)
+    # permission_classes = (IsAuthenticated,)
 
     def get_queryset(self):
         return None
@@ -1307,8 +1307,8 @@ class ConsumerEConsultationViewSet(viewsets.GenericViewSet):
         order_id = request.query_params.get('order_id', None)
         order_obj = None
         econsult_id = None
-        order_obj = Order.objects.filter(id = order_id).first()
-        if not order_id or order_obj:
+        order_obj = Order.objects.filter(id=order_id).first()
+        if not order_id or not order_obj:
             return Response({"error": "Order Id not Found"}, status=status.HTTP_404_NOT_FOUND)
 
         action_data = order_obj.action_data
