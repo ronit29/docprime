@@ -1204,7 +1204,7 @@ class TransactionViewSet(viewsets.GenericViewSet):
         LAB_REDIRECT_URL = settings.BASE_URL + "/lab/appointment"
         OPD_REDIRECT_URL = settings.BASE_URL + "/opd/appointment"
         PLAN_REDIRECT_URL = settings.BASE_URL + "/prime/success?user_plan="
-        ECONSULT_REDIRECT_URL = settings.BASE_URL + "/dummy/econsult"
+        ECONSULT_REDIRECT_URL = settings.BASE_URL + "/e_consultation/%s?payment=success"
 
         CHAT_ERROR_REDIRECT_URL = settings.BASE_URL + "/mobileviewchat?payment=fail&error_message=%s" % "Error processing payment, please try again."
         CHAT_REDIRECT_URL = CHAT_ERROR_REDIRECT_URL
@@ -1335,7 +1335,7 @@ class TransactionViewSet(viewsets.GenericViewSet):
                 elif processed_data.get("type") == "plan":
                     REDIRECT_URL = PLAN_REDIRECT_URL + str(processed_data.get("id", "")) + "&payment_success=true"
                 elif processed_data.get("type") == "econsultation":
-                    REDIRECT_URL = ECONSULT_REDIRECT_URL + str(processed_data.get("id", "")) + "&payment_success=true"
+                    REDIRECT_URL = ECONSULT_REDIRECT_URL % order_obj.id
                 elif processed_data.get('type') == "chat":
                     CHAT_REDIRECT_URL = CHAT_SUCCESS_REDIRECT_URL % order_obj.id
         except Exception as e:

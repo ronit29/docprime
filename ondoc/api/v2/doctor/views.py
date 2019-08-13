@@ -1274,7 +1274,7 @@ class ConsumerEConsultationViewSet(viewsets.GenericViewSet):
         profile = consultation.online_patient if consultation.online_patient else consultation.offline_patient
         action_data = {"user": user.id, "extra_details": details, "doc_id": consultation.doctor.id, "coupon": data.get('coupon'),
                        "effective_price": float(amount_to_paid), "profile": str(profile.id), "validity": consultation.validity,
-                       "price": float(amount), "cashback": float(cashback_amount)}
+                       "price": float(amount), "cashback": float(cashback_amount), "consultation_id": consultation.id}
 
         pg_order = Order.objects.create(
             amount=float(amount_to_paid),
@@ -1302,4 +1302,17 @@ class ConsumerEConsultationViewSet(viewsets.GenericViewSet):
 
         return Response(resp, status=status.HTTP_200_OK)
 
+    def get_order_consult_id(self, request):
+        from ondoc.account.models import Order
+        order_id = request.query_params.get('order_id', None)
+        order_obj = None
+        econsult_id = None
+        order_obj = Order.objects.filter(id = order_id).first()
+        if not order_id or order_obj:
+            return Response({"error": "Order Id not Found"}, status=status.HTTP_404_NOT_FOUND)
+
+        action_data = order_obj.action_data
+        if action_data:
+            econsult_id = action_data.get('consultation_id')
+        return Response({"econsult_id": econsult_id})
 

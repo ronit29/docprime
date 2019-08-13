@@ -33,6 +33,7 @@ urlpatterns = [
     path('ecs/complete', views.PartnerEConsultationViewSet.as_view({'post': 'complete'}), name='ecs_complete'),
     path('pecs/pay', views.ConsumerEConsultationViewSet.as_view({'post': 'create_order'}), name='pecs_pay'),
     path('pecs/list', views.ConsumerEConsultationViewSet.as_view({'get': 'list'}), name='pecs_list'),
+    path('pecs/get_id', views.ConsumerEConsultationViewSet.as_view({'get': 'get_order_consult_id'}), name='pecs_get_id'),
 ]
 
 
