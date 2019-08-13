@@ -95,8 +95,9 @@ class DoctorSearchHelper:
             )
 
         counter=1
+        spec_filter_str = ''
         if len(specialization_filter_ids) > 0 and len(procedure_ids)==0 and len(procedure_category_ids)==0:
-            spec_filter_str = 'gs.id IN('
+            spec_filter_str = 'and d.id in (select doctor_id from doctor_practice_specialization where specialization_id IN('
             for id in specialization_filter_ids:
 
                 if not counter == 1:
@@ -105,10 +106,7 @@ class DoctorSearchHelper:
                 params['specialization_filter'+str(counter)] = id
                 counter += 1
 
-            filtering_params.append(
-                spec_filter_str+')'
-            )
-
+            spec_filter_str += '))'
 
         # counter = 1
         # if self.query_params.get("sits_at"):
@@ -294,6 +292,8 @@ class DoctorSearchHelper:
             return result
 
         result['string'] = " and ".join(filtering_params)
+        if spec_filter_str:
+            result['string'] = result.get('string') + spec_filter_str
         result['params'] = params
         if len(procedure_ids) > 0:
             result['count_of_procedure'] = len(procedure_ids)
@@ -487,7 +487,7 @@ class DoctorSearchHelper:
                            "LEFT JOIN doctor_leave dl on dl.doctor_id = d.id and (%(ist_date)s) BETWEEN dl.start_date and dl.end_date " \
                            "AND (%(ist_time)s) BETWEEN dl.start_time and dl.end_time " \
                            "{sp_cond} " \
-                           "WHERE {filtering_params} " \
+                           "WHERE {filtering_params}" \
                            " {search_distance} " \
                            "{min_dist_cond}" \
                            " )x " \
