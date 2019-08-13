@@ -1942,3 +1942,12 @@ def is_valid_ckeditor_text(text):
     if text == "<p>&nbsp;</p>":
         return False
     return True
+
+
+def get_pdf_njs(self, request):
+    url = ''
+    object = requests.post(url)
+    return object.text
+
+
+
