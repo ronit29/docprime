@@ -2305,7 +2305,6 @@ class PurchaseOrderCreation(auth_model.TimeStampedModel):
             self.provider_name_hospital.enabled_for_cod = False
             self.provider_name_hospital.save()
             self.is_enabled = False
-            self.save()
 
 
     class Meta:
