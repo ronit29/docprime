@@ -1502,6 +1502,7 @@ class DoctorListViewSet(viewsets.GenericViewSet):
 
         ratings = None
         reviews = None
+        result_count = 0
 
 
         # Insurance check for logged in user
@@ -1534,7 +1535,8 @@ class DoctorListViewSet(viewsets.GenericViewSet):
             doctor_search_result = RawSql(query_string.get('query'),
                                          query_string.get('params')).fetch_all()
 
-            result_count = doctor_search_result[0]['result_count']
+            if doctor_search_result:
+                result_count = doctor_search_result[0]['result_count']
             # sa
             # saved_search_result = models.DoctorSearchResult.objects.create(results=doctor_search_result,
             #                                                                result_count=result_count)

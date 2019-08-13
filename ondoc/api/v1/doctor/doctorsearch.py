@@ -52,6 +52,7 @@ class DoctorSearchHelper:
         procedure_category_ids = self.query_params.get("procedure_category_ids", [])  # NEW_LOGIC
         # sits_at_hosp_types = self.query_params.get("sits_at", [])
 
+
         counter = 1
         if self.query_params.get('hospital_id') is not None and self.query_params.get('hospital_id') is not "":
             hosp_str = 'h.id IN('
@@ -95,17 +96,17 @@ class DoctorSearchHelper:
 
         counter=1
         if len(specialization_filter_ids) > 0 and len(procedure_ids)==0 and len(procedure_category_ids)==0:
-            sp_str = 'gs.id IN('
+            spec_filter_str = 'gs.id IN('
             for id in specialization_filter_ids:
 
                 if not counter == 1:
-                    sp_str += ','
-                sp_str = sp_str + '%('+'specialization_filter_ids'+str(counter)+')s'
-                params['specialization_filter_ids'+str(counter)] = id
+                    spec_filter_str += ','
+                spec_filter_str = spec_filter_str + '%('+'specialization_filter'+str(counter)+')s'
+                params['specialization_filter'+str(counter)] = id
                 counter += 1
 
             filtering_params.append(
-                sp_str+')'
+                spec_filter_str+')'
             )
 
 
