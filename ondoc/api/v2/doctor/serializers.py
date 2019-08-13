@@ -627,6 +627,8 @@ class EConsultListSerializer(serializers.ModelSerializer):
     patient_name = serializers.SerializerMethodField()
     validity_status = serializers.SerializerMethodField()
     patient_id = serializers.SerializerMethodField()
+    doctor_auto_login_url = serializers.SerializerMethodField()
+    patient_auto_login_url = serializers.SerializerMethodField()
 
     def get_patient_type(self, obj):
         patient = None
@@ -638,7 +640,7 @@ class EConsultListSerializer(serializers.ModelSerializer):
 
     def get_patient_name(self, obj):
         patient = self.get_patient_type(obj)
-        return ''.join(e for e in patient.name if e.isalnum() or e==' ')
+        return patient.name
 
     def get_patient_id(self, obj):
         patient = self.get_patient_type(obj)
@@ -650,10 +652,17 @@ class EConsultListSerializer(serializers.ModelSerializer):
             validity_status = 'current'
         return validity_status
 
+    def get_doctor_auto_login_url(self, obj):
+        return obj.rc_group.doctor_login_url if obj.rc_group else None
+
+    def get_patient_auto_login_url(self, obj):
+        return obj.rc_group.patient_login_url if obj.rc_group else None
+
     class Meta:
         model = provider_models.EConsultation
         fields = ('id', 'doctor_name', 'doctor_id', 'patient_id', 'patient_name', 'fees', 'validity', 'payment_status',
-                        'created_at', 'link', 'status', 'validity_status', 'validity')
+                        'created_at', 'link', 'status', 'validity_status', 'validity', 'doctor_auto_login_url',
+                        'patient_auto_login_url')
 
 
 class EConsultTransactionModelSerializer(serializers.Serializer):
@@ -673,8 +682,10 @@ class EConsultSerializer(serializers.Serializer):
     id = serializers.IntegerField(min_value=1)
 
     def validate(self, attrs):
+        request = self.context.get('request')
+        user = request.user
         consult_id = attrs['id']
-        e_consultation = provider_models.EConsultation.objects.filter(id=consult_id,
+        e_consultation = provider_models.EConsultation.objects.filter(id=consult_id, created_by=user,
                                                                       status__in=[provider_models.EConsultation.BOOKED,
                                                                                   provider_models.EConsultation.CREATED]).first()
         if not e_consultation:

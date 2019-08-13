@@ -23,7 +23,7 @@ from ondoc.procedure.models import Procedure
 from django.contrib.auth import get_user_model
 from django.conf import settings
 import datetime, logging, re, random, jwt, os, hashlib
-import json, decimal
+import json, decimal, requests
 from django.utils import timezone
 
 from ondoc.diagnostic.models import LabAppointment
@@ -1128,17 +1128,28 @@ class PartnerEConsultationViewSet(viewsets.GenericViewSet):
         e_obj = prov_models.EConsultation(doctor=valid_data['doctor_obj'], created_by=request.user,
                                           fees=valid_data['fees'], validity=valid_data.get('validity', None),
                                           status=prov_models.EConsultation.CREATED)
+        patient = valid_data['patient_obj']
         if valid_data.get('offline_p') and valid_data['offline_p']:
-            e_obj.offline_patient = valid_data['patient_obj']
-            patient_number = str(valid_data['patient_obj'].get_patient_mobile())
+            e_obj.offline_patient = patient
+            patient_number = patient.get_patient_mobile()
+            if patient_number:
+                patient_number = str(patient_number)
 
         else:
-            e_obj.online_patient = valid_data['patient_obj']
-            patient_number = valid_data['patient_obj'].phone_number
+            e_obj.online_patient = patient
+            patient_number = patient.phone_number
 
+        auth_token = prov_models.RocketChatUsers.AUTH_TOKEN
+        auth_user_id = prov_models.RocketChatUsers.AUTH_USER_ID
+        exception = v1_utils.rc_users(e_obj, patient, auth_token, auth_user_id)
+        if exception:
+            logger.error('Error in e-consultation create - ' + str(exception))
+            return Response('Error in e-consultation create - ' + str(exception),
+                            status=status.HTTP_500_INTERNAL_SERVER_ERROR)
         e_obj.save()
-        e_obj.send_sms_link(valid_data['patient_obj'], patient_number)
 
+        if patient_number:
+            e_obj.send_sms_link(valid_data['patient_obj'], patient_number)
 
         resp_data = serializers.EConsultListSerializer(e_obj, context={'request': request})
 
@@ -1154,7 +1165,7 @@ class PartnerEConsultationViewSet(viewsets.GenericViewSet):
         return Response(serializer.data)
 
     def share(self, request):
-        serializer = serializers.EConsultSerializer(data=request.query_params)
+        serializer = serializers.EConsultSerializer(data=request.query_params, context={'request': request})
         serializer.is_valid(raise_exception=True)
         valid_data = serializer.validated_data
         e_consultation = valid_data['e_consultation']
@@ -1174,7 +1185,7 @@ class PartnerEConsultationViewSet(viewsets.GenericViewSet):
         return Response({"status": 1, "message": "e-consultation link shared"})
 
     def complete(self, request):
-        serializer = serializers.EConsultSerializer(data=request.query_params)
+        serializer = serializers.EConsultSerializer(data=request.query_params, context={'request': request})
         serializer.is_valid(raise_exception=True)
         valid_data = serializer.validated_data
         e_consultation = valid_data['e_consultation']
@@ -1299,6 +1310,27 @@ class ConsumerEConsultationViewSet(viewsets.GenericViewSet):
         else:
             resp["status"] = 1
             resp['data'], resp["payment_required"] = v1_utils.payment_details(request, pg_order)
+
+        response = requests.post(settings.ROCKETCHAT_SERVER + '/api/v1/login',
+                                 data={
+                                     "user": settings.ROCKETCHAT_SUPERUSER,
+                                     "password": settings.ROCKETCHAT_PASSWORD
+                                 })
+        data = json.loads(response._content.decode())['data']
+        auth_token = data.get('authToken')
+        user_id = data.get('userId')
+
+        user_response = requests.post(settings.ROCKETCHAT_SERVER + '/api/v1/users.create',
+                      headers={'X-Auth-Token': auth_token,
+                               'X-User-Id': user_id,
+                               'Content-Type': 'application/json'},
+                      data=json.dumps({
+                          "name": "name",
+                          "email": "email@user.tld",
+                          "password": "anypassyouwant",
+                          "username": "uniqueusername"
+                      }))
+        response_data = json.loads(user_response._content.decode())
 
         return Response(resp, status=status.HTTP_200_OK)
 

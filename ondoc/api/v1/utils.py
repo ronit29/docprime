@@ -22,6 +22,7 @@ import requests
 import json
 import random
 import string
+import uuid
 from django.conf import settings
 from dateutil.parser import parse
 from dateutil import tz
@@ -1936,3 +1937,141 @@ def format_return_value(value):
         return None
 
     return value
+
+
+def rc_superuser_login():
+    response = requests.post(settings.ROCKETCHAT_SERVER + '/api/v1/login',
+                             data={
+                                 "user": settings.ROCKETCHAT_SUPERUSER,
+                                 "password": settings.ROCKETCHAT_PASSWORD
+                             })
+    data = json.loads(response._content.decode())['data']
+    auth_token = data.get('authToken')
+    auth_user_id = data.get('userId')
+    return auth_token, auth_user_id
+
+
+def rc_user_create(auth_token, auth_user_id, name, **kwargs):
+    random_unique_string = uuid.uuid4().hex
+    username = random_unique_string[:10].upper()
+    password = random_unique_string[-10:]
+    email = username + "@docprime.com"
+    rc_req_extras = kwargs.get("rc_req_extras", dict())
+    user_create_response = requests.post(settings.ROCKETCHAT_SERVER + '/api/v1/users.create',
+                                         headers={'X-Auth-Token': auth_token,
+                                                  'X-User-Id': auth_user_id,
+                                                  'Content-Type': 'application/json'},
+                                         data=json.dumps({
+                                             "name": name,
+                                             "email": email,
+                                             "password": password,
+                                             "username": username,
+                                             "customFields": rc_req_extras
+                                         }))
+    response_data_dict = json.loads(user_create_response._content.decode())
+    return {"name": name,
+            "username": username,
+            "email": email,
+            "password": password,
+            "rc_req_extras": json.dumps(rc_req_extras),
+            "response_data": response_data_dict
+            }
+
+
+def rc_user_login(auth_token, auth_user_id, username):
+    user_login_response = requests.post(settings.ROCKETCHAT_SERVER + '/api/v1/users.createToken',
+                                        headers={'X-Auth-Token': auth_token,
+                                                 'X-User-Id': auth_user_id,
+                                                 'Content-Type': 'application/json'},
+                                        data=json.dumps({"username": username}))
+    response_data_dict = json.loads(user_login_response._content.decode())
+    return response_data_dict
+
+
+def rc_group_create(auth_token, auth_user_id, patient_username, doctor_username):
+    members = [patient_username, doctor_username]
+    group_name = patient_username + doctor_username
+    group_create_response = requests.post(settings.ROCKETCHAT_SERVER + '/api/v1/groups.create',
+                                          headers={'X-Auth-Token': auth_token,
+                                                   'X-User-Id': auth_user_id,
+                                                   'Content-Type': 'application/json'},
+                                          data=json.dumps({"name": group_name, "members": members}))
+    response_data_dict = json.loads(group_create_response._content.decode())
+    return response_data_dict
+
+
+def is_valid_uuid(uuid_to_test):
+    try:
+        uuid_obj = uuid.UUID(str(uuid_to_test), version=4)
+        return True
+    except ValueError:
+        return False
+
+
+def get_existing_rc_group(rc_user_patient, rc_user_doc):
+    patient_group_ids = set()
+    doc_group_ids = set()
+    patient = rc_user_patient.online_patient if rc_user_patient.online_patient else rc_user_patient.offline_patient
+    for econsultation in patient.econsultations.all():
+        patient_group_ids.add(econsultation.rc_group)
+    for econsultation in rc_user_doc.doctor.econsultations.all():
+        doc_group_ids.add(econsultation.rc_group)
+    rc_group = (patient_group_ids & doc_group_ids)
+    return (list(rc_group)[0] if rc_group else None)
+
+
+def create_rc_user_and_login_token(auth_token, auth_user_id, patient=None, doctor=None):
+    from ondoc.provider.models import RocketChatUsers
+    rocket_chat_user_obj = e = None
+    try:
+        if patient:
+            name = patient.name
+            user_type = auth_models.User.CONSUMER
+        elif doctor:
+            name = doctor.name
+            user_type = auth_models.User.DOCTOR
+        else:
+            raise Exception('either patient or doctor is required for creating rc_user')
+        rc_req_extras = {'user_type': user_type}
+        created_user_dict = rc_user_create(auth_token, auth_user_id, name, rc_req_extras=rc_req_extras)
+        username = created_user_dict.get('username')
+        login_token = rc_user_login(auth_token, auth_user_id, username)['data']['authToken']
+
+        if user_type == auth_models.User.DOCTOR:
+            created_user_dict['doctor'] = doctor
+        elif is_valid_uuid(patient.id):
+            created_user_dict['offline_patient'] = patient
+        else:
+            created_user_dict['online_patient'] = patient
+        rocket_chat_user_obj = RocketChatUsers.objects.create(**created_user_dict, login_token=login_token,
+                                                              user_type=user_type)
+    except Exception as e:
+        return rocket_chat_user_obj, e
+    return rocket_chat_user_obj, e
+
+
+def rc_users(e_obj, patient, auth_token, auth_user_id):
+    from ondoc.provider.models import RocketChatGroups
+    exception = None
+    doctor = e_obj.doctor
+    if hasattr(patient, 'rc_user') and patient.rc_user.all():
+        rc_user_patient = patient.rc_user.all()[0]
+    else:
+        rc_user_patient, exception = create_rc_user_and_login_token(auth_token, auth_user_id, patient=patient)
+        if exception:
+            return exception
+    if hasattr(doctor, 'rc_user') and doctor.rc_user.all():
+        rc_user_doc = doctor.rc_user.all()[0]
+    else:
+        rc_user_doc, exception = create_rc_user_and_login_token(auth_token, auth_user_id,
+                                                                                doctor=doctor)
+        if exception:
+            return exception
+
+    rc_group_obj = get_existing_rc_group(rc_user_patient, rc_user_doc)
+    if not rc_group_obj:
+        rc_group_obj, exception = RocketChatGroups.create_group(auth_token, auth_user_id, rc_user_patient, rc_user_doc)
+    if exception:
+        return exception
+    e_obj.rc_group = rc_group_obj
+    return exception

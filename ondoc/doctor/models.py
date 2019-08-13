@@ -3998,7 +3998,7 @@ class OfflinePatients(auth_model.TimeStampedModel):
 
     def get_patient_mobile(self):
         patient_numbers = self.patient_mobiles.all()
-        patient_number = patient_numbers[0]
+        patient_number = patient_numbers[0] if patient_numbers else None
         for number in self.patient_mobiles.all():
             if number.is_default:
                 patient_number = number
