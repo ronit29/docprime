@@ -665,6 +665,7 @@ class Hospital(auth_model.TimeStampedModel, auth_model.CreatedByModel, auth_mode
         return insured
 
 
+@reversion.register()
 class HospitalPlaceDetails(auth_model.TimeStampedModel):
     hospital = models.ForeignKey(Hospital, on_delete=models.CASCADE, related_name='hospital_place_details')
     place_id = models.TextField()
@@ -1390,6 +1391,7 @@ class Doctor(auth_model.TimeStampedModel, auth_model.QCModel, SearchKey, auth_mo
         db_table = "doctor"
 
 
+@reversion.register()
 class DoctorSticker(auth_model.TimeStampedModel):
     image_base_path = 'doctor/stickers'
     doctor = models.ForeignKey(Doctor, related_name="stickers", on_delete=models.CASCADE)
@@ -1467,6 +1469,7 @@ class GeneralSpecialization(auth_model.TimeStampedModel, UniqueNameModel, Search
         db_table = "general_specialization"
 
 
+@reversion.register()
 class DoctorSpecialization(auth_model.TimeStampedModel):
     doctor = models.ForeignKey(Doctor, related_name="doctorspecializations", on_delete=models.CASCADE)
     specialization = models.ForeignKey(GeneralSpecialization, on_delete=models.CASCADE, blank=False, null=False)
@@ -1619,6 +1622,7 @@ class DoctorClinicTiming(auth_model.TimeStampedModel):
         super().save(*args, **kwargs)
 
 
+@reversion.register()
 class DoctorHospital(auth_model.TimeStampedModel):
     DAY_CHOICES = [(0, "Monday"), (1, "Tuesday"), (2, "Wednesday"), (3, "Thursday"), (4, "Friday"), (5, "Saturday"), (6, "Sunday")]
     doctor = models.ForeignKey(Doctor, related_name="availability", on_delete=models.CASCADE)
@@ -3280,13 +3284,16 @@ class OpdAppointment(auth_model.TimeStampedModel, CouponsMixin, OpdAppointmentIn
         insurance_id = None
         user_insurance = UserInsurance.objects.filter(user=user).last()
         if user_insurance and user_insurance.is_valid():
-            is_appointment_insured, insurance_id, insurance_message = user_insurance.validate_doctor_insurance(data)
-
+            # is_appointment_insured, insurance_id, insurance_message = user_insurance.validate_doctor_insurance(data)
+            insurance_resp = user_insurance.validate_insurance(data)
+            is_appointment_insured = insurance_resp.get('is_insured')
+            insurance_id = insurance_resp.get('insurance_id')
         if is_appointment_insured and cart_data.get('is_appointment_insured', None):
             payment_type = OpdAppointment.INSURANCE
             effective_price = 0.0
         else:
             insurance_id = None
+            is_appointment_insured = False
 
         return {
             "doctor": data.get("doctor"),
@@ -3683,6 +3690,7 @@ class OpdAppointment(auth_model.TimeStampedModel, CouponsMixin, OpdAppointmentIn
         return self.hospital == artemis_hospital if artemis_hospital else False
 
 
+@reversion.register()
 class OpdAppointmentProcedureMapping(models.Model):
     opd_appointment = models.ForeignKey(OpdAppointment, on_delete=models.CASCADE, related_name='procedure_mappings')
     procedure = models.ForeignKey('procedure.Procedure', on_delete=models.CASCADE, related_name='opd_appointment_mappings')
@@ -3732,6 +3740,7 @@ class DoctorLeave(auth_model.TimeStampedModel):
         return self.INTERVAL_MAPPING.get((str(self.start_time), str(self.end_time)))
 
 
+@reversion.register()
 class Prescription(auth_model.TimeStampedModel):
     appointment = models.ForeignKey(OpdAppointment, related_name='prescriptions', on_delete=models.CASCADE)
     prescription_details = models.TextField(max_length=300, blank=True, null=True)
@@ -3936,6 +3945,7 @@ class PracticeSpecialization(auth_model.TimeStampedModel, SearchKey):
     priority = models.PositiveIntegerField(default=0, null=True)
     search_distance = models.FloatField(default=None, blank=True, null=True)
     is_similar_specialization = models.BooleanField(default=True)
+    breadcrumb_priority = models.PositiveIntegerField(null=True, blank=True)
 
     class Meta:
         db_table = 'practice_specialization'
@@ -4150,6 +4160,7 @@ class PatientMobile(auth_model.TimeStampedModel):
         db_table = "patient_mobile"
 
 
+@reversion.register()
 class OfflineOPDAppointments(auth_model.TimeStampedModel):
     CREATED = 1
     BOOKED = 2

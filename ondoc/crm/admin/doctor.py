@@ -23,6 +23,8 @@ from datetime import datetime
 from django.db import transaction
 import logging
 from dal import autocomplete
+from reversion_compare.admin import CompareVersionAdmin
+
 from ondoc.api.v1.utils import GenericAdminEntity, util_absolute_url, util_file_name
 from ondoc.common.models import AppointmentHistory
 from django.contrib import messages
@@ -1097,7 +1099,7 @@ class CompetitorMonthlyVisitsInline(ReadOnlyInline):
     verbose_name_plural = 'Monthly Visits through Competitor Info'
 
 
-class DoctorAdmin(AutoComplete, ImportExportMixin, VersionAdmin, ActionAdmin, QCPemAdmin, nested_admin.NestedModelAdmin):
+class DoctorAdmin(AutoComplete, ImportExportMixin, CompareVersionAdmin, ActionAdmin, QCPemAdmin, nested_admin.NestedModelAdmin):
     # class DoctorAdmin(nested_admin.NestedModelAdmin):
     resource_class = DoctorResource
     change_list_template = 'superuser_import_export.html'
