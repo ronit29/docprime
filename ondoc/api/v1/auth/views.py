@@ -1204,7 +1204,7 @@ class TransactionViewSet(viewsets.GenericViewSet):
         LAB_REDIRECT_URL = settings.BASE_URL + "/lab/appointment"
         OPD_REDIRECT_URL = settings.BASE_URL + "/opd/appointment"
         PLAN_REDIRECT_URL = settings.BASE_URL + "/prime/success?user_plan="
-        ECONSULT_REDIRECT_URL = settings.BASE_URL + "/e_consultation/%s?payment=success"
+        ECONSULT_REDIRECT_URL = settings.BASE_URL + "/econsult?order_id=%s&payment=success"
 
         CHAT_ERROR_REDIRECT_URL = settings.BASE_URL + "/mobileviewchat?payment=fail&error_message=%s" % "Error processing payment, please try again."
         CHAT_REDIRECT_URL = CHAT_ERROR_REDIRECT_URL
