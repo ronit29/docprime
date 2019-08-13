@@ -3338,12 +3338,46 @@ class CompareLabPackagesViewSet(viewsets.ReadOnlyModelViewSet):
         response = self.retrieve(request, **kwargs)
         return response
 
+    def build_request_parameters(self, request):
+        result = {}
+        category_id = request.data.get('category_id')
+        if not LabTestCategory.objects.filter(is_live=True, id=category_id).exists():
+            return Response({'error': 'Invalid category ID'}, status=status.HTTP_400_BAD_REQUEST)
+        longitude = request.data.get('longitude', default=77.071848)
+        latitude = request.data.get('latitude', default=28.450367)
+        max_distance = 50000
+        point_string = 'POINT(' + str(longitude) + ' ' + str(latitude) + ')'
+        pnt = GEOSGeometry(point_string, srid=4326)
+        package_lab_ids = list(AvailableLabTest.objects.filter(lab_pricing_group__labs__is_live=True, test__is_package=True,
+                                                          test__categories__id=category_id,
+                                                          enabled=True, lab_pricing_group__labs__location__dwithin=(
+                Point(float(longitude),
+                      float(latitude)),
+                D(m=max_distance))).annotate(
+            distance=Distance('lab_pricing_group__labs__location',
+                              pnt)).annotate(rank=Window(expression=RowNumber(), order_by=F('distance').asc(),
+                                                         partition_by=[F('test__id')])).order_by(
+            '-test__priority').values('rank', package_id=F('test_id'), lab_id=F('lab_pricing_group__labs__id')))
+
+        package_lab_ids = [x for x in package_lab_ids if x['rank'] == 1]
+        package_lab_ids = package_lab_ids[:5]
+        if not package_lab_ids:
+            return Response(status=status.HTTP_404_NOT_FOUND)
+        result['package_lab_ids'] = package_lab_ids
+        result['latitude'] = latitude
+        result['longitude'] = longitude
+        result['category'] = category_id
+        return result
+
     def retrieve(self, request, *args, **kwargs):
         from django.db.models import Min
         if kwargs and kwargs['compare_package_details']:
             request_parameters = kwargs['compare_package_details']
+        elif request.data.get('category_id'):
+            request_parameters = self.build_request_parameters(request)
         else:
             request_parameters = request.data
+
         serializer = serializers.CompareLabPackagesSerializer(data=request_parameters, context={"request": request})
         serializer.is_valid(raise_exception=True)
         validated_data = serializer.validated_data
@@ -3515,6 +3549,10 @@ class CompareLabPackagesViewSet(viewsets.ReadOnlyModelViewSet):
                 response['description'] = new_dynamic.first().meta_description
                 if response['title'] is None:
                     response['title'] = new_dynamic.first().meta_title
+        response['requested_category'] = None
+        if validated_data.get('category'):
+            response['requested_category'] = {'id': validated_data.get('category').id, 'name': validated_data.get('category').name}
+
         return Response(response)
 
     def get_discounted_price(self, coupon_recommender, deal_price=0, tests_included=None, lab=None, ):
