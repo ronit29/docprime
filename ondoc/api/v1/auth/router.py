@@ -8,7 +8,8 @@ from .views import (LoginOTP, UserViewset, NotificationEndpointViewSet,
                     OrderViewSet, ConsumerAccountRefundViewSet, RefreshJSONWebToken, OnlineLeadViewSet, UserLabViewSet,
                     OrderDetailViewSet, UserTokenViewSet, SendBookingUrlViewSet, ContactUsViewSet, CareerViewSet,
                     DoctorNumberAutocomplete, UserLeadViewSet, ReferralViewSet, UserRatingViewSet, AppointmentViewSet,
-                    WhatsappOptinViewSet, DoctorScanViewSet, TokenFromUrlKey, ProfileEmailUpdateViewset)
+                    WhatsappOptinViewSet, DoctorScanViewSet, TokenFromUrlKey, ProfileEmailUpdateViewset,
+                    BajajAllianzUserViewset)
 
 urlpatterns = [
     path('api-token-refresh', RefreshJSONWebToken.as_view({'post':'refresh'}), name='token-refresh'),
@@ -16,6 +17,7 @@ urlpatterns = [
     path('otp/generate', LoginOTP.as_view({'post': 'generate'}), name='otp-generate'),
     # path('otp/verify', OTP.as_view({'post': 'verify'}), name='otp-verify'),
     path('login', UserViewset.as_view({'post': 'login'}), name='user-login'),
+    path('bajaj_ext_login', BajajAllianzUserViewset.as_view({'post': 'user_login_via_external_source'}), name='bajaj-external-login'),
     path('doctor/login', UserViewset.as_view({'post': 'doctor_login'}), name='doctor-login'),
     path('logout', UserViewset.as_view({'post': 'logout'}), name='user-logout'),
     path('doctor/logout', UserViewset.as_view({'post': 'logout'}), name='doctor-logout'),

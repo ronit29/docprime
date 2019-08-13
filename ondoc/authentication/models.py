@@ -317,6 +317,7 @@ class User(AbstractBaseUser, PermissionsMixin):
     date_joined = models.DateTimeField(auto_now_add=True)
     auto_created = models.BooleanField(default=False)
     source = models.CharField(blank=True, max_length=50, null=True)
+    data = JSONField(blank=True, null=True)
 
     def __hash__(self):
         return self.id
