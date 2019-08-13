@@ -2295,6 +2295,8 @@ class PurchaseOrderCreation(auth_model.TimeStampedModel):
                 self.provider_name_hospital.enabled_for_cod = True
                 self.provider_name_hospital.enabled_poc = True
                 self.provider_name_hospital.save()
+                notification_tasks.purchase_order_closing_counter_automation.apply_async((self.id, ), eta=self.end_date, )    # task to disable Pay-at-clinic functionality in hospital
+
             else:
                 notification_tasks.purchase_order_creation_counter_automation.apply_async((self.id, ), eta=self.start_date, ) # task to enable Pay-at-clinic functionality in hospital
                 notification_tasks.purchase_order_closing_counter_automation.apply_async((self.id, ), eta=self.end_date, )    # task to disable Pay-at-clinic functionality in hospital
