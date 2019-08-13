@@ -2419,14 +2419,15 @@ class PurchaseOrderCreationForm(forms.ModelForm):
             raise forms.ValidationError('Cannot choose Hospital, Please select a Lab')
         if cleaned_data.get('provider_type') == 'hospital' and cleaned_data.get('provider_name_lab'):
             raise forms.ValidationError('Cannot choose Lab, Please select a Hospital')
-        if cleaned_data.get('start_date') >= cleaned_data.get('end_date'):
-            raise forms.ValidationError('Start date cannot be greater than end date')
-        if cleaned_data.get('start_date') < timezone.now().date():
-            raise forms.ValidationError('Enter a valid start date')
-        if cleaned_data.get('end_date') < timezone.now().date() or cleaned_data.get('end_date') < cleaned_data.get('start_date'):
-            raise forms.ValidationError('Enter a valid end date')
-        if not cleaned_data.get('start_date') and cleaned_data.get('end_date'):
-            raise forms.ValidationError('Start date and End date are mandatory')
+        if cleaned_data.get('start_date') or cleaned_data.get('end_date'):
+            if cleaned_data.get('start_date') >= cleaned_data.get('end_date'):
+                raise forms.ValidationError('Start date cannot be greater than end date')
+            if cleaned_data.get('start_date') < timezone.now().date():
+                raise forms.ValidationError('Enter a valid start date')
+            if cleaned_data.get('end_date') < timezone.now().date() or cleaned_data.get('end_date') < cleaned_data.get('start_date'):
+                raise forms.ValidationError('Enter a valid end date')
+            if not cleaned_data.get('start_date') and cleaned_data.get('end_date'):
+                raise forms.ValidationError('Start date and End date are mandatory')
 
         return super().clean()
 
