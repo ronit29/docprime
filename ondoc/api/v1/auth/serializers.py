@@ -595,12 +595,8 @@ class ProfileEmailUpdateProcessSerializer(serializers.Serializer):
 
 
 class ExternalLoginSerializer(serializers.Serializer):
-    GENDER_CHOICES = UserProfile.GENDER_CHOICES
     phone_number = serializers.IntegerField(min_value=1000000000,max_value=9999999999)
     name = serializers.CharField(max_length=100)
-    gender = serializers.ChoiceField(choices=GENDER_CHOICES)
-    # age = serializers.SerializerMethodField()
-    # dob = serializers.DateField(allow_null=True, required=True)
     is_default_user = serializers.BooleanField(required=False)
-    email = serializers.EmailField(required=False, allow_null=True, allow_blank=True)
+    email = serializers.EmailField(required=True, allow_null=True, allow_blank=True)
     extra = serializers.JSONField(allow_null=True, required=False)

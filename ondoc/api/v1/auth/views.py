@@ -2284,9 +2284,8 @@ class BajajAllianzUserViewset(GenericViewSet):
 
         profile_data['name'] = data.get('name')
         profile_data['phone_number'] = user.phone_number
-        profile_data['gender'] = data.get('gender')
         profile_data['user'] = user
-        profile_data['dob'] = data.get('dob')
+        profile_data['email'] = data.get('email')
         profile_data['source'] = source
         user_profiles = user.profiles.all()
 
@@ -2298,8 +2297,7 @@ class BajajAllianzUserViewset(GenericViewSet):
             if user_profiles:
                 user_profile = user_profiles[0]
                 user_profile.phone_number = profile_data['phone_number'] if not user_profile.phone_number else None
-                user_profile.gender = profile_data['gender'] if not user_profile.gender else None
-                user_profile.dob = profile_data['dob'] if not user_profile.dob else None
+                user_profile.email = profile_data['email'] if not user_profile.email else None
                 user_profile.save()
             else:
                 UserProfile.objects.create(**profile_data)
