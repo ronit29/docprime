@@ -2257,7 +2257,7 @@ class BajajAllianzUserViewset(GenericViewSet):
 
     # todo - code needs improvements
     @transaction.atomic()
-    def user_login_via_external_source(self, request):
+    def user_login_via_bagic(self, request):
         from django.http import JsonResponse
         response = {'login': 0}
         if request.method != 'POST':
