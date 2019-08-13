@@ -3161,13 +3161,16 @@ class OpdAppointment(auth_model.TimeStampedModel, CouponsMixin, OpdAppointmentIn
         insurance_id = None
         user_insurance = UserInsurance.objects.filter(user=user).last()
         if user_insurance and user_insurance.is_valid():
-            is_appointment_insured, insurance_id, insurance_message = user_insurance.validate_doctor_insurance(data)
-
+            # is_appointment_insured, insurance_id, insurance_message = user_insurance.validate_doctor_insurance(data)
+            insurance_resp = user_insurance.validate_insurance(data)
+            is_appointment_insured = insurance_resp.get('is_insured')
+            insurance_id = insurance_resp.get('insurance_id')
         if is_appointment_insured and cart_data.get('is_appointment_insured', None):
             payment_type = OpdAppointment.INSURANCE
             effective_price = 0.0
         else:
             insurance_id = None
+            is_appointment_insured = False
 
         return {
             "doctor": data.get("doctor"),
@@ -3817,6 +3820,7 @@ class PracticeSpecialization(auth_model.TimeStampedModel, SearchKey):
     priority = models.PositiveIntegerField(default=0, null=True)
     search_distance = models.FloatField(default=None, blank=True, null=True)
     is_similar_specialization = models.BooleanField(default=True)
+    breadcrumb_priority = models.PositiveIntegerField(null=True, blank=True)
 
     class Meta:
         db_table = 'practice_specialization'
