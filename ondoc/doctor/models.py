@@ -2734,6 +2734,10 @@ class OpdAppointment(auth_model.TimeStampedModel, CouponsMixin, OpdAppointmentIn
 
         if old_instance and old_instance.status != self.ACCEPTED and self.status == self.ACCEPTED:
             try:
+                if self.is_followup_appointment():
+                    notification_models.EmailNotification.ops_notification_alert(self, email_list=settings.INSURANCE_OPS_EMAIL,
+                                                                             product=Order.DOCTOR_PRODUCT_ID,
+                                                                             alert_type=notification_models.EmailNotification.FOLLOWUP_APPOINTMENT)
                 notification_tasks.docprime_appointment_reminder_sms_provider.apply_async(
                     (self.id, str(math.floor(self.updated_at.timestamp()))),
                     eta=self.time_slot_start - datetime.timedelta(
@@ -3161,13 +3165,16 @@ class OpdAppointment(auth_model.TimeStampedModel, CouponsMixin, OpdAppointmentIn
         insurance_id = None
         user_insurance = UserInsurance.objects.filter(user=user).last()
         if user_insurance and user_insurance.is_valid():
-            is_appointment_insured, insurance_id, insurance_message = user_insurance.validate_doctor_insurance(data)
-
+            # is_appointment_insured, insurance_id, insurance_message = user_insurance.validate_doctor_insurance(data)
+            insurance_resp = user_insurance.validate_insurance(data)
+            is_appointment_insured = insurance_resp.get('is_insured')
+            insurance_id = insurance_resp.get('insurance_id')
         if is_appointment_insured and cart_data.get('is_appointment_insured', None):
             payment_type = OpdAppointment.INSURANCE
             effective_price = 0.0
         else:
             insurance_id = None
+            is_appointment_insured = False
 
         return {
             "doctor": data.get("doctor"),
@@ -3314,7 +3321,7 @@ class OpdAppointment(auth_model.TimeStampedModel, CouponsMixin, OpdAppointmentIn
                 if self.profile_detail.get('dob', None) else ''
         except Exception as e:
             pass
-
+        opd_appointment_type = 'FOLLOWUP' if self.is_followup_appointment() else 'REGULAR'
         merchant_payout = self.merchant_payout_data()
         accepted_history = self.appointment_accepted_history()
         user_insurance = self.insurance
@@ -3378,7 +3385,8 @@ class OpdAppointment(auth_model.TimeStampedModel, CouponsMixin, OpdAppointmentIn
             "RefundPaymentMode": float(refund_data['original_payment_mode_refund']) if refund_data['original_payment_mode_refund'] else None,
             "RefundToWallet": float(refund_data['promotional_wallet_refund']) if refund_data['promotional_wallet_refund'] else None,
             "RefundInitiationDate": int(refund_data['refund_initiated_at']) if refund_data['refund_initiated_at'] else None,
-            "RefundURN": refund_data['refund_urn']
+            "RefundURN": refund_data['refund_urn'],
+            "OPD_AppointmentType": opd_appointment_type
         }
         return appointment_details
 
@@ -3818,6 +3826,7 @@ class PracticeSpecialization(auth_model.TimeStampedModel, SearchKey):
     priority = models.PositiveIntegerField(default=0, null=True)
     search_distance = models.FloatField(default=None, blank=True, null=True)
     is_similar_specialization = models.BooleanField(default=True)
+    breadcrumb_priority = models.PositiveIntegerField(null=True, blank=True)
 
     class Meta:
         db_table = 'practice_specialization'

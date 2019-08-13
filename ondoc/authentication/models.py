@@ -307,6 +307,7 @@ class User(AbstractBaseUser, PermissionsMixin):
     # EMAIL_FIELD = 'email'
     objects = CustomUserManager()
     username = None
+    first_name = None
     phone_number = models.CharField(max_length=10, blank=False, null=True, default=None)
     email = models.EmailField(max_length=100, blank=False, null=True, default=None)
     user_type = models.PositiveSmallIntegerField(choices=USER_TYPE_CHOICES)
@@ -420,6 +421,13 @@ class User(AbstractBaseUser, PermissionsMixin):
         profile = self.get_default_profile()
         if profile and profile.email:
             return profile.email
+        return ''
+
+    @property
+    def username(self):
+        profile = self.get_default_profile()
+        if profile and profile.name:
+            return profile.name
         return ''
 
     # @cached_property
