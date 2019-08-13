@@ -2376,7 +2376,7 @@ class OpdAppointment(auth_model.TimeStampedModel, CouponsMixin, OpdAppointmentIn
     payment_type = models.PositiveSmallIntegerField(choices=PAY_CHOICES, default=PREPAID)
     insurance = models.ForeignKey(insurance_model.UserInsurance, blank=True, null=True, default=None,
                                   on_delete=models.DO_NOTHING)
-    purchase_order = models.ForeignKey(PurchaseOrderCreation, on_delete=models.DO_NOTHING, null=True, blank=True, related_name='opdpurchaseorder')
+    purchase_order = models.ForeignKey(PurchaseOrderCreation, on_delete=models.SET_NULL, null=True, blank=True, related_name='opdpurchaseorder')
     outstanding = models.ForeignKey(Outstanding, blank=True, null=True, on_delete=models.SET_NULL)
     matrix_lead_id = models.IntegerField(null=True)
     is_rated = models.BooleanField(default=False)
