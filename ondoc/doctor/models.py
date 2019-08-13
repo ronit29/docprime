@@ -2287,10 +2287,10 @@ class PurchaseOrderCreation(auth_model.TimeStampedModel):
         if self.id:
             if self.is_enabled == False:
                 self.disable_cod_functionality()
-            if self.opdpurchaseorder.insurance.status == 2 or self.opdpurchaseorder.insurance.status == 3 or self.opdpurchaseorder.insurance.status == 5 \
-                or self.opdpurchaseorder.status == 6:
-                self.opdpurchaseorder.hospital.enabled_for_cod = True
-                self.opdpurchaseorder.hospital.save()
+            # if self.opdpurchaseorder.insurance.status == 2 or self.opdpurchaseorder.insurance.status == 3 or self.opdpurchaseorder.insurance.status == 5 \
+            #     or self.opdpurchaseorder.status == 6:
+            #     self.opdpurchaseorder.hospital.enabled_for_cod = True
+            #     self.opdpurchaseorder.hospital.save()
 
 
         if self.is_enabled == True and self.provider_name_hospital.enabled_poc == True and self.current_appointment_count < 1:
