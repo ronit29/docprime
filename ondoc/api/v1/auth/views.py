@@ -2255,7 +2255,6 @@ class ProfileEmailUpdateViewset(viewsets.GenericViewSet):
 class BajajAllianzUserViewset(GenericViewSet):
     authentication_classes = (BajajAllianzAuthentication,)
 
-    # todo - code needs improvements
     @transaction.atomic()
     def user_login_via_bagic(self, request):
         from django.http import JsonResponse
@@ -2268,6 +2267,7 @@ class BajajAllianzUserViewset(GenericViewSet):
         data = serializer.validated_data
         profile_data = {}
         source = data.get('extra').get('utm_source', 'External') if data.get('extra') else 'External'
+        redirect_type = data.get('redirect_type')
 
         user = User.objects.filter(phone_number=data.get('phone_number'), user_type=User.CONSUMER).first()
         if not user:
@@ -2310,8 +2310,9 @@ class BajajAllianzUserViewset(GenericViewSet):
         token_object = JWTAuthentication.generate_token(user)
 
         base_landing_url = settings.BASE_URL + '/sms/booking?token={}'.format(token_object['token'].decode("utf-8"))
-        home_page_url = base_landing_url + "&callbackurl=/"
-        docprime_login_url = generate_short_url(home_page_url)
+        redirect_url = 'search' if redirect_type == 'lab' else '/'
+        callback_url = base_landing_url + "&callbackurl={}".format(redirect_url)
+        docprime_login_url = generate_short_url(callback_url)
 
         response = {
             "docprime_url": docprime_login_url

@@ -600,3 +600,4 @@ class ExternalLoginSerializer(serializers.Serializer):
     is_default_user = serializers.BooleanField(required=False)
     email = serializers.EmailField(required=True, allow_null=True, allow_blank=True)
     extra = serializers.JSONField(allow_null=True, required=False)
+    redirect_type = serializers.ChoiceField(choices=[('doctor',"Doctor"), ('lab',"Lab")])
