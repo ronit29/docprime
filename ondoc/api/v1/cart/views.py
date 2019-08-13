@@ -136,8 +136,13 @@ class CartViewSet(viewsets.GenericViewSet):
                     raise Exception('Insurance expired.')
                 # is_agent = True if hasattr(request, 'agent') else False
                 if not insurance_doctor and cart_data.get('is_appointment_insured') and user_insurance and user_insurance.is_valid():
-                    is_lab_insured, insurance_id, insurance_message = user_insurance.validate_insurance(
+                    # is_lab_insured, insurance_id, insurance_message = user_insurance.validate_insurance(
+                    #     validated_data)
+                    insurance_dict = user_insurance.validate_insurance(
                         validated_data)
+                    is_lab_insured = insurance_dict.get('is_insured', False)
+                    insurance_id = insurance_dict.get('insurance_id', None)
+                    insurance_message = insurance_dict.get('insurance_message', '')
                     if is_lab_insured:
                         item.data['is_appointment_insured'] = True
                         item.data['insurance_id'] = insurance_id
