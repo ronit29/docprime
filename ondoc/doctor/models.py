@@ -2941,7 +2941,7 @@ class OpdAppointment(auth_model.TimeStampedModel, CouponsMixin, OpdAppointmentIn
                 elif self.status == 7 and self.purchase_order.current_appointment_count > 0:
                     self.purchase_order.current_appointment_count = self.purchase_order.current_appointment_count - 1
                     to_save = True
-                elif self.status == 7 and self.purchase_order.current_appointment_count <= 1:
+                elif self.status == 7 and self.purchase_order.current_appointment_count <= 0:
                     # self.purchase_order.provider_name_hospital.enabled_for_cod = False
                     self.purchase_order.is_enabled = False
                     self.purchase_order.current_appointment_count = self.purchase_order.current_appointment_count - 1
