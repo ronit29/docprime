@@ -126,6 +126,7 @@ DJANGO_APPS = (
     'storages',
     'django.contrib.sites',
     'django.contrib.sitemaps',
+    'reversion_compare',
 )
 THIRD_PARTY_APPS = (
 
@@ -190,7 +191,7 @@ LOCAL_APPS = (
 )
 
 INSTALLED_APPS = DJANGO_APPS + THIRD_PARTY_APPS + LOCAL_APPS
-
+ADD_REVERSION_ADMIN = True
 
 MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',

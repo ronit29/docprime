@@ -22,6 +22,8 @@ from django.utils.timezone import make_aware
 from django.utils.html import format_html_join
 import pytz
 from django.contrib import messages
+from reversion_compare.admin import CompareVersionAdmin
+
 from ondoc.account.models import Order, Invoice
 from ondoc.api.v1.utils import util_absolute_url, util_file_name, datetime_to_formated_string
 from ondoc.common.models import AppointmentHistory
@@ -559,7 +561,7 @@ class LabTestGroupTimingInline(admin.TabularInline):
     show_change_link = False
 
 
-class LabAdmin(ImportExportMixin, admin.GeoModelAdmin, VersionAdmin, ActionAdmin, QCPemAdmin):
+class LabAdmin(ImportExportMixin, admin.GeoModelAdmin, CompareVersionAdmin, ActionAdmin, QCPemAdmin):
     change_list_template = 'superuser_import_export.html'
     resource_class = LabResource
     list_display = ('name', 'lab_logo', 'updated_at', 'onboarding_status', 'data_status', 'welcome_calling_done',
@@ -945,7 +947,7 @@ class LabPrescriptionInline(nested_admin.NestedGenericTabularInline):
         return readonly_fields
 
 
-class LabAppointmentAdmin(nested_admin.NestedModelAdmin):
+class LabAppointmentAdmin(nested_admin.NestedModelAdmin, CompareVersionAdmin):
     form = LabAppointmentForm
     change_form_template = 'appointment_change_form.html'
     search_fields = ['id']

@@ -1,3 +1,4 @@
+import reversion
 from django.db import models
 from django_comments.models import Comment
 
@@ -14,7 +15,7 @@ from ondoc.authentication.models import TimeStampedModel
 #         db_table = 'custom_comment'
 from ondoc.doctor.models import Doctor
 
-
+@reversion.register()
 class CustomComment(TimeStampedModel):
     author = models.ForeignKey(Doctor, null=True, blank=True, related_name='author_comments', on_delete=models.SET_NULL)
     comment = models.ForeignKey(Comment, null=True, blank=True, on_delete=models.SET_NULL)
