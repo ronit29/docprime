@@ -17,7 +17,8 @@ from ondoc.doctor.models import (OpdAppointment, Doctor, Hospital, DoctorHospita
                                  CommonMedicalCondition, CommonSpecialization,
                                  DoctorPracticeSpecialization, DoctorClinic, OfflineOPDAppointments, OfflinePatients,
                                  CancellationReason, HealthInsuranceProvider, HospitalDocument, HospitalNetworkDocument,
-                                 AppointmentHistory, HospitalNetwork, ProviderEncrypt, SimilarSpecializationGroup)
+                                 AppointmentHistory, HospitalNetwork, ProviderEncrypt, SimilarSpecializationGroup,
+                                 PracticeSpecialization)
 from ondoc.diagnostic import models as lab_models
 from ondoc.authentication.models import UserProfile, DoctorNumber, GenericAdmin, GenericLabAdmin
 from django.db.models import Avg
@@ -857,6 +858,17 @@ class DoctorListSerializer(serializers.Serializer):
     availability = CommaSepratedToListField(required=False,  max_length=50, typecast_to=str)
     avg_ratings = CommaSepratedToListField(required=False,  max_length=50, typecast_to=str)
     group_ids = CommaSepratedToListField(required=False,  max_length=50, typecast_to=str)
+    specialization_filter_ids = CommaSepratedToListField(required=False, max_length=500, typecast_to=str, allow_blank=True)
+
+    def validate_specialization_filter_ids(self, attrs):
+        try:
+            temp_attrs = [int(attr) for attr in attrs]
+            temp_attrs = set(temp_attrs)
+            if PracticeSpecialization.objects.filter(id__in=temp_attrs).count() == len(temp_attrs):
+                return attrs
+        except:
+            raise serializers.ValidationError('Invalid Specialization IDs')
+        raise serializers.ValidationError('Invalid Specialization IDs')
 
     def validate(self, attrs):
         if attrs.get('group_ids'):

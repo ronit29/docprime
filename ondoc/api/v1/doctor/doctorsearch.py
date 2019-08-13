@@ -44,6 +44,7 @@ class DoctorSearchHelper:
         filtering_params = []
 
         specialization_ids = self.query_params.get("specialization_ids", [])
+        specialization_filter_ids = self.query_params.get("specialization_filter_ids", [])
         condition_ids = self.query_params.get("condition_ids", [])
 
         procedure_ids = self.query_params.get("procedure_ids", [])# NEW_LOGIC
@@ -91,6 +92,22 @@ class DoctorSearchHelper:
             filtering_params.append(
                 sp_str+')'
             )
+
+        counter=1
+        if len(specialization_filter_ids) > 0 and len(procedure_ids)==0 and len(procedure_category_ids)==0:
+            sp_str = 'gs.id IN('
+            for id in specialization_filter_ids:
+
+                if not counter == 1:
+                    sp_str += ','
+                sp_str = sp_str + '%('+'specialization_filter_ids'+str(counter)+')s'
+                params['specialization_filter_ids'+str(counter)] = id
+                counter += 1
+
+            filtering_params.append(
+                sp_str+')'
+            )
+
 
         # counter = 1
         # if self.query_params.get("sits_at"):
