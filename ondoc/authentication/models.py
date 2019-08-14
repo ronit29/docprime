@@ -425,9 +425,8 @@ class User(AbstractBaseUser, PermissionsMixin):
 
     @property
     def username(self):
-        profile = self.get_default_profile()
-        if profile and profile.name:
-            return profile.name
+        if self.email:
+            return self.email
         return ''
 
     # @cached_property
