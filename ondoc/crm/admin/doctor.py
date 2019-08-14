@@ -1684,7 +1684,7 @@ class InsuredOpdAppointmentResource(resources.ModelResource):
             return "REGULAR"
 
 
-class DoctorOpdAppointmentAdmin(ExportMixin, admin.ModelAdmin):
+class DoctorOpdAppointmentAdmin(ExportMixin, CompareVersionAdmin):
     form = DoctorOpdAppointmentForm
     export_template_name = "export_opd_appointment_report.html"
     formats = (base_formats.XLS,)
