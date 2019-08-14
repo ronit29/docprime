@@ -416,6 +416,11 @@ class DoctorURL():
             doc_locality = None
             hospital = None
 
+	        #practice_specializations = doctor.doctorpracticespecializations.all().order_by('specialization__breadcrumb_priority')
+            #sp_dict = OrderedDict()
+            #for sp in practice_specializations:
+            #    sp_dict[sp.specialization_id] = sp.specialization.name
+
             practice_specializations = doctor.doctorpracticespecializations.all()
             sp_dict = dict()
             for sp in practice_specializations:
@@ -431,12 +436,16 @@ class DoctorURL():
                 break
 
             top_specialization = None
-            for ps in practice_specializations:
-                spec = spec_cache.get(ps.specialization_id)
-                if not top_specialization:
-                    top_specialization = spec
-                elif spec and spec.get('doctor_count')> top_specialization.get('doctor_count'):
-                    top_specialization = spec
+            if practice_specializations:
+                top_specialization = practice_specializations.order_by('specialization__breadcrumb_priority').first()
+
+            # top_specialization = None
+            # for ps in practice_specializations:
+            #     spec = spec_cache.get(ps.specialization_id)
+            #     if not top_specialization:
+            #         top_specialization = spec
+            #     elif spec and spec.get('doctor_count')> top_specialization.get('doctor_count'):
+            #         top_specialization = spec
 
             #print(top_specialization)
 
@@ -553,8 +562,8 @@ class DoctorURL():
             extras['breadcrums'] = []
             data['extras'] = extras
             if top_specialization:
-                data['specialization'] = top_specialization.get('name')
-                data['specialization_id'] = top_specialization.get('specialization_id')
+                data['specialization'] = top_specialization.specialization.name
+                data['specialization_id'] = top_specialization.specialization.id
 
             #data['sequence'] = sequence
 

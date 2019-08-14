@@ -8,6 +8,7 @@ import math
 import traceback
 from collections import OrderedDict
 from io import BytesIO
+from django.db.models import Q
 
 import pytz
 from django.db import transaction
@@ -682,6 +683,11 @@ def send_insurance_endorsment_notifications(self, data):
         if notification and user_insurance:
             insurance_notification = InsuranceNotification(user_insurance, notification)
             insurance_notification.send()
+            pending_members = user_insurance.endorse_members.filter(Q(mail_status=EndorsementRequest.MAIL_PENDING) |
+                                                                    Q(mail_status__isnull=True))
+            for member in pending_members:
+                member.mail_status = EndorsementRequest.MAIL_SENT
+                member.save()
 
     except Exception as e:
         logger.error(str(e))
