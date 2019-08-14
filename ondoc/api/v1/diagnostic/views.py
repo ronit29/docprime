@@ -3345,7 +3345,7 @@ class CompareLabPackagesViewSet(viewsets.ReadOnlyModelViewSet):
             return Response({'error': 'Invalid category ID'}, status=status.HTTP_400_BAD_REQUEST)
         longitude = request.data.get('longitude', 77.071848)
         latitude = request.data.get('latitude', 28.450367)
-        max_distance = 50000
+        max_distance = 10000
         point_string = 'POINT(' + str(longitude) + ' ' + str(latitude) + ')'
         pnt = GEOSGeometry(point_string, srid=4326)
         package_lab_ids = list(
