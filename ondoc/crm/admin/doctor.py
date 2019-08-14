@@ -23,7 +23,7 @@ from django.db import transaction
 import logging
 from dal import autocomplete
 from ondoc.api.v1.utils import GenericAdminEntity, util_absolute_url, util_file_name
-from ondoc.common.models import AppointmentHistory
+from ondoc.common.models import AppointmentHistory, SponsorListingURL, SponsorListingSpecialization
 from django.contrib import messages
 from django.http import HttpResponseRedirect
 
@@ -2317,10 +2317,22 @@ class PurchaseOrderCreationForm(forms.ModelForm):
             raise forms.ValidationError('Cannot choose Hospital, Please select a Lab')
         if cleaned_data.get('provider_type') == 'hospital' and cleaned_data.get('provider_name_lab'):
             raise forms.ValidationError('Cannot choose Lab, Please select a Hospital')
-        if cleaned_data.get('start_date') >=  cleaned_data.get('end_date'):
+        if cleaned_data.get('start_date') >= cleaned_data.get('end_date'):
             raise forms.ValidationError('Start date cannot be greater than end date')
 
         return super().clean()
+
+
+class SponsorListingURLInline(admin.TabularInline):
+    model = SponsorListingURL
+    extra = 2
+    can_delete = True
+
+
+class SponsorListingSpecializationInline(admin.TabularInline):
+    model = SponsorListingSpecialization
+    extra = 2
+    can_delete = True
 
 
 class PurchaseOrderCreationAdmin(admin.ModelAdmin):
@@ -2331,3 +2343,4 @@ class PurchaseOrderCreationAdmin(admin.ModelAdmin):
     autocomplete_fields = ['provider_name_lab', 'provider_name_hospital']
     search_fields = ['provider_name_lab__name', 'provider_name_hospital__name']
     readonly_fields = ['provider_name', 'appointment_booked_count', 'current_appointment_count']
+    inlines = [SponsorListingURLInline, SponsorListingSpecializationInline]

@@ -1,6 +1,6 @@
 from django.contrib.gis import admin
 from ondoc.common.models import PaymentOptions, UserConfig, Feature, Service, MatrixMappedState, MatrixMappedCity, \
-    GlobalNonBookable, QRCode, BlacklistUser, BlockedStates
+    GlobalNonBookable, QRCode, BlacklistUser, BlockedStates, SponsorListingSpecialization, SponsorListingURL
 from ondoc.corporate_booking.models import Corporates, CorporateDeal, CorporateDocument
 from ondoc.crm.admin.banner import BannerAdmin, SliderLocationAdmin, RecommenderAdmin, EmailBannerAdmin
 from ondoc.crm.admin.location import ComparePackagesSEOUrlsAdmin
@@ -285,3 +285,5 @@ admin.site.register(UserNumberUpdate, UserNumberUpdateAdmin)
 admin.site.register(GenericQuestionAnswer, GenericQuestionAnswerAdmin)
 admin.site.register(IntegratorLabTestParameterMapping, IntegratorLabTestParameterMappingAdmin)
 admin.site.register(PurchaseOrderCreation, PurchaseOrderCreationAdmin)
+admin.site.register(SponsorListingURL)
+admin.site.register(SponsorListingSpecialization)
