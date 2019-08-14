@@ -5,7 +5,7 @@ from .views import (DoctorAppointmentsViewSet, DoctorProfileView, DoctorHospital
                     DoctorAppointmentNoAuthViewSet, DoctorContactNumberViewSet, DoctorFeedbackViewSet,
                     HospitalAutocomplete, CreateAdminViewSet, OfflineCustomerViewSet, HospitalNetworkListViewset,
                     AppointmentMessageViewset, IpdProcedureViewSet, HospitalViewSet, IpdProcedureSyncViewSet,
-                    PracticeSpecializationAutocomplete, SimilarSpecializationGroupAutocomplete, HospitalsFilteredList)
+                    PracticeSpecializationAutocomplete, SimilarSpecializationGroupAutocomplete)
 
 urlpatterns = [
     path('appointment', DoctorAppointmentsViewSet.as_view({'get': 'list'}), name='appointment-list'),
@@ -76,7 +76,6 @@ urlpatterns = [
     path('ipd_procedure/update_lead', IpdProcedureViewSet.as_view({'post': 'update_lead'}), name='ipd_procedure_lead_update'),
     path('ipd_procedure/sync_lead', IpdProcedureSyncViewSet.as_view({'post': 'sync_lead'}), name='ipd_procedure_sync_lead'),
     path('licence/update', DoctorProfileView.as_view({'post': 'licence_update'}), name='licence_update'),
-    path('hospitals/list', HospitalsFilteredList.as_view({'get': 'list'}), name='hospitals_filtered_list'),
     path('hospital/filter', DoctorListViewSet.as_view({'get': 'hosp_filtered_list'}), name='hospital-filter-in-doctor-search'),
     path('speciality/filter', DoctorListViewSet.as_view({'get': 'speciality_filtered_list'}), name='speciality-filter-in-doctor-search'),
 ]
