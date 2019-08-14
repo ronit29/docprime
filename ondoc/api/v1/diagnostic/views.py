@@ -3361,7 +3361,7 @@ class CompareLabPackagesViewSet(viewsets.ReadOnlyModelViewSet):
                 '-test__priority').values('rank', package_id=F('test_id'), lab_id=F('lab_pricing_group__labs__id')))
 
         package_lab_ids = [x for x in package_lab_ids if x['rank'] == 1]
-        package_lab_ids = package_lab_ids[:5]
+        package_lab_ids = package_lab_ids[:3]
         if not package_lab_ids:
             return Response(status=status.HTTP_404_NOT_FOUND)
         result['package_lab_ids'] = package_lab_ids
