@@ -799,7 +799,7 @@ class SponsorListingURL(auth_model.TimeStampedModel):
 
 
 class SponsorListingSpecialization(auth_model.TimeStampedModel):
-    poc = models.ForeignKey("doctor.PurchaseOrderCreation", on_delete=models.CASCADE, related_name='poc_specialization', null= True)
+    poc = models.ForeignKey("doctor.PurchaseOrderCreation", on_delete=models.CASCADE, related_name='poc_specialization', null=True)
     specialization = models.ForeignKey("doctor.PracticeSpecialization", on_delete=models.SET_NULL, null=True, blank=True, related_name='listing_specialization')
     latitude = models.FloatField()
     longitude = models.FloatField()
