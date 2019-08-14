@@ -3352,7 +3352,7 @@ class CompareLabPackagesViewSet(viewsets.ReadOnlyModelViewSet):
             AvailableLabTest.objects.filter(lab_pricing_group__labs__is_live=True, test__is_package=True,
                                             test__enable_for_retail=True,
                                             test__searchable=True,
-                                            test__categories__id=category_id, test__enable_for_retail=True,
+                                            test__categories__id=category_id,
                                             enabled=True, lab_pricing_group__labs__location__dwithin=(
                     Point(float(longitude),
                           float(latitude)),
