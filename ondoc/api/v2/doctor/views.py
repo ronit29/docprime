@@ -1283,21 +1283,20 @@ class ConsumerEConsultationViewSet(viewsets.GenericViewSet):
 
         action = Order.PROVIDER_ECONSULT_PAY
         profile = consultation.online_patient if consultation.online_patient else consultation.offline_patient
-        action_data = {"user": user.id, "extra_details": details, "doc_id": consultation.doctor.id, "coupon": data.get('coupon'),
-                       "effective_price": float(amount_to_paid), "profile": str(profile.id), "validity": consultation.validity,
+        action_data = {"id": consultation.id, "user": user.id, "extra_details": details, "doc_id": consultation.doctor.id, "coupon": data.get('coupon'),
+                       "effective_price": float(amount_to_paid), "profile": str(profile.id), "validity": consultation.validity.strftime("%Y-%m-%d"),
                        "price": float(amount), "cashback": float(cashback_amount), "consultation_id": consultation.id}
 
         pg_order = Order.objects.create(
             amount=float(amount_to_paid),
             action=action,
-            action_data=json.dumps(action_data, default=str),
+            action_data=action_data,
             wallet_amount=wallet_amount,
             cashback_amount=cashback_amount,
             payment_status=Order.PAYMENT_PENDING,
             user=user,
             product_id=product_id
         )
-
         if process_immediately:
             consultation_ids = pg_order.process_pg_order()
             resp["status"] = 1
