@@ -86,12 +86,14 @@ class NotificationAction:
 
     LAB_LOGO_CHANGE_MAIL = 70
     PRICING_ALERT_EMAIL = 72
+
     DOCPRIME_APPOINTMENT_REMINDER_PROVIDER_SMS = 69
     PROVIDER_ENCRYPTION_ENABLED = 78
     PROVIDER_ENCRYPTION_DISABLED = 79
     LOGIN_OTP = 80
     REQUEST_ENCRYPTION_KEY = 81
     CHAT_NOTIFICATION = 87
+    PROVIDER_MATRIX_LEAD_EMAIL = 88
 
     COD_TO_PREPAID = 91
     COD_TO_PREPAID_REQUEST = 92
@@ -134,7 +136,11 @@ class NotificationAction:
         (IPD_PROCEDURE_MAIL, 'IPD Procedure Mail'),
         (PRICING_ALERT_EMAIL, 'Pricing Change Mail'),
         (LAB_LOGO_CHANGE_MAIL, 'Lab Logo Change Mail'),
+        (PROVIDER_MATRIX_LEAD_EMAIL, 'Provider Matrix Lead Email'),
         (DOCPRIME_APPOINTMENT_REMINDER_PROVIDER_SMS, 'Docprime Appointment Reminder Provider SMS'),
+        (PROVIDER_ENCRYPTION_ENABLED, 'Provider Encryption Enabled'),
+        (PROVIDER_ENCRYPTION_DISABLED, 'Provider Decryption Disabled'),
+        (REQUEST_ENCRYPTION_KEY, 'Request Encryption Key'),
         (LOGIN_OTP, 'Login OTP'),
         (CHAT_NOTIFICATION, "Push Notification from chat"),
         (COD_TO_PREPAID, 'COD to Prepaid'),
@@ -576,6 +582,7 @@ class EmailNotificationLabMixin:
 class EmailNotification(TimeStampedModel, EmailNotificationOpdMixin, EmailNotificationLabMixin):
     OPS_APPOINTMENT_NOTIFICATION = 1
     OPS_PAYMENT_NOTIFICATION = 2
+    FOLLOWUP_APPOINTMENT = 3
 
     user = models.ForeignKey(User, on_delete=models.CASCADE, null=True, blank=True)
     content = models.TextField()
@@ -691,7 +698,11 @@ class EmailNotification(TimeStampedModel, EmailNotificationOpdMixin, EmailNotifi
                     user_number=data_obj.get("user_number"), lab_name=data_obj.get("lab_name"),
                     test_names=data_obj.get("test_names"), time_of_appointment=data_obj.get("time_of_appointment"),
                     order_id=data_obj.get("order_id"), transaction_time=data_obj.get("transaction_time"))
-
+        elif alert_type == cls.FOLLOWUP_APPOINTMENT:
+            url = settings.ADMIN_BASE_URL + "/admin/doctor/opdappointment/" + str(data_obj.id) + "/change"
+            html_body = "Doctor Followup Appointment received for id   - {id}, You can change the appointment type with" \
+                        "given url {url}".format(id=data_obj.id, url=url)
+            email_subject = "Followup Appointment Received - {id}".format(id=data_obj.id)
         if email_list:
             for e_id in email_list:
                 cls.publish_ops_email(e_id, html_body, email_subject)

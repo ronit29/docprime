@@ -168,17 +168,19 @@ class Hospital(auth_model.TimeStampedModel, auth_model.CreatedByModel, auth_mode
     PHONE_RINGING_BUT_COULD_NOT_CONNECT = 10
     WELCOME_CALLING = 1
     ESCALATION = 2
+    INSURANCE = 3
     DISABLED_REASONS_CHOICES = (
         ("", "Select"), (INCORRECT_CONTACT_DETAILS, "Incorrect contact details"),
         (MOU_AGREEMENT_NEEDED, "MoU agreement needed"), (HOSPITAL_NOT_INTERESTED, "Hospital not interested for tie-up"),
         (CHARGES_ISSUES, "Issue in discount % / consultation charges"),
         (PHONE_RINGING_BUT_COULD_NOT_CONNECT, "Phone ringing but could not connect"),
         (DUPLICATE, "Duplicate"), (OTHERS, "Others (please specify)"))
-    DISABLED_AFTER_CHOICES = (("", "Select"), (WELCOME_CALLING, "Welcome Calling"), (ESCALATION, "Escalation"))
+    DISABLED_AFTER_CHOICES = (("", "Select"), (WELCOME_CALLING, "Welcome Calling"), (ESCALATION, "Escalation"), (INSURANCE, "INSURANCE"))
     AGENT = 1
     PROVIDER = 2
     SOURCE_TYPE_CHOICES = ((AGENT, "Agent"), (PROVIDER, "Provider"))
     name = models.CharField(max_length=200)
+    seo_title = models.CharField(max_length=200, null=True, blank=True)
     location = models.PointField(geography=True, srid=4326, blank=True, null=True)
     location_error = models.PositiveIntegerField(blank=True, null=True)
     operational_since = models.PositiveSmallIntegerField(blank=True, null=True, validators=[MinValueValidator(1800)])
@@ -334,7 +336,7 @@ class Hospital(auth_model.TimeStampedModel, auth_model.CreatedByModel, auth_mode
         result = TopHospitalForIpdProcedureSerializer(hosp_queryset, many=True, context={'request': request,
                                                                                          'hosp_entity_dict': hosp_entity_dict,
                                                                                          'hosp_locality_entity_dict': hosp_locality_entity_dict,
-                                                                                         'new_dynamic_dict':new_dynamic_dict}).data
+                                                                                         'new_dynamic_dict': new_dynamic_dict}).data
         return result
 
 
@@ -560,7 +562,8 @@ class Hospital(auth_model.TimeStampedModel, auth_model.CreatedByModel, auth_mode
         # if self.is_live and self.id and self.location:
         #     if Hospital.objects.filter(location__distance_lte=(self.location, 0), id=self.id).exists():
         #         build_url = False
-
+        if not self.seo_title and self.name:
+            self.seo_title = self.name
         push_to_matrix = False
         update_status_in_matrix = False
         if self.id:
@@ -659,6 +662,7 @@ class Hospital(auth_model.TimeStampedModel, auth_model.CreatedByModel, auth_mode
         return insured
 
 
+@reversion.register()
 class HospitalPlaceDetails(auth_model.TimeStampedModel):
     hospital = models.ForeignKey(Hospital, on_delete=models.CASCADE, related_name='hospital_place_details')
     place_id = models.TextField()
@@ -891,6 +895,7 @@ class Doctor(auth_model.TimeStampedModel, auth_model.QCModel, SearchKey, auth_mo
     rating_data = JSONField(blank=True, null=True)
     qr_code = GenericRelation(QRCode, related_name="qrcode")
     priority_score = models.IntegerField(default=0, null=False, blank=False)
+    is_ipd_doctor = models.NullBooleanField(default=None)
 
     def __str__(self):
         return '{} ({})'.format(self.name, self.id)
@@ -1383,6 +1388,7 @@ class Doctor(auth_model.TimeStampedModel, auth_model.QCModel, SearchKey, auth_mo
         db_table = "doctor"
 
 
+@reversion.register()
 class DoctorSticker(auth_model.TimeStampedModel):
     image_base_path = 'doctor/stickers'
     doctor = models.ForeignKey(Doctor, related_name="stickers", on_delete=models.CASCADE)
@@ -1460,6 +1466,7 @@ class GeneralSpecialization(auth_model.TimeStampedModel, UniqueNameModel, Search
         db_table = "general_specialization"
 
 
+@reversion.register()
 class DoctorSpecialization(auth_model.TimeStampedModel):
     doctor = models.ForeignKey(Doctor, related_name="doctorspecializations", on_delete=models.CASCADE)
     specialization = models.ForeignKey(GeneralSpecialization, on_delete=models.CASCADE, blank=False, null=False)
@@ -1612,6 +1619,7 @@ class DoctorClinicTiming(auth_model.TimeStampedModel):
         super().save(*args, **kwargs)
 
 
+@reversion.register()
 class DoctorHospital(auth_model.TimeStampedModel):
     DAY_CHOICES = [(0, "Monday"), (1, "Tuesday"), (2, "Wednesday"), (3, "Thursday"), (4, "Friday"), (5, "Saturday"), (6, "Sunday")]
     doctor = models.ForeignKey(Doctor, related_name="availability", on_delete=models.CASCADE)
@@ -2388,6 +2396,11 @@ class OpdAppointment(auth_model.TimeStampedModel, CouponsMixin, OpdAppointmentIn
                 mime_type = get_file_mime_type(file)
                 file_url = pf.name.url
                 resp.append({"url": file_url, "type": mime_type})
+
+        for pres in self.eprescription.all():
+            file = pres.prescription_file
+            resp.append({"url": file.url, "type": get_file_mime_type(file)})
+
         return resp
 
 
@@ -2721,6 +2734,10 @@ class OpdAppointment(auth_model.TimeStampedModel, CouponsMixin, OpdAppointmentIn
 
         if old_instance and old_instance.status != self.ACCEPTED and self.status == self.ACCEPTED:
             try:
+                if self.is_followup_appointment():
+                    notification_models.EmailNotification.ops_notification_alert(self, email_list=settings.INSURANCE_OPS_EMAIL,
+                                                                             product=Order.DOCTOR_PRODUCT_ID,
+                                                                             alert_type=notification_models.EmailNotification.FOLLOWUP_APPOINTMENT)
                 notification_tasks.docprime_appointment_reminder_sms_provider.apply_async(
                     (self.id, str(math.floor(self.updated_at.timestamp()))),
                     eta=self.time_slot_start - datetime.timedelta(
@@ -3148,13 +3165,16 @@ class OpdAppointment(auth_model.TimeStampedModel, CouponsMixin, OpdAppointmentIn
         insurance_id = None
         user_insurance = UserInsurance.objects.filter(user=user).last()
         if user_insurance and user_insurance.is_valid():
-            is_appointment_insured, insurance_id, insurance_message = user_insurance.validate_doctor_insurance(data, user_insurance)
-
+            # is_appointment_insured, insurance_id, insurance_message = user_insurance.validate_doctor_insurance(data)
+            insurance_resp = user_insurance.validate_insurance(data)
+            is_appointment_insured = insurance_resp.get('is_insured')
+            insurance_id = insurance_resp.get('insurance_id')
         if is_appointment_insured and cart_data.get('is_appointment_insured', None):
             payment_type = OpdAppointment.INSURANCE
             effective_price = 0.0
         else:
             insurance_id = None
+            is_appointment_insured = False
 
         return {
             "doctor": data.get("doctor"),
@@ -3301,7 +3321,7 @@ class OpdAppointment(auth_model.TimeStampedModel, CouponsMixin, OpdAppointmentIn
                 if self.profile_detail.get('dob', None) else ''
         except Exception as e:
             pass
-
+        opd_appointment_type = 'FOLLOWUP' if self.is_followup_appointment() else 'REGULAR'
         merchant_payout = self.merchant_payout_data()
         accepted_history = self.appointment_accepted_history()
         user_insurance = self.insurance
@@ -3365,7 +3385,8 @@ class OpdAppointment(auth_model.TimeStampedModel, CouponsMixin, OpdAppointmentIn
             "RefundPaymentMode": float(refund_data['original_payment_mode_refund']) if refund_data['original_payment_mode_refund'] else None,
             "RefundToWallet": float(refund_data['promotional_wallet_refund']) if refund_data['promotional_wallet_refund'] else None,
             "RefundInitiationDate": int(refund_data['refund_initiated_at']) if refund_data['refund_initiated_at'] else None,
-            "RefundURN": refund_data['refund_urn']
+            "RefundURN": refund_data['refund_urn'],
+            "OPD_AppointmentType": opd_appointment_type
         }
         return appointment_details
 
@@ -3550,6 +3571,7 @@ class OpdAppointment(auth_model.TimeStampedModel, CouponsMixin, OpdAppointmentIn
         return self.hospital == artemis_hospital if artemis_hospital else False
 
 
+@reversion.register()
 class OpdAppointmentProcedureMapping(models.Model):
     opd_appointment = models.ForeignKey(OpdAppointment, on_delete=models.CASCADE, related_name='procedure_mappings')
     procedure = models.ForeignKey('procedure.Procedure', on_delete=models.CASCADE, related_name='opd_appointment_mappings')
@@ -3599,6 +3621,7 @@ class DoctorLeave(auth_model.TimeStampedModel):
         return self.INTERVAL_MAPPING.get((str(self.start_time), str(self.end_time)))
 
 
+@reversion.register()
 class Prescription(auth_model.TimeStampedModel):
     appointment = models.ForeignKey(OpdAppointment, related_name='prescriptions', on_delete=models.CASCADE)
     prescription_details = models.TextField(max_length=300, blank=True, null=True)
@@ -3802,6 +3825,8 @@ class PracticeSpecialization(auth_model.TimeStampedModel, SearchKey):
     is_insurance_enabled = models.BooleanField(default=True)
     priority = models.PositiveIntegerField(default=0, null=True)
     search_distance = models.FloatField(default=None, blank=True, null=True)
+    is_similar_specialization = models.BooleanField(default=True)
+    breadcrumb_priority = models.PositiveIntegerField(null=True, blank=True)
 
     class Meta:
         db_table = 'practice_specialization'
@@ -4016,6 +4041,7 @@ class PatientMobile(auth_model.TimeStampedModel):
         db_table = "patient_mobile"
 
 
+@reversion.register()
 class OfflineOPDAppointments(auth_model.TimeStampedModel):
     CREATED = 1
     BOOKED = 2
