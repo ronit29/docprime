@@ -34,7 +34,8 @@ from django.template.loader import render_to_string
 
 from ondoc.procedure.models import IpdProcedure, IpdProcedureLead
 from . import serializers
-from ondoc.common.models import Cities, PaymentOptions, UserConfig, DeviceDetails, LastUsageTimestamp, AppointmentHistory
+from ondoc.common.models import Cities, PaymentOptions, UserConfig, DeviceDetails, LastUsageTimestamp, \
+    AppointmentHistory, SponsorListingURL
 from ondoc.common.utils import send_email, send_sms
 from ondoc.authentication.backends import JWTAuthentication, WhatsappAuthentication
 from django.core.files.uploadedfile import SimpleUploadedFile, TemporaryUploadedFile, InMemoryUploadedFile
@@ -1221,3 +1222,30 @@ class CommentViewSet(viewsets.ModelViewSet):
             return Response(serializer.data)
 
         return Response({})
+
+
+
+class SponsorListingViewSet(viewsets.GenericViewSet):
+
+    def list(self, request):
+
+        parameters = request.query_params
+        url = parameters.get('url')
+        specialization_id = parameters.get('specialization_id')
+        lat = parameters.get('lat')
+        long = parameters.get('long')
+        utm_term = parameters.get('utm_term')
+        resp = dict()
+
+        sponsorlisting_object = SponsorListingURL.objects.all().first()
+
+        if sponsorlisting_object.is_enabled == True:
+
+            seo_url = sponsorlisting_object.seo_url
+            if seo_url == url:
+                resp['seo_url'] = seo_url
+            provider_name = sponsorlisting_object.poc.provider_name_hospital.name
+            provider_id = sponsorlisting_object.poc.provider_name_hospital.id
+            resp['provider_name'] = provider_name
+            resp['provider_id'] = provider_id
+
