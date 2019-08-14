@@ -3329,8 +3329,8 @@ class CompareLabPackagesViewSet(viewsets.ReadOnlyModelViewSet):
                 package_lab_ids.append({'package_id': data.package_id, 'lab_id': data.lab_id})
 
         compare_package_details['package_lab_ids'] = package_lab_ids
-        compare_package_details['lat'] = request.GET.get('lat') if request.GET.get('lat') else None
-        compare_package_details['long'] = request.GET.get('long') if request.GET.get('long') else None
+        compare_package_details['lat'] = request.data.get('lat')
+        compare_package_details['long'] = request.data.get('long')
         compare_package_details['title'] = compare_seo_url.title if compare_seo_url.title else None
         kwargs['compare_package_details'] = compare_package_details
         kwargs['compare_seo_url'] = compare_seo_url
@@ -3343,29 +3343,30 @@ class CompareLabPackagesViewSet(viewsets.ReadOnlyModelViewSet):
         category_id = request.data.get('category_id')
         if not LabTestCategory.objects.filter(is_live=True, id=category_id).exists():
             return Response({'error': 'Invalid category ID'}, status=status.HTTP_400_BAD_REQUEST)
-        longitude = request.data.get('longitude', default=77.071848)
-        latitude = request.data.get('latitude', default=28.450367)
+        longitude = request.data.get('longitude', 77.071848)
+        latitude = request.data.get('latitude', 28.450367)
         max_distance = 50000
         point_string = 'POINT(' + str(longitude) + ' ' + str(latitude) + ')'
         pnt = GEOSGeometry(point_string, srid=4326)
-        package_lab_ids = list(AvailableLabTest.objects.filter(lab_pricing_group__labs__is_live=True, test__is_package=True,
-                                                          test__categories__id=category_id,
-                                                          enabled=True, lab_pricing_group__labs__location__dwithin=(
-                Point(float(longitude),
-                      float(latitude)),
-                D(m=max_distance))).annotate(
-            distance=Distance('lab_pricing_group__labs__location',
-                              pnt)).annotate(rank=Window(expression=RowNumber(), order_by=F('distance').asc(),
-                                                         partition_by=[F('test__id')])).order_by(
-            '-test__priority').values('rank', package_id=F('test_id'), lab_id=F('lab_pricing_group__labs__id')))
+        package_lab_ids = list(
+            AvailableLabTest.objects.filter(lab_pricing_group__labs__is_live=True, test__is_package=True,
+                                            test__categories__id=category_id, test__enable_for_retail=True,
+                                            enabled=True, lab_pricing_group__labs__location__dwithin=(
+                    Point(float(longitude),
+                          float(latitude)),
+                    D(m=max_distance))).annotate(
+                distance=Distance('lab_pricing_group__labs__location',
+                                  pnt)).annotate(rank=Window(expression=RowNumber(), order_by=F('distance').asc(),
+                                                             partition_by=[F('test__id')])).order_by(
+                '-test__priority').values('rank', package_id=F('test_id'), lab_id=F('lab_pricing_group__labs__id')))
 
         package_lab_ids = [x for x in package_lab_ids if x['rank'] == 1]
         package_lab_ids = package_lab_ids[:5]
         if not package_lab_ids:
             return Response(status=status.HTTP_404_NOT_FOUND)
         result['package_lab_ids'] = package_lab_ids
-        result['latitude'] = latitude
-        result['longitude'] = longitude
+        result['lat'] = latitude
+        result['long'] = longitude
         result['category'] = category_id
         return result
 
