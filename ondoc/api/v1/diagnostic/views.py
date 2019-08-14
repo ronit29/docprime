@@ -3350,6 +3350,8 @@ class CompareLabPackagesViewSet(viewsets.ReadOnlyModelViewSet):
         pnt = GEOSGeometry(point_string, srid=4326)
         package_lab_ids = list(
             AvailableLabTest.objects.filter(lab_pricing_group__labs__is_live=True, test__is_package=True,
+                                            test__enable_for_retail=True,
+                                            test__searchable=True,
                                             test__categories__id=category_id, test__enable_for_retail=True,
                                             enabled=True, lab_pricing_group__labs__location__dwithin=(
                     Point(float(longitude),
