@@ -29,6 +29,8 @@ from rest_framework import status
 from collections import OrderedDict
 from django.utils.text import slugify
 import logging
+
+
 logger = logging.getLogger(__name__)
 
 class Image(models.Model):
@@ -305,6 +307,7 @@ class User(AbstractBaseUser, PermissionsMixin):
     # EMAIL_FIELD = 'email'
     objects = CustomUserManager()
     username = None
+    first_name = None
     phone_number = models.CharField(max_length=10, blank=False, null=True, default=None)
     email = models.EmailField(max_length=100, blank=False, null=True, default=None)
     user_type = models.PositiveSmallIntegerField(choices=USER_TYPE_CHOICES)
@@ -314,6 +317,7 @@ class User(AbstractBaseUser, PermissionsMixin):
     is_staff = models.BooleanField(verbose_name= 'Staff Status', default=False, help_text= 'Designates whether the user can log into this admin site.')
     date_joined = models.DateTimeField(auto_now_add=True)
     auto_created = models.BooleanField(default=False)
+    source = models.CharField(blank=True, max_length=50, null=True)
 
     def __hash__(self):
         return self.id
@@ -334,7 +338,27 @@ class User(AbstractBaseUser, PermissionsMixin):
         #     return self.staffprofile.name
         # return str(self.phone_number)
 
-    # @property
+    def is_valid_lead(self, date_time_to_be_checked, check_lab_appointment=False, check_ipd_lead=False):
+        # If this user has booked an appointment with specific period from date_time_to_be_checked, then
+        # the lead is valid else invalid.
+        from ondoc.doctor.models import OpdAppointment
+        from ondoc.diagnostic.models import LabAppointment
+        from ondoc.procedure.models import IpdProcedureLead
+        any_appointments = OpdAppointment.objects.filter(user=self, created_at__gte=date_time_to_be_checked,
+                                                         created_at__lte=date_time_to_be_checked + timezone.timedelta(
+                                                             minutes=settings.LEAD_AND_APPOINTMENT_BUFFER_TIME)).exists()
+        if check_lab_appointment and not any_appointments:
+            any_appointments = LabAppointment.objects.filter(user=self, created_at__gte=date_time_to_be_checked,
+                                                             created_at__lte=date_time_to_be_checked + timezone.timedelta(
+                                                                 minutes=settings.LEAD_AND_APPOINTMENT_BUFFER_TIME)).exists()
+        if check_ipd_lead and not any_appointments:
+            count = IpdProcedureLead.objects.filter(user=self, is_valid=True,
+                                                    created_at__lte=date_time_to_be_checked,
+                                                    created_at__gte=date_time_to_be_checked - timezone.timedelta(
+                                                        minutes=settings.LEAD_AND_APPOINTMENT_BUFFER_TIME)).count()
+            if count > 0:
+                any_appointments = True
+        return not any_appointments
 
     @cached_property
     def show_ipd_popup(self):
@@ -397,6 +421,13 @@ class User(AbstractBaseUser, PermissionsMixin):
         profile = self.get_default_profile()
         if profile and profile.email:
             return profile.email
+        return ''
+
+    @property
+    def username(self):
+        profile = self.get_default_profile()
+        if profile and profile.name:
+            return profile.name
         return ''
 
     # @cached_property
@@ -520,6 +551,7 @@ class UserProfile(TimeStampedModel):
     is_otp_verified = models.BooleanField(default=False)
     is_default_user = models.BooleanField(default=False)
     dob = models.DateField(blank=True, null=True)
+    source = models.CharField(blank=True, max_length=50, null=True)
     
     profile_image = models.ImageField(upload_to='users/images', height_field=None, width_field=None, blank=True, null=True)
     whatsapp_optin = models.NullBooleanField(default=None) # optin check of the whatsapp
@@ -629,6 +661,19 @@ class OtpVerifications(TimeStampedModel):
     via_whatsapp = models.NullBooleanField(null=True)
     via_sms = models.NullBooleanField(null=True)
 
+    def can_send(self):
+        from ondoc.notification.models import WhtsappNotification, NotificationAction
+        request_window = timezone.now() - timezone.timedelta(minutes=1)
+        if self.is_expired:
+            return True
+
+        if WhtsappNotification.objects.filter(notification_type=NotificationAction.LOGIN_OTP,
+                                              created_at__gte=request_window,
+                                              phone_number=self.phone_number).exists():
+            return False
+
+        return True
+
     def __str__(self):
         return self.phone_number
 
@@ -716,6 +761,7 @@ class Address(TimeStampedModel):
         return str(self.user)
 
 
+@reversion.register()
 class UserPermission(TimeStampedModel):
     APPOINTMENT = 'appointment'
     BILLINNG = 'billing'
@@ -796,6 +842,7 @@ class AppointmentTransaction(TimeStampedModel):
         return "{}-{}".format(self.id, self.appointment)
 
 
+@reversion.register()
 class LabUserPermission(TimeStampedModel):
     APPOINTMENT = 'appointment'
     BILLINNG = 'billing'

@@ -44,6 +44,7 @@ class Order(TimeStampedModel):
     LAB_APPOINTMENT_CREATE = 4
     INSURANCE_CREATE = 5
     SUBSCRIPTION_PLAN_BUY = 6
+    CHAT_CONSULTATION_CREATE = 7
     PAYMENT_ACCEPTED = 1
     PAYMENT_PENDING = 0
     PAYMENT_FAILURE = 3
@@ -56,13 +57,17 @@ class Order(TimeStampedModel):
                       (OPD_APPOINTMENT_CREATE, "Opd Create"),
                       (LAB_APPOINTMENT_CREATE, "Lab Create"),
                       (LAB_APPOINTMENT_RESCHEDULE, "Lab Reschedule"),
-                      (INSURANCE_CREATE, "Insurance Create"),(SUBSCRIPTION_PLAN_BUY, "Subscription Plan Buy"))
+                      (INSURANCE_CREATE, "Insurance Create"),
+                      (SUBSCRIPTION_PLAN_BUY, "Subscription Plan Buy"),
+                      (CHAT_CONSULTATION_CREATE, "Chat Consultation Create"))
     DOCTOR_PRODUCT_ID = 1
     LAB_PRODUCT_ID = 2
     INSURANCE_PRODUCT_ID = 3
     SUBSCRIPTION_PLAN_PRODUCT_ID = 4
+    CHAT_PRODUCT_ID = 5
     PRODUCT_IDS = [(DOCTOR_PRODUCT_ID, "Doctor Appointment"), (LAB_PRODUCT_ID, "LAB_PRODUCT_ID"),
-                   (INSURANCE_PRODUCT_ID, "INSURANCE_PRODUCT_ID"),(SUBSCRIPTION_PLAN_PRODUCT_ID, "SUBSCRIPTION_PLAN_PRODUCT_ID")]
+                   (INSURANCE_PRODUCT_ID, "INSURANCE_PRODUCT_ID"),(SUBSCRIPTION_PLAN_PRODUCT_ID, "SUBSCRIPTION_PLAN_PRODUCT_ID"),
+                   (CHAT_PRODUCT_ID, "CHAT_PRODUCT_ID")]
 
     product_id = models.SmallIntegerField(choices=PRODUCT_IDS, blank=True, null=True)
     reference_id = models.BigIntegerField(blank=True, null=True)
@@ -105,7 +110,8 @@ class Order(TimeStampedModel):
                     insurance_order_transaction = transactions[0]
                     data['refOrderId'] = str(insurance_order_transaction.order_id)
                     data['refOrderNo'] = str(insurance_order_transaction.order_no)
-                    data['insurerCode'] = str(user_insurance.insurance_plan.insurer.insurer_merchant_code)
+                    #data['insurerCode'] = str(user_insurance.insurance_plan.insurer.insurer_merchant_code)
+                    #data['insurerCode'] = "advancePay"
 
         return data
 
@@ -186,12 +192,14 @@ class Order(TimeStampedModel):
     def process_order(self, convert_cod_to_prepaid=False):
         from ondoc.doctor.models import OpdAppointment
         from ondoc.diagnostic.models import LabAppointment
+        from ondoc.chat.models import ChatConsultation
         from ondoc.api.v1.doctor.serializers import OpdAppTransactionModelSerializer
         from ondoc.api.v1.diagnostic.serializers import LabAppTransactionModelSerializer
         from ondoc.api.v1.insurance.serializers import UserInsuranceSerializer
         from ondoc.api.v1.diagnostic.serializers import PlanTransactionModelSerializer
         from ondoc.subscription_plan.models import UserPlanMapping
         from ondoc.insurance.models import UserInsurance, InsuranceTransaction
+        from ondoc.api.v1.chat.serializers import ChatTransactionModelSerializer
 
         # skip if order already processed, except if appointment is COD and can be converted to prepaid
         cod_to_prepaid_app = None
@@ -238,6 +246,10 @@ class Order(TimeStampedModel):
             serializer = PlanTransactionModelSerializer(data=appointment_data)
             serializer.is_valid(raise_exception=True)
             appointment_data = serializer.validated_data
+        elif self.product_id == self.CHAT_PRODUCT_ID:
+            serializer = ChatTransactionModelSerializer(data=appointment_data)
+            serializer.is_valid(raise_exception=True)
+            consultation_data = serializer.validated_data
 
         consumer_account = ConsumerAccount.objects.get_or_create(user=appointment_data['user'])
         consumer_account = ConsumerAccount.objects.select_for_update().get(user=appointment_data['user'])
@@ -245,6 +257,7 @@ class Order(TimeStampedModel):
         appointment_obj = None
         order_dict = dict()
         amount = None
+        promotional_amount = 0
         total_balance = consumer_account.get_total_balance()
 
         if self.action == Order.OPD_APPOINTMENT_CREATE:
@@ -325,6 +338,16 @@ class Order(TimeStampedModel):
                     "reference_id": appointment_obj.id,
                     "payment_status": Order.PAYMENT_ACCEPTED
                 }
+        elif self.action == Order.CHAT_CONSULTATION_CREATE:
+            if total_balance >= appointment_data.get("effective_price"):
+                amount = Decimal(appointment_data.get("amount"))
+                promotional_amount = consultation_data.pop('promotional_amount')
+                appointment_obj = ChatConsultation(**consultation_data)
+                appointment_obj.save()
+                order_dict = {
+                    "reference_id": appointment_obj.id,
+                    "payment_status": Order.PAYMENT_ACCEPTED
+                }
 
         if order_dict:
             self.update_order(order_dict)
@@ -337,6 +360,9 @@ class Order(TimeStampedModel):
         if appointment_obj:
             appointment_obj.price_data = {"wallet_amount": int(wallet_amount), "cashback_amount": int(cashback_amount)}
             appointment_obj.save()
+
+            if promotional_amount:
+                ConsumerAccount.credit_cashback(consultation_data.get('user'), promotional_amount, appointment_obj, self.product_id)
 
         return appointment_obj, wallet_amount, cashback_amount
 
@@ -501,7 +527,7 @@ class Order(TimeStampedModel):
         fulfillment_data = []
         for item in cart_items:
             validated_data = item.validate(request)
-            fd = item.get_fulfillment_data(validated_data)
+            fd = item.get_fulfillment_data(validated_data, request)
             fd["cart_item_id"] = item.id
             fulfillment_data.append(fd)
         return fulfillment_data
@@ -572,7 +598,8 @@ class Order(TimeStampedModel):
                 visitor_info=visitor_info
             )
             push_order_to_matrix.apply_async(
-                ({'order_id': pg_order.id},), countdown=5)
+                ({'order_id': pg_order.id},),
+                eta=timezone.now() + timezone.timedelta(minutes=settings.LEAD_VALIDITY_BUFFER_TIME))
         # building separate orders for all fulfillments
         fulfillment_data = copy.deepcopy(fulfillment_data)
         order_list = []
@@ -646,6 +673,7 @@ class Order(TimeStampedModel):
         from ondoc.diagnostic.models import LabAppointment
         from ondoc.insurance.models import UserInsurance
         from ondoc.subscription_plan.models import UserPlanMapping
+        from ondoc.chat.models import ChatConsultation
         from ondoc.insurance.models import InsuranceDoctorSpecializations
         orders_to_process = []
         if self.orders.exists():
@@ -658,6 +686,7 @@ class Order(TimeStampedModel):
         lab_appointment_ids = []
         insurance_ids = []
         user_plan_ids = []
+        chat_plan_ids = []
         user = self.user
         user_insurance_obj = user.active_insurance
 
@@ -709,6 +738,8 @@ class Order(TimeStampedModel):
                     insurance_ids.append(curr_app.id)
                 elif order.product_id == Order.SUBSCRIPTION_PLAN_PRODUCT_ID:
                     user_plan_ids.append(curr_app.id)
+                elif order.product_id == Order.CHAT_PRODUCT_ID:
+                    chat_plan_ids.append(curr_app.id)
 
                 total_cashback_used += curr_cashback
                 total_wallet_used += curr_wallet
@@ -723,7 +754,7 @@ class Order(TimeStampedModel):
             except Exception as e:
                 logger.error(str(e))
 
-        if not opd_appointment_ids and not lab_appointment_ids and not insurance_ids and not user_plan_ids:
+        if not opd_appointment_ids and not lab_appointment_ids and not insurance_ids and not user_plan_ids and not chat_plan_ids:
             raise Exception("Could not process entire order")
 
         # mark order processed:
@@ -746,12 +777,14 @@ class Order(TimeStampedModel):
             UserInsurance.objects.filter(id__in=insurance_ids).update(money_pool=money_pool)
         if user_plan_ids:
             UserPlanMapping.objects.filter(id__in=user_plan_ids).update(money_pool=money_pool)
+        if chat_plan_ids:
+            ChatConsultation.objects.filter(id__in=chat_plan_ids).update(money_pool=money_pool)
 
         resp = { "opd" : opd_appointment_ids , "lab" : lab_appointment_ids, "plan": user_plan_ids,
-                 "insurance": insurance_ids, "type" : "all", "id" : None }
+                 "insurance": insurance_ids, "chat" : chat_plan_ids, "type" : "all", "id" : None }
         # Handle backward compatibility, in case of single booking, return the booking id
 
-        if (len(opd_appointment_ids) + len(lab_appointment_ids) + len(user_plan_ids) + len(insurance_ids)) == 1:
+        if (len(opd_appointment_ids) + len(lab_appointment_ids) + len(user_plan_ids) + len(insurance_ids) + len(chat_plan_ids)) == 1:
             result_type = "all"
             result_id = None
             if len(opd_appointment_ids) > 0:
@@ -766,6 +799,9 @@ class Order(TimeStampedModel):
             elif len(insurance_ids) > 0:
                 result_type = "insurance"
                 result_id = insurance_ids[0]
+            elif len(chat_plan_ids) > 0:
+                result_type = "chat"
+                result_id = chat_plan_ids[0]
             # resp["type"] = "doctor" if len(opd_appointment_ids) > 0 else "lab"
             # resp["id"] = opd_appointment_ids[0] if len(opd_appointment_ids) > 0 else lab_appointment_ids[0]
             resp["type"] = result_type
@@ -993,7 +1029,7 @@ class PgTransaction(TimeStampedModel):
     @classmethod
     def is_valid_hash(cls, data, product_id):
         client_key = secret_key = ""
-        if product_id == Order.DOCTOR_PRODUCT_ID or product_id == Order.SUBSCRIPTION_PLAN_PRODUCT_ID:
+        if product_id in [Order.DOCTOR_PRODUCT_ID, Order.SUBSCRIPTION_PLAN_PRODUCT_ID, Order.CHAT_PRODUCT_ID]:
             client_key = settings.PG_CLIENT_KEY_P1
             secret_key = settings.PG_SECRET_KEY_P1
         elif product_id == Order.LAB_PRODUCT_ID:
@@ -1868,7 +1904,7 @@ class MerchantPayout(TimeStampedModel):
                 req_data[key] = str(req_data[key])
 
             response = requests.post(url, data=json.dumps(req_data), headers=headers)
-            save_pg_response.apply_async((PgLogsMongo.DUMMY_TXN, user_insurance.order.id, None, response.json(), req_data,), eta=timezone.localtime(), )
+            save_pg_response.apply_async((PgLogsMongo.DUMMY_TXN, user_insurance.order.id, None, response.json(), req_data, user.id,), eta=timezone.localtime(), )
             if response.status_code == status.HTTP_200_OK:
                 resp_data = response.json()
                 #logger.error(resp_data)
@@ -2048,20 +2084,35 @@ class MerchantPayout(TimeStampedModel):
             if all_txn:
                 return all_txn[0].order_no
 
+    def get_order_id(self):
+        order_id = None
+        appointment = self.get_appointment()
+        if not appointment:
+            return None
+        order_data = Order.objects.filter(reference_id=appointment.id).order_by('-id').first()
+        if order_data:
+            order_id = order_data.id
+
+        return order_id
+
     def update_status_from_pg(self):
+        from ondoc.account.mongo_models import PgLogs as PgLogsMongo
         with transaction.atomic():
             # if self.pg_status=='SETTLEMENT_COMPLETED' or self.utr_no or self.type ==self.MANUAL:
             #     return
 
             order_no = None
+            order_id = None
             url = settings.SETTLEMENT_DETAILS_API
             if self.is_insurance_premium_payout():
                 txn = self.get_insurance_premium_transactions()
                 if txn:
                     order_no = txn[0].order_no
+                    order_id = txn[0].order_id
 
             else:
                 order_no = self.get_pg_order_no()
+                order_id = self.get_order_id()
 
             if order_no:
                 req_data = {"orderNo": order_no}
@@ -2070,6 +2121,8 @@ class MerchantPayout(TimeStampedModel):
                 headers = {"auth": settings.SETTLEMENT_AUTH, "Content-Type": "application/json"}
 
                 response = requests.post(url, data=json.dumps(req_data), headers=headers)
+                if order_id:
+                    save_pg_response.apply_async((PgLogsMongo.PAYOUT_SETTLEMENT_DETAIL, order_id, None, response.json(), req_data, None), eta=timezone.localtime(),)
                 if response.status_code == status.HTTP_200_OK:
                     resp_data = response.json()
                     self.status_api_response = resp_data
@@ -2300,13 +2353,16 @@ class PgStatusCode(TimeStampedModel):
 
 
 class PaymentProcessStatus(TimeStampedModel):
-    INITIATED = 1
+    INITIATE = 1
     AUTHORIZE = 2
     SUCCESS = 3
     FAILURE = 4
+    CAPTURE = 5
+    RELEASE = 6
 
-    STATUS_CHOICES = [(INITIATED, "Initiated"), (AUTHORIZE, "Authorize"),
-                      (SUCCESS, "Success"), (FAILURE, "Failure")]
+    STATUS_CHOICES = [(INITIATE, "Initiate"), (AUTHORIZE, "Authorize"),
+                      (SUCCESS, "Success"), (FAILURE, "Failure"),
+                      (CAPTURE, "Capture"), (RELEASE, "Release")]
 
     user = models.ForeignKey(User, on_delete=models.DO_NOTHING, null=True)
     order = models.ForeignKey(Order, on_delete=models.DO_NOTHING, null=True)
@@ -2339,11 +2395,23 @@ class PaymentProcessStatus(TimeStampedModel):
 
     @classmethod
     def get_status_type(cls, status_code, txStatus):
-        if status_code == 1:
-            if txStatus == 'TXN_AUTHORIZE':
+        try:
+            status_code = int(status_code)
+        except KeyError:
+            logger.error("ValueError : statusCode is not type integer")
+            status_code = None
+
+        if status_code and status_code == 1:
+            if txStatus == 'TXN_AUTHORIZE' or txStatus == '27':
                 return PaymentProcessStatus.AUTHORIZE
             else:
                 return PaymentProcessStatus.SUCCESS
+
+        if status_code and status_code == 20 and txStatus == 'TXN_SUCCESS':
+            return PaymentProcessStatus.CAPTURE
+
+        if status_code and status_code == 22 and txStatus == 'TXN_RELEASE':
+            return PaymentProcessStatus.RELEASE
 
         return PaymentProcessStatus.FAILURE
 
@@ -2422,7 +2490,7 @@ class AdvanceMerchantPayout(TimeStampedModel):
                 adv_amt_obj = AdvanceMerchantAmount.objects.filter(merchant_id=mp.paid_to_id).first()
                 if adv_amt_obj and adv_amt_obj.amount:
                     adv_amt_obj.amount = decimal.Decimal(adv_amt_obj.amount) + mp.payable_amount
-                    adv_amt_obj.total_amount = decimal.Decimal(adv_amt_obj.amount) + mp.payable_amount
+                    adv_amt_obj.total_amount = decimal.Decimal(adv_amt_obj.total_amount) + mp.payable_amount
                 else:
                     adv_amt_obj = AdvanceMerchantAmount(merchant_id=mp.paid_to_id)
                     adv_amt_obj.amount = mp.payable_amount

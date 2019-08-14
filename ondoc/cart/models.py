@@ -119,7 +119,7 @@ class Cart(auth_model.TimeStampedModel, auth_model.SoftDeleteModel):
 
         return price_data
 
-    def get_fulfillment_data(self, validated_data):
+    def get_fulfillment_data(self, validated_data, request):
         from ondoc.doctor.models import OpdAppointment
         from ondoc.diagnostic.models import LabAppointment
 
@@ -131,7 +131,7 @@ class Cart(auth_model.TimeStampedModel, auth_model.SoftDeleteModel):
         if self.product_id == Order.DOCTOR_PRODUCT_ID:
             fulfillment_data = OpdAppointment.create_fulfillment_data(self.user, validated_data, price_data)
         elif self.product_id == Order.LAB_PRODUCT_ID:
-            fulfillment_data = LabAppointment.create_fulfillment_data(self.user, validated_data, price_data)
+            fulfillment_data = LabAppointment.create_fulfillment_data(self.user, validated_data, price_data, request)
 
         return fulfillment_data
 
@@ -152,13 +152,19 @@ class Cart(auth_model.TimeStampedModel, auth_model.SoftDeleteModel):
         return str(self.id)
 
     @classmethod
-    def check_for_insurance(cls, validated_data, request):
+    def check_for_insurance(cls, validated_data, **kwargs):
         from ondoc.insurance.models import UserInsurance
-        user_insurance = UserInsurance.get_user_insurance(request.user)
+        user = kwargs.get('user')
+        if not user:
+            return False, None, ""
+        booked_by = kwargs.get('booked_by', 'user')
+        user_insurance = UserInsurance.get_user_insurance(user)
         is_appointment_insured = False
         insurance_id = None
         insurance_message = ""
-        cart_items = Cart.objects.filter(user=request.user, deleted_at__isnull=True)
+        cart_items = Cart.objects.filter(user=user, deleted_at__isnull=True)
+        # is_agent = True if hasattr(request, 'agent') else False
         if user_insurance and user_insurance.is_valid():
-            is_appointment_insured, insurance_id, insurance_message = user_insurance.validate_insurance_for_cart(validated_data, cart_items)
+            is_appointment_insured, insurance_id, insurance_message = user_insurance.validate_insurance_for_cart(
+                validated_data, cart_items, booked_by=booked_by)
         return is_appointment_insured, insurance_id, insurance_message

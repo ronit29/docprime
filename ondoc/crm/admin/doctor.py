@@ -18,10 +18,13 @@ from dateutil import tz
 from django.conf import settings
 from django.utils import timezone
 import pytz
-import datetime
+# import datetime
+from datetime import datetime
 from django.db import transaction
 import logging
 from dal import autocomplete
+from reversion_compare.admin import CompareVersionAdmin
+
 from ondoc.api.v1.utils import GenericAdminEntity, util_absolute_url, util_file_name
 from ondoc.common.models import AppointmentHistory
 from django.contrib import messages
@@ -31,7 +34,7 @@ from ondoc.notification.models import NotificationAction
 from ondoc.procedure.models import DoctorClinicProcedure, Procedure, DoctorClinicIpdProcedure
 
 logger = logging.getLogger(__name__)
-
+import ondoc.notification as notification_models
 from ondoc.account.models import Order, Invoice
 from django.contrib.contenttypes.admin import GenericTabularInline
 from ondoc.authentication.models import GenericAdmin, SPOCDetails, AssociatedMerchant, Merchant, QCModel
@@ -1096,7 +1099,7 @@ class CompetitorMonthlyVisitsInline(ReadOnlyInline):
     verbose_name_plural = 'Monthly Visits through Competitor Info'
 
 
-class DoctorAdmin(AutoComplete, ImportExportMixin, VersionAdmin, ActionAdmin, QCPemAdmin, nested_admin.NestedModelAdmin):
+class DoctorAdmin(AutoComplete, ImportExportMixin, CompareVersionAdmin, ActionAdmin, QCPemAdmin, nested_admin.NestedModelAdmin):
     # class DoctorAdmin(nested_admin.NestedModelAdmin):
     resource_class = DoctorResource
     change_list_template = 'superuser_import_export.html'
@@ -1474,8 +1477,8 @@ class DoctorOpdAppointmentForm(RefundableAppointmentForm):
         # Appointments are now made with CREATED status.
         # if self.request.user.groups.filter(name=constants['OPD_APPOINTMENT_MANAGEMENT_TEAM']).exists() and cleaned_data.get('status') == OpdAppointment.BOOKED:
         #     raise forms.ValidationError("Form cant be Saved with Booked Status.")
-        if self.instance.status in [OpdAppointment.ACCEPTED] and self.instance.is_followup_appointment() \
-            and (not self.instance.appointment_type in [OpdAppointment.FOLLOWUP, OpdAppointment.REGULAR]):
+        if cleaned_data.get('status') in [OpdAppointment.ACCEPTED] and self.instance.is_followup_appointment() \
+            and cleaned_data.get('appointment_type') is None:
             raise forms.ValidationError("Please select Appointment type for Follow up Appointment!!")
 
         if cleaned_data.get('start_date') and cleaned_data.get('start_time'):
@@ -1589,7 +1592,6 @@ class DoctorOpdAppointmentForm(RefundableAppointmentForm):
         return cleaned_data
 
 
-
 class PrescriptionFileInline(nested_admin.NestedTabularInline):
     model = PrescriptionFile
     extra = 0
@@ -1605,12 +1607,93 @@ class PrescriptionInline(nested_admin.NestedTabularInline):
     inlines = [PrescriptionFileInline]
 
 
-class DoctorOpdAppointmentAdmin(admin.ModelAdmin):
+class InsuredOpdAppointmentResource(resources.ModelResource):
+    id = fields.Field()
+    patient_name = fields.Field()
+    booking_date = fields.Field()
+    doctor_name = fields.Field()
+    appointment_date = fields.Field()
+    appointment_time = fields.Field()
+    clinic = fields.Field()
+    insurance_id = fields.Field()
+    agent_appointment_type = fields.Field()
+    system_appointment_type = fields.Field()
+
+    def export(self, queryset=None, *args, **kwargs):
+        queryset = self.get_queryset(**kwargs)
+        fetched_queryset = list(queryset)
+        return super().export(fetched_queryset)
+
+    def get_queryset(self, **kwargs):
+        request = kwargs.get('request')
+        date_range = [datetime.datetime.strptime(kwargs.get('from_date'), '%Y-%m-%d').date(), datetime.datetime.strptime(
+                                        kwargs.get('to_date'), '%Y-%m-%d').date()]
+        # if request and (request.user.is_member_of(constants['INSURANCE_GROUP']) or request.user.is_member_of(constants['SUPER_INSURANCE_GROUP'])):
+        appointments = OpdAppointment.objects.filter(~Q(status=OpdAppointment.CANCELLED),
+                                                    created_at__date__range=date_range,
+                                                    insurance__isnull=False).order_by('-id')
+
+        return appointments
+
+    class Meta:
+        model = OpdAppointment
+        fields = ()
+        export_order = ('id', 'patient_name', 'doctor_name', 'appointment_date', 'appointment_time',
+                        'agent_appointment_type', 'system_appointment_type', 'booking_date', 'clinic', 'insurance_id',)
+
+    def dehydrate_id(self, appd):
+        return str(appd.id)
+
+    def dehydrate_patient_name(self, appd):
+        return str(appd.profile.name) if appd.profile and appd.profile.name else ""
+
+    def dehydrate_booking_date(self, appd):
+        return str(appd.created_at.date())
+
+    def dehydrate_doctor_name(self, appd):
+        doctor_obj = appd.doctor
+        if doctor_obj:
+            return str(doctor_obj.name)
+        else:
+            return ""
+
+    def dehydrate_appointment_date(self, appd):
+        return str(appd.time_slot_start.date()) if appd.time_slot_start else ""
+
+    def dehydrate_appointment_time(self, appd):
+        return str(appd.time_slot_start.time()) if appd.time_slot_start else ""
+
+    def dehydrate_clinic(self, appd):
+        return str(appd.hospital.name) if appd.hospital else ""
+
+    def dehydrate_insurance_id(self, appd):
+        return str(appd.insurance_id) if appd.insurance_id else ""
+
+    def dehydrate_agent_appointment_type(self, appd):
+        if appd.appointment_type and appd.appointment_type == OpdAppointment.REGULAR:
+            return "REGULAR"
+        elif appd.appointment_type and appd.appointment_type == OpdAppointment.FOLLOWUP:
+            return "FOLLOWUP"
+        else:
+            return ""
+
+    def dehydrate_system_appointment_type(self, appd):
+        if appd.is_followup_appointment():
+            return "FOLLOWUP"
+        else:
+            return "REGULAR"
+
+
+class DoctorOpdAppointmentAdmin(ExportMixin, admin.ModelAdmin):
     form = DoctorOpdAppointmentForm
+    export_template_name = "export_opd_appointment_report.html"
+    formats = (base_formats.XLS,)
+    resource_class = (InsuredOpdAppointmentResource,)
+    change_form_template = 'appointment_change_form.html'
     search_fields = ['id', 'profile__name', 'profile__phone_number', 'doctor__name', 'hospital__name']
     list_display = ('booking_id', 'get_doctor', 'get_profile', 'status', 'time_slot_start', 'effective_price',
-                    'get_insurance', 'get_appointment_type', 'get_is_fraud', 'created_at', 'updated_at',)
-    list_filter = ('status', 'payment_type', 'appointment_type')
+                    'get_insurance', 'get_system_appointment_type', 'get_is_fraud', 'created_at', 'updated_at')
+    list_filter = ('status', 'payment_type')
     date_hierarchy = 'created_at'
     list_display_links = ('booking_id', 'get_insurance',)
     inlines = [PrescriptionInline, FraudInline]
@@ -1622,12 +1705,27 @@ class DoctorOpdAppointmentAdmin(admin.ModelAdmin):
             return "False"
     get_is_fraud.short_description = 'Is Fraud'
 
-    def get_appointment_type(self, obj):
+    def response_change(self, request, obj):
+        if "_capture-payment" in request.POST:
+            if request.user.is_superuser:
+                txn_obj = obj.get_transaction()
+                if txn_obj and txn_obj.is_preauth():
+                    notification_tasks.send_capture_payment_request.apply_async(
+                        (Order.DOCTOR_PRODUCT_ID, obj.id), eta=timezone.localtime(), )
+                    messages.success(request, ('Payment capture requested successfully.'))
+                else:
+                    messages.error(request, ('Appointment transaction is not in authorize state.'))
+            else:
+                messages.error(request, ('You do not have access to perform this action.'))
+            return HttpResponseRedirect(".")
+        return super().response_change(request, obj)
+
+    def get_system_appointment_type(self, obj):
         if obj.is_followup_appointment():
             return "Followup"
         else:
             return "Regular"
-    get_appointment_type.short_description = 'Type'
+    get_system_appointment_type.short_description = 'System Appointment Type'
 
     def get_insurance(self, obj):
         if obj.insurance:
@@ -1641,6 +1739,27 @@ class DoctorOpdAppointmentAdmin(admin.ModelAdmin):
 
     def get_queryset(self, request):
         return super(DoctorOpdAppointmentAdmin, self).get_queryset(request).select_related('doctor', 'hospital', 'hospital__network')
+
+    def get_export_queryset(self, request):
+        super().get_export_queryset(request)
+
+    def get_export_data(self, file_format, queryset, *args, **kwargs):
+        """
+        Returns file_format representation for given queryset.
+        """
+        kwargs['from_date'] = kwargs.get('request').POST.get('from_date')
+        kwargs['to_date'] = kwargs.get('request').POST.get('to_date')
+        kwargs['appointment_type'] = kwargs.get('request').POST.get('appointment_type')
+        request = kwargs.pop("request")
+        kwargs['request'] = request
+        resource_class = self.get_export_resource_class()
+        # data = resource_class(**self.get_export_resource_kwargs(request)).export(queryset, *args, **kwargs)
+        # if kwargs['appointment_type'] == 'All':
+        #     data = resource_class[0](**self.get_export_resource_kwargs(request)).export(queryset, *args, **kwargs)
+        if kwargs['appointment_type'] == 'Insurance':
+            data = resource_class[0](**self.get_export_resource_kwargs(request)).export(queryset, *args, **kwargs)
+        export_data = file_format.export_data(data)
+        return export_data
 
     @transaction.non_atomic_requests
     def change_view(self, request, object_id, form_url='', extra_context=None):
@@ -1701,8 +1820,8 @@ class DoctorOpdAppointmentAdmin(admin.ModelAdmin):
                 'payment_type', 'admin_information', 'insurance', 'outstanding',
                 'status', 'cancel_type', 'cancellation_reason', 'cancellation_comments',
                 'start_date', 'start_time', 'invoice_urls', 'payment_type', 'payout_info', 'refund_initiated',
-                'status_change_comments', 'get_appointment_type', 'hospital_reference_id', 'send_credit_letter',
-                'send_cod_to_prepaid_request', 'appointment_type')
+                'status_change_comments', 'get_system_appointment_type', 'appointment_type', 'hospital_reference_id', 'send_credit_letter',
+                'send_cod_to_prepaid_request')
 
         if request.user.groups.filter(name=constants['APPOINTMENT_OTP_TEAM']).exists() or request.user.is_superuser:
             all_fields = all_fields + ('otp',)
@@ -1728,7 +1847,7 @@ class DoctorOpdAppointmentAdmin(admin.ModelAdmin):
                      'default_profile_number', 'user_id', 'user_number', 'booked_by',
                      'fees', 'effective_price', 'mrp', 'deal_price', 'payment_status', 'payment_type',
                      'admin_information', 'insurance', 'outstanding', 'procedures_details', 'invoice_urls',
-                     'payment_type', 'invoice_urls', 'payout_info', 'refund_initiated', 'get_appointment_type')
+                     'payment_type', 'invoice_urls', 'payout_info', 'refund_initiated', 'get_system_appointment_type')
         if obj and (obj.status == LabAppointment.COMPLETED or obj.status == LabAppointment.CANCELLED):
             read_only += ('status', 'appointment_type',)
         if request.user.groups.filter(name=constants['APPOINTMENT_OTP_TEAM']).exists() or request.user.is_superuser:
@@ -1945,6 +2064,7 @@ class DoctorOpdAppointmentAdmin(admin.ModelAdmin):
                 obj.action_refund()
             else:
                 super().save_model(request, obj, form, change)
+
 
     class Media:
         js = (
