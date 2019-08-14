@@ -629,6 +629,7 @@ class EConsultListSerializer(serializers.ModelSerializer):
     patient_id = serializers.SerializerMethodField()
     doctor_auto_login_url = serializers.SerializerMethodField()
     patient_auto_login_url = serializers.SerializerMethodField()
+    video_chat_url = serializers.SerializerMethodField()
 
     def get_patient_type(self, obj):
         patient = None
@@ -653,16 +654,21 @@ class EConsultListSerializer(serializers.ModelSerializer):
         return validity_status
 
     def get_doctor_auto_login_url(self, obj):
-        return obj.rc_group.doctor_login_url if obj.rc_group else None
+        request = self.context.get('request')
+        return obj.rc_group.doctor_login_url if (obj.rc_group and request.user.user_type == User.DOCTOR) else None
 
     def get_patient_auto_login_url(self, obj):
-        return obj.rc_group.patient_login_url if obj.rc_group else None
+        request = self.context.get('request')
+        return obj.rc_group.patient_login_url if (obj.rc_group and request.user.user_type == User.CONSUMER) else None
+
+    def get_video_chat_url(self, obj):
+        return "https://video.docprime.com/" + str(obj.id)
 
     class Meta:
         model = provider_models.EConsultation
         fields = ('id', 'doctor_name', 'doctor_id', 'patient_id', 'patient_name', 'fees', 'validity', 'payment_status',
                         'created_at', 'link', 'status', 'validity_status', 'validity', 'doctor_auto_login_url',
-                        'patient_auto_login_url')
+                        'patient_auto_login_url', 'video_chat_url')
 
 
 class EConsultTransactionModelSerializer(serializers.Serializer):
