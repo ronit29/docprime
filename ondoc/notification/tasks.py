@@ -1396,3 +1396,32 @@ def save_payment_status(self, current_status, args):
         PaymentProcessStatus.save_payment_status(current_status, args)
     except Exception as e:
        logger.error("Error in saving payment status - " + json.dumps(args) + " with exception - " + str(e))
+
+
+@task()
+def purchase_order_creation_counter_automation(purchase_order_id):
+
+    from ondoc.doctor.models import PurchaseOrderCreation
+    instance = PurchaseOrderCreation.objects.filter(id=purchase_order_id).first()
+    if instance:
+        if (instance.start_date < instance.end_date):
+            instance.is_enabled = True
+            instance.provider_name_hospital.enabled_poc = True
+            instance.provider_name_hospital.enabled_for_cod = True
+
+            # TODO: In OPDAppointment
+            # if timezone.now() >= instance.end_date:
+            #     instance.is_enabled = False
+            #     instance.provider_name_hospital.enabled_poc = False
+            #     instance.provider_name_hospital.enabled_for_cod = False
+
+
+
+@task()
+def purchase_order_closing_counter_automation(purchase_order_id):
+
+    from ondoc.doctor.models import PurchaseOrderCreation
+    instance = PurchaseOrderCreation.objects.filter(id=purchase_order_id).first()
+    if instance:
+        if (instance.end_date < timezone.now().date()):
+            instance.disable_cod_functionality()
