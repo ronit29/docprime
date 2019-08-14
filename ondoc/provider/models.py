@@ -72,12 +72,13 @@ class RocketChatUsers(auth_models.TimeStampedModel):
 class RocketChatGroups(auth_models.TimeStampedModel):
 
     group_id = models.CharField(max_length=64)
+    group_name = models.CharField(max_length=128)
     data = JSONField()
     patient_login_url = models.URLField()
     doctor_login_url = models.URLField()
 
     def create_auto_login_link(self, patient_login_token, doctor_login_token):
-        url_common_address = settings.ROCKETCHAT_SERVER + '/group/' + self.group_id + '?layout=embedded&autoLogin=true&loginToken='
+        url_common_address = settings.ROCKETCHAT_SERVER + '/group/' + self.group.name + '?layout=embedded&autoLogin=true&loginToken='
         self.patient_login_url = url_common_address + patient_login_token
         self.doctor_login_url = url_common_address + doctor_login_token
         return self
@@ -89,7 +90,8 @@ class RocketChatGroups(auth_models.TimeStampedModel):
             response_data_dict = v1_utils.rc_group_create(auth_token, auth_user_id, rc_patient.username, rc_doctor.username)
             if response_data_dict['success']:
                 group_id = response_data_dict['group']['_id']
-                rc_group_obj = cls(group_id=group_id, data=json.dumps(response_data_dict))
+                group_name = response_data_dict['group']['name']
+                rc_group_obj = cls(group_id=group_id, group_name=group_name, data=response_data_dict)
                 rc_group_obj.create_auto_login_link(rc_patient.login_token, rc_doctor.login_token)
                 rc_group_obj.save()
             else:
