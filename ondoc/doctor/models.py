@@ -2688,6 +2688,35 @@ class OpdAppointment(auth_model.TimeStampedModel, CouponsMixin, OpdAppointmentIn
                     result = parent.is_cod_order
         return result
 
+    def get_doctor_clinic(self):
+        return DoctorClinic.objects.filter(doctor_id=self.doctor_id, hospital_id=self.hospital_id,
+                                           enabled_for_online_booking=True).first()
+
+    def is_medanta_appointment(self):
+        dc_obj = self.get_doctor_clinic()
+        if dc_obj and dc_obj.is_part_of_integration():
+            integrator_dict = dc_obj.get_integration_dict()
+            if integrator_dict:
+                class_name = integrator_dict['class_name']
+                if class_name == 'Medanta':
+                    return True
+
+        return False
+
+    def created_by_native(self):
+        from packaging.version import parse
+        child_order = Order.objects.filter(reference_id=self.id).first()
+        parent_order = None
+        from_app = False
+
+        if child_order:
+            parent_order = child_order.parent
+
+        if parent_order and parent_order.visitor_info:
+            from_app = parent_order.visitor_info.get('from_app', False)
+
+        return from_app
+
     def after_commit_tasks(self, old_instance, push_to_matrix):
         if old_instance is None:
             try:
@@ -2787,6 +2816,9 @@ class OpdAppointment(auth_model.TimeStampedModel, CouponsMixin, OpdAppointmentIn
                             hours=int(settings.PAYMENT_AUTO_CAPTURE_DURATION)), )
             except Exception as e:
                 logger.error(str(e))
+
+        if self.is_medanta_appointment() and not self.created_by_native():
+            push_opd_appointment_to_integrator.apply_async(({'appointment_id': self.id},), countdown=5)
 
         print('all ops tasks completed')
 

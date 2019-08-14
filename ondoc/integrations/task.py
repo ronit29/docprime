@@ -119,3 +119,64 @@ def get_integrator_order_status(self, *args, **kwargs):
         IntegratorHistory.create_history(appointment, url, response, url, 'order_summary', 'Thyrocare',
                                          status_code, retry_count, status, '')
         self.retry(**kwargs, countdown=countdown_time)
+
+
+@task(bind=True, max_retries=3)
+def push_opd_appointment_to_integrator(self, data):
+    from ondoc.diagnostic.models import OpdAppointment
+    from ondoc.integrations.models import IntegratorResponse, IntegratorDoctorMappings
+    from ondoc.integrations import service
+
+    try:
+        appointment_id = data.get('appointment_id', None)
+        if not appointment_id:
+            raise Exception("Appointment id not found, could not push to Integrator")
+
+        appointment = OpdAppointment.objects.filter(pk=appointment_id).first()
+        if not appointment:
+            raise Exception("Appointment could not found against id - " + str(appointment_id))
+
+        dc_obj = appointment.get_doctor_clinic()
+        if not dc_obj:
+            raise Exception("Doctor Clinic id not found, could not push to Integrator")
+
+        if appointment.status == OpdAppointment.BOOKED:
+            integrator_mapping = IntegratorDoctorMappings.objects.filter(doctor_clinic_id=dc_obj,
+                                                                         is_active=True).first()
+            if not integrator_mapping:
+                raise Exception(
+                    "[ERROR] Mapping not found for doctor or hospital - appointment id %d" % appointment.id)
+
+            integrator_obj = service.create_integrator_obj(integrator_mapping.integrator_class_name)
+            retry_count = push_opd_appointment_to_integrator.request.retries
+            integrator_response = integrator_obj.post_order(appointment, dc_obj=dc_obj,
+                                                            integrator_mapping=integrator_mapping,
+                                                            retry_count=retry_count)
+
+            if not integrator_response:
+                countdown_time = (1 ** self.request.retries) * 60
+                print(countdown_time)
+                self.retry([data], countdown=countdown_time)
+
+            resp_data = integrator_response
+            if not IntegratorResponse.objects.filter(dp_order_id=appointment.id).first():
+                IntegratorResponse.objects.create(lead_id=resp_data['tokenno'], dp_order_id=appointment.id,
+                                                  integrator_order_id=resp_data['return_id'],
+                                                  content_object=appointment, response_data=resp_data,
+                                                  integrator_class_name=integrator_mapping.integrator_class_name)
+        # elif appointment.status == OpdAppointment.CANCELLED:
+        #     saved_response = IntegratorResponse.objects.filter(object_id=appointment.id).first()
+        #     if not saved_response:
+        #         raise Exception("[ERROR] Cant find integrator response for appointment id " + str(appointment.id))
+        #
+        #     integrator_obj = service.create_integrator_obj(saved_response.integrator_class_name)
+        #     retry_count = push_opd_appointment_to_integrator.request.retries
+        #     response = integrator_obj.cancel_integrator_order(appointment, saved_response, retry_count)
+        #
+        #     if not response:
+        #         countdown_time = (1 ** self.request.retries) * 60
+        #         print(countdown_time)
+        #         self.retry([data], countdown=countdown_time)
+
+    except Exception as e:
+        logger.error(str(e))

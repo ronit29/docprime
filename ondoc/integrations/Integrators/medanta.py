@@ -7,7 +7,7 @@ import logging
 logger = logging.getLogger(__name__)
 from datetime import datetime, date, timedelta
 from django.contrib.contenttypes.models import ContentType
-from ondoc.integrations.models import IntegratorDoctorMappings
+from ondoc.integrations.models import IntegratorDoctorMappings, IntegratorHistory
 
 
 class Medanta(BaseIntegrator):
@@ -111,3 +111,73 @@ class Medanta(BaseIntegrator):
         time_dict[date].append(am_dict)
         time_dict[date].append(pm_dict)
         return time_dict
+
+    def get_auth_token(self):
+        url = '%s/login' % settings.MEDANTA_API_BASE_URL
+        body = {'username': 'Docprime_Technologies', 'password': '1234'}
+        response = requests.post(url, data=body)
+        if response.status_code != status.HTTP_200_OK or not response.ok:
+            return None
+
+        response = response.json()
+        return response['token']
+
+    def _post_order_details(self, appointment, **kwargs):
+        auth_token = self.get_auth_token()
+        retry_count = kwargs.get('retry_count', 0)
+        integrator_mapping = kwargs.get('integrator_mapping', None)
+        if integrator_mapping:
+            payload = self.prepare_payload(integrator_mapping, appointment)
+
+            url = "%s/rest/api/external/appointment/booking" % (settings.MEDANTA_API_BASE_URL)
+            headers = {'Content-Type': 'application/json', 'X-AuthToken': auth_token}
+
+            response = requests.get(url, data=json.dumps(payload), headers=headers)
+            status_code = response.status_code
+            if response.status_code != status.HTTP_200_OK or not response.ok:
+                h_status = IntegratorHistory.NOT_PUSHED
+                IntegratorHistory.create_history(appointment, '', response, url, 'post_order', 'Sims', status_code,
+                                                 retry_count, h_status, '')
+                logger.error("[ERROR-SIMS] Failed to push appointment - %s", response.json())
+                return None
+            else:
+                response = response.json()
+                h_status = IntegratorHistory.PUSHED_AND_NOT_ACCEPTED
+                IntegratorHistory.create_history(appointment, '', response, url, 'post_order', 'Sims', status_code,
+                                                 retry_count, h_status, '')
+                return response[0]
+
+        return None
+
+    def prepare_payload(self, integrator_mapping, appointment):
+        doctor_id = integrator_mapping.integrator_doctor_id
+        preferred_date = appointment.time_slot_start.strftime("%d/%m/%Y %H:%M:%S")
+        preferred_time = appointment.time_slot_start.strftime("%H:%M")
+        name = appointment.profile_detail.get("name", "")
+        profile = appointment.profile
+        if profile:
+            dob = profile.dob.strftime("%d/%m/%Y")
+
+        if profile and profile.gender == 'm':
+            gender = 'MALE'
+        elif profile and profile.gender == 'f':
+            gender = 'FEMALE'
+        else:
+            gender = "NA"
+
+        payload = {
+            "birthDate": dob,
+            "isdCode": '91',
+            'contactNumber': profile.phone_no,
+            'email': profile.email,
+            'firstName': name,
+            'lastName': 'Ji',
+            'gender': gender,
+            'consultMode': 'In person',
+            'patientQuery': 'For consultation',
+            'doctorId': doctor_id,
+            'preferredDate': preferred_date,
+            'preferredTimeSlot': preferred_time
+        }
+
+        return payload
