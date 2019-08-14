@@ -663,7 +663,7 @@ class EConsultTransactionModelSerializer(serializers.Serializer):
     price = serializers.DecimalField(max_digits=10, decimal_places=2)
     effective_price = serializers.DecimalField(max_digits=10, decimal_places=2)
     # status = serializers.IntegerField()
-    coupon = serializers.ListField(child=serializers.IntegerField(), required=False, default=[])
+    # coupon = serializers.ListField(child=serializers.IntegerField(), required=False, default=[])
     cashback = serializers.DecimalField(max_digits=10, decimal_places=2)
     extra_details = serializers.JSONField(required=False)
     # coupon_data = serializers.JSONField(required=False)

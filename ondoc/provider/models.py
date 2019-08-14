@@ -51,9 +51,9 @@ class EConsultation(auth_models.TimeStampedModel, auth_models.CreatedByModel):
     money_pool = models.ForeignKey(acct_mdoels.MoneyPool, on_delete=models.SET_NULL, null=True, related_name='econsult_pool')
     price_data = JSONField(blank=True, null=True)
     merchant_payout = models.ForeignKey(acct_mdoels.MerchantPayout, related_name="econsultations", on_delete=models.SET_NULL, null=True)
+    user = models.ForeignKey(auth_models.User, on_delete=models.SET_NULL, null=True, related_name="econsultationss")
 
-    @classmethod
-    def update_consultation(self, data):
+    def update_consultation(self):
         self.payment_status = self.PAYMENT_ACCEPTED
         self.status = self.BOOKED
 
@@ -77,7 +77,7 @@ class EConsultation(auth_models.TimeStampedModel, auth_models.CreatedByModel):
             url = settings.BASE_URL + "/econsult?id=" + str(self.id) + "&token=" + token.decode("utf-8")
             link = v1_utils.generate_short_url(url)
             # self.link = link
-            EConsultation.objects.filter(id=self.id).update(link=link)
+            EConsultation.objects.filter(id=self.id).update(link=link, user=user)
         else:
             link = self.link
 

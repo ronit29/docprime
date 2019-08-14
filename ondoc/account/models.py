@@ -353,12 +353,15 @@ class Order(TimeStampedModel):
                     "payment_status": Order.PAYMENT_ACCEPTED
                 }
         elif self.action == Order.PROVIDER_ECONSULT_PAY:
+            amount = appointment_data["effective_price"]
             if total_balance >= appointment_data["effective_price"] or payment_not_required:
-                appointment_obj = EConsultation.update_consultation(appointment_data)
-                order_dict = {
-                    "reference_id": appointment_obj.id,
-                    "payment_status": Order.PAYMENT_ACCEPTED
-                }
+                appointment_obj = EConsultation.objects.filter(id=appointment_data.get('id')).first()
+                if appointment_obj:
+                    appointment_obj.update_consultation()
+                    order_dict = {
+                        "reference_id": appointment_obj.id,
+                        "payment_status": Order.PAYMENT_ACCEPTED
+                    }
         elif self.action == Order.CHAT_CONSULTATION_CREATE:
             if total_balance >= appointment_data.get("effective_price"):
                 amount = Decimal(appointment_data.get("amount"))
@@ -1060,7 +1063,7 @@ class PgTransaction(TimeStampedModel):
     @classmethod
     def is_valid_hash(cls, data, product_id):
         client_key = secret_key = ""
-        if product_id in [Order.DOCTOR_PRODUCT_ID, Order.SUBSCRIPTION_PLAN_PRODUCT_ID, Order.CHAT_PRODUCT_ID]:
+        if product_id in [Order.DOCTOR_PRODUCT_ID, Order.SUBSCRIPTION_PLAN_PRODUCT_ID, Order.CHAT_PRODUCT_ID, Order.PROVIDER_ECONSULT_PRODUCT_ID]:
             client_key = settings.PG_CLIENT_KEY_P1
             secret_key = settings.PG_SECRET_KEY_P1
         elif product_id == Order.LAB_PRODUCT_ID:
