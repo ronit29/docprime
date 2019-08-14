@@ -78,7 +78,7 @@ class RocketChatGroups(auth_models.TimeStampedModel):
     doctor_login_url = models.URLField()
 
     def create_auto_login_link(self, patient_login_token, doctor_login_token):
-        url_common_address = settings.ROCKETCHAT_SERVER + '/group/' + self.group.name + '?layout=embedded&autoLogin=true&loginToken='
+        url_common_address = settings.ROCKETCHAT_SERVER + '/group/' + self.group_name + '?layout=embedded&autoLogin=true&loginToken='
         self.patient_login_url = url_common_address + patient_login_token
         self.doctor_login_url = url_common_address + doctor_login_token
         return self
