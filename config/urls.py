@@ -48,6 +48,7 @@ urlpatterns = [
     path('', include('ondoc.web.urls', namespace='web')),
     path('', include('ondoc.matrix.urls', namespace='matrix')),
     path('', include('ondoc.doctor.urls', namespace='doctor')),
+    path('', include('ondoc.notification.urls', namespace='notification')),
     path('onboard/', include('ondoc.onboard.urls', namespace='onboard')),
     path('', include('ondoc.seo.urls')),
     url(r'^select2/', include('django_select2.urls')),

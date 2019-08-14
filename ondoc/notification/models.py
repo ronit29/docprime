@@ -1,4 +1,5 @@
 import json
+import re
 
 from django.contrib.contenttypes.fields import GenericForeignKey
 from django.contrib.contenttypes.models import ContentType
@@ -31,8 +32,12 @@ from django.core.files.uploadedfile import SimpleUploadedFile, InMemoryUploadedF
 from django.core.files import File
 from hardcopy import bytestring_to_pdf
 from django.contrib.postgres.fields import ArrayField
+from ondoc.common.helper import Choices
+from django.utils.safestring import mark_safe
+from collections import OrderedDict
 
 import copy
+import random, string
 
 User = get_user_model()
 logger = logging.getLogger(__name__)
@@ -1210,3 +1215,148 @@ class PushNotification(TimeStampedModel):
         }
         message = json.dumps(message)
         publish_message(message)
+
+
+class DynamicTemplates(TimeStampedModel):
+    class TemplateType(Choices):
+        SMS = 'SMS'
+        EMAIL = 'EMAIL'
+
+    class Content:
+        def __init__(self, content):
+            self.content = content
+
+    template_name = models.CharField(max_length=100, null=False, blank=False, help_text="Give name without extension")
+    template_type = models.CharField(max_length=100, choices=TemplateType.as_choices(), null=False, blank=False)
+    content = models.TextField(blank=False, null=False)
+    virtual_content = models.TextField(null=True)
+    approved = models.BooleanField(default=False)
+    created_by = models.ForeignKey(User, null=False, limit_choices_to={'user_type': 1}, on_delete=models.DO_NOTHING)
+    sample_parameters = JSONField(default=dict, null=True, blank=True)
+
+    def __str__(self):
+        return str(self.template_name)
+
+    def evaluate_loop(self, content_obj):
+        content = content_obj.content.replace('\r','').replace('\n', '')
+        loops = re.findall(r'\{LOOP.*?ENDLOOP\}', content, re.MULTILINE)
+        if not loops:
+            return
+        loops_dict = dict()
+        for loop in loops:
+            # get loop name
+            loop_tag = re.findall(r'\{.*?\}', loop, re.MULTILINE)[0]
+            loop_tag = loop_tag[1:len(loop_tag)-1]
+            loop_name = loop_tag.split(" ")[1]
+            counter = 0
+            for e in loop:
+                counter = counter + 1
+                if e is not '}':
+                    pass
+                else:
+                    break
+            loop_script = loop[counter:len(loop) - len("{ENDLOOP}")]
+            parameter_list = re.findall(r'\{.*?\}', loop_script, re.MULTILINE)
+            p_dict = dict()
+            for p in parameter_list:
+                p_dict[p[1:len(p)-1]] = 'SAMPLE_VALUE'
+
+            loops_dict[loop_name] = [p_dict]
+
+            starting_offset = content.find(loop)
+            ending_offset = starting_offset + len(loop)
+            content = content[0:starting_offset] + content[ending_offset:]
+
+        content_obj.content = content
+
+        return loops_dict
+
+    def evaluate_if(self, content):
+        return
+
+    @classmethod
+    def get_random_id(cls):
+        return ''.join(random.choice(string.ascii_uppercase + string.digits) for _ in range(5))
+
+    def generate_virutal_content(self):
+        print("Generating virtual content.")
+        virtual_content = copy.deepcopy(self.content)
+        virtual_content = virtual_content.replace('\r','').replace('\n', '')
+
+        loops = re.findall(r'\{LOOP.*?ENDLOOP\}', virtual_content, re.MULTILINE)
+
+        for k, v in self.sample_parameters.items():
+            if v.__class__.__name__ == 'list':
+                if not loops:
+                    return
+                for loop in loops:
+                    loop_tag = re.findall(r'\{.*?\}', loop, re.MULTILINE)[0]
+                    loop_tag = loop_tag[1:len(loop_tag) - 1]
+                    loop_name = loop_tag.split(" ")[1]
+
+                    if k != loop_name:
+                        continue
+
+                    loop_identifier = DynamicTemplates.get_random_id()
+                    starting_offset = virtual_content.find(loop)
+                    ending_offset = starting_offset + len(loop)
+
+                    starting_loop_defination = "{%% for %s in %s %%}" % (str(loop_identifier), str(k))
+                    counter = 0
+                    for e in loop:
+                        counter = counter + 1
+                        if e is not '}':
+                            pass
+                        else:
+                            break
+                    loop = loop[counter:len(loop) - len("{ENDLOOP}")]
+                    parameter_list = re.findall(r'\{.*?\}', loop, re.MULTILINE)
+                    for v_para in parameter_list:
+                        updated_value = "{{%s.%s}}" % (str(loop_identifier), v_para[1:len(v_para)-1])
+                        loop = loop.replace(v_para, updated_value)
+
+                    ending_loop_defination = '{% endfor %}'
+
+                    final_parsed_template_loop = '%s%s%s' %(starting_loop_defination, loop, ending_loop_defination)
+                    virtual_content = virtual_content[0:starting_offset] + final_parsed_template_loop + virtual_content[ending_offset:]
+            else:
+                virtual_content = virtual_content.replace('{%s}' % str(k), '{{%s}}' % str(k))
+
+        self.virtual_content = virtual_content
+
+    def parse_and_genearate_sample_json(self):
+        parameter_dict = OrderedDict()
+        content = copy.deepcopy(self.content)
+        content_obj = self.Content(content)
+        loop_dict = self.evaluate_loop(content_obj)
+        if loop_dict:
+            parameter_dict.update(loop_dict)
+        parameter_list = re.findall(r'\{.*?\}', content_obj.content, re.MULTILINE)
+
+        for p in parameter_list:
+            parameter_dict[p[1:len(p)-1]] = 'SAMPLE_VALUE'
+
+        return parameter_dict
+
+    def save(self, *args, **kwargs):
+
+        old_instance = None
+        if self.id:
+            old_instance = DynamicTemplates.objects.get(id=self.id)
+
+        if not self.id or self.content != old_instance.content:
+            parameter_dict = self.parse_and_genearate_sample_json()
+            self.sample_parameters = parameter_dict
+            self.generate_virutal_content()
+
+        super().save(*args, **kwargs)
+
+    def get_content(self):
+        return self.sample_parameters
+
+    def preview_url(self):
+        return mark_safe("<a href='/notification/preview/%s'>Preview</a>" % self.template_name)
+
+    class Meta:
+        db_table = 'dynamic_template'
+        unique_together = (('template_name', 'template_type'), )

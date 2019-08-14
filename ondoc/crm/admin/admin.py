@@ -35,6 +35,7 @@ from ondoc.account.models import ConsumerAccount, MerchantPayout, Order, Merchan
 from ondoc.location.admin import EntityUrlsAdmin
 from ondoc.location.models import EntityUrls, CompareSEOUrls
 from ondoc.notification import models as notifcation_model
+from ondoc.notification.models import DynamicTemplates
 from ondoc.procedure.models import Procedure, ProcedureCategory, CommonProcedureCategory, CommonProcedure, IpdProcedure, \
     IpdProcedureCategory, CommonIpdProcedure, IpdProcedureDetail, IpdProcedureDetailType, IpdProcedureSynonym, \
     IpdProcedureSynonymMapping, IpdProcedurePracticeSpecialization, IpdProcedureLead, Offer, \
@@ -63,7 +64,7 @@ from .lab import LabAdmin, LabTestAdmin, LabTestTypeAdmin, AvailableLabTestAdmin
     LabTestGroupAdmin, LabTestGroupMappingAdmin, TestParameterChatAdmin, LabTestCategoryUrlsAdmin
 from .lab_network import LabNetworkAdmin
 from .notification import (EmailNotificationAdmin, SmsNotificationAdmin,
-                           PushNotificationAdmin, AppNotificationAdmin)
+                           PushNotificationAdmin, AppNotificationAdmin, DynamicTemplatesAdmin)
 from .report import ReportAdmin
 from .coupon import CouponAdmin, UserSpecificCouponAdmin, RandomGeneratedCouponAdmin
 from ondoc.reports import models as report_models
@@ -284,3 +285,4 @@ admin.site.register(UserNumberUpdate, UserNumberUpdateAdmin)
 admin.site.register(GenericQuestionAnswer, GenericQuestionAnswerAdmin)
 
 admin.site.register(IntegratorLabTestParameterMapping, IntegratorLabTestParameterMappingAdmin)
+admin.site.register(DynamicTemplates, DynamicTemplatesAdmin)
