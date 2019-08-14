@@ -2415,8 +2415,9 @@ class SimilarSpecializationGroupAdmin(VersionAdmin):
 class PurchaseOrderCreationForm(forms.ModelForm):
     def clean(self):
         cleaned_data = self.cleaned_data
-        if not (cleaned_data.get('proof_of_payment') or cleaned_data.get('proof_of_payment_image')):
-            raise forms.ValidationError('Either enter proof of payment or upload proof of payment image')
+        if cleaned_data.get('proof_of_payment') or cleaned_data.get('proof_of_payment_image'):
+            if not (cleaned_data.get('proof_of_payment') or cleaned_data.get('proof_of_payment_image')):
+                raise forms.ValidationError('Either enter proof of payment or upload proof of payment image')
         if cleaned_data.get('provider_type') == 'lab' and cleaned_data.get('provider_name_hospital'):
             raise forms.ValidationError('Cannot choose Hospital, Please select a Lab')
         if cleaned_data.get('provider_type') == 'hospital' and cleaned_data.get('provider_name_lab'):
