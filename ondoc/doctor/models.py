@@ -2287,11 +2287,6 @@ class PurchaseOrderCreation(auth_model.TimeStampedModel):
         if self.id:
             if self.is_enabled == False:
                 self.disable_cod_functionality()
-            # if self.opdpurchaseorder.insurance.status == 2 or self.opdpurchaseorder.insurance.status == 3 or self.opdpurchaseorder.insurance.status == 5 \
-            #     or self.opdpurchaseorder.status == 6:
-            #     self.opdpurchaseorder.hospital.enabled_for_cod = True
-            #     self.opdpurchaseorder.hospital.save()
-
 
         if self.is_enabled == True and self.provider_name_hospital.enabled_poc == True and self.current_appointment_count < 1:
             self.disable_cod_functionality()
@@ -2924,9 +2919,9 @@ class OpdAppointment(auth_model.TimeStampedModel, CouponsMixin, OpdAppointmentIn
         if not self.id:
             if self.hospital.enabled_for_cod:
                 # TODO: Add check for valid POC object (date)
-                x = self.hospital.hospitalpurchaseorder.filter(is_enabled=True, start_date__lte=timezone.now(), end_date__gte=timezone.now()).order_by('id').first()
-                if x:
-                    self.purchase_order = x
+                poc_hospital = self.hospital.hospitalpurchaseorder.filter(is_enabled=True, start_date__lte=timezone.now(), end_date__gte=timezone.now()).order_by('id').first()
+                if poc_hospital:
+                    self.purchase_order = poc_hospital
 
         if self.purchase_order:
             to_save = False
