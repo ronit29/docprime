@@ -1390,7 +1390,7 @@ class SearchedItemsViewSet(viewsets.GenericViewSet):
         top_hospitals_data = Hospital.get_top_hospitals_data(request, validated_data.get('lat'), validated_data.get('long'))
 
         categories = LabTestCategory.objects.filter(is_live=True, is_package_category=True,
-                                                    show_on_recommended_screen=True).order_by('priority')[:15].values('id', 'name', 'preferred_lab_test', 'is_live', 'is_package_category', 'show_on_recommended_screen',
+                                                    show_on_recommended_screen=True).order_by('-priority')[:15].values('id', 'name', 'preferred_lab_test', 'is_live', 'is_package_category', 'show_on_recommended_screen',
                   'priority', 'icon')
 
         return Response({"conditions": conditions_serializer.data, "specializations": specializations_serializer.data,
