@@ -1571,9 +1571,12 @@ class UserInsurance(auth_model.TimeStampedModel, MerchantPayoutMixin):
         elif daily_count and insurance_appointment_stats['used_daily_count'] + 1 > daily_count:
             response['created_state'] = True
 
-        if response['created_state'] and prescription_required and \
-                not AppointmentPrescription.prescription_exist_for_date(self.user, timezone.now().date()):
+        if prescription_required and not AppointmentPrescription.prescription_exist_for_date(self.user, timezone.now().date()):
             response['prescription_needed'] = True
+
+        # if response['created_state'] and prescription_required and \
+        #         not AppointmentPrescription.prescription_exist_for_date(self.user, timezone.now().date()):
+        #     response['prescription_needed'] = True
 
         return response
 
@@ -2192,11 +2195,9 @@ class EndorsementRequest(auth_model.TimeStampedModel):
         endorsed_members_count = user_insurance.endorse_members.filter((Q(mail_status=EndorsementRequest.MAIL_PENDING) | Q(mail_status__isnull=True)), ~Q(status=EndorsementRequest.PENDING)).count()
         endorsed_approved_members_count = user_insurance.endorse_members.filter((Q(mail_status=EndorsementRequest.MAIL_PENDING) | Q(mail_status__isnull=True)), Q(status=EndorsementRequest.APPROVED)).count()
 
-        pending_members = user_insurance.endorse_members.filter(Q(mail_status=EndorsementRequest.MAIL_PENDING) |
-                                                              Q(mail_status__isnull=True))
-        for member in pending_members:
-            member.mail_status = EndorsementRequest.MAIL_SENT
-            member.save()
+        # pending_members = user_insurance.endorse_members.filter(Q(mail_status=EndorsementRequest.MAIL_PENDING) |
+        #                                                       Q(mail_status__isnull=True))
+
         if total_endorsement_members == endorsed_approved_members_count:
             try:
 
@@ -2215,6 +2216,10 @@ class EndorsementRequest(auth_model.TimeStampedModel):
                                                                     user_insurance.user)
             except Exception as e:
                 logger.error('Insurance coi pdf cannot be generated. %s' % str(e))
+
+        # for member in pending_members:
+        #     member.mail_status = EndorsementRequest.MAIL_SENT
+        #     member.save()
 
     def reject_endorsement(self):
         user_insurance = self.insurance

@@ -8,6 +8,7 @@ import math
 import traceback
 from collections import OrderedDict
 from io import BytesIO
+from django.db.models import Q
 
 import pytz
 from django.db import transaction
@@ -343,7 +344,7 @@ def set_order_dummy_transaction(self, order_id, user_id):
             req_data[key] = str(req_data[key])
 
         response = requests.post(url, data=json.dumps(req_data), headers=headers)
-        save_pg_response.apply_async((PgLogs.DUMMY_TXN, order_id, None, response.json(), req_data,), eta=timezone.localtime(), )
+        save_pg_response.apply_async((PgLogs.DUMMY_TXN, order_id, None, response.json(), req_data, user_id,), eta=timezone.localtime(), )
         if response.status_code == status.HTTP_200_OK:
             resp_data = response.json()
             #logger.error(resp_data)
@@ -682,6 +683,11 @@ def send_insurance_endorsment_notifications(self, data):
         if notification and user_insurance:
             insurance_notification = InsuranceNotification(user_insurance, notification)
             insurance_notification.send()
+            pending_members = user_insurance.endorse_members.filter(Q(mail_status=EndorsementRequest.MAIL_PENDING) |
+                                                                    Q(mail_status__isnull=True))
+            for member in pending_members:
+                member.mail_status = EndorsementRequest.MAIL_SENT
+                member.save()
 
     except Exception as e:
         logger.error(str(e))
@@ -734,7 +740,7 @@ def request_payout(req_data, order_data):
 
     response = requests.post(url, data=json.dumps(req_data), headers=headers)
     resp_data = response.json()
-    save_pg_response.apply_async((PgLogs.PAYOUT_PROCESS, order_data.id, None, resp_data, req_data,), eta=timezone.localtime(), )
+    save_pg_response.apply_async((PgLogs.PAYOUT_PROCESS, order_data.id, None, resp_data, req_data, None), eta=timezone.localtime(), )
     if response.status_code == status.HTTP_200_OK:
         if resp_data.get("ok") is not None and resp_data.get("ok") == '1':
             success_payout = False
@@ -1280,7 +1286,7 @@ def send_capture_payment_request(self, product_id, appointment_id):
             response = requests.post(url, data=json.dumps(req_data), headers=headers)
 
             resp_data = response.json()
-            save_pg_response.apply_async((PgLogs.TXN_CAPTURED, order.id, txn_obj.id, resp_data, req_data,), eta=timezone.localtime(), )
+            save_pg_response.apply_async((PgLogs.TXN_CAPTURED, order.id, txn_obj.id, resp_data, req_data, order.user_id,), eta=timezone.localtime(), )
 
             args = {'order_id': order.id, 'status_code': resp_data.get('statusCode'), 'source': 'CAPTURE'}
             status_type = PaymentProcessStatus.get_status_type(resp_data.get('statusCode'), resp_data.get('txStatus'))
@@ -1350,7 +1356,7 @@ def send_release_payment_request(self, product_id, appointment_id):
 
                 response = requests.post(url, data=json.dumps(req_data), headers=headers)
                 resp_data = response.json()
-                save_pg_response.apply_async((PgLogs.TXN_RELEASED, order.id, txn_obj.id, resp_data, req_data,), eta=timezone.localtime(), )
+                save_pg_response.apply_async((PgLogs.TXN_RELEASED, order.id, txn_obj.id, resp_data, req_data, order.user_id,), eta=timezone.localtime(), )
 
                 args = {'order_id': order.id, 'status_code': resp_data.get('statusCode'), 'source': 'RELEASE'}
                 status_type = PaymentProcessStatus.get_status_type(resp_data.get('statusCode'),
@@ -1373,10 +1379,10 @@ def send_release_payment_request(self, product_id, appointment_id):
 
 
 @task(bind=True)
-def save_pg_response(self, log_type, order_id, txn_id, response, request):
+def save_pg_response(self, log_type, order_id, txn_id, response, request, user_id):
     try:
         from ondoc.account.mongo_models import PgLogs
-        PgLogs.save_pg_response(log_type, order_id, txn_id, response, request)
+        PgLogs.save_pg_response(log_type, order_id, txn_id, response, request, user_id)
     except Exception as e:
         logger.error("Error in saving pg response to mongo database - " + json.dumps(response) + " with exception - " + str(e))
         self.retry([txn_id, response], countdown=300)
@@ -1390,3 +1396,32 @@ def save_payment_status(self, current_status, args):
         PaymentProcessStatus.save_payment_status(current_status, args)
     except Exception as e:
        logger.error("Error in saving payment status - " + json.dumps(args) + " with exception - " + str(e))
+
+
+@task()
+def purchase_order_creation_counter_automation(purchase_order_id):
+
+    from ondoc.doctor.models import PurchaseOrderCreation
+    instance = PurchaseOrderCreation.objects.filter(id=purchase_order_id).first()
+    if instance:
+        if (instance.start_date < instance.end_date):
+            instance.is_enabled = True
+            instance.provider_name_hospital.enabled_poc = True
+            instance.provider_name_hospital.enabled_for_cod = True
+
+            # TODO: In OPDAppointment
+            # if timezone.now() >= instance.end_date:
+            #     instance.is_enabled = False
+            #     instance.provider_name_hospital.enabled_poc = False
+            #     instance.provider_name_hospital.enabled_for_cod = False
+
+
+
+@task()
+def purchase_order_closing_counter_automation(purchase_order_id):
+
+    from ondoc.doctor.models import PurchaseOrderCreation
+    instance = PurchaseOrderCreation.objects.filter(id=purchase_order_id).first()
+    if instance:
+        if (instance.end_date < timezone.now().date()):
+            instance.disable_cod_functionality()

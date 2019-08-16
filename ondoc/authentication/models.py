@@ -307,6 +307,7 @@ class User(AbstractBaseUser, PermissionsMixin):
     # EMAIL_FIELD = 'email'
     objects = CustomUserManager()
     username = None
+    first_name = None
     phone_number = models.CharField(max_length=10, blank=False, null=True, default=None)
     email = models.EmailField(max_length=100, blank=False, null=True, default=None)
     user_type = models.PositiveSmallIntegerField(choices=USER_TYPE_CHOICES)
@@ -316,6 +317,7 @@ class User(AbstractBaseUser, PermissionsMixin):
     is_staff = models.BooleanField(verbose_name= 'Staff Status', default=False, help_text= 'Designates whether the user can log into this admin site.')
     date_joined = models.DateTimeField(auto_now_add=True)
     auto_created = models.BooleanField(default=False)
+    source = models.CharField(blank=True, max_length=50, null=True)
 
     def __hash__(self):
         return self.id
@@ -419,6 +421,12 @@ class User(AbstractBaseUser, PermissionsMixin):
         profile = self.get_default_profile()
         if profile and profile.email:
             return profile.email
+        return ''
+
+    @property
+    def username(self):
+        if self.email:
+            return self.email
         return ''
 
     # @cached_property
@@ -542,6 +550,7 @@ class UserProfile(TimeStampedModel):
     is_otp_verified = models.BooleanField(default=False)
     is_default_user = models.BooleanField(default=False)
     dob = models.DateField(blank=True, null=True)
+    source = models.CharField(blank=True, max_length=50, null=True)
     
     profile_image = models.ImageField(upload_to='users/images', height_field=None, width_field=None, blank=True, null=True)
     whatsapp_optin = models.NullBooleanField(default=None) # optin check of the whatsapp
@@ -751,6 +760,7 @@ class Address(TimeStampedModel):
         return str(self.user)
 
 
+@reversion.register()
 class UserPermission(TimeStampedModel):
     APPOINTMENT = 'appointment'
     BILLINNG = 'billing'
@@ -831,6 +841,7 @@ class AppointmentTransaction(TimeStampedModel):
         return "{}-{}".format(self.id, self.appointment)
 
 
+@reversion.register()
 class LabUserPermission(TimeStampedModel):
     APPOINTMENT = 'appointment'
     BILLINNG = 'billing'

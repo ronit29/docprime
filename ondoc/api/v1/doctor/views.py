@@ -22,7 +22,7 @@ from ondoc.insurance.models import UserInsurance, InsuredMembers
 from ondoc.notification import tasks as notification_tasks
 #from ondoc.doctor.models import Hospital, DoctorClinic,Doctor,  OpdAppointment
 from ondoc.doctor.models import DoctorClinic, OpdAppointment, DoctorAssociation, DoctorQualification, Doctor, Hospital, \
-    HealthInsuranceProvider, ProviderSignupLead, HospitalImage, CommonHospital
+    HealthInsuranceProvider, ProviderSignupLead, HospitalImage, CommonHospital, PracticeSpecialization, SpecializationDepartmentMapping, DoctorPracticeSpecialization
 from ondoc.notification.models import EmailNotification
 from django.utils.safestring import mark_safe
 from ondoc.coupon.models import Coupon, CouponRecommender
@@ -1502,6 +1502,7 @@ class DoctorListViewSet(viewsets.GenericViewSet):
 
         ratings = None
         reviews = None
+        result_count = 0
 
 
         # Insurance check for logged in user
@@ -1530,17 +1531,21 @@ class DoctorListViewSet(viewsets.GenericViewSet):
             order_by_field, rank_by = doctor_search_helper.get_ordering_params()
             query_string = doctor_search_helper.prepare_raw_query(filtering_params,
                                                                   order_by_field, rank_by)
+            query_string['query'] = paginate_raw_query(request, query_string['query'])
             doctor_search_result = RawSql(query_string.get('query'),
                                          query_string.get('params')).fetch_all()
 
-            result_count = len(doctor_search_result)
+            if doctor_search_result:
+                result_count = doctor_search_result[0]['result_count']
             # sa
             # saved_search_result = models.DoctorSearchResult.objects.create(results=doctor_search_result,
             #                                                                result_count=result_count)
         else:
             saved_search_result = get_object_or_404(models.DoctorSearchResult, pk=validated_data.get("search_id"))
-        doctor_ids = paginate_queryset([data.get("doctor_id") for data in doctor_search_result], request)
-        temp_hospital_ids = paginate_queryset([data.get("hospital_id") for data in doctor_search_result], request)
+        # doctor_ids = paginate_queryset([data.get("doctor_id") for data in doctor_search_result], request)
+        # temp_hospital_ids = paginate_queryset([data.get("hospital_id") for data in doctor_search_result], request)
+        doctor_ids = [data.get("doctor_id") for data in doctor_search_result]
+        temp_hospital_ids = [data.get("hospital_id") for data in doctor_search_result]
         hosp_entity_dict, hosp_locality_entity_dict = Hospital.get_hosp_and_locality_dict(temp_hospital_ids,
                                                                                           EntityUrls.SitemapIdentifier.DOCTORS_LOCALITY_CITY)
         preserved = Case(*[When(pk=pk, then=pos) for pos, pk in enumerate(doctor_ids)])
@@ -1913,7 +1918,53 @@ class DoctorListViewSet(viewsets.GenericViewSet):
             reviews = validated_data.get('reviews')
         hospital_req_data = {}
         if validated_data.get('hospital_id'):
-            hospital_req_data = Hospital.objects.filter(id__in=validated_data.get('hospital_id')).values('id', 'name').first()
+            hospital_req_data = Hospital.objects.filter(id__in=validated_data.get('hospital_id')).values('id',
+                                                                                                         'name').first()
+
+        similar_specializations = list()
+        if validated_data.get('specialization_ids') and len(validated_data.get('specialization_ids')) == 1:
+            spec = PracticeSpecialization.objects.filter(id=validated_data['specialization_ids'][0]).first()
+            department_spec_list = list()
+            departent_ids_list = list()
+            similar_specializations_ids = list()
+            if spec and spec.is_similar_specialization:
+                for department in spec.department.all():
+                    department_spec_mapping = department.specializationdepartmentmapping_set.all()
+                    if department_spec_mapping:
+                        department_spec_list.extend(department_spec_mapping.values_list('specialization', flat=True))
+                    departent_ids_list.append(department.id)
+            if department_spec_list:
+                department_spec_list = set(department_spec_list)
+                spec_dept_mapping_spec_ids = set(PracticeSpecialization.objects.filter(id__in=department_spec_list).prefetch_related(
+                    "department", "department__departments",
+                    "department__departments__specializationdepartmentmapping").
+                    annotate( specialization_id=F('department__departments__specializationdepartmentmapping__specialization')).values_list('specialization_id', flat=True))
+
+                doctors_spec_ids = PracticeSpecialization.objects.filter(id__in=spec_dept_mapping_spec_ids).prefetch_related("specialization__doctor__doctor_clinics",
+                                                                        "specialization__doctor__doctor_clinics__hospital", "specialization__doctor",
+                                                                        "specialization").annotate(bookable_doctors_count=Count(Q(specialization__doctor__enabled_for_online_booking=True,
+                                                                         specialization__doctor__doctor_clinics__hospital__enabled_for_online_booking=True,
+                                                                        specialization__doctor__doctor_clinics__enabled_for_online_booking=True,
+                                                                        specialization__doctor__is_live=True, specialization__doctor__doctor_clinics__hospital__is_live=True))).\
+                                                                        filter(bookable_doctors_count__gt=0).order_by('-bookable_doctors_count').values_list('id', flat=True)
+                for id in doctors_spec_ids:
+                    if not id in similar_specializations_ids:
+                        similar_specializations_ids.append(id)
+
+                if similar_specializations_ids:
+                    if int(validated_data['specialization_ids'][0]) in similar_specializations_ids:
+                        similar_specializations_ids.remove(int(validated_data['specialization_ids'][0]))
+                    specialization_department = SpecializationDepartmentMapping.objects.filter(
+                        specialization__id__in=similar_specializations_ids,
+                        department__id__in=departent_ids_list).values('specialization__id', 'specialization__name', 'department__id', 'department__name')
+                    spec_dept_details = dict()
+                    for data in specialization_department:
+                        if not spec_dept_details.get(data.get('specialization__id')):
+                            spec_dept_details[data.get('specialization__id')] = {'specialization_id': data.get('specialization__id'), 'department_id': data.get('department__id'),
+                                                        'specialization_name': data.get('specialization__name'), 'department_name': data.get('department__name')}
+                    for id in similar_specializations_ids:
+                        if spec_dept_details.get(id):
+                            similar_specializations.append(spec_dept_details[id])
 
         return Response({"result": response, "count": result_count,
                          'specializations': specializations, 'conditions': conditions, "seo": seo,
@@ -1922,7 +1973,8 @@ class DoctorListViewSet(viewsets.GenericViewSet):
                          'ratings': ratings, 'reviews': reviews, 'ratings_title': ratings_title,
                          'bottom_content': bottom_content, 'canonical_url': canonical_url,
                          'ipd_procedures': ipd_procedures, 'hospital': hospital_req_data,
-                         'specialization_groups': specialization_groups})
+                         'specialization_groups': specialization_groups,
+                         'similar_specializations': similar_specializations})
 
     def get_schema(self, request, response):
 
@@ -2102,6 +2154,136 @@ class DoctorListViewSet(viewsets.GenericViewSet):
         return Response(data={"result": result, "count": result_count,
                          'specializations': specializations, 'conditions': conditions,
                          'procedures': procedures, 'procedure_categories': procedure_categories})
+
+    @transaction.non_atomic_requests
+    def hosp_filtered_list(self, request):
+        if (request.query_params.get('procedure_ids') or request.query_params.get('procedure_category_ids')) \
+                and request.query_params.get('is_insurance'):
+            return Response({"result": [], "count": 0})
+
+        parameters = request.query_params
+        serializer = serializers.DoctorListSerializer(data=parameters, context={"request": request})
+        serializer.is_valid(raise_exception=True)
+        validated_data = serializer.validated_data
+        result_count = None
+        response = list()
+
+        # Insurance check for logged in user
+        logged_in_user = request.user
+        insurance_threshold = InsuranceThreshold.objects.all().order_by('-opd_amount_limit').first()
+        insurance_data_dict = {
+            'is_user_insured': False,
+            'insurance_threshold_amount': insurance_threshold.opd_amount_limit if insurance_threshold else 5000
+        }
+
+        if logged_in_user.is_authenticated and not logged_in_user.is_anonymous:
+            user_insurance = logged_in_user.purchased_insurance.filter().order_by('id').last()
+            if user_insurance and user_insurance.is_valid():
+                insurance_threshold = user_insurance.insurance_plan.threshold.filter().first()
+                if insurance_threshold:
+                    insurance_data_dict['insurance_threshold_amount'] = 0 if insurance_threshold.opd_amount_limit is None else \
+                        insurance_threshold.opd_amount_limit
+                    insurance_data_dict['is_user_insured'] = True
+
+        validated_data['insurance_threshold_amount'] = insurance_data_dict['insurance_threshold_amount']
+        validated_data['is_user_insured'] = insurance_data_dict['is_user_insured']
+
+        doctor_search_helper = DoctorSearchHelper(validated_data)
+        if not validated_data.get("search_id"):
+            filtering_params = doctor_search_helper.get_filtering_params()
+            order_by_field, rank_by = doctor_search_helper.get_ordering_params()
+            query_string = doctor_search_helper.prepare_raw_query(filtering_params,
+                                                                  order_by_field, rank_by)
+            doctor_search_result = RawSql(query_string.get('query'),
+                                         query_string.get('params')).fetch_all()
+
+        else:
+            saved_search_result = get_object_or_404(models.DoctorSearchResult, pk=validated_data.get("search_id"))
+
+        temp_hospital_ids = set(data.get("hospital_id") for data in doctor_search_result)
+        result_count = len(temp_hospital_ids)
+        hosp_entity = EntityUrls.objects.filter(is_valid=True,
+                                                        sitemap_identifier=EntityUrls.SitemapIdentifier.HOSPITAL_PAGE,
+                                                        entity_id__in=temp_hospital_ids)
+        entity_data = dict()
+        for data in hosp_entity:
+            entity_data[data.entity_id] = dict()
+            entity_data[data.entity_id]['url'] = data.url
+
+        hospitals = Hospital.objects.filter(id__in=temp_hospital_ids).prefetch_related('hospital_doctors').annotate(
+            bookable_doctors_count=Count(Q(enabled_for_online_booking=True,
+                                     hospital_doctors__enabled_for_online_booking=True,
+                                     hospital_doctors__doctor__enabled_for_online_booking=True,
+                                     hospital_doctors__doctor__is_live=True, is_live=True))).order_by('-bookable_doctors_count')
+
+        for data in hospitals:
+            response.append({'id':data.id, 'name': data.name, 'url': entity_data[data.id]['url'] if entity_data and entity_data.get(data.id) and entity_data[data.id].get('url') else None})
+
+        return Response({"result": response, "count": result_count})
+
+
+    def speciality_filtered_list(self,request):
+        if (request.query_params.get('procedure_ids') or request.query_params.get('procedure_category_ids')) \
+                and request.query_params.get('is_insurance'):
+            return Response({"result": [], "count": 0})
+
+        parameters = request.query_params
+        serializer = serializers.DoctorListSerializer(data=parameters, context={"request": request})
+        serializer.is_valid(raise_exception=True)
+        validated_data = serializer.validated_data
+        result_count = None
+        response = list()
+
+        # Insurance check for logged in user
+        logged_in_user = request.user
+        insurance_threshold = InsuranceThreshold.objects.all().order_by('-opd_amount_limit').first()
+        insurance_data_dict = {
+            'is_user_insured': False,
+            'insurance_threshold_amount': insurance_threshold.opd_amount_limit if insurance_threshold else 5000
+        }
+
+        if logged_in_user.is_authenticated and not logged_in_user.is_anonymous:
+            user_insurance = logged_in_user.purchased_insurance.filter().order_by('id').last()
+            if user_insurance and user_insurance.is_valid():
+                insurance_threshold = user_insurance.insurance_plan.threshold.filter().first()
+                if insurance_threshold:
+                    insurance_data_dict['insurance_threshold_amount'] = 0 if insurance_threshold.opd_amount_limit is None else \
+                        insurance_threshold.opd_amount_limit
+                    insurance_data_dict['is_user_insured'] = True
+
+        validated_data['insurance_threshold_amount'] = insurance_data_dict['insurance_threshold_amount']
+        validated_data['is_user_insured'] = insurance_data_dict['is_user_insured']
+
+        doctor_search_helper = DoctorSearchHelper(validated_data)
+        if not validated_data.get("search_id"):
+            filtering_params = doctor_search_helper.get_filtering_params()
+            order_by_field, rank_by = doctor_search_helper.get_ordering_params()
+            query_string = doctor_search_helper.prepare_raw_query(filtering_params,
+                                                                  order_by_field, rank_by)
+            doctor_search_result = RawSql(query_string.get('query'),
+                                         query_string.get('params')).fetch_all()
+
+        else:
+            saved_search_result = get_object_or_404(models.DoctorSearchResult, pk=validated_data.get("search_id"))
+
+        doctor_ids = set(data.get("doctor_id") for data in doctor_search_result)
+
+        doctors_spec = DoctorPracticeSpecialization.objects.filter(doctor__id__in=doctor_ids).prefetch_related("doctor__doctor_clinics",
+                                                                                        "doctor__doctor_clinics__hospital",
+                                                                                        "specialization").annotate(bookable_doctors_count=Count(Q(doctor__enabled_for_online_booking=True,
+                                                                                        doctor__doctor_clinics__hospital__enabled_for_online_booking=True,
+                                                                                        doctor__doctor_clinics__enabled_for_online_booking=True))).order_by('-bookable_doctors_count')
+        specialization_ids = list()
+        for data in doctors_spec:
+            if not data.specialization.id in specialization_ids:
+                specialization_ids.append(data.specialization.id)
+        result_count = len(specialization_ids)
+        practice_spec = PracticeSpecialization.objects.filter(id__in=specialization_ids)
+
+        for data in practice_spec:
+            response.append({'id': data.id, 'name': data.name})
+
+        return Response({"result": response, "count": result_count})
 
 
 class DoctorAvailabilityTimingViewSet(viewsets.ViewSet):
