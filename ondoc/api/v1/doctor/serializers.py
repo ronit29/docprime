@@ -2275,14 +2275,6 @@ class HospitalDetailIpdProcedureSerializer(TopHospitalForIpdProcedureSerializer)
                                    Q(related_entity_id=obj.id, appointment_id__isnull=True)) \
                            .order_by('-ratings', '-updated_at')[:5]
         reviews = rating_serializer.RatingsModelSerializer(queryset, many=True, context={'app': app})
-        doctor_name = ""
-        for review in reviews.data:
-            object_id = review.get('object_id', None)
-            if object_id:
-                doctor_obj = Doctor.objects.filter(id=object_id).first()
-                if doctor_obj:
-                    doctor_name = doctor_obj.name
-            review['doctor_name'] = doctor_name
         return reviews.data
 
     def get_display_rating_widget(self, obj):

@@ -171,6 +171,7 @@ class RatingsModelSerializer(serializers.ModelSerializer):
     date = serializers.SerializerMethodField()
     user_name = serializers.SerializerMethodField()
     is_verified = serializers.SerializerMethodField()
+    doctor_name = serializers.SerializerMethodField()
 
     def get_user_name(self, obj):
         name = app = profile = None
@@ -209,9 +210,20 @@ class RatingsModelSerializer(serializers.ModelSerializer):
     def get_is_verified(self, obj):
         return True if obj.appointment_id else False
 
+    def get_doctor_name(self, obj):
+        from django.contrib.contenttypes.models import ContentType
+        from ondoc.doctor.models import Doctor
+        content_type = ContentType.objects.get_for_model(Doctor)
+        doctor_name = ""
+        if content_type and content_type.id == obj.content_type_id :
+            doctor_obj = Doctor.objects.filter(id=obj.object_id).first()
+            doctor_name = doctor_obj.name
+        return doctor_name
+
     class Meta:
         model = RatingsReview
-        fields = ('id', 'user', 'ratings', 'review', 'is_live', 'date', 'compliment', 'user_name', 'is_verified', 'appointment_id', 'object_id', 'related_entity_id')
+        fields = ('id', 'user', 'ratings', 'review', 'is_live', 'date', 'compliment', 'user_name', 'is_verified',
+                  'appointment_id', 'object_id', 'related_entity_id', 'doctor_name')
 
 
 class RatingUpdateBodySerializer(serializers.Serializer):
