@@ -287,4 +287,3 @@ admin.site.register(IntegratorLabTestParameterMapping, IntegratorLabTestParamete
 admin.site.register(PurchaseOrderCreation, PurchaseOrderCreationAdmin)
 admin.site.register(SponsorListingURL)
 admin.site.register(SponsorListingSpecialization)
-admin.site.register(IntegratorLabTestParameterMapping, IntegratorLabTestParameterMappingAdmin)

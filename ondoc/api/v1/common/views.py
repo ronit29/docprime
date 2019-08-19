@@ -19,9 +19,11 @@ from ondoc.api.v1.insurance.serializers import InsuranceCityEligibilitySerialize
 from ondoc.api.v1.utils import html_to_pdf, generate_short_url
 from ondoc.authentication.models import User
 from ondoc.diagnostic.models import Lab
-from ondoc.doctor.models import (Doctor, DoctorPracticeSpecialization, PracticeSpecialization, DoctorMobile, Qualification,
+from ondoc.doctor.models import (Doctor, DoctorPracticeSpecialization, PracticeSpecialization, DoctorMobile,
+                                 Qualification,
                                  Specialization, College, DoctorQualification, DoctorExperience, DoctorAward,
-                                 DoctorClinicTiming, DoctorClinic, Hospital, SourceIdentifier, DoctorAssociation)
+                                 DoctorClinicTiming, DoctorClinic, Hospital, SourceIdentifier, DoctorAssociation,
+                                 PurchaseOrderCreation)
 
 from ondoc.chat.models import ChatPrescription
 from ondoc.insurance.models import InsuranceEligibleCities
@@ -35,7 +37,7 @@ from django.template.loader import render_to_string
 from ondoc.procedure.models import IpdProcedure, IpdProcedureLead
 from . import serializers
 from ondoc.common.models import Cities, PaymentOptions, UserConfig, DeviceDetails, LastUsageTimestamp, \
-    AppointmentHistory, SponsorListingURL
+    AppointmentHistory, SponsorListingURL, SponsorListingSpecialization
 from ondoc.common.utils import send_email, send_sms
 from ondoc.authentication.backends import JWTAuthentication, WhatsappAuthentication
 from django.core.files.uploadedfile import SimpleUploadedFile, TemporaryUploadedFile, InMemoryUploadedFile
@@ -1237,15 +1239,30 @@ class SponsorListingViewSet(viewsets.GenericViewSet):
         utm_term = parameters.get('utm_term')
         resp = dict()
 
-        sponsorlisting_object = SponsorListingURL.objects.all().first()
+        # sponsorlisting_objects = SponsorListingURL.objects.filter(start_date__lte=timezone.now().date(), end_date__gte=timezone.now().date(), is_enabled=True)
+        #
+        # for sponsor in sponsorlisting_objects:
+        #     seo_url = sponsor.seo_url
+        #     if seo_url == url:
+        #         resp['seo_url'] = seo_url
+        #     provider_name = sponsor.poc.provider_name_hospital.name
+        #     provider_id = sponsor.poc.provider_name_hospital.id
+        #     resp['provider_name'] = provider_name
+        #     resp['provider_id'] = provider_id
+        #
+        # sponsorspecialization_objects = SponsorListingSpecialization.objects.filter()
 
-        if sponsorlisting_object.is_enabled == True:
 
-            seo_url = sponsorlisting_object.seo_url
-            if seo_url == url:
-                resp['seo_url'] = seo_url
-            provider_name = sponsorlisting_object.poc.provider_name_hospital.name
-            provider_id = sponsorlisting_object.poc.provider_name_hospital.id
-            resp['provider_name'] = provider_name
-            resp['provider_id'] = provider_id
+        sponsorlisting_objects = PurchaseOrderCreation.objects.filter(is_enabled=True, start_date__lte=timezone.now().date(),
+                                                                      end_date__gte=timezone.now().date(), product_type=PurchaseOrderCreation.SPONSOR_LISTING)
+
+        for sponsor in sponsorlisting_objects:
+            provider_id = sponsor.provider_name_hospital.id
+            provider_name = sponsor.provider_name_hospital.name
+            for sp in sponsor.poc_sponsorlisting.filter(start_date__lte=timezone.now(), end_date__gte=timezone.now(), is_enabled=True):
+                seo_url = sp.seo_url
+                if seo_url == url:
+                    resp['seo_url'] = seo_url
+            for spec in sponsor.poc_specialization.all():
+                specialization_id = spec.specialization
 
