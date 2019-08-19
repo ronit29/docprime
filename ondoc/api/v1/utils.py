@@ -2013,9 +2013,11 @@ def get_existing_rc_group(rc_user_patient, rc_user_doc):
     doc_group_ids = set()
     patient = rc_user_patient.online_patient if rc_user_patient.online_patient else rc_user_patient.offline_patient
     for econsultation in patient.econsultations.all():
-        patient_group_ids.add(econsultation.rc_group)
+        if econsultation.rc_group:
+            patient_group_ids.add(econsultation.rc_group)
     for econsultation in rc_user_doc.doctor.econsultations.all():
-        doc_group_ids.add(econsultation.rc_group)
+        if econsultation.rc_group:
+            doc_group_ids.add(econsultation.rc_group)
     rc_group = (patient_group_ids & doc_group_ids)
     return (list(rc_group)[0] if rc_group else None)
 
