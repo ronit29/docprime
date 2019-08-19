@@ -1449,24 +1449,19 @@ class AvailableLabTest(TimeStampedModel):
         #         else computed_agreed_price end), mrp) where id = %s '''
 
         query = '''update available_lab_test set computed_deal_price = (select deal_price from 
-                    (select *,  least(greatest(floor(price /5)*5, agreed_price), mrp ) as deal_price from 
-                    (select id, mrp, agreed_price,
-                    case 
-                    when agreed_price <=0 then mrp*.4 
-                    when mrp<=2000 then
-                        case when (least(agreed_price*1.5, .9*mrp) - agreed_price) >100 then least(agreed_price*1.5, .9*mrp) 
-                        else least(agreed_price+100, mrp) end
-                    else 
-                        case when (least(agreed_price*1.5, agreed_price+.5*(mrp-agreed_price)) - agreed_price )>100
-                        then least(agreed_price*1.5, agreed_price+.5*(mrp-agreed_price))
-                        else
-                        least(agreed_price+100, mrp) end 	
-                    end price
-                    from 
-                    (select case when custom_agreed_price is null then computed_agreed_price else
-                     custom_agreed_price end as agreed_price,
-                    mrp, id from available_lab_test  where id=%s )x)y where y.id = available_lab_test.id )z) 
-                    where available_lab_test.enabled=true and id=%s '''
+                (select * from 
+                (select id, mrp, agreed_price,
+                case 
+                when mrp <=300 then  least( case when mrp>2000 then 
+                (least(agreed_price*1.5, agreed_price+ 0.5*	(mrp-agreed_price))) 
+                else
+                (greatest(agreed_price+60, greatest(0.7*mrp, mrp-200))) end /0.75, mrp)
+                else
+				least( case when mrp>2000 then least(agreed_price*1.5, agreed_price+0.5*(mrp-agreed_price)) 
+				else greatest(agreed_price+60, greatest(0.7*mrp, mrp-200))end +75, mrp) end as deal_price							
+                from 
+                (select case when custom_agreed_price is null then computed_agreed_price else custom_agreed_price end as agreed_price,
+                mrp, id from available_lab_test)x)y where y.id = available_lab_test.id )z) where available_lab_test.enabled=true and id=%s '''
 
         update_available_lab_test_deal_price = RawSql(query, [self.pk, self.pk]).execute()
         # deal_price = RawSql(query, [self.pk]).fetch_all()
@@ -1477,19 +1472,16 @@ class AvailableLabTest(TimeStampedModel):
     def update_all_deal_price(cls):
         # will update all lab prices
         query = '''update available_lab_test set computed_deal_price = (select deal_price from 
-                (select *,  least(greatest(floor(price /5)*5, agreed_price), mrp ) as deal_price from 
+                (select * from 
                 (select id, mrp, agreed_price,
                 case 
-                when agreed_price <=0 then mrp*.4 
-                when mrp<=2000 then
-                    case when (least(agreed_price*1.5, .9*mrp) - agreed_price) >100 then least(agreed_price*1.5, .9*mrp) 
-                    else least(agreed_price+100, mrp) end
-                else 
-                    case when (least(agreed_price*1.5, agreed_price+.5*(mrp-agreed_price)) - agreed_price )>100
-                    then least(agreed_price*1.5, agreed_price+.5*(mrp-agreed_price))
-                    else
-                    least(agreed_price+100, mrp) end 	
-                end price
+                when mrp <=300 then  least( case when mrp>2000 then 
+                (least(agreed_price*1.5, agreed_price+ 0.5*	(mrp-agreed_price))) 
+                else
+                (greatest(agreed_price+60, greatest(0.7*mrp, mrp-200))) end /0.75, mrp)
+                else
+				least( case when mrp>2000 then least(agreed_price*1.5, agreed_price+0.5*(mrp-agreed_price)) 
+				else greatest(agreed_price+60, greatest(0.7*mrp, mrp-200))end +75, mrp) end as deal_price							
                 from 
                 (select case when custom_agreed_price is null then computed_agreed_price else custom_agreed_price end as agreed_price,
                 mrp, id from available_lab_test)x)y where y.id = available_lab_test.id )z) where available_lab_test.enabled=true'''
@@ -2572,12 +2564,16 @@ class LabAppointment(TimeStampedModel, CouponsMixin, LabAppointmentInvoiceMixin,
         booked_by = 'agent' if hasattr(request, 'agent') else 'user'
         user_insurance = UserInsurance.objects.filter(user=user).order_by('-id').first()
         if user_insurance and user_insurance.is_valid():
-            is_appointment_insured, insurance_id, insurance_message = user_insurance.validate_lab_insurance(data, booked_by=booked_by)
+            insurance_resp = user_insurance.validate_insurance(data, booked_by=booked_by)
+            if insurance_resp.get('is_insured', False):
+                is_appointment_insured = True
+                insurance_id = insurance_resp.get('insurance_id', None)
 
-        if is_appointment_insured and cart_data.get('is_appointment_insured', None):
+        if is_appointment_insured or cart_data.get('is_appointment_insured', None):
             payment_type = OpdAppointment.INSURANCE
             effective_price = 0.0
         else:
+            is_appointment_insured = False
             insurance_id = None
             if data["payment_type"] == OpdAppointment.INSURANCE:
                 payment_type = OpdAppointment.PREPAID
@@ -3188,6 +3184,7 @@ class LabPricing(Lab):
         default_permissions = []
 
 
+@reversion.register()
 class LabReport(auth_model.TimeStampedModel):
     appointment = models.ForeignKey(LabAppointment, related_name='reports', on_delete=models.CASCADE)
     report_details = models.TextField(max_length=300, blank=True, null=True)
@@ -3241,6 +3238,7 @@ class LabTestGroup(auth_model.TimeStampedModel):
         return "{}".format(self.name)
 
 
+@reversion.register()
 class LabAppointmentTestMapping(models.Model):
     appointment = models.ForeignKey(LabAppointment, on_delete=models.CASCADE, related_name='test_mappings')
     test = models.ForeignKey(LabTest, on_delete=models.CASCADE, related_name='lab_appointment_mappings')

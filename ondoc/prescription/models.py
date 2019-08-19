@@ -1,3 +1,4 @@
+import reversion
 from django.db import models
 from ondoc.authentication.models import User
 from django.contrib.contenttypes.fields import GenericForeignKey, GenericRelation
@@ -96,6 +97,7 @@ class PrescriptionTests(PrescriptionEntity):
         db_table = 'eprescription_tests'
 
 
+@reversion.register()
 class PresccriptionPdf(auth_models.TimeStampedModel):
 
     SERIAL_ID_START = 600000
