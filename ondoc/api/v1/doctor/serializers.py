@@ -2075,10 +2075,13 @@ class HospitalDetailIpdProcedureSerializer(TopHospitalForIpdProcedureSerializer)
     def get_all_specializations(self, obj):
         from ondoc.doctor.models import PracticeSpecialization
         from ondoc.api.v2.doctor.serializers import PracticeSpecializationSerializer
-        q = PracticeSpecialization.objects.filter(specialization__doctor__is_live=True,
+        q = PracticeSpecialization.objects.prefetch_related('department')\
+                                          .select_related('specialization_field')\
+                                          .filter(specialization__doctor__is_live=True,
                                                   specialization__doctor__doctor_clinics__enabled=True,
-                                                  specialization__doctor__doctor_clinics__hospital=obj).order_by(
-            '-priority').distinct()
+                                                  specialization__doctor__doctor_clinics__hospital=obj)\
+                                          .order_by('-priority')\
+                                          .distinct()
         return PracticeSpecializationSerializer(q, many=True).data
 
     def get_all_specialization_groups(self, obj):
