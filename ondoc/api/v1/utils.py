@@ -1936,3 +1936,9 @@ def format_return_value(value):
         return None
 
     return value
+
+
+def is_valid_ckeditor_text(text):
+    if text == "<p>&nbsp;</p>":
+        return False
+    return True
