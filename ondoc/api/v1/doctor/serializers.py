@@ -17,7 +17,8 @@ from ondoc.doctor.models import (OpdAppointment, Doctor, Hospital, DoctorHospita
                                  CommonMedicalCondition, CommonSpecialization,
                                  DoctorPracticeSpecialization, DoctorClinic, OfflineOPDAppointments, OfflinePatients,
                                  CancellationReason, HealthInsuranceProvider, HospitalDocument, HospitalNetworkDocument,
-                                 AppointmentHistory, HospitalNetwork, ProviderEncrypt, SimilarSpecializationGroup)
+                                 AppointmentHistory, HospitalNetwork, ProviderEncrypt, SimilarSpecializationGroup,
+                                 PracticeSpecialization)
 from ondoc.diagnostic import models as lab_models
 from ondoc.authentication.models import UserProfile, DoctorNumber, GenericAdmin, GenericLabAdmin
 from django.db.models import Avg
@@ -29,7 +30,7 @@ from django.contrib.staticfiles.templatetags.staticfiles import static
 from ondoc.api.v1.auth.serializers import UserProfileSerializer
 from ondoc.api.v1.ratings import serializers as rating_serializer
 from ondoc.api.v1.utils import is_valid_testing_data, form_time_slot, GenericAdminEntity, util_absolute_url, \
-    util_file_name, aware_time_zone
+    util_file_name, aware_time_zone, is_valid_ckeditor_text
 from django.utils import timezone
 from django.contrib.auth import get_user_model
 import math
@@ -829,14 +830,14 @@ class DoctorListSerializer(serializers.Serializer):
     NEXT_3_DAYS = 3
     AVAILABILITY_CHOICES = ((TODAY, 'Today'), (TOMORROW, "Tomorrow"), (NEXT_3_DAYS, "Next 3 days"),)
 
-    SITTING_CHOICES = [type_choice[1] for type_choice in Hospital.HOSPITAL_TYPE_CHOICES]
+    # SITTING_CHOICES = [type_choice[1] for type_choice in Hospital.HOSPITAL_TYPE_CHOICES]
     specialization_ids = CommaSepratedToListField(required=False, max_length=500, typecast_to=str, allow_blank=True)
     condition_ids = CommaSepratedToListField(required=False, max_length=500, typecast_to=str)
     procedure_ids = CommaSepratedToListField(required=False, max_length=500, typecast_to=str)
     procedure_category_ids = CommaSepratedToListField(required=False, max_length=500, typecast_to=str)
     longitude = serializers.FloatField(default=77.071848)
     latitude = serializers.FloatField(default=28.450367)
-    sits_at = CommaSepratedToListField(required=False, max_length=100, typecast_to=str)
+    # sits_at = CommaSepratedToListField(required=False, max_length=100, typecast_to=str)
     sort_on = serializers.ChoiceField(choices=SORT_CHOICES, required=False)
     min_fees = serializers.IntegerField(required=False)
     max_fees = serializers.IntegerField(required=False)
@@ -857,6 +858,17 @@ class DoctorListSerializer(serializers.Serializer):
     availability = CommaSepratedToListField(required=False,  max_length=50, typecast_to=str)
     avg_ratings = CommaSepratedToListField(required=False,  max_length=50, typecast_to=str)
     group_ids = CommaSepratedToListField(required=False,  max_length=50, typecast_to=str)
+    specialization_filter_ids = CommaSepratedToListField(required=False, max_length=500, typecast_to=str, allow_blank=True)
+
+    def validate_specialization_filter_ids(self, attrs):
+        try:
+            temp_attrs = [int(attr) for attr in attrs]
+            temp_attrs = set(temp_attrs)
+            if PracticeSpecialization.objects.filter(id__in=temp_attrs).count() == len(temp_attrs):
+                return attrs
+        except:
+            raise serializers.ValidationError('Invalid Specialization IDs')
+        raise serializers.ValidationError('Invalid Specialization IDs')
 
     def validate(self, attrs):
         if attrs.get('group_ids'):
@@ -928,10 +940,10 @@ class DoctorListSerializer(serializers.Serializer):
             raise serializers.ValidationError("Invalid specialization Id.")
         return value
 
-    def validate_sits_at(self, value):
-        if not set(value).issubset(set(self.SITTING_CHOICES)):
-            raise serializers.ValidationError("Not a Valid Choice")
-        return value
+    # def validate_sits_at(self, value):
+    #     if not set(value).issubset(set(self.SITTING_CHOICES)):
+    #         raise serializers.ValidationError("Not a Valid Choice")
+    #     return value
 
     def validate_availability(self, value):
         if not set(value).issubset(set([str(avl_choice[0]) for avl_choice in self.AVAILABILITY_CHOICES])):
@@ -1926,7 +1938,7 @@ class TopHospitalForIpdProcedureSerializer(serializers.ModelSerializer):
         fields = ('id', 'name', 'distance', 'certifications', 'bed_count', 'logo', 'avg_rating',
                   'count_of_insurance_provider', 'multi_speciality', 'address', 'short_address','open_today',
                   'insurance_provider', 'established_in', 'long', 'lat', 'url', 'locality_url', 'name_city', 'operational_since',
-                  'h1_title', 'is_ipd_hospital', 'seo_title')
+                  'h1_title', 'is_ipd_hospital', 'seo_title', 'network_id')
 
     def get_name_city(self, obj):
         result = obj.name
@@ -2116,15 +2128,22 @@ class HospitalDetailIpdProcedureSerializer(TopHospitalForIpdProcedureSerializer)
                                         parameters={'hospital_id': str(obj.id), 'longitude': validated_data.get('long'),
                                                     'latitude': validated_data.get('lat'), 'sort_on': 'experience',
                                                     'restrict_result_count': 3, 'specialization_ids' : specialization_ids}).data
+
     def get_about(self, obj):
-        if obj.network:
-            return obj.network.about
-        return obj.about
+        result = None
+        if obj.about:
+            result = obj.about
+        if not result and obj.network:
+            result = obj.network.about
+        return result
 
     def get_new_about(self, obj):
-        if obj.network:
-            return obj.network.new_about
-        return obj.new_about
+        result = None
+        if is_valid_ckeditor_text(obj.new_about):
+            result = obj.new_about
+        if not result and obj.network and is_valid_ckeditor_text(obj.network.new_about):
+            result = obj.network.new_about
+        return result
 
     def get_opd_timings(self, obj):
         return obj.opd_timings
@@ -2178,12 +2197,35 @@ class HospitalDetailIpdProcedureSerializer(TopHospitalForIpdProcedureSerializer)
         result = []
         if not obj.network:
             return result
-        for temp_hospital in obj.network.assoc_hospitals.all():
+        other_hospitals = list(obj.network.assoc_hospitals.all())
+        other_hospital_ids = [x.id for x in other_hospitals]
+        hosp_entity_dict, hosp_locality_entity_dict = Hospital.get_hosp_and_locality_dict(other_hospital_ids,
+                                                                                          EntityUrls.SitemapIdentifier.HOSPITALS_LOCALITY_CITY)
+
+        request = self.context.get('request')
+        network_icon = None
+        if request:
+            if obj.network:
+                for document in obj.network.hospital_network_documents.all():
+                    if document.document_type == HospitalNetworkDocument.LOGO:
+                        network_icon = request.build_absolute_uri(document.name.url) if document.name else None
+                        break
+        for temp_hospital in other_hospitals:
+            temp_icon = None
+            for document in obj.hospital_documents.all():
+                if document.document_type == HospitalDocument.LOGO:
+                    temp_icon = request.build_absolute_uri(document.name.url) if document.name else None
+                    break
+            if temp_icon:
+                icon = temp_icon
+            else:
+                icon = network_icon
             if not temp_hospital.id == obj.id:
                 result.append(
                     {'id': temp_hospital.id, 'name': temp_hospital.name, 'address': temp_hospital.get_hos_address(),
                      'lat': temp_hospital.location.y if temp_hospital.location else None,
-                     'long': temp_hospital.location.x if temp_hospital.location else None})
+                     'long': temp_hospital.location.x if temp_hospital.location else None,
+                     'url': hosp_entity_dict.get(temp_hospital.id), 'icon': icon})
         return result
 
     def get_doctors(self, obj):
@@ -2260,10 +2302,9 @@ class HospitalDetailIpdProcedureSerializer(TopHospitalForIpdProcedureSerializer)
         return False
 
     def get_offers(self, obj):
-        if obj.network:
+        query_set = Offer.objects.filter(is_live=True, hospital=obj)
+        if not query_set and obj.network:
             query_set = Offer.objects.filter(is_live=True, network=obj.network)
-        else:
-            query_set = Offer.objects.filter(is_live=True, hospital=obj)
         return OfferSerializer(query_set, many=True).data
 
 

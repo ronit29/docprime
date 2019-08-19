@@ -1665,7 +1665,7 @@ class MerchantPayout(TimeStampedModel):
         if not self.id:
             first_instance = True
 
-        if self.id and not self.is_insurance_premium_payout() and hasattr(self,'process_payout') and self.process_payout and self.status==self.PENDING and self.type==self.AUTOMATIC:
+        if self.id and not self.is_insurance_premium_payout() and hasattr(self,'process_payout') and self.process_payout and (self.status==self.PENDING or self.status==self.ATTEMPTED) and self.type==self.AUTOMATIC:
             self.type = self.AUTOMATIC
             self.update_billed_to_content_type()
             # if not self.content_object:

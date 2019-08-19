@@ -1,5 +1,6 @@
 from decimal import Decimal
 
+from celery.task import task
 from django.contrib.gis.db.models.functions import Distance
 from django.contrib.gis.geos import GEOSGeometry
 from django.db.models import Window
@@ -34,6 +35,7 @@ from django.utils import timezone
 from ondoc.authentication import models as auth_model
 from ondoc.authentication.models import SPOCDetails, RefundMixin, MerchantTdsDeduction, PaymentMixin
 from ondoc.bookinganalytics.models import DP_OpdConsultsAndTests
+# from ondoc.diagnostic.models import Lab
 from ondoc.location import models as location_models
 from ondoc.account.models import Order, ConsumerAccount, ConsumerTransaction, PgTransaction, ConsumerRefund, \
     MerchantPayout, UserReferred, MoneyPool, Invoice
@@ -248,6 +250,7 @@ class Hospital(auth_model.TimeStampedModel, auth_model.CreatedByModel, auth_mode
     # ratings = GenericRelation(ratings_models.RatingsReview, related_query_name='hospital_ratings')
     city_search_key = models.CharField(db_index=True, editable=False, max_length=100, default="", null=True, blank=True)
     enabled_for_cod = models.BooleanField(default=False)
+    enabled_poc = models.BooleanField(default=False)
     enabled_for_prepaid = models.BooleanField(default=True)
     is_location_verified = models.BooleanField(verbose_name='Location Verified', default=False)
     auto_ivr_enabled = models.BooleanField(default=True)
@@ -663,6 +666,7 @@ class Hospital(auth_model.TimeStampedModel, auth_model.CreatedByModel, auth_mode
         return insured
 
 
+@reversion.register()
 class HospitalPlaceDetails(auth_model.TimeStampedModel):
     hospital = models.ForeignKey(Hospital, on_delete=models.CASCADE, related_name='hospital_place_details')
     place_id = models.TextField()
@@ -1388,6 +1392,7 @@ class Doctor(auth_model.TimeStampedModel, auth_model.QCModel, SearchKey, auth_mo
         db_table = "doctor"
 
 
+@reversion.register()
 class DoctorSticker(auth_model.TimeStampedModel):
     image_base_path = 'doctor/stickers'
     doctor = models.ForeignKey(Doctor, related_name="stickers", on_delete=models.CASCADE)
@@ -1465,6 +1470,7 @@ class GeneralSpecialization(auth_model.TimeStampedModel, UniqueNameModel, Search
         db_table = "general_specialization"
 
 
+@reversion.register()
 class DoctorSpecialization(auth_model.TimeStampedModel):
     doctor = models.ForeignKey(Doctor, related_name="doctorspecializations", on_delete=models.CASCADE)
     specialization = models.ForeignKey(GeneralSpecialization, on_delete=models.CASCADE, blank=False, null=False)
@@ -1617,6 +1623,7 @@ class DoctorClinicTiming(auth_model.TimeStampedModel):
         super().save(*args, **kwargs)
 
 
+@reversion.register()
 class DoctorHospital(auth_model.TimeStampedModel):
     DAY_CHOICES = [(0, "Monday"), (1, "Tuesday"), (2, "Wednesday"), (3, "Thursday"), (4, "Friday"), (5, "Saturday"), (6, "Sunday")]
     doctor = models.ForeignKey(Doctor, related_name="availability", on_delete=models.CASCADE)
@@ -2232,6 +2239,94 @@ class OpdAppointmentInvoiceMixin(object):
         return invoices
 
 
+class PurchaseOrderCreation(auth_model.TimeStampedModel):
+    HOSPITAL = 'HOSPITAL'
+    LAB = 'LAB'
+    PAY_AT_CLINIC = 'Pay at Clinic'
+    SPONSOR_LISTING = 'Sponsor Listing'
+    product_choices = (('Pay at Clinic', PAY_AT_CLINIC), ('Sponsor Listing', SPONSOR_LISTING))
+    provider_choices = (('hospital', HOSPITAL), ('lab', LAB))
+    provider_type = models.CharField(choices=provider_choices, max_length=10)
+    product_type = models.CharField(choices=product_choices, max_length=100, default=PAY_AT_CLINIC)
+    provider_name_lab = models.ForeignKey("diagnostic.Lab", on_delete=models.DO_NOTHING, null=True, blank=True)
+    provider_name_hospital = models.ForeignKey(Hospital, on_delete=models.DO_NOTHING, null=True, blank=True, related_name='hospitalpurchaseorder')
+    provider_name = models.CharField(max_length=500, default='')
+    gst_number = models.CharField(max_length=1000)
+    total_amount_paid = models.IntegerField(help_text='Inclusive of GST')
+    start_date = models.DateField(null=True, blank=True)
+    end_date = models.DateField(null=True, blank=True)
+    appointment_booked_count = models.IntegerField(default=0)
+    total_appointment_count = models.IntegerField(default=0)
+    is_enabled = models.BooleanField(default=False)
+    current_appointment_count = models.IntegerField(default=0) # Count to establish how many appointments for a particular provider are still left, the counter keeps decreasing. Look at Save() for further logic.
+    agreement_details = models.TextField()
+    proof_of_payment = models.CharField(max_length=1000, null=True, blank=True, help_text='Either enter a valid invoice number or upload the invoice image')
+    proof_of_payment_image = models.FileField(upload_to='purchaseorder', validators=[
+        FileExtensionValidator(allowed_extensions=['pdf', 'jfif', 'jpg', 'jpeg', 'png'])], null=True, blank=True)
+
+
+    def __str__(self):
+        if self.provider_name_hospital:
+            return self.provider_name_hospital.name
+        else:
+            return self.provider_name_lab.name
+
+    def save(self, force_insert=False, force_update=False, using=None, update_fields=None):
+        if self.provider_name_hospital:
+            self.provider_name = self.provider_name_hospital.name
+        elif self.provider_name_lab:
+            self.provider_name = self.provider_name_lab.name
+        save_now = False
+        if not self.id:
+            save_now =True
+            if self.product_type == self.PAY_AT_CLINIC:
+                self.appointment_booked_count = 0
+                self.current_appointment_count = self.total_appointment_count
+                if self.start_date == timezone.now().date():
+                     self.is_enabled = True
+                #     self.provider_name_hospital.enabled_for_cod = True
+                #     self.provider_name_hospital.enabled_poc = True
+                #     self.provider_name_hospital.save()
+                #     Hospital.objects.filter(id=self.provider_name_hospital.id, enabled_for_cod=True, enabled_poc=True)
+
+        if self.id:
+            if self.is_enabled == False:
+                self.disable_cod_functionality()
+
+        if self.is_enabled == True and self.provider_name_hospital.enabled_poc == True and self.current_appointment_count < 1:
+            self.disable_cod_functionality()
+
+        super().save(force_insert, force_update, using, update_fields)
+
+        if save_now:
+            if self.start_date == timezone.now().date():
+                self.provider_name_hospital.enabled_for_cod = True
+                self.provider_name_hospital.enabled_poc = True
+                self.provider_name_hospital.save()
+                notification_tasks.purchase_order_closing_counter_automation.apply_async((self.id, ), eta=self.end_date, )    # task to disable Pay-at-clinic functionality in hospital
+
+            else:
+                notification_tasks.purchase_order_creation_counter_automation.apply_async((self.id, ), eta=self.start_date, ) # task to enable Pay-at-clinic functionality in hospital
+                notification_tasks.purchase_order_closing_counter_automation.apply_async((self.id, ), eta=self.end_date, )    # task to disable Pay-at-clinic functionality in hospital
+
+    def disable_cod_functionality(self):
+        remaining_poc_objects = PurchaseOrderCreation.objects.filter(is_enabled=True,
+                                                 provider_name_hospital=self.provider_name_hospital,
+                                                 start_date__lte=timezone.now().date(),
+                                                 end_date__gte=timezone.now().date()
+                                                 ).exclude(id=self.id).count()  # Queryset to find the remaining POC objects for a particular
+                                                                                # Hospital that is still enabled/live
+        if remaining_poc_objects == 0:
+            self.provider_name_hospital.enabled_poc = False
+            self.provider_name_hospital.enabled_for_cod = False
+            self.provider_name_hospital.save()
+            self.is_enabled = False
+
+
+    class Meta:
+        db_table = 'purchase_order_creation'
+
+
 @reversion.register()
 class OpdAppointment(auth_model.TimeStampedModel, CouponsMixin, OpdAppointmentInvoiceMixin, RefundMixin, CompletedBreakupMixin, MatrixDataMixin, TdsDeductionMixin, PaymentMixin, MerchantPayoutMixin):
     PRODUCT_ID = Order.DOCTOR_PRODUCT_ID
@@ -2296,6 +2391,7 @@ class OpdAppointment(auth_model.TimeStampedModel, CouponsMixin, OpdAppointmentIn
     payment_type = models.PositiveSmallIntegerField(choices=PAY_CHOICES, default=PREPAID)
     insurance = models.ForeignKey(insurance_model.UserInsurance, blank=True, null=True, default=None,
                                   on_delete=models.DO_NOTHING)
+    purchase_order = models.ForeignKey(PurchaseOrderCreation, on_delete=models.SET_NULL, null=True, blank=True, related_name='opdpurchaseorder')
     outstanding = models.ForeignKey(Outstanding, blank=True, null=True, on_delete=models.SET_NULL)
     matrix_lead_id = models.IntegerField(null=True)
     is_rated = models.BooleanField(default=False)
@@ -2731,6 +2827,10 @@ class OpdAppointment(auth_model.TimeStampedModel, CouponsMixin, OpdAppointmentIn
 
         if old_instance and old_instance.status != self.ACCEPTED and self.status == self.ACCEPTED:
             try:
+                if self.is_followup_appointment():
+                    notification_models.EmailNotification.ops_notification_alert(self, email_list=settings.INSURANCE_OPS_EMAIL,
+                                                                             product=Order.DOCTOR_PRODUCT_ID,
+                                                                             alert_type=notification_models.EmailNotification.FOLLOWUP_APPOINTMENT)
                 notification_tasks.docprime_appointment_reminder_sms_provider.apply_async(
                     (self.id, str(math.floor(self.updated_at.timestamp()))),
                     eta=self.time_slot_start - datetime.timedelta(
@@ -2821,12 +2921,39 @@ class OpdAppointment(auth_model.TimeStampedModel, CouponsMixin, OpdAppointmentIn
         elif self.id is None:
             push_to_history = True
 
+        if not self.id:
+            if self.hospital.enabled_for_cod:
+                # TODO: Add check for valid POC object (date)
+                poc_hospital = self.hospital.hospitalpurchaseorder.filter(is_enabled=True, start_date__lte=timezone.now(), end_date__gte=timezone.now()).order_by('id').first()
+                if poc_hospital:
+                    self.purchase_order = poc_hospital
+
+        if self.purchase_order:
+            to_save = False
+            if (not database_instance or database_instance.status != self.status):
+                if self.status == 2:
+                    self.purchase_order.appointment_booked_count += 1
+                    to_save = True
+                elif self.status == 7 and self.purchase_order.current_appointment_count > 0:
+                    self.purchase_order.current_appointment_count = self.purchase_order.current_appointment_count - 1
+                    to_save = True
+                elif self.status == 7 and self.purchase_order.current_appointment_count <= 0:
+                    # self.purchase_order.provider_name_hospital.enabled_for_cod = False
+                    self.purchase_order.is_enabled = False
+                    self.purchase_order.current_appointment_count = self.purchase_order.current_appointment_count - 1
+                    to_save = True
+                if to_save:
+                    self.purchase_order.save()
+
+
         super().save(*args, **kwargs)
 
         if push_to_history:
             AppointmentHistory.create(content_object=self)
 
         transaction.on_commit(lambda: self.after_commit_tasks(database_instance, push_to_matrix))
+
+
 
     def save_merchant_payout(self):
         if self.payment_type in [OpdAppointment.COD]:
@@ -3158,13 +3285,16 @@ class OpdAppointment(auth_model.TimeStampedModel, CouponsMixin, OpdAppointmentIn
         insurance_id = None
         user_insurance = UserInsurance.objects.filter(user=user).last()
         if user_insurance and user_insurance.is_valid():
-            is_appointment_insured, insurance_id, insurance_message = user_insurance.validate_doctor_insurance(data)
-
+            # is_appointment_insured, insurance_id, insurance_message = user_insurance.validate_doctor_insurance(data)
+            insurance_resp = user_insurance.validate_insurance(data)
+            is_appointment_insured = insurance_resp.get('is_insured')
+            insurance_id = insurance_resp.get('insurance_id')
         if is_appointment_insured and cart_data.get('is_appointment_insured', None):
             payment_type = OpdAppointment.INSURANCE
             effective_price = 0.0
         else:
             insurance_id = None
+            is_appointment_insured = False
 
         return {
             "doctor": data.get("doctor"),
@@ -3311,7 +3441,7 @@ class OpdAppointment(auth_model.TimeStampedModel, CouponsMixin, OpdAppointmentIn
                 if self.profile_detail.get('dob', None) else ''
         except Exception as e:
             pass
-
+        opd_appointment_type = 'FOLLOWUP' if self.is_followup_appointment() else 'REGULAR'
         merchant_payout = self.merchant_payout_data()
         accepted_history = self.appointment_accepted_history()
         user_insurance = self.insurance
@@ -3375,7 +3505,8 @@ class OpdAppointment(auth_model.TimeStampedModel, CouponsMixin, OpdAppointmentIn
             "RefundPaymentMode": float(refund_data['original_payment_mode_refund']) if refund_data['original_payment_mode_refund'] else None,
             "RefundToWallet": float(refund_data['promotional_wallet_refund']) if refund_data['promotional_wallet_refund'] else None,
             "RefundInitiationDate": int(refund_data['refund_initiated_at']) if refund_data['refund_initiated_at'] else None,
-            "RefundURN": refund_data['refund_urn']
+            "RefundURN": refund_data['refund_urn'],
+            "OPD_AppointmentType": opd_appointment_type
         }
         return appointment_details
 
@@ -3560,6 +3691,7 @@ class OpdAppointment(auth_model.TimeStampedModel, CouponsMixin, OpdAppointmentIn
         return self.hospital == artemis_hospital if artemis_hospital else False
 
 
+@reversion.register()
 class OpdAppointmentProcedureMapping(models.Model):
     opd_appointment = models.ForeignKey(OpdAppointment, on_delete=models.CASCADE, related_name='procedure_mappings')
     procedure = models.ForeignKey('procedure.Procedure', on_delete=models.CASCADE, related_name='opd_appointment_mappings')
@@ -3609,6 +3741,7 @@ class DoctorLeave(auth_model.TimeStampedModel):
         return self.INTERVAL_MAPPING.get((str(self.start_time), str(self.end_time)))
 
 
+@reversion.register()
 class Prescription(auth_model.TimeStampedModel):
     appointment = models.ForeignKey(OpdAppointment, related_name='prescriptions', on_delete=models.CASCADE)
     prescription_details = models.TextField(max_length=300, blank=True, null=True)
@@ -3813,6 +3946,7 @@ class PracticeSpecialization(auth_model.TimeStampedModel, SearchKey):
     priority = models.PositiveIntegerField(default=0, null=True)
     search_distance = models.FloatField(default=None, blank=True, null=True)
     is_similar_specialization = models.BooleanField(default=True)
+    breadcrumb_priority = models.PositiveIntegerField(null=True, blank=True)
 
     class Meta:
         db_table = 'practice_specialization'
@@ -4045,6 +4179,7 @@ class PatientMobile(auth_model.TimeStampedModel):
         db_table = "patient_mobile"
 
 
+@reversion.register()
 class OfflineOPDAppointments(auth_model.TimeStampedModel):
     CREATED = 1
     BOOKED = 2

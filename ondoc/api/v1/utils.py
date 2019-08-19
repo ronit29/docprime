@@ -2077,3 +2077,9 @@ def rc_users(e_obj, patient, auth_token, auth_user_id):
         return exception
     e_obj.rc_group = rc_group_obj
     return exception
+
+
+def is_valid_ckeditor_text(text):
+    if text == "<p>&nbsp;</p>":
+        return False
+    return True
