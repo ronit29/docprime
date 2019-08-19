@@ -1067,9 +1067,8 @@ class SmsNotification(TimeStampedModel, SmsNotificationOpdMixin, SmsNotification
         return booking_url
 
     @classmethod
-    @classmethod
-    def send_cart_url(cls, token, phone_number, order_id):
-        callback_url = "{}/payment/{}?refs=lab".format(settings.CONSUMER_APP_DOMAIN, order_id)
+    def send_cart_url(cls, token, phone_number):
+        callback_url = "{}/cart?refs=lab".format(settings.CONSUMER_APP_DOMAIN)
         payment_page_url = "{}/agent/booking?token={}&agent=false&callbackurl={}".format(settings.CONSUMER_APP_DOMAIN,
                                                                                          token, callback_url)
         short_url = generate_short_url(payment_page_url)

@@ -1903,7 +1903,7 @@ class SendCartUrlViewSet(GenericViewSet):
     permission_classes = (IsAuthenticated,)
 
     def send_cart_url(self, request):
-        order_id = request.data.get('orderId', None)
+        # order_id = request.data.get('orderId', None)
         # utm_source = request.query_params.get('UtmSource')
         # utm_term = request.query_params.get('UtmTerm')
         # utm_medium = request.query_params.get('UtmMedium')
@@ -1932,7 +1932,7 @@ class SendCartUrlViewSet(GenericViewSet):
         if not user_profile:
             return Response({"status": 1})
 
-        SmsNotification.send_cart_url(token=token, phone_number=str(user_profile.phone_number), order_id=order_id)
+        SmsNotification.send_cart_url(token=token, phone_number=str(user_profile.phone_number))
 
         return Response({"status": 1})
 
