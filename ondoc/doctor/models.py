@@ -2276,6 +2276,8 @@ class PurchaseOrderCreation(auth_model.TimeStampedModel):
         elif self.provider_name_lab:
             self.provider_name = self.provider_name_lab.name
         save_now = False
+        sponsor_listing = False
+
         if not self.id:
             save_now =True
             if self.product_type == self.PAY_AT_CLINIC:
@@ -2288,6 +2290,11 @@ class PurchaseOrderCreation(auth_model.TimeStampedModel):
                 #     self.provider_name_hospital.save()
                 #     Hospital.objects.filter(id=self.provider_name_hospital.id, enabled_for_cod=True, enabled_poc=True)
 
+            if self.product_type == self.SPONSOR_LISTING:
+                if self.start_date == timezone.now().date():
+                    self.is_enabled = True
+                    sponsor_listing = True
+
         if self.id:
             if self.is_enabled == False:
                 self.disable_cod_functionality()
@@ -2297,7 +2304,7 @@ class PurchaseOrderCreation(auth_model.TimeStampedModel):
 
         super().save(force_insert, force_update, using, update_fields)
 
-        if save_now:
+        if save_now and self.PAY_AT_CLINIC:
             if self.start_date == timezone.now().date():
                 self.provider_name_hospital.enabled_for_cod = True
                 self.provider_name_hospital.enabled_poc = True
@@ -2307,6 +2314,17 @@ class PurchaseOrderCreation(auth_model.TimeStampedModel):
             else:
                 notification_tasks.purchase_order_creation_counter_automation.apply_async((self.id, ), eta=self.start_date, ) # task to enable Pay-at-clinic functionality in hospital
                 notification_tasks.purchase_order_closing_counter_automation.apply_async((self.id, ), eta=self.end_date, )    # task to disable Pay-at-clinic functionality in hospital
+
+        if sponsor_listing and self.SPONSOR_LISTING:
+            if self.start_date == timezone.now().date():
+                notification_tasks.purchase_order_closing_counter_automation.apply_async((self.id,),
+                                                                                         eta=self.end_date, )
+            else:
+                notification_tasks.purchase_order_creation_counter_automation.apply_async((self.id,),
+                                                                                          eta=self.start_date, )
+                notification_tasks.purchase_order_closing_counter_automation.apply_async((self.id,),
+                                                                                         eta=self.end_date, )
+
 
     def disable_cod_functionality(self):
         remaining_poc_objects = PurchaseOrderCreation.objects.filter(is_enabled=True,

@@ -1,5 +1,6 @@
 # from hardcopy import bytestring_to_pdf
 from django.contrib.contenttypes.models import ContentType
+from django.contrib.gis.measure import D
 from django.core.exceptions import ValidationError
 from django.core.validators import validate_email
 from fluent_comments.models import FluentComment
@@ -49,7 +50,7 @@ import base64
 import logging
 import datetime
 import re
-from django.db.models import Count
+from django.db.models import Count, F
 from io import BytesIO
 import requests
 from PIL import Image as Img
@@ -1233,36 +1234,76 @@ class SponsorListingViewSet(viewsets.GenericViewSet):
 
         parameters = request.query_params
         url = parameters.get('url')
-        specialization_id = parameters.get('specialization_id')
+        spec_id = parameters.get('specialization_id')
         lat = parameters.get('lat')
         long = parameters.get('long')
-        utm_term = parameters.get('utm_term')
-        resp = dict()
+        utm = parameters.get('utm_term')
+        list_obj = list()
 
-        # sponsorlisting_objects = SponsorListingURL.objects.filter(start_date__lte=timezone.now().date(), end_date__gte=timezone.now().date(), is_enabled=True)
-        #
-        # for sponsor in sponsorlisting_objects:
-        #     seo_url = sponsor.seo_url
-        #     if seo_url == url:
-        #         resp['seo_url'] = seo_url
-        #     provider_name = sponsor.poc.provider_name_hospital.name
-        #     provider_id = sponsor.poc.provider_name_hospital.id
-        #     resp['provider_name'] = provider_name
-        #     resp['provider_id'] = provider_id
-        #
-        # sponsorspecialization_objects = SponsorListingSpecialization.objects.filter()
+        sponsorlisting_objects = PurchaseOrderCreation.objects.filter(is_enabled=True,
+                                                                      start_date__lte=timezone.now().date(),
+                                                                      end_date__gte=timezone.now().date(),
+                                                                      product_type=PurchaseOrderCreation.SPONSOR_LISTING). \
+            select_related('poc', 'provider_name_hospital').prefetch_related('poc_specialization', 'poc_sponsorlisting',
+                                                                             'poc_utm_term', 'poc_lat_long')
 
+        if url:
+            seo_url_matching_ids = sponsorlisting_objects.filter(poc_sponsorlisting__seo_url=url).values('provider_name_hospital').distinct()
+            hospital_object = Hospital.objects.filter(id=seo_url_matching_ids)
 
-        sponsorlisting_objects = PurchaseOrderCreation.objects.filter(is_enabled=True, start_date__lte=timezone.now().date(),
-                                                                      end_date__gte=timezone.now().date(), product_type=PurchaseOrderCreation.SPONSOR_LISTING)
+        # if spec_id:
+        #     specialization_matching_ids = sponsorlisting_objects.filter(
+        #         poc_specialization__specialization__id=spec_id, ).annotate(
+        #         location=Point(F('poc_lat_long__longitude'), F('poc_lat_long__latitude'))).filter(
+        #         location__dwithin=(Point(float(long), float(lat)), D(m=F('poc_lat_long__radius'))), ).values(
+        #         'provider_name_hospital').distinct()
+
+        if utm:
+            utm_matching_ids = sponsorlisting_objects.filter(poc_utm_term__utm_term=utm).values(
+                'provider_name_hospital').distinct()
+            hospital_objects = Hospital.objects.filter(id=utm_matching_ids)
 
         for sponsor in sponsorlisting_objects:
-            provider_id = sponsor.provider_name_hospital.id
-            provider_name = sponsor.provider_name_hospital.name
-            for sp in sponsor.poc_sponsorlisting.filter(start_date__lte=timezone.now(), end_date__gte=timezone.now(), is_enabled=True):
-                seo_url = sp.seo_url
-                if seo_url == url:
-                    resp['seo_url'] = seo_url
+            resp1 = {}
+            resp2 = {}
+            resp3 = {}
+            # for sp in sponsor.poc_sponsorlisting.filter(start_date__lte=timezone.now(), end_date__gte=timezone.now(), is_enabled=True):
+            #     seo_url = sp.seo_url
+            #     if seo_url == url:
+            #         resp1['seo_url'] = seo_url
+            #         resp1['provider_id'] = sp.poc.provider_name_hospital.id
+            #         resp1['provider_name'] = sp.poc.provider_name_hospital.name
+            #     list_obj.append({'SEO_URL': resp1})
+
             for spec in sponsor.poc_specialization.all():
-                specialization_id = spec.specialization
+                for loc in sponsor.poc_lat_long.all():
+                    latitude = loc.latitude
+                    longitude = loc.longitude
+                    radius = loc.radius
+                    if spec_id:
+                        specialization_id = spec.specialization.id
+                        if latitude and longitude and radius and specialization_id:
+                            pnt1 = Point(float(longitude), float(latitude))
+                            pnt2 = Point(float(long), float(lat))
+                            if pnt1.distance(pnt2) * 100 <= radius and specialization_id == spec_id:
+                                resp2['specialization_id'] = specialization_id
+                                resp2['provider_id'] = spec.poc.provider_name_hospital.id
+                                resp2['provider_name'] = spec.poc.provider_name_hospital.name
+                                hospital_id = spec.poc.provider_name_hospital.id
+                                hospital_object = Hospital.objects.filter(id=hospital_id)
+                        list_obj.append({'specialization': resp2})
+                    elif latitude and longitude and radius:
+                        pnt1 = Point(float(longitude), float(latitude))
+                        pnt2 = Point(float(long), float(lat))
+                        if pnt1.distance(pnt2) * 100 <= radius:
+                            hospital_id = spec.poc.provider_name_hospital.id
+                            hospital_object = Hospital.objects.filter(id=hospital_id)
+
+            # for utm in sponsor.poc_utm_term.filter(is_enabled=True):
+            #     utm_term = utm.utm_term
+            #     if utm_term == utm:
+            #         resp3['provider_id'] = utm.poc.provider_name_hospital.id
+            #         resp3['provider_name'] = utm.poc.provider_name_hospital.name
+            #     list_obj.append({'Utm_term': resp3})
+
 

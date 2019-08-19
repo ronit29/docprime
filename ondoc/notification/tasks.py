@@ -1403,11 +1403,16 @@ def purchase_order_creation_counter_automation(purchase_order_id):
 
     from ondoc.doctor.models import PurchaseOrderCreation
     instance = PurchaseOrderCreation.objects.filter(id=purchase_order_id).first()
-    if instance:
+
+    if instance and instance.product_type == PurchaseOrderCreation.PAY_AT_CLINIC:
         if (instance.start_date < instance.end_date):
             instance.is_enabled = True
             instance.provider_name_hospital.enabled_poc = True
             instance.provider_name_hospital.enabled_for_cod = True
+
+    if instance and instance.product_type == PurchaseOrderCreation.SPONSOR_LISTING:
+        if instance.start_date < instance.end_date:
+            instance.is_enabled = True
 
             # TODO: In OPDAppointment
             # if timezone.now() >= instance.end_date:
@@ -1422,6 +1427,11 @@ def purchase_order_closing_counter_automation(purchase_order_id):
 
     from ondoc.doctor.models import PurchaseOrderCreation
     instance = PurchaseOrderCreation.objects.filter(id=purchase_order_id).first()
-    if instance:
+
+    if instance and instance.product_type == PurchaseOrderCreation.PAY_AT_CLINIC:
         if (instance.end_date < timezone.now().date()):
             instance.disable_cod_functionality()
+
+    if instance and instance.product_type == PurchaseOrderCreation.SPONSOR_LISTING:
+        if instance.end_date < timezone.now().date():
+            instance.is_enabled = False

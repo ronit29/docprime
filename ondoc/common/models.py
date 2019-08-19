@@ -801,6 +801,17 @@ class SponsorListingURL(auth_model.TimeStampedModel):
 class SponsorListingSpecialization(auth_model.TimeStampedModel):
     poc = models.ForeignKey("doctor.PurchaseOrderCreation", on_delete=models.CASCADE, related_name='poc_specialization', null=True)
     specialization = models.ForeignKey("doctor.PracticeSpecialization", on_delete=models.SET_NULL, null=True, blank=True, related_name='listing_specialization')
+
+
+class SponsorListingLocation(auth_model.TimeStampedModel):
+    poc = models.ForeignKey("doctor.PurchaseOrderCreation", on_delete=models.CASCADE, related_name='poc_lat_long', null=True)
     latitude = models.FloatField()
     longitude = models.FloatField()
     radius = models.FloatField()
+    is_enabled = models.BooleanField(default=True)
+
+
+class SponsorListingUtmTerm(auth_model.TimeStampedModel):
+    poc = models.ForeignKey('doctor.PurchaseOrderCreation', on_delete=models.CASCADE, related_name='poc_utm_term', null=True)
+    utm_term = models.CharField(max_length=1000, null=True, blank=True)
+    is_enabled = models.BooleanField(default=False)
