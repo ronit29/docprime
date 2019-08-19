@@ -17,7 +17,8 @@ from ondoc.doctor.models import (OpdAppointment, Doctor, Hospital, DoctorHospita
                                  CommonMedicalCondition, CommonSpecialization,
                                  DoctorPracticeSpecialization, DoctorClinic, OfflineOPDAppointments, OfflinePatients,
                                  CancellationReason, HealthInsuranceProvider, HospitalDocument, HospitalNetworkDocument,
-                                 AppointmentHistory, HospitalNetwork, ProviderEncrypt, SimilarSpecializationGroup)
+                                 AppointmentHistory, HospitalNetwork, ProviderEncrypt, SimilarSpecializationGroup,
+                                 PracticeSpecialization)
 from ondoc.diagnostic import models as lab_models
 from ondoc.authentication.models import UserProfile, DoctorNumber, GenericAdmin, GenericLabAdmin
 from django.db.models import Avg
@@ -829,14 +830,14 @@ class DoctorListSerializer(serializers.Serializer):
     NEXT_3_DAYS = 3
     AVAILABILITY_CHOICES = ((TODAY, 'Today'), (TOMORROW, "Tomorrow"), (NEXT_3_DAYS, "Next 3 days"),)
 
-    SITTING_CHOICES = [type_choice[1] for type_choice in Hospital.HOSPITAL_TYPE_CHOICES]
+    # SITTING_CHOICES = [type_choice[1] for type_choice in Hospital.HOSPITAL_TYPE_CHOICES]
     specialization_ids = CommaSepratedToListField(required=False, max_length=500, typecast_to=str, allow_blank=True)
     condition_ids = CommaSepratedToListField(required=False, max_length=500, typecast_to=str)
     procedure_ids = CommaSepratedToListField(required=False, max_length=500, typecast_to=str)
     procedure_category_ids = CommaSepratedToListField(required=False, max_length=500, typecast_to=str)
     longitude = serializers.FloatField(default=77.071848)
     latitude = serializers.FloatField(default=28.450367)
-    sits_at = CommaSepratedToListField(required=False, max_length=100, typecast_to=str)
+    # sits_at = CommaSepratedToListField(required=False, max_length=100, typecast_to=str)
     sort_on = serializers.ChoiceField(choices=SORT_CHOICES, required=False)
     min_fees = serializers.IntegerField(required=False)
     max_fees = serializers.IntegerField(required=False)
@@ -857,6 +858,17 @@ class DoctorListSerializer(serializers.Serializer):
     availability = CommaSepratedToListField(required=False,  max_length=50, typecast_to=str)
     avg_ratings = CommaSepratedToListField(required=False,  max_length=50, typecast_to=str)
     group_ids = CommaSepratedToListField(required=False,  max_length=50, typecast_to=str)
+    specialization_filter_ids = CommaSepratedToListField(required=False, max_length=500, typecast_to=str, allow_blank=True)
+
+    def validate_specialization_filter_ids(self, attrs):
+        try:
+            temp_attrs = [int(attr) for attr in attrs]
+            temp_attrs = set(temp_attrs)
+            if PracticeSpecialization.objects.filter(id__in=temp_attrs).count() == len(temp_attrs):
+                return attrs
+        except:
+            raise serializers.ValidationError('Invalid Specialization IDs')
+        raise serializers.ValidationError('Invalid Specialization IDs')
 
     def validate(self, attrs):
         if attrs.get('group_ids'):
@@ -928,10 +940,10 @@ class DoctorListSerializer(serializers.Serializer):
             raise serializers.ValidationError("Invalid specialization Id.")
         return value
 
-    def validate_sits_at(self, value):
-        if not set(value).issubset(set(self.SITTING_CHOICES)):
-            raise serializers.ValidationError("Not a Valid Choice")
-        return value
+    # def validate_sits_at(self, value):
+    #     if not set(value).issubset(set(self.SITTING_CHOICES)):
+    #         raise serializers.ValidationError("Not a Valid Choice")
+    #     return value
 
     def validate_availability(self, value):
         if not set(value).issubset(set([str(avl_choice[0]) for avl_choice in self.AVAILABILITY_CHOICES])):
@@ -2063,10 +2075,13 @@ class HospitalDetailIpdProcedureSerializer(TopHospitalForIpdProcedureSerializer)
     def get_all_specializations(self, obj):
         from ondoc.doctor.models import PracticeSpecialization
         from ondoc.api.v2.doctor.serializers import PracticeSpecializationSerializer
-        q = PracticeSpecialization.objects.filter(specialization__doctor__is_live=True,
+        q = PracticeSpecialization.objects.prefetch_related('department')\
+                                          .select_related('specialization_field')\
+                                          .filter(specialization__doctor__is_live=True,
                                                   specialization__doctor__doctor_clinics__enabled=True,
-                                                  specialization__doctor__doctor_clinics__hospital=obj).order_by(
-            '-priority').distinct()
+                                                  specialization__doctor__doctor_clinics__hospital=obj)\
+                                          .order_by('-priority')\
+                                          .distinct()
         return PracticeSpecializationSerializer(q, many=True).data
 
     def get_all_specialization_groups(self, obj):

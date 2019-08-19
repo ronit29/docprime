@@ -20,7 +20,7 @@ from ondoc.doctor.models import (Doctor, Language, MedicalService, Specializatio
                                  VisitReason, CancellationReason, PracticeSpecializationContent, OfflinePatients,
                                  OfflineOPDAppointments,
                                  DoctorMobileOtp, UploadDoctorData, DoctorLeave, HealthInsuranceProvider,
-                                 CommonHospital, SimilarSpecializationGroup)
+                                 CommonHospital, SimilarSpecializationGroup, PurchaseOrderCreation)
 
 from ondoc.diagnostic.models import (Lab, LabNetwork, LabTest, LabTestType, LabService,
                                      AvailableLabTest, LabAppointment, CommonTest, CommonDiagnosticCondition,
@@ -53,7 +53,8 @@ from .doctor import (DoctorAdmin, MedicalServiceAdmin, SpecializationAdmin, Qual
                      SpecializationFieldAdmin, SpecializationDepartmentAdmin, PracticeSpecializationAdmin,
                      CompetitorInfoImportAdmin, VisitReasonAdmin, PracticeSpecializationContentAdmin,
                      OfflinePatientAdmin,
-                     UploadDoctorDataAdmin, DoctorLeaveAdmin, SimilarSpecializationGroupAdmin)
+                     UploadDoctorDataAdmin, DoctorLeaveAdmin, SimilarSpecializationGroupAdmin,
+                     PurchaseOrderCreationAdmin)
 from .aboutdoctor import AboutDoctorAdmin
 from .hospital import HospitalAdmin, CommonHospitalAdmin, GenericQuestionAnswerAdmin
 from .user import CustomUserAdmin, UserNumberUpdateAdmin, UserProfileAdmin
@@ -282,5 +283,5 @@ admin.site.register(BankHolidays)
 admin.site.register(LabTestCategoryUrls, LabTestCategoryUrlsAdmin)
 admin.site.register(UserNumberUpdate, UserNumberUpdateAdmin)
 admin.site.register(GenericQuestionAnswer, GenericQuestionAnswerAdmin)
-
+admin.site.register(PurchaseOrderCreation, PurchaseOrderCreationAdmin)
 admin.site.register(IntegratorLabTestParameterMapping, IntegratorLabTestParameterMappingAdmin)
