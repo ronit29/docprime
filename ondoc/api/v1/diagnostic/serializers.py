@@ -4,7 +4,7 @@ from rest_framework.fields import CharField
 from ondoc.cart.models import Cart
 from ondoc.diagnostic.models import (LabTest, AvailableLabTest, Lab, LabAppointment, LabTiming, PromotedLab,
                                      CommonTest, CommonDiagnosticCondition, LabImage, LabReportFile, CommonPackage,
-                                     LabTestCategory, LabAppointmentTestMapping)
+                                     LabTestCategory, LabAppointmentTestMapping, LabTestGroup)
 from django.contrib.staticfiles.templatetags.staticfiles import static
 from ondoc.authentication.models import UserProfile, Address
 from ondoc.api.v1.doctor.serializers import CreateAppointmentSerializer, CommaSepratedToListField
@@ -825,6 +825,14 @@ class LabAppointmentUpdateSerializer(serializers.Serializer):
             raise serializers.ValidationError("Cannot Cancel")
 
 
+class LabAppointmentTestSerializer(serializers.Serializer):
+    TEST_TYPE = [(LabTest.RADIOLOGY, "Radiology"), (LabTest.PATHOLOGY, "Pathology")]
+    test = serializers.PrimaryKeyRelatedField(queryset=LabTest.objects.all())
+    start_date = serializers.DateTimeField(required=True)
+    start_time = serializers.FloatField()
+    type = serializers.ChoiceField(choices=TEST_TYPE)
+    is_home_pickup = serializers.BooleanField(default=False)
+
 class LabAppointmentCreateSerializer(serializers.Serializer):
     lab = serializers.PrimaryKeyRelatedField(queryset=Lab.objects.filter(is_live=True))
     test_ids = serializers.ListField(child=serializers.PrimaryKeyRelatedField(queryset=LabTest.objects.all()))
@@ -848,6 +856,18 @@ class LabAppointmentCreateSerializer(serializers.Serializer):
     included_in_user_plan = serializers.BooleanField(required=False, default=False)
     app_version = serializers.CharField(required=False, allow_null=True, allow_blank=True)
     prescription_list = serializers.ListSerializer(child=PrescriptionDocumentSerializer(), required=False)
+    test_timings = serializers.ListSerializer(child=LabAppointmentTestSerializer(), required=False, allow_empty=False)
+    has_radiology_timings = serializers.BooleanField(required=False, default=False)
+
+    def __init__(self, instance=None, data=None, **kwargs):
+        super().__init__(instance, data, **kwargs)
+        if kwargs.get('context') and kwargs.get('context').get('data') and kwargs.get('context').get('data').get(
+                'has_radiology_timings'):
+            self.fields.fields['start_date'].required = False
+            self.fields.fields['start_time'].required = False
+            self.fields.fields['is_home_pickup'].required = False
+            self.fields.fields['test_timings'].required = True
+
 
     def validate(self, data):
         MAX_APPOINTMENTS_ALLOWED = 10
@@ -862,7 +882,17 @@ class LabAppointmentCreateSerializer(serializers.Serializer):
         if not utils.is_valid_testing_lab_data(request.user, data["lab"]):
             raise serializers.ValidationError("Both User and Lab should be for testing")
 
-        if data.get("is_home_pickup"):
+        address_required = False
+        if data.get('has_radiology_timings'):
+            for test_timing in data.get('test_timings'):
+                if test_timing.get("is_home_pickup"):
+                    address_required = True
+                    break
+        else:
+            if data.get("is_home_pickup"):
+                address_required = True
+
+        if address_required:
             if data.get("address") is None:
                 raise serializers.ValidationError("Address required for home pickup")
             elif not Address.objects.filter(id=data.get("address").id, user=request.user).exists():
@@ -905,11 +935,6 @@ class LabAppointmentCreateSerializer(serializers.Serializer):
                 else:
                     raise serializers.ValidationError("Item already exists in cart.")
 
-        time_slot_start = (form_time_slot(data.get('start_date'), data.get('start_time'))
-                           if not data.get("time_slot_start") else data.get("time_slot_start"))
-
-        # validations for same day and next day timeslot bookings
-        selected_date = time_slot_start.strftime("%Y-%m-%d")
         lab = data.get("lab")
         pincode = data.get('pincode', None)
         address = data.get("address", None)
@@ -921,45 +946,118 @@ class LabAppointmentCreateSerializer(serializers.Serializer):
             if not int(pincode) == int(address.pincode):
                 raise serializers.ValidationError("Entered pincode should be same as pickup address pincode.")
 
+        has_pathology_timings = False
+        has_radiology_timings = False
+        pathology_time_slot_start = None
+        pathology_slot_validated = False
+        pathology_home_pickup = False
+        if data.get('has_radiology_timings'):
+            test_timings = data.get('test_timings')
+            for test_timing in test_timings:
+                if test_timing.get('type') == LabTest.PATHOLOGY:
+                    has_pathology_timings = True
+                    if not pathology_time_slot_start:
+                        pathology_time_slot_start = form_time_slot(test_timing.get('start_date'), test_timing.get('start_time'))
+                        if not pathology_slot_validated:
+                            params = dict()
+                            params['is_integrated'] = lab.is_integrated()
+                            params['is_home_pickup'] = test_timing.get("is_home_pickup")
+                            params['start_date'] = test_timing.get('start_date')
+                            params['start_time'] = test_timing.get('start_time')
+                            params['lab'] = lab
+                            self.pathology_time_slot_validator_v2(request, params)
+                            pathology_slot_validated = True
+                            pathology_home_pickup = test_timing.get('is_home_pickup')
+                if test_timing.get('type') == LabTest.RADIOLOGY:
+                    has_radiology_timings = True
+                    time_slot_start = form_time_slot(test_timing.get('start_date'), test_timing.get('start_time'))
+                    selected_date = time_slot_start.strftime("%Y-%m-%d")
+                    curr_time = time_slot_start.hour
+                    curr_minute = round(round(float(time_slot_start.minute) / 60, 2) * 2) / 2
+                    curr_time += curr_minute
 
-        now = datetime.datetime.now()
-        tomorrow = datetime.date.today() + datetime.timedelta(days=1)
-        is_today = now.weekday() == time_slot_start.weekday()
-        is_tomorrow = tomorrow.weekday() == time_slot_start.weekday()
-        curr_time = time_slot_start.hour
-        curr_minute = round(round(float(time_slot_start.minute) / 60, 2) * 2) / 2
-        curr_time += curr_minute
+                    # radiology for each times
+                    available_slots = lab.get_radiology_available_slots(test_timing.get('test'), test_timing.get("is_home_pickup"), pincode, selected_date)
+                    # is_integrated = lab.is_integrated()
+                    selected_day_slots = available_slots['time_slots'][selected_date]
+                    if not selected_day_slots:
+                        raise serializers.ValidationError("No time slots available")
 
-        if bool(data.get('from_app')) and data.get('app_version') and parse(data.get('app_version')) < parse('1.2'):
-            available_slots = LabTiming.timing_manager.lab_booking_slots(lab__id=data.get("lab").id, lab__is_live=True, for_home_pickup=data.get("is_home_pickup"))
-            is_integrated = False
-            if is_today and available_slots.get("today_min") and available_slots.get("today_min") > curr_time:
-                raise serializers.ValidationError("Invalid Time slot")
-            if is_tomorrow and available_slots.get("tomorrow_min") and available_slots.get("tomorrow_min") > curr_time:
-                raise serializers.ValidationError("Invalid Time slot")
-            if is_today and available_slots.get("today_max") and available_slots.get("today_max") < curr_time:
-                raise serializers.ValidationError("Invalid Time slot")
+                    current_day_slots = self.get_slots_list(selected_day_slots)
+
+                    if not curr_time in current_day_slots:
+                        raise serializers.ValidationError("Invalid Time slot")
+
+                    params = dict()
+                    params['is_integrated'] = lab.is_integrated()
+                    params['is_home_pickup'] = test_timing.get("is_home_pickup")
+                    params['start_date'] = test_timing.get('start_date')
+                    params['start_time'] = test_timing.get('start_time')
+                    params['test_id'] = test_timing.get('test')
+                    self.radiology_time_slot_validator(request, params)
         else:
-            available_slots = lab.get_available_slots(data.get("is_home_pickup"), pincode, selected_date)
-            is_integrated = lab.is_integrated()
-            selected_day_slots = available_slots['time_slots'][selected_date]
-            if not selected_day_slots:
-                raise serializers.ValidationError("No time slots available")
+            has_pathology_timings = True
+            pathology_home_pickup = data.get('is_home_pickup')
+            pathology_time_slot_start = (form_time_slot(data.get('start_date'), data.get('start_time'))
+                               if not data.get("time_slot_start") else data.get("time_slot_start"))
 
-            current_day_slots = self.get_slots_list(selected_day_slots)
+        if has_pathology_timings:
+            selected_date = pathology_time_slot_start.strftime("%Y-%m-%d")
+            now = datetime.datetime.now()
+            tomorrow = datetime.date.today() + datetime.timedelta(days=1)
+            is_today = now.weekday() == pathology_time_slot_start.weekday()
+            is_tomorrow = tomorrow.weekday() == pathology_time_slot_start.weekday()
+            curr_time = pathology_time_slot_start.hour
+            curr_minute = round(round(float(pathology_time_slot_start.minute) / 60, 2) * 2) / 2
+            curr_time += curr_minute
 
-            if not curr_time in current_day_slots:
-                raise serializers.ValidationError("Invalid Time slot")
+            if bool(data.get('from_app')) and data.get('app_version') and parse(data.get('app_version')) < parse('1.2'):
+                available_slots = LabTiming.timing_manager.lab_booking_slots(lab__id=data.get("lab").id,
+                                                                             lab__is_live=True,
+                                                                             for_home_pickup=pathology_home_pickup)
+                is_integrated = False
+                if is_today and available_slots.get("today_min") and available_slots.get("today_min") > curr_time:
+                    raise serializers.ValidationError("Invalid Time slot")
+                if is_tomorrow and available_slots.get("tomorrow_min") and available_slots.get(
+                        "tomorrow_min") > curr_time:
+                    raise serializers.ValidationError("Invalid Time slot")
+                if is_today and available_slots.get("today_max") and available_slots.get("today_max") < curr_time:
+                    raise serializers.ValidationError("Invalid Time slot")
+            else:
+                available_slots = lab.get_available_slots(pathology_home_pickup, pincode, selected_date)
+                is_integrated = lab.is_integrated()
+                selected_day_slots = available_slots['time_slots'][selected_date]
+                if not selected_day_slots:
+                    raise serializers.ValidationError("No time slots available")
 
-            if lab.network and lab.network.id == settings.THYROCARE_NETWORK_ID:
-                self.thyrocare_test_validator(data)
-                check_active_appointment = False
+                current_day_slots = self.get_slots_list(selected_day_slots)
+
+                if not curr_time in current_day_slots:
+                    raise serializers.ValidationError("Invalid Time slot")
+
+                if lab.network and lab.network.id == settings.THYROCARE_NETWORK_ID:
+                    self.thyrocare_test_validator(data)
+                    check_active_appointment = False
 
         if check_active_appointment:
-            if LabAppointment.objects.filter(profile=data.get("profile"), lab=data.get("lab"),
-                                             tests__in=data.get("test_ids"), time_slot_start=time_slot_start) \
-                    .exclude(status__in=[LabAppointment.COMPLETED, LabAppointment.CANCELLED]).exists():
-                raise serializers.ValidationError("One active appointment for the selected date & time already exists. Please change the date & time of the appointment.")
+            if data.get('has_radiology_timings'):
+                user_active_appointments = LabAppointment.objects.prefetch_related('test_mappings').filter(profile=data.get("profile"),
+                                                                                lab=data.get("lab")) \
+                        .exclude(status__in=[LabAppointment.COMPLETED, LabAppointment.CANCELLED])
+                if user_active_appointments:
+                    # radiology_timings = list(filter(lambda x: x.get('type') == LabTest.RADIOLOGY), test_timings)
+                    for test_timing in test_timings:
+                        test_time_slot_start = form_time_slot(test_timing.get('start_date'), test_timing.get('start_time'))
+                        if user_active_appointments.filter(test_mappings__test_id=test_timing.get('test'),
+                                                           test_mappings__time_slot_start=test_time_slot_start).exists():
+                            raise serializers.ValidationError(
+                                "One active appointment for the selected date & time already exists. Please change the date & time of the appointment.")
+            else:
+                if LabAppointment.objects.filter(profile=data.get("profile"), lab=data.get("lab"),
+                                                 tests__in=data.get("test_ids"), time_slot_start=pathology_time_slot_start) \
+                        .exclude(status__in=[LabAppointment.COMPLETED, LabAppointment.CANCELLED]).exists():
+                    raise serializers.ValidationError(
+                        "One active appointment for the selected date & time already exists. Please change the date & time of the appointment.")
 
         if 'use_wallet' in data and data['use_wallet'] is False:
             data['use_wallet'] = False
@@ -967,7 +1065,8 @@ class LabAppointmentCreateSerializer(serializers.Serializer):
             data['use_wallet'] = True
 
         self.test_lab_id_validator(data, request)
-        self.time_slot_validator(data, request, is_integrated)
+        if not data.get('has_radiology_timings'):
+            self.time_slot_validator(data, request, lab.is_integrated())
         self.user_plan_validator(data, request, cart_item_id)
         return data
 
@@ -1093,6 +1192,79 @@ class LabAppointmentCreateSerializer(serializers.Serializer):
                     raise serializers.ValidationError("No time slot available")
             else:
                 if not lab_queryset.always_open and not lab_timing_queryset:
+                    logger.error(
+                        "Error 'No time slot available' for lab appointment with data - " + json.dumps(request.data))
+                    raise serializers.ValidationError("No time slot available")
+
+    @staticmethod
+    def pathology_time_slot_validator_v2(request, params):
+        start_dt = (form_time_slot(params.get('start_date'), params.get('start_time')))
+
+        if start_dt < timezone.now():
+            logger.error("Error 'Cannot book in past' for lab appointment with data - " + json.dumps(request.data))
+            raise serializers.ValidationError("Cannot book in past")
+
+        day_of_week = start_dt.weekday()
+
+        lab_queryset = params.get('lab')
+
+        lab_timing_queryset = lab_queryset.lab_timings.filter(day=day_of_week, start__lte=params.get('start_time'),
+                                                              end__gte=params.get('start_time'),
+                                                              for_home_pickup=params.get('is_home_pickup')).exists()
+        if params.get('is_integrated'):
+            pass
+        else:
+            if params.get('is_home_pickup'):
+                if not lab_queryset.is_home_collection_enabled:
+                    logger.error(
+                        "Error 'Home Pickup is disabled for the lab' for lab appointment with data - " + json.dumps(
+                            request.data))
+                    raise serializers.ValidationError("Home Pickup is disabled for the lab")
+                if params.get("start_time") < 7.0 or params.get("start_time") > 19.0:
+                    logger.error(
+                        "Error 'No time slot available' for lab appointment with data - " + json.dumps(
+                            request.data))
+                    raise serializers.ValidationError("No time slot available")
+            else:
+                if not lab_queryset.always_open and not lab_timing_queryset:
+                    logger.error(
+                        "Error 'No time slot available' for lab appointment with data - " + json.dumps(request.data))
+                    raise serializers.ValidationError("No time slot available")
+
+    @staticmethod
+    def radiology_time_slot_validator(request, params):
+        start_dt = (form_time_slot(params.get('start_date'), params.get('start_time')))
+
+        if start_dt < timezone.now():
+            logger.error("Error 'Cannot book in past' for lab appointment with data - " + json.dumps(request.data))
+            raise serializers.ValidationError("Cannot book in past")
+
+        day_of_week = start_dt.weekday()
+
+        lab_queryset = params.get('lab')
+        if params.get('is_integrated'):
+            pass
+        else:
+            if params.get('is_home_pickup'):
+                if not lab_queryset.is_home_collection_enabled:
+                    logger.error(
+                        "Error 'Home Pickup is disabled for the lab' for lab appointment with data - " + json.dumps(
+                            request.data))
+                    raise serializers.ValidationError("Home Pickup is disabled for the lab")
+                if params.get("start_time") < 7.0 or params.get("start_time") > 19.0:
+                    logger.error(
+                        "Error 'No time slot available' for lab appointment with data - " + json.dumps(
+                            request.data))
+                    raise serializers.ValidationError("No time slot available")
+            else:
+                lab_test_group = LabTestGroup.objects.filter(test_id=params.get('test_id'))
+                lab_group_timing_queryset = lab_queryset.test_group_timings.filter(lab_test_group=lab_test_group.id,
+                                                                                   day=day_of_week,
+                                                                                   start__lte=params.get('start_time'),
+                                                                                   end__gte=params.get('start_time'),
+                                                                                   for_home_pickup=params.get(
+                                                                                       'is_home_pickup')).exists()
+                if not lab_queryset.always_open and not lab_group_timing_queryset:
                     logger.error(
                         "Error 'No time slot available' for lab appointment with data - " + json.dumps(request.data))
                     raise serializers.ValidationError("No time slot available")

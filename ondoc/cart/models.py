@@ -43,8 +43,8 @@ class Cart(auth_model.TimeStampedModel, auth_model.SoftDeleteModel):
             returns True => if not similar, False => if similar
         '''
         data = dict(data)
-        data['start_date'] = format_iso_date(data['start_date'])
-        item_data['start_date'] = format_iso_date(item_data['start_date'])
+        # data['start_date'] = format_iso_date(data['start_date'])
+        # item_data['start_date'] = format_iso_date(item_data['start_date'])
 
         equal_check = ["lab", "doctor", "hospital", "profile", "start_date", "start_time"]
         subset_check = ["test_ids", "procedure_ids"]
