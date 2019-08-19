@@ -1067,10 +1067,10 @@ class SmsNotification(TimeStampedModel, SmsNotificationOpdMixin, SmsNotification
         return booking_url
 
     @classmethod
-    def send_cart_url(cls, token, phone_number):
-        callback_url = "{}/cart?refs=lab".format(settings.CONSUMER_APP_DOMAIN)
-        payment_page_url = "{}/agent/booking?token={}&agent=false&callbackurl={}".format(settings.CONSUMER_APP_DOMAIN,
-                                                                                         token, callback_url)
+    def send_cart_url(cls, token, phone_number, utm):
+        callback_url = "{}/cart".format(settings.CONSUMER_APP_DOMAIN)
+        payment_page_url = "{}/agent/booking?token={}&agent=false&callbackurl={}&{}".format(settings.CONSUMER_APP_DOMAIN,
+                                                                                         token, callback_url, utm)
         short_url = generate_short_url(payment_page_url)
         html_body = "Your booking url is - {} . Please pay to confirm".format(short_url)
         if phone_number:
