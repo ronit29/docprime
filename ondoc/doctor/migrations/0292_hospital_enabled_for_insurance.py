@@ -13,6 +13,6 @@ class Migration(migrations.Migration):
         migrations.AddField(
             model_name='hospital',
             name='enabled_for_insurance',
-            field=models.BooleanField(default=True, verbose_name='Enabled for Insurance'),
+            field=models.BooleanField(verbose_name='Enabled for Insurance'),
         ),
     ]
