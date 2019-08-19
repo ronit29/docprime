@@ -1394,7 +1394,7 @@ class SearchedItemsViewSet(viewsets.GenericViewSet):
 
 
 class DoctorListViewSet(viewsets.GenericViewSet):
-    queryset = models.Doctor.objects.all()
+    queryset = models.Doctor.objects.none()
 
     @transaction.non_atomic_requests
     def list_by_url(self, request, *args, **kwargs):
