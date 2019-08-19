@@ -3343,8 +3343,8 @@ class CompareLabPackagesViewSet(viewsets.ReadOnlyModelViewSet):
         category_id = request.data.get('category_id')
         if not LabTestCategory.objects.filter(is_live=True, id=category_id).exists():
             return Response({'error': 'Invalid category ID'}, status=status.HTTP_400_BAD_REQUEST)
-        longitude = request.data.get('longitude', 77.071848)
-        latitude = request.data.get('latitude', 28.450367)
+        longitude = request.data.get('long', 77.071848)
+        latitude = request.data.get('lat', 28.450367)
         max_distance = 10000
         point_string = 'POINT(' + str(longitude) + ' ' + str(latitude) + ')'
         pnt = GEOSGeometry(point_string, srid=4326)
@@ -3360,7 +3360,8 @@ class CompareLabPackagesViewSet(viewsets.ReadOnlyModelViewSet):
                 distance=Distance('lab_pricing_group__labs__location',
                                   pnt)).annotate(rank=Window(expression=RowNumber(), order_by=F('distance').asc(),
                                                              partition_by=[F('test__id')])).order_by(
-                '-test__priority').values('rank', package_id=F('test_id'), lab_id=F('lab_pricing_group__labs__id')))
+                '-test__priority').values('rank', 'distance', package_id=F('test_id'),
+                                          lab_id=F('lab_pricing_group__labs__id')))
 
         package_lab_ids = [x for x in package_lab_ids if x['rank'] == 1]
         package_lab_ids = package_lab_ids[:3]
