@@ -71,6 +71,7 @@ from django.contrib.contenttypes.models import ContentType
 from ondoc.matrix.tasks import push_appointment_to_matrix, push_onboarding_qcstatus_to_matrix, \
     update_onboarding_qcstatus_to_matrix, create_or_update_lead_on_matrix, push_signup_lead_to_matrix, \
     create_ipd_lead_from_opd_appointment
+from ondoc.integrations.task import push_opd_appointment_to_integrator
 # from ondoc.procedure.models import Procedure
 from ondoc.ratings_review import models as ratings_models
 from django.utils import timezone
@@ -1554,7 +1555,7 @@ class DoctorClinic(auth_model.TimeStampedModel, auth_model.WelcomeCallingDone):
             class_name = integration_dict['class_name']
             integrator_obj_id = integration_dict['id']
             integrator_obj = service.create_integrator_obj(class_name)
-            data = integrator_obj.get_appointment_slots(pincode, date, integrator_obj_id=integrator_obj_id)
+            data = integrator_obj.get_appointment_slots(pincode, date, integrator_obj_id=integrator_obj_id, dc_obj=self)
             if data:
                 return data['timeslots']
 
@@ -3099,12 +3100,19 @@ class OpdAppointment(auth_model.TimeStampedModel, CouponsMixin, OpdAppointmentIn
         doctor = data.get('doctor')
         time_slot_start = form_time_slot(data.get("start_date"), data.get("start_time"))
 
-        doctor_clinic_timing = DoctorClinicTiming.objects.filter(
-            doctor_clinic__doctor=data.get('doctor'),
-            doctor_clinic__hospital=data.get('hospital'),
-            doctor_clinic__doctor__is_live=True, doctor_clinic__hospital__is_live=True,
-            day=time_slot_start.weekday(), start__lte=data.get("start_time"),
-            end__gte=data.get("start_time")).first()
+        doctor_clinic = DoctorClinic.objects.filter(doctor=data.get('doctor'), hospital=data.get('hospital'), enabled=True).first()
+        if doctor_clinic.is_part_of_integration():
+            doctor_clinic_timing = DoctorClinicTiming.objects.filter(
+                doctor_clinic__doctor=data.get('doctor'),
+                doctor_clinic__hospital=data.get('hospital'),
+                doctor_clinic__doctor__is_live=True, doctor_clinic__hospital__is_live=True).first()
+        else:
+            doctor_clinic_timing = DoctorClinicTiming.objects.filter(
+                doctor_clinic__doctor=data.get('doctor'),
+                doctor_clinic__hospital=data.get('hospital'),
+                doctor_clinic__doctor__is_live=True, doctor_clinic__hospital__is_live=True,
+                day=time_slot_start.weekday(), start__lte=data.get("start_time"),
+                end__gte=data.get("start_time")).first()
 
         effective_price = 0
         if not procedures:

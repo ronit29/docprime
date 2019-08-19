@@ -279,11 +279,12 @@ class DoctorAppointmentsViewSet(OndocViewSet):
             data['is_appointment_insured'], data['insurance_id'], data[
                 'insurance_message'] = False, None, ""
         cart_item_id = validated_data.get('cart_item').id if validated_data.get('cart_item') else None
-        if not models.OpdAppointment.can_book_for_free(request, validated_data, cart_item_id):
-            return Response({'request_errors': {"code": "invalid",
-                                                "message": "Only {} active free bookings allowed per customer".format(
-                                                    models.OpdAppointment.MAX_FREE_BOOKINGS_ALLOWED)}},
-                            status=status.HTTP_400_BAD_REQUEST)
+        if not validated_data.get("part_of_integration"):
+            if not models.OpdAppointment.can_book_for_free(request, validated_data, cart_item_id):
+                return Response({'request_errors': {"code": "invalid",
+                                                    "message": "Only {} active free bookings allowed per customer".format(
+                                                        models.OpdAppointment.MAX_FREE_BOOKINGS_ALLOWED)}},
+                                status=status.HTTP_400_BAD_REQUEST)
 
         if validated_data.get("existing_cart_item"):
             cart_item = validated_data.get("existing_cart_item")

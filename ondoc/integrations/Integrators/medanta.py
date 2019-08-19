@@ -8,6 +8,7 @@ logger = logging.getLogger(__name__)
 from datetime import datetime, date, timedelta
 from django.contrib.contenttypes.models import ContentType
 from ondoc.integrations.models import IntegratorDoctorMappings, IntegratorHistory
+from ondoc.api.v1.utils import aware_time_zone
 
 
 class Medanta(BaseIntegrator):
@@ -132,7 +133,7 @@ class Medanta(BaseIntegrator):
             url = "%s/rest/api/external/appointment/booking" % (settings.MEDANTA_API_BASE_URL)
             headers = {'Content-Type': 'application/json', 'X-AuthToken': auth_token}
 
-            response = requests.get(url, data=json.dumps(payload), headers=headers)
+            response = requests.post(url, data=json.dumps(payload), headers=headers)
             status_code = response.status_code
             if response.status_code != status.HTTP_200_OK or not response.ok:
                 h_status = IntegratorHistory.NOT_PUSHED
@@ -145,14 +146,14 @@ class Medanta(BaseIntegrator):
                 h_status = IntegratorHistory.PUSHED_AND_NOT_ACCEPTED
                 IntegratorHistory.create_history(appointment, '', response, url, 'post_order', 'Sims', status_code,
                                                  retry_count, h_status, '')
-                return response[0]
+                return response
 
         return None
 
     def prepare_payload(self, integrator_mapping, appointment):
         doctor_id = integrator_mapping.integrator_doctor_id
-        preferred_date = appointment.time_slot_start.strftime("%d/%m/%Y %H:%M:%S")
-        preferred_time = appointment.time_slot_start.strftime("%H:%M")
+        preferred_date = aware_time_zone(appointment.time_slot_start).strftime("%d/%m/%Y %H:%M:%S")
+        # preferred_time = appointment.time_slot_start.strftime("%H:%M")
         name = appointment.profile_detail.get("name", "")
         profile = appointment.profile
         if profile:
@@ -168,7 +169,7 @@ class Medanta(BaseIntegrator):
         payload = {
             "birthDate": dob,
             "isdCode": '91',
-            'contactNumber': profile.phone_no,
+            'contactNumber': profile.phone_number,
             'email': profile.email,
             'firstName': name,
             'lastName': 'Ji',
@@ -177,7 +178,7 @@ class Medanta(BaseIntegrator):
             'patientQuery': 'For consultation',
             'doctorId': doctor_id,
             'preferredDate': preferred_date,
-            'preferredTimeSlot': preferred_time
+            'uploads': []
         }
 
         return payload

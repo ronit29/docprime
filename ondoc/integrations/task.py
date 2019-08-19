@@ -141,11 +141,9 @@ def push_opd_appointment_to_integrator(self, data):
             raise Exception("Doctor Clinic id not found, could not push to Integrator")
 
         if appointment.status == OpdAppointment.BOOKED:
-            integrator_mapping = IntegratorDoctorMappings.objects.filter(doctor_clinic_id=dc_obj,
-                                                                         is_active=True).first()
+            integrator_mapping = IntegratorDoctorMappings.objects.filter(doctor_clinic_id=dc_obj, is_active=True).first()
             if not integrator_mapping:
-                raise Exception(
-                    "[ERROR] Mapping not found for doctor or hospital - appointment id %d" % appointment.id)
+                raise Exception("[ERROR] Mapping not found for doctor or hospital - appointment id %d" % appointment.id)
 
             integrator_obj = service.create_integrator_obj(integrator_mapping.integrator_class_name)
             retry_count = push_opd_appointment_to_integrator.request.retries
@@ -160,8 +158,8 @@ def push_opd_appointment_to_integrator(self, data):
 
             resp_data = integrator_response
             if not IntegratorResponse.objects.filter(dp_order_id=appointment.id).first():
-                IntegratorResponse.objects.create(lead_id=resp_data['tokenno'], dp_order_id=appointment.id,
-                                                  integrator_order_id=resp_data['return_id'],
+                IntegratorResponse.objects.create(lead_id=resp_data['appointmentId'], dp_order_id=appointment.id,
+                                                  integrator_order_id=resp_data['appointmentId'],
                                                   content_object=appointment, response_data=resp_data,
                                                   integrator_class_name=integrator_mapping.integrator_class_name)
         # elif appointment.status == OpdAppointment.CANCELLED:
