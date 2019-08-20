@@ -26,7 +26,9 @@ from ondoc.doctor.models import (Doctor, Hospital, DoctorClinicTiming, DoctorCli
                                  SpecializationDepartmentMapping, CancellationReason, UploadDoctorData,
                                  HospitalServiceMapping, HealthInsuranceProviderHospitalMapping,
                                  HealthInsuranceProvider, HospitalHelpline, HospitalTiming, CommonHospital,
-                                 SimilarSpecializationGroup, SimilarSpecializationGroupMapping, PurchaseOrderCreation)
+                                 SimilarSpecializationGroup, SimilarSpecializationGroupMapping, PurchaseOrderCreation,
+                                 HospitalNetworkImage, HospitalNetworkTiming, HospitalNetworkServiceMapping,
+                                 HospitalNetworkSpeciality)
 
 from ondoc.diagnostic.models import (Lab, LabTiming, LabImage, GenericLabAdmin,
                                      LabManager, LabAccreditation, LabAward, LabCertification,
@@ -582,7 +584,10 @@ class Command(BaseCommand):
                                                            EmailBanner, RecommenderThrough, Recommender,
                                                            IpdProcedurePracticeSpecialization, CityLatLong, CommonHospital,
                                                            PotentialIpdLeadPracticeSpecialization, PotentialIpdCity,
-                                                           SimilarSpecializationGroupMapping, LabTestCategoryLandingURLS, LabTestCategoryUrls)
+                                                           SimilarSpecializationGroupMapping, LabTestCategoryLandingURLS, LabTestCategoryUrls,
+                                                           HospitalNetworkImage, HospitalNetworkTiming,
+                                                           HospitalNetworkServiceMapping,
+                                                           HospitalNetworkSpeciality)
         for cl, ct in content_types.items():
             permissions = Permission.objects.filter(
                 Q(content_type=ct),
