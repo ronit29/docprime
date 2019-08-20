@@ -1308,11 +1308,12 @@ class DynamicTemplates(TimeStampedModel):
     created_by = models.ForeignKey(User, null=False, limit_choices_to={'user_type': 1}, on_delete=models.DO_NOTHING)
     sample_parameters = JSONField(default=dict, null=True, blank=True)
     subject = models.CharField(max_length=256, null=True, blank=True)
+    recipient = models.CharField(max_length=100, null=True, blank=True)
 
     def __str__(self):
         return str(self.template_name)
 
-    def get_content(self):
+    def get_parameter_json(self):
         return self.sample_parameters
 
     def send_notification(self, context, recipient_obj, notification_type):
@@ -1355,7 +1356,13 @@ class DynamicTemplates(TimeStampedModel):
         super().save(*args, **kwargs)
 
     def preview_url(self):
-        return mark_safe("<a href='/notification/preview/%s' target='_blank'>Preview</a>" % self.template_name)
+        return mark_safe("<a href='/notification/preview/{template_name}?send=False' target='_blank'>Preview</a> "
+                         "| <a href='/notification/preview/{template_name}?send=True' target='_blank'>Send Preview</a>"
+                         .format(template_name=self.template_name))
+
+    class Meta:
+        db_table = 'dynamic_template'
+        unique_together = (('template_name', 'template_type'), )
 
     # def evaluate_loop(self, content_obj):
     #     content = content_obj.content.replace('\r','').replace('\n', '')
@@ -1458,6 +1465,3 @@ class DynamicTemplates(TimeStampedModel):
     #
     #     return parameter_dict
 
-    class Meta:
-        db_table = 'dynamic_template'
-        unique_together = (('template_name', 'template_type'), )

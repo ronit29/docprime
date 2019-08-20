@@ -3,6 +3,7 @@ from django.views import View
 from django.template import Context, Template
 from ondoc.notification.models import DynamicTemplates, RecipientEmail, NotificationAction
 from django.utils.safestring import mark_safe
+from django.conf import settings
 
 
 class DynamicTemplate(View):
@@ -14,18 +15,28 @@ class DynamicTemplate(View):
         html = t.render(c)
         return html
 
-    def get(self, request, template_name):
+    def get(self, request, template_name, *args, **kwargs):
         obj = DynamicTemplates.objects.filter(template_name=template_name).first()
 
         if not obj:
             return HttpResponse(self.get_invalid_content())
 
-        recipient_obj = RecipientEmail("akusaini@gmail.com").add_cc(['akashs@docprime.com']).add_bcc(['akusaini@gmail.com'])
-        obj.send_notification({}, recipient_obj, NotificationAction.APPOINTMENT_ACCEPTED)
+        if request.GET.get('send') == 'True':
 
-        # context = obj.get_content()
-        # file_content = obj.content
-        # t = Template(file_content)
-        # c = Context(context)
-        # html = t.render(c)
-        return HttpResponse()
+            if obj.recipient:
+
+                if obj.template_type == DynamicTemplates.TemplateType.EMAIL:
+                    recipient_obj = RecipientEmail(obj.recipient).add_cc([]).add_bcc([])
+                else:
+                    recipient_obj = obj.recipient
+
+                obj.send_notification(obj.get_parameter_json(), recipient_obj, NotificationAction.APPOINTMENT_ACCEPTED)
+                html = "Notification send successfully."
+            else:
+                html = "Recipient Number or address found to send notification."
+
+        else:
+
+            html = obj.render_template(obj.get_parameter_json())
+
+        return HttpResponse(html)
