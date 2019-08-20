@@ -136,32 +136,33 @@ def push_opd_appointment_to_integrator(self, data):
         if not appointment:
             raise Exception("Appointment could not found against id - " + str(appointment_id))
 
-        dc_obj = appointment.get_doctor_clinic()
-        if not dc_obj:
-            raise Exception("Doctor Clinic id not found, could not push to Integrator")
+        if not appointment.integrator_response_available():
+            dc_obj = appointment.get_doctor_clinic()
+            if not dc_obj:
+                raise Exception("Doctor Clinic id not found, could not push to Integrator")
 
-        if appointment.status == OpdAppointment.BOOKED:
-            integrator_mapping = IntegratorDoctorMappings.objects.filter(doctor_clinic_id=dc_obj, is_active=True).first()
-            if not integrator_mapping:
-                raise Exception("[ERROR] Mapping not found for doctor or hospital - appointment id %d" % appointment.id)
+            if appointment.status == OpdAppointment.BOOKED:
+                integrator_mapping = IntegratorDoctorMappings.objects.filter(doctor_clinic_id=dc_obj, is_active=True).first()
+                if not integrator_mapping:
+                    raise Exception("[ERROR] Mapping not found for doctor or hospital - appointment id %d" % appointment.id)
 
-            integrator_obj = service.create_integrator_obj(integrator_mapping.integrator_class_name)
-            retry_count = push_opd_appointment_to_integrator.request.retries
-            integrator_response = integrator_obj.post_order(appointment, dc_obj=dc_obj,
-                                                            integrator_mapping=integrator_mapping,
-                                                            retry_count=retry_count)
+                integrator_obj = service.create_integrator_obj(integrator_mapping.integrator_class_name)
+                retry_count = push_opd_appointment_to_integrator.request.retries
+                integrator_response = integrator_obj.post_order(appointment, dc_obj=dc_obj,
+                                                                integrator_mapping=integrator_mapping,
+                                                                retry_count=retry_count)
 
-            if not integrator_response:
-                countdown_time = (1 ** self.request.retries) * 60
-                print(countdown_time)
-                self.retry([data], countdown=countdown_time)
+                if not integrator_response:
+                    countdown_time = (1 ** self.request.retries) * 60
+                    print(countdown_time)
+                    self.retry([data], countdown=countdown_time)
 
-            resp_data = integrator_response
-            if not IntegratorResponse.objects.filter(dp_order_id=appointment.id).first():
-                IntegratorResponse.objects.create(lead_id=resp_data['appointmentId'], dp_order_id=appointment.id,
-                                                  integrator_order_id=resp_data['appointmentId'],
-                                                  content_object=appointment, response_data=resp_data,
-                                                  integrator_class_name=integrator_mapping.integrator_class_name)
+                resp_data = integrator_response
+                if not IntegratorResponse.objects.filter(dp_order_id=appointment.id).first():
+                    IntegratorResponse.objects.create(lead_id=resp_data['appointmentId'], dp_order_id=appointment.id,
+                                                      integrator_order_id=resp_data['appointmentId'],
+                                                      content_object=appointment, response_data=resp_data,
+                                                      integrator_class_name=integrator_mapping.integrator_class_name)
         # elif appointment.status == OpdAppointment.CANCELLED:
         #     saved_response = IntegratorResponse.objects.filter(object_id=appointment.id).first()
         #     if not saved_response:

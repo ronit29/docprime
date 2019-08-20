@@ -3609,6 +3609,14 @@ class OpdAppointment(auth_model.TimeStampedModel, CouponsMixin, OpdAppointmentIn
         artemis_hospital = Hospital.objects.filter(id=settings.ARTEMIS_HOSPITAL_ID).first()
         return self.hospital == artemis_hospital if artemis_hospital else False
 
+    def integrator_response_available(self):
+        from ondoc.integrations.models import IntegratorResponse
+        content_type = ContentType.objects.get_for_model(self)
+        if IntegratorResponse.objects.filter(object_id=self.id, content_type_id=content_type).first():
+            return True
+        else:
+            return False
+
 
 class OpdAppointmentProcedureMapping(models.Model):
     opd_appointment = models.ForeignKey(OpdAppointment, on_delete=models.CASCADE, related_name='procedure_mappings')
