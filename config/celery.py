@@ -6,8 +6,9 @@ import raven
 import os
 from django.conf import settings
 from raven.contrib.celery import register_signal, register_logger_signal
-from ondoc.account.tasks import refund_status_update, consumer_refund_update, dump_to_elastic, integrator_order_summary,\
-    get_thyrocare_reports, elastic_alias_switch, add_net_revenue_for_merchant
+from ondoc.account.tasks import refund_status_update, consumer_refund_update, dump_to_elastic, integrator_order_summary, \
+    get_thyrocare_reports, elastic_alias_switch, add_net_revenue_for_merchant, \
+    purchase_order_creation_counter_automation, purchase_order_closing_counter_automation
 from celery.schedules import crontab
 from ondoc.doctor.tasks import save_avg_rating, update_prices, update_city_search_key, update_doctors_count, update_search_score, \
     update_all_ipd_seo_urls, update_insured_labs_and_doctors, update_seo_urls, update_hosp_google_avg_rating, \
@@ -16,8 +17,6 @@ from ondoc.account.tasks import update_ben_status_from_pg,update_merchant_payout
 from ondoc.insurance.tasks import push_mis, process_insurance_payouts
 # from ondoc.doctor.services.update_search_score import DoctorSearchScore
 from ondoc.bookinganalytics.tasks import sync_booking_data
-from ondoc.notification.tasks import purchase_order_creation_counter_automation, \
-    purchase_order_closing_counter_automation
 
 env = environ.Env()
 

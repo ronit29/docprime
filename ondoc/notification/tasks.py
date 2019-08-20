@@ -1398,32 +1398,3 @@ def save_payment_status(self, current_status, args):
         PaymentProcessStatus.save_payment_status(current_status, args)
     except Exception as e:
        logger.error("Error in saving payment status - " + json.dumps(args) + " with exception - " + str(e))
-
-
-@task()
-def purchase_order_creation_counter_automation():
-
-    from ondoc.doctor.models import PurchaseOrderCreation
-    instance = PurchaseOrderCreation.objects.filter(start_date=timezone.now().date())
-    for poc_instance in instance:
-        if poc_instance and poc_instance.product_type == PurchaseOrderCreation.PAY_AT_CLINIC:
-            poc_instance.is_enabled = True
-            poc_instance.provider_name_hospital.enabled_poc = True
-            poc_instance.provider_name_hospital.enabled_for_cod = True
-
-        if poc_instance and poc_instance.product_type == PurchaseOrderCreation.SPONSOR_LISTING:
-            poc_instance.is_enabled = True
-
-
-@task()
-def purchase_order_closing_counter_automation():
-
-    from ondoc.doctor.models import PurchaseOrderCreation
-    instance = PurchaseOrderCreation.objects.filter(end_date=timezone.now().date())
-
-    for poc_instance in instance:
-        if poc_instance and poc_instance.product_type == PurchaseOrderCreation.PAY_AT_CLINIC:
-            instance.disable_cod_functionality()
-
-        if instance and instance.product_type == PurchaseOrderCreation.SPONSOR_LISTING:
-            instance.is_enabled = False
