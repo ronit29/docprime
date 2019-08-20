@@ -1973,7 +1973,7 @@ def rc_user_create(auth_token, auth_user_id, name, **kwargs):
             "username": username,
             "email": email,
             "password": password,
-            "rc_req_extras": json.dumps(rc_req_extras),
+            "rc_req_extras": rc_req_extras,
             "response_data": response_data_dict
             }
 
