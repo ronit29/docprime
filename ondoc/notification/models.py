@@ -1356,8 +1356,8 @@ class DynamicTemplates(TimeStampedModel):
         super().save(*args, **kwargs)
 
     def preview_url(self):
-        return mark_safe("<a href='/notification/preview/{template_name}?send=False' target='_blank'>Preview</a> "
-                         "| <a href='/notification/preview/{template_name}?send=True' target='_blank'>Send Preview</a>"
+        return mark_safe("<a href='/api/v1/notification/preview/{template_name}?send=False' target='_blank'>Preview</a> "
+                         "| <a href='/api/v1/notification/preview/{template_name}?send=True' target='_blank'>Send Preview</a>"
                          .format(template_name=self.template_name))
 
     class Meta:
