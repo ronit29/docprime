@@ -3340,9 +3340,11 @@ class CompareLabPackagesViewSet(viewsets.ReadOnlyModelViewSet):
 
     def build_request_parameters(self, request):
         result = {}
+        error_dict = {}
         category_id = request.data.get('category_id')
         if not LabTestCategory.objects.filter(is_live=True, id=category_id).exists():
-            return Response({'error': 'Invalid category ID'}, status=status.HTTP_400_BAD_REQUEST)
+            error_dict = {'error': 'Invalid category ID', 'status': status.HTTP_400_BAD_REQUEST}
+            return None, error_dict
         longitude = request.data.get('long', 77.071848)
         latitude = request.data.get('lat', 28.450367)
         max_distance = 10000
@@ -3366,19 +3368,22 @@ class CompareLabPackagesViewSet(viewsets.ReadOnlyModelViewSet):
         package_lab_ids = [x for x in package_lab_ids if x['rank'] == 1]
         package_lab_ids = package_lab_ids[:3]
         if not package_lab_ids:
-            return Response(status=status.HTTP_404_NOT_FOUND)
+            error_dict = {'error': 'Not Found', 'status': status.HTTP_404_NOT_FOUND}
+            return None, error_dict
         result['package_lab_ids'] = package_lab_ids
         result['lat'] = latitude
         result['long'] = longitude
         result['category'] = category_id
-        return result
+        return result, None
 
     def retrieve(self, request, *args, **kwargs):
         from django.db.models import Min
         if kwargs and kwargs['compare_package_details']:
             request_parameters = kwargs['compare_package_details']
         elif request.data.get('category_id'):
-            request_parameters = self.build_request_parameters(request)
+            request_parameters, error = self.build_request_parameters(request)
+            if error:
+                return Response(error.get('error'), status=error.get('status', status.HTTP_400_BAD_REQUEST))
         else:
             request_parameters = request.data
 
