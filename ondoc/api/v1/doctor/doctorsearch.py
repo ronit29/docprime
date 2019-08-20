@@ -38,21 +38,23 @@ class DoctorSearchHelper:
     def get_filtering_params(self):
         """Helper function that prepare dynamic query for filtering"""
         params = {}
-        hospital_type_mapping = {hospital_type[1]: hospital_type[0] for hospital_type in
-                                 models.Hospital.HOSPITAL_TYPE_CHOICES}
+        # hospital_type_mapping = {hospital_type[1]: hospital_type[0] for hospital_type in
+        #                          models.Hospital.HOSPITAL_TYPE_CHOICES}
 
         filtering_params = []
 
         specialization_ids = self.query_params.get("specialization_ids", [])
+        specialization_filter_ids = self.query_params.get("specialization_filter_ids", [])
         condition_ids = self.query_params.get("condition_ids", [])
 
         procedure_ids = self.query_params.get("procedure_ids", [])# NEW_LOGIC
         ipd_procedure_ids = self.query_params.get("ipd_procedure_ids", [])
         procedure_category_ids = self.query_params.get("procedure_category_ids", [])  # NEW_LOGIC
-        sits_at_hosp_types = self.query_params.get("sits_at", [])
+        # sits_at_hosp_types = self.query_params.get("sits_at", [])
+
 
         counter = 1
-        if self.query_params.get('hospital_id') is not None:
+        if self.query_params.get('hospital_id') is not None and self.query_params.get('hospital_id') is not "":
             hosp_str = 'h.id IN('
             for id in self.query_params.get('hospital_id'):
 
@@ -92,20 +94,34 @@ class DoctorSearchHelper:
                 sp_str+')'
             )
 
-        counter = 1
-        if self.query_params.get("sits_at"):
-            sits_at_str = 'hospital_type IN('
-            for hosp_type in sits_at_hosp_types:
+        counter=1
+        spec_filter_str = ''
+        if len(specialization_filter_ids) > 0 and len(procedure_ids)==0 and len(procedure_category_ids)==0:
+            spec_filter_str = 'and d.id in (select doctor_id from doctor_practice_specialization where specialization_id IN('
+            for id in specialization_filter_ids:
 
-                if counter != 1:
-                    sits_at_str += ', '
-                sits_at_str = sits_at_str + '%(' + 'sits_at' + str(counter) + ')s'
-                params['sits_at' + str(counter)] = hospital_type_mapping.get(hosp_type)
+                if not counter == 1:
+                    spec_filter_str += ','
+                spec_filter_str = spec_filter_str + '%('+'specialization_filter'+str(counter)+')s'
+                params['specialization_filter'+str(counter)] = id
                 counter += 1
 
-            filtering_params.append(
-                sits_at_str + ')'
-            )
+            spec_filter_str += '))'
+
+        # counter = 1
+        # if self.query_params.get("sits_at"):
+        #     sits_at_str = 'hospital_type IN('
+        #     for hosp_type in sits_at_hosp_types:
+        #
+        #         if counter != 1:
+        #             sits_at_str += ', '
+        #         sits_at_str = sits_at_str + '%(' + 'sits_at' + str(counter) + ')s'
+        #         params['sits_at' + str(counter)] = hospital_type_mapping.get(hosp_type)
+        #         counter += 1
+        #
+        #     filtering_params.append(
+        #         sits_at_str + ')'
+        #     )
             # filtering_params.append(
             #     "hospital_type IN (%(sits_at)s)"
             # )
@@ -265,7 +281,7 @@ class DoctorSearchHelper:
 
         if self.query_params.get('is_insurance'):
             filtering_params.append(
-                "mrp<=(%(insurance_threshold_amount)s) and h.enabled_for_online_booking=True and h.enabled_for_prepaid and d.enabled_for_online_booking=True and d.is_insurance_enabled and dc.enabled_for_online_booking=True"
+                "mrp<=(%(insurance_threshold_amount)s) and h.enabled_for_insurance and h.enabled_for_online_booking=True and h.enabled_for_prepaid and d.enabled_for_online_booking=True and d.is_insurance_enabled and dc.enabled_for_online_booking=True"
             )
             params['insurance_threshold_amount'] = self.query_params.get('insurance_threshold_amount')
 
@@ -276,6 +292,8 @@ class DoctorSearchHelper:
             return result
 
         result['string'] = " and ".join(filtering_params)
+        if spec_filter_str:
+            result['string'] = result.get('string') + spec_filter_str
         result['params'] = params
         if len(procedure_ids) > 0:
             result['count_of_procedure'] = len(procedure_ids)
@@ -452,7 +470,7 @@ class DoctorSearchHelper:
             else:
                 ipd_query = ""
 
-            query_string = "SELECT x.doctor_id, x.hospital_id, doctor_clinic_id, doctor_clinic_timing_id " \
+            query_string = "SELECT count(*) OVER() AS result_count, x.doctor_id, x.hospital_id, doctor_clinic_id, doctor_clinic_timing_id " \
                            "FROM (select {rank_part}, " \
                            "St_distance(St_setsrid(St_point((%(longitude)s), (%(latitude)s)), 4326), h.location) distance, " \
                            "d.id as doctor_id, dct.fees as fees, " \
@@ -469,7 +487,7 @@ class DoctorSearchHelper:
                            "LEFT JOIN doctor_leave dl on dl.doctor_id = d.id and (%(ist_date)s) BETWEEN dl.start_date and dl.end_date " \
                            "AND (%(ist_time)s) BETWEEN dl.start_time and dl.end_time " \
                            "{sp_cond} " \
-                           "WHERE {filtering_params} " \
+                           "WHERE {filtering_params}" \
                            " {search_distance} " \
                            "{min_dist_cond}" \
                            " )x " \
@@ -593,7 +611,7 @@ class DoctorSearchHelper:
                 is_insurance_covered = False
                 insurance_error = None
                 insurance_data_dict = kwargs.get('insurance_data')
-                if doctor_clinic.hospital.enabled_for_prepaid and enable_online_booking and doctor.is_insurance_enabled and doctor.is_doctor_specialization_insured() and insurance_data_dict and min_price.get("mrp") is not None and \
+                if doctor_clinic.hospital.enabled_for_prepaid and doctor_clinic.hospital.enabled_for_insurance and enable_online_booking and doctor.is_insurance_enabled and doctor.is_doctor_specialization_insured() and insurance_data_dict and min_price.get("mrp") is not None and \
                         min_price["mrp"] <= insurance_data_dict['insurance_threshold_amount'] and \
                         not (request.query_params.get('procedure_ids') or request.query_params.get('procedure_category_ids')):
                     is_insurance_covered = True

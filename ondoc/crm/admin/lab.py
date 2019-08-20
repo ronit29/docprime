@@ -573,6 +573,7 @@ class LabAdmin(ImportExportMixin, admin.GeoModelAdmin, CompareVersionAdmin, Acti
                'radiology_agreed_price_percentage', 'radiology_deal_price_percentage', 'live_at',
                'onboarded_at', 'qc_approved_at', 'disabled_at', 'welcome_calling_done_at')
     # autocomplete_fields = ['related_hospital']
+    search_fields = ['provider_name_lab']
 
     def has_delete_permission(self, request, obj=None):
         return super().has_delete_permission(request, obj)
@@ -994,7 +995,8 @@ class LabAppointmentAdmin(nested_admin.NestedModelAdmin, CompareVersionAdmin):
     get_insurance.short_description = 'Insurance'
 
     def is_prescription_uploaded(self, obj):
-        is_prescription = AppointmentPrescription.is_prescription_uploaded_for_appointment(obj)
+        # is_prescription = AppointmentPrescription.is_prescription_uploaded_for_appointment(obj)
+        is_prescription = obj.get_all_uploaded_prescriptions()
         if is_prescription:
             return str(True)
         else:
