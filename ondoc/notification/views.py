@@ -1,7 +1,7 @@
 from django.shortcuts import render, redirect, HttpResponse
 from django.views import View
 from django.template import Context, Template
-from ondoc.notification.models import DynamicTemplates
+from ondoc.notification.models import DynamicTemplates, RecipientEmail, NotificationAction
 from django.utils.safestring import mark_safe
 
 
@@ -20,9 +20,12 @@ class DynamicTemplate(View):
         if not obj:
             return HttpResponse(self.get_invalid_content())
 
-        context = obj.get_content()
-        file_content = obj.virtual_content
-        t = Template(file_content)
-        c = Context(context)
-        html = t.render(c)
-        return HttpResponse(html)
+        recipient_obj = RecipientEmail("akusaini@gmail.com").add_cc(['akashs@docprime.com']).add_bcc(['akusaini@gmail.com'])
+        obj.send_notification({}, recipient_obj, NotificationAction.APPOINTMENT_ACCEPTED)
+
+        # context = obj.get_content()
+        # file_content = obj.content
+        # t = Template(file_content)
+        # c = Context(context)
+        # html = t.render(c)
+        return HttpResponse()
