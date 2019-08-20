@@ -2917,9 +2917,12 @@ class LabTimingListView(mixins.ListModelMixin,
                                             intersect_data = intersect_dict
                                         else:
                                             intersect_data = list([x for x in intersect_data if x in intersect_dict])
-                                    intersect_resp['timeslots'][slot_date][i]['timing'].append(intersect_data)
+                                    intersect_resp['timeslots'][slot_date][i]['timing'] = intersect_resp['timeslots'][slot_date][i]['timing'] + intersect_data
                                 else:
                                     intersect_resp['timeslots'][slot_date][i]['timing'] = []
+
+                    upcoming_slots = TimeSlotExtraction().get_upcoming_slots(time_slots=intersect_resp['timeslots'])
+                    intersect_resp['upcoming_slots'] = upcoming_slots
 
         resp_data = {
             'all': intersect_resp,
