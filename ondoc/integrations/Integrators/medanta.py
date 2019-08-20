@@ -182,3 +182,10 @@ class Medanta(BaseIntegrator):
         }
 
         return payload
+
+    # def _cancel_order(self, appointment, integrator_response, retry_count):
+    #     integrator_appointment_id = integrator_response.lead_id
+    #     url = "https://www.medantaeclinic.org/rest/api/userDirectCancel/appointment/" \
+    #           "cancel/%s?reasonCode=Patient%27s+Requests" % integrator_appointment_id
+    #     response = requests.post(url)
+
