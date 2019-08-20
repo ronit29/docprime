@@ -2197,6 +2197,7 @@ class LabAppointment(TimeStampedModel, CouponsMixin, LabAppointmentInvoiceMixin,
         appointment_data["otp"] = otp
         appointment_data["user_plan_used"] = appointment_data.pop("user_plan", None)
         lab_ids = appointment_data.pop("lab_test")
+        test_timeslots = appointment_data.pop('test_time_slots') if appointment_data.get('test_time_slots', []) else []
         coupon_list = appointment_data.pop("coupon", None)
         coupon_data = {
             "random_coupons": appointment_data.pop("coupon_data", [])
@@ -2219,6 +2220,8 @@ class LabAppointment(TimeStampedModel, CouponsMixin, LabAppointmentInvoiceMixin,
             test['computed_deal_price'] = Decimal(test['computed_deal_price']) if test['computed_deal_price'] != 'None' else None
             test['custom_agreed_price'] = Decimal(test['custom_agreed_price']) if test['custom_agreed_price'] != 'None' else None
             test['computed_agreed_price'] = Decimal(test['computed_agreed_price']) if test['computed_agreed_price'] != 'None' else None
+            test['time_slot_start'] = test['time_slot_start'] if test['time_slot_start'] != 'None' else None
+            test['is_home_pickup'] = test['is_home_pickup'] if test['is_home_pickup'] != 'None' else False
             test_mappings.append(LabAppointmentTestMapping(**test))
         LabAppointmentTestMapping.objects.bulk_create(test_mappings)
         app_obj.lab_test.add(*lab_ids)
@@ -2515,27 +2518,19 @@ class LabAppointment(TimeStampedModel, CouponsMixin, LabAppointmentInvoiceMixin,
         extra_details = list()
         time_slot_details = ''
         test_time_slots = list()
-        is_home_pickup = None
-        pathology_home_pickup = None
-        radiology_home_pickup = None
-        for obj in lab_test_queryset:
-            test_ids_list.append(obj.id)
-            extra_details.append({
-                "id": str(obj.test.id),
-                "name": str(obj.test.name),
-                "custom_deal_price": str(obj.custom_deal_price),
-                "computed_deal_price": str(obj.computed_deal_price),
-                "mrp": str(obj.mrp),
-                "computed_agreed_price": str(obj.computed_agreed_price),
-                "custom_agreed_price": str(obj.custom_agreed_price)
-            })
+        is_home_pickup = False
+        pathology_home_pickup = False
+        radiology_home_pickup = False
+        time_slot_dict = dict()
 
         if data.get('has_radiology_timings'):
             for test_timing in data.get('test_timings'):
                 test_id = test_timing.get('test').id
                 test_data = dict()
                 test_data['test_id'] = test_id
-                test_data['time_slot_start'] = form_time_slot(test_timing["start_date"], test_timing["start_time"])
+                time_slot_start = form_time_slot(test_timing["start_date"], test_timing["start_time"])
+                test_data['time_slot_start'] = time_slot_start
+                time_slot_dict[test_id] = time_slot_start
                 test_data['is_home_pickup'] = test_timing.get('is_home_pickup')
                 test_time_slots.append(test_data)
                 if test_timing.get('type') == LabTest.PATHOLOGY:
@@ -2547,6 +2542,25 @@ class LabAppointment(TimeStampedModel, CouponsMixin, LabAppointmentInvoiceMixin,
         else:
             time_slot_details = form_time_slot(data["start_date"], data["start_time"])
             is_home_pickup = data["is_home_pickup"]
+
+        for obj in lab_test_queryset:
+            test_ids_list.append(obj.id)
+            home_pickup = False
+            if obj.test.test_type == LabTest.PATHOLOGY:
+                home_pickup = pathology_home_pickup
+            elif obj.test.test_type == LabTest.RADIOLOGY:
+                home_pickup = radiology_home_pickup
+            extra_details.append({
+                "id": str(obj.test.id),
+                "name": str(obj.test.name),
+                "custom_deal_price": str(obj.custom_deal_price),
+                "computed_deal_price": str(obj.computed_deal_price),
+                "mrp": str(obj.mrp),
+                "computed_agreed_price": str(obj.computed_agreed_price),
+                "custom_agreed_price": str(obj.custom_agreed_price),
+                "is_home_pickup": home_pickup,
+                "time_slot_start": str(time_slot_dict.get(obj.test.id)) if time_slot_dict.get(obj.test.id) else None
+            })
 
         profile_detail = {
             "name": data["profile"].name,
@@ -2603,7 +2617,8 @@ class LabAppointment(TimeStampedModel, CouponsMixin, LabAppointmentInvoiceMixin,
             "is_appointment_insured": is_appointment_insured,
             "insurance": insurance_id,
             "coupon_data": price_data.get("coupon_data"),
-            "prescription_list": data.get('prescription_list', [])
+            "prescription_list": data.get('prescription_list', []),
+            "has_radiology_timings": data.get('has_radiology_timings')
         }
 
         if data.get('included_in_user_plan', False):
@@ -3248,6 +3263,7 @@ class LabAppointmentTestMapping(models.Model):
     computed_deal_price = models.DecimalField(max_digits=10, decimal_places=2, default=None, null=True, blank=True)
     custom_deal_price = models.DecimalField(max_digits=10, decimal_places=2, default=None, null=True, blank=True)
     time_slot_start = models.DateTimeField(blank=True, null=True)
+    is_home_pickup = models.BooleanField(default=False)
 
     def __str__(self):
         return '{}>{}'.format(self.appointment, self.test)

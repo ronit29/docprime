@@ -747,6 +747,12 @@ class PrescriptionDocumentSerializer(serializers.Serializer):
     prescription = serializers.PrimaryKeyRelatedField(queryset=AppointmentPrescription.objects.all())
 
 
+class LabAppointmentTestTransactionSerializer(serializers.Serializer):
+    TEST_TYPE = [(LabTest.RADIOLOGY, "Radiology"), (LabTest.PATHOLOGY, "Pathology")]
+    test_id = serializers.PrimaryKeyRelatedField(queryset=LabTest.objects.all())
+    is_home_pickup = serializers.BooleanField(default=False)
+    time_slot_start = serializers.DateTimeField()
+
 class LabAppTransactionModelSerializer(serializers.Serializer):
     id = serializers.IntegerField(required=False)
     lab = serializers.PrimaryKeyRelatedField(queryset=Lab.objects.filter(is_live=True))
@@ -756,7 +762,7 @@ class LabAppTransactionModelSerializer(serializers.Serializer):
     agreed_price = serializers.DecimalField(max_digits=10, decimal_places=2)
     deal_price = serializers.DecimalField(max_digits=10, decimal_places=2)
     effective_price = serializers.DecimalField(max_digits=10, decimal_places=2)
-    time_slot_start = serializers.DateTimeField()
+    time_slot_start = serializers.DateTimeField(allow_null=True)
     profile_detail = serializers.JSONField()
     status = serializers.IntegerField()
     payment_type = serializers.IntegerField()
@@ -773,6 +779,20 @@ class LabAppTransactionModelSerializer(serializers.Serializer):
     user_plan = serializers.PrimaryKeyRelatedField(queryset=UserPlanMapping.objects.all(), allow_null=True)
     coupon_data = serializers.JSONField(required=False)
     prescription_list = serializers.ListSerializer(child=PrescriptionDocumentSerializer(), required=False)
+    test_time_slots = serializers.ListSerializer(child=LabAppointmentTestTransactionSerializer(), required=False, allow_empty=False)
+
+    def __init__(self, instance=None, data=None, **kwargs):
+        super().__init__(instance, data, **kwargs)
+        if data.get('has_radiology_timings'):
+            data.pop('time_slot_start', None)
+            data.pop('is_home_pickup', None)
+            self.fields.fields['time_slot_start'].required = False
+            self.fields.fields['is_home_pickup'].required = False
+            self.fields.fields['test_time_slots'].required = True
+        else:
+            data.pop('test_time_slots', None)
+            self.fields.fields['test_time_slots'].required = False
+            self.fields.fields['time_slot_start'].required = True
 
 
 class LabAppRescheduleModelSerializer(serializers.ModelSerializer):
@@ -832,6 +852,7 @@ class LabAppointmentTestSerializer(serializers.Serializer):
     start_time = serializers.FloatField()
     type = serializers.ChoiceField(choices=TEST_TYPE)
     is_home_pickup = serializers.BooleanField(default=False)
+
 
 class LabAppointmentCreateSerializer(serializers.Serializer):
     lab = serializers.PrimaryKeyRelatedField(queryset=Lab.objects.filter(is_live=True))
