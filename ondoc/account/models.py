@@ -1631,7 +1631,7 @@ class MerchantPayout(TimeStampedModel):
         if not self.id:
             first_instance = True
 
-        if self.id and not self.is_insurance_premium_payout() and hasattr(self,'process_payout') and self.process_payout and self.status==self.PENDING and self.type==self.AUTOMATIC:
+        if self.id and not self.is_insurance_premium_payout() and hasattr(self,'process_payout') and self.process_payout and (self.status==self.PENDING or self.status==self.ATTEMPTED) and self.type==self.AUTOMATIC:
             self.type = self.AUTOMATIC
             self.update_billed_to_content_type()
             # if not self.content_object:
@@ -2230,6 +2230,20 @@ class MerchantPayout(TimeStampedModel):
             adv_amt_obj.save()
             self.payout_ref_id = self.id
             self.save()
+
+    @property
+    def get_nodal_id(self):
+        from ondoc.doctor.models import OpdAppointment
+        if self.booking_type == self.InsurancePremium:
+            return 2
+        else:
+            appointment = self.get_appointment()
+            if appointment.payment_type == OpdAppointment.PREPAID:
+                return 1
+            elif appointment.payment_type == OpdAppointment.INSURANCE:
+                return 2
+
+        return 0
 
     class Meta:
         db_table = "merchant_payout"

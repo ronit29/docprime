@@ -1741,7 +1741,7 @@ def create_payout_checksum(all_txn, product_id):
     checksum = ""
     for txn in all_txn:
         curr = "{"
-        for k in txn.keys():
+        for k in sorted(txn.keys()):
             if str(txn[k]) and txn[k] is not None and txn[k] is not "":
                 curr = curr + k + '=' + str(txn[k]) + ';'
         curr = curr + "}"
@@ -1936,3 +1936,9 @@ def format_return_value(value):
         return None
 
     return value
+
+
+def is_valid_ckeditor_text(text):
+    if text == "<p>&nbsp;</p>":
+        return False
+    return True
