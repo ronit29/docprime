@@ -9,7 +9,7 @@ from .views import (LoginOTP, UserViewset, NotificationEndpointViewSet,
                     OrderDetailViewSet, UserTokenViewSet, SendBookingUrlViewSet, ContactUsViewSet, CareerViewSet,
                     DoctorNumberAutocomplete, UserLeadViewSet, ReferralViewSet, UserRatingViewSet, AppointmentViewSet,
                     WhatsappOptinViewSet, DoctorScanViewSet, TokenFromUrlKey, ProfileEmailUpdateViewset,
-                    BajajAllianzUserViewset)
+                    BajajAllianzUserViewset, MatrixUserViewset)
 
 urlpatterns = [
     path('api-token-refresh', RefreshJSONWebToken.as_view({'post':'refresh'}), name='token-refresh'),
@@ -72,5 +72,6 @@ urlpatterns = [
     # path('test/', PathologyTestList.as_view({'get': 'list'}), name='test-list'),
     # path('test/<int:id>/', PathologyTestList.as_view({'get': 'retrieve'}), name='test-detail'),
     path('profile-email/update/init', ProfileEmailUpdateViewset.as_view({'post': 'create'}), name='update-profile-email-init'),
-    path('profile-email/update', ProfileEmailUpdateViewset.as_view({'post': 'update_email'}), name='update-profile-email')
+    path('profile-email/update', ProfileEmailUpdateViewset.as_view({'post': 'update_email'}), name='update-profile-email'),
+    path('matrix_user', MatrixUserViewset.as_view({'post': 'user_login_via_matrix'}), name='matrix-login'),
 ]

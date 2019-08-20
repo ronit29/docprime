@@ -2,7 +2,7 @@ from rest_framework import serializers
 from ondoc.authentication.models import (OtpVerifications, User, UserProfile, Notification, NotificationEndpoint,
                                          DoctorNumber, Address, GenericAdmin, UserSecretKey,
                                          UserPermission, Address, GenericAdmin, GenericLabAdmin, UserProfileEmailUpdate)
-from ondoc.doctor.models import DoctorMobile, ProviderSignupLead, Hospital
+from ondoc.doctor.models import DoctorMobile, ProviderSignupLead, Hospital, Doctor
 from ondoc.common.models import AppointmentHistory
 from ondoc.doctor.models import DoctorMobile
 from ondoc.insurance.models import InsuredMembers, UserInsurance
@@ -601,3 +601,16 @@ class ExternalLoginSerializer(serializers.Serializer):
     email = serializers.EmailField(required=True, allow_null=True, allow_blank=True)
     extra = serializers.JSONField(allow_null=True, required=False)
     redirect_type = serializers.ChoiceField(choices=[('doctor',"Doctor"), ('lab',"Lab")])
+
+
+class MatrixUserLoginSerializer(serializers.Serializer):
+    GENDER_CHOICES = UserProfile.GENDER_CHOICES
+    name = serializers.CharField(max_length=100)
+    phone_number = serializers.IntegerField(min_value=1000000000, max_value=9999999999)
+    is_default_user = serializers.BooleanField(required=False)
+    email = serializers.EmailField()
+    dob = serializers.DateField()
+    serializers.ChoiceField(choices=GENDER_CHOICES)
+    extra = serializers.JSONField(allow_null=True, required=False)
+    doctor = serializers.PrimaryKeyRelatedField(queryset=Doctor.objects.all())
+    hospital = serializers.PrimaryKeyRelatedField(queryset=Hospital.objects.all())

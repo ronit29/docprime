@@ -13,6 +13,7 @@ from django.core.files.uploadedfile import InMemoryUploadedFile
 from io import BytesIO
 import math
 import os
+import re
 import hashlib
 import random, string
 from django.contrib.contenttypes.fields import GenericForeignKey, GenericRelation
@@ -29,7 +30,6 @@ from rest_framework import status
 from collections import OrderedDict
 from django.utils.text import slugify
 import logging
-
 
 logger = logging.getLogger(__name__)
 
@@ -338,6 +338,66 @@ class User(AbstractBaseUser, PermissionsMixin):
         # if self.user_type==1 and hasattr(self, 'staffprofile'):
         #     return self.staffprofile.name
         # return str(self.phone_number)
+
+    @classmethod
+    def get_external_login_data(cls, data):
+        from ondoc.authentication.backends import JWTAuthentication
+        profile_data = {}
+        source = data.get('extra').get('utm_source', 'External') if data.get('extra') else 'External'
+        redirect_type = data.get('redirect_type', "")
+
+        user = User.objects.filter(phone_number=data.get('phone_number'), user_type=User.CONSUMER).first()
+        if not user:
+            user = User.objects.create(phone_number=data.get('phone_number'),
+                                       is_phone_number_verified=False,
+                                       user_type=User.CONSUMER,
+                                       auto_created=True,
+                                       email=data.get('email'),
+                                       source=source,
+                                       data=data.get('extra'))
+
+        if not user:
+            raise Exception('Invalid User')
+            # return JsonResponse(response, status=400)
+
+        profile_data['name'] = data.get('name')
+        profile_data['phone_number'] = user.phone_number
+        profile_data['user'] = user
+        profile_data['email'] = data.get('email')
+        profile_data['source'] = source
+        user_profiles = user.profiles.all()
+
+        if not bool(re.match(r"^[a-zA-Z ]+$", data.get('name'))):
+            raise Exception('Invalid Name')
+            # return Response({"error": "Invalid Name"}, status=status.HTTP_400_BAD_REQUEST)
+
+        if user_profiles:
+            user_profiles = list(filter(lambda x: x.name.lower() == profile_data['name'].lower(), user_profiles))
+            if user_profiles:
+                user_profile = user_profiles[0]
+                user_profile.phone_number = profile_data['phone_number'] if not user_profile.phone_number else None
+                user_profile.email = profile_data['email'] if not user_profile.email else None
+                user_profile.gender = profile_data['gender'] if profile_data['gender'] and not user_profile.gender else None
+                user_profile.dob = profile_data['dob'] if profile_data['dob'] and not user_profile.dob else None
+                user_profile.save()
+            else:
+                UserProfile.objects.create(**profile_data)
+        else:
+            profile_data.update({
+                "is_default_user": True
+            })
+            if profile_data.get('doctor'):
+                profile_data.pop('doctor')
+            if profile_data.get('hospital'):
+                profile_data.pop('hospital')
+            UserProfile.objects.create(**profile_data)
+
+        token_object = JWTAuthentication.generate_token(user)
+        result = dict()
+        result['token'] = token_object
+        result['user_id'] = user.id
+        return result
+
 
     def is_valid_lead(self, date_time_to_be_checked, check_lab_appointment=False, check_ipd_lead=False):
         # If this user has booked an appointment with specific period from date_time_to_be_checked, then
