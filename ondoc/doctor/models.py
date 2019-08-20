@@ -2052,6 +2052,10 @@ class HospitalNetwork(auth_model.TimeStampedModel, auth_model.CreatedByModel, au
     auto_ivr_enabled = models.BooleanField(default=True)
     priority_score = models.IntegerField(default=0, null=False, blank=False)
     opd_timings = models.CharField(max_length=150, blank=True, null=True, default="")
+    always_open = models.BooleanField(verbose_name='Are hospitals open 24X7', default=False)
+    service = models.ManyToManyField(Service, through='HospitalNetworkServiceMapping',
+                                     through_fields=('network', 'service'),
+                                     related_name='of_hospital_network')
 
     def update_time_stamps(self):
         if self.welcome_calling_done and not self.welcome_calling_done_at:
