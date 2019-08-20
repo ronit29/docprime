@@ -16,6 +16,7 @@ from django.utils.dateparse import parse_datetime
 from weasyprint import HTML
 from django.http import HttpResponse
 
+from ondoc.api.v1.doctor.serializers import TopHospitalForIpdProcedureSerializer
 from ondoc.api.v1.insurance.serializers import InsuranceCityEligibilitySerializer
 from ondoc.api.v1.utils import html_to_pdf, generate_short_url
 from ondoc.authentication.models import User
@@ -1230,6 +1231,8 @@ class CommentViewSet(viewsets.ModelViewSet):
 
 class SponsorListingViewSet(viewsets.GenericViewSet):
 
+    queryset = PurchaseOrderCreation.objects.all()
+
     def list(self, request):
 
         parameters = request.query_params
@@ -1238,42 +1241,29 @@ class SponsorListingViewSet(viewsets.GenericViewSet):
         lat = parameters.get('lat')
         long = parameters.get('long')
         utm = parameters.get('utm_term')
-        list_obj = list()
+        important_ids = set()
 
         sponsorlisting_objects = PurchaseOrderCreation.objects.filter(is_enabled=True,
                                                                       start_date__lte=timezone.now().date(),
                                                                       end_date__gte=timezone.now().date(),
                                                                       product_type=PurchaseOrderCreation.SPONSOR_LISTING). \
-            select_related('poc', 'provider_name_hospital').prefetch_related('poc_specialization', 'poc_sponsorlisting',
+            select_related('provider_name_hospital').prefetch_related('poc_specialization', 'poc_sponsorlisting',
                                                                              'poc_utm_term', 'poc_lat_long')
 
-        if url:
-            seo_url_matching_ids = sponsorlisting_objects.filter(poc_sponsorlisting__seo_url=url).values('provider_name_hospital').distinct()
-            hospital_object = Hospital.objects.filter(id=seo_url_matching_ids)
 
-        # if spec_id:
-        #     specialization_matching_ids = sponsorlisting_objects.filter(
-        #         poc_specialization__specialization__id=spec_id, ).annotate(
-        #         location=Point(F('poc_lat_long__longitude'), F('poc_lat_long__latitude'))).filter(
-        #         location__dwithin=(Point(float(long), float(lat)), D(m=F('poc_lat_long__radius'))), ).values(
-        #         'provider_name_hospital').distinct()
+        if url:
+            seo_url_matching_ids = sponsorlisting_objects.filter(poc_sponsorlisting__seo_url=url).values_list('provider_name_hospital', flat=True).distinct()
+            important_ids = important_ids | set(seo_url_matching_ids)
 
         if utm:
-            utm_matching_ids = sponsorlisting_objects.filter(poc_utm_term__utm_term=utm).values(
-                'provider_name_hospital').distinct()
-            hospital_objects = Hospital.objects.filter(id=utm_matching_ids)
+            utm_matching_ids = sponsorlisting_objects.filter(poc_utm_term__utm_term=utm).values_list(
+                'provider_name_hospital', flat=True).distinct()
+            important_ids = important_ids | set(utm_matching_ids)
 
+        sepc_lat_matching_ids = []
         for sponsor in sponsorlisting_objects:
-            resp1 = {}
-            resp2 = {}
-            resp3 = {}
-            # for sp in sponsor.poc_sponsorlisting.filter(start_date__lte=timezone.now(), end_date__gte=timezone.now(), is_enabled=True):
-            #     seo_url = sp.seo_url
-            #     if seo_url == url:
-            #         resp1['seo_url'] = seo_url
-            #         resp1['provider_id'] = sp.poc.provider_name_hospital.id
-            #         resp1['provider_name'] = sp.poc.provider_name_hospital.name
-            #     list_obj.append({'SEO_URL': resp1})
+
+            resp = {}
 
             for spec in sponsor.poc_specialization.all():
                 for loc in sponsor.poc_lat_long.all():
@@ -1286,24 +1276,29 @@ class SponsorListingViewSet(viewsets.GenericViewSet):
                             pnt1 = Point(float(longitude), float(latitude))
                             pnt2 = Point(float(long), float(lat))
                             if pnt1.distance(pnt2) * 100 <= radius and specialization_id == spec_id:
-                                resp2['specialization_id'] = specialization_id
-                                resp2['provider_id'] = spec.poc.provider_name_hospital.id
-                                resp2['provider_name'] = spec.poc.provider_name_hospital.name
+                                resp['specialization_id'] = specialization_id
+                                resp['provider_id'] = spec.poc.provider_name_hospital.id
+                                resp['provider_name'] = spec.poc.provider_name_hospital.name
                                 hospital_id = spec.poc.provider_name_hospital.id
-                                hospital_object = Hospital.objects.filter(id=hospital_id)
-                        list_obj.append({'specialization': resp2})
+                                sepc_lat_matching_ids.append(hospital_id)
+
+
                     elif latitude and longitude and radius:
                         pnt1 = Point(float(longitude), float(latitude))
                         pnt2 = Point(float(long), float(lat))
                         if pnt1.distance(pnt2) * 100 <= radius:
                             hospital_id = spec.poc.provider_name_hospital.id
-                            hospital_object = Hospital.objects.filter(id=hospital_id)
+                            sepc_lat_matching_ids.append(hospital_id)
 
-            # for utm in sponsor.poc_utm_term.filter(is_enabled=True):
-            #     utm_term = utm.utm_term
-            #     if utm_term == utm:
-            #         resp3['provider_id'] = utm.poc.provider_name_hospital.id
-            #         resp3['provider_name'] = utm.poc.provider_name_hospital.name
-            #     list_obj.append({'Utm_term': resp3})
+        important_ids = important_ids | set(sepc_lat_matching_ids)
 
+        list_obj = Hospital.objects.prefetch_related('hospitalcertification_set',
+                                                            'hospital_documents',
+                                                            'hosp_availability',
+                                                            'health_insurance_providers',
+                                                            'network__hospital_network_documents',
+                                                            'hospitalspeciality_set').filter(id__in=important_ids)
+
+        serialized_objects = TopHospitalForIpdProcedureSerializer(list_obj, many=True).data
+        return Response(serialized_objects)
 

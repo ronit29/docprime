@@ -793,8 +793,6 @@ class Fraud(auth_model.TimeStampedModel):
 class SponsorListingURL(auth_model.TimeStampedModel):
     poc = models.ForeignKey("doctor.PurchaseOrderCreation", on_delete=models.CASCADE, null=True, blank=True, related_name='poc_sponsorlisting')
     seo_url = models.CharField(max_length=500, null=True, blank=True)
-    start_date = models.DateField(null=True, blank=True)
-    end_date = models.DateField(null=True, blank=True)
     is_enabled = models.BooleanField(default=False)
 
 
