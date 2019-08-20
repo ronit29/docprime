@@ -1263,8 +1263,6 @@ class SponsorListingViewSet(viewsets.GenericViewSet):
         sepc_lat_matching_ids = []
         for sponsor in sponsorlisting_objects:
 
-            resp = {}
-
             for spec in sponsor.poc_specialization.all():
                 for loc in sponsor.poc_lat_long.all():
                     latitude = loc.latitude
@@ -1276,9 +1274,6 @@ class SponsorListingViewSet(viewsets.GenericViewSet):
                             pnt1 = Point(float(longitude), float(latitude))
                             pnt2 = Point(float(long), float(lat))
                             if pnt1.distance(pnt2) * 100 <= radius and specialization_id == spec_id:
-                                resp['specialization_id'] = specialization_id
-                                resp['provider_id'] = spec.poc.provider_name_hospital.id
-                                resp['provider_name'] = spec.poc.provider_name_hospital.name
                                 hospital_id = spec.poc.provider_name_hospital.id
                                 sepc_lat_matching_ids.append(hospital_id)
 

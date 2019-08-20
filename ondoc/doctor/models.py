@@ -2294,7 +2294,6 @@ class PurchaseOrderCreation(auth_model.TimeStampedModel):
             if self.product_type == self.SPONSOR_LISTING:
                 if self.start_date == timezone.now().date():
                     self.is_enabled = True
-                    sponsor_listing = True
 
         if self.id:
             if self.is_enabled == False:
@@ -2310,22 +2309,6 @@ class PurchaseOrderCreation(auth_model.TimeStampedModel):
                 self.provider_name_hospital.enabled_for_cod = True
                 self.provider_name_hospital.enabled_poc = True
                 self.provider_name_hospital.save()
-                notification_tasks.purchase_order_closing_counter_automation.apply_async((self.id, ), eta=self.end_date, )    # task to disable Pay-at-clinic functionality in hospital
-
-            else:
-                notification_tasks.purchase_order_creation_counter_automation.apply_async((self.id, ), eta=self.start_date, ) # task to enable Pay-at-clinic functionality in hospital
-                notification_tasks.purchase_order_closing_counter_automation.apply_async((self.id, ), eta=self.end_date, )    # task to disable Pay-at-clinic functionality in hospital
-
-        if sponsor_listing and self.SPONSOR_LISTING:
-            if self.start_date == timezone.now().date():
-                notification_tasks.purchase_order_closing_counter_automation.apply_async((self.id,),
-                                                                                         eta=self.end_date, )
-            else:
-                notification_tasks.purchase_order_creation_counter_automation.apply_async((self.id,),
-                                                                                          eta=self.start_date, )
-                notification_tasks.purchase_order_closing_counter_automation.apply_async((self.id,),
-                                                                                         eta=self.end_date, )
-
 
     def disable_cod_functionality(self):
         remaining_poc_objects = PurchaseOrderCreation.objects.filter(is_enabled=True,

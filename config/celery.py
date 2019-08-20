@@ -16,6 +16,8 @@ from ondoc.account.tasks import update_ben_status_from_pg,update_merchant_payout
 from ondoc.insurance.tasks import push_mis, process_insurance_payouts
 # from ondoc.doctor.services.update_search_score import DoctorSearchScore
 from ondoc.bookinganalytics.tasks import sync_booking_data
+from ondoc.notification.tasks import purchase_order_creation_counter_automation, \
+    purchase_order_closing_counter_automation
 
 env = environ.Env()
 
@@ -100,3 +102,6 @@ def setup_periodic_tasks(sender, **kwargs):
     sender.add_periodic_task(crontab(hour=19, minute=00), create_appointment_admins_from_spocs.s(), name='Create Appointment Admins from SPOCs')
     sender.add_periodic_task(crontab(hour=0, minute=30), doctors_daily_schedule.s(), name="Doctor's Daily Schedule")
     # sender.add_periodic_task(crontab(hour=21, minute=00), add_net_revenue_for_merchant.s(), name='Add net revenue for merchants')
+    sender.add_periodic_task(crontab(hour=0, minute=00), purchase_order_creation_counter_automation(), name="Enable Purchase Order Creation")
+    sender.add_periodic_task(crontab(hour=18, minute=30), purchase_order_closing_counter_automation(),
+                             name="Disable Purchase Order Creation")
