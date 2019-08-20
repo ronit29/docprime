@@ -846,6 +846,7 @@ class DoctorSearchHelper:
                     "name": doctor_clinic.hospital.name,
                     "priceRange": min_price["deal_price"],
                     "image": doctor_clinic.hospital.get_thumbnail() if doctor_clinic.hospital.get_thumbnail() else None,
+                    "url": kwargs.get('hosp_entity_dict', {}).get(doctor_clinic.hospital.id),
                     "address":
                         {
                             "@type": 'PostalAddress',
