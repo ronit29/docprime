@@ -12,7 +12,7 @@ from ondoc.crm.admin.doctor import CreatedByFilter
 from ondoc.doctor.models import (HospitalImage, HospitalDocument, HospitalAward, Doctor,
                                  HospitalAccreditation, HospitalCertification, HospitalSpeciality, HospitalNetwork,
                                  Hospital, HospitalServiceMapping, HealthInsuranceProviderHospitalMapping,
-                                 HospitalHelpline, HospitalTiming, DoctorClinic, CommonHospital)
+                                 HospitalHelpline, HospitalTiming, DoctorClinic, CommonHospital, HospitalNetworkImage)
 from .common import *
 from ondoc.crm.constants import constants
 from django.utils.safestring import mark_safe

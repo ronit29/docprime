@@ -33,6 +33,7 @@ import logging
 
 logger = logging.getLogger(__name__)
 
+
 class Image(models.Model):
     # name = models.ImageField(height_field='height', width_field='width')
     width = models.PositiveSmallIntegerField(editable=False,blank=True, null=True)

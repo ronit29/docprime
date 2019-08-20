@@ -9,8 +9,9 @@ from ondoc.authentication.models import GenericAdmin, User, AssociatedMerchant, 
 from ondoc.crm.admin.doctor import CreatedByFilter
 
 from ondoc.doctor.models import (HospitalNetworkManager, Hospital,
-    HospitalNetworkHelpline, HospitalNetworkEmail, HospitalNetworkAccreditation,
-    HospitalNetworkAward, HospitalNetworkCertification, HospitalNetworkDocument)
+                                 HospitalNetworkHelpline, HospitalNetworkEmail, HospitalNetworkAccreditation,
+                                 HospitalNetworkAward, HospitalNetworkCertification, HospitalNetworkDocument,
+                                 HospitalNetworkImage, HospitalNetworkTiming)
 import datetime
 from .common import *
 from ondoc.authentication.admin import SPOCDetailsInline
@@ -76,6 +77,41 @@ class HospitalNetworkHelplineInline(admin.TabularInline):
 
     def get_queryset(self, request):
         return super().get_queryset(request).select_related('network')
+
+
+class HospitalNetworkTimingInlineFormSet(forms.BaseInlineFormSet):
+    def clean(self):
+        super().clean()
+        if any(self.errors):
+            return
+        temp = set()
+
+        for value in self.cleaned_data:
+            if not value.get("DELETE"):
+                t = tuple([value.get("day"), value.get("start"), value.get("end")])
+                if t not in temp:
+                    temp.add(t)
+                else:
+                    raise forms.ValidationError("Duplicate records not allowed.")
+
+
+class HospitalNetworkTimingInline(admin.TabularInline):
+    model = HospitalNetworkTiming
+    formset = HospitalNetworkTimingInlineFormSet
+    fk_name = 'network'
+    extra = 0
+    can_delete = True
+    show_change_link = False
+
+
+class HospitalNetworkImageInline(admin.TabularInline):
+    model = HospitalNetworkImage
+    readonly_fields = ['cropped_image']
+    extra = 0
+    can_delete = True
+    show_change_link = False
+    max_num = 10
+
 
 
 class HospitalNetworkManagerInline(admin.TabularInline):
@@ -220,6 +256,8 @@ class HospitalNetworkAdmin(VersionAdmin, ActionAdmin, QCPemAdmin):
     exclude = ('qc_approved_at', 'welcome_calling_done_at', 'physical_agreement_signed_at')
     # autocomplete_fields = ['matrix_city', 'matrix_state']
     inlines = [
+        HospitalNetworkImageInline,
+        HospitalNetworkTimingInline,
         HospitalNetworkManagerInline,
         HospitalNetworkHelplineInline,
         HospitalNetworkEmailInline,
