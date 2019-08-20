@@ -158,7 +158,7 @@ def push_opd_appointment_to_integrator(self, data):
                     self.retry([data], countdown=countdown_time)
 
                 resp_data = integrator_response
-                if not IntegratorResponse.objects.filter(dp_order_id=appointment.id).first():
+                if not IntegratorResponse.objects.filter(object_id=appointment.id).first():
                     IntegratorResponse.objects.create(lead_id=resp_data['appointmentId'], dp_order_id=appointment.id,
                                                       integrator_order_id=resp_data['appointmentId'],
                                                       content_object=appointment, response_data=resp_data,

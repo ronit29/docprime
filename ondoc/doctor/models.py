@@ -2706,7 +2706,7 @@ class OpdAppointment(auth_model.TimeStampedModel, CouponsMixin, OpdAppointmentIn
 
     def created_by_native(self):
         from packaging.version import parse
-        child_order = Order.objects.filter(reference_id=self.id).first()
+        child_order = Order.objects.filter(reference_id=self.id, product_id=self.PRODUCT_ID).first()
         parent_order = None
         from_app = False
 
