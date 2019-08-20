@@ -2531,13 +2531,12 @@ class LabAppointment(TimeStampedModel, CouponsMixin, LabAppointmentInvoiceMixin,
             else:
                 payment_type = data["payment_type"]
 
-
         # check if test mapped with affiliates
         mapped_with_affiliates = None
-        source = data["spo_data"].get("UtmSource", None)
+        source = data["utm_spo_tags"].get("UtmSource", None)
         if source:
             mapped_with_affiliates = True
-            affiliate = SalesPoint.objects.filter(name=data["spo_data"]["UtmSource"]).first()
+            affiliate = SalesPoint.objects.filter(name=data["utm_spo_tags"]["UtmSource"]).first()
             if affiliate:
                 for test_id in test_ids_list:
                     spo_mapping = SalespointTestmapping.objects.filter(salespoint_id=affiliate.id,
@@ -2546,7 +2545,7 @@ class LabAppointment(TimeStampedModel, CouponsMixin, LabAppointmentInvoiceMixin,
                         mapped_with_affiliates = False
 
         if mapped_with_affiliates:
-            spo_data = data["spo_data"]
+            spo_data = data["utm_spo_tags"]
         else:
             spo_data = {}
 
