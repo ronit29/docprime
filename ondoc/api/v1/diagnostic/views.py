@@ -2828,7 +2828,8 @@ class LabTimingListView(mixins.ListModelMixin,
         from ondoc.integrations import service
         params = request.query_params
 
-        for_home_pickup = True if int(params.get('pickup', 0)) else False
+        pathology_pickup = True if int(params.get('p_pickup', 0)) else False
+        radiology_pickup = True if int(params.get('r_pickup', 0)) else False
         lab = params.get('lab')
         test_ids = params.get('test_ids', '')
         test_ids = test_ids.split(',')
@@ -2867,11 +2868,11 @@ class LabTimingListView(mixins.ListModelMixin,
             if lab_obj:
                 if not integration_dict:
                     if pathology_tests:
-                        lab_timings = lab_obj.get_timing_v2(for_home_pickup, total_leaves)
+                        lab_timings = lab_obj.get_timing_v2(pathology_pickup, total_leaves)
                 else:
                     class_name = integration_dict['class_name']
                     integrator_obj = service.create_integrator_obj(class_name)
-                    lab_timings = integrator_obj.get_appointment_slots(pincode, date, is_home_pickup=for_home_pickup)
+                    lab_timings = integrator_obj.get_appointment_slots(pincode, date, is_home_pickup=pathology_pickup)
                 pathology_resp = {"timeslots": lab_timings.get('time_slots', []),
                                   "upcoming_slots": lab_timings.get('upcoming_slots', []),
                                   "is_thyrocare": lab_timings.get('is_thyrocare', False)}
@@ -2885,7 +2886,7 @@ class LabTimingListView(mixins.ListModelMixin,
                         timing_obj = {'name': radiology_test.name, 'timings': pathology_test_resp}
                         radiology_resp['tests'].append(timing_obj)
 
-                if pathology_tests and radiology_tests and not for_home_pickup:
+                if pathology_tests and radiology_tests and pathology_pickup == radiology_pickup:
                     for slot_date in pathology_resp['timeslots']:
                         intersect_resp['timeslots'].update({slot_date: []})
                         time_separtors = ['AM', 'PM']
