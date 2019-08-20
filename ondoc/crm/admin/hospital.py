@@ -97,6 +97,8 @@ class HospitalServiceInline(admin.TabularInline):
     can_delete = True
     show_change_link = False
     autocomplete_fields = ['service']
+    verbose_name = "Hospital Facility"
+    verbose_name_plural = "Hospital Facilities"
 
 
 class HospitalTimingInlineFormSet(forms.BaseInlineFormSet):

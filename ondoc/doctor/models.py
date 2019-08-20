@@ -4733,3 +4733,14 @@ class HospitalNetworkTiming(auth_model.TimeStampedModel):
 
     class Meta:
         db_table = "hospital_network_timing"
+
+
+class HospitalNetworkSpeciality(auth_model.TimeStampedModel):
+    network = models.ForeignKey(HospitalNetwork, on_delete=models.CASCADE)
+    name = models.CharField(max_length=200)
+
+    def __str__(self):
+        return self.network.name + " (" + self.name + ")"
+
+    class Meta:
+        db_table = "hospital_network_speciality"

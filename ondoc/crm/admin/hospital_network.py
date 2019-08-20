@@ -11,7 +11,8 @@ from ondoc.crm.admin.doctor import CreatedByFilter
 from ondoc.doctor.models import (HospitalNetworkManager, Hospital,
                                  HospitalNetworkHelpline, HospitalNetworkEmail, HospitalNetworkAccreditation,
                                  HospitalNetworkAward, HospitalNetworkCertification, HospitalNetworkDocument,
-                                 HospitalNetworkImage, HospitalNetworkTiming)
+                                 HospitalNetworkImage, HospitalNetworkTiming, HospitalNetworkServiceMapping,
+                                 HospitalNetworkSpeciality)
 import datetime
 from .common import *
 from ondoc.authentication.admin import SPOCDetailsInline
@@ -99,6 +100,24 @@ class HospitalNetworkTimingInline(admin.TabularInline):
     model = HospitalNetworkTiming
     formset = HospitalNetworkTimingInlineFormSet
     fk_name = 'network'
+    extra = 0
+    can_delete = True
+    show_change_link = False
+
+
+class HospitalNetworkServiceInline(admin.TabularInline):
+    model = HospitalNetworkServiceMapping
+    fk_name = 'network'
+    extra = 0
+    can_delete = True
+    show_change_link = False
+    autocomplete_fields = ['service']
+    verbose_name = "Hospital Network Facility"
+    verbose_name_plural = "Hospital Network Facilities"
+
+
+class HospitalSpecialityInline(admin.TabularInline):
+    model = HospitalNetworkSpeciality
     extra = 0
     can_delete = True
     show_change_link = False
@@ -258,6 +277,8 @@ class HospitalNetworkAdmin(VersionAdmin, ActionAdmin, QCPemAdmin):
     inlines = [
         HospitalNetworkImageInline,
         HospitalNetworkTimingInline,
+        HospitalNetworkServiceInline,
+        HospitalSpecialityInline,
         HospitalNetworkManagerInline,
         HospitalNetworkHelplineInline,
         HospitalNetworkEmailInline,
