@@ -2836,6 +2836,7 @@ class LabTimingListView(mixins.ListModelMixin,
         pathology_tests = []
 
         intersect_resp = {
+            "tests": {},
             "timeslots": {},
             "upcoming_slots": {},
             "is_thyrocare": False
@@ -2873,8 +2874,8 @@ class LabTimingListView(mixins.ListModelMixin,
                     integrator_obj = service.create_integrator_obj(class_name)
                     lab_timings = integrator_obj.get_appointment_slots(pincode, date, is_home_pickup=pathology_pickup)
 
-                pathology_resp = {"tests_id": list(map(lambda x: x.id, pathology_tests)),
-                                  "tests_name": ', '.join(list(map(lambda x: x.name, pathology_tests))),
+                path_tests = list(map(lambda x: {'id': x.id, 'name': x.name}, pathology_tests))
+                pathology_resp = {"tests": path_tests,
                                   "timeslots": lab_timings.get('time_slots', []),
                                   "upcoming_slots": lab_timings.get('upcoming_slots', []),
                                   "is_thyrocare": lab_timings.get('is_thyrocare', False)}
@@ -2889,6 +2890,8 @@ class LabTimingListView(mixins.ListModelMixin,
                         radiology_resp['tests'].append(timing_obj)
 
                 if pathology_tests and radiology_tests and pathology_pickup == radiology_pickup:
+                    intersect_tests = list(map(lambda x: {'id': x.id, 'name': x.name}, tests))
+                    intersect_resp['tests'] = intersect_tests
                     for slot_date in pathology_resp['timeslots']:
                         intersect_resp['timeslots'].update({slot_date: []})
                         time_separtors = ['AM', 'PM']
