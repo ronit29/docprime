@@ -365,6 +365,8 @@ class User(AbstractBaseUser, PermissionsMixin):
         profile_data['user'] = user
         profile_data['email'] = data.get('email')
         profile_data['source'] = source
+        profile_data['dob'] = data.get('dob', "")
+        profile_data['gender'] = data.get('gender', "")
         user_profiles = user.profiles.all()
 
         if not bool(re.match(r"^[a-zA-Z ]+$", data.get('name'))):
@@ -377,8 +379,10 @@ class User(AbstractBaseUser, PermissionsMixin):
                 user_profile = user_profiles[0]
                 user_profile.phone_number = profile_data['phone_number'] if not user_profile.phone_number else None
                 user_profile.email = profile_data['email'] if not user_profile.email else None
-                user_profile.gender = profile_data['gender'] if profile_data['gender'] and not user_profile.gender else None
-                user_profile.dob = profile_data['dob'] if profile_data['dob'] and not user_profile.dob else None
+                if not user_profile.gender and profile_data.get('gender', None):
+                    user_profile.gender = profile_data.get('gender', "")
+                if not user_profile.dob and profile_data.get('dob', None):
+                    user_profile.dob = profile_data.get('dob', "")
                 user_profile.save()
             else:
                 UserProfile.objects.create(**profile_data)
