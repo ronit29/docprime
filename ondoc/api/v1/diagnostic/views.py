@@ -1877,7 +1877,6 @@ class LabList(viewsets.ReadOnlyModelViewSet):
 
         return lab_network
 
-
     @transaction.non_atomic_requests
     def retrieve(self, request, lab_id, entity=None):
 

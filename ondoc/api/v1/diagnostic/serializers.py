@@ -257,6 +257,8 @@ class AvailableLabTestPackageSerializer(serializers.ModelSerializer):
     included_in_user_plan = serializers.SerializerMethodField()
     is_price_zero = serializers.SerializerMethodField()
     # is_prescription_needed = serializers.SerializerMethodField()
+    is_radiology = serializers.SerializerMethodField()
+    is_pathology = serializers.SerializerMethodField()
 
     def get_is_price_zero(self, obj):
         agreed_price = obj.computed_agreed_price if obj.custom_agreed_price is None else obj.custom_agreed_price
@@ -372,11 +374,18 @@ class AvailableLabTestPackageSerializer(serializers.ModelSerializer):
 
         return parameters
 
+    def get_is_radiology(self, obj):
+        return obj.test.test_type == LabTest.RADIOLOGY
+
+    def get_is_pathology(self, obj):
+        return obj.test.test_type == LabTest.PATHOLOGY
+
     class Meta:
         model = AvailableLabTest
         fields = ('test_id', 'mrp', 'test', 'agreed_price', 'deal_price', 'enabled', 'is_home_collection_enabled',
                   'package', 'parameters', 'is_package', 'number_of_tests', 'why', 'pre_test_info', 'expected_tat',
-                  'hide_price', 'included_in_user_plan', 'insurance', 'is_price_zero', 'insurance_agreed_price')
+                  'hide_price', 'included_in_user_plan', 'insurance', 'is_price_zero', 'insurance_agreed_price',
+                  'is_radiology', 'is_pathology')
 
 class AvailableLabTestSerializer(serializers.ModelSerializer):
     test = LabTestSerializer()
@@ -388,6 +397,8 @@ class AvailableLabTestSerializer(serializers.ModelSerializer):
     is_package = serializers.SerializerMethodField()
     included_in_user_plan = serializers.SerializerMethodField()
     is_price_zero = serializers.SerializerMethodField()
+    is_pathology = serializers.SerializerMethodField()
+    is_radiology = serializers.SerializerMethodField()
 
     def get_is_price_zero(self, obj):
         agreed_price = obj.computed_agreed_price if obj.custom_agreed_price is None else obj.custom_agreed_price
@@ -443,13 +454,19 @@ class AvailableLabTestSerializer(serializers.ModelSerializer):
 
         return resp
 
+    def get_is_package(self, obj):
+        return obj.test.is_package
+
+    def get_is_radiology(self, obj):
+        return obj.test.test_type == LabTest.RADIOLOGY
+
+    def get_is_pathology(self, obj):
+        return obj.test.test_type == LabTest.PATHOLOGY
+
     class Meta:
         model = AvailableLabTest
         fields = ('test_id', 'mrp', 'test', 'agreed_price', 'deal_price', 'enabled', 'is_home_collection_enabled',
-                  'insurance', 'is_package', 'included_in_user_plan', 'is_price_zero', 'insurance_agreed_price')
-
-    def get_is_package(self, obj):
-        return obj.test.is_package
+                  'insurance', 'is_package', 'included_in_user_plan', 'is_price_zero', 'insurance_agreed_price', 'is_pathology', 'is_radiology')
 
 
 class LabAppointmentTestMappingSerializer(serializers.ModelSerializer):
