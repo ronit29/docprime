@@ -2873,7 +2873,9 @@ class LabTimingListView(mixins.ListModelMixin,
                     class_name = integration_dict['class_name']
                     integrator_obj = service.create_integrator_obj(class_name)
                     lab_timings = integrator_obj.get_appointment_slots(pincode, date, is_home_pickup=pathology_pickup)
-                pathology_resp = {"timeslots": lab_timings.get('time_slots', []),
+
+                pathology_resp = {"tests_name": ', '.join(list(map(lambda x: x.name, pathology_tests))),
+                                  "timeslots": lab_timings.get('time_slots', []),
                                   "upcoming_slots": lab_timings.get('upcoming_slots', []),
                                   "is_thyrocare": lab_timings.get('is_thyrocare', False)}
 
@@ -2890,6 +2892,7 @@ class LabTimingListView(mixins.ListModelMixin,
                     for slot_date in pathology_resp['timeslots']:
                         intersect_resp['timeslots'].update({slot_date: []})
                         time_separtors = ['AM', 'PM']
+                        has_date_timings = False
                         for i in range(len(time_separtors)):
                             intersect_resp['timeslots'][slot_date].append({
                                 'type': time_separtors[i],
@@ -2920,6 +2923,12 @@ class LabTimingListView(mixins.ListModelMixin,
                                     intersect_resp['timeslots'][slot_date][i]['timing'] = intersect_resp['timeslots'][slot_date][i]['timing'] + intersect_data
                                 else:
                                     intersect_resp['timeslots'][slot_date][i]['timing'] = []
+
+                            if intersect_resp['timeslots'][slot_date][i]['timing']:
+                                has_date_timings = True
+
+                        if not has_date_timings:
+                            intersect_resp['timeslots'][slot_date] = []
 
                     upcoming_slots = TimeSlotExtraction().get_upcoming_slots(time_slots=intersect_resp['timeslots'])
                     intersect_resp['upcoming_slots'] = upcoming_slots
