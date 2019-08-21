@@ -455,7 +455,9 @@ class MerchantPayoutForm(forms.ModelForm):
 
                 if not self.instance.booking_type == self.instance.InsurancePremium:
                     associated_merchant = billed_to.merchant.first()
-                    if not associated_merchant.verified:
+                    if not associated_merchant:
+                        raise forms.ValidationError("Associated Merchant not found.")
+                    if associated_merchant and not associated_merchant.verified:
                         raise forms.ValidationError("Associated Merchant not verified.")
 
                 if self.instance.status not in [1, 2]:
