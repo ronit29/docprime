@@ -610,7 +610,7 @@ class MatrixUserLoginSerializer(serializers.Serializer):
     is_default_user = serializers.BooleanField(required=False)
     email = serializers.EmailField()
     dob = serializers.DateField()
-    serializers.ChoiceField(choices=GENDER_CHOICES)
+    gender = serializers.ChoiceField(choices=GENDER_CHOICES)
     extra = serializers.JSONField(allow_null=True, required=False)
     doctor = serializers.PrimaryKeyRelatedField(queryset=Doctor.objects.all())
     hospital = serializers.PrimaryKeyRelatedField(queryset=Hospital.objects.all())

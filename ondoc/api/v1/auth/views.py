@@ -2253,7 +2253,7 @@ class ProfileEmailUpdateViewset(viewsets.GenericViewSet):
 
 
 class MatrixUserViewset(GenericViewSet):
-    authentication_classes = (MatrixUserAuthentication)
+    authentication_classes = (MatrixUserAuthentication,)
 
     @transaction.atomic()
     def user_login_via_matrix(self, request):
