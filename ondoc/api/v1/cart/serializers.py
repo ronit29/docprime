@@ -46,13 +46,17 @@ class CartItemSerializer(serializers.ModelSerializer):
     def get_date(self, obj):
         from django.utils.timezone import make_aware
 
-        if not obj.data.get("start_date"):
-            return None
+        selected_time = None
+        if not obj.data.get('has_radiology_timings'):
+            if not obj.data.get("start_date"):
+                return None
 
-        date_field = obj.data.get("start_date").find('T')
-        if date_field:
-            date_field = obj.data.get("start_date")[:date_field]
-        return form_time_slot(make_aware(datetime.datetime.strptime(date_field, '%Y-%m-%d')), float(obj.data.get("start_time")))
+            date_field = obj.data.get("start_date").find('T')
+            if date_field:
+                date_field = obj.data.get("start_date")[:date_field]
+            selected_time = form_time_slot(make_aware(datetime.datetime.strptime(date_field, '%Y-%m-%d')), float(obj.data.get("start_time")))
+
+        return selected_time
 
     def get_thumbnail(self, obj):
         if obj.data.get('doctor'):
@@ -92,6 +96,8 @@ class CartItemSerializer(serializers.ModelSerializer):
         return None
 
     def get_tests(self, obj):
+        from django.utils.timezone import make_aware
+
         if not obj.data.get('test_ids', None) or not obj.data.get('lab', None):
             return []
         lab_pricing_group = LabPricingGroup.objects.filter(labs__in=[obj.data.get('lab')])
@@ -99,9 +105,25 @@ class CartItemSerializer(serializers.ModelSerializer):
             return []
         tests = AvailableLabTest.objects.select_related('test', 'lab')\
                                         .filter(lab_pricing_group=lab_pricing_group.first(), test_id__in=obj.data.get('test_ids'))\
-                                        .annotate(test_name=F('test__name'), deal_price=Case(When(custom_deal_price__isnull=True, then=F('computed_deal_price')),
+                                        .annotate(test_id=F('test_id'), test_name=F('test__name'), deal_price=Case(When(custom_deal_price__isnull=True, then=F('computed_deal_price')),
                                                                                              When(custom_deal_price__isnull=False, then=F('custom_deal_price'))))\
-                                        .values('test_name', 'deal_price', 'mrp')
+                                        .values('test_id', 'test_name', 'deal_price', 'mrp')
+
+        test_timings = obj.data.get('test_timings')
+        for test in tests:
+            for test_timing in test_timings:
+                if test_timing.get('test') == test.get('test_id'):
+                    test['is_home_pickup'] = test_timing.get('is_home_pickup')
+
+                    date_field = test_timing.get("start_date").find('T')
+                    if date_field:
+                        date_field = test_timing.get("start_date")[:date_field]
+                    test_selected_time = form_time_slot(
+                        make_aware(datetime.datetime.strptime(date_field, '%Y-%m-%d')),
+                        float(test_timing.get("start_time")))
+                    test['date'] = test_selected_time
+                    break
+
         return tests
 
 
