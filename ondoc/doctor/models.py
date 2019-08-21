@@ -2837,7 +2837,8 @@ class OpdAppointment(auth_model.TimeStampedModel, CouponsMixin, OpdAppointmentIn
                         minutes=int(self.SMS_APPOINTMENT_REMINDER_TIME)), )
                 if (self.time_slot_start - self.created_at).total_seconds() > (3 * 60 * 60):
                     notification_tasks.opd_send_otp_before_appointment.apply_async(
-                        (self.id, str(math.floor(self.time_slot_start.timestamp()))),
+                        # (self.id, str(math.floor(self.time_slot_start.timestamp())))
+                        (self.id,),
                         countdown=1,)
                         # eta=self.time_slot_start - datetime.timedelta(
                         #     minutes=settings.TIME_BEFORE_APPOINTMENT_TO_SEND_OTP), )
