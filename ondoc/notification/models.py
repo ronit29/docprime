@@ -111,6 +111,7 @@ class NotificationAction:
     LAB_FEEDBACK_AFTER_APPOINTMENT = 95
 
     CONTACT_US_EMAIL = 65
+    SAMPLE_DYNAMIC_TEMPLATE_PREVIEW = 110
     NOTIFICATION_TYPE_CHOICES = (
         (APPOINTMENT_ACCEPTED, "Appointment Accepted"),
         (APPOINTMENT_CANCELLED, "Appointment Cancelled"),
