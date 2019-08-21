@@ -2885,7 +2885,7 @@ class LabTimingListView(mixins.ListModelMixin,
                         pathology_test_resp = {"timeslots": test_timings.get('time_slots', []),
                                                "upcoming_slots": test_timings.get('upcoming_slots', []),
                                                "is_thyrocare": test_timings.get('is_thyrocare', False)}
-                        timing_obj = {'name': radiology_test.name, 'timings': pathology_test_resp}
+                        timing_obj = {'tests_id': radiology_test.id, 'name': radiology_test.name, 'timings': pathology_test_resp}
                         radiology_resp['tests'].append(timing_obj)
 
                 if pathology_tests and radiology_tests and pathology_pickup == radiology_pickup:
