@@ -125,6 +125,15 @@ class OpdAppointmentSerializer(serializers.ModelSerializer):
     reports = serializers.SerializerMethodField()
     prescription = serializers.SerializerMethodField()
     report_files = serializers.SerializerMethodField()
+    specialization = serializers.ReadOnlyField(source='doctor.get_doctor_specializations')
+    payment_type = serializers.SerializerMethodField()
+    effective_price = serializers.SerializerMethodField()
+
+    def get_payment_type(self, obj):
+        return obj.payment_type
+
+    def get_effective_price(self, obj):
+        return obj.effective_price
 
     def get_report_files(self, obj):
         return []
@@ -141,7 +150,8 @@ class OpdAppointmentSerializer(serializers.ModelSerializer):
         model = OpdAppointment
         fields = ('id', 'doctor_name', 'hospital_name', 'patient_name', 'patient_image', 'type',
                   'allowed_action', 'effective_price', 'deal_price', 'status', 'time_slot_start',
-                  'time_slot_end', 'doctor_thumbnail', 'patient_thumbnail', 'display_name', 'invoices', 'reports', 'prescription', 'report_files')
+                  'time_slot_end', 'doctor_thumbnail', 'patient_thumbnail', 'display_name', 'invoices', 'reports',
+                  'prescription', 'report_files', 'specialization', 'payment_type', 'effective_price')
 
     def get_patient_image(self, obj):
         if obj.profile and obj.profile.profile_image:

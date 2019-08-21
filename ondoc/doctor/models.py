@@ -1388,6 +1388,16 @@ class Doctor(auth_model.TimeStampedModel, auth_model.QCModel, SearchKey, auth_mo
         else:
             return False
 
+    def get_doctor_specializations(self):
+        all_dps = self.doctorpracticespecializations.all()
+        specialization_list = list()
+        if not all_dps:
+            return []
+        for dps in all_dps:
+            specialization_list.append(dps.specialization.name)
+        return specialization_list
+
+
     class Meta:
         db_table = "doctor"
 
