@@ -2574,10 +2574,9 @@ class OpdAppointment(auth_model.TimeStampedModel, CouponsMixin, OpdAppointmentIn
         return invoices_urls
 
     def is_credit_letter_required_for_appointment(self):
-        hospital_ids_cl_required = list(settings.HOSPITAL_CREDIT_LETTER_REQUIRED.values())
-        if self.hospital and self.hospital.id in hospital_ids_cl_required:
-            if self.is_medanta_hospital_booking() or self.is_artemis_hospital_booking():
-                return True
+        # hospital_ids_cl_required = list(settings.HOSPITAL_CREDIT_LETTER_REQUIRED.values())
+        if self.hospital and self.hospital.is_ipd_hospital:
+            return True
         return False
 
 
@@ -3666,10 +3665,15 @@ class OpdAppointment(auth_model.TimeStampedModel, CouponsMixin, OpdAppointmentIn
             "instance": self
         }
         html_body = None
-        if self.is_medanta_hospital_booking():
+
+        if self.hospital.is_ipd_hospital:
             html_body = render_to_string("email/documents/credit_letter_medanta.html", context=context)
-        elif self.is_artemis_hospital_booking():
-            html_body = render_to_string("email/documents/credit_letter_artemis.html", context=context)
+
+        # if self.is_medanta_hospital_booking():
+        #     html_body = render_to_string("email/documents/credit_letter_medanta.html", context=context)
+        # elif self.is_artemis_hospital_booking():
+        #     html_body = render_to_string("email/documents/credit_letter_artemis.html", context=context)
+
         if not html_body:
             logger.error("Got error while getting hospital for opd credit letter.")
             return None
