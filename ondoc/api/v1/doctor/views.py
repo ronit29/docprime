@@ -1388,13 +1388,18 @@ class SearchedItemsViewSet(viewsets.GenericViewSet):
 
         top_hospitals_data = Hospital.get_top_hospitals_data(request, validated_data.get('lat'), validated_data.get('long'))
 
-        categories = LabTestCategory.objects.filter(is_live=True, is_package_category=True,
-                                                    show_on_recommended_screen=True).order_by('-priority')[:15].values('id', 'name', 'preferred_lab_test', 'is_live', 'is_package_category', 'show_on_recommended_screen',
-                  'priority', 'icon')
+        categories = []
+        need_to_hit_query = True
 
         if request.user and request.user.is_authenticated and not hasattr(request, 'agent') and request.user.active_insurance and request.user.active_insurance.insurance_plan and request.user.active_insurance.insurance_plan.plan_usages:
             if request.user.active_insurance.insurance_plan.plan_usages.get('package_disabled'):
-                categories = []
+                need_to_hit_query = False
+
+        if need_to_hit_query:
+            categories = LabTestCategory.objects.filter(is_live=True, is_package_category=True,
+                                                        show_on_recommended_screen=True).order_by('-priority')[:15].values(
+                'id', 'name', 'preferred_lab_test', 'is_live', 'is_package_category', 'show_on_recommended_screen',
+                'priority', 'icon')
 
         return Response({"conditions": conditions_serializer.data, "specializations": specializations_serializer.data,
                          "procedure_categories": common_procedure_categories_serializer.data,
