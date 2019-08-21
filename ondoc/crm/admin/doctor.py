@@ -51,7 +51,7 @@ from ondoc.doctor.models import (Doctor, DoctorQualification,
                                  GoogleDetailing, VisitReason, VisitReasonMapping, PracticeSpecializationContent,
                                  PatientMobile, DoctorMobileOtp,
                                  UploadDoctorData, CancellationReason, Prescription, PrescriptionFile,
-                                 SimilarSpecializationGroup, SimilarSpecializationGroupMapping)
+                                 SimilarSpecializationGroup, SimilarSpecializationGroupMapping, PurchaseOrderCreation)
 
 from ondoc.authentication.models import User
 from .common import *
@@ -1684,7 +1684,7 @@ class InsuredOpdAppointmentResource(resources.ModelResource):
             return "REGULAR"
 
 
-class DoctorOpdAppointmentAdmin(ExportMixin, admin.ModelAdmin):
+class DoctorOpdAppointmentAdmin(ExportMixin, CompareVersionAdmin):
     form = DoctorOpdAppointmentForm
     export_template_name = "export_opd_appointment_report.html"
     formats = (base_formats.XLS,)
@@ -2410,3 +2410,43 @@ class SimilarSpecializationGroupInline(admin.TabularInline):
 class SimilarSpecializationGroupAdmin(VersionAdmin):
     inlines = [SimilarSpecializationGroupInline]
     list_display = ['id', 'name']
+
+
+class PurchaseOrderCreationForm(forms.ModelForm):
+    def clean(self):
+        cleaned_data = self.cleaned_data
+        if not (cleaned_data.get('proof_of_payment') or cleaned_data.get('proof_of_payment_image')):
+            raise forms.ValidationError('Either enter proof of payment or upload proof of payment image')
+        if cleaned_data.get('provider_type') == 'lab' and cleaned_data.get('provider_name_hospital'):
+            raise forms.ValidationError('Cannot choose Hospital, Please select a Lab')
+        if cleaned_data.get('provider_type') == 'hospital' and cleaned_data.get('provider_name_lab'):
+            raise forms.ValidationError('Cannot choose Lab, Please select a Hospital')
+        if cleaned_data.get('start_date') or cleaned_data.get('end_date'):
+            if cleaned_data.get('start_date') >= cleaned_data.get('end_date'):
+                raise forms.ValidationError('Start date cannot be greater than end date')
+            if cleaned_data.get('start_date') < timezone.now().date():
+                raise forms.ValidationError('Enter a valid start date')
+            if cleaned_data.get('end_date') < timezone.now().date() or cleaned_data.get('end_date') < cleaned_data.get('start_date'):
+                raise forms.ValidationError('Enter a valid end date')
+            if not cleaned_data.get('start_date') and cleaned_data.get('end_date'):
+                raise forms.ValidationError('Start date and End date are mandatory')
+
+        return super().clean()
+
+
+class PurchaseOrderCreationAdmin(admin.ModelAdmin):
+    model = PurchaseOrderCreation
+    form = PurchaseOrderCreationForm
+    list_display = ['provider_type', 'start_date', 'end_date', 'provider_name_lab', 'provider_name_hospital', 'total_appointment_count',
+                    'appointment_booked_count', 'current_appointment_count']
+    autocomplete_fields = ['provider_name_lab', 'provider_name_hospital']
+    search_fields = ['provider_name_lab__name', 'provider_name_hospital__name']
+    # readonly_fields = ['provider_name', 'appointment_booked_count', 'current_appointment_count']
+
+    def get_readonly_fields(self, request, obj=None):
+        read_only_fields = ['provider_name', 'appointment_booked_count', 'current_appointment_count']
+        if obj and obj.id:
+            read_only_fields += ['start_date', 'end_date', 'total_appointment_count', 'provider_name_hospital', 'total_amount_paid', 'gst_number',
+                                 'provider_type', 'product_type']
+
+        return read_only_fields
