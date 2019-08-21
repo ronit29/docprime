@@ -2005,13 +2005,12 @@ class TopHospitalForIpdProcedureSerializer(serializers.ModelSerializer):
     def get_logo(self, obj):
         request = self.context.get('request')
         if request:
+            for document in obj.hospital_documents.all():
+                if document.document_type == HospitalDocument.LOGO:
+                    return request.build_absolute_uri(document.name.url) if document.name else None
             if obj.network:
                 for document in obj.network.hospital_network_documents.all():
                     if document.document_type == HospitalNetworkDocument.LOGO:
-                        return request.build_absolute_uri(document.name.url) if document.name else None
-            else:
-                for document in obj.hospital_documents.all():
-                    if document.document_type == HospitalDocument.LOGO:
                         return request.build_absolute_uri(document.name.url) if document.name else None
         return None
 
