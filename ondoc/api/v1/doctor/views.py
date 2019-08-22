@@ -1400,6 +1400,8 @@ class SearchedItemsViewSet(viewsets.GenericViewSet):
                                                         show_on_recommended_screen=True).order_by('-priority')[:15].values(
                 'id', 'name', 'preferred_lab_test', 'is_live', 'is_package_category', 'show_on_recommended_screen',
                 'priority', 'icon')
+            for category in categories:
+                category['icon'] = request.build_absolute_uri('media/' + category.get('icon')) if category.get('icon') else None
 
         return Response({"conditions": conditions_serializer.data, "specializations": specializations_serializer.data,
                          "procedure_categories": common_procedure_categories_serializer.data,
