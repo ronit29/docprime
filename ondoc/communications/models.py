@@ -32,7 +32,7 @@ from ondoc.authentication.models import UserProfile, GenericAdmin, NotificationE
 from ondoc.insurance.models import EndorsementRequest, UserInsurance
 
 from ondoc.notification.models import NotificationAction, SmsNotification, EmailNotification, AppNotification, \
-    PushNotification, WhtsappNotification
+    PushNotification, WhtsappNotification, DynamicTemplates
 # from ondoc.notification.sqs_client import publish_message
 from ondoc.notification.rabbitmq_client import publish_message
 # import datetime
@@ -349,6 +349,14 @@ class SMSNotification:
     #        body_template = "sms/lab/lab_feedback.txt"
         return body_template
 
+    def get_template_object(self, user):
+        notification_type = self.notification_type
+        obj = None
+        if notification_type == NotificationAction.APPOINTMENT_ACCEPTED or notification_type == NotificationAction.OPD_OTP_BEFORE_APPOINTMENT:
+            obj = DynamicTemplates.objects.filter(template_name="").first()
+
+        return obj
+
     def trigger(self, receiver, template, context):
         user = receiver.get('user')
         phone_number = receiver.get('phone_number')
@@ -441,6 +449,11 @@ class SMSNotification:
         return context, click_login_token_obj
 
     def send(self, receivers):
+
+        dispatch_response, receivers = self.dispatch(receivers)
+        if dispatch_response:
+            return
+
         context = self.context
         if not context:
             return
@@ -455,6 +468,49 @@ class SMSNotification:
             if template:
                 self.trigger(receiver, template, context)
         ClickLoginToken.objects.bulk_create(click_login_token_objects)
+
+    def dispatch(self, receivers):
+        context = self.context
+        if not context:
+            return None, receivers
+
+        receivers_left = list()
+
+        for receiver in receivers:
+            obj = self.get_template_object(receiver.get('user'))
+            if not obj:
+                receivers_left.append(receiver)
+            else:
+                click_login_token_objects = list()
+                user = receiver.get('user')
+                phone_number = receiver.get('phone_number')
+                if not phone_number:
+                    phone_number = user.phone_number
+
+                if user and user.user_type == User.DOCTOR:
+                    context, click_login_token_obj = self.save_token_to_context(context, receiver['user'])
+                    click_login_token_objects.append(click_login_token_obj)
+                elif context.get('provider_login_url'):
+                    context.pop('provider_login_url')
+                ClickLoginToken.objects.bulk_create(click_login_token_objects)
+
+                instance = context.get('instance')
+
+                # Hospital and labs which has the flag open to communication, send notificaiton to them only.
+                if (instance.__class__.__name__ == LabAppointment.__name__) and (not user or user.user_type == User.DOCTOR):
+                    if not instance.lab.open_for_communications():
+                        continue
+
+                if (instance.__class__.__name__ == OpdAppointment.__name__) and (not user or user.user_type == User.DOCTOR):
+                    if instance.hospital and not instance.hospital.open_for_communications():
+                        continue
+
+                obj.send_notification(context, phone_number, self.notification_type, user=user)
+
+        if not receivers_left:
+            return True, receivers_left
+
+        return False, receivers_left
 
 
 class WHTSAPPNotification:

@@ -1317,7 +1317,7 @@ class DynamicTemplates(TimeStampedModel):
     def get_parameter_json(self):
         return self.sample_parameters
 
-    def send_notification(self, context, recipient_obj, notification_type):
+    def send_notification(self, context, recipient_obj, notification_type, *args, **kwargs):
         rendered_content = self.render_template(context)
         if rendered_content is None:
             logger.error("Could not generate content. Dynamic temlplate id %s" % str(self.id))
