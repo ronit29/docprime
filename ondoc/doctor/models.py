@@ -1744,9 +1744,7 @@ class DoctorImage(auth_model.TimeStampedModel, auth_model.Image):
             height = size[1]
             self.resize_cropped_image(width, height)
 
-    def save(self, *args, **kwargs):
-        super().save(*args, **kwargs)
-        self.create_all_images()
+
 
     def original_image(self):
         return mark_safe('<div><img crossOrigin="anonymous" style="max-width:300px; max-height:300px;" src="{0}"/></div>'.format(self.name.url))
@@ -1783,9 +1781,9 @@ class DoctorImage(auth_model.TimeStampedModel, auth_model.Image):
             self.cropped_image.save(md5_hash + ".jpg", image_file, save=True)
             #self.save()
 
-    @classmethod
-    def rename_cropped_images(cls):
-        images = cls.objects.prefetch_related('doctor','doctor__doctorpracticespecializations','doctor__doctorpracticespecializations__specialization').filter(cropped_image__isnull=False).order_by('id')[:100]
+    # @classmethod
+    def rename_cropped_images(self):
+        images = DoctorImage.objects.prefetch_related('doctor','doctor__doctorpracticespecializations','doctor__doctorpracticespecializations__specialization').filter(cropped_image__isnull=False).order_by('id')[:100]
         for img in images:
             image_name = img.get_image_name()
             if img.cropped_image and not image_name in img.cropped_image.name:
@@ -1798,6 +1796,11 @@ class DoctorImage(auth_model.TimeStampedModel, auth_model.Image):
                 img.cropped_image = InMemoryUploadedFile(new_image_io, None, image_name + ".jpg", 'image/jpeg',
                                                           new_image_io.tell(), None)
                 img.save()
+
+    def save(self, *args, **kwargs):
+        super().save(*args, **kwargs)
+        self.create_all_images()
+        self.rename_cropped_images()
 
 
     class Meta:
