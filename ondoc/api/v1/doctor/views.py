@@ -1408,7 +1408,7 @@ class SearchedItemsViewSet(viewsets.GenericViewSet):
                          "procedures": common_procedures_serializer.data,
                          "ipd_procedures": common_ipd_procedures_serializer.data,
                          "top_hospitals": top_hospitals_data,
-                         'package_categories': categories_serializer.data})
+                         'package_categories': categories_serializer.data if categories_serializer and categories_serializer.data else None})
 
 
 class DoctorListViewSet(viewsets.GenericViewSet):
