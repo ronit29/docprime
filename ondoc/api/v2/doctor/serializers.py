@@ -630,6 +630,7 @@ class EConsultListSerializer(serializers.ModelSerializer):
     doctor_auto_login_url = serializers.SerializerMethodField()
     patient_auto_login_url = serializers.SerializerMethodField()
     video_chat_url = serializers.SerializerMethodField()
+    patient_phone_number = serializers.SerializerMethodField()
 
     def get_patient_type(self, obj):
         patient = None
@@ -662,13 +663,17 @@ class EConsultListSerializer(serializers.ModelSerializer):
         return obj.rc_group.patient_login_url if (obj.rc_group and request.user.user_type == User.CONSUMER) else None
 
     def get_video_chat_url(self, obj):
-        return "https://video.docprime.com/" + str(obj.id)
+        return obj.get_video_chat_url()
+
+    def get_patient_phone_number(self, obj):
+        patient, patient_number = obj.get_patient_and_number()
+        return patient_number
 
     class Meta:
         model = provider_models.EConsultation
         fields = ('id', 'doctor_name', 'doctor_id', 'patient_id', 'patient_name', 'fees', 'validity', 'payment_status',
                         'created_at', 'link', 'status', 'validity_status', 'validity', 'doctor_auto_login_url',
-                        'patient_auto_login_url', 'video_chat_url')
+                        'patient_auto_login_url', 'video_chat_url', 'patient_phone_number')
 
 
 class EConsultTransactionModelSerializer(serializers.Serializer):

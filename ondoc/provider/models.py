@@ -152,6 +152,18 @@ class EConsultation(auth_models.TimeStampedModel, auth_models.CreatedByModel):
         self.payment_status = self.PAYMENT_ACCEPTED
         self.status = self.BOOKED
 
+    def get_video_chat_url(self):
+        return settings.JITSI_SERVER + "/" + self.rc_group.group_name
+
+    def get_patient_and_number(self):
+        if self.offline_patient:
+            patient = self.offline_patient
+            patient_number = str(self.offline_patient.get_patient_mobile())
+        else:
+            patient = self.online_patient
+            patient_number = self.online_patient.phone_number
+        return patient, patient_number
+
     def send_sms_link(self, patient, patient_number):
         from ondoc.authentication.backends import JWTAuthentication
         from ondoc.communications.models import  SMSNotification, NotificationAction

@@ -1169,16 +1169,9 @@ class PartnerEConsultationViewSet(viewsets.GenericViewSet):
         serializer.is_valid(raise_exception=True)
         valid_data = serializer.validated_data
         e_consultation = valid_data['e_consultation']
-        patient = None
         if not e_consultation.link:
             return Response({"status": 0, "error": "Consultation Link not Found"}, status=status.HTTP_404_NOT_FOUND)
-        if e_consultation.offline_patient:
-            patient = e_consultation.offline_patient
-            patient_number = str(e_consultation.offline_patient.get_patient_mobile())
-        else:
-            patient = e_consultation.online_patient
-            patient_number = e_consultation.online_patient.phone_number
-
+        patient, patient_number = e_consultation.get_patient_and_number()
         result = e_consultation.send_sms_link(patient, patient_number)
         if result.get('error'):
             return Response({"status": 0, "message": "Error updating invoice - " + str(result.get('error'))}, status.HTTP_400_BAD_REQUEST)
@@ -1209,7 +1202,7 @@ class PartnerEConsultationViewSet(viewsets.GenericViewSet):
         user_id = e_consultation.doctor.rc_user.response_data['user']['_id']
         video_link = 'https://meet.jit.si/demoapp'
         rc_group = e_consultation.rc_group
-        msg_txt = "This is the video link: {}/{}".format(settings.JITSI_SERVER, rc_group.group_name)
+        msg_txt = "This is the video link: {}".format(e_consultation.get_video_chat_url())
         request_data = {
             "roomId": rc_group.group_id,
             "text": msg_txt,
