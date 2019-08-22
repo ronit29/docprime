@@ -520,7 +520,7 @@ class DoctorHospitalSerializer(serializers.ModelSerializer):
         enabled_for_online_booking = doctor_clinic.enabled_for_online_booking and doctor.enabled_for_online_booking and \
                                      doctor.is_doctor_specialization_insured() and hospital.enabled_for_online_booking
 
-        if hospital.enabled_for_prepaid and obj.mrp is not None and resp['insurance_threshold_amount'] is not None and obj.mrp <= resp['insurance_threshold_amount'] and enabled_for_online_booking and \
+        if hospital.enabled_for_prepaid and hospital.enabled_for_insurance and obj.mrp is not None and resp['insurance_threshold_amount'] is not None and obj.mrp <= resp['insurance_threshold_amount'] and enabled_for_online_booking and \
                 not (request.query_params.get('procedure_ids') or request.query_params.get('procedure_category_ids')) and doctor.is_enabled_for_insurance:
 
             user_insurance = None if not user.is_authenticated or user.is_anonymous else user.active_insurance
@@ -2075,10 +2075,13 @@ class HospitalDetailIpdProcedureSerializer(TopHospitalForIpdProcedureSerializer)
     def get_all_specializations(self, obj):
         from ondoc.doctor.models import PracticeSpecialization
         from ondoc.api.v2.doctor.serializers import PracticeSpecializationSerializer
-        q = PracticeSpecialization.objects.filter(specialization__doctor__is_live=True,
+        q = PracticeSpecialization.objects.prefetch_related('department')\
+                                          .select_related('specialization_field')\
+                                          .filter(specialization__doctor__is_live=True,
                                                   specialization__doctor__doctor_clinics__enabled=True,
-                                                  specialization__doctor__doctor_clinics__hospital=obj).order_by(
-            '-priority').distinct()
+                                                  specialization__doctor__doctor_clinics__hospital=obj)\
+                                          .order_by('-priority')\
+                                          .distinct()
         return PracticeSpecializationSerializer(q, many=True).data
 
     def get_all_specialization_groups(self, obj):

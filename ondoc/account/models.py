@@ -2265,6 +2265,20 @@ class MerchantPayout(TimeStampedModel):
             self.payout_ref_id = self.id
             self.save()
 
+    @property
+    def get_nodal_id(self):
+        from ondoc.doctor.models import OpdAppointment
+        if self.booking_type == self.InsurancePremium:
+            return 2
+        else:
+            appointment = self.get_appointment()
+            if appointment.payment_type == OpdAppointment.PREPAID:
+                return 1
+            elif appointment.payment_type == OpdAppointment.INSURANCE:
+                return 2
+
+        return 0
+
     class Meta:
         db_table = "merchant_payout"
 

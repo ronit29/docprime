@@ -17,7 +17,8 @@ from rest_framework.response import Response
 from django.db import transaction, IntegrityError
 from django.utils import timezone
 from rest_framework.authtoken.models import Token
-from django.db.models import F, Sum, Max, Q, Prefetch, Case, When, Count
+from django.db.models import F, Sum, Max, Q, Prefetch, Case, When, Count, Value
+from django.db.models.functions import Concat, Substr
 from django.forms.models import model_to_dict
 
 from ondoc.common.models import UserConfig, PaymentOptions, AppointmentHistory, BlacklistUser, BlockedStates
@@ -1569,7 +1570,13 @@ class HospitalDoctorAppointmentPermissionViewSet(GenericViewSet):
                              .annotate(doctor_gender=F('doctor__gender'),
                                        hospital_building=F('hospital__building'),
                                        hospital_name=F('hospital__name'),
-                                       doctor_name=F('doctor__name'),
+                                       doctor_name=Case(
+                                           When(doctor__name__istartswith='dr. ',
+                                                then=Concat(Value('Dr. '), Substr(F('doctor__name'), 5))),
+                                           When(doctor__name__istartswith='dr ',
+                                                then=Concat(Value('Dr. '), Substr(F('doctor__name'), 4))),
+                                           default=Concat(Value('Dr. '), F('doctor__name')),
+                                       ),
                                        doctor_source_type=F('doctor__source_type'),
                                        doctor_is_live=F('doctor__is_live'),
                                        license=F('doctor__license'),

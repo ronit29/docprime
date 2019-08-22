@@ -15,6 +15,7 @@ from ondoc.api.v1.procedure.serializers import CommonProcedureCategorySerializer
     CommonHospitalSerializer
 from ondoc.cart.models import Cart
 from ondoc.crm.constants import constants
+from ondoc.diagnostic.models import LabTestCategory
 from ondoc.doctor import models
 from ondoc.authentication import models as auth_models
 from ondoc.diagnostic import models as lab_models
@@ -90,6 +91,7 @@ from ondoc.prescription import models as pres_models
 from ondoc.api.v1.prescription import serializers as pres_serializers
 from django.template.defaultfilters import slugify
 from packaging.version import parse
+
 
 class CreateAppointmentPermission(permissions.BasePermission):
     message = 'creating appointment is not allowed.'
@@ -1386,15 +1388,29 @@ class SearchedItemsViewSet(viewsets.GenericViewSet):
 
         top_hospitals_data = Hospital.get_top_hospitals_data(request, validated_data.get('lat'), validated_data.get('long'))
 
+        categories = []
+        need_to_hit_query = True
+
+        if request.user and request.user.is_authenticated and not hasattr(request, 'agent') and request.user.active_insurance and request.user.active_insurance.insurance_plan and request.user.active_insurance.insurance_plan.plan_usages:
+            if request.user.active_insurance.insurance_plan.plan_usages.get('package_disabled'):
+                need_to_hit_query = False
+
+        if need_to_hit_query:
+            categories = LabTestCategory.objects.filter(is_live=True, is_package_category=True,
+                                                        show_on_recommended_screen=True).order_by('-priority')[:15].values(
+                'id', 'name', 'preferred_lab_test', 'is_live', 'is_package_category', 'show_on_recommended_screen',
+                'priority', 'icon')
+
         return Response({"conditions": conditions_serializer.data, "specializations": specializations_serializer.data,
                          "procedure_categories": common_procedure_categories_serializer.data,
                          "procedures": common_procedures_serializer.data,
                          "ipd_procedures": common_ipd_procedures_serializer.data,
-                         "top_hospitals": top_hospitals_data})
+                         "top_hospitals": top_hospitals_data,
+                         'package_categories': categories})
 
 
 class DoctorListViewSet(viewsets.GenericViewSet):
-    queryset = models.Doctor.objects.all()
+    queryset = models.Doctor.objects.none()
 
     @transaction.non_atomic_requests
     def list_by_url(self, request, *args, **kwargs):

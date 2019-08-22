@@ -265,6 +265,7 @@ class Hospital(auth_model.TimeStampedModel, auth_model.CreatedByModel, auth_mode
     is_big_hospital = models.BooleanField(default=False)
     has_proper_hospital_page = models.BooleanField(default=False)
     question_answer = GenericRelation(auth_model.GenericQuestionAnswer, related_query_name='hospital_qa')
+    enabled_for_insurance = models.NullBooleanField(verbose_name='Enabled for Insurance')
 
     def __str__(self):
         return self.name
@@ -939,7 +940,7 @@ class Doctor(auth_model.TimeStampedModel, auth_model.QCModel, SearchKey, auth_mo
                  inner join hospital h on h.id = dc.hospital_id
                  where d.is_live=true and  d.enabled_for_online_booking=true and
                  dc.enabled=true and dc.enabled_for_online_booking=true
-                 and h.enabled_for_online_booking=true and h.enabled_for_prepaid=true and h.is_live=true
+                 and h.enabled_for_online_booking=true and h.enabled_for_insurance and h.enabled_for_prepaid=true and h.is_live=true
                         and h.location is not null
                   and  d.is_test_doctor=false and d.is_internal=false and d.is_insurance_enabled=true
                 group by d.id

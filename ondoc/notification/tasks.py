@@ -542,6 +542,7 @@ def process_payout(payout_id):
         if not all_txn or all_txn.count() == 0:
             raise Exception("No transactions found for given payout " + str(payout_data))
 
+        nodal_id = payout_data.get_nodal_id
         req_data = {"payload": [], "checkSum": ""}
         req_data2 = {"payload": [], "checkSum": ""}
 
@@ -560,6 +561,7 @@ def process_payout(payout_id):
             curr_txn["refNo"] = payout_data.payout_ref_id
             curr_txn["bookingId"] = appointment.id
             curr_txn["paymentType"] = payout_data.payment_mode if payout_data.payment_mode else default_payment_mode
+            curr_txn["nodalId"] = nodal_id
             req_data["payload"].append(curr_txn)
             idx += 1
             if isinstance(txn, DummyTransactions) and txn.amount>0:
