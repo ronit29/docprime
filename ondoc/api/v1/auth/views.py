@@ -2270,7 +2270,11 @@ class MatrixUserViewset(GenericViewSet):
             return Response({"error": "Invalid Doctor ID"}, status=status.HTTP_400_BAD_REQUEST)
         if not hospital:
             return Response({'error': "Invalid Hospital ID"}, status=status.HTTP_400_BAD_REQUEST)
-        user_data = User.get_external_login_data(data)
+        try:
+            user_data = User.get_external_login_data(data)
+        except Exception as e:
+            logger.error(str(e))
+            return Response({'error': str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
         token = user_data.get('token')
         if not token:
             return JsonResponse(response, status=400)

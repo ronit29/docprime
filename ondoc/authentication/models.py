@@ -346,8 +346,11 @@ class User(AbstractBaseUser, PermissionsMixin):
         source = data.get('extra').get('utm_source', 'External') if data.get('extra') else 'External'
         redirect_type = data.get('redirect_type', "")
 
-        user = User.objects.filter((Q(phone_number=data.get('phone_number'))
-                                   or Q(email=data.get('email'))) and Q(user_type=User.CONSUMER)).first()
+        user = User.objects.filter(phone_number=data.get('phone_number'),
+                                                     user_type=User.CONSUMER).first()
+        user_with_email = User.objects.filter(email=data.get('email', None), user_type=User.CONSUMER).first()
+        if not user and user_with_email:
+            raise Exception("Email already taken with another number")
         if not user:
             user = User.objects.create(phone_number=data.get('phone_number'),
                                        is_phone_number_verified=False,
@@ -378,8 +381,10 @@ class User(AbstractBaseUser, PermissionsMixin):
             user_profiles = list(filter(lambda x: x.name.lower() == profile_data['name'].lower(), user_profiles))
             if user_profiles:
                 user_profile = user_profiles[0]
-                user_profile.phone_number = profile_data['phone_number'] if not user_profile.phone_number else None
-                user_profile.email = profile_data['email'] if not user_profile.email else None
+                if not user_profile.phone_number:
+                    user_profile.phone_number = profile_data['phone_number']
+                if not user_profile.email:
+                    user_profile.email = profile_data['email'] if not user_profile.email else None
                 if not user_profile.gender and profile_data.get('gender', None):
                     user_profile.gender = profile_data.get('gender', "")
                 if not user_profile.dob and profile_data.get('dob', None):
