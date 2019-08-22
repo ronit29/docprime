@@ -396,10 +396,8 @@ class User(AbstractBaseUser, PermissionsMixin):
             profile_data.update({
                 "is_default_user": True
             })
-            if profile_data.get('doctor'):
-                profile_data.pop('doctor')
-            if profile_data.get('hospital'):
-                profile_data.pop('hospital')
+            profile_data.pop('doctor', None)
+            profile_data.pop('hospital', None)
             UserProfile.objects.create(**profile_data)
 
         token_object = JWTAuthentication.generate_token(user)
