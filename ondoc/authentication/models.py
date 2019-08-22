@@ -346,7 +346,8 @@ class User(AbstractBaseUser, PermissionsMixin):
         source = data.get('extra').get('utm_source', 'External') if data.get('extra') else 'External'
         redirect_type = data.get('redirect_type', "")
 
-        user = User.objects.filter(phone_number=data.get('phone_number'), user_type=User.CONSUMER).first()
+        user = User.objects.filter((Q(phone_number=data.get('phone_number'))
+                                   or Q(email=data.get('email'))) and Q(user_type=User.CONSUMER)).first()
         if not user:
             user = User.objects.create(phone_number=data.get('phone_number'),
                                        is_phone_number_verified=False,
