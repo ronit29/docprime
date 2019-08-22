@@ -967,13 +967,24 @@ class DoctorProfileUserViewSet(viewsets.GenericViewSet):
             doc = DoctorListViewSet()
             doctors_url = None
             spec_breadcrumb = None
+            lat = None
+            long = None
 
-            if general_specialization and hospital:
+            if hospital:
+                lat = hospital.get('lat')
+                long = hospital.get('long')
+            else:
+                hospital = doctor.hospitals.all().first()
+                if hospital and hospital.location:
+                    lat = hospital.location.coords[1]
+                    long = hospital.location.coords[0]
+
+            if general_specialization and lat and long:
                 specialization_id = general_specialization[0].pk
 
                 parameters['specialization_ids'] = str(specialization_id)                
-                parameters['latitude'] = hospital.get('lat')
-                parameters['longitude'] = hospital.get('long')
+                parameters['latitude'] = lat
+                parameters['longitude'] = long
                 parameters['doctor_suggestions'] = 1
                 
                 kwargs['parameters'] = parameters
