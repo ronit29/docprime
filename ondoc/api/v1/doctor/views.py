@@ -975,7 +975,7 @@ class DoctorProfileUserViewSet(viewsets.GenericViewSet):
                 long = hospital.get('long')
             else:
                 hospital = doctor.hospitals.all().first()
-                if hospital.location:
+                if hospital and hospital.location:
                     lat = hospital.location.coords[1]
                     long = hospital.location.coords[0]
 
