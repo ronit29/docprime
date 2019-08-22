@@ -495,8 +495,7 @@ class LabAppointmentTestMappingSerializer(serializers.ModelSerializer):
     class Meta:
         model = LabAppointmentTestMapping
         fields = ('test_id', 'mrp', 'test', 'agreed_price', 'deal_price',
-                  # 'enabled',
-                  'is_home_collection_enabled')
+                  'is_home_collection_enabled', 'time_slot_start', 'is_home_pickup')
 
 
 class LabCustomSerializer(serializers.Serializer):
@@ -666,6 +665,16 @@ class PromotedLabsSerializer(serializers.ModelSerializer):
         fields = ('id', 'name', )
 
 
+class LabAppointmentTestMappingModelSerializer(serializers.ModelSerializer):
+    test_id = serializers.ReadOnlyField(source="test.id")
+    test_name = serializers.ReadOnlyField(source="test.name")
+
+    class Meta:
+        model = LabAppointmentTestMapping
+        fields = ('id', 'test_id', 'test_name', 'time_slot_start', 'is_home_pickup')
+
+
+
 class LabAppointmentModelSerializer(serializers.ModelSerializer):
     LAB_TYPE = 'lab'
     type = serializers.ReadOnlyField(default="lab")
@@ -680,6 +689,8 @@ class LabAppointmentModelSerializer(serializers.ModelSerializer):
     reports = serializers.SerializerMethodField()
     report_files = serializers.SerializerMethodField()
     prescription = serializers.SerializerMethodField()
+    time_slot_start = serializers.SerializerMethodField()
+    test_time_slots = serializers.SerializerMethodField()
 
     def get_prescription(self, obj):
         return []
@@ -717,11 +728,27 @@ class LabAppointmentModelSerializer(serializers.ModelSerializer):
         else:
             return []
 
+    def get_time_slot_start(self, obj):
+        if obj.time_slot_start:
+            return obj.time_slot_start
+        else:
+            appointment_first_slot = obj.test_mappings.order_by('time_slot_start').first()
+            return appointment_first_slot.time_slot_start
+
+    def get_test_time_slots(self, obj):
+        test_time_slots = []
+        if obj.time_slot_start:
+            return test_time_slots
+        else:
+            appointment_tests = obj.test_mappings.all()
+            serializer = LabAppointmentTestMappingModelSerializer(appointment_tests, many=True)
+            return serializer.data
+
     class Meta:
         model = LabAppointment
         fields = ('id', 'lab', 'lab_test', 'profile', 'type', 'lab_name', 'status', 'deal_price', 'effective_price', 'time_slot_start', 'time_slot_end',
                    'is_home_pickup', 'lab_thumbnail', 'lab_image', 'patient_thumbnail', 'patient_name', 'allowed_action', 'address', 'invoices', 'reports', 'report_files',
-                  'prescription')
+                  'prescription', 'test_time_slots')
 
 
 class LabAppointmentBillingSerializer(serializers.ModelSerializer):

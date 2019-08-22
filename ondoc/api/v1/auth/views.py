@@ -54,7 +54,7 @@ from ondoc.diagnostic.models import (Lab, LabAppointment, AvailableLabTest, LabN
 from ondoc.payout.models import Outstanding
 from ondoc.authentication.backends import JWTAuthentication
 from ondoc.api.v1.utils import (IsConsumer, IsDoctor, opdappointment_transform, labappointment_transform,
-                                ErrorCodeMapping, IsNotAgent, GenericAdminEntity)
+                                ErrorCodeMapping, IsNotAgent, GenericAdminEntity, form_time_slot)
 from django.conf import settings
 from collections import defaultdict
 import copy
@@ -987,15 +987,16 @@ class UserAppointmentsViewSet(OndocViewSet):
     def lab_appointment_list(self, request, params):
         user = request.user
         queryset = LabAppointment.objects.select_related('lab', 'profile', 'user')\
-                                        .prefetch_related('lab__lab_image', 'lab__lab_documents', 'reports').filter(user=user)
+                                        .prefetch_related('lab__lab_image', 'lab__lab_documents', 'reports', 'test_mappings').filter(user=user)
         if queryset and params.get('profile_id'):
             queryset = queryset.filter(profile=params['profile_id'])
         range = params.get('range')
-        if range and range == 'upcoming':
-            queryset = queryset.filter(time_slot_start__gte=timezone.now(),
-                                       status__in=LabAppointment.ACTIVE_APPOINTMENT_STATUS).order_by('time_slot_start')
-        else:
-            queryset = queryset.order_by('-time_slot_start')
+        # below code is not being used; Sorting will be done in parent method
+        # if range and range == 'upcoming':
+        #     queryset = queryset.filter(time_slot_start__gte=timezone.now(),
+        #                                status__in=LabAppointment.ACTIVE_APPOINTMENT_STATUS).order_by('time_slot_start')
+        # else:
+        #     queryset = queryset.order_by('-time_slot_start')
         queryset = paginate_queryset(queryset, request, 100)
         serializer = LabAppointmentModelSerializer(queryset, many=True, context={"request": request})
         return serializer
@@ -1981,7 +1982,18 @@ class OrderDetailViewSet(GenericViewSet):
                     enabled_for_cod = doc_clinic_timing.is_enabled_for_cod()
 
             item = OrderCartItemMapper(order)
-            temp_time_slot_start = convert_datetime_str_to_iso_str(order.action_data["time_slot_start"])
+            temp_time_slot_start = None
+            temp_test_time_slots = []
+            if order.action_data.get('has_radiology_timings'):
+                for test_time_slot in order.action_data.get('test_time_slots'):
+                    test_id = test_time_slot.get('test_id')
+                    test_data = dict()
+                    test_data['test_id'] = test_id
+                    test_data['time_slot_start'] = convert_datetime_str_to_iso_str(test_time_slot.get('time_slot_start'))
+                    test_data['is_home_pickup'] = test_time_slot.get('is_home_pickup')
+                    temp_test_time_slots.append(test_data)
+            else:
+                temp_time_slot_start = convert_datetime_str_to_iso_str(order.action_data["time_slot_start"])
             curr = {
                 "mrp": order.action_data["mrp"] if "mrp" in order.action_data else order.action_data["agreed_price"],
                 "deal_price": order.action_data["deal_price"],
@@ -1989,6 +2001,7 @@ class OrderDetailViewSet(GenericViewSet):
                 "data": cart_serializers.CartItemSerializer(item, context={"validated_data": None}).data,
                 "booking_id": order.reference_id,
                 "time_slot_start": temp_time_slot_start,
+                "test_time_slots": temp_test_time_slots,
                 "payment_type": order.action_data["payment_type"],
                 "cod_deal_price": cod_deal_price,
                 "enabled_for_cod": enabled_for_cod

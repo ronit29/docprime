@@ -2836,7 +2836,7 @@ class LabTimingListView(mixins.ListModelMixin,
         pathology_tests = []
 
         intersect_resp = {
-            "tests": {},
+            "tests": [],
             "timeslots": {},
             "upcoming_slots": {},
             "is_thyrocare": False
@@ -2859,6 +2859,9 @@ class LabTimingListView(mixins.ListModelMixin,
                     integration_dict = IntegratorMapping.get_if_third_party_integration(network_id=lab_obj.network.id)
 
             tests = LabTest.objects.filter(id__in=test_ids)
+            intersect_tests = list(map(lambda x: {'id': x.id, 'name': x.name}, tests))
+            intersect_resp['tests'] = intersect_tests
+
             for test in tests:
                 if test.test_type == LabTest.PATHOLOGY:
                     pathology_tests.append(test)
@@ -2890,8 +2893,6 @@ class LabTimingListView(mixins.ListModelMixin,
                         radiology_resp['tests'].append(timing_obj)
 
                 if pathology_tests and radiology_tests and pathology_pickup == radiology_pickup:
-                    intersect_tests = list(map(lambda x: {'id': x.id, 'name': x.name}, tests))
-                    intersect_resp['tests'] = intersect_tests
                     for slot_date in pathology_resp['timeslots']:
                         intersect_resp['timeslots'].update({slot_date: []})
                         time_separtors = ['AM', 'PM']

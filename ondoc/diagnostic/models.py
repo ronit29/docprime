@@ -1831,18 +1831,28 @@ class LabAppointment(TimeStampedModel, CouponsMixin, LabAppointmentInvoiceMixin,
             # return []
 
         current_datetime = timezone.now()
-        if user_type == User.CONSUMER and current_datetime <= self.time_slot_start:
-            if self.status in (self.BOOKED, self.ACCEPTED, self.RESCHEDULED_LAB, self.RESCHEDULED_PATIENT):
-                allowed = [self.RESCHEDULED_PATIENT]
-                if all([x.is_cancellable for x in self.tests.all()]):
-                    allowed += [self.CANCELLED]
-        if user_type == User.DOCTOR and self.time_slot_start.date() >= current_datetime.date():
-            if self.status in [self.BOOKED, self.RESCHEDULED_PATIENT]:
-                allowed = [self.ACCEPTED, self.RESCHEDULED_LAB]
-            elif self.status == self.ACCEPTED:
-                allowed = [self.RESCHEDULED_LAB, self.COMPLETED]
-            elif self.status == self.RESCHEDULED_LAB:
-                allowed = [self.ACCEPTED]
+        first_time_slot = None
+
+        if self.time_slot_start:
+            first_time_slot = self.time_slot_start
+        else:
+            first_time_slot_test = self.test_mappings.order_by('time_slot_start').first()
+            if first_time_slot_test:
+                first_time_slot = first_time_slot_test.time_slot_start
+
+        if first_time_slot:
+            if user_type == User.CONSUMER and current_datetime <= first_time_slot:
+                if self.status in (self.BOOKED, self.ACCEPTED, self.RESCHEDULED_LAB, self.RESCHEDULED_PATIENT):
+                    allowed = [self.RESCHEDULED_PATIENT]
+                    if all([x.is_cancellable for x in self.tests.all()]):
+                        allowed += [self.CANCELLED]
+            if user_type == User.DOCTOR and first_time_slot.date() >= current_datetime.date():
+                if self.status in [self.BOOKED, self.RESCHEDULED_PATIENT]:
+                    allowed = [self.ACCEPTED, self.RESCHEDULED_LAB]
+                elif self.status == self.ACCEPTED:
+                    allowed = [self.RESCHEDULED_LAB, self.COMPLETED]
+                elif self.status == self.RESCHEDULED_LAB:
+                    allowed = [self.ACCEPTED]
 
         return allowed
 
