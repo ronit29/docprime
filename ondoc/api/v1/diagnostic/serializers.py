@@ -649,6 +649,14 @@ class PromotedLabsSerializer(serializers.ModelSerializer):
         fields = ('id', 'name', )
 
 
+class LabTestNameSerializer(serializers.ModelSerializer):
+    test_name = serializers.ReadOnlyField(source='test.name')
+
+    class Meta:
+        model = LabAppointmentTestMapping
+        fields = ('test_name', )
+
+
 class LabAppointmentModelSerializer(serializers.ModelSerializer):
     LAB_TYPE = 'lab'
     type = serializers.ReadOnlyField(default="lab")
@@ -676,7 +684,7 @@ class LabAppointmentModelSerializer(serializers.ModelSerializer):
         return list(obj.test_mappings.values_list('test_id', flat=True))
 
     def get_lab_test_name(self, obj):
-        return list(obj.test_mappings.values_list('name', flat=True))
+        return LabTestNameSerializer(obj.test_mappings.all(), many=True).data
 
     def get_lab_thumbnail(self, obj):
         request = self.context.get("request")
