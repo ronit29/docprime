@@ -28,9 +28,9 @@ class RocketChatUsers(auth_models.TimeStampedModel):
     response_data = JSONField()
     user_type = models.PositiveSmallIntegerField(choices=((auth_models.User.DOCTOR, 'doctor'),
                                                           (auth_models.User.CONSUMER, 'user')))
-    doctor = models.ForeignKey(doc_models.Doctor, related_name='rc_user', on_delete=models.SET_NULL, null=True)
-    offline_patient = models.ForeignKey(doc_models.OfflinePatients, related_name='rc_user', on_delete=models.SET_NULL, null=True)
-    online_patient = models.ForeignKey(auth_models.UserProfile, related_name='rc_user', on_delete=models.SET_NULL, null=True)
+    doctor = models.OneToOneField(doc_models.Doctor, related_name='rc_user', on_delete=models.SET_NULL, null=True)
+    offline_patient = models.OneToOneField(doc_models.OfflinePatients, related_name='rc_user', on_delete=models.SET_NULL, null=True)
+    online_patient = models.OneToOneField(auth_models.UserProfile, related_name='rc_user', on_delete=models.SET_NULL, null=True)
     login_token = models.CharField(max_length=64)
 
     @staticmethod

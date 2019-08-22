@@ -1200,6 +1200,41 @@ class PartnerEConsultationViewSet(viewsets.GenericViewSet):
         resp_data = serializers.EConsultListSerializer(e_consultation, context={'request': request})
         return Response({'status': 1, 'message': 'EConsultation completed successfully', 'data': resp_data.data})
 
+    def video_link_share(self, request):
+        serializer = serializers.EConsultSerializer(data=request.query_params, context={'request': request})
+        serializer.is_valid(raise_exception=True)
+        valid_data = serializer.validated_data
+        e_consultation = valid_data.get('e_consultation')
+        user_token = e_consultation.doctor.rc_user.login_token
+        user_id = e_consultation.doctor.rc_user.response_data['user']['_id']
+        video_link = 'https://meet.jit.si/demoapp'
+        rc_group = e_consultation.rc_group
+        msg_txt = "This is the video link: {}/{}".format(settings.JITSI_SERVER, rc_group.group_name)
+        request_data = {
+            "roomId": rc_group.group_id,
+            "text": msg_txt,
+        }
+        response = requests.post(settings.ROCKETCHAT_SERVER + '/api/v1/chat.postMessage',
+                                 headers={'X-Auth-Token': user_token,
+                                          'X-User-Id': user_id,
+                                          'Content-Type': 'application/json'},
+                                 data=json.dumps({
+                                     "roomId": rc_group.group_id,
+                                     "text": msg_txt,
+                                 }))
+        if response.status_code != status.HTTP_200_OK or not response.ok:
+            error_message = "[ERROR] Message for RC user with user_id - {} and user_token - {} could not be posted to group - {}".format(
+                    user_id, user_token, rc_group.group_name)
+            logger.info(error_message)
+            logger.info("[ERROR] %s", response.reason)
+            logger.error(
+                "RC Group - " + rc_group.group_name + ", Payload - " + json.dumps(
+                    request_data) + ", RC Response - " + json.dumps(
+                    response.json()) + "")
+            return Response({"status": 0, "message": error_message})
+        else:
+            return Response({"status": 1, "message": "Message posted"})
+
 
 class ConsumerEConsultationViewSet(viewsets.GenericViewSet):
 

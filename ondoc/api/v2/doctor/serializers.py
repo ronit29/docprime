@@ -691,7 +691,11 @@ class EConsultSerializer(serializers.Serializer):
         request = self.context.get('request')
         user = request.user
         consult_id = attrs['id']
-        e_consultation = provider_models.EConsultation.objects.filter(id=consult_id, created_by=user,
+        e_consultation = provider_models.EConsultation.objects.select_related('doctor', 'offline_patient', 'online_patient') \
+                                                              .prefetch_related('doctor__rc_user',
+                                                                                'offline_patient__rc_user',
+                                                                                'online_patient__rc_user') \
+                                                              .filter(id=consult_id, created_by=user,
                                                                       status__in=[provider_models.EConsultation.BOOKED,
                                                                                   provider_models.EConsultation.CREATED]).first()
         if not e_consultation:
