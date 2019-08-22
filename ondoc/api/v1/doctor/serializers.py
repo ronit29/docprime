@@ -9,6 +9,7 @@ from ondoc.api.v1.procedure.serializers import DoctorClinicProcedureSerializer, 
 from ondoc.api.v1.ratings.serializers import RatingsGraphSerializer
 from ondoc.cart.models import Cart
 from ondoc.common.models import Feature, MatrixMappedCity
+from ondoc.diagnostic.models import LabTest
 from ondoc.doctor.models import (OpdAppointment, Doctor, Hospital, DoctorHospital, DoctorClinicTiming,
                                  DoctorAssociation,
                                  DoctorAward, DoctorDocument, DoctorEmail, DoctorExperience, DoctorImage,
@@ -402,6 +403,15 @@ class OTPConfirmationSerializer(serializers.Serializer):
         return attrs
 
 
+class LabAppointmentTestMappingSerializer(serializers.Serializer):
+    TEST_TYPE = [(LabTest.RADIOLOGY, "Radiology"), (LabTest.PATHOLOGY, "Pathology")]
+    test = serializers.PrimaryKeyRelatedField(queryset=LabTest.objects.all())
+    start_date = serializers.DateTimeField(required=True)
+    start_time = serializers.FloatField()
+    type = serializers.ChoiceField(choices=TEST_TYPE)
+    is_home_pickup = serializers.BooleanField(default=False)
+
+
 class UpdateStatusSerializer(serializers.Serializer):
     status = serializers.IntegerField()
     time_slot_start = serializers.DateTimeField(required=False)
@@ -413,6 +423,15 @@ class UpdateStatusSerializer(serializers.Serializer):
         queryset=CancellationReason.objects.filter(visible_on_front_end=True), required=False)
     cancellation_comment = serializers.CharField(required=False, allow_blank=True)
     source = serializers.ChoiceField(required=False, choices=AppointmentHistory.SOURCE_CHOICES)
+    test_timings = serializers.ListSerializer(child=LabAppointmentTestMappingSerializer(), required=False, allow_empty=False)
+    has_radiology_timings = serializers.BooleanField(required=False, default=False)
+
+    def __init__(self, instance=None, data=None, **kwargs):
+        super().__init__(instance, data, **kwargs)
+        if data and data.get('has_radiology_timings'):
+            self.fields.fields['start_date'].required = False
+            self.fields.fields['start_time'].required = False
+            self.fields.fields['test_timings'].required = True
 
 
 class DoctorImageSerializer(serializers.ModelSerializer):

@@ -2255,6 +2255,12 @@ class LabAppointment(TimeStampedModel, CouponsMixin, LabAppointmentInvoiceMixin,
 
         self.save()
 
+        if data and data.get('test_time_slots'):
+            for test_time_slot in data.get('test_time_slots'):
+                appointment_test = self.test_mappings.filter(test_id=test_time_slot.get('test_id')).first()
+                appointment_test.time_slot_start = test_time_slot.get('time_slot_start')
+                appointment_test.save()
+
     def action_accepted(self):
         self.status = self.ACCEPTED
         self.save()
