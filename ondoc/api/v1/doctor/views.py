@@ -12,7 +12,7 @@ from ondoc.api.v1.doctor.serializers import HospitalModelSerializer, Appointment
 from ondoc.api.v1.doctor.DoctorSearchByHospitalHelper import DoctorSearchByHospitalHelper
 from ondoc.api.v1.procedure.serializers import CommonProcedureCategorySerializer, ProcedureInSerializer, \
     ProcedureSerializer, DoctorClinicProcedureSerializer, CommonProcedureSerializer, CommonIpdProcedureSerializer, \
-    CommonHospitalSerializer
+    CommonHospitalSerializer, CommonCategoriesSerializer
 from ondoc.cart.models import Cart
 from ondoc.crm.constants import constants
 from ondoc.diagnostic.models import LabTestCategory
@@ -1395,20 +1395,20 @@ class SearchedItemsViewSet(viewsets.GenericViewSet):
             if request.user.active_insurance.insurance_plan.plan_usages.get('package_disabled'):
                 need_to_hit_query = False
 
+        categories_serializer = None
+
         if need_to_hit_query:
             categories = LabTestCategory.objects.filter(is_live=True, is_package_category=True,
-                                                        show_on_recommended_screen=True).order_by('-priority')[:15].values(
-                'id', 'name', 'preferred_lab_test', 'is_live', 'is_package_category', 'show_on_recommended_screen',
-                'priority', 'icon')
-            for category in categories:
-                category['icon'] = request.build_absolute_uri('media/' + category.get('icon')) if category.get('icon') else None
+                                                        show_on_recommended_screen=True).order_by('-priority')[:15]
+
+            categories_serializer = CommonCategoriesSerializer(categories, many=True, context={'request': request})
 
         return Response({"conditions": conditions_serializer.data, "specializations": specializations_serializer.data,
                          "procedure_categories": common_procedure_categories_serializer.data,
                          "procedures": common_procedures_serializer.data,
                          "ipd_procedures": common_ipd_procedures_serializer.data,
                          "top_hospitals": top_hospitals_data,
-                         'package_categories': categories})
+                         'package_categories': categories_serializer.data})
 
 
 class DoctorListViewSet(viewsets.GenericViewSet):
