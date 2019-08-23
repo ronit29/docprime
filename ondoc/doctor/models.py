@@ -2579,10 +2579,9 @@ class OpdAppointment(auth_model.TimeStampedModel, CouponsMixin, OpdAppointmentIn
         return invoices_urls
 
     def is_credit_letter_required_for_appointment(self):
-        hospital_ids_cl_required = list(settings.HOSPITAL_CREDIT_LETTER_REQUIRED.values())
-        if self.hospital and self.hospital.id in hospital_ids_cl_required:
-            if self.is_medanta_hospital_booking() or self.is_artemis_hospital_booking():
-                return True
+        # hospital_ids_cl_required = list(settings.HOSPITAL_CREDIT_LETTER_REQUIRED.values())
+        if self.hospital and self.hospital.is_ipd_hospital:
+            return True
         return False
 
 
@@ -2840,10 +2839,11 @@ class OpdAppointment(auth_model.TimeStampedModel, CouponsMixin, OpdAppointmentIn
                     (self.id, str(math.floor(self.updated_at.timestamp()))),
                     eta=self.time_slot_start - datetime.timedelta(
                         minutes=int(self.SMS_APPOINTMENT_REMINDER_TIME)), )
-                notification_tasks.opd_send_otp_before_appointment.apply_async(
-                    (self.id, str(math.floor(self.time_slot_start.timestamp()))),
-                    eta=self.time_slot_start - datetime.timedelta(
-                        minutes=settings.TIME_BEFORE_APPOINTMENT_TO_SEND_OTP), )
+                if (self.time_slot_start - self.created_at).total_seconds() > (settings.COUNT_DOWN_FOR_REMINDER):
+                    notification_tasks.opd_send_otp_before_appointment.apply_async(
+                        (self.id, str(math.floor(self.time_slot_start.timestamp()))), countdown=5)
+                        # eta=self.time_slot_start - datetime.timedelta(
+                        #     minutes=settings.TIME_BEFORE_APPOINTMENT_TO_SEND_OTP), )
                 notification_tasks.opd_send_after_appointment_confirmation.apply_async(
                     (self.id, str(math.floor(self.time_slot_start.timestamp()))),
                     eta=self.time_slot_start + datetime.timedelta(
@@ -3671,10 +3671,15 @@ class OpdAppointment(auth_model.TimeStampedModel, CouponsMixin, OpdAppointmentIn
             "instance": self
         }
         html_body = None
-        if self.is_medanta_hospital_booking():
+
+        if self.hospital.is_ipd_hospital:
             html_body = render_to_string("email/documents/credit_letter_medanta.html", context=context)
-        elif self.is_artemis_hospital_booking():
-            html_body = render_to_string("email/documents/credit_letter_artemis.html", context=context)
+
+        # if self.is_medanta_hospital_booking():
+        #     html_body = render_to_string("email/documents/credit_letter_medanta.html", context=context)
+        # elif self.is_artemis_hospital_booking():
+        #     html_body = render_to_string("email/documents/credit_letter_artemis.html", context=context)
+
         if not html_body:
             logger.error("Got error while getting hospital for opd credit letter.")
             return None
