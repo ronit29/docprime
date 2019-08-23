@@ -2012,6 +2012,8 @@ class PackageLabCompareRequestSerializer(serializers.Serializer):
 
 class CompareLabPackagesSerializer(serializers.Serializer):
     package_lab_ids = serializers.ListField(child=PackageLabCompareRequestSerializer(), min_length=1, max_length=5)
-    longitude = serializers.FloatField(default=77.071848)
-    latitude = serializers.FloatField(default=28.450367)
+    long = serializers.FloatField(default=77.071848)
+    lat = serializers.FloatField(default=28.450367)
     title = serializers.CharField(required=False, max_length=500)
+    category = serializers.PrimaryKeyRelatedField(queryset=LabTestCategory.objects.all(), required=False,
+                                                  allow_null=True)

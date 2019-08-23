@@ -13,6 +13,7 @@ from django.core.files.uploadedfile import InMemoryUploadedFile
 from io import BytesIO
 import math
 import os
+import re
 import hashlib
 import random, string
 from django.contrib.contenttypes.fields import GenericForeignKey, GenericRelation
@@ -29,7 +30,6 @@ from rest_framework import status
 from collections import OrderedDict
 from django.utils.text import slugify
 import logging
-
 
 logger = logging.getLogger(__name__)
 
@@ -318,6 +318,7 @@ class User(AbstractBaseUser, PermissionsMixin):
     date_joined = models.DateTimeField(auto_now_add=True)
     auto_created = models.BooleanField(default=False)
     source = models.CharField(blank=True, max_length=50, null=True)
+    data = JSONField(blank=True, null=True)
 
     def __hash__(self):
         return self.id
@@ -337,6 +338,74 @@ class User(AbstractBaseUser, PermissionsMixin):
         # if self.user_type==1 and hasattr(self, 'staffprofile'):
         #     return self.staffprofile.name
         # return str(self.phone_number)
+
+    @classmethod
+    def get_external_login_data(cls, data):
+        from ondoc.authentication.backends import JWTAuthentication
+        profile_data = {}
+        source = data.get('extra').get('utm_source', 'External') if data.get('extra') else 'External'
+        redirect_type = data.get('redirect_type', "")
+
+        user = User.objects.filter(phone_number=data.get('phone_number'),
+                                                     user_type=User.CONSUMER).first()
+        user_with_email = User.objects.filter(email=data.get('email', None), user_type=User.CONSUMER).first()
+        if not user and user_with_email:
+            raise Exception("Email already taken with another number")
+        if not user:
+            user = User.objects.create(phone_number=data.get('phone_number'),
+                                       is_phone_number_verified=False,
+                                       user_type=User.CONSUMER,
+                                       auto_created=True,
+                                       email=data.get('email'),
+                                       source=source,
+                                       data=data.get('extra'))
+
+        if not user:
+            raise Exception('Invalid User')
+            # return JsonResponse(response, status=400)
+
+        profile_data['name'] = data.get('name')
+        profile_data['phone_number'] = user.phone_number
+        profile_data['user'] = user
+        profile_data['email'] = data.get('email')
+        profile_data['source'] = source
+        profile_data['dob'] = data.get('dob', "")
+        profile_data['gender'] = data.get('gender', "")
+        user_profiles = user.profiles.all()
+
+        if not bool(re.match(r"^[a-zA-Z ]+$", data.get('name'))):
+            raise Exception('Invalid Name')
+            # return Response({"error": "Invalid Name"}, status=status.HTTP_400_BAD_REQUEST)
+
+        if user_profiles:
+            user_profiles = list(filter(lambda x: x.name.lower() == profile_data['name'].lower(), user_profiles))
+            if user_profiles:
+                user_profile = user_profiles[0]
+                if not user_profile.phone_number:
+                    user_profile.phone_number = profile_data['phone_number']
+                if not user_profile.email:
+                    user_profile.email = profile_data['email'] if not user_profile.email else None
+                if not user_profile.gender and profile_data.get('gender', None):
+                    user_profile.gender = profile_data.get('gender', "")
+                if not user_profile.dob and profile_data.get('dob', None):
+                    user_profile.dob = profile_data.get('dob', "")
+                user_profile.save()
+            else:
+                UserProfile.objects.create(**profile_data)
+        else:
+            profile_data.update({
+                "is_default_user": True
+            })
+            profile_data.pop('doctor', None)
+            profile_data.pop('hospital', None)
+            UserProfile.objects.create(**profile_data)
+
+        token_object = JWTAuthentication.generate_token(user)
+        result = dict()
+        result['token'] = token_object
+        result['user_id'] = user.id
+        return result
+
 
     def is_valid_lead(self, date_time_to_be_checked, check_lab_appointment=False, check_ipd_lead=False):
         # If this user has booked an appointment with specific period from date_time_to_be_checked, then
