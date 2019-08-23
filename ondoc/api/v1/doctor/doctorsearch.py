@@ -263,9 +263,9 @@ class DoctorSearchHelper:
             #         )
             # params['doctor_name'] = '%'+search_key+'%'
             params['order_doctor'] = search_key
-            params['doctor_name1'] = search_key + ' %'
-            params['doctor_name2'] = '% ' + search_key + ' %'
-            params['doctor_name3'] = '% ' + search_key
+            params['doctor_name1'] = search_key + '%'
+            params['doctor_name2'] = '%' + search_key + '%'
+            params['doctor_name3'] = '%' + search_key
 
         if self.query_params.get('gender'):
             filtering_params.append("d.gender=(%(gender)s)")
@@ -281,7 +281,7 @@ class DoctorSearchHelper:
 
         if self.query_params.get('is_insurance'):
             filtering_params.append(
-                "mrp<=(%(insurance_threshold_amount)s) and h.enabled_for_online_booking=True and h.enabled_for_prepaid and d.enabled_for_online_booking=True and d.is_insurance_enabled and dc.enabled_for_online_booking=True"
+                "mrp<=(%(insurance_threshold_amount)s) and h.enabled_for_insurance and h.enabled_for_online_booking=True and h.enabled_for_prepaid and d.enabled_for_online_booking=True and d.is_insurance_enabled and dc.enabled_for_online_booking=True"
             )
             params['insurance_threshold_amount'] = self.query_params.get('insurance_threshold_amount')
 
@@ -611,7 +611,7 @@ class DoctorSearchHelper:
                 is_insurance_covered = False
                 insurance_error = None
                 insurance_data_dict = kwargs.get('insurance_data')
-                if doctor_clinic.hospital.enabled_for_prepaid and enable_online_booking and doctor.is_insurance_enabled and doctor.is_doctor_specialization_insured() and insurance_data_dict and min_price.get("mrp") is not None and \
+                if doctor_clinic.hospital.enabled_for_prepaid and doctor_clinic.hospital.enabled_for_insurance and enable_online_booking and doctor.is_insurance_enabled and doctor.is_doctor_specialization_insured() and insurance_data_dict and min_price.get("mrp") is not None and \
                         min_price["mrp"] <= insurance_data_dict['insurance_threshold_amount'] and \
                         not (request.query_params.get('procedure_ids') or request.query_params.get('procedure_category_ids')):
                     is_insurance_covered = True

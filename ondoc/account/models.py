@@ -942,7 +942,7 @@ class PgTransaction(TimeStampedModel):
 
     user = models.ForeignKey(User, on_delete=models.DO_NOTHING)
     product_id = models.SmallIntegerField(choices=Order.PRODUCT_IDS)
-    reference_id = models.PositiveIntegerField(blank=True, null=True)
+    reference_id = models.BigIntegerField(blank=True, null=True)
     order = models.ForeignKey(Order, on_delete=models.CASCADE, null=True, related_name="txn")
     #order_id = models.PositiveIntegerField()
     order_no = models.CharField(max_length=100, blank=True, null=True)
@@ -2230,6 +2230,20 @@ class MerchantPayout(TimeStampedModel):
             adv_amt_obj.save()
             self.payout_ref_id = self.id
             self.save()
+
+    @property
+    def get_nodal_id(self):
+        from ondoc.doctor.models import OpdAppointment
+        if self.booking_type == self.InsurancePremium:
+            return 2
+        else:
+            appointment = self.get_appointment()
+            if appointment.payment_type == OpdAppointment.PREPAID:
+                return 1
+            elif appointment.payment_type == OpdAppointment.INSURANCE:
+                return 2
+
+        return 0
 
     class Meta:
         db_table = "merchant_payout"

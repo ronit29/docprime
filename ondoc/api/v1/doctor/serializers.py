@@ -520,7 +520,7 @@ class DoctorHospitalSerializer(serializers.ModelSerializer):
         enabled_for_online_booking = doctor_clinic.enabled_for_online_booking and doctor.enabled_for_online_booking and \
                                      doctor.is_doctor_specialization_insured() and hospital.enabled_for_online_booking
 
-        if hospital.enabled_for_prepaid and obj.mrp is not None and resp['insurance_threshold_amount'] is not None and obj.mrp <= resp['insurance_threshold_amount'] and enabled_for_online_booking and \
+        if hospital.enabled_for_prepaid and hospital.enabled_for_insurance and obj.mrp is not None and resp['insurance_threshold_amount'] is not None and obj.mrp <= resp['insurance_threshold_amount'] and enabled_for_online_booking and \
                 not (request.query_params.get('procedure_ids') or request.query_params.get('procedure_category_ids')) and doctor.is_enabled_for_insurance:
 
             user_insurance = None if not user.is_authenticated or user.is_anonymous else user.active_insurance
@@ -1992,7 +1992,9 @@ class TopHospitalForIpdProcedureSerializer(serializers.ModelSerializer):
         return [x.name for x in obj.health_insurance_providers.all()]
 
     def get_multi_speciality(self, obj):
-        return len(obj.hospitalspeciality_set.all()) > 1
+        result1 = len(obj.hospitalspeciality_set.all()) > 1
+        result2 = len(obj.network.hospitalnetworkspeciality_set.all()) > 1 if obj.network else False
+        return result1 or result2
 
     def get_address(self, obj):
         return obj.get_hos_address()
@@ -2003,13 +2005,12 @@ class TopHospitalForIpdProcedureSerializer(serializers.ModelSerializer):
     def get_logo(self, obj):
         request = self.context.get('request')
         if request:
+            for document in obj.hospital_documents.all():
+                if document.document_type == HospitalDocument.LOGO:
+                    return request.build_absolute_uri(document.name.url) if document.name else None
             if obj.network:
                 for document in obj.network.hospital_network_documents.all():
                     if document.document_type == HospitalNetworkDocument.LOGO:
-                        return request.build_absolute_uri(document.name.url) if document.name else None
-            else:
-                for document in obj.hospital_documents.all():
-                    if document.document_type == HospitalDocument.LOGO:
                         return request.build_absolute_uri(document.name.url) if document.name else None
         return None
 
@@ -2149,7 +2150,10 @@ class HospitalDetailIpdProcedureSerializer(TopHospitalForIpdProcedureSerializer)
         return result
 
     def get_opd_timings(self, obj):
-        return obj.opd_timings
+        result = obj.opd_timings
+        if not result:
+            result = obj.network.opd_timings if obj.network else None
+        return result
 
     def get_contact_number(self, obj):
         for x in obj.hospital_helpline_numbers.all():
@@ -2158,14 +2162,26 @@ class HospitalDetailIpdProcedureSerializer(TopHospitalForIpdProcedureSerializer)
 
     def get_services(self, obj):
         request = self.context.get('request')
-        return [{'icon': request.build_absolute_uri(x.icon.url), 'name': x.name} for x in obj.service.all() if x.icon]
+        result = [{'icon': request.build_absolute_uri(x.icon.url), 'name': x.name} for x in obj.service.all() if x.icon]
+        if not result:
+            if obj.network:
+                result = [{'icon': request.build_absolute_uri(x.icon.url), 'name': x.name} for x in obj.network.service.all() if x.icon]
+        return result
 
     def get_images(self, obj):
         request = self.context.get('request')
-        return [{'original': request.build_absolute_uri(img.name.url),
-                 "thumbnail": request.build_absolute_uri(img.cropped_image.url) if img.cropped_image else None,
-                 "cover_image": img.cover_image} for img in
-                obj.hospitalimage_set.all() if img.name]
+        result = [{'original': request.build_absolute_uri(img.name.url),
+                   "thumbnail": request.build_absolute_uri(img.cropped_image.url) if img.cropped_image else None,
+                   "cover_image": img.cover_image} for img in
+                  obj.hospitalimage_set.all() if img.name]
+        if not result:
+            if obj.network:
+                result = [{'original': request.build_absolute_uri(img.name.url),
+                           "thumbnail": request.build_absolute_uri(
+                               img.cropped_image.url) if img.cropped_image else None,
+                           "cover_image": img.cover_image} for img in obj.network.hospitalnetworkimage_set.all() if
+                          img.name]
+        return result
 
     def get_ipd_procedure_categories(self, obj):
         result = {}
