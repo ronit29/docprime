@@ -4,7 +4,7 @@ from rest_framework.fields import CharField
 from ondoc.cart.models import Cart
 from ondoc.diagnostic.models import (LabTest, AvailableLabTest, Lab, LabAppointment, LabTiming, PromotedLab,
                                      CommonTest, CommonDiagnosticCondition, LabImage, LabReportFile, CommonPackage,
-                                     LabTestCategory, LabAppointmentTestMapping, LabTestGroup)
+                                     LabTestCategory, LabAppointmentTestMapping, LabTestGroup, LabTestGroupMapping)
 from django.contrib.staticfiles.templatetags.staticfiles import static
 from ondoc.authentication.models import UserProfile, Address
 from ondoc.api.v1.doctor.serializers import CreateAppointmentSerializer, CommaSepratedToListField
@@ -1058,7 +1058,8 @@ class LabAppointmentCreateSerializer(serializers.Serializer):
                     params['is_home_pickup'] = test_timing.get("is_home_pickup")
                     params['start_date'] = test_timing.get('start_date')
                     params['start_time'] = test_timing.get('start_time')
-                    params['test_id'] = test_timing.get('test')
+                    params['test'] = test_timing.get('test')
+                    params['lab'] = lab
                     self.radiology_time_slot_validator(request, params)
         else:
             has_pathology_timings = True
@@ -1322,17 +1323,32 @@ class LabAppointmentCreateSerializer(serializers.Serializer):
                             request.data))
                     raise serializers.ValidationError("No time slot available")
             else:
-                lab_test_group = LabTestGroup.objects.filter(test_id=params.get('test_id'))
-                lab_group_timing_queryset = lab_queryset.test_group_timings.filter(lab_test_group=lab_test_group.id,
-                                                                                   day=day_of_week,
-                                                                                   start__lte=params.get('start_time'),
-                                                                                   end__gte=params.get('start_time'),
-                                                                                   for_home_pickup=params.get(
-                                                                                       'is_home_pickup')).exists()
-                if not lab_queryset.always_open and not lab_group_timing_queryset:
+                lab_test_group_mapping = LabTestGroupMapping.objects.filter(test=params.get('test')).first()
+                if lab_test_group_mapping:
+                    lab_test_group = LabTestGroup.objects.filter(id=lab_test_group_mapping.lab_test_group_id).first()
+
+                    lab_test_group_timing = False
+                    if lab_test_group:
+                        lab_test_group_timing = lab_queryset.test_group_timings.filter(lab_test_group=lab_test_group.id,
+                                                                                       day=day_of_week,
+                                                                                       start__lte=params.get('start_time'),
+                                                                                       end__gte=params.get('start_time'),
+                                                                                       for_home_pickup=params.get('is_home_pickup')).exists()
+                    else:
+                        logger.error(
+                            "Error: Mapping not found - " + json.dumps(
+                                request.data))
+                        raise serializers.ValidationError("Something went wrong.")
+
+                    if not lab_queryset.always_open and not lab_test_group_timing:
+                        logger.error(
+                            "Error 'No time slot available' for lab appointment with data - " + json.dumps(request.data))
+                        raise serializers.ValidationError("No time slot available")
+                else:
                     logger.error(
-                        "Error 'No time slot available' for lab appointment with data - " + json.dumps(request.data))
-                    raise serializers.ValidationError("No time slot available")
+                        "Error: Mapping not found - " + json.dumps(
+                            request.data))
+                    raise serializers.ValidationError("Something went wrong.")
 
     def get_slots_list(self, data):
         slots = list()
