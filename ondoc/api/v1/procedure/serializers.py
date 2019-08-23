@@ -141,7 +141,7 @@ class CommonCategoriesSerializer(serializers.ModelSerializer):
 
     def get_icon(self, obj):
         request = self.context.get('request')
-        return request.build_absolute_uri('/media/' + obj.icon.name) if obj.icon  and obj.icon.name else None
+        return request.build_absolute_uri(obj.icon.url) if obj.icon  and obj.icon.url else None
 
     class Meta:
         model = LabTestCategory
