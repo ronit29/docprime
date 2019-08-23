@@ -3662,3 +3662,10 @@ class LabTestCategoryLandingUrlViewSet(viewsets.GenericViewSet):
 
         return Response({'url': list(resp.keys())[0], 'title': title, 'all_categories': list(resp.values())[0], 'meta_title': meta_title, 'meta_description': meta_description})
 
+
+class IPDMedicinePageLeadViewSet(viewsets.GenericViewSet):
+
+    def store(self, request):
+
+        params = request.data
+

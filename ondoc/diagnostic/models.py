@@ -3280,3 +3280,16 @@ class LabTestCategoryLandingURLS(TimeStampedModel):
 
     class Meta:
         db_table = "lab_test_category_landing_urls"
+
+
+
+class IPDMedicinePageLead(auth_model.TimeStampedModel):
+    name = models.CharField(max_length=500)
+    phone_number = models.BigIntegerField()
+    city = models.ForeignKey(MatrixMappedCity, on_delete=models.SET_NULL, null=True)
+
+    class Meta:
+        db_table = "ipd_medicine_lead"
+
+    def __str__(self):
+        return self.name
