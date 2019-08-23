@@ -1,14 +1,3 @@
-{% if instance.payment_type == 2 %}
-Appointment ID:{{instance.id}} - You have received a pay at clinic(Cash) appointment request. Please confirm the appointment by using Docprime provider app.
-Patient Name : {{patient_name|capfirst}}
-Patient Contact No: {{mask_number}}
-Doctor Name : Dr. {{doctor_name|capfirst}}
-Appointment Date and Time : {{instance.time_slot_start|date:"D jS F Y"}} || {{instance.time_slot_start|date:"h:i A"}}
-{{clinic_or_hospital}} : {{instance.hospital.name|capfirst}}
-{{clinic_or_hospital}} Address : {{instance.hospital.get_hos_address}}
-Amount to be Collected: Rs.{{cod_amount}}
-
-{% else %}
 We have received an appointment for {{patient_name|capfirst}} with Dr. {{doctor_name|capfirst}} at {{instance.hospital.name|capfirst}} on {{instance.time_slot_start|date:"D jS F Y"}} at {{instance.time_slot_start|date:"h:i A"}}
 Please confirm the booking at the earliest by accepting the booking using docprime provider app.
 
