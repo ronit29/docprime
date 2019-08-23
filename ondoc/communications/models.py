@@ -32,7 +32,7 @@ from ondoc.authentication.models import UserProfile, GenericAdmin, NotificationE
 from ondoc.insurance.models import EndorsementRequest, UserInsurance
 
 from ondoc.notification.models import NotificationAction, SmsNotification, EmailNotification, AppNotification, \
-    PushNotification, WhtsappNotification
+    PushNotification, WhtsappNotification, DynamicTemplates
 # from ondoc.notification.sqs_client import publish_message
 from ondoc.notification.rabbitmq_client import publish_message
 # import datetime
@@ -55,15 +55,20 @@ def get_spoc_email_and_number_hospital(spocs, appointment):
                                                                             Q(doctor__isnull=True) | Q(doctor=appointment.doctor)))
             if admins:
                 admins_with_user = admins.filter(user__isnull=False)
-                for admin in admins_with_user:
-                    if int(admin.user.phone_number) == int(spoc.number):
-                        user_and_number.append({'user': admin.user, 'phone_number': spoc.number})
-                        if spoc.email:
-                            user_and_email.append({'user': admin.user, 'email': spoc.email})
-                    else:
-                        user_and_number.append({'user': None, 'phone_number': spoc.number})
-                        if spoc.email:
-                            user_and_email.append({'user': None, 'email': spoc.email})
+                if admins_with_user:
+                    for admin in admins_with_user:
+                        if int(admin.user.phone_number) == int(spoc.number):
+                            user_and_number.append({'user': admin.user, 'phone_number': spoc.number})
+                            if spoc.email:
+                                user_and_email.append({'user': admin.user, 'email': spoc.email})
+                        else:
+                            user_and_number.append({'user': None, 'phone_number': spoc.number})
+                            if spoc.email:
+                                user_and_email.append({'user': None, 'email': spoc.email})
+                else:
+                    user_and_number.append({'user': None, 'phone_number': spoc.number})
+                    if spoc.email:
+                        user_and_email.append({'user': None, 'email': spoc.email})
             else:
                 user_and_number.append({'user': None, 'phone_number': spoc.number})
                 if spoc.email:
@@ -252,11 +257,12 @@ class SMSNotification:
     def get_template(self, user):
         notification_type = self.notification_type
         body_template = ''
-        if notification_type == NotificationAction.APPOINTMENT_ACCEPTED or \
-                notification_type == NotificationAction.OPD_OTP_BEFORE_APPOINTMENT:
+        if notification_type == NotificationAction.APPOINTMENT_ACCEPTED:
             body_template = "sms/appointment_accepted.txt"
         elif notification_type == NotificationAction.APPOINTMENT_BOOKED and user and user.user_type == User.CONSUMER:
             body_template = "sms/appointment_booked_patient.txt"
+        elif notification_type == NotificationAction.OPD_OTP_BEFORE_APPOINTMENT:
+            body_template = "sms/appointment_accepted_reminder.txt"
         elif notification_type == NotificationAction.APPOINTMENT_BOOKED and (not user or user.user_type == User.DOCTOR):
             body_template = "sms/appointment_booked_doctor.txt"
         elif notification_type == NotificationAction.APPOINTMENT_RESCHEDULED_BY_PATIENT and user and user.user_type == User.CONSUMER:
@@ -348,6 +354,18 @@ class SMSNotification:
     #    elif notification_type == NotificationAction.LAB_FEEDBACK_AFTER_APPOINTMENT:
     #        body_template = "sms/lab/lab_feedback.txt"
         return body_template
+
+    def get_template_object(self, user):
+        notification_type = self.notification_type
+        obj = None
+        if notification_type == NotificationAction.APPOINTMENT_ACCEPTED:
+            obj = DynamicTemplates.objects.filter(template_name="Confirmation_IPD_OPD").first()
+        elif notification_type == NotificationAction.APPOINTMENT_BOOKED:
+            obj = DynamicTemplates.objects.filter(template_name="Booking_customer_pay_at_clinic").first()
+        elif notification_type == NotificationAction.OPD_OTP_BEFORE_APPOINTMENT:
+            obj = DynamicTemplates.objects.filter(template_name="Reminder_appointment")
+
+        return obj
 
     def trigger(self, receiver, template, context):
         user = receiver.get('user')
@@ -441,6 +459,11 @@ class SMSNotification:
         return context, click_login_token_obj
 
     def send(self, receivers):
+
+        dispatch_response, receivers = self.dispatch(receivers)
+        if dispatch_response:
+            return
+
         context = self.context
         if not context:
             return
@@ -455,6 +478,49 @@ class SMSNotification:
             if template:
                 self.trigger(receiver, template, context)
         ClickLoginToken.objects.bulk_create(click_login_token_objects)
+
+    def dispatch(self, receivers):
+        context = self.context
+        if not context:
+            return None, receivers
+
+        receivers_left = list()
+
+        for receiver in receivers:
+            obj = self.get_template_object(receiver.get('user'))
+            if not obj:
+                receivers_left.append(receiver)
+            else:
+                click_login_token_objects = list()
+                user = receiver.get('user')
+                phone_number = receiver.get('phone_number')
+                if not phone_number:
+                    phone_number = user.phone_number
+
+                if user and user.user_type == User.DOCTOR:
+                    context, click_login_token_obj = self.save_token_to_context(context, receiver['user'])
+                    click_login_token_objects.append(click_login_token_obj)
+                elif context.get('provider_login_url'):
+                    context.pop('provider_login_url')
+                ClickLoginToken.objects.bulk_create(click_login_token_objects)
+
+                instance = context.get('instance')
+
+                # Hospital and labs which has the flag open to communication, send notificaiton to them only.
+                if (instance.__class__.__name__ == LabAppointment.__name__) and (not user or user.user_type == User.DOCTOR):
+                    if not instance.lab.open_for_communications():
+                        continue
+
+                if (instance.__class__.__name__ == OpdAppointment.__name__) and (not user or user.user_type == User.DOCTOR):
+                    if instance.hospital and not instance.hospital.open_for_communications():
+                        continue
+
+                obj.send_notification(context, phone_number, self.notification_type, user=user)
+
+        if not receivers_left:
+            return True, receivers_left
+
+        return False, receivers_left
 
 
 class WHTSAPPNotification:
@@ -923,6 +989,14 @@ class EMAILNotification:
         context.pop('time_slot_start', None)
         self.context = context
 
+    def get_template_object(self, user):
+        notification_type = self.notification_type
+        obj = None
+        if notification_type == NotificationAction.APPOINTMENT_ACCEPTED or notification_type == NotificationAction.OPD_OTP_BEFORE_APPOINTMENT:
+            obj = DynamicTemplates.objects.filter(template_type=DynamicTemplates.TemplateType.EMAIL, template_name="").first()
+
+        return obj
+
     def get_template(self, user):
         notification_type = self.notification_type
         context = self.context
@@ -1220,6 +1294,11 @@ class EMAILNotification:
             publish_message(message)
 
     def send(self, receivers):
+
+        # dispatch_response, receivers = self.dispatch(receivers)
+        # if dispatch_response:
+        #     return
+
         context = self.context
         if not context:
             return
@@ -1227,6 +1306,25 @@ class EMAILNotification:
             template = self.get_template(receiver.get('user'))
             if template:
                 self.trigger(receiver, template, context)
+
+    # def dispatch(self, receivers):
+    #     context = self.context
+    #     if not context:
+    #         return None, receivers
+    #
+    #     receivers_left = list()
+    #
+    #     for receiver in receivers:
+    #         obj = self.get_template_object(receiver.get('user'))
+    #         if not obj:
+    #             receivers_left.append(receiver)
+    #         else:
+    #             pass
+    #
+    #     if not receivers_left:
+    #         return True, receivers_left
+    #
+    #     return False, receivers_left
 
 
 class APPNotification:
@@ -1316,12 +1414,18 @@ class OpdNotification(Notification):
     def get_context(self):
         patient_name = self.appointment.profile.name if self.appointment.profile.name else ""
         doctor_name = self.appointment.doctor.name if self.appointment.doctor.name else ""
-        procedures = self.appointment.get_procedures()
+        appointment_id = self.appointment.id
+        hospital_name = self.appointment.hospital.name
+        hospital_address = self.appointment.hospital.get_hos_address()
+        payment_type = self.appointment.payment_type
+        cod_amount = self.appointment.get_cod_amount()
 
         est = pytz.timezone(settings.TIME_ZONE)
         time_slot_start = self.appointment.time_slot_start.astimezone(est)
+        procedures = self.appointment.get_procedures()
         mask_number_instance = self.appointment.mask_number.filter(is_deleted=False).first()
         mask_number = ''
+        coupon_discount = self.appointment.discount
         if mask_number_instance:
             mask_number = mask_number_instance.mask_number
 
@@ -1343,39 +1447,45 @@ class OpdNotification(Notification):
         opd_appointment_feedback_url = booking_url + "&callbackurl=opd/appointment/{}".format(self.appointment.id)
         reschdule_appointment_bypass_url = booking_url + "&callbackurl=opd/doctor/{}/{}/book?reschedule={}".format(
             self.appointment.doctor.id, self.appointment.hospital.id, self.appointment.id)
-        hospitals_not_required_unique_code = set(json.loads(settings.HOSPITALS_NOT_REQUIRED_UNIQUE_CODE))
+        # hospitals_not_required_unique_code = set(json.loads(settings.HOSPITALS_NOT_REQUIRED_UNIQUE_CODE))
         credit_letter_url = self.appointment.get_credit_letter_url()
         context = {
             "doctor_name": doctor_name,
-            "hospital_address": self.appointment.hospital.get_hos_address(),
-            "hospital_name": self.appointment.hospital.name,
+            "hospital_address": hospital_address,
+            "hospital_name": hospital_name,
             "patient_name": patient_name,
-            "id": self.appointment.id,
+            "id": appointment_id,
             "instance": self.appointment,
             "clinic_or_hospital": clinic_or_hospital,
             "procedures": procedures,
-            "coupon_discount": str(self.appointment.discount) if self.appointment.discount else None,
-            "url": "/opd/appointment/{}".format(self.appointment.id),
+            "coupon_discount": str(coupon_discount) if coupon_discount else None,
+            "url": "/opd/appointment/{}".format(appointment_id),
             "action_type": NotificationAction.OPD_APPOINTMENT,
-            "action_id": self.appointment.id,
-            "payment_type": dict(OpdAppointment.PAY_CHOICES)[self.appointment.payment_type],
+            "action_id": appointment_id,
+            "payment_type": dict(OpdAppointment.PAY_CHOICES)[payment_type],
             "image_url": "",
             "time_slot_start": time_slot_start,
             "attachments": {},  # Updated later
             "screen": "appointment",
             "type": "doctor",
-            "cod_amount": self.appointment.get_cod_amount(),
+            "cod_amount": cod_amount,
             "mask_number": mask_number,
             "email_banners": email_banners_html if email_banners_html is not None else "",
             "opd_appointment_complete_url": generate_short_url(opd_appointment_complete_url),
             "opd_appointment_feedback_url": generate_short_url(opd_appointment_feedback_url),
             "reschdule_appointment_bypass_url": generate_short_url(reschdule_appointment_bypass_url),
-            "show_amounts": bool(self.appointment.payment_type != OpdAppointment.INSURANCE),
+            "show_amounts": bool(payment_type != OpdAppointment.INSURANCE),
             "opd_appointment_cod_to_prepaid_url": generate_short_url(
                 opd_appointment_cod_to_prepaid_url) if opd_appointment_cod_to_prepaid_url else None,
             "cod_to_prepaid_discount": cod_to_prepaid_discount,
-            "hospitals_not_required_unique_code": hospitals_not_required_unique_code,
-            "credit_letter_url": generate_short_url(credit_letter_url) if credit_letter_url else None
+            "hospitals_not_required_unique_code": not self.appointment.is_credit_letter_required_for_appointment(),
+            "credit_letter_url": generate_short_url(credit_letter_url) if credit_letter_url else None,
+            "instance_id": self.appointment.id,
+            "time_slot_start_date": str(time_slot_start.strftime("%b %d %Y")),
+            "time_slot_start_time": str(time_slot_start.strftime("%I:%M %p")),
+            "is_payment_type_cod": self.appointment.is_payment_type_cod(),
+            "instance_otp": self.appointment.otp,
+            "is_credit_letter_required_for_appointment": self.appointment.is_credit_letter_required_for_appointment()
         }
         return context
 

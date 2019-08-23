@@ -53,9 +53,9 @@ from ondoc.api.v1.insurance.serializers import (InsuranceTransactionSerializer)
 from ondoc.api.v1.diagnostic.views import LabAppointmentView
 from ondoc.diagnostic.models import (Lab, LabAppointment, AvailableLabTest, LabNetwork)
 from ondoc.payout.models import Outstanding
-from ondoc.authentication.backends import JWTAuthentication
+from ondoc.authentication.backends import JWTAuthentication, BajajAllianzAuthentication, MatrixUserAuthentication
 from ondoc.api.v1.utils import (IsConsumer, IsDoctor, opdappointment_transform, labappointment_transform,
-                                ErrorCodeMapping, IsNotAgent, GenericAdminEntity)
+                                ErrorCodeMapping, IsNotAgent, GenericAdminEntity, generate_short_url)
 from django.conf import settings
 from collections import defaultdict
 import copy
@@ -2257,3 +2257,118 @@ class ProfileEmailUpdateViewset(viewsets.GenericViewSet):
             return Response({'success': False})
 
         return Response({'success': True, 'message': 'OTP verified successfully.'})
+
+
+class MatrixUserViewset(GenericViewSet):
+    authentication_classes = (MatrixUserAuthentication,)
+
+    @transaction.atomic()
+    def user_login_via_matrix(self, request):
+        from django.http import JsonResponse
+        response = {'login': 0}
+        if request.method != 'POST':
+            return JsonResponse(response, status=405)
+        serializer = serializers.MatrixUserLoginSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        data = serializer.validated_data
+        doctor = data.get('doctor')
+        hospital = data.get('hospital')
+        if not doctor:
+            return Response({"error": "Invalid Doctor ID"}, status=status.HTTP_400_BAD_REQUEST)
+        if not hospital:
+            return Response({'error': "Invalid Hospital ID"}, status=status.HTTP_400_BAD_REQUEST)
+        try:
+            user_data = User.get_external_login_data(data)
+        except Exception as e:
+            logger.error(str(e))
+            return Response({'error': str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+        token = user_data.get('token')
+        if not token:
+            return JsonResponse(response, status=400)
+
+        base_landing_url = settings.BASE_URL + '/sms/booking?token={}'.format(token['token'].decode("utf-8"))
+        # redirect_url = 'search' if redirect_type == 'lab' else '/'
+        redirect_url = 'opd/doctor/{}/{}/bookdetails?is_matrix=true'.format(doctor.id, hospital.id)
+        callback_url = base_landing_url + "&callbackurl={}".format(redirect_url)
+        docprime_login_url = generate_short_url(callback_url)
+
+        response = {
+            "docprime_url": docprime_login_url
+        }
+
+        return Response(response, status=status.HTTP_200_OK)
+
+
+
+class BajajAllianzUserViewset(GenericViewSet):
+    authentication_classes = (BajajAllianzAuthentication,)
+
+    @transaction.atomic()
+    def user_login_via_bagic(self, request):
+        from django.http import JsonResponse
+        response = {'login': 0}
+        if request.method != 'POST':
+            return JsonResponse(response, status=405)
+
+        serializer = serializers.ExternalLoginSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        data = serializer.validated_data
+        redirect_type = data.get('redirect_type')
+        # profile_data = {}
+        # source = data.get('extra').get('utm_source', 'External') if data.get('extra') else 'External'
+        # redirect_type = data.get('redirect_type')
+        #
+        # user = User.objects.filter(phone_number=data.get('phone_number'), user_type=User.CONSUMER).first()
+        # if not user:
+        #     user = User.objects.create(phone_number=data.get('phone_number'),
+        #                                is_phone_number_verified=False,
+        #                                user_type=User.CONSUMER,
+        #                                auto_created=True,
+        #                                email=data.get('email'),
+        #                                source=source,
+        #                                data=data.get('extra'))
+        #
+        # if not user:
+        #     return JsonResponse(response, status=400)
+        #
+        # profile_data['name'] = data.get('name')
+        # profile_data['phone_number'] = user.phone_number
+        # profile_data['user'] = user
+        # profile_data['email'] = data.get('email')
+        # profile_data['source'] = source
+        # user_profiles = user.profiles.all()
+        #
+        # if not bool(re.match(r"^[a-zA-Z ]+$", data.get('name'))):
+        #     return Response({"error": "Invalid Name"}, status=status.HTTP_400_BAD_REQUEST)
+        #
+        # if user_profiles:
+        #     user_profiles = list(filter(lambda x: x.name.lower() == profile_data['name'].lower(), user_profiles))
+        #     if user_profiles:
+        #         user_profile = user_profiles[0]
+        #         user_profile.phone_number = profile_data['phone_number'] if not user_profile.phone_number else None
+        #         user_profile.email = profile_data['email'] if not user_profile.email else None
+        #         user_profile.save()
+        #     else:
+        #         UserProfile.objects.create(**profile_data)
+        # else:
+        #     profile_data.update({
+        #         "is_default_user": True
+        #     })
+        #     UserProfile.objects.create(**profile_data)
+        #
+        # token_object = JWTAuthentication.generate_token(user)
+        user_data = User.get_external_login_data(data)
+        token_object = user_data.get('token', None)
+        if not token_object or not user_data:
+            return Response({'error': 'Unauthorise'}, status=status.HTTP_400_BAD_REQUEST)
+
+        base_landing_url = settings.BASE_URL + '/sms/booking?token={}'.format(token_object['token'].decode("utf-8"))
+        redirect_url = 'search' if redirect_type == 'lab' else '/'
+        callback_url = base_landing_url + "&callbackurl={}".format(redirect_url)
+        docprime_login_url = generate_short_url(callback_url)
+
+        response = {
+            "docprime_url": docprime_login_url
+        }
+
+        return Response(response, status=status.HTTP_200_OK)

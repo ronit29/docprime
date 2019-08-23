@@ -2051,6 +2051,11 @@ class HospitalNetwork(auth_model.TimeStampedModel, auth_model.CreatedByModel, au
     remark = GenericRelation(Remark)
     auto_ivr_enabled = models.BooleanField(default=True)
     priority_score = models.IntegerField(default=0, null=False, blank=False)
+    opd_timings = models.CharField(max_length=150, blank=True, null=True, default="")
+    always_open = models.BooleanField(verbose_name='Are hospitals open 24X7', default=False)
+    service = models.ManyToManyField(Service, through='HospitalNetworkServiceMapping',
+                                     through_fields=('network', 'service'),
+                                     related_name='of_hospital_network')
 
     def update_time_stamps(self):
         if self.welcome_calling_done and not self.welcome_calling_done_at:
@@ -2574,10 +2579,9 @@ class OpdAppointment(auth_model.TimeStampedModel, CouponsMixin, OpdAppointmentIn
         return invoices_urls
 
     def is_credit_letter_required_for_appointment(self):
-        hospital_ids_cl_required = list(settings.HOSPITAL_CREDIT_LETTER_REQUIRED.values())
-        if self.hospital and self.hospital.id in hospital_ids_cl_required:
-            if self.is_medanta_hospital_booking() or self.is_artemis_hospital_booking():
-                return True
+        # hospital_ids_cl_required = list(settings.HOSPITAL_CREDIT_LETTER_REQUIRED.values())
+        if self.hospital and self.hospital.is_ipd_hospital:
+            return True
         return False
 
 
@@ -2835,10 +2839,11 @@ class OpdAppointment(auth_model.TimeStampedModel, CouponsMixin, OpdAppointmentIn
                     (self.id, str(math.floor(self.updated_at.timestamp()))),
                     eta=self.time_slot_start - datetime.timedelta(
                         minutes=int(self.SMS_APPOINTMENT_REMINDER_TIME)), )
-                notification_tasks.opd_send_otp_before_appointment.apply_async(
-                    (self.id, str(math.floor(self.time_slot_start.timestamp()))),
-                    eta=self.time_slot_start - datetime.timedelta(
-                        minutes=settings.TIME_BEFORE_APPOINTMENT_TO_SEND_OTP), )
+                if (self.time_slot_start - self.created_at).total_seconds() > (settings.COUNT_DOWN_FOR_REMINDER):
+                    notification_tasks.opd_send_otp_before_appointment.apply_async(
+                        (self.id, str(math.floor(self.time_slot_start.timestamp()))), countdown=5)
+                        # eta=self.time_slot_start - datetime.timedelta(
+                        #     minutes=settings.TIME_BEFORE_APPOINTMENT_TO_SEND_OTP), )
                 notification_tasks.opd_send_after_appointment_confirmation.apply_async(
                     (self.id, str(math.floor(self.time_slot_start.timestamp()))),
                     eta=self.time_slot_start + datetime.timedelta(
@@ -3666,10 +3671,15 @@ class OpdAppointment(auth_model.TimeStampedModel, CouponsMixin, OpdAppointmentIn
             "instance": self
         }
         html_body = None
-        if self.is_medanta_hospital_booking():
+
+        if self.hospital.is_ipd_hospital:
             html_body = render_to_string("email/documents/credit_letter_medanta.html", context=context)
-        elif self.is_artemis_hospital_booking():
-            html_body = render_to_string("email/documents/credit_letter_artemis.html", context=context)
+
+        # if self.is_medanta_hospital_booking():
+        #     html_body = render_to_string("email/documents/credit_letter_medanta.html", context=context)
+        # elif self.is_artemis_hospital_booking():
+        #     html_body = render_to_string("email/documents/credit_letter_artemis.html", context=context)
+
         if not html_body:
             logger.error("Got error while getting hospital for opd credit letter.")
             return None
@@ -4679,3 +4689,67 @@ class SimilarSpecializationGroupMapping(models.Model):
 
     class Meta:
         db_table = "similar_specialization_group_mapping"
+
+
+class HospitalNetworkImage(auth_model.TimeStampedModel, auth_model.Image):
+    network = models.ForeignKey(HospitalNetwork, on_delete=models.CASCADE)
+    name = models.ImageField(upload_to='hospital_network/images', height_field='height', width_field='width')
+    cropped_image = models.ImageField(upload_to='hospital_network/images', height_field='height', width_field='width',
+                                      blank=True, null=True)
+    cover_image = models.BooleanField(default=False, verbose_name="Can be used as cover image?")
+
+    class Meta:
+        db_table = "hospital_network_image"
+
+    def use_image_name(self):
+        return True
+
+    def get_image_name(self):
+        name = self.network.name
+        return slugify(name)
+
+    def auto_generate_thumbnails(self):
+        return True
+
+    def save(self, *args, **kwargs):
+        super().save(*args, **kwargs)
+        self.create_thumbnail()
+
+
+class HospitalNetworkServiceMapping(models.Model):
+    network = models.ForeignKey(HospitalNetwork, on_delete=models.CASCADE,
+                                related_name='network_service_mappings')
+    service = models.ForeignKey(Service, on_delete=models.CASCADE,
+                                related_name='service_network_mappings')
+
+    def __str__(self):
+        return '{} - {}'.format(self.network.name, self.service.name)
+
+    class Meta:
+        db_table = "hospital_network_service_mapping"
+        unique_together = (('network', 'service'),)
+
+
+class HospitalNetworkTiming(auth_model.TimeStampedModel):
+    DAY_CHOICES = HospitalTiming.DAY_CHOICES
+    SHORT_DAY_CHOICES = HospitalTiming.SHORT_DAY_CHOICES
+    TIME_CHOICES = HospitalTiming.TIME_CHOICES
+    network = models.ForeignKey(HospitalNetwork, on_delete=models.CASCADE, related_name='network_availability')
+    day = models.PositiveSmallIntegerField(choices=DAY_CHOICES)
+    start = models.DecimalField(max_digits=3, decimal_places=1, choices=TIME_CHOICES)
+    end = models.DecimalField(max_digits=3, decimal_places=1, choices=TIME_CHOICES)
+
+
+    class Meta:
+        db_table = "hospital_network_timing"
+
+
+class HospitalNetworkSpeciality(auth_model.TimeStampedModel):
+    network = models.ForeignKey(HospitalNetwork, on_delete=models.CASCADE)
+    name = models.CharField(max_length=200)
+
+    def __str__(self):
+        return self.network.name + " (" + self.name + ")"
+
+    class Meta:
+        db_table = "hospital_network_speciality"
