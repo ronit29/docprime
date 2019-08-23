@@ -979,6 +979,14 @@ class EMAILNotification:
         context.pop('time_slot_start', None)
         self.context = context
 
+    def get_template_object(self, user):
+        notification_type = self.notification_type
+        obj = None
+        if notification_type == NotificationAction.APPOINTMENT_ACCEPTED or notification_type == NotificationAction.OPD_OTP_BEFORE_APPOINTMENT:
+            obj = DynamicTemplates.objects.filter(template_type=DynamicTemplates.TemplateType.EMAIL, template_name="").first()
+
+        return obj
+
     def get_template(self, user):
         notification_type = self.notification_type
         context = self.context
@@ -1276,6 +1284,11 @@ class EMAILNotification:
             publish_message(message)
 
     def send(self, receivers):
+
+        # dispatch_response, receivers = self.dispatch(receivers)
+        # if dispatch_response:
+        #     return
+
         context = self.context
         if not context:
             return
@@ -1283,6 +1296,25 @@ class EMAILNotification:
             template = self.get_template(receiver.get('user'))
             if template:
                 self.trigger(receiver, template, context)
+
+    # def dispatch(self, receivers):
+    #     context = self.context
+    #     if not context:
+    #         return None, receivers
+    #
+    #     receivers_left = list()
+    #
+    #     for receiver in receivers:
+    #         obj = self.get_template_object(receiver.get('user'))
+    #         if not obj:
+    #             receivers_left.append(receiver)
+    #         else:
+    #             pass
+    #
+    #     if not receivers_left:
+    #         return True, receivers_left
+    #
+    #     return False, receivers_left
 
 
 class APPNotification:

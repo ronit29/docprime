@@ -129,7 +129,7 @@ class DynamicTemplate(View):
             if obj.recipient:
 
                 if obj.template_type == DynamicTemplates.TemplateType.EMAIL:
-                    recipient_obj = RecipientEmail(obj.recipient).add_cc([]).add_bcc([])
+                    recipient_obj = RecipientEmail(obj.recipient)
                 else:
                     recipient_obj = obj.recipient
 
