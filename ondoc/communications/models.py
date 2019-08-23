@@ -213,6 +213,9 @@ def get_title_body(notification_type, context, user):
     elif notification_type == NotificationAction.CHAT_NOTIFICATION:
         title = context.get('title')
         body = context.get('body')
+    elif notification_type == NotificationAction.E_CONSULT_VIDEO_LINK_SHARE:
+        title = "Video Link Shared"
+        body = "Video Link has been shared. Please proceed with consultation."
     context.update({'title': title, 'body': body})
 
 

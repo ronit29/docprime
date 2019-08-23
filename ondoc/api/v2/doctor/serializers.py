@@ -699,7 +699,9 @@ class EConsultSerializer(serializers.Serializer):
         e_consultation = provider_models.EConsultation.objects.select_related('doctor', 'offline_patient', 'online_patient') \
                                                               .prefetch_related('doctor__rc_user',
                                                                                 'offline_patient__rc_user',
-                                                                                'online_patient__rc_user') \
+                                                                                'offline_patient__user',
+                                                                                'online_patient__rc_user',
+                                                                                'online_patient__user') \
                                                               .filter(id=consult_id, created_by=user,
                                                                       status__in=[provider_models.EConsultation.BOOKED,
                                                                                   provider_models.EConsultation.CREATED]).first()

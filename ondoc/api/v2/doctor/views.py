@@ -3,6 +3,8 @@ from ondoc.doctor import models as doc_models
 from ondoc.diagnostic import models as lab_models
 from ondoc.authentication import models as auth_models
 from ondoc.provider import models as prov_models
+from ondoc.communications import models as comm_models
+from ondoc.notification import models as notif_models
 from ondoc.matrix.tasks import decrypted_invoice_pdfs, decrypted_prescription_pdfs
 from django.utils.safestring import mark_safe
 from . import serializers
@@ -1226,13 +1228,19 @@ class PartnerEConsultationViewSet(viewsets.GenericViewSet):
                     response.json()) + "")
             return Response({"status": 0, "message": error_message})
         else:
+            receivers = list()
+            patient = e_consultation.get_patient_and_number()[0]
+            receivers.append(patient.user)
+            user_and_tokens = comm_models.NotificationEndpoint.get_user_and_tokens(receivers=receivers)
+            push_notification = comm_models.PUSHNotification(notification_type=notif_models.NotificationAction.E_CONSULT_VIDEO_LINK_SHARE, context={'patient_name': patient.name})
+            push_notification.send(receivers=user_and_tokens)
             return Response({"status": 1, "message": "Message posted"})
 
 
 class ConsumerEConsultationViewSet(viewsets.GenericViewSet):
 
-    # authentication_classes = (JWTAuthentication,)
-    # permission_classes = (IsAuthenticated,)
+    authentication_classes = (JWTAuthentication,)
+    permission_classes = (IsAuthenticated,)
 
     def get_queryset(self):
         return None

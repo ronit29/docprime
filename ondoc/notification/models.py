@@ -20,6 +20,7 @@ from django.utils import timezone
 from weasyprint import HTML
 from django.conf import settings
 from num2words import num2words
+from itertools import groupby
 import datetime
 from datetime import timedelta
 import pytz
@@ -123,6 +124,7 @@ class NotificationAction:
     OFFLINE_PATIENT_WELCOME_MESSAGE = 138
 
     E_CONSULT_SHARE = 140
+    E_CONSULT_VIDEO_LINK_SHARE = 141
 
     SAMPLE_DYNAMIC_TEMPLATE_PREVIEW = 110
 
@@ -152,6 +154,7 @@ class NotificationAction:
         (OFFLINE_APPOINTMENT_REMINDER_PROVIDER_SMS, 'Offline Appointment Reminder Provider SMS'),
 
         (E_CONSULT_SHARE, 'E Consult Share'),
+        (E_CONSULT_VIDEO_LINK_SHARE, 'E Consult Video Link Share'),
 
         (PRESCRIPTION_UPLOADED, "Prescription Uploaded"),
         (PAYMENT_PENDING, "Payment Pending"),

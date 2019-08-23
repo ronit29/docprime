@@ -11,6 +11,7 @@ from django.utils import timezone
 from PIL import Image as Img
 from django.core.files.uploadedfile import InMemoryUploadedFile
 from io import BytesIO
+from itertools import groupby
 import math
 import os
 import re
@@ -774,6 +775,17 @@ class NotificationEndpoint(TimeStampedModel):
 
     def __str__(self):
         return "{}-{}".format(self.user.phone_number, self.token)
+
+    @classmethod
+    def get_user_and_tokens(cls, receivers):
+        user_and_tokens = list()
+        user_and_token = [{'user': token.user, 'token': token.token, 'app_name': token.app_name} for token in
+                          cls.objects.filter(user__in=receivers).order_by('user')]
+        for user, user_token_group in groupby(user_and_token, key=lambda x: x['user']):
+            user_and_tokens.append(
+                {'user': user,
+                 'tokens': [{"token": t['token'], "app_name": t["app_name"]} for t in user_token_group]})
+        return user_and_tokens
 
 
 class Notification(TimeStampedModel):
