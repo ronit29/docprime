@@ -1476,7 +1476,7 @@ class OpdNotification(Notification):
             "opd_appointment_cod_to_prepaid_url": generate_short_url(
                 opd_appointment_cod_to_prepaid_url) if opd_appointment_cod_to_prepaid_url else None,
             "cod_to_prepaid_discount": cod_to_prepaid_discount,
-            "hospitals_not_required_unique_code": not self.self.appointment.is_credit_letter_required_for_appointment(),
+            "hospitals_not_required_unique_code": not self.appointment.is_credit_letter_required_for_appointment(),
             "credit_letter_url": generate_short_url(credit_letter_url) if credit_letter_url else None,
             "instance_id": self.appointment.id,
             "time_slot_start_date": str(time_slot_start.strftime("%b %d %Y")),
