@@ -1,5 +1,6 @@
-Appointment ID:{{instance.id}} - Your appointment with Dr. {{doctor_name|capfirst}} is confirmed for {{instance.time_slot_start|date:"D jS F Y"}} at {{instance.time_slot_start|date:"h:i A"}}. Please share {% if not instance.hospital.id in hospitals_not_required_unique_code %}unique confirmation code and {% endif %}appointment id while availing the service.
 {% if instance.is_credit_letter_required_for_appointment and not instance.is_payment_type_cod and credit_letter_url %}
-Please share the credit letter (provided in the link below) at the time of your appointment.
-{{credit_letter_url}}{% endif %}
-{% if not instance.hospital.id in hospitals_not_required_unique_code %}Unique Confirmation Code : {{instance.otp}}{% endif %}
+Appointment ID:{{instance.id}} - Your appointment with Dr. {{doctor_name|capfirst}} is confirmed for {{instance.time_slot_start|date:"D jS F Y"}} at {{instance.time_slot_start|date:"h:i A"}}. Please share the credit letter (provided in the link below) at the time of your appointment.
+{{credit_letter_url}}
+{% else %}
+Appointment ID:{{instance.id}} - Your appointment with Dr. {{doctor_name|capfirst}} is confirmed for {{instance.time_slot_start|date:"D jS F Y"}} at {{instance.time_slot_start|date:"h:i A"}}. Please share {% if not instance.hospital.id in hospitals_not_required_unique_code %}unique confirmation code {{instance.otp}} and {% endif %}appointment id while availing the service.
+{% endif %}
