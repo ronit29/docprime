@@ -39,7 +39,8 @@ constants = {
     'MARKETING_INTERN': 'marketing_intern',
     'USER_UPDATE_TEAM': 'user_update_team',
     'QC_MERCHANT_TEAM': 'qc_merchant_team',
-    'POC_TEAM': 'poc_team'
+    'POC_TEAM': 'poc_team',
+    'COMMUNICATION_TEAM': 'communication_team'
 }
 matrix_product_ids = {
     'opd_products': 1,

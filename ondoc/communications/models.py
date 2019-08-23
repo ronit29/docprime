@@ -358,10 +358,12 @@ class SMSNotification:
     def get_template_object(self, user):
         notification_type = self.notification_type
         obj = None
-        if notification_type == NotificationAction.APPOINTMENT_ACCEPTED or notification_type == NotificationAction.OPD_OTP_BEFORE_APPOINTMENT:
+        if notification_type == NotificationAction.APPOINTMENT_ACCEPTED:
             obj = DynamicTemplates.objects.filter(template_name="Confirmation_IPD_OPD").first()
         elif notification_type == NotificationAction.APPOINTMENT_BOOKED:
             obj = DynamicTemplates.objects.filter(template_name="Booking_customer_pay_at_clinic").first()
+        elif notification_type == NotificationAction.OPD_OTP_BEFORE_APPOINTMENT:
+            obj = DynamicTemplates.objects.filter(template_name="Reminder_appointment")
 
         return obj
 
