@@ -263,9 +263,9 @@ class DoctorSearchHelper:
             #         )
             # params['doctor_name'] = '%'+search_key+'%'
             params['order_doctor'] = search_key
-            params['doctor_name1'] = search_key + ' %'
-            params['doctor_name2'] = '% ' + search_key + ' %'
-            params['doctor_name3'] = '% ' + search_key
+            params['doctor_name1'] = search_key + '%'
+            params['doctor_name2'] = '%' + search_key + '%'
+            params['doctor_name3'] = '%' + search_key
 
         if self.query_params.get('gender'):
             filtering_params.append("d.gender=(%(gender)s)")
