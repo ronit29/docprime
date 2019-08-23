@@ -6,7 +6,7 @@ import string
 import random
 from django.core.files.uploadedfile import SimpleUploadedFile, InMemoryUploadedFile
 from weasyprint.fonts import FontConfiguration
-from hardcopy import bytestring_to_pdf
+# from hardcopy import bytestring_to_pdf
 import io
 #from tempfile import NamedTemporaryFile
 from django.core.files.storage import default_storage
@@ -58,30 +58,30 @@ class PDFTester(models.Model):
     css = models.TextField(max_length=50000000, blank=True)
     file = models.FileField(upload_to='common/pdf/test', blank=True)
 
-    def save(self, *args, **kwargs):
-
-        random_string = ''.join([random.choice(string.ascii_letters + string.digits) for n in range(12)])
-        path = 'common/pdf/test/' + random_string + '.pdf'
-        fs = FileSystemStorage()
-        file = fs.open(path, 'wb')
-
-        extra_args = {
-            'virtual-time-budget': 6000
-        }
-
-        bytestring_to_pdf(self.html.encode(), file, **extra_args)
-
-        file.close()
-
-        ff = File(fs.open(path, 'rb'))
-
-        random_string = ''.join([random.choice(string.ascii_letters + string.digits) for n in range(12)])
-        name = random_string+'.pdf'
-
-        self.file = InMemoryUploadedFile(ff.file, None, 'aaa.pdf', 'application/pdf', ff.file.tell(), None)
-
-
-        super().save(*args, **kwargs)
+    # def save(self, *args, **kwargs):
+    #
+    #     random_string = ''.join([random.choice(string.ascii_letters + string.digits) for n in range(12)])
+    #     path = 'common/pdf/test/' + random_string + '.pdf'
+    #     fs = FileSystemStorage()
+    #     file = fs.open(path, 'wb')
+    #
+    #     extra_args = {
+    #         'virtual-time-budget': 6000
+    #     }
+    #
+    #     bytestring_to_pdf(self.html.encode(), file, **extra_args)
+    #
+    #     file.close()
+    #
+    #     ff = File(fs.open(path, 'rb'))
+    #
+    #     random_string = ''.join([random.choice(string.ascii_letters + string.digits) for n in range(12)])
+    #     name = random_string+'.pdf'
+    #
+    #     self.file = InMemoryUploadedFile(ff.file, None, 'aaa.pdf', 'application/pdf', ff.file.tell(), None)
+    #
+    #
+    #     super().save(*args, **kwargs)
 
 
     class Meta:
