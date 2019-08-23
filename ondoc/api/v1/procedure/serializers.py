@@ -1,5 +1,6 @@
 from rest_framework import serializers
 
+from ondoc.diagnostic.models import LabTestCategory
 from ondoc.doctor.models import OpdAppointmentProcedureMapping, CommonHospital
 from ondoc.procedure.models import Procedure, DoctorClinicProcedure, ProcedureToCategoryMapping, \
     CommonProcedureCategory, CommonProcedure, CommonIpdProcedure
@@ -133,3 +134,15 @@ class CommonHospitalSerializer(serializers.ModelSerializer):
     class Meta:
         model = CommonHospital
         fields = ['id']
+
+
+class CommonCategoriesSerializer(serializers.ModelSerializer):
+    icon = serializers.SerializerMethodField()
+
+    def get_icon(self, obj):
+        request = self.context.get('request')
+        return request.build_absolute_uri(obj.icon.url) if obj.icon  and obj.icon.url else None
+
+    class Meta:
+        model = LabTestCategory
+        fields = [ 'id', 'name', 'preferred_lab_test', 'is_live', 'is_package_category', 'show_on_recommended_screen', 'priority', 'icon']

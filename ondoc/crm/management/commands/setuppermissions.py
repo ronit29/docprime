@@ -51,6 +51,7 @@ from ondoc.insurance.models import (Insurer, InsurancePlans, InsuranceThreshold,
                                     EndorsementRequest, InsuredMemberDocument, InsuredMemberHistory,
                                     ThirdPartyAdministrator,
                                     UserBank, UserBankDocument, InsurerAccountTransfer, BankHolidays)
+from ondoc.notification.models import DynamicTemplates
 
 from ondoc.procedure.models import Procedure, ProcedureCategory, CommonProcedureCategory, DoctorClinicProcedure, \
     ProcedureCategoryMapping, ProcedureToCategoryMapping, CommonProcedure, IpdProcedure, IpdProcedureFeatureMapping, \
@@ -570,6 +571,18 @@ class Command(BaseCommand):
 
             group.permissions.add(*permissions)
 
+        group, created = Group.objects.get_or_create(name=constants['COMMUNICATION_TEAM'])
+        group.permissions.clear()
+
+        content_types = ContentType.objects.get_for_models(DynamicTemplates)
+        for cl, ct in content_types.items():
+            permissions = Permission.objects.filter(
+                Q(content_type=ct),
+                Q(codename='add_' + ct.model) |
+                Q(codename='change_' + ct.model))
+
+            group.permissions.add(*permissions)
+
         group, created = Group.objects.get_or_create(name=constants['PRODUCT_TEAM'])
         group.permissions.clear()
 
@@ -587,7 +600,8 @@ class Command(BaseCommand):
                                                            SimilarSpecializationGroupMapping, LabTestCategoryLandingURLS, LabTestCategoryUrls,
                                                            HospitalNetworkImage, HospitalNetworkTiming,
                                                            HospitalNetworkServiceMapping,
-                                                           HospitalNetworkSpeciality)
+                                                           HospitalNetworkSpeciality, DynamicTemplates)
+
         for cl, ct in content_types.items():
             permissions = Permission.objects.filter(
                 Q(content_type=ct),
