@@ -5,11 +5,14 @@ from django.forms.utils import ErrorList
 from reversion.admin import VersionAdmin
 from django.db.models import Q
 import datetime
+
+from reversion_compare.admin import CompareVersionAdmin
+
 from ondoc.crm.admin.doctor import CreatedByFilter
 from ondoc.doctor.models import (HospitalImage, HospitalDocument, HospitalAward, Doctor,
                                  HospitalAccreditation, HospitalCertification, HospitalSpeciality, HospitalNetwork,
                                  Hospital, HospitalServiceMapping, HealthInsuranceProviderHospitalMapping,
-                                 HospitalHelpline, HospitalTiming, DoctorClinic, CommonHospital)
+                                 HospitalHelpline, HospitalTiming, DoctorClinic, CommonHospital, HospitalNetworkImage)
 from .common import *
 from ondoc.crm.constants import constants
 from django.utils.safestring import mark_safe
@@ -23,6 +26,7 @@ import nested_admin
 from .common import AssociatedMerchantInline, RemarkInline
 from django.contrib import messages
 from django.http import HttpResponseRedirect
+
 
 import logging
 logger = logging.getLogger(__name__)
@@ -93,6 +97,8 @@ class HospitalServiceInline(admin.TabularInline):
     can_delete = True
     show_change_link = False
     autocomplete_fields = ['service']
+    verbose_name = "Hospital Facility"
+    verbose_name_plural = "Hospital Facilities"
 
 
 class HospitalTimingInlineFormSet(forms.BaseInlineFormSet):
@@ -454,7 +460,7 @@ class QuestionAnswerInline(GenericTabularInline):
         return result
 
 
-class HospitalAdmin(admin.GeoModelAdmin, VersionAdmin, ActionAdmin, QCPemAdmin):
+class HospitalAdmin(admin.GeoModelAdmin, CompareVersionAdmin, ActionAdmin, QCPemAdmin):
     list_filter = ('data_status', 'welcome_calling_done', 'enabled_for_online_booking', 'enabled', CreatedByFilter,
                    HospCityFilter)
     readonly_fields = ('source', 'batch', 'associated_doctors', 'is_live', 'matrix_lead_id', 'city', 'state', 'live_seo_url', 'edit_url')
@@ -487,7 +493,7 @@ class HospitalAdmin(admin.GeoModelAdmin, VersionAdmin, ActionAdmin, QCPemAdmin):
     map_width = 200
     map_template = 'admin/gis/gmap.html'
     extra_js = ['js/admin/GoogleMap.js',
-                'https://maps.googleapis.com/maps/api/js?key=AIzaSyBqDAVDFBQzI5JMgaXcqJq431QPpJtNiZE&callback=initGoogleMap']
+                'https://maps.googleapis.com/maps/api/js?key=AIzaSyClYPAOTREfAZ-95eRbU6hDVHU0p3XygoY&callback=initGoogleMap']
 
     # def get_inline_instances(self, request, obj=None):
     #     res = super().get_inline_instances(request, obj)

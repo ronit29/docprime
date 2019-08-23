@@ -2,7 +2,7 @@ from rest_framework import serializers
 from ondoc.authentication.models import (OtpVerifications, User, UserProfile, Notification, NotificationEndpoint,
                                          DoctorNumber, Address, GenericAdmin, UserSecretKey,
                                          UserPermission, Address, GenericAdmin, GenericLabAdmin, UserProfileEmailUpdate)
-from ondoc.doctor.models import DoctorMobile, ProviderSignupLead, Hospital
+from ondoc.doctor.models import DoctorMobile, ProviderSignupLead, Hospital, Doctor
 from ondoc.common.models import AppointmentHistory
 from ondoc.doctor.models import DoctorMobile
 from ondoc.insurance.models import InsuredMembers, UserInsurance
@@ -76,11 +76,18 @@ class DoctorLoginSerializer(serializers.Serializer):
             if doctor_not_exists and admin_not_exists and lab_admin_not_exists and provider_signup_lead_not_exists:
                 raise serializers.ValidationError('No Doctor or Admin with given phone number found')
 
-        agent_hospitals = GenericAdmin.objects.filter(Q(phone_number=attrs['phone_number'], is_disabled=False, hospital__is_live=True), Q(Q(hospital__source_type=Hospital.AGENT) | Q(hospital__source_type=None)))
-        provider_hospitals = GenericAdmin.objects.filter(phone_number=attrs['phone_number'], is_disabled=False, hospital__source_type=Hospital.PROVIDER)
-        if not agent_hospitals.exists():
-            if not provider_hospitals.exists():
-                raise serializers.ValidationError("Live hospital for admin not found")
+        generic_admins = GenericAdmin.objects.select_related('hospital').filter(phone_number=attrs['phone_number'],
+                                                                                is_disabled=False)
+        live_hospital_exists = False
+        for admin in generic_admins:
+            if admin.hospital:
+                hospital = admin.hospital
+                if (hospital.source_type in (None, Hospital.AGENT) and hospital.is_live) \
+                        or (hospital.source_type == Hospital.PROVIDER):
+                    live_hospital_exists = True
+                    break
+        if generic_admins and not live_hospital_exists:
+            raise serializers.ValidationError("Live hospital for admin not found")
 
         return attrs
 
@@ -593,3 +600,24 @@ class ProfileEmailUpdateProcessSerializer(serializers.Serializer):
 
         return attrs
 
+
+class ExternalLoginSerializer(serializers.Serializer):
+    phone_number = serializers.IntegerField(min_value=1000000000,max_value=9999999999)
+    name = serializers.CharField(max_length=100)
+    is_default_user = serializers.BooleanField(required=False)
+    email = serializers.EmailField(required=True, allow_null=True, allow_blank=True)
+    extra = serializers.JSONField(allow_null=True, required=False)
+    redirect_type = serializers.ChoiceField(choices=[('doctor',"Doctor"), ('lab',"Lab")])
+
+
+class MatrixUserLoginSerializer(serializers.Serializer):
+    GENDER_CHOICES = UserProfile.GENDER_CHOICES
+    name = serializers.CharField(max_length=100)
+    phone_number = serializers.IntegerField(min_value=1000000000, max_value=9999999999)
+    is_default_user = serializers.BooleanField(required=False)
+    email = serializers.EmailField()
+    dob = serializers.DateField()
+    gender = serializers.ChoiceField(choices=GENDER_CHOICES)
+    extra = serializers.JSONField(allow_null=True, required=False)
+    doctor = serializers.PrimaryKeyRelatedField(queryset=Doctor.objects.all())
+    hospital = serializers.PrimaryKeyRelatedField(queryset=Hospital.objects.all())

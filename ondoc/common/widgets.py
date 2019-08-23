@@ -24,7 +24,7 @@ class ArticleFooterWidget():
     def doctor_appointment_widget(self):
         medicine_top_specializations = [int(i) for i in settings.MEDICINE_TOP_SPECIALIZATIONS]
         top_specializations = {
-            "Obstetrician & Gynecologist": medicine_top_specializations[0],
+            "Gynecologist": medicine_top_specializations[0],
             "Dermatologist": medicine_top_specializations[1],
             "Orthopedist": medicine_top_specializations[2],
             "Dentist": medicine_top_specializations[3],
@@ -76,8 +76,7 @@ class ArticleFooterWidget():
             "Ultrasound whole abdomen": medicine_top_tests[0],
             "CBC Hemogram": medicine_top_tests[1],
             "Lipid Profile": medicine_top_tests[2],
-            "Thyroid Profile": medicine_top_tests[3],
-            "Liver function test": medicine_top_tests[4]
+            "Thyroid Profile": medicine_top_tests[3]
         }
         title = "Book lab tests"
         discount = "50% off"
@@ -90,8 +89,8 @@ class ArticleFooterWidget():
     @property
     def health_package_widget(self):
         resp = dict()
-        title_first = "Book fully body checkup starting"
-        price = "Rs 499"
+        title_first = "Book full body checkup starting"
+        price = "Rs 549"
         title_last = "with 60 tests covering heart, liver, lipid, iron, thyroid etc."
         resp["widget_type"] = 'HealthPackage'
         resp["title_first"] = title_first
