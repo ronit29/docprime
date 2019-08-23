@@ -18,6 +18,25 @@ ENV DEBIAN_FRONTEND noninteractive
 RUN apt-get update && apt-get install binutils libproj-dev gdal-bin nano apt-utils -y
 RUN apt-get update
 
+# install chrome libraries
+#RUN apt-get install -y gconf-service libasound2 libatk1.0-0 libcairo2 libcups2 libfontconfig1 libgdk-pixbuf2.0-0 libgtk-3-0 libnspr4 libpango-1.0-0 libxss1 fonts-liberation
+#RUN apt-get install -y libappindicator1 libnss3 lsb-release xdg-utils libappindicator3-1 libindicator3-7
+# install chrome
+#RUN wget https://dl.google.com/linux/direct/google-chrome-stable_current_amd64.deb
+#RUN dpkg -i google-chrome-stable_current_amd64.deb; apt-get -fy install
+#RUN ln -s /usr/bin/google-chrome-stable /usr/bin/chrome
+#install Microsoft ODBC Driver for debian 9
+#RUN curl https://packages.microsoft.com/keys/microsoft.asc | apt-key add -
+#RUN curl https://packages.microsoft.com/config/debian/9/prod.list > /etc/apt/sources.list.d/mssql-release.list
+#RUN unlink /usr/lib/apt/methods/https
+#RUN ln -s  /usr/lib/apt/methods/http /usr/lib/apt/methods/https
+#RUN apt-get update && ACCEPT_EULA=Y apt-get install msodbcsql17 -y
+#RUN echo 'export PATH="$PATH:/opt/mssql-tools/bin"' >> ~/.bash_profile
+#RUN echo 'export PATH="$PATH:/opt/mssql-tools/bin"' >> ~/.bashrc
+#RUN . ~/.bashrc
+#RUN apt-get install unixodbc-dev
+
+
 
 RUN mkdir -p /home/docprime/workspace/backend
 RUN mkdir /env
