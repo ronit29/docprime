@@ -26,7 +26,9 @@ from ondoc.doctor.models import (Doctor, Hospital, DoctorClinicTiming, DoctorCli
                                  SpecializationDepartmentMapping, CancellationReason, UploadDoctorData,
                                  HospitalServiceMapping, HealthInsuranceProviderHospitalMapping,
                                  HealthInsuranceProvider, HospitalHelpline, HospitalTiming, CommonHospital,
-                                 SimilarSpecializationGroup, SimilarSpecializationGroupMapping, PurchaseOrderCreation)
+                                 SimilarSpecializationGroup, SimilarSpecializationGroupMapping, PurchaseOrderCreation,
+                                 HospitalNetworkImage, HospitalNetworkTiming, HospitalNetworkServiceMapping,
+                                 HospitalNetworkSpeciality)
 
 from ondoc.diagnostic.models import (Lab, LabTiming, LabImage, GenericLabAdmin,
                                      LabManager, LabAccreditation, LabAward, LabCertification,
@@ -569,6 +571,18 @@ class Command(BaseCommand):
 
             group.permissions.add(*permissions)
 
+        group, created = Group.objects.get_or_create(name=constants['COMMUNICATION_TEAM'])
+        group.permissions.clear()
+
+        content_types = ContentType.objects.get_for_models(DynamicTemplates)
+        for cl, ct in content_types.items():
+            permissions = Permission.objects.filter(
+                Q(content_type=ct),
+                Q(codename='add_' + ct.model) |
+                Q(codename='change_' + ct.model))
+
+            group.permissions.add(*permissions)
+
         group, created = Group.objects.get_or_create(name=constants['PRODUCT_TEAM'])
         group.permissions.clear()
 
@@ -583,7 +597,11 @@ class Command(BaseCommand):
                                                            EmailBanner, RecommenderThrough, Recommender,
                                                            IpdProcedurePracticeSpecialization, CityLatLong, CommonHospital,
                                                            PotentialIpdLeadPracticeSpecialization, PotentialIpdCity,
-                                                           SimilarSpecializationGroupMapping, LabTestCategoryLandingURLS, LabTestCategoryUrls, DynamicTemplates)
+                                                           SimilarSpecializationGroupMapping, LabTestCategoryLandingURLS, LabTestCategoryUrls,
+                                                           HospitalNetworkImage, HospitalNetworkTiming,
+                                                           HospitalNetworkServiceMapping,
+                                                           HospitalNetworkSpeciality, DynamicTemplates)
+
         for cl, ct in content_types.items():
             permissions = Permission.objects.filter(
                 Q(content_type=ct),
