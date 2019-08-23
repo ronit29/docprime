@@ -353,7 +353,7 @@ class SMSNotification:
         notification_type = self.notification_type
         obj = None
         if notification_type == NotificationAction.APPOINTMENT_ACCEPTED or notification_type == NotificationAction.OPD_OTP_BEFORE_APPOINTMENT:
-            obj = DynamicTemplates.objects.filter(template_name="").first()
+            obj = DynamicTemplates.objects.filter(template_name="Confirmation_IPD_OPD").first()
 
         return obj
 
@@ -1431,7 +1431,7 @@ class OpdNotification(Notification):
         opd_appointment_feedback_url = booking_url + "&callbackurl=opd/appointment/{}".format(self.appointment.id)
         reschdule_appointment_bypass_url = booking_url + "&callbackurl=opd/doctor/{}/{}/book?reschedule={}".format(
             self.appointment.doctor.id, self.appointment.hospital.id, self.appointment.id)
-        hospitals_not_required_unique_code = set(json.loads(settings.HOSPITALS_NOT_REQUIRED_UNIQUE_CODE))
+        # hospitals_not_required_unique_code = set(json.loads(settings.HOSPITALS_NOT_REQUIRED_UNIQUE_CODE))
         credit_letter_url = self.appointment.get_credit_letter_url()
         context = {
             "doctor_name": doctor_name,
@@ -1462,8 +1462,14 @@ class OpdNotification(Notification):
             "opd_appointment_cod_to_prepaid_url": generate_short_url(
                 opd_appointment_cod_to_prepaid_url) if opd_appointment_cod_to_prepaid_url else None,
             "cod_to_prepaid_discount": cod_to_prepaid_discount,
-            "hospitals_not_required_unique_code": hospitals_not_required_unique_code,
+            "hospitals_not_required_unique_code": not self.self.appointment.is_credit_letter_required_for_appointment(),
             "credit_letter_url": generate_short_url(credit_letter_url) if credit_letter_url else None
+            "instance_id": self.appointment.id,
+            "time_slot_start_date": str(time_slot_start.strftime("%b %d %Y")),
+            "time_slot_start_time": str(time_slot_start.strftime("%I:%M %p")),
+            "is_payment_type_cod": self.appointment.is_payment_type_cod(),
+            "instance_otp": self.appointment.otp,
+            "is_credit_letter_required_for_appointment": self.appointment.is_credit_letter_required_for_appointment()
         }
         return context
 
