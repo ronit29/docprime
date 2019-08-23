@@ -45,7 +45,7 @@
 			</tr>
 			<tr>
 				<td>
-					<b>Date:</b> {{instance.created_at|date:"D jS F Y"}} at {{instance.created_at|date:"h:i A"}}
+					<b>Date:</b> {{instance.created_at|date:"D jS F Y"}}
 				</td>
 			</tr>
 			<tr>
@@ -71,7 +71,7 @@
 			<tr>
 				<td>
 					Dear Sir,<br><br>
-					We hereby authorise <b>{{instance.profile.name}}</b> to avail the consultation services at {{instance.hospital.name}} with <b>Dr. {{instance.doctor.name}}</b> on {{instance.time_slot_start|date:"D jS F Y"}}. Please share the invoice with the customer at the time of appointment.<br><br>
+					We hereby authorise <b>{{instance.profile.name}}</b> to avail the consultation services at {{instance.hospital.name}} with <b>Dr. {{instance.doctor.name}}</b> on {{instance.time_slot_start|date:"D jS F Y"}} at {{instance.created_at|date:"h:i A"}}. Please share the invoice with the customer at the time of appointment.<br><br>
 					Request you to extend your consultation services on credit basis for this appointment. Kindly note that, this letter is only valid for this appointment and is non-transferrable.<br><br>
 					For any clarification, you may contact our team at concierge@docprime.com.
 				</td>
