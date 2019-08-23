@@ -2286,7 +2286,7 @@ class MatrixUserViewset(GenericViewSet):
         if not token:
             return JsonResponse(response, status=400)
 
-        base_landing_url = settings.BASE_URL + '/sms/booking?token={}'.format(token['token'].decode("utf-8"))
+        base_landing_url = settings.BASE_URL + '/sms/booking?is_matrix=true&token={}'.format(token['token'].decode("utf-8"))
         # redirect_url = 'search' if redirect_type == 'lab' else '/'
         redirect_url = 'opd/doctor/{}/{}/bookdetails'.format(doctor.id, hospital.id)
         callback_url = base_landing_url + "&callbackurl={}".format(redirect_url)
