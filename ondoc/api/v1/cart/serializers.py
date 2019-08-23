@@ -47,7 +47,7 @@ class CartItemSerializer(serializers.ModelSerializer):
         from django.utils.timezone import make_aware
 
         selected_time = None
-        if not obj.data.get('has_radiology_timings'):
+        if not obj.data.get('multi_timings_enabled'):
             if not obj.data.get("start_date"):
                 return None
 

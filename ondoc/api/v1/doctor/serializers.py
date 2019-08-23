@@ -424,11 +424,11 @@ class UpdateStatusSerializer(serializers.Serializer):
     cancellation_comment = serializers.CharField(required=False, allow_blank=True)
     source = serializers.ChoiceField(required=False, choices=AppointmentHistory.SOURCE_CHOICES)
     test_timings = serializers.ListSerializer(child=LabAppointmentTestMappingSerializer(), required=False, allow_empty=False)
-    has_radiology_timings = serializers.BooleanField(required=False, default=False)
+    multi_timings_enabled = serializers.BooleanField(required=False, default=False)
 
     def __init__(self, instance=None, data=None, **kwargs):
         super().__init__(instance, data, **kwargs)
-        if data and data.get('has_radiology_timings'):
+        if data and data.get('multi_timings_enabled'):
             self.fields.fields['start_date'].required = False
             self.fields.fields['start_time'].required = False
             self.fields.fields['test_timings'].required = True

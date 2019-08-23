@@ -827,7 +827,7 @@ class LabAppTransactionModelSerializer(serializers.Serializer):
 
     def __init__(self, instance=None, data=None, **kwargs):
         super().__init__(instance, data, **kwargs)
-        if data.get('has_radiology_timings'):
+        if data.get('multi_timings_enabled'):
             data.pop('time_slot_start', None)
             data.pop('is_home_pickup', None)
             self.fields.fields['time_slot_start'].required = False
@@ -922,12 +922,12 @@ class LabAppointmentCreateSerializer(serializers.Serializer):
     app_version = serializers.CharField(required=False, allow_null=True, allow_blank=True)
     prescription_list = serializers.ListSerializer(child=PrescriptionDocumentSerializer(), required=False)
     test_timings = serializers.ListSerializer(child=LabAppointmentTestSerializer(), required=False, allow_empty=False)
-    has_radiology_timings = serializers.BooleanField(required=False, default=False)
+    multi_timings_enabled = serializers.BooleanField(required=False, default=False)
 
     def __init__(self, instance=None, data=None, **kwargs):
         super().__init__(instance, data, **kwargs)
         if kwargs.get('context') and kwargs.get('context').get('data') and kwargs.get('context').get('data').get(
-                'has_radiology_timings'):
+                'multi_timings_enabled'):
             self.fields.fields['start_date'].required = False
             self.fields.fields['start_time'].required = False
             self.fields.fields['is_home_pickup'].required = False
@@ -948,7 +948,7 @@ class LabAppointmentCreateSerializer(serializers.Serializer):
             raise serializers.ValidationError("Both User and Lab should be for testing")
 
         address_required = False
-        if data.get('has_radiology_timings'):
+        if data.get('multi_timings_enabled'):
             for test_timing in data.get('test_timings'):
                 if test_timing.get("is_home_pickup"):
                     address_required = True
@@ -1016,7 +1016,7 @@ class LabAppointmentCreateSerializer(serializers.Serializer):
         pathology_time_slot_start = None
         pathology_slot_validated = False
         pathology_home_pickup = False
-        if data.get('has_radiology_timings'):
+        if data.get('multi_timings_enabled'):
             test_timings = data.get('test_timings')
             for test_timing in test_timings:
                 if test_timing.get('type') == LabTest.PATHOLOGY:
@@ -1092,7 +1092,7 @@ class LabAppointmentCreateSerializer(serializers.Serializer):
             else:
                 available_slots = lab.get_available_slots(pathology_home_pickup, pincode, selected_date)
                 is_integrated = lab.is_integrated()
-                selected_day_slots = available_slots['time_slots'][selected_date]
+                selected_day_slots = available_slots.get('time_slots').get(selected_date)
                 if not selected_day_slots:
                     raise serializers.ValidationError("No time slots available")
 
@@ -1106,7 +1106,7 @@ class LabAppointmentCreateSerializer(serializers.Serializer):
                     check_active_appointment = False
 
         if check_active_appointment:
-            if data.get('has_radiology_timings'):
+            if data.get('multi_timings_enabled'):
                 user_active_appointments = LabAppointment.objects.prefetch_related('test_mappings').filter(profile=data.get("profile"),
                                                                                 lab=data.get("lab")) \
                         .exclude(status__in=[LabAppointment.COMPLETED, LabAppointment.CANCELLED])
@@ -1131,7 +1131,7 @@ class LabAppointmentCreateSerializer(serializers.Serializer):
             data['use_wallet'] = True
 
         self.test_lab_id_validator(data, request)
-        if not data.get('has_radiology_timings'):
+        if not data.get('multi_timings_enabled'):
             self.time_slot_validator(data, request, lab.is_integrated())
         self.user_plan_validator(data, request, cart_item_id)
         return data

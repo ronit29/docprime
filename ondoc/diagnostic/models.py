@@ -2539,7 +2539,7 @@ class LabAppointment(TimeStampedModel, CouponsMixin, LabAppointmentInvoiceMixin,
         radiology_home_pickup = False
         time_slot_dict = dict()
 
-        if data.get('has_radiology_timings'):
+        if data.get('multi_timings_enabled'):
             for test_timing in data.get('test_timings'):
                 test_id = test_timing.get('test').id
                 test_data = dict()
@@ -2634,7 +2634,7 @@ class LabAppointment(TimeStampedModel, CouponsMixin, LabAppointmentInvoiceMixin,
             "insurance": insurance_id,
             "coupon_data": price_data.get("coupon_data"),
             "prescription_list": data.get('prescription_list', []),
-            "has_radiology_timings": data.get('has_radiology_timings')
+            "multi_timings_enabled": data.get('multi_timings_enabled')
         }
 
         if data.get('included_in_user_plan', False):

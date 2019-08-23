@@ -691,8 +691,8 @@ class UserAppointmentsViewSet(OndocViewSet):
                 resp = LabAppointmentRetrieveSerializer(lab_appointment, context={"request": request}).data
             elif validated_data.get('status') == LabAppointment.RESCHEDULED_PATIENT:
                 test_time_slots = []
-                if validated_data.get('has_radiology_timings'):
-                    same_time_slot_err = False
+                if validated_data.get('multi_timings_enabled'):
+                    same_time_slot_err = True
                     lab_appointment_tests = lab_appointment.test_mappings.all()
                     for test_timing in validated_data.get('test_timings'):
                         appointment_tests = list(filter(lambda x: x.test_id == test_timing.get('test').id, lab_appointment_tests))
@@ -707,9 +707,8 @@ class UserAppointmentsViewSet(OndocViewSet):
                             time_slot_start = utils.form_time_slot(
                                 test_timing.get("start_date"),
                                 test_timing.get("start_time"))
-                            if appointment_test.time_slot_start == time_slot_start:
-                                if not same_time_slot_err:
-                                    same_time_slot_err = True
+                            if not appointment_test.time_slot_start == time_slot_start:
+                                same_time_slot_err = False
                             if lab_appointment.payment_type == OpdAppointment.INSURANCE and lab_appointment.insurance_id is not None:
                                 user_insurance = UserInsurance.objects.get(id=lab_appointment.insurance_id)
                                 if user_insurance:
@@ -2032,7 +2031,7 @@ class OrderDetailViewSet(GenericViewSet):
             item = OrderCartItemMapper(order)
             temp_time_slot_start = None
             temp_test_time_slots = []
-            if order.action_data.get('has_radiology_timings'):
+            if order.action_data.get('multi_timings_enabled'):
                 for test_time_slot in order.action_data.get('test_time_slots'):
                     test_id = test_time_slot.get('test_id')
                     test_data = dict()
