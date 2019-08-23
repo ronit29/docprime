@@ -55,15 +55,20 @@ def get_spoc_email_and_number_hospital(spocs, appointment):
                                                                             Q(doctor__isnull=True) | Q(doctor=appointment.doctor)))
             if admins:
                 admins_with_user = admins.filter(user__isnull=False)
-                for admin in admins_with_user:
-                    if int(admin.user.phone_number) == int(spoc.number):
-                        user_and_number.append({'user': admin.user, 'phone_number': spoc.number})
-                        if spoc.email:
-                            user_and_email.append({'user': admin.user, 'email': spoc.email})
-                    else:
-                        user_and_number.append({'user': None, 'phone_number': spoc.number})
-                        if spoc.email:
-                            user_and_email.append({'user': None, 'email': spoc.email})
+                if admins_with_user:
+                    for admin in admins_with_user:
+                        if int(admin.user.phone_number) == int(spoc.number):
+                            user_and_number.append({'user': admin.user, 'phone_number': spoc.number})
+                            if spoc.email:
+                                user_and_email.append({'user': admin.user, 'email': spoc.email})
+                        else:
+                            user_and_number.append({'user': None, 'phone_number': spoc.number})
+                            if spoc.email:
+                                user_and_email.append({'user': None, 'email': spoc.email})
+                else:
+                    user_and_number.append({'user': None, 'phone_number': spoc.number})
+                    if spoc.email:
+                        user_and_email.append({'user': None, 'email': spoc.email})
             else:
                 user_and_number.append({'user': None, 'phone_number': spoc.number})
                 if spoc.email:
@@ -252,11 +257,12 @@ class SMSNotification:
     def get_template(self, user):
         notification_type = self.notification_type
         body_template = ''
-        if notification_type == NotificationAction.APPOINTMENT_ACCEPTED or \
-                notification_type == NotificationAction.OPD_OTP_BEFORE_APPOINTMENT:
+        if notification_type == NotificationAction.APPOINTMENT_ACCEPTED:
             body_template = "sms/appointment_accepted.txt"
         elif notification_type == NotificationAction.APPOINTMENT_BOOKED and user and user.user_type == User.CONSUMER:
             body_template = "sms/appointment_booked_patient.txt"
+        elif notification_type == NotificationAction.OPD_OTP_BEFORE_APPOINTMENT:
+            body_template = "sms/appointment_accepted_reminder.txt"
         elif notification_type == NotificationAction.APPOINTMENT_BOOKED and (not user or user.user_type == User.DOCTOR):
             body_template = "sms/appointment_booked_doctor.txt"
         elif notification_type == NotificationAction.APPOINTMENT_RESCHEDULED_BY_PATIENT and user and user.user_type == User.CONSUMER:
