@@ -114,6 +114,7 @@ class CartItemSerializer(serializers.ModelSerializer):
             for test_timing in test_timings:
                 if test_timing.get('test') == test.get('test_id'):
                     test['is_home_pickup'] = test_timing.get('is_home_pickup')
+                    test['type'] = test_timing.get('type')
 
                     date_field = test_timing.get("start_date").find('T')
                     if date_field:
