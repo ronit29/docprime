@@ -2056,17 +2056,16 @@ def rc_users(e_obj, patient, auth_token, auth_user_id):
     from ondoc.provider.models import RocketChatGroups
     exception = None
     doctor = e_obj.doctor
-    if hasattr(patient, 'rc_user') and patient.rc_user.all():
-        rc_user_patient = patient.rc_user.all()[0]
+    if hasattr(patient, 'rc_user') and patient.rc_user:
+        rc_user_patient = patient.rc_user
     else:
         rc_user_patient, exception = create_rc_user_and_login_token(auth_token, auth_user_id, patient=patient)
         if exception:
             return exception
-    if hasattr(doctor, 'rc_user') and doctor.rc_user.all():
-        rc_user_doc = doctor.rc_user.all()[0]
+    if hasattr(doctor, 'rc_user') and doctor.rc_user:
+        rc_user_doc = doctor.rc_user
     else:
-        rc_user_doc, exception = create_rc_user_and_login_token(auth_token, auth_user_id,
-                                                                                doctor=doctor)
+        rc_user_doc, exception = create_rc_user_and_login_token(auth_token, auth_user_id, doctor=doctor)
         if exception:
             return exception
 
