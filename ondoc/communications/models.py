@@ -360,10 +360,12 @@ class SMSNotification:
         obj = None
         if notification_type == NotificationAction.APPOINTMENT_ACCEPTED:
             obj = DynamicTemplates.objects.filter(template_name="Confirmation_IPD_OPD").first()
-        elif notification_type == NotificationAction.APPOINTMENT_BOOKED:
+        elif notification_type == NotificationAction.APPOINTMENT_BOOKED and (not user or user.user_type == User.DOCTOR):
+            obj = DynamicTemplates.objects.filter(template_name="Booking_Provider_Pay_at_clinic").first()
+        elif notification_type == NotificationAction.APPOINTMENT_BOOKED and user and user.user_type == User.CONSUMER:
             obj = DynamicTemplates.objects.filter(template_name="Booking_customer_pay_at_clinic").first()
         elif notification_type == NotificationAction.OPD_OTP_BEFORE_APPOINTMENT:
-            obj = DynamicTemplates.objects.filter(template_name="Reminder_appointment")
+            obj = DynamicTemplates.objects.filter(template_name="Reminder_appointment").first()
 
         return obj
 
