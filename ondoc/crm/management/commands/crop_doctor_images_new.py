@@ -7,7 +7,7 @@ class Command(BaseCommand):
     help = 'Crop doctor images'
 
     def handle(self, *args, **options):
-        for di in DoctorImage.objects.all():
+        for di in DoctorImage.objects.filter(cropped_image=''):
             if di.cropped_image == '':
                 try:
                     di.crop_image()
