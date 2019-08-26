@@ -59,19 +59,20 @@
         <td>
             <table cellpadding="0" cellspacing="0" style="width: 100%; padding: 20px 15px 0;">
                 <tbody>
+                {% if instance.is_credit_letter_required_for_appointment and not instance.is_payment_type_cod %}
+                <tr>
+                    <td style="color: #3f3f3f; font-size: 16px; font-weight: 500;">
+                        Dear {{patient_name|capfirst}}
+                        Thanks for booking your appointment with Docprime. Your appointment is now confirmed. We have attached a credit letter along with the email.
+                        You will be required to share it with the person in-charge at the time of your appointment.
+                    </td>
+                </tr>
+                {% else %}
                 <tr>
                     <td style="color: #3f3f3f; font-size: 16px; font-weight: 500;">
                         Hi<br/>The appointment for {{patient_name|capfirst}} with Dr {{doctor_name|capfirst}} on
                         {{instance.time_slot_start|date:"D jS F Y"}} at {{instance.time_slot_start|date:"h:i A"}} has
                         been confirmed.{% if instance.payment_type == 2 %} Please pay Rs {{cod_amount}} at the clinic.{%endif %}
-                    </td>
-                </tr>
-
-                {% if instance.is_credit_letter_required_for_appointment and not instance.is_payment_type_cod %}
-                <tr>
-                    <td style="color: #3f3f3f; font-size: 16px; font-weight: 500;">
-                        We have attached a credit letter along with the email. You will be required to share it with the
-                        person in-charge at the time of your appointment.
                     </td>
                 </tr>
                 {% endif %}
@@ -97,11 +98,19 @@
                     </td>
                 </tr>
                 {% endif %}
+                {% if instance.is_credit_letter_required_for_appointment and not instance.is_payment_type_cod %}
+                <tr>
+                    <td style="color:#3f3f3f;font-size:16px;font-weight:500; padding-top: 14px;">
+                        Appointment Details:
+                    </td>
+                </tr>
+                {% else %}
                 <tr>
                     <td style="color:#3f3f3f;font-size:16px;font-weight:500; padding-top: 14px;">
                         Your booking details are as below :
                     </td>
                 </tr>
+                {% endif %}
                 </tbody>
             </table>
         </td>
@@ -112,6 +121,49 @@
             <table cellpadding="0" cellspacing="0"
                    style="width:100%;padding:20px 15px 30px;">
                 <tbody>
+                {% if instance.is_credit_letter_required_for_appointment and not instance.is_payment_type_cod %}
+                <tr>
+                    <td>
+                        <table cellpadding="0" cellspacing="0" style="width:100%;">
+                            <tbody>
+                            <tr>
+                                <td style="color:#000000;font-size:16px;font-weight:700;padding-top:16px;width:40%">
+                                    Patient Name
+                                </td>
+                                <td style="color:#3f3f3f;font-size:16px;font-weight:500;padding-top:16px">
+                                    {{patient_name|capfirst}}
+                                </td>
+                            </tr>
+                            <tr>
+                                <td style="color:#000000;font-size:16px;font-weight:700;padding-top:16px;width:40%">
+                                    Doctor Name
+                                </td>
+                                <td style="color:#3f3f3f;font-size:16px;font-weight:500;padding-top:16px">
+                                    Dr. {{doctor_name|capfirst}}
+                                </td>
+                            </tr>
+                            <tr>
+                                <td style="color:#000000;font-size:16px;font-weight:700;padding-top:16px;width:40%">
+                                    Date and Time
+                                </td>
+                                <td style="color:#3f3f3f;font-size:16px;font-weight:500;padding-top:16px">
+                                    {{instance.time_slot_start|date:"D jS F Y"}} ||
+                                    {{instance.time_slot_start|date:"h:i A"}}
+                                </td>
+                            </tr>
+                                    <tr>
+                                <td style="color:#000000;font-size:16px;font-weight:700;padding-top:16px;width:40%">
+                                    Hospital Name and Address
+                                </td>
+                                <td style="color:#3f3f3f;font-size:16px;font-weight:500;padding-top:16px">
+                                    {{instance.hospital.name|capfirst}}, {{instance.hospital.get_hos_address}}
+                                </td>
+                            </tr>
+                            </tbody>
+                        </table>
+                    </td>
+                </tr>
+                {% else %}
                 <tr>
                     <td>
                         <table cellpadding="0" cellspacing="0" style="width:100%;">
@@ -183,6 +235,44 @@
                         </table>
                     </td>
                 </tr>
+                {% endif %}
+                {% if instance.is_credit_letter_required_for_appointment and not instance.is_payment_type_cod %}
+                <tr>
+                    <td style="padding-top: 5px;">
+                        <table align="center" cellpadding="0" cellspacing="0"
+                               style="width: 100%;border-collapse: collapse;border: 1px solid black;">
+                            <thead>
+                            <tr>
+                                <th style="border: 1px solid black;">
+                                    Consultation Fee
+                                </th>
+                                <th style="border: 1px solid black;">
+                                    Discount
+                                </th>
+                                <th style="border: 1px solid black;">
+                                    Total
+                                </th>
+                            </tr>
+                            </thead>
+                            <tbody>
+                            {% for procedure in procedures %}
+                            <tr>
+                                <td style="border: 1px solid black;text-align: center;color:#3f3f3f;font-size:16px;font-weight:500;">
+                                    {{procedure.mrp}}
+                                </td>
+                                <td style="border: 1px solid black;text-align: center;color:#3f3f3f;font-size:16px;font-weight:500;">
+                                    {{procedure.discount}}
+                                </td>
+                                <td style="border: 1px solid black;text-align: center;color:#3f3f3f;font-size:16px;font-weight:500;">
+                                    {{procedure.deal_price}}
+                                </td>
+                            </tr>
+                            {% endfor %}
+                            </tbody>
+                        </table>
+                    </td>
+                </tr>
+                {% else %}
                 <tr>
                     <td style="padding-top: 5px;">
                         <table align="center" cellpadding="0" cellspacing="0"
@@ -285,6 +375,7 @@
                         </table>
                     </td>
                 </tr>
+                {% endif %}
                 <tr>
                     <td style="color:#3f3f3f;font-size:16px;font-weight:500;padding-top:30px">
                         In case of any queries please contact us at customercare@docprime.com .
