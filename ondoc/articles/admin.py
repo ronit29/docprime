@@ -56,8 +56,9 @@ class ArticleAdmin(VersionAdmin):
     model = Article
     list_display = ('title', 'updated_at', 'created_at', 'created_by', 'preview')
     search_fields = ['title']
-    fields = ['heading_title','title', 'body', 'header_image', 'header_image_alt', 'category', 'url', 'description', 'keywords',
-              'icon_tag', 'icon', 'author_name', 'published_date', 'is_published', 'preview', 'author']
+    fields = ['heading_title', 'title', 'body', 'header_image', 'header_image_alt', 'category', 'url', 'description',
+              'keywords', 'icon_tag', 'icon', 'author_name', 'published_date', 'is_published', 'preview', 'author',
+              'pharmeasy_url', 'pharmeasy_product_id', 'is_visit']
     readonly_fields = ['icon_tag', 'preview']
     inlines = [ArticleLinkedUrlInline, LinkedArticleInline]
     actions = [bulk_publishing]
