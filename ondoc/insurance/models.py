@@ -33,7 +33,7 @@ from ondoc.api.v1.utils import RawSql, aware_time_zone, html_to_pdf
 from django.core.files.uploadedfile import InMemoryUploadedFile
 from django.template.loader import render_to_string
 from num2words import num2words
-from hardcopy import bytestring_to_pdf
+# from hardcopy import bytestring_to_pdf
 import math
 import reversion
 import numbers
