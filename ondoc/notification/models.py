@@ -1360,16 +1360,6 @@ class DynamicTemplates(TimeStampedModel):
         return rendered_data
 
     def save(self, *args, **kwargs):
-
-        # old_instance = None
-        # if self.id:
-        #     old_instance = DynamicTemplates.objects.get(id=self.id)
-        #
-        # if not self.id or self.content != old_instance.content:
-        #     parameter_dict = self.parse_and_genearate_sample_json()
-        #     self.sample_parameters = parameter_dict
-        # self.generate_virutal_content()
-
         super().save(*args, **kwargs)
 
     def preview_url(self):

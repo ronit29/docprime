@@ -32,7 +32,7 @@ from ondoc.authentication.models import UserProfile, GenericAdmin, NotificationE
 from ondoc.insurance.models import EndorsementRequest, UserInsurance
 
 from ondoc.notification.models import NotificationAction, SmsNotification, EmailNotification, AppNotification, \
-    PushNotification, WhtsappNotification, DynamicTemplates
+    PushNotification, WhtsappNotification, DynamicTemplates, RecipientEmail
 # from ondoc.notification.sqs_client import publish_message
 from ondoc.notification.rabbitmq_client import publish_message
 # import datetime
@@ -1295,9 +1295,9 @@ class EMAILNotification:
 
     def send(self, receivers):
 
-        # dispatch_response, receivers = self.dispatch(receivers)
-        # if dispatch_response:
-        #     return
+        dispatch_response, receivers = self.dispatch(receivers)
+        if dispatch_response:
+            return
 
         context = self.context
         if not context:
@@ -1307,24 +1307,44 @@ class EMAILNotification:
             if template:
                 self.trigger(receiver, template, context)
 
-    # def dispatch(self, receivers):
-    #     context = self.context
-    #     if not context:
-    #         return None, receivers
-    #
-    #     receivers_left = list()
-    #
-    #     for receiver in receivers:
-    #         obj = self.get_template_object(receiver.get('user'))
-    #         if not obj:
-    #             receivers_left.append(receiver)
-    #         else:
-    #             pass
-    #
-    #     if not receivers_left:
-    #         return True, receivers_left
-    #
-    #     return False, receivers_left
+    def dispatch(self, receivers):
+        context = self.context
+        if not context:
+            return None, receivers
+
+        receivers_left = list()
+
+        for receiver in receivers:
+            obj = self.get_template_object(receiver.get('user'))
+            if not obj:
+                receivers_left.append(receiver)
+            else:
+                email = receiver.get('email')
+                context = copy.deepcopy(context)
+                instance = context.get('instance', None)
+                receiver_user = receiver.get('user')
+
+                send_without_email = False
+                if (instance.__class__.__name__ == LabAppointment.__name__) and (
+                        not receiver_user or receiver_user.user_type == User.DOCTOR):
+                    if not instance.lab.open_for_communications():
+                        email = None
+                        send_without_email = True
+
+                if (instance.__class__.__name__ == OpdAppointment.__name__) and (
+                        not receiver_user or receiver_user.user_type == User.DOCTOR):
+                    if instance.hospital and not instance.hospital.open_for_communications():
+                        email = None
+                        send_without_email = True
+
+                if email or send_without_email:
+                    recipient_obj = RecipientEmail(obj.recipient)
+                    obj.send_notification(context, recipient_obj, self.notification_type, user=receiver_user)
+
+        if not receivers_left:
+            return True, receivers_left
+
+        return False, receivers_left
 
 
 class APPNotification:
