@@ -1,2 +1,4 @@
-Dear {{patient_name|capfirst}},
-You have selected the "Pay at Clinic" option for your upcoming doctor's appointment with Booking ID {{instance.id}}. You can avail {% if cod_to_prepaid_discount %}{{cod_to_prepaid_discount}}% {% endif %}discount by paying online. Pay using the below link {{opd_appointment_cod_to_prepaid_url}}
+{% if cod_to_prepaid_discount and cod_to_prepaid_discount >= 9.5 %}Appointment Id: {{instance.id}} - You have selected the "Pay at Clinic" option for your upcoming doctor's appointment. You can avail {{cod_to_prepaid_discount}}% discount by paying online. Pay using the below link {{opd_appointment_cod_to_prepaid_url}}
+{% else %}
+Appointment Id:{{instance.id}} - You have selected the “Pay at Clinic” option for your upcoming doctor’s appointment. You can also pay using the below link {{opd_appointment_cod_to_prepaid_url}}
+{% endif %}
