@@ -4,6 +4,8 @@ from copy import deepcopy
 from itertools import groupby
 from pyodbc import Date
 
+from django.contrib.contenttypes.models import ContentType
+
 from ondoc.api.v1.diagnostic.serializers import CustomLabTestPackageSerializer, SearchLabListSerializer
 from ondoc.api.v1.doctor.serializers import CommaSepratedToListField
 from ondoc.authentication.backends import JWTAuthentication
@@ -11,13 +13,13 @@ from ondoc.api.v1.diagnostic import serializers as diagnostic_serializer
 from ondoc.api.v1.auth.serializers import AddressSerializer
 from ondoc.integrations.models import IntegratorTestMapping, IntegratorReport, IntegratorMapping
 from ondoc.cart.models import Cart
-from ondoc.common.models import UserConfig, GlobalNonBookable, AppointmentHistory
+from ondoc.common.models import UserConfig, GlobalNonBookable, AppointmentHistory, MatrixMappedCity
 from ondoc.ratings_review import models as rating_models
 from ondoc.diagnostic.models import (LabTest, AvailableLabTest, Lab, LabAppointment, LabTiming, PromotedLab,
                                      CommonDiagnosticCondition, CommonTest, CommonPackage,
                                      FrequentlyAddedTogetherTests, TestParameter, ParameterLabTest, QuestionAnswer,
                                      LabPricingGroup, LabTestCategory, LabTestCategoryMapping, LabTestThresholds,
-                                     LabTestCategoryLandingURLS, LabTestCategoryUrls)
+                                     LabTestCategoryLandingURLS, LabTestCategoryUrls, IPDMedicinePageLead)
 from ondoc.account import models as account_models
 from ondoc.authentication.models import UserProfile, Address
 from ondoc.insurance.models import UserInsurance, InsuranceThreshold
@@ -3668,4 +3670,14 @@ class IPDMedicinePageLeadViewSet(viewsets.GenericViewSet):
     def store(self, request):
 
         params = request.data
+        name = params.get('name', None)
+        phone_number = params.get('phone_number', None)
+        city = params.get('city', None)
+
+        city_id = MatrixMappedCity.objects.filter(id=city).first()
+
+        ipd_med_page_object = IPDMedicinePageLead(name=name, phone_number=phone_number, city=city_id)
+        ipd_med_page_object.save()
+
+
 

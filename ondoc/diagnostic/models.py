@@ -3293,3 +3293,14 @@ class IPDMedicinePageLead(auth_model.TimeStampedModel):
 
     def __str__(self):
         return self.name
+
+    def save(self):
+
+        if not self.id:
+            name = self.name
+            phone_number = self.phone_number
+            city = self.city.id
+            productID = 5
+
+
+
