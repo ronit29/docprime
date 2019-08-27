@@ -4002,7 +4002,7 @@ class OfflineCustomerViewSet(viewsets.GenericViewSet):
                 # mrp = app.mrp
                 mrp_fees = app.fees if app.fees else 0
                 #RAJIV YADAV
-                mrp = app.mrp if app.payment_type == app.COD else mrp_fees
+                mrp = app.deal_price if app.payment_type == app.COD else mrp_fees
                 payment_type = app.payment_type
                 deal_price = app.deal_price
                 mask_number = app.mask_number.all()
