@@ -675,8 +675,6 @@ def create_or_update_lead_on_matrix(self, data):
         content_type = ContentType.objects.get_for_model(model_used)
         if obj_type == ProviderSignupLead.__name__:
             exit_point_url = settings.ADMIN_BASE_URL + reverse('admin:doctor_doctor_add')
-        if obj_type == IPDMedicinePageLead.__name__:
-            exit_point_url = settings.ADMIN_BASE_URL
         else:
             exit_point_url = settings.ADMIN_BASE_URL + reverse(
                 'admin:{}_{}_change'.format(content_type.app_label, content_type.model), kwargs={"object_id": obj_id})
