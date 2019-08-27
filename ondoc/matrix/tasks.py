@@ -647,25 +647,36 @@ def create_or_update_lead_on_matrix(self, data):
     from ondoc.procedure.models import IpdProcedureLead
     from ondoc.communications.models import EMAILNotification
     from ondoc.notification.models import NotificationAction
+    from ondoc.diagnostic.models import IPDMedicinePageLead
+
     try:
         obj_id = data.get('obj_id', None)
         obj_type = data.get('obj_type', None)
         if not obj_id or not obj_type:
             logger.error("CELERY ERROR: Incorrect values provided.")
             raise ValueError()
+
         product_id = matrix_product_ids.get('opd_products', 1)
         if obj_type == IpdProcedureLead.__name__:
             product_id = matrix_product_ids.get('ipd_procedure', 9)
+        if obj_type == IPDMedicinePageLead.__name__:
+            product_id = matrix_product_ids.get('consumer', 5)
+
         sub_product_id = matrix_subproduct_ids.get(obj_type.lower(), 4)
         if obj_type == ProviderSignupLead.__name__:
             sub_product_id = matrix_subproduct_ids.get(Doctor.__name__.lower(), 4)
         if obj_type == IpdProcedureLead.__name__:
             sub_product_id = matrix_subproduct_ids.get('idp_subproduct_id', 0)
+        if obj_type == IPDMedicinePageLead.__name__:
+            sub_product_id = matrix_product_ids.get(IPDMedicinePageLead.__name__.lower(), 4)
+
         ct = ContentType.objects.get(model=obj_type.lower())
         model_used = ct.model_class()
         content_type = ContentType.objects.get_for_model(model_used)
         if obj_type == ProviderSignupLead.__name__:
             exit_point_url = settings.ADMIN_BASE_URL + reverse('admin:doctor_doctor_add')
+        if obj_type == IPDMedicinePageLead.__name__:
+            exit_point_url = settings.ADMIN_BASE_URL
         else:
             exit_point_url = settings.ADMIN_BASE_URL + reverse(
                 'admin:{}_{}_change'.format(content_type.app_label, content_type.model), kwargs={"object_id": obj_id})
@@ -725,7 +736,11 @@ def create_or_update_lead_on_matrix(self, data):
             elif obj.gender and obj.gender == 'f':
                 gender = 2
             obj.update_idp_data(request_data)
+        elif obj_type == IPDMedicinePageLead.__name__:
+            lead_source = 'Medicine Page'
+            mobile = obj.phone_number
         mobile = int(mobile)
+
         # if not mobile:
         #     return
         if not lead_source:

@@ -3286,7 +3286,7 @@ class LabTestCategoryLandingURLS(TimeStampedModel):
 class IPDMedicinePageLead(auth_model.TimeStampedModel):
     name = models.CharField(max_length=500)
     phone_number = models.BigIntegerField()
-    city = models.ForeignKey(MatrixMappedCity, on_delete=models.SET_NULL, null=True)
+    matrix_city = models.ForeignKey(MatrixMappedCity, on_delete=models.SET_NULL, null=True)
 
     class Meta:
         db_table = "ipd_medicine_lead"
@@ -3294,15 +3294,18 @@ class IPDMedicinePageLead(auth_model.TimeStampedModel):
     def __str__(self):
         return self.name
 
-    def save(self):
+    def save(self, force_insert=False, force_update=False, using=None, update_fields=None):
 
         if not self.id:
-            name = self.name
-            phone_number = self.phone_number
-            city = self.city.id
-            productID = 5
+            if self.name:
+                name = self.name
+            if self.phone_number:
+                phone_number = self.phone_number
+            if self.matrix_city and self.matrix_city.id:
+                matrix_city = self.matrix_city.id
 
-            create_or_update_lead_on_matrix.apply_async(({'obj_type': self.__class__.__name__, 'obj_id': self.id}
-                                                         ,), countdown=5)
+        super().save(force_insert, force_update, using, update_fields)
+
+        create_or_update_lead_on_matrix.apply_async(({'obj_type': self.__class__.__name__, 'obj_id': self.id}, ), countdown=5)
 
 

@@ -3686,7 +3686,7 @@ class IPDMedicinePageLeadViewSet(viewsets.GenericViewSet):
 
         city_id = MatrixMappedCity.objects.filter(id=city).first()
 
-        ipd_med_page_object = IPDMedicinePageLead(name=name, phone_number=phone_number, city=city_id)
+        ipd_med_page_object = IPDMedicinePageLead(name=name, phone_number=phone_number, matrix_city=city_id)
         ipd_med_page_object.save()
 
 
