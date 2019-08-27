@@ -4,7 +4,7 @@ from ondoc.authentication import models as auth_model
 from django.contrib.contenttypes.fields import GenericRelation
 from django.contrib.contenttypes.models import ContentType
 from django.contrib.gis.geos import Point
-from django.core.validators import FileExtensionValidator
+from django.core.validators import FileExtensionValidator, MaxValueValidator, MinValueValidator
 from django.contrib.postgres.fields import JSONField
 from django.utils import timezone
 from ondoc.account import models as account_model
@@ -41,6 +41,9 @@ class PlusProposer(auth_model.TimeStampedModel):
     plus_document = models.FileField(null=True, blank=False, upload_to='plus/documents',
                                         validators=[FileExtensionValidator(allowed_extensions=['pdf'])])
 
+    def __str__(self):
+        return "{}".format(self.name)
+
     class Meta:
         db_table = 'plus_proposer'
 
@@ -55,6 +58,9 @@ class PlusPlans(auth_model.TimeStampedModel, LiveMixin):
     is_live = models.BooleanField(default=False)
     total_allowed_members = models.PositiveSmallIntegerField(default=0)
     is_selected = models.BooleanField(default=False)
+
+    def __str__(self):
+        return "{}".format(self.plan_name)
 
     class Meta:
         db_table = 'plus_plans'
@@ -103,3 +109,48 @@ class PlusUser(auth_model.TimeStampedModel):
 
     class Meta:
         db_table = 'plus_users'
+
+
+class PlusMembers(auth_model.TimeStampedModel):
+    MALE = 'm'
+    FEMALE = 'f'
+    OTHER = 'o'
+    GENDER_CHOICES = [(MALE, 'Male'), (FEMALE, 'Female'), (OTHER, 'Other')]
+    SELF = 'self'
+    SPOUSE = 'spouse'
+    SON = 'son'
+    DAUGHTER = 'daughter'
+    # RELATION_CHOICES = [(SPOUSE, 'Spouse'), (SON, 'Son'), (DAUGHTER, 'Daughter'), (SELF, 'Self')]
+    ADULT = "adult"
+    CHILD = "child"
+    MEMBER_TYPE_CHOICES = [(ADULT, 'adult'), (CHILD, 'child')]
+    MR = 'mr.'
+    MISS = 'miss'
+    MRS = 'mrs.'
+    MAST = 'mast.'
+    TITLE_TYPE_CHOICES = [(MR, 'mr.'), (MRS, 'mrs.'), (MISS, 'miss'), (MAST, 'mast.')]
+    # insurer = models.ForeignKey(Insurer, on_delete=models.DO_NOTHING)
+    # insurance_plan = models.ForeignKey(InsurancePlans, on_delete=models.DO_NOTHING)
+    first_name = models.CharField(max_length=50, null=False)
+    last_name = models.CharField(max_length=50, null=True)
+    dob = models.DateField(blank=False, null=False)
+    email = models.EmailField(max_length=100, null=True)
+    # relation = models.CharField(max_length=50, choices=RELATION_CHOICES, default=None)
+    pincode = models.PositiveIntegerField(default=None)
+    address = models.TextField(default=None)
+    gender = models.CharField(max_length=50, choices=GENDER_CHOICES, default=None)
+    phone_number = models.BigIntegerField(blank=True, null=True,
+                                          validators=[MaxValueValidator(9999999999), MinValueValidator(1000000000)])
+    profile = models.ForeignKey(auth_model.UserProfile, related_name="plus_member", on_delete=models.SET_NULL, null=True)
+    title = models.CharField(max_length=20, choices=TITLE_TYPE_CHOICES, default=None)
+    middle_name = models.CharField(max_length=50, null=True)
+    town = models.CharField(max_length=100, null=False)
+    district = models.CharField(max_length=100, null=False)
+    state = models.CharField(max_length=100, null=False)
+    state_code = models.CharField(max_length=10, default='')
+    plus_user = models.ForeignKey(PlusUser, related_name="plus_members", on_delete=models.DO_NOTHING, null=False)
+    city_code = models.CharField(max_length=10, blank=True, null=True, default='')
+    district_code = models.CharField(max_length=10, blank=True, null=True, default='')
+
+    class Meta:
+        db_table = "plus_members"
