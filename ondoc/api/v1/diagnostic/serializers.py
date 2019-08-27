@@ -824,6 +824,7 @@ class LabAppTransactionModelSerializer(serializers.Serializer):
     coupon_data = serializers.JSONField(required=False)
     prescription_list = serializers.ListSerializer(child=PrescriptionDocumentSerializer(), required=False)
     test_time_slots = serializers.ListSerializer(child=LabAppointmentTestTransactionSerializer(), required=False, allow_empty=False)
+    selected_timings_type = serializers.ChoiceField(required=False, choices=(('common', 'common'), ('separate', 'separate')))
 
     def __init__(self, instance=None, data=None, **kwargs):
         super().__init__(instance, data, **kwargs)
@@ -833,9 +834,11 @@ class LabAppTransactionModelSerializer(serializers.Serializer):
             self.fields.fields['time_slot_start'].required = False
             self.fields.fields['is_home_pickup'].required = False
             self.fields.fields['test_time_slots'].required = True
+            self.fields.fields['selected_timings_type'].required = True
         else:
             data.pop('test_time_slots', None)
             self.fields.fields['test_time_slots'].required = False
+            self.fields.fields['selected_timings_type'].required = False
             self.fields.fields['time_slot_start'].required = True
 
 
@@ -923,6 +926,7 @@ class LabAppointmentCreateSerializer(serializers.Serializer):
     prescription_list = serializers.ListSerializer(child=PrescriptionDocumentSerializer(), required=False)
     test_timings = serializers.ListSerializer(child=LabAppointmentTestSerializer(), required=False, allow_empty=False)
     multi_timings_enabled = serializers.BooleanField(required=False, default=False)
+    selected_timings_type = serializers.ChoiceField(required=False, choices=(('common', 'common'), ('separate', 'separate')))
 
     def __init__(self, instance=None, data=None, **kwargs):
         super().__init__(instance, data, **kwargs)
@@ -932,7 +936,7 @@ class LabAppointmentCreateSerializer(serializers.Serializer):
             self.fields.fields['start_time'].required = False
             self.fields.fields['is_home_pickup'].required = False
             self.fields.fields['test_timings'].required = True
-
+            self.fields.fields['selected_timings_type'].required = True
 
     def validate(self, data):
         MAX_APPOINTMENTS_ALLOWED = 10
@@ -1568,6 +1572,7 @@ class LabAppointmentRetrieveSerializer(LabAppointmentModelSerializer):
     invoices = serializers.SerializerMethodField()
     cancellation_reason = serializers.SerializerMethodField()
     mask_data = serializers.SerializerMethodField()
+    selected_timings_type = serializers.SerializerMethodField()
 
     def get_mask_data(self, obj):
         mask_number = obj.mask_number.first()
@@ -1610,10 +1615,17 @@ class LabAppointmentRetrieveSerializer(LabAppointmentModelSerializer):
                 resp_address += str(obj.address.get("pincode"))
         return resp_address
 
+    def get_selected_timings_type(self, obj):
+        selected_timings_type = None
+        if obj.action_data:
+            selected_timings_type = obj.action_data.get('selected_timings_type')
+
+        return selected_timings_type
+
     class Meta:
         model = LabAppointment
         fields = ('id', 'type', 'lab_name', 'status', 'deal_price', 'effective_price',
-                  'time_slot_start', 'time_slot_end', 'is_rated', 'rating_declined', 'is_home_pickup', 'lab_thumbnail',
+                  'time_slot_start', 'time_slot_end', 'selected_timings_type', 'is_rated', 'rating_declined', 'is_home_pickup', 'lab_thumbnail',
                   'lab_image', 'profile', 'allowed_action', 'lab_test', 'lab', 'otp', 'address', 'type', 'reports',
                   'report_files', 'invoices', 'prescription', 'cancellation_reason', 'mask_data', 'payment_type',
                   'price')

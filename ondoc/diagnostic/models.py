@@ -1662,6 +1662,7 @@ class LabAppointment(TimeStampedModel, CouponsMixin, LabAppointmentInvoiceMixin,
     appointment_prescriptions = GenericRelation("prescription.AppointmentPrescription", related_query_name="appointment_prescriptions")
     hospital_reference_id = models.CharField(max_length=1000, null=True, blank=True)
     reports_physically_collected = models.NullBooleanField()
+    action_data = JSONField(blank=True, null=True)
 
     @cached_property
     def is_thyrocare(self):
@@ -2206,6 +2207,8 @@ class LabAppointment(TimeStampedModel, CouponsMixin, LabAppointmentInvoiceMixin,
         appointment_data["status"] = appointment_status
         appointment_data["otp"] = otp
         appointment_data["user_plan_used"] = appointment_data.pop("user_plan", None)
+        appointment_data["action_data"] = dict()
+        appointment_data["action_data"]["selected_timings_type"] = appointment_data.pop('selected_timings_type', 'separate')
         lab_ids = appointment_data.pop("lab_test")
         test_timeslots = appointment_data.pop('test_time_slots') if appointment_data.get('test_time_slots', []) else []
         coupon_list = appointment_data.pop("coupon", None)
@@ -2213,6 +2216,7 @@ class LabAppointment(TimeStampedModel, CouponsMixin, LabAppointmentInvoiceMixin,
             "random_coupons": appointment_data.pop("coupon_data", [])
         }
         extra_details = deepcopy(appointment_data.pop("extra_details", None))
+
         prescription_objects = deepcopy(appointment_data.pop("prescription_list", []))
         prescription_id_list = []
         for prescription in prescription_objects:
@@ -2252,6 +2256,9 @@ class LabAppointment(TimeStampedModel, CouponsMixin, LabAppointmentInvoiceMixin,
         self.price = data.get('price', self.price)
         self.deal_price = data.get('deal_price', self.deal_price)
         self.effective_price = data.get('effective_price', self.effective_price)
+        if data.get('selected_timings_type'):
+            self.action_data = dict()
+            self.action_data['selected_timings_type'] = data.get('selected_timings_type', '')
 
         self.save()
 
@@ -2634,7 +2641,8 @@ class LabAppointment(TimeStampedModel, CouponsMixin, LabAppointmentInvoiceMixin,
             "insurance": insurance_id,
             "coupon_data": price_data.get("coupon_data"),
             "prescription_list": data.get('prescription_list', []),
-            "multi_timings_enabled": data.get('multi_timings_enabled')
+            "multi_timings_enabled": data.get('multi_timings_enabled'),
+            "selected_timings_type": data.get('selected_timings_type')
         }
 
         if data.get('included_in_user_plan', False):

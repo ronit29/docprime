@@ -425,6 +425,8 @@ class UpdateStatusSerializer(serializers.Serializer):
     source = serializers.ChoiceField(required=False, choices=AppointmentHistory.SOURCE_CHOICES)
     test_timings = serializers.ListSerializer(child=LabAppointmentTestMappingSerializer(), required=False, allow_empty=False)
     multi_timings_enabled = serializers.BooleanField(required=False, default=False)
+    selected_timings_type = serializers.ChoiceField(required=False,
+                                                    choices=(('common', 'common'), ('separate', 'separate')))
 
     def __init__(self, instance=None, data=None, **kwargs):
         super().__init__(instance, data, **kwargs)
@@ -432,7 +434,7 @@ class UpdateStatusSerializer(serializers.Serializer):
             self.fields.fields['start_date'].required = False
             self.fields.fields['start_time'].required = False
             self.fields.fields['test_timings'].required = True
-
+            self.fields.fields['selected_timings_type'].required = True
 
 class DoctorImageSerializer(serializers.ModelSerializer):
 

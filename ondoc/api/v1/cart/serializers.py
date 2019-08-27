@@ -30,7 +30,7 @@ class CartItemSerializer(serializers.ModelSerializer):
     thumbnail = serializers.SerializerMethodField()
     date = serializers.SerializerMethodField()
     procedures = serializers.SerializerMethodField()
-
+    selected_timings_type = serializers.SerializerMethodField()
 
     def get_procedures(self, obj):
         procedures_ids = obj.data.get("procedure_ids", [])
@@ -145,6 +145,9 @@ class CartItemSerializer(serializers.ModelSerializer):
             return coupon_list
         return None
 
+    def get_selected_timings_type(self, obj):
+        return obj.data.get("selected_timings_type", 'common')
+
     class Meta:
         model = Cart
-        fields = ('tests', 'profile', 'coupons', 'doctor', 'hospital', 'lab', 'thumbnail', 'date', 'procedures')
+        fields = ('tests', 'profile', 'coupons', 'doctor', 'hospital', 'lab', 'thumbnail', 'date', 'procedures', 'selected_timings_type')

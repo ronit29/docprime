@@ -683,6 +683,7 @@ class UserAppointmentsViewSet(OndocViewSet):
     def lab_appointment_update(self, request, lab_appointment, validated_data):
         resp = dict()
         resp["status"] = 1
+        selected_timings_type = ""
         if validated_data.get('status'):
             if validated_data['status'] == LabAppointment.CANCELLED:
                 lab_appointment.cancellation_type = LabAppointment.PATIENT_CANCELLED
@@ -694,6 +695,7 @@ class UserAppointmentsViewSet(OndocViewSet):
                 test_time_slots = []
                 if validated_data.get('multi_timings_enabled'):
                     same_time_slot_err = True
+                    selected_timings_type = validated_data.get('selected_timings_type', 'separate')
                     lab_appointment_tests = lab_appointment.test_mappings.all()
                     for test_timing in validated_data.get('test_timings'):
                         appointment_tests = list(filter(lambda x: x.test_id == test_timing.get('test').id, lab_appointment_tests))
@@ -798,6 +800,7 @@ class UserAppointmentsViewSet(OndocViewSet):
                     "effective_price": new_effective_price,
                     "time_slot_start": time_slot_start,
                     "test_time_slots": test_time_slots,
+                    "selected_timings_type": selected_timings_type,
                     "profile_detail": lab_appointment.profile_detail,
                     "status": lab_appointment.status,
                     "payment_type": lab_appointment.payment_type,
