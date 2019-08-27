@@ -360,10 +360,12 @@ class SMSNotification:
         obj = None
         if notification_type == NotificationAction.APPOINTMENT_ACCEPTED:
             obj = DynamicTemplates.objects.filter(template_name="Confirmation_IPD_OPD").first()
-        elif notification_type == NotificationAction.APPOINTMENT_BOOKED:
+        elif notification_type == NotificationAction.APPOINTMENT_BOOKED and (not user or user.user_type == User.DOCTOR):
+            obj = DynamicTemplates.objects.filter(template_name="Booking_Provider_Pay_at_clinic").first()
+        elif notification_type == NotificationAction.APPOINTMENT_BOOKED and user and user.user_type == User.CONSUMER and user.recent_opd_appointment.first().payment_type == 2:
             obj = DynamicTemplates.objects.filter(template_name="Booking_customer_pay_at_clinic").first()
         elif notification_type == NotificationAction.OPD_OTP_BEFORE_APPOINTMENT:
-            obj = DynamicTemplates.objects.filter(template_name="Reminder_appointment")
+            obj = DynamicTemplates.objects.filter(template_name="Reminder_appointment").first()
 
         return obj
 
@@ -1418,7 +1420,9 @@ class OpdNotification(Notification):
         hospital_name = self.appointment.hospital.name
         hospital_address = self.appointment.hospital.get_hos_address()
         payment_type = self.appointment.payment_type
-        cod_amount = self.appointment.get_cod_amount()
+        cod_amount = 'Not Applicable'
+        if payment_type == 2:
+            cod_amount = self.appointment.get_cod_amount()
 
         est = pytz.timezone(settings.TIME_ZONE)
         time_slot_start = self.appointment.time_slot_start.astimezone(est)

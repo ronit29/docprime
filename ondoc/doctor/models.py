@@ -2845,7 +2845,7 @@ class OpdAppointment(auth_model.TimeStampedModel, CouponsMixin, OpdAppointmentIn
                     (self.id, str(math.floor(self.updated_at.timestamp()))),
                     eta=self.time_slot_start - datetime.timedelta(
                         minutes=int(self.SMS_APPOINTMENT_REMINDER_TIME)), )
-                if (self.time_slot_start - self.created_at).total_seconds() > (settings.COUNT_DOWN_FOR_REMINDER):
+                if (self.time_slot_start - self.created_at).total_seconds() > float(settings.COUNT_DOWN_FOR_REMINDER):
                     notification_tasks.opd_send_otp_before_appointment.apply_async(
                         (self.id, str(math.floor(self.time_slot_start.timestamp()))),
                         eta=self.time_slot_start - datetime.timedelta(
@@ -3963,6 +3963,7 @@ class PracticeSpecialization(auth_model.TimeStampedModel, SearchKey):
     search_distance = models.FloatField(default=None, blank=True, null=True)
     is_similar_specialization = models.BooleanField(default=True)
     breadcrumb_priority = models.PositiveIntegerField(null=True, blank=True)
+    bucket_size = models.PositiveIntegerField(null=True, blank=True)
 
     class Meta:
         db_table = 'practice_specialization'
