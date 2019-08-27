@@ -1343,13 +1343,16 @@ def push_appointment_to_spo(self, data):
         else:
             # TO DO - Need to update after api response change
             resp_data = response.json()
-            if not resp_data.get('data', '') == 'Lead Update Successfully.':
-                spo_resp = resp_data.get('data', None)
-                if spo_resp and spo_resp['error']:
-                    logger.error("[ERROR-SPO] Appointment could not be published to the SPO system - " + str(json.dumps(request_data)))
-                    logger.info("[ERROR-SPO] %s", spo_resp)
+            resp_data = resp_data['data']
+            if resp_data.get('error', None):
+                logger.error("[ERROR-SPO] Appointment could not be published to the SPO system - " + str(json.dumps(request_data)))
+                logger.info("[ERROR-SPO] %s", resp_data.get('errorDetails', []))
             else:
-                return True
-
+                lead_id = resp_data.get('leadId', '')
+                if lead_id:
+                    # save the appointment with the spo lead id.
+                    qs = LabAppointment.objects.filter(id=appointment.id)
+                    if qs:
+                        qs.update(spo_lead_id=int(lead_id))
     except Exception as e:
         logger.error("Error in Celery. Failed pushing Appointment to the SPO- " + str(e))

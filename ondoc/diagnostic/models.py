@@ -1620,6 +1620,7 @@ class LabAppointment(TimeStampedModel, CouponsMixin, LabAppointmentInvoiceMixin,
     appointment_prescriptions = GenericRelation("prescription.AppointmentPrescription", related_query_name="appointment_prescriptions")
     hospital_reference_id = models.CharField(max_length=1000, null=True, blank=True)
     reports_physically_collected = models.NullBooleanField()
+    spo_lead_id = models.IntegerField(null=True, blank=True)
 
     @cached_property
     def is_thyrocare(self):
