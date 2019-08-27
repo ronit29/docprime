@@ -668,11 +668,11 @@ class PromotedLabsSerializer(serializers.ModelSerializer):
 class LabAppointmentTestMappingModelSerializer(serializers.ModelSerializer):
     test_id = serializers.ReadOnlyField(source="test.id")
     test_name = serializers.ReadOnlyField(source="test.name")
+    test_type = serializers.ReadOnlyField(source="test.test_type")
 
     class Meta:
         model = LabAppointmentTestMapping
-        fields = ('id', 'test_id', 'test_name', 'time_slot_start', 'is_home_pickup')
-
+        fields = ('id', 'test_id', 'test_name', 'test_type', 'time_slot_start', 'is_home_pickup')
 
 
 class LabAppointmentModelSerializer(serializers.ModelSerializer):
@@ -691,6 +691,7 @@ class LabAppointmentModelSerializer(serializers.ModelSerializer):
     prescription = serializers.SerializerMethodField()
     time_slot_start = serializers.SerializerMethodField()
     test_time_slots = serializers.SerializerMethodField()
+    selected_timings_type = serializers.SerializerMethodField()
 
     def get_prescription(self, obj):
         return []
@@ -744,11 +745,20 @@ class LabAppointmentModelSerializer(serializers.ModelSerializer):
             serializer = LabAppointmentTestMappingModelSerializer(appointment_tests, many=True)
             return serializer.data
 
+    def get_selected_timings_type(self, obj):
+        selected_timings_type = None
+        if obj.action_data:
+            selected_timings_type = obj.action_data.get('selected_timings_type')
+
+        return selected_timings_type
+
     class Meta:
         model = LabAppointment
-        fields = ('id', 'lab', 'lab_test', 'profile', 'type', 'lab_name', 'status', 'deal_price', 'effective_price', 'time_slot_start', 'time_slot_end',
-                   'is_home_pickup', 'lab_thumbnail', 'lab_image', 'patient_thumbnail', 'patient_name', 'allowed_action', 'address', 'invoices', 'reports', 'report_files',
-                  'prescription', 'test_time_slots')
+        fields = ('id', 'lab', 'lab_test', 'profile', 'type', 'lab_name', 'status', 'deal_price', 'effective_price',
+                  'time_slot_start', 'time_slot_end', 'is_home_pickup', 'lab_thumbnail', 'lab_image',
+                  'patient_thumbnail', 'patient_name', 'allowed_action', 'address', 'invoices', 'reports',
+                  'report_files', 'prescription', 'test_time_slots',
+                  'selected_timings_type')
 
 
 class LabAppointmentBillingSerializer(serializers.ModelSerializer):
