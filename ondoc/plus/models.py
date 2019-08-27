@@ -1,5 +1,4 @@
 from django.db import models
-from ondoc.account.models import MoneyPool
 from ondoc.authentication import models as auth_model
 from django.contrib.contenttypes.fields import GenericRelation
 from django.contrib.contenttypes.models import ContentType
@@ -84,6 +83,7 @@ class PlusThreshold(auth_model.TimeStampedModel, LiveMixin):
 
 
 class PlusUser(auth_model.TimeStampedModel):
+    from ondoc.account.models import MoneyPool
     ACTIVE = 1
     CANCELLED = 2
     EXPIRED = 3
@@ -107,6 +107,13 @@ class PlusUser(auth_model.TimeStampedModel):
     price_data = JSONField(blank=True, null=True)
     money_pool = models.ForeignKey(MoneyPool, on_delete=models.SET_NULL, null=True)
     matrix_lead_id = models.IntegerField(null=True)
+
+    def is_valid(self):
+        if self.expiry_date >= timezone.now() and (self.status == self.ACTIVE):
+            return True
+        else:
+            return False
+
 
     class Meta:
         db_table = 'plus_users'

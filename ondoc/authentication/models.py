@@ -23,7 +23,6 @@ from datetime import date, datetime, timedelta
 from safedelete import SOFT_DELETE
 from safedelete.models import SafeDeleteModel
 import reversion
-
 import requests
 import json
 from rest_framework import status
@@ -339,6 +338,11 @@ class User(AbstractBaseUser, PermissionsMixin):
         # if self.user_type==1 and hasattr(self, 'staffprofile'):
         #     return self.staffprofile.name
         # return str(self.phone_number)
+
+    @cached_property
+    def active_plus_user(self):
+        active_plus_user = self.purchased_plus.filter().order_by('-id').first()
+        return active_plus_user if active_plus_user and active_plus_user.is_valid() else None
 
     @classmethod
     def get_external_login_data(cls, data):
