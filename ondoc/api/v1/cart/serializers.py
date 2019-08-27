@@ -135,12 +135,13 @@ class CartItemSerializer(serializers.ModelSerializer):
             coupon_data = coupon_data.annotate(is_cashback=Case(When(coupon_type=Coupon.DISCOUNT, then=Value(0)),
                                                                 When(coupon_type=Coupon.CASHBACK, then=Value(1)), output_field=IntegerField())
                                                )\
-                                .values('code', 'id', 'is_cashback', 'random_coupon_code')
+                                .values('code', 'id', 'is_cashback', 'random_coupon_code', 'payment_option')
 
         if coupon_data and coupon_data.exists():
             coupon_list = []
             for c in coupon_data:
                 c["code"] = c["random_coupon_code"] or c["code"]
+                c["is_payment_specific"] = bool(c.pop('payment_option', None))
                 coupon_list.append(c)
             return coupon_list
         return None
