@@ -51,7 +51,8 @@ from ondoc.doctor.models import (Doctor, DoctorQualification,
                                  GoogleDetailing, VisitReason, VisitReasonMapping, PracticeSpecializationContent,
                                  PatientMobile, DoctorMobileOtp,
                                  UploadDoctorData, CancellationReason, Prescription, PrescriptionFile,
-                                 SimilarSpecializationGroup, SimilarSpecializationGroupMapping, PurchaseOrderCreation)
+                                 SimilarSpecializationGroup, SimilarSpecializationGroupMapping, PurchaseOrderCreation,
+                                 DoctorSponsoredServices)
 
 from ondoc.authentication.models import User
 from .common import *
@@ -1099,6 +1100,14 @@ class CompetitorMonthlyVisitsInline(ReadOnlyInline):
     verbose_name_plural = 'Monthly Visits through Competitor Info'
 
 
+class DoctorSponsoredServicesInline(nested_admin.NestedTabularInline):
+    model = DoctorSponsoredServices
+    extra = 0
+    can_delete = True
+    show_change_link = True
+    fields = ['sponsored_service', ]
+
+
 class DoctorAdmin(AutoComplete, ImportExportMixin, CompareVersionAdmin, ActionAdmin, QCPemAdmin, nested_admin.NestedModelAdmin):
     # class DoctorAdmin(nested_admin.NestedModelAdmin):
     resource_class = DoctorResource
@@ -1171,7 +1180,8 @@ class DoctorAdmin(AutoComplete, ImportExportMixin, CompareVersionAdmin, ActionAd
         DoctorDocumentInline,
         GenericAdminInline,
         AssociatedMerchantInline,
-        RemarkInline
+        RemarkInline,
+        DoctorSponsoredServicesInline
     ]
 
     search_fields = ['name']

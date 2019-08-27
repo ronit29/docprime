@@ -20,7 +20,7 @@ from ondoc.doctor.models import (Doctor, Language, MedicalService, Specializatio
                                  VisitReason, CancellationReason, PracticeSpecializationContent, OfflinePatients,
                                  OfflineOPDAppointments,
                                  DoctorMobileOtp, UploadDoctorData, DoctorLeave, HealthInsuranceProvider,
-                                 CommonHospital, SimilarSpecializationGroup, PurchaseOrderCreation)
+                                 CommonHospital, SimilarSpecializationGroup, PurchaseOrderCreation, SponsoredServices)
 
 from ondoc.diagnostic.models import (Lab, LabNetwork, LabTest, LabTestType, LabService,
                                      AvailableLabTest, LabAppointment, CommonTest, CommonDiagnosticCondition,
@@ -287,3 +287,4 @@ admin.site.register(GenericQuestionAnswer, GenericQuestionAnswerAdmin)
 admin.site.register(PurchaseOrderCreation, PurchaseOrderCreationAdmin)
 admin.site.register(IntegratorLabTestParameterMapping, IntegratorLabTestParameterMappingAdmin)
 admin.site.register(DynamicTemplates, DynamicTemplatesAdmin)
+admin.site.register(SponsoredServices)

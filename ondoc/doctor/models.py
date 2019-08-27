@@ -4754,3 +4754,31 @@ class HospitalNetworkSpeciality(auth_model.TimeStampedModel):
 
     class Meta:
         db_table = "hospital_network_speciality"
+
+
+class SponsoredServices(auth_model.TimeStampedModel):
+    name = models.CharField(max_length=200, unique=True)
+
+    def __str__(self):
+        return self.name
+
+    class Meta:
+        db_table = 'sponsored_services'
+
+
+class DoctorSponsoredServices(auth_model.TimeStampedModel):
+    doctor = models.ForeignKey(Doctor, related_name="doctor_services", on_delete=models.DO_NOTHING)
+    sponsored_service = models.ForeignKey(SponsoredServices, on_delete=models.DO_NOTHING, blank=False, null=False, related_name='doc_sponsored_services')
+
+    class Meta:
+        db_table = "doctor_sponsored_services"
+        unique_together = (("doctor", "sponsored_service"),)
+
+
+class HospitalSponsoredServices(auth_model.TimeStampedModel):
+    hospital = models.ForeignKey(Hospital, related_name="hospital_services", on_delete=models.DO_NOTHING)
+    sponsored_service = models.ForeignKey(SponsoredServices, on_delete=models.DO_NOTHING, blank=False, null=False, related_name='hosp_sponsored_services')
+
+    class Meta:
+        db_table = "hospital_sponsored_services"
+        unique_together = (("hospital", "sponsored_service"),)
