@@ -110,20 +110,21 @@ class CartItemSerializer(serializers.ModelSerializer):
                                         .values('test_id', 'test_name', 'deal_price', 'mrp')
 
         test_timings = obj.data.get('test_timings')
-        for test in tests:
-            for test_timing in test_timings:
-                if test_timing.get('test') == test.get('test_id'):
-                    test['is_home_pickup'] = test_timing.get('is_home_pickup')
-                    test['type'] = test_timing.get('type')
+        if test_timings:
+            for test in tests:
+                for test_timing in test_timings:
+                    if test_timing.get('test') == test.get('test_id'):
+                        test['is_home_pickup'] = test_timing.get('is_home_pickup')
+                        test['type'] = test_timing.get('type')
 
-                    date_field = test_timing.get("start_date").find('T')
-                    if date_field:
-                        date_field = test_timing.get("start_date")[:date_field]
-                    test_selected_time = form_time_slot(
-                        make_aware(datetime.datetime.strptime(date_field, '%Y-%m-%d')),
-                        float(test_timing.get("start_time")))
-                    test['date'] = test_selected_time
-                    break
+                        date_field = test_timing.get("start_date").find('T')
+                        if date_field:
+                            date_field = test_timing.get("start_date")[:date_field]
+                        test_selected_time = form_time_slot(
+                            make_aware(datetime.datetime.strptime(date_field, '%Y-%m-%d')),
+                            float(test_timing.get("start_time")))
+                        test['date'] = test_selected_time
+                        break
 
         return tests
 
