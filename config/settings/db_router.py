@@ -10,7 +10,7 @@ class DatabaseRouter:
     def db_for_read(self, model, **hints):
         if model._meta.app_label in DATABASE_LABEL_APPS_MAPPING:
             return DATABASE_LABEL_APPS_MAPPING[model._meta.app_label]
-        return 'default'
+        return 'doc_read'
 
     def db_for_write(self, model, **hints):
         if model._meta.app_label in DATABASE_LABEL_APPS_MAPPING:
