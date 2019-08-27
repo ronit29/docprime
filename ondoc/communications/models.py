@@ -1467,7 +1467,7 @@ class OpdNotification(Notification):
             "url": "/opd/appointment/{}".format(appointment_id),
             "action_type": NotificationAction.OPD_APPOINTMENT,
             "action_id": appointment_id,
-            "payment_type": dict(OpdAppointment.PAY_CHOICES)[payment_type],
+            "payment_type": payment_type,
             "image_url": "",
             "time_slot_start": time_slot_start,
             "attachments": {},  # Updated later
