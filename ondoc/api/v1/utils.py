@@ -1034,6 +1034,9 @@ class CouponsMixin(object):
             new_user = False
         return new_user
 
+    def has_lensfit_coupon_used(self):
+        self.coupon.filter(is_lensfit=True).exists()
+
 
 class TimeSlotExtraction(object):
     MORNING = "AM"
