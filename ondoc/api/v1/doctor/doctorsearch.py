@@ -263,9 +263,9 @@ class DoctorSearchHelper:
             #         )
             # params['doctor_name'] = '%'+search_key+'%'
             params['order_doctor'] = search_key
-            params['doctor_name1'] = search_key + ' %'
-            params['doctor_name2'] = '% ' + search_key + ' %'
-            params['doctor_name3'] = '% ' + search_key
+            params['doctor_name1'] = search_key + '%'
+            params['doctor_name2'] = '%' + search_key + '%'
+            params['doctor_name3'] = '%' + search_key
 
         if self.query_params.get('gender'):
             filtering_params.append("d.gender=(%(gender)s)")
@@ -281,7 +281,7 @@ class DoctorSearchHelper:
 
         if self.query_params.get('is_insurance'):
             filtering_params.append(
-                "mrp<=(%(insurance_threshold_amount)s) and h.enabled_for_online_booking=True and h.enabled_for_prepaid and d.enabled_for_online_booking=True and d.is_insurance_enabled and dc.enabled_for_online_booking=True"
+                "mrp<=(%(insurance_threshold_amount)s) and h.enabled_for_insurance and h.enabled_for_online_booking=True and h.enabled_for_prepaid and d.enabled_for_online_booking=True and d.is_insurance_enabled and dc.enabled_for_online_booking=True"
             )
             params['insurance_threshold_amount'] = self.query_params.get('insurance_threshold_amount')
 
@@ -350,7 +350,11 @@ class DoctorSearchHelper:
                     order_by_field = " distance ASC, deal_price ASC, priority desc "
                     rank_by = " rnk=1 "
             else:
-                order_by_field = ' welcome_calling_done DESC, floor(distance/{bucket_size}) ASC, is_license_verified DESC, search_score desc '.format(bucket_size=str(bucket_size))
+                if self.query_params.get("specialization_ids") and len(self.query_params.get("specialization_ids")) == 1:
+                    order_by_field = ' welcome_calling_done DESC, floor(distance/bucket_size) ASC, is_license_verified DESC, search_score desc '
+
+                else:
+                    order_by_field = ' welcome_calling_done DESC, floor(distance/{bucket_size}) ASC, is_license_verified DESC, search_score desc '.format(bucket_size=str(bucket_size))
                 rank_by = "rnk=1"
 
             order_by_field = "{}, {} ".format(' enabled_for_online_booking DESC ', order_by_field)
@@ -439,10 +443,13 @@ class DoctorSearchHelper:
             sp_cond = ''
             min_dist_cond = ''
             search_distance =''
+            bucket_query = ''
             rank_part = " Row_number() OVER( partition BY d.id  ORDER BY " \
                 "St_distance(St_setsrid(St_point((%(longitude)s), (%(latitude)s)), 4326 ), h.location),dct.deal_price ASC) rnk " \
 
             if len(specialization_ids)>0 or len(condition_ids)>0:
+                if len(specialization_ids) == 1:
+                    bucket_query = ' , gs.bucket_size as bucket_size '
                 sp_cond = " LEFT JOIN doctor_practice_specialization ds on ds.doctor_id = d.id " \
                        " LEFT JOIN practice_specialization gs on ds.specialization_id = gs.id "
 
@@ -478,7 +485,8 @@ class DoctorSearchHelper:
                            "dct.id as doctor_clinic_timing_id,practicing_since, " \
                            "d.enabled_for_online_booking and dc.enabled_for_online_booking and h.enabled_for_online_booking as enabled_for_online_booking, " \
                            "is_license_verified, dc.priority,deal_price, h.welcome_calling_done, " \
-                           "dc.hospital_id as hospital_id, d.search_score FROM doctor d " \
+                           "dc.hospital_id as hospital_id, d.search_score " \
+                           "{bucket_query} FROM doctor d " \
                            "INNER JOIN doctor_clinic dc ON d.id = dc.doctor_id and dc.enabled=true and d.is_live=true " \
                            "and d.is_test_doctor is False and d.is_internal is False " \
                            "INNER JOIN hospital h ON h.id = dc.hospital_id and h.is_live=true " \
@@ -496,7 +504,8 @@ class DoctorSearchHelper:
                                                                                   'string'), search_distance=search_distance,\
                                                                               min_dist_cond=min_dist_cond,
                                                                               order_by_field=order_by_field, \
-                                                                              rank_by=rank_by, ipd_query=ipd_query)
+                                                                              rank_by=rank_by, ipd_query=ipd_query,
+                                                                              bucket_query=bucket_query)
 
         if filtering_params.get('params'):
             filtering_params.get('params')['longitude'] = longitude
@@ -611,7 +620,7 @@ class DoctorSearchHelper:
                 is_insurance_covered = False
                 insurance_error = None
                 insurance_data_dict = kwargs.get('insurance_data')
-                if doctor_clinic.hospital.enabled_for_prepaid and enable_online_booking and doctor.is_insurance_enabled and doctor.is_doctor_specialization_insured() and insurance_data_dict and min_price.get("mrp") is not None and \
+                if doctor_clinic.hospital.enabled_for_prepaid and doctor_clinic.hospital.enabled_for_insurance and enable_online_booking and doctor.is_insurance_enabled and doctor.is_doctor_specialization_insured() and insurance_data_dict and min_price.get("mrp") is not None and \
                         min_price["mrp"] <= insurance_data_dict['insurance_threshold_amount'] and \
                         not (request.query_params.get('procedure_ids') or request.query_params.get('procedure_category_ids')):
                     is_insurance_covered = True

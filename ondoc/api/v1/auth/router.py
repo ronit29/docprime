@@ -8,7 +8,8 @@ from .views import (LoginOTP, UserViewset, NotificationEndpointViewSet,
                     OrderViewSet, ConsumerAccountRefundViewSet, RefreshJSONWebToken, OnlineLeadViewSet, UserLabViewSet,
                     OrderDetailViewSet, UserTokenViewSet, SendBookingUrlViewSet, ContactUsViewSet, CareerViewSet,
                     DoctorNumberAutocomplete, UserLeadViewSet, ReferralViewSet, UserRatingViewSet, AppointmentViewSet,
-                    WhatsappOptinViewSet, DoctorScanViewSet, TokenFromUrlKey, ProfileEmailUpdateViewset, SendCartUrlViewSet)
+                    WhatsappOptinViewSet, DoctorScanViewSet, TokenFromUrlKey, ProfileEmailUpdateViewset,
+                    BajajAllianzUserViewset, MatrixUserViewset, SendCartUrlViewSet)
 
 urlpatterns = [
     path('api-token-refresh', RefreshJSONWebToken.as_view({'post':'refresh'}), name='token-refresh'),
@@ -16,6 +17,7 @@ urlpatterns = [
     path('otp/generate', LoginOTP.as_view({'post': 'generate'}), name='otp-generate'),
     # path('otp/verify', OTP.as_view({'post': 'verify'}), name='otp-verify'),
     path('login', UserViewset.as_view({'post': 'login'}), name='user-login'),
+    path('bagic_user', BajajAllianzUserViewset.as_view({'post': 'user_login_via_bagic'}), name='bagic-login'),
     path('doctor/login', UserViewset.as_view({'post': 'doctor_login'}), name='doctor-login'),
     path('logout', UserViewset.as_view({'post': 'logout'}), name='user-logout'),
     path('doctor/logout', UserViewset.as_view({'post': 'logout'}), name='doctor-logout'),
@@ -71,5 +73,6 @@ urlpatterns = [
     # path('test/', PathologyTestList.as_view({'get': 'list'}), name='test-list'),
     # path('test/<int:id>/', PathologyTestList.as_view({'get': 'retrieve'}), name='test-detail'),
     path('profile-email/update/init', ProfileEmailUpdateViewset.as_view({'post': 'create'}), name='update-profile-email-init'),
-    path('profile-email/update', ProfileEmailUpdateViewset.as_view({'post': 'update_email'}), name='update-profile-email')
+    path('profile-email/update', ProfileEmailUpdateViewset.as_view({'post': 'update_email'}), name='update-profile-email'),
+    path('matrix_user', MatrixUserViewset.as_view({'post': 'user_login_via_matrix'}), name='matrix-login'),
 ]

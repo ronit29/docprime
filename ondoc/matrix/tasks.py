@@ -714,6 +714,8 @@ def create_or_update_lead_on_matrix(self, data):
         elif obj_type == IpdProcedureLead.__name__:
             potential_ipd_lead = 1 if obj.is_potential_ipd() else 0
             lead_source = obj.source
+            if lead_source.lower() == 'crm' and not obj.is_potential_ipd():
+                return
             mobile = obj.phone_number
             email = obj.email if obj.email else ''
             name = obj.name
