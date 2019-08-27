@@ -1485,7 +1485,8 @@ class OpdNotification(Notification):
             "time_slot_start_time": str(time_slot_start.strftime("%I:%M %p")),
             "is_payment_type_cod": self.appointment.is_payment_type_cod(),
             "instance_otp": self.appointment.otp,
-            "is_credit_letter_required_for_appointment": self.appointment.is_credit_letter_required_for_appointment()
+            "is_credit_letter_required_for_appointment": self.appointment.is_credit_letter_required_for_appointment(),
+            "is_otp_required": self.appointment.is_otp_required_wrt_hospitals()
         }
         return context
 
