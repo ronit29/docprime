@@ -361,7 +361,8 @@ class SMSNotification:
         if notification_type == NotificationAction.APPOINTMENT_ACCEPTED:
             obj = DynamicTemplates.objects.filter(template_name="Confirmation_IPD_OPD").first()
         elif notification_type == NotificationAction.APPOINTMENT_BOOKED and (not user or user.user_type == User.DOCTOR):
-            obj = DynamicTemplates.objects.filter(template_name="Booking_Provider_Pay_at_clinic", approved=True).first()
+            if DynamicTemplates.objects.filter(template_name="Booking_Provider_Pay_at_clinic", approved=True).first():
+                obj = DynamicTemplates.objects.filter(template_name="Booking_Provider_Pay_at_clinic", approved=True).first()
         elif notification_type == NotificationAction.APPOINTMENT_BOOKED and user and user.user_type == User.CONSUMER and user.recent_opd_appointment.first().payment_type == 2:
             obj = DynamicTemplates.objects.filter(template_name="Booking_customer_pay_at_clinic").first()
         elif notification_type == NotificationAction.OPD_OTP_BEFORE_APPOINTMENT:
