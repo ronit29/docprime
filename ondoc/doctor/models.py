@@ -2256,7 +2256,7 @@ class PurchaseOrderCreation(auth_model.TimeStampedModel):
     provider_name_lab = models.ForeignKey("diagnostic.Lab", on_delete=models.DO_NOTHING, null=True, blank=True)
     provider_name_hospital = models.ForeignKey(Hospital, on_delete=models.DO_NOTHING, null=True, blank=True, related_name='hospitalpurchaseorder')
     provider_name = models.CharField(max_length=500, default='')
-    gst_number = models.CharField(max_length=1000)
+    gst_number = models.CharField(max_length=1000, null=True, blank=True)
     total_amount_paid = models.IntegerField(help_text='Inclusive of GST')
     start_date = models.DateField(null=True, blank=True)
     end_date = models.DateField(null=True, blank=True)

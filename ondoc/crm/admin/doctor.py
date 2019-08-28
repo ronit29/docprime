@@ -2437,7 +2437,7 @@ class PurchaseOrderCreationForm(forms.ModelForm):
 class PurchaseOrderCreationAdmin(admin.ModelAdmin):
     model = PurchaseOrderCreation
     form = PurchaseOrderCreationForm
-    list_display = ['provider_type', 'start_date', 'end_date', 'provider_name_lab', 'provider_name_hospital', 'total_appointment_count',
+    list_display = ['provider_type', 'created_at', 'start_date', 'end_date', 'provider_name_hospital', 'total_appointment_count',
                     'appointment_booked_count', 'current_appointment_count']
     autocomplete_fields = ['provider_name_lab', 'provider_name_hospital']
     search_fields = ['provider_name_lab__name', 'provider_name_hospital__name']
