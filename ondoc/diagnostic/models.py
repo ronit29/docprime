@@ -1866,12 +1866,12 @@ class LabAppointment(TimeStampedModel, CouponsMixin, LabAppointmentInvoiceMixin,
             except Exception as e:
                 logger.error(str(e))
 
-        if push_to_matrix and self.booked_by_spo():
-            try:
-                push_appointment_to_spo.apply_async(({'type': 'LAB_APPOINTMENT', 'appointment_id': self.id, 'product_id': 5,
-                                                    'sub_product_id': 2},), countdown=5)
-            except Exception as e:
-                logger.error(str(e))
+        # if push_to_matrix and self.booked_by_spo():
+        try:
+            push_appointment_to_spo.apply_async(({'type': 'LAB_APPOINTMENT', 'appointment_id': self.id, 'product_id': 5,
+                                                'sub_product_id': 2},), countdown=5)
+        except Exception as e:
+            logger.error(str(e))
 
         is_thyrocare_enabled = False
         if not self.created_by_native():
