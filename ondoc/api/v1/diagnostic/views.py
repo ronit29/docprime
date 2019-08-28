@@ -3698,7 +3698,8 @@ class IPDMedicinePageLeadViewSet(viewsets.GenericViewSet):
         ipd_med_page_object = IPDMedicinePageLead(name=name, phone_number=phone_number, matrix_city=city, lead_source=lead_source)
         try:
             ipd_med_page_object.save()
-            return Response(status=status.HTTP_200_OK)
+            # return Response(status=status.HTTP_200_OK)
+            return Response({})
         except Exception as e:
             logger.error(str(e))
             return Response(status=status.HTTP_500_INTERNAL_SERVER_ERROR)
