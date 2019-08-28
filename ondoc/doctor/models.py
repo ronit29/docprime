@@ -4782,3 +4782,12 @@ class HospitalSponsoredServices(auth_model.TimeStampedModel):
     class Meta:
         db_table = "hospital_sponsored_services"
         unique_together = (("hospital", "sponsored_service"),)
+
+
+class SponsoredServicePracticeSpecialization(auth_model.TimeStampedModel):
+    sponsored_service = models.ForeignKey(SponsoredServices, on_delete=models.DO_NOTHING, blank=False, null=False, related_name='spec_sponsored_services')
+    specialization = models.ForeignKey(PracticeSpecialization, on_delete=models.DO_NOTHING, blank=False, null=False, related_name='spec_sponsored_services')
+    is_primary_specialization = models.BooleanField(default=False)
+
+    class Meta:
+        db_table = "specialization_sponsored_services"

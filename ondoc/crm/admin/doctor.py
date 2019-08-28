@@ -52,7 +52,7 @@ from ondoc.doctor.models import (Doctor, DoctorQualification,
                                  PatientMobile, DoctorMobileOtp,
                                  UploadDoctorData, CancellationReason, Prescription, PrescriptionFile,
                                  SimilarSpecializationGroup, SimilarSpecializationGroupMapping, PurchaseOrderCreation,
-                                 DoctorSponsoredServices)
+                                 DoctorSponsoredServices, SponsoredServicePracticeSpecialization)
 
 from ondoc.authentication.models import User
 from .common import *
@@ -2460,3 +2460,34 @@ class PurchaseOrderCreationAdmin(admin.ModelAdmin):
                                  'provider_type', 'product_type']
 
         return read_only_fields
+
+
+class SponsoredServicePracticeSpecializationFormSet(forms.BaseInlineFormSet):
+    def clean(self):
+        super().clean()
+        if any(self.errors):
+            return
+        is_primary_spec = False
+        if self.cleaned_data:
+            for value in self.cleaned_data:
+                if value.get('is_primary_specialization') and not is_primary_spec:
+                    is_primary_spec = True
+                elif value.get('is_primary_specialization') and is_primary_spec:
+                    raise forms.ValidationError("Only one Specialization can be marked as Primary")
+
+            if not is_primary_spec:
+                raise forms.ValidationError('Alteast one sponsored service should be marked as primary')
+
+
+class SponsoredServicePracticeSpecializationInline(admin.TabularInline):
+    model = SponsoredServicePracticeSpecialization
+    formset = SponsoredServicePracticeSpecializationFormSet
+    extra = 0
+    can_delete = True
+    show_change_link = True
+    fields = ['sponsored_service', 'specialization', 'is_primary_specialization']
+
+
+class SponsoredServicesAdmin(admin.ModelAdmin):
+    search_fields = ['name']
+    inlines = [ SponsoredServicePracticeSpecializationInline ]

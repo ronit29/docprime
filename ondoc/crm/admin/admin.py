@@ -55,7 +55,7 @@ from .doctor import (DoctorAdmin, MedicalServiceAdmin, SpecializationAdmin, Qual
                      CompetitorInfoImportAdmin, VisitReasonAdmin, PracticeSpecializationContentAdmin,
                      OfflinePatientAdmin,
                      UploadDoctorDataAdmin, DoctorLeaveAdmin, SimilarSpecializationGroupAdmin,
-                     PurchaseOrderCreationAdmin)
+                     PurchaseOrderCreationAdmin, SponsoredServicesAdmin)
 from .aboutdoctor import AboutDoctorAdmin
 from .hospital import HospitalAdmin, CommonHospitalAdmin, GenericQuestionAnswerAdmin
 from .user import CustomUserAdmin, UserNumberUpdateAdmin, UserProfileAdmin
@@ -287,4 +287,4 @@ admin.site.register(GenericQuestionAnswer, GenericQuestionAnswerAdmin)
 admin.site.register(PurchaseOrderCreation, PurchaseOrderCreationAdmin)
 admin.site.register(IntegratorLabTestParameterMapping, IntegratorLabTestParameterMappingAdmin)
 admin.site.register(DynamicTemplates, DynamicTemplatesAdmin)
-admin.site.register(SponsoredServices)
+admin.site.register(SponsoredServices, SponsoredServicesAdmin)
