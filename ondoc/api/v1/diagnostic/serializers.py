@@ -475,6 +475,7 @@ class LabAppointmentTestMappingSerializer(serializers.ModelSerializer):
     agreed_price = serializers.SerializerMethodField()
     deal_price = serializers.SerializerMethodField()
     is_home_collection_enabled = serializers.SerializerMethodField()
+    test_type = serializers.ReadOnlyField(source='test.test_type')
 
     def get_is_home_collection_enabled(self, obj):
         if self.context.get("lab") is not None:
@@ -495,7 +496,7 @@ class LabAppointmentTestMappingSerializer(serializers.ModelSerializer):
     class Meta:
         model = LabAppointmentTestMapping
         fields = ('test_id', 'mrp', 'test', 'agreed_price', 'deal_price',
-                  'is_home_collection_enabled', 'time_slot_start', 'is_home_pickup')
+                  'is_home_collection_enabled', 'time_slot_start', 'is_home_pickup', 'test_type')
 
 
 class LabCustomSerializer(serializers.Serializer):

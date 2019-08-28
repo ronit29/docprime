@@ -2937,6 +2937,13 @@ class LabTimingListView(mixins.ListModelMixin,
                     upcoming_slots = TimeSlotExtraction().get_upcoming_slots(time_slots=intersect_resp['timeslots'])
                     intersect_resp['upcoming_slots'] = upcoming_slots
 
+                elif pathology_tests:
+                    intersect_resp['timeslots'] = pathology_resp['timeslots']
+                    intersect_resp['upcoming_slots'] = pathology_resp['upcoming_slots']
+                    intersect_resp['is_thyrocare'] = pathology_resp['is_thyrocare']
+                elif radiology_tests:
+                    pass
+
         resp_data = {
             'all': intersect_resp,
             'radiology': radiology_resp,
