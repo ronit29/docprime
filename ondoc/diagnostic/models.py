@@ -3287,6 +3287,8 @@ class IPDMedicinePageLead(auth_model.TimeStampedModel):
     name = models.CharField(max_length=500)
     phone_number = models.BigIntegerField()
     matrix_city = models.ForeignKey(MatrixMappedCity, on_delete=models.SET_NULL, null=True)
+    matrix_lead_id = models.IntegerField(null=True)
+    lead_source = models.CharField(null=True, max_length=1000)
 
     class Meta:
         db_table = "ipd_medicine_lead"
@@ -3306,6 +3308,7 @@ class IPDMedicinePageLead(auth_model.TimeStampedModel):
 
         super().save(force_insert, force_update, using, update_fields)
 
-        create_or_update_lead_on_matrix.apply_async(({'obj_type': self.__class__.__name__, 'obj_id': self.id}, ), countdown=5)
+        if self.id and not self.matrix_lead_id:
+            create_or_update_lead_on_matrix.apply_async(({'obj_type': self.__class__.__name__, 'obj_id': self.id}, ), countdown=5)
 
 
