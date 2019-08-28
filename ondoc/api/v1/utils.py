@@ -75,6 +75,7 @@ def get_pdf_njs(html, filename):
     if base_url.find('localhost') > 0:
         base_url = "https://docprime.com"
     url = base_url + '/nodejs/html_to_pdf'
+    url = "http://localhost:4444/nodejs/html_to_pdf"
     response = requests.post(url, data=params, stream=True)
     if response.status_code == 200:
         object = response
