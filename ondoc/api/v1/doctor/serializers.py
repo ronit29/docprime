@@ -5,6 +5,7 @@ from rest_framework import serializers
 from rest_framework.fields import CharField
 from django.db.models import Q, Avg, Count, Max, F, ExpressionWrapper, DateTimeField
 from collections import defaultdict, OrderedDict
+
 from ondoc.api.v1.procedure.serializers import DoctorClinicProcedureSerializer, OpdAppointmentProcedureMappingSerializer
 from ondoc.api.v1.ratings.serializers import RatingsGraphSerializer
 from ondoc.cart.models import Cart
@@ -973,7 +974,7 @@ class DoctorProfileUserViewSerializer(DoctorProfileSerializer):
     doctor_specializations_ids = serializers.SerializerMethodField()
     show_popup = serializers.SerializerMethodField()
     force_popup = serializers.SerializerMethodField()
-    is_lensfit_offer_applicable = serializers.SerializerMethodField()
+    lensfit_offer = serializers.SerializerMethodField()
 
     def get_enabled_for_cod(self, obj):
         return obj.enabled_for_cod()
@@ -1311,9 +1312,12 @@ class DoctorProfileUserViewSerializer(DoctorProfileSerializer):
     def get_force_popup(self, obj):
         return False
 
-    def get_is_lensfit_offer_applicable(self, obj):
+    def get_lensfit_offer(self, obj):
+        from ondoc.api.v1.coupon.serializers import CouponSerializer
         is_insurance_covered = False
-        offer_applicable = False
+        offer = {
+            'applicable': False
+        }
         insurance_applicable = False
         request = self.context.get("request")
         profile = self.context.get("profile")
@@ -1357,9 +1361,13 @@ class DoctorProfileUserViewSerializer(DoctorProfileSerializer):
                     coupon_recommender = CouponRecommender(user, profile, 'doctor', product_id, coupon_code, None)
                     applicable_coupons = coupon_recommender.applicable_coupons(**filters)
 
-                    offer_applicable = bool(list(filter(lambda x: x.is_lensfit is True, applicable_coupons)))
+                    lensfit_coupons = list(filter(lambda x: x.is_lensfit is True, applicable_coupons))
+                    if lensfit_coupons:
+                        offer['applicable'] = True
+                        serializer = CouponSerializer(lensfit_coupons[0])
+                        offer['coupon'] = serializer.data
 
-        return offer_applicable
+        return offer
 
     class Meta:
         model = Doctor
@@ -1372,7 +1380,7 @@ class DoctorProfileUserViewSerializer(DoctorProfileSerializer):
                   'general_specialization', 'doctor_specializations_ids', 'thumbnail', 'license', 'is_live', 'seo',
                   'breadcrumb', 'rating', 'rating_graph',
                   'enabled_for_online_booking', 'unrated_appointment', 'display_rating_widget', 'is_gold',
-                  'search_data', 'enabled_for_cod', 'show_popup', 'force_popup', 'is_lensfit_offer_applicable')
+                  'search_data', 'enabled_for_cod', 'show_popup', 'force_popup', 'lensfit_offer')
 
 
 class DoctorAvailabilityTimingSerializer(serializers.Serializer):

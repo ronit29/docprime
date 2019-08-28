@@ -159,3 +159,34 @@ class UserSpecificCouponSerializer(CouponListSerializer):
                         raise serializers.ValidationError('Invalid coupon code - ' + str(coupon))
 
         return attrs
+
+
+class CouponSerializer(serializers.ModelSerializer):
+    coupon_type = serializers.SerializerMethodField()
+    coupon_id = serializers.SerializerMethodField()
+    desc = serializers.SerializerMethodField()
+    coupon_count = serializers.SerializerMethodField()
+    is_cashback = serializers.SerializerMethodField()
+    is_payment_specific = serializers.SerializerMethodField()
+
+    def get_coupon_type(self, obj):
+        return obj.type
+
+    def get_coupon_id(self, obj):
+        return obj.id
+
+    def get_desc(self, obj):
+        return obj.description
+
+    def get_coupon_count(self, obj):
+        return obj.count
+
+    def get_is_cashback(self, obj):
+        return obj.coupon_type == Coupon.CASHBACK
+
+    def get_is_payment_specific(self, obj):
+        return bool(obj.payment_option)
+
+    class Meta:
+        model = Coupon
+        fields = ('coupon_type', 'coupon_id', 'code', 'desc', 'coupon_count', 'heading', 'is_corporate', 'is_cashback', 'tnc', 'is_payment_specific')

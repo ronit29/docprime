@@ -257,7 +257,7 @@ class AvailableLabTestPackageSerializer(serializers.ModelSerializer):
     included_in_user_plan = serializers.SerializerMethodField()
     is_price_zero = serializers.SerializerMethodField()
     # is_prescription_needed = serializers.SerializerMethodField()
-    is_lensfit_offer_applicable = serializers.SerializerMethodField()
+    lensfit_offer = serializers.SerializerMethodField()
 
     def get_is_price_zero(self, obj):
         agreed_price = obj.computed_agreed_price if obj.custom_agreed_price is None else obj.custom_agreed_price
@@ -373,9 +373,12 @@ class AvailableLabTestPackageSerializer(serializers.ModelSerializer):
 
         return parameters
 
-    def get_is_lensfit_offer_applicable(self, obj):
+    def get_lensfit_offer(self, obj):
+        from ondoc.api.v1.coupon.serializers import CouponSerializer
         is_insurance_covered = False
-        offer_applicable = False
+        offer = {
+            'applicable': False
+        }
         insurance_applicable = False
         request = self.context.get("request")
         lab = self.context.get("lab")
@@ -406,16 +409,20 @@ class AvailableLabTestPackageSerializer(serializers.ModelSerializer):
             coupon_recommender = CouponRecommender(request.user, profile, 'lab', product_id, coupon_code, None)
             applicable_coupons = coupon_recommender.applicable_coupons(**filters)
 
-            offer_applicable = bool(list(filter(lambda x: x.is_lensfit is True, applicable_coupons)))
+            lensfit_coupons = list(filter(lambda x: x.is_lensfit is True, applicable_coupons))
+            if lensfit_coupons:
+                offer['applicable'] = True
+                serializer = CouponSerializer(lensfit_coupons[0])
+                offer['coupon'] = serializer.data
 
-        return offer_applicable
+        return offer
 
 
     class Meta:
         model = AvailableLabTest
         fields = ('test_id', 'mrp', 'test', 'agreed_price', 'deal_price', 'enabled', 'is_home_collection_enabled',
                   'package', 'parameters', 'is_package', 'number_of_tests', 'why', 'pre_test_info', 'expected_tat',
-                  'hide_price', 'included_in_user_plan', 'insurance', 'is_price_zero', 'insurance_agreed_price', 'is_lensfit_offer_applicable')
+                  'hide_price', 'included_in_user_plan', 'insurance', 'is_price_zero', 'insurance_agreed_price', 'lensfit_offer')
 
 class AvailableLabTestSerializer(serializers.ModelSerializer):
     test = LabTestSerializer()
