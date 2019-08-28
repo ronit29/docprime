@@ -1874,11 +1874,11 @@ class LabAppointment(TimeStampedModel, CouponsMixin, LabAppointmentInvoiceMixin,
             except Exception as e:
                 logger.error(str(e))
 
-            try:
-                push_appointment_to_spo_1.apply_async(({'type': 'LAB_APPOINTMENT', 'appointment_id': self.id, 'product_id': 5,
-                                                    'sub_product_id': 2},), countdown=5)
-            except Exception as e:
-                logger.error(str(e))
+            # try:
+            #     push_appointment_to_spo_1.apply_async(({'type': 'LAB_APPOINTMENT', 'appointment_id': self.id, 'product_id': 5,
+            #                                         'sub_product_id': 2},), countdown=5)
+            # except Exception as e:
+            #     logger.error(str(e))
 
             try:
                 push_appointment_to_spo_2.apply_async(({'type': 'LAB_APPOINTMENT', 'appointment_id': self.id, 'product_id': 5,
