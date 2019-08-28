@@ -82,7 +82,7 @@ class Medanta(BaseIntegrator):
                 resp_list = dict()
                 resp_list[date] = list()
 
-            res_data = {"timeslots": resp_list, "upcoming_slots": [], "is_medanta": True}
+            res_data = {"timeslots": resp_list, "upcoming_slots": [], "is_integrated": True}
             return res_data
 
     def time_slot_extraction(self, slots, date, dc_obj):

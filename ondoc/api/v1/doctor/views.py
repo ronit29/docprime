@@ -2485,6 +2485,7 @@ class DoctorAvailabilityTimingViewSet(viewsets.ViewSet):
 
         resp_data = {"timeslots": clinic_timings.get('timeslots', []),
                      "upcoming_slots": clinic_timings.get('upcoming_slots', []),
+                     "is_integrated": clinic_timings.get('is_integrated', False),
                      "doctor_data": doctor_serializer.data}
 
         return Response(resp_data)
