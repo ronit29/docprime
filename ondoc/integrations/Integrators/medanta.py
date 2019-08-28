@@ -28,9 +28,9 @@ class Medanta(BaseIntegrator):
             return None
 
         all_doctors_data = json.loads(doctors_data_response.json())
-        if all_doctors_data['ErrorCode']:
-            logger.info("[ERROR-MEDANTA] Failed to fetch doctor details - %s", all_doctors_data['ErrorMessage'])
-            return None
+        # if all_doctors_data['ErrorCode']:
+        #     logger.info("[ERROR-MEDANTA] Failed to fetch doctor details - %s", all_doctors_data['ErrorMessage'])
+        #     return None
 
         for doc_data in all_doctors_data:
             print(doc_data)
