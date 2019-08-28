@@ -1,4 +1,5 @@
 import json
+import logging
 import operator
 from copy import deepcopy
 from itertools import groupby
@@ -77,6 +78,7 @@ from django.db.models.expressions import RawSQL
 from ondoc.doctor.v1.serializers import ArticleAuthorSerializer
 from decimal import Decimal
 User = get_user_model()
+logger = logging.getLogger(__name__)
 
 
 class SearchPageViewSet(viewsets.ReadOnlyModelViewSet):
@@ -3694,9 +3696,13 @@ class IPDMedicinePageLeadViewSet(viewsets.GenericViewSet):
 
 
         ipd_med_page_object = IPDMedicinePageLead(name=name, phone_number=phone_number, matrix_city=city, lead_source=lead_source)
-        ipd_med_page_object.save()
-        queryset = IPDMedicinePageLead.objects.all().values()
-        return JsonResponse({"medicine_page_leads": list(queryset)})
+        try:
+            ipd_med_page_object.save()
+            return Response(status=status.HTTP_200_OK)
+        except Exception as e:
+            logger.error(str(e))
+            return Response(status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
 
 
 
