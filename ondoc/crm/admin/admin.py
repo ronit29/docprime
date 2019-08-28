@@ -26,7 +26,7 @@ from ondoc.diagnostic.models import (Lab, LabNetwork, LabTest, LabTestType, LabS
                                      AvailableLabTest, LabAppointment, CommonTest, CommonDiagnosticCondition,
                                      LabPricingGroup,
                                      TestParameter, CommonPackage, LabTestCategory, LabTestGroup, LabTestGroupMapping,
-                                     TestParameterChat, LabTestCategoryUrls)
+                                     TestParameterChat, LabTestCategoryUrls, IPDMedicinePageLead)
 from ondoc.coupon.models import Coupon, UserSpecificCoupon, RandomGeneratedCoupon
 from ondoc.integrations.models import IntegratorLabTestParameterMapping
 from ondoc.lead.models import HospitalLead, DoctorLead, SearchLead
@@ -287,3 +287,4 @@ admin.site.register(GenericQuestionAnswer, GenericQuestionAnswerAdmin)
 admin.site.register(PurchaseOrderCreation, PurchaseOrderCreationAdmin)
 admin.site.register(IntegratorLabTestParameterMapping, IntegratorLabTestParameterMappingAdmin)
 admin.site.register(DynamicTemplates, DynamicTemplatesAdmin)
+admin.site.register(IPDMedicinePageLead)
