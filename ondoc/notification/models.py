@@ -46,6 +46,13 @@ logger = logging.getLogger(__name__)
 
 
 class NotificationAction:
+    SMS_NOTIFICATION = 1001
+    EMAIL_NOTIFICATION = 1002
+    PUSH_NOTIFICATION = 1003
+
+    NOTIFICATION_CHOICES = ((SMS_NOTIFICATION, "SMS Notification"), (EMAIL_NOTIFICATION, "Email Notification"),
+                            (PUSH_NOTIFICATION, "Push Notification"))
+
     APPOINTMENT_ACCEPTED = 1
     APPOINTMENT_CANCELLED = 2
     APPOINTMENT_RESCHEDULED_BY_PATIENT = 3

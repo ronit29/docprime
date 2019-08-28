@@ -11,6 +11,7 @@ from ondoc.authentication.models import (OtpVerifications, User, UserProfile, No
 from ondoc.doctor import models as doc_models
 from ondoc.procedure.models import Procedure
 from ondoc.diagnostic.models import LabAppointment
+from ondoc.notification.models import NotificationAction
 from ondoc.api.v1.doctor import serializers as v1_serializers
 from ondoc.api.v1.diagnostic import serializers as v1_diagnostic_serailizers
 
@@ -716,14 +717,13 @@ class EConsultCommunicationSerializer(serializers.Serializer):
     notification_types = serializers.ListField(child=serializers.IntegerField(min_value=1))
     sender_rc_user_id = serializers.CharField(max_length=64, required=False, allow_blank=True)
     receiver_rc_user_ids = serializers.ListField(child=serializers.CharField(max_length=64), allow_empty=True, required=False)
+    comm_types = serializers.ChoiceField(choices=NotificationAction.NOTIFICATION_CHOICES, required=False)
 
     def validate(self, attrs):
-        from ondoc.notification.models import NotificationAction
         rc_group_id = attrs.get('rc_group_id')
         notification_types = attrs.get('notification_types')
         sender_rc_user_id = attrs.get('sender_rc_user_id')
         receiver_rc_user_ids = attrs.get('receiver_rc_user_ids')
-        # e_consultation = attrs.get('e_consultation')
         if NotificationAction.E_CONSULT_NEW_MESSAGE_RECEIVED in notification_types and not receiver_rc_user_ids:
             raise serializers.ValidationError("receiver rocket chat user_id is required for new message notification")
         rc_group = provider_models.RocketChatGroups.objects.prefetch_related('econsultations',

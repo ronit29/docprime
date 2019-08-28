@@ -1399,6 +1399,8 @@ class EConsultationCommViewSet(viewsets.GenericViewSet):
         sender_rc_user = valid_data.get('sender_rc_user')
         patient_rc_user = valid_data.get('patient_rc_user')
         doctor_rc_user = valid_data.get('doctor_rc_user')
+        comm_types = valid_data.get('comm_types')
+
         if NotificationAction.E_CONSULT_NEW_MESSAGE_RECEIVED in notification_types:
             receivers = list()
             if doctor_rc_user in receiver_rc_users:
@@ -1406,7 +1408,9 @@ class EConsultationCommViewSet(viewsets.GenericViewSet):
             elif patient_rc_user in receiver_rc_users:
                 receivers.append(patient.user)
             try:
-                e_consultation_notification = comm_models.EConsultationComm(e_consultation, notification_type=NotificationAction.E_CONSULT_NEW_MESSAGE_RECEIVED, receivers=receivers)
+                e_consultation_notification = comm_models.EConsultationComm(e_consultation,
+                                                                            notification_type=NotificationAction.E_CONSULT_NEW_MESSAGE_RECEIVED,
+                                                                            receivers=receivers, comm_types=comm_types)
                 e_consultation_notification.send()
             except Exception as e:
                 logger.error('Error in send new message notification - ' + str(e))

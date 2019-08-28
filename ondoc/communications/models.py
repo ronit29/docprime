@@ -2089,6 +2089,8 @@ class EConsultationComm(Notification):
             self.notification_type = self.E_CONSULTATION_NOTIFICATION_TYPE_MAPPING[e_consultation.status]
         if kwargs.get('receivers'):
             self.receivers = kwargs.get('receivers')
+        if kwargs.get('comm_types'):
+            self.comm_types = kwargs.get('comm_types')
 
     def get_context(self):
         patient_name = self.patient.name.title()
@@ -2111,15 +2113,21 @@ class EConsultationComm(Notification):
         return context
 
     def get_receivers(self):
-        if hasattr(self, 'receivers'):
-            receivers = self.receivers
+        receivers = self.receivers if hasattr(self, 'receivers') else None
+        comm_types = self.comm_types if hasattr(self, 'comm_types') else None
         all_receivers = dict()
+        sms_receivers = list()
+        email_receivers = list()
         push_receivers = list()
         if self.notification_type in (NotificationAction.E_CONSULT_VIDEO_LINK_SHARE, ):
             push_receivers.append(self.patient.user)
         if self.notification_type in (NotificationAction.E_CONSULT_NEW_MESSAGE_RECEIVED, ) and receivers:
             push_receivers.extend(receivers)
+            sms_receivers = [receiver.phone_number for receiver in receivers]
+            email_receivers = [receiver.email for receiver in receivers if receiver.email]
         user_and_tokens = NotificationEndpoint.get_user_and_tokens(receivers=push_receivers)
+        all_receivers['sms_receivers'] = sms_receivers
+        all_receivers['email_receivers'] = email_receivers
         all_receivers['push_receivers'] = user_and_tokens
         return all_receivers
 
@@ -2127,6 +2135,7 @@ class EConsultationComm(Notification):
         context = self.get_context()
         notification_type = self.notification_type
         all_receivers = self.get_receivers()
+        comm_types = self.comm_types if hasattr(self, 'comm_types') else None
         if notification_type == NotificationAction.E_CONSULT_SHARE:
             sms_notification = SMSNotification(notification_type, context)
             sms_notification.send(all_receivers.get('sms_receivers', []))
@@ -2136,6 +2145,12 @@ class EConsultationComm(Notification):
         elif notification_type == NotificationAction.E_CONSULT_NEW_MESSAGE_RECEIVED:
             push_notification = PUSHNotification(notification_type, context)
             push_notification.send(all_receivers.get('push_receivers', []))
+            if comm_types and NotificationAction.SMS_NOTIFICATION in comm_types:
+                sms_notification = SMSNotification(notification_type, context)
+                sms_notification.send(all_receivers.get('sms_receivers', []))
+            if comm_types and NotificationAction.EMAIL_NOTIFICATION in comm_types:
+                email_notification = EMAILNotification(notification_type, context)
+                email_notification.send(all_receivers.get('email_receivers', []))
         else:
             email_notification = EMAILNotification(notification_type, context)
             sms_notification = SMSNotification(notification_type, context)
