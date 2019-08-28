@@ -1,5 +1,10 @@
 from django.contrib.gis import admin
-from .models import Article, ArticleImage, ArticleCategory, ArticleLinkedUrl, LinkedArticle, ArticleContentBox
+from import_export import resources, fields
+from import_export.admin import ImportExportMixin
+from import_export.formats import base_formats
+from dal import autocomplete
+from .models import Article, ArticleImage, ArticleCategory, ArticleLinkedUrl, LinkedArticle, ArticleContentBox, \
+    MedicineSpecialization
 from reversion.admin import VersionAdmin
 from django.contrib.admin import ModelAdmin, TabularInline
 from django.utils.safestring import mark_safe
@@ -91,19 +96,62 @@ class ArticleImageAdmin(ModelAdmin):
     readonly_fields = ['image_tag']
 
 
+class MedicineSpecializationResource(resources.ModelResource):
+    class Meta:
+        model = MedicineSpecialization
+        fields = ('medicine', 'specialization', 'id')
+
+
+class MedicineSpecializationForm(forms.ModelForm):
+    class Media:
+        extend = True
+        js = ('/admin/js/vendor/jquery/jquery.js', 'admin/js/jquery.init.js', )
+        css = {'all': ('admin/css/vendor/select2/select2.css', 'admin/css/autocomplete.css')}
+
+    class Meta:
+        model = MedicineSpecialization
+        fields = ('__all__')
+        widgets = {
+            'medicine': autocomplete.ModelSelect2(url='medicine-autocomplete'),
+            'specialization': autocomplete.ModelSelect2(url='practicespecialization-autocomplete')
+        }
+
+
+class MedicineSpecializationAdmin(ImportExportMixin, VersionAdmin):
+    model = MedicineSpecialization
+    formats = (base_formats.XLS, )
+    form = MedicineSpecializationForm
+    resource_class = MedicineSpecializationResource
+    list_display = ('medicine', 'specialization', )
+    search_fields = ('medicine__title', 'specialization__name', )
+
+
 admin.site.register(Article, ArticleAdmin)
 admin.site.register(ArticleImage, ArticleImageAdmin)
 admin.site.register(ArticleCategory)
 admin.site.register(ArticleContentBox)
+admin.site.register(MedicineSpecialization, MedicineSpecializationAdmin)
 
 # class FluentCommentsInline(TabularInline):
 #     model = Comment
 #     can_delete = True
 #     verbose_name = "Reply"
 
-
-
 #admin.site.register(FluentComment, FluentCommentsAdmin)
 
+class MedicineAutocomplete(autocomplete.Select2QuerySetView):
 
+    def get_queryset(self):
+        if not self.request.user.is_authenticated:
+            return Article.objects.none()
+        medicine_category = ArticleCategory.objects.filter(identifier='mddp').first()
+        if medicine_category:
+            queryset = Article.objects.filter(category_id=medicine_category.id)
+        else:
+            queryset = Article.objects.none()
+
+        if self.q:
+            queryset = queryset.filter(title__istartswith=self.q)
+
+        return queryset.distinct()
 

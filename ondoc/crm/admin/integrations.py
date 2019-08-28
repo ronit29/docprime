@@ -1,7 +1,6 @@
 from django.contrib import admin
-from ondoc.integrations.models import IntegratorMapping
-from ondoc.integrations.models import IntegratorProfileMapping, IntegratorReport, IntegratorTestMapping, \
-    IntegratorTestParameterMapping, IntegratorDoctorMappings, IntegratorHospitalMappings
+from ondoc.integrations.models import IntegratorMapping, IntegratorLabTestParameterMapping, IntegratorDoctorMappings, IntegratorHospitalMappings
+from ondoc.integrations.models import IntegratorProfileMapping, IntegratorReport, IntegratorTestMapping, IntegratorTestParameterMapping
 from ondoc.diagnostic.models import LabTest, Lab, LabPricingGroup, AvailableLabTest
 from django import forms
 from django.conf import settings
@@ -116,3 +115,11 @@ class IntegratorHospitalMappingsAdmin(admin.ModelAdmin):
     list_display = ('integrator_class_name', 'integrator_hospital_name', 'is_active')
     fields = ('hospital', 'integrator_hospital_name', 'is_active', 'integrator_class_name')
     autocomplete_fields = ['hospital']
+
+
+class IntegratorLabTestParameterMappingAdmin(admin.ModelAdmin):
+    model = IntegratorLabTestParameterMapping
+    list_display = ['integrator_test_parameter_code', 'integrator_class_name']
+    readonly_fields = ('integrator_test_parameter_code',)
+    autocomplete_fields = ['test_parameter']
+

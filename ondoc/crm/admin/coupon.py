@@ -247,7 +247,9 @@ class CouponForm(forms.ModelForm):
             'test': autocomplete.ModelSelect2Multiple(url='test-autocomplete', forward=['lab', 'lab_network', 'test_categories']),
             'test_categories': autocomplete.ModelSelect2Multiple(url='test-categories-autocomplete', forward=['lab', 'lab_network', 'test']),
             'doctors': autocomplete.ModelSelect2Multiple(url='doctors-autocomplete', forward=['hospitals', 'specializations', 'procedures', 'procedure_categories']),
+            'doctors_exclude': autocomplete.ModelSelect2Multiple(url='doctors-autocomplete'),
             'hospitals': autocomplete.ModelSelect2Multiple(url='hospitals-autocomplete', forward=['doctors', 'specializations', 'procedures', 'procedure_categories']),
+            'hospitals_exclude': autocomplete.ModelSelect2Multiple(url='hospitals-autocomplete'),
             'specializations': autocomplete.ModelSelect2Multiple(url='specializations-autocomplete', forward=['doctors', 'hospitals', 'procedures', 'procedure_categories']),
             'procedures': autocomplete.ModelSelect2Multiple(url='procedures-autocomplete', forward=['doctors', 'hospitals', 'specializations', 'procedure_categories']),
             'procedure_categories': autocomplete.ModelSelect2Multiple(url='procedure-categories-autocomplete', forward=['doctors', 'hospitals', 'specializations', 'procedures'])
@@ -267,7 +269,9 @@ class CouponForm(forms.ModelForm):
         test = cleaned_data.get('test')
         test_categories = cleaned_data.get('test_categories')
         doctors = cleaned_data.get('doctors')
+        doctors_exclude = cleaned_data.get('doctors_exclude')
         hospitals = cleaned_data.get('hospitals')
+        hospitals_exclude = cleaned_data.get('hospitals_exclude')
         specializations = cleaned_data.get('specializations')
         procedures = cleaned_data.get('procedures')
         procedure_categories = cleaned_data.get('procedure_categories')
