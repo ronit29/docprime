@@ -1384,7 +1384,11 @@ class ConsumerEConsultationViewSet(viewsets.GenericViewSet):
         return Response({"econsult_id": econsult_id})
 
 
+class EConsultationCommViewSet(viewsets.GenericViewSet):
+
     def communicate(self, request):
+        if not request.query_params.get('api_key') or request.query_params['api_key'] != settings.ECS_COMM_API_KEY:
+            return Response({"status": 0, "error": "Unauthorized"}, status=status.HTTP_400_BAD_REQUEST)
         serializer = serializers.EConsultCommunicationSerializer(data=request.data, context={'request': request})
         serializer.is_valid(raise_exception=True)
         valid_data = serializer.validated_data
