@@ -62,16 +62,14 @@ class DoctorSearchScore:
                                                 "doctor_clinics__hospital__hospital_place_details").order_by('id').count()
 
         count = 0
+        score_obj_list = []
         while count <= doctors_count:
 
             doctors = doctor_models.Doctor.objects.all().prefetch_related("hospitals", "doctor_clinics", "doctor_clinics__hospital",
                                                     "doctor_clinics__hospital__hospital_place_details").order_by('id')[count : count+1000]
-            final_result = dict()
-            score_obj_list = []
 
             for doctor in doctors:
                 result = list()
-                final_result[doctor.id] = result
                 result.append(self.get_popularity_score(doctor))
                 result.append(self.get_practice_score(doctor))
                 result.append(self.get_doctors_score(doctor_in_hosp_count, doctor))
