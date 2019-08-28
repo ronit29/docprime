@@ -1693,6 +1693,8 @@ class DoctorDetailsRequestSerializer(serializers.Serializer):
     procedure_category_ids = CommaSepratedToListField(required=False, max_length=500)
     procedure_ids = CommaSepratedToListField(required=False, max_length=500)
     hospital_id = serializers.IntegerField(required=False)
+    appointment_id = serializers.IntegerField(required=False)
+    cod_to_prepaid = serializers.BooleanField(required=False)
 
     def validate(self, attrs):
         return super().validate(attrs)
@@ -1722,6 +1724,13 @@ class DoctorDetailsRequestSerializer(serializers.Serializer):
                 return attrs
         except:
             raise serializers.ValidationError('Invalid Hospital ID.')
+
+    def validate_appointment_id(self, attrs):
+        temp_attr = int(attrs)
+        if OpdAppointment.objects.filter(id=temp_attr).count():
+            return attrs
+        else:
+            raise serializers.ValidationError('Invalid Appointment ID.')
 
 
 class OfflinePatientBodySerializer(serializers.Serializer):

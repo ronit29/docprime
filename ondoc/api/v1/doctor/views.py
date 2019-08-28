@@ -23,7 +23,8 @@ from ondoc.insurance.models import UserInsurance, InsuredMembers
 from ondoc.notification import tasks as notification_tasks
 #from ondoc.doctor.models import Hospital, DoctorClinic,Doctor,  OpdAppointment
 from ondoc.doctor.models import DoctorClinic, OpdAppointment, DoctorAssociation, DoctorQualification, Doctor, Hospital, \
-    HealthInsuranceProvider, ProviderSignupLead, HospitalImage, CommonHospital, PracticeSpecialization, SpecializationDepartmentMapping, DoctorPracticeSpecialization
+    HealthInsuranceProvider, ProviderSignupLead, HospitalImage, CommonHospital, PracticeSpecialization, \
+    SpecializationDepartmentMapping, DoctorPracticeSpecialization, DoctorClinicTiming
 from ondoc.notification.models import EmailNotification
 from django.utils.safestring import mark_safe
 from ondoc.coupon.models import Coupon, CouponRecommender
@@ -1059,9 +1060,34 @@ class DoctorProfileUserViewSet(viewsets.GenericViewSet):
 
                     google_rating.update(hosp_reviews_dict)
 
+        cod_to_prepaid = dict()
+        doctor_id = None
+        if pk:
+            doctor_id = pk
+
+        if validated_data and validated_data.get('cod_to_prepaid') and validated_data.get('appointment_id') and validated_data.get('hospital_id') and doctor_id:
+            opd_appoint = OpdAppointment.objects.filter(id=validated_data['appointment_id'])
+            if opd_appoint:
+                opd_appoint = opd_appoint[0]
+                cod_to_prepaid['profile_id'] = opd_appoint.profile.id if opd_appoint.profile else None
+                cod_to_prepaid['time_slot_start'] = opd_appoint.time_slot_start
+                cod_to_prepaid['time_slot_end'] = opd_appoint.time_slot_end
+                cod_to_prepaid['user_id'] = opd_appoint.user.id if opd_appoint.user else None
+                cod_to_prepaid['fees'] = opd_appoint.fees
+                cod_to_prepaid['effective_price'] = opd_appoint.effective_price
+                cod_to_prepaid['mrp'] = opd_appoint.mrp
+                cod_to_prepaid['payment_status'] = opd_appoint.payment_status
+                cod_to_prepaid['payment_type'] = opd_appoint.payment_type
+                cod_to_prepaid['is_cod_to_prepaid'] = opd_appoint.is_cod_to_prepaid
+                day = opd_appoint.time_slot_start.weekday()
+                doc_clinic_timing = DoctorClinicTiming.objects.filter(doctor_clinic__doctor = doctor_id, doctor_clinic__hospital=validated_data.get('hospital_id'), day = day)
+                if doc_clinic_timing:
+                    cod_to_prepaid['deal_price'] = doc_clinic_timing[0].deal_price
+
         response_data['google_rating'] = google_rating
         response_data['potential_ipd'] = potential_ipd
         response_data['all_cities'] = all_cities
+        response_data['cod_to_prepaid'] = cod_to_prepaid
         return Response(response_data)
 
 
