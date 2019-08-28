@@ -100,6 +100,7 @@ class PlusUser(auth_model.TimeStampedModel):
     STATUS_CHOICES = [(ACTIVE, "Active"), (CANCELLED, "Cancelled"), (EXPIRED, "Expired"), (ONHOLD, "Onhold"),
                       (CANCEL_INITIATE, 'Cancel Initiate'), (CANCELLATION_APPROVED, "Cancellation Approved")]
 
+    id = models.BigAutoField(primary_key=True)
     user = models.ForeignKey(auth_model.User, related_name='active_plus_users', on_delete=models.DO_NOTHING)
     plan = models.ForeignKey(PlusPlans, related_name='purchased_plus', on_delete=models.DO_NOTHING)
     purchase_date = models.DateTimeField(null=False, blank=False, default=timezone.now)
@@ -162,7 +163,7 @@ class PlusMembers(auth_model.TimeStampedModel):
     district = models.CharField(max_length=100, null=False)
     state = models.CharField(max_length=100, null=False)
     state_code = models.CharField(max_length=10, default='')
-    plus_user = models.ForeignKey(PlusUser, related_name="plus_members", on_delete=models.DO_NOTHING, null=False)
+    plus_user = models.ForeignKey(PlusUser, related_name="plus_members", on_delete=models.DO_NOTHING, null=False, default=None)
     city_code = models.CharField(max_length=10, blank=True, null=True, default='')
     district_code = models.CharField(max_length=10, blank=True, null=True, default='')
 
