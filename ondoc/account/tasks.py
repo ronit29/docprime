@@ -619,7 +619,6 @@ def push_appointment_to_spo(self, data):
             countdown_time = (2 ** self.request.retries) * 60 * 10
             self.retry([data], countdown=countdown_time)
         else:
-            # TO DO - Need to update after api response change
             resp_data = response.json()
             resp_data = resp_data['data']
             if resp_data.get('error', None):

@@ -53,8 +53,9 @@ from django.contrib.contenttypes.fields import GenericRelation
 from django.contrib.contenttypes.fields import GenericForeignKey
 from django.contrib.contenttypes.models import ContentType
 from ondoc.matrix.tasks import push_appointment_to_matrix, push_onboarding_qcstatus_to_matrix, \
-    create_ipd_lead_from_lab_appointment
-from ondoc.integrations.task import push_lab_appointment_to_integrator, get_integrator_order_status
+    create_ipd_lead_from_lab_appointment, push_appointment_to_spo_1
+from ondoc.integrations.task import push_lab_appointment_to_integrator, get_integrator_order_status, \
+    push_appointment_to_spo_2
 from ondoc.account.tasks import push_appointment_to_spo
 from ondoc.location import models as location_models
 from ondoc.ratings_review import models as ratings_models
@@ -1866,12 +1867,24 @@ class LabAppointment(TimeStampedModel, CouponsMixin, LabAppointmentInvoiceMixin,
             except Exception as e:
                 logger.error(str(e))
 
-        # if push_to_matrix and self.booked_by_spo():
-        try:
-            push_appointment_to_spo.apply_async(({'type': 'LAB_APPOINTMENT', 'appointment_id': self.id, 'product_id': 5,
-                                                'sub_product_id': 2},), countdown=5)
-        except Exception as e:
-            logger.error(str(e))
+        if push_to_matrix and self.booked_by_spo():
+            try:
+                push_appointment_to_spo.apply_async(({'type': 'LAB_APPOINTMENT', 'appointment_id': self.id, 'product_id': 5,
+                                                    'sub_product_id': 2},), countdown=5)
+            except Exception as e:
+                logger.error(str(e))
+
+            try:
+                push_appointment_to_spo_1.apply_async(({'type': 'LAB_APPOINTMENT', 'appointment_id': self.id, 'product_id': 5,
+                                                    'sub_product_id': 2},), countdown=5)
+            except Exception as e:
+                logger.error(str(e))
+
+            try:
+                push_appointment_to_spo_2.apply_async(({'type': 'LAB_APPOINTMENT', 'appointment_id': self.id, 'product_id': 5,
+                                                    'sub_product_id': 2},), countdown=5)
+            except Exception as e:
+                logger.error(str(e))
 
         is_thyrocare_enabled = False
         if not self.created_by_native():
