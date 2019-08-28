@@ -74,7 +74,7 @@ class Medanta(BaseIntegrator):
                                 all_slots.add(end)
 
                     sorted_slots = sorted(all_slots)
-                    resp_list = self.time_slot_extraction(sorted_slots, date)
+                    resp_list = self.time_slot_extraction(sorted_slots, date, dc_obj)
                 else:
                     resp_list = dict()
                     resp_list[date] = list()
@@ -85,7 +85,21 @@ class Medanta(BaseIntegrator):
             res_data = {"timeslots": resp_list, "upcoming_slots": [], "is_medanta": True}
             return res_data
 
-    def time_slot_extraction(self, slots, date):
+    def time_slot_extraction(self, slots, date, dc_obj):
+        from ondoc.doctor.models import DoctorClinicTiming
+        deal_price = None
+        mrp = None
+        fees = None
+        cod_deal_price = None
+
+        weekday = datetime.strptime(date, "%Y-%m-%d").weekday()
+        dc_timing = DoctorClinicTiming.objects.filter(doctor_clinic_id=dc_obj.id, day=weekday).first()
+        if dc_timing:
+            deal_price = dc_timing.deal_price
+            mrp = dc_timing.mrp
+            fees = dc_timing.fees
+            cod_deal_price = dc_timing.cod_deal_price
+
         am_timings, pm_timings = list(), list()
         am_dict, pm_dict = dict(), dict()
         time_dict = dict()
@@ -94,7 +108,8 @@ class Medanta(BaseIntegrator):
             hour, minutes = float(hour), int(minutes)
             minutes = float("%0.2f" % (minutes / 60))
             value = hour + minutes
-            data = {"text": slot, "value": value, "price": None, "is_available": True, "on_call": False}
+            data = {"text": slot, "value": value, "price": None, "is_available": True, "on_call": False,
+                    "deal_price": deal_price, "mrp": mrp, "fees": fees, "is_price_zero": False, "cod_deal_price": cod_deal_price}
 
             if value >= 12.0:
                 pm_timings.append(data)
