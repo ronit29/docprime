@@ -168,6 +168,8 @@ class CouponSerializer(serializers.ModelSerializer):
     coupon_count = serializers.SerializerMethodField()
     is_cashback = serializers.SerializerMethodField()
     is_payment_specific = serializers.SerializerMethodField()
+    valid = serializers.SerializerMethodField()
+    invalidating_message = serializers.SerializerMethodField()
 
     def get_coupon_type(self, obj):
         return obj.type
@@ -187,6 +189,20 @@ class CouponSerializer(serializers.ModelSerializer):
     def get_is_payment_specific(self, obj):
         return bool(obj.payment_option)
 
+    def get_valid(self, obj):
+        coupon_properties = self.context.get('coupon_properties')
+        valid = True
+        if coupon_properties:
+            valid = coupon_properties.get('valid', True)
+        return valid
+
+    def get_invalidating_message(self, obj):
+        coupon_properties = self.context.get('coupon_properties')
+        invalidating_message = ''
+        if coupon_properties:
+            invalidating_message = coupon_properties.get('invalidating_message', '')
+        return invalidating_message
+
     class Meta:
         model = Coupon
-        fields = ('coupon_type', 'coupon_id', 'code', 'desc', 'coupon_count', 'heading', 'is_corporate', 'is_cashback', 'tnc', 'is_payment_specific')
+        fields = ('coupon_type', 'coupon_id', 'code', 'desc', 'coupon_count', 'heading', 'is_corporate', 'is_cashback', 'tnc', 'is_payment_specific', 'valid', 'invalidating_message')

@@ -377,7 +377,8 @@ class AvailableLabTestPackageSerializer(serializers.ModelSerializer):
         from ondoc.api.v1.coupon.serializers import CouponSerializer
         is_insurance_covered = False
         offer = {
-            'applicable': False
+            'applicable': False,
+            'coupon': {}
         }
         insurance_applicable = False
         request = self.context.get("request")
@@ -412,7 +413,8 @@ class AvailableLabTestPackageSerializer(serializers.ModelSerializer):
             lensfit_coupons = list(filter(lambda x: x.is_lensfit is True, applicable_coupons))
             if lensfit_coupons:
                 offer['applicable'] = True
-                serializer = CouponSerializer(lensfit_coupons[0])
+                coupon_properties = coupon_recommender.get_coupon_properties(str(lensfit_coupons[0]))
+                serializer = CouponSerializer(lensfit_coupons[0], context={'coupon_properties': coupon_properties})
                 offer['coupon'] = serializer.data
 
         return offer
