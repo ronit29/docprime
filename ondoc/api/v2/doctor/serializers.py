@@ -717,7 +717,7 @@ class EConsultCommunicationSerializer(serializers.Serializer):
     notification_types = serializers.ListField(child=serializers.IntegerField(min_value=1))
     sender_rc_user_id = serializers.CharField(max_length=64, required=False, allow_blank=True)
     receiver_rc_user_ids = serializers.ListField(child=serializers.CharField(max_length=64), allow_empty=True, required=False)
-    comm_types = serializers.ChoiceField(choices=NotificationAction.NOTIFICATION_CHOICES, required=False)
+    comm_types = serializers.MultipleChoiceField(choices=NotificationAction.NOTIFICATION_CHOICES, allow_empty=True, required=False)
 
     def validate(self, attrs):
         rc_group_id = attrs.get('rc_group_id')

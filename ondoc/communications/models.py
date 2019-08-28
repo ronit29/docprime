@@ -2123,8 +2123,8 @@ class EConsultationComm(Notification):
             push_receivers.append(self.patient.user)
         if self.notification_type in (NotificationAction.E_CONSULT_NEW_MESSAGE_RECEIVED, ) and receivers:
             push_receivers.extend(receivers)
-            sms_receivers = [receiver.phone_number for receiver in receivers]
-            email_receivers = [receiver.email for receiver in receivers if receiver.email]
+            sms_receivers = [{"user": receiver, "phone_number": receiver.phone_number} for receiver in receivers]
+            email_receivers = [{"user": receiver, "email": receiver.email} for receiver in receivers if receiver.email]
         user_and_tokens = NotificationEndpoint.get_user_and_tokens(receivers=push_receivers)
         all_receivers['sms_receivers'] = sms_receivers
         all_receivers['email_receivers'] = email_receivers
