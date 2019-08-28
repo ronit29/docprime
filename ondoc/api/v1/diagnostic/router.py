@@ -3,7 +3,7 @@ from .views import (LabTestList, LabList, LabAppointmentView, SearchPageViewSet,
                     AvailableTestViewSet, LabReportFileViewset, DoctorLabAppointmentsViewSet,
                     DoctorLabAppointmentsNoAuthViewSet, TestDetailsViewset, LabTestCategoryListViewSet,
                     CompareLabPackagesViewSet, DigitalReports, LabTestCategoryLandingUrlViewSet,
-                    IPDMedicinePageLeadViewSet)
+                    IPDMedicinePageLeadViewSet, AllMatrixCitiesViewSet)
 
 # from rest_framework.routers import DefaultRouter
 #
@@ -63,4 +63,5 @@ urlpatterns = [
     # path('digital/report/<int:booking_id>', DigitalReports.as_view({'get': 'retrieve'}), name='digital_report'),
     path('lab-test-category-landing-urls', LabTestCategoryLandingUrlViewSet.as_view({'get': 'category_landing_url'}), name='lab_test_category_landing_urls'),
     path('ipdmedicinepagelead', IPDMedicinePageLeadViewSet.as_view({'post': 'store'}), name='ipd_medicine_page_lead'),
+    path('allmatrixcities', AllMatrixCitiesViewSet.as_view({'get': 'retrieve'}), name='get_all_cities'),
 ]

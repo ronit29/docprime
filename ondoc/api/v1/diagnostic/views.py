@@ -3701,3 +3701,12 @@ class IPDMedicinePageLeadViewSet(viewsets.GenericViewSet):
 
 
 
+
+
+class AllMatrixCitiesViewSet(viewsets.GenericViewSet):
+
+    def retrieve(self, request):
+
+        main_queryset = MatrixMappedCity.objects.all().values("id", "name")
+
+        return Response(main_queryset)
