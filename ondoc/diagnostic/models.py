@@ -53,8 +53,9 @@ from django.contrib.contenttypes.fields import GenericRelation
 from django.contrib.contenttypes.fields import GenericForeignKey
 from django.contrib.contenttypes.models import ContentType
 from ondoc.matrix.tasks import push_appointment_to_matrix, push_onboarding_qcstatus_to_matrix, \
-    create_ipd_lead_from_lab_appointment, push_appointment_to_spo
+    create_ipd_lead_from_lab_appointment
 from ondoc.integrations.task import push_lab_appointment_to_integrator, get_integrator_order_status
+from ondoc.account.tasks import push_appointment_to_spo
 from ondoc.location import models as location_models
 from ondoc.ratings_review import models as ratings_models
 # from ondoc.api.v1.common import serializers as common_serializers
