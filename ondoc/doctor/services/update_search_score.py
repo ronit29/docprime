@@ -62,9 +62,9 @@ class DoctorSearchScore:
                                                 "doctor_clinics__hospital__hospital_place_details").order_by('id').count()
 
         count = 0
-        score_obj_list = []
-        while count <= doctors_count:
 
+        while count <= doctors_count:
+            score_obj_list = []
             doctors = doctor_models.Doctor.objects.all().prefetch_related("hospitals", "doctor_clinics", "doctor_clinics__hospital",
                                                     "doctor_clinics__hospital__hospital_place_details").order_by('id')[count : count+1000]
 
@@ -85,11 +85,12 @@ class DoctorSearchScore:
                                                                 final_score=result[5]['final_score']))
 
             count = count + 1000
-        bulk_created = doctor_models.SearchScore.objects.bulk_create(score_obj_list)
-        if bulk_created:
-            return 'success'
-        else:
-            return 'failure'
+            bulk_created = doctor_models.SearchScore.objects.bulk_create(score_obj_list)
+            if bulk_created:
+                print ('success')
+            else:
+                print ('failure')
+        return 'successfully inserted.'
 
     def get_doctor_ratings(self, doctor):
         average_ratings = self.scoring_data.get('average_ratings')
