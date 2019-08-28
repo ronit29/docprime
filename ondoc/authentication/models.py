@@ -780,7 +780,7 @@ class NotificationEndpoint(TimeStampedModel):
     def get_user_and_tokens(cls, receivers):
         user_and_tokens = list()
         user_and_token = [{'user': token.user, 'token': token.token, 'app_name': token.app_name} for token in
-                          cls.objects.filter(user__in=receivers).order_by('user')]
+                          cls.objects.select_related('user').filter(user__in=receivers).order_by('user')]
         for user, user_token_group in groupby(user_and_token, key=lambda x: x['user']):
             user_and_tokens.append(
                 {'user': user,

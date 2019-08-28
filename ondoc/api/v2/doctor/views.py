@@ -1383,3 +1383,28 @@ class ConsumerEConsultationViewSet(viewsets.GenericViewSet):
             econsult_id = action_data.get('consultation_id')
         return Response({"econsult_id": econsult_id})
 
+
+    def communicate(self, request):
+        serializer = serializers.EConsultCommunicationSerializer(data=request.data, context={'request': request})
+        serializer.is_valid(raise_exception=True)
+        valid_data = serializer.validated_data
+        e_consultation = valid_data.get('e_consultation')
+        notification_types = valid_data.get('notification_types')
+        patient = valid_data.get('patient')
+        receiver_rc_users = valid_data.get('receiver_rc_users')
+        sender_rc_user = valid_data.get('sender_rc_user')
+        patient_rc_user = valid_data.get('patient_rc_user')
+        doctor_rc_user = valid_data.get('doctor_rc_user')
+        if NotificationAction.E_CONSULT_NEW_MESSAGE_RECEIVED in notification_types:
+            receivers = list()
+            if doctor_rc_user in receiver_rc_users:
+                receivers.append(e_consultation.created_by)
+            elif patient_rc_user in receiver_rc_users:
+                receivers.append(patient.user)
+            try:
+                e_consultation_notification = comm_models.EConsultationComm(e_consultation, notification_type=NotificationAction.E_CONSULT_NEW_MESSAGE_RECEIVED, receivers=receivers)
+                e_consultation_notification.send()
+            except Exception as e:
+                logger.error('Error in send new message notification - ' + str(e))
+                return Response({"status": 0, "error": 'Error in send new message notification - ' + str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+        return Response({"status": 1, "message": "success"})

@@ -14,6 +14,7 @@ from ondoc.api.v1.utils import util_absolute_url, util_file_name, generate_short
 from ondoc.banner.models import EmailBanner
 from ondoc.doctor.models import OpdAppointment, Hospital, OfflineOPDAppointments
 from ondoc.diagnostic.models import LabAppointment
+from ondoc.provider.models import EConsultation
 from ondoc.common.models import UserConfig
 from django.core.files.uploadedfile import SimpleUploadedFile, TemporaryUploadedFile, InMemoryUploadedFile
 from django.forms import model_to_dict
@@ -250,6 +251,16 @@ class Notification:
             OfflineOPDAppointments.NO_SHOW: NotificationAction.OFFLINE_OPD_APPOINTMENT_NO_SHOW,
             OfflineOPDAppointments.CANCELLED: NotificationAction.OFFLINE_OPD_APPOINTMENT_CANCELLED,
             OfflineOPDAppointments.COMPLETED: NotificationAction.OFFLINE_OPD_INVOICE
+        }
+    E_CONSULTATION_NOTIFICATION_TYPE_MAPPING = \
+        {
+            EConsultation.BOOKED: NotificationAction.ECONSULTATION_BOOKED,
+            EConsultation.ACCEPTED: NotificationAction.ECONSULTATION_ACCEPTED,
+            EConsultation.RESCHEDULED_DOCTOR: NotificationAction.OFFLINE_OPD_APPOINTMENT_RESCHEDULED_DOCTOR,
+            EConsultation.RESCHEDULED_PATIENT: NotificationAction.OFFLINE_OPD_APPOINTMENT_NO_SHOW,
+            EConsultation.CANCELLED: NotificationAction.OFFLINE_OPD_APPOINTMENT_CANCELLED,
+            EConsultation.COMPLETED: NotificationAction.OFFLINE_OPD_INVOICE,
+            EConsultation.EXPIRED: NotificationAction.OFFLINE_OPD_INVOICE
         }
 
 
@@ -2063,3 +2074,76 @@ class OfflineOpdAppointments(Notification):
     def get_receivers(self):
         all_receivers = list()
         return all_receivers
+
+
+class EConsultationComm(Notification):
+
+    def __init__(self, e_consultation, notification_type=None, **kwargs):
+        self.e_consultation = e_consultation
+        patient, patient_number = self.e_consultation.get_patient_and_number()
+        self.patient = patient
+        self.patient_number = patient_number
+        if notification_type:
+            self.notification_type = notification_type
+        else:
+            self.notification_type = self.E_CONSULTATION_NOTIFICATION_TYPE_MAPPING[e_consultation.status]
+        if kwargs.get('receivers'):
+            self.receivers = kwargs.get('receivers')
+
+    def get_context(self):
+        patient_name = self.patient.name.title()
+        doctor_name = self.e_consultation.doctor.name
+        doctor_display_name = self.e_consultation.doctor.get_display_name()
+
+        # est = pytz.timezone(settings.TIME_ZONE)
+        # time_slot_start = self.e_consultation.time_slot_start.astimezone(est)
+
+        context = {
+            "doctor_name": doctor_name,
+            "doctor_display_name": doctor_display_name,
+            "patient_name": patient_name,
+            "id": self.e_consultation.id,
+            "instance": self.e_consultation,
+            "action_type": NotificationAction.E_CONSULTATION,
+            "action_id": self.e_consultation.id,
+            "link": self.e_consultation.link,
+        }
+        return context
+
+    def get_receivers(self):
+        if hasattr(self, 'receivers'):
+            receivers = self.receivers
+        all_receivers = dict()
+        push_receivers = list()
+        if self.notification_type in (NotificationAction.E_CONSULT_VIDEO_LINK_SHARE, ):
+            push_receivers.append(self.patient.user)
+        if self.notification_type in (NotificationAction.E_CONSULT_NEW_MESSAGE_RECEIVED, ) and receivers:
+            push_receivers.extend(receivers)
+        user_and_tokens = NotificationEndpoint.get_user_and_tokens(receivers=push_receivers)
+        all_receivers['push_receivers'] = user_and_tokens
+        return all_receivers
+
+    def send(self):
+        context = self.get_context()
+        notification_type = self.notification_type
+        all_receivers = self.get_receivers()
+        if notification_type == NotificationAction.E_CONSULT_SHARE:
+            sms_notification = SMSNotification(notification_type, context)
+            sms_notification.send(all_receivers.get('sms_receivers', []))
+        elif notification_type == NotificationAction.E_CONSULT_VIDEO_LINK_SHARE:
+            push_notification = PUSHNotification(notification_type, context)
+            push_notification.send(all_receivers.get('push_receivers', []))
+        elif notification_type == NotificationAction.E_CONSULT_NEW_MESSAGE_RECEIVED:
+            push_notification = PUSHNotification(notification_type, context)
+            push_notification.send(all_receivers.get('push_receivers', []))
+        else:
+            email_notification = EMAILNotification(notification_type, context)
+            sms_notification = SMSNotification(notification_type, context)
+            app_notification = APPNotification(notification_type, context)
+            push_notification = PUSHNotification(notification_type, context)
+            whtsapp_notification = WHTSAPPNotification(notification_type, context)
+            email_notification.send(all_receivers.get('email_receivers', []))
+            sms_notification.send(all_receivers.get('sms_receivers', []))
+            app_notification.send(all_receivers.get('app_receivers', []))
+            whtsapp_notification.send(all_receivers.get('sms_receivers', []))
+            push_notification.send(all_receivers.get('push_receivers', []))

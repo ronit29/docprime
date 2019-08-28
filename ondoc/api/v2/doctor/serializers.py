@@ -710,3 +710,48 @@ class EConsultSerializer(serializers.Serializer):
         attrs['e_consultation'] = e_consultation
         return attrs
 
+
+class EConsultCommunicationSerializer(serializers.Serializer):
+    rc_group_id = serializers.CharField(max_length=64)
+    notification_types = serializers.ListField(child=serializers.IntegerField(min_value=1))
+    sender_rc_user_id = serializers.CharField(max_length=64, required=False, allow_blank=True)
+    receiver_rc_user_ids = serializers.ListField(child=serializers.CharField(max_length=64), allow_empty=True, required=False)
+
+    def validate(self, attrs):
+        from ondoc.notification.models import NotificationAction
+        rc_group_id = attrs.get('rc_group_id')
+        notification_types = attrs.get('notification_types')
+        sender_rc_user_id = attrs.get('sender_rc_user_id')
+        receiver_rc_user_ids = attrs.get('receiver_rc_user_ids')
+        # e_consultation = attrs.get('e_consultation')
+        if NotificationAction.E_CONSULT_NEW_MESSAGE_RECEIVED in notification_types and not receiver_rc_user_ids:
+            raise serializers.ValidationError("receiver rocket chat user_id is required for new message notification")
+        rc_group = provider_models.RocketChatGroups.objects.prefetch_related('econsultations',
+                                                                             'econsultations__doctor',
+                                                                             'econsultations__offline_patient',
+                                                                             'econsultations__online_patient',
+                                                                             'econsultations__offline_patient__user',
+                                                                             'econsultations__online_patient__user',
+                                                                             'econsultations__doctor__rc_user',
+                                                                             'econsultations__offline_patient__rc_user',
+                                                                             'econsultations__online_patient__rc_user',
+                                                                             )\
+                                                           .filter(group_id=rc_group_id).first()
+        e_consultation = rc_group.econsultations.all().order_by('-created_at')[0]
+        patient, phone_number = e_consultation.get_patient_and_number()
+        patient_rc_user = patient.rc_user
+        doctor_rc_user = e_consultation.doctor.rc_user
+        receiver_rc_users = list()
+        sender_rc_user = None
+        for rc_user in (doctor_rc_user, patient_rc_user):
+            if rc_user.response_data['user']['_id'] in receiver_rc_user_ids:
+                receiver_rc_users.append(rc_user)
+            elif rc_user.response_data['user']['_id'] == sender_rc_user_id:
+                sender_rc_user = rc_user
+        attrs['e_consultation'] = e_consultation
+        attrs['patient'] = patient
+        attrs['patient_rc_user'] = patient_rc_user
+        attrs['doctor_rc_user'] = doctor_rc_user
+        attrs['receiver_rc_users'] = receiver_rc_users
+        attrs['sender_rc_user'] = sender_rc_user
+        return attrs

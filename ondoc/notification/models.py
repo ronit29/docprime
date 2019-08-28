@@ -123,8 +123,16 @@ class NotificationAction:
     OFFLINE_APPOINTMENT_REMINDER_PROVIDER_SMS = 137
     OFFLINE_PATIENT_WELCOME_MESSAGE = 138
 
-    E_CONSULT_SHARE = 140
-    E_CONSULT_VIDEO_LINK_SHARE = 141
+    ECONSULTATION_BOOKED = 150
+    ECONSULTATION_ACCEPTED = 151
+    ECONSULTATION_RESCHEDULED_DOCTOR = 152
+    ECONSULTATION_RESCHEDULED_PATIENT = 153
+    ECONSULTATION_CANCELLED = 154
+    ECONSULTATION_COMPLETED = 155
+    ECONSULTATION_EXPIRED = 156
+    E_CONSULT_SHARE = 157
+    E_CONSULT_VIDEO_LINK_SHARE = 158
+    E_CONSULT_NEW_MESSAGE_RECEIVED = 159
 
     SAMPLE_DYNAMIC_TEMPLATE_PREVIEW = 110
 
@@ -153,8 +161,16 @@ class NotificationAction:
         (DOCPRIME_APPOINTMENT_REMINDER_PROVIDER_SMS, 'Docprime Appointment Reminder Provider SMS'),
         (OFFLINE_APPOINTMENT_REMINDER_PROVIDER_SMS, 'Offline Appointment Reminder Provider SMS'),
 
+        (ECONSULTATION_BOOKED, 'EConsultation Booked'),
+        (ECONSULTATION_ACCEPTED, 'EConsultation Accepted'),
+        (ECONSULTATION_RESCHEDULED_DOCTOR, 'EConsultation Rescheduled Doctor'),
+        (ECONSULTATION_RESCHEDULED_PATIENT, 'EConsultation Rescheduled Patient'),
+        (ECONSULTATION_CANCELLED, 'EConsultation Cancelled'),
+        (ECONSULTATION_COMPLETED, 'EConsultation Completed'),
+        (ECONSULTATION_EXPIRED, 'EConsultation Expired'),
         (E_CONSULT_SHARE, 'E Consult Share'),
         (E_CONSULT_VIDEO_LINK_SHARE, 'E Consult Video Link Share'),
+        (E_CONSULT_NEW_MESSAGE_RECEIVED, 'E Consult New Message Received'),
 
         (PRESCRIPTION_UPLOADED, "Prescription Uploaded"),
         (PAYMENT_PENDING, "Payment Pending"),
@@ -187,11 +203,13 @@ class NotificationAction:
     OPD_APPOINTMENT = "opd_appointment"
     LAB_APPOINTMENT = "lab_appoingment"
     OFFLINE_OPD_APPOINTMENT = "offline_opd_appointment"
+    E_CONSULTATION = "e_consultation"
 
     ACTION_TYPE_CHOICES = (
         (OPD_APPOINTMENT, 'Opd Appointment'),
         (LAB_APPOINTMENT, 'Lab Appointment'),
         (OFFLINE_OPD_APPOINTMENT, 'Offline Opd Appointment'),
+        (E_CONSULTATION, 'E Consultation'),
     )
 
     @classmethod
