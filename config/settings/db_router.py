@@ -1,4 +1,3 @@
-from django.conf import settings
 DATABASE_LABEL_APPS_MAPPING = {
     'bookinganalytics' : 'sql_server'
 }
@@ -11,9 +10,6 @@ class DatabaseRouter:
     def db_for_read(self, model, **hints):
         if model._meta.app_label in DATABASE_LABEL_APPS_MAPPING:
             return DATABASE_LABEL_APPS_MAPPING[model._meta.app_label]
-        is_prod = settings.PRODUCTION
-        if is_prod:
-            return 'doc_read'
         return 'default'
 
     def db_for_write(self, model, **hints):
