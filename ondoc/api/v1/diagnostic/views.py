@@ -2402,7 +2402,13 @@ class LabAppointmentView(mixins.CreateModelMixin,
         user_insurance = UserInsurance.get_user_insurance(request.user)
         if user_insurance:
             if user_insurance.status == UserInsurance.ONHOLD:
-                return Response(status=status.HTTP_400_BAD_REQUEST, data={'error': 'Your documents from the last claim are under verification.Please write to customercare@docprime.com for more information'})
+                return Response(status=status.HTTP_400_BAD_REQUEST,
+                                data={'error': 'Your documents from the last claim are under verification.'
+                                               'Please write to customercare@docprime.com for more information',
+                                      'request_errors': {
+                                        'message': 'Your documents from the last claim are under verification.'
+                                               'Please write to customercare@docprime.com for more information'
+                                      }})
             insurance_validate_dict = user_insurance.validate_insurance(validated_data, booked_by=booked_by)
             data['is_appointment_insured'] = insurance_validate_dict['is_insured']
             data['insurance_id'] = insurance_validate_dict['insurance_id']
@@ -2412,7 +2418,11 @@ class LabAppointmentView(mixins.CreateModelMixin,
                 data['payment_type'] = OpdAppointment.INSURANCE
                 appointment_test_ids = validated_data.get('test_ids', [])
                 if request.user and request.user.is_authenticated and not hasattr(request, 'agent') and len(appointment_test_ids) > 1:
-                    return Response(status=status.HTTP_400_BAD_REQUEST, data={'error': 'Some error occured. Please try again after some time.'})
+                    return Response(status=status.HTTP_400_BAD_REQUEST,
+                                    data={'error': 'Some error occured. Please try again after some time.',
+                                          'request_errors': {
+                                              'message': 'Some error occured. Please try again after some time.'
+                                          }})
 
         else:
             data['is_appointment_insured'], data['insurance_id'], data[
@@ -3329,8 +3339,8 @@ class CompareLabPackagesViewSet(viewsets.ReadOnlyModelViewSet):
                 package_lab_ids.append({'package_id': data.package_id, 'lab_id': data.lab_id})
 
         compare_package_details['package_lab_ids'] = package_lab_ids
-        compare_package_details['lat'] = request.GET.get('lat') if request.GET.get('lat') else None
-        compare_package_details['long'] = request.GET.get('long') if request.GET.get('long') else None
+        compare_package_details['lat'] = request.data.get('lat')
+        compare_package_details['long'] = request.data.get('long')
         compare_package_details['title'] = compare_seo_url.title if compare_seo_url.title else None
         kwargs['compare_package_details'] = compare_package_details
         kwargs['compare_seo_url'] = compare_seo_url
@@ -3338,12 +3348,55 @@ class CompareLabPackagesViewSet(viewsets.ReadOnlyModelViewSet):
         response = self.retrieve(request, **kwargs)
         return response
 
+    def build_request_parameters(self, request):
+        result = {}
+        error_dict = {}
+        category_id = request.data.get('category_id')
+        if not LabTestCategory.objects.filter(is_live=True, id=category_id).exists():
+            error_dict = {'error': 'Invalid category ID', 'status': status.HTTP_400_BAD_REQUEST}
+            return None, error_dict
+        longitude = request.data.get('long', 77.071848)
+        latitude = request.data.get('lat', 28.450367)
+        max_distance = 10000
+        point_string = 'POINT(' + str(longitude) + ' ' + str(latitude) + ')'
+        pnt = GEOSGeometry(point_string, srid=4326)
+        package_lab_ids = list(
+            AvailableLabTest.objects.filter(lab_pricing_group__labs__is_live=True, test__is_package=True,
+                                            test__enable_for_retail=True,
+                                            test__searchable=True,
+                                            test__categories__id=category_id,
+                                            enabled=True, lab_pricing_group__labs__location__dwithin=(
+                    Point(float(longitude),
+                          float(latitude)),
+                    D(m=max_distance))).annotate(
+                distance=Distance('lab_pricing_group__labs__location',
+                                  pnt)).annotate(rank=Window(expression=RowNumber(), order_by=F('distance').asc(),
+                                                             partition_by=[F('test__id')])).order_by(
+                '-test__priority').values('rank', 'distance', package_id=F('test_id'),
+                                          lab_id=F('lab_pricing_group__labs__id')))
+
+        package_lab_ids = [x for x in package_lab_ids if x['rank'] == 1]
+        package_lab_ids = package_lab_ids[:3]
+        if not package_lab_ids:
+            error_dict = {'error': 'Not Found', 'status': status.HTTP_404_NOT_FOUND}
+            return None, error_dict
+        result['package_lab_ids'] = package_lab_ids
+        result['lat'] = latitude
+        result['long'] = longitude
+        result['category'] = category_id
+        return result, None
+
     def retrieve(self, request, *args, **kwargs):
         from django.db.models import Min
         if kwargs and kwargs['compare_package_details']:
             request_parameters = kwargs['compare_package_details']
+        elif request.data.get('category_id'):
+            request_parameters, error = self.build_request_parameters(request)
+            if error:
+                return Response(error.get('error'), status=error.get('status', status.HTTP_400_BAD_REQUEST))
         else:
             request_parameters = request.data
+
         serializer = serializers.CompareLabPackagesSerializer(data=request_parameters, context={"request": request})
         serializer.is_valid(raise_exception=True)
         validated_data = serializer.validated_data
@@ -3515,6 +3568,10 @@ class CompareLabPackagesViewSet(viewsets.ReadOnlyModelViewSet):
                 response['description'] = new_dynamic.first().meta_description
                 if response['title'] is None:
                     response['title'] = new_dynamic.first().meta_title
+        response['requested_category'] = None
+        if validated_data.get('category'):
+            response['requested_category'] = {'id': validated_data.get('category').id, 'name': validated_data.get('category').name}
+
         return Response(response)
 
     def get_discounted_price(self, coupon_recommender, deal_price=0, tests_included=None, lab=None, ):
