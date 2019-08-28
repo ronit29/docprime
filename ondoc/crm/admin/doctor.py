@@ -2446,7 +2446,7 @@ class PurchaseOrderCreationAdmin(admin.ModelAdmin):
     def get_readonly_fields(self, request, obj=None):
         read_only_fields = ['provider_name', 'appointment_booked_count', 'current_appointment_count']
         if obj and obj.id:
-            read_only_fields += ['start_date', 'end_date', 'total_appointment_count', 'provider_name_hospital', 'total_amount_paid', 'gst_number',
+            read_only_fields += ['total_appointment_count', 'provider_name_hospital', 'total_amount_paid', 'gst_number',
                                  'provider_type', 'product_type']
 
         return read_only_fields
