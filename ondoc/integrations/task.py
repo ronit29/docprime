@@ -124,7 +124,7 @@ def get_integrator_order_status(self, *args, **kwargs):
 
 
 @task(bind=True, max_retries=2)
-def push_appointment_to_spo_2(self, data):
+def push_appointment_to_spo(self, data):
     from ondoc.diagnostic.models import LabAppointment
     from ondoc.account.models import Order
     try:
