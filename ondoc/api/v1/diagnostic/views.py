@@ -2413,7 +2413,13 @@ class LabAppointmentView(mixins.CreateModelMixin,
         user_insurance = UserInsurance.get_user_insurance(request.user)
         if user_insurance:
             if user_insurance.status == UserInsurance.ONHOLD:
-                return Response(status=status.HTTP_400_BAD_REQUEST, data={'error': 'Your documents from the last claim are under verification.Please write to customercare@docprime.com for more information'})
+                return Response(status=status.HTTP_400_BAD_REQUEST,
+                                data={'error': 'Your documents from the last claim are under verification.'
+                                               'Please write to customercare@docprime.com for more information',
+                                      'request_errors': {
+                                        'message': 'Your documents from the last claim are under verification.'
+                                               'Please write to customercare@docprime.com for more information'
+                                      }})
             insurance_validate_dict = user_insurance.validate_insurance(validated_data, booked_by=booked_by)
             data['is_appointment_insured'] = insurance_validate_dict['is_insured']
             data['insurance_id'] = insurance_validate_dict['insurance_id']
@@ -2423,7 +2429,11 @@ class LabAppointmentView(mixins.CreateModelMixin,
                 data['payment_type'] = OpdAppointment.INSURANCE
                 appointment_test_ids = validated_data.get('test_ids', [])
                 if request.user and request.user.is_authenticated and not hasattr(request, 'agent') and len(appointment_test_ids) > 1:
-                    return Response(status=status.HTTP_400_BAD_REQUEST, data={'error': 'Some error occured. Please try again after some time.'})
+                    return Response(status=status.HTTP_400_BAD_REQUEST,
+                                    data={'error': 'Some error occured. Please try again after some time.',
+                                          'request_errors': {
+                                              'message': 'Some error occured. Please try again after some time.'
+                                          }})
 
         else:
             data['is_appointment_insured'], data['insurance_id'], data[

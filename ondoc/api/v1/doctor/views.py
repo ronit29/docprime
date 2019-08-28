@@ -249,7 +249,11 @@ class DoctorAppointmentsViewSet(OndocViewSet):
         #     'insurance_message'] = Cart.check_for_insurance(validated_data,request)
         if user_insurance:
             if user_insurance.status == UserInsurance.ONHOLD:
-                return Response(status=status.HTTP_400_BAD_REQUEST, data={'error': 'Your documents from the last claim are under verification.Please write to customercare@docprime.com for more information'})
+                return Response(status=status.HTTP_400_BAD_REQUEST, data={"error": 'Your documents from the last claim '
+                                                                                   'are under verification.Please write to customercare@docprime.com for more information',
+                                                                          "request_errors": {
+                                                                              "message": 'Your documents from the last claim are under '
+                                                                                         'verification. Please write to customercare@docprime.com for more information'}})
             hospital = validated_data.get('hospital')
             doctor = validated_data.get('doctor')
 
@@ -258,7 +262,10 @@ class DoctorAppointmentsViewSet(OndocViewSet):
             payment_type = validated_data.get('payment_type')
             if profile.is_insured_profile and doctor.is_enabled_for_insurance and doctor.enabled_for_online_booking and \
                     payment_type == OpdAppointment.COD and doctor_clinic and doctor_clinic.enabled_for_online_booking:
-                return Response(status=status.HTTP_400_BAD_REQUEST, data={'error': 'Some error occured. Please try again after some time.'})
+                return Response(status=status.HTTP_400_BAD_REQUEST,
+                                data={"error": 'Some error occured. Please try again after some time.',
+                                      "request_errors": {"message": 'Some error occured. Please try again'
+                                                                    ' after some time.'}})
 
             insurance_validate_dict = user_insurance.validate_insurance(validated_data)
             data['is_appointment_insured'] = insurance_validate_dict['is_insured']
@@ -271,12 +278,20 @@ class DoctorAppointmentsViewSet(OndocViewSet):
                 blocked_slots = hospital.get_blocked_specialization_appointments_slots(doctor, user_insurance)
                 start_date = validated_data.get('start_date').date()
                 if str(start_date) in blocked_slots:
-                    return Response(status=status.HTTP_400_BAD_REQUEST, data={'error': 'Some error occured. Please try again after some time.'})
+                    return Response(status=status.HTTP_400_BAD_REQUEST, data={'error': 'Some error occured. Please try '
+                                                                                       'again after some time.',
+                                                                              'request_errors': {
+                                                                                  'message':'Some error occured.Please'
+                                                                                            'try again after some time'}})
 
                 appointment_date = validated_data.get('start_date')
                 is_appointment_exist = hospital.get_active_opd_appointments(request.user, user_insurance, appointment_date.date())
                 if request.user and request.user.is_authenticated and not hasattr(request, 'agent') and is_appointment_exist :
-                    return Response(status=status.HTTP_400_BAD_REQUEST, data={'error': 'Some error occured. Please try again after some time.'})
+                    return Response(status=status.HTTP_400_BAD_REQUEST, data={'error': 'Some error occured. Please try '
+                                                                                       'again after some time.',
+                                                                              'request_errors': {
+                                                                                  'message':'Some error occured.Please'
+                                                                                            'Try again after some time.'}})
         else:
             data['is_appointment_insured'], data['insurance_id'], data[
                 'insurance_message'] = False, None, ""
@@ -3985,7 +4000,7 @@ class OfflineCustomerViewSet(viewsets.GenericViewSet):
                 # mrp = app.mrp
                 mrp_fees = app.fees if app.fees else 0
                 #RAJIV YADAV
-                mrp = app.mrp if app.payment_type == app.COD else mrp_fees
+                mrp = app.deal_price if app.payment_type == app.COD else mrp_fees
                 payment_type = app.payment_type
                 deal_price = app.deal_price
                 mask_number = app.mask_number.all()

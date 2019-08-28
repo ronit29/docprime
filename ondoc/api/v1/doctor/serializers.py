@@ -1498,7 +1498,7 @@ class DoctorAppointmentRetrieveSerializer(OpdAppointmentSerializer):
 
     def get_mrp(self, obj):
         mrp_fees = obj.fees if obj.fees else 0
-        mrp = obj.mrp if obj.payment_type == obj.COD else mrp_fees
+        mrp = obj.deal_price if obj.payment_type == obj.COD else mrp_fees
         return mrp
 
     def get_mask_data(self, obj):
