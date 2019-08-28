@@ -3285,7 +3285,7 @@ class LabTestCategoryLandingURLS(TimeStampedModel):
 
 class IPDMedicinePageLead(auth_model.TimeStampedModel):
     name = models.CharField(max_length=500)
-    phone_number = models.BigIntegerField()
+    phone_number = models.BigIntegerField(validators=[MaxValueValidator(9999999999), MinValueValidator(1000000000)])
     matrix_city = models.ForeignKey(MatrixMappedCity, on_delete=models.SET_NULL, null=True)
     matrix_lead_id = models.IntegerField(null=True)
     lead_source = models.CharField(null=True, max_length=1000)
