@@ -3299,16 +3299,9 @@ class IPDMedicinePageLead(auth_model.TimeStampedModel):
     def save(self, force_insert=False, force_update=False, using=None, update_fields=None):
 
         if not self.id:
-            if self.name:
-                name = self.name
-            if self.phone_number:
-                phone_number = self.phone_number
-            if self.matrix_city and self.matrix_city.id:
-                matrix_city = self.matrix_city.id
+            super().save(force_insert, force_update, using, update_fields)
 
-        super().save(force_insert, force_update, using, update_fields)
-
-        if self.id and not self.matrix_lead_id:
+        if not self.matrix_lead_id:
             create_or_update_lead_on_matrix.apply_async(({'obj_type': self.__class__.__name__, 'obj_id': self.id}, ), countdown=5)
 
 

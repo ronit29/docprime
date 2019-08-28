@@ -3678,16 +3678,26 @@ class LabTestCategoryLandingUrlViewSet(viewsets.GenericViewSet):
 class IPDMedicinePageLeadViewSet(viewsets.GenericViewSet):
 
     def store(self, request):
+        from django.http import JsonResponse
 
         params = request.data
         name = params.get('name', None)
         phone_number = params.get('phone_number', None)
-        city = params.get('city', None)
+        city_id = params.get('city_id', None)
+        city_name = params.get('city_name', None)
+        lead_source = params.get('lead_source')
 
-        city_id = MatrixMappedCity.objects.filter(id=city).first()
+        if city_id:
+            city = MatrixMappedCity.objects.filter(id=city_id).first()
+        else:
+            city = MatrixMappedCity.objects.filter(name=city_name).first()
 
-        ipd_med_page_object = IPDMedicinePageLead(name=name, phone_number=phone_number, matrix_city=city_id)
+
+        ipd_med_page_object = IPDMedicinePageLead(name=name, phone_number=phone_number, matrix_city=city, lead_source=lead_source)
         ipd_med_page_object.save()
+        queryset = IPDMedicinePageLead.objects.all().values()
+        return JsonResponse({"medicine_page_leads": list(queryset)})
+
 
 
 

@@ -737,7 +737,7 @@ def create_or_update_lead_on_matrix(self, data):
                 gender = 2
             obj.update_idp_data(request_data)
         elif obj_type == IPDMedicinePageLead.__name__:
-            lead_source = 'Medicine Page'
+            lead_source = obj.lead_source
             mobile = obj.phone_number
         mobile = int(mobile)
 
@@ -782,9 +782,13 @@ def create_or_update_lead_on_matrix(self, data):
             # save the order with the matrix lead id.
             # obj = model_used.objects.select_for_update().filter(id=obj_id).first()
             if obj and hasattr(obj, 'matrix_lead_id') and not obj.matrix_lead_id:
-                obj.matrix_lead_id = resp_data.get('Id', None)
-                obj.matrix_lead_id = int(obj.matrix_lead_id)
-                obj.save()
+                # obj.matrix_lead_id = resp_data.get('Id', None)
+                # obj.matrix_lead_id = int(obj.matrix_lead_id)
+                mlid = resp_data.get('Id', None)
+                if mlid:
+                    mx_lead_id = int(mlid)
+                    queryset = model_used.objects.filter(id=obj.id)
+                    queryset.update(matrix_lead_id=mx_lead_id)
                 if lead_source == 'ProviderApp':
                     receivers = [{"user": None, "email": "kabeer@docprime.com"},
                                  {"user": None, "email": "simranjeet@docprime.com"},
