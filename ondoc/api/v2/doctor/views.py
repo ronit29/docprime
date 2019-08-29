@@ -1127,6 +1127,11 @@ class PartnerEConsultationViewSet(viewsets.GenericViewSet):
         serializer = serializers.EConsultCreateBodySerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         valid_data = serializer.validated_data
+        e_obj = valid_data.get('e_consultation')
+        if e_obj:
+            return Response(
+                {"already_exists": True,
+                 "data": serializers.EConsultListSerializer(e_obj, context={'request': request}).data})
         e_obj = prov_models.EConsultation(doctor=valid_data['doctor_obj'], created_by=request.user,
                                           fees=valid_data['fees'], validity=valid_data.get('validity', None),
                                           status=prov_models.EConsultation.CREATED)
@@ -1155,7 +1160,7 @@ class PartnerEConsultationViewSet(viewsets.GenericViewSet):
 
         resp_data = serializers.EConsultListSerializer(e_obj, context={'request': request})
 
-        return Response(resp_data.data)
+        return Response({"already_exists": False, "data": resp_data.data})
 
     def list(self, request):
         id = request.query_params.get('id')

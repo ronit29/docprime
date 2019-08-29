@@ -620,6 +620,24 @@ class EConsultCreateBodySerializer(serializers.Serializer):
         if not doc:
             raise serializers.ValidationError("Doctor not Found!")
         attrs['doctor_obj'] = doc
+        if attrs['offline_p']:
+            e_consultation = provider_models.EConsultation.objects.filter(offline_patient=patient, doctor=doc,
+                                                                          status__in=[
+                                                                              provider_models.EConsultation.CREATED,
+                                                                              provider_models.EConsultation.BOOKED,
+                                                                              provider_models.EConsultation.RESCHEDULED_DOCTOR,
+                                                                              provider_models.EConsultation.RESCHEDULED_PATIENT,
+                                                                              provider_models.EConsultation.ACCEPTED]).order_by('-updated_at').first()
+        else:
+            e_consultation = provider_models.EConsultation.objects.filter(online_patient=patient, doctor=doc,
+                                                                          status__in=[
+                                                                              provider_models.EConsultation.CREATED,
+                                                                              provider_models.EConsultation.BOOKED,
+                                                                              provider_models.EConsultation.RESCHEDULED_DOCTOR,
+                                                                              provider_models.EConsultation.RESCHEDULED_PATIENT,
+                                                                              provider_models.EConsultation.ACCEPTED]).order_by('-updated_at').first()
+        if e_consultation:
+            attrs['e_consultation'] = e_consultation
         return attrs
 
 
