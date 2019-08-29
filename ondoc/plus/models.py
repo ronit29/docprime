@@ -239,7 +239,7 @@ class PlusUser(auth_model.TimeStampedModel):
             hospital_network_logo = hospital_network.hospital_network_documents.filter(document_type=HospitalNetworkDocument.LOGO).first()
             data['name'] = hospital_network.name
             data['id'] = hospital_network.id
-            data['logo'] = request.build_absolute_uri(hospital_network_logo.name.url) if hospital_network_logo.name else None
+            data['logo'] = request.build_absolute_uri(hospital_network_logo.name.url) if hospital_network_logo and hospital_network_logo.name else None
             networks.append(data)
 
         return networks
