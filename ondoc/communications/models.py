@@ -359,15 +359,15 @@ class SMSNotification:
         notification_type = self.notification_type
         obj = None
         if notification_type == NotificationAction.APPOINTMENT_ACCEPTED:
-            obj = DynamicTemplates.objects.filter(template_name="Confirmation_IPD_OPD").first()
-        elif notification_type == NotificationAction.APPOINTMENT_BOOKED and (not user or user.user_type == User.DOCTOR):
+            obj = DynamicTemplates.objects.filter(template_name="Confirmation_IPD_OPD", approved=True).first()
+        elif notification_type == NotificationAction.APPOINTMENT_BOOKED and (not user or user.user_type == User.DOCTOR) and (self.context.get('payment_type') == 2):
             obj = DynamicTemplates.objects.filter(template_name="Booking_Provider_Pay_at_clinic", approved=True).first()
         elif notification_type == NotificationAction.APPOINTMENT_BOOKED and (not user or user.user_type == User.DOCTOR) and (self.context.get('payment_type') == 1 or self.context.get('payment_type') == 3):
             obj = DynamicTemplates.objects.filter(template_name="Booking_Provider_SMS_OPD_Insurance_And_Prepaid", approved=True).first()
         elif notification_type == NotificationAction.APPOINTMENT_BOOKED and user and user.user_type == User.CONSUMER and user.recent_opd_appointment.first().payment_type == 2:
-            obj = DynamicTemplates.objects.filter(template_name="Booking_customer_pay_at_clinic").first()
+            obj = DynamicTemplates.objects.filter(template_name="Booking_customer_pay_at_clinic", approved=True).first()
         elif notification_type == NotificationAction.OPD_OTP_BEFORE_APPOINTMENT:
-            obj = DynamicTemplates.objects.filter(template_name="Reminder_appointment").first()
+            obj = DynamicTemplates.objects.filter(template_name="Reminder_appointment", approved=True).first()
 
         return obj
 
