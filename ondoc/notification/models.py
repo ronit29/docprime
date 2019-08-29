@@ -112,6 +112,7 @@ class NotificationAction:
 
     CONTACT_US_EMAIL = 65
     SAMPLE_DYNAMIC_TEMPLATE_PREVIEW = 110
+    SEND_LENSFIT_COUPON = 111
     NOTIFICATION_TYPE_CHOICES = (
         (APPOINTMENT_ACCEPTED, "Appointment Accepted"),
         (APPOINTMENT_CANCELLED, "Appointment Cancelled"),
