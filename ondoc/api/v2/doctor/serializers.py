@@ -737,6 +737,8 @@ class EConsultCommunicationSerializer(serializers.Serializer):
                                                                              'econsultations__online_patient__rc_user',
                                                                              )\
                                                            .filter(group_id=rc_group_id).first()
+        if not rc_group:
+            raise serializers.ValidationError("rocket chat group not found.")
         e_consultation = rc_group.econsultations.all().order_by('-created_at')[0]
         patient, phone_number = e_consultation.get_patient_and_number()
         patient_rc_user = patient.rc_user
