@@ -3665,7 +3665,7 @@ class OpdAppointment(auth_model.TimeStampedModel, CouponsMixin, OpdAppointmentIn
         result = None, None
         order_id, discount = self.get_master_order_id_and_discount()
         if order_id:
-            url = settings.BASE_URL + '/order/paymentSummary?appointment_id={}&token={}&cod_to_prepaid=True'.format(order_id, token)
+            url = settings.BASE_URL + '/order/doctor/{}/{}/bookdetails?appointment_id={}&token={}&cod_to_prepaid=True'.format(self.doctor_id, self.hospital_id, self.id, token)
             result = url, discount
         return result
 
