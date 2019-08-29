@@ -716,16 +716,16 @@ class EConsultCommunicationSerializer(serializers.Serializer):
     rc_group_id = serializers.CharField(max_length=64)
     notification_types = serializers.ListField(child=serializers.IntegerField(min_value=1))
     sender_rc_user_id = serializers.CharField(max_length=64, required=False, allow_blank=True)
-    receiver_rc_user_ids = serializers.ListField(child=serializers.CharField(max_length=64), allow_empty=True, required=False)
+    receiver_rc_user_names = serializers.ListField(child=serializers.CharField(max_length=64), allow_empty=True, required=False)
     comm_types = serializers.MultipleChoiceField(choices=NotificationAction.NOTIFICATION_CHOICES, allow_empty=True, required=False)
 
     def validate(self, attrs):
         rc_group_id = attrs.get('rc_group_id')
         notification_types = attrs.get('notification_types')
         sender_rc_user_id = attrs.get('sender_rc_user_id')
-        receiver_rc_user_ids = attrs.get('receiver_rc_user_ids')
-        if NotificationAction.E_CONSULT_NEW_MESSAGE_RECEIVED in notification_types and not receiver_rc_user_ids:
-            raise serializers.ValidationError("receiver rocket chat user_id is required for new message notification")
+        receiver_rc_user_names = attrs.get('receiver_rc_user_names')
+        if NotificationAction.E_CONSULT_NEW_MESSAGE_RECEIVED in notification_types and not receiver_rc_user_names:
+            raise serializers.ValidationError("receiver rocket chat user_names are required for new message notification")
         rc_group = provider_models.RocketChatGroups.objects.prefetch_related('econsultations',
                                                                              'econsultations__doctor',
                                                                              'econsultations__offline_patient',
@@ -744,7 +744,7 @@ class EConsultCommunicationSerializer(serializers.Serializer):
         receiver_rc_users = list()
         sender_rc_user = None
         for rc_user in (doctor_rc_user, patient_rc_user):
-            if rc_user.response_data['user']['_id'] in receiver_rc_user_ids:
+            if rc_user.username in receiver_rc_user_names:
                 receiver_rc_users.append(rc_user)
             elif rc_user.response_data['user']['_id'] == sender_rc_user_id:
                 sender_rc_user = rc_user
