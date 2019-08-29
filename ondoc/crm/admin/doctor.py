@@ -52,7 +52,8 @@ from ondoc.doctor.models import (Doctor, DoctorQualification,
                                  PatientMobile, DoctorMobileOtp,
                                  UploadDoctorData, CancellationReason, Prescription, PrescriptionFile,
                                  SimilarSpecializationGroup, SimilarSpecializationGroupMapping, PurchaseOrderCreation,
-                                 DoctorSponsoredServices, SponsoredServicePracticeSpecialization, SponsoredServices)
+                                 DoctorSponsoredServices, SponsoredServicePracticeSpecialization, SponsoredServices,
+                                 HospitalSponsoredServices)
 
 from ondoc.authentication.models import User
 from .common import *
@@ -2487,15 +2488,43 @@ class SponsoredServicePracticeSpecializationInline(admin.TabularInline):
     show_change_link = True
     fields = ['sponsored_service', 'specialization', 'is_primary_specialization']
 
-#
-# class SponsoredServicesResource(resources.ModelResource):
-#     class Meta:
-#         model = SponsoredServices
-#         fields = ('id', 'name')
+
+class SponsoredServicesResource(resources.ModelResource):
+    class Meta:
+        model = SponsoredServices
+        exclude = ('created_at', 'updated_at')
 
 
-class SponsoredServicesAdmin(ImportExportMixin, admin.ModelAdmin):
+class SponsoredServicesAdmin(ImportMixin, admin.ModelAdmin):
     search_fields = ['name']
     formats = (base_formats.XLS, base_formats.XLSX,)
     inlines = [ SponsoredServicePracticeSpecializationInline ]
-    # resource_class = SponsoredServicesResource
+    resource_class = SponsoredServicesResource
+
+
+class HospitalSponsoredServicesAdminResource(resources.ModelResource):
+    class Meta:
+        model = HospitalSponsoredServices
+        exclude = ('created_at', 'updated_at')
+
+
+class HospitalSponsoredServicesAdmin(ImportMixin, admin.ModelAdmin):
+    search_fields = ['hospital']
+    list_display = ['hospital', 'sponsored_service']
+    formats = (base_formats.XLS, base_formats.XLSX,)
+    resource_class = HospitalSponsoredServicesAdminResource
+
+
+class DoctorSponsoredServicesAdminResource(resources.ModelResource):
+    class Meta:
+        model = DoctorSponsoredServices
+        exclude = ('created_at', 'updated_at')
+
+
+class DoctorSponsoredServicesAdmin(ImportMixin, admin.ModelAdmin):
+    search_fields = ['doctor']
+    list_display = ['doctor', 'sponsored_service']
+    formats = (base_formats.XLS, base_formats.XLSX,)
+    resource_class = DoctorSponsoredServicesAdminResource
+
+

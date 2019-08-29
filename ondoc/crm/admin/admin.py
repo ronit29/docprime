@@ -20,7 +20,8 @@ from ondoc.doctor.models import (Doctor, Language, MedicalService, Specializatio
                                  VisitReason, CancellationReason, PracticeSpecializationContent, OfflinePatients,
                                  OfflineOPDAppointments,
                                  DoctorMobileOtp, UploadDoctorData, DoctorLeave, HealthInsuranceProvider,
-                                 CommonHospital, SimilarSpecializationGroup, PurchaseOrderCreation, SponsoredServices)
+                                 CommonHospital, SimilarSpecializationGroup, PurchaseOrderCreation, SponsoredServices,
+                                 HospitalSponsoredServices, DoctorSponsoredServices)
 
 from ondoc.diagnostic.models import (Lab, LabNetwork, LabTest, LabTestType, LabService,
                                      AvailableLabTest, LabAppointment, CommonTest, CommonDiagnosticCondition,
@@ -55,7 +56,8 @@ from .doctor import (DoctorAdmin, MedicalServiceAdmin, SpecializationAdmin, Qual
                      CompetitorInfoImportAdmin, VisitReasonAdmin, PracticeSpecializationContentAdmin,
                      OfflinePatientAdmin,
                      UploadDoctorDataAdmin, DoctorLeaveAdmin, SimilarSpecializationGroupAdmin,
-                     PurchaseOrderCreationAdmin, SponsoredServicesAdmin)
+                     PurchaseOrderCreationAdmin, SponsoredServicesAdmin, HospitalSponsoredServicesAdmin,
+                     DoctorSponsoredServicesAdmin)
 from .aboutdoctor import AboutDoctorAdmin
 from .hospital import HospitalAdmin, CommonHospitalAdmin, GenericQuestionAnswerAdmin
 from .user import CustomUserAdmin, UserNumberUpdateAdmin, UserProfileAdmin
@@ -289,4 +291,6 @@ admin.site.register(IntegratorLabTestParameterMapping, IntegratorLabTestParamete
 admin.site.register(DynamicTemplates, DynamicTemplatesAdmin)
 admin.site.register(SponsoredServices, SponsoredServicesAdmin)
 admin.site.register(IPDMedicinePageLead)
+admin.site.register(HospitalSponsoredServices, HospitalSponsoredServicesAdmin)
+admin.site.register(DoctorSponsoredServices, DoctorSponsoredServicesAdmin)
 
