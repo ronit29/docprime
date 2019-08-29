@@ -71,16 +71,14 @@ class CustomTemporaryUploadedFile(UploadedFile):
 
 def get_pdf_njs(html, filename):
     params = {'html': html, 'filename': filename}
-    base_url = str(settings.BASE_URL)
-    if base_url.find('localhost') > 0:
-        base_url = "https://docprime.com"
-    url = base_url + '/nodejs/html_to_pdf'
-    url = "http://localhost:4444/nodejs/html_to_pdf"
+    odbc_base_url = str(settings.ODBC_BASE_URL)
+    url = odbc_base_url + '/api/get_pdf'
+    # url = 'http://localhost:8000/api/get_pdf'
     response = requests.post(url, data=params, stream=True)
     if response.status_code == 200:
         object = response
         return object
-    logger.error("Error Generating PDF " + str(filename) + " from Node Server " + str(response.text))
+    logger.error("Error Generating PDF " + str(filename) + " from PDF Server " + str(response.text))
     return None
 
 def flatten_dict(d):

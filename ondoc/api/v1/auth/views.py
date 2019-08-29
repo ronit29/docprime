@@ -88,8 +88,8 @@ class LoginOTP(GenericViewSet):
 
     @transaction.atomic
     def generate(self, request, format=None):
-        from ondoc.prescription.models import PresccriptionPdf
-        from ondoc.doctor.models import OfflineOPDAppointments
+        # from ondoc.prescription.models import PresccriptionPdf
+        # from ondoc.doctor.models import OfflineOPDAppointments
         # opd = OfflineOPDAppointments.objects.last()
         # pdf = PresccriptionPdf.objects.last()
         # file = pdf.get_pdf(opd)
