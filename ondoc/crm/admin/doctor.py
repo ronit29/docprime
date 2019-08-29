@@ -2449,4 +2449,10 @@ class PurchaseOrderCreationAdmin(admin.ModelAdmin):
             read_only_fields += ['total_appointment_count', 'provider_name_hospital', 'total_amount_paid', 'gst_number',
                                  'provider_type', 'product_type']
 
+        if obj and obj.id and obj.start_date != None:
+            read_only_fields += ['start_date']
+
+        if obj and obj.id and obj.end_date != None:
+            read_only_fields += ['end_date']
+
         return read_only_fields
