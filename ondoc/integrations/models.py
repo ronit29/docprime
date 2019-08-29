@@ -223,6 +223,14 @@ class IntegratorHistory(TimeStampedModel):
                                              accepted_through=mode)
 
 
+class IntegratorCity(TimeStampedModel):
+    city_name = models.CharField(max_length=60, null=True, blank=True)
+    city_id = models.IntegerField(null=True, blank=True)
+
+    class Meta:
+        db_table = 'integrator_city'
+
+
 class IntegratorTestMapping(TimeStampedModel):
     from ondoc.diagnostic.models import LabTest
 
@@ -240,8 +248,6 @@ class IntegratorTestMapping(TimeStampedModel):
     name_params_required = models.BooleanField(default=False)
     test_type = models.CharField(max_length=30, null=True, blank=True)
     is_active = models.BooleanField(default=False)
-    integrator_city = models.CharField(max_length=60, null=True, blank=True)
-    integrator_city_id = models.IntegerField(null=True, blank=True)
 
     @classmethod
     def get_if_third_party_integration(cls, network_id=None):
@@ -285,3 +291,12 @@ class IntegratorLabTestParameterMapping(TimeStampedModel):
     class Meta:
         db_table = 'integrator_lab_test_parameter_mapping'
         unique_together = (('integrator_class_name', 'integrator_test_parameter_code'), )
+
+
+class IntegratorTestCityMapping(TimeStampedModel):
+    integrator_city = models.ForeignKey(IntegratorCity, null=True, on_delete=models.DO_NOTHING)
+    integrator_test_mapping = models.ForeignKey(IntegratorTestMapping, null=True, on_delete=models.DO_NOTHING, related_name='mapped_city_test')
+
+    class Meta:
+        db_table = 'integrator_test_city_mapping'
+
