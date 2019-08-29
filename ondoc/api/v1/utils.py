@@ -1988,9 +1988,9 @@ def rc_user_login(auth_token, auth_user_id, username):
     return response_data_dict
 
 
-def rc_group_create(auth_token, auth_user_id, patient_username, doctor_username):
-    members = [patient_username, doctor_username]
-    group_name = patient_username + doctor_username
+def rc_group_create(auth_token, auth_user_id, patient, rc_doctor):
+    members = [patient.rc_user.username, rc_doctor.username]
+    group_name = str(patient.id) + '_' + str(rc_doctor.doctor.id)
     group_create_response = requests.post(settings.ROCKETCHAT_SERVER + '/api/v1/groups.create',
                                           headers={'X-Auth-Token': auth_token,
                                                    'X-User-Id': auth_user_id,
@@ -2071,7 +2071,7 @@ def rc_users(e_obj, patient, auth_token, auth_user_id):
 
     rc_group_obj = get_existing_rc_group(rc_user_patient, rc_user_doc)
     if not rc_group_obj:
-        rc_group_obj, exception = RocketChatGroups.create_group(auth_token, auth_user_id, rc_user_patient, rc_user_doc)
+        rc_group_obj, exception = RocketChatGroups.create_group(auth_token, auth_user_id, patient, rc_user_doc)
     if exception:
         return exception
     e_obj.rc_group = rc_group_obj

@@ -84,15 +84,15 @@ class RocketChatGroups(auth_models.TimeStampedModel):
         return self
 
     @classmethod
-    def create_group(cls, auth_token, auth_user_id, rc_patient, rc_doctor):
+    def create_group(cls, auth_token, auth_user_id, patient, rc_doctor):
         rc_group_obj = e = None
         try:
-            response_data_dict = v1_utils.rc_group_create(auth_token, auth_user_id, rc_patient.username, rc_doctor.username)
+            response_data_dict = v1_utils.rc_group_create(auth_token, auth_user_id, patient, rc_doctor)
             if response_data_dict['success']:
                 group_id = response_data_dict['group']['_id']
                 group_name = response_data_dict['group']['name']
                 rc_group_obj = cls(group_id=group_id, group_name=group_name, data=response_data_dict)
-                rc_group_obj.create_auto_login_link(rc_patient.login_token, rc_doctor.login_token)
+                rc_group_obj.create_auto_login_link(patient.rc_user.login_token, rc_doctor.login_token)
                 rc_group_obj.save()
             else:
                 raise Exception(response_data_dict['error'])
