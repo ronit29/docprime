@@ -777,10 +777,19 @@ class NotificationEndpoint(TimeStampedModel):
         return "{}-{}".format(self.user.phone_number, self.token)
 
     @classmethod
-    def get_user_and_tokens(cls, receivers):
+    def get_user_and_tokens(cls, receivers, **kwargs):
+        from ondoc.notification.models import NotificationAction
         user_and_tokens = list()
-        user_and_token = [{'user': token.user, 'token': token.token, 'app_name': token.app_name} for token in
-                          cls.objects.select_related('user').filter(user__in=receivers).order_by('user')]
+        if kwargs.get("action_type") == NotificationAction.E_CONSULTATION:
+            user_and_token = [{'user': token.user, 'token': token.token, 'app_name': token.app_name} for token in
+                              cls.objects.select_related('user').filter(Q(user__in=receivers), Q(Q(platform="android",
+                                                                                                   app_version__gt="2.100.13") |
+                                                                                                 Q(platform="ios",
+                                                                                                   app_version__gt="2.200.9"))) \
+                                                                .order_by('user')]
+        else:
+            user_and_token = [{'user': token.user, 'token': token.token, 'app_name': token.app_name} for token in
+                              cls.objects.select_related('user').filter(user__in=receivers).order_by('user')]
         for user, user_token_group in groupby(user_and_token, key=lambda x: x['user']):
             user_and_tokens.append(
                 {'user': user,

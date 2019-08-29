@@ -1404,7 +1404,7 @@ class OpdNotification(Notification):
             "image_url": "",
             "time_slot_start": time_slot_start,
             "attachments": {},  # Updated later
-            "screen": "appointment",
+            "screen": NotificationAction.APPOINTMENT,
             "type": "doctor",
             "cod_amount": self.appointment.get_cod_amount(),
             "mask_number": mask_number,
@@ -1608,7 +1608,7 @@ class LabNotification(Notification):
             "tests": tests,
             "reports": report_file_links,
             "attachments": {},  # Updated later
-            "screen": "appointment",
+            "screen": NotificationAction.APPOINTMENT,
             "type": "lab",
             "mask_number": mask_number,
             "email_banners": email_banners_html if email_banners_html is not None else "",
@@ -2112,6 +2112,11 @@ class EConsultationComm(Notification):
             "action_type": NotificationAction.E_CONSULTATION,
             "action_id": self.e_consultation.id,
             "link": self.e_consultation.link,
+            "screen": NotificationAction.E_CONSULT_CHAT_VIEW,
+            "is_open_screen": True,
+            "screen_params": {
+                "id": self.e_consultation.id
+            }
         }
         return context
 
@@ -2128,7 +2133,7 @@ class EConsultationComm(Notification):
             push_receivers.extend(receivers)
             sms_receivers = [{"user": receiver, "phone_number": receiver.phone_number} for receiver in receivers]
             email_receivers = [{"user": receiver, "email": receiver.email} for receiver in receivers if receiver.email]
-        user_and_tokens = NotificationEndpoint.get_user_and_tokens(receivers=push_receivers)
+        user_and_tokens = NotificationEndpoint.get_user_and_tokens(receivers=push_receivers, action_type=NotificationAction.E_CONSULTATION)
         all_receivers['sms_receivers'] = sms_receivers
         all_receivers['email_receivers'] = email_receivers
         all_receivers['push_receivers'] = user_and_tokens

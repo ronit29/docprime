@@ -1236,7 +1236,7 @@ class PartnerEConsultationViewSet(viewsets.GenericViewSet):
             receivers = list()
             patient = e_consultation.get_patient_and_number()[0]
             receivers.append(patient.user)
-            user_and_tokens = comm_models.NotificationEndpoint.get_user_and_tokens(receivers=receivers)
+            user_and_tokens = comm_models.NotificationEndpoint.get_user_and_tokens(receivers=receivers, kwargs=NotificationAction.E_CONSULTATION)
             push_notification = comm_models.PUSHNotification(notification_type=notif_models.NotificationAction.E_CONSULT_VIDEO_LINK_SHARE, context={'patient_name': patient.name})
             push_notification.send(receivers=user_and_tokens)
             return Response({"status": 1, "message": "Message posted"})

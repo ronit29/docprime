@@ -219,6 +219,13 @@ class NotificationAction:
         (E_CONSULTATION, 'E Consultation'),
     )
 
+    APPOINTMENT = "appointment"
+    E_CONSULT_CHAT_VIEW = "EConsultChatView"
+    SCREEN_TYPE_CHOICES = (
+        (APPOINTMENT, 'appointment'),
+        (E_CONSULT_CHAT_VIEW, 'e_consult_chat_view'),
+    )
+
     @classmethod
     def trigger(cls, instance, user, notification_type):
         from ondoc.doctor.models import OpdAppointment
