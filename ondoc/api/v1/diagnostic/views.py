@@ -3699,16 +3699,10 @@ class IPDMedicinePageLeadViewSet(viewsets.GenericViewSet):
         try:
             ipd_med_page_object.save()
             # return Response(status=status.HTTP_200_OK)
-            return Response({})
+            return Response({'success':'true'}, status=status.HTTP_200_OK)
         except Exception as e:
             logger.error(str(e))
-            return Response(status=status.HTTP_500_INTERNAL_SERVER_ERROR)
-
-
-
-
-
-
+            return Response({'message': 'Lead is not created.'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 class AllMatrixCitiesViewSet(viewsets.GenericViewSet):
 
