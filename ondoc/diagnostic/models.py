@@ -1836,10 +1836,10 @@ class LabAppointment(TimeStampedModel, CouponsMixin, LabAppointmentInvoiceMixin,
 
         if self.time_slot_start:
             first_time_slot = self.time_slot_start
-        else:
-            first_time_slot_test = self.test_mappings.order_by('time_slot_start').first()
-            if first_time_slot_test:
-                first_time_slot = first_time_slot_test.time_slot_start
+        # else:
+        #     first_time_slot_test = self.test_mappings.order_by('time_slot_start').first()
+        #     if first_time_slot_test:
+        #         first_time_slot = first_time_slot_test.time_slot_start
 
         if first_time_slot:
             if user_type == User.CONSUMER and current_datetime <= first_time_slot:
