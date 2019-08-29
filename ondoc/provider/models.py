@@ -3,9 +3,10 @@ from ondoc.doctor import models as doc_models
 from ondoc.authentication import models as auth_models
 from ondoc.common import models as common_models
 from ondoc.account import models as acct_mdoels
+from ondoc.prescription import models as pres_models
 from django.contrib.contenttypes.fields import GenericRelation
 from django.contrib.postgres.fields import JSONField
-import logging, json, uuid
+import logging, json, uuid, requests
 logger = logging.getLogger(__name__)
 from django.conf import settings
 from ondoc.api.v1 import utils as v1_utils
@@ -100,6 +101,14 @@ class RocketChatGroups(auth_models.TimeStampedModel):
             return rc_group_obj, e
         return rc_group_obj, e
 
+    def post_chat_message(self, user_id, user_token, request_data):
+        response = requests.post(settings.ROCKETCHAT_SERVER + '/api/v1/chat.postMessage',
+                                 headers={'X-Auth-Token': user_token,
+                                          'X-User-Id': user_id,
+                                          'Content-Type': 'application/json'},
+                                 data=json.dumps(request_data))
+        return response
+
     def __str__(self):
         return str(self.id)
 
@@ -147,6 +156,7 @@ class EConsultation(auth_models.TimeStampedModel, auth_models.CreatedByModel):
     merchant_payout = models.ForeignKey(acct_mdoels.MerchantPayout, related_name="econsultations", on_delete=models.SET_NULL, null=True)
     rc_group = models.ForeignKey(RocketChatGroups, related_name='econsultations', on_delete=models.SET_NULL, null=True)
     user = models.ForeignKey(auth_models.User, on_delete=models.SET_NULL, null=True, related_name="econsultationss")
+    prescription_file = GenericRelation(pres_models.AppointmentPrescription, related_query_name='econsult_pres_file')
 
     def update_consultation(self):
         self.payment_status = self.PAYMENT_ACCEPTED

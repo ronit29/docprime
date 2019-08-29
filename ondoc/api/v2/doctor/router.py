@@ -32,6 +32,7 @@ urlpatterns = [
     path('ecs/share', views.PartnerEConsultationViewSet.as_view({'get': 'share'}), name='ecs_share'),
     path('ecs/complete', views.PartnerEConsultationViewSet.as_view({'post': 'complete'}), name='ecs_complete'),
     path('ecs/video_link', views.PartnerEConsultationViewSet.as_view({'post': 'video_link_share'}), name='ecs_video_link_share'),
+    path('ecs/pres/upload', views.PartnerEConsultationViewSet.as_view({'post': 'prescription_upload'}), name='ecs_prescription_upload'),
     path('pecs/pay', views.ConsumerEConsultationViewSet.as_view({'post': 'create_order'}), name='pecs_pay'),
     path('pecs/list', views.ConsumerEConsultationViewSet.as_view({'get': 'list'}), name='pecs_list'),
     path('pecs/get_id', views.ConsumerEConsultationViewSet.as_view({'get': 'get_order_consult_id'}), name='pecs_get_id'),
