@@ -53,7 +53,7 @@ from django.contrib.contenttypes.fields import GenericRelation
 from django.contrib.contenttypes.fields import GenericForeignKey
 from django.contrib.contenttypes.models import ContentType
 from ondoc.matrix.tasks import push_appointment_to_matrix, push_onboarding_qcstatus_to_matrix, \
-    create_ipd_lead_from_lab_appointment
+    create_ipd_lead_from_lab_appointment, create_or_update_lead_on_matrix
 from ondoc.integrations.task import push_lab_appointment_to_integrator, get_integrator_order_status
 from ondoc.location import models as location_models
 from ondoc.ratings_review import models as ratings_models
@@ -3310,3 +3310,28 @@ class LabTestCategoryLandingURLS(TimeStampedModel):
 
     class Meta:
         db_table = "lab_test_category_landing_urls"
+
+
+
+class IPDMedicinePageLead(auth_model.TimeStampedModel):
+    name = models.CharField(max_length=500)
+    phone_number = models.BigIntegerField(validators=[MaxValueValidator(9999999999), MinValueValidator(1000000000)])
+    matrix_city = models.ForeignKey(MatrixMappedCity, on_delete=models.SET_NULL, null=True)
+    matrix_lead_id = models.IntegerField(null=True)
+    lead_source = models.CharField(null=True, max_length=1000)
+
+    class Meta:
+        db_table = "ipd_medicine_lead"
+
+    def __str__(self):
+        return self.name
+
+    def save(self, force_insert=False, force_update=False, using=None, update_fields=None):
+
+        if not self.id:
+            super().save(force_insert, force_update, using, update_fields)
+
+        if not self.matrix_lead_id:
+            create_or_update_lead_on_matrix.apply_async(({'obj_type': self.__class__.__name__, 'obj_id': self.id}, ), countdown=5)
+
+
