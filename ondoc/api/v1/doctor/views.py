@@ -1079,6 +1079,7 @@ class DoctorProfileUserViewSet(viewsets.GenericViewSet):
                 cod_to_prepaid['payment_status'] = opd_appoint.payment_status
                 cod_to_prepaid['payment_type'] = opd_appoint.payment_type
                 cod_to_prepaid['is_cod_to_prepaid'] = opd_appoint.is_cod_to_prepaid
+                cod_to_prepaid['formatted_date'] = opd_appoint.time_slot_start.date() if opd_appoint.time_slot_start else None
                 day = opd_appoint.time_slot_start.weekday()
                 doc_clinic_timing = DoctorClinicTiming.objects.filter(doctor_clinic__doctor = doctor_id, doctor_clinic__hospital=validated_data.get('hospital_id'), day = day)
                 if doc_clinic_timing:
