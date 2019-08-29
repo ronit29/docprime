@@ -2041,16 +2041,17 @@ class OrderDetailViewSet(GenericViewSet):
             item = OrderCartItemMapper(order)
             temp_time_slot_start = None
             temp_test_time_slots = []
-            if order.action_data.get('multi_timings_enabled'):
-                for test_time_slot in order.action_data.get('test_time_slots'):
-                    test_id = test_time_slot.get('test_id')
-                    test_data = dict()
-                    test_data['test_id'] = test_id
-                    test_data['time_slot_start'] = convert_datetime_str_to_iso_str(test_time_slot.get('time_slot_start'))
-                    test_data['is_home_pickup'] = test_time_slot.get('is_home_pickup')
-                    temp_test_time_slots.append(test_data)
-            else:
-                temp_time_slot_start = convert_datetime_str_to_iso_str(order.action_data["time_slot_start"])
+            # if order.action_data.get('multi_timings_enabled'):
+            #     for test_time_slot in order.action_data.get('test_time_slots'):
+            #         test_id = test_time_slot.get('test_id')
+            #         test_data = dict()
+            #         test_data['test_id'] = test_id
+            #         test_data['time_slot_start'] = convert_datetime_str_to_iso_str(test_time_slot.get('time_slot_start'))
+            #         test_data['is_home_pickup'] = test_time_slot.get('is_home_pickup')
+            #         temp_test_time_slots.append(test_data)
+            # else:
+            #     temp_time_slot_start = convert_datetime_str_to_iso_str(order.action_data["time_slot_start"])
+            temp_time_slot_start = convert_datetime_str_to_iso_str(order.action_data["time_slot_start"])
             curr = {
                 "mrp": order.action_data["mrp"] if "mrp" in order.action_data else order.action_data["agreed_price"],
                 "deal_price": order.action_data["deal_price"],

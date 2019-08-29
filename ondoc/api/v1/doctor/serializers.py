@@ -423,18 +423,18 @@ class UpdateStatusSerializer(serializers.Serializer):
         queryset=CancellationReason.objects.filter(visible_on_front_end=True), required=False)
     cancellation_comment = serializers.CharField(required=False, allow_blank=True)
     source = serializers.ChoiceField(required=False, choices=AppointmentHistory.SOURCE_CHOICES)
-    test_timings = serializers.ListSerializer(child=LabAppointmentTestMappingSerializer(), required=False, allow_empty=False)
+    # test_timings = serializers.ListSerializer(child=LabAppointmentTestMappingSerializer(), required=False, allow_empty=False)
     multi_timings_enabled = serializers.BooleanField(required=False, default=False)
-    selected_timings_type = serializers.ChoiceField(required=False,
-                                                    choices=(('common', 'common'), ('separate', 'separate')))
+    # selected_timings_type = serializers.ChoiceField(required=False,
+    #                                                 choices=(('common', 'common'), ('separate', 'separate')))
 
-    def __init__(self, instance=None, data=None, **kwargs):
-        super().__init__(instance, data, **kwargs)
-        if data and data.get('multi_timings_enabled'):
-            self.fields.fields['start_date'].required = False
-            self.fields.fields['start_time'].required = False
-            self.fields.fields['test_timings'].required = True
-            self.fields.fields['selected_timings_type'].required = True
+    # def __init__(self, instance=None, data=None, **kwargs):
+    #     super().__init__(instance, data, **kwargs)
+    #     if data and data.get('multi_timings_enabled'):
+    #         self.fields.fields['start_date'].required = False
+    #         self.fields.fields['start_time'].required = False
+    #         self.fields.fields['test_timings'].required = True
+    #         # self.fields.fields['selected_timings_type'].required = True
 
 class DoctorImageSerializer(serializers.ModelSerializer):
 

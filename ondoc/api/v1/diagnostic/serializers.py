@@ -496,7 +496,7 @@ class LabAppointmentTestMappingSerializer(serializers.ModelSerializer):
     class Meta:
         model = LabAppointmentTestMapping
         fields = ('test_id', 'mrp', 'test', 'agreed_price', 'deal_price',
-                  'is_home_collection_enabled', 'time_slot_start', 'is_home_pickup', 'test_type')
+                  'is_home_collection_enabled', 'test_type')
 
 
 class LabCustomSerializer(serializers.Serializer):
@@ -817,7 +817,7 @@ class LabAppTransactionModelSerializer(serializers.Serializer):
     agreed_price = serializers.DecimalField(max_digits=10, decimal_places=2)
     deal_price = serializers.DecimalField(max_digits=10, decimal_places=2)
     effective_price = serializers.DecimalField(max_digits=10, decimal_places=2)
-    time_slot_start = serializers.DateTimeField(allow_null=True)
+    time_slot_start = serializers.DateTimeField(required=True, allow_null=True)
     profile_detail = serializers.JSONField()
     status = serializers.IntegerField()
     payment_type = serializers.IntegerField()
@@ -834,23 +834,24 @@ class LabAppTransactionModelSerializer(serializers.Serializer):
     user_plan = serializers.PrimaryKeyRelatedField(queryset=UserPlanMapping.objects.all(), allow_null=True)
     coupon_data = serializers.JSONField(required=False)
     prescription_list = serializers.ListSerializer(child=PrescriptionDocumentSerializer(), required=False)
-    test_time_slots = serializers.ListSerializer(child=LabAppointmentTestTransactionSerializer(), required=False, allow_empty=False)
+    # test_time_slots = serializers.ListSerializer(child=LabAppointmentTestTransactionSerializer(), required=False, allow_empty=False)
     selected_timings_type = serializers.ChoiceField(required=False, choices=(('common', 'common'), ('separate', 'separate')))
 
     def __init__(self, instance=None, data=None, **kwargs):
         super().__init__(instance, data, **kwargs)
         if data.get('multi_timings_enabled'):
-            data.pop('time_slot_start', None)
-            data.pop('is_home_pickup', None)
-            self.fields.fields['time_slot_start'].required = False
-            self.fields.fields['is_home_pickup'].required = False
-            self.fields.fields['test_time_slots'].required = True
+            # data.pop('time_slot_start', None)
+            # data.pop('is_home_pickup', None)
+            # self.fields.fields['time_slot_start'].required = False
+            # self.fields.fields['is_home_pickup'].required = False
+            # self.fields.fields['test_time_slots'].required = True
             self.fields.fields['selected_timings_type'].required = True
         else:
-            data.pop('test_time_slots', None)
-            self.fields.fields['test_time_slots'].required = False
-            self.fields.fields['selected_timings_type'].required = False
-            self.fields.fields['time_slot_start'].required = True
+            data.pop('selected_timings_type', None)
+            # data.pop('test_time_slots', None)
+            # self.fields.fields['test_time_slots'].required = False
+            # self.fields.fields['selected_timings_type'].required = False
+            # self.fields.fields['time_slot_start'].required = True
 
 
 class LabAppRescheduleModelSerializer(serializers.ModelSerializer):
@@ -961,6 +962,14 @@ class LabAppointmentCreateSerializer(serializers.Serializer):
 
         if not utils.is_valid_testing_lab_data(request.user, data["lab"]):
             raise serializers.ValidationError("Both User and Lab should be for testing")
+
+        if data.get('multi_timings_enabled') and data.get('selected_timings_type') == 'common':
+            if not data.get('test_timings'):
+                raise serializers.ValidationError("Start date and start time not found")
+            else:
+                data['start_date'] = data.get('test_timings')[0].get('start_date')
+                data['start_time'] = data.get('test_timings')[0].get('start_time')
+                data['is_home_pickup'] = data.get('test_timings')[0].get('is_home_pickup')
 
         address_required = False
         if data.get('multi_timings_enabled'):
@@ -1122,17 +1131,26 @@ class LabAppointmentCreateSerializer(serializers.Serializer):
 
         if check_active_appointment:
             if data.get('multi_timings_enabled'):
-                user_active_appointments = LabAppointment.objects.prefetch_related('test_mappings').filter(profile=data.get("profile"),
-                                                                                lab=data.get("lab")) \
-                        .exclude(status__in=[LabAppointment.COMPLETED, LabAppointment.CANCELLED])
-                if user_active_appointments:
-                    # radiology_timings = list(filter(lambda x: x.get('type') == LabTest.RADIOLOGY), test_timings)
-                    for test_timing in test_timings:
-                        test_time_slot_start = form_time_slot(test_timing.get('start_date'), test_timing.get('start_time'))
-                        if user_active_appointments.filter(test_mappings__test_id=test_timing.get('test'),
-                                                           test_mappings__time_slot_start=test_time_slot_start).exists():
-                            raise serializers.ValidationError(
-                                "One active appointment for the selected date & time already exists. Please change the date & time of the appointment.")
+                # user_active_appointments = LabAppointment.objects.prefetch_related('test_mappings').filter(profile=data.get("profile"),
+                #                                                                 lab=data.get("lab")) \
+                #         .exclude(status__in=[LabAppointment.COMPLETED, LabAppointment.CANCELLED])
+                # if user_active_appointments:
+                #     # radiology_timings = list(filter(lambda x: x.get('type') == LabTest.RADIOLOGY), test_timings)
+                #     for test_timing in test_timings:
+                #         test_time_slot_start = form_time_slot(test_timing.get('start_date'), test_timing.get('start_time'))
+                #         if user_active_appointments.filter(test_mappings__test_id=test_timing.get('test'),
+                #                                            test_mappings__time_slot_start=test_time_slot_start).exists():
+                #             raise serializers.ValidationError(
+                #                 "One active appointment for the selected date & time already exists. Please change the date & time of the appointment.")
+
+                for test_timing in test_timings:
+                    test_time_slot_start = form_time_slot(test_timing.get('start_date'), test_timing.get('start_time'))
+                    if LabAppointment.objects.filter(profile=data.get("profile"), lab=data.get("lab"),
+                                                     tests__in=data.get("test_ids"),
+                                                     time_slot_start=test_time_slot_start) \
+                            .exclude(status__in=[LabAppointment.COMPLETED, LabAppointment.CANCELLED]).exists():
+                        raise serializers.ValidationError(
+                            "One active appointment for the selected date & time already exists. Please change the date & time of the appointment.")
             else:
                 if LabAppointment.objects.filter(profile=data.get("profile"), lab=data.get("lab"),
                                                  tests__in=data.get("test_ids"), time_slot_start=pathology_time_slot_start) \

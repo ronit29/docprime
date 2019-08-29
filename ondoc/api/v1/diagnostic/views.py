@@ -2418,27 +2418,50 @@ class LabAppointmentView(mixins.CreateModelMixin,
                 'insurance_message'] = False, None, ""
         # data['is_appointment_insured'], data['insurance_id'], data['insurance_message'] = Cart.check_for_insurance(validated_data, request)
 
-        cart_item_id = validated_data.get('cart_item').id if validated_data.get('cart_item') else None
+        multiple_appointments = False
+        if validated_data.get('multi_timings_enabled'):
+            if validated_data.get('selected_timings_type') == 'separate':
+                multiple_appointments = True
 
-        if validated_data.get("existing_cart_item"):
-            cart_item = validated_data.get("existing_cart_item")
-            old_cart_obj = Cart.objects.filter(id=validated_data.get('existing_cart_item').id).first()
-            payment_type = old_cart_obj.data.get('payment_type')
-            if payment_type == OpdAppointment.INSURANCE and data['is_appointment_insured'] == False:
-                data['payment_type'] = OpdAppointment.PREPAID
-            # cart_item.data = request.data
-            cart_item.data = data
-            cart_item.save()
+        cart_items = []
+        if multiple_appointments:
+            pathology_data = None
+            for test_timing in validated_data.get('test_timings'):
+                test_type = test_timing.get('type')
+                if test_type == LabTest.PATHOLOGY:
+                    if not pathology_data:
+                        pathology_data = copy.deepcopy(data)
+                        pathology_data['test_ids'] = []
+                        pathology_data['start_date'] = str(test_timing['start_date'])
+                        pathology_data['start_time'] = test_timing['start_time']
+                        pathology_data['is_home_pickup'] = test_timing['is_home_pickup']
+                    pathology_data['test_ids'].append(test_timing['test'].id)
+                elif test_type == LabTest.RADIOLOGY:
+                    new_data = copy.deepcopy(data)
+                    new_data['start_date'] = str(test_timing['start_date'])
+                    new_data['start_time'] = test_timing['start_time']
+                    new_data['is_home_pickup'] = test_timing['is_home_pickup']
+                    new_data['test_ids'] = [test_timing['test'].id]
+                    cart_item = Cart.add_items_to_cart(request, validated_data, new_data)
+                    if cart_item:
+                        cart_items.append(cart_item)
+
+            if pathology_data:
+                cart_item = Cart.add_items_to_cart(request, validated_data, pathology_data)
+                if cart_item:
+                    cart_items.append(cart_item)
         else:
-            cart_item, is_new = Cart.objects.update_or_create(id=cart_item_id, deleted_at__isnull=True, product_id=account_models.Order.LAB_PRODUCT_ID,
-                                                  user=request.user, defaults={"data": data})
+            cart_item = Cart.add_items_to_cart(request, validated_data, data)
+            if cart_item:
+                cart_items.append(cart_item)
 
         if hasattr(request, 'agent') and request.agent:
-            resp = { 'is_agent': True , "status" : 1 }
+            resp = {'is_agent': True, "status":1}
         else:
-            resp = account_models.Order.create_order(request, [cart_item], validated_data.get("use_wallet"))
+            resp = account_models.Order.create_order(request, cart_items, validated_data.get("use_wallet"))
 
         return Response(data=resp)
+
 
     def form_lab_app_data(self, request, data):
         deal_price_calculation = Case(When(custom_deal_price__isnull=True, then=F('computed_deal_price')),

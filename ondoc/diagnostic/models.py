@@ -2210,7 +2210,7 @@ class LabAppointment(TimeStampedModel, CouponsMixin, LabAppointmentInvoiceMixin,
         appointment_data["action_data"] = dict()
         appointment_data["action_data"]["selected_timings_type"] = appointment_data.pop('selected_timings_type', 'separate')
         lab_ids = appointment_data.pop("lab_test")
-        test_timeslots = appointment_data.pop('test_time_slots') if appointment_data.get('test_time_slots', []) else []
+        # test_timeslots = appointment_data.pop('test_time_slots') if appointment_data.get('test_time_slots', []) else []
         coupon_list = appointment_data.pop("coupon", None)
         coupon_data = {
             "random_coupons": appointment_data.pop("coupon_data", [])
@@ -2234,8 +2234,8 @@ class LabAppointment(TimeStampedModel, CouponsMixin, LabAppointmentInvoiceMixin,
             test['computed_deal_price'] = Decimal(test['computed_deal_price']) if test['computed_deal_price'] != 'None' else None
             test['custom_agreed_price'] = Decimal(test['custom_agreed_price']) if test['custom_agreed_price'] != 'None' else None
             test['computed_agreed_price'] = Decimal(test['computed_agreed_price']) if test['computed_agreed_price'] != 'None' else None
-            test['time_slot_start'] = test['time_slot_start'] if test['time_slot_start'] != 'None' else None
-            test['is_home_pickup'] = test['is_home_pickup'] if test['is_home_pickup'] != 'None' else False
+            # test['time_slot_start'] = test['time_slot_start'] if test['time_slot_start'] != 'None' else None
+            # test['is_home_pickup'] = test['is_home_pickup'] if test['is_home_pickup'] != 'None' else False
             test_mappings.append(LabAppointmentTestMapping(**test))
         LabAppointmentTestMapping.objects.bulk_create(test_mappings)
         app_obj.lab_test.add(*lab_ids)
@@ -2546,25 +2546,28 @@ class LabAppointment(TimeStampedModel, CouponsMixin, LabAppointmentInvoiceMixin,
         radiology_home_pickup = False
         time_slot_dict = dict()
 
-        if data.get('multi_timings_enabled'):
-            for test_timing in data.get('test_timings'):
-                test_id = test_timing.get('test').id
-                test_data = dict()
-                test_data['test_id'] = test_id
-                time_slot_start = form_time_slot(test_timing["start_date"], test_timing["start_time"])
-                test_data['time_slot_start'] = time_slot_start
-                time_slot_dict[test_id] = time_slot_start
-                test_data['is_home_pickup'] = test_timing.get('is_home_pickup')
-                test_time_slots.append(test_data)
-                if test_timing.get('type') == LabTest.PATHOLOGY:
-                    if not pathology_home_pickup:
-                        pathology_home_pickup = test_timing.get('is_home_pickup')
-                if test_timing.get('type') == LabTest.RADIOLOGY:
-                    if not radiology_home_pickup:
-                        radiology_home_pickup = test_timing.get('is_home_pickup')
-        else:
-            time_slot_details = form_time_slot(data["start_date"], data["start_time"])
-            is_home_pickup = data["is_home_pickup"]
+        # if data.get('multi_timings_enabled'):
+        #     for test_timing in data.get('test_timings'):
+        #         test_id = test_timing.get('test').id
+        #         test_data = dict()
+        #         test_data['test_id'] = test_id
+        #         time_slot_start = form_time_slot(test_timing["start_date"], test_timing["start_time"])
+        #         test_data['time_slot_start'] = time_slot_start
+        #         time_slot_dict[test_id] = time_slot_start
+        #         test_data['is_home_pickup'] = test_timing.get('is_home_pickup')
+        #         test_time_slots.append(test_data)
+        #         if test_timing.get('type') == LabTest.PATHOLOGY:
+        #             if not pathology_home_pickup:
+        #                 pathology_home_pickup = test_timing.get('is_home_pickup')
+        #         if test_timing.get('type') == LabTest.RADIOLOGY:
+        #             if not radiology_home_pickup:
+        #                 radiology_home_pickup = test_timing.get('is_home_pickup')
+        # else:
+        #     time_slot_details = form_time_slot(data["start_date"], data["start_time"])
+        #     is_home_pickup = data["is_home_pickup"]
+
+        time_slot_details = form_time_slot(data["start_date"], data["start_time"])
+        is_home_pickup = data["is_home_pickup"]
 
         for obj in lab_test_queryset:
             test_ids_list.append(obj.id)
@@ -2581,8 +2584,8 @@ class LabAppointment(TimeStampedModel, CouponsMixin, LabAppointmentInvoiceMixin,
                 "mrp": str(obj.mrp),
                 "computed_agreed_price": str(obj.computed_agreed_price),
                 "custom_agreed_price": str(obj.custom_agreed_price),
-                "is_home_pickup": home_pickup,
-                "time_slot_start": str(time_slot_dict.get(obj.test.id)) if time_slot_dict.get(obj.test.id) else None
+                # "is_home_pickup": home_pickup,
+                # "time_slot_start": str(time_slot_dict.get(obj.test.id)) if time_slot_dict.get(obj.test.id) else None
             })
 
         profile_detail = {
@@ -2617,6 +2620,7 @@ class LabAppointment(TimeStampedModel, CouponsMixin, LabAppointmentInvoiceMixin,
             else:
                 payment_type = data["payment_type"]
 
+        # "test_time_slots": test_time_slots,
         fulfillment_data = {
             "lab": data["lab"],
             "user": user,
@@ -2627,7 +2631,6 @@ class LabAppointment(TimeStampedModel, CouponsMixin, LabAppointmentInvoiceMixin,
             "effective_price": effective_price,
             "home_pickup_charges": price_data.get("home_pickup_charges"),
             "time_slot_start": time_slot_details,
-            "test_time_slots": test_time_slots,
             "is_home_pickup": is_home_pickup,
             "profile_detail": profile_detail,
             "status": LabAppointment.BOOKED,
@@ -3286,8 +3289,6 @@ class LabAppointmentTestMapping(models.Model):
     custom_agreed_price = models.DecimalField(max_digits=10, decimal_places=2, default=None, null=True, blank=True)
     computed_deal_price = models.DecimalField(max_digits=10, decimal_places=2, default=None, null=True, blank=True)
     custom_deal_price = models.DecimalField(max_digits=10, decimal_places=2, default=None, null=True, blank=True)
-    time_slot_start = models.DateTimeField(blank=True, null=True)
-    is_home_pickup = models.BooleanField(default=False)
 
     def __str__(self):
         return '{}>{}'.format(self.appointment, self.test)
