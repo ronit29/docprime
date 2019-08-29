@@ -52,7 +52,7 @@ from ondoc.doctor.models import (Doctor, DoctorQualification,
                                  PatientMobile, DoctorMobileOtp,
                                  UploadDoctorData, CancellationReason, Prescription, PrescriptionFile,
                                  SimilarSpecializationGroup, SimilarSpecializationGroupMapping, PurchaseOrderCreation,
-                                 DoctorSponsoredServices, SponsoredServicePracticeSpecialization)
+                                 DoctorSponsoredServices, SponsoredServicePracticeSpecialization, SponsoredServices)
 
 from ondoc.authentication.models import User
 from .common import *
@@ -2487,7 +2487,15 @@ class SponsoredServicePracticeSpecializationInline(admin.TabularInline):
     show_change_link = True
     fields = ['sponsored_service', 'specialization', 'is_primary_specialization']
 
+#
+# class SponsoredServicesResource(resources.ModelResource):
+#     class Meta:
+#         model = SponsoredServices
+#         fields = ('id', 'name')
 
-class SponsoredServicesAdmin(admin.ModelAdmin):
+
+class SponsoredServicesAdmin(ImportExportMixin, admin.ModelAdmin):
     search_fields = ['name']
+    formats = (base_formats.XLS, base_formats.XLSX,)
     inlines = [ SponsoredServicePracticeSpecializationInline ]
+    # resource_class = SponsoredServicesResource
