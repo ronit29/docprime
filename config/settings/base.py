@@ -69,12 +69,15 @@ FILE_UPLOAD_PERMISSIONS = 0o664
 # Database
 # https://docs.djangoproject.com/en/2.0/ref/settings/#databases
 
-
+DATABASE_ROUTERS = ['config.settings.db_router.DatabaseRouter']
 DATABASES = {
-    'default': env.db('DATABASE_URL')
+    'default': env.db('DATABASE_URL'),
 }
 
 DATABASES['default']['ENGINE'] = 'django.contrib.gis.db.backends.postgis'
+# if (env('DJANGO_SETTINGS_MODULE') == 'config.settings.production'):
+#     DATABASES['doc_read'] = env.db('READ_DATABASE_URL')
+#     DATABASES['doc_read']['ENGINE'] = 'django.contrib.gis.db.backends.postgis'
 
 try:
     if env('MSSQL_HOST') and env('MSSQL_USERNAME') and env('MSSQL_PASSWORD'):
@@ -85,7 +88,7 @@ try:
              'PASSWORD': env('MSSQL_PASSWORD'),
              'NAME': env('MSSQL_DB'),
              'OPTIONS': {
-                  'driver' : 'ODBC Driver 17 for SQL Server'
+                  'driver': 'ODBC Driver 17 for SQL Server'
             }
         }
 except Exception as e:
@@ -107,9 +110,6 @@ except Exception as e:
     print(e)
     print('Failed to connect to mongo')
     MONGO_STORE = False
-
-
-DATABASE_ROUTERS = ['config.settings.db_router.DatabaseRouter']
 
 # Application definition
 
