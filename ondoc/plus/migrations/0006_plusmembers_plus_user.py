@@ -16,4 +16,9 @@ class Migration(migrations.Migration):
             name='plus_user',
             field=models.ForeignKey(default=None, on_delete=django.db.models.deletion.DO_NOTHING, related_name='plus_members', to='plus.PlusUser'),
         ),
+        migrations.AddField(
+            model_name='plusplans',
+            name='features',
+            field=django.contrib.postgres.fields.jsonb.JSONField(default=dict),
+        ),
     ]

@@ -7,6 +7,10 @@ from django.core.validators import FileExtensionValidator, MaxValueValidator, Mi
 from django.contrib.postgres.fields import JSONField
 from django.utils import timezone
 from ondoc.account import models as account_model
+from ondoc.authentication.models import UserProfile
+from ondoc.common.helper import Choices
+import json
+
 
 
 class LiveMixin(models.Model):
@@ -43,6 +47,15 @@ class PlusProposer(auth_model.TimeStampedModel):
     def __str__(self):
         return "{}".format(self.name)
 
+
+    @property
+    def get_active_plans(self):
+        return self.plus_plans.filter(is_live=True).order_by('total_allowed_members')
+
+    @property
+    def get_all_plans(self):
+        return self.plus_plans.all().order_by('total_allowed_members')
+
     class Meta:
         db_table = 'plus_proposer'
 
@@ -51,18 +64,58 @@ class PlusPlans(auth_model.TimeStampedModel, LiveMixin):
     plan_name = models.CharField(max_length=300)
     proposer = models.ForeignKey(PlusProposer, related_name='plus_plans', on_delete=models.DO_NOTHING)
     internal_name = models.CharField(max_length=200, null=True)
-    amount = models.PositiveIntegerField(default=0)
+    mrp = models.PositiveIntegerField(default=0)
+    deal_price = models.PositiveIntegerField(default=0)
+    tax_rebate = models.PositiveIntegerField(default=0)
     tenure = models.PositiveIntegerField(default=1)
     enabled = models.BooleanField(default=False)
     is_live = models.BooleanField(default=False)
     total_allowed_members = models.PositiveSmallIntegerField(default=0)
     is_selected = models.BooleanField(default=False)
+    features = JSONField(blank=False, null=False, default=dict)
 
     def __str__(self):
         return "{}".format(self.plan_name)
 
     class Meta:
         db_table = 'plus_plans'
+
+
+class PlusPlanParameters(auth_model.TimeStampedModel):
+    key = models.CharField(max_length=100, null=False, blank=False)
+    details = models.CharField(max_length=500, null=False, blank=False)
+
+    def __str__(self):
+        return "{}".format(self.key)
+
+    class Meta:
+        db_table = 'plus_plan_parameters'
+
+
+class PlusPlanParametersMapping(auth_model.TimeStampedModel):
+    plus_plan = models.ForeignKey(PlusPlans, related_name="plan_parameters", null=False, blank=False, on_delete=models.CASCADE)
+    parameter = models.ForeignKey(PlusPlanParameters, null=False, blank=False, on_delete=models.CASCADE)
+    value = models.CharField(max_length=100, null=False, blank=False)
+
+    def __str__(self):
+        return "{} - ({} : {})".format(self.plus_plan, self.parameter, self.value )
+
+    class Meta:
+        db_table = 'plus_plan_parameters_mapping'
+
+
+class PlusPlanContent(auth_model.TimeStampedModel):
+
+    class PossibleTitles(Choices):
+        SALIENT_FEATURES = 'SALIENT_FEATURES'
+        WHATS_NOT_COVERED = 'WHATS_NOT_COVERED'
+
+    plan = models.ForeignKey(PlusPlans, related_name="plan_content", on_delete=models.CASCADE)
+    title = models.CharField(max_length=500, blank=False, choices=PossibleTitles.as_choices())
+    content = models.TextField(blank=False)
+
+    class Meta:
+        db_table = 'plus_plan_content'
 
 
 class PlusThreshold(auth_model.TimeStampedModel, LiveMixin):
@@ -100,7 +153,7 @@ class PlusUser(auth_model.TimeStampedModel):
     STATUS_CHOICES = [(ACTIVE, "Active"), (CANCELLED, "Cancelled"), (EXPIRED, "Expired"), (ONHOLD, "Onhold"),
                       (CANCEL_INITIATE, 'Cancel Initiate'), (CANCELLATION_APPROVED, "Cancellation Approved")]
 
-    id = models.BigAutoField(primary_key=True)
+    id = models.BigAutoField(primary_key=True)  # TODO Alter the sequence in the production.
     user = models.ForeignKey(auth_model.User, related_name='active_plus_users', on_delete=models.DO_NOTHING)
     plan = models.ForeignKey(PlusPlans, related_name='purchased_plus', on_delete=models.DO_NOTHING)
     purchase_date = models.DateTimeField(null=False, blank=False, default=timezone.now)
@@ -114,16 +167,107 @@ class PlusUser(auth_model.TimeStampedModel):
     price_data = JSONField(blank=True, null=True)
     money_pool = models.ForeignKey(MoneyPool, on_delete=models.SET_NULL, null=True)
     matrix_lead_id = models.IntegerField(null=True)
+    raw_plus_member = JSONField(blank=False, null=False, default=list)
 
     def is_valid(self):
-        if self.expiry_date >= timezone.now() and (self.status == self.ACTIVE):
+        if self.expire_date >= timezone.now() and (self.status == self.ACTIVE):
             return True
         else:
             return False
 
+    def is_appointment_valid(self, appointment_time):
+        if self.expire_date >= appointment_time:
+            return True
+        else:
+            return False
+
+    def get_primary_member_profile(self):
+        insured_members = self.plus_members.filter().order_by('id')
+        proposers = list(filter(lambda member: member.is_primary_user, insured_members))
+        if proposers:
+            return proposers[0]
+
+        return None
+
+    @classmethod
+    def profile_create_or_update(cls, member, user):
+        profile = {}
+        l_name = member.get('last_name') if member.get('last_name') else ''
+        name = "{fname} {lname}".format(fname=member['first_name'], lname=l_name)
+        if member['profile'] or UserProfile.objects.filter(name__iexact=name, user=user.id).exists():
+            # Check whether Profile exist with same name
+            existing_profile = UserProfile.objects.filter(name__iexact=name, user=user.id).first()
+            if member['profile']:
+                profile = member['profile']
+            elif existing_profile:
+                profile = existing_profile
+            if profile:
+                if profile.user_id == user.id:
+                    profile.name = name
+                    profile.email = member['email']
+                    profile.gender = member['gender']
+                    profile.dob = member['dob']
+                    if member['relation'] == "self":
+                        profile.is_default_user = True
+                    else:
+                        profile.is_default_user = False
+                    profile.save()
+
+                profile = profile.id
+        # Create Profile if not exist with name or not exist in profile id from request
+        else:
+            data = {'name': name, 'email': member['email'], 'gender': member['gender'], 'user_id': user.id,
+                    'dob': member['dob'], 'is_default_user': False, 'is_otp_verified': False,
+                    'phone_number': user.phone_number}
+            if member['is_primary_user']:
+                data['is_default_user'] = True
+
+            member_profile = UserProfile.objects.create(**data)
+            profile = member_profile.id
+
+        return profile
+
+    @classmethod
+    def get_enabled_hospitals(cls, *args, **kwargs):
+        from ondoc.doctor.models import HospitalNetwork, HospitalNetworkDocument
+        networks = list()
+        request = kwargs.get('request')
+        hospital_networks = HospitalNetwork.get_plus_enabled()
+        for hospital_network in hospital_networks:
+            data = {}
+
+            hospital_network_logo = hospital_network.hospital_network_documents.filter(document_type=HospitalNetworkDocument.LOGO).first()
+            data['name'] = hospital_network.name
+            data['id'] = hospital_network.id
+            data['logo'] = request.build_absolute_uri(hospital_network_logo.name.url) if hospital_network_logo.name else None
+            networks.append(data)
+
+        return networks
+
+    @classmethod
+    def create_plus_user(cls, plus_data, user):
+        members = plus_data['plus_members']
+
+        for member in members:
+            member['profile'] = cls.profile_create_or_update(member, user)
+            member['dob'] = str(member['dob'])
+            # member['profile'] = member['profile'].id if member.get('profile') else None
+        plus_data['insured_members'] = members
+
+        plus_membership_obj = cls.objects.create(plan=plus_data['insurance_plan'],
+                                                          user=plus_data['user'],
+                                                          raw_plus_member=json.dumps(plus_data['insured_members']),
+                                                          purchase_date=plus_data['purchase_date'],
+                                                          expire_date=plus_data['expiry_date'],
+                                                          amount=plus_data['premium_amount'],
+                                                          order=plus_data['order'])
+
+        PlusMembers.create_plus_members(plus_membership_obj)
+        return plus_membership_obj
 
     class Meta:
         db_table = 'plus_users'
+        unique_together = (('user', 'plan'),)
 
 
 class PlusMembers(auth_model.TimeStampedModel):
@@ -166,6 +310,23 @@ class PlusMembers(auth_model.TimeStampedModel):
     plus_user = models.ForeignKey(PlusUser, related_name="plus_members", on_delete=models.DO_NOTHING, null=False, default=None)
     city_code = models.CharField(max_length=10, blank=True, null=True, default='')
     district_code = models.CharField(max_length=10, blank=True, null=True, default='')
+    is_primary_user = models.NullBooleanField()
+
+    @classmethod
+    def create_plus_members(cls, plus_user_obj):
+        import json
+        members = plus_user_obj.raw_plus_member
+        members = json.loads(members)
+        for member in members:
+            user_profile = UserProfile.objects.get(id=member.get('profile'))
+            insured_members_obj = cls.objects.create(first_name=member.get('first_name'), title=member.get('title'),
+                                                     last_name=member.get('last_name'), dob=member.get('dob'),
+                                                     email=member.get('email'), address=member.get('address'),
+                                                     pincode=member.get('pincode'), phone_number=user_profile.phone_number,
+                                                     gender=member.get('gender'), profile=user_profile, town=member.get('town'),
+                                                     district=member.get('district'), state=member.get('state'),
+                                                     state_code = member.get('state_code'), plus_user=plus_user_obj,
+                                                     city_code=member.get('city_code'), district_code=member.get('district_code'))
 
     class Meta:
         db_table = "plus_members"

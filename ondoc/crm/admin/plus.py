@@ -5,7 +5,8 @@ from django.db.models import F
 from rest_framework import serializers
 from dal import autocomplete
 from ondoc.authentication.models import User
-from ondoc.plus.models import  PlusProposer, PlusPlans, PlusThreshold, PlusUser
+from ondoc.plus.models import PlusProposer, PlusPlans, PlusThreshold, PlusUser, PlusPlanContent, PlusPlanParameters, \
+    PlusPlanParametersMapping
 from import_export.admin import ImportExportMixin, ImportExportModelAdmin, base_formats
 import nested_admin
 from import_export import fields, resources
@@ -22,10 +23,29 @@ class PlusProposerAdmin(admin.ModelAdmin):
     list_display = ('name', 'is_live')
 
 
+class PlusPlanParametersAdmin(admin.ModelAdmin):
+    model = PlusPlanParameters
+    fields = ('key', 'details')
+    list_display = ('key',)
+
+
+class PlusPlanParametersMappingInline(admin.TabularInline):
+    model = PlusPlanParametersMapping
+    fields = ('plus_plan', 'parameter', 'value')
+    extra = 0
+
+
+class PlusPlanContentInline(admin.TabularInline):
+    model = PlusPlanContent
+    fields = ('title', 'content')
+    extra = 0
+
+
 class PlusPlansAdmin(admin.ModelAdmin):
     model = PlusPlans
-    display = ("plan_name", "proposer", "internal_name", "amount", "tenure", "enabled", "is_live", "total_allowed_members", "is_selected", )
-    list_display = ('plan_name', 'proposer', 'amount')
+    inlines = [PlusPlanContentInline, PlusPlanParametersMappingInline]
+    display = ("plan_name", "proposer", "internal_name", "mrp", "deal_price", "tenure", "enabled", "is_live", "total_allowed_members", "is_selected", )
+    list_display = ('plan_name', 'proposer', 'mrp', "deal_price")
 
 
 class PlusThresholdAdmin(admin.ModelAdmin):

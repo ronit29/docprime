@@ -87,6 +87,7 @@ import qrcode
 from django.utils.functional import cached_property
 from ondoc.crm.constants import constants
 from django.utils.text import slugify
+from ondoc.plus import models as plus_model
 
 logger = logging.getLogger(__name__)
 
@@ -265,6 +266,7 @@ class Hospital(auth_model.TimeStampedModel, auth_model.CreatedByModel, auth_mode
     has_proper_hospital_page = models.BooleanField(default=False)
     question_answer = GenericRelation(auth_model.GenericQuestionAnswer, related_query_name='hospital_qa')
     enabled_for_insurance = models.NullBooleanField(verbose_name='Enabled for Insurance')
+    enabled_for_plus_plans = models.NullBooleanField()
 
     def __str__(self):
         return self.name
@@ -900,6 +902,7 @@ class Doctor(auth_model.TimeStampedModel, auth_model.QCModel, SearchKey, auth_mo
     qr_code = GenericRelation(QRCode, related_name="qrcode")
     priority_score = models.IntegerField(default=0, null=False, blank=False)
     is_ipd_doctor = models.NullBooleanField(default=None)
+    enabled_for_plus_plans = models.NullBooleanField()
 
     def __str__(self):
         return '{} ({})'.format(self.name, self.id)
@@ -2057,6 +2060,12 @@ class HospitalNetwork(auth_model.TimeStampedModel, auth_model.CreatedByModel, au
                                      through_fields=('network', 'service'),
                                      related_name='of_hospital_network')
 
+    enabled_for_plus_plans = models.NullBooleanField()
+
+    @classmethod
+    def get_plus_enabled(cls):
+        return cls.objects.filter(enabled_for_plus_plans=True)
+
     def update_time_stamps(self):
         if self.welcome_calling_done and not self.welcome_calling_done_at:
             self.welcome_calling_done_at = timezone.now()
@@ -2427,6 +2436,8 @@ class OpdAppointment(auth_model.TimeStampedModel, CouponsMixin, OpdAppointmentIn
     documents = GenericRelation(Documents)
     fraud = GenericRelation(Fraud)
     appointment_type = models.PositiveSmallIntegerField(choices=APPOINTMENT_TYPE_CHOICES, null=True, blank=True)
+    plus_plan = models.ForeignKey(plus_model.PlusUser, blank=True, null=True, default=None,
+                                  on_delete=models.DO_NOTHING)
 
     def __str__(self):
         return self.profile.name + " (" + self.doctor.name + ")"
