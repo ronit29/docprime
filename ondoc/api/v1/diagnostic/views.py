@@ -2956,16 +2956,64 @@ class LabTimingListView(mixins.ListModelMixin,
 
                         if not has_date_timings:
                             intersect_resp['timeslots'][slot_date] = []
-
                     upcoming_slots = TimeSlotExtraction().get_upcoming_slots(time_slots=intersect_resp['timeslots'])
                     intersect_resp['upcoming_slots'] = upcoming_slots
-
-                elif pathology_tests:
+                elif pathology_tests and not radiology_tests:
                     intersect_resp['timeslots'] = pathology_resp['timeslots']
                     intersect_resp['upcoming_slots'] = pathology_resp['upcoming_slots']
                     intersect_resp['is_thyrocare'] = pathology_resp['is_thyrocare']
-                elif radiology_tests:
-                    pass
+                elif radiology_tests and not pathology_tests:
+                    radiology_resp_modified = copy.deepcopy(radiology_resp)
+                    first_radiology_resp_test = radiology_resp_modified['tests'].pop(0)
+                    if first_radiology_resp_test['timings'] and first_radiology_resp_test['timings']['timeslots']:
+                        for slot_date in first_radiology_resp_test['timings']['timeslots']:
+                            intersect_resp['timeslots'].update({slot_date: []})
+                            time_separtors = ['AM', 'PM']
+                            has_date_timings = False
+                            for i in range(len(time_separtors)):
+                                intersect_resp['timeslots'][slot_date].append({
+                                    'type': time_separtors[i],
+                                    'title': time_separtors[i],
+                                    'timing': []
+                                })
+                                if first_radiology_resp_test['timings']['timeslots'][slot_date] and first_radiology_resp_test['timings']['timeslots'][slot_date][i][
+                                    'timing']:
+                                    has_intersection = True
+                                    radiology_date_time_slots = []
+                                    for radiology_test_resp in radiology_resp_modified['tests']:
+                                        if radiology_test_resp['timings']['timeslots'][slot_date] and \
+                                                radiology_test_resp['timings']['timeslots'][slot_date][i]['timing']:
+                                            radiology_date_time_slots.append(
+                                                radiology_test_resp['timings']['timeslots'][slot_date][i]['timing'])
+                                        else:
+                                            has_intersection = False
+                                        if not has_intersection:
+                                            break
+                                    if has_intersection:
+                                        intersect_data = list()
+                                        intersect_dicts = list()
+                                        intersect_dicts.append(first_radiology_resp_test['timings']['timeslots'][slot_date][i]['timing'])
+                                        for radiology_date_time_slot in radiology_date_time_slots:
+                                            intersect_dicts.append(radiology_date_time_slot)
+                                        for intersect_dict in intersect_dicts:
+                                            if not intersect_data:
+                                                intersect_data = intersect_dict
+                                            else:
+                                                intersect_data = list(
+                                                    [x for x in intersect_data if x in intersect_dict])
+                                        intersect_resp['timeslots'][slot_date][i]['timing'] = \
+                                        intersect_resp['timeslots'][slot_date][i]['timing'] + intersect_data
+                                    else:
+                                        intersect_resp['timeslots'][slot_date][i]['timing'] = []
+
+                                if intersect_resp['timeslots'][slot_date][i]['timing']:
+                                    has_date_timings = True
+
+                            if not has_date_timings:
+                                intersect_resp['timeslots'][slot_date] = []
+
+                    upcoming_slots = TimeSlotExtraction().get_upcoming_slots(time_slots=intersect_resp['timeslots'])
+                    intersect_resp['upcoming_slots'] = upcoming_slots
 
         resp_data = {
             'all': intersect_resp,
