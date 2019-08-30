@@ -2595,6 +2595,12 @@ class OpdAppointment(auth_model.TimeStampedModel, CouponsMixin, OpdAppointmentIn
             return True
         return False
 
+    def is_otp_required_wrt_hospitals(self):
+        hospital_ids = list(settings.HOSPITAL_CREDIT_LETTER_REQUIRED.values())
+        if self.hospital and self.hospital.id in hospital_ids:
+            return False
+
+        return True
 
     def get_valid_credit_letter(self):
         credit_letter = self.get_document_objects(Documents.CREDIT_LETTER).first()

@@ -1,3 +1,4 @@
+{% if payment_type == 1 %}
 We have received an appointment for {{patient_name|capfirst}} with Dr. {{doctor_name|capfirst}} at {{instance.hospital.name|capfirst}} on {{instance.time_slot_start|date:"D jS F Y"}} at {{instance.time_slot_start|date:"h:i A"}}
 Please confirm the booking at the earliest by accepting the booking using docprime provider app.
 
@@ -11,9 +12,22 @@ Hospital/Clinic Address: {{hospital_address|capfirst}}
 Appointment Date and Time : {{instance.time_slot_start|date:"D jS F Y"}} || {{instance.time_slot_start|date:"h:i A"}}
 
 Please note that the consultation needs to be done on Credit Basis.
-Please do not ask for consultation fees from the customer.{% endif %}
-
+Please do not ask for consultation fees from the customer.
 {% if provider_login_url %}
 To accept/reschedule the appointment, please click the link provided below:
 {{provider_login_url}}
+{% endif %}
+{% else %}
+Appointment ID {{instance.id}} - You have received a pay at {{clinic_or_hospital}} (Cash) appointment request. Please confirm appointment by using Docprime provider app.
+Patient Name : {{patient_name|capfirst}}
+Patient Contact No: {{mask_number}}
+Doctor Name : Dr. {{doctor_name|capfirst}}
+Appointment Date and Time : {{time_slot_start_date}} at {{time_slot_start_time}}
+{{clinic_or_hospital}} Name:  {{hospital_name|capfirst}}
+{% if is_hospital_network_available %}{{clinic_or_hospital}} Address: {{hospital_address}}{% endif %}
+Amount to be Collected: {{cod_amount}}
+{% if provider_login_url %}
+To accept/reschedule the appointment, please click the link provided below:
+{{provider_login_url}}
+{% endif %}
 {% endif %}

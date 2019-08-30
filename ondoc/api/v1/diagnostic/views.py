@@ -1,8 +1,11 @@
 import json
+import logging
 import operator
 from copy import deepcopy
 from itertools import groupby
 from pyodbc import Date
+
+from django.contrib.contenttypes.models import ContentType
 
 from ondoc.api.v1.diagnostic.serializers import CustomLabTestPackageSerializer, SearchLabListSerializer
 from ondoc.api.v1.doctor.serializers import CommaSepratedToListField
@@ -11,13 +14,13 @@ from ondoc.api.v1.diagnostic import serializers as diagnostic_serializer
 from ondoc.api.v1.auth.serializers import AddressSerializer
 from ondoc.integrations.models import IntegratorTestMapping, IntegratorReport, IntegratorMapping
 from ondoc.cart.models import Cart
-from ondoc.common.models import UserConfig, GlobalNonBookable, AppointmentHistory
+from ondoc.common.models import UserConfig, GlobalNonBookable, AppointmentHistory, MatrixMappedCity
 from ondoc.ratings_review import models as rating_models
 from ondoc.diagnostic.models import (LabTest, AvailableLabTest, Lab, LabAppointment, LabTiming, PromotedLab,
                                      CommonDiagnosticCondition, CommonTest, CommonPackage,
                                      FrequentlyAddedTogetherTests, TestParameter, ParameterLabTest, QuestionAnswer,
                                      LabPricingGroup, LabTestCategory, LabTestCategoryMapping, LabTestThresholds,
-                                     LabTestCategoryLandingURLS, LabTestCategoryUrls)
+                                     LabTestCategoryLandingURLS, LabTestCategoryUrls, IPDMedicinePageLead)
 from ondoc.account import models as account_models
 from ondoc.authentication.models import UserProfile, Address
 from ondoc.insurance.models import UserInsurance, InsuranceThreshold
@@ -75,6 +78,7 @@ from django.db.models.expressions import RawSQL
 from ondoc.doctor.v1.serializers import ArticleAuthorSerializer
 from decimal import Decimal
 User = get_user_model()
+logger = logging.getLogger(__name__)
 
 
 class SearchPageViewSet(viewsets.ReadOnlyModelViewSet):
@@ -3672,3 +3676,38 @@ class LabTestCategoryLandingUrlViewSet(viewsets.GenericViewSet):
 
         return Response({'url': list(resp.keys())[0], 'title': title, 'all_categories': list(resp.values())[0], 'meta_title': meta_title, 'meta_description': meta_description})
 
+
+class IPDMedicinePageLeadViewSet(viewsets.GenericViewSet):
+
+    def store(self, request):
+        from django.http import JsonResponse
+
+        params = request.data
+        name = params.get('name', None)
+        phone_number = params.get('phone_number', None)
+        city_id = params.get('city_id', None)
+        city_name = params.get('city_name', None)
+        lead_source = params.get('lead_source')
+
+        if city_id:
+            city = MatrixMappedCity.objects.filter(id=city_id).first()
+        else:
+            city = MatrixMappedCity.objects.filter(name=city_name).first()
+
+
+        ipd_med_page_object = IPDMedicinePageLead(name=name, phone_number=phone_number, matrix_city=city, lead_source=lead_source)
+        try:
+            ipd_med_page_object.save()
+            # return Response(status=status.HTTP_200_OK)
+            return Response({'success':'true'}, status=status.HTTP_200_OK)
+        except Exception as e:
+            logger.error(str(e))
+            return Response({'message': 'Lead is not created.'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+class AllMatrixCitiesViewSet(viewsets.GenericViewSet):
+
+    def retrieve(self, request):
+
+        main_queryset = MatrixMappedCity.objects.all().values("id", "name")
+
+        return Response(main_queryset)
