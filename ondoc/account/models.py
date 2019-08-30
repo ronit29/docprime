@@ -45,6 +45,7 @@ class Order(TimeStampedModel):
     INSURANCE_CREATE = 5
     SUBSCRIPTION_PLAN_BUY = 6
     CHAT_CONSULTATION_CREATE = 7
+    VIP_CREATE = 11
     PAYMENT_ACCEPTED = 1
     PAYMENT_PENDING = 0
     PAYMENT_FAILURE = 3
@@ -59,15 +60,17 @@ class Order(TimeStampedModel):
                       (LAB_APPOINTMENT_RESCHEDULE, "Lab Reschedule"),
                       (INSURANCE_CREATE, "Insurance Create"),
                       (SUBSCRIPTION_PLAN_BUY, "Subscription Plan Buy"),
-                      (CHAT_CONSULTATION_CREATE, "Chat Consultation Create"))
+                      (CHAT_CONSULTATION_CREATE, "Chat Consultation Create"),
+                      (VIP_CREATE, "Vip create"))
     DOCTOR_PRODUCT_ID = 1
     LAB_PRODUCT_ID = 2
     INSURANCE_PRODUCT_ID = 3
     SUBSCRIPTION_PLAN_PRODUCT_ID = 4
     CHAT_PRODUCT_ID = 5
+    VIP_PRODUCT_ID = 11
     PRODUCT_IDS = [(DOCTOR_PRODUCT_ID, "Doctor Appointment"), (LAB_PRODUCT_ID, "LAB_PRODUCT_ID"),
                    (INSURANCE_PRODUCT_ID, "INSURANCE_PRODUCT_ID"),(SUBSCRIPTION_PLAN_PRODUCT_ID, "SUBSCRIPTION_PLAN_PRODUCT_ID"),
-                   (CHAT_PRODUCT_ID, "CHAT_PRODUCT_ID")]
+                   (CHAT_PRODUCT_ID, "CHAT_PRODUCT_ID"), (VIP_PRODUCT_ID, 'VIP_PRODUCT_ID')]
 
     product_id = models.SmallIntegerField(choices=PRODUCT_IDS, blank=True, null=True)
     reference_id = models.BigIntegerField(blank=True, null=True)
@@ -191,6 +194,7 @@ class Order(TimeStampedModel):
     @transaction.atomic
     def process_order(self, convert_cod_to_prepaid=False):
         from ondoc.doctor.models import OpdAppointment
+        from ondoc.plus.models import PlusUser
         from ondoc.diagnostic.models import LabAppointment
         from ondoc.chat.models import ChatConsultation
         from ondoc.api.v1.doctor.serializers import OpdAppTransactionModelSerializer
@@ -250,6 +254,13 @@ class Order(TimeStampedModel):
             serializer = ChatTransactionModelSerializer(data=appointment_data)
             serializer.is_valid(raise_exception=True)
             consultation_data = serializer.validated_data
+        elif self.product_id == self.VIP_PRODUCT_ID:
+            plus_data = deepcopy(self.action_data)
+            plus_data = insurance_reverse_transform(plus_data)
+            plus_data['user_insurance']['order'] = self.id
+            serializer = UserInsuranceSerializer(data=plus_data.get('user_insurance'))
+            serializer.is_valid(raise_exception=True)
+            user_insurance_data = serializer.validated_data
 
         consumer_account = ConsumerAccount.objects.get_or_create(user=appointment_data['user'])
         consumer_account = ConsumerAccount.objects.select_for_update().get(user=appointment_data['user'])

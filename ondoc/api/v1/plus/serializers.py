@@ -2,6 +2,8 @@ from rest_framework import serializers
 from collections import defaultdict
 from rest_framework.fields import NullBooleanField
 from rest_framework.renderers import JSONRenderer
+
+from ondoc.authentication.models import UserProfile
 from ondoc.diagnostic.models import Lab
 from ondoc.doctor.models import Doctor
 from ondoc.plus.models import (PlusProposer, PlusPlans, PlusThreshold, PlusMembers, PlusUser)
@@ -81,3 +83,24 @@ class PlusProposerSerializer(serializers.ModelSerializer):
     class Meta:
         model = PlusProposer
         fields = ('id', 'name', 'logo', 'website', 'phone_number', 'email', 'plans')
+
+
+class PlusMemberListSerializer(serializers.Serializer):
+    title = serializers.ChoiceField(choices=PlusMembers.TITLE_TYPE_CHOICES)
+    first_name = serializers.CharField(max_length=50)
+    last_name = serializers.CharField(max_length=50, allow_blank=True, allow_null=True)
+    dob = serializers.DateField()
+    email = serializers.EmailField(allow_blank=True, allow_null=True)
+    address = serializers.CharField(max_length=250)
+    pincode = serializers.IntegerField()
+    profile = serializers.PrimaryKeyRelatedField(queryset=UserProfile.objects.all(), allow_null=True)
+    city = serializers.CharField(allow_null=True, allow_blank=True, required=False)
+    city_code = serializers.CharField(allow_null=True, allow_blank=True, required=False)
+    relation = serializers.ChoiceField(choices=PlusMembers.Relations.as_choices())
+    # is_primary_user = serializers.BooleanField()
+    # plan = serializers.PrimaryKeyRelatedField(queryset=PlusPlans.all_active_plans(), allow_null=False, allow_empty=False)
+
+
+class PlusMembersSerializer(serializers.Serializer):
+    members = serializers.ListSerializer(child=PlusMemberListSerializer())
+

@@ -41,6 +41,7 @@ from Crypto import Random
 from Crypto.Cipher import AES
 import decimal
 
+
 logger = logging.getLogger(__name__)
 
 User = get_user_model()
@@ -292,6 +293,36 @@ class IsMatrixUser(permissions.BasePermission):
         return False
 
 
+def plus_subscription_transform(app_data):
+    """A serializer helper to serialize Insurance data"""
+
+    app_data['plus_user']['purchase_date'] = str(
+        app_data['plus_user']['purchase_date'])
+    app_data['plus_user']['expire_date'] = str(
+        app_data['plus_user']['expire_date'])
+
+    app_data['profile_detail']['dob'] = str(app_data['profile_detail']['dob'])
+    insured_members = app_data['plus_user']['plus_members']
+    for member in insured_members:
+        member['dob'] = str(member['dob'])
+        # member['member_profile']['dob'] = str(member['member_profile']['dob'])
+    return app_data
+
+def plan_subscription_reverse_transform(insurance_data):
+    insurance_data['user_insurance']['purchase_date'] = \
+        datetime.datetime.strptime(insurance_data['user_insurance']['purchase_date'], "%Y-%m-%d %H:%M:%S.%f")
+    insurance_data['user_insurance']['expiry_date'] = \
+        datetime.datetime.strptime(insurance_data['user_insurance']['expiry_date'],
+                                   "%Y-%m-%d %H:%M:%S.%f")
+    insurance_data['profile_detail']['dob'] = \
+        datetime.datetime.strptime(insurance_data['profile_detail']['dob'],
+                                   "%Y-%m-%d")
+    insured_members = insurance_data['user_insurance']['insured_members']
+    for member in insured_members:
+        member['dob'] = datetime.datetime.strptime(member['dob'], "%Y-%m-%d").date()
+    return insurance_data
+
+
 def insurance_transform(app_data):
     """A serializer helper to serialize Insurance data"""
     # app_data['insurance']['insurance_transaction']['transaction_date'] = str(app_data['insurance']['insurance_transaction']['transaction_date'])
@@ -411,6 +442,8 @@ def payment_details(request, order):
     from ondoc.account.models import PgTransaction, Order, PaymentProcessStatus
     from ondoc.notification.tasks import save_pg_response, save_payment_status
     from ondoc.account.mongo_models import PgLogs
+    from ondoc.plus.models import PlusPlans
+
     payment_required = True
     user = request.user
     if user.email:
@@ -436,6 +469,19 @@ def payment_details(request, order):
             raise Exception('Invalid pg transaction as insurer plan is not found.')
         insurer = insurance_plan.insurer
         insurer_code = insurer.insurer_merchant_code
+
+        if not profile:
+            if order.action_data.get('profile_detail'):
+                profile_name = order.action_data.get('profile_detail').get('name', "")
+
+    if order.product_id == Order.VIP_PRODUCT_ID:
+        isPreAuth = '0'
+        plus_plan_id = order.action_data.get('plus_plan')
+        plus_plan = PlusPlans.objects.filter(id=plus_plan_id).first()
+        if not plus_plan:
+            raise Exception('Invalid pg transaction as insurer plan is not found.')
+        proposer = plus_plan.proposer
+        # insurer_code = insurer.insurer_merchant_code
 
         if not profile:
             if order.action_data.get('profile_detail'):

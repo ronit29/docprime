@@ -74,6 +74,10 @@ class PlusPlans(auth_model.TimeStampedModel, LiveMixin):
     is_selected = models.BooleanField(default=False)
     features = JSONField(blank=False, null=False, default=dict)
 
+    @classmethod
+    def all_active_plans(cls):
+        return cls.objects.filter(is_live=True, enabled=True)
+
     def __str__(self):
         return "{}".format(self.plan_name)
 
@@ -271,14 +275,27 @@ class PlusUser(auth_model.TimeStampedModel):
 
 
 class PlusMembers(auth_model.TimeStampedModel):
+    class Relations(Choices):
+        SELF = 'SELF'
+        SPOUSE = "SPOUSE"
+        FATHER = "FATHER"
+        MOTHER = "MOTHER"
+        SON = "SON"
+        DAUGHTER = "DAUGHTER"
+        SPOUSE_FATHER = "SPOUSE_FATHER"
+        SPOUSE_MOTHER = "SPOUSE_MOTHER"
+        BROTHER = "BROTHER"
+        SISTER = "SISTER"
+        OTHERS = "OTHERS"
+
     MALE = 'm'
     FEMALE = 'f'
     OTHER = 'o'
     GENDER_CHOICES = [(MALE, 'Male'), (FEMALE, 'Female'), (OTHER, 'Other')]
-    SELF = 'self'
-    SPOUSE = 'spouse'
-    SON = 'son'
-    DAUGHTER = 'daughter'
+    # SELF = 'self'
+    # SPOUSE = 'spouse'
+    # SON = 'son'
+    # DAUGHTER = 'daughter'
     # RELATION_CHOICES = [(SPOUSE, 'Spouse'), (SON, 'Son'), (DAUGHTER, 'Daughter'), (SELF, 'Self')]
     ADULT = "adult"
     CHILD = "child"
@@ -294,7 +311,7 @@ class PlusMembers(auth_model.TimeStampedModel):
     last_name = models.CharField(max_length=50, null=True)
     dob = models.DateField(blank=False, null=False)
     email = models.EmailField(max_length=100, null=True)
-    # relation = models.CharField(max_length=50, choices=RELATION_CHOICES, default=None)
+    relation = models.CharField(max_length=50, choices=Relations.as_choices(), default=None)
     pincode = models.PositiveIntegerField(default=None)
     address = models.TextField(default=None)
     gender = models.CharField(max_length=50, choices=GENDER_CHOICES, default=None)

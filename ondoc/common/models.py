@@ -601,6 +601,7 @@ class BlockedStates(TimeStampedModel):
     class States(Choices):
         LOGIN = 'LOGIN'
         INSURANCE = 'INSURANCE'
+        VIP = 'VIP'
 
     state_name = models.CharField(max_length=50, null=False, blank=False, choices=States.as_choices(), unique=True)
     message = models.TextField()
