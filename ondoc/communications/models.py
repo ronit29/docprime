@@ -1450,6 +1450,10 @@ class OpdNotification(Notification):
             token_object['token'].decode("utf-8"))
         opd_appointment_complete_url = booking_url + "&callbackurl=opd/appointment/{}?complete=true".format(
             self.appointment.id)
+        appointment_type = 'opd'
+        url_key = get_random_string(length=ClickLoginToken.URL_KEY_LENGTH)
+        provider_login_url = settings.PROVIDER_APP_DOMAIN + "/sms/login?key=" + url_key + \
+                             "&url=/sms-redirect/" + appointment_type + "/appointment/" + str(appointment_id)
         opd_appointment_feedback_url = booking_url + "&callbackurl=opd/appointment/{}".format(self.appointment.id)
         reschdule_appointment_bypass_url = booking_url + "&callbackurl=opd/doctor/{}/{}/book?reschedule={}".format(
             self.appointment.doctor.id, self.appointment.hospital.id, self.appointment.id)
@@ -1492,7 +1496,8 @@ class OpdNotification(Notification):
             "is_payment_type_cod": self.appointment.is_payment_type_cod(),
             "instance_otp": self.appointment.otp,
             "is_credit_letter_required_for_appointment": self.appointment.is_credit_letter_required_for_appointment(),
-            "is_otp_required": self.appointment.is_otp_required_wrt_hospitals()
+            "is_otp_required": self.appointment.is_otp_required_wrt_hospitals(),
+            "provider_login_url": generate_short_url(provider_login_url)
         }
         return context
 
