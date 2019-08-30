@@ -62,9 +62,12 @@ class PlusPlansSerializer(serializers.ModelSerializer):
                                                                          PlanParametersEnum.ONLINE_CHAT_AMOUNT,
                                                                          PlanParametersEnum.HEALTH_CHECKUPS_AMOUNT])
 
+        effective_price = 0
         for pp in plan_parameters:
             data[pp.parameter.key.lower()] = pp.value
+            effective_price += int(pp.value)
 
+        data['effective_price'] = effective_price
         return data
 
     class Meta:

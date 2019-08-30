@@ -341,7 +341,7 @@ class User(AbstractBaseUser, PermissionsMixin):
 
     @cached_property
     def active_plus_user(self):
-        active_plus_user = self.purchased_plus.filter().order_by('-id').first()
+        active_plus_user = self.active_plus_users.filter().order_by('-id').first()
         return active_plus_user if active_plus_user and active_plus_user.is_valid() else None
 
     @classmethod
