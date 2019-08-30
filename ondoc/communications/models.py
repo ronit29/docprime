@@ -501,12 +501,12 @@ class SMSNotification:
                 if not phone_number:
                     phone_number = user.phone_number
 
-                if user and user.user_type == User.DOCTOR:
-                    context, click_login_token_obj = self.save_token_to_context(context, receiver['user'])
-                    click_login_token_objects.append(click_login_token_obj)
-                elif context.get('provider_login_url'):
-                    context.pop('provider_login_url')
-                ClickLoginToken.objects.bulk_create(click_login_token_objects)
+                # if user and user.user_type == User.DOCTOR:
+                #     context, click_login_token_obj = self.save_token_to_context(context, receiver['user'])
+                #     click_login_token_objects.append(click_login_token_obj)
+                # elif context.get('provider_login_url'):
+                #     context.pop('provider_login_url')
+                # ClickLoginToken.objects.bulk_create(click_login_token_objects)
 
                 instance = context.get('instance')
 
