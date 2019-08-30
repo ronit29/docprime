@@ -1106,6 +1106,7 @@ class DoctorProfileUserViewSerializer(DoctorProfileSerializer):
 
         specializations = [doctor_specialization.specialization for doctor_specialization in obj.doctorpracticespecializations.all()]
         clinics = [clinic_hospital for clinic_hospital in obj.doctor_clinics.all()]
+        hospitals = [hos.name for hos in obj.hospitals.all()]
         # entity = EntityUrls.objects.filter(entity_id=obj.id, sitemap_identifier=EntityUrls.SitemapIdentifier.DOCTOR_PAGE,
         #                                    is_valid=True)
         sublocality = None
@@ -1116,33 +1117,47 @@ class DoctorProfileUserViewSerializer(DoctorProfileSerializer):
             if entity.additional_info:
                 locality = entity.additional_info.get('locality_value')
                 sublocality = entity.additional_info.get('sublocality_value')
+            elif entity.locality_value:
+                locality = entity.locality_value
+                sublocality = entity.sublocality_value
 
         title = "Dr. " + obj.name
-        description = "Dr. " + obj.name + ': ' + "Dr. " + obj.name
+        description = "Dr. " + obj.name
 
         doc_spec_list = []
+        doc_hosp_list = []
 
         for name in specializations:
             doc_spec_list.append(str(name))
+        for hosp_name in hospitals:
+            doc_hosp_list.append(str(hosp_name))
+
+
         if len(doc_spec_list) >= 1:
-            title +=  ' - '+', '.join(doc_spec_list)
-            description += ' is ' + ', '.join(doc_spec_list)
+            title += ' - '+', '.join(doc_spec_list)
+            description += ' is a ' + ', '.join(doc_spec_list)
+        if len(doc_hosp_list) >= 1:
+            title += ' in '+', '.join(doc_hosp_list)
+            description += ' in ' + ', '.join(doc_hosp_list)
+
         if sublocality and locality:
             # title += ' in ' + sublocality + " " + locality + ' - Consult Online'
-            description += ' in ' + sublocality + " " + locality
+            description += ' , ' + sublocality + " , " + locality
         elif locality:
-            # title += ' in ' + locality + ' - Consult Online'
-            description += ' in ' + locality
+            title += ' ,' + locality
+            description += ' , ' + locality
 
-        title += ' | Book Appointment Online'
+        # title += ' | Book Appointment Online'
+        title += '| Upto 50% off'
+        description += ' Check ' + obj.name + 's' + 'Fees, OPD Schedule & Contact No. Book & get upto 50% off at docprime.'
 
         hospital = []
         for hospital_name in clinics:
             hospital.append(str(hospital_name.hospital))
-        if len(hospital) >= 1:
-            description += ' consulting patients at '+', '.join(hospital)
+        # if len(hospital) >= 1:
+            # description += ' consulting patients at '+', '.join(hospital)
 
-        description += '. Book appointments online, check fees, address and more.'
+        # description += '. Book appointments online, check fees, address and more.'
 
         doctor_realted_hospitals = obj.doctor_clinics.all()
 
@@ -1447,7 +1462,7 @@ class DoctorAppointmentRetrieveSerializer(OpdAppointmentSerializer):
 
     def get_mrp(self, obj):
         mrp_fees = obj.fees if obj.fees else 0
-        mrp = obj.mrp if obj.payment_type == obj.COD else mrp_fees
+        mrp = obj.deal_price if obj.payment_type == obj.COD else mrp_fees
         return mrp
 
     def get_mask_data(self, obj):
@@ -1992,7 +2007,9 @@ class TopHospitalForIpdProcedureSerializer(serializers.ModelSerializer):
         return [x.name for x in obj.health_insurance_providers.all()]
 
     def get_multi_speciality(self, obj):
-        return len(obj.hospitalspeciality_set.all()) > 1
+        result1 = len(obj.hospitalspeciality_set.all()) > 1
+        result2 = len(obj.network.hospitalnetworkspeciality_set.all()) > 1 if obj.network else False
+        return result1 or result2
 
     def get_address(self, obj):
         return obj.get_hos_address()
@@ -2003,13 +2020,12 @@ class TopHospitalForIpdProcedureSerializer(serializers.ModelSerializer):
     def get_logo(self, obj):
         request = self.context.get('request')
         if request:
+            for document in obj.hospital_documents.all():
+                if document.document_type == HospitalDocument.LOGO:
+                    return request.build_absolute_uri(document.name.url) if document.name else None
             if obj.network:
                 for document in obj.network.hospital_network_documents.all():
                     if document.document_type == HospitalNetworkDocument.LOGO:
-                        return request.build_absolute_uri(document.name.url) if document.name else None
-            else:
-                for document in obj.hospital_documents.all():
-                    if document.document_type == HospitalDocument.LOGO:
                         return request.build_absolute_uri(document.name.url) if document.name else None
         return None
 
@@ -2149,7 +2165,10 @@ class HospitalDetailIpdProcedureSerializer(TopHospitalForIpdProcedureSerializer)
         return result
 
     def get_opd_timings(self, obj):
-        return obj.opd_timings
+        result = obj.opd_timings
+        if not result:
+            result = obj.network.opd_timings if obj.network else None
+        return result
 
     def get_contact_number(self, obj):
         for x in obj.hospital_helpline_numbers.all():
@@ -2158,14 +2177,26 @@ class HospitalDetailIpdProcedureSerializer(TopHospitalForIpdProcedureSerializer)
 
     def get_services(self, obj):
         request = self.context.get('request')
-        return [{'icon': request.build_absolute_uri(x.icon.url), 'name': x.name} for x in obj.service.all() if x.icon]
+        result = [{'icon': request.build_absolute_uri(x.icon.url), 'name': x.name} for x in obj.service.all() if x.icon]
+        if not result:
+            if obj.network:
+                result = [{'icon': request.build_absolute_uri(x.icon.url), 'name': x.name} for x in obj.network.service.all() if x.icon]
+        return result
 
     def get_images(self, obj):
         request = self.context.get('request')
-        return [{'original': request.build_absolute_uri(img.name.url),
-                 "thumbnail": request.build_absolute_uri(img.cropped_image.url) if img.cropped_image else None,
-                 "cover_image": img.cover_image} for img in
-                obj.hospitalimage_set.all() if img.name]
+        result = [{'original': request.build_absolute_uri(img.name.url),
+                   "thumbnail": request.build_absolute_uri(img.cropped_image.url) if img.cropped_image else None,
+                   "cover_image": img.cover_image} for img in
+                  obj.hospitalimage_set.all() if img.name]
+        if not result:
+            if obj.network:
+                result = [{'original': request.build_absolute_uri(img.name.url),
+                           "thumbnail": request.build_absolute_uri(
+                               img.cropped_image.url) if img.cropped_image else None,
+                           "cover_image": img.cover_image} for img in obj.network.hospitalnetworkimage_set.all() if
+                          img.name]
+        return result
 
     def get_ipd_procedure_categories(self, obj):
         result = {}

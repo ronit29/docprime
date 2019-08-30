@@ -34,6 +34,7 @@ import logging
 
 logger = logging.getLogger(__name__)
 
+
 class Image(models.Model):
     # name = models.ImageField(height_field='height', width_field='width')
     width = models.PositiveSmallIntegerField(editable=False,blank=True, null=True)
@@ -370,8 +371,8 @@ class User(AbstractBaseUser, PermissionsMixin):
         profile_data['user'] = user
         profile_data['email'] = data.get('email')
         profile_data['source'] = source
-        profile_data['dob'] = data.get('dob', "")
-        profile_data['gender'] = data.get('gender', "")
+        profile_data['dob'] = data.get('dob', None)
+        profile_data['gender'] = data.get('gender', None)
         user_profiles = user.profiles.all()
 
         if not bool(re.match(r"^[a-zA-Z ]+$", data.get('name'))):
@@ -387,9 +388,9 @@ class User(AbstractBaseUser, PermissionsMixin):
                 if not user_profile.email:
                     user_profile.email = profile_data['email'] if not user_profile.email else None
                 if not user_profile.gender and profile_data.get('gender', None):
-                    user_profile.gender = profile_data.get('gender', "")
+                    user_profile.gender = profile_data.get('gender', None)
                 if not user_profile.dob and profile_data.get('dob', None):
-                    user_profile.dob = profile_data.get('dob', "")
+                    user_profile.dob = profile_data.get('dob', None)
                 user_profile.save()
             else:
                 UserProfile.objects.create(**profile_data)
@@ -1077,6 +1078,17 @@ class GenericLabAdmin(TimeStampedModel, CreatedByModel):
                                write_permission=write_permission,
                                read_permission=read_permission
                                )
+
+    @classmethod
+    def get_appointment_admins(cls, appoinment):
+        if not appoinment:
+            return []
+        admins = GenericLabAdmin.objects.filter(is_disabled=False, lab=appoinment.lab).distinct('user')
+        admin_users = []
+        for admin in admins:
+            if admin.user:
+                admin_users.append(admin.user)
+        return admin_users
 
 
 class GenericAdminManager(models.Manager):

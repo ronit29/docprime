@@ -1373,6 +1373,8 @@ class DynamicTemplates(TimeStampedModel):
     sample_parameters = JSONField(default=dict, null=True, blank=True)
     subject = models.CharField(max_length=256, null=True, blank=True)
     recipient = models.CharField(max_length=100, null=True, blank=True)
+    cc = models.CharField(max_length=512, null=True, blank=True)
+    bcc = models.CharField(max_length=512, null=True, blank=True)
 
     def __str__(self):
         return str(self.template_name)
@@ -1380,13 +1382,27 @@ class DynamicTemplates(TimeStampedModel):
     def get_parameter_json(self):
         return self.sample_parameters
 
-    def send_notification(self, context, recipient_obj, notification_type):
+    def get_cc(self):
+        cc_emails = self.cc.split(',')
+        return cc_emails
+
+    def get_bcc(self):
+        bcc_emails = self.bcc.split(',')
+        return bcc_emails
+
+    def send_notification(self, context, recipient_obj, notification_type, *args, **kwargs):
         rendered_content = self.render_template(context)
         if rendered_content is None:
             logger.error("Could not generate content. Dynamic temlplate id %s" % str(self.id))
             return None
 
         if self.template_type == self.TemplateType.EMAIL:
+            if recipient_obj.__class__.__name__ != 'RecipientEmail':
+                raise Exception('Recipient object is not defined.')
+
+            recipient_obj.add_cc(self.get_cc())
+            recipient_obj.add_bcc(self.get_bcc())
+
             EmailNotification.send_dynamic_template_notification(recipient_obj, rendered_content, self.subject, notification_type)
         elif self.template_type == self.TemplateType.SMS:
             SmsNotification.send_dynamic_template_notification(recipient_obj, rendered_content, notification_type)
