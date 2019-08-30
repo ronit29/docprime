@@ -974,7 +974,7 @@ class UserInsurance(auth_model.TimeStampedModel, MerchantPayoutMixin):
         # f.content_type = 'application/pdf'
         #
         # self.coi = InMemoryUploadedFile(file, None, filename, 'application/pdf', file.tell(), None)
-        self.coi1 = html_to_pdf(html_body, filename)
+        self.coi = html_to_pdf(html_body, filename)
 
         self.save()
 
