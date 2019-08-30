@@ -1058,6 +1058,17 @@ class GenericLabAdmin(TimeStampedModel, CreatedByModel):
                                read_permission=read_permission
                                )
 
+    @classmethod
+    def get_appointment_admins(cls, appoinment):
+        if not appoinment:
+            return []
+        admins = GenericLabAdmin.objects.filter(is_disabled=False, lab=appoinment.lab).distinct('user')
+        admin_users = []
+        for admin in admins:
+            if admin.user:
+                admin_users.append(admin.user)
+        return admin_users
+
 
 class GenericAdminManager(models.Manager):
 

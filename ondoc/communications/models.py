@@ -28,7 +28,7 @@ from weasyprint import HTML
 
 from ondoc.account.models import Invoice, Order
 from ondoc.authentication.models import UserProfile, GenericAdmin, NotificationEndpoint, AgentToken, UserSecretKey, \
-    ClickLoginToken
+    ClickLoginToken, GenericLabAdmin
 from ondoc.insurance.models import EndorsementRequest, UserInsurance
 
 from ondoc.notification.models import NotificationAction, SmsNotification, EmailNotification, AppNotification, \
@@ -1736,6 +1736,7 @@ class LabNotification(Notification):
         all_receivers = {}
         instance = self.appointment
         receivers = []
+        lab_admins_app_recievers = list()
         notification_type = self.notification_type
         if not instance or not instance.user:
             return receivers
@@ -1756,16 +1757,17 @@ class LabNotification(Notification):
                                    NotificationAction.LAB_APPOINTMENT_BOOKED,
                                    NotificationAction.LAB_APPOINTMENT_CANCELLED]:
             lab_managers_to_be_communicated = lab_managers
+            lab_admins_app_recievers = GenericLabAdmin.get_appointment_admins(instance)
             # receivers.extend(lab_spocs)
             receivers.append(instance.user)
         receivers = list(set(receivers))
         user_and_phone_number = []
         user_and_email = []
-        app_receivers = receivers
+        app_receivers = push_receivers = receivers + lab_admins_app_recievers
         user_and_tokens = []
 
         user_and_token = [{'user': token.user, 'token': token.token, 'app_name': token.app_name} for token in
-                          NotificationEndpoint.objects.filter(user__in=receivers).order_by('user')]
+                          NotificationEndpoint.objects.filter(user__in=push_receivers).order_by('user')]
         for user, user_token_group in groupby(user_and_token, key=lambda x: x['user']):
             user_and_tokens.append(
                 {'user': user, 'tokens': [{"token": t['token'], "app_name": t["app_name"]} for t in user_token_group]})
