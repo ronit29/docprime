@@ -2122,7 +2122,6 @@ class EConsultationComm(Notification):
 
     def get_receivers(self):
         receivers = self.receivers if hasattr(self, 'receivers') else None
-        comm_types = self.comm_types if hasattr(self, 'comm_types') else None
         all_receivers = dict()
         sms_receivers = list()
         email_receivers = list()

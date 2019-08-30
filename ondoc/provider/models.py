@@ -10,6 +10,7 @@ import logging, json, uuid, requests
 logger = logging.getLogger(__name__)
 from django.conf import settings
 from ondoc.api.v1 import utils as v1_utils
+from rest_framework import status
 
 # Create your models here.
 
@@ -100,14 +101,6 @@ class RocketChatGroups(auth_models.TimeStampedModel):
         except Exception as e:
             return rc_group_obj, e
         return rc_group_obj, e
-
-    def post_chat_message(self, user_id, user_token, request_data):
-        response = requests.post(settings.ROCKETCHAT_SERVER + '/api/v1/chat.postMessage',
-                                 headers={'X-Auth-Token': user_token,
-                                          'X-User-Id': user_id,
-                                          'Content-Type': 'application/json'},
-                                 data=json.dumps(request_data))
-        return response
 
     def __str__(self):
         return str(self.id)
@@ -209,6 +202,23 @@ class EConsultation(auth_models.TimeStampedModel, auth_models.CreatedByModel):
             return {'error': str(e)}
         return {}
 
+    def post_chat_message(self, user_id, user_token, request_data):
+        response = requests.post(settings.ROCKETCHAT_SERVER + '/api/v1/chat.postMessage',
+                                 headers={'X-Auth-Token': user_token,
+                                          'X-User-Id': user_id,
+                                          'Content-Type': 'application/json'},
+                                 data=json.dumps(request_data))
+        error_message = None
+        if response.status_code != status.HTTP_200_OK or not response.ok:
+            error_message = "[ERROR] Error in Rocket Chat API hit with user_id - {} and user_token".format(
+                user_id, user_token)
+            logger.info(error_message)
+            logger.info("[ERROR] %s", response.reason)
+            logger.error(
+                "Payload - " + json.dumps(
+                    request_data) + ", RC Response - " + json.dumps(
+                    response.json()) + "")
+        return response, error_message
 
     def __str__(self):
         return str(self.id)

@@ -1207,62 +1207,41 @@ class PartnerEConsultationViewSet(viewsets.GenericViewSet):
         e_consultation = valid_data.get('e_consultation')
         user_token = e_consultation.doctor.rc_user.login_token
         user_id = e_consultation.doctor.rc_user.response_data['user']['_id']
-        rc_group = e_consultation.rc_group
         msg_txt = "This is the video link: {}".format(e_consultation.get_video_chat_url())
         request_data = {
-            "roomId": rc_group.group_id,
+            "roomId": e_consultation.rc_group.group_id,
             "text": msg_txt,
         }
-        response = rc_group.post_chat_message(user_id, user_token, request_data)
-        if response.status_code != status.HTTP_200_OK or not response.ok:
-            error_message = "[ERROR] Message for RC user with user_id - {} and user_token - {} could not be posted to group - {}".format(
-                    user_id, user_token, rc_group.group_name)
-            logger.info(error_message)
-            logger.info("[ERROR] %s", response.reason)
-            logger.error(
-                "RC Group - " + rc_group.group_name + ", Payload - " + json.dumps(
-                    request_data) + ", RC Response - " + json.dumps(
-                    response.json()) + "")
+        response, error_message = e_consultation.post_chat_message(user_id, user_token, request_data)
+        if error_message:
             return Response({"status": 0, "message": error_message})
         else:
-            receivers = list()
-            patient = e_consultation.get_patient_and_number()[0]
-            receivers.append(patient.user)
-            user_and_tokens = comm_models.NotificationEndpoint.get_user_and_tokens(receivers=receivers, kwargs=NotificationAction.E_CONSULTATION)
-            push_notification = comm_models.PUSHNotification(notification_type=notif_models.NotificationAction.E_CONSULT_VIDEO_LINK_SHARE, context={'patient_name': patient.name})
-            push_notification.send(receivers=user_and_tokens)
-            return Response({"status": 1, "message": "Message posted"})
+            e_consultation_notification = comm_models.EConsultationComm(e_consultation=e_consultation,
+                                                                        notification_type=notif_models.NotificationAction.E_CONSULT_VIDEO_LINK_SHARE)
+            e_consultation_notification.send()
+            return Response({"status": 1, "message": "Notifications sent"})
 
     def prescription_upload(self, request):
         from ondoc.api.v1.prescription.serializers import AppointmentPrescriptionUploadSerializer
         from ondoc.prescription.models import AppointmentPrescription
-        from django.forms.models import model_to_dict
         from ondoc.api.v1.utils import util_absolute_url
         request.data['user'] = request.user.id
         pres_serializer = AppointmentPrescriptionUploadSerializer(data=request.data, context={'request': request})
         pres_serializer.is_valid(raise_exception=True)
         pres_data = pres_serializer.validated_data
-        econsult_serializer = serializers.EConsultSerializer(data=request.data, context={'request': request})
-        econsult_serializer.is_valid(raise_exception=True)
-        e_consultation = econsult_serializer.validated_data['e_consultation']
+        e_consult_serializer = serializers.EConsultSerializer(data=request.data, context={'request': request})
+        e_consult_serializer.is_valid(raise_exception=True)
+        e_consultation = e_consult_serializer.validated_data['e_consultation']
         prescription_obj = AppointmentPrescription.objects.create(**pres_data, content_object=e_consultation)
+
         user_token = e_consultation.doctor.rc_user.login_token
         user_id = e_consultation.doctor.rc_user.response_data['user']['_id']
-        rc_group = e_consultation.rc_group
         request_data = {
-            "roomId": rc_group.group_id,
+            "roomId": e_consultation.rc_group.group_id,
             "text": "Link to Prescription: {}".format(util_absolute_url(prescription_obj.prescription_file.url)),
         }
-        response = rc_group.post_chat_message(user_id, user_token, request_data)
-        if response.status_code != status.HTTP_200_OK or not response.ok:
-            error_message = "[ERROR] Message for RC user with user_id - {} and user_token - {} could not be posted to group - {}".format(
-                user_id, user_token, rc_group.group_name)
-            logger.info(error_message)
-            logger.info("[ERROR] %s", response.reason)
-            logger.error(
-                "RC Group - " + rc_group.group_name + ", Payload - " + json.dumps(
-                    request_data) + ", RC Response - " + json.dumps(
-                    response.json()) + "")
+        response, error_message = e_consultation.post_chat_message(user_id, user_token, request_data)
+        if error_message:
             return Response({"status": 0, "message": error_message})
         else:
             model_serializer = AppointmentPrescriptionUploadSerializer(prescription_obj)
