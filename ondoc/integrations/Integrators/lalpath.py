@@ -1,23 +1,15 @@
-from decimal import Decimal
-
-from django.core.files.uploadedfile import TemporaryUploadedFile, InMemoryUploadedFile
-from django.db.models import Q
-
-from ondoc.api.v1.utils import TimeSlotExtraction
+import logging
+import requests
+import json
+from django.conf import settings
 from ondoc.integrations.models import IntegratorTestMapping, IntegratorCity, IntegratorTestCityMapping
 from .baseIntegrator import BaseIntegrator
-import requests
-from django.conf import settings
-import json
-from rest_framework import status
-import logging
 logger = logging.getLogger(__name__)
-from datetime import datetime, date, timedelta
-from ondoc.diagnostic.models import LabReport, LabReportFile, LabAppointment
+from datetime import date
 from django.contrib.contenttypes.models import ContentType
-from ondoc.api.v1.utils import thyrocare_resolve_address, aware_time_zone
-from django.utils import timezone
-import time
+from ondoc.api.v1.utils import resolve_address
+from ondoc.account.models import Order
+from rest_framework import status
 
 
 class Lalpath(BaseIntegrator):
@@ -47,7 +39,130 @@ class Lalpath(BaseIntegrator):
                 IntegratorTestCityMapping.objects.create(integrator_city=integrator_city, integrator_test_mapping=itm_obj)
                 print(test['TestName'])
 
+    def _post_order_details(self, lab_appointment, **kwargs):
+        from ondoc.integrations.models import IntegratorHistory
+        tests = kwargs.get('tests', None)
+        retry_count = kwargs.get('retry_count', 0)
+        payload = self.prepare_data(tests, lab_appointment)
+        url = "%s/CreateOrder" % settings.LAL_PATH_BASE_URL
+        headers = {'apiKey': settings.LAL_PATH_API_KEY, 'Content-Type': "application/json"}
+        response = requests.post(url, data=json.dumps(payload), headers=headers)
+        status_code = response.status_code
+        if response.status_code != status.HTTP_200_OK or not response.ok:
+            history_status = IntegratorHistory.NOT_PUSHED
+            IntegratorHistory.create_history(lab_appointment, payload, response.json(), url, 'post_order', 'Lalpath',
+                                             status_code, retry_count, history_status, '')
+            logger.error("[ERROR] %s" % response.json())
+        else:
+            # Add details to history table
+            history_status = IntegratorHistory.PUSHED_AND_NOT_ACCEPTED
+            IntegratorHistory.create_history(lab_appointment, payload, response.json(), url, 'post_order', 'Lalpath',
+                                             status_code, retry_count, history_status, '')
+            lal_path_response_id = response.json().get('OrderID')
+            resp_data = {
+                "lead_id": lal_path_response_id,
+                "dp_order_id": lab_appointment.id,
+                "integrator_order_id": lal_path_response_id,
+                "response_data": response.json()
+            }
+            return resp_data
+        return None
 
+    def prepare_data(self, tests, lab_appointment):
+        profile = lab_appointment.profile
+        patient_address = ""
+        if hasattr(lab_appointment, 'address') and lab_appointment.address:
+            patient_address = resolve_address(lab_appointment.address)
+            # address_id = lab_appointment.address.get('id')
+            # Address.objects.filter(id=address_id).first()
+
+        if profile:
+            age = self.calculate_age(profile)
+            if profile.gender:
+                gender = profile.gender
+                if gender == 'm':
+                    gender = '1'
+                    if age > 15:
+                        salution = '1'
+                    else:
+                        salution = '4'
+                else:
+                    gender = '2'
+                    salution = '2'
+
+        number = "9560488461"
+        mask_number = lab_appointment.mask_number.all().filter(is_deleted=False).first()
+        if mask_number:
+            number = mask_number.mask_number
+            if len(number) > 10:
+                number = number[1:]
+
+        patient_details = {
+            "SALUTATION": salution,
+            "LName": profile.name,
+            "age": str(age),
+            "gender": gender,
+            "mobile": number,
+            "email": "",
+            "city": "delhi",
+            "Address": patient_address,
+            "Preferred_Date": lab_appointment.time_slot_start.strftime("%d/%m/%Y")
+        }
+
+        lab = lab_appointment.lab
+        if lab:
+            lab_codes = lab.lab_code.all().first()
+
+        test_details = []
+        order_amount = 0
+        if tests:
+            for test in tests:
+                integrator_test = IntegratorTestMapping.objects.filter(test_id=test.id, is_active=True,
+                                                                       integrator_class_name=Lalpath.__name__).first()
+                if not integrator_test:
+                    raise Exception("[ERROR] No tests data found in integrator.")
+                data = {
+                    "TestName": integrator_test.integrator_test_name,
+                    "TestCode": integrator_test.integrator_product_data['TestCode'],
+                    "mrp": integrator_test.integrator_product_data['MRP'], "discount": "0",
+                    "price": integrator_test.integrator_product_data['MRP']
+                }
+                order_amount += int(data['mrp'])
+                test_details.append(data)
+
+        if order_amount >= 2000:
+            hcc = 0
+        else:
+            hcc = 100
+
+        order_details = {
+            "orderAmt": order_amount,
+            "actualAmt": order_amount,
+            "payable_amt": order_amount,
+            "HCC": hcc,
+            "InvoiceCode": "LP"+str(lab_appointment.id),
+            "LabCode": lab_codes.lab_code if lab_codes else "",
+            "WareHouseCode": lab_codes.warehouse_code if lab_codes else "",
+            "invoiceid": "LP"+str(lab_appointment.id)
+        }
+
+        request_data = {
+            "Order": order_details,
+            "Patient": patient_details,
+            "TestDetails": test_details,
+            "isEmailRequired": False
+        }
+
+        return request_data
+
+    def calculate_age(self, profile):
+        if not profile:
+            return 0
+        if not profile.dob:
+            return 0
+        dob = profile.dob
+        today = date.today()
+        return today.year - dob.year - ((today.month, today.day) < (dob.month, dob.day))
 
 
 

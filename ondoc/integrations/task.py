@@ -59,9 +59,9 @@ def push_lab_appointment_to_integrator(self, data):
 
             # save integrator response
             resp_data = integrator_response
-            IntegratorResponse.objects.create(lead_id=resp_data['ORDERRESPONSE']['PostOrderDataResponse'][0]['LEAD_ID'],
-                                              dp_order_id=resp_data['ORDER_NO'], integrator_order_id=resp_data['REF_ORDERID'],
-                                              content_object=appointment, response_data=resp_data,
+            IntegratorResponse.objects.create(lead_id=resp_data['lead_id'], dp_order_id=resp_data['dp_order_id'],
+                                              integrator_order_id=resp_data['integrator_order_id'],
+                                              content_object=appointment, response_data=resp_data['response_data'],
                                               integrator_class_name=integrator_mapping.integrator_class_name)
 
         elif appointment.status == LabAppointment.CANCELLED:

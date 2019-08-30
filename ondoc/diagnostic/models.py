@@ -1096,7 +1096,6 @@ class LabTestSubType(TimeStampedModel):
     class Meta:
         db_table = "lab_test_sub_type"
 
-
 # class RadiologyTestType(TimeStampedModel):
 #     name = models.CharField(max_length=200)
 
@@ -1105,7 +1104,6 @@ class LabTestSubType(TimeStampedModel):
 
 #     class Meta:
 #         db_table = "radiology_test_type"
-
 
 class TestParameter(TimeStampedModel):
     name = models.CharField(max_length=200, unique=True)
@@ -1772,7 +1770,6 @@ class LabAppointment(TimeStampedModel, CouponsMixin, LabAppointmentInvoiceMixin,
                     resp.append({"url": file_url, "type": mime_type})
         return resp
 
-
     def get_reports(self):
         return self.reports.all()
 
@@ -1838,6 +1835,30 @@ class LabAppointment(TimeStampedModel, CouponsMixin, LabAppointmentInvoiceMixin,
         else:
             return False
 
+    def is_part_of_integration(self):
+        network_id = None
+        if self.lab and self.lab.network and self.lab.network.id:
+            network_id = self.lab.network.id
+
+        if network_id == settings.THYROCARE_NETWORK_ID:
+            return True
+        elif network_id == settings.LAL_PATH_NETWORK_ID:
+            return True
+
+        return False
+
+    def can_push_to_integrator(self):
+        network_id = None
+        if self.lab and self.lab.network and self.lab.network.id:
+            network_id = self.lab.network.id
+
+        if network_id == settings.THYROCARE_NETWORK_ID and settings.THYROCARE_INTEGRATION_ENABLED:
+            return True
+        elif network_id == settings.LAL_PATH_NETWORK_ID and settings.LAL_PATH_INTEGRATION_ENABLED:
+            return True
+
+        return False
+
     def app_commit_tasks(self, old_instance, push_to_matrix, push_to_integrator):
         if old_instance is None:
             try:
@@ -1854,20 +1875,14 @@ class LabAppointment(TimeStampedModel, CouponsMixin, LabAppointmentInvoiceMixin,
             except Exception as e:
                 logger.error(str(e))
 
-        is_thyrocare_enabled = False
         if not self.created_by_native():
-            if push_to_integrator:
-                if self.lab.network and self.lab.network.id == settings.THYROCARE_NETWORK_ID:
-                    if settings.THYROCARE_INTEGRATION_ENABLED:
-                        is_thyrocare_enabled = True
-
+            if self.is_part_of_integration() and self.can_push_to_integrator():
                 try:
-                    if is_thyrocare_enabled:
-                        if old_instance:
-                            if (old_instance.status != self.CANCELLED and self.status == self.CANCELLED) or (old_instance.status == self.CREATED and self.status == self.BOOKED):
-                                push_lab_appointment_to_integrator.apply_async(({'appointment_id': self.id},), countdown=5)
-                        else:
+                    if old_instance:
+                        if (old_instance.status != self.CANCELLED and self.status == self.CANCELLED) or (old_instance.status == self.CREATED and self.status == self.BOOKED):
                             push_lab_appointment_to_integrator.apply_async(({'appointment_id': self.id},), countdown=5)
+                    else:
+                        push_lab_appointment_to_integrator.apply_async(({'appointment_id': self.id},), countdown=5)
                 except Exception as e:
                     logger.error(str(e))
 

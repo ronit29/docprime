@@ -113,3 +113,4 @@ class IntegratorLabTestParameterMappingAdmin(admin.ModelAdmin):
     list_display = ['integrator_test_parameter_code', 'integrator_class_name']
     readonly_fields = ('integrator_test_parameter_code',)
     autocomplete_fields = ['test_parameter']
+
