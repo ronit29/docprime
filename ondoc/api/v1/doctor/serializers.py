@@ -220,6 +220,8 @@ class CreateAppointmentSerializer(serializers.Serializer):
     procedure_ids = serializers.ListField(child=serializers.PrimaryKeyRelatedField(queryset=Procedure.objects.filter()), required=False)
     use_wallet = serializers.BooleanField(required=False)
     cart_item = serializers.PrimaryKeyRelatedField(queryset=Cart.objects.all(), required=False, allow_null=True)
+    appointment_id = serializers.IntegerField(required=False)
+    cod_to_prepaid = serializers.BooleanField(required=False)
     # procedure_category_ids = serializers.ListField(child=serializers.PrimaryKeyRelatedField(queryset=ProcedureCategory.objects.filter(is_live=True)), required=False, default=[])
     # time_slot_end = serializers.DateTimeField()
 
@@ -248,7 +250,8 @@ class CreateAppointmentSerializer(serializers.Serializer):
         if OpdAppointment.objects.filter(profile=data.get("profile"), doctor=data.get("doctor"),
                                          hospital=data.get("hospital"), time_slot_start=time_slot_start) \
                                 .exclude(status__in=[OpdAppointment.COMPLETED, OpdAppointment.CANCELLED]).exists():
-            raise serializers.ValidationError("Appointment for the selected date & time already exists. Please change the date & time of the appointment.")
+            if not data.get('cod_to_prepaid'):
+                raise serializers.ValidationError("Appointment for the selected date & time already exists. Please change the date & time of the appointment.")
 
         if not is_valid_testing_data(request.user, data["doctor"]):
             logger.error("Error 'Both User and Doctor should be for testing' for opd appointment with data - " + json.dumps(request.data))

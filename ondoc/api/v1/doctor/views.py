@@ -5,6 +5,7 @@ from uuid import UUID
 from django.contrib.gis.db.models.functions import Distance
 from django.contrib.gis.measure import D
 
+from ondoc.account.models import Order, ConsumerAccount
 from ondoc.api.v1.auth.serializers import UserProfileSerializer
 from ondoc.api.v1.doctor.city_match import city_match
 from ondoc.api.v1.doctor.serializers import HospitalModelSerializer, AppointmentRetrieveDoctorSerializer, \
@@ -235,6 +236,38 @@ class DoctorAppointmentsViewSet(OndocViewSet):
             opd_appointment.action_completed()
         opd_appointment_serializer = serializers.DoctorAppointmentRetrieveSerializer(opd_appointment, context={'request': request})
         return Response(opd_appointment_serializer.data)
+
+
+    def create_new(self, request):
+        serializer = serializers.CreateAppointmentSerializer(data=request.data,
+                                                             context={'request': request, 'data': request.data,
+                                                                      'use_duplicate': True})
+        serializer.is_valid(raise_exception=True)
+        validated_data = serializer.validated_data
+        data = request.data
+        if data and data.get('appointment_id') and data.get('cod_to_prepaid'):
+            cashback_balance = 0
+            fulfillment_data = Order.transfrom_cart_items(request, cart_items)
+            if validated_data.get('use_wallet'):
+                consumer_account = ConsumerAccount.objects.select_for_update().get(user=user)
+                balance = consumer_account.balance
+                cashback_balance = consumer_account.cashback
+                total_balance = balance + cashback_balance
+                payable_amount = Order.get_total_payable_amount(fulfillment_data)
+                if total_balance >= payable_amount:
+                    cashback_amount = min(cashback_balance, payable_amount)
+                    wallet_amount = max(0, payable_amount - cashback_amount)
+
+                    order_obj = Order.objects.filter(product_id=1, reference_id=data.get('appointment_id')).first()
+                    order_obj.amount = 0
+                    order_obj.wallet_amount = wallet_amount
+                    order_obj.cashback_amount = cashback_amount
+                    order_obj.payment_status = Order.PAYMENT_PENDING
+                    order_obj.save()
+
+                    process_immediately = True
+
+        return Response({})
 
 
     @transaction.atomic
