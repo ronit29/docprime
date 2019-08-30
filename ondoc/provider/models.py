@@ -18,8 +18,8 @@ class RocketChatUsers(auth_models.TimeStampedModel):
     # AUTH_TOKEN = 'Bwil0I0XK5GtRTuxFMaxxolZ-mNtQ-40MOjjcV6uzF8'
     # AUTH_USER_ID = '8DjvhTsfjxFHpuLcR'
 
-    AUTH_TOKEN = 'jtJnQp40Z1ZzFWd7zftbsfXfkT60K3P7MQlZpIS5CZ_'
-    AUTH_USER_ID = 'RX2J45QQShWpxgtNd'
+    AUTH_TOKEN = 'Tmdg6wA9zC31Nk2Uy0FVGZeIrd8WvImxqZqUklUoNde'
+    AUTH_USER_ID = 'QdY8ZL6FyZRdC8rAw'
 
     name = models.CharField(max_length=64)
     email = models.EmailField(max_length=64, unique=True)
