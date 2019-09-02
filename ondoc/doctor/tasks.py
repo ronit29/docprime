@@ -114,12 +114,7 @@ def update_flags():
 @task()
 def update_rc_super_user():
     from ondoc.provider.models import RocketChatSuperUser
-    from ondoc.api.v1.utils import rc_superuser_login
-    rc_super_user_obj = RocketChatSuperUser.objects.order_by('-created_at').first()
-    if rc_super_user_obj:
-        rc_superuser_login(rc_super_user_obj=rc_super_user_obj)
-    else:
-        rc_superuser_login()
+    RocketChatSuperUser.update_rc_super_user()
 
 @task()
 def doctors_daily_schedule():

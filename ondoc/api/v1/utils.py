@@ -1979,6 +1979,7 @@ def rc_superuser_login(**kwargs):
     auth_user_id = data.get('userId')
     if rc_super_user_obj:
         rc_super_user_obj.token = auth_token
+        rc_super_user_obj.user_id = auth_user_id
         rc_super_user_obj.save()
     else:
         rc_super_user_obj = RocketChatSuperUser.objects.create(username=username, password=password, user_id=auth_user_id, token=auth_token)

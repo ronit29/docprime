@@ -20,6 +20,15 @@ class RocketChatSuperUser(auth_models.TimeStampedModel):
     user_id = models.CharField(max_length=64, null=True, blank=True)
     token = models.CharField(max_length=64, null=True, blank=True)
 
+    @classmethod
+    def update_rc_super_user(cls):
+        rc_super_user_obj = cls.objects.order_by('-created_at').first()
+        if rc_super_user_obj:
+            rc_super_user_obj = v1_utils.rc_superuser_login(rc_super_user_obj=rc_super_user_obj)
+        else:
+            rc_super_user_obj = v1_utils.rc_superuser_login()
+        return rc_super_user_obj
+
     def __str__(self):
         return self.username
 
@@ -216,7 +225,7 @@ class EConsultation(auth_models.TimeStampedModel, auth_models.CreatedByModel):
                                  data=json.dumps(request_data))
         error_message = None
         if response.status_code != status.HTTP_200_OK or not response.ok:
-            error_message = "[ERROR] Error in Rocket Chat API hit with user_id - {} and user_token".format(
+            error_message = "[ERROR] Error in Rocket Chat API hit with user_id - {} and user_token - {}".format(
                 user_id, user_token)
             logger.info(error_message)
             logger.info("[ERROR] %s", response.reason)
