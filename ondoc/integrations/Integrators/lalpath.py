@@ -23,10 +23,9 @@ import time
 class Lalpath(BaseIntegrator):
 
     @classmethod
-    def get_test_data(self, obj_id):
+    def get_test_data(cls, obj_id):
         url = "%s/BulkDataTestCityPrice" % settings.LAL_PATH_BASE_URL
-        api_key = self.get_auth_token()
-        headers = {'apiKey': api_key}
+        headers = {'apiKey': settings.LAL_PATH_DATA_API_KEY, 'Content-Type': "application/json"}
         response = requests.request("POST", url, headers=headers)
         response = response.json()
 
@@ -48,18 +47,6 @@ class Lalpath(BaseIntegrator):
                 IntegratorTestCityMapping.objects.create(integrator_city=integrator_city, integrator_test_mapping=itm_obj)
                 print(test['TestName'])
 
-    def get_auth_token(self):
-        username = settings.LAL_PATH_USERNAME
-        password = settings.LAL_PATH_PASSWORD
-        url = "https://lalpathlabs.com/partner/api/v1/login"
-        data = {"username": username, "password": password}
-        headers = {'Content-Type': "application/json"}
-        response = requests.post(url, data, headers=headers)
-        if response.status_code == status.HTTP_200_OK or not response.ok:
-            resp_data = response.json()
-            return resp_data["token"]
-
-        return None
 
 
 
