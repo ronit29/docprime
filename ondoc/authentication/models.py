@@ -2101,10 +2101,13 @@ class RefundMixin(object):
         if self.payment_type == OpdAppointment.PREPAID and ConsumerTransaction.valid_appointment_for_cancellation(self.id, product_id):
             RefundDetails.log_refund(self)
             wallet_refund, cashback_refund = self.get_cancellation_breakup()
+            if hasattr(self, 'promotional_amount'):
+                consumer_account.debit_promotional(self)
             consumer_account.credit_cancellation(self, product_id, wallet_refund, cashback_refund)
             if refund_flag:
                 ctx_obj = consumer_account.debit_refund()
-                ConsumerRefund.initiate_refund(self.user, ctx_obj) if initiate_refund else None
+                if initiate_refund:
+                    ConsumerRefund.initiate_refund(self.user, ctx_obj)
 
     def can_agent_refund(self, user):
         from ondoc.crm.constants import constants
@@ -2271,7 +2274,7 @@ class PaymentMixin(object):
         order = Order.objects.filter(product_id=self.PRODUCT_ID,
                                          reference_id=self.id).first()
         if order:
-            order_parent = order.parent
+            order_parent = order.parent if not order.is_parent() else order;
             txn_obj = PgTransaction.objects.filter(order=order_parent).first() if order_parent else None
 
             if txn_obj and txn_obj.is_preauth():

@@ -23,6 +23,7 @@ class PgLogs(DynamicDocument, TimeStampedModel):
     PAYOUT_PROCESS = 6
     PAYOUT_SETTLEMENT_DETAIL = 7
     CHAT_ORDER_REQUEST = 8
+    CHAT_CONSULTATION_CANCEL = 9
 
     id = UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     order_id = LongField(null=True, blank=True, editable=False)

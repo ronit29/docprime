@@ -82,7 +82,7 @@ class Order(TimeStampedModel):
     matrix_lead_id = models.PositiveIntegerField(null=True)
     parent = models.ForeignKey('self', on_delete=models.CASCADE, related_name="orders", blank=True, null=True)
     cart = models.ForeignKey('cart.Cart', on_delete=models.CASCADE, related_name="order", blank=True, null=True)
-    user = models.ForeignKey(User, on_delete=models.DO_NOTHING, blank=True, null=True)
+    user = models.ForeignKey(User, on_delete=models.DO_NOTHING, blank=True, null=True, related_name="orders")
     visitor_info = JSONField(blank=True, null=True)
 
     def __str__(self):
@@ -362,6 +362,8 @@ class Order(TimeStampedModel):
             appointment_obj.save()
 
             if promotional_amount:
+                appointment_obj.price_data["promotional_amount"] = int(promotional_amount)
+                appointment_obj.save()
                 ConsumerAccount.credit_cashback(consultation_data.get('user'), promotional_amount, appointment_obj, self.product_id)
 
         return appointment_obj, wallet_amount, cashback_amount
@@ -1266,10 +1268,39 @@ class ConsumerAccount(TimeStampedModel):
         ConsumerTransaction.objects.create(**consumer_tx_data)
         self.save()
 
+    def debit_promotional(self, appointment_obj):
+        cashback_deducted = balance_deducted = 0
+        promotional_amount_debit = appointment_obj.promotional_amount
+
+        if promotional_amount_debit:
+            cashback_deducted = min(self.cashback, promotional_amount_debit)
+            self.cashback -= cashback_deducted
+
+            balance_deducted = min(self.balance, promotional_amount_debit - cashback_deducted)
+            self.balance -= balance_deducted
+
+            action = ConsumerTransaction.PROMOTIONAL_DEBIT
+            tx_type = PgTransaction.DEBIT
+
+            if cashback_deducted:
+                consumer_tx_data = self.consumer_tx_appointment_data(appointment_obj.user, appointment_obj, appointment_obj.PRODUCT_ID,
+                                                                     cashback_deducted, action, tx_type,
+                                                                     ConsumerTransaction.CASHBACK_SOURCE)
+                ConsumerTransaction.objects.create(**consumer_tx_data)
+
+            if balance_deducted:
+                consumer_tx_data = self.consumer_tx_appointment_data(appointment_obj.user, appointment_obj, appointment_obj.PRODUCT_ID,
+                                                                     balance_deducted, action, tx_type,
+                                                                     ConsumerTransaction.WALLET_SOURCE)
+                ConsumerTransaction.objects.create(**consumer_tx_data)
+
+            self.save()
+        return balance_deducted, cashback_deducted
+
     @classmethod
     def credit_cashback(cls, user, cashback_amount, appointment_obj, product_id):
         # check if cashback already credited
-        if ConsumerTransaction.objects.filter(product_id=product_id, type=ConsumerTransaction.CASHBACK_CREDIT, reference_id=appointment_obj.id).exists():
+        if ConsumerTransaction.objects.filter(product_id=product_id, action=ConsumerTransaction.CASHBACK_CREDIT, reference_id=appointment_obj.id).exists():
             return
 
         consumer_account = cls.objects.select_for_update().get(user=user)
@@ -1346,12 +1377,13 @@ class ConsumerTransaction(TimeStampedModel):
     RESCHEDULE_PAYMENT = 4
     CASHBACK_CREDIT = 5
     REFERRAL_CREDIT = 6
+    PROMOTIONAL_DEBIT = 7
 
     WALLET_SOURCE = 1
     CASHBACK_SOURCE = 2
 
     SOURCE_TYPE = [(WALLET_SOURCE, "Wallet"), (CASHBACK_SOURCE, "Cashback")]
-    action_list = ["Cancellation", "Payment", "Refund", "Sale", "CashbackCredit", "ReferralCredit"]
+    action_list = ["Cancellation", "Payment", "Refund", "Sale", "CashbackCredit", "ReferralCredit", "PromotionalDebit"]
     ACTION_CHOICES = list(enumerate(action_list, 0))
     user = models.ForeignKey(User, on_delete=models.DO_NOTHING)
     product_id = models.SmallIntegerField(choices=Order.PRODUCT_IDS, blank=True, null=True)
