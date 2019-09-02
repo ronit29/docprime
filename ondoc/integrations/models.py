@@ -147,6 +147,40 @@ class IntegratorReport(TimeStampedModel):
     xml_url = models.TextField(null=True, blank=True)
     json_data = JSONField(null=True, default={})
 
+    def get_transformed_report(self):
+        from collections import OrderedDict
+        json_data = self.json_data
+        response = {}
+
+        if json_data.__class__.__name__ == 'list' and json_data:
+            response['name'] = json_data[0].get('NAME')
+            response['tests'] = {}
+            for test_json in json_data:
+                integrator_test = IntegratorTestMapping.objects.filter(integrator_test_name=test_json['TESTS']).first()
+                if not integrator_test:
+                    continue
+
+                response['tests'][integrator_test.test.id] = {}
+
+                test_parameter_list = list()
+                test_parameter_list.extend(test_json['RED'])
+                test_parameter_list.extend(test_json['WHITE'])
+
+                test_parameter_list_dict = OrderedDict()
+                for tp in test_parameter_list:
+                    test_parameter_list_dict[tp.get('TEST_CODE')] = tp
+                
+                parameter_dict = {}
+
+                test_parameter_code_list = list(map(lambda x: x.get('TEST_CODE'), test_parameter_list))
+                integrator_test_parameter_mappings = IntegratorTestParameterMapping.objects.filter(integrator_test_name__in=[test_parameter_code_list])
+                for it in integrator_test_parameter_mappings:
+                    parameter_dict[it.id] = test_parameter_list_dict.get(it.integrator_test_name)
+
+                response['tests'][integrator_test.test.id]['parameters'] = parameter_dict
+
+        return response
+
     class Meta:
         db_table = 'integrator_report'
 
@@ -191,6 +225,14 @@ class IntegratorHistory(TimeStampedModel):
                                              accepted_through=mode)
 
 
+class IntegratorCity(TimeStampedModel):
+    city_name = models.CharField(max_length=60, null=True, blank=True)
+    city_id = models.IntegerField(null=True, blank=True)
+
+    class Meta:
+        db_table = 'integrator_city'
+
+
 class IntegratorTestMapping(TimeStampedModel):
     from ondoc.diagnostic.models import LabTest
 
@@ -204,7 +246,7 @@ class IntegratorTestMapping(TimeStampedModel):
     integrator_class_name = models.CharField(max_length=40, null=False, blank=False)
     service_type = models.CharField(max_length=30, choices=ServiceType.as_choices(), null=False, blank=False, default=None)
     integrator_product_data = JSONField(blank=True, null=True)
-    integrator_test_name = models.CharField(max_length=60, null=False, blank=False, default=None)
+    integrator_test_name = models.CharField(max_length=150, null=False, blank=False)
     name_params_required = models.BooleanField(default=False)
     test_type = models.CharField(max_length=30, null=True, blank=True)
     is_active = models.BooleanField(default=False)
@@ -292,3 +334,23 @@ class IntegratorDoctorMappings(TimeStampedModel):
 
     class Meta:
         db_table = 'integrator_doctor_mappings'
+
+
+class IntegratorLabTestParameterMapping(TimeStampedModel):
+    integrator_class_name = models.CharField(max_length=40, null=False, blank=False)
+    integrator_test_parameter_code = models.CharField(max_length=60, null=True, blank=True, unique=True)
+    integrator_test_name = models.CharField(max_length=100, null=True, blank=True, unique=True)
+    test_parameter = models.ForeignKey(TestParameter, related_name='integrator_mapped_test_parameters', on_delete=models.DO_NOTHING, null=True)
+
+    class Meta:
+        db_table = 'integrator_lab_test_parameter_mapping'
+        unique_together = (('integrator_class_name', 'integrator_test_parameter_code'), )
+
+
+class IntegratorTestCityMapping(TimeStampedModel):
+    integrator_city = models.ForeignKey(IntegratorCity, null=True, on_delete=models.DO_NOTHING)
+    integrator_test_mapping = models.ForeignKey(IntegratorTestMapping, null=True, on_delete=models.DO_NOTHING, related_name='mapped_city_test')
+
+    class Meta:
+        db_table = 'integrator_test_city_mapping'
+

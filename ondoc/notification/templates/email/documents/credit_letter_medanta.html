@@ -55,8 +55,8 @@
 				<td>
 					To,<br><br>
 					Medical Superintendent<br><br>
-					Medanta Medicity<br><br>
-					Sector 38, Gurgaon<br><br>
+					{{instance.hospital.name}}<br><br>
+					{{instance.hospital.get_hos_address}}<br><br>
 				</td>
 			</tr>
 			<tr>
@@ -71,10 +71,9 @@
 			<tr>
 				<td>
 					Dear Sir,<br><br>
-					We hereby authorise <b>{{instance.profile.name}}</b>, customer of Docprime to avail the <b>Consultation</b> services at Medanta Medicity for <b>Dr. {{instance.doctor.name}}</b>  <br><br>
-					The invoice for this consultation needs to be given to the customer directly.<br><br>
-					Kindly extend consultation services on credit basis for the above doctor for {{instance.time_slot_start|date:"D jS F Y"}} at {{instance.time_slot_start|date:"h:i A"}}.<br><br>
-					For any clarification, you may contact our team at 1800-123-9419.<br><br>
+					We hereby authorise <b>{{instance.profile.name}}</b> to avail the consultation services at {{instance.hospital.name}} with <b>Dr. {{instance.doctor.name}}</b> on {{instance.time_slot_start|date:"D jS F Y"}} at {{instance.created_at|date:"h:i A"}}. Please share the invoice with the customer at the time of appointment.<br><br>
+					Request you to extend your consultation services on credit basis for this appointment. Kindly note that, this letter is only valid for this appointment and is non-transferrable.<br><br>
+					For any clarification, you may contact our team at concierge@docprime.com.
 				</td>
 			</tr>
 			<tr>
@@ -84,7 +83,7 @@
 				<td>Sincerely,</td>
 			</tr>
 			<tr>
-				<td style="padding-top: 50px;"></td>
+				<td style="padding-top: 25px;"></td>
 			</tr>
 			<tr>
 				<td>

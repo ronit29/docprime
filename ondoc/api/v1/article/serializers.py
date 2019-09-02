@@ -6,6 +6,7 @@ from fluent_comments.models import FluentComment
 from ondoc.articles.models import Article, ArticleLinkedUrl, LinkedArticle
 from ondoc.articles.models import ArticleCategory
 from ondoc.authentication.models import User
+from ondoc.common.widgets import ArticleFooterWidget
 from ondoc.doctor.models import PracticeSpecialization
 from ondoc.doctor.v1.serializers import DoctorSerializer, ArticleAuthorSerializer
 from django.db import models
@@ -47,6 +48,7 @@ class ArticleRetrieveSerializer(serializers.ModelSerializer):
     comments = serializers.SerializerMethodField()
     body_doms = serializers.SerializerMethodField()
     recent_articles = serializers.SerializerMethodField()
+    footer_widget = serializers.SerializerMethodField()
 
     def get_comments(self, obj):
         comments = FluentComment.objects.filter(object_pk=str(obj.id), parent_id=None, is_public=True)
@@ -182,10 +184,15 @@ class ArticleRetrieveSerializer(serializers.ModelSerializer):
         recent_articles_dict = {'title': 'Recent Articles', 'items': recent_articles}
         return recent_articles_dict
 
+    def get_footer_widget(self, obj):
+        if obj.category.identifier == 'mddp':
+            return ArticleFooterWidget(obj).widget_picker
+        return ""
+
     class Meta:
         model = Article
         fields = ('title','heading_title', 'url', 'body_doms', 'body', 'icon', 'id', 'seo', 'header_image', 'header_image_alt', 'category',
-                  'linked', 'author_name', 'published_date', 'author', 'last_updated_at', 'comments', 'recent_articles')
+                  'linked', 'author_name', 'published_date', 'author', 'last_updated_at', 'comments', 'recent_articles', 'footer_widget')
 
 
 class ArticleListSerializer(serializers.ModelSerializer):

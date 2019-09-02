@@ -22,6 +22,8 @@ from django.utils.timezone import make_aware
 from django.utils.html import format_html_join
 import pytz
 from django.contrib import messages
+from reversion_compare.admin import CompareVersionAdmin
+
 from ondoc.account.models import Order, Invoice
 from ondoc.api.v1.utils import util_absolute_url, util_file_name, datetime_to_formated_string
 from ondoc.common.models import AppointmentHistory
@@ -34,7 +36,8 @@ from ondoc.diagnostic.models import (LabTiming, LabImage,
                                      TestParameter, ParameterLabTest, FrequentlyAddedTogetherTests, QuestionAnswer,
                                      LabReport, LabReportFile, LabTestCategoryMapping,
                                      LabTestRecommendedCategoryMapping, LabTestGroupTiming, LabTestGroupMapping,
-                                     TestParameterChat, LabTestThresholds)
+                                     TestParameterChat, LabTestThresholds, LabTestCategoryUrls,
+                                     LabTestCategoryLandingURLS)
 from ondoc.integrations.models import IntegratorHistory
 from ondoc.notification.models import EmailNotification, NotificationAction
 from ondoc.prescription.models import AppointmentPrescription
@@ -53,6 +56,7 @@ from ondoc.location.models import EntityUrls
 logger = logging.getLogger(__name__)
 from django.urls import reverse
 from django.utils.html import format_html_join, format_html
+from ondoc.notification import tasks as notification_tasks
 
 
 class LabTestResource(resources.ModelResource):
@@ -557,7 +561,7 @@ class LabTestGroupTimingInline(admin.TabularInline):
     show_change_link = False
 
 
-class LabAdmin(ImportExportMixin, admin.GeoModelAdmin, VersionAdmin, ActionAdmin, QCPemAdmin):
+class LabAdmin(ImportExportMixin, admin.GeoModelAdmin, CompareVersionAdmin, ActionAdmin, QCPemAdmin):
     change_list_template = 'superuser_import_export.html'
     resource_class = LabResource
     list_display = ('name', 'lab_logo', 'updated_at', 'onboarding_status', 'data_status', 'welcome_calling_done',
@@ -569,6 +573,7 @@ class LabAdmin(ImportExportMixin, admin.GeoModelAdmin, VersionAdmin, ActionAdmin
                'radiology_agreed_price_percentage', 'radiology_deal_price_percentage', 'live_at',
                'onboarded_at', 'qc_approved_at', 'disabled_at', 'welcome_calling_done_at')
     # autocomplete_fields = ['related_hospital']
+    search_fields = ['provider_name_lab']
 
     def has_delete_permission(self, request, obj=None):
         return super().has_delete_permission(request, obj)
@@ -943,8 +948,9 @@ class LabPrescriptionInline(nested_admin.NestedGenericTabularInline):
         return readonly_fields
 
 
-class LabAppointmentAdmin(nested_admin.NestedModelAdmin):
+class LabAppointmentAdmin(nested_admin.NestedModelAdmin, CompareVersionAdmin):
     form = LabAppointmentForm
+    change_form_template = 'appointment_change_form.html'
     search_fields = ['id']
     list_display = (
         'booking_id', 'get_profile', 'get_lab', 'status', 'reports_uploaded', 'time_slot_start', 'effective_price',
@@ -963,6 +969,21 @@ class LabAppointmentAdmin(nested_admin.NestedModelAdmin):
             return "False"
     get_is_fraud.short_description = 'Is Fraud'
 
+    def response_change(self, request, obj):
+        if "_capture-payment" in request.POST:
+            if request.user.is_superuser:
+                txn_obj = obj.get_transaction()
+                if txn_obj and txn_obj.is_preauth():
+                    notification_tasks.send_capture_payment_request.apply_async(
+                        (Order.LAB_PRODUCT_ID, obj.id), eta=timezone.localtime(), )
+                    messages.success(request, ('Payment capture requested successfully.'))
+                else:
+                    messages.error(request, ('Appointment transaction is not in authorize state.'))
+            else:
+                messages.error(request, ('You do not have access to perform this action.'))
+            return HttpResponseRedirect(".")
+        return super().response_change(request, obj)
+
     def get_insurance(self, obj):
         if obj.insurance:
             content_type = ContentType.objects.get_for_model(UserInsurance)
@@ -974,7 +995,8 @@ class LabAppointmentAdmin(nested_admin.NestedModelAdmin):
     get_insurance.short_description = 'Insurance'
 
     def is_prescription_uploaded(self, obj):
-        is_prescription = AppointmentPrescription.is_prescription_uploaded_for_appointment(obj)
+        # is_prescription = AppointmentPrescription.is_prescription_uploaded_for_appointment(obj)
+        is_prescription = obj.get_all_uploaded_prescriptions()
         if is_prescription:
             return str(True)
         else:
@@ -1729,3 +1751,17 @@ class TestParameterChatAdmin(admin.ModelAdmin):
     form = TestParameterChatForm
     list_display = ['test_name']
     readonly_fields = ('test_name',)
+
+
+
+class LabTestCategoryLandingURLSInline(admin.TabularInline):
+    model = LabTestCategoryLandingURLS
+    extra = 0
+    can_delete = True
+    show_change_link = False
+    # autocomplete_fields = ['lab_test']
+
+
+class LabTestCategoryUrlsAdmin(admin.ModelAdmin):
+    model = LabTestCategoryUrls
+    inlines = [LabTestCategoryLandingURLSInline]

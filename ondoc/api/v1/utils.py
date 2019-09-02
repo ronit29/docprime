@@ -69,6 +69,18 @@ class CustomTemporaryUploadedFile(UploadedFile):
             pass
 
 
+def get_pdf_njs(html, filename):
+    params = {'html': html, 'filename': filename}
+    odbc_base_url = str(settings.ODBC_BASE_URL)
+    url = odbc_base_url + '/api/get_pdf'
+    # url = 'http://localhost:8000/api/get_pdf'
+    response = requests.post(url, data=params, stream=True)
+    if response.status_code == 200:
+        object = response
+        return object
+    logger.error("Error Generating PDF " + str(filename) + " from PDF Server " + str(response.text))
+    return None
+
 def flatten_dict(d):
     def items():
         for key, value in d.items():
@@ -441,7 +453,7 @@ def payment_details(request, order):
             if order.action_data.get('profile_detail'):
                 profile_name = order.action_data.get('profile_detail').get('name', "")
 
-    if order.product_id == Order.SUBSCRIPTION_PLAN_PRODUCT_ID:
+    if order.product_id in [Order.SUBSCRIPTION_PLAN_PRODUCT_ID, Order.CHAT_PRODUCT_ID]:
         isPreAuth = '0'
 
     if isPreAuth == '1':
@@ -505,9 +517,9 @@ def payment_details(request, order):
     pgdata.update(filtered_pgdata)
     pgdata['hash'] = PgTransaction.create_pg_hash(pgdata, secret_key, client_key)
 
-    args = {'user_id': user.id, 'order_id': order.id}
-    save_payment_status.apply_async((PaymentProcessStatus.INITIATED, args),eta=timezone.localtime(), )
-    save_pg_response.apply_async((PgLogs.TXN_REQUEST, order.id, None, None, pgdata), eta=timezone.localtime(), )
+    args = {'user_id': user.id, 'order_id': order.id, 'source': 'ORDER_CREATE'}
+    save_payment_status.apply_async((PaymentProcessStatus.INITIATE, args),eta=timezone.localtime(), )
+    save_pg_response.apply_async((PgLogs.TXN_REQUEST, order.id, None, None, pgdata, user.id), eta=timezone.localtime(), )
     return pgdata, payment_required
 
 
@@ -525,7 +537,7 @@ def get_pg_secret_client_key(order):
     from ondoc.account.models import Order
     secret_key = client_key = ""
 
-    if order.product_id == Order.DOCTOR_PRODUCT_ID or order.product_id == Order.SUBSCRIPTION_PLAN_PRODUCT_ID:
+    if order.product_id in [Order.DOCTOR_PRODUCT_ID, Order.SUBSCRIPTION_PLAN_PRODUCT_ID, Order.CHAT_PRODUCT_ID]:
         secret_key = settings.PG_SECRET_KEY_P1
         client_key = settings.PG_CLIENT_KEY_P1
     elif order.product_id == Order.LAB_PRODUCT_ID:
@@ -889,7 +901,13 @@ class CouponsMixin(object):
         if coupon_obj.doctors.exists() and (not doctor or doctor not in coupon_obj.doctors.all()):
             return False
 
+        if doctor and (coupon_obj.doctors_exclude.exists() and (not doctor or doctor in coupon_obj.doctors_exclude.all())):
+            return False
+
         if coupon_obj.hospitals.exists() and (not hospital or hospital not in coupon_obj.hospitals.all()):
+            return False
+
+        if hospital and (coupon_obj.hospitals_exclude.exists() and (not hospital or hospital in coupon_obj.hospitals_exclude.all())):
             return False
 
         if coupon_obj.procedures.exists():
@@ -1735,7 +1753,7 @@ def create_payout_checksum(all_txn, product_id):
     checksum = ""
     for txn in all_txn:
         curr = "{"
-        for k in txn.keys():
+        for k in sorted(txn.keys()):
             if str(txn[k]) and txn[k] is not None and txn[k] is not "":
                 curr = curr + k + '=' + str(txn[k]) + ';'
         curr = curr + "}"
@@ -1749,25 +1767,38 @@ def create_payout_checksum(all_txn, product_id):
     return checksum_hash
 
 def html_to_pdf(html_body, filename):
+    from django.core.files.uploadedfile import InMemoryUploadedFile
     file = None
+    response = get_pdf_njs(html_body, filename)
     try:
-        extra_args = {
-            'virtual-time-budget': 6000
-        }
-        from django.core.files.uploadedfile import TemporaryUploadedFile
         temp_pdf_file = TemporaryUploadedFile(filename, 'byte', 1000, 'utf-8')
-        file = open(temp_pdf_file.temporary_file_path())
-        from hardcopy import bytestring_to_pdf
-        bytestring_to_pdf(html_body.encode(), file, **extra_args)
-        file.seek(0)
-        file.flush()
-        file.content_type = 'application/pdf'
-        from django.core.files.uploadedfile import InMemoryUploadedFile
-        file = InMemoryUploadedFile(temp_pdf_file, None, filename, 'application/pdf',
-                                    temp_pdf_file.tell(), None)
-
+        for block in response.iter_content(1024 * 8):
+            if not block:
+                break
+            temp_pdf_file.write(block)
+        temp_pdf_file.seek(0)
+        temp_pdf_file.content_type = "application/pdf"
+        file = InMemoryUploadedFile(temp_pdf_file, None, filename, temp_pdf_file.content_type, temp_pdf_file.tell(), None)
     except Exception as e:
         logger.error("Got error while creating PDF file :: {}.".format(e))
+    # try:
+    #     extra_args = {
+    #         'virtual-time-budget': 6000
+    #     }
+    #     from django.core.files.uploadedfile import TemporaryUploadedFile
+    #     temp_pdf_file = TemporaryUploadedFile(filename, 'byte', 1000, 'utf-8')
+    #     file = open(temp_pdf_file.temporary_file_path())
+    #     from hardcopy import bytestring_to_pdf
+    #     bytestring_to_pdf(html_body.encode(), file, **extra_args)
+    #     file.seek(0)
+    #     file.flush()
+    #     file.content_type = 'application/pdf'
+    #     from django.core.files.uploadedfile import InMemoryUploadedFile
+    #     file = InMemoryUploadedFile(temp_pdf_file, None, filename, 'application/pdf',
+    #                                 temp_pdf_file.tell(), None)
+    #
+    # except Exception as e:
+    #     logger.error("Got error while creating PDF file :: {}.".format(e))
     return file
 
 def util_absolute_url(url):
@@ -1930,3 +1961,15 @@ def format_return_value(value):
         return None
 
     return value
+
+
+def is_valid_ckeditor_text(text):
+    if text == "<p>&nbsp;</p>":
+        return False
+    return True
+
+
+
+
+
+

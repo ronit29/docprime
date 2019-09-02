@@ -53,7 +53,7 @@ from django.contrib.contenttypes.fields import GenericRelation
 from django.contrib.contenttypes.fields import GenericForeignKey
 from django.contrib.contenttypes.models import ContentType
 from ondoc.matrix.tasks import push_appointment_to_matrix, push_onboarding_qcstatus_to_matrix, \
-    create_ipd_lead_from_lab_appointment
+    create_ipd_lead_from_lab_appointment, create_or_update_lead_on_matrix
 from ondoc.integrations.task import push_lab_appointment_to_integrator, get_integrator_order_status
 from ondoc.location import models as location_models
 from ondoc.ratings_review import models as ratings_models
@@ -1403,24 +1403,19 @@ class AvailableLabTest(TimeStampedModel):
         #         else computed_agreed_price end), mrp) where id = %s '''
 
         query = '''update available_lab_test set computed_deal_price = (select deal_price from 
-                    (select *,  least(greatest(floor(price /5)*5, agreed_price), mrp ) as deal_price from 
-                    (select id, mrp, agreed_price,
-                    case 
-                    when agreed_price <=0 then mrp*.4 
-                    when mrp<=2000 then
-                        case when (least(agreed_price*1.5, .9*mrp) - agreed_price) >100 then least(agreed_price*1.5, .9*mrp) 
-                        else least(agreed_price+100, mrp) end
-                    else 
-                        case when (least(agreed_price*1.5, agreed_price+.5*(mrp-agreed_price)) - agreed_price )>100
-                        then least(agreed_price*1.5, agreed_price+.5*(mrp-agreed_price))
-                        else
-                        least(agreed_price+100, mrp) end 	
-                    end price
-                    from 
-                    (select case when custom_agreed_price is null then computed_agreed_price else
-                     custom_agreed_price end as agreed_price,
-                    mrp, id from available_lab_test  where id=%s )x)y where y.id = available_lab_test.id )z) 
-                    where available_lab_test.enabled=true and id=%s '''
+                (select * from 
+                (select id, mrp, agreed_price,
+                case 
+                when mrp <=300 then  least( case when mrp>2000 then 
+                (least(agreed_price*1.5, agreed_price+ 0.5*	(mrp-agreed_price))) 
+                else
+                (greatest(agreed_price+60, greatest(0.7*mrp, mrp-200))) end /0.75, mrp)
+                else
+				least( case when mrp>2000 then least(agreed_price*1.5, agreed_price+0.5*(mrp-agreed_price)) 
+				else greatest(agreed_price+60, greatest(0.7*mrp, mrp-200))end +75, mrp) end as deal_price							
+                from 
+                (select case when custom_agreed_price is null then computed_agreed_price else custom_agreed_price end as agreed_price,
+                mrp, id from available_lab_test)x)y where y.id = available_lab_test.id )z) where available_lab_test.enabled=true and id=%s '''
 
         update_available_lab_test_deal_price = RawSql(query, [self.pk, self.pk]).execute()
         # deal_price = RawSql(query, [self.pk]).fetch_all()
@@ -1431,19 +1426,16 @@ class AvailableLabTest(TimeStampedModel):
     def update_all_deal_price(cls):
         # will update all lab prices
         query = '''update available_lab_test set computed_deal_price = (select deal_price from 
-                (select *,  least(greatest(floor(price /5)*5, agreed_price), mrp ) as deal_price from 
+                (select * from 
                 (select id, mrp, agreed_price,
                 case 
-                when agreed_price <=0 then mrp*.4 
-                when mrp<=2000 then
-                    case when (least(agreed_price*1.5, .9*mrp) - agreed_price) >100 then least(agreed_price*1.5, .9*mrp) 
-                    else least(agreed_price+100, mrp) end
-                else 
-                    case when (least(agreed_price*1.5, agreed_price+.5*(mrp-agreed_price)) - agreed_price )>100
-                    then least(agreed_price*1.5, agreed_price+.5*(mrp-agreed_price))
-                    else
-                    least(agreed_price+100, mrp) end 	
-                end price
+                when mrp <=300 then  least( case when mrp>2000 then 
+                (least(agreed_price*1.5, agreed_price+ 0.5*	(mrp-agreed_price))) 
+                else
+                (greatest(agreed_price+60, greatest(0.7*mrp, mrp-200))) end /0.75, mrp)
+                else
+				least( case when mrp>2000 then least(agreed_price*1.5, agreed_price+0.5*(mrp-agreed_price)) 
+				else greatest(agreed_price+60, greatest(0.7*mrp, mrp-200))end +75, mrp) end as deal_price							
                 from 
                 (select case when custom_agreed_price is null then computed_agreed_price else custom_agreed_price end as agreed_price,
                 mrp, id from available_lab_test)x)y where y.id = available_lab_test.id )z) where available_lab_test.enabled=true'''
@@ -1660,6 +1652,36 @@ class LabAppointment(TimeStampedModel, CouponsMixin, LabAppointmentInvoiceMixin,
             return self.lab.matrix_state.id
         else:
             return None
+
+    def get_booking_analytics_data(self):
+        data = dict()
+
+        category = None
+        for t in self.tests.all():
+            if t.is_package == True:
+                category = 1
+                break
+            else:
+                category = 0
+
+        promo_cost = self.deal_price - self.effective_price if self.deal_price and self.effective_price else 0
+
+        data['Appointment_Id'] = self.id
+        data['CityId'] = self.get_city()
+        data['StateId'] = self.get_state()
+        data['ProviderId'] = self.lab.id
+        data['TypeId'] = 2
+        data['PaymentType'] = self.payment_type if self.payment_type else None
+        data['Payout'] = self.agreed_price
+        data['BookingDate'] = self.created_at
+        data['CorporateDealId'] = self.get_corporate_deal_id()
+        data['PromoCost'] = max(0, promo_cost)
+        data['GMValue'] = self.deal_price
+        data['Category'] = category
+        data['StatusId'] = self.status
+
+        return data
+
 
     def sync_with_booking_analytics(self):
 
@@ -2468,7 +2490,7 @@ class LabAppointment(TimeStampedModel, CouponsMixin, LabAppointmentInvoiceMixin,
         }
 
     @classmethod
-    def create_fulfillment_data(cls, user, data, price_data):
+    def create_fulfillment_data(cls, user, data, price_data, request):
         from ondoc.api.v1.auth.serializers import AddressSerializer
         from ondoc.insurance.models import UserInsurance
 
@@ -2501,15 +2523,25 @@ class LabAppointment(TimeStampedModel, CouponsMixin, LabAppointmentInvoiceMixin,
 
         is_appointment_insured = False
         insurance_id = None
+        booked_by = 'agent' if hasattr(request, 'agent') else 'user'
         user_insurance = UserInsurance.objects.filter(user=user).order_by('-id').first()
         if user_insurance and user_insurance.is_valid():
-            is_appointment_insured, insurance_id, insurance_message = user_insurance.validate_lab_insurance(data, user_insurance)
+            insurance_resp = user_insurance.validate_insurance(data, booked_by=booked_by)
+            if insurance_resp.get('is_insured', False):
+                is_appointment_insured = True
+                insurance_id = insurance_resp.get('insurance_id', None)
 
-        if is_appointment_insured and cart_data.get('is_appointment_insured', None):
+        if is_appointment_insured or cart_data.get('is_appointment_insured', None):
             payment_type = OpdAppointment.INSURANCE
             effective_price = 0.0
         else:
+            is_appointment_insured = False
             insurance_id = None
+            if data["payment_type"] == OpdAppointment.INSURANCE:
+                payment_type = OpdAppointment.PREPAID
+            else:
+                payment_type = data["payment_type"]
+
 
         fulfillment_data = {
             "lab": data["lab"],
@@ -3114,6 +3146,7 @@ class LabPricing(Lab):
         default_permissions = []
 
 
+@reversion.register()
 class LabReport(auth_model.TimeStampedModel):
     appointment = models.ForeignKey(LabAppointment, related_name='reports', on_delete=models.CASCADE)
     report_details = models.TextField(max_length=300, blank=True, null=True)
@@ -3167,6 +3200,7 @@ class LabTestGroup(auth_model.TimeStampedModel):
         return "{}".format(self.name)
 
 
+@reversion.register()
 class LabAppointmentTestMapping(models.Model):
     appointment = models.ForeignKey(LabAppointment, on_delete=models.CASCADE, related_name='test_mappings')
     test = models.ForeignKey(LabTest, on_delete=models.CASCADE, related_name='lab_appointment_mappings')
@@ -3249,3 +3283,55 @@ class LabTestThresholds(TimeStampedModel):
 
     class Meta:
         db_table = 'lab_test_thresholds'
+
+
+class LabTestCategoryUrls(TimeStampedModel):
+    url = models.SlugField(blank=False, null=True, max_length=2000, db_index=True, unique=True)
+    title = models.CharField(max_length=2000, default='')
+    latitude = models.FloatField(null=True, blank=True)
+    longitude = models.FloatField(null=True, blank=True)
+    radius = models.FloatField(null=True, blank=True)
+
+    class Meta:
+        db_table = 'lab_test_category_urls'
+
+    def save(self, *args, **kwargs):
+        self.url = self.url.lower()
+        if not self.url.endswith('tpcp'):
+            self.url = self.url + '-tpcp'
+
+        super(LabTestCategoryUrls, self).save(*args, **kwargs)
+
+
+class LabTestCategoryLandingURLS(TimeStampedModel):
+    url = models.ForeignKey(LabTestCategoryUrls, related_name="lab_category_url", on_delete=models.CASCADE)
+    test = models.ForeignKey(LabTestCategory, related_name="compare_lab", on_delete=models.CASCADE)
+    priority = models.IntegerField(default=0)
+
+    class Meta:
+        db_table = "lab_test_category_landing_urls"
+
+
+
+class IPDMedicinePageLead(auth_model.TimeStampedModel):
+    name = models.CharField(max_length=500)
+    phone_number = models.BigIntegerField(validators=[MaxValueValidator(9999999999), MinValueValidator(1000000000)])
+    matrix_city = models.ForeignKey(MatrixMappedCity, on_delete=models.SET_NULL, null=True)
+    matrix_lead_id = models.IntegerField(null=True)
+    lead_source = models.CharField(null=True, max_length=1000)
+
+    class Meta:
+        db_table = "ipd_medicine_lead"
+
+    def __str__(self):
+        return self.name
+
+    def save(self, force_insert=False, force_update=False, using=None, update_fields=None):
+
+        if not self.id:
+            super().save(force_insert, force_update, using, update_fields)
+
+        if not self.matrix_lead_id:
+            create_or_update_lead_on_matrix.apply_async(({'obj_type': self.__class__.__name__, 'obj_id': self.id}, ), countdown=5)
+
+

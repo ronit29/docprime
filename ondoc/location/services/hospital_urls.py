@@ -47,13 +47,19 @@ class HospitalURL():
                   a.locality_id, a.sublocality_id, a.locality_value, a.sublocality_value, a.is_valid, 
                   a.locality_location, a.sublocality_location, a.location, entity_id, 
                   specialization_id, specialization, breadcrumb, bookable_doctors_count from temp_url a
+                   where ((a.sitemap_identifier='HOSPITAL_PAGE'  and a.entity_id not in (select entity_id from entity_urls where
+                   sitemap_identifier='HOSPITAL_PAGE' and is_valid=True)) OR (a.sitemap_identifier!='HOSPITAL_PAGE' ))
                   ''' %seq
+
+        update_seq_query = '''update entity_urls set sequence = %d where sitemap_identifier = 'HOSPITAL_PAGE' and
+         is_valid = True''' % seq
 
         update_query = '''update entity_urls set is_valid=false where sitemap_identifier 
                            in ('HOSPITALS_LOCALITY_CITY', 'HOSPITALS_CITY', 'HOSPITAL_PAGE') and sequence< %d''' % seq
 
 
         RawSql(query, []).execute()
+        RawSql(update_seq_query, []).execute()
         RawSql(update_query, []).execute()
 
 
