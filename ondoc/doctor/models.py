@@ -1498,8 +1498,8 @@ class DoctorClinic(auth_model.TimeStampedModel, auth_model.WelcomeCallingDone):
         db_table = "doctor_clinic"
         unique_together = (('doctor', 'hospital', ),)
 
-    # def __str__(self):
-    #     return '{}-{}'.format(self.doctor, self.hospital)
+    def __str__(self):
+        return '{}-{}'.format(self.doctor, self.hospital)
 
     def is_enabled_for_cod(self):
         return self.hospital.is_enabled_for_cod()
@@ -1533,8 +1533,6 @@ class DoctorClinic(auth_model.TimeStampedModel, auth_model.WelcomeCallingDone):
         res_data = {"time_slots": slots, "upcoming_slots": upcoming_slots}
         return res_data
 
-
-
     def get_timings_v2(self, total_leaves, blocks=[]):
         clinic_timings = self.availability.order_by("start")
         booking_details = dict()
@@ -1549,7 +1547,6 @@ class DoctorClinic(auth_model.TimeStampedModel, auth_model.WelcomeCallingDone):
         upcoming_slots = timeslot_object.get_upcoming_slots(time_slots=clinic_timings)
         timing_response = {"timeslots": clinic_timings, "upcoming_slots": upcoming_slots}
         return timing_response
-
 
 
 class DoctorClinicTiming(auth_model.TimeStampedModel):
@@ -2513,6 +2510,35 @@ class OpdAppointment(auth_model.TimeStampedModel, CouponsMixin, OpdAppointmentIn
             return self.hospital.matrix_state.id
         else:
             return None
+
+    def get_booking_analytics_data(self):
+        data = dict()
+
+        promo_cost = self.deal_price - self.effective_price if self.deal_price and self.effective_price else 0
+        department = None
+        if self.doctor:
+            if self.doctor.doctorpracticespecializations.first():
+                if self.doctor.doctorpracticespecializations.first().specialization.department.first():
+                    department = self.doctor.doctorpracticespecializations.first().specialization.department.first().id
+
+        wallet, cashback = self.get_completion_breakup()
+
+        data['Appointment_Id'] = self.id
+        data['CityId'] = self.get_city()
+        data['StateId'] = self.get_state()
+        data['SpecialityId'] = department
+        data['TypeId'] = 1
+        data['ProviderId'] = self.hospital.id
+        data['PaymentType'] = self.payment_type if self.payment_type else None
+        data['Payout'] = self.fees
+        data['CashbackUsed'] = cashback
+        data['BookingDate'] = self.created_at
+        data['CorporateDealId'] = self.get_corporate_deal_id()
+        data['PromoCost'] = max(0, promo_cost)
+        data['GMValue'] = self.deal_price
+        data['StatusId'] = self.status
+
+        return data
 
     def sync_with_booking_analytics(self):
 

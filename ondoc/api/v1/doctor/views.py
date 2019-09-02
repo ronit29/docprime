@@ -328,7 +328,6 @@ class DoctorAppointmentsViewSet(OndocViewSet):
     def can_book_for_free(self, user):
         return models.OpdAppointment.objects.filter(user=user, deal_price=0)\
                    .exclude(status__in=[models.OpdAppointment.COMPLETED, models.OpdAppointment.CANCELLED]).count() < models.OpdAppointment.MAX_FREE_BOOKINGS_ALLOWED
-
     def update(self, request, pk=None):
         user = request.user
         source = request.query_params.get('source', '')

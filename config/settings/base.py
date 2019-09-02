@@ -79,20 +79,21 @@ DATABASES['default']['ENGINE'] = 'django.contrib.gis.db.backends.postgis'
 #     DATABASES['doc_read'] = env.db('READ_DATABASE_URL')
 #     DATABASES['doc_read']['ENGINE'] = 'django.contrib.gis.db.backends.postgis'
 
-try:
-    if env('MSSQL_HOST') and env('MSSQL_USERNAME') and env('MSSQL_PASSWORD'):
-        DATABASES['sql_server'] = {
-             'ENGINE': 'sql_server.pyodbc',
-             'HOST': env('MSSQL_HOST'),
-             'USER': env('MSSQL_USERNAME'),
-             'PASSWORD': env('MSSQL_PASSWORD'),
-             'NAME': env('MSSQL_DB'),
-             'OPTIONS': {
-                  'driver': 'ODBC Driver 17 for SQL Server'
-            }
-        }
-except Exception as e:
-    print(str(e))
+# try:
+#     if env('MSSQL_HOST') and env('MSSQL_USERNAME') and env('MSSQL_PASSWORD'):
+#         DATABASES['sql_server'] = {
+#              'ENGINE': 'sql_server.pyodbc',
+#              'HOST': env('MSSQL_HOST'),
+#              'USER': env('MSSQL_USERNAME'),
+#              'PASSWORD': env('MSSQL_PASSWORD'),
+#              'NAME': env('MSSQL_DB'),
+#              'OPTIONS': {
+#                   'driver' : 'ODBC Driver 17 for SQL Server'
+#             }
+#         }
+# except Exception as e:
+#     print(str(e))
+
 
 
 
@@ -505,3 +506,14 @@ MEDICINE_TOP_TESTS = env.list('MEDICINE_TOP_TESTS')
 CHAT_AUTH_TOKEN=env('CHAT_AUTH_TOKEN')
 BAJAJ_ALLIANZ_AUTH_TOKEN=env('BAJAJ_ALLIANZ_AUTH_TOKEN')
 MATRIX_USER_AUTH_TOKEN=env('MATRIX_USER_AUTH_TOKEN')
+ODBC_BASE_URL=env('ODBC_BASE_URL')
+LAL_PATH_BASE_URL=env('LAL_PATH_BASE_URL')
+LAL_PATH_USERNAME=env('LAL_PATH_USERNAME')
+LAL_PATH_PASSWORD=env('LAL_PATH_PASSWORD')
+LAL_PATH_DATA_API_KEY=env('LAL_PATH_DATA_API_KEY')
+SIMS_BASE_URL = env('SIMS_BASE_URL')
+MEDANTA_DOCTOR_LIST_URL=env('MEDANTA_DOCTOR_LIST_URL')
+MEDANTA_DOCTOR_LIST_USER_HEADER=env('MEDANTA_DOCTOR_LIST_USER_HEADER')
+MEDANTA_DOCTOR_LIST_USER_VALUE=env('MEDANTA_DOCTOR_LIST_USER_VALUE')
+MEDANTA_DOCTOR_LIST_PASSWORD_HEADER=env('MEDANTA_DOCTOR_LIST_PASSWORD_HEADER')
+MEDANTA_DOCTOR_LIST_PASSWORD_VALUE=env('MEDANTA_DOCTOR_LIST_PASSWORD_VALUE')

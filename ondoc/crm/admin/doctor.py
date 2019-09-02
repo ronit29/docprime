@@ -2305,7 +2305,6 @@ class PracticeSpecializationDepartmentMappingInline(admin.TabularInline):
     show_change_link = False
 
 
-
 class PracticeSpecializationAdmin(AutoComplete, ImportExportMixin, VersionAdmin):
     formats = (base_formats.XLS, base_formats.XLSX,)
     list_display = ('name', )
@@ -2423,6 +2422,17 @@ class SimilarSpecializationGroupAdmin(VersionAdmin):
     list_display = ['id', 'name']
 
 
+class DoctorClinicAdmin(VersionAdmin):
+    list_display = ('doctor', 'hospital', 'updated_at')
+    date_hierarchy = 'created_at'
+    search_fields = ['doctor__name', 'hospital__name']
+    autocomplete_fields = ['doctor', 'hospital']
+    inlines = [DoctorClinicTimingInline]
+
+    def get_queryset(self, request):
+        return super(DoctorClinicAdmin, self).get_queryset(request).select_related('doctor', 'hospital')
+
+
 class PurchaseOrderCreationForm(forms.ModelForm):
     def clean(self):
         cleaned_data = self.cleaned_data
@@ -2530,3 +2540,4 @@ class DoctorSponsoredServicesAdmin(ImportExportMixin, admin.ModelAdmin):
     list_display = ['doctor', 'sponsored_service']
     formats = (base_formats.XLS, base_formats.XLSX,)
     resource_class = DoctorSponsoredServicesResource
+

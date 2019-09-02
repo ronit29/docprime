@@ -3,7 +3,7 @@ import logging
 import operator
 from copy import deepcopy
 from itertools import groupby
-from pyodbc import Date
+# from pyodbc import Date
 
 from django.contrib.contenttypes.models import ContentType
 
@@ -1465,7 +1465,7 @@ class LabList(viewsets.ReadOnlyModelViewSet):
         lab_timing_join = ""
 
         if availability:
-            today = Date.today().weekday()
+            today = datetime.datetime.now().weekday()
             aval_query = "( "
             currentDT = timezone.now()
             today_time = aware_time_zone(currentDT).strftime("%H.%M")
