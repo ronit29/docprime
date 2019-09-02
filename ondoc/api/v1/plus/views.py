@@ -65,7 +65,7 @@ class PlusOrderViewSet(viewsets.GenericViewSet):
             plus_user = user.active_plus_users.filter().order_by('id').last()
 
             if plus_user and plus_user.is_valid():
-                return Response({'success': True, "is_insured": True})
+                return Response({'success': True, "is_plus_user": True})
 
             if not plus_lead:
                 plus_lead = PlusLead(user=user)
@@ -79,13 +79,13 @@ class PlusOrderViewSet(viewsets.GenericViewSet):
             plus_lead.extras = request.data
             plus_lead.save()
 
-            return Response({'success': True, 'is_insured': False})
+            return Response({'success': True, 'is_plus_user': False})
         else:
             lead = PlusLead.create_lead_by_phone_number(request)
             if not lead:
-                return Response({'success': False, 'is_insured': False})
+                return Response({'success': False, 'is_plus_user': False})
 
-            return Response({'success': True, 'is_insured': False})
+            return Response({'success': True, 'is_plus_user': False})
 
     @transaction.atomic
     def create_order(self, request):
