@@ -1258,7 +1258,6 @@ class ConsumerEConsultationViewSet(viewsets.GenericViewSet):
         return None
 
     def list(self, request):
-        request.user = auth_models.User.objects.filter(id=17329).first()
         filter_kwargs = dict()
         id = request.query_params.get('id')
         if id:
