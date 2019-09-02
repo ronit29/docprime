@@ -356,7 +356,7 @@ class DoctorAppointmentsViewSet(OndocViewSet):
             else:
                 resp["status"] = 1
                 resp['data'], resp["payment_required"] = payment_details(request, pg_order)
-            return resp
+            return Response(resp)
 
         return Response({})
 
