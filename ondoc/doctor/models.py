@@ -2621,7 +2621,7 @@ class OpdAppointment(auth_model.TimeStampedModel, CouponsMixin, OpdAppointmentIn
         return appointments
 
     @classmethod
-    def create_appointment(cls, appointment_data):
+    def create_appointment(cls, appointment_data, validated_data=None):
         from ondoc.insurance.models import UserInsurance
         insurance = appointment_data.get('insurance')
         appointment_status = OpdAppointment.BOOKED
@@ -2643,7 +2643,18 @@ class OpdAppointment(auth_model.TimeStampedModel, CouponsMixin, OpdAppointmentIn
             "random_coupons": appointment_data.pop("coupon_data", [])
         }
         procedure_details = appointment_data.pop('extra_details', [])
-        app_obj = cls.objects.create(**appointment_data)
+        if validated_data and validated_data.get('appointment_id') and validated_data.get('cod_to_prepaid'):
+            app_obj = OpdAppointment.objects.filter(id=validated_data.get('appointment_id')).first()
+            for data in appointment_data:
+                app_obj.data = appointment_data[data]
+
+            # app_obj.status = appointment_status
+            # app_obj.otp = otp
+            # app_obj.payment_status = OpdAppointment.PAYMENT_ACCEPTED
+            # app_obj.save()
+
+        else:
+            app_obj = cls.objects.create(**appointment_data)
         if procedure_details:
             procedure_to_be_added = []
             for procedure in procedure_details:
@@ -3261,7 +3272,7 @@ class OpdAppointment(auth_model.TimeStampedModel, CouponsMixin, OpdAppointmentIn
         }
 
     @classmethod
-    def create_fulfillment_data(cls, user, data, price_data):
+    def create_fulfillment_data(cls, user, data, price_data, cart_item_id=None):
         from ondoc.insurance.models import UserInsurance
         procedures = data.get('procedure_ids', [])
         selected_hospital = data.get('hospital')
@@ -3288,7 +3299,7 @@ class OpdAppointment(auth_model.TimeStampedModel, CouponsMixin, OpdAppointmentIn
 
         payment_type = data.get("payment_type")
         effective_price = price_data.get("effective_price")
-        cart_data = data.get('cart_item').data
+        cart_data = data.get('cart_item').data if data.get('cart_item') and data.get('cart_item').data else cart_item_id
         # is_appointment_insured = cart_data.get('is_appointment_insured', None)
         # insurance_id = cart_data.get('insurance_id', None)
 
