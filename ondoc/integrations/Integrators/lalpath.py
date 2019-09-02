@@ -17,27 +17,42 @@ class Lalpath(BaseIntegrator):
     @classmethod
     def get_test_data(self, obj_id):
         url = "%s/BulkDataTestCityPrice" % settings.LAL_PATH_BASE_URL
-        headers = {'apiKey': settings.LAL_PATH_API_KEY}
-        response = requests.request("POST", url, headers=headers)
-        response = response.json()
+        api_key = self.get_auth_token()
+        if api_key:
+            headers = {'apiKey': api_key}
+            response = requests.request("POST", url, headers=headers)
+            response = response.json()
 
-        all_data = response['Response']
-        for data in all_data:
-            integrator_city_id = data['CityID']
-            integrator_city_name = data['CityName']
-            integrator_city = IntegratorCity.objects.filter(city_id=integrator_city_id).first()
-            if not integrator_city:
-                integrator_city = IntegratorCity.objects.create(city_id=integrator_city_id, city_name=integrator_city_name)
+            all_data = response['Response']
+            for data in all_data:
+                integrator_city_id = data['CityID']
+                integrator_city_name = data['CityName']
+                integrator_city = IntegratorCity.objects.filter(city_id=integrator_city_id).first()
+                if not integrator_city:
+                    integrator_city = IntegratorCity.objects.create(city_id=integrator_city_id, city_name=integrator_city_name)
 
-            for test in data['Test']:
-                defaults = {'integrator_product_data': test, 'integrator_class_name': Lalpath.__name__,
-                            'content_type': ContentType.objects.get(model='labnetwork'),
-                            'service_type': IntegratorTestMapping.ServiceType.LabTest,
-                            'name_params_required': False, 'test_type': 'TEST'}
-                itm_obj, created = IntegratorTestMapping.objects.update_or_create(integrator_test_name=test['TestName'],
-                                                                                  object_id=obj_id, defaults=defaults)
-                IntegratorTestCityMapping.objects.create(integrator_city=integrator_city, integrator_test_mapping=itm_obj)
-                print(test['TestName'])
+                for test in data['Test']:
+                    defaults = {'integrator_product_data': test, 'integrator_class_name': Lalpath.__name__,
+                                'content_type': ContentType.objects.get(model='labnetwork'),
+                                'service_type': IntegratorTestMapping.ServiceType.LabTest,
+                                'name_params_required': False, 'test_type': 'TEST'}
+                    itm_obj, created = IntegratorTestMapping.objects.update_or_create(integrator_test_name=test['TestName'],
+                                                                                      object_id=obj_id, defaults=defaults)
+                    IntegratorTestCityMapping.objects.create(integrator_city=integrator_city, integrator_test_mapping=itm_obj)
+                    print(test['TestName'])
+
+    def get_auth_token(self):
+        username = settings.LAL_PATH_USERNAME
+        password = settings.LAL_PATH_PASSWORD
+        url = "https://lalpathlabs.com/partner/api/v1/login"
+        data = {"username": username, "password": password}
+        headers = {'Content-Type': "application/json"}
+        response = requests.post(url, data, headers=headers)
+        if response.status_code == status.HTTP_200_OK or not response.ok:
+            resp_data = response.json()
+            return resp_data["token"]
+
+        return None
 
     def _post_order_details(self, lab_appointment, **kwargs):
         from ondoc.integrations.models import IntegratorHistory
@@ -45,27 +60,29 @@ class Lalpath(BaseIntegrator):
         retry_count = kwargs.get('retry_count', 0)
         payload = self.prepare_data(tests, lab_appointment)
         url = "%s/CreateOrder" % settings.LAL_PATH_BASE_URL
-        headers = {'apiKey': settings.LAL_PATH_API_KEY, 'Content-Type': "application/json"}
-        response = requests.post(url, data=json.dumps(payload), headers=headers)
-        status_code = response.status_code
-        if response.status_code != status.HTTP_200_OK or not response.ok:
-            history_status = IntegratorHistory.NOT_PUSHED
-            IntegratorHistory.create_history(lab_appointment, payload, response.json(), url, 'post_order', 'Lalpath',
-                                             status_code, retry_count, history_status, '')
-            logger.error("[ERROR] %s" % response.json())
-        else:
-            # Add details to history table
-            history_status = IntegratorHistory.PUSHED_AND_NOT_ACCEPTED
-            IntegratorHistory.create_history(lab_appointment, payload, response.json(), url, 'post_order', 'Lalpath',
-                                             status_code, retry_count, history_status, '')
-            lal_path_response_id = response.json().get('OrderID')
-            resp_data = {
-                "lead_id": lal_path_response_id,
-                "dp_order_id": lab_appointment.id,
-                "integrator_order_id": lal_path_response_id,
-                "response_data": response.json()
-            }
-            return resp_data
+        api_key = self.get_auth_token()
+        if api_key:
+            headers = {'apiKey': api_key, 'Content-Type': "application/json"}
+            response = requests.post(url, data=json.dumps(payload), headers=headers)
+            status_code = response.status_code
+            if response.status_code != status.HTTP_200_OK or not response.ok:
+                history_status = IntegratorHistory.NOT_PUSHED
+                IntegratorHistory.create_history(lab_appointment, payload, response.json(), url, 'post_order', 'Lalpath',
+                                                 status_code, retry_count, history_status, '')
+                logger.error("[ERROR-Lalpath] %s" % response.json())
+            else:
+                # Add details to history table
+                history_status = IntegratorHistory.PUSHED_AND_NOT_ACCEPTED
+                IntegratorHistory.create_history(lab_appointment, payload, response.json(), url, 'post_order', 'Lalpath',
+                                                 status_code, retry_count, history_status, '')
+                lal_path_response_id = response.json().get('OrderID')
+                resp_data = {
+                    "lead_id": lal_path_response_id,
+                    "dp_order_id": lab_appointment.id,
+                    "integrator_order_id": lal_path_response_id,
+                    "response_data": response.json()
+                }
+                return resp_data
         return None
 
     def prepare_data(self, tests, lab_appointment):
@@ -140,10 +157,10 @@ class Lalpath(BaseIntegrator):
             "actualAmt": order_amount,
             "payable_amt": order_amount,
             "HCC": hcc,
-            "InvoiceCode": "LP"+str(lab_appointment.id),
+            "InvoiceCode": settings.LAL_PATH_INVOICE_CODE,
             "LabCode": lab_codes.lab_code if lab_codes else "",
             "WareHouseCode": lab_codes.warehouse_code if lab_codes else "",
-            "invoiceid": "LP"+str(lab_appointment.id)
+            "invoiceid": "DPLP-x"+str(lab_appointment.id)
         }
 
         request_data = {
