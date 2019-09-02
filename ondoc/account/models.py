@@ -265,10 +265,7 @@ class Order(TimeStampedModel):
                 if self.reference_id:
                     appointment_obj = cod_to_prepaid_app
                 else:
-                    if validated_data and validated_data.get('appointment_id') and validated_data.get('cod_to_prepaid'):
-                        appointment_obj = OpdAppointment.create_appointment(appointment_data, validated_data)
-                    else:
-                        appointment_obj = OpdAppointment.create_appointment(appointment_data)
+                    appointment_obj = OpdAppointment.create_appointment(appointment_data)
                 order_dict = {
                     "reference_id": appointment_obj.id,
                     "payment_status": Order.PAYMENT_ACCEPTED
