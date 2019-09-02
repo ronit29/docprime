@@ -23,6 +23,6 @@ class Migration(migrations.Migration):
         migrations.AlterField(
             model_name='integratortestmapping',
             name='integrator_test_name',
-            field=models.CharField(default=None, max_length=150),
+            field=models.CharField(max_length=150),
         ),
     ]
