@@ -336,7 +336,7 @@ class DoctorAppointmentsViewSet(OndocViewSet):
                     order.payment_status = Order.PAYMENT_PENDING
                     order.user = user
                     order.parent = pg_order
-                    order.cart_id = appointment_detail["cart_item_id"]
+                    order.cart_id = cart_item_id
                     order.save()
                 if order:
                     order_list.append(order)
