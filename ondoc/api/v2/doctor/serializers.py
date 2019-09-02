@@ -705,6 +705,7 @@ class ConsumerEConsultListSerializer(EConsultListSerializer):
                 "qualification": qual.qualification.name,
                 "specialization": qual.specialization.name,
                 "college": qual.college.name,
+                "passing_year": qual.passing_year
             })
         return ret_obj
 
