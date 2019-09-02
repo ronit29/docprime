@@ -1,4 +1,13 @@
 from collections import defaultdict
+
+from django.db.models import F
+
+from ondoc.common.models import MatrixMappedCity
+from ondoc.common.models import MatrixMappedState
+from ondoc.doctor.models import OpdAppointment
+from ondoc.diagnostic.models import LabAppointment
+from ondoc.common.models import SyncBookingAnalytics
+from ondoc.corporate_booking.models import CorporateDeal
 from django.contrib.contenttypes.models import ContentType
 from django.db import transaction
 from rest_framework import mixins, viewsets, status
@@ -10,16 +19,18 @@ from django.conf import settings
 
 from fluent_comments.models import FluentComment
 
-from ondoc.api.v1.article.serializers import CommentAuthorSerializer
+from ondoc.api.v1.article.serializers import CommentAuthorSerializer, CommentSerializer
 from ondoc.comments.models import CustomComment
 from ondoc.seo.models import NewDynamic
-from .serializers import CommentSerializer
+# from .serializers import CommentSerializer
 from ondoc.articles import models as article_models
 from ondoc.articles.models import ArticleCategory, Article
 from . import serializers
 from ondoc.api.pagination import paginate_queryset
 from ondoc.authentication.models import User
 from ondoc.api.v1.utils import RawSql
+import logging
+logger = logging.getLogger(__name__)
 
 
 class ArticleCategoryViewSet(viewsets.GenericViewSet):
@@ -207,6 +218,60 @@ class CommentViewSet(viewsets.ModelViewSet):
             return Response(serializer.data)
 
 
+class OptimusViewSet(viewsets.GenericViewSet):
 
+    def get_analytics_data(self, request, *args, **kwargs):
+        data = dict()
+        data['matrix_mapped_city'] = list()
+        data['matrix_mapped_state'] = list()
+        data['opd_appointment'] = list()
+        data['lab_appointment'] = list()
+        data['corporate_deals'] = list()
 
+        cities = MatrixMappedCity.objects.filter(synced_analytics__isnull=True)[0:10]
+        for city in cities:
+            analytics_data = city.get_booking_analytics_data()
+            data['matrix_mapped_city'].append(analytics_data)
 
+        states = MatrixMappedState.objects.filter(synced_analytics__isnull=True)[0:10]
+        for state in states:
+            analytics_data = state.get_booking_analytics_data()
+            data['matrix_mapped_state'].append(analytics_data)
+
+        opd_apps = OpdAppointment.objects.filter(synced_analytics__isnull=True)[0:10]
+        for app in opd_apps:
+            analytics_data = app.get_booking_analytics_data()
+            data['opd_appointment'].append(analytics_data)
+
+        lab_apps = LabAppointment.objects.filter(synced_analytics__isnull=True)[0:10]
+        for app in lab_apps:
+            analytics_data = app.get_booking_analytics_data()
+            data['lab_appointment'].append(analytics_data)
+            # print('lab-id : {} has been synced'.format(app.id))
+
+        corp_deals = CorporateDeal.objects.filter(synced_analytics__isnull=True)[0:10]
+        for deal in corp_deals:
+            analytics_data = deal.get_booking_analytics_data()
+            data['corporate_deals'].append(analytics_data)
+
+        to_be_updated = SyncBookingAnalytics.objects.exclude(synced_at=F('last_updated_at'))[0:10]
+        for obj in to_be_updated:
+            row = obj.content_object
+
+            if row.__class__.__name__ == 'OpdAppointment':
+                analytics_data = row.sync_with_booking_analytics()
+                data['opd_appointment'].append(analytics_data)
+            elif row.__class__.__name__ == 'LabAppointment':
+                analytics_data = row.sync_with_booking_analytics()
+                data['lab_appointment'].append(analytics_data)
+            elif row.__class__.__name__ == 'CorporateDeal':
+                analytics_data = row.sync_with_booking_analytics()
+                data['corporate_deals'].append(analytics_data)
+            elif row.__class__.__name__ == 'MatrixMappedCity':
+                analytics_data = row.sync_with_booking_analytics()
+                data['matrix_mapped_city'].append(analytics_data)
+            elif row.__class__.__name__ == 'MatrixMappedState':
+                analytics_data = row.sync_with_booking_analytics()
+                data['matrix_mapped_state'].append(analytics_data)
+
+        return Response(data=data)

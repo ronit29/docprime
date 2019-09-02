@@ -88,7 +88,13 @@ class LoginOTP(GenericViewSet):
 
     @transaction.atomic
     def generate(self, request, format=None):
-
+        # from ondoc.prescription.models import PresccriptionPdf
+        # from ondoc.doctor.models import OfflineOPDAppointments
+        # opd = OfflineOPDAppointments.objects.last()
+        # pdf = PresccriptionPdf.objects.last()
+        # file = pdf.get_pdf(opd)
+        # pdf.prescription_file = file
+        # pdf.save()
         response = {'exists': 0}
         # if request.data.get("phone_number"):
         #     expire_otp(phone_number=request.data.get("phone_number"))

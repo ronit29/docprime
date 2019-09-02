@@ -31,7 +31,7 @@ from django.core.files.storage import default_storage
 from django.core.files.base import ContentFile
 from django.core.files.uploadedfile import SimpleUploadedFile, InMemoryUploadedFile
 from django.core.files import File
-from hardcopy import bytestring_to_pdf
+#from hardcopy import bytestring_to_pdf
 from django.contrib.postgres.fields import ArrayField
 from ondoc.common.helper import Choices
 from django.utils.safestring import mark_safe
