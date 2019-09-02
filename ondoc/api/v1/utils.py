@@ -1964,16 +1964,25 @@ def format_return_value(value):
     return value
 
 
-def rc_superuser_login():
+def rc_superuser_login(**kwargs):
+    from ondoc.provider.models import RocketChatSuperUser
+    rc_super_user_obj = kwargs.get('rc_super_user_obj') if kwargs.get('rc_super_user_obj') else None
+    username = rc_super_user_obj.username if rc_super_user_obj else settings.ROCKETCHAT_SUPERUSER
+    password = rc_super_user_obj.password if rc_super_user_obj else settings.ROCKETCHAT_PASSWORD
     response = requests.post(settings.ROCKETCHAT_SERVER + '/api/v1/login',
                              data={
-                                 "user": settings.ROCKETCHAT_SUPERUSER,
-                                 "password": settings.ROCKETCHAT_PASSWORD
+                                 "user": username,
+                                 "password": password
                              })
     data = json.loads(response._content.decode())['data']
     auth_token = data.get('authToken')
     auth_user_id = data.get('userId')
-    return auth_token, auth_user_id
+    if rc_super_user_obj:
+        rc_super_user_obj.token = auth_token
+        rc_super_user_obj.save()
+    else:
+        rc_super_user_obj = RocketChatSuperUser.objects.create(username=username, password=password, user_id=auth_user_id, token=auth_token)
+    return rc_super_user_obj
 
 
 def rc_user_create(auth_token, auth_user_id, name, **kwargs):

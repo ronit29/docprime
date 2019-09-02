@@ -14,13 +14,19 @@ from rest_framework import status
 
 # Create your models here.
 
+class RocketChatSuperUser(auth_models.TimeStampedModel):
+    username = models.CharField(max_length=64)
+    password = models.CharField(max_length=64)
+    user_id = models.CharField(max_length=64, null=True, blank=True)
+    token = models.CharField(max_length=64, null=True, blank=True)
+
+    def __str__(self):
+        return self.username
+
+    class Meta:
+        db_table = "rc_super_user"
+
 class RocketChatUsers(auth_models.TimeStampedModel):
-
-    # AUTH_TOKEN = 'Bwil0I0XK5GtRTuxFMaxxolZ-mNtQ-40MOjjcV6uzF8'
-    # AUTH_USER_ID = '8DjvhTsfjxFHpuLcR'
-
-    AUTH_TOKEN = 'Tmdg6wA9zC31Nk2Uy0FVGZeIrd8WvImxqZqUklUoNde'
-    AUTH_USER_ID = 'QdY8ZL6FyZRdC8rAw'
 
     name = models.CharField(max_length=64)
     email = models.EmailField(max_length=64, unique=True)

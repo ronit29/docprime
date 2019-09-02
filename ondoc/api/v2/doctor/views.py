@@ -1146,8 +1146,9 @@ class PartnerEConsultationViewSet(viewsets.GenericViewSet):
             e_obj.online_patient = patient
             patient_number = patient.phone_number
 
-        auth_token = prov_models.RocketChatUsers.AUTH_TOKEN
-        auth_user_id = prov_models.RocketChatUsers.AUTH_USER_ID
+        rc_super_user_obj = prov_models.RocketChatSuperUser.objects.filter(token__isnull=False).order_by('-updated_at').first()
+        auth_token = rc_super_user_obj.token
+        auth_user_id = rc_super_user_obj.user_id
         exception = v1_utils.rc_users(e_obj, patient, auth_token, auth_user_id)
         if exception:
             logger.error('Error in e-consultation create - ' + str(exception))

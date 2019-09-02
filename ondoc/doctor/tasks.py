@@ -112,6 +112,13 @@ def update_flags():
     Hospital.update_is_big_hospital()
 
 @task()
+def update_rc_super_user():
+    from ondoc.provider.models import RocketChatSuperUser
+    from ondoc.api.v1.utils import rc_superuser_login
+    rc_super_user_obj = RocketChatSuperUser.objects.order_by('-created_at').first()
+    rc_superuser_login(rc_super_user_obj=rc_super_user_obj)
+
+@task()
 def doctors_daily_schedule():
     from ondoc.doctor.models import Hospital, OpdAppointment, OfflineOPDAppointments
     from ondoc.authentication.models import GenericAdmin
