@@ -1,5 +1,5 @@
 import operator
-from pyodbc import Date
+# from pyodbc import Date
 
 from django.contrib.gis.geos import Point
 from django.utils import timezone
@@ -204,7 +204,7 @@ class DoctorSearchHelper:
         if self.query_params.get('availability'):
             aval_query = "( "
             availability = self.query_params.get('availability')
-            today = Date.today().weekday()
+            today = datetime.now().weekday()
             currentDT = timezone.now()
             today_time = aware_time_zone(currentDT).strftime("%H.%M")
             avail_days =list(map(int, availability))
