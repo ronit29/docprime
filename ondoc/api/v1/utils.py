@@ -308,19 +308,20 @@ def plus_subscription_transform(app_data):
         # member['member_profile']['dob'] = str(member['member_profile']['dob'])
     return app_data
 
-def plan_subscription_reverse_transform(insurance_data):
-    insurance_data['user_insurance']['purchase_date'] = \
-        datetime.datetime.strptime(insurance_data['user_insurance']['purchase_date'], "%Y-%m-%d %H:%M:%S.%f")
-    insurance_data['user_insurance']['expiry_date'] = \
-        datetime.datetime.strptime(insurance_data['user_insurance']['expiry_date'],
+
+def plan_subscription_reverse_transform(subscription_data):
+    subscription_data['plus_user']['purchase_date'] = \
+        datetime.datetime.strptime(subscription_data['plus_user']['purchase_date'], "%Y-%m-%d %H:%M:%S.%f")
+    subscription_data['plus_user']['expire_date'] = \
+        datetime.datetime.strptime(subscription_data['plus_user']['expire_date'],
                                    "%Y-%m-%d %H:%M:%S.%f")
-    insurance_data['profile_detail']['dob'] = \
-        datetime.datetime.strptime(insurance_data['profile_detail']['dob'],
+    subscription_data['profile_detail']['dob'] = \
+        datetime.datetime.strptime(subscription_data['profile_detail']['dob'],
                                    "%Y-%m-%d")
-    insured_members = insurance_data['user_insurance']['insured_members']
+    insured_members = subscription_data['plus_user']['plus_members']
     for member in insured_members:
         member['dob'] = datetime.datetime.strptime(member['dob'], "%Y-%m-%d").date()
-    return insurance_data
+    return subscription_data
 
 
 def insurance_transform(app_data):

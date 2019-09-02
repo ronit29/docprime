@@ -4,10 +4,10 @@ from rest_framework.fields import NullBooleanField
 from rest_framework.renderers import JSONRenderer
 
 from ondoc.authentication.models import UserProfile
-from ondoc.diagnostic.models import Lab
-from ondoc.doctor.models import Doctor
+from ondoc.authentication.models import User
 from ondoc.plus.models import (PlusProposer, PlusPlans, PlusThreshold, PlusMembers, PlusUser)
 from ondoc.plus.enums import PlanParametersEnum
+from ondoc.account import models as account_models
 
 
 class PlusThresholdSerializer(serializers.ModelSerializer):
@@ -104,3 +104,13 @@ class PlusMemberListSerializer(serializers.Serializer):
 class PlusMembersSerializer(serializers.Serializer):
     members = serializers.ListSerializer(child=PlusMemberListSerializer())
 
+
+class PlusUserSerializer(serializers.Serializer):
+
+    insurance_plan = serializers.PrimaryKeyRelatedField(queryset=PlusPlans.objects.all())
+    user = serializers.PrimaryKeyRelatedField(queryset=User.objects.all())
+    premium_amount = serializers.IntegerField()
+    insured_members = serializers.ListSerializer(child=PlusMemberListSerializer())
+    purchase_date = serializers.DateTimeField()
+    expiry_date = serializers.DateTimeField()
+    order = serializers.PrimaryKeyRelatedField(queryset=account_models.Order.objects.all())

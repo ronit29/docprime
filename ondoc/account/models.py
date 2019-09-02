@@ -15,7 +15,7 @@ from django.db.models import Sum, Q, F, Max
 from datetime import datetime, timedelta
 from django.utils import timezone
 from ondoc.api.v1.utils import refund_curl_request, form_pg_refund_data, opdappointment_transform, \
-    labappointment_transform, payment_details, insurance_reverse_transform
+    labappointment_transform, payment_details, insurance_reverse_transform, plan_subscription_reverse_transform
 from django.conf import settings
 from rest_framework import status
 from copy import deepcopy
@@ -194,7 +194,8 @@ class Order(TimeStampedModel):
     @transaction.atomic
     def process_order(self, convert_cod_to_prepaid=False):
         from ondoc.doctor.models import OpdAppointment
-        from ondoc.plus.models import PlusUser
+        from ondoc.api.v1.plus.serializers import PlusUserSerializer
+        from ondoc.plus.models import PlusUser, PlusTransaction
         from ondoc.diagnostic.models import LabAppointment
         from ondoc.chat.models import ChatConsultation
         from ondoc.api.v1.doctor.serializers import OpdAppTransactionModelSerializer
@@ -216,6 +217,7 @@ class Order(TimeStampedModel):
         # Initial validations for appointment data
         appointment_data = self.action_data
         user_insurance_data = None
+        plus_user_data = None
         # Check if payment is required at all, only when payment is required we debit consumer's account
         payment_not_required = False
         if self.product_id == self.DOCTOR_PRODUCT_ID:
@@ -256,11 +258,11 @@ class Order(TimeStampedModel):
             consultation_data = serializer.validated_data
         elif self.product_id == self.VIP_PRODUCT_ID:
             plus_data = deepcopy(self.action_data)
-            plus_data = insurance_reverse_transform(plus_data)
-            plus_data['user_insurance']['order'] = self.id
-            serializer = UserInsuranceSerializer(data=plus_data.get('user_insurance'))
+            plus_data = plan_subscription_reverse_transform(plus_data)
+            plus_data['plus_user']['order'] = self.id
+            serializer = PlusUserSerializer(data=plus_data.get('plus_user'))
             serializer.is_valid(raise_exception=True)
-            user_insurance_data = serializer.validated_data
+            plus_user_data = serializer.validated_data
 
         consumer_account = ConsumerAccount.objects.get_or_create(user=appointment_data['user'])
         consumer_account = ConsumerAccount.objects.select_for_update().get(user=appointment_data['user'])
@@ -331,6 +333,27 @@ class Order(TimeStampedModel):
                 InsuranceTransaction.objects.create(user_insurance=appointment_obj,
                                                     account=appointment_obj.master_policy.insurer_account,
                                                     transaction_type=InsuranceTransaction.DEBIT, amount=amount)
+
+        elif self.action == Order.VIP_CREATE:
+            user = User.objects.get(id=self.action_data.get('user'))
+            if not user:
+                raise Exception('User Not Found for Order' + str(self.id))
+            if user.active_plus_user:
+                raise Exception('User has already subscribed to VIP plan.' + str(user.id))
+            if consumer_account.balance >= plus_user_data['amount']:
+                appointment_obj = PlusUser.create_plus_user(user_insurance_data, user)
+                amount = appointment_obj.amount
+                order_dict = {
+                    "reference_id": appointment_obj.id,
+                    "payment_status": Order.PAYMENT_ACCEPTED
+                }
+                proposer = appointment_obj.plan.proposer
+                # InsuranceTransaction.objects.create(user_insurance=appointment_obj,
+                #                                     account=appointment_obj.master_policy_reference.apd_account,
+                #                                     transaction_type=InsuranceTransaction.DEBIT, amount=amount)
+                PlusTransaction.objects.create(plus_user=appointment_obj,
+                                               transaction_type=InsuranceTransaction.DEBIT, amount=amount)
+
         elif self.action == Order.SUBSCRIPTION_PLAN_BUY:
             amount = Decimal(appointment_data.get('extra_details').get('payable_amount', float('inf')))
             if consumer_account.balance >= amount:

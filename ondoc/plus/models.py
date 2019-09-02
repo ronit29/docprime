@@ -10,7 +10,7 @@ from ondoc.account import models as account_model
 from ondoc.authentication.models import UserProfile
 from ondoc.common.helper import Choices
 import json
-
+from django.db import transaction
 
 
 class LiveMixin(models.Model):
@@ -272,6 +272,49 @@ class PlusUser(auth_model.TimeStampedModel):
     class Meta:
         db_table = 'plus_users'
         unique_together = (('user', 'plan'),)
+
+
+class PlusTransaction(auth_model.TimeStampedModel):
+    CREDIT = 1
+    DEBIT = 2
+    TRANSACTION_TYPE_CHOICES = ((CREDIT, 'CREDIT'), (DEBIT, "DEBIT"),)
+
+    PLUS_PLAN_PURCHASE = 1
+    PREMIUM_PAYOUT = 2
+
+    REASON_CHOICES = ((PLUS_PLAN_PURCHASE, 'Plus Plan purchase'), (PREMIUM_PAYOUT, 'Premium payout'))
+
+    # user_insurance = models.ForeignKey(UserInsurance,related_name='transactions', on_delete=models.DO_NOTHING)
+    plus_user = models.ForeignKey(PlusUser,related_name='plus_transactions', on_delete=models.DO_NOTHING, default=None)
+    # account = models.ForeignKey(InsurerAccount,related_name='transactions', on_delete=models.DO_NOTHING)
+    transaction_type = models.PositiveSmallIntegerField(choices=TRANSACTION_TYPE_CHOICES)
+    amount = models.PositiveSmallIntegerField(default=0)
+    reason = models.PositiveSmallIntegerField(null=True, choices=REASON_CHOICES)
+
+    def after_commit_tasks(self):
+        pass
+
+    def save(self, *args, **kwargs):
+        #should never be saved again
+        if self.pk:
+            return
+
+        super().save(*args, **kwargs)
+
+        transaction_amount = int(self.amount)
+        if self.transaction_type == self.DEBIT:
+            transaction_amount = -1*transaction_amount
+
+        master_policy_obj = self.user_insurance.master_policy
+        account_id = master_policy_obj.insurer_account.id
+        # insurer_account = InsurerAccount.objects.select_for_update().get(id=account_id)
+        # insurer_account.current_float += transaction_amount
+        # insurer_account.save()
+
+        transaction.on_commit(lambda: self.after_commit_tasks())
+
+    class Meta:
+        db_table = "plus_transaction"
 
 
 class PlusMembers(auth_model.TimeStampedModel):
