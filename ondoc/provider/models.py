@@ -156,7 +156,7 @@ class EConsultation(auth_models.TimeStampedModel, auth_models.CreatedByModel):
         self.status = self.BOOKED
 
     def get_video_chat_url(self):
-        return settings.JITSI_SERVER + "/" + self.rc_group.group_name
+        return settings.JITSI_SERVER + "/" + self.rc_group.group_id
 
     def get_patient_and_number(self):
         if self.offline_patient:
