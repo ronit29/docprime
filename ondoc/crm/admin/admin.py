@@ -20,7 +20,8 @@ from ondoc.doctor.models import (Doctor, Language, MedicalService, Specializatio
                                  VisitReason, CancellationReason, PracticeSpecializationContent, OfflinePatients,
                                  OfflineOPDAppointments,
                                  DoctorMobileOtp, UploadDoctorData, DoctorLeave, HealthInsuranceProvider,
-                                 CommonHospital, SimilarSpecializationGroup, PurchaseOrderCreation)
+                                 CommonHospital, SimilarSpecializationGroup, PurchaseOrderCreation, SponsoredServices,
+                                 HospitalSponsoredServices, DoctorSponsoredServices)
 
 from ondoc.diagnostic.models import (Lab, LabNetwork, LabTest, LabTestType, LabService,
                                      AvailableLabTest, LabAppointment, CommonTest, CommonDiagnosticCondition,
@@ -55,7 +56,8 @@ from .doctor import (DoctorAdmin, MedicalServiceAdmin, SpecializationAdmin, Qual
                      CompetitorInfoImportAdmin, VisitReasonAdmin, PracticeSpecializationContentAdmin,
                      OfflinePatientAdmin,
                      UploadDoctorDataAdmin, DoctorLeaveAdmin, SimilarSpecializationGroupAdmin,
-                     PurchaseOrderCreationAdmin)
+                     PurchaseOrderCreationAdmin, SponsoredServicesAdmin, HospitalSponsoredServicesAdmin,
+                     DoctorSponsoredServicesAdmin)
 from .aboutdoctor import AboutDoctorAdmin
 from .hospital import HospitalAdmin, CommonHospitalAdmin, GenericQuestionAnswerAdmin
 from .user import CustomUserAdmin, UserNumberUpdateAdmin, UserProfileAdmin
@@ -291,4 +293,8 @@ admin.site.register(GenericQuestionAnswer, GenericQuestionAnswerAdmin)
 admin.site.register(PurchaseOrderCreation, PurchaseOrderCreationAdmin)
 admin.site.register(IntegratorLabTestParameterMapping, IntegratorLabTestParameterMappingAdmin)
 admin.site.register(DynamicTemplates, DynamicTemplatesAdmin)
+admin.site.register(SponsoredServices, SponsoredServicesAdmin)
 admin.site.register(IPDMedicinePageLead)
+admin.site.register(HospitalSponsoredServices, HospitalSponsoredServicesAdmin)
+admin.site.register(DoctorSponsoredServices, DoctorSponsoredServicesAdmin)
+

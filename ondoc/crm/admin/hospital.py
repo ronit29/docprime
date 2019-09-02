@@ -12,7 +12,8 @@ from ondoc.crm.admin.doctor import CreatedByFilter
 from ondoc.doctor.models import (HospitalImage, HospitalDocument, HospitalAward, Doctor,
                                  HospitalAccreditation, HospitalCertification, HospitalSpeciality, HospitalNetwork,
                                  Hospital, HospitalServiceMapping, HealthInsuranceProviderHospitalMapping,
-                                 HospitalHelpline, HospitalTiming, DoctorClinic, CommonHospital, HospitalNetworkImage)
+                                 HospitalHelpline, HospitalTiming, DoctorClinic, CommonHospital, HospitalNetworkImage,
+                                 HospitalSponsoredServices)
 from .common import *
 from ondoc.crm.constants import constants
 from django.utils.safestring import mark_safe
@@ -99,6 +100,14 @@ class HospitalServiceInline(admin.TabularInline):
     autocomplete_fields = ['service']
     verbose_name = "Hospital Facility"
     verbose_name_plural = "Hospital Facilities"
+
+
+class HospitalSponsoredServicesInline(admin.TabularInline):
+    model = HospitalSponsoredServices
+    extra = 0
+    can_delete = True
+    show_change_link = True
+    fields = ['sponsored_service', ]
 
 
 class HospitalTimingInlineFormSet(forms.BaseInlineFormSet):
@@ -488,7 +497,8 @@ class HospitalAdmin(admin.GeoModelAdmin, CompareVersionAdmin, ActionAdmin, QCPem
         GenericAdminInline,
         SPOCDetailsInline,
         AssociatedMerchantInline,
-        RemarkInline
+        RemarkInline,
+        HospitalSponsoredServicesInline
     ]
     map_width = 200
     map_template = 'admin/gis/gmap.html'
