@@ -4,8 +4,10 @@ from django.contrib.contenttypes.fields import GenericForeignKey
 from django.contrib.contenttypes.models import ContentType
 from ondoc.authentication.models import TimeStampedModel
 from ondoc.common.helper import Choices
-from django.contrib.postgres.fields import JSONField
+from django.contrib.postgres.fields import JSONField, ArrayField
 from django.db import transaction
+
+from ondoc.doctor.models import DoctorClinic
 from ondoc.matrix.tasks import push_appointment_to_matrix
 from ondoc.diagnostic.models import TestParameter
 import logging
@@ -280,6 +282,58 @@ class IntegratorTestParameterMapping(TimeStampedModel):
 
     class Meta:
         db_table = 'integrator_test_parameter_mapping'
+
+
+class IntegratorHospitalMappings(TimeStampedModel):
+    from ondoc.doctor.models import Hospital
+    integrator_hospital_name = models.CharField(max_length=60, null=True, blank=True)
+    hospital = models.ForeignKey(Hospital, on_delete=models.CASCADE)
+    integrator_class_name = models.CharField(max_length=40, null=False, blank=False)
+    is_active = models.BooleanField(default=False)
+
+    class Meta:
+        db_table = 'integrator_hospital_mappings'
+
+
+class IntegratorDoctorMappings(TimeStampedModel):
+    integrator_doctor_id = models.PositiveIntegerField()
+    integrator_hospital_id = models.PositiveIntegerField(null=True)
+    title = models.CharField(max_length=10, null=True, blank=True)
+    first_name = models.CharField(max_length=160, null=False, blank=False)
+    middle_name = models.CharField(max_length=40, null=True, blank=True)
+    last_name = models.CharField(max_length=40, null=True, blank=True)
+    gender = models.CharField(max_length=10, null=True, blank=True)
+    designation = models.CharField(max_length=100, null=True, blank=True)
+    qualification = models.TextField(null=True, blank=True)
+    specialities = models.CharField(max_length=100, null=True, blank=True)
+    hospital_name = models.CharField(max_length=100, null=False, blank=False)
+    city = models.CharField(max_length=40, null=True, blank=True)
+    address = models.TextField(null=True, blank=True)
+    primary_contact = models.CharField(max_length=20, null=True, blank=True)
+    secondary_contact = models.CharField(max_length=20, null=True, blank=True)
+    emergency_contact = models.CharField(max_length=20, null=True, blank=True)
+    helpline_sos = models.CharField(max_length=20, null=True, blank=True)
+    integrator_doctor_data = JSONField(blank=True, null=True)
+    doctor_clinic = models.ForeignKey(DoctorClinic, on_delete=models.CASCADE, null=True)
+    is_active = models.BooleanField(default=False)
+    integrator_class_name = models.CharField(max_length=30, null=False, blank=False)
+
+    @classmethod
+    def get_if_third_party_integration(cls, doctor_clinic_id=None):
+        if doctor_clinic_id:
+            mapping = cls.objects.filter(doctor_clinic_id=doctor_clinic_id, is_active=True).first()
+        else:
+            return None
+
+        # Return if no test exist over here and it depicts that it is not a part of integrations.
+        if not mapping:
+            return None
+
+        # Part of the integrations.
+        return {'class_name': mapping.integrator_class_name, 'id': mapping.id}
+
+    class Meta:
+        db_table = 'integrator_doctor_mappings'
 
 
 class IntegratorLabTestParameterMapping(TimeStampedModel):

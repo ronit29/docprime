@@ -1498,8 +1498,8 @@ class DoctorClinic(auth_model.TimeStampedModel, auth_model.WelcomeCallingDone):
         db_table = "doctor_clinic"
         unique_together = (('doctor', 'hospital', ),)
 
-    # def __str__(self):
-    #     return '{}-{}'.format(self.doctor, self.hospital)
+    def __str__(self):
+        return '{}-{}'.format(self.doctor, self.hospital)
 
     def is_enabled_for_cod(self):
         return self.hospital.is_enabled_for_cod()
@@ -1533,8 +1533,6 @@ class DoctorClinic(auth_model.TimeStampedModel, auth_model.WelcomeCallingDone):
         res_data = {"time_slots": slots, "upcoming_slots": upcoming_slots}
         return res_data
 
-
-
     def get_timings_v2(self, total_leaves, blocks=[]):
         clinic_timings = self.availability.order_by("start")
         booking_details = dict()
@@ -1549,7 +1547,6 @@ class DoctorClinic(auth_model.TimeStampedModel, auth_model.WelcomeCallingDone):
         upcoming_slots = timeslot_object.get_upcoming_slots(time_slots=clinic_timings)
         timing_response = {"timeslots": clinic_timings, "upcoming_slots": upcoming_slots}
         return timing_response
-
 
 
 class DoctorClinicTiming(auth_model.TimeStampedModel):
