@@ -23,8 +23,9 @@ import time
 class Lalpath(BaseIntegrator):
 
     @classmethod
-    def get_test_data(cls, obj_id):
+    def get_test_data(cls):
         url = "%s/BulkDataTestCityPrice" % settings.LAL_PATH_BASE_URL
+        obj_id = settings.LAL_PATH_NETWORK_ID
         headers = {'apiKey': settings.LAL_PATH_DATA_API_KEY, 'Content-Type': "application/json"}
         response = requests.request("POST", url, headers=headers)
         response = response.json()
