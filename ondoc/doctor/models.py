@@ -2647,7 +2647,7 @@ class OpdAppointment(auth_model.TimeStampedModel, CouponsMixin, OpdAppointmentIn
         return appointments
 
     @classmethod
-    def create_appointment(cls, appointment_data, validated_data=None):
+    def create_appointment(cls, appointment_data):
         from ondoc.insurance.models import UserInsurance
         insurance = appointment_data.get('insurance')
         appointment_status = OpdAppointment.BOOKED
@@ -2669,18 +2669,7 @@ class OpdAppointment(auth_model.TimeStampedModel, CouponsMixin, OpdAppointmentIn
             "random_coupons": appointment_data.pop("coupon_data", [])
         }
         procedure_details = appointment_data.pop('extra_details', [])
-        if validated_data and validated_data.get('appointment_id') and validated_data.get('cod_to_prepaid'):
-            app_obj = OpdAppointment.objects.filter(id=validated_data.get('appointment_id')).first()
-            for data in appointment_data:
-                app_obj.data = appointment_data[data]
-
-            # app_obj.status = appointment_status
-            # app_obj.otp = otp
-            # app_obj.payment_status = OpdAppointment.PAYMENT_ACCEPTED
-            # app_obj.save()
-
-        else:
-            app_obj = cls.objects.create(**appointment_data)
+        app_obj = cls.objects.create(**appointment_data)
         if procedure_details:
             procedure_to_be_added = []
             for procedure in procedure_details:
