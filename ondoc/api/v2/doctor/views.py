@@ -1163,11 +1163,12 @@ class PartnerEConsultationViewSet(viewsets.GenericViewSet):
         return Response({"already_exists": False, "data": resp_data.data})
 
     def list(self, request):
+        filter_kwargs = dict()
         id = request.query_params.get('id')
-        queryset = prov_models.EConsultation.objects.select_related('doctor', 'offline_patient', 'online_patient')\
-                                                    .filter(created_by=request.user)
         if id:
-            queryset = queryset.filter(id=id)
+            filter_kwargs['id'] = id
+        queryset = prov_models.EConsultation.objects.select_related('doctor', 'offline_patient', 'online_patient')\
+                                                    .filter(**filter_kwargs, created_by=request.user)
         serializer = serializers.EConsultListSerializer(queryset, context={'request': request}, many=True)
         return Response(serializer.data)
 
@@ -1257,18 +1258,26 @@ class ConsumerEConsultationViewSet(viewsets.GenericViewSet):
         return None
 
     def list(self, request):
+        request.user = auth_models.User.objects.filter(id=17329).first()
+        filter_kwargs = dict()
         id = request.query_params.get('id')
-        queryset = prov_models.EConsultation.objects.select_related('doctor', 'offline_patient', 'online_patient')\
-                                                    .filter(Q(online_patient__isnull=True,
+        if id:
+            filter_kwargs['id'] = id
+        queryset = prov_models.EConsultation.objects.select_related('doctor', 'offline_patient', 'online_patient', 'rc_group')\
+                                                    .prefetch_related('offline_patient__patient_mobiles',
+                                                                      'doctor__qualifications',
+                                                                      'doctor__qualifications__qualification',
+                                                                      'doctor__qualifications__specialization',
+                                                                      'doctor__qualifications__college',
+                                                                      )\
+                                                    .filter(Q(**filter_kwargs),
+                                                            Q(online_patient__isnull=True,
                                                               offline_patient__user=request.user)
                                                             |
                                                             Q(online_patient__isnull=False,
                                                               online_patient__user=request.user)
                                                             ).all()
-
-        if id:
-            queryset = queryset.filter(id=id)
-        serializer = serializers.EConsultListSerializer(queryset, context={'request': request}, many=True)
+        serializer = serializers.ConsumerEConsultListSerializer(queryset, context={'request': request}, many=True)
         return Response(serializer.data)
 
     @transaction.atomic()

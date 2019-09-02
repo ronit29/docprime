@@ -604,15 +604,18 @@ class EConsultCreateBodySerializer(serializers.Serializer):
 
     def validate(self, attrs):
         super().validate(attrs)
+        e_consult_filter_dynamic_kwargs = dict()
         attrs['offline_p'] = True
         try:
             patient_id = UUID(attrs.get('patient'), version=4)
             patient = doc_models.OfflinePatients.objects.filter(id=patient_id).first()
             attrs['offline_p'] = True
+            e_consult_filter_dynamic_kwargs['offline_patient'] = patient
         except ValueError:
             patient_id = attrs.get('patient')
             patient = UserProfile.objects.filter(id=patient_id).first()
             attrs['offline_p'] = False
+            e_consult_filter_dynamic_kwargs['online_patient'] = patient
         if not patient:
             raise serializers.ValidationError("Patient not Found!")
         attrs['patient_obj'] = patient
@@ -620,22 +623,13 @@ class EConsultCreateBodySerializer(serializers.Serializer):
         if not doc:
             raise serializers.ValidationError("Doctor not Found!")
         attrs['doctor_obj'] = doc
-        if attrs['offline_p']:
-            e_consultation = provider_models.EConsultation.objects.filter(offline_patient=patient, doctor=doc,
-                                                                          status__in=[
-                                                                              provider_models.EConsultation.CREATED,
-                                                                              provider_models.EConsultation.BOOKED,
-                                                                              provider_models.EConsultation.RESCHEDULED_DOCTOR,
-                                                                              provider_models.EConsultation.RESCHEDULED_PATIENT,
-                                                                              provider_models.EConsultation.ACCEPTED]).order_by('-updated_at').first()
-        else:
-            e_consultation = provider_models.EConsultation.objects.filter(online_patient=patient, doctor=doc,
-                                                                          status__in=[
-                                                                              provider_models.EConsultation.CREATED,
-                                                                              provider_models.EConsultation.BOOKED,
-                                                                              provider_models.EConsultation.RESCHEDULED_DOCTOR,
-                                                                              provider_models.EConsultation.RESCHEDULED_PATIENT,
-                                                                              provider_models.EConsultation.ACCEPTED]).order_by('-updated_at').first()
+        e_consultation = provider_models.EConsultation.objects.filter(**e_consult_filter_dynamic_kwargs, doctor=doc,
+                                                                      status__in=[
+                                                                          provider_models.EConsultation.CREATED,
+                                                                          provider_models.EConsultation.BOOKED,
+                                                                          provider_models.EConsultation.RESCHEDULED_DOCTOR,
+                                                                          provider_models.EConsultation.RESCHEDULED_PATIENT,
+                                                                          provider_models.EConsultation.ACCEPTED]).order_by('-updated_at').first()
         if e_consultation:
             attrs['e_consultation'] = e_consultation
         return attrs
@@ -695,6 +689,33 @@ class EConsultListSerializer(serializers.ModelSerializer):
                         'patient_auto_login_url', 'video_chat_url', 'patient_phone_number')
 
 
+class ConsumerEConsultListSerializer(EConsultListSerializer):
+    doctor_qualification = serializers.SerializerMethodField()
+    doctor_thumbnail = serializers.SerializerMethodField()
+
+    def get_doctor_thumbnail(self, obj):
+        request = self.context.get('request')
+        return request.build_absolute_uri(obj.doctor.get_thumbnail()) if obj.doctor.get_thumbnail() else None
+
+    def get_doctor_qualification(self, obj):
+        ret_obj = list()
+        qualifications = obj.doctor.qualifications.all()
+        for qual in qualifications:
+            ret_obj.append({
+                "qualification": qual.qualification.name,
+                "specialization": qual.specialization.name,
+                "college": qual.college.name,
+            })
+        return ret_obj
+
+    class Meta:
+        model = provider_models.EConsultation
+        fields = ('id', 'doctor_name', 'doctor_id', 'patient_id', 'patient_name', 'fees', 'validity', 'payment_status',
+                  'created_at', 'link', 'status', 'validity_status', 'validity', 'doctor_auto_login_url',
+                  'patient_auto_login_url', 'video_chat_url', 'patient_phone_number', 'doctor_qualification',
+                  'doctor_thumbnail')
+
+
 class EConsultTransactionModelSerializer(serializers.Serializer):
     id = serializers.IntegerField(required=False)
     user = serializers.PrimaryKeyRelatedField(queryset=User.objects.all())
@@ -715,10 +736,11 @@ class EConsultSerializer(serializers.Serializer):
         request = self.context.get('request')
         user = request.user
         consult_id = attrs['id']
-        e_consultation = provider_models.EConsultation.objects.select_related('doctor', 'offline_patient', 'online_patient') \
+        e_consultation = provider_models.EConsultation.objects.select_related('doctor', 'offline_patient', 'online_patient', 'rc_group') \
                                                               .prefetch_related('doctor__rc_user',
                                                                                 'offline_patient__rc_user',
                                                                                 'offline_patient__user',
+                                                                                'offline_patient__patient_mobiles',
                                                                                 'online_patient__rc_user',
                                                                                 'online_patient__user') \
                                                               .filter(id=consult_id, created_by=user,
@@ -753,6 +775,7 @@ class EConsultCommunicationSerializer(serializers.Serializer):
                                                                              'econsultations__doctor__rc_user',
                                                                              'econsultations__offline_patient__rc_user',
                                                                              'econsultations__online_patient__rc_user',
+                                                                             'econsultations__offline_patient__patient_mobiles',
                                                                              )\
                                                            .filter(group_id=rc_group_id).first()
         if not rc_group:
