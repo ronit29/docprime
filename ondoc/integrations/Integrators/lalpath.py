@@ -15,31 +15,32 @@ from rest_framework import status
 class Lalpath(BaseIntegrator):
 
     @classmethod
-    def get_test_data(self, obj_id):
+    def get_test_data(cls):
         url = "%s/BulkDataTestCityPrice" % settings.LAL_PATH_BASE_URL
-        api_key = self.get_auth_token()
-        if api_key:
-            headers = {'apiKey': api_key}
-            response = requests.request("POST", url, headers=headers)
-            response = response.json()
+        obj_id = settings.LAL_PATH_NETWORK_ID
+        headers = {'apiKey': settings.LAL_PATH_DATA_API_KEY, 'Content-Type': "application/json"}
+        response = requests.request("POST", url, headers=headers)
+        response = response.json()
 
-            all_data = response['Response']
-            for data in all_data:
-                integrator_city_id = data['CityID']
-                integrator_city_name = data['CityName']
-                integrator_city = IntegratorCity.objects.filter(city_id=integrator_city_id).first()
-                if not integrator_city:
-                    integrator_city = IntegratorCity.objects.create(city_id=integrator_city_id, city_name=integrator_city_name)
+        all_data = response['Response']
+        for data in all_data:
+            integrator_city_id = data['CityID']
+            integrator_city_name = data['CityName']
+            integrator_city = IntegratorCity.objects.filter(city_id=integrator_city_id).first()
+            if not integrator_city:
+                integrator_city = IntegratorCity.objects.create(city_id=integrator_city_id,
+                                                                city_name=integrator_city_name)
 
-                for test in data['Test']:
-                    defaults = {'integrator_product_data': test, 'integrator_class_name': Lalpath.__name__,
-                                'content_type': ContentType.objects.get(model='labnetwork'),
-                                'service_type': IntegratorTestMapping.ServiceType.LabTest,
-                                'name_params_required': False, 'test_type': 'TEST'}
-                    itm_obj, created = IntegratorTestMapping.objects.update_or_create(integrator_test_name=test['TestName'],
-                                                                                      object_id=obj_id, defaults=defaults)
-                    IntegratorTestCityMapping.objects.create(integrator_city=integrator_city, integrator_test_mapping=itm_obj)
-                    print(test['TestName'])
+            for test in data['Test']:
+                defaults = {'integrator_product_data': test, 'integrator_class_name': Lalpath.__name__,
+                            'content_type': ContentType.objects.get(model='labnetwork'),
+                            'service_type': IntegratorTestMapping.ServiceType.LabTest,
+                            'name_params_required': False, 'test_type': 'TEST'}
+                itm_obj, created = IntegratorTestMapping.objects.update_or_create(integrator_test_name=test['TestName'],
+                                                                                  object_id=obj_id, defaults=defaults)
+                IntegratorTestCityMapping.objects.create(integrator_city=integrator_city,
+                                                         integrator_test_mapping=itm_obj)
+                print(test['TestName'])
 
     def get_auth_token(self):
         username = settings.LAL_PATH_USERNAME
@@ -180,7 +181,3 @@ class Lalpath(BaseIntegrator):
         dob = profile.dob
         today = date.today()
         return today.year - dob.year - ((today.month, today.day) < (dob.month, dob.day))
-
-
-
-

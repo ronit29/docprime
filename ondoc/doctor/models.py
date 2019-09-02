@@ -2514,6 +2514,35 @@ class OpdAppointment(auth_model.TimeStampedModel, CouponsMixin, OpdAppointmentIn
         else:
             return None
 
+    def get_booking_analytics_data(self):
+        data = dict()
+
+        promo_cost = self.deal_price - self.effective_price if self.deal_price and self.effective_price else 0
+        department = None
+        if self.doctor:
+            if self.doctor.doctorpracticespecializations.first():
+                if self.doctor.doctorpracticespecializations.first().specialization.department.first():
+                    department = self.doctor.doctorpracticespecializations.first().specialization.department.first().id
+
+        wallet, cashback = self.get_completion_breakup()
+
+        data['Appointment_Id'] = self.id
+        data['CityId'] = self.get_city()
+        data['StateId'] = self.get_state()
+        data['SpecialityId'] = department
+        data['TypeId'] = 1
+        data['ProviderId'] = self.hospital.id
+        data['PaymentType'] = self.payment_type if self.payment_type else None
+        data['Payout'] = self.fees
+        data['CashbackUsed'] = cashback
+        data['BookingDate'] = self.created_at
+        data['CorporateDealId'] = self.get_corporate_deal_id()
+        data['PromoCost'] = max(0, promo_cost)
+        data['GMValue'] = self.deal_price
+        data['StatusId'] = self.status
+
+        return data
+
     def sync_with_booking_analytics(self):
 
         promo_cost = self.deal_price - self.effective_price if self.deal_price and self.effective_price else 0
@@ -2584,6 +2613,12 @@ class OpdAppointment(auth_model.TimeStampedModel, CouponsMixin, OpdAppointmentIn
             return True
         return False
 
+    def is_otp_required_wrt_hospitals(self):
+        hospital_ids = list(settings.HOSPITAL_CREDIT_LETTER_REQUIRED.values())
+        if self.hospital and self.hospital.id in hospital_ids:
+            return False
+
+        return True
 
     def get_valid_credit_letter(self):
         credit_letter = self.get_document_objects(Documents.CREDIT_LETTER).first()
@@ -2839,7 +2874,7 @@ class OpdAppointment(auth_model.TimeStampedModel, CouponsMixin, OpdAppointmentIn
                     (self.id, str(math.floor(self.updated_at.timestamp()))),
                     eta=self.time_slot_start - datetime.timedelta(
                         minutes=int(self.SMS_APPOINTMENT_REMINDER_TIME)), )
-                if (self.time_slot_start - self.created_at).total_seconds() > (settings.COUNT_DOWN_FOR_REMINDER):
+                if (self.time_slot_start - self.created_at).total_seconds() > float(settings.COUNT_DOWN_FOR_REMINDER):
                     notification_tasks.opd_send_otp_before_appointment.apply_async(
                         (self.id, str(math.floor(self.time_slot_start.timestamp()))),
                         eta=self.time_slot_start - datetime.timedelta(
@@ -3957,6 +3992,7 @@ class PracticeSpecialization(auth_model.TimeStampedModel, SearchKey):
     search_distance = models.FloatField(default=None, blank=True, null=True)
     is_similar_specialization = models.BooleanField(default=True)
     breadcrumb_priority = models.PositiveIntegerField(null=True, blank=True)
+    bucket_size = models.PositiveIntegerField(null=True, blank=True)
 
     class Meta:
         db_table = 'practice_specialization'

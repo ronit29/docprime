@@ -69,27 +69,31 @@ FILE_UPLOAD_PERMISSIONS = 0o664
 # Database
 # https://docs.djangoproject.com/en/2.0/ref/settings/#databases
 
-
+DATABASE_ROUTERS = ['config.settings.db_router.DatabaseRouter']
 DATABASES = {
-    'default': env.db('DATABASE_URL')
+    'default': env.db('DATABASE_URL'),
 }
 
 DATABASES['default']['ENGINE'] = 'django.contrib.gis.db.backends.postgis'
+# if (env('DJANGO_SETTINGS_MODULE') == 'config.settings.production'):
+#     DATABASES['doc_read'] = env.db('READ_DATABASE_URL')
+#     DATABASES['doc_read']['ENGINE'] = 'django.contrib.gis.db.backends.postgis'
 
-try:
-    if env('MSSQL_HOST') and env('MSSQL_USERNAME') and env('MSSQL_PASSWORD'):
-        DATABASES['sql_server'] = {
-             'ENGINE': 'sql_server.pyodbc',
-             'HOST': env('MSSQL_HOST'),
-             'USER': env('MSSQL_USERNAME'),
-             'PASSWORD': env('MSSQL_PASSWORD'),
-             'NAME': env('MSSQL_DB'),
-             'OPTIONS': {
-                  'driver' : 'ODBC Driver 17 for SQL Server'
-            }
-        }
-except Exception as e:
-    print(str(e))
+# try:
+#     if env('MSSQL_HOST') and env('MSSQL_USERNAME') and env('MSSQL_PASSWORD'):
+#         DATABASES['sql_server'] = {
+#              'ENGINE': 'sql_server.pyodbc',
+#              'HOST': env('MSSQL_HOST'),
+#              'USER': env('MSSQL_USERNAME'),
+#              'PASSWORD': env('MSSQL_PASSWORD'),
+#              'NAME': env('MSSQL_DB'),
+#              'OPTIONS': {
+#                   'driver' : 'ODBC Driver 17 for SQL Server'
+#             }
+#         }
+# except Exception as e:
+#     print(str(e))
+
 
 
 
@@ -107,9 +111,6 @@ except Exception as e:
     print(e)
     print('Failed to connect to mongo')
     MONGO_STORE = False
-
-
-DATABASE_ROUTERS = ['config.settings.db_router.DatabaseRouter']
 
 # Application definition
 
@@ -410,6 +411,7 @@ NO_OF_WEEKS_FOR_TIME_SLOTS=env('NO_OF_WEEKS_FOR_TIME_SLOTS')
 THYROCARE_INTEGRATION_ENABLED= env.bool('THYROCARE_INTEGRATION_ENABLED')
 ORDER_SUMMARY_CRON_TIME = env('ORDER_SUMMARY_CRON_TIME')
 THYROCARE_REPORT_CRON_TIME = env('THYROCARE_REPORT_CRON_TIME')
+COUNT_DOWN_FOR_REMINDER=env('COUNT_DOWN_FOR_REMINDER')
 
 NODAL_BENEFICIARY_API=env('NODAL_BENEFICIARY_API')
 NODAL_BENEFICIARY_TOKEN=env('NODAL_BENEFICIARY_TOKEN')
@@ -504,8 +506,10 @@ MEDICINE_TOP_TESTS = env.list('MEDICINE_TOP_TESTS')
 CHAT_AUTH_TOKEN=env('CHAT_AUTH_TOKEN')
 BAJAJ_ALLIANZ_AUTH_TOKEN=env('BAJAJ_ALLIANZ_AUTH_TOKEN')
 MATRIX_USER_AUTH_TOKEN=env('MATRIX_USER_AUTH_TOKEN')
+ODBC_BASE_URL=env('ODBC_BASE_URL')
 LAL_PATH_BASE_URL=env('LAL_PATH_BASE_URL')
-LAL_PATH_INTEGRATION_ENABLED=env.bool('LAL_PATH_INTEGRATION_ENABLED')
 LAL_PATH_USERNAME=env('LAL_PATH_USERNAME')
 LAL_PATH_PASSWORD=env('LAL_PATH_PASSWORD')
+LAL_PATH_DATA_API_KEY=env('LAL_PATH_DATA_API_KEY')
+LAL_PATH_INTEGRATION_ENABLED=env.bool('LAL_PATH_INTEGRATION_ENABLED')
 LAL_PATH_INVOICE_CODE=env('LAL_PATH_INVOICE_CODE')
