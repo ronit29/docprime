@@ -61,7 +61,8 @@ class PlusOrderViewSet(viewsets.GenericViewSet):
 
         if not user.is_anonymous:
             plus_lead = PlusLead.objects.filter(user=user).order_by('id').last()
-            plus_user = user.active_plus_user.filter().order_by('id').last()
+
+            plus_user = user.active_plus_users.filter().order_by('id').last()
 
             if plus_user and plus_user.is_valid():
                 return Response({'success': True, "is_insured": True})
