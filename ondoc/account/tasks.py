@@ -587,3 +587,9 @@ def appointment_wise_revenue(all_appointments):
                 else:
                     MerchantNetRevenue.objects.create(merchant=merchant, total_revenue=booking_net_revenue,
                                                       financial_year=financial_year)
+
+
+@task()
+def update_lal_path_test_data():
+    from ondoc.integrations.Integrators import Lalpath
+    Lalpath.get_test_data()

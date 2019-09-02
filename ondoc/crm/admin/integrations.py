@@ -4,6 +4,7 @@ from ondoc.integrations.models import IntegratorProfileMapping, IntegratorReport
 from ondoc.diagnostic.models import LabTest, Lab, LabPricingGroup, AvailableLabTest
 from django import forms
 from django.conf import settings
+from reversion.admin import VersionAdmin
 
 
 class IntegratorMappingForm(forms.ModelForm):
@@ -80,7 +81,7 @@ class IntegratorTestMappingForm(forms.ModelForm):
                                         enable_for_retail=True, availablelabs__enabled=True).distinct().order_by('name'))
 
 
-class IntegratorTestMappingAdmin(admin.ModelAdmin):
+class IntegratorTestMappingAdmin(VersionAdmin, admin.ModelAdmin):
     model = IntegratorTestMapping
     list_display = ('integrator_class_name', 'integrator_test_name', 'is_active')
     fields = ('test', 'integrator_test_name', 'is_active', 'integrator_test_type', 'available_in_cities')

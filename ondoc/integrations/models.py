@@ -6,7 +6,7 @@ from ondoc.authentication.models import TimeStampedModel
 from ondoc.common.helper import Choices
 from django.contrib.postgres.fields import JSONField, ArrayField
 from django.db import transaction
-
+import reversion
 from ondoc.doctor.models import DoctorClinic
 from ondoc.matrix.tasks import push_appointment_to_matrix
 from ondoc.diagnostic.models import TestParameter
@@ -233,6 +233,7 @@ class IntegratorCity(TimeStampedModel):
         db_table = 'integrator_city'
 
 
+@reversion.register()
 class IntegratorTestMapping(TimeStampedModel):
     from ondoc.diagnostic.models import LabTest
 
