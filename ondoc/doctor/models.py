@@ -2821,11 +2821,10 @@ class OpdAppointment(auth_model.TimeStampedModel, CouponsMixin, OpdAppointmentIn
             except Exception as e:
                 logger.error(str(e))
         if push_to_matrix:
-        # Push the appointment data to the matrix .
+        # Push the appointment data to the matrix
             try:
                 push_appointment_to_matrix.apply_async(({'type': 'OPD_APPOINTMENT', 'appointment_id': self.id,
-                                                         'product_id': 5, 'sub_product_id': 2},), countdown=5)
-
+                                                             'product_id': 5, 'sub_product_id': 2},), countdown=5)
             except Exception as e:
                 logger.error(str(e))
 
@@ -3416,16 +3415,31 @@ class OpdAppointment(auth_model.TimeStampedModel, CouponsMixin, OpdAppointmentIn
         except Exception as e:
             logger.error("Could not save triggered event - " + str(e))
 
-    def get_matrix_data(self, order, product_id, sub_product_id):
+    def is_retail_booking(self):
+        if self.status == OpdAppointment.ACCEPTED and (self.payment_type == OpdAppointment.PREPAID or
+                                                                self.payment_type == OpdAppointment.COD) and \
+                                                                self.doctor.is_insurance_enabled and \
+                                                                self.hospital.enabled_for_insurance:
+            return True
+        else:
+            return False
+
+    def get_matrix_data(self, order, product_id, sub_product_id, lead_source=None):
         # policy_details = self.get_matrix_policy_data()
         appointment_details = self.get_matrix_appointment_data(order)
+        lead_source = 'DocPrime'
+        if self.is_retail_booking():
+            product_id = 8
+            sub_product_id = 0
+            lead_source = 'RetailBooking'
 
         request_data = {
             'DocPrimeUserId': self.user.id,
             'LeadID': self.matrix_lead_id if self.matrix_lead_id else 0,
             'Name': self.profile.name,
             'PrimaryNo': self.user.phone_number,
-            'LeadSource': 'DocPrime',
+            # 'LeadSource': 'DocPrime',
+            'LeadSource': lead_source,
             'EmailId': self.profile.email,
             'Gender': 1 if self.profile.gender == 'm' else 2 if self.profile.gender == 'f' else 0,
             'CityId': 0,
