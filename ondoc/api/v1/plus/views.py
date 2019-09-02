@@ -11,7 +11,7 @@ from ondoc.authentication.backends import JWTAuthentication
 from ondoc.account import models as account_models
 from ondoc.authentication.models import User, UserProfile
 from ondoc.common.models import BlacklistUser, BlockedStates
-from ondoc.plus.models import (PlusProposer, PlusPlans, PlusThreshold, PlusMembers, PlusUser)
+from ondoc.plus.models import (PlusProposer, PlusPlans, PlusThreshold, PlusMembers, PlusUser, PlusLead)
 from . import serializers
 import datetime
 from datetime import timedelta
@@ -40,7 +40,51 @@ class PlusListViewSet(viewsets.GenericViewSet):
 
 class PlusOrderViewSet(viewsets.GenericViewSet):
     authentication_classes = (JWTAuthentication,)
-    permission_classes = (IsAuthenticated,)
+    # permission_classes = (IsAuthenticated,)
+
+    def create_plus_lead(self, request):
+        # latitude = request.data.get('latitude', None)
+        # longitude = request.data.get('longitude', None)
+        #
+        # if latitude or longitude:
+        #     city_name = InsuranceEligibleCities.get_nearest_city(latitude, longitude)
+        #     if not city_name:
+        #         return Response({'success': False, 'is_insured': False})
+
+        phone_number = request.data.get('phone_number', None)
+        if phone_number:
+            user = User.objects.filter(phone_number=phone_number, user_type=User.CONSUMER).first()
+            if not user:
+                user = request.user
+        else:
+            user = request.user
+
+        if not user.is_anonymous:
+            plus_lead = PlusLead.objects.filter(user=user).order_by('id').last()
+            plus_user = user.active_plus_user.filter().order_by('id').last()
+
+            if plus_user and plus_user.is_valid():
+                return Response({'success': True, "is_insured": True})
+
+            if not plus_lead:
+                plus_lead = PlusLead(user=user)
+            elif plus_lead and plus_user and not plus_user.is_valid():
+                active_plus_lead = PlusLead.objects.filter(created_at__gte=plus_user.expire_date, user=user).order_by('created_at').last()
+                if not active_plus_lead:
+                    plus_lead = PlusLead(user=user)
+                else:
+                    plus_lead = active_plus_lead
+
+            plus_lead.extras = request.data
+            plus_lead.save()
+
+            return Response({'success': True, 'is_insured': False})
+        else:
+            lead = PlusLead.create_lead_by_phone_number(request)
+            if not lead:
+                return Response({'success': False, 'is_insured': False})
+
+            return Response({'success': True, 'is_insured': False})
 
     @transaction.atomic
     def create_order(self, request):

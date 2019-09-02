@@ -1002,6 +1002,99 @@ def refund_breakup_sms_task(obj_id):
 
 
 @task(bind=True, max_retries=2)
+def push_plus_lead_to_matrix(self, data):
+    from ondoc.plus.models import PlusLead, PlusPlans
+    try:
+        if not data:
+            raise Exception('Data not received for banner lead.')
+
+        id = data.get('id', None)
+        if not id:
+            logger.error("[CELERY ERROR: Incorrect values provided.]")
+            raise ValueError()
+
+        plus_lead_obj = PlusLead.objects.filter(id=id).first()
+
+        if not plus_lead_obj:
+            raise Exception("Plus lead object could not found against id - " + str(id))
+
+        if plus_lead_obj.user:
+            phone_number = plus_lead_obj.user.phone_number
+        else:
+            phone_number = plus_lead_obj.phone_number
+
+        extras = plus_lead_obj.extras
+        plan_id = extras.get('plan_id', None)
+
+        lead_source = "InsuranceOPD"  #TODO change
+        lead_data = extras.get('lead_data')
+        if lead_data:
+            provided_lead_source = lead_data.get('source')
+            if type(provided_lead_source).__name__ == 'str' and provided_lead_source.lower() == 'docprimechat':
+                lead_source = 'docprimechat'  #TODO change
+
+        plan = None
+        if plan_id and type(plan_id).__name__ == 'int':
+            plan = PlusPlans.objects.filter(id=plan_id).first()
+
+        request_data = {
+            'LeadID': plus_lead_obj.matrix_lead_id if plus_lead_obj.matrix_lead_id else 0,
+            'LeadSource': lead_source,
+            'Name': 'none',
+            'BookedBy': phone_number,
+            'PrimaryNo': phone_number,
+            'PaymentStatus': 0,
+            'UtmCampaign': extras.get('utm_campaign', ''),
+            'UTMMedium': extras.get('utm_medium', ''),
+            'UtmSource': extras.get('utm_source', ''),
+            'UtmTerm': extras.get('utm_term', ''),
+            'ProductId': 11,
+            'SubProductId': 0,
+            # 'PolicyDetails': {
+            #     "ProposalNo": None,
+            #     "BookingId": None,
+            #     'PolicyPaymentSTATUS': 0,
+            #     "ProposerName": None,
+            #     "PolicyId": None,
+            #     "InsurancePlanPurchased": plan.plan_ame if plan else None,
+            #     "PurchaseDate": None,
+            #     "ExpirationDate": None,
+            #     "COILink": None,
+            #     "PeopleCovered": 0
+            # }
+        }
+
+        url = settings.MATRIX_API_URL
+        matrix_api_token = settings.MATRIX_API_TOKEN
+        response = requests.post(url, data=json.dumps(request_data), headers={'Authorization': matrix_api_token,
+                                                                              'Content-Type': 'application/json'})
+
+        if response.status_code != status.HTTP_200_OK or not response.ok:
+            logger.error(json.dumps(request_data))
+            logger.info("[ERROR] Plus lead could not be published to the matrix system")
+            logger.info("[ERROR] %s", response.reason)
+
+            countdown_time = (2 ** self.request.retries) * 60 * 10
+            logging.error("Lead sync with the Matrix System failed with response - " + str(response.content))
+            print(countdown_time)
+            self.retry([data], countdown=countdown_time)
+        else:
+            resp_data = response.json()
+            if not resp_data:
+                raise Exception('Data received from matrix is null or empty.')
+
+            if not resp_data.get('Id', None):
+                logger.error(json.dumps(request_data))
+                raise Exception("[ERROR] Id not recieved from the matrix while pushing plus lead to matrix.")
+
+            plus_lead_qs = PlusLead.objects.filter(id=id)
+            plus_lead_qs.update(matrix_lead_id=resp_data.get('Id'))
+
+    except Exception as e:
+        logger.error("Error in Celery. Failed pushing Plus lead to the matrix- " + str(e))
+
+
+@task(bind=True, max_retries=2)
 def push_insurance_banner_lead_to_matrix(self, data):
     from ondoc.insurance.models import InsuranceLead, InsurancePlans
     try:

@@ -11,6 +11,9 @@ from ondoc.authentication.models import UserProfile
 from ondoc.common.helper import Choices
 import json
 from django.db import transaction
+from ondoc.notification.tasks import push_plus_lead_to_matrix
+from datetime import datetime
+from django.utils.timezone import utc
 
 
 class LiveMixin(models.Model):
@@ -390,3 +393,71 @@ class PlusMembers(auth_model.TimeStampedModel):
 
     class Meta:
         db_table = "plus_members"
+
+
+class PlusLead(auth_model.TimeStampedModel):
+    matrix_lead_id = models.IntegerField(null=True)
+    extras = JSONField(default={})
+    user = models.ForeignKey(auth_model.User, on_delete=models.CASCADE, null=True, blank=True)
+    phone_number = models.BigIntegerField(blank=True, null=True, validators=[MaxValueValidator(9999999999), MinValueValidator(1000000000)])
+
+    def save(self, *args, **kwargs):
+        super().save(*args, **kwargs)
+        transaction.on_commit(lambda: self.after_commit())
+
+    def after_commit(self):
+        pass
+        push_plus_lead_to_matrix.apply_async(({'id': self.id}, ))
+
+    # get seconds elapsed since creation time
+
+    # def get_creation_time_diff(self):
+    #     now = datetime.utcnow().replace(tzinfo=utc)
+    #     timediff = now - self.created_at
+    #     return timediff.total_seconds()
+    #
+    # def get_lead_creation_wait_time(self):
+    #     source = self.get_source()
+    #     if source!='docprimechat':
+    #         return 0
+    #     tdiff = self.get_creation_time_diff()
+    #     wait = 86400 - tdiff
+    #     if wait<0:
+    #         wait=0
+    #     return wait
+    #
+    # def get_source(self):
+    #     extras = self.extras
+    #     lead_source = "InsuranceOPD"
+    #     lead_data = extras.get('lead_data')
+    #     if lead_data:
+    #         provided_lead_source = lead_data.get('source')
+    #         if type(provided_lead_source).__name__ == 'str' and provided_lead_source.lower() == 'docprimechat':
+    #             lead_source = 'docprimechat'
+    #
+    #     return lead_source
+
+    @classmethod
+    def get_latest_lead_id(cls, user):
+        insurance_lead = cls.objects.filter(user=user).order_by('id').last()
+        if insurance_lead:
+            return insurance_lead.matrix_lead_id
+
+        return None
+
+    @classmethod
+    def create_lead_by_phone_number(cls, request):
+        phone_number = request.data.get('phone_number', None)
+        if not phone_number:
+            return None
+
+        user_insurance_lead = cls.objects.filter(phone_number=phone_number).order_by('id').last()
+        if not user_insurance_lead:
+            user_insurance_lead = cls(phone_number=phone_number)
+
+        user_insurance_lead.extras = request.data
+        user_insurance_lead.save()
+        return True
+
+    class Meta:
+        db_table = 'plus_leads'
