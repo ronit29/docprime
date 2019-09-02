@@ -359,11 +359,15 @@ class SMSNotification:
         notification_type = self.notification_type
         obj = None
         if notification_type == NotificationAction.APPOINTMENT_ACCEPTED:
-            obj = DynamicTemplates.objects.filter(template_name="Confirmation_IPD_OPD").first()
-        elif notification_type == NotificationAction.APPOINTMENT_BOOKED:
-            obj = DynamicTemplates.objects.filter(template_name="Booking_customer_pay_at_clinic").first()
+            obj = DynamicTemplates.objects.filter(template_name="Confirmation_IPD_OPD", approved=True).first()
+        elif notification_type == NotificationAction.APPOINTMENT_BOOKED and (not user or user.user_type == User.DOCTOR) and (self.context.get('payment_type') == 2):
+            obj = DynamicTemplates.objects.filter(template_name="Booking_Provider_Pay_at_clinic", approved=True).first()
+        elif notification_type == NotificationAction.APPOINTMENT_BOOKED and (not user or user.user_type == User.DOCTOR) and (self.context.get('payment_type') == 1 or self.context.get('payment_type') == 3):
+            obj = DynamicTemplates.objects.filter(template_name="Booking_Provider_SMS_OPD_Insurance_And_Prepaid", approved=True).first()
+        elif notification_type == NotificationAction.APPOINTMENT_BOOKED and user and user.user_type == User.CONSUMER and user.recent_opd_appointment.first().payment_type == 2:
+            obj = DynamicTemplates.objects.filter(template_name="Booking_customer_pay_at_clinic", approved=True).first()
         elif notification_type == NotificationAction.OPD_OTP_BEFORE_APPOINTMENT:
-            obj = DynamicTemplates.objects.filter(template_name="Reminder_appointment")
+            obj = DynamicTemplates.objects.filter(template_name="Reminder_appointment", approved=True).first()
 
         return obj
 
@@ -497,12 +501,12 @@ class SMSNotification:
                 if not phone_number:
                     phone_number = user.phone_number
 
-                if user and user.user_type == User.DOCTOR:
-                    context, click_login_token_obj = self.save_token_to_context(context, receiver['user'])
-                    click_login_token_objects.append(click_login_token_obj)
-                elif context.get('provider_login_url'):
-                    context.pop('provider_login_url')
-                ClickLoginToken.objects.bulk_create(click_login_token_objects)
+                # if user and user.user_type == User.DOCTOR:
+                #     context, click_login_token_obj = self.save_token_to_context(context, receiver['user'])
+                #     click_login_token_objects.append(click_login_token_obj)
+                # elif context.get('provider_login_url'):
+                #     context.pop('provider_login_url')
+                # ClickLoginToken.objects.bulk_create(click_login_token_objects)
 
                 instance = context.get('instance')
 
@@ -1418,7 +1422,9 @@ class OpdNotification(Notification):
         hospital_name = self.appointment.hospital.name
         hospital_address = self.appointment.hospital.get_hos_address()
         payment_type = self.appointment.payment_type
-        cod_amount = self.appointment.get_cod_amount()
+        cod_amount = 'Not Applicable'
+        if payment_type == 2:
+            cod_amount = self.appointment.get_cod_amount()
 
         est = pytz.timezone(settings.TIME_ZONE)
         time_slot_start = self.appointment.time_slot_start.astimezone(est)
@@ -1444,6 +1450,10 @@ class OpdNotification(Notification):
             token_object['token'].decode("utf-8"))
         opd_appointment_complete_url = booking_url + "&callbackurl=opd/appointment/{}?complete=true".format(
             self.appointment.id)
+        appointment_type = 'opd'
+        url_key = get_random_string(length=ClickLoginToken.URL_KEY_LENGTH)
+        provider_login_url = settings.PROVIDER_APP_DOMAIN + "/sms/login?key=" + url_key + \
+                             "&url=/sms-redirect/" + appointment_type + "/appointment/" + str(appointment_id)
         opd_appointment_feedback_url = booking_url + "&callbackurl=opd/appointment/{}".format(self.appointment.id)
         reschdule_appointment_bypass_url = booking_url + "&callbackurl=opd/doctor/{}/{}/book?reschedule={}".format(
             self.appointment.doctor.id, self.appointment.hospital.id, self.appointment.id)
@@ -1462,7 +1472,7 @@ class OpdNotification(Notification):
             "url": "/opd/appointment/{}".format(appointment_id),
             "action_type": NotificationAction.OPD_APPOINTMENT,
             "action_id": appointment_id,
-            "payment_type": dict(OpdAppointment.PAY_CHOICES)[payment_type],
+            "payment_type": payment_type,
             "image_url": "",
             "time_slot_start": time_slot_start,
             "attachments": {},  # Updated later
@@ -1485,7 +1495,9 @@ class OpdNotification(Notification):
             "time_slot_start_time": str(time_slot_start.strftime("%I:%M %p")),
             "is_payment_type_cod": self.appointment.is_payment_type_cod(),
             "instance_otp": self.appointment.otp,
-            "is_credit_letter_required_for_appointment": self.appointment.is_credit_letter_required_for_appointment()
+            "is_credit_letter_required_for_appointment": self.appointment.is_credit_letter_required_for_appointment(),
+            "is_otp_required": self.appointment.is_otp_required_wrt_hospitals(),
+            "provider_login_url": generate_short_url(provider_login_url)
         }
         return context
 
