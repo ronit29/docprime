@@ -1147,6 +1147,8 @@ class PartnerEConsultationViewSet(viewsets.GenericViewSet):
             patient_number = patient.phone_number
 
         rc_super_user_obj = prov_models.RocketChatSuperUser.objects.filter(token__isnull=False).order_by('-updated_at').first()
+        if not rc_super_user_obj:
+            rc_super_user_obj = v1_utils.rc_superuser_login()
         auth_token = rc_super_user_obj.token
         auth_user_id = rc_super_user_obj.user_id
         exception = v1_utils.rc_users(e_obj, patient, auth_token, auth_user_id)
