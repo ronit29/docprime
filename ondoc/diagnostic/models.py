@@ -67,6 +67,7 @@ from django.utils.text import slugify
 from django.utils.functional import cached_property
 #from ondoc.api.v1.diagnostic import serializers as diagnostic_serializers
 from ondoc.common.helper import Choices
+from ondoc.plus import models as plus_model
 
 logger = logging.getLogger(__name__)
 
@@ -262,6 +263,7 @@ class Lab(TimeStampedModel, CreatedByModel, QCModel, SearchKey, WelcomeCallingDo
     search_distance = models.FloatField(default=20000)
     is_ipd_lab = models.BooleanField(default=False)
     related_hospital = models.ForeignKey(Hospital, null=True, blank=True, on_delete=models.SET_NULL, related_name='ipd_hospital')
+    enabled_for_plus_plans = models.NullBooleanField()
 
     def __str__(self):
         return self.name
@@ -990,6 +992,11 @@ class LabNetwork(TimeStampedModel, CreatedByModel, QCModel):
     open_for_communication = models.BooleanField(default=True)
     remark = GenericRelation(Remark)
     auto_ivr_enabled = models.BooleanField(default=True)
+    enabled_for_plus_plans = models.NullBooleanField()
+
+    @classmethod
+    def get_plus_enabled(cls):
+        return cls.objects.filter(enabled_for_plus_plans=True)
 
     def all_associated_labs(self):
         if self.id:
@@ -1616,6 +1623,8 @@ class LabAppointment(TimeStampedModel, CouponsMixin, LabAppointmentInvoiceMixin,
     appointment_prescriptions = GenericRelation("prescription.AppointmentPrescription", related_query_name="appointment_prescriptions")
     hospital_reference_id = models.CharField(max_length=1000, null=True, blank=True)
     reports_physically_collected = models.NullBooleanField()
+    plus_plan = models.ForeignKey(plus_model.PlusUser, blank=True, null=True, default=None,
+                                  on_delete=models.DO_NOTHING)
 
     @cached_property
     def is_thyrocare(self):
