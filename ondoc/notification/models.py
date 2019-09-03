@@ -908,11 +908,17 @@ class EmailNotification(TimeStampedModel, EmailNotificationOpdMixin, EmailNotifi
         publish_message(message)
 
     @classmethod
-    def send_dynamic_template_notification(cls, recipient_obj, html_body, email_subject, notification_type):
+    def send_dynamic_template_notification(cls, recipient_obj, html_body, email_subject, notification_type, *args, **kwargs):
         if recipient_obj and recipient_obj.to:
 
-            email_obj = cls.objects.create(email=recipient_obj.to, notification_type=notification_type,
-                                           content=html_body, email_subject=email_subject, cc=recipient_obj.cc, bcc=recipient_obj.bcc)
+            if kwargs.get('is_preview', False):
+                email_obj = cls.objects.create(email=recipient_obj.to, notification_type=notification_type,
+                                               content=html_body, email_subject=email_subject, cc=[], bcc=[])
+
+            else:
+                email_obj = cls.objects.create(email=recipient_obj.to, notification_type=notification_type,
+                                               content=html_body, email_subject=email_subject, cc=recipient_obj.cc, bcc=recipient_obj.bcc)
+
             email_obj.save()
 
             email_noti = {
@@ -1321,10 +1327,14 @@ class DynamicTemplates(TimeStampedModel):
         return self.sample_parameters
 
     def get_cc(self):
+        if not self.cc:
+            return []
         cc_emails = self.cc.split(',')
         return cc_emails
 
     def get_bcc(self):
+        if not self.bcc:
+            return []
         bcc_emails = self.bcc.split(',')
         return bcc_emails
 
@@ -1341,9 +1351,9 @@ class DynamicTemplates(TimeStampedModel):
             recipient_obj.add_cc(self.get_cc())
             recipient_obj.add_bcc(self.get_bcc())
 
-            EmailNotification.send_dynamic_template_notification(recipient_obj, rendered_content, self.subject, notification_type)
+            EmailNotification.send_dynamic_template_notification(recipient_obj, rendered_content, self.subject, notification_type, *args, **kwargs)
         elif self.template_type == self.TemplateType.SMS:
-            SmsNotification.send_dynamic_template_notification(recipient_obj, rendered_content, notification_type)
+            SmsNotification.send_dynamic_template_notification(recipient_obj, rendered_content, notification_type, *args, **kwargs)
 
         return
 
