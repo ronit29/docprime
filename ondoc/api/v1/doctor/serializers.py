@@ -1115,6 +1115,7 @@ class DoctorProfileUserViewSerializer(DoctorProfileSerializer):
 
         specializations = [doctor_specialization.specialization for doctor_specialization in obj.doctorpracticespecializations.all()]
         clinics = [clinic_hospital for clinic_hospital in obj.doctor_clinics.all()]
+        hospitals = [hos.name for hos in obj.hospitals.all()]
         # entity = EntityUrls.objects.filter(entity_id=obj.id, sitemap_identifier=EntityUrls.SitemapIdentifier.DOCTOR_PAGE,
         #                                    is_valid=True)
         sublocality = None
@@ -1125,33 +1126,47 @@ class DoctorProfileUserViewSerializer(DoctorProfileSerializer):
             if entity.additional_info:
                 locality = entity.additional_info.get('locality_value')
                 sublocality = entity.additional_info.get('sublocality_value')
+            elif entity.locality_value:
+                locality = entity.locality_value
+                sublocality = entity.sublocality_value
 
         title = "Dr. " + obj.name
-        description = "Dr. " + obj.name + ': ' + "Dr. " + obj.name
+        description = "Dr. " + obj.name
 
         doc_spec_list = []
+        doc_hosp_list = []
 
         for name in specializations:
             doc_spec_list.append(str(name))
+        for hosp_name in hospitals:
+            doc_hosp_list.append(str(hosp_name))
+
+
         if len(doc_spec_list) >= 1:
-            title +=  ' - '+', '.join(doc_spec_list)
-            description += ' is ' + ', '.join(doc_spec_list)
+            title += ' - '+', '.join(doc_spec_list)
+            description += ' is a ' + ', '.join(doc_spec_list)
+        if len(doc_hosp_list) >= 1:
+            title += ' in '+', '.join(doc_hosp_list)
+            description += ' in ' + ', '.join(doc_hosp_list)
+
         if sublocality and locality:
             # title += ' in ' + sublocality + " " + locality + ' - Consult Online'
-            description += ' in ' + sublocality + " " + locality
+            description += ' , ' + sublocality + " , " + locality
         elif locality:
-            # title += ' in ' + locality + ' - Consult Online'
-            description += ' in ' + locality
+            title += ' ,' + locality
+            description += ' , ' + locality
 
-        title += ' | Book Appointment Online'
+        # title += ' | Book Appointment Online'
+        title += '| Upto 50% off'
+        description += ' Check ' + obj.name + 's' + 'Fees, OPD Schedule & Contact No. Book & get upto 50% off at docprime.'
 
         hospital = []
         for hospital_name in clinics:
             hospital.append(str(hospital_name.hospital))
-        if len(hospital) >= 1:
-            description += ' consulting patients at '+', '.join(hospital)
+        # if len(hospital) >= 1:
+            # description += ' consulting patients at '+', '.join(hospital)
 
-        description += '. Book appointments online, check fees, address and more.'
+        # description += '. Book appointments online, check fees, address and more.'
 
         doctor_realted_hospitals = obj.doctor_clinics.all()
 

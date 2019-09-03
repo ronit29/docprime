@@ -647,25 +647,36 @@ def create_or_update_lead_on_matrix(self, data):
     from ondoc.procedure.models import IpdProcedureLead
     from ondoc.communications.models import EMAILNotification
     from ondoc.notification.models import NotificationAction
+    from ondoc.diagnostic.models import IPDMedicinePageLead
+
     try:
         obj_id = data.get('obj_id', None)
         obj_type = data.get('obj_type', None)
         if not obj_id or not obj_type:
             logger.error("CELERY ERROR: Incorrect values provided.")
             raise ValueError()
+
         product_id = matrix_product_ids.get('opd_products', 1)
         if obj_type == IpdProcedureLead.__name__:
             product_id = matrix_product_ids.get('ipd_procedure', 9)
+        if obj_type == IPDMedicinePageLead.__name__:
+            product_id = matrix_product_ids.get('consumer', 5)
+
         sub_product_id = matrix_subproduct_ids.get(obj_type.lower(), 4)
         if obj_type == ProviderSignupLead.__name__:
             sub_product_id = matrix_subproduct_ids.get(Doctor.__name__.lower(), 4)
         if obj_type == IpdProcedureLead.__name__:
             sub_product_id = matrix_subproduct_ids.get('idp_subproduct_id', 0)
+        if obj_type == IPDMedicinePageLead.__name__:
+            sub_product_id = matrix_product_ids.get(IPDMedicinePageLead.__name__.lower(), 4)
+
         ct = ContentType.objects.get(model=obj_type.lower())
         model_used = ct.model_class()
         content_type = ContentType.objects.get_for_model(model_used)
         if obj_type == ProviderSignupLead.__name__:
             exit_point_url = settings.ADMIN_BASE_URL + reverse('admin:doctor_doctor_add')
+        elif obj_type == IPDMedicinePageLead.__name__:
+            exit_point_url = ''
         else:
             exit_point_url = settings.ADMIN_BASE_URL + reverse(
                 'admin:{}_{}_change'.format(content_type.app_label, content_type.model), kwargs={"object_id": obj_id})
@@ -725,7 +736,11 @@ def create_or_update_lead_on_matrix(self, data):
             elif obj.gender and obj.gender == 'f':
                 gender = 2
             obj.update_idp_data(request_data)
+        elif obj_type == IPDMedicinePageLead.__name__:
+            lead_source = obj.lead_source
+            mobile = obj.phone_number
         mobile = int(mobile)
+
         # if not mobile:
         #     return
         if not lead_source:
@@ -767,9 +782,13 @@ def create_or_update_lead_on_matrix(self, data):
             # save the order with the matrix lead id.
             # obj = model_used.objects.select_for_update().filter(id=obj_id).first()
             if obj and hasattr(obj, 'matrix_lead_id') and not obj.matrix_lead_id:
-                obj.matrix_lead_id = resp_data.get('Id', None)
-                obj.matrix_lead_id = int(obj.matrix_lead_id)
-                obj.save()
+                # obj.matrix_lead_id = resp_data.get('Id', None)
+                # obj.matrix_lead_id = int(obj.matrix_lead_id)
+                mlid = resp_data.get('Id', None)
+                if mlid:
+                    mx_lead_id = int(mlid)
+                    queryset = model_used.objects.filter(id=obj.id)
+                    queryset.update(matrix_lead_id=mx_lead_id)
                 if lead_source == 'ProviderApp':
                     receivers = [{"user": None, "email": "kabeer@docprime.com"},
                                  {"user": None, "email": "simranjeet@docprime.com"},

@@ -1,5 +1,5 @@
 from django.contrib import admin
-from ondoc.integrations.models import IntegratorMapping, IntegratorLabTestParameterMapping, IntegratorDoctorMappings, IntegratorHospitalMappings
+from ondoc.integrations.models import IntegratorMapping, IntegratorLabTestParameterMapping, IntegratorCity, IntegratorDoctorMappings, IntegratorHospitalMappings
 from ondoc.integrations.models import IntegratorProfileMapping, IntegratorReport, IntegratorTestMapping, IntegratorTestParameterMapping
 from ondoc.diagnostic.models import LabTest, Lab, LabPricingGroup, AvailableLabTest
 from django import forms
@@ -83,12 +83,22 @@ class IntegratorTestMappingForm(forms.ModelForm):
 class IntegratorTestMappingAdmin(admin.ModelAdmin):
     model = IntegratorTestMapping
     list_display = ('integrator_class_name', 'integrator_test_name', 'is_active')
-    fields = ('test', 'integrator_test_name', 'is_active', 'integrator_test_type')
+    fields = ('test', 'integrator_test_name', 'is_active', 'integrator_test_type', 'available_in_cities')
     form = IntegratorTestMappingForm
-    readonly_fields = ('integrator_test_name', 'integrator_test_type')
+    readonly_fields = ('integrator_test_name', 'integrator_test_type', 'available_in_cities')
 
     def integrator_test_type(self, obj):
         return obj.test_type
+
+    def available_in_cities(self, obj):
+        cities = ['All']
+        mapped_city_tests = obj.mapped_city_test.all()
+        if mapped_city_tests:
+            integrator_city_ids = [mapped_city_test.integrator_city_id for mapped_city_test in mapped_city_tests]
+            if integrator_city_ids:
+                cities = IntegratorCity.objects.filter(id__in=integrator_city_ids).values('city_name')
+                cities = [c['city_name'] for c in cities]
+        return cities
 
 
 class IntegratorTestParameterMappingAdmin(admin.ModelAdmin):
