@@ -87,6 +87,7 @@ import qrcode
 from django.utils.functional import cached_property
 from ondoc.crm.constants import constants
 from django.utils.text import slugify
+from ondoc.plus import models as plus_model
 
 logger = logging.getLogger(__name__)
 
@@ -265,6 +266,7 @@ class Hospital(auth_model.TimeStampedModel, auth_model.CreatedByModel, auth_mode
     has_proper_hospital_page = models.BooleanField(default=False)
     question_answer = GenericRelation(auth_model.GenericQuestionAnswer, related_query_name='hospital_qa')
     enabled_for_insurance = models.NullBooleanField(verbose_name='Enabled for Insurance')
+    enabled_for_plus_plans = models.NullBooleanField()
 
     def __str__(self):
         return self.name
@@ -900,6 +902,7 @@ class Doctor(auth_model.TimeStampedModel, auth_model.QCModel, SearchKey, auth_mo
     qr_code = GenericRelation(QRCode, related_name="qrcode")
     priority_score = models.IntegerField(default=0, null=False, blank=False)
     is_ipd_doctor = models.NullBooleanField(default=None)
+    enabled_for_plus_plans = models.NullBooleanField()
 
     def __str__(self):
         return '{} ({})'.format(self.name, self.id)
@@ -1498,8 +1501,8 @@ class DoctorClinic(auth_model.TimeStampedModel, auth_model.WelcomeCallingDone):
         db_table = "doctor_clinic"
         unique_together = (('doctor', 'hospital', ),)
 
-    # def __str__(self):
-    #     return '{}-{}'.format(self.doctor, self.hospital)
+    def __str__(self):
+        return '{}-{}'.format(self.doctor, self.hospital)
 
     def is_enabled_for_cod(self):
         return self.hospital.is_enabled_for_cod()
@@ -1533,8 +1536,6 @@ class DoctorClinic(auth_model.TimeStampedModel, auth_model.WelcomeCallingDone):
         res_data = {"time_slots": slots, "upcoming_slots": upcoming_slots}
         return res_data
 
-
-
     def get_timings_v2(self, total_leaves, blocks=[]):
         clinic_timings = self.availability.order_by("start")
         booking_details = dict()
@@ -1549,7 +1550,6 @@ class DoctorClinic(auth_model.TimeStampedModel, auth_model.WelcomeCallingDone):
         upcoming_slots = timeslot_object.get_upcoming_slots(time_slots=clinic_timings)
         timing_response = {"timeslots": clinic_timings, "upcoming_slots": upcoming_slots}
         return timing_response
-
 
 
 class DoctorClinicTiming(auth_model.TimeStampedModel):
@@ -2057,6 +2057,12 @@ class HospitalNetwork(auth_model.TimeStampedModel, auth_model.CreatedByModel, au
                                      through_fields=('network', 'service'),
                                      related_name='of_hospital_network')
 
+    enabled_for_plus_plans = models.NullBooleanField()
+
+    @classmethod
+    def get_plus_enabled(cls):
+        return cls.objects.filter(enabled_for_plus_plans=True)
+
     def update_time_stamps(self):
         if self.welcome_calling_done and not self.welcome_calling_done_at:
             self.welcome_calling_done_at = timezone.now()
@@ -2429,6 +2435,8 @@ class OpdAppointment(auth_model.TimeStampedModel, CouponsMixin, OpdAppointmentIn
     documents = GenericRelation(Documents)
     fraud = GenericRelation(Fraud)
     appointment_type = models.PositiveSmallIntegerField(choices=APPOINTMENT_TYPE_CHOICES, null=True, blank=True)
+    plus_plan = models.ForeignKey(plus_model.PlusUser, blank=True, null=True, default=None,
+                                  on_delete=models.DO_NOTHING)
 
     def __str__(self):
         return self.profile.name + " (" + self.doctor.name + ")"
@@ -2503,7 +2511,6 @@ class OpdAppointment(auth_model.TimeStampedModel, CouponsMixin, OpdAppointmentIn
 
         return resp
 
-
     def get_city(self):
         if self.hospital and self.hospital.matrix_city:
             return self.hospital.matrix_city.id
@@ -2515,6 +2522,35 @@ class OpdAppointment(auth_model.TimeStampedModel, CouponsMixin, OpdAppointmentIn
             return self.hospital.matrix_state.id
         else:
             return None
+
+    def get_booking_analytics_data(self):
+        data = dict()
+
+        promo_cost = self.deal_price - self.effective_price if self.deal_price and self.effective_price else 0
+        department = None
+        if self.doctor:
+            if self.doctor.doctorpracticespecializations.first():
+                if self.doctor.doctorpracticespecializations.first().specialization.department.first():
+                    department = self.doctor.doctorpracticespecializations.first().specialization.department.first().id
+
+        wallet, cashback = self.get_completion_breakup()
+
+        data['Appointment_Id'] = self.id
+        data['CityId'] = self.get_city()
+        data['StateId'] = self.get_state()
+        data['SpecialityId'] = department
+        data['TypeId'] = 1
+        data['ProviderId'] = self.hospital.id
+        data['PaymentType'] = self.payment_type if self.payment_type else None
+        data['Payout'] = self.fees
+        data['CashbackUsed'] = cashback
+        data['BookingDate'] = self.created_at
+        data['CorporateDealId'] = self.get_corporate_deal_id()
+        data['PromoCost'] = max(0, promo_cost)
+        data['GMValue'] = self.deal_price
+        data['StatusId'] = self.status
+
+        return data
 
     def sync_with_booking_analytics(self):
 
@@ -2586,6 +2622,12 @@ class OpdAppointment(auth_model.TimeStampedModel, CouponsMixin, OpdAppointmentIn
             return True
         return False
 
+    def is_otp_required_wrt_hospitals(self):
+        hospital_ids = list(settings.HOSPITAL_CREDIT_LETTER_REQUIRED.values())
+        if self.hospital and self.hospital.id in hospital_ids:
+            return False
+
+        return True
 
     def get_valid_credit_letter(self):
         credit_letter = self.get_document_objects(Documents.CREDIT_LETTER).first()
@@ -2729,6 +2771,9 @@ class OpdAppointment(auth_model.TimeStampedModel, CouponsMixin, OpdAppointmentIn
                     (Order.DOCTOR_PRODUCT_ID, self.id), eta=timezone.localtime() , )
         except Exception as e:
             logger.error(str(e))
+
+        if self.has_lensfit_coupon_used():
+            notification_tasks.send_lensfit_coupons.apply_async((self.id, self.PRODUCT_ID, NotificationAction.SEND_LENSFIT_COUPON), countdown=5)
 
     def get_billable_admin_level(self):
         if self.hospital.network and self.hospital.network.is_billing_enabled:
@@ -4756,3 +4801,40 @@ class HospitalNetworkSpeciality(auth_model.TimeStampedModel):
 
     class Meta:
         db_table = "hospital_network_speciality"
+
+
+class SponsoredServices(auth_model.TimeStampedModel):
+    name = models.CharField(max_length=200, unique=True)
+
+    def __str__(self):
+        return self.name
+
+    class Meta:
+        db_table = 'sponsored_services'
+
+
+class DoctorSponsoredServices(auth_model.TimeStampedModel):
+    doctor = models.ForeignKey(Doctor, related_name="doctor_services", on_delete=models.DO_NOTHING)
+    sponsored_service = models.ForeignKey(SponsoredServices, on_delete=models.DO_NOTHING, blank=False, null=False, related_name='doc_sponsored_services')
+
+    class Meta:
+        db_table = "doctor_sponsored_services"
+        unique_together = (("doctor", "sponsored_service"),)
+
+
+class HospitalSponsoredServices(auth_model.TimeStampedModel):
+    hospital = models.ForeignKey(Hospital, related_name="hospital_services", on_delete=models.DO_NOTHING)
+    sponsored_service = models.ForeignKey(SponsoredServices, on_delete=models.DO_NOTHING, blank=False, null=False, related_name='hosp_sponsored_services')
+
+    class Meta:
+        db_table = "hospital_sponsored_services"
+        unique_together = (("hospital", "sponsored_service"),)
+
+
+class SponsoredServicePracticeSpecialization(auth_model.TimeStampedModel):
+    sponsored_service = models.ForeignKey(SponsoredServices, on_delete=models.DO_NOTHING, blank=False, null=False, related_name='spec_sponsored_services')
+    specialization = models.ForeignKey(PracticeSpecialization, on_delete=models.DO_NOTHING, blank=False, null=False, related_name='spec_sponsored_services')
+    is_primary_specialization = models.BooleanField(default=False)
+
+    class Meta:
+        db_table = "specialization_sponsored_services"

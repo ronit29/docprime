@@ -51,7 +51,9 @@ from ondoc.doctor.models import (Doctor, DoctorQualification,
                                  GoogleDetailing, VisitReason, VisitReasonMapping, PracticeSpecializationContent,
                                  PatientMobile, DoctorMobileOtp,
                                  UploadDoctorData, CancellationReason, Prescription, PrescriptionFile,
-                                 SimilarSpecializationGroup, SimilarSpecializationGroupMapping, PurchaseOrderCreation)
+                                 SimilarSpecializationGroup, SimilarSpecializationGroupMapping, PurchaseOrderCreation,
+                                 DoctorSponsoredServices, SponsoredServicePracticeSpecialization, SponsoredServices,
+                                 HospitalSponsoredServices)
 
 from ondoc.authentication.models import User
 from .common import *
@@ -1099,6 +1101,14 @@ class CompetitorMonthlyVisitsInline(ReadOnlyInline):
     verbose_name_plural = 'Monthly Visits through Competitor Info'
 
 
+class DoctorSponsoredServicesInline(nested_admin.NestedTabularInline):
+    model = DoctorSponsoredServices
+    extra = 0
+    can_delete = True
+    show_change_link = True
+    fields = ['sponsored_service', ]
+
+
 class DoctorAdmin(AutoComplete, ImportExportMixin, CompareVersionAdmin, ActionAdmin, QCPemAdmin, nested_admin.NestedModelAdmin):
     # class DoctorAdmin(nested_admin.NestedModelAdmin):
     resource_class = DoctorResource
@@ -1171,7 +1181,8 @@ class DoctorAdmin(AutoComplete, ImportExportMixin, CompareVersionAdmin, ActionAd
         DoctorDocumentInline,
         GenericAdminInline,
         AssociatedMerchantInline,
-        RemarkInline
+        RemarkInline,
+        DoctorSponsoredServicesInline
     ]
 
     search_fields = ['name']
@@ -2294,7 +2305,6 @@ class PracticeSpecializationDepartmentMappingInline(admin.TabularInline):
     show_change_link = False
 
 
-
 class PracticeSpecializationAdmin(AutoComplete, ImportExportMixin, VersionAdmin):
     formats = (base_formats.XLS, base_formats.XLSX,)
     list_display = ('name', )
@@ -2412,6 +2422,17 @@ class SimilarSpecializationGroupAdmin(VersionAdmin):
     list_display = ['id', 'name']
 
 
+class DoctorClinicAdmin(VersionAdmin):
+    list_display = ('doctor', 'hospital', 'updated_at')
+    date_hierarchy = 'created_at'
+    search_fields = ['doctor__name', 'hospital__name']
+    autocomplete_fields = ['doctor', 'hospital']
+    inlines = [DoctorClinicTimingInline]
+
+    def get_queryset(self, request):
+        return super(DoctorClinicAdmin, self).get_queryset(request).select_related('doctor', 'hospital')
+
+
 class PurchaseOrderCreationForm(forms.ModelForm):
     def clean(self):
         cleaned_data = self.cleaned_data
@@ -2456,3 +2477,73 @@ class PurchaseOrderCreationAdmin(admin.ModelAdmin):
             read_only_fields += ['end_date']
 
         return read_only_fields
+
+
+class SponsoredServicePracticeSpecializationFormSet(forms.BaseInlineFormSet):
+    def clean(self):
+        super().clean()
+        if any(self.errors):
+            return
+        is_primary_spec = False
+        if self.cleaned_data:
+            for value in self.cleaned_data:
+                if value.get('is_primary_specialization') and not is_primary_spec:
+                    is_primary_spec = True
+                elif value.get('is_primary_specialization') and is_primary_spec:
+                    raise forms.ValidationError("Only one Specialization can be marked as Primary")
+
+            if not is_primary_spec:
+                raise forms.ValidationError('Alteast one sponsored service should be marked as primary')
+
+
+class SponsoredServicePracticeSpecializationInline(admin.TabularInline):
+    model = SponsoredServicePracticeSpecialization
+    formset = SponsoredServicePracticeSpecializationFormSet
+    extra = 0
+    can_delete = True
+    show_change_link = True
+    fields = ['sponsored_service', 'specialization', 'is_primary_specialization']
+
+
+class SponsoredServicesResource(resources.ModelResource):
+    class Meta:
+        model = SponsoredServices
+        fields = ('id', 'name')
+        export_order = ('id', 'name')
+
+
+class SponsoredServicesAdmin(ImportExportMixin, admin.ModelAdmin):
+    search_fields = ['name']
+    formats = (base_formats.XLS, base_formats.XLSX,)
+    inlines = [ SponsoredServicePracticeSpecializationInline ]
+    resource_class = SponsoredServicesResource
+
+
+class HospitalSponsoredServicesAdminResource(resources.ModelResource):
+    class Meta:
+        model = HospitalSponsoredServices
+        fields = ('id', 'hospital', 'sponsored_service')
+        export_order = ('id', 'hospital', 'sponsored_service')
+
+
+class HospitalSponsoredServicesAdmin(ImportExportMixin, admin.ModelAdmin):
+    search_fields = ['hospital']
+    list_display = ['hospital', 'sponsored_service']
+    formats = (base_formats.XLS, base_formats.XLSX,)
+    resource_class = HospitalSponsoredServicesAdminResource
+
+
+class DoctorSponsoredServicesResource(resources.ModelResource):
+
+    class Meta:
+        model = DoctorSponsoredServices
+        fields = ('id', 'doctor', 'sponsored_service')
+        export_order = ('id', 'doctor', 'sponsored_service')
+
+
+class DoctorSponsoredServicesAdmin(ImportExportMixin, admin.ModelAdmin):
+    search_fields = ['doctor']
+    list_display = ['doctor', 'sponsored_service']
+    formats = (base_formats.XLS, base_formats.XLSX,)
+    resource_class = DoctorSponsoredServicesResource
+

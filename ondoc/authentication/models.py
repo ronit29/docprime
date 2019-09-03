@@ -23,7 +23,6 @@ from datetime import date, datetime, timedelta
 from safedelete import SOFT_DELETE
 from safedelete.models import SafeDeleteModel
 import reversion
-
 import requests
 import json
 from rest_framework import status
@@ -340,6 +339,11 @@ class User(AbstractBaseUser, PermissionsMixin):
         #     return self.staffprofile.name
         # return str(self.phone_number)
 
+    @cached_property
+    def active_plus_user(self):
+        active_plus_user = self.active_plus_users.filter().order_by('-id').first()
+        return active_plus_user if active_plus_user and active_plus_user.is_valid() else None
+
     @classmethod
     def get_external_login_data(cls, data):
         from ondoc.authentication.backends import JWTAuthentication
@@ -370,8 +374,8 @@ class User(AbstractBaseUser, PermissionsMixin):
         profile_data['user'] = user
         profile_data['email'] = data.get('email')
         profile_data['source'] = source
-        profile_data['dob'] = data.get('dob', "")
-        profile_data['gender'] = data.get('gender', "")
+        profile_data['dob'] = data.get('dob', None)
+        profile_data['gender'] = data.get('gender', None)
         user_profiles = user.profiles.all()
 
         if not bool(re.match(r"^[a-zA-Z ]+$", data.get('name'))):
@@ -387,9 +391,9 @@ class User(AbstractBaseUser, PermissionsMixin):
                 if not user_profile.email:
                     user_profile.email = profile_data['email'] if not user_profile.email else None
                 if not user_profile.gender and profile_data.get('gender', None):
-                    user_profile.gender = profile_data.get('gender', "")
+                    user_profile.gender = profile_data.get('gender', None)
                 if not user_profile.dob and profile_data.get('dob', None):
-                    user_profile.dob = profile_data.get('dob', "")
+                    user_profile.dob = profile_data.get('dob', None)
                 user_profile.save()
             else:
                 UserProfile.objects.create(**profile_data)

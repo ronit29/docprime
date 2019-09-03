@@ -1,0 +1,30 @@
+{% load static %}
+{% load invoice_tags %}
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml">
+<head>
+    <title>Payment Receipt Generated</title>
+    <meta http-equiv="Content-Type" content="text/html; charset=UTF-8"/>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+    <link href="https://fonts.googleapis.com/css?family=Quicksand:300,400,500,700" rel="stylesheet">
+</head>
+<body style="margin: 0; padding: 0; width: 100%; font-family: 'Quicksand', sans-serif;">
+Here’s A Free Pair of Eyewear For You
+
+Dear {{patient_name}},
+Thank you for completing your {{type}} appointment.
+You have received a free pair of eyewear from Lensfit against the appointment ID {{id}}. Pick from the hottest range of eyeglasses by simply following the steps below:
+
+Step 1: Visit https://www.lensfit.com/collections/docprime
+Step 2: Shop from the wide range of eyeglasses in the collection. After selecting the frame, select 'Classic Anti-Scratch Lenses' from single vision
+Step 3: Add the product to cart & apply code {{lensfit_coupon}} at checkout and place the order
+ 
+*Coupon is not transferable or redeemable for cash
+*Coupon is valid till 31st December 2019 and can be used only once
+
+We look forward to serving you again!
+
+Stay Healthy!
+Team Docprime.com
+</body>
+</html>

@@ -29,7 +29,7 @@ from django.core.files.uploadedfile import TemporaryUploadedFile
 from datetime import timedelta
 from django.utils import timezone
 from django.conf import settings
-from ondoc.api.v1.utils import RawSql, aware_time_zone
+from ondoc.api.v1.utils import RawSql, aware_time_zone, html_to_pdf
 from django.core.files.uploadedfile import InMemoryUploadedFile
 from django.template.loader import render_to_string
 from num2words import num2words
@@ -962,18 +962,20 @@ class UserInsurance(auth_model.TimeStampedModel, MerchantPayoutMixin):
         policy_number = self.policy_number
         certificate_number = policy_number.split('/')[-1]
         filename = "{}.pdf".format(str(certificate_number))
+        #
+        # extra_args = {
+        #     'virtual-time-budget': 6000
+        # }
+        # file = TemporaryUploadedFile(filename, 'byte', 1000, 'utf-8')
+        # f = open(file.temporary_file_path())
+        # bytestring_to_pdf(html_body.encode(), f, **extra_args)
+        # f.seek(0)
+        # f.flush()
+        # f.content_type = 'application/pdf'
+        #
+        # self.coi = InMemoryUploadedFile(file, None, filename, 'application/pdf', file.tell(), None)
+        self.coi = html_to_pdf(html_body, filename)
 
-        extra_args = {
-            'virtual-time-budget': 6000
-        }
-        file = TemporaryUploadedFile(filename, 'byte', 1000, 'utf-8')
-        f = open(file.temporary_file_path())
-        bytestring_to_pdf(html_body.encode(), f, **extra_args)
-        f.seek(0)
-        f.flush()
-        f.content_type = 'application/pdf'
-
-        self.coi = InMemoryUploadedFile(file, None, filename, 'application/pdf', file.tell(), None)
         self.save()
 
 

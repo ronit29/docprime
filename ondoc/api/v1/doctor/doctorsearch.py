@@ -1,6 +1,5 @@
 import operator
 
-
 from django.contrib.gis.geos import Point
 from django.utils import timezone
 from django.conf import settings
@@ -97,7 +96,7 @@ class DoctorSearchHelper:
         counter=1
         spec_filter_str = ''
         if len(specialization_filter_ids) > 0 and len(procedure_ids)==0 and len(procedure_category_ids)==0:
-            spec_filter_str = 'and d.id in (select doctor_id from doctor_practice_specialization where specialization_id IN('
+            spec_filter_str = ' and d.id in (select doctor_id from doctor_practice_specialization where specialization_id IN('
             for id in specialization_filter_ids:
 
                 if not counter == 1:
@@ -204,7 +203,7 @@ class DoctorSearchHelper:
         if self.query_params.get('availability'):
             aval_query = "( "
             availability = self.query_params.get('availability')
-            today = Date.today().weekday()
+            today = datetime.now().weekday()
             currentDT = timezone.now()
             today_time = aware_time_zone(currentDT).strftime("%H.%M")
             avail_days =list(map(int, availability))
@@ -855,6 +854,7 @@ class DoctorSearchHelper:
                     "name": doctor_clinic.hospital.name,
                     "priceRange": min_price["deal_price"],
                     "image": doctor_clinic.hospital.get_thumbnail() if doctor_clinic.hospital.get_thumbnail() else None,
+                    "url": kwargs.get('hosp_entity_dict', {}).get(doctor_clinic.hospital.id),
                     "address":
                         {
                             "@type": 'PostalAddress',

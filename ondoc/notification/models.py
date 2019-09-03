@@ -30,7 +30,6 @@ from django.core.files.storage import default_storage
 from django.core.files.base import ContentFile
 from django.core.files.uploadedfile import SimpleUploadedFile, InMemoryUploadedFile
 from django.core.files import File
-# from hardcopy import bytestring_to_pdf
 from django.contrib.postgres.fields import ArrayField
 from ondoc.common.helper import Choices
 from django.utils.safestring import mark_safe
@@ -112,6 +111,7 @@ class NotificationAction:
 
     CONTACT_US_EMAIL = 65
     SAMPLE_DYNAMIC_TEMPLATE_PREVIEW = 110
+    SEND_LENSFIT_COUPON = 111
     NOTIFICATION_TYPE_CHOICES = (
         (APPOINTMENT_ACCEPTED, "Appointment Accepted"),
         (APPOINTMENT_CANCELLED, "Appointment Cancelled"),
@@ -907,11 +907,17 @@ class EmailNotification(TimeStampedModel, EmailNotificationOpdMixin, EmailNotifi
         publish_message(message)
 
     @classmethod
-    def send_dynamic_template_notification(cls, recipient_obj, html_body, email_subject, notification_type):
+    def send_dynamic_template_notification(cls, recipient_obj, html_body, email_subject, notification_type, *args, **kwargs):
         if recipient_obj and recipient_obj.to:
 
-            email_obj = cls.objects.create(email=recipient_obj.to, notification_type=notification_type,
-                                           content=html_body, email_subject=email_subject, cc=recipient_obj.cc, bcc=recipient_obj.bcc)
+            if kwargs.get('is_preview', False):
+                email_obj = cls.objects.create(email=recipient_obj.to, notification_type=notification_type,
+                                               content=html_body, email_subject=email_subject, cc=[], bcc=[])
+
+            else:
+                email_obj = cls.objects.create(email=recipient_obj.to, notification_type=notification_type,
+                                               content=html_body, email_subject=email_subject, cc=recipient_obj.cc, bcc=recipient_obj.bcc)
+
             email_obj.save()
 
             email_noti = {
@@ -1320,10 +1326,14 @@ class DynamicTemplates(TimeStampedModel):
         return self.sample_parameters
 
     def get_cc(self):
+        if not self.cc:
+            return []
         cc_emails = self.cc.split(',')
         return cc_emails
 
     def get_bcc(self):
+        if not self.bcc:
+            return []
         bcc_emails = self.bcc.split(',')
         return bcc_emails
 
@@ -1340,9 +1350,9 @@ class DynamicTemplates(TimeStampedModel):
             recipient_obj.add_cc(self.get_cc())
             recipient_obj.add_bcc(self.get_bcc())
 
-            EmailNotification.send_dynamic_template_notification(recipient_obj, rendered_content, self.subject, notification_type)
+            EmailNotification.send_dynamic_template_notification(recipient_obj, rendered_content, self.subject, notification_type, *args, **kwargs)
         elif self.template_type == self.TemplateType.SMS:
-            SmsNotification.send_dynamic_template_notification(recipient_obj, rendered_content, notification_type)
+            SmsNotification.send_dynamic_template_notification(recipient_obj, rendered_content, notification_type, *args, **kwargs)
 
         return
 
@@ -1360,16 +1370,6 @@ class DynamicTemplates(TimeStampedModel):
         return rendered_data
 
     def save(self, *args, **kwargs):
-
-        # old_instance = None
-        # if self.id:
-        #     old_instance = DynamicTemplates.objects.get(id=self.id)
-        #
-        # if not self.id or self.content != old_instance.content:
-        #     parameter_dict = self.parse_and_genearate_sample_json()
-        #     self.sample_parameters = parameter_dict
-        # self.generate_virutal_content()
-
         super().save(*args, **kwargs)
 
     def preview_url(self):

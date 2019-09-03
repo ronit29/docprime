@@ -53,7 +53,7 @@ from django.contrib.contenttypes.fields import GenericRelation
 from django.contrib.contenttypes.fields import GenericForeignKey
 from django.contrib.contenttypes.models import ContentType
 from ondoc.matrix.tasks import push_appointment_to_matrix, push_onboarding_qcstatus_to_matrix, \
-    create_ipd_lead_from_lab_appointment
+    create_ipd_lead_from_lab_appointment, create_or_update_lead_on_matrix
 from ondoc.integrations.task import push_lab_appointment_to_integrator, get_integrator_order_status
 from ondoc.location import models as location_models
 from ondoc.ratings_review import models as ratings_models
@@ -67,6 +67,7 @@ from django.utils.text import slugify
 from django.utils.functional import cached_property
 #from ondoc.api.v1.diagnostic import serializers as diagnostic_serializers
 from ondoc.common.helper import Choices
+from ondoc.plus import models as plus_model
 
 logger = logging.getLogger(__name__)
 
@@ -262,6 +263,7 @@ class Lab(TimeStampedModel, CreatedByModel, QCModel, SearchKey, WelcomeCallingDo
     search_distance = models.FloatField(default=20000)
     is_ipd_lab = models.BooleanField(default=False)
     related_hospital = models.ForeignKey(Hospital, null=True, blank=True, on_delete=models.SET_NULL, related_name='ipd_hospital')
+    enabled_for_plus_plans = models.NullBooleanField()
 
     def __str__(self):
         return self.name
@@ -990,6 +992,11 @@ class LabNetwork(TimeStampedModel, CreatedByModel, QCModel):
     open_for_communication = models.BooleanField(default=True)
     remark = GenericRelation(Remark)
     auto_ivr_enabled = models.BooleanField(default=True)
+    enabled_for_plus_plans = models.NullBooleanField()
+
+    @classmethod
+    def get_plus_enabled(cls):
+        return cls.objects.filter(enabled_for_plus_plans=True)
 
     def all_associated_labs(self):
         if self.id:
@@ -1616,6 +1623,8 @@ class LabAppointment(TimeStampedModel, CouponsMixin, LabAppointmentInvoiceMixin,
     appointment_prescriptions = GenericRelation("prescription.AppointmentPrescription", related_query_name="appointment_prescriptions")
     hospital_reference_id = models.CharField(max_length=1000, null=True, blank=True)
     reports_physically_collected = models.NullBooleanField()
+    plus_plan = models.ForeignKey(plus_model.PlusUser, blank=True, null=True, default=None,
+                                  on_delete=models.DO_NOTHING)
 
     @cached_property
     def is_thyrocare(self):
@@ -1652,6 +1661,36 @@ class LabAppointment(TimeStampedModel, CouponsMixin, LabAppointmentInvoiceMixin,
             return self.lab.matrix_state.id
         else:
             return None
+
+    def get_booking_analytics_data(self):
+        data = dict()
+
+        category = None
+        for t in self.tests.all():
+            if t.is_package == True:
+                category = 1
+                break
+            else:
+                category = 0
+
+        promo_cost = self.deal_price - self.effective_price if self.deal_price and self.effective_price else 0
+
+        data['Appointment_Id'] = self.id
+        data['CityId'] = self.get_city()
+        data['StateId'] = self.get_state()
+        data['ProviderId'] = self.lab.id
+        data['TypeId'] = 2
+        data['PaymentType'] = self.payment_type if self.payment_type else None
+        data['Payout'] = self.agreed_price
+        data['BookingDate'] = self.created_at
+        data['CorporateDealId'] = self.get_corporate_deal_id()
+        data['PromoCost'] = max(0, promo_cost)
+        data['GMValue'] = self.deal_price
+        data['Category'] = category
+        data['StatusId'] = self.status
+
+        return data
+
 
     def sync_with_booking_analytics(self):
 
@@ -3280,3 +3319,28 @@ class LabTestCategoryLandingURLS(TimeStampedModel):
 
     class Meta:
         db_table = "lab_test_category_landing_urls"
+
+
+
+class IPDMedicinePageLead(auth_model.TimeStampedModel):
+    name = models.CharField(max_length=500)
+    phone_number = models.BigIntegerField(validators=[MaxValueValidator(9999999999), MinValueValidator(1000000000)])
+    matrix_city = models.ForeignKey(MatrixMappedCity, on_delete=models.SET_NULL, null=True)
+    matrix_lead_id = models.IntegerField(null=True)
+    lead_source = models.CharField(null=True, max_length=1000)
+
+    class Meta:
+        db_table = "ipd_medicine_lead"
+
+    def __str__(self):
+        return self.name
+
+    def save(self, force_insert=False, force_update=False, using=None, update_fields=None):
+
+        if not self.id:
+            super().save(force_insert, force_update, using, update_fields)
+
+        if not self.matrix_lead_id:
+            create_or_update_lead_on_matrix.apply_async(({'obj_type': self.__class__.__name__, 'obj_id': self.id}, ), countdown=5)
+
+

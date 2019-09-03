@@ -223,10 +223,13 @@ class CommentViewSet(viewsets.ModelViewSet):
         article = data.get('article')
         article = article_models.Article.objects.filter(id=article).first()
         if article:
-            comments = self.queryset.filter(object_pk=article.id)
+            content_type = ContentType.objects.get(model="article")
+            comments = self.queryset.filter(object_pk=article.id, content_type=content_type)
 
             serializer = CommentSerializer(comments, many=True, context={'request': request})
             return Response(serializer.data)
+
+        return Response({})
 
 
 

@@ -41,6 +41,7 @@ from Crypto import Random
 from Crypto.Cipher import AES
 import decimal
 
+
 logger = logging.getLogger(__name__)
 
 User = get_user_model()
@@ -68,6 +69,18 @@ class CustomTemporaryUploadedFile(UploadedFile):
             # self.file.file.close() before the exception.
             pass
 
+
+def get_pdf_njs(html, filename):
+    params = {'html': html, 'filename': filename}
+    odbc_base_url = str(settings.ODBC_BASE_URL)
+    url = odbc_base_url + '/api/get_pdf'
+    # url = 'http://localhost:8000/api/get_pdf'
+    response = requests.post(url, data=params, stream=True)
+    if response.status_code == 200:
+        object = response
+        return object
+    logger.error("Error Generating PDF " + str(filename) + " from PDF Server " + str(response.text))
+    return None
 
 def flatten_dict(d):
     def items():
@@ -292,6 +305,37 @@ class IsMatrixUser(permissions.BasePermission):
         return False
 
 
+def plus_subscription_transform(app_data):
+    """A serializer helper to serialize Insurance data"""
+
+    app_data['plus_user']['purchase_date'] = str(
+        app_data['plus_user']['purchase_date'])
+    app_data['plus_user']['expire_date'] = str(
+        app_data['plus_user']['expire_date'])
+
+    app_data['profile_detail']['dob'] = str(app_data['profile_detail']['dob'])
+    insured_members = app_data['plus_user']['plus_members']
+    for member in insured_members:
+        member['dob'] = str(member['dob'])
+        # member['member_profile']['dob'] = str(member['member_profile']['dob'])
+    return app_data
+
+
+def plan_subscription_reverse_transform(subscription_data):
+    subscription_data['plus_user']['purchase_date'] = \
+        datetime.datetime.strptime(subscription_data['plus_user']['purchase_date'], "%Y-%m-%d %H:%M:%S.%f")
+    subscription_data['plus_user']['expire_date'] = \
+        datetime.datetime.strptime(subscription_data['plus_user']['expire_date'],
+                                   "%Y-%m-%d %H:%M:%S.%f")
+    subscription_data['profile_detail']['dob'] = \
+        datetime.datetime.strptime(subscription_data['profile_detail']['dob'],
+                                   "%Y-%m-%d")
+    insured_members = subscription_data['plus_user']['plus_members']
+    for member in insured_members:
+        member['dob'] = datetime.datetime.strptime(member['dob'], "%Y-%m-%d").date()
+    return subscription_data
+
+
 def insurance_transform(app_data):
     """A serializer helper to serialize Insurance data"""
     # app_data['insurance']['insurance_transaction']['transaction_date'] = str(app_data['insurance']['insurance_transaction']['transaction_date'])
@@ -411,6 +455,8 @@ def payment_details(request, order):
     from ondoc.account.models import PgTransaction, Order, PaymentProcessStatus
     from ondoc.notification.tasks import save_pg_response, save_payment_status
     from ondoc.account.mongo_models import PgLogs
+    from ondoc.plus.models import PlusPlans
+
     payment_required = True
     user = request.user
     if user.email:
@@ -436,6 +482,19 @@ def payment_details(request, order):
             raise Exception('Invalid pg transaction as insurer plan is not found.')
         insurer = insurance_plan.insurer
         insurer_code = insurer.insurer_merchant_code
+
+        if not profile:
+            if order.action_data.get('profile_detail'):
+                profile_name = order.action_data.get('profile_detail').get('name', "")
+
+    if order.product_id == Order.VIP_PRODUCT_ID:
+        isPreAuth = '0'
+        plus_plan_id = order.action_data.get('plus_plan')
+        plus_plan = PlusPlans.objects.filter(id=plus_plan_id).first()
+        if not plus_plan:
+            raise Exception('Invalid pg transaction as plus plan is not found.')
+        proposer = plus_plan.proposer
+        # insurer_code = insurer.insurer_merchant_code
 
         if not profile:
             if order.action_data.get('profile_detail'):
@@ -1033,6 +1092,9 @@ class CouponsMixin(object):
         if all_appointments > 0:
             new_user = False
         return new_user
+
+    def has_lensfit_coupon_used(self):
+        self.coupon.filter(is_lensfit=True).exists()
 
 
 class TimeSlotExtraction(object):
@@ -1755,25 +1817,38 @@ def create_payout_checksum(all_txn, product_id):
     return checksum_hash
 
 def html_to_pdf(html_body, filename):
+    from django.core.files.uploadedfile import InMemoryUploadedFile
     file = None
+    response = get_pdf_njs(html_body, filename)
     try:
-        extra_args = {
-            'virtual-time-budget': 6000
-        }
-        from django.core.files.uploadedfile import TemporaryUploadedFile
         temp_pdf_file = TemporaryUploadedFile(filename, 'byte', 1000, 'utf-8')
-        file = open(temp_pdf_file.temporary_file_path())
-        from hardcopy import bytestring_to_pdf
-        bytestring_to_pdf(html_body.encode(), file, **extra_args)
-        file.seek(0)
-        file.flush()
-        file.content_type = 'application/pdf'
-        from django.core.files.uploadedfile import InMemoryUploadedFile
-        file = InMemoryUploadedFile(temp_pdf_file, None, filename, 'application/pdf',
-                                    temp_pdf_file.tell(), None)
-
+        for block in response.iter_content(1024 * 8):
+            if not block:
+                break
+            temp_pdf_file.write(block)
+        temp_pdf_file.seek(0)
+        temp_pdf_file.content_type = "application/pdf"
+        file = InMemoryUploadedFile(temp_pdf_file, None, filename, temp_pdf_file.content_type, temp_pdf_file.tell(), None)
     except Exception as e:
         logger.error("Got error while creating PDF file :: {}.".format(e))
+    # try:
+    #     extra_args = {
+    #         'virtual-time-budget': 6000
+    #     }
+    #     from django.core.files.uploadedfile import TemporaryUploadedFile
+    #     temp_pdf_file = TemporaryUploadedFile(filename, 'byte', 1000, 'utf-8')
+    #     file = open(temp_pdf_file.temporary_file_path())
+    #     from hardcopy import bytestring_to_pdf
+    #     bytestring_to_pdf(html_body.encode(), file, **extra_args)
+    #     file.seek(0)
+    #     file.flush()
+    #     file.content_type = 'application/pdf'
+    #     from django.core.files.uploadedfile import InMemoryUploadedFile
+    #     file = InMemoryUploadedFile(temp_pdf_file, None, filename, 'application/pdf',
+    #                                 temp_pdf_file.tell(), None)
+    #
+    # except Exception as e:
+    #     logger.error("Got error while creating PDF file :: {}.".format(e))
     return file
 
 def util_absolute_url(url):
@@ -1942,3 +2017,9 @@ def is_valid_ckeditor_text(text):
     if text == "<p>&nbsp;</p>":
         return False
     return True
+
+
+
+
+
+

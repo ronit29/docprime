@@ -5,6 +5,7 @@ from rest_framework import serializers
 from rest_framework.fields import CharField
 from django.db.models import Q, Avg, Count, Max, F, ExpressionWrapper, DateTimeField
 from collections import defaultdict, OrderedDict
+
 from ondoc.api.v1.procedure.serializers import DoctorClinicProcedureSerializer, OpdAppointmentProcedureMappingSerializer
 from ondoc.api.v1.ratings.serializers import RatingsGraphSerializer
 from ondoc.cart.models import Cart
@@ -24,7 +25,7 @@ from ondoc.authentication.models import UserProfile, DoctorNumber, GenericAdmin,
 from django.db.models import Avg
 from django.db.models import Q
 
-from ondoc.coupon.models import Coupon, RandomGeneratedCoupon
+from ondoc.coupon.models import Coupon, RandomGeneratedCoupon, CouponRecommender
 from ondoc.account.models import Order, Invoice
 from django.contrib.staticfiles.templatetags.staticfiles import static
 from ondoc.api.v1.auth.serializers import UserProfileSerializer
@@ -472,7 +473,7 @@ class DoctorHospitalSerializer(serializers.ModelSerializer):
 
         return 0
 
-    
+
     def get_enabled_for_online_booking(self, obj):
         enable_for_online_booking = False
         if obj.doctor_clinic:
@@ -973,6 +974,7 @@ class DoctorProfileUserViewSerializer(DoctorProfileSerializer):
     doctor_specializations_ids = serializers.SerializerMethodField()
     show_popup = serializers.SerializerMethodField()
     force_popup = serializers.SerializerMethodField()
+    lensfit_offer = serializers.SerializerMethodField()
 
     def get_enabled_for_cod(self, obj):
         return obj.enabled_for_cod()
@@ -1106,6 +1108,7 @@ class DoctorProfileUserViewSerializer(DoctorProfileSerializer):
 
         specializations = [doctor_specialization.specialization for doctor_specialization in obj.doctorpracticespecializations.all()]
         clinics = [clinic_hospital for clinic_hospital in obj.doctor_clinics.all()]
+        hospitals = [hos.name for hos in obj.hospitals.all()]
         # entity = EntityUrls.objects.filter(entity_id=obj.id, sitemap_identifier=EntityUrls.SitemapIdentifier.DOCTOR_PAGE,
         #                                    is_valid=True)
         sublocality = None
@@ -1116,33 +1119,47 @@ class DoctorProfileUserViewSerializer(DoctorProfileSerializer):
             if entity.additional_info:
                 locality = entity.additional_info.get('locality_value')
                 sublocality = entity.additional_info.get('sublocality_value')
+            elif entity.locality_value:
+                locality = entity.locality_value
+                sublocality = entity.sublocality_value
 
         title = "Dr. " + obj.name
-        description = "Dr. " + obj.name + ': ' + "Dr. " + obj.name
+        description = "Dr. " + obj.name
 
         doc_spec_list = []
+        doc_hosp_list = []
 
         for name in specializations:
             doc_spec_list.append(str(name))
+        for hosp_name in hospitals:
+            doc_hosp_list.append(str(hosp_name))
+
+
         if len(doc_spec_list) >= 1:
-            title +=  ' - '+', '.join(doc_spec_list)
-            description += ' is ' + ', '.join(doc_spec_list)
+            title += ' - '+', '.join(doc_spec_list)
+            description += ' is a ' + ', '.join(doc_spec_list)
+        if len(doc_hosp_list) >= 1:
+            title += ' in '+', '.join(doc_hosp_list)
+            description += ' in ' + ', '.join(doc_hosp_list)
+
         if sublocality and locality:
             # title += ' in ' + sublocality + " " + locality + ' - Consult Online'
-            description += ' in ' + sublocality + " " + locality
+            description += ' , ' + sublocality + " , " + locality
         elif locality:
-            # title += ' in ' + locality + ' - Consult Online'
-            description += ' in ' + locality
+            title += ' ,' + locality
+            description += ' , ' + locality
 
-        title += ' | Book Appointment Online'
+        # title += ' | Book Appointment Online'
+        title += '| Upto 50% off'
+        description += ' Check ' + obj.name + 's' + 'Fees, OPD Schedule & Contact No. Book & get upto 50% off at docprime.'
 
         hospital = []
         for hospital_name in clinics:
             hospital.append(str(hospital_name.hospital))
-        if len(hospital) >= 1:
-            description += ' consulting patients at '+', '.join(hospital)
+        # if len(hospital) >= 1:
+            # description += ' consulting patients at '+', '.join(hospital)
 
-        description += '. Book appointments online, check fees, address and more.'
+        # description += '. Book appointments online, check fees, address and more.'
 
         doctor_realted_hospitals = obj.doctor_clinics.all()
 
@@ -1310,6 +1327,71 @@ class DoctorProfileUserViewSerializer(DoctorProfileSerializer):
     def get_force_popup(self, obj):
         return False
 
+    def get_lensfit_offer(self, obj):
+        from ondoc.api.v1.coupon.serializers import CouponSerializer
+        is_insurance_covered = False
+        offer = {
+            'applicable': False,
+            'coupon': {}
+        }
+        insurance_applicable = False
+        request = self.context.get("request")
+        profile = self.context.get("profile")
+        user = request.user
+        hospital = self.context.get('hospital_id')
+        resp = Doctor.get_insurance_details(user)
+        doctor_clinic_timing = None
+        doctor_clinic = obj.doctor_clinics.filter(hospital=hospital).first()
+
+        if doctor_clinic:
+            hospital = doctor_clinic.hospital
+            doctor_clinic_timing = DoctorClinicTiming.objects.filter(doctor_clinic=doctor_clinic,
+                                                                     doctor_clinic__enabled=True,
+                                                                     doctor_clinic__hospital__is_live=True).select_related(
+                "doctor_clinic__doctor", "doctor_clinic__hospital").first()
+
+            enabled_for_online_booking = doctor_clinic.enabled_for_online_booking and obj.enabled_for_online_booking and \
+                                         obj.is_doctor_specialization_insured() and hospital.enabled_for_online_booking
+
+            if doctor_clinic_timing:
+                if hospital.enabled_for_prepaid and hospital.enabled_for_insurance and doctor_clinic_timing.mrp is not None and resp[
+                    'insurance_threshold_amount'] is not None and doctor_clinic_timing.mrp <= resp[
+                    'insurance_threshold_amount'] and enabled_for_online_booking and \
+                        not (request.query_params.get('procedure_ids') or request.query_params.get(
+                            'procedure_category_ids')) and obj.is_enabled_for_insurance:
+                        is_insurance_covered = True
+
+                if is_insurance_covered and user and user.is_authenticated and profile:
+                    insurance_applicable = user.active_insurance and profile.is_insured_profile
+
+                if not insurance_applicable:
+                    coupon_code = Coupon.objects.filter(is_lensfit=True).order_by('-created_at').first()
+                    product_id = Order.DOCTOR_PRODUCT_ID
+
+                    # doctor_clinic_timing = DoctorClinicTiming.objects.filter(doctor_clinic=doctor_clinic,
+                    #                                          doctor_clinic__enabled=True,
+                    #                                          doctor_clinic__hospital__is_live=True).select_related(
+                    #     "doctor_clinic__doctor", "doctor_clinic__hospital").first()
+
+                    deal_price = doctor_clinic_timing.deal_price
+                    filters = dict()
+                    filters['deal_price'] = deal_price
+                    filters['doctor_id'] = obj.id
+                    filters['hospital'] = hospital
+
+                    coupon_recommender = CouponRecommender(user, profile, 'doctor', product_id, coupon_code, None)
+                    applicable_coupons = coupon_recommender.applicable_coupons(**filters)
+
+                    lensfit_coupons = list(filter(lambda x: x.is_lensfit is True, applicable_coupons))
+                    if lensfit_coupons:
+                        offer['applicable'] = True
+                        coupon_properties = coupon_recommender.get_coupon_properties(str(lensfit_coupons[0]))
+                        serializer = CouponSerializer(lensfit_coupons[0],
+                                                      context={'coupon_properties': coupon_properties})
+                        offer['coupon'] = serializer.data
+
+        return offer
+
     class Meta:
         model = Doctor
         # exclude = ('created_at', 'updated_at', 'onboarding_status', 'is_email_verified',
@@ -1321,7 +1403,7 @@ class DoctorProfileUserViewSerializer(DoctorProfileSerializer):
                   'general_specialization', 'doctor_specializations_ids', 'thumbnail', 'license', 'is_live', 'seo',
                   'breadcrumb', 'rating', 'rating_graph',
                   'enabled_for_online_booking', 'unrated_appointment', 'display_rating_widget', 'is_gold',
-                  'search_data', 'enabled_for_cod', 'show_popup', 'force_popup')
+                  'search_data', 'enabled_for_cod', 'show_popup', 'force_popup', 'lensfit_offer')
 
 
 class DoctorAvailabilityTimingSerializer(serializers.Serializer):
@@ -1447,7 +1529,7 @@ class DoctorAppointmentRetrieveSerializer(OpdAppointmentSerializer):
 
     def get_mrp(self, obj):
         mrp_fees = obj.fees if obj.fees else 0
-        mrp = obj.mrp if obj.payment_type == obj.COD else mrp_fees
+        mrp = obj.deal_price if obj.payment_type == obj.COD else mrp_fees
         return mrp
 
     def get_mask_data(self, obj):
