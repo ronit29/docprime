@@ -1149,12 +1149,14 @@ class PartnerEConsultationViewSet(viewsets.GenericViewSet):
         rc_super_user_obj = prov_models.RocketChatSuperUser.objects.filter(token__isnull=False).order_by('-updated_at').first()
         if not rc_super_user_obj:
             rc_super_user_obj = v1_utils.rc_superuser_login()
+        if not rc_super_user_obj:
+            return Response("Error in RocketChat SuperUser Login API", status=status.HTTP_500_INTERNAL_SERVER_ERROR)
         auth_token = rc_super_user_obj.token
         auth_user_id = rc_super_user_obj.user_id
-        exception = v1_utils.rc_users(e_obj, patient, auth_token, auth_user_id)
-        if exception:
-            logger.error('Error in e-consultation create - ' + str(exception))
-            return Response('Error in e-consultation create - ' + str(exception),
+        executed_fully = v1_utils.rc_users(e_obj, patient, auth_token, auth_user_id)
+        if not executed_fully:
+            logger.error('Error in e-consultation create - check logs related to RocketChat APIs')
+            return Response('Error in e-consultation create - check logs related to RocketChat APIs',
                             status=status.HTTP_500_INTERNAL_SERVER_ERROR)
         e_obj.save()
 
@@ -1229,13 +1231,20 @@ class PartnerEConsultationViewSet(viewsets.GenericViewSet):
         from ondoc.api.v1.prescription.serializers import AppointmentPrescriptionUploadSerializer
         from ondoc.prescription.models import AppointmentPrescription
         from ondoc.api.v1.utils import util_absolute_url
-        request.data['user'] = request.user.id
+        user = request.user
+        request.data['user'] = user.id
         pres_serializer = AppointmentPrescriptionUploadSerializer(data=request.data, context={'request': request})
         pres_serializer.is_valid(raise_exception=True)
         pres_data = pres_serializer.validated_data
-        e_consult_serializer = serializers.EConsultSerializer(data=request.data, context={'request': request})
-        e_consult_serializer.is_valid(raise_exception=True)
-        e_consultation = e_consult_serializer.validated_data['e_consultation']
+        e_consult_id = request.data.get('id')
+        if not e_consult_id:
+            return Response({"status": 0, "message": "e_consult id is required"}, status=status.HTTP_400_BAD_REQUEST)
+        e_consultation = prov_models.EConsultation.objects.filter(id=e_consult_id, created_by=user)\
+                                                          .exclude(status__in=[prov_models.EConsultation.COMPLETED,
+                                                                               prov_models.EConsultation.CANCELLED,
+                                                                               prov_models.EConsultation.EXPIRED]).first()
+        if not e_consultation:
+            return Response({"status": 0, "message": "e_consultation not found"}, status=status.HTTP_404_NOT_FOUND)
         prescription_obj = AppointmentPrescription.objects.create(**pres_data, content_object=e_consultation)
 
         user_token = e_consultation.doctor.rc_user.login_token
@@ -1367,28 +1376,6 @@ class ConsumerEConsultationViewSet(viewsets.GenericViewSet):
         else:
             resp["status"] = 1
             resp['data'], resp["payment_required"] = v1_utils.payment_details(request, pg_order)
-
-        response = requests.post(settings.ROCKETCHAT_SERVER + '/api/v1/login',
-                                 data={
-                                     "user": settings.ROCKETCHAT_SUPERUSER,
-                                     "password": settings.ROCKETCHAT_PASSWORD
-                                 })
-        data = json.loads(response._content.decode())['data']
-        auth_token = data.get('authToken')
-        user_id = data.get('userId')
-
-        user_response = requests.post(settings.ROCKETCHAT_SERVER + '/api/v1/users.create',
-                      headers={'X-Auth-Token': auth_token,
-                               'X-User-Id': user_id,
-                               'Content-Type': 'application/json'},
-                      data=json.dumps({
-                          "name": "name",
-                          "email": "email@user.tld",
-                          "password": "anypassyouwant",
-                          "username": "uniqueusername"
-                      }))
-        response_data = json.loads(user_response._content.decode())
-
         return Response(resp, status=status.HTTP_200_OK)
 
     def get_order_consult_id(self, request):

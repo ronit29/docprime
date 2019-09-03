@@ -50,35 +50,6 @@ class RocketChatUsers(auth_models.TimeStampedModel):
     online_patient = models.OneToOneField(auth_models.UserProfile, related_name='rc_user', on_delete=models.SET_NULL, null=True)
     login_token = models.CharField(max_length=64)
 
-    @staticmethod
-    def create_rc_user_and_login_token(auth_token, auth_user_id, patient=None, doctor=None):
-        rocket_chat_user_obj = e = None
-        try:
-            if patient:
-                name = patient.name
-                user_type = auth_models.User.CONSUMER
-            elif doctor:
-                name = doctor.name
-                user_type = auth_models.User.DOCTOR
-            else:
-                raise Exception('either patient or doctor is required for creating rc_user')
-            rc_req_extras = {'user_type': user_type}
-            created_user_dict = v1_utils.rc_user_create(auth_token, auth_user_id, name, rc_req_extras=rc_req_extras)
-            username = created_user_dict.get('username')
-            login_token = v1_utils.rc_user_login(auth_token, auth_user_id, username)['data']['authToken']
-
-            if user_type == auth_models.User.DOCTOR:
-                created_user_dict['doctor'] = doctor
-            elif v1_utils.is_valid_uuid(patient.id):
-                created_user_dict['offline_patient'] = patient
-            else:
-                created_user_dict['online_patient'] = patient
-            rocket_chat_user_obj = RocketChatUsers.objects.create(**created_user_dict, login_token=login_token,
-                                                                  user_type=user_type)
-        except Exception as e:
-            return rocket_chat_user_obj, e
-        return rocket_chat_user_obj, e
-
     def __str__(self):
         return str(self.name)
 
@@ -102,20 +73,16 @@ class RocketChatGroups(auth_models.TimeStampedModel):
 
     @classmethod
     def create_group(cls, auth_token, auth_user_id, patient, rc_doctor):
-        rc_group_obj = e = None
-        try:
-            response_data_dict = v1_utils.rc_group_create(auth_token, auth_user_id, patient, rc_doctor)
-            if response_data_dict['success']:
-                group_id = response_data_dict['group']['_id']
-                group_name = response_data_dict['group']['name']
-                rc_group_obj = cls(group_id=group_id, group_name=group_name, data=response_data_dict)
-                rc_group_obj.create_auto_login_link(patient.rc_user.login_token, rc_doctor.login_token)
-                rc_group_obj.save()
-            else:
-                raise Exception(response_data_dict['error'])
-        except Exception as e:
-            return rc_group_obj, e
-        return rc_group_obj, e
+        response_data_dict = v1_utils.rc_group_create(auth_token, auth_user_id, patient, rc_doctor)
+        if not response_data_dict:
+            logger.error("Error in creating RC group")
+            return None
+        group_id = response_data_dict['group']['_id']
+        group_name = response_data_dict['group']['name']
+        rc_group_obj = cls(group_id=group_id, group_name=group_name, data=response_data_dict)
+        rc_group_obj.create_auto_login_link(patient.rc_user.login_token, rc_doctor.login_token)
+        rc_group_obj.save()
+        return rc_group_obj
 
     def __str__(self):
         return str(self.id)
@@ -227,12 +194,9 @@ class EConsultation(auth_models.TimeStampedModel, auth_models.CreatedByModel):
         if response.status_code != status.HTTP_200_OK or not response.ok:
             error_message = "[ERROR] Error in Rocket Chat API hit with user_id - {} and user_token - {}".format(
                 user_id, user_token)
-            logger.info(error_message)
-            logger.info("[ERROR] %s", response.reason)
             logger.error(
-                "Payload - " + json.dumps(
-                    request_data) + ", RC Response - " + json.dumps(
-                    response.json()) + "")
+                "Payload - " + json.dumps(request_data) + ", RC Response - " + json.dumps(
+                    response.json() + ", response text" + response.text))
         return response, error_message
 
     def __str__(self):

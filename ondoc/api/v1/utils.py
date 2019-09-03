@@ -2,7 +2,7 @@ from urllib.parse import urlparse
 
 from django.core.files.uploadedfile import TemporaryUploadedFile, UploadedFile
 from rest_framework.views import exception_handler
-from rest_framework import permissions
+from rest_framework import permissions, status
 from collections import defaultdict
 from operator import itemgetter
 from itertools import groupby
@@ -1974,16 +1974,20 @@ def rc_superuser_login(**kwargs):
                                  "user": username,
                                  "password": password
                              })
-    data = json.loads(response._content.decode())['data']
-    auth_token = data.get('authToken')
-    auth_user_id = data.get('userId')
-    if rc_super_user_obj:
-        rc_super_user_obj.token = auth_token
-        rc_super_user_obj.user_id = auth_user_id
-        rc_super_user_obj.save()
+    if response.status_code != status.HTTP_200_OK or not response.ok:
+        logger.error("Error in Rocket Chat Superuser Login API - " + response.text)
+        return None
     else:
-        rc_super_user_obj = RocketChatSuperUser.objects.create(username=username, password=password, user_id=auth_user_id, token=auth_token)
-    return rc_super_user_obj
+        data = json.loads(response._content.decode())['data']
+        auth_token = data.get('authToken')
+        auth_user_id = data.get('userId')
+        if rc_super_user_obj:
+            rc_super_user_obj.token = auth_token
+            rc_super_user_obj.user_id = auth_user_id
+            rc_super_user_obj.save()
+        else:
+            rc_super_user_obj = RocketChatSuperUser.objects.create(username=username, password=password, user_id=auth_user_id, token=auth_token)
+        return rc_super_user_obj
 
 
 def rc_user_create(auth_token, auth_user_id, name, **kwargs):
@@ -2003,6 +2007,9 @@ def rc_user_create(auth_token, auth_user_id, name, **kwargs):
                                              "username": username,
                                              "customFields": rc_req_extras
                                          }))
+    if user_create_response.status_code != status.HTTP_200_OK or not user_create_response.ok:
+        logger.error("Error in Rocket Chat user create API - " + response.text)
+        return None
     response_data_dict = json.loads(user_create_response._content.decode())
     return {"name": name,
             "username": username,
@@ -2019,6 +2026,9 @@ def rc_user_login(auth_token, auth_user_id, username):
                                                  'X-User-Id': auth_user_id,
                                                  'Content-Type': 'application/json'},
                                         data=json.dumps({"username": username}))
+    if user_login_response.status_code != status.HTTP_200_OK or not user_login_response.ok:
+        logger.error("Error in Rocket Chat user Login API - " + response.text)
+        return None
     response_data_dict = json.loads(user_login_response._content.decode())
     return response_data_dict
 
@@ -2031,6 +2041,9 @@ def rc_group_create(auth_token, auth_user_id, patient, rc_doctor):
                                                    'X-User-Id': auth_user_id,
                                                    'Content-Type': 'application/json'},
                                           data=json.dumps({"name": group_name, "members": members}))
+    if group_create_response.status_code != status.HTTP_200_OK or not group_create_response.ok:
+        logger.error("Error in Rocket Chat user Login API - " + response.text)
+        return None
     response_data_dict = json.loads(group_create_response._content.decode())
     return response_data_dict
 
@@ -2059,58 +2072,57 @@ def get_existing_rc_group(rc_user_patient, rc_user_doc):
 
 def create_rc_user_and_login_token(auth_token, auth_user_id, patient=None, doctor=None):
     from ondoc.provider.models import RocketChatUsers
-    rocket_chat_user_obj = e = None
-    try:
-        if patient:
-            name = patient.name
-            user_type = auth_models.User.CONSUMER
-        elif doctor:
-            name = doctor.name
-            user_type = auth_models.User.DOCTOR
-        else:
-            raise Exception('either patient or doctor is required for creating rc_user')
-        rc_req_extras = {'user_type': user_type}
-        created_user_dict = rc_user_create(auth_token, auth_user_id, name, rc_req_extras=rc_req_extras)
-        username = created_user_dict.get('username')
-        login_token = rc_user_login(auth_token, auth_user_id, username)['data']['authToken']
+    if patient:
+        name = patient.name
+        user_type = auth_models.User.CONSUMER
+    elif doctor:
+        name = doctor.name
+        user_type = auth_models.User.DOCTOR
+    else:
+        raise Exception('either patient or doctor is required for creating rc_user')
+    rc_req_extras = {'user_type': user_type}
+    created_user_dict = rc_user_create(auth_token, auth_user_id, name, rc_req_extras=rc_req_extras)
+    if not created_user_dict:
+        return None
+    username = created_user_dict.get('username')
+    login_token = rc_user_login(auth_token, auth_user_id, username)['data']['authToken']
+    if not login_token:
+        return None
 
-        if user_type == auth_models.User.DOCTOR:
-            created_user_dict['doctor'] = doctor
-        elif is_valid_uuid(patient.id):
-            created_user_dict['offline_patient'] = patient
-        else:
-            created_user_dict['online_patient'] = patient
-        rocket_chat_user_obj = RocketChatUsers.objects.create(**created_user_dict, login_token=login_token,
-                                                              user_type=user_type)
-    except Exception as e:
-        return rocket_chat_user_obj, e
-    return rocket_chat_user_obj, e
+    if user_type == auth_models.User.DOCTOR:
+        created_user_dict['doctor'] = doctor
+    elif is_valid_uuid(patient.id):
+        created_user_dict['offline_patient'] = patient
+    else:
+        created_user_dict['online_patient'] = patient
+    rocket_chat_user_obj = RocketChatUsers.objects.create(**created_user_dict, login_token=login_token,
+                                                          user_type=user_type)
+    return rocket_chat_user_obj
 
 
 def rc_users(e_obj, patient, auth_token, auth_user_id):
     from ondoc.provider.models import RocketChatGroups
-    exception = None
     doctor = e_obj.doctor
     if hasattr(patient, 'rc_user') and patient.rc_user:
         rc_user_patient = patient.rc_user
     else:
-        rc_user_patient, exception = create_rc_user_and_login_token(auth_token, auth_user_id, patient=patient)
-        if exception:
-            return exception
+        rc_user_patient = create_rc_user_and_login_token(auth_token, auth_user_id, patient=patient)
+        if not rc_user_patient:
+            return False
     if hasattr(doctor, 'rc_user') and doctor.rc_user:
         rc_user_doc = doctor.rc_user
     else:
-        rc_user_doc, exception = create_rc_user_and_login_token(auth_token, auth_user_id, doctor=doctor)
-        if exception:
-            return exception
+        rc_user_doc = create_rc_user_and_login_token(auth_token, auth_user_id, doctor=doctor)
+        if not rc_user_doc:
+            return False
 
     rc_group_obj = get_existing_rc_group(rc_user_patient, rc_user_doc)
     if not rc_group_obj:
-        rc_group_obj, exception = RocketChatGroups.create_group(auth_token, auth_user_id, patient, rc_user_doc)
-    if exception:
-        return exception
+        rc_group_obj = RocketChatGroups.create_group(auth_token, auth_user_id, patient, rc_user_doc)
+        if not rc_group_obj:
+            return False
     e_obj.rc_group = rc_group_obj
-    return exception
+    return True
 
 
 def is_valid_ckeditor_text(text):

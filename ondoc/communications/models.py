@@ -2190,13 +2190,9 @@ class OfflineOpdAppointments(Notification):
             email_notification = EMAILNotification(notification_type, context)
             sms_notification = SMSNotification(notification_type, context)
             app_notification = APPNotification(notification_type, context)
-            push_notification = PUSHNotification(notification_type, context)
-            whtsapp_notification = WHTSAPPNotification(notification_type, context)
             email_notification.send(all_receivers.get('email_receivers', []))
             sms_notification.send(all_receivers.get('sms_receivers', []))
             app_notification.send(all_receivers.get('app_receivers', []))
-            whtsapp_notification.send(all_receivers.get('sms_receivers', []))
-            push_notification.send(all_receivers.get('push_receivers', []))
 
     def get_receivers(self):
         all_receivers = list()
