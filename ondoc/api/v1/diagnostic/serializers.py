@@ -987,6 +987,8 @@ class LabAppointmentCreateSerializer(serializers.Serializer):
                 raise serializers.ValidationError("Address required for home pickup")
             elif not Address.objects.filter(id=data.get("address").id, user=request.user).exists():
                 raise serializers.ValidationError("Invalid address for given user")
+        else:
+            data.pop("address", None)
 
         if not UserProfile.objects.filter(user=request.user, pk=int(data.get("profile").id)).exists():
             raise serializers.ValidationError("Invalid profile id")

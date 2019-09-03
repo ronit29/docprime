@@ -2389,8 +2389,8 @@ class LabAppointmentView(mixins.CreateModelMixin,
     def create(self, request, **kwargs):
         from ondoc.doctor.models import OpdAppointment
         data = dict(request.data)
-        if not data.get("is_home_pickup"):
-            data.pop("address", None)
+        # if not data.get("is_home_pickup"):
+        #     data.pop("address", None)
 
         self.update_plan_details(request, data)
         serializer = diagnostic_serializer.LabAppointmentCreateSerializer(data=data, context={'request': request, 'data' : request.data, 'use_duplicate' : True})
