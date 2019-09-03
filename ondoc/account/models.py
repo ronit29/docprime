@@ -45,7 +45,10 @@ class Order(TimeStampedModel):
     INSURANCE_CREATE = 5
     SUBSCRIPTION_PLAN_BUY = 6
     CHAT_CONSULTATION_CREATE = 7
+    PROVIDER_ECONSULT_PAY = 8
     VIP_CREATE = 11
+
+
     PAYMENT_ACCEPTED = 1
     PAYMENT_PENDING = 0
     PAYMENT_FAILURE = 3
@@ -61,16 +64,23 @@ class Order(TimeStampedModel):
                       (INSURANCE_CREATE, "Insurance Create"),
                       (SUBSCRIPTION_PLAN_BUY, "Subscription Plan Buy"),
                       (CHAT_CONSULTATION_CREATE, "Chat Consultation Create"),
-                      (VIP_CREATE, "Vip create"))
+                      (VIP_CREATE, "Vip create"),
+                      (PROVIDER_ECONSULT_PAY, "Provider Econsult Pay"),
+                      )
     DOCTOR_PRODUCT_ID = 1
     LAB_PRODUCT_ID = 2
     INSURANCE_PRODUCT_ID = 3
     SUBSCRIPTION_PLAN_PRODUCT_ID = 4
     CHAT_PRODUCT_ID = 5
     VIP_PRODUCT_ID = 11
+    PROVIDER_ECONSULT_PRODUCT_ID = 6
     PRODUCT_IDS = [(DOCTOR_PRODUCT_ID, "Doctor Appointment"), (LAB_PRODUCT_ID, "LAB_PRODUCT_ID"),
-                   (INSURANCE_PRODUCT_ID, "INSURANCE_PRODUCT_ID"),(SUBSCRIPTION_PLAN_PRODUCT_ID, "SUBSCRIPTION_PLAN_PRODUCT_ID"),
-                   (CHAT_PRODUCT_ID, "CHAT_PRODUCT_ID"), (VIP_PRODUCT_ID, 'VIP_PRODUCT_ID')]
+                   (INSURANCE_PRODUCT_ID, "INSURANCE_PRODUCT_ID"),
+                   (SUBSCRIPTION_PLAN_PRODUCT_ID, "SUBSCRIPTION_PLAN_PRODUCT_ID"),
+                   (CHAT_PRODUCT_ID, "CHAT_PRODUCT_ID"),
+                   (VIP_PRODUCT_ID, 'VIP_PRODUCT_ID'),
+                   (PROVIDER_ECONSULT_PRODUCT_ID, "Provider Econsult"),
+                   ]
 
     product_id = models.SmallIntegerField(choices=PRODUCT_IDS, blank=True, null=True)
     reference_id = models.BigIntegerField(blank=True, null=True)
@@ -197,11 +207,13 @@ class Order(TimeStampedModel):
         from ondoc.api.v1.plus.serializers import PlusUserSerializer
         from ondoc.plus.models import PlusUser, PlusTransaction
         from ondoc.diagnostic.models import LabAppointment
+        from ondoc.provider.models import EConsultation
         from ondoc.chat.models import ChatConsultation
         from ondoc.api.v1.doctor.serializers import OpdAppTransactionModelSerializer
         from ondoc.api.v1.diagnostic.serializers import LabAppTransactionModelSerializer
         from ondoc.api.v1.insurance.serializers import UserInsuranceSerializer
         from ondoc.api.v1.diagnostic.serializers import PlanTransactionModelSerializer
+        from ondoc.api.v2.doctor.serializers import EConsultTransactionModelSerializer
         from ondoc.subscription_plan.models import UserPlanMapping
         from ondoc.insurance.models import UserInsurance, InsuranceTransaction
         from ondoc.api.v1.chat.serializers import ChatTransactionModelSerializer
@@ -250,6 +262,10 @@ class Order(TimeStampedModel):
             user_insurance_data = serializer.validated_data
         elif self.product_id == self.SUBSCRIPTION_PLAN_PRODUCT_ID:
             serializer = PlanTransactionModelSerializer(data=appointment_data)
+            serializer.is_valid(raise_exception=True)
+            appointment_data = serializer.validated_data
+        elif self.product_id == self.PROVIDER_ECONSULT_PRODUCT_ID:
+            serializer = EConsultTransactionModelSerializer(data=appointment_data)
             serializer.is_valid(raise_exception=True)
             appointment_data = serializer.validated_data
         elif self.product_id == self.CHAT_PRODUCT_ID:
@@ -372,6 +388,16 @@ class Order(TimeStampedModel):
                     "reference_id": appointment_obj.id,
                     "payment_status": Order.PAYMENT_ACCEPTED
                 }
+        elif self.action == Order.PROVIDER_ECONSULT_PAY:
+            amount = appointment_data["effective_price"]
+            if total_balance >= appointment_data["effective_price"] or payment_not_required:
+                appointment_obj = EConsultation.objects.filter(id=appointment_data.get('id')).first()
+                if appointment_obj:
+                    appointment_obj.update_consultation()
+                    order_dict = {
+                        "reference_id": appointment_obj.id,
+                        "payment_status": Order.PAYMENT_ACCEPTED
+                    }
         elif self.action == Order.CHAT_CONSULTATION_CREATE:
             if total_balance >= appointment_data.get("effective_price"):
                 amount = Decimal(appointment_data.get("amount"))
@@ -382,6 +408,7 @@ class Order(TimeStampedModel):
                     "reference_id": appointment_obj.id,
                     "payment_status": Order.PAYMENT_ACCEPTED
                 }
+                amount = appointment_obj.effective_price
 
         if order_dict:
             self.update_order(order_dict)
@@ -709,6 +736,8 @@ class Order(TimeStampedModel):
         from ondoc.subscription_plan.models import UserPlanMapping
         from ondoc.chat.models import ChatConsultation
         from ondoc.insurance.models import InsuranceDoctorSpecializations
+
+        from ondoc.provider.models import EConsultation
         orders_to_process = []
         if self.orders.exists():
             orders_to_process = self.orders.all()
@@ -720,6 +749,7 @@ class Order(TimeStampedModel):
         lab_appointment_ids = []
         insurance_ids = []
         user_plan_ids = []
+        econsult_ids = []
         chat_plan_ids = []
         user = self.user
         user_insurance_obj = user.active_insurance
@@ -772,6 +802,8 @@ class Order(TimeStampedModel):
                     insurance_ids.append(curr_app.id)
                 elif order.product_id == Order.SUBSCRIPTION_PLAN_PRODUCT_ID:
                     user_plan_ids.append(curr_app.id)
+                elif order.product_id == Order.PROVIDER_ECONSULT_PRODUCT_ID:
+                    econsult_ids.append(curr_app.id)
                 elif order.product_id == Order.CHAT_PRODUCT_ID:
                     chat_plan_ids.append(curr_app.id)
 
@@ -788,7 +820,7 @@ class Order(TimeStampedModel):
             except Exception as e:
                 logger.error(str(e))
 
-        if not opd_appointment_ids and not lab_appointment_ids and not insurance_ids and not user_plan_ids and not chat_plan_ids:
+        if not opd_appointment_ids and not lab_appointment_ids and not insurance_ids and not user_plan_ids and not econsult_ids and not chat_plan_ids:
             raise Exception("Could not process entire order")
 
         # mark order processed:
@@ -811,14 +843,15 @@ class Order(TimeStampedModel):
             UserInsurance.objects.filter(id__in=insurance_ids).update(money_pool=money_pool)
         if user_plan_ids:
             UserPlanMapping.objects.filter(id__in=user_plan_ids).update(money_pool=money_pool)
+        if econsult_ids:
+            EConsultation.objects.filter(id__in=econsult_ids).update(money_pool=money_pool)
         if chat_plan_ids:
             ChatConsultation.objects.filter(id__in=chat_plan_ids).update(money_pool=money_pool)
-
-        resp = { "opd" : opd_appointment_ids , "lab" : lab_appointment_ids, "plan": user_plan_ids,
-                 "insurance": insurance_ids, "chat" : chat_plan_ids, "type" : "all", "id" : None }
+        resp = {"opd": opd_appointment_ids , "lab": lab_appointment_ids, "plan": user_plan_ids,
+                 "insurance": insurance_ids, "econsultation": econsult_ids, "chat" : chat_plan_ids, "type": "all", "id": None }
         # Handle backward compatibility, in case of single booking, return the booking id
 
-        if (len(opd_appointment_ids) + len(lab_appointment_ids) + len(user_plan_ids) + len(insurance_ids) + len(chat_plan_ids)) == 1:
+        if (len(opd_appointment_ids) + len(lab_appointment_ids) + len(user_plan_ids) + len(insurance_ids) + len(econsult_ids) + len(chat_plan_ids)) == 1:
             result_type = "all"
             result_id = None
             if len(opd_appointment_ids) > 0:
@@ -833,6 +866,9 @@ class Order(TimeStampedModel):
             elif len(insurance_ids) > 0:
                 result_type = "insurance"
                 result_id = insurance_ids[0]
+            elif len(econsult_ids) > 0:
+                result_type = "econsultation"
+                result_id = econsult_ids[0]
             elif len(chat_plan_ids) > 0:
                 result_type = "chat"
                 result_id = chat_plan_ids[0]
@@ -1063,7 +1099,7 @@ class PgTransaction(TimeStampedModel):
     @classmethod
     def is_valid_hash(cls, data, product_id):
         client_key = secret_key = ""
-        if product_id in [Order.DOCTOR_PRODUCT_ID, Order.SUBSCRIPTION_PLAN_PRODUCT_ID, Order.CHAT_PRODUCT_ID]:
+        if product_id in [Order.DOCTOR_PRODUCT_ID, Order.SUBSCRIPTION_PLAN_PRODUCT_ID, Order.CHAT_PRODUCT_ID, Order.PROVIDER_ECONSULT_PRODUCT_ID]:
             client_key = settings.PG_CLIENT_KEY_P1
             secret_key = settings.PG_SECRET_KEY_P1
         elif product_id == Order.LAB_PRODUCT_ID:
