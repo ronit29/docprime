@@ -3,7 +3,7 @@ import logging
 import operator
 from copy import deepcopy
 from itertools import groupby
-from pyodbc import Date
+# from pyodbc import Date
 
 from django.contrib.contenttypes.models import ContentType
 
@@ -1465,7 +1465,7 @@ class LabList(viewsets.ReadOnlyModelViewSet):
         lab_timing_join = ""
 
         if availability:
-            today = Date.today().weekday()
+            today = datetime.datetime.now().weekday()
             aval_query = "( "
             currentDT = timezone.now()
             today_time = aware_time_zone(currentDT).strftime("%H.%M")
@@ -1883,7 +1883,8 @@ class LabList(viewsets.ReadOnlyModelViewSet):
 
 
     @transaction.non_atomic_requests
-    def retrieve(self, request, lab_id, entity=None):
+    def retrieve(self, request, lab_id, profile_id=None, entity=None):
+        profile = None
 
         lab_obj = Lab.objects.select_related('network')\
                              .prefetch_related('rating', 'lab_documents')\
@@ -1891,6 +1892,15 @@ class LabList(viewsets.ReadOnlyModelViewSet):
 
         if not lab_obj:
             return Response(status=status.HTTP_404_NOT_FOUND)
+
+        user = request.user
+        if profile_id and user and user.is_authenticated:
+            profile = UserProfile.objects.filter(pk=profile_id).first()
+            if not profile:
+                return Response(status=status.HTTP_404_NOT_FOUND)
+
+            if not profile in user.profiles.all():
+                return Response(status=status.HTTP_400_BAD_REQUEST)
 
         if not entity:
             entity = EntityUrls.objects.filter(entity_id=lab_id,
@@ -1914,7 +1924,8 @@ class LabList(viewsets.ReadOnlyModelViewSet):
         queryset = queryset.filter(test__in=test_ids)
 
         test_serializer = diagnostic_serializer.AvailableLabTestPackageSerializer(queryset, many=True,
-                                                                           context={"lab": lab_obj, "request": request, "package_free_or_not_dict": package_free_or_not_dict})
+                                                                           context={"lab": lab_obj, "profile": profile,
+                                                                                    "request": request, "package_free_or_not_dict": package_free_or_not_dict})
         # for Demo
         demo_lab_test = AvailableLabTest.objects.filter(test__enable_for_retail=True, lab_pricing_group=lab_obj.lab_pricing_group, enabled=True, test__searchable=True).order_by("-test__priority").prefetch_related('test')[:2]
         lab_test_serializer = diagnostic_serializer.AvailableLabTestSerializer(demo_lab_test, many=True, context={"lab": lab_obj, "request": request, "package_free_or_not_dict": package_free_or_not_dict})
@@ -1981,7 +1992,7 @@ class LabList(viewsets.ReadOnlyModelViewSet):
         temp_data['lab_timing'], temp_data["lab_timing_data"] = lab_timing, lab_timing_data
         temp_data['total_test_count'] = total_test_count
 
-        #disable home pickup for insured customers if lab charges home collection
+        # disable home pickup for insured customers if lab charges home collection
         if request.user and request.user.is_authenticated and temp_data.get('lab'):
             active_insurance = request.user.active_insurance
             threshold = None
@@ -2398,7 +2409,7 @@ class LabAppointmentView(mixins.CreateModelMixin,
             data.pop("address", None)
 
         self.update_plan_details(request, data)
-        serializer = diagnostic_serializer.LabAppointmentCreateSerializer(data=data, context={'request': request, 'data' : request.data, 'use_duplicate' : True})
+        serializer = diagnostic_serializer.LabAppointmentCreateSerializer(data=data, context={'request': request, 'data': request.data, 'use_duplicate': True})
         serializer.is_valid(raise_exception=True)
         validated_data = serializer.validated_data
 

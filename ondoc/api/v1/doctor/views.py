@@ -328,7 +328,6 @@ class DoctorAppointmentsViewSet(OndocViewSet):
     def can_book_for_free(self, user):
         return models.OpdAppointment.objects.filter(user=user, deal_price=0)\
                    .exclude(status__in=[models.OpdAppointment.COMPLETED, models.OpdAppointment.CANCELLED]).count() < models.OpdAppointment.MAX_FREE_BOOKINGS_ALLOWED
-
     def update(self, request, pk=None):
         user = request.user
         source = request.query_params.get('source', '')
@@ -896,7 +895,6 @@ class DoctorProfileUserViewSet(viewsets.GenericViewSet):
 
         selected_procedure_ids, other_procedure_ids = get_selected_and_other_procedures(category_ids, procedure_ids, doctor, all=True)
 
-
         general_specialization = []
         spec_ids = list()
         spec_url_dict = dict()
@@ -916,7 +914,6 @@ class DoctorProfileUserViewSet(viewsets.GenericViewSet):
                                           locality_value=entity.locality_value, is_valid=True, entity_type='Doctor', url_type='SEARCHURL')
             for su in spec_urls:
                 spec_url_dict[su.specialization_id] = su.url
-
 
         serializer = serializers.DoctorProfileUserViewSerializer(doctor, many=False,
                                                                      context={"request": request

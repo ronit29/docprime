@@ -30,6 +30,7 @@ from .v2.lab.router import urlpatterns as lab_v2_url
 from .v1.integrations.router import urlpatterns as integrations_url
 from .v1.prescription.router import urlpatterns as prescription_url
 from .v1.plus.router import urlpatterns as plus_url
+from .v1.bookinganalytics.router import urlpatterns as bookinganalytics_url
 
 urlpatterns = [
     path('v1/doctor/', include(doctor_url)),
@@ -59,5 +60,6 @@ urlpatterns = [
     path('v2/lab/', include(lab_v2_url)),
     path('v1/integrations/', include(integrations_url)),
     path('v1/prescription/', include(prescription_url)),
-    path('v1/plus/', include(plus_url))
+    path('v1/plus/', include(plus_url)),
+    path('v1/bookinganalytics/', include(bookinganalytics_url))
 ]

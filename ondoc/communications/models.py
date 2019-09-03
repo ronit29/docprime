@@ -12,6 +12,7 @@ from django.db.models import F, Q
 
 from ondoc.api.v1.utils import util_absolute_url, util_file_name, generate_short_url
 from ondoc.banner.models import EmailBanner
+from ondoc.coupon.models import Coupon
 from ondoc.doctor.models import OpdAppointment, Hospital
 from ondoc.diagnostic.models import LabAppointment
 from ondoc.common.models import UserConfig
@@ -32,7 +33,7 @@ from ondoc.authentication.models import UserProfile, GenericAdmin, NotificationE
 from ondoc.insurance.models import EndorsementRequest, UserInsurance
 
 from ondoc.notification.models import NotificationAction, SmsNotification, EmailNotification, AppNotification, \
-    PushNotification, WhtsappNotification, DynamicTemplates
+    PushNotification, WhtsappNotification, DynamicTemplates, RecipientEmail
 # from ondoc.notification.sqs_client import publish_message
 from ondoc.notification.rabbitmq_client import publish_message
 # import datetime
@@ -347,6 +348,8 @@ class SMSNotification:
             body_template = "sms/cod_to_prepaid_request.txt"
         elif notification_type == NotificationAction.IPD_PROCEDURE_COST_ESTIMATE:
             body_template = "sms/ipd/cost_estimate.txt"
+        elif notification_type == NotificationAction.SEND_LENSFIT_COUPON:
+            body_template = "sms/send_lensfit_coupon.txt"
     #    elif notification_type == NotificationAction.LAB_CONFIRMATION_CHECK_AFTER_APPOINTMENT:
     #        body_template = "sms/lab/lab_confirmation_check.txt"
     #   elif notification_type == NotificationAction.LAB_CONFIRMATION_SECOND_CHECK_AFTER_APPOINTMENT:
@@ -359,13 +362,17 @@ class SMSNotification:
         notification_type = self.notification_type
         obj = None
         if notification_type == NotificationAction.APPOINTMENT_ACCEPTED:
-            obj = DynamicTemplates.objects.filter(template_name="Confirmation_IPD_OPD").first()
-        elif notification_type == NotificationAction.APPOINTMENT_BOOKED and (not user or user.user_type == User.DOCTOR):
+            obj = DynamicTemplates.objects.filter(template_name="Confirmation_IPD_OPD", approved=True).first()
+        elif notification_type == NotificationAction.APPOINTMENT_BOOKED and (not user or user.user_type == User.DOCTOR) and (self.context.get('payment_type') == 2):
             obj = DynamicTemplates.objects.filter(template_name="Booking_Provider_Pay_at_clinic", approved=True).first()
+        elif notification_type == NotificationAction.APPOINTMENT_BOOKED and (not user or user.user_type == User.DOCTOR) and (self.context.get('payment_type') == 1 or self.context.get('payment_type') == 3):
+            obj = DynamicTemplates.objects.filter(template_name="Booking_Provider_SMS_OPD_Insurance_And_Prepaid", approved=True).first()
         elif notification_type == NotificationAction.APPOINTMENT_BOOKED and user and user.user_type == User.CONSUMER and user.recent_opd_appointment.first().payment_type == 2:
-            obj = DynamicTemplates.objects.filter(template_name="Booking_customer_pay_at_clinic").first()
+            obj = DynamicTemplates.objects.filter(template_name="Booking_customer_pay_at_clinic", approved=True).first()
         elif notification_type == NotificationAction.OPD_OTP_BEFORE_APPOINTMENT:
-            obj = DynamicTemplates.objects.filter(template_name="Reminder_appointment").first()
+            obj = DynamicTemplates.objects.filter(template_name="Reminder_appointment", approved=True).first()
+        elif notification_type == NotificationAction.SEND_LENSFIT_COUPON:
+            obj = DynamicTemplates.objects.filter(template_name="SEND_LENSFIT_COUPON", approved=True).first()
 
         return obj
 
@@ -499,12 +506,12 @@ class SMSNotification:
                 if not phone_number:
                     phone_number = user.phone_number
 
-                if user and user.user_type == User.DOCTOR:
-                    context, click_login_token_obj = self.save_token_to_context(context, receiver['user'])
-                    click_login_token_objects.append(click_login_token_obj)
-                elif context.get('provider_login_url'):
-                    context.pop('provider_login_url')
-                ClickLoginToken.objects.bulk_create(click_login_token_objects)
+                # if user and user.user_type == User.DOCTOR:
+                #     context, click_login_token_obj = self.save_token_to_context(context, receiver['user'])
+                #     click_login_token_objects.append(click_login_token_obj)
+                # elif context.get('provider_login_url'):
+                #     context.pop('provider_login_url')
+                # ClickLoginToken.objects.bulk_create(click_login_token_objects)
 
                 instance = context.get('instance')
 
@@ -996,6 +1003,8 @@ class EMAILNotification:
         obj = None
         if notification_type == NotificationAction.APPOINTMENT_ACCEPTED or notification_type == NotificationAction.OPD_OTP_BEFORE_APPOINTMENT:
             obj = DynamicTemplates.objects.filter(template_type=DynamicTemplates.TemplateType.EMAIL, template_name="").first()
+        if notification_type == NotificationAction.SEND_LENSFIT_COUPON:
+            obj = DynamicTemplates.objects.filter(template_type=DynamicTemplates.TemplateType.EMAIL, template_name="SEND_LENSFIT_COUPON_EMAIL", approved=True).first()
 
         return obj
 
@@ -1193,6 +1202,9 @@ class EMAILNotification:
         elif notification_type == NotificationAction.COD_TO_PREPAID and (not user or user.user_type == User.DOCTOR):
             body_template = "email/cod_to_prepaid_/body.html"
             subject_template = "email/cod_to_prepaid_patient/subject.txt"
+        #elif notification_type == NotificationAction.SEND_LENSFIT_COUPON and user and user.user_type == User.CONSUMER:
+        #    body_template = "email/lensfit_coupon/body.html"
+        #    subject_template = "email/lensfit_coupon/subject.txt"
         return subject_template, body_template
 
     def trigger(self, receiver, template, context):
@@ -1297,9 +1309,9 @@ class EMAILNotification:
 
     def send(self, receivers):
 
-        # dispatch_response, receivers = self.dispatch(receivers)
-        # if dispatch_response:
-        #     return
+        dispatch_response, receivers = self.dispatch(receivers)
+        if dispatch_response:
+            return
 
         context = self.context
         if not context:
@@ -1309,24 +1321,44 @@ class EMAILNotification:
             if template:
                 self.trigger(receiver, template, context)
 
-    # def dispatch(self, receivers):
-    #     context = self.context
-    #     if not context:
-    #         return None, receivers
-    #
-    #     receivers_left = list()
-    #
-    #     for receiver in receivers:
-    #         obj = self.get_template_object(receiver.get('user'))
-    #         if not obj:
-    #             receivers_left.append(receiver)
-    #         else:
-    #             pass
-    #
-    #     if not receivers_left:
-    #         return True, receivers_left
-    #
-    #     return False, receivers_left
+    def dispatch(self, receivers):
+        context = self.context
+        if not context:
+            return None, receivers
+
+        receivers_left = list()
+
+        for receiver in receivers:
+            obj = self.get_template_object(receiver.get('user'))
+            if not obj:
+                receivers_left.append(receiver)
+            else:
+                email = receiver.get('email')
+                context = copy.deepcopy(context)
+                instance = context.get('instance', None)
+                receiver_user = receiver.get('user')
+
+                send_without_email = False
+                if (instance.__class__.__name__ == LabAppointment.__name__) and (
+                        not receiver_user or receiver_user.user_type == User.DOCTOR):
+                    if not instance.lab.open_for_communications():
+                        email = None
+                        send_without_email = True
+
+                if (instance.__class__.__name__ == OpdAppointment.__name__) and (
+                        not receiver_user or receiver_user.user_type == User.DOCTOR):
+                    if instance.hospital and not instance.hospital.open_for_communications():
+                        email = None
+                        send_without_email = True
+
+                if email or send_without_email:
+                    recipient_obj = RecipientEmail(obj.recipient)
+                    obj.send_notification(context, recipient_obj, self.notification_type, user=receiver_user)
+
+        if not receivers_left:
+            return True, receivers_left
+
+        return False, receivers_left
 
 
 class APPNotification:
@@ -1406,8 +1438,9 @@ class PUSHNotification:
 
 class OpdNotification(Notification):
 
-    def __init__(self, appointment, notification_type=None):
+    def __init__(self, appointment, notification_type=None, extra={}):
         self.appointment = appointment
+        self.extra = extra
         if notification_type:
             self.notification_type = notification_type
         else:
@@ -1448,11 +1481,16 @@ class OpdNotification(Notification):
             token_object['token'].decode("utf-8"))
         opd_appointment_complete_url = booking_url + "&callbackurl=opd/appointment/{}?complete=true".format(
             self.appointment.id)
+        appointment_type = 'opd'
+        url_key = get_random_string(length=ClickLoginToken.URL_KEY_LENGTH)
+        provider_login_url = settings.PROVIDER_APP_DOMAIN + "/sms/login?key=" + url_key + \
+                             "&url=/sms-redirect/" + appointment_type + "/appointment/" + str(appointment_id)
         opd_appointment_feedback_url = booking_url + "&callbackurl=opd/appointment/{}".format(self.appointment.id)
         reschdule_appointment_bypass_url = booking_url + "&callbackurl=opd/doctor/{}/{}/book?reschedule={}".format(
             self.appointment.doctor.id, self.appointment.hospital.id, self.appointment.id)
         # hospitals_not_required_unique_code = set(json.loads(settings.HOSPITALS_NOT_REQUIRED_UNIQUE_CODE))
         credit_letter_url = self.appointment.get_credit_letter_url()
+        lensfit_coupon = self.extra.get('lensfit_coupon')
         context = {
             "doctor_name": doctor_name,
             "hospital_address": hospital_address,
@@ -1490,7 +1528,9 @@ class OpdNotification(Notification):
             "is_payment_type_cod": self.appointment.is_payment_type_cod(),
             "instance_otp": self.appointment.otp,
             "is_credit_letter_required_for_appointment": self.appointment.is_credit_letter_required_for_appointment(),
-            "is_otp_required": self.appointment.is_otp_required_wrt_hospitals()
+            "is_otp_required": self.appointment.is_otp_required_wrt_hospitals(),
+            "lensfit_coupon": lensfit_coupon,
+	    "provider_login_url": generate_short_url(provider_login_url)
         }
         return context
 
@@ -1519,7 +1559,8 @@ class OpdNotification(Notification):
         elif notification_type == NotificationAction.DOCPRIME_APPOINTMENT_REMINDER_PROVIDER_SMS:
             sms_notification = SMSNotification(notification_type, context)
             sms_notification.send(all_receivers.get('sms_receivers', []))
-        elif notification_type == NotificationAction.COD_TO_PREPAID:
+        elif notification_type == NotificationAction.COD_TO_PREPAID or \
+                notification_type == NotificationAction.SEND_LENSFIT_COUPON:
             email_notification = EMAILNotification(notification_type, context)
             sms_notification = SMSNotification(notification_type, context)
             # whtsapp_notification = WHTSAPPNotification(notification_type, context) # TODO : SHASHANK_SINGH dont know how!!
@@ -1559,6 +1600,7 @@ class OpdNotification(Notification):
                                  NotificationAction.OPD_FEEDBACK_AFTER_APPOINTMENT,
                                  NotificationAction.COD_TO_PREPAID,
                                  NotificationAction.COD_TO_PREPAID_REQUEST,
+                                 NotificationAction.SEND_LENSFIT_COUPON
                                  ]:
             receivers.append(instance.user)
         elif notification_type in [NotificationAction.APPOINTMENT_RESCHEDULED_BY_PATIENT,
@@ -1621,8 +1663,9 @@ class OpdNotification(Notification):
 
 class LabNotification(Notification):
 
-    def __init__(self, appointment, notification_type=None):
+    def __init__(self, appointment, notification_type=None, extra={}):
         self.appointment = appointment
+        self.extra = extra
         if notification_type:
             self.notification_type = notification_type
         else:
@@ -1645,7 +1688,7 @@ class LabNotification(Notification):
         email_banners_html = EmailBanner.get_banner(instance, self.notification_type)
         # email_banners_html = UserConfig.objects.filter(key__iexact="email_banners") \
         #             .annotate(html_code=KeyTransform('html_code', 'data')).values_list('html_code', flat=True).first()
-
+        lensfit_coupon = self.extra.get('lensfit_coupon')
 
         for test in tests:
             test['mrp'] = str(test['mrp'])
@@ -1690,7 +1733,8 @@ class LabNotification(Notification):
             "reschedule_appointment_bypass_url": generate_short_url(reschedule_appointment_bypass_url),
             "is_thyrocare_report": is_thyrocare_report,
             "chat_url": chat_url,
-            "show_amounts": bool(self.appointment.payment_type != OpdAppointment.INSURANCE)
+            "show_amounts": bool(self.appointment.payment_type != OpdAppointment.INSURANCE),
+            "lensfit_coupon": lensfit_coupon
         }
         return context
 
@@ -1720,6 +1764,11 @@ class LabNotification(Notification):
             sms_notification.send(all_receivers.get('sms_receivers', []))
             whtsapp_notification = WHTSAPPNotification(notification_type, context)
             whtsapp_notification.send(all_receivers.get('sms_receivers', []))
+        elif notification_type == NotificationAction.SEND_LENSFIT_COUPON:
+            email_notification = EMAILNotification(notification_type, context)
+            sms_notification = SMSNotification(notification_type, context)
+            email_notification.send(all_receivers.get('email_receivers', []))
+            sms_notification.send(all_receivers.get('sms_receivers', []))
         else:
             email_notification = EMAILNotification(notification_type, context)
             sms_notification = SMSNotification(notification_type, context)
@@ -1750,7 +1799,9 @@ class LabNotification(Notification):
                                  NotificationAction.LAB_CONFIRMATION_CHECK_AFTER_APPOINTMENT,
                                  NotificationAction.LAB_CONFIRMATION_SECOND_CHECK_AFTER_APPOINTMENT,
                                  NotificationAction.LAB_FEEDBACK_AFTER_APPOINTMENT,
-                                 NotificationAction.LAB_REPORT_SEND_VIA_CRM]:
+                                 NotificationAction.LAB_REPORT_SEND_VIA_CRM,
+                                 NotificationAction.SEND_LENSFIT_COUPON
+                                 ]:
             receivers.append(instance.user)
         elif notification_type in [NotificationAction.LAB_APPOINTMENT_RESCHEDULED_BY_PATIENT,
                                    NotificationAction.LAB_APPOINTMENT_BOOKED,
