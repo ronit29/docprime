@@ -38,7 +38,7 @@ from ondoc.diagnostic.models import (LabTiming, LabImage,
                                      LabTestRecommendedCategoryMapping, LabTestGroupTiming, LabTestGroupMapping,
                                      TestParameterChat, LabTestThresholds, LabTestCategoryUrls,
                                      LabTestCategoryLandingURLS)
-from ondoc.integrations.models import IntegratorHistory, IntegratorLabCode
+from ondoc.integrations.models import IntegratorHistory
 from ondoc.notification.models import EmailNotification, NotificationAction
 from ondoc.prescription.models import AppointmentPrescription
 from .common import *
@@ -561,13 +561,6 @@ class LabTestGroupTimingInline(admin.TabularInline):
     show_change_link = False
 
 
-class LabCodeInline(admin.TabularInline):
-    model = IntegratorLabCode
-    extra = 0
-    can_delete = True
-    show_change_link = False
-
-
 class LabAdmin(ImportExportMixin, admin.GeoModelAdmin, CompareVersionAdmin, ActionAdmin, QCPemAdmin):
     change_list_template = 'superuser_import_export.html'
     resource_class = LabResource
@@ -616,7 +609,7 @@ class LabAdmin(ImportExportMixin, admin.GeoModelAdmin, CompareVersionAdmin, Acti
     inlines = [LabDoctorInline, LabServiceInline, LabDoctorAvailabilityInline, LabCertificationInline, LabAwardInline,
                LabAccreditationInline,
                LabManagerInline, LabTimingInline, LabImageInline, LabDocumentInline, HomePickupChargesInline,
-               GenericLabAdminInline, AssociatedMerchantInline, LabTestGroupTimingInline, RemarkInline, LabCodeInline]
+               GenericLabAdminInline, AssociatedMerchantInline, LabTestGroupTimingInline, RemarkInline]
     # autocomplete_fields = ['lab_pricing_group', ]
 
     map_width = 200
@@ -1757,7 +1750,6 @@ class TestParameterChatAdmin(admin.ModelAdmin):
     form = TestParameterChatForm
     list_display = ['test_name']
     readonly_fields = ('test_name',)
-
 
 
 class LabTestCategoryLandingURLSInline(admin.TabularInline):

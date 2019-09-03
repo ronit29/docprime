@@ -354,14 +354,3 @@ class IntegratorTestCityMapping(TimeStampedModel):
 
     class Meta:
         db_table = 'integrator_test_city_mapping'
-
-
-class IntegratorLabCode(TimeStampedModel):
-    from ondoc.diagnostic.models import Lab
-    lab_code = models.CharField(max_length=30, null=True, blank=True)
-    warehouse_code = models.CharField(max_length=50, null=True, blank=True)
-    lab = models.ForeignKey(Lab, null=False, blank=False, related_name='lab_code', on_delete=models.DO_NOTHING)
-
-    class Meta:
-        db_table = 'integrator_lab_code'
-
