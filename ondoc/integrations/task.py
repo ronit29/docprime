@@ -159,7 +159,7 @@ def push_appointment_to_spo(self, data):
                 logger.error("[ERROR-SPO] Appointment could not be published to the SPO system - " + str(json.dumps(request_data)))
                 logger.info("[ERROR-SPO] %s", resp_data.get('errorDetails', []))
             else:
-                logger.error("Response = ", + str(resp_data))
+                logger.error("Response = " + str(resp_data))
                 lead_id = resp_data.get('leadId', '')
                 logger.error("[SUCCESS-SPO] Lead ID is- " + str(lead_id))
                 if lead_id:
