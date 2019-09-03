@@ -3,8 +3,10 @@ from collections import defaultdict
 from rest_framework.fields import NullBooleanField
 from rest_framework.renderers import JSONRenderer
 
+from ondoc.api.v1.doctor.serializers import CommonConditionsSerializer
 from ondoc.authentication.models import UserProfile
 from ondoc.authentication.models import User
+from ondoc.doctor.models import Hospital
 from ondoc.plus.models import (PlusProposer, PlusPlans, PlusThreshold, PlusMembers, PlusUser)
 from ondoc.plus.enums import PlanParametersEnum
 from ondoc.account import models as account_models
@@ -35,7 +37,12 @@ class PlusPlansSerializer(serializers.ModelSerializer):
         request = self.context.get('request')
         if not request:
             return None
-        return PlusUser.get_enabled_hospitals(request=request)
+
+        serializer = CommonConditionsSerializer(data=request.query_params)
+        serializer.is_valid(raise_exception=True)
+        validated_data = serializer.validated_data
+        top_hospitals_data = Hospital.get_top_hospitals_data(request, validated_data.get('lat'), validated_data.get('long'))
+        return top_hospitals_data
 
     def get_worth(self, obj):
         data = {}

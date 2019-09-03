@@ -1056,7 +1056,7 @@ def push_plus_lead_to_matrix(self, data):
                 'PolicyPaymentSTATUS': 0,
                 "ProposerName": None,
                 "PolicyId": None,
-                "InsurancePlanPurchased": plan.plan_ame if plan else None,
+                "InsurancePlanPurchased": plan.plan_name if plan else None,
                 "PurchaseDate": None,
                 "ExpirationDate": None,
                 "COILink": None,
