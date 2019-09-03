@@ -2815,11 +2815,14 @@ class OpdAppointment(auth_model.TimeStampedModel, CouponsMixin, OpdAppointmentIn
             try:
                 create_ipd_lead_from_opd_appointment.apply_async(({'obj_id': self.id},),)
                                                                  # eta=timezone.now() + timezone.timedelta(hours=1))
-                if self.send_cod_to_prepaid_request():
-                    notification_tasks.send_opd_notifications_refactored.apply_async(
-                        (self.id, NotificationAction.COD_TO_PREPAID_REQUEST), countdown=5)
+                # if self.send_cod_to_prepaid_request():
+                #     notification_tasks.send_opd_notifications_refactored.apply_async(
+                #         (self.id, NotificationAction.COD_TO_PREPAID_REQUEST), countdown=5)
             except Exception as e:
                 logger.error(str(e))
+        if self.send_cod_to_prepaid_request():
+            notification_tasks.send_opd_notifications_refactored.apply_async(
+                (self.id, NotificationAction.COD_TO_PREPAID_REQUEST), countdown=5)
         if push_to_matrix:
         # Push the appointment data to the matrix .
             try:
