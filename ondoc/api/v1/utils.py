@@ -2025,7 +2025,7 @@ def rc_user_login(auth_token, auth_user_id, username):
 
 def rc_group_create(auth_token, auth_user_id, patient, rc_doctor):
     members = [patient.rc_user.username, rc_doctor.username]
-    group_name = str(patient.id) + '_' + str(rc_doctor.doctor.id)
+    group_name = str(rc_doctor.doctor.id) + '_' + str(patient.id)
     group_create_response = requests.post(settings.ROCKETCHAT_SERVER + '/api/v1/groups.create',
                                           headers={'X-Auth-Token': auth_token,
                                                    'X-User-Id': auth_user_id,
