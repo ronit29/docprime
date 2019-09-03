@@ -219,6 +219,8 @@ class CreateAppointmentSerializer(serializers.Serializer):
     coupon_code = serializers.ListField(child=serializers.CharField(), required=False, default=[])
     procedure_ids = serializers.ListField(child=serializers.PrimaryKeyRelatedField(queryset=Procedure.objects.filter()), required=False)
     use_wallet = serializers.BooleanField(required=False)
+    from_app = serializers.BooleanField(required=False)
+    from_web = serializers.BooleanField(required=False)
     cart_item = serializers.PrimaryKeyRelatedField(queryset=Cart.objects.all(), required=False, allow_null=True)
     # procedure_category_ids = serializers.ListField(child=serializers.PrimaryKeyRelatedField(queryset=ProcedureCategory.objects.filter(is_live=True)), required=False, default=[])
     # time_slot_end = serializers.DateTimeField()

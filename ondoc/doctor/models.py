@@ -2669,6 +2669,7 @@ class OpdAppointment(auth_model.TimeStampedModel, CouponsMixin, OpdAppointmentIn
             "random_coupons": appointment_data.pop("coupon_data", [])
         }
         procedure_details = appointment_data.pop('extra_details', [])
+        
         app_obj = cls.objects.create(**appointment_data)
         if procedure_details:
             procedure_to_be_added = []

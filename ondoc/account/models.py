@@ -539,7 +539,8 @@ class Order(TimeStampedModel):
         from ondoc.matrix.tasks import push_order_to_matrix
 
         fulfillment_data = cls.transfrom_cart_items(request, cart_items)
-
+        fulfillment_data['from_app'] = request.data.get('from_app', None)
+        fulfillment_data['from_web'] = request.data.get('from_web', None)
         user = request.user
         resp = {}
         balance = 0
