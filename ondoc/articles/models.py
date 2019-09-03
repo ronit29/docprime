@@ -47,7 +47,7 @@ class Article(TimeStampedModel, CreatedByModel):
                                              through_fields=('article', 'linked_article'))
     pharmeasy_url = models.CharField(blank=False, null=True, max_length=1000, unique=True)
     pharmeasy_product_id = models.PositiveIntegerField(null=True)
-    is_visit = models.NullBooleanField()
+    is_widget = models.NullBooleanField()
 
     def get_absolute_url(self):
         content_type = ContentType.objects.get_for_model(self)
