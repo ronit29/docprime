@@ -3428,14 +3428,16 @@ class OpdAppointment(auth_model.TimeStampedModel, CouponsMixin, OpdAppointmentIn
         # policy_details = self.get_matrix_policy_data()
         appointment_details = self.get_matrix_appointment_data(order)
         lead_source = 'DocPrime'
+        lead_id = self.matrix_lead_id if self.matrix_lead_id else 0
         if self.is_retail_booking():
             product_id = 8
             sub_product_id = 0
             lead_source = 'RetailBooking'
+            lead_id = 0
 
         request_data = {
             'DocPrimeUserId': self.user.id,
-            'LeadID': self.matrix_lead_id if self.matrix_lead_id else 0,
+            'LeadID': lead_id,
             'Name': self.profile.name,
             'PrimaryNo': self.user.phone_number,
             # 'LeadSource': 'DocPrime',
