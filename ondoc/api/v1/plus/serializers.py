@@ -41,7 +41,9 @@ class PlusPlansSerializer(serializers.ModelSerializer):
         data = {}
         plan_parameters = obj.plan_parameters.filter(parameter__key__in=[PlanParametersEnum.DOCTOR_CONSULT_AMOUNT,
                                                        PlanParametersEnum.ONLINE_CHAT_AMOUNT,
-                                                       PlanParametersEnum.HEALTH_CHECKUPS_AMOUNT])
+                                                       PlanParametersEnum.HEALTH_CHECKUPS_AMOUNT,
+                                                       PlanParametersEnum.MEMBERS_COVERED_IN_PACKAGE,
+                                                       PlanParametersEnum.TOTAL_TEST_COVERED_IN_PACKAGE])
 
         for pp in plan_parameters:
             data[pp.parameter.key.lower()] = pp.value

@@ -212,14 +212,14 @@ class PlusOrderViewSet(viewsets.GenericViewSet):
                     # visitor_info=visitor_info
                 )
 
-                insurance_object, wallet_amount, cashback_amount = order.process_order()
+                plus_object, wallet_amount, cashback_amount = order.process_order()
                 resp["status"] = 1
                 resp["payment_required"] = False
-                resp["data"] = {'id': insurance_object.id}
+                resp["data"] = {'id': plus_object.id}
                 resp["data"] = {
                     "orderId": order.id,
                     "type": "insurance",
-                    "id": insurance_object.id if insurance_object else None
+                    "id": plus_object.id if plus_object else None
                 }
         else:
             return Response(status=status.HTTP_404_NOT_FOUND)

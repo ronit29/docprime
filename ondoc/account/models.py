@@ -1269,7 +1269,7 @@ class ConsumerAccount(TimeStampedModel):
         return ctx_obj
 
     def debit_schedule(self, appointment_obj, product_id, amount):
-        if product_id == Order.SUBSCRIPTION_PLAN_PRODUCT_ID or product_id == Order.INSURANCE_PRODUCT_ID:
+        if product_id == Order.SUBSCRIPTION_PLAN_PRODUCT_ID or product_id == Order.INSURANCE_PRODUCT_ID or product_id == Order.VIP_PRODUCT_ID:
             cashback_deducted = 0
         else:
             cashback_deducted = min(self.cashback, amount)

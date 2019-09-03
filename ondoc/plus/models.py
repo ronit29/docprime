@@ -12,6 +12,7 @@ from ondoc.common.helper import Choices
 import json
 from django.db import transaction
 from ondoc.notification.tasks import push_plus_lead_to_matrix
+from .enums import PlanParametersEnum
 from datetime import datetime
 from django.utils.timezone import utc
 
@@ -89,7 +90,7 @@ class PlusPlans(auth_model.TimeStampedModel, LiveMixin):
 
 
 class PlusPlanParameters(auth_model.TimeStampedModel):
-    key = models.CharField(max_length=100, null=False, blank=False)
+    key = models.CharField(max_length=100, null=False, blank=False, choices=PlanParametersEnum.as_choices())
     details = models.CharField(max_length=500, null=False, blank=False)
 
     def __str__(self):
@@ -304,12 +305,12 @@ class PlusTransaction(auth_model.TimeStampedModel):
 
         super().save(*args, **kwargs)
 
-        transaction_amount = int(self.amount)
-        if self.transaction_type == self.DEBIT:
-            transaction_amount = -1*transaction_amount
+        # transaction_amount = int(self.amount)
+        # if self.transaction_type == self.DEBIT:
+        #     transaction_amount = -1*transaction_amount
 
-        master_policy_obj = self.user_insurance.master_policy
-        account_id = master_policy_obj.insurer_account.id
+        # master_policy_obj = self.user_insurance.master_policy
+        # account_id = master_policy_obj.insurer_account.id
         # insurer_account = InsurerAccount.objects.select_for_update().get(id=account_id)
         # insurer_account.current_float += transaction_amount
         # insurer_account.save()
@@ -357,27 +358,26 @@ class PlusMembers(auth_model.TimeStampedModel):
     last_name = models.CharField(max_length=50, null=True)
     dob = models.DateField(blank=False, null=False)
     email = models.EmailField(max_length=100, null=True)
-    relation = models.CharField(max_length=50, choices=Relations.as_choices(), default=None)
+    relation = models.CharField(max_length=50, choices=Relations.as_choices(), default=None, null=True)
     pincode = models.PositiveIntegerField(default=None)
     address = models.TextField(default=None)
-    gender = models.CharField(max_length=50, choices=GENDER_CHOICES, default=None)
+    gender = models.CharField(max_length=50, choices=GENDER_CHOICES, default=None, null=True)
     phone_number = models.BigIntegerField(blank=True, null=True,
                                           validators=[MaxValueValidator(9999999999), MinValueValidator(1000000000)])
-    profile = models.ForeignKey(auth_model.UserProfile, related_name="plus_member", on_delete=models.SET_NULL, null=True)
+    profile = models.ForeignKey(auth_model.UserProfile, related_name="plus_member", on_delete=models.CASCADE, null=True)
     title = models.CharField(max_length=20, choices=TITLE_TYPE_CHOICES, default=None)
     middle_name = models.CharField(max_length=50, null=True)
-    town = models.CharField(max_length=100, null=False)
-    district = models.CharField(max_length=100, null=False)
-    state = models.CharField(max_length=100, null=False)
-    state_code = models.CharField(max_length=10, default='')
+    town = models.CharField(max_length=100, null=True, default=None)
+    district = models.CharField(max_length=100, null=True, default=None)
+    state = models.CharField(max_length=100, null=True, default=None)
+    state_code = models.CharField(max_length=10, default=None, null=True)
     plus_user = models.ForeignKey(PlusUser, related_name="plus_members", on_delete=models.DO_NOTHING, null=False, default=None)
     city_code = models.CharField(max_length=10, blank=True, null=True, default='')
-    district_code = models.CharField(max_length=10, blank=True, null=True, default='')
+    district_code = models.CharField(max_length=10, blank=True, null=True, default=None)
     is_primary_user = models.NullBooleanField()
 
     @classmethod
     def create_plus_members(cls, plus_user_obj):
-        import json
         members = plus_user_obj.raw_plus_member
         members = json.loads(members)
         for member in members:
@@ -406,7 +406,6 @@ class PlusLead(auth_model.TimeStampedModel):
         transaction.on_commit(lambda: self.after_commit())
 
     def after_commit(self):
-        pass
         push_plus_lead_to_matrix.apply_async(({'id': self.id}, ))
 
     # get seconds elapsed since creation time

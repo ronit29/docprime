@@ -1026,7 +1026,7 @@ def push_plus_lead_to_matrix(self, data):
         extras = plus_lead_obj.extras
         plan_id = extras.get('plan_id', None)
 
-        lead_source = "InsuranceOPD"  #TODO change
+        lead_source = "Docprime"
         lead_data = extras.get('lead_data')
         if lead_data:
             provided_lead_source = lead_data.get('source')
@@ -1050,18 +1050,18 @@ def push_plus_lead_to_matrix(self, data):
             'UtmTerm': extras.get('utm_term', ''),
             'ProductId': 11,
             'SubProductId': 0,
-            # 'PolicyDetails': {
-            #     "ProposalNo": None,
-            #     "BookingId": None,
-            #     'PolicyPaymentSTATUS': 0,
-            #     "ProposerName": None,
-            #     "PolicyId": None,
-            #     "InsurancePlanPurchased": plan.plan_ame if plan else None,
-            #     "PurchaseDate": None,
-            #     "ExpirationDate": None,
-            #     "COILink": None,
-            #     "PeopleCovered": 0
-            # }
+            'PolicyDetails': {
+                "ProposalNo": None,
+                "BookingId": None,
+                'PolicyPaymentSTATUS': 0,
+                "ProposerName": None,
+                "PolicyId": None,
+                "InsurancePlanPurchased": plan.plan_ame if plan else None,
+                "PurchaseDate": None,
+                "ExpirationDate": None,
+                "COILink": None,
+                "PeopleCovered": 0
+            }
         }
 
         url = settings.MATRIX_API_URL
