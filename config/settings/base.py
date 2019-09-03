@@ -189,6 +189,7 @@ LOCAL_APPS = (
     'ondoc.bookinganalytics',
     'ondoc.prescription',
     'ondoc.corporate_booking',
+    'ondoc.plus',
 )
 
 INSTALLED_APPS = DJANGO_APPS + THIRD_PARTY_APPS + LOCAL_APPS
@@ -422,6 +423,7 @@ SETTLEMENT_DETAILS_API=env('SETTLEMENT_DETAILS_API', default=None)
 SETTLEMENT_AUTH=env('SETTLEMENT_AUTH', default=None)
 THYROCARE_NAME_PARAM_REQUIRED_TESTS = env('THYROCARE_NAME_PARAM_REQUIRED_TESTS', default='')
 IS_INSURANCE_ACTIVE = env.bool('IS_INSURANCE_ACTIVE')
+IS_PLUS_ACTIVE = env.bool('IS_PLUS_ACTIVE')
 
 
 ANYMAIL = {
