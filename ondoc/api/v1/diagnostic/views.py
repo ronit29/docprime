@@ -2,7 +2,7 @@ import json
 import operator
 from copy import deepcopy
 from itertools import groupby
-from pyodbc import Date
+# from pyodbc import Date
 
 from ondoc.api.v1.diagnostic.serializers import CustomLabTestPackageSerializer, SearchLabListSerializer
 from ondoc.api.v1.doctor.serializers import CommaSepratedToListField

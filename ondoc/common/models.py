@@ -6,7 +6,7 @@ import string
 import random
 from django.core.files.uploadedfile import SimpleUploadedFile, InMemoryUploadedFile
 from weasyprint.fonts import FontConfiguration
-from hardcopy import bytestring_to_pdf
+# from hardcopy import bytestring_to_pdf
 import io
 #from tempfile import NamedTemporaryFile
 from django.core.files.storage import default_storage

@@ -1,5 +1,5 @@
 import operator
-from pyodbc import Date
+
 
 from django.contrib.gis.geos import Point
 from django.utils import timezone
