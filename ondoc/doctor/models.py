@@ -2811,18 +2811,15 @@ class OpdAppointment(auth_model.TimeStampedModel, CouponsMixin, OpdAppointmentIn
         return result
 
     def after_commit_tasks(self, old_instance, push_to_matrix):
-        if old_instance is None:
+        if old_instance and old_instance.payment_type == OpdAppointment.COD:
             try:
                 create_ipd_lead_from_opd_appointment.apply_async(({'obj_id': self.id},),)
                                                                  # eta=timezone.now() + timezone.timedelta(hours=1))
-                # if self.send_cod_to_prepaid_request():
-                #     notification_tasks.send_opd_notifications_refactored.apply_async(
-                #         (self.id, NotificationAction.COD_TO_PREPAID_REQUEST), countdown=5)
+                if self.send_cod_to_prepaid_request():
+                    notification_tasks.send_opd_notifications_refactored.apply_async(
+                        (self.id, NotificationAction.COD_TO_PREPAID_REQUEST), countdown=5)
             except Exception as e:
                 logger.error(str(e))
-        if self.send_cod_to_prepaid_request():
-            notification_tasks.send_opd_notifications_refactored.apply_async(
-                (self.id, NotificationAction.COD_TO_PREPAID_REQUEST), countdown=5)
         if push_to_matrix:
         # Push the appointment data to the matrix .
             try:
