@@ -492,7 +492,7 @@ def payment_details(request, order):
         plus_plan_id = order.action_data.get('plus_plan')
         plus_plan = PlusPlans.objects.filter(id=plus_plan_id).first()
         if not plus_plan:
-            raise Exception('Invalid pg transaction as insurer plan is not found.')
+            raise Exception('Invalid pg transaction as plus plan is not found.')
         proposer = plus_plan.proposer
         # insurer_code = insurer.insurer_merchant_code
 
