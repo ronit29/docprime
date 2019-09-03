@@ -262,6 +262,7 @@ class Lab(TimeStampedModel, CreatedByModel, QCModel, SearchKey, WelcomeCallingDo
     search_distance = models.FloatField(default=20000)
     is_ipd_lab = models.BooleanField(default=False)
     related_hospital = models.ForeignKey(Hospital, null=True, blank=True, on_delete=models.SET_NULL, related_name='ipd_hospital')
+    is_b2b = models.BooleanField(default=False)
 
     def __str__(self):
         return self.name
