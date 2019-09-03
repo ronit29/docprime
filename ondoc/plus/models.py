@@ -212,9 +212,9 @@ class PlusUser(auth_model.TimeStampedModel):
                 if profile.user_id == user.id:
                     profile.name = name
                     profile.email = member['email']
-                    profile.gender = member['gender']
+                    # profile.gender = member['gender']
                     profile.dob = member['dob']
-                    if member['relation'] == "self":
+                    if member['relation'] == PlusMembers.Relations.SELF:
                         profile.is_default_user = True
                     else:
                         profile.is_default_user = False
@@ -223,10 +223,10 @@ class PlusUser(auth_model.TimeStampedModel):
                 profile = profile.id
         # Create Profile if not exist with name or not exist in profile id from request
         else:
-            data = {'name': name, 'email': member['email'], 'gender': member['gender'], 'user_id': user.id,
+            data = {'name': name, 'email': member['email'], 'user_id': user.id,
                     'dob': member['dob'], 'is_default_user': False, 'is_otp_verified': False,
                     'phone_number': user.phone_number}
-            if member['is_primary_user']:
+            if member['relation'] == PlusMembers.Relations.SELF:
                 data['is_default_user'] = True
 
             member_profile = UserProfile.objects.create(**data)
@@ -261,12 +261,12 @@ class PlusUser(auth_model.TimeStampedModel):
             # member['profile'] = member['profile'].id if member.get('profile') else None
         plus_data['insured_members'] = members
 
-        plus_membership_obj = cls.objects.create(plan=plus_data['insurance_plan'],
+        plus_membership_obj = cls.objects.create(plan=plus_data['plus_plan'],
                                                           user=plus_data['user'],
-                                                          raw_plus_member=json.dumps(plus_data['insured_members']),
+                                                          raw_plus_member=json.dumps(plus_data['plus_members']),
                                                           purchase_date=plus_data['purchase_date'],
-                                                          expire_date=plus_data['expiry_date'],
-                                                          amount=plus_data['premium_amount'],
+                                                          expire_date=plus_data['expire_date'],
+                                                          amount=plus_data['amount'],
                                                           order=plus_data['order'])
 
         PlusMembers.create_plus_members(plus_membership_obj)

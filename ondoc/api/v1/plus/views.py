@@ -127,6 +127,7 @@ class PlusOrderViewSet(viewsets.GenericViewSet):
                     pre_insured_members['address'] = member['address']
                     pre_insured_members['pincode'] = member['pincode']
                     pre_insured_members['email'] = member['email']
+                    pre_insured_members['relation'] = member['relation']
                     pre_insured_members['profile'] = member.get('profile').id if member.get(
                         'profile') is not None else None
 

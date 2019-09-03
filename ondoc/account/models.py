@@ -341,7 +341,7 @@ class Order(TimeStampedModel):
             if user.active_plus_user:
                 raise Exception('User has already subscribed to VIP plan.' + str(user.id))
             if consumer_account.balance >= plus_user_data['amount']:
-                appointment_obj = PlusUser.create_plus_user(user_insurance_data, user)
+                appointment_obj = PlusUser.create_plus_user(plus_user_data, user)
                 amount = appointment_obj.amount
                 order_dict = {
                     "reference_id": appointment_obj.id,

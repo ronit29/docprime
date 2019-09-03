@@ -107,10 +107,10 @@ class PlusMembersSerializer(serializers.Serializer):
 
 class PlusUserSerializer(serializers.Serializer):
 
-    insurance_plan = serializers.PrimaryKeyRelatedField(queryset=PlusPlans.objects.all())
+    plus_plan = serializers.PrimaryKeyRelatedField(queryset=PlusPlans.objects.all())
     user = serializers.PrimaryKeyRelatedField(queryset=User.objects.all())
-    premium_amount = serializers.IntegerField()
-    insured_members = serializers.ListSerializer(child=PlusMemberListSerializer())
+    amount = serializers.IntegerField()
+    plus_members = serializers.ListSerializer(child=PlusMemberListSerializer())
     purchase_date = serializers.DateTimeField()
-    expiry_date = serializers.DateTimeField()
+    expire_date = serializers.DateTimeField()
     order = serializers.PrimaryKeyRelatedField(queryset=account_models.Order.objects.all())
