@@ -52,6 +52,7 @@ from ondoc.insurance.models import (Insurer, InsurancePlans, InsuranceThreshold,
                                     ThirdPartyAdministrator,
                                     UserBank, UserBankDocument, InsurerAccountTransfer, BankHolidays)
 from ondoc.notification.models import DynamicTemplates
+from ondoc.plus.models import PlusPlans, PlusPlanParameters
 
 from ondoc.procedure.models import Procedure, ProcedureCategory, CommonProcedureCategory, DoctorClinicProcedure, \
     ProcedureCategoryMapping, ProcedureToCategoryMapping, CommonProcedure, IpdProcedure, IpdProcedureFeatureMapping, \
@@ -469,6 +470,9 @@ class Command(BaseCommand):
 
         # Creating group for read only payout access
         self.create_qc_merchant_team()
+
+        # Creating group for plus
+        self.create_plus_group()
 
         #Create XL Data Export Group
         Group.objects.get_or_create(name=constants['DATA_EXPORT_GROUP'])
@@ -1149,4 +1153,17 @@ class Command(BaseCommand):
 
             group.permissions.add(*permissions)
 
+    def create_plus_group(self):
 
+        group, created = Group.objects.get_or_create(name=constants['PLUS_TEAM'])
+        group.permissions.clear()
+
+        content_types = ContentType.objects.get_for_models(PlusPlans, PlusPlanParameters)
+
+        for cl, ct in content_types.items():
+            permissions = Permission.objects.filter(
+                Q(content_type=ct),
+                Q(codename='add_' + ct.model) |
+                Q(codename='change_' + ct.model))
+
+            group.permissions.add(*permissions)

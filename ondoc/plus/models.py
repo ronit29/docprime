@@ -54,7 +54,7 @@ class PlusProposer(auth_model.TimeStampedModel):
 
     @property
     def get_active_plans(self):
-        return self.plus_plans.filter(is_live=True).order_by('total_allowed_members')
+        return self.plus_plans.filter(is_live=True).order_by('id')
 
     @property
     def get_all_plans(self):
