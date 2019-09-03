@@ -1534,10 +1534,10 @@ class OpdNotification(Notification):
         }
         return context
 
-    def send(self):
+    def send(self, old_instance):
         context = self.get_context()
         notification_type = self.notification_type
-        all_receivers = self.get_receivers()
+        all_receivers = self.get_receivers(old_instance)
         if notification_type == NotificationAction.DOCTOR_INVOICE:
             email_notification = EMAILNotification(notification_type, context)
             email_notification.send(all_receivers.get('email_receivers', []))
@@ -1579,7 +1579,7 @@ class OpdNotification(Notification):
             whtsapp_notification.send(all_receivers.get('sms_receivers', []))
             push_notification.send(all_receivers.get('push_receivers', []))
 
-    def get_receivers(self):
+    def get_receivers(self, old_instance):
         all_receivers = {}
         instance = self.appointment
         receivers = []
@@ -1608,6 +1608,8 @@ class OpdNotification(Notification):
                                    NotificationAction.APPOINTMENT_CANCELLED,
                                    NotificationAction.COD_TO_PREPAID]:
             spocs_to_be_communicated = doctor_spocs
+            if old_instance.status == OpdAppointment.CREATED and self.status == OpdAppointment.CANCELLED:
+                spocs_to_be_communicated = []
             doctor_spocs_app_recievers = GenericAdmin.get_appointment_admins(instance)
             # receivers.extend(doctor_spocs)
             receivers.append(instance.user)
@@ -1738,10 +1740,10 @@ class LabNotification(Notification):
         }
         return context
 
-    def send(self):
+    def send(self, old_instance):
         context = self.get_context()
         notification_type = self.notification_type
-        all_receivers = self.get_receivers()
+        all_receivers = self.get_receivers(old_instance)
 
         if notification_type == NotificationAction.LAB_INVOICE:
             email_notification = EMAILNotification(notification_type, context)
@@ -1781,7 +1783,7 @@ class LabNotification(Notification):
             app_notification.send(all_receivers.get('app_receivers', []))
             push_notification.send(all_receivers.get('push_receivers', []))
 
-    def get_receivers(self):
+    def get_receivers(self, old_instance):
         all_receivers = {}
         instance = self.appointment
         receivers = []
@@ -1807,6 +1809,9 @@ class LabNotification(Notification):
                                    NotificationAction.LAB_APPOINTMENT_BOOKED,
                                    NotificationAction.LAB_APPOINTMENT_CANCELLED]:
             lab_managers_to_be_communicated = lab_managers
+            if old_instance.status == OpdAppointment.CREATED and instance.status == OpdAppointment.CANCELLED:
+                lab_managers_to_be_communicated = []
+
             # receivers.extend(lab_spocs)
             receivers.append(instance.user)
         receivers = list(set(receivers))

@@ -36,7 +36,7 @@ logger = logging.getLogger(__name__)
 
 
 @task
-def send_lab_notifications_refactored(appointment_id):
+def send_lab_notifications_refactored(appointment_id, old_instance):
     from ondoc.diagnostic import models as lab_models
     from ondoc.communications.models import LabNotification
     instance = lab_models.LabAppointment.objects.filter(id=appointment_id).first()
@@ -58,7 +58,7 @@ def send_lab_notifications_refactored(appointment_id):
                 is_masking_done = generate_appointment_masknumber(
                     ({'type': 'LAB_APPOINTMENT', 'appointment': instance}))
         lab_notification = LabNotification(instance)
-        lab_notification.send()
+        lab_notification.send(old_instance)
     except Exception as e:
         logger.error(str(e))
 
@@ -157,7 +157,7 @@ def send_lab_notifications(appointment_id):
 
 
 @task()
-def send_opd_notifications_refactored(appointment_id, notification_type=None):
+def send_opd_notifications_refactored(appointment_id, old_instance, notification_type=None):
     from ondoc.doctor.models import OpdAppointment
     from ondoc.communications.models import OpdNotification
     instance = OpdAppointment.objects.filter(id=appointment_id).first()
@@ -180,7 +180,7 @@ def send_opd_notifications_refactored(appointment_id, notification_type=None):
     except Exception as e:
         logger.error(str(e))
     opd_notification = OpdNotification(instance, notification_type)
-    opd_notification.send()
+    opd_notification.send(old_instance)
 
 
 @task

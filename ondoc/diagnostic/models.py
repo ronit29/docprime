@@ -1910,8 +1910,9 @@ class LabAppointment(TimeStampedModel, CouponsMixin, LabAppointmentInvoiceMixin,
 
         if self.is_to_send_notification(old_instance):
             try:
-                notification_tasks.send_lab_notifications_refactored.apply_async(kwargs={'appointment_id': self.id},
-                                                                                 countdown=1)
+                notification_tasks.send_lab_notifications_refactored.apply_async(kwargs={'appointment_id': self.id,
+                                                                                         'old_instance': old_instance},
+                                                                                countdown=1)
                 # notification_tasks.send_lab_notifications_refactored(self.id)
                 # notification_tasks.send_lab_notifications.apply_async(kwargs={'appointment_id': self.id}, countdown=1)
             except Exception as e:
