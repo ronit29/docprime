@@ -2860,7 +2860,7 @@ class LabAppointment(TimeStampedModel, CouponsMixin, LabAppointmentInvoiceMixin,
         appointment_details['CityId'] = 0
         appointment_details['ProductId'] = product_id
         appointment_details['SubProductId'] = sub_product_id
-        # appointment_details['UtmTerm'] = self.spo_data.get('UtmTerm', '')
+        appointment_details['UtmTerm'] = self.spo_data.get('UtmTerm', '')
         appointment_details['UtmMedium'] = self.spo_data.get('UtmMedium', '')
         appointment_details['UtmCampaign'] = self.spo_data.get('UtmCampaign', '')
         appointment_details['UtmSource'] = self.spo_data.get('UtmSource', '')
