@@ -86,6 +86,7 @@ class IntegratorTestMappingAdmin(admin.ModelAdmin):
     fields = ('test', 'integrator_test_name', 'is_active', 'integrator_test_type', 'available_in_cities')
     form = IntegratorTestMappingForm
     readonly_fields = ('integrator_test_name', 'integrator_test_type', 'available_in_cities')
+    search_fields = ('integrator_test_name',)
 
     def integrator_test_type(self, obj):
         return obj.test_type
@@ -118,6 +119,7 @@ class IntegratorDoctorMappingsAdmin(admin.ModelAdmin):
                        'primary_contact', 'secondary_contact', 'emergency_contact', 'helpline_sos', 'integrator_class_name',
                        'integrator_doctor_id', 'integrator_hospital_id', 'integrator_doctor_data')
     autocomplete_fields = ['doctor_clinic']
+    search_fields = ('first_name', 'middle_name', 'last_name')
 
 
 class IntegratorHospitalMappingsAdmin(admin.ModelAdmin):
