@@ -1439,3 +1439,30 @@ def purchase_order_closing_counter_automation(purchase_order_id):
     if instance:
         if (instance.end_date < timezone.now().date()):
             instance.disable_cod_functionality()
+
+
+@task(bind=True)
+def send_lensfit_coupons(self, appointment_id, product_id, notification_type=None):
+    from ondoc.account.models import Order
+    from ondoc.doctor.models import OpdAppointment
+    from ondoc.diagnostic.models import LabAppointment
+    from ondoc.coupon.models import Coupon
+    from ondoc.communications.models import OpdNotification
+    from ondoc.communications.models import LabNotification
+    try:
+        if product_id == Order.DOCTOR_PRODUCT_ID:
+            cls = OpdAppointment
+        elif product_id == Order.LAB_PRODUCT_ID:
+            cls = LabAppointment
+        appointment_obj =cls.objects.filter(pk=appointment_id).first()
+        if not appointment_obj or not appointment_obj.user:
+            return
+        if appointment_obj.status == OpdAppointment.COMPLETED:
+            lensfit_coupon = Coupon.get_lensfit_coupon()
+            if product_id == Order.DOCTOR_PRODUCT_ID:
+                notification = OpdNotification(appointment_obj, notification_type, {"lensfit_coupon": lensfit_coupon})
+            elif product_id == Order.LAB_PRODUCT_ID:
+                notification = LabNotification(appointment_obj, notification_type, {"lensfit_coupon": lensfit_coupon})
+            notification.send()
+    except Exception as e:
+        logger.error(str(e))
