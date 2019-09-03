@@ -160,10 +160,13 @@ def push_appointment_to_spo(self, data):
                 logger.info("[ERROR-SPO] %s", resp_data.get('errorDetails', []))
             else:
                 lead_id = resp_data.get('leadId', '')
+                logger.error("[SUCCESS-SPO] Lead ID is- " + str(lead_id))
                 if lead_id:
+                    logger.error("[SUCCESS-SPO] Lead ID is- " + str(lead_id))
                     # save the appointment with the spo lead id.
                     qs = LabAppointment.objects.filter(id=appointment.id)
                     if qs:
                         qs.update(spo_lead_id=int(lead_id))
+        logger.error("[NO_SUCCESS-SPO] Lead ID")
     except Exception as e:
         logger.error("Error in Celery. Failed pushing Appointment to the SPO- " + str(e))
