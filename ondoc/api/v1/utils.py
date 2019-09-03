@@ -69,6 +69,18 @@ class CustomTemporaryUploadedFile(UploadedFile):
             pass
 
 
+def get_pdf_njs(html, filename):
+    params = {'html': html, 'filename': filename}
+    odbc_base_url = str(settings.ODBC_BASE_URL)
+    url = odbc_base_url + '/api/get_pdf'
+    # url = 'http://localhost:8000/api/get_pdf'
+    response = requests.post(url, data=params, stream=True)
+    if response.status_code == 200:
+        object = response
+        return object
+    logger.error("Error Generating PDF " + str(filename) + " from PDF Server " + str(response.text))
+    return None
+
 def flatten_dict(d):
     def items():
         for key, value in d.items():
@@ -1758,25 +1770,38 @@ def create_payout_checksum(all_txn, product_id):
     return checksum_hash
 
 def html_to_pdf(html_body, filename):
+    from django.core.files.uploadedfile import InMemoryUploadedFile
     file = None
+    response = get_pdf_njs(html_body, filename)
     try:
-        extra_args = {
-            'virtual-time-budget': 6000
-        }
-        from django.core.files.uploadedfile import TemporaryUploadedFile
         temp_pdf_file = TemporaryUploadedFile(filename, 'byte', 1000, 'utf-8')
-        file = open(temp_pdf_file.temporary_file_path())
-        from hardcopy import bytestring_to_pdf
-        bytestring_to_pdf(html_body.encode(), file, **extra_args)
-        file.seek(0)
-        file.flush()
-        file.content_type = 'application/pdf'
-        from django.core.files.uploadedfile import InMemoryUploadedFile
-        file = InMemoryUploadedFile(temp_pdf_file, None, filename, 'application/pdf',
-                                    temp_pdf_file.tell(), None)
-
+        for block in response.iter_content(1024 * 8):
+            if not block:
+                break
+            temp_pdf_file.write(block)
+        temp_pdf_file.seek(0)
+        temp_pdf_file.content_type = "application/pdf"
+        file = InMemoryUploadedFile(temp_pdf_file, None, filename, temp_pdf_file.content_type, temp_pdf_file.tell(), None)
     except Exception as e:
         logger.error("Got error while creating PDF file :: {}.".format(e))
+    # try:
+    #     extra_args = {
+    #         'virtual-time-budget': 6000
+    #     }
+    #     from django.core.files.uploadedfile import TemporaryUploadedFile
+    #     temp_pdf_file = TemporaryUploadedFile(filename, 'byte', 1000, 'utf-8')
+    #     file = open(temp_pdf_file.temporary_file_path())
+    #     from hardcopy import bytestring_to_pdf
+    #     bytestring_to_pdf(html_body.encode(), file, **extra_args)
+    #     file.seek(0)
+    #     file.flush()
+    #     file.content_type = 'application/pdf'
+    #     from django.core.files.uploadedfile import InMemoryUploadedFile
+    #     file = InMemoryUploadedFile(temp_pdf_file, None, filename, 'application/pdf',
+    #                                 temp_pdf_file.tell(), None)
+    #
+    # except Exception as e:
+    #     logger.error("Got error while creating PDF file :: {}.".format(e))
     return file
 
 def util_absolute_url(url):
@@ -1945,3 +1970,9 @@ def is_valid_ckeditor_text(text):
     if text == "<p>&nbsp;</p>":
         return False
     return True
+
+
+
+
+
+

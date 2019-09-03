@@ -67,7 +67,7 @@ class Coupon(auth_model.TimeStampedModel):
     is_corporate = models.BooleanField(default=False)
     is_visible = models.BooleanField(default=True)
     is_for_insurance = models.BooleanField(default=False)
-    is_lensfit = models.BooleanField(default=False)
+    is_lensfit = models.NullBooleanField()
     new_user_constraint = models.BooleanField(default=False)
     coupon_type = models.IntegerField(choices=COUPON_TYPE_CHOICES, default=DISCOUNT)
     payment_option = models.ForeignKey(PaymentOptions, on_delete=models.SET_NULL, blank=True, null=True)
