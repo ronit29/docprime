@@ -115,6 +115,7 @@ class Lalpath(BaseIntegrator):
             if len(number) > 10:
                 number = number[1:]
 
+        lab = lab_appointment.lab
         patient_details = {
             "SALUTATION": salution,
             "LName": profile.name,
@@ -122,12 +123,11 @@ class Lalpath(BaseIntegrator):
             "gender": gender,
             "mobile": number,
             "email": "",
-            "city": "delhi",
+            "city": lab.city if lab else "",
             "Address": patient_address,
             "Preferred_Date": lab_appointment.time_slot_start.strftime("%d/%m/%Y")
         }
 
-        lab = lab_appointment.lab
         if lab:
             lab_codes = lab.lab_code.all().first()
 
