@@ -1498,8 +1498,8 @@ class DoctorClinic(auth_model.TimeStampedModel, auth_model.WelcomeCallingDone):
         db_table = "doctor_clinic"
         unique_together = (('doctor', 'hospital', ),)
 
-    # def __str__(self):
-    #     return '{}-{}'.format(self.doctor, self.hospital)
+    def __str__(self):
+        return '{}-{}'.format(self.doctor, self.hospital)
 
     def is_enabled_for_cod(self):
         return self.hospital.is_enabled_for_cod()
@@ -1533,8 +1533,6 @@ class DoctorClinic(auth_model.TimeStampedModel, auth_model.WelcomeCallingDone):
         res_data = {"time_slots": slots, "upcoming_slots": upcoming_slots}
         return res_data
 
-
-
     def get_timings_v2(self, total_leaves, blocks=[]):
         clinic_timings = self.availability.order_by("start")
         booking_details = dict()
@@ -1549,7 +1547,6 @@ class DoctorClinic(auth_model.TimeStampedModel, auth_model.WelcomeCallingDone):
         upcoming_slots = timeslot_object.get_upcoming_slots(time_slots=clinic_timings)
         timing_response = {"timeslots": clinic_timings, "upcoming_slots": upcoming_slots}
         return timing_response
-
 
 
 class DoctorClinicTiming(auth_model.TimeStampedModel):
@@ -2512,6 +2509,35 @@ class OpdAppointment(auth_model.TimeStampedModel, CouponsMixin, OpdAppointmentIn
             return self.hospital.matrix_state.id
         else:
             return None
+
+    def get_booking_analytics_data(self):
+        data = dict()
+
+        promo_cost = self.deal_price - self.effective_price if self.deal_price and self.effective_price else 0
+        department = None
+        if self.doctor:
+            if self.doctor.doctorpracticespecializations.first():
+                if self.doctor.doctorpracticespecializations.first().specialization.department.first():
+                    department = self.doctor.doctorpracticespecializations.first().specialization.department.first().id
+
+        wallet, cashback = self.get_completion_breakup()
+
+        data['Appointment_Id'] = self.id
+        data['CityId'] = self.get_city()
+        data['StateId'] = self.get_state()
+        data['SpecialityId'] = department
+        data['TypeId'] = 1
+        data['ProviderId'] = self.hospital.id
+        data['PaymentType'] = self.payment_type if self.payment_type else None
+        data['Payout'] = self.fees
+        data['CashbackUsed'] = cashback
+        data['BookingDate'] = self.created_at
+        data['CorporateDealId'] = self.get_corporate_deal_id()
+        data['PromoCost'] = max(0, promo_cost)
+        data['GMValue'] = self.deal_price
+        data['StatusId'] = self.status
+
+        return data
 
     def sync_with_booking_analytics(self):
 
@@ -4762,3 +4788,40 @@ class HospitalNetworkSpeciality(auth_model.TimeStampedModel):
 
     class Meta:
         db_table = "hospital_network_speciality"
+
+
+class SponsoredServices(auth_model.TimeStampedModel):
+    name = models.CharField(max_length=200, unique=True)
+
+    def __str__(self):
+        return self.name
+
+    class Meta:
+        db_table = 'sponsored_services'
+
+
+class DoctorSponsoredServices(auth_model.TimeStampedModel):
+    doctor = models.ForeignKey(Doctor, related_name="doctor_services", on_delete=models.DO_NOTHING)
+    sponsored_service = models.ForeignKey(SponsoredServices, on_delete=models.DO_NOTHING, blank=False, null=False, related_name='doc_sponsored_services')
+
+    class Meta:
+        db_table = "doctor_sponsored_services"
+        unique_together = (("doctor", "sponsored_service"),)
+
+
+class HospitalSponsoredServices(auth_model.TimeStampedModel):
+    hospital = models.ForeignKey(Hospital, related_name="hospital_services", on_delete=models.DO_NOTHING)
+    sponsored_service = models.ForeignKey(SponsoredServices, on_delete=models.DO_NOTHING, blank=False, null=False, related_name='hosp_sponsored_services')
+
+    class Meta:
+        db_table = "hospital_sponsored_services"
+        unique_together = (("hospital", "sponsored_service"),)
+
+
+class SponsoredServicePracticeSpecialization(auth_model.TimeStampedModel):
+    sponsored_service = models.ForeignKey(SponsoredServices, on_delete=models.DO_NOTHING, blank=False, null=False, related_name='spec_sponsored_services')
+    specialization = models.ForeignKey(PracticeSpecialization, on_delete=models.DO_NOTHING, blank=False, null=False, related_name='spec_sponsored_services')
+    is_primary_specialization = models.BooleanField(default=False)
+
+    class Meta:
+        db_table = "specialization_sponsored_services"
