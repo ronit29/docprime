@@ -2296,6 +2296,9 @@ class LabAppointment(TimeStampedModel, CouponsMixin, LabAppointmentInvoiceMixin,
         except Exception as e:
             logger.error(str(e))
 
+        if self.has_lensfit_coupon_used():
+            notification_tasks.send_lensfit_coupons.apply_async((self.id, self.PRODUCT_ID, NotificationAction.SEND_LENSFIT_COUPON), countdown=5)
+
     def outstanding_create(self):
         admin_obj, out_level = self.get_billable_admin_level()
         app_outstanding_fees = self.lab_payout_amount()

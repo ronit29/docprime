@@ -1095,7 +1095,7 @@ class CouponsMixin(object):
         return new_user
 
     def has_lensfit_coupon_used(self):
-        self.coupon.filter(is_lensfit=True).exists()
+        return self.coupon.filter(is_lensfit=True).exists()
 
 
 class TimeSlotExtraction(object):
