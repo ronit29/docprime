@@ -23,6 +23,6 @@ class Migration(migrations.Migration):
         migrations.AddField(
             model_name='article',
             name='pharmeasy_url',
-            field=models.CharField(max_length=1000, null=True, unique=True),
+            field=models.TextField(null=True, unique=True),
         ),
     ]

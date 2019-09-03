@@ -194,7 +194,7 @@ class ArticleRetrieveSerializer(serializers.ModelSerializer):
         fields = ('title', 'heading_title', 'url', 'body_doms', 'body', 'icon', 'id', 'seo', 'header_image',
                   'header_image_alt', 'category', 'linked', 'author_name', 'published_date', 'author',
                   'last_updated_at', 'comments', 'recent_articles', 'footer_widget', 'pharmeasy_url',
-                  'pharmeasy_product_id', 'is_visit')
+                  'pharmeasy_product_id', 'is_widget_available')
 
 
 class ArticleListSerializer(serializers.ModelSerializer):
