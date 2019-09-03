@@ -2262,7 +2262,7 @@ class PurchaseOrderCreation(auth_model.TimeStampedModel):
     provider_name_lab = models.ForeignKey("diagnostic.Lab", on_delete=models.DO_NOTHING, null=True, blank=True)
     provider_name_hospital = models.ForeignKey(Hospital, on_delete=models.DO_NOTHING, null=True, blank=True, related_name='hospitalpurchaseorder')
     provider_name = models.CharField(max_length=500, default='')
-    gst_number = models.CharField(max_length=1000)
+    gst_number = models.CharField(max_length=1000, null=True, blank=True)
     total_amount_paid = models.IntegerField(help_text='Inclusive of GST')
     start_date = models.DateField(null=True, blank=True)
     end_date = models.DateField(null=True, blank=True)
@@ -2314,11 +2314,13 @@ class PurchaseOrderCreation(auth_model.TimeStampedModel):
                 self.provider_name_hospital.enabled_for_cod = True
                 self.provider_name_hospital.enabled_poc = True
                 self.provider_name_hospital.save()
-                notification_tasks.purchase_order_closing_counter_automation.apply_async((self.id, ), eta=self.end_date, )    # task to disable Pay-at-clinic functionality in hospital
+                if self.end_date:
+                    notification_tasks.purchase_order_closing_counter_automation.apply_async((self.id, ), eta=self.end_date, )    # task to disable Pay-at-clinic functionality in hospital
 
             else:
-                notification_tasks.purchase_order_creation_counter_automation.apply_async((self.id, ), eta=self.start_date, ) # task to enable Pay-at-clinic functionality in hospital
-                notification_tasks.purchase_order_closing_counter_automation.apply_async((self.id, ), eta=self.end_date, )    # task to disable Pay-at-clinic functionality in hospital
+                if self.start_date and self.end_date:
+                    notification_tasks.purchase_order_creation_counter_automation.apply_async((self.id, ), eta=self.start_date, ) # task to enable Pay-at-clinic functionality in hospital
+                    notification_tasks.purchase_order_closing_counter_automation.apply_async((self.id, ), eta=self.end_date, )    # task to disable Pay-at-clinic functionality in hospital
 
     def disable_cod_functionality(self):
         remaining_poc_objects = PurchaseOrderCreation.objects.filter(is_enabled=True,
