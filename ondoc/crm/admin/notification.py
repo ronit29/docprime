@@ -73,7 +73,7 @@ class DynamicTemplatesAdmin(VersionAdmin):
     form = DynamicTemplateForm
     model = DynamicTemplates
     list_display = ('template_type', 'template_name', 'preview_url')
-    fields = ('template_type', 'subject', 'template_name', 'content', 'sample_parameters', 'recipient', 'approved')
+    fields = ('template_type', 'subject', 'template_name', 'content', 'sample_parameters', 'recipient', 'cc', 'bcc', 'approved')
 
     def save_model(self, request, obj, form, change):
         responsible_user = request.user

@@ -112,6 +112,7 @@ class NotificationAction:
 
     CONTACT_US_EMAIL = 65
     SAMPLE_DYNAMIC_TEMPLATE_PREVIEW = 110
+    SEND_LENSFIT_COUPON = 111
     NOTIFICATION_TYPE_CHOICES = (
         (APPOINTMENT_ACCEPTED, "Appointment Accepted"),
         (APPOINTMENT_CANCELLED, "Appointment Cancelled"),
@@ -1360,16 +1361,6 @@ class DynamicTemplates(TimeStampedModel):
         return rendered_data
 
     def save(self, *args, **kwargs):
-
-        # old_instance = None
-        # if self.id:
-        #     old_instance = DynamicTemplates.objects.get(id=self.id)
-        #
-        # if not self.id or self.content != old_instance.content:
-        #     parameter_dict = self.parse_and_genearate_sample_json()
-        #     self.sample_parameters = parameter_dict
-        # self.generate_virutal_content()
-
         super().save(*args, **kwargs)
 
     def preview_url(self):

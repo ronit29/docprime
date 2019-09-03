@@ -7,7 +7,9 @@ from django.db.models import Prefetch, Q
 from django.utils import timezone
 from django.utils.functional import cached_property
 import sys
+import random
 import datetime
+from django.conf import settings
 from django.utils.crypto import get_random_string
 import logging
 
@@ -65,6 +67,7 @@ class Coupon(auth_model.TimeStampedModel):
     is_corporate = models.BooleanField(default=False)
     is_visible = models.BooleanField(default=True)
     is_for_insurance = models.BooleanField(default=False)
+    is_lensfit = models.NullBooleanField()
     new_user_constraint = models.BooleanField(default=False)
     coupon_type = models.IntegerField(choices=COUPON_TYPE_CHOICES, default=DISCOUNT)
     payment_option = models.ForeignKey(PaymentOptions, on_delete=models.SET_NULL, blank=True, null=True)
@@ -109,7 +112,6 @@ class Coupon(auth_model.TimeStampedModel):
 
         if not user.is_authenticated:
             return 0
-
 
         count = 0
         if str(self.type) == str(self.DOCTOR) or str(self.type) == str(self.ALL):
@@ -185,7 +187,6 @@ class Coupon(auth_model.TimeStampedModel):
 
         return count
 
-
     @classmethod
     def get_total_deduction(cls, data, deal_price):
         from ondoc.doctor.models import OpdAppointment
@@ -256,6 +257,14 @@ class Coupon(auth_model.TimeStampedModel):
 
     def __str__(self):
         return self.code
+
+    @classmethod
+    def get_lensfit_coupon(cls):
+        lensfit_coupons = settings.LENSFIT_COUPONS
+
+        lensfit_coupon = random.choice(lensfit_coupons)
+
+        return lensfit_coupon
 
     class Meta:
         db_table = "coupon"
@@ -679,7 +688,7 @@ class CouponRecommender():
                 deal_price = filters.get('deal_price')
                 if deal_price:
                     discount = obj.get_discount(coupon, deal_price)
-                    return discount > 0
+                    return discount >= 0
                 return True
 
             # sort coupons on discount granted
