@@ -372,7 +372,7 @@ class SMSNotification:
         elif notification_type == NotificationAction.OPD_OTP_BEFORE_APPOINTMENT:
             obj = DynamicTemplates.objects.filter(template_name="Reminder_appointment", approved=True).first()
         elif notification_type == NotificationAction.SEND_LENSFIT_COUPON:
-            obj = DynamicTemplates.objects.filter(template_name="SEND_LENSFIT_COUPON", approved=True).first()
+            obj = DynamicTemplates.objects.filter(template_name="Lensfit_sms", approved=True).first()
 
         return obj
 
@@ -1004,7 +1004,7 @@ class EMAILNotification:
         if notification_type == NotificationAction.APPOINTMENT_ACCEPTED or notification_type == NotificationAction.OPD_OTP_BEFORE_APPOINTMENT:
             obj = DynamicTemplates.objects.filter(template_type=DynamicTemplates.TemplateType.EMAIL, template_name="").first()
         if notification_type == NotificationAction.SEND_LENSFIT_COUPON:
-            obj = DynamicTemplates.objects.filter(template_type=DynamicTemplates.TemplateType.EMAIL, template_name="SEND_LENSFIT_COUPON_EMAIL", approved=True).first()
+            obj = DynamicTemplates.objects.filter(template_type=DynamicTemplates.TemplateType.EMAIL, template_name="Lensfit_email", approved=True).first()
 
         return obj
 
