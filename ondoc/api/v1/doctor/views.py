@@ -247,10 +247,7 @@ class DoctorAppointmentsViewSet(OndocViewSet):
         validated_data = serializer.validated_data
         data = request.data
         user = request.user
-        # profile = None
-        # coupon_recommender = None
-        # filters = dict()
-        # doctor_specializations_ids = []
+
         if data and data.get('appointment_id') and data.get('cod_to_prepaid'):
             pg_order = Order.objects.filter(reference_id=validated_data.get('appointment_id')).first()
             cart_item_id = pg_order.action_data.get('cart_item_id', None)
@@ -343,6 +340,12 @@ class DoctorAppointmentsViewSet(OndocViewSet):
 
             if process_immediately:
                 appointment_ids = pg_order.process_pg_order(data)
+                if appointment_ids.get('id') and price_data.get('coupon_list'):
+                    coupon_id  = price_data.get('coupon_list')[0]
+                    opd_app = OpdAppointment.objects.filter(id=appointment_ids.get('id')).first()
+                    opd_app.coupon.add(coupon_id)
+                    opd_app.save()
+
 
                 resp["status"] = 1
                 resp["payment_required"] = False
