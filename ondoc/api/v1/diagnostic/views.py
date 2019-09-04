@@ -3,7 +3,6 @@ import logging
 import operator
 from copy import deepcopy
 from itertools import groupby
-# from pyodbc import Date
 
 from django.contrib.contenttypes.models import ContentType
 

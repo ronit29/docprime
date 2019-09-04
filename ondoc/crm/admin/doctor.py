@@ -2458,7 +2458,7 @@ class PurchaseOrderCreationForm(forms.ModelForm):
 class PurchaseOrderCreationAdmin(admin.ModelAdmin):
     model = PurchaseOrderCreation
     form = PurchaseOrderCreationForm
-    list_display = ['provider_type', 'start_date', 'end_date', 'provider_name_lab', 'provider_name_hospital', 'total_appointment_count',
+    list_display = ['provider_type', 'created_at', 'start_date', 'end_date', 'provider_name_hospital', 'total_appointment_count',
                     'appointment_booked_count', 'current_appointment_count']
     autocomplete_fields = ['provider_name_lab', 'provider_name_hospital']
     search_fields = ['provider_name_lab__name', 'provider_name_hospital__name']
@@ -2467,8 +2467,14 @@ class PurchaseOrderCreationAdmin(admin.ModelAdmin):
     def get_readonly_fields(self, request, obj=None):
         read_only_fields = ['provider_name', 'appointment_booked_count', 'current_appointment_count']
         if obj and obj.id:
-            read_only_fields += ['start_date', 'end_date', 'total_appointment_count', 'provider_name_hospital', 'total_amount_paid', 'gst_number',
+            read_only_fields += ['total_appointment_count', 'provider_name_hospital', 'total_amount_paid', 'gst_number',
                                  'provider_type', 'product_type']
+
+        if obj and obj.id and obj.start_date != None:
+            read_only_fields += ['start_date']
+
+        if obj and obj.id and obj.end_date != None:
+            read_only_fields += ['end_date']
 
         return read_only_fields
 
