@@ -15,6 +15,7 @@ from ondoc.notification.tasks import push_plus_lead_to_matrix
 from .enums import PlanParametersEnum
 from datetime import datetime
 from django.utils.timezone import utc
+import reversion
 
 
 class LiveMixin(models.Model):
@@ -29,6 +30,7 @@ class LiveMixin(models.Model):
         abstract = True
 
 
+@reversion.register()
 class PlusProposer(auth_model.TimeStampedModel):
     name = models.CharField(max_length=250)
     min_float = models.PositiveIntegerField(default=None)
@@ -64,6 +66,7 @@ class PlusProposer(auth_model.TimeStampedModel):
         db_table = 'plus_proposer'
 
 
+@reversion.register()
 class PlusPlans(auth_model.TimeStampedModel, LiveMixin):
     plan_name = models.CharField(max_length=300)
     proposer = models.ForeignKey(PlusProposer, related_name='plus_plans', on_delete=models.DO_NOTHING)
@@ -100,6 +103,7 @@ class PlusPlanParameters(auth_model.TimeStampedModel):
         db_table = 'plus_plan_parameters'
 
 
+@reversion.register()
 class PlusPlanParametersMapping(auth_model.TimeStampedModel):
     plus_plan = models.ForeignKey(PlusPlans, related_name="plan_parameters", null=False, blank=False, on_delete=models.CASCADE)
     parameter = models.ForeignKey(PlusPlanParameters, null=False, blank=False, on_delete=models.CASCADE)
