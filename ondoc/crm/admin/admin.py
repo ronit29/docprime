@@ -20,13 +20,14 @@ from ondoc.doctor.models import (Doctor, Language, MedicalService, Specializatio
                                  VisitReason, CancellationReason, PracticeSpecializationContent, OfflinePatients,
                                  OfflineOPDAppointments,
                                  DoctorMobileOtp, UploadDoctorData, DoctorLeave, HealthInsuranceProvider,
-                                 CommonHospital, SimilarSpecializationGroup, PurchaseOrderCreation)
+                                 CommonHospital, SimilarSpecializationGroup, PurchaseOrderCreation, SponsoredServices,
+                                 HospitalSponsoredServices, DoctorSponsoredServices)
 
 from ondoc.diagnostic.models import (Lab, LabNetwork, LabTest, LabTestType, LabService,
                                      AvailableLabTest, LabAppointment, CommonTest, CommonDiagnosticCondition,
                                      LabPricingGroup,
                                      TestParameter, CommonPackage, LabTestCategory, LabTestGroup, LabTestGroupMapping,
-                                     TestParameterChat, LabTestCategoryUrls)
+                                     TestParameterChat, LabTestCategoryUrls, IPDMedicinePageLead)
 from ondoc.coupon.models import Coupon, UserSpecificCoupon, RandomGeneratedCoupon
 from ondoc.integrations.models import IntegratorLabTestParameterMapping
 from ondoc.lead.models import HospitalLead, DoctorLead, SearchLead
@@ -55,7 +56,8 @@ from .doctor import (DoctorAdmin, MedicalServiceAdmin, SpecializationAdmin, Qual
                      CompetitorInfoImportAdmin, VisitReasonAdmin, PracticeSpecializationContentAdmin,
                      OfflinePatientAdmin,
                      UploadDoctorDataAdmin, DoctorLeaveAdmin, SimilarSpecializationGroupAdmin,
-                     PurchaseOrderCreationAdmin)
+                     PurchaseOrderCreationAdmin, SponsoredServicesAdmin, HospitalSponsoredServicesAdmin,
+                     DoctorSponsoredServicesAdmin)
 from .aboutdoctor import AboutDoctorAdmin
 from .hospital import HospitalAdmin, CommonHospitalAdmin, GenericQuestionAnswerAdmin
 from .user import CustomUserAdmin, UserNumberUpdateAdmin, UserProfileAdmin
@@ -101,11 +103,14 @@ from ondoc.seo.models import SeoLabNetwork
 from ondoc.elastic.models import DemoElastic
 from .elastic import DemoElasticAdmin
 from ondoc.banner.models import Banner, SliderLocation, BannerLocation, EmailBanner, Recommender
-from .integrations import IntegratorMapping, IntegratorMappingAdmin, IntegratorLabTestParameterMappingAdmin
-from .integrations import IntegratorProfileMapping, IntegratorProfileMappingAdmin
-from .integrations import IntegratorReport, IntegratorReportAdmin
+from .integrations import IntegratorMapping, IntegratorMappingAdmin, IntegratorHospitalMappings, \
+    IntegratorDoctorMappings, IntegratorLabTestParameterMappingAdmin
+from .integrations import IntegratorProfileMapping, IntegratorProfileMappingAdmin, IntegratorHospitalMappingsAdmin
+from .integrations import IntegratorReport, IntegratorReportAdmin, IntegratorDoctorMappingsAdmin
 from .integrations import IntegratorTestMapping, IntegratorTestMappingAdmin
 from .integrations import IntegratorTestParameterMapping, IntegratorTestParameterMappingAdmin
+from .plus import PlusPlansAdmin, PlusProposerAdmin, PlusThresholdAdmin, PlusUserAdmin, PlusPlanParametersAdmin
+from ondoc.plus.models import PlusUser, PlusProposer, PlusPlans, PlusThreshold, PlusPlanParameters
 
 User = get_user_model()
 
@@ -114,6 +119,13 @@ admin.site.site_header = 'Ondoc CRM'
 admin.site.site_title = 'Ondoc CRM'
 admin.site.site_url = None
 admin.site.index_title = 'CRM Administration'
+
+
+admin.site.register(PlusThreshold, PlusThresholdAdmin)
+admin.site.register(PlusPlans, PlusPlansAdmin)
+admin.site.register(PlusUser, PlusUserAdmin)
+admin.site.register(PlusProposer, PlusProposerAdmin)
+admin.site.register(PlusPlanParameters, PlusPlanParametersAdmin)
 
 admin.site.register(OtpVerifications)
 # admin.site.register(OpdAppointment)
@@ -241,8 +253,11 @@ admin.site.register(UploadDoctorData, UploadDoctorDataAdmin)
 admin.site.register(SimilarSpecializationGroup, SimilarSpecializationGroupAdmin)
 admin.site.register(UploadCostEstimateData, UploadCostEstimateDataAdmin)
 admin.site.register(SliderLocation, SliderLocationAdmin)
+admin.site.register(DoctorClinic, DoctorClinicAdmin)
 admin.site.register(IntegratorMapping, IntegratorMappingAdmin)
 admin.site.register(IntegratorProfileMapping, IntegratorProfileMappingAdmin)
+admin.site.register(IntegratorDoctorMappings, IntegratorDoctorMappingsAdmin)
+admin.site.register(IntegratorHospitalMappings, IntegratorHospitalMappingsAdmin)
 admin.site.register(GlobalNonBookable, GlobalNonBookableAdmin)
 admin.site.register(IpdProcedure, IpdProcedureAdmin)
 admin.site.register(IpdProcedureSynonym, IpdProcedureSynonymAdmin)
@@ -287,3 +302,8 @@ admin.site.register(GenericQuestionAnswer, GenericQuestionAnswerAdmin)
 admin.site.register(PurchaseOrderCreation, PurchaseOrderCreationAdmin)
 admin.site.register(IntegratorLabTestParameterMapping, IntegratorLabTestParameterMappingAdmin)
 admin.site.register(DynamicTemplates, DynamicTemplatesAdmin)
+admin.site.register(SponsoredServices, SponsoredServicesAdmin)
+admin.site.register(IPDMedicinePageLead)
+admin.site.register(HospitalSponsoredServices, HospitalSponsoredServicesAdmin)
+admin.site.register(DoctorSponsoredServices, DoctorSponsoredServicesAdmin)
+

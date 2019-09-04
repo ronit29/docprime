@@ -249,7 +249,11 @@ class DoctorAppointmentsViewSet(OndocViewSet):
         #     'insurance_message'] = Cart.check_for_insurance(validated_data,request)
         if user_insurance:
             if user_insurance.status == UserInsurance.ONHOLD:
-                return Response(status=status.HTTP_400_BAD_REQUEST, data={'error': 'Your documents from the last claim are under verification.Please write to customercare@docprime.com for more information'})
+                return Response(status=status.HTTP_400_BAD_REQUEST, data={"error": 'Your documents from the last claim '
+                                                                                   'are under verification.Please write to customercare@docprime.com for more information',
+                                                                          "request_errors": {
+                                                                              "message": 'Your documents from the last claim are under '
+                                                                                         'verification. Please write to customercare@docprime.com for more information'}})
             hospital = validated_data.get('hospital')
             doctor = validated_data.get('doctor')
 
@@ -258,7 +262,10 @@ class DoctorAppointmentsViewSet(OndocViewSet):
             payment_type = validated_data.get('payment_type')
             if profile.is_insured_profile and doctor.is_enabled_for_insurance and doctor.enabled_for_online_booking and \
                     payment_type == OpdAppointment.COD and doctor_clinic and doctor_clinic.enabled_for_online_booking:
-                return Response(status=status.HTTP_400_BAD_REQUEST, data={'error': 'Some error occured. Please try again after some time.'})
+                return Response(status=status.HTTP_400_BAD_REQUEST,
+                                data={"error": 'Some error occured. Please try again after some time.',
+                                      "request_errors": {"message": 'Some error occured. Please try again'
+                                                                    ' after some time.'}})
 
             insurance_validate_dict = user_insurance.validate_insurance(validated_data)
             data['is_appointment_insured'] = insurance_validate_dict['is_insured']
@@ -271,12 +278,20 @@ class DoctorAppointmentsViewSet(OndocViewSet):
                 blocked_slots = hospital.get_blocked_specialization_appointments_slots(doctor, user_insurance)
                 start_date = validated_data.get('start_date').date()
                 if str(start_date) in blocked_slots:
-                    return Response(status=status.HTTP_400_BAD_REQUEST, data={'error': 'Some error occured. Please try again after some time.'})
+                    return Response(status=status.HTTP_400_BAD_REQUEST, data={'error': 'Some error occured. Please try '
+                                                                                       'again after some time.',
+                                                                              'request_errors': {
+                                                                                  'message':'Some error occured.Please'
+                                                                                            'try again after some time'}})
 
                 appointment_date = validated_data.get('start_date')
                 is_appointment_exist = hospital.get_active_opd_appointments(request.user, user_insurance, appointment_date.date())
                 if request.user and request.user.is_authenticated and not hasattr(request, 'agent') and is_appointment_exist :
-                    return Response(status=status.HTTP_400_BAD_REQUEST, data={'error': 'Some error occured. Please try again after some time.'})
+                    return Response(status=status.HTTP_400_BAD_REQUEST, data={'error': 'Some error occured. Please try '
+                                                                                       'again after some time.',
+                                                                              'request_errors': {
+                                                                                  'message':'Some error occured.Please'
+                                                                                            'Try again after some time.'}})
         else:
             data['is_appointment_insured'], data['insurance_id'], data[
                 'insurance_message'] = False, None, ""
@@ -313,7 +328,6 @@ class DoctorAppointmentsViewSet(OndocViewSet):
     def can_book_for_free(self, user):
         return models.OpdAppointment.objects.filter(user=user, deal_price=0)\
                    .exclude(status__in=[models.OpdAppointment.COMPLETED, models.OpdAppointment.CANCELLED]).count() < models.OpdAppointment.MAX_FREE_BOOKINGS_ALLOWED
-
     def update(self, request, pk=None):
         user = request.user
         source = request.query_params.get('source', '')
@@ -881,7 +895,6 @@ class DoctorProfileUserViewSet(viewsets.GenericViewSet):
 
         selected_procedure_ids, other_procedure_ids = get_selected_and_other_procedures(category_ids, procedure_ids, doctor, all=True)
 
-
         general_specialization = []
         spec_ids = list()
         spec_url_dict = dict()
@@ -901,7 +914,6 @@ class DoctorProfileUserViewSet(viewsets.GenericViewSet):
                                           locality_value=entity.locality_value, is_valid=True, entity_type='Doctor', url_type='SEARCHURL')
             for su in spec_urls:
                 spec_url_dict[su.specialization_id] = su.url
-
 
         serializer = serializers.DoctorProfileUserViewSerializer(doctor, many=False,
                                                                      context={"request": request
@@ -3987,7 +3999,7 @@ class OfflineCustomerViewSet(viewsets.GenericViewSet):
                 # mrp = app.mrp
                 mrp_fees = app.fees if app.fees else 0
                 #RAJIV YADAV
-                mrp = app.mrp if app.payment_type == app.COD else mrp_fees
+                mrp = app.deal_price if app.payment_type == app.COD else mrp_fees
                 payment_type = app.payment_type
                 deal_price = app.deal_price
                 mask_number = app.mask_number.all()
@@ -4467,11 +4479,50 @@ class HospitalViewSet(viewsets.GenericViewSet):
             if new_dynamic.h1_title:
                 h1_title = new_dynamic.h1_title
         schema = self.build_schema_for_hospital(hosp_serializer, hospital_obj, canonical_url)
-        response['seo'] = {'title': title, "description": description, "schema": schema, "h1_title": h1_title}
+        listing_schema = self.build_listing_schema_for_hospital(hosp_serializer)
+        breadcrumb_schema = self.build_breadcrumb_schema_for_hospital(response['breadcrumb'])
+        all_schema = [x for x in [schema, listing_schema, breadcrumb_schema] if x]
+        response['seo'] = {'title': title, "description": description, "schema": schema,
+                           "h1_title": h1_title, 'all_schema': all_schema}
         response['canonical_url'] = canonical_url
-
         return Response(response)
 
+    def build_listing_schema_for_hospital(self, serialized_data):
+        try:
+            schema = {
+                "@context": "http://schema.org",
+                "@type": "ItemList",
+            }
+            list_items = []
+            for indx, doc in enumerate(serialized_data.get('doctors', {}).get('result', [])):
+                item = {"@type": "ListItem", "position": indx + 1, "url": doc.get('new_schema', {}).get('url')}
+                list_items.append(item)
+            schema["itemListElement"] = list_items
+        except Exception as e:
+            logger.error(str(e))
+            schema = None
+        return schema
+
+    def build_breadcrumb_schema_for_hospital(self, breadcrumb):
+        try:
+            schema = {
+                "@context": "http://schema.org",
+                "@type": "BreadcrumbList"
+            }
+            list_items = []
+            for indx, doc in enumerate(breadcrumb):
+                if doc.get('url'):
+                    item = {
+                        "@type": "ListItem",
+                        "position": indx + 1,
+                        "item": {"@id": "{}/{}".format(settings.BASE_URL.strip('/'), doc.get('url')), "name": doc.get('title')}
+                    }
+                    list_items.append(item)
+            schema["itemListElement"] = list_items
+        except Exception as e:
+            logger.error(str(e))
+            schema = None
+        return schema
 
     def build_schema_for_hospital(self, serialized_data, hospital, url):
         try:

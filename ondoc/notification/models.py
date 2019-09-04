@@ -20,6 +20,7 @@ from django.utils import timezone
 from weasyprint import HTML
 from django.conf import settings
 from num2words import num2words
+from itertools import groupby
 import datetime
 from datetime import timedelta
 import pytz
@@ -30,7 +31,6 @@ from django.core.files.storage import default_storage
 from django.core.files.base import ContentFile
 from django.core.files.uploadedfile import SimpleUploadedFile, InMemoryUploadedFile
 from django.core.files import File
-from hardcopy import bytestring_to_pdf
 from django.contrib.postgres.fields import ArrayField
 from ondoc.common.helper import Choices
 from django.utils.safestring import mark_safe
@@ -45,6 +45,13 @@ logger = logging.getLogger(__name__)
 
 
 class NotificationAction:
+    SMS_NOTIFICATION = 1001
+    EMAIL_NOTIFICATION = 1002
+    PUSH_NOTIFICATION = 1003
+
+    NOTIFICATION_CHOICES = ((SMS_NOTIFICATION, "SMS Notification"), (EMAIL_NOTIFICATION, "Email Notification"),
+                            (PUSH_NOTIFICATION, "Push Notification"))
+
     APPOINTMENT_ACCEPTED = 1
     APPOINTMENT_CANCELLED = 2
     APPOINTMENT_RESCHEDULED_BY_PATIENT = 3
@@ -111,7 +118,31 @@ class NotificationAction:
     LAB_FEEDBACK_AFTER_APPOINTMENT = 95
 
     CONTACT_US_EMAIL = 65
+
+    OFFLINE_OPD_APPOINTMENT_BOOKED = 130
+    OFFLINE_OPD_APPOINTMENT_ACCEPTED = 131
+    OFFLINE_OPD_APPOINTMENT_CANCELLED = 132
+    OFFLINE_OPD_APPOINTMENT_RESCHEDULED_DOCTOR = 133
+    OFFLINE_OPD_APPOINTMENT_NO_SHOW = 134
+    OFFLINE_OPD_INVOICE = 135
+    OFFLINE_OPD_APPOINTMENT_COMPLETED = 136
+    OFFLINE_APPOINTMENT_REMINDER_PROVIDER_SMS = 137
+    OFFLINE_PATIENT_WELCOME_MESSAGE = 138
+
+    ECONSULTATION_BOOKED = 150
+    ECONSULTATION_ACCEPTED = 151
+    ECONSULTATION_RESCHEDULED_DOCTOR = 152
+    ECONSULTATION_RESCHEDULED_PATIENT = 153
+    ECONSULTATION_CANCELLED = 154
+    ECONSULTATION_COMPLETED = 155
+    ECONSULTATION_EXPIRED = 156
+    E_CONSULT_SHARE = 157
+    E_CONSULT_VIDEO_LINK_SHARE = 158
+    E_CONSULT_NEW_MESSAGE_RECEIVED = 159
+
     SAMPLE_DYNAMIC_TEMPLATE_PREVIEW = 110
+    SEND_LENSFIT_COUPON = 111
+
     NOTIFICATION_TYPE_CHOICES = (
         (APPOINTMENT_ACCEPTED, "Appointment Accepted"),
         (APPOINTMENT_CANCELLED, "Appointment Cancelled"),
@@ -128,11 +159,33 @@ class NotificationAction:
         (LAB_REPORT_UPLOADED, "Lab Report Uploaded"),
         (LAB_REPORT_SEND_VIA_CRM, "Send Lab Reports via CRM"),
 
+        (OFFLINE_OPD_APPOINTMENT_BOOKED, "Offline OPD Appointment Booked"),
+        (OFFLINE_OPD_APPOINTMENT_ACCEPTED, "Offline OPD Appointment Accepted"),
+        (OFFLINE_OPD_APPOINTMENT_CANCELLED, "Offline OPD Appointment Cancelled"),
+        (OFFLINE_OPD_APPOINTMENT_RESCHEDULED_DOCTOR, "Offline OPD Appointment Rescheduled by Doctor"),
+        (OFFLINE_OPD_APPOINTMENT_NO_SHOW, "Offline OPD Appointment No Show"),
+        (OFFLINE_OPD_APPOINTMENT_COMPLETED, "Offline OPD Appointment Completed"),
+        (DOCPRIME_APPOINTMENT_REMINDER_PROVIDER_SMS, 'Docprime Appointment Reminder Provider SMS'),
+        (OFFLINE_APPOINTMENT_REMINDER_PROVIDER_SMS, 'Offline Appointment Reminder Provider SMS'),
+
+        (ECONSULTATION_BOOKED, 'EConsultation Booked'),
+        (ECONSULTATION_ACCEPTED, 'EConsultation Accepted'),
+        (ECONSULTATION_RESCHEDULED_DOCTOR, 'EConsultation Rescheduled Doctor'),
+        (ECONSULTATION_RESCHEDULED_PATIENT, 'EConsultation Rescheduled Patient'),
+        (ECONSULTATION_CANCELLED, 'EConsultation Cancelled'),
+        (ECONSULTATION_COMPLETED, 'EConsultation Completed'),
+        (ECONSULTATION_EXPIRED, 'EConsultation Expired'),
+        (E_CONSULT_SHARE, 'E Consult Share'),
+        (E_CONSULT_VIDEO_LINK_SHARE, 'E Consult Video Link Share'),
+        (E_CONSULT_NEW_MESSAGE_RECEIVED, 'E Consult New Message Received'),
+
         (PRESCRIPTION_UPLOADED, "Prescription Uploaded"),
         (PAYMENT_PENDING, "Payment Pending"),
         (RECEIPT, "Receipt"),
         (DOCTOR_INVOICE, "Doctor Invoice"),
         (LAB_INVOICE, "Lab Invoice"),
+        (OFFLINE_OPD_INVOICE, "Offline OPD Invoice"),
+
         (INSURANCE_CONFIRMED, "Insurance Confirmed"),
         (INSURANCE_ENDORSMENT_APPROVED, "Insurance endorsment completed."),
         (INSURANCE_ENDORSMENT_REJECTED, "Insurance endorsment rejected."),
@@ -154,13 +207,23 @@ class NotificationAction:
         (COD_TO_PREPAID_REQUEST, 'COD To Prepaid Request'),
         (OPD_DAILY_SCHEDULE, 'OPD Daily Schedule')
     )
-
     OPD_APPOINTMENT = "opd_appointment"
     LAB_APPOINTMENT = "lab_appoingment"
+    OFFLINE_OPD_APPOINTMENT = "offline_opd_appointment"
+    E_CONSULTATION = "e_consultation"
 
     ACTION_TYPE_CHOICES = (
         (OPD_APPOINTMENT, 'Opd Appointment'),
         (LAB_APPOINTMENT, 'Lab Appointment'),
+        (OFFLINE_OPD_APPOINTMENT, 'Offline Opd Appointment'),
+        (E_CONSULTATION, 'E Consultation'),
+    )
+
+    APPOINTMENT = "appointment"
+    E_CONSULT_CHAT_VIEW = "EConsultChatView"
+    SCREEN_TYPE_CHOICES = (
+        (APPOINTMENT, 'appointment'),
+        (E_CONSULT_CHAT_VIEW, 'e_consult_chat_view'),
     )
 
     @classmethod
@@ -907,11 +970,17 @@ class EmailNotification(TimeStampedModel, EmailNotificationOpdMixin, EmailNotifi
         publish_message(message)
 
     @classmethod
-    def send_dynamic_template_notification(cls, recipient_obj, html_body, email_subject, notification_type):
+    def send_dynamic_template_notification(cls, recipient_obj, html_body, email_subject, notification_type, *args, **kwargs):
         if recipient_obj and recipient_obj.to:
 
-            email_obj = cls.objects.create(email=recipient_obj.to, notification_type=notification_type,
-                                           content=html_body, email_subject=email_subject, cc=recipient_obj.cc, bcc=recipient_obj.bcc)
+            if kwargs.get('is_preview', False):
+                email_obj = cls.objects.create(email=recipient_obj.to, notification_type=notification_type,
+                                               content=html_body, email_subject=email_subject, cc=[], bcc=[])
+
+            else:
+                email_obj = cls.objects.create(email=recipient_obj.to, notification_type=notification_type,
+                                               content=html_body, email_subject=email_subject, cc=recipient_obj.cc, bcc=recipient_obj.bcc)
+
             email_obj.save()
 
             email_noti = {
@@ -1310,6 +1379,8 @@ class DynamicTemplates(TimeStampedModel):
     sample_parameters = JSONField(default=dict, null=True, blank=True)
     subject = models.CharField(max_length=256, null=True, blank=True)
     recipient = models.CharField(max_length=100, null=True, blank=True)
+    cc = models.CharField(max_length=512, null=True, blank=True)
+    bcc = models.CharField(max_length=512, null=True, blank=True)
 
     def __str__(self):
         return str(self.template_name)
@@ -1317,16 +1388,34 @@ class DynamicTemplates(TimeStampedModel):
     def get_parameter_json(self):
         return self.sample_parameters
 
-    def send_notification(self, context, recipient_obj, notification_type):
+    def get_cc(self):
+        if not self.cc:
+            return []
+        cc_emails = self.cc.split(',')
+        return cc_emails
+
+    def get_bcc(self):
+        if not self.bcc:
+            return []
+        bcc_emails = self.bcc.split(',')
+        return bcc_emails
+
+    def send_notification(self, context, recipient_obj, notification_type, *args, **kwargs):
         rendered_content = self.render_template(context)
         if rendered_content is None:
             logger.error("Could not generate content. Dynamic temlplate id %s" % str(self.id))
             return None
 
         if self.template_type == self.TemplateType.EMAIL:
-            EmailNotification.send_dynamic_template_notification(recipient_obj, rendered_content, self.subject, notification_type)
+            if recipient_obj.__class__.__name__ != 'RecipientEmail':
+                raise Exception('Recipient object is not defined.')
+
+            recipient_obj.add_cc(self.get_cc())
+            recipient_obj.add_bcc(self.get_bcc())
+
+            EmailNotification.send_dynamic_template_notification(recipient_obj, rendered_content, self.subject, notification_type, *args, **kwargs)
         elif self.template_type == self.TemplateType.SMS:
-            SmsNotification.send_dynamic_template_notification(recipient_obj, rendered_content, notification_type)
+            SmsNotification.send_dynamic_template_notification(recipient_obj, rendered_content, notification_type, *args, **kwargs)
 
         return
 
@@ -1344,16 +1433,6 @@ class DynamicTemplates(TimeStampedModel):
         return rendered_data
 
     def save(self, *args, **kwargs):
-
-        # old_instance = None
-        # if self.id:
-        #     old_instance = DynamicTemplates.objects.get(id=self.id)
-        #
-        # if not self.id or self.content != old_instance.content:
-        #     parameter_dict = self.parse_and_genearate_sample_json()
-        #     self.sample_parameters = parameter_dict
-        # self.generate_virutal_content()
-
         super().save(*args, **kwargs)
 
     def preview_url(self):

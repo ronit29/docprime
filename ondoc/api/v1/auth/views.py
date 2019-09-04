@@ -88,7 +88,13 @@ class LoginOTP(GenericViewSet):
 
     @transaction.atomic
     def generate(self, request, format=None):
-
+        # from ondoc.prescription.models import PresccriptionPdf
+        # from ondoc.doctor.models import OfflineOPDAppointments
+        # opd = OfflineOPDAppointments.objects.last()
+        # pdf = PresccriptionPdf.objects.last()
+        # file = pdf.get_pdf(opd)
+        # pdf.prescription_file = file
+        # pdf.save()
         response = {'exists': 0}
         # if request.data.get("phone_number"):
         #     expire_otp(phone_number=request.data.get("phone_number"))
@@ -1256,6 +1262,7 @@ class TransactionViewSet(viewsets.GenericViewSet):
         LAB_REDIRECT_URL = settings.BASE_URL + "/lab/appointment"
         OPD_REDIRECT_URL = settings.BASE_URL + "/opd/appointment"
         PLAN_REDIRECT_URL = settings.BASE_URL + "/prime/success?user_plan="
+        ECONSULT_REDIRECT_URL = settings.BASE_URL + "/econsult?order_id=%s&payment=success"
 
         CHAT_ERROR_REDIRECT_URL = settings.BASE_URL + "/mobileviewchat?payment=fail&error_message=%s" % "Error processing payment, please try again."
         CHAT_REDIRECT_URL = CHAT_ERROR_REDIRECT_URL
@@ -1385,6 +1392,8 @@ class TransactionViewSet(viewsets.GenericViewSet):
                     REDIRECT_URL = settings.BASE_URL + "/insurance/complete?payment_success=true&id=" + str(processed_data.get("id", ""))
                 elif processed_data.get("type") == "plan":
                     REDIRECT_URL = PLAN_REDIRECT_URL + str(processed_data.get("id", "")) + "&payment_success=true"
+                elif processed_data.get("type") == "econsultation":
+                    REDIRECT_URL = ECONSULT_REDIRECT_URL % order_obj.id
                 elif processed_data.get('type') == "chat":
                     CHAT_REDIRECT_URL = CHAT_SUCCESS_REDIRECT_URL % order_obj.id
         except Exception as e:
@@ -2352,7 +2361,7 @@ class MatrixUserViewset(GenericViewSet):
 
         base_landing_url = settings.BASE_URL + '/sms/booking?token={}'.format(token['token'].decode("utf-8"))
         # redirect_url = 'search' if redirect_type == 'lab' else '/'
-        redirect_url = 'opd/doctor/{}/{}/bookdetails'.format(doctor.id, hospital.id)
+        redirect_url = 'opd/doctor/{}/{}/bookdetails?is_matrix=true'.format(doctor.id, hospital.id)
         callback_url = base_landing_url + "&callbackurl={}".format(redirect_url)
         docprime_login_url = generate_short_url(callback_url)
 
