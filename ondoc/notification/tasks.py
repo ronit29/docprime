@@ -373,12 +373,16 @@ def set_order_dummy_transaction(self, order_id, user_id):
         self.retry([order_id, user_id], countdown=300)
 
 @task
-def send_offline_appointment_message(number, text, type):
-    data = {}
-    data['phone_number'] = number
-    data['text'] = mark_safe(text)
+def send_offline_appointment_message(**kwargs):
+    from ondoc.communications.models import OfflineOpdAppointments
+    appointment = kwargs.get('appointment')
+    notification_type = kwargs.get('notification_type')
+    receivers = kwargs.get('receivers')
     try:
-        notification_models.SmsNotification.send_rating_link(data)
+        offline_opd_appointment_comm = OfflineOpdAppointments(appointment=appointment,
+                                                              notification_type=notification_type,
+                                                              receivers=receivers)
+        offline_opd_appointment_comm.send()
     except Exception as e:
         logger.error("Error sending " + str(type) + " message - " + str(e))
 
@@ -804,10 +808,13 @@ def docprime_appointment_reminder_sms_provider(appointment_id, appointment_updat
 
 
 @task()
-def offline_appointment_reminder_sms_patient(appointment_id, time_slot_start_timestamp, **kwargs):
+def offline_appointment_reminder_sms_patient(appointment_id, time_slot_start_timestamp, number):
     from ondoc.doctor.models import OfflineOPDAppointments
+    from ondoc.communications.models import SMSNotification, OfflineOpdAppointments
     try:
-        instance = OfflineOPDAppointments.objects.filter(id=appointment_id).first()
+        instance = OfflineOPDAppointments.objects.select_related('user', 'doctor', 'hospital')\
+                                                 .prefetch_related('hospital__assoc_doctors')\
+                                                 .filter(id=appointment_id).first()
         if not instance or \
                 not instance.user or \
                 math.floor(instance.time_slot_start.timestamp()) != time_slot_start_timestamp \
@@ -817,10 +824,15 @@ def offline_appointment_reminder_sms_patient(appointment_id, time_slot_start_tim
             #                                                previous_appointment_date_time,
             #                                                str(math.floor(instance.time_slot_start.timestamp()))))
             return
-        data = {}
-        data['phone_number'] = kwargs.get('number')
-        data['text'] = mark_safe(kwargs.get('text'))
-        notification_models.SmsNotification.send_rating_link(data)
+        receivers = [{"user": None, "phone_number": number}]
+        offline_opd_comm_obj = OfflineOpdAppointments(appointment=instance,
+                                                      notification_type=NotificationAction.OFFLINE_APPOINTMENT_REMINDER_PROVIDER_SMS,
+                                                      receivers=receivers)
+        offline_opd_comm_obj.send()
+        # data = {}
+        # data['phone_number'] = kwargs.get('number')
+        # data['text'] = mark_safe(kwargs.get('text'))
+        # notification_models.SmsNotification.send_rating_link(data)
     except Exception as e:
         logger.error(str(e))
 
