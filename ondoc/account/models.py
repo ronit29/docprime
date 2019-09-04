@@ -288,13 +288,17 @@ class Order(TimeStampedModel):
         amount = None
         promotional_amount = 0
         total_balance = consumer_account.get_total_balance()
+        if appointment_data.get('_responsible_user'):
+            _responsible_user = appointment_data.pop('_responsible_user')
+        if appointment_data.get('_source'):
+            _source = appointment_data.pop('_source')
 
         if self.action == Order.OPD_APPOINTMENT_CREATE:
             if total_balance >= appointment_data["effective_price"] or payment_not_required:
                 if self.reference_id:
                     appointment_obj = cod_to_prepaid_app
                 else:
-                    appointment_obj = OpdAppointment.create_appointment(appointment_data)
+                    appointment_obj = OpdAppointment.create_appointment(appointment_data, responsible_user=_responsible_user, source=_source)
                 order_dict = {
                     "reference_id": appointment_obj.id,
                     "payment_status": Order.PAYMENT_ACCEPTED
@@ -302,7 +306,7 @@ class Order(TimeStampedModel):
                 amount = appointment_obj.effective_price
         elif self.action == Order.LAB_APPOINTMENT_CREATE:
             if total_balance >= appointment_data["effective_price"] or payment_not_required:
-                appointment_obj = LabAppointment.create_appointment(appointment_data)
+                appointment_obj = LabAppointment.create_appointment(appointment_data, responsible_user=_responsible_user, source=_source)
                 order_dict = {
                     "reference_id": appointment_obj.id,
                     "payment_status": Order.PAYMENT_ACCEPTED
@@ -600,8 +604,6 @@ class Order(TimeStampedModel):
         from ondoc.matrix.tasks import push_order_to_matrix
 
         fulfillment_data = cls.transfrom_cart_items(request, cart_items)
-        fulfillment_data['from_app'] = request.data.get('from_app', None)
-        fulfillment_data['from_web'] = request.data.get('from_web', None)
         user = request.user
         resp = {}
         balance = 0

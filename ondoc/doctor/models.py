@@ -2660,7 +2660,7 @@ class OpdAppointment(auth_model.TimeStampedModel, CouponsMixin, OpdAppointmentIn
         return appointments
 
     @classmethod
-    def create_appointment(cls, appointment_data):
+    def create_appointment(cls, appointment_data, responsible_user=None, source=None):
         from ondoc.insurance.models import UserInsurance
         insurance = appointment_data.get('insurance')
         appointment_status = OpdAppointment.BOOKED
@@ -2682,8 +2682,13 @@ class OpdAppointment(auth_model.TimeStampedModel, CouponsMixin, OpdAppointmentIn
             "random_coupons": appointment_data.pop("coupon_data", [])
         }
         procedure_details = appointment_data.pop('extra_details', [])
-        
-        app_obj = cls.objects.create(**appointment_data)
+
+        # app_obj = cls.objects.create(**appointment_data)
+        _responsible_user=None
+        if responsible_user:
+            _responsible_user = auth_model.User.objects.filter(id=responsible_user).first()
+        app_obj = cls(**appointment_data)
+        app_obj.save(responsible_user=_responsible_user, source=source)
         if procedure_details:
             procedure_to_be_added = []
             for procedure in procedure_details:
@@ -2999,10 +3004,15 @@ class OpdAppointment(auth_model.TimeStampedModel, CouponsMixin, OpdAppointmentIn
                 if to_save:
                     self.purchase_order.save()
 
-
+        if kwargs.get('source'):
+            source = kwargs.pop('source')
+        if kwargs.get('responsible_user'):
+            responsible_user = kwargs.pop('responsible_user')
         super().save(*args, **kwargs)
 
         if push_to_history:
+            self._responsible_user = responsible_user
+            self._source = source
             AppointmentHistory.create(content_object=self)
 
         transaction.on_commit(lambda: self.after_commit_tasks(database_instance, push_to_matrix))
@@ -3369,7 +3379,9 @@ class OpdAppointment(auth_model.TimeStampedModel, CouponsMixin, OpdAppointmentIn
             "cashback": int(price_data.get("coupon_cashback")),
             "is_appointment_insured": is_appointment_insured,
             "insurance": insurance_id,
-            "coupon_data": price_data.get("coupon_data")
+            "coupon_data": price_data.get("coupon_data"),
+            "_responsible_user": data.get("_responsible_user", None),
+            "_source": data.get("_source", None)
         }
 
     @staticmethod
