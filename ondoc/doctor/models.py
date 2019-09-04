@@ -3004,6 +3004,8 @@ class OpdAppointment(auth_model.TimeStampedModel, CouponsMixin, OpdAppointmentIn
                 if to_save:
                     self.purchase_order.save()
 
+        responsible_user = None
+        source = None
         if kwargs.get('source'):
             source = kwargs.pop('source')
         if kwargs.get('responsible_user'):
@@ -3011,8 +3013,10 @@ class OpdAppointment(auth_model.TimeStampedModel, CouponsMixin, OpdAppointmentIn
         super().save(*args, **kwargs)
 
         if push_to_history:
-            self._responsible_user = responsible_user
-            self._source = source
+            if responsible_user:
+                self._responsible_user = responsible_user
+            if source:
+                self._source = source
             AppointmentHistory.create(content_object=self)
 
         transaction.on_commit(lambda: self.after_commit_tasks(database_instance, push_to_matrix))

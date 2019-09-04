@@ -2084,6 +2084,9 @@ class LabAppointment(TimeStampedModel, CouponsMixin, LabAppointmentInvoiceMixin,
             push_to_history = True
         elif self.id is None:
             push_to_history = True
+
+        responsible_user=None
+        source=None
         if kwargs.get('source'):
             source = kwargs.pop('source')
         if kwargs.get('responsible_user'):
@@ -2092,8 +2095,10 @@ class LabAppointment(TimeStampedModel, CouponsMixin, LabAppointmentInvoiceMixin,
         super().save(*args, **kwargs)
 
         if push_to_history:
-            self._responsible_user = responsible_user
-            self._source = source
+            if responsible_user:
+                self._responsible_user = responsible_user
+            if source:
+                self._source = source
             AppointmentHistory.create(content_object=self)
 
         # Push the appointment to the integrator.
