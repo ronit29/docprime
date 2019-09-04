@@ -27,7 +27,7 @@ from reversion_compare.admin import CompareVersionAdmin
 
 from ondoc.api.v1.utils import GenericAdminEntity, util_absolute_url, util_file_name
 from ondoc.common.models import AppointmentHistory, SponsorListingURL, SponsorListingSpecialization, \
-    SponsorListingUtmTerm
+    SponsorListingUtmTerm, SponsoredListingService
 from django.contrib import messages
 from django.http import HttpResponseRedirect
 
@@ -2467,20 +2467,27 @@ class SponsorListingSpecializationInline(admin.TabularInline):
     extra = 2
     can_delete = True
 
+
 class SponsorListingUtmTermInline(admin.TabularInline):
     model = SponsorListingUtmTerm
     extra = 0
     can_delete = True
 
 
-class PurchaseOrderCreationAdmin(admin.ModelAdmin):
+class SponsoredListingServiceInline(admin.TabularInline):
+    model = SponsoredListingService
+    extra = 0
+    can_delete = True
+
+
+class PurchaseOrderCreationAdmin(CompareVersionAdmin):
     model = PurchaseOrderCreation
     form = PurchaseOrderCreationForm
     list_display = ['provider_type', 'created_at', 'start_date', 'end_date', 'provider_name_hospital', 'total_appointment_count',
                     'appointment_booked_count', 'current_appointment_count']
     autocomplete_fields = ['provider_name_lab', 'provider_name_hospital']
     search_fields = ['provider_name_lab__name', 'provider_name_hospital__name']
-    inlines = [SponsorListingURLInline, SponsorListingSpecializationInline, SponsorListingUtmTermInline]
+    inlines = [SponsorListingURLInline, SponsorListingSpecializationInline, SponsorListingUtmTermInline, SponsoredListingServiceInline]
     # readonly_fields = ['provider_name', 'appointment_booked_count', 'current_appointment_count']
 
     def get_readonly_fields(self, request, obj=None):

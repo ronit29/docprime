@@ -32,6 +32,7 @@ from ondoc.common.helper import Choices
 from django.conf import settings
 
 # from ondoc.doctor.models import PurchaseOrderCreation, PracticeSpecialization
+from ondoc.doctor.models import SponsoredServices
 
 
 class Cities(models.Model):
@@ -831,3 +832,14 @@ class SponsorListingUtmTerm(auth_model.TimeStampedModel):
     poc = models.ForeignKey('doctor.PurchaseOrderCreation', on_delete=models.CASCADE, related_name='poc_utm_term', null=True)
     utm_term = models.CharField(max_length=1000, null=True, blank=True)
     is_enabled = models.BooleanField(default=False)
+
+
+class SponsoredListingService(auth_model.TimeStampedModel):
+    poc = models.ForeignKey('doctor.PurchaseOrderCreation', on_delete=models.SET_NULL, related_name='poc_utm_term', null=True)
+    sponsored_service = models.ForeignKey(SponsoredServices, on_delete=models.SET_NULL, blank=False, null=False, related_name='hosp_sponsored_services')
+
+    class Meta:
+        db_table = 'sponsoredlisting_service'
+
+
+
