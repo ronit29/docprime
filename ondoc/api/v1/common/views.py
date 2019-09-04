@@ -25,7 +25,7 @@ from ondoc.doctor.models import (Doctor, DoctorPracticeSpecialization, PracticeS
                                  Qualification,
                                  Specialization, College, DoctorQualification, DoctorExperience, DoctorAward,
                                  DoctorClinicTiming, DoctorClinic, Hospital, SourceIdentifier, DoctorAssociation,
-                                 PurchaseOrderCreation)
+                                 PurchaseOrderCreation, HospitalSponsoredServices)
 
 from ondoc.chat.models import ChatPrescription
 from ondoc.insurance.models import InsuranceEligibleCities
@@ -1294,6 +1294,15 @@ class SponsorListingViewSet(viewsets.GenericViewSet):
                                                             'health_insurance_providers',
                                                             'network__hospital_network_documents',
                                                             'hospitalspeciality_set').filter(id__in=important_ids)
+
+        # for hospital in list_obj:
+        #     sp_list = []
+        #     resp={}
+        #     for sp_service in hospital.hospital_services.all():
+        #         resp['name'] = sp_service.sponsored_service.name
+        #         resp['id'] = sp_service.sponsored_service.id
+        #         sp_list.append({})
+
 
         serialized_objects = TopHospitalForIpdProcedureSerializer(list_obj, many=True).data
         return Response(serialized_objects)
