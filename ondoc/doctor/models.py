@@ -73,7 +73,7 @@ from django.contrib.contenttypes.fields import GenericForeignKey
 from django.contrib.contenttypes.models import ContentType
 from ondoc.matrix.tasks import push_appointment_to_matrix, push_onboarding_qcstatus_to_matrix, \
     update_onboarding_qcstatus_to_matrix, create_or_update_lead_on_matrix, push_signup_lead_to_matrix, \
-    create_ipd_lead_from_opd_appointment
+    create_ipd_lead_from_opd_appointment, push_retail_appointment_to_matrix
 # from ondoc.procedure.models import Procedure
 from ondoc.ratings_review import models as ratings_models
 from django.utils import timezone
@@ -2842,14 +2842,21 @@ class OpdAppointment(auth_model.TimeStampedModel, CouponsMixin, OpdAppointmentIn
                         (self.id, NotificationAction.COD_TO_PREPAID_REQUEST), countdown=5)
             except Exception as e:
                 logger.error(str(e))
+
         if push_to_matrix:
-        # Push the appointment data to the matrix .
+            # Push the appointment data to the matrix
             try:
                 push_appointment_to_matrix.apply_async(({'type': 'OPD_APPOINTMENT', 'appointment_id': self.id,
-                                                         'product_id': 5, 'sub_product_id': 2},), countdown=5)
-
+                                                             'product_id': 5, 'sub_product_id': 2},), countdown=5)
             except Exception as e:
                 logger.error(str(e))
+
+            if self.is_retail_booking():
+                try:
+                    push_retail_appointment_to_matrix.apply_async(({'type': 'OPD_APPOINTMENT', 'appointment_id': self.id,
+                                                        'product_id': 5, 'sub_product_id': 2},), countdown=5)
+                except Exception as e:
+                    logger.error(str(e))
 
         if self.is_to_send_notification(old_instance):
             sent_to_provider = True
@@ -3442,16 +3449,27 @@ class OpdAppointment(auth_model.TimeStampedModel, CouponsMixin, OpdAppointmentIn
         except Exception as e:
             logger.error("Could not save triggered event - " + str(e))
 
-    def get_matrix_data(self, order, product_id, sub_product_id):
+    def is_retail_booking(self):
+        if self.status == OpdAppointment.ACCEPTED and (self.payment_type == OpdAppointment.PREPAID or
+                                                                self.payment_type == OpdAppointment.COD) and \
+                                                                self.doctor.is_insurance_enabled and \
+                                                                self.hospital.enabled_for_insurance:
+            return True
+        else:
+            return False
+
+    def get_matrix_data(self, order, product_id, sub_product_id, lead_source=None):
         # policy_details = self.get_matrix_policy_data()
         appointment_details = self.get_matrix_appointment_data(order)
+        lead_source = 'DocPrime'
+        lead_id = self.matrix_lead_id if self.matrix_lead_id else 0
 
         request_data = {
             'DocPrimeUserId': self.user.id,
-            'LeadID': self.matrix_lead_id if self.matrix_lead_id else 0,
+            'LeadID': lead_id,
             'Name': self.profile.name,
             'PrimaryNo': self.user.phone_number,
-            'LeadSource': 'DocPrime',
+            'LeadSource': lead_source,
             'EmailId': self.profile.email,
             'Gender': 1 if self.profile.gender == 'm' else 2 if self.profile.gender == 'f' else 0,
             'CityId': 0,
@@ -3608,6 +3626,17 @@ class OpdAppointment(auth_model.TimeStampedModel, CouponsMixin, OpdAppointmentIn
         mobile_list.extend(doctor_mobiles)
 
         return mobile_list
+
+    def get_matrix_retail_booking_data(self):
+        data = {
+                "Name": self.profile.name,
+                "ProductId": 11,
+                "PrimaryNo": self.user.phone_number,
+                "ReferenceBookingId": self.id,
+                "SubProductId": 0,
+                "LeadSource": "RetailBooking"
+            }
+        return data
 
     @classmethod
     def get_insured_completed_appointment(cls, insurance_obj):

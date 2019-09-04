@@ -79,11 +79,10 @@ class EventCreateViewSet(GenericViewSet):
                                                             visit_id=visit_id, user=user, triggered_at=triggered_at)
             resp['success'] = "Event Saved Successfully!"
         except Exception as e:
-            logger.error("Error saving event - " + str(e))
+            # logger.error("Error saving event - " + str(e))
             resp['error'] = "Error Processing Event Data!"
 
-
-        self.modify_visit( event_name, visit_id, visitor_id, data, userAgent, track_models.TrackingVisit, track_models.TrackingVisitor)
+        self.modify_visit(event_name, visit_id, visitor_id, data, userAgent, track_models.TrackingVisit, track_models.TrackingVisitor)
         if settings.MONGO_STORE:
             self.modify_visit(event_name, visit_id, visitor_id, data, userAgent, track_mongo_models.TrackingVisit, track_mongo_models.TrackingVisitor)
 
