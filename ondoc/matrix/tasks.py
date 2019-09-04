@@ -1354,7 +1354,7 @@ def push_retail_appointment_to_matrix(self, data):
         matrix_api_token = settings.MATRIX_API_TOKEN
         response = requests.post(url, data=json.dumps(request_data), headers={'Authorization': matrix_api_token,
                                                                               'Content-Type': 'application/json'})
-
+        logger.info(json.dumps(request_data))
         if response.status_code != status.HTTP_200_OK or not response.ok:
             logger.error(json.dumps(request_data))
             logger.info("[ERROR] Retail Appointment could not be published to the matrix system")
