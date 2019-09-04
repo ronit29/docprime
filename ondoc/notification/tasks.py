@@ -1052,7 +1052,7 @@ def push_plus_lead_to_matrix(self, data):
         request_data = {
             'LeadID': plus_lead_obj.matrix_lead_id if plus_lead_obj.matrix_lead_id else 0,
             'LeadSource': lead_source,
-            'Name': 'none',
+            'Name': extras.get('name', 'none'),
             'BookedBy': phone_number,
             'PrimaryNo': phone_number,
             'PaymentStatus': 0,
