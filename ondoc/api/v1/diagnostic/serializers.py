@@ -257,6 +257,7 @@ class AvailableLabTestPackageSerializer(serializers.ModelSerializer):
     included_in_user_plan = serializers.SerializerMethodField()
     is_price_zero = serializers.SerializerMethodField()
     # is_prescription_needed = serializers.SerializerMethodField()
+    lensfit_offer = serializers.SerializerMethodField()
 
     def get_is_price_zero(self, obj):
         agreed_price = obj.computed_agreed_price if obj.custom_agreed_price is None else obj.custom_agreed_price
@@ -372,11 +373,58 @@ class AvailableLabTestPackageSerializer(serializers.ModelSerializer):
 
         return parameters
 
+    def get_lensfit_offer(self, obj):
+        from ondoc.api.v1.coupon.serializers import CouponSerializer
+        is_insurance_covered = False
+        offer = {
+            'applicable': False,
+            'coupon': {}
+        }
+        insurance_applicable = False
+        request = self.context.get("request")
+        lab = self.context.get("lab")
+        profile = self.context.get("profile")
+        user = request.user
+        resp = Lab.get_insurance_details(user)
+
+        if lab.is_enabled_for_insurance and obj.mrp is not None and resp['insurance_threshold_amount'] is not None \
+                and obj.mrp <= resp['insurance_threshold_amount']:
+            is_insurance_covered = True
+
+        if is_insurance_covered and user and user.is_authenticated and profile:
+            insurance_applicable = user.active_insurance and profile.is_insured_profile
+
+        if not insurance_applicable:
+            deal_price = obj.computed_deal_price if obj.custom_deal_price is None else obj.custom_deal_price
+            coupon_code = Coupon.objects.filter(is_lensfit=True).order_by('-created_at').first()
+            product_id = Order.LAB_PRODUCT_ID
+
+            filters = dict()
+            filters['lab'] = dict()
+            lab_obj = filters['lab']
+            lab_obj['id'] = lab.id
+            lab_obj['network_id'] = lab.network_id
+            lab_obj['city'] = lab.city
+            filters['tests'] = [obj.test]
+            filters['deal_price'] = deal_price
+            coupon_recommender = CouponRecommender(request.user, profile, 'lab', product_id, coupon_code, None)
+            applicable_coupons = coupon_recommender.applicable_coupons(**filters)
+
+            lensfit_coupons = list(filter(lambda x: x.is_lensfit is True, applicable_coupons))
+            if lensfit_coupons:
+                offer['applicable'] = True
+                coupon_properties = coupon_recommender.get_coupon_properties(str(lensfit_coupons[0]))
+                serializer = CouponSerializer(lensfit_coupons[0], context={'coupon_properties': coupon_properties})
+                offer['coupon'] = serializer.data
+
+        return offer
+
+
     class Meta:
         model = AvailableLabTest
         fields = ('test_id', 'mrp', 'test', 'agreed_price', 'deal_price', 'enabled', 'is_home_collection_enabled',
                   'package', 'parameters', 'is_package', 'number_of_tests', 'why', 'pre_test_info', 'expected_tat',
-                  'hide_price', 'included_in_user_plan', 'insurance', 'is_price_zero', 'insurance_agreed_price')
+                  'hide_price', 'included_in_user_plan', 'insurance', 'is_price_zero', 'insurance_agreed_price', 'lensfit_offer')
 
 class AvailableLabTestSerializer(serializers.ModelSerializer):
     test = LabTestSerializer()
@@ -1759,6 +1807,8 @@ class PackageLabCompareRequestSerializer(serializers.Serializer):
 
 class CompareLabPackagesSerializer(serializers.Serializer):
     package_lab_ids = serializers.ListField(child=PackageLabCompareRequestSerializer(), min_length=1, max_length=5)
-    longitude = serializers.FloatField(default=77.071848)
-    latitude = serializers.FloatField(default=28.450367)
+    long = serializers.FloatField(default=77.071848)
+    lat = serializers.FloatField(default=28.450367)
     title = serializers.CharField(required=False, max_length=500)
+    category = serializers.PrimaryKeyRelatedField(queryset=LabTestCategory.objects.all(), required=False,
+                                                  allow_null=True)

@@ -12,7 +12,7 @@ from ondoc.account.tasks import refund_status_update, consumer_refund_update, du
 from celery.schedules import crontab
 from ondoc.doctor.tasks import save_avg_rating, update_prices, update_city_search_key, update_doctors_count, update_search_score, \
     update_all_ipd_seo_urls, update_insured_labs_and_doctors, update_seo_urls, update_hosp_google_avg_rating, \
-    update_flags, doctors_daily_schedule
+    update_flags, doctors_daily_schedule, update_rc_super_user
 from ondoc.account.tasks import update_ben_status_from_pg,update_merchant_payout_pg_status, create_appointment_admins_from_spocs
 from ondoc.insurance.tasks import push_mis, process_insurance_payouts
 # from ondoc.doctor.services.update_search_score import DoctorSearchScore
@@ -100,6 +100,7 @@ def setup_periodic_tasks(sender, **kwargs):
 
     sender.add_periodic_task(crontab(hour=19, minute=00), create_appointment_admins_from_spocs.s(), name='Create Appointment Admins from SPOCs')
     sender.add_periodic_task(crontab(hour=0, minute=30), doctors_daily_schedule.s(), name="Doctor's Daily Schedule")
+    sender.add_periodic_task(crontab(day_of_week=1, hour=22, minute=0), update_rc_super_user.s(), name="Update Rocket Chat Super User Token")
     # sender.add_periodic_task(crontab(hour=21, minute=00), add_net_revenue_for_merchant.s(), name='Add net revenue for merchants')
     sender.add_periodic_task(crontab(hour=0, minute=00), purchase_order_creation_counter_automation(), name="Enable Purchase Order Creation")
     sender.add_periodic_task(crontab(hour=18, minute=30), purchase_order_closing_counter_automation(),

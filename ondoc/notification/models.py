@@ -1,4 +1,5 @@
 import json
+import re
 
 from django.contrib.contenttypes.fields import GenericForeignKey
 from django.contrib.contenttypes.models import ContentType
@@ -19,6 +20,7 @@ from django.utils import timezone
 from weasyprint import HTML
 from django.conf import settings
 from num2words import num2words
+from itertools import groupby
 import datetime
 from datetime import timedelta
 import pytz
@@ -29,16 +31,27 @@ from django.core.files.storage import default_storage
 from django.core.files.base import ContentFile
 from django.core.files.uploadedfile import SimpleUploadedFile, InMemoryUploadedFile
 from django.core.files import File
-from hardcopy import bytestring_to_pdf
 from django.contrib.postgres.fields import ArrayField
+from ondoc.common.helper import Choices
+from django.utils.safestring import mark_safe
+from collections import OrderedDict
+from django.template import Context, Template
 
 import copy
+import random, string
 
 User = get_user_model()
 logger = logging.getLogger(__name__)
 
 
 class NotificationAction:
+    SMS_NOTIFICATION = 1001
+    EMAIL_NOTIFICATION = 1002
+    PUSH_NOTIFICATION = 1003
+
+    NOTIFICATION_CHOICES = ((SMS_NOTIFICATION, "SMS Notification"), (EMAIL_NOTIFICATION, "Email Notification"),
+                            (PUSH_NOTIFICATION, "Push Notification"))
+
     APPOINTMENT_ACCEPTED = 1
     APPOINTMENT_CANCELLED = 2
     APPOINTMENT_RESCHEDULED_BY_PATIENT = 3
@@ -105,6 +118,31 @@ class NotificationAction:
     LAB_FEEDBACK_AFTER_APPOINTMENT = 95
 
     CONTACT_US_EMAIL = 65
+
+    OFFLINE_OPD_APPOINTMENT_BOOKED = 130
+    OFFLINE_OPD_APPOINTMENT_ACCEPTED = 131
+    OFFLINE_OPD_APPOINTMENT_CANCELLED = 132
+    OFFLINE_OPD_APPOINTMENT_RESCHEDULED_DOCTOR = 133
+    OFFLINE_OPD_APPOINTMENT_NO_SHOW = 134
+    OFFLINE_OPD_INVOICE = 135
+    OFFLINE_OPD_APPOINTMENT_COMPLETED = 136
+    OFFLINE_APPOINTMENT_REMINDER_PROVIDER_SMS = 137
+    OFFLINE_PATIENT_WELCOME_MESSAGE = 138
+
+    ECONSULTATION_BOOKED = 150
+    ECONSULTATION_ACCEPTED = 151
+    ECONSULTATION_RESCHEDULED_DOCTOR = 152
+    ECONSULTATION_RESCHEDULED_PATIENT = 153
+    ECONSULTATION_CANCELLED = 154
+    ECONSULTATION_COMPLETED = 155
+    ECONSULTATION_EXPIRED = 156
+    E_CONSULT_SHARE = 157
+    E_CONSULT_VIDEO_LINK_SHARE = 158
+    E_CONSULT_NEW_MESSAGE_RECEIVED = 159
+
+    SAMPLE_DYNAMIC_TEMPLATE_PREVIEW = 110
+    SEND_LENSFIT_COUPON = 111
+
     NOTIFICATION_TYPE_CHOICES = (
         (APPOINTMENT_ACCEPTED, "Appointment Accepted"),
         (APPOINTMENT_CANCELLED, "Appointment Cancelled"),
@@ -121,11 +159,33 @@ class NotificationAction:
         (LAB_REPORT_UPLOADED, "Lab Report Uploaded"),
         (LAB_REPORT_SEND_VIA_CRM, "Send Lab Reports via CRM"),
 
+        (OFFLINE_OPD_APPOINTMENT_BOOKED, "Offline OPD Appointment Booked"),
+        (OFFLINE_OPD_APPOINTMENT_ACCEPTED, "Offline OPD Appointment Accepted"),
+        (OFFLINE_OPD_APPOINTMENT_CANCELLED, "Offline OPD Appointment Cancelled"),
+        (OFFLINE_OPD_APPOINTMENT_RESCHEDULED_DOCTOR, "Offline OPD Appointment Rescheduled by Doctor"),
+        (OFFLINE_OPD_APPOINTMENT_NO_SHOW, "Offline OPD Appointment No Show"),
+        (OFFLINE_OPD_APPOINTMENT_COMPLETED, "Offline OPD Appointment Completed"),
+        (DOCPRIME_APPOINTMENT_REMINDER_PROVIDER_SMS, 'Docprime Appointment Reminder Provider SMS'),
+        (OFFLINE_APPOINTMENT_REMINDER_PROVIDER_SMS, 'Offline Appointment Reminder Provider SMS'),
+
+        (ECONSULTATION_BOOKED, 'EConsultation Booked'),
+        (ECONSULTATION_ACCEPTED, 'EConsultation Accepted'),
+        (ECONSULTATION_RESCHEDULED_DOCTOR, 'EConsultation Rescheduled Doctor'),
+        (ECONSULTATION_RESCHEDULED_PATIENT, 'EConsultation Rescheduled Patient'),
+        (ECONSULTATION_CANCELLED, 'EConsultation Cancelled'),
+        (ECONSULTATION_COMPLETED, 'EConsultation Completed'),
+        (ECONSULTATION_EXPIRED, 'EConsultation Expired'),
+        (E_CONSULT_SHARE, 'E Consult Share'),
+        (E_CONSULT_VIDEO_LINK_SHARE, 'E Consult Video Link Share'),
+        (E_CONSULT_NEW_MESSAGE_RECEIVED, 'E Consult New Message Received'),
+
         (PRESCRIPTION_UPLOADED, "Prescription Uploaded"),
         (PAYMENT_PENDING, "Payment Pending"),
         (RECEIPT, "Receipt"),
         (DOCTOR_INVOICE, "Doctor Invoice"),
         (LAB_INVOICE, "Lab Invoice"),
+        (OFFLINE_OPD_INVOICE, "Offline OPD Invoice"),
+
         (INSURANCE_CONFIRMED, "Insurance Confirmed"),
         (INSURANCE_ENDORSMENT_APPROVED, "Insurance endorsment completed."),
         (INSURANCE_ENDORSMENT_REJECTED, "Insurance endorsment rejected."),
@@ -147,13 +207,23 @@ class NotificationAction:
         (COD_TO_PREPAID_REQUEST, 'COD To Prepaid Request'),
         (OPD_DAILY_SCHEDULE, 'OPD Daily Schedule')
     )
-
     OPD_APPOINTMENT = "opd_appointment"
     LAB_APPOINTMENT = "lab_appoingment"
+    OFFLINE_OPD_APPOINTMENT = "offline_opd_appointment"
+    E_CONSULTATION = "e_consultation"
 
     ACTION_TYPE_CHOICES = (
         (OPD_APPOINTMENT, 'Opd Appointment'),
         (LAB_APPOINTMENT, 'Lab Appointment'),
+        (OFFLINE_OPD_APPOINTMENT, 'Offline Opd Appointment'),
+        (E_CONSULTATION, 'E Consultation'),
+    )
+
+    APPOINTMENT = "appointment"
+    E_CONSULT_CHAT_VIEW = "EConsultChatView"
+    SCREEN_TYPE_CHOICES = (
+        (APPOINTMENT, 'appointment'),
+        (E_CONSULT_CHAT_VIEW, 'e_consult_chat_view'),
     )
 
     @classmethod
@@ -899,6 +969,32 @@ class EmailNotification(TimeStampedModel, EmailNotificationOpdMixin, EmailNotifi
         message = json.dumps(message)
         publish_message(message)
 
+    @classmethod
+    def send_dynamic_template_notification(cls, recipient_obj, html_body, email_subject, notification_type, *args, **kwargs):
+        if recipient_obj and recipient_obj.to:
+
+            if kwargs.get('is_preview', False):
+                email_obj = cls.objects.create(email=recipient_obj.to, notification_type=notification_type,
+                                               content=html_body, email_subject=email_subject, cc=[], bcc=[])
+
+            else:
+                email_obj = cls.objects.create(email=recipient_obj.to, notification_type=notification_type,
+                                               content=html_body, email_subject=email_subject, cc=recipient_obj.cc, bcc=recipient_obj.bcc)
+
+            email_obj.save()
+
+            email_noti = {
+                "email": recipient_obj.to,
+                "content": html_body,
+                "email_subject": email_subject
+            }
+            message = {
+                "data": email_noti,
+                "type": "email"
+            }
+            message = json.dumps(message)
+            publish_message(message)
+
 
 class SmsNotificationOpdMixin:
 
@@ -961,6 +1057,26 @@ class SmsNotification(TimeStampedModel, SmsNotificationOpdMixin, SmsNotification
 
     def __str__(self):
         return '{} -> {} ({})'.format(self.content, self.phone_number, self.user)
+
+    @classmethod
+    def send_dynamic_template_notification(cls, phone_number, body, notification_type, *args, **kwargs):
+        user = kwargs.get('user')
+        obj = cls.objects.create(
+            user=user,
+            phone_number=phone_number,
+            notification_type=notification_type,
+            content=body
+        )
+
+        if phone_number:
+            message = {
+                "data": model_to_dict(obj),
+                "type": "sms"
+            }
+            message = json.dumps(message)
+            if phone_number not in settings.OTP_BYPASS_NUMBERS:
+                publish_message(message)
+
 
     @classmethod
     def send_notification(cls, user, phone_number, notification_type, context):
@@ -1215,3 +1331,217 @@ class PushNotification(TimeStampedModel):
         }
         message = json.dumps(message)
         publish_message(message)
+
+
+class RecipientSMS(object):
+    def __init__(self, to):
+        self.to = to
+
+
+class RecipientEmail(object):
+    def __init__(self, to, cc=[], bcc=[]):
+        self.to = to
+        self.cc = cc if cc else []
+        self.bcc = bcc if bcc else []
+
+    def add_cc(self, email):
+        if email.__class__.__name__ == 'list':
+            self.cc.extend(email)
+        elif email.__class__.__name__ == 'str':
+            self.cc.append(email)
+
+        return self
+
+    def add_bcc(self, email):
+        if email.__class__.__name__ == 'list':
+            self.bcc.extend(email)
+        elif email.__class__.__name__ == 'str':
+            self.bcc.append(email)
+
+        return self
+
+
+class DynamicTemplates(TimeStampedModel):
+    class TemplateType(Choices):
+        SMS = 'SMS'
+        EMAIL = 'EMAIL'
+
+    class Content:
+        def __init__(self, content):
+            self.content = content
+
+    template_name = models.CharField(max_length=100, null=False, blank=False, help_text="Give name without extension")
+    template_type = models.CharField(max_length=100, choices=TemplateType.as_choices(), null=False, blank=False)
+    content = models.TextField(blank=False, null=False)
+    virtual_content = models.TextField(null=True)
+    approved = models.BooleanField(default=False)
+    created_by = models.ForeignKey(User, null=False, limit_choices_to={'user_type': 1}, on_delete=models.DO_NOTHING)
+    sample_parameters = JSONField(default=dict, null=True, blank=True)
+    subject = models.CharField(max_length=256, null=True, blank=True)
+    recipient = models.CharField(max_length=100, null=True, blank=True)
+    cc = models.CharField(max_length=512, null=True, blank=True)
+    bcc = models.CharField(max_length=512, null=True, blank=True)
+
+    def __str__(self):
+        return str(self.template_name)
+
+    def get_parameter_json(self):
+        return self.sample_parameters
+
+    def get_cc(self):
+        if not self.cc:
+            return []
+        cc_emails = self.cc.split(',')
+        return cc_emails
+
+    def get_bcc(self):
+        if not self.bcc:
+            return []
+        bcc_emails = self.bcc.split(',')
+        return bcc_emails
+
+    def send_notification(self, context, recipient_obj, notification_type, *args, **kwargs):
+        rendered_content = self.render_template(context)
+        if rendered_content is None:
+            logger.error("Could not generate content. Dynamic temlplate id %s" % str(self.id))
+            return None
+
+        if self.template_type == self.TemplateType.EMAIL:
+            if recipient_obj.__class__.__name__ != 'RecipientEmail':
+                raise Exception('Recipient object is not defined.')
+
+            recipient_obj.add_cc(self.get_cc())
+            recipient_obj.add_bcc(self.get_bcc())
+
+            EmailNotification.send_dynamic_template_notification(recipient_obj, rendered_content, self.subject, notification_type, *args, **kwargs)
+        elif self.template_type == self.TemplateType.SMS:
+            SmsNotification.send_dynamic_template_notification(recipient_obj, rendered_content, notification_type, *args, **kwargs)
+
+        return
+
+    def render_template(self, context):
+        rendered_data = None
+
+        try:
+            file_content = self.content
+            t = Template(file_content)
+            c = Context(context)
+            rendered_data = t.render(c)
+        except Exception as e:
+            logger.error(str(e))
+
+        return rendered_data
+
+    def save(self, *args, **kwargs):
+        super().save(*args, **kwargs)
+
+    def preview_url(self):
+        return mark_safe("<a href='/api/v1/notification/preview/{template_name}?send=False' target='_blank'>Preview</a> "
+                         "| <a href='/api/v1/notification/preview/{template_name}?send=True' target='_blank'>Send Preview</a>"
+                         .format(template_name=self.template_name))
+
+    class Meta:
+        db_table = 'dynamic_template'
+        unique_together = (('template_name', 'template_type'), )
+
+    # def evaluate_loop(self, content_obj):
+    #     content = content_obj.content.replace('\r','').replace('\n', '')
+    #     loops = re.findall(r'\{LOOP.*?ENDLOOP\}', content, re.MULTILINE)
+    #     if not loops:
+    #         return
+    #     loops_dict = dict()
+    #     for loop in loops:
+    #         # get loop name
+    #         loop_tag = re.findall(r'\{.*?\}', loop, re.MULTILINE)[0]
+    #         loop_tag = loop_tag[1:len(loop_tag)-1]
+    #         loop_name = loop_tag.split(" ")[1]
+    #         counter = 0
+    #         for e in loop:
+    #             counter = counter + 1
+    #             if e is not '}':
+    #                 pass
+    #             else:
+    #                 break
+    #         loop_script = loop[counter:len(loop) - len("{ENDLOOP}")]
+    #         parameter_list = re.findall(r'\{.*?\}', loop_script, re.MULTILINE)
+    #         p_dict = dict()
+    #         for p in parameter_list:
+    #             p_dict[p[1:len(p)-1]] = 'SAMPLE_VALUE'
+    #
+    #         loops_dict[loop_name] = [p_dict]
+    #
+    #         starting_offset = content.find(loop)
+    #         ending_offset = starting_offset + len(loop)
+    #         content = content[0:starting_offset] + content[ending_offset:]
+    #
+    #     content_obj.content = content
+    #
+    #     return loops_dict
+    #
+    # def evaluate_if(self, content):
+    #     return
+    #
+    # @classmethod
+    # def get_random_id(cls):
+    #     return ''.join(random.choice(string.ascii_uppercase + string.digits) for _ in range(5))
+    #
+    # def generate_virutal_content(self):
+    #     print("Generating virtual content.")
+    #     virtual_content = copy.deepcopy(self.content)
+    #     virtual_content = virtual_content.replace('\r','').replace('\n', '')
+    #
+    #     loops = re.findall(r'\{LOOP.*?ENDLOOP\}', virtual_content, re.MULTILINE)
+    #
+    #     for k, v in self.sample_parameters.items():
+    #         if v.__class__.__name__ == 'list':
+    #             if not loops:
+    #                 return
+    #             for loop in loops:
+    #                 loop_tag = re.findall(r'\{.*?\}', loop, re.MULTILINE)[0]
+    #                 loop_tag = loop_tag[1:len(loop_tag) - 1]
+    #                 loop_name = loop_tag.split(" ")[1]
+    #
+    #                 if k != loop_name:
+    #                     continue
+    #
+    #                 loop_identifier = DynamicTemplates.get_random_id()
+    #                 starting_offset = virtual_content.find(loop)
+    #                 ending_offset = starting_offset + len(loop)
+    #
+    #                 starting_loop_defination = "{%% for %s in %s %%}" % (str(loop_identifier), str(k))
+    #                 counter = 0
+    #                 for e in loop:
+    #                     counter = counter + 1
+    #                     if e is not '}':
+    #                         pass
+    #                     else:
+    #                         break
+    #                 loop = loop[counter:len(loop) - len("{ENDLOOP}")]
+    #                 parameter_list = re.findall(r'\{.*?\}', loop, re.MULTILINE)
+    #                 for v_para in parameter_list:
+    #                     updated_value = "{{%s.%s}}" % (str(loop_identifier), v_para[1:len(v_para)-1])
+    #                     loop = loop.replace(v_para, updated_value)
+    #
+    #                 ending_loop_defination = '{% endfor %}'
+    #
+    #                 final_parsed_template_loop = '%s%s%s' %(starting_loop_defination, loop, ending_loop_defination)
+    #                 virtual_content = virtual_content[0:starting_offset] + final_parsed_template_loop + virtual_content[ending_offset:]
+    #         else:
+    #             virtual_content = virtual_content.replace('{%s}' % str(k), '{{%s}}' % str(k))
+    #
+    #     self.virtual_content = virtual_content
+
+    # def parse_and_genearate_sample_json(self):
+    #     parameter_dict = OrderedDict()
+    #     content = copy.deepcopy(self.content)
+    #     content_obj = self.Content(content)
+    #     loop_dict = self.evaluate_loop(content_obj)
+    #     if loop_dict:
+    #         parameter_dict.update(loop_dict)
+    #     parameter_list = re.findall(r'\{.*?\}', content_obj.content, re.MULTILINE)
+    #
+    #     for p in parameter_list:
+    #         parameter_dict[p[1:len(p)-1]] = 'SAMPLE_VALUE'
+    #
+    #     return parameter_dict
+

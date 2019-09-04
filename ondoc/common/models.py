@@ -6,7 +6,7 @@ import string
 import random
 from django.core.files.uploadedfile import SimpleUploadedFile, InMemoryUploadedFile
 from weasyprint.fonts import FontConfiguration
-from hardcopy import bytestring_to_pdf
+# from hardcopy import bytestring_to_pdf
 import io
 #from tempfile import NamedTemporaryFile
 from django.core.files.storage import default_storage
@@ -60,30 +60,30 @@ class PDFTester(models.Model):
     css = models.TextField(max_length=50000000, blank=True)
     file = models.FileField(upload_to='common/pdf/test', blank=True)
 
-    def save(self, *args, **kwargs):
-
-        random_string = ''.join([random.choice(string.ascii_letters + string.digits) for n in range(12)])
-        path = 'common/pdf/test/' + random_string + '.pdf'
-        fs = FileSystemStorage()
-        file = fs.open(path, 'wb')
-
-        extra_args = {
-            'virtual-time-budget': 6000
-        }
-
-        bytestring_to_pdf(self.html.encode(), file, **extra_args)
-
-        file.close()
-
-        ff = File(fs.open(path, 'rb'))
-
-        random_string = ''.join([random.choice(string.ascii_letters + string.digits) for n in range(12)])
-        name = random_string+'.pdf'
-
-        self.file = InMemoryUploadedFile(ff.file, None, 'aaa.pdf', 'application/pdf', ff.file.tell(), None)
-
-
-        super().save(*args, **kwargs)
+    # def save(self, *args, **kwargs):
+    #
+    #     random_string = ''.join([random.choice(string.ascii_letters + string.digits) for n in range(12)])
+    #     path = 'common/pdf/test/' + random_string + '.pdf'
+    #     fs = FileSystemStorage()
+    #     file = fs.open(path, 'wb')
+    #
+    #     extra_args = {
+    #         'virtual-time-budget': 6000
+    #     }
+    #
+    #     bytestring_to_pdf(self.html.encode(), file, **extra_args)
+    #
+    #     file.close()
+    #
+    #     ff = File(fs.open(path, 'rb'))
+    #
+    #     random_string = ''.join([random.choice(string.ascii_letters + string.digits) for n in range(12)])
+    #     name = random_string+'.pdf'
+    #
+    #     self.file = InMemoryUploadedFile(ff.file, None, 'aaa.pdf', 'application/pdf', ff.file.tell(), None)
+    #
+    #
+    #     super().save(*args, **kwargs)
 
 
     class Meta:
@@ -339,6 +339,15 @@ class MatrixMappedState(TimeStampedModel):
         db_table = 'matrix_mapped_state'
         verbose_name_plural = "Matrix Mapped States"
 
+    def get_booking_analytics_data(self):
+        data = dict()
+
+        data['CreatedOn'] = self.updated_at
+        data['StateId'] = self.id
+        data['StateName'] = self.name
+
+        return data
+
 
     def sync_with_booking_analytics(self):
         obj = DP_StateMaster.objects.filter(StateId=self.id).first()
@@ -371,6 +380,14 @@ class MatrixMappedCity(TimeStampedModel):
         db_table = 'matrix_mapped_city'
         verbose_name_plural = "Matrix Mapped Cities"
 
+    def get_booking_analytics_data(self):
+        data = dict()
+
+        data['CreatedOn'] = self.updated_at
+        data['CityId'] = self.id
+        data['CityName'] = self.name
+
+        return data
 
     def sync_with_booking_analytics(self):
         obj = DP_CityMaster.objects.filter(CityId=self.id).first()
@@ -603,6 +620,7 @@ class BlockedStates(TimeStampedModel):
     class States(Choices):
         LOGIN = 'LOGIN'
         INSURANCE = 'INSURANCE'
+        VIP = 'VIP'
 
     state_name = models.CharField(max_length=50, null=False, blank=False, choices=States.as_choices(), unique=True)
     message = models.TextField()

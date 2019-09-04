@@ -1221,7 +1221,8 @@ class CommentViewSet(viewsets.ModelViewSet):
             id = data.get('id')
             object = Hospital.objects.filter(id=id).first()
         if object:
-            comments = FluentComment.objects.filter(object_pk=str(object.id), parent_id=None, is_public=True)
+            content_type = ContentType.objects.get(model="hospital")
+            comments = FluentComment.objects.filter(object_pk=str(object.id), is_public=True, content_type=content_type)
             serializer = CommentSerializer(comments, many=True, context={'request': request})
             return Response(serializer.data)
 

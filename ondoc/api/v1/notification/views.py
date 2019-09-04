@@ -11,6 +11,11 @@ from django.db import transaction
 from . import serializers
 from rest_framework import status
 
+from django.shortcuts import HttpResponse
+from django.views import View
+from django.template import Context, Template
+from ondoc.notification.models import DynamicTemplates, RecipientEmail, NotificationAction
+
 
 class AppNotificationViewSet(viewsets.GenericViewSet):
     serializer_class = serializers.AppNotificationSerializer
@@ -103,3 +108,40 @@ class ChatNotificationViewSet(viewsets.GenericViewSet):
         noti.send(user_and_tokens)
         return Response({"message": "Notification Sent"})
 
+
+class DynamicTemplate(View):
+
+    def get_invalid_content(self):
+        content = '<p>Invalid Template</p>'
+        t = Template(content)
+        c = Context({})
+        html = t.render(c)
+        return html
+
+    def get(self, request, template_name, *args, **kwargs):
+        obj = DynamicTemplates.objects.filter(template_name=template_name).first()
+
+        if not obj:
+            return HttpResponse(self.get_invalid_content())
+
+        if request.GET.get('send') == 'True':
+
+            if obj.recipient:
+
+                if obj.template_type == DynamicTemplates.TemplateType.EMAIL:
+                    recipient_obj = RecipientEmail(obj.recipient)
+                else:
+                    recipient_obj = obj.recipient
+
+                obj.send_notification(obj.get_parameter_json(), recipient_obj,
+                                      NotificationAction.SAMPLE_DYNAMIC_TEMPLATE_PREVIEW, is_preview=True)
+
+                html = "Notification send successfully."
+            else:
+                html = "Recipient Number or address found to send notification."
+
+        else:
+
+            html = obj.render_template(obj.get_parameter_json())
+
+        return HttpResponse(html)

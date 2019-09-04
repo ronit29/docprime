@@ -11,8 +11,10 @@ from django.utils import timezone
 from PIL import Image as Img
 from django.core.files.uploadedfile import InMemoryUploadedFile
 from io import BytesIO
+from itertools import groupby
 import math
 import os
+import re
 import hashlib
 import random, string
 from django.contrib.contenttypes.fields import GenericForeignKey, GenericRelation
@@ -22,7 +24,6 @@ from datetime import date, datetime, timedelta
 from safedelete import SOFT_DELETE
 from safedelete.models import SafeDeleteModel
 import reversion
-
 import requests
 import json
 from rest_framework import status
@@ -30,8 +31,8 @@ from collections import OrderedDict
 from django.utils.text import slugify
 import logging
 
-
 logger = logging.getLogger(__name__)
+
 
 class Image(models.Model):
     # name = models.ImageField(height_field='height', width_field='width')
@@ -318,6 +319,7 @@ class User(AbstractBaseUser, PermissionsMixin):
     date_joined = models.DateTimeField(auto_now_add=True)
     auto_created = models.BooleanField(default=False)
     source = models.CharField(blank=True, max_length=50, null=True)
+    data = JSONField(blank=True, null=True)
 
     def __hash__(self):
         return self.id
@@ -337,6 +339,79 @@ class User(AbstractBaseUser, PermissionsMixin):
         # if self.user_type==1 and hasattr(self, 'staffprofile'):
         #     return self.staffprofile.name
         # return str(self.phone_number)
+
+    @cached_property
+    def active_plus_user(self):
+        active_plus_user = self.active_plus_users.filter().order_by('-id').first()
+        return active_plus_user if active_plus_user and active_plus_user.is_valid() else None
+
+    @classmethod
+    def get_external_login_data(cls, data):
+        from ondoc.authentication.backends import JWTAuthentication
+        profile_data = {}
+        source = data.get('extra').get('utm_source', 'External') if data.get('extra') else 'External'
+        redirect_type = data.get('redirect_type', "")
+
+        user = User.objects.filter(phone_number=data.get('phone_number'),
+                                                     user_type=User.CONSUMER).first()
+        user_with_email = User.objects.filter(email=data.get('email', None), user_type=User.CONSUMER).first()
+        if not user and user_with_email:
+            raise Exception("Email already taken with another number")
+        if not user:
+            user = User.objects.create(phone_number=data.get('phone_number'),
+                                       is_phone_number_verified=False,
+                                       user_type=User.CONSUMER,
+                                       auto_created=True,
+                                       email=data.get('email'),
+                                       source=source,
+                                       data=data.get('extra'))
+
+        if not user:
+            raise Exception('Invalid User')
+            # return JsonResponse(response, status=400)
+
+        profile_data['name'] = data.get('name')
+        profile_data['phone_number'] = user.phone_number
+        profile_data['user'] = user
+        profile_data['email'] = data.get('email')
+        profile_data['source'] = source
+        profile_data['dob'] = data.get('dob', None)
+        profile_data['gender'] = data.get('gender', None)
+        user_profiles = user.profiles.all()
+
+        if not bool(re.match(r"^[a-zA-Z ]+$", data.get('name'))):
+            raise Exception('Invalid Name')
+            # return Response({"error": "Invalid Name"}, status=status.HTTP_400_BAD_REQUEST)
+
+        if user_profiles:
+            user_profiles = list(filter(lambda x: x.name.lower() == profile_data['name'].lower(), user_profiles))
+            if user_profiles:
+                user_profile = user_profiles[0]
+                if not user_profile.phone_number:
+                    user_profile.phone_number = profile_data['phone_number']
+                if not user_profile.email:
+                    user_profile.email = profile_data['email'] if not user_profile.email else None
+                if not user_profile.gender and profile_data.get('gender', None):
+                    user_profile.gender = profile_data.get('gender', None)
+                if not user_profile.dob and profile_data.get('dob', None):
+                    user_profile.dob = profile_data.get('dob', None)
+                user_profile.save()
+            else:
+                UserProfile.objects.create(**profile_data)
+        else:
+            profile_data.update({
+                "is_default_user": True
+            })
+            profile_data.pop('doctor', None)
+            profile_data.pop('hospital', None)
+            UserProfile.objects.create(**profile_data)
+
+        token_object = JWTAuthentication.generate_token(user)
+        result = dict()
+        result['token'] = token_object
+        result['user_id'] = user.id
+        return result
+
 
     def is_valid_lead(self, date_time_to_be_checked, check_lab_appointment=False, check_ipd_lead=False):
         # If this user has booked an appointment with specific period from date_time_to_be_checked, then
@@ -706,6 +781,26 @@ class NotificationEndpoint(TimeStampedModel):
     def __str__(self):
         return "{}-{}".format(self.user.phone_number, self.token)
 
+    @classmethod
+    def get_user_and_tokens(cls, receivers, **kwargs):
+        from ondoc.notification.models import NotificationAction
+        user_and_tokens = list()
+        if kwargs.get("action_type") == NotificationAction.E_CONSULTATION:
+            user_and_token = [{'user': token.user, 'token': token.token, 'app_name': token.app_name} for token in
+                              cls.objects.select_related('user').filter(Q(user__in=receivers), Q(Q(platform="android",
+                                                                                                   app_version__gt="2.100.13") |
+                                                                                                 Q(platform="ios",
+                                                                                                   app_version__gt="2.200.9"))) \
+                                                                .order_by('user')]
+        else:
+            user_and_token = [{'user': token.user, 'token': token.token, 'app_name': token.app_name} for token in
+                              cls.objects.select_related('user').filter(user__in=receivers).order_by('user')]
+        for user, user_token_group in groupby(user_and_token, key=lambda x: x['user']):
+            user_and_tokens.append(
+                {'user': user,
+                 'tokens': [{"token": t['token'], "app_name": t["app_name"]} for t in user_token_group]})
+        return user_and_tokens
+
 
 class Notification(TimeStampedModel):
     ACCEPTED = 1
@@ -987,6 +1082,17 @@ class GenericLabAdmin(TimeStampedModel, CreatedByModel):
                                write_permission=write_permission,
                                read_permission=read_permission
                                )
+
+    @classmethod
+    def get_appointment_admins(cls, appoinment):
+        if not appoinment:
+            return []
+        admins = GenericLabAdmin.objects.filter(is_disabled=False, lab=appoinment.lab).distinct('user')
+        admin_users = []
+        for admin in admins:
+            if admin.user:
+                admin_users.append(admin.user)
+        return admin_users
 
 
 class GenericAdminManager(models.Manager):
