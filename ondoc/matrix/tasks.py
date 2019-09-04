@@ -1330,3 +1330,46 @@ def check_for_ipd_lead_validity(self, data):
         obj.validate_lead()
     except Exception as e:
         pass
+
+
+@task(bind=True, max_retries=2)
+def push_retail_appointment_to_matrix(self, data):
+    from ondoc.doctor.models import OpdAppointment
+
+    try:
+        appointment_id = data.get('appointment_id', None)
+        if not appointment_id:
+            raise Exception("Appointment id not found, could not push to Matrix")
+
+        appointment = OpdAppointment.objects.filter(pk=appointment_id).first()
+        if not appointment:
+            raise Exception("Appointment could not found against id - " + str(appointment_id))
+
+        if not appointment.is_retail_booking():
+            raise Exception("Not a Retail Appointment - " + str(appointment_id))
+
+        request_data = appointment.get_matrix_retail_booking_data()
+
+        url = settings.MATRIX_API_URL
+        matrix_api_token = settings.MATRIX_API_TOKEN
+        response = requests.post(url, data=json.dumps(request_data), headers={'Authorization': matrix_api_token,
+                                                                              'Content-Type': 'application/json'})
+
+        if response.status_code != status.HTTP_200_OK or not response.ok:
+            logger.error(json.dumps(request_data))
+            logger.info("[ERROR] Retail Appointment could not be published to the matrix system")
+            logger.info("[ERROR] %s", response.reason)
+
+            countdown_time = (2 ** self.request.retries) * 60 * 10
+            logging.error("Retail Appointment sync with the Matrix System failed with response - " + str(response.content))
+            print(countdown_time)
+            self.retry([data], countdown=countdown_time)
+
+        resp_data = response.json()
+        logger.info(resp_data)
+        if not resp_data.get('Id', None):
+            logger.error(json.dumps(request_data))
+            raise Exception("[ERROR] Id not recieved from the matrix while pushing retail appointment lead.")
+
+    except Exception as e:
+        logger.error("Error in Celery. Failed pushing Retail Appointment to the matrix- " + str(e))
