@@ -47,6 +47,7 @@ from ondoc.doctor.tasks import doc_app_auto_cancel
 # from ondoc.account import models as account_model
 from ondoc.insurance import models as insurance_model
 from ondoc.payout import models as payout_model
+# from ondoc.communications.models import OfflineOpdAppointments
 from ondoc.notification import models as notification_models
 from ondoc.notification import tasks as notification_tasks
 from django.contrib.contenttypes.fields import GenericRelation
@@ -87,6 +88,7 @@ import qrcode
 from django.utils.functional import cached_property
 from ondoc.crm.constants import constants
 from django.utils.text import slugify
+from ondoc.plus import models as plus_model
 
 logger = logging.getLogger(__name__)
 
@@ -265,6 +267,7 @@ class Hospital(auth_model.TimeStampedModel, auth_model.CreatedByModel, auth_mode
     has_proper_hospital_page = models.BooleanField(default=False)
     question_answer = GenericRelation(auth_model.GenericQuestionAnswer, related_query_name='hospital_qa')
     enabled_for_insurance = models.NullBooleanField(verbose_name='Enabled for Insurance')
+    enabled_for_plus_plans = models.NullBooleanField()
     is_cloud_lab_enabled = models.BooleanField(default=False)
 
     def __str__(self):
@@ -901,6 +904,7 @@ class Doctor(auth_model.TimeStampedModel, auth_model.QCModel, SearchKey, auth_mo
     qr_code = GenericRelation(QRCode, related_name="qrcode")
     priority_score = models.IntegerField(default=0, null=False, blank=False)
     is_ipd_doctor = models.NullBooleanField(default=None)
+    enabled_for_plus_plans = models.NullBooleanField()
 
     def __str__(self):
         return '{} ({})'.format(self.name, self.id)
@@ -1499,8 +1503,8 @@ class DoctorClinic(auth_model.TimeStampedModel, auth_model.WelcomeCallingDone):
         db_table = "doctor_clinic"
         unique_together = (('doctor', 'hospital', ),)
 
-    # def __str__(self):
-    #     return '{}-{}'.format(self.doctor, self.hospital)
+    def __str__(self):
+        return '{}-{}'.format(self.doctor, self.hospital)
 
     def is_enabled_for_cod(self):
         return self.hospital.is_enabled_for_cod()
@@ -1534,8 +1538,6 @@ class DoctorClinic(auth_model.TimeStampedModel, auth_model.WelcomeCallingDone):
         res_data = {"time_slots": slots, "upcoming_slots": upcoming_slots}
         return res_data
 
-
-
     def get_timings_v2(self, total_leaves, blocks=[]):
         clinic_timings = self.availability.order_by("start")
         booking_details = dict()
@@ -1550,7 +1552,6 @@ class DoctorClinic(auth_model.TimeStampedModel, auth_model.WelcomeCallingDone):
         upcoming_slots = timeslot_object.get_upcoming_slots(time_slots=clinic_timings)
         timing_response = {"timeslots": clinic_timings, "upcoming_slots": upcoming_slots}
         return timing_response
-
 
 
 class DoctorClinicTiming(auth_model.TimeStampedModel):
@@ -2058,6 +2059,12 @@ class HospitalNetwork(auth_model.TimeStampedModel, auth_model.CreatedByModel, au
                                      through_fields=('network', 'service'),
                                      related_name='of_hospital_network')
 
+    enabled_for_plus_plans = models.NullBooleanField()
+
+    @classmethod
+    def get_plus_enabled(cls):
+        return cls.objects.filter(enabled_for_plus_plans=True)
+
     def update_time_stamps(self):
         if self.welcome_calling_done and not self.welcome_calling_done_at:
             self.welcome_calling_done_at = timezone.now()
@@ -2257,7 +2264,7 @@ class PurchaseOrderCreation(auth_model.TimeStampedModel):
     provider_name_lab = models.ForeignKey("diagnostic.Lab", on_delete=models.DO_NOTHING, null=True, blank=True)
     provider_name_hospital = models.ForeignKey(Hospital, on_delete=models.DO_NOTHING, null=True, blank=True, related_name='hospitalpurchaseorder')
     provider_name = models.CharField(max_length=500, default='')
-    gst_number = models.CharField(max_length=1000)
+    gst_number = models.CharField(max_length=1000, null=True, blank=True)
     total_amount_paid = models.IntegerField(help_text='Inclusive of GST')
     start_date = models.DateField(null=True, blank=True)
     end_date = models.DateField(null=True, blank=True)
@@ -2309,11 +2316,13 @@ class PurchaseOrderCreation(auth_model.TimeStampedModel):
                 self.provider_name_hospital.enabled_for_cod = True
                 self.provider_name_hospital.enabled_poc = True
                 self.provider_name_hospital.save()
-                notification_tasks.purchase_order_closing_counter_automation.apply_async((self.id, ), eta=self.end_date, )    # task to disable Pay-at-clinic functionality in hospital
+                if self.end_date:
+                    notification_tasks.purchase_order_closing_counter_automation.apply_async((self.id, ), eta=self.end_date, )    # task to disable Pay-at-clinic functionality in hospital
 
             else:
-                notification_tasks.purchase_order_creation_counter_automation.apply_async((self.id, ), eta=self.start_date, ) # task to enable Pay-at-clinic functionality in hospital
-                notification_tasks.purchase_order_closing_counter_automation.apply_async((self.id, ), eta=self.end_date, )    # task to disable Pay-at-clinic functionality in hospital
+                if self.start_date and self.end_date:
+                    notification_tasks.purchase_order_creation_counter_automation.apply_async((self.id, ), eta=self.start_date, ) # task to enable Pay-at-clinic functionality in hospital
+                    notification_tasks.purchase_order_closing_counter_automation.apply_async((self.id, ), eta=self.end_date, )    # task to disable Pay-at-clinic functionality in hospital
 
     def disable_cod_functionality(self):
         remaining_poc_objects = PurchaseOrderCreation.objects.filter(is_enabled=True,
@@ -2428,6 +2437,8 @@ class OpdAppointment(auth_model.TimeStampedModel, CouponsMixin, OpdAppointmentIn
     documents = GenericRelation(Documents)
     fraud = GenericRelation(Fraud)
     appointment_type = models.PositiveSmallIntegerField(choices=APPOINTMENT_TYPE_CHOICES, null=True, blank=True)
+    plus_plan = models.ForeignKey(plus_model.PlusUser, blank=True, null=True, default=None,
+                                  on_delete=models.DO_NOTHING)
 
     def __str__(self):
         return self.profile.name + " (" + self.doctor.name + ")"
@@ -2501,7 +2512,6 @@ class OpdAppointment(auth_model.TimeStampedModel, CouponsMixin, OpdAppointmentIn
             resp.append({"url": file.url, "type": get_file_mime_type(file)})
 
         return resp
-
 
     def get_city(self):
         if self.hospital and self.hospital.matrix_city:
@@ -2763,6 +2773,9 @@ class OpdAppointment(auth_model.TimeStampedModel, CouponsMixin, OpdAppointmentIn
                     (Order.DOCTOR_PRODUCT_ID, self.id), eta=timezone.localtime() , )
         except Exception as e:
             logger.error(str(e))
+
+        if self.has_lensfit_coupon_used():
+            notification_tasks.send_lensfit_coupons.apply_async((self.id, self.PRODUCT_ID, NotificationAction.SEND_LENSFIT_COUPON), countdown=5)
 
     def get_billable_admin_level(self):
         if self.hospital.network and self.hospital.network.is_billing_enabled:
@@ -4170,6 +4183,7 @@ class OfflinePatients(auth_model.TimeStampedModel):
     error = models.BooleanField(default=False)
     error_message = models.CharField(max_length=256, blank=True, null=True)
     age = models.IntegerField(null=True, blank=True)
+    user = models.ForeignKey(auth_model.User, related_name="offline_patients", on_delete=models.SET_NULL, null=True)
 
     def __str__(self):
         return self.name
@@ -4178,15 +4192,32 @@ class OfflinePatients(auth_model.TimeStampedModel):
     def __repr__(self):
         return self.name
 
+    def get_patient_mobile(self):
+        patient_numbers = self.patient_mobiles.all()
+        patient_number = patient_numbers[0] if patient_numbers else None
+        for number in self.patient_mobiles.all():
+            if number.is_default:
+                patient_number = number
+        return patient_number
 
     @staticmethod
     def welcome_message_sms(sms_obj):
         if sms_obj:
             try:
-                default_text = '''Dear %s, you have been successfully added as a patient to %s. In case of any query, please reach out to the %s.''' \
-                               % (sms_obj['name'], sms_obj['appointment'].hospital.name, sms_obj['appointment'].hospital.name)
-                text = sms_obj['welcome_message'] if sms_obj['welcome_message'] else default_text
-                notification_tasks.send_offline_appointment_message.apply_async(kwargs={'number': sms_obj['phone_number'], 'text': text, 'type': 'Welcome SMS'}, countdown=1)
+                instance = sms_obj['appointment']
+                receivers = [{"user": None, "phone_number": sms_obj['phone_number']}]
+                # offline_opd_appointment_comm = communication_models.OfflineOpdAppointments(appointment=instance,
+                #                                                                            notification_type=NotificationAction.OFFLINE_PATIENT_WELCOME_MESSAGE,
+                #                                                                            receivers=receivers)
+                # offline_opd_appointment_comm.send()
+                # default_text = '''Dear %s, you have been successfully added as a patient to %s. In case of any query, please reach out to the %s.''' \
+                #                % (sms_obj['name'], sms_obj['appointment'].hospital.name, sms_obj['appointment'].hospital.name)
+                # text = sms_obj['welcome_message'] if sms_obj['welcome_message'] else default_text
+                # notification_tasks.send_offline_appointment_message.apply_async(kwargs={'number': sms_obj['phone_number'], 'text': text, 'type': 'Welcome SMS'}, countdown=1)
+                notification_tasks.send_offline_appointment_message.apply_async(kwargs={'appointment': instance,
+                                                                                        'notification_type': NotificationAction.OFFLINE_PATIENT_WELCOME_MESSAGE,
+                                                                                        'receivers': receivers},
+                                                                                countdown=1)
             except Exception as e:
                 logger.error("Failed to Push Offline Welcome Message SMS Task "+ str(e))
 
@@ -4249,63 +4280,107 @@ class OfflineOPDAppointments(auth_model.TimeStampedModel):
     @staticmethod
     def appointment_add_sms(sms_obj):
         try:
-            default_text = '''Dear %s, your appointment has been confirmed with %s at %s on %s.''' % (
-                sms_obj['name'], sms_obj['appointment'].doctor.get_display_name(), sms_obj['appointment'].hospital.name,
-                sms_obj['appointment'].time_slot_start.strftime("%B %d, %Y %I:%M %p"))
-            notification_tasks.send_offline_appointment_message.apply_async(
-                kwargs={'number': sms_obj['phone_number'], 'text': default_text, 'type': 'Appointment ADD'},
-                countdown=1)
+            instance = sms_obj['appointment']
+            receivers = [{"user": None, "phone_number": sms_obj['phone_number']}]
+            # offline_opd_appointment_comm = communication_models.OfflineOpdAppointments(appointment=instance,
+            #                                                                            notification_type=NotificationAction.OFFLINE_OPD_APPOINTMENT_ACCEPTED,
+            #                                                                            receivers=receivers)
+            # offline_opd_appointment_comm.send()
+            # default_text = '''Dear %s, your appointment has been confirmed with %s at %s on %s.''' % (
+            #     sms_obj['name'], sms_obj['appointment'].doctor.get_display_name(), sms_obj['appointment'].hospital.name,
+            #     sms_obj['appointment'].time_slot_start.strftime("%B %d, %Y %I:%M %p"))
+            # communication_models.SMSNotification(NotificationAction.OFFLINE_OPD_APPOINTMENT_ACCEPTED, context)
+            # notification_tasks.send_offline_appointment_message.apply_async(
+            #     kwargs={'number': sms_obj['phone_number'], 'text': default_text, 'type': 'Appointment ADD'},
+            #     countdown=1)
+            notification_tasks.send_offline_appointment_message.apply_async(kwargs={'appointment': instance,
+                                                                                    'notification_type': NotificationAction.OFFLINE_OPD_APPOINTMENT_ACCEPTED,
+                                                                                    'receivers': receivers},
+                                                                            countdown=1)
         except Exception as e:
             logger.error("Failed to Push Offline Appointment Add Message SMS Task " + str(e))
 
     @staticmethod
     def appointment_cancel_sms(sms_obj):
         try:
-            cancel_time = aware_time_zone(sms_obj['old_appointment'].time_slot_start)
-            default_text = "Dear %s, your appointment with %s at %s for %s has been cancelled. In case of any query, please reach out to the clinic." % (
-                              sms_obj['name'], sms_obj['old_appointment'].doctor.get_display_name(), sms_obj['old_appointment'].hospital.name,
-                              cancel_time.strftime("%B %d, %Y %I:%M %p"))
-            notification_tasks.send_offline_appointment_message.apply_async(
-                kwargs={'number': sms_obj['phone_number'], 'text': default_text, 'type': 'Appointment CANCEL'},
-                countdown=1)
+            instance = sms_obj['appointment']
+            receivers = [{"user": None, "phone_number": sms_obj['phone_number']}]
+            # offline_opd_appointment_comm = communication_models.OfflineOpdAppointments(appointment=instance,
+            #                                                                            notification_type=NotificationAction.OFFLINE_OPD_APPOINTMENT_CANCELLED,
+            #                                                                            receivers=receivers)
+            # offline_opd_appointment_comm.send()
+            # cancel_time = aware_time_zone(sms_obj['old_appointment'].time_slot_start)
+            # default_text = "Dear %s, your appointment with %s at %s for %s has been cancelled. In case of any query, please reach out to the clinic." % (
+            #                   sms_obj['name'], sms_obj['old_appointment'].doctor.get_display_name(), sms_obj['old_appointment'].hospital.name,
+            #                   cancel_time.strftime("%B %d, %Y %I:%M %p"))
+            # notification_tasks.send_offline_appointment_message.apply_async(
+            #     kwargs={'number': sms_obj['phone_number'], 'text': default_text, 'type': 'Appointment CANCEL'},
+            #     countdown=1)
+            notification_tasks.send_offline_appointment_message.apply_async(kwargs={'appointment': instance,
+                                                                                    'notification_type': NotificationAction.OFFLINE_OPD_APPOINTMENT_CANCELLED,
+                                                                                    'receivers': receivers},
+                                                                            countdown=1)
+
         except Exception as e:
             logger.error("Failed to Push Offline Appointment Cancel Message SMS Task " + str(e))
 
     @staticmethod
     def appointment_complete_sms(sms_obj):
         try:
-            default_text = "Dear %s, your appointment with %s at %s is complete. In case of any query, please reach out to the %s." % \
-                           (sms_obj['name'], sms_obj['appointment'].doctor.get_display_name(),
-                            sms_obj['appointment'].hospital.name, sms_obj['appointment'].hospital.name)
-            notification_tasks.send_offline_appointment_message.apply_async(
-                kwargs={'number': sms_obj['phone_number'], 'text': default_text, 'type': 'Appointment COMPLETE'},
-                countdown=1)
+            instance = sms_obj['appointment']
+            receivers = [{"user": None, "phone_number": sms_obj['phone_number']}]
+            # offline_opd_appointment_comm = communication_models.OfflineOpdAppointments(appointment=instance,
+            #                                                                            notification_type=NotificationAction.OFFLINE_OPD_APPOINTMENT_COMPLETED,
+            #                                                                            receivers=receivers)
+            # offline_opd_appointment_comm.send()
+            # default_text = "Dear %s, your appointment with %s at %s is complete. In case of any query, please reach out to the %s." % \
+            #                (sms_obj['name'], sms_obj['appointment'].doctor.get_display_name(),
+            #                 sms_obj['appointment'].hospital.name, sms_obj['appointment'].hospital.name)
+            # notification_tasks.send_offline_appointment_message.apply_async(
+            #     kwargs={'number': sms_obj['phone_number'], 'text': default_text, 'type': 'Appointment COMPLETE'},
+            #     countdown=1)
+            notification_tasks.send_offline_appointment_message.apply_async(kwargs={'appointment': instance,
+                                                                                    'notification_type': NotificationAction.OFFLINE_OPD_APPOINTMENT_COMPLETED,
+                                                                                    'receivers': receivers},
+                                                                            countdown=1)
         except Exception as e:
             logger.error("Failed to Push Offline Appointment Cancel Message SMS Task " + str(e))
 
     @staticmethod
     def appointment_reschedule_sms(sms_obj):
         try:
-            default_text = "Dear %s, your appointment with %s at %s has been rescheduled to %s. In case of any query, please reach out to the clinic." % (
-                              sms_obj['name'], sms_obj['appointment'].doctor.get_display_name(), sms_obj['appointment'].hospital.name,
-                              sms_obj['appointment'].time_slot_start.strftime("%B %d, %Y %I:%M %p"))
-            notification_tasks.send_offline_appointment_message.apply_async(
-                kwargs={'number': sms_obj['phone_number'], 'text': default_text, 'type': 'Appointment RESCHEDULE'},
-                countdown=1)
+            instance = sms_obj['appointment']
+            receivers = [{"user": None, "phone_number": sms_obj['phone_number']}]
+            # offline_opd_appointment_comm = communication_models.OfflineOpdAppointments(appointment=instance,
+            #                                                                            notification_type=NotificationAction.OFFLINE_OPD_APPOINTMENT_RESCHEDULED_DOCTOR,
+            #                                                                            receivers=receivers)
+            # offline_opd_appointment_comm.send()
+            # default_text = "Dear %s, your appointment with %s at %s has been rescheduled to %s. In case of any query, please reach out to the clinic." % (
+            #                   sms_obj['name'], sms_obj['appointment'].doctor.get_display_name(), sms_obj['appointment'].hospital.name,
+            #                   sms_obj['appointment'].time_slot_start.strftime("%B %d, %Y %I:%M %p"))
+            # notification_tasks.send_offline_appointment_message.apply_async(
+            #     kwargs={'number': sms_obj['phone_number'], 'text': default_text, 'type': 'Appointment RESCHEDULE'},
+            #     countdown=1)
+            notification_tasks.send_offline_appointment_message.apply_async(kwargs={'appointment': instance,
+                                                                                    'notification_type': NotificationAction.OFFLINE_OPD_APPOINTMENT_RESCHEDULED_DOCTOR,
+                                                                                    'receivers': receivers},
+                                                                            countdown=1)
         except Exception as e:
             logger.error("Failed to Push Offline Appointment Rescehdule Message SMS Task " + str(e))
 
     @staticmethod
     def schedule_appointment_reminder_sms(sms_obj):
         try:
-            default_text = "Appointment reminder: Dear %s, your appointment with %s at %s is scheduled on %s. Please make sure you reach the clinic premises on time." % (
-                sms_obj['name'], sms_obj['appointment'].doctor.get_display_name(), sms_obj['appointment'].hospital.name,
-                sms_obj['appointment'].time_slot_start.strftime("%B %d, %Y %I:%M %p"))
+            # default_text = "Appointment reminder: Dear %s, your appointment with %s at %s is scheduled on %s. Please make sure you reach the clinic premises on time." % (
+            #     sms_obj['name'], sms_obj['appointment'].doctor.get_display_name(), sms_obj['appointment'].hospital.name,
+            #     sms_obj['appointment'].time_slot_start.strftime("%B %d, %Y %I:%M %p"))
             notification_tasks.offline_appointment_reminder_sms_patient.apply_async(
                 kwargs={'appointment_id': sms_obj['appointment'].id,
                         'time_slot_start_timestamp': sms_obj['appointment'].time_slot_start.timestamp(),
-                        'number': sms_obj['phone_number'], 'text': default_text, 'type': 'Appointment RESCHEDULE'},
-                eta=sms_obj['appointment'].time_slot_start - datetime.timedelta(minutes=int(OfflineOPDAppointments.SMS_APPOINTMENT_REMINDER_TIME)))
+                        'number': sms_obj['phone_number']},
+                # , 'text': default_text, 'type': 'Appointment RESCHEDULE'},
+                eta=sms_obj['appointment'].time_slot_start - datetime.timedelta(
+                    minutes=int(OfflineOPDAppointments.SMS_APPOINTMENT_REMINDER_TIME)))
         except Exception as e:
             logger.error("Failed to Push Offline Appointment Reminder Message SMS Task " + str(e))
 
@@ -4790,3 +4865,40 @@ class HospitalNetworkSpeciality(auth_model.TimeStampedModel):
 
     class Meta:
         db_table = "hospital_network_speciality"
+
+
+class SponsoredServices(auth_model.TimeStampedModel):
+    name = models.CharField(max_length=200, unique=True)
+
+    def __str__(self):
+        return self.name
+
+    class Meta:
+        db_table = 'sponsored_services'
+
+
+class DoctorSponsoredServices(auth_model.TimeStampedModel):
+    doctor = models.ForeignKey(Doctor, related_name="doctor_services", on_delete=models.DO_NOTHING)
+    sponsored_service = models.ForeignKey(SponsoredServices, on_delete=models.DO_NOTHING, blank=False, null=False, related_name='doc_sponsored_services')
+
+    class Meta:
+        db_table = "doctor_sponsored_services"
+        unique_together = (("doctor", "sponsored_service"),)
+
+
+class HospitalSponsoredServices(auth_model.TimeStampedModel):
+    hospital = models.ForeignKey(Hospital, related_name="hospital_services", on_delete=models.DO_NOTHING)
+    sponsored_service = models.ForeignKey(SponsoredServices, on_delete=models.DO_NOTHING, blank=False, null=False, related_name='hosp_sponsored_services')
+
+    class Meta:
+        db_table = "hospital_sponsored_services"
+        unique_together = (("hospital", "sponsored_service"),)
+
+
+class SponsoredServicePracticeSpecialization(auth_model.TimeStampedModel):
+    sponsored_service = models.ForeignKey(SponsoredServices, on_delete=models.DO_NOTHING, blank=False, null=False, related_name='spec_sponsored_services')
+    specialization = models.ForeignKey(PracticeSpecialization, on_delete=models.DO_NOTHING, blank=False, null=False, related_name='spec_sponsored_services')
+    is_primary_specialization = models.BooleanField(default=False)
+
+    class Meta:
+        db_table = "specialization_sponsored_services"
