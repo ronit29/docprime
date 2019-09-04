@@ -829,7 +829,8 @@ class SponsorListingSpecialization(auth_model.TimeStampedModel):
         db_table = 'sponsor_listing_specialization'
 
     def __str__(self):
-        return self.specialization.id
+        return self.id
+
 
 class SponsorListingLocation(auth_model.TimeStampedModel):
     poc = models.ForeignKey("doctor.PurchaseOrderCreation", on_delete=models.CASCADE, related_name='poc_lat_long', null=True)
