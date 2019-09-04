@@ -2445,6 +2445,16 @@ class LabAppointmentView(mixins.CreateModelMixin,
 
         cart_item_id = validated_data.get('cart_item').id if validated_data.get('cart_item') else None
 
+        #for appointment History
+        responsible_user = None
+        if data.get('from_app') and data['from_app']:
+            data['_source'] = AppointmentHistory.CONSUMER_APP
+            responsible_user = request.user.id
+        elif data.get('from_web') and data['from_web']:
+            data['_source'] = AppointmentHistory.WEB
+            responsible_user = request.user.id
+        data['_responsible_user'] = responsible_user
+        
         if validated_data.get("existing_cart_item"):
             cart_item = validated_data.get("existing_cart_item")
             old_cart_obj = Cart.objects.filter(id=validated_data.get('existing_cart_item').id).first()
