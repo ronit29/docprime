@@ -4,6 +4,7 @@ import operator
 from copy import deepcopy
 from itertools import groupby
 
+import dateutil
 from django.contrib.contenttypes.models import ContentType
 
 from ondoc.api.v1.diagnostic.serializers import CustomLabTestPackageSerializer, SearchLabListSerializer
@@ -2452,17 +2453,19 @@ class LabAppointmentView(mixins.CreateModelMixin,
             pathology_data = None
             for test_timing in validated_data.get('test_timings'):
                 test_type = test_timing.get('type')
+                datetime_ist = dateutil.parser.parse(str(test_timing.get('start_date')))
+                data_start_date = datetime_ist.astimezone(tz=timezone.utc).isoformat()
                 if test_type == LabTest.PATHOLOGY:
                     if not pathology_data:
                         pathology_data = copy.deepcopy(data)
                         pathology_data['test_ids'] = []
-                        pathology_data['start_date'] = str(test_timing['start_date'])
+                        pathology_data['start_date'] = data_start_date
                         pathology_data['start_time'] = test_timing['start_time']
                         pathology_data['is_home_pickup'] = test_timing['is_home_pickup']
                     pathology_data['test_ids'].append(test_timing['test'].id)
                 elif test_type == LabTest.RADIOLOGY:
                     new_data = copy.deepcopy(data)
-                    new_data['start_date'] = str(test_timing['start_date'])
+                    new_data['start_date'] = data_start_date
                     new_data['start_time'] = test_timing['start_time']
                     new_data['is_home_pickup'] = test_timing['is_home_pickup']
                     new_data['test_ids'] = [test_timing['test'].id]

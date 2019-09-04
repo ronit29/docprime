@@ -1,3 +1,4 @@
+from dateutil.parser import parser
 from rest_framework import serializers
 from rest_framework.fields import CharField
 
@@ -1017,7 +1018,8 @@ class LabAppointmentCreateSerializer(serializers.Serializer):
             if not data.get('test_timings'):
                 raise serializers.ValidationError("Start date and start time not found")
             else:
-                data['start_date'] = data.get('test_timings')[0].get('start_date')
+                datetime_ist = parser.parse(data.get('test_timings')[0].get('start_date'))
+                data['start_date'] = datetime_ist.astimezone(tz=timezone.utc).isoformat()
                 data['start_time'] = data.get('test_timings')[0].get('start_time')
                 data['is_home_pickup'] = data.get('test_timings')[0].get('is_home_pickup')
 

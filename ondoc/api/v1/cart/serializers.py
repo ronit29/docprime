@@ -47,14 +47,14 @@ class CartItemSerializer(serializers.ModelSerializer):
         from django.utils.timezone import make_aware
 
         selected_time = None
-        if not obj.data.get('multi_timings_enabled'):
-            if not obj.data.get("start_date"):
-                return None
+        #if not obj.data.get('multi_timings_enabled'):
+        if not obj.data.get("start_date"):
+            return None
 
-            date_field = obj.data.get("start_date").find('T')
-            if date_field:
-                date_field = obj.data.get("start_date")[:date_field]
-            selected_time = form_time_slot(make_aware(datetime.datetime.strptime(date_field, '%Y-%m-%d')), float(obj.data.get("start_time")))
+        date_field = obj.data.get("start_date").find('T')
+        if date_field:
+            date_field = obj.data.get("start_date")[:date_field]
+        selected_time = form_time_slot(make_aware(datetime.datetime.strptime(date_field, '%Y-%m-%d')), float(obj.data.get("start_time")))
 
         return selected_time
 
