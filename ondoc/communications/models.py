@@ -1394,7 +1394,7 @@ class EMAILNotification:
                         send_without_email = True
 
                 if email or send_without_email:
-                    recipient_obj = RecipientEmail(obj.recipient)
+                    recipient_obj = RecipientEmail(email)
                     obj.send_notification(context, recipient_obj, self.notification_type, user=receiver_user)
 
         if not receivers_left:
