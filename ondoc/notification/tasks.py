@@ -369,12 +369,16 @@ def set_order_dummy_transaction(self, order_id, user_id):
         self.retry([order_id, user_id], countdown=300)
 
 @task
-def send_offline_appointment_message(number, text, type):
-    data = {}
-    data['phone_number'] = number
-    data['text'] = mark_safe(text)
+def send_offline_appointment_message(**kwargs):
+    from ondoc.communications.models import OfflineOpdAppointments
+    appointment = kwargs.get('appointment')
+    notification_type = kwargs.get('notification_type')
+    receivers = kwargs.get('receivers')
     try:
-        notification_models.SmsNotification.send_rating_link(data)
+        offline_opd_appointment_comm = OfflineOpdAppointments(appointment=appointment,
+                                                              notification_type=notification_type,
+                                                              receivers=receivers)
+        offline_opd_appointment_comm.send()
     except Exception as e:
         logger.error("Error sending " + str(type) + " message - " + str(e))
 
@@ -800,10 +804,13 @@ def docprime_appointment_reminder_sms_provider(appointment_id, appointment_updat
 
 
 @task()
-def offline_appointment_reminder_sms_patient(appointment_id, time_slot_start_timestamp, **kwargs):
+def offline_appointment_reminder_sms_patient(appointment_id, time_slot_start_timestamp, number):
     from ondoc.doctor.models import OfflineOPDAppointments
+    from ondoc.communications.models import SMSNotification, OfflineOpdAppointments
     try:
-        instance = OfflineOPDAppointments.objects.filter(id=appointment_id).first()
+        instance = OfflineOPDAppointments.objects.select_related('user', 'doctor', 'hospital')\
+                                                 .prefetch_related('hospital__assoc_doctors')\
+                                                 .filter(id=appointment_id).first()
         if not instance or \
                 not instance.user or \
                 math.floor(instance.time_slot_start.timestamp()) != time_slot_start_timestamp \
@@ -813,10 +820,15 @@ def offline_appointment_reminder_sms_patient(appointment_id, time_slot_start_tim
             #                                                previous_appointment_date_time,
             #                                                str(math.floor(instance.time_slot_start.timestamp()))))
             return
-        data = {}
-        data['phone_number'] = kwargs.get('number')
-        data['text'] = mark_safe(kwargs.get('text'))
-        notification_models.SmsNotification.send_rating_link(data)
+        receivers = [{"user": None, "phone_number": number}]
+        offline_opd_comm_obj = OfflineOpdAppointments(appointment=instance,
+                                                      notification_type=NotificationAction.OFFLINE_APPOINTMENT_REMINDER_PROVIDER_SMS,
+                                                      receivers=receivers)
+        offline_opd_comm_obj.send()
+        # data = {}
+        # data['phone_number'] = kwargs.get('number')
+        # data['text'] = mark_safe(kwargs.get('text'))
+        # notification_models.SmsNotification.send_rating_link(data)
     except Exception as e:
         logger.error(str(e))
 
@@ -999,6 +1011,99 @@ def refund_breakup_sms_task(obj_id):
         sms_notification.send(receivers)
     except Exception as e:
         logger.error(str(e))
+
+
+@task(bind=True, max_retries=2)
+def push_plus_lead_to_matrix(self, data):
+    from ondoc.plus.models import PlusLead, PlusPlans
+    try:
+        if not data:
+            raise Exception('Data not received for banner lead.')
+
+        id = data.get('id', None)
+        if not id:
+            logger.error("[CELERY ERROR: Incorrect values provided.]")
+            raise ValueError()
+
+        plus_lead_obj = PlusLead.objects.filter(id=id).first()
+
+        if not plus_lead_obj:
+            raise Exception("Plus lead object could not found against id - " + str(id))
+
+        if plus_lead_obj.user:
+            phone_number = plus_lead_obj.user.phone_number
+        else:
+            phone_number = plus_lead_obj.phone_number
+
+        extras = plus_lead_obj.extras
+        plan_id = extras.get('plan_id', None)
+
+        lead_source = "Docprime"
+        lead_data = extras.get('lead_data')
+        if lead_data:
+            provided_lead_source = lead_data.get('source')
+            if type(provided_lead_source).__name__ == 'str' and provided_lead_source.lower() == 'docprimechat':
+                lead_source = 'docprimechat'  #TODO change
+
+        plan = None
+        if plan_id and type(plan_id).__name__ == 'int':
+            plan = PlusPlans.objects.filter(id=plan_id).first()
+
+        request_data = {
+            'LeadID': plus_lead_obj.matrix_lead_id if plus_lead_obj.matrix_lead_id else 0,
+            'LeadSource': lead_source,
+            'Name': extras.get('name', 'none'),
+            'BookedBy': phone_number,
+            'PrimaryNo': phone_number,
+            'PaymentStatus': 0,
+            'UtmCampaign': extras.get('utm_campaign', ''),
+            'UTMMedium': extras.get('utm_medium', ''),
+            'UtmSource': extras.get('utm_source', ''),
+            'UtmTerm': extras.get('utm_term', ''),
+            'ProductId': 11,
+            'SubProductId': 0,
+            'PolicyDetails': {
+                "ProposalNo": None,
+                "BookingId": None,
+                'PolicyPaymentSTATUS': 0,
+                "ProposerName": None,
+                "PolicyId": None,
+                "InsurancePlanPurchased": plan.plan_name if plan else None,
+                "PurchaseDate": None,
+                "ExpirationDate": None,
+                "COILink": None,
+                "PeopleCovered": 0
+            }
+        }
+
+        url = settings.MATRIX_API_URL
+        matrix_api_token = settings.MATRIX_API_TOKEN
+        response = requests.post(url, data=json.dumps(request_data), headers={'Authorization': matrix_api_token,
+                                                                              'Content-Type': 'application/json'})
+
+        if response.status_code != status.HTTP_200_OK or not response.ok:
+            logger.error(json.dumps(request_data))
+            logger.info("[ERROR] Plus lead could not be published to the matrix system")
+            logger.info("[ERROR] %s", response.reason)
+
+            countdown_time = (2 ** self.request.retries) * 60 * 10
+            logging.error("Lead sync with the Matrix System failed with response - " + str(response.content))
+            print(countdown_time)
+            self.retry([data], countdown=countdown_time)
+        else:
+            resp_data = response.json()
+            if not resp_data:
+                raise Exception('Data received from matrix is null or empty.')
+
+            if not resp_data.get('Id', None):
+                logger.error(json.dumps(request_data))
+                raise Exception("[ERROR] Id not recieved from the matrix while pushing plus lead to matrix.")
+
+            plus_lead_qs = PlusLead.objects.filter(id=id)
+            plus_lead_qs.update(matrix_lead_id=resp_data.get('Id'))
+
+    except Exception as e:
+        logger.error("Error in Celery. Failed pushing Plus lead to the matrix- " + str(e))
 
 
 @task(bind=True, max_retries=2)
@@ -1427,3 +1532,30 @@ def purchase_order_closing_counter_automation(purchase_order_id):
     if instance:
         if (instance.end_date < timezone.now().date()):
             instance.disable_cod_functionality()
+
+
+@task(bind=True)
+def send_lensfit_coupons(self, appointment_id, product_id, notification_type=None):
+    from ondoc.account.models import Order
+    from ondoc.doctor.models import OpdAppointment
+    from ondoc.diagnostic.models import LabAppointment
+    from ondoc.coupon.models import Coupon
+    from ondoc.communications.models import OpdNotification
+    from ondoc.communications.models import LabNotification
+    try:
+        if product_id == Order.DOCTOR_PRODUCT_ID:
+            cls = OpdAppointment
+        elif product_id == Order.LAB_PRODUCT_ID:
+            cls = LabAppointment
+        appointment_obj =cls.objects.filter(pk=appointment_id).first()
+        if not appointment_obj or not appointment_obj.user:
+            return
+        if appointment_obj.status == OpdAppointment.COMPLETED:
+            lensfit_coupon = Coupon.get_lensfit_coupon()
+            if product_id == Order.DOCTOR_PRODUCT_ID:
+                notification = OpdNotification(appointment_obj, notification_type, {"lensfit_coupon": lensfit_coupon})
+            elif product_id == Order.LAB_PRODUCT_ID:
+                notification = LabNotification(appointment_obj, notification_type, {"lensfit_coupon": lensfit_coupon})
+            notification.send()
+    except Exception as e:
+        logger.error(str(e))
