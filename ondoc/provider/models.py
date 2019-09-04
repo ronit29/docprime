@@ -1,5 +1,6 @@
 from django.db import models, transaction
 from ondoc.doctor import models as doc_models
+from ondoc.diagnostic import models as diag_models
 from ondoc.authentication import models as auth_models
 from ondoc.common import models as common_models
 from ondoc.account import models as acct_mdoels
@@ -204,3 +205,14 @@ class EConsultation(auth_models.TimeStampedModel, auth_models.CreatedByModel):
 
     class Meta:
         db_table = "e_consultation"
+
+
+class ProviderHospitalLabMapping(models.Model):
+    hospital = models.ForeignKey(doc_models.Hospital, on_delete=models.CASCADE, related_name="provider_labs")
+    lab = models.ForeignKey(diag_models.Lab, on_delete=models.CASCADE, related_name="provider_hospitals")
+
+    def __str__(self):
+        return str(self.hospital.name) + '-' + str(self.lab.name)
+
+    class Meta:
+        db_table = "provider_hospital_lab_mapping"

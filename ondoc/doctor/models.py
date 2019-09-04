@@ -268,7 +268,7 @@ class Hospital(auth_model.TimeStampedModel, auth_model.CreatedByModel, auth_mode
     question_answer = GenericRelation(auth_model.GenericQuestionAnswer, related_query_name='hospital_qa')
     enabled_for_insurance = models.NullBooleanField(verbose_name='Enabled for Insurance')
     enabled_for_plus_plans = models.NullBooleanField()
-    is_cloud_lab_enabled = models.BooleanField(default=False)
+    is_partner_lab_enabled = models.BooleanField(default=False)
 
     def __str__(self):
         return self.name
