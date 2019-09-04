@@ -2512,7 +2512,7 @@ class SponsoredServicesResource(resources.ModelResource):
         export_order = ('id', 'name')
 
 
-class SponsoredServicesAdmin(ImportExportMixin, admin.ModelAdmin):
+class SponsoredServicesAdmin(ImportExportMixin, CompareVersionAdmin):
     search_fields = ['name']
     formats = (base_formats.XLS, base_formats.XLSX,)
     inlines = [ SponsoredServicePracticeSpecializationInline ]
@@ -2526,7 +2526,7 @@ class HospitalSponsoredServicesAdminResource(resources.ModelResource):
         export_order = ('id', 'hospital', 'sponsored_service')
 
 
-class HospitalSponsoredServicesAdmin(ImportExportMixin, admin.ModelAdmin):
+class HospitalSponsoredServicesAdmin(ImportExportMixin, CompareVersionAdmin):
     search_fields = ['hospital']
     list_display = ['hospital', 'sponsored_service']
     formats = (base_formats.XLS, base_formats.XLSX,)
@@ -2541,7 +2541,7 @@ class DoctorSponsoredServicesResource(resources.ModelResource):
         export_order = ('id', 'doctor', 'sponsored_service')
 
 
-class DoctorSponsoredServicesAdmin(ImportExportMixin, admin.ModelAdmin):
+class DoctorSponsoredServicesAdmin(ImportExportMixin, CompareVersionAdmin):
     search_fields = ['doctor']
     list_display = ['doctor', 'sponsored_service']
     formats = (base_formats.XLS, base_formats.XLSX,)

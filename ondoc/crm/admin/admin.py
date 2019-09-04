@@ -21,7 +21,8 @@ from ondoc.doctor.models import (Doctor, Language, MedicalService, Specializatio
                                  OfflineOPDAppointments,
                                  DoctorMobileOtp, UploadDoctorData, DoctorLeave, HealthInsuranceProvider,
                                  CommonHospital, SimilarSpecializationGroup, PurchaseOrderCreation, SponsoredServices,
-                                 HospitalSponsoredServices, DoctorSponsoredServices)
+                                 HospitalSponsoredServices, DoctorSponsoredServices,
+                                 SponsoredServicePracticeSpecialization)
 
 from ondoc.diagnostic.models import (Lab, LabNetwork, LabTest, LabTestType, LabService,
                                      AvailableLabTest, LabAppointment, CommonTest, CommonDiagnosticCondition,
@@ -306,4 +307,5 @@ admin.site.register(SponsoredServices, SponsoredServicesAdmin)
 admin.site.register(IPDMedicinePageLead)
 admin.site.register(HospitalSponsoredServices, HospitalSponsoredServicesAdmin)
 admin.site.register(DoctorSponsoredServices, DoctorSponsoredServicesAdmin)
+admin.site.register(SponsoredServicePracticeSpecialization)
 

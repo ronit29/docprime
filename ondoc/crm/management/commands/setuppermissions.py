@@ -28,7 +28,8 @@ from ondoc.doctor.models import (Doctor, Hospital, DoctorClinicTiming, DoctorCli
                                  HealthInsuranceProvider, HospitalHelpline, HospitalTiming, CommonHospital,
                                  SimilarSpecializationGroup, SimilarSpecializationGroupMapping, PurchaseOrderCreation,
                                  HospitalNetworkImage, HospitalNetworkTiming, HospitalNetworkServiceMapping,
-                                 HospitalNetworkSpeciality)
+                                 HospitalNetworkSpeciality, HospitalSponsoredServices,
+                                 SponsoredServicePracticeSpecialization, DoctorSponsoredServices, SponsoredServices)
 
 from ondoc.diagnostic.models import (Lab, LabTiming, LabImage, GenericLabAdmin,
                                      LabManager, LabAccreditation, LabAward, LabCertification,
@@ -604,7 +605,8 @@ class Command(BaseCommand):
                                                            SimilarSpecializationGroupMapping, LabTestCategoryLandingURLS, LabTestCategoryUrls,
                                                            HospitalNetworkImage, HospitalNetworkTiming,
                                                            HospitalNetworkServiceMapping,
-                                                           HospitalNetworkSpeciality, DynamicTemplates)
+                                                           HospitalNetworkSpeciality, DynamicTemplates, HospitalSponsoredServices,
+                                                           SponsoredServicePracticeSpecialization, DoctorSponsoredServices, SponsoredServices)
 
         for cl, ct in content_types.items():
             permissions = Permission.objects.filter(
