@@ -3604,7 +3604,7 @@ class OpdAppointment(auth_model.TimeStampedModel, CouponsMixin, OpdAppointmentIn
     def get_matrix_retail_booking_data(self):
         data = {
                 "Name": self.profile.name,
-                "ProductId": 8,
+                "ProductId": 11,
                 "PrimaryNo": self.user.phone_number,
                 "ReferenceBookingId": self.id,
                 "SubProductId": 0,
