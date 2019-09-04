@@ -1877,6 +1877,12 @@ class LabAppointment(TimeStampedModel, CouponsMixin, LabAppointmentInvoiceMixin,
         else:
             return False
 
+    def is_provider_notification_allowed(self, old_instance):
+        if old_instance.status == OpdAppointment.CREATED and self.status == OpdAppointment.CANCELLED:
+            return False
+        else:
+            return True
+
     def app_commit_tasks(self, old_instance, push_to_matrix, push_to_integrator):
         if old_instance is None:
             try:
