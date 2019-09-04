@@ -2852,7 +2852,9 @@ class OpdAppointment(auth_model.TimeStampedModel, CouponsMixin, OpdAppointmentIn
                 logger.error(str(e))
 
         if self.is_to_send_notification(old_instance):
-            sent_to_provider = self.is_provider_notification_allowed(old_instance)
+            sent_to_provider = True
+            if old_instance:
+                sent_to_provider = self.is_provider_notification_allowed(old_instance)
             try:
                 notification_tasks.send_opd_notifications_refactored.apply_async(({'appointment_id': self.id,
                                                                                    'is_valid_for_provider': sent_to_provider},), countdown=1)
