@@ -2122,6 +2122,7 @@ class TopHospitalForIpdProcedureSerializer(serializers.ModelSerializer):
 
     def get_service_count(self, obj):
         sp_list = []
+        count = None
         if obj:
             if obj.hospital_services.all():
                 for sp_service in obj.hospital_services.all():
