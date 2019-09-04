@@ -11,12 +11,15 @@ from ondoc.authentication.models import (OtpVerifications, User, UserProfile, No
 from ondoc.doctor import models as doc_models
 from ondoc.procedure.models import Procedure
 from ondoc.diagnostic.models import LabAppointment
+from ondoc.notification.models import NotificationAction
 from ondoc.api.v1.doctor import serializers as v1_serializers
 from ondoc.api.v1.diagnostic import serializers as v1_diagnostic_serailizers
 
 from dateutil.relativedelta import relativedelta
 from django.utils import timezone
 logger = logging.getLogger(__name__)
+from uuid import UUID
+from ondoc.provider import models as provider_models
 User = get_user_model()
 
 
@@ -591,3 +594,208 @@ class ProviderEncryptResponseModelSerializer(serializers.ModelSerializer):
     class Meta:
         model = doc_models.ProviderEncrypt
         fields = "__all__"
+
+
+class EConsultCreateBodySerializer(serializers.Serializer):
+    validity = serializers.DateTimeField(allow_null=True, required=False)
+    doctor = serializers.IntegerField()
+    patient = serializers.CharField()
+    fees = serializers.FloatField(required=False)
+
+    def validate(self, attrs):
+        super().validate(attrs)
+        e_consult_filter_dynamic_kwargs = dict()
+        attrs['offline_p'] = True
+        try:
+            patient_id = UUID(attrs.get('patient'), version=4)
+            patient = doc_models.OfflinePatients.objects.filter(id=patient_id).first()
+            attrs['offline_p'] = True
+            e_consult_filter_dynamic_kwargs['offline_patient'] = patient
+        except ValueError:
+            patient_id = attrs.get('patient')
+            patient = UserProfile.objects.filter(id=patient_id).first()
+            attrs['offline_p'] = False
+            e_consult_filter_dynamic_kwargs['online_patient'] = patient
+        if not patient:
+            raise serializers.ValidationError("Patient not Found!")
+        attrs['patient_obj'] = patient
+        doc = doc_models.Doctor.objects.filter(id=attrs.get('doctor')).first()
+        if not doc:
+            raise serializers.ValidationError("Doctor not Found!")
+        attrs['doctor_obj'] = doc
+        e_consultation = provider_models.EConsultation.objects.filter(**e_consult_filter_dynamic_kwargs, doctor=doc,
+                                                                      status__in=[
+                                                                          provider_models.EConsultation.CREATED,
+                                                                          provider_models.EConsultation.BOOKED,
+                                                                          provider_models.EConsultation.RESCHEDULED_DOCTOR,
+                                                                          provider_models.EConsultation.RESCHEDULED_PATIENT,
+                                                                          provider_models.EConsultation.ACCEPTED]).order_by('-updated_at').first()
+        if e_consultation:
+            attrs['e_consultation'] = e_consultation
+        return attrs
+
+
+class EConsultListSerializer(serializers.ModelSerializer):
+    doctor_name = serializers.ReadOnlyField(source='doctor.name')
+    patient_name = serializers.SerializerMethodField()
+    validity_status = serializers.SerializerMethodField()
+    patient_id = serializers.SerializerMethodField()
+    doctor_auto_login_url = serializers.SerializerMethodField()
+    patient_auto_login_url = serializers.SerializerMethodField()
+    video_chat_url = serializers.SerializerMethodField()
+    patient_phone_number = serializers.SerializerMethodField()
+
+    def get_patient_type(self, obj):
+        patient = None
+        if obj.offline_patient:
+            patient = obj.offline_patient
+        elif obj.online_patient:
+            patient = obj.online_patient
+        return patient
+
+    def get_patient_name(self, obj):
+        patient = self.get_patient_type(obj)
+        return patient.name
+
+    def get_patient_id(self, obj):
+        patient = self.get_patient_type(obj)
+        return str(patient.id)
+
+    def get_validity_status(self, obj):
+        validity_status = 'past'
+        if obj.validity and obj.validity > timezone.now():
+            validity_status = 'current'
+        return validity_status
+
+    def get_doctor_auto_login_url(self, obj):
+        request = self.context.get('request')
+        return obj.rc_group.doctor_login_url if (obj.rc_group and request.user.user_type == User.DOCTOR) else None
+
+    def get_patient_auto_login_url(self, obj):
+        request = self.context.get('request')
+        return obj.rc_group.patient_login_url if (obj.rc_group and request.user.user_type == User.CONSUMER) else None
+
+    def get_video_chat_url(self, obj):
+        return obj.get_video_chat_url()
+
+    def get_patient_phone_number(self, obj):
+        patient, patient_number = obj.get_patient_and_number()
+        return patient_number
+
+    class Meta:
+        model = provider_models.EConsultation
+        fields = ('id', 'doctor_name', 'doctor_id', 'patient_id', 'patient_name', 'fees', 'validity', 'payment_status',
+                        'created_at', 'link', 'status', 'validity_status', 'validity', 'doctor_auto_login_url',
+                        'patient_auto_login_url', 'video_chat_url', 'patient_phone_number')
+
+
+class ConsumerEConsultListSerializer(EConsultListSerializer):
+    doctor_qualification = serializers.SerializerMethodField()
+    doctor_thumbnail = serializers.SerializerMethodField()
+
+    def get_doctor_thumbnail(self, obj):
+        request = self.context.get('request')
+        return request.build_absolute_uri(obj.doctor.get_thumbnail()) if obj.doctor.get_thumbnail() else None
+
+    def get_doctor_qualification(self, obj):
+        ret_obj = list()
+        qualifications = obj.doctor.qualifications.all()
+        for qual in qualifications:
+            ret_obj.append({
+                "qualification": qual.qualification.name,
+                "specialization": qual.specialization.name,
+                "college": qual.college.name,
+                "passing_year": qual.passing_year
+            })
+        return ret_obj
+
+    class Meta:
+        model = provider_models.EConsultation
+        fields = ('id', 'doctor_name', 'doctor_id', 'patient_id', 'patient_name', 'fees', 'validity', 'payment_status',
+                  'created_at', 'link', 'status', 'validity_status', 'validity', 'doctor_auto_login_url',
+                  'patient_auto_login_url', 'video_chat_url', 'patient_phone_number', 'doctor_qualification',
+                  'doctor_thumbnail')
+
+
+class EConsultTransactionModelSerializer(serializers.Serializer):
+    id = serializers.IntegerField(required=False)
+    user = serializers.PrimaryKeyRelatedField(queryset=User.objects.all())
+    # profile = serializers.PrimaryKeyRelatedField(queryset=UserProfile.objects.all())
+    price = serializers.DecimalField(max_digits=10, decimal_places=2)
+    effective_price = serializers.DecimalField(max_digits=10, decimal_places=2)
+    # status = serializers.IntegerField()
+    # coupon = serializers.ListField(child=serializers.IntegerField(), required=False, default=[])
+    cashback = serializers.DecimalField(max_digits=10, decimal_places=2)
+    extra_details = serializers.JSONField(required=False)
+    # coupon_data = serializers.JSONField(required=False)
+
+
+class EConsultSerializer(serializers.Serializer):
+    id = serializers.IntegerField(min_value=1)
+
+    def validate(self, attrs):
+        request = self.context.get('request')
+        user = request.user
+        consult_id = attrs['id']
+        e_consultation = provider_models.EConsultation.objects.select_related('doctor', 'offline_patient', 'online_patient', 'rc_group') \
+                                                              .prefetch_related('doctor__rc_user',
+                                                                                'offline_patient__rc_user',
+                                                                                'offline_patient__user',
+                                                                                'offline_patient__patient_mobiles',
+                                                                                'online_patient__rc_user',
+                                                                                'online_patient__user') \
+                                                              .filter(id=consult_id, created_by=user,
+                                                                      status__in=[provider_models.EConsultation.BOOKED,
+                                                                                  provider_models.EConsultation.CREATED]).first()
+        if not e_consultation:
+            raise serializers.ValidationError('Valid consultation not found for given id')
+        attrs['e_consultation'] = e_consultation
+        return attrs
+
+
+class EConsultCommunicationSerializer(serializers.Serializer):
+    rc_group_id = serializers.CharField(max_length=64)
+    notification_types = serializers.ListField(child=serializers.IntegerField(min_value=1))
+    sender_rc_user_id = serializers.CharField(max_length=64, required=False, allow_blank=True)
+    receiver_rc_user_names = serializers.ListField(child=serializers.CharField(max_length=64), allow_empty=True, required=False)
+    comm_types = serializers.MultipleChoiceField(choices=NotificationAction.NOTIFICATION_CHOICES, allow_empty=True, required=False)
+
+    def validate(self, attrs):
+        rc_group_id = attrs.get('rc_group_id')
+        notification_types = attrs.get('notification_types')
+        sender_rc_user_id = attrs.get('sender_rc_user_id')
+        receiver_rc_user_names = attrs.get('receiver_rc_user_names')
+        if NotificationAction.E_CONSULT_NEW_MESSAGE_RECEIVED in notification_types and not receiver_rc_user_names:
+            raise serializers.ValidationError("receiver rocket chat user_names are required for new message notification")
+        rc_group = provider_models.RocketChatGroups.objects.prefetch_related('econsultations',
+                                                                             'econsultations__doctor',
+                                                                             'econsultations__offline_patient',
+                                                                             'econsultations__online_patient',
+                                                                             'econsultations__offline_patient__user',
+                                                                             'econsultations__online_patient__user',
+                                                                             'econsultations__doctor__rc_user',
+                                                                             'econsultations__offline_patient__rc_user',
+                                                                             'econsultations__online_patient__rc_user',
+                                                                             'econsultations__offline_patient__patient_mobiles',
+                                                                             )\
+                                                           .filter(group_id=rc_group_id).first()
+        if not rc_group:
+            raise serializers.ValidationError("rocket chat group not found.")
+        e_consultation = rc_group.econsultations.all().order_by('-created_at')[0]
+        patient, phone_number = e_consultation.get_patient_and_number()
+        patient_rc_user = patient.rc_user
+        doctor_rc_user = e_consultation.doctor.rc_user
+        receiver_rc_users = list()
+        sender_rc_user = None
+        for rc_user in (doctor_rc_user, patient_rc_user):
+            if rc_user.username in receiver_rc_user_names:
+                receiver_rc_users.append(rc_user)
+            elif rc_user.response_data['user']['_id'] == sender_rc_user_id:
+                sender_rc_user = rc_user
+        attrs['e_consultation'] = e_consultation
+        attrs['patient'] = patient
+        attrs['patient_rc_user'] = patient_rc_user
+        attrs['doctor_rc_user'] = doctor_rc_user
+        attrs['receiver_rc_users'] = receiver_rc_users
+        attrs['sender_rc_user'] = sender_rc_user
+        return attrs
