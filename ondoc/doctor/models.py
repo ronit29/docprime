@@ -2831,6 +2831,12 @@ class OpdAppointment(auth_model.TimeStampedModel, CouponsMixin, OpdAppointmentIn
                     result = parent.is_cod_order
         return result
 
+    def is_provider_notification_allowed(self, old_instance):
+        if old_instance.status == OpdAppointment.CREATED and self.status == OpdAppointment.CANCELLED:
+            return False
+        else:
+            return True
+
     def after_commit_tasks(self, old_instance, push_to_matrix):
         if old_instance is None:
             try:
@@ -2858,8 +2864,12 @@ class OpdAppointment(auth_model.TimeStampedModel, CouponsMixin, OpdAppointmentIn
                     logger.error(str(e))
 
         if self.is_to_send_notification(old_instance):
+            sent_to_provider = True
+            if old_instance:
+                sent_to_provider = self.is_provider_notification_allowed(old_instance)
             try:
-                notification_tasks.send_opd_notifications_refactored.apply_async((self.id,), countdown=1)
+                notification_tasks.send_opd_notifications_refactored.apply_async(({'appointment_id': self.id,
+                                                                                   'is_valid_for_provider': sent_to_provider},), countdown=1)
             except Exception as e:
                 logger.error(str(e))
             # notification_tasks.send_opd_notifications_refactored(self.id)

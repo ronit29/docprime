@@ -1882,6 +1882,12 @@ class LabAppointment(TimeStampedModel, CouponsMixin, LabAppointmentInvoiceMixin,
         else:
             return False
 
+    def is_provider_notification_allowed(self, old_instance):
+        if old_instance.status == OpdAppointment.CREATED and self.status == OpdAppointment.CANCELLED:
+            return False
+        else:
+            return True
+
     def app_commit_tasks(self, old_instance, push_to_matrix, push_to_integrator):
         if old_instance is None:
             try:
@@ -1923,9 +1929,14 @@ class LabAppointment(TimeStampedModel, CouponsMixin, LabAppointmentInvoiceMixin,
         #         logger.error(str(e))
 
         if self.is_to_send_notification(old_instance):
+            sent_to_provider = True
+            if old_instance:
+                sent_to_provider = self.is_provider_notification_allowed(old_instance)
             try:
-                notification_tasks.send_lab_notifications_refactored.apply_async(kwargs={'appointment_id': self.id},
-                                                                                 countdown=1)
+                notification_tasks.send_lab_notifications_refactored.apply_async(({'appointment_id': self.id,
+                                                                                         'is_valid_for_provider':
+                                                                                             sent_to_provider},),
+                                                                                countdown=1)
                 # notification_tasks.send_lab_notifications_refactored(self.id)
                 # notification_tasks.send_lab_notifications.apply_async(kwargs={'appointment_id': self.id}, countdown=1)
             except Exception as e:
