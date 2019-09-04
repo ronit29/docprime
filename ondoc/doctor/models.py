@@ -978,57 +978,62 @@ class Doctor(auth_model.TimeStampedModel, auth_model.QCModel, SearchKey, auth_mo
 
     def update_deal_price(self):        
         # will update only this doctor prices and will be called on save
-        query = '''update doctor_clinic_timing set deal_price = 
-					case when (custom_deal_price > 0 )
-					then custom_deal_price else floor(				 
-                    case when fees =0 then
-						case when mrp <300 then least((0.5*mrp)/0.75, mrp)
-						else  least( 0.5*mrp + 75 , mrp)
-						end 
-					else
-					case when mrp<300 then 
-					least(greatest(greatest(fees+60, 0.7*mrp), mrp-200)/0.75,mrp)
-					else least(greatest(greatest(fees+60, 0.7*mrp), mrp-200)+75, mrp)
-					end  end)
-					end
-					where doctor_clinic_id in (
-                    select id from doctor_clinic where doctor_id=%s and hospital_id!=3560) '''
-
+        query = '''update doctor_clinic_timing set deal_price=case when custom_deal_price is null then mrp else custom_deal_price end 
+                                                              where doctor_clinic_id in ( select id from doctor_clinic where doctor_id=%s) '''
         update_doctor_deal_price = RawSql(query, [self.pk]).execute()
-
-        # update nanavati hospital deal price
-
-        query1 = '''update doctor_clinic_timing set deal_price = mrp*0.80 
-                         where doctor_clinic_id  in (select id from doctor_clinic where doctor_id= %s and  hospital_id=3560 ) '''
-
-        update_all_nanavati_doctor_deal_price = RawSql(query1, [self.pk]).execute()
+        # query = '''update doctor_clinic_timing set deal_price =
+			# 		case when (custom_deal_price > 0 )
+			# 		then custom_deal_price else floor(
+        #             case when fees =0 then
+			# 			case when mrp <300 then least((0.5*mrp)/0.75, mrp)
+			# 			else  least( 0.5*mrp + 75 , mrp)
+			# 			end
+			# 		else
+			# 		case when mrp<300 then
+			# 		least(greatest(greatest(fees+60, 0.7*mrp), mrp-200)/0.75,mrp)
+			# 		else least(greatest(greatest(fees+60, 0.7*mrp), mrp-200)+75, mrp)
+			# 		end  end)
+			# 		end
+			# 		where doctor_clinic_id in (
+        #             select id from doctor_clinic where doctor_id=%s and hospital_id!=3560) '''
+        #
+        # update_doctor_deal_price = RawSql(query, [self.pk]).execute()
+        #
+        # # update nanavati hospital deal price
+        #
+        # query1 = '''update doctor_clinic_timing set deal_price = mrp*0.80
+        #                  where doctor_clinic_id  in (select id from doctor_clinic where doctor_id= %s and  hospital_id=3560 ) '''
+        #
+        # update_all_nanavati_doctor_deal_price = RawSql(query1, [self.pk]).execute()
 
     @classmethod
     def update_all_deal_price(cls):
         # will update all doctors prices
-        query = '''update doctor_clinic_timing set deal_price = 
-					case when (custom_deal_price > 0 )
-					then custom_deal_price else floor(				 
-                    case when fees =0 then
-						case when mrp <300 then least((0.5*mrp)/0.75, mrp)
-						else  least( 0.5*mrp + 75 , mrp)
-						end 
-					else
-					case when mrp<300 then 
-					least(greatest(greatest(fees+60, 0.7*mrp), mrp-200)/0.75,mrp)
-					else least(greatest(greatest(fees+60, 0.7*mrp), mrp-200)+75, mrp)
-					end  end)
-					end
-					 where doctor_clinic_id  in (select id from doctor_clinic where hospital_id!=3560 )  '''
-
+        query = '''update doctor_clinic_timing set deal_price=case when custom_deal_price is null then mrp else custom_deal_price end '''
         update_all_doctor_deal_price = RawSql(query, []).execute()
-
-        #update nanavati hospital deal price
-
-        query1 = '''update doctor_clinic_timing set deal_price = mrp*0.80 
-                 where doctor_clinic_id  in (select id from doctor_clinic where hospital_id=3560 ) '''
-
-        update_all_nanavati_doctor_deal_price = RawSql(query1, []).execute()
+        # query = '''update doctor_clinic_timing set deal_price =
+			# 		case when (custom_deal_price > 0 )
+			# 		then custom_deal_price else floor(
+        #             case when fees =0 then
+			# 			case when mrp <300 then least((0.5*mrp)/0.75, mrp)
+			# 			else  least( 0.5*mrp + 75 , mrp)
+			# 			end
+			# 		else
+			# 		case when mrp<300 then
+			# 		least(greatest(greatest(fees+60, 0.7*mrp), mrp-200)/0.75,mrp)
+			# 		else least(greatest(greatest(fees+60, 0.7*mrp), mrp-200)+75, mrp)
+			# 		end  end)
+			# 		end
+			# 		 where doctor_clinic_id  in (select id from doctor_clinic where hospital_id!=3560 )  '''
+        #
+        # update_all_doctor_deal_price = RawSql(query, []).execute()
+        #
+        # #update nanavati hospital deal price
+        #
+        # query1 = '''update doctor_clinic_timing set deal_price = mrp*0.80
+        #          where doctor_clinic_id  in (select id from doctor_clinic where hospital_id=3560 ) '''
+        #
+        # update_all_nanavati_doctor_deal_price = RawSql(query1, []).execute()
 
     def get_display_name(self):
         return "Dr. {}".format(self.name.title()) if self.name else None
