@@ -1918,9 +1918,11 @@ class LabAppointment(TimeStampedModel, CouponsMixin, LabAppointmentInvoiceMixin,
         #         logger.error(str(e))
 
         if self.is_to_send_notification(old_instance):
+            sent_to_provider = self.is_provider_notification_allowed(old_instance)
             try:
-                notification_tasks.send_lab_notifications_refactored.apply_async(kwargs={'appointment_id': self.id,
-                                                                                         'old_instance': old_instance},
+                notification_tasks.send_lab_notifications_refactored.apply_async(({'appointment_id': self.id,
+                                                                                         'is_valid_for_provider':
+                                                                                             sent_to_provider},),
                                                                                 countdown=1)
                 # notification_tasks.send_lab_notifications_refactored(self.id)
                 # notification_tasks.send_lab_notifications.apply_async(kwargs={'appointment_id': self.id}, countdown=1)
