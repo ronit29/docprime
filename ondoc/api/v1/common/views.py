@@ -1,5 +1,6 @@
 # from hardcopy import bytestring_to_pdf
 from django.contrib.contenttypes.models import ContentType
+from django.contrib.gis.measure import D
 from django.core.exceptions import ValidationError
 from django.core.validators import validate_email
 from fluent_comments.models import FluentComment
@@ -15,13 +16,16 @@ from django.utils.dateparse import parse_datetime
 from weasyprint import HTML
 from django.http import HttpResponse
 
+from ondoc.api.v1.doctor.serializers import TopHospitalForIpdProcedureSerializer
 from ondoc.api.v1.insurance.serializers import InsuranceCityEligibilitySerializer
 from ondoc.api.v1.utils import html_to_pdf, generate_short_url
 from ondoc.authentication.models import User
 from ondoc.diagnostic.models import Lab
-from ondoc.doctor.models import (Doctor, DoctorPracticeSpecialization, PracticeSpecialization, DoctorMobile, Qualification,
+from ondoc.doctor.models import (Doctor, DoctorPracticeSpecialization, PracticeSpecialization, DoctorMobile,
+                                 Qualification,
                                  Specialization, College, DoctorQualification, DoctorExperience, DoctorAward,
-                                 DoctorClinicTiming, DoctorClinic, Hospital, SourceIdentifier, DoctorAssociation)
+                                 DoctorClinicTiming, DoctorClinic, Hospital, SourceIdentifier, DoctorAssociation,
+                                 PurchaseOrderCreation)
 
 from ondoc.chat.models import ChatPrescription
 from ondoc.insurance.models import InsuranceEligibleCities
@@ -34,7 +38,8 @@ from django.template.loader import render_to_string
 
 from ondoc.procedure.models import IpdProcedure, IpdProcedureLead
 from . import serializers
-from ondoc.common.models import Cities, PaymentOptions, UserConfig, DeviceDetails, LastUsageTimestamp, AppointmentHistory
+from ondoc.common.models import Cities, PaymentOptions, UserConfig, DeviceDetails, LastUsageTimestamp, \
+    AppointmentHistory, SponsorListingURL, SponsorListingSpecialization
 from ondoc.common.utils import send_email, send_sms
 from ondoc.authentication.backends import JWTAuthentication, WhatsappAuthentication
 from django.core.files.uploadedfile import SimpleUploadedFile, TemporaryUploadedFile, InMemoryUploadedFile
@@ -46,7 +51,7 @@ import base64
 import logging
 import datetime
 import re
-from django.db.models import Count
+from django.db.models import Count, F
 from io import BytesIO
 import requests
 from PIL import Image as Img
@@ -1222,3 +1227,74 @@ class CommentViewSet(viewsets.ModelViewSet):
             return Response(serializer.data)
 
         return Response({})
+
+
+
+class SponsorListingViewSet(viewsets.GenericViewSet):
+
+    queryset = PurchaseOrderCreation.objects.all()
+
+    def list(self, request):
+
+        parameters = request.query_params
+        url = parameters.get('url')
+        spec_id = parameters.get('specialization_id')
+        lat = parameters.get('lat')
+        long = parameters.get('long')
+        utm = parameters.get('utm_term')
+        important_ids = set()
+
+        sponsorlisting_objects = PurchaseOrderCreation.objects.filter(is_enabled=True,
+                                                                      start_date__lte=timezone.now().date(),
+                                                                      end_date__gte=timezone.now().date(),
+                                                                      product_type=PurchaseOrderCreation.SPONSOR_LISTING). \
+            select_related('provider_name_hospital').prefetch_related('poc_specialization', 'poc_sponsorlisting',
+                                                                             'poc_utm_term', 'poc_lat_long')
+
+
+        if url:
+            seo_url_matching_ids = sponsorlisting_objects.filter(poc_sponsorlisting__seo_url=url).values_list('provider_name_hospital', flat=True).distinct()
+            important_ids = important_ids | set(seo_url_matching_ids)
+
+        if utm:
+            utm_matching_ids = sponsorlisting_objects.filter(poc_utm_term__utm_term=utm).values_list(
+                'provider_name_hospital', flat=True).distinct()
+            important_ids = important_ids | set(utm_matching_ids)
+
+        sepc_lat_matching_ids = []
+        for sponsor in sponsorlisting_objects:
+
+            for spec in sponsor.poc_specialization.all():
+                for loc in sponsor.poc_lat_long.all():
+                    latitude = loc.latitude
+                    longitude = loc.longitude
+                    radius = loc.radius
+                    if spec_id:
+                        specialization_id = spec.specialization.id
+                        if latitude and longitude and radius and specialization_id:
+                            pnt1 = Point(float(longitude), float(latitude))
+                            pnt2 = Point(float(long), float(lat))
+                            if pnt1.distance(pnt2) * 100 <= radius and specialization_id == spec_id:
+                                hospital_id = spec.poc.provider_name_hospital.id
+                                sepc_lat_matching_ids.append(hospital_id)
+
+
+                    elif latitude and longitude and radius:
+                        pnt1 = Point(float(longitude), float(latitude))
+                        pnt2 = Point(float(long), float(lat))
+                        if pnt1.distance(pnt2) * 100 <= radius:
+                            hospital_id = spec.poc.provider_name_hospital.id
+                            sepc_lat_matching_ids.append(hospital_id)
+
+        important_ids = important_ids | set(sepc_lat_matching_ids)
+
+        list_obj = Hospital.objects.prefetch_related('hospitalcertification_set',
+                                                            'hospital_documents',
+                                                            'hosp_availability',
+                                                            'health_insurance_providers',
+                                                            'network__hospital_network_documents',
+                                                            'hospitalspeciality_set').filter(id__in=important_ids)
+
+        serialized_objects = TopHospitalForIpdProcedureSerializer(list_obj, many=True).data
+        return Response(serialized_objects)
+
