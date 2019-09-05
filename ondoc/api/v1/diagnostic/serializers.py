@@ -821,7 +821,8 @@ class LabAppTransactionModelSerializer(serializers.Serializer):
     user_plan = serializers.PrimaryKeyRelatedField(queryset=UserPlanMapping.objects.all(), allow_null=True)
     coupon_data = serializers.JSONField(required=False)
     prescription_list = serializers.ListSerializer(child=PrescriptionDocumentSerializer(), required=False)
-
+    _source = serializers.CharField(required=False)
+    _responsible_user = serializers.IntegerField(required=False)
 
 class LabAppRescheduleModelSerializer(serializers.ModelSerializer):
     class Meta:
@@ -896,6 +897,8 @@ class LabAppointmentCreateSerializer(serializers.Serializer):
     included_in_user_plan = serializers.BooleanField(required=False, default=False)
     app_version = serializers.CharField(required=False, allow_null=True, allow_blank=True)
     prescription_list = serializers.ListSerializer(child=PrescriptionDocumentSerializer(), required=False)
+    _source = serializers.CharField(required=False)
+    _responsible_user = serializers.IntegerField(required=False)
 
     def validate(self, data):
         MAX_APPOINTMENTS_ALLOWED = 10
