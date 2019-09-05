@@ -85,13 +85,16 @@ class PlusPlansSerializer(serializers.ModelSerializer):
     def get_utilize(self, obj):
         request = self.context.get('request')
         user = request.user
+        utilization = {}
         plus_user = PlusUser.objects.filter(user_id=user.id).first()
-        utilization = plus_user.get_utilization()
+        if plus_user:
+            utilization = plus_user.get_utilization()
         return utilization
 
     class Meta:
         model = PlusPlans
-        fields = ('id', 'plan_name', 'worth', 'mrp', 'tax_rebate', 'you_pay', 'you_get', 'deal_price', 'is_selected', 'tenure', 'total_allowed_members', 'content', 'enabled_hospital_networks')
+        fields = ('id', 'plan_name', 'worth', 'mrp', 'tax_rebate', 'you_pay', 'you_get', 'deal_price', 'is_selected',
+                  'tenure', 'total_allowed_members', 'content', 'enabled_hospital_networks', 'utilize')
 
 
 class PlusProposerSerializer(serializers.ModelSerializer):
