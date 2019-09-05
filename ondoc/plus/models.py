@@ -203,6 +203,22 @@ class PlusUser(auth_model.TimeStampedModel):
 
         return None
 
+    def get_utilization(self):
+        plan = self.plan
+        data = {}
+        plan_parameters = plan.plan_parameters.filter(parameter__key__in=[PlanParametersEnum.DOCTOR_CONSULT_AMOUNT,
+                                                                               PlanParametersEnum.ONLINE_CHAT_AMOUNT,
+                                                                               PlanParametersEnum.HEALTH_CHECKUPS_AMOUNT,
+                                                                               PlanParametersEnum.MEMBERS_COVERED_IN_PACKAGE,
+                                                                               PlanParametersEnum.TOTAL_TEST_COVERED_IN_PACKAGE])
+
+        for pp in plan_parameters:
+            data[pp.parameter.key.lower()] = pp.value
+
+        data['tax_rebate'] = plan.tax_rebate
+        return data
+
+
     @classmethod
     def profile_create_or_update(cls, member, user):
         profile = {}
@@ -277,11 +293,28 @@ class PlusUser(auth_model.TimeStampedModel):
                                                           order=plus_data['order'])
 
         PlusMembers.create_plus_members(plus_membership_obj)
+        PlusUserUtilization.create_utilization(plus_membership_obj)
         return plus_membership_obj
 
     class Meta:
         db_table = 'plus_users'
         unique_together = (('user', 'plan'),)
+
+
+class PlusUserUtilization(auth_model.TimeStampedModel):
+    plus_user = models.ForeignKey(PlusUser, related_name='plus_utilization', on_delete=models.DO_NOTHING)
+    plan = models.ForeignKey(PlusPlans, related_name='plus_plans_for_utilization', on_delete=models.DO_NOTHING)
+    utilization = JSONField(blank=False, null=False)
+
+    class Meta:
+        db_table = 'plus_user_utilization'
+        unique_together = (('plus_user', 'plan'),)
+
+    @classmethod
+    def create_utilization(cls, plus_user_obj):
+        plus_plan = plus_user_obj.plan
+        utilization = plus_user_obj.get_utilization()
+        plus_utilize = cls.objects.create(plus_user=plus_user_obj, plan=plus_plan, utilization=utilization)
 
 
 class PlusTransaction(auth_model.TimeStampedModel):

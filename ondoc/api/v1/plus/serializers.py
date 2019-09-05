@@ -8,7 +8,7 @@ from ondoc.authentication.models import UserProfile
 from ondoc.authentication.models import User
 from ondoc.common.models import DocumentsProofs
 from ondoc.doctor.models import Hospital
-from ondoc.plus.models import (PlusProposer, PlusPlans, PlusThreshold, PlusMembers, PlusUser)
+from ondoc.plus.models import (PlusProposer, PlusPlans, PlusThreshold, PlusMembers, PlusUser, PlusUserUtilization)
 from ondoc.plus.enums import PlanParametersEnum
 from ondoc.account import models as account_models
 
@@ -26,6 +26,7 @@ class PlusPlansSerializer(serializers.ModelSerializer):
     worth = serializers.SerializerMethodField()
     you_pay = serializers.SerializerMethodField()
     you_get = serializers.SerializerMethodField()
+    utilize = serializers.SerializerMethodField()
 
     def get_content(self, obj):
         resp = defaultdict(list)
@@ -82,9 +83,19 @@ class PlusPlansSerializer(serializers.ModelSerializer):
         data['effective_price'] = effective_price
         return data
 
+    def get_utilize(self, obj):
+        request = self.context.get('request')
+        user = request.user
+        utilization = {}
+        plus_user = PlusUser.objects.filter(user_id=user.id).first()
+        if plus_user:
+            utilization = plus_user.get_utilization()
+        return utilization
+
     class Meta:
         model = PlusPlans
-        fields = ('id', 'plan_name', 'worth', 'mrp', 'tax_rebate', 'you_pay', 'you_get', 'deal_price', 'is_selected', 'tenure', 'total_allowed_members', 'content', 'enabled_hospital_networks')
+        fields = ('id', 'plan_name', 'worth', 'mrp', 'tax_rebate', 'you_pay', 'you_get', 'deal_price', 'is_selected',
+                  'tenure', 'total_allowed_members', 'content', 'enabled_hospital_networks', 'utilize')
 
 
 class PlusProposerSerializer(serializers.ModelSerializer):
