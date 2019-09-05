@@ -792,9 +792,6 @@ class Order(TimeStampedModel):
                     if not is_process:
                         raise Exception("Insurance invalidate, Could not process entire order")
 
-                # if validated_data and validated_data.get('appointment_id') and validated_data.get('cod_to_prepaid'):
-                #     curr_app, curr_wallet, curr_cashback = order.process_order(True, validated_data)
-                # else:
                 curr_app, curr_wallet, curr_cashback = order.process_order(convert_cod_to_prepaid)
 
                 # appointment was not created - due to insufficient balance, do not process
