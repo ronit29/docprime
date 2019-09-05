@@ -3367,4 +3367,15 @@ class LabAlerts(auth_model.TimeStampedModel):
         return str(self.name)
 
     class Meta:
-        db_table="lab_alerts"
+        db_table = "lab_alerts"
+
+
+class LabSamples(auth_model.TimeStampedModel):
+
+    name = models.CharField(max_length=128)
+
+    def __str__(self):
+        return str(self.name)
+
+    class Meta:
+        db_table = "lab_samples"
