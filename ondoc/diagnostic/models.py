@@ -3359,3 +3359,12 @@ class IPDMedicinePageLead(auth_model.TimeStampedModel):
             create_or_update_lead_on_matrix.apply_async(({'obj_type': self.__class__.__name__, 'obj_id': self.id}, ), countdown=5)
 
 
+class LabAlerts(auth_model.TimeStampedModel):
+
+    name = models.CharField(max_length=128)
+
+    def __str__(self):
+        return str(self.name)
+
+    class Meta:
+        db_table="lab_alerts"
