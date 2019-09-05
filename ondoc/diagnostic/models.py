@@ -2101,9 +2101,20 @@ class LabAppointment(TimeStampedModel, CouponsMixin, LabAppointmentInvoiceMixin,
         elif self.id is None:
             push_to_history = True
 
+        responsible_user=None
+        source=None
+        if kwargs.get('source'):
+            source = kwargs.pop('source')
+        if kwargs.get('responsible_user'):
+            responsible_user = kwargs.pop('responsible_user')
+
         super().save(*args, **kwargs)
 
         if push_to_history:
+            if responsible_user:
+                self._responsible_user = responsible_user
+            if source:
+                self._source = source
             AppointmentHistory.create(content_object=self)
 
         # Push the appointment to the integrator.
@@ -2181,7 +2192,7 @@ class LabAppointment(TimeStampedModel, CouponsMixin, LabAppointmentInvoiceMixin,
             return delay
 
     @classmethod
-    def create_appointment(cls, appointment_data):
+    def create_appointment(cls, appointment_data, responsible_user=None, source=None):
         from ondoc.prescription.models import AppointmentPrescription
         insurance = appointment_data.get('insurance')
         appointment_status = OpdAppointment.BOOKED
@@ -2216,7 +2227,12 @@ class LabAppointment(TimeStampedModel, CouponsMixin, LabAppointmentInvoiceMixin,
         for prescription in prescription_objects:
             prescription_id_list.append(prescription.get('prescription').id)
 
-        app_obj = cls.objects.create(**appointment_data)
+        # app_obj = cls.objects.create(**appointment_data)
+        _responsible_user = None
+        if responsible_user:
+            _responsible_user = auth_model.User.objects.filter(id=responsible_user).first()
+        app_obj = cls(**appointment_data)
+        app_obj.save(responsible_user=_responsible_user, source=source)
         AppointmentPrescription.update_with_appointment(app_obj, prescription_id_list)
         test_mappings = []
         for test in extra_details:
@@ -2593,7 +2609,9 @@ class LabAppointment(TimeStampedModel, CouponsMixin, LabAppointmentInvoiceMixin,
             "is_appointment_insured": is_appointment_insured,
             "insurance": insurance_id,
             "coupon_data": price_data.get("coupon_data"),
-            "prescription_list": data.get('prescription_list', [])
+            "prescription_list": data.get('prescription_list', []),
+            "_responsible_user": data.get("_responsible_user", None),
+            "_source": data.get("_source", None)
         }
 
         if data.get('included_in_user_plan', False):
