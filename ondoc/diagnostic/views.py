@@ -190,6 +190,9 @@ def update_records_from_excel(lpg_queryset, excel_data):
         return {'error': "Lab pricing group not found"}
 
     for data in excel_data:
+        if not data.get('mrp', None):
+            return {'error': "Mrp cannot be blank."}
+
         if data.get('mrp') and data.get('test'):
             data['lab_pricing_group'] = lpg_queryset.id
             labtest_queryset = LabTest.objects.filter(id=data.get('test')).first()
@@ -214,8 +217,11 @@ def update_records_from_excel(lpg_queryset, excel_data):
                         data = serialized_data.validated_data
                         instance = AvailableLabTest(**data)
                 instance.save()
+            else:
+                return {'error': 'Lab test not found for id - ' + data.get('test')}
 
     return {'success': "Uploaded Successfully"}
+
 
 
 # class LabTestTable(tables.Table):
