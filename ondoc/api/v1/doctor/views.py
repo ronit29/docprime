@@ -444,7 +444,8 @@ class DoctorAppointmentsViewSet(OndocViewSet):
         elif data.get('from_web') and data['from_web']:
             data['_source'] = AppointmentHistory.WEB
             responsible_user = request.user.id
-        data['_responsible_user'] = responsible_user
+        if responsible_user:
+            data['_responsible_user'] = responsible_user
 
         if validated_data.get("existing_cart_item"):
             cart_item = validated_data.get("existing_cart_item")
