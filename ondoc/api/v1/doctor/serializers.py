@@ -2016,13 +2016,14 @@ class TopHospitalForIpdProcedureSerializer(serializers.ModelSerializer):
     h1_title = serializers.SerializerMethodField()
     services = serializers.SerializerMethodField()
     service_count = serializers.SerializerMethodField()
+    hospital_image = serializers.SerializerMethodField()
 
     class Meta:
         model = Hospital
         fields = ('id', 'name', 'distance', 'certifications', 'bed_count', 'logo', 'avg_rating',
                   'count_of_insurance_provider', 'multi_speciality', 'address', 'short_address','open_today',
                   'insurance_provider', 'established_in', 'long', 'lat', 'url', 'locality_url', 'name_city', 'operational_since',
-                  'h1_title', 'is_ipd_hospital', 'seo_title', 'network_id', 'services', 'service_count')
+                  'h1_title', 'is_ipd_hospital', 'seo_title', 'network_id', 'services', 'service_count', 'hospital_image')
 
     def get_name_city(self, obj):
         result = obj.name
@@ -2133,6 +2134,15 @@ class TopHospitalForIpdProcedureSerializer(serializers.ModelSerializer):
                 sp_list = None
             count = len(sp_list)
         return count
+
+    def get_hospital_image(self, obj):
+        if obj:
+            request = self.context.get('request')
+            if obj.imagehospital.all():
+                for image in obj.imagehospital.all():
+                    image = image.name
+                    return request.build_absolute_uri(image.url) if image else None
+        return None
 
 
 class HospitalDetailIpdProcedureSerializer(TopHospitalForIpdProcedureSerializer):

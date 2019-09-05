@@ -1304,6 +1304,6 @@ class SponsorListingViewSet(viewsets.GenericViewSet):
         #         sp_list.append({})
 
 
-        serialized_objects = TopHospitalForIpdProcedureSerializer(list_obj, many=True).data
+        serialized_objects = TopHospitalForIpdProcedureSerializer(list_obj, many=True, context={'request': request}).data
         return Response(serialized_objects)
 

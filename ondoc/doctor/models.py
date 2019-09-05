@@ -1832,7 +1832,7 @@ class DoctorDocument(auth_model.TimeStampedModel, auth_model.Document):
 
 
 class HospitalImage(auth_model.TimeStampedModel, auth_model.Image):
-    hospital = models.ForeignKey(Hospital, on_delete=models.CASCADE)
+    hospital = models.ForeignKey(Hospital, on_delete=models.CASCADE, related_name='imagehospital')
     name = models.ImageField(upload_to='hospital/images', height_field='height', width_field='width')
     cropped_image = models.ImageField(upload_to='hospital/images', height_field='height', width_field='width',
                                       blank=True, null=True)
