@@ -115,7 +115,7 @@ def availablelabtestajaxsave(request):
 
 
 def testcsvupload(request):
-    import xlrd
+    import openpyxl
     if request.POST and request.POST['lpg_id']:
         pk = request.POST['lpg_id']
         lpg_queryset = LabPricingGroup.objects.filter(id=pk).first()
@@ -123,12 +123,27 @@ def testcsvupload(request):
             if request.FILES and request.FILES['csv']:
                 csv = request.FILES['csv']
                 try:
-                    book = xlrd.open_workbook(file_contents=csv.read())
-                except Exception:
-                    return JsonResponse({'error': "Invalid File"})
+                    book = openpyxl.load_workbook(csv)
+                except Exception as e:
+                    return JsonResponse({'error': "Invalid File - " + str(e)})
                 if book:
-                    sheet = book.sheet_by_index(0)
-                    output = update_records_from_csv(lpg_queryset, sheet)
+                    sheet = book.active
+                    excel_data = list()
+                    headers = list()
+                    i = 0
+                    for row in sheet.iter_rows():
+                        j = 0
+                        data = {}
+                        for cell in row:
+                            if i == 0:
+                                headers.append(str(cell.value))
+                            else:
+                                data[headers[j]] = cell.value
+                                j = j + 1
+                        i = i + 1
+                        excel_data.append(data)
+                    output = update_records_from_excel(lpg_queryset, excel_data)
+                    # output = update_records_from_csv(lpg_queryset, sheet)
                     return JsonResponse(output)
             else:
                 return JsonResponse({'error': "Invalid File"})
@@ -166,6 +181,40 @@ def update_records_from_csv(lpg_queryset, sheet):
                         data = serialized_data.validated_data
                         instance = AvailableLabTest(**data)
                 instance.save()
+    return {'success': "Uploaded Successfully"}
+
+
+@transaction.atomic
+def update_records_from_excel(lpg_queryset, excel_data):
+    if not lpg_queryset:
+        return {'error': "Lab pricing group not found"}
+
+    for data in excel_data:
+        if data.get('mrp') and data.get('test'):
+            data['lab_pricing_group'] = lpg_queryset.id
+            labtest_queryset = LabTest.objects.filter(id=data.get('test')).first()
+            if labtest_queryset:
+                if labtest_queryset.test_type == LabTest.PATHOLOGY:
+                    if not lpg_queryset.pathology_agreed_price_percentage and not lpg_queryset.pathology_deal_price_percentage:
+                        return {'error': "No Price Percentage Found"}
+                elif labtest_queryset.test_type == LabTest.RADIOLOGY:
+                    if not lpg_queryset.radiology_agreed_price_percentage and not lpg_queryset.radiology_deal_price_percentage:
+                        return {'error': "No Price Percentage Found"}
+                else:
+                    return {'error': "Test Type Not Found"}
+                instance = None
+                existing_test = AvailableLabTest.objects.filter(test__id=data['test'], lab_pricing_group=lpg_queryset)
+                if existing_test.exists():
+                    instance = existing_test.first()
+                    if instance:
+                        instance.mrp = data.get('mrp')
+                else:
+                    serialized_data = AjaxAvailableLabTestSerializer(instance=instance, data=data)
+                    if serialized_data.is_valid(raise_exception=True):
+                        data = serialized_data.validated_data
+                        instance = AvailableLabTest(**data)
+                instance.save()
+
     return {'success': "Uploaded Successfully"}
 
 
