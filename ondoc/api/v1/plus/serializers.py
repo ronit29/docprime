@@ -6,6 +6,7 @@ from rest_framework.renderers import JSONRenderer
 from ondoc.api.v1.doctor.serializers import CommonConditionsSerializer
 from ondoc.authentication.models import UserProfile
 from ondoc.authentication.models import User
+from ondoc.common.models import DocumentsProofs
 from ondoc.doctor.models import Hospital
 from ondoc.plus.models import (PlusProposer, PlusPlans, PlusThreshold, PlusMembers, PlusUser, PlusUserUtilization)
 from ondoc.plus.enums import PlanParametersEnum
@@ -105,6 +106,10 @@ class PlusProposerSerializer(serializers.ModelSerializer):
         fields = ('id', 'name', 'logo', 'website', 'phone_number', 'email', 'plans')
 
 
+class PlusMembersDocumentSerializer(serializers.Serializer):
+    proof_file = serializers.PrimaryKeyRelatedField(queryset=DocumentsProofs.objects.all())
+
+
 class PlusMemberListSerializer(serializers.Serializer):
     title = serializers.ChoiceField(choices=PlusMembers.TITLE_TYPE_CHOICES)
     first_name = serializers.CharField(max_length=50)
@@ -117,6 +122,7 @@ class PlusMemberListSerializer(serializers.Serializer):
     city = serializers.CharField(allow_null=True, allow_blank=True, required=False)
     city_code = serializers.CharField(allow_null=True, allow_blank=True, required=False)
     relation = serializers.ChoiceField(choices=PlusMembers.Relations.as_choices())
+    document_ids = serializers.ListField(required=False, allow_null=True, child=PlusMembersDocumentSerializer())
     # is_primary_user = serializers.BooleanField()
     # plan = serializers.PrimaryKeyRelatedField(queryset=PlusPlans.all_active_plans(), allow_null=False, allow_empty=False)
 

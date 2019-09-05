@@ -11,6 +11,8 @@ from ondoc.authentication.models import UserProfile
 from ondoc.common.helper import Choices
 import json
 from django.db import transaction
+
+from ondoc.common.models import DocumentsProofs
 from ondoc.notification.tasks import push_plus_lead_to_matrix
 from .enums import PlanParametersEnum
 from datetime import datetime
@@ -427,7 +429,7 @@ class PlusMembers(auth_model.TimeStampedModel):
         for member in members:
             user_profile = UserProfile.objects.get(id=member.get('profile'))
             is_primary_user = True if member['relation'] and member['relation']  == cls.Relations.SELF else False
-            insured_members_obj = cls.objects.create(first_name=member.get('first_name'), title=member.get('title'),
+            plus_members_obj = cls(first_name=member.get('first_name'), title=member.get('title'),
                                                      last_name=member.get('last_name'), dob=member.get('dob'),
                                                      email=member.get('email'), address=member.get('address'),
                                                      pincode=member.get('pincode'), phone_number=user_profile.phone_number,
@@ -436,6 +438,11 @@ class PlusMembers(auth_model.TimeStampedModel):
                                                      state_code = member.get('state_code'), plus_user=plus_user_obj,
                                                      city_code=member.get('city_code'), district_code=member.get('district_code'),
                                                      relation=member.get('relation'), is_primary_user=is_primary_user)
+            plus_members_obj.save()
+            member_document_proofs = member.get('document_ids')
+            if member_document_proofs:
+                document_ids = list(map(lambda d: d.get('proof_file'), member_document_proofs))
+                DocumentsProofs.update_with_object(plus_members_obj, document_ids)
 
     class Meta:
         db_table = "plus_members"
@@ -506,3 +513,5 @@ class PlusLead(auth_model.TimeStampedModel):
 
     class Meta:
         db_table = 'plus_leads'
+
+
