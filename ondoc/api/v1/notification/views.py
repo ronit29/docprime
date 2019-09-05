@@ -133,7 +133,9 @@ class DynamicTemplate(View):
                 else:
                     recipient_obj = obj.recipient
 
-                obj.send_notification(obj.get_parameter_json(), recipient_obj, NotificationAction.SAMPLE_DYNAMIC_TEMPLATE_PREVIEW)
+                obj.send_notification(obj.get_parameter_json(), recipient_obj,
+                                      NotificationAction.SAMPLE_DYNAMIC_TEMPLATE_PREVIEW, is_preview=True)
+
                 html = "Notification send successfully."
             else:
                 html = "Recipient Number or address found to send notification."
