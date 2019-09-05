@@ -434,7 +434,7 @@ class PlusMembers(auth_model.TimeStampedModel):
                                                      last_name=member.get('last_name'), dob=member.get('dob'),
                                                      email=member.get('email'), address=member.get('address'),
                                                      pincode=member.get('pincode'), phone_number=user_profile.phone_number,
-                                                     gender=member.get('gender'), profile=user_profile, town=member.get('town'),
+                                                     gender=member.get('gender'), profile=user_profile, town=member.get('city'),
                                                      district=member.get('district'), state=member.get('state'),
                                                      state_code = member.get('state_code'), plus_user=plus_user_obj,
                                                      city_code=member.get('city_code'), district_code=member.get('district_code'),

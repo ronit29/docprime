@@ -131,6 +131,8 @@ class PlusOrderViewSet(viewsets.GenericViewSet):
                     pre_insured_members['last_name'] = member.get('last_name') if member.get('last_name') else ''
                     pre_insured_members['address'] = member['address']
                     pre_insured_members['pincode'] = member['pincode']
+                    pre_insured_members['city'] = member['city']
+                    pre_insured_members['city_code'] = member['city_code']
                     pre_insured_members['email'] = member['email']
                     pre_insured_members['relation'] = member['relation']
                     pre_insured_members['profile'] = member.get('profile').id if member.get(
@@ -294,15 +296,23 @@ class PlusProfileViewSet(viewsets.GenericViewSet):
 
     def dashboard(self, request):
         resp = {}
-        plus_user_id = request.query_params.get('id')
-        plus_user = PlusUser.objects.filter(id=plus_user_id).first()
-        plus_members = plus_user.plus_membrs
+        if request.query_params.get('is_dashboard'):
+            user = request.user
+            plus_user = PlusUser.objects.filter(user=user).first()
+        elif(request.query_params.get('id') and not request.query_params.get('is_dashboard')):
+            plus_user_id = request.query_params.get('id')
+            plus_user = PlusUser.objects.filter(id=plus_user_id).first()
+        else:
+            return Response(status=status.HTTP_404_NOT_FOUND)
+        plus_members = plus_user.plus_members.all()
         if len(plus_members) > 1:
             resp['is_member_allowed'] = False
         else:
             resp['is_member_allowed'] = True
-        proposer_queryset = PlusProposer.objects.filter(id=plus_user.plan.proposer.id)
-        plan_body_serializer = serializers.PlusPlansSerializer(proposer_queryset, context={'request': request}, many=True)
+        plus_plan_queryset = PlusPlans.objects.filter(id=plus_user.plan.id)
+        plan_body_serializer = serializers.PlusPlansSerializer(plus_plan_queryset, context={'request': request}, many=True)
         resp['plan'] = plan_body_serializer.data
-        return resp
+        plus_user_body_serializer = serializers.PlusUserModelSerializer(plus_user, context={'request': request})
+        resp['user'] = plus_user_body_serializer.data
+        return Response({'data': resp})
 
