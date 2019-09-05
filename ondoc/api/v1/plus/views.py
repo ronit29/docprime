@@ -38,7 +38,7 @@ class PlusListViewSet(viewsets.GenericViewSet):
         return Response(resp)
 
 
-class PlusOrderViewSet(viewsets.GenericViewSet):
+class PlusOrderLeadViewSet(viewsets.GenericViewSet):
     authentication_classes = (JWTAuthentication,)
     # permission_classes = (IsAuthenticated,)
 
@@ -86,6 +86,11 @@ class PlusOrderViewSet(viewsets.GenericViewSet):
                 return Response({'success': False, 'is_plus_user': False})
 
             return Response({'success': True, 'is_plus_user': False})
+
+
+class PlusOrderViewSet(viewsets.GenericViewSet):
+    authentication_classes = (JWTAuthentication,)
+    permission_classes = (IsAuthenticated,)
 
     @transaction.atomic
     def create_order(self, request):
@@ -224,6 +229,32 @@ class PlusOrderViewSet(viewsets.GenericViewSet):
         else:
             return Response(status=status.HTTP_404_NOT_FOUND)
         return Response(resp)
+
+    @transaction.atomic
+    def add_members(self, request):
+        user = request.user
+
+        active_plus_subscription = user.active_plus_user
+        if not active_plus_subscription:
+            return Response({'error': 'User has not purchased the VIP plan.'})
+
+        phone_number = user.phone_number
+        blocked_state = BlacklistUser.get_state_by_number(phone_number, BlockedStates.States.VIP)
+        if blocked_state:
+            return Response({'error': blocked_state.message}, status=status.HTTP_400_BAD_REQUEST)
+
+        serializer = serializers.PlusMembersSerializer(data=request.data, context={'request': request})
+        if not serializer.is_valid() and serializer.errors:
+            logger.error(str(serializer.errors))
+
+        serializer.is_valid(raise_exception=True)
+        valid_data = serializer.validated_data
+        members_to_be_added = valid_data.get('members')
+        for member in members_to_be_added:
+            member['profile'] = PlusUser.profile_create_or_update(member, user)
+        PlusMembers.create_plus_members(active_plus_subscription, members_list=members_to_be_added)
+
+        return Response({'success': True})
 
 
 class PlusProfileViewSet(viewsets.GenericViewSet):
