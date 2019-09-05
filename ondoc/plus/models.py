@@ -439,8 +439,10 @@ class PlusMembers(auth_model.TimeStampedModel):
                                                      city_code=member.get('city_code'), district_code=member.get('district_code'),
                                                      relation=member.get('relation'), is_primary_user=is_primary_user)
             plus_members_obj.save()
-            if member.get('document_ids'):
-                DocumentsProofs.update_with_object(plus_members_obj, member.get('document_ids'))
+            member_document_proofs = member.get('document_ids')
+            if member_document_proofs:
+                document_ids = list(map(lambda d: d.get('proof_file'), member_document_proofs))
+                DocumentsProofs.update_with_object(plus_members_obj, document_ids)
 
     class Meta:
         db_table = "plus_members"
