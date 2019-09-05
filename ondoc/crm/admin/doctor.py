@@ -2462,13 +2462,13 @@ class SponsorListingLocationInline(admin.TabularInline):
 
 class SponsorListingURLInline(admin.TabularInline):
     model = SponsorListingURL
-    extra = 2
+    extra = 0
     can_delete = True
 
 
 class SponsorListingSpecializationInline(admin.TabularInline):
     model = SponsorListingSpecialization
-    extra = 2
+    extra = 0
     can_delete = True
 
 
@@ -2480,22 +2480,17 @@ class SponsorListingUtmTermInline(admin.TabularInline):
 
 class SponsoredListingServiceInline(admin.TabularInline):
     model = SponsoredListingService
-#     extra = 0
-#     can_delete = True
-#
-#     # def get_queryset(self, request):
-#     #     return super(SponsoredListingService, self).get_queryset(request).filter(poc=request.resolver_match.kwargs.get('object_id')).first().provider_name_hospital.hospital_services.first().sponsored_service
+    extra = 0
+    can_delete = True
 
-
-# class HospitalSponsoredServicesInline(admin.TabularInline):
-#     model = HospitalSponsoredServices
-#     extra = 0
-#     can_delete = 0
-#
-#     def get_queryset(self, request):
-#         hospital = PurchaseOrderCreation.objects.filter(id=request.resolver_match.kwargs.get('object_id')).first().provider_name_hospital.id
-#         return super(HospitalSponsoredServicesInline, self).get_queryset(request).filter(hospital=hospital)
-
+    def formfield_for_foreignkey(self, db_field, request=None, **kwargs):
+        if db_field.name == 'hospital_service':
+            parent_object_id = request.resolver_match.kwargs.get('object_id')
+            parent_obj = PurchaseOrderCreation.objects.filter(id=parent_object_id).first()
+            if parent_obj:
+                hospital = parent_obj.provider_name_hospital.id
+                kwargs['queryset'] = HospitalSponsoredServices.objects.select_related('hospital', 'sponsored_service').filter(hospital=hospital)
+        return super(SponsoredListingServiceInline, self).formfield_for_foreignkey(db_field, request, **kwargs)
 
 
 class PurchaseOrderCreationAdmin(CompareVersionAdmin):
@@ -2506,7 +2501,7 @@ class PurchaseOrderCreationAdmin(CompareVersionAdmin):
     autocomplete_fields = ['provider_name_lab', 'provider_name_hospital']
     search_fields = ['provider_name_lab__name', 'provider_name_hospital__name']
 
-    inlines = [SponsorListingURLInline, SponsorListingSpecializationInline, SponsorListingUtmTermInline, SponsorListingLocationInline]
+    inlines = [SponsorListingURLInline, SponsorListingSpecializationInline, SponsorListingUtmTermInline, SponsorListingLocationInline, SponsoredListingServiceInline]
 
     # readonly_fields = ['provider_name', 'appointment_booked_count', 'current_appointment_count']
 

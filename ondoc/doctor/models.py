@@ -4900,6 +4900,8 @@ class HospitalSponsoredServices(auth_model.TimeStampedModel):
         db_table = "hospital_sponsored_services"
         unique_together = (("hospital", "sponsored_service"),)
 
+    def __str__(self):
+        return '{}-{}'.format(self.hospital.name, self.sponsored_service.name)
 
 @reversion.register()
 class SponsoredServicePracticeSpecialization(auth_model.TimeStampedModel):
