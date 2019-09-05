@@ -164,6 +164,7 @@ def send_opd_notifications_refactored(data, notification_type=None):
     from ondoc.communications.models import OpdNotification
     appointment_id = data.get('appointment_id', None)
     is_valid_for_provider = data.get('is_valid_for_provider', False)
+    notification_type = data.get('notification_type', None)
     instance = OpdAppointment.objects.filter(id=appointment_id).first()
     try:
         if not instance or not instance.user:
@@ -914,7 +915,8 @@ def send_lab_reports(appointment_id):
         if not instance:
             return
         lab_notification = LabNotification(instance, NotificationAction.LAB_REPORT_SEND_VIA_CRM)
-        lab_notification.send()
+        is_valid_for_provider = True
+        lab_notification.send(is_valid_for_provider)
     except Exception as e:
         logger.error(str(e))
 
