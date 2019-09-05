@@ -2014,7 +2014,7 @@ class TopHospitalForIpdProcedureSerializer(serializers.ModelSerializer):
     locality_url = serializers.SerializerMethodField()
     name_city = serializers.SerializerMethodField()
     h1_title = serializers.SerializerMethodField()
-    services = serializers.SerializerMethodField()
+    hospital_services = serializers.SerializerMethodField()
     service_count = serializers.SerializerMethodField()
     hospital_image = serializers.SerializerMethodField()
 
@@ -2023,7 +2023,7 @@ class TopHospitalForIpdProcedureSerializer(serializers.ModelSerializer):
         fields = ('id', 'name', 'distance', 'certifications', 'bed_count', 'logo', 'avg_rating',
                   'count_of_insurance_provider', 'multi_speciality', 'address', 'short_address','open_today',
                   'insurance_provider', 'established_in', 'long', 'lat', 'url', 'locality_url', 'name_city', 'operational_since',
-                  'h1_title', 'is_ipd_hospital', 'seo_title', 'network_id', 'services', 'service_count', 'hospital_image')
+                  'h1_title', 'is_ipd_hospital', 'seo_title', 'network_id', 'hospital_services', 'service_count', 'hospital_image')
 
     def get_name_city(self, obj):
         result = obj.name
@@ -2109,7 +2109,7 @@ class TopHospitalForIpdProcedureSerializer(serializers.ModelSerializer):
                 return True
         return False
 
-    def get_services(self, obj):
+    def get_hospital_services(self, obj):
         sp_list = []
         if obj:
             if obj.hospital_services.all():
