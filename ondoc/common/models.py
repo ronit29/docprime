@@ -828,8 +828,8 @@ class SponsorListingSpecialization(auth_model.TimeStampedModel):
     class Meta:
         db_table = 'sponsor_listing_specialization'
 
-    def __str__(self):
-        return self.id
+    # def __str__(self):
+    #     return self.id
 
 
 class SponsorListingLocation(auth_model.TimeStampedModel):
