@@ -19,7 +19,7 @@ class PlusProposerAdmin(admin.ModelAdmin):
     model = PlusProposer
     display = ("name", "min_float", "logo", "website", "phone_number", "email", "address", "company_name",
                "intermediary_name", "intermediary_code", "intermediary_contact_number", "gstin_number", "signature",
-               "is_live", "enabled", "plus_document")
+               "is_live", "enabled", "plus_document, merchant_code")
     list_display = ('name', 'is_live')
 
 

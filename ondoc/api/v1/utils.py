@@ -475,6 +475,7 @@ def payment_details(request, order):
         profile_name = profile.name
 
     insurer_code = None
+    plus_merchant_code = None
     if order.product_id == Order.INSURANCE_PRODUCT_ID:
         isPreAuth = '0'
         insurance_plan_id = order.action_data.get('insurance_plan')
@@ -495,7 +496,7 @@ def payment_details(request, order):
         if not plus_plan:
             raise Exception('Invalid pg transaction as plus plan is not found.')
         proposer = plus_plan.proposer
-        # insurer_code = insurer.insurer_merchant_code
+        plus_merchant_code = proposer.merchant_code
 
         if not profile:
             if order.action_data.get('profile_detail'):
@@ -558,6 +559,9 @@ def payment_details(request, order):
 
     if insurer_code:
         pgdata['insurerCode'] = insurer_code
+
+    if plus_merchant_code:
+        pgdata['merchCode'] = plus_merchant_code
 
     secret_key, client_key = get_pg_secret_client_key(order)
     filtered_pgdata = {k: v for k, v in pgdata.items() if v is not None and v != ''}

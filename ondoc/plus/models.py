@@ -51,6 +51,7 @@ class PlusProposer(auth_model.TimeStampedModel):
     enabled = models.BooleanField(default=True)
     plus_document = models.FileField(null=True, blank=False, upload_to='plus/documents',
                                         validators=[FileExtensionValidator(allowed_extensions=['pdf'])])
+    merchant_code = models.CharField(blank=False, null=True, max_length=100)
 
     def __str__(self):
         return "{}".format(self.name)
