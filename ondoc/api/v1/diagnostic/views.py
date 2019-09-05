@@ -2478,7 +2478,17 @@ class LabAppointmentView(mixins.CreateModelMixin,
                 if cart_item:
                     cart_items.append(cart_item)
         else:
-            cart_item = Cart.add_items_to_cart(request, validated_data, data)
+            test_timings = validated_data.get('test_timings')
+            if test_timings:
+                datetime_ist = dateutil.parser.parse(str(test_timings[0].get('start_date')))
+                data_start_date = datetime_ist.astimezone(tz=timezone.utc).isoformat()
+                new_data = copy.deepcopy(data)
+                new_data['start_date'] = data_start_date
+                new_data['start_time'] = test_timings[0]['start_time']
+                new_data['is_home_pickup'] = test_timings[0]['is_home_pickup']
+            else:
+                new_data = copy.deepcopy(data)
+            cart_item = Cart.add_items_to_cart(request, validated_data, new_data)
             if cart_item:
                 cart_items.append(cart_item)
 

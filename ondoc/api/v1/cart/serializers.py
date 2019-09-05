@@ -46,8 +46,6 @@ class CartItemSerializer(serializers.ModelSerializer):
     def get_date(self, obj):
         from django.utils.timezone import make_aware
 
-        selected_time = None
-        #if not obj.data.get('multi_timings_enabled'):
         if not obj.data.get("start_date"):
             return None
 
