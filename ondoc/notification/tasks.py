@@ -915,7 +915,8 @@ def send_lab_reports(appointment_id):
         if not instance:
             return
         lab_notification = LabNotification(instance, NotificationAction.LAB_REPORT_SEND_VIA_CRM)
-        lab_notification.send()
+        is_valid_for_provider = True
+        lab_notification.send(is_valid_for_provider)
     except Exception as e:
         logger.error(str(e))
 

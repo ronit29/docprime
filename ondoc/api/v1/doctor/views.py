@@ -5,7 +5,7 @@ from uuid import UUID
 from django.contrib.gis.db.models.functions import Distance
 from django.contrib.gis.measure import D
 
-from ondoc.account.models import Order, ConsumerAccount
+from ondoc.account.models import Order, ConsumerAccount, PgTransaction
 from ondoc.api.v1.auth.serializers import UserProfileSerializer
 from ondoc.api.v1.doctor.city_match import city_match
 from ondoc.api.v1.doctor.serializers import HospitalModelSerializer, AppointmentRetrieveDoctorSerializer, \
@@ -249,6 +249,12 @@ class DoctorAppointmentsViewSet(OndocViewSet):
         user = request.user
 
         if data and data.get('appointment_id') and data.get('cod_to_prepaid'):
+            pgtrans = PgTransaction.objects.filter(reference_id=validated_data.get('appointment_id'))
+            if pgtrans:
+                return Response(status=status.HTTP_400_BAD_REQUEST,
+                                data={"error": 'Appointment already created, Cannot Rebook.',
+                                      "request_errors": {"message": 'Appointment already created, Cannot Rebook.'}})
+
             pg_order = Order.objects.filter(reference_id=validated_data.get('appointment_id')).first()
             cart_item_id = pg_order.action_data.get('cart_item_id', None)
             price_data = OpdAppointment.get_price_details(validated_data)
@@ -339,7 +345,7 @@ class DoctorAppointmentsViewSet(OndocViewSet):
                     order_list.append(order)
 
             if process_immediately:
-                appointment_ids = pg_order.process_pg_order(data)
+                appointment_ids = pg_order.process_pg_order(True)
                 if appointment_ids.get('id') and price_data.get('coupon_list'):
                     coupon_id  = price_data.get('coupon_list')[0]
                     opd_app = OpdAppointment.objects.filter(id=appointment_ids.get('id')).first()
@@ -438,7 +444,8 @@ class DoctorAppointmentsViewSet(OndocViewSet):
         elif data.get('from_web') and data['from_web']:
             data['_source'] = AppointmentHistory.WEB
             responsible_user = request.user.id
-        data['_responsible_user'] = responsible_user
+        if responsible_user:
+            data['_responsible_user'] = responsible_user
 
         if validated_data.get("existing_cart_item"):
             cart_item = validated_data.get("existing_cart_item")

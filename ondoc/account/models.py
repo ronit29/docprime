@@ -202,7 +202,7 @@ class Order(TimeStampedModel):
         return opd_obj
 
     @transaction.atomic
-    def process_order(self, convert_cod_to_prepaid=False, validated_data=None):
+    def process_order(self, convert_cod_to_prepaid=False):
         from ondoc.doctor.models import OpdAppointment
         from ondoc.api.v1.plus.serializers import PlusUserSerializer
         from ondoc.plus.models import PlusUser, PlusTransaction
@@ -732,7 +732,7 @@ class Order(TimeStampedModel):
         return resp
 
     @transaction.atomic()
-    def process_pg_order(self, validated_data=None, convert_cod_to_prepaid=False):
+    def process_pg_order(self, convert_cod_to_prepaid=False):
         from ondoc.doctor.models import OpdAppointment
         from ondoc.diagnostic.models import LabAppointment
         from ondoc.insurance.models import UserInsurance
@@ -792,10 +792,7 @@ class Order(TimeStampedModel):
                     if not is_process:
                         raise Exception("Insurance invalidate, Could not process entire order")
 
-                if validated_data and validated_data.get('appointment_id') and validated_data.get('cod_to_prepaid'):
-                    curr_app, curr_wallet, curr_cashback = order.process_order(True, validated_data)
-                else:
-                    curr_app, curr_wallet, curr_cashback = order.process_order(convert_cod_to_prepaid)
+                curr_app, curr_wallet, curr_cashback = order.process_order(convert_cod_to_prepaid)
 
                 # appointment was not created - due to insufficient balance, do not process
                 if not curr_app:
