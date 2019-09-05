@@ -339,7 +339,7 @@ class DoctorAppointmentsViewSet(OndocViewSet):
                     order_list.append(order)
 
             if process_immediately:
-                appointment_ids = pg_order.process_pg_order(data)
+                appointment_ids = pg_order.process_pg_order(True)
                 if appointment_ids.get('id') and price_data.get('coupon_list'):
                     coupon_id  = price_data.get('coupon_list')[0]
                     opd_app = OpdAppointment.objects.filter(id=appointment_ids.get('id')).first()

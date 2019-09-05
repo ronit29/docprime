@@ -1282,8 +1282,7 @@ class TransactionViewSet(viewsets.GenericViewSet):
             order_obj = Order.objects.select_for_update().filter(pk=response.get("orderId")).first()
             convert_cod_to_prepaid = False
             try:
-                if order_obj and response and order_obj.amount != Decimal(
-                        response.get('txAmount')) and order_obj.is_cod_order and order_obj.get_deal_price_without_coupon <= Decimal(response.get('txAmount')):
+                if order_obj and response and order_obj.is_cod_order and order_obj.get_deal_price_without_coupon <= Decimal(response.get('txAmount')):
                     convert_cod_to_prepaid = True
                     order_obj.amount = Decimal(response.get('txAmount'))
                     order_obj.save()
