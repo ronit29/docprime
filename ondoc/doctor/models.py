@@ -3478,7 +3478,7 @@ class OpdAppointment(auth_model.TimeStampedModel, CouponsMixin, OpdAppointmentIn
             logger.error("Could not save triggered event - " + str(e))
 
     def is_retail_booking(self, old_instance):
-        if old_instance.status != OpdAppointment.ACCEPTED and self.status == OpdAppointment.ACCEPTED \
+        if old_instance.status == OpdAppointment.BOOKED and self.status == OpdAppointment.ACCEPTED \
                 and (self.payment_type == OpdAppointment.PREPAID or self.payment_type == OpdAppointment.COD) \
                 and self.doctor.is_insurance_enabled and self.hospital.enabled_for_insurance:
             return True
