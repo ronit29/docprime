@@ -3,8 +3,8 @@ from .views import PlusListViewSet, PlusOrderViewSet, PlusOrderLeadViewSet, Plus
 
 
 urlpatterns = [
-    path('list', PlusOrderLeadViewSet.as_view({'get': 'list'}), name='plus-list'),
-    path('lead/create', PlusOrderViewSet.as_view({'post': 'create_plus_lead'}), name='plus-lead-create'),
+    path('list', PlusListViewSet.as_view({'get': 'list'}), name='plus-list'),
+    path('lead/create', PlusOrderLeadViewSet.as_view({'post': 'create_plus_lead'}), name='plus-lead-create'),
     path('create', PlusOrderViewSet.as_view({'post': 'create_order'}), name='plus-subscription-create'),
     path('dashboard', PlusProfileViewSet.as_view({'get': 'dashboard'}), name='dashboard'),
     path('add/members', PlusOrderViewSet.as_view({'post': 'add_members'}), name='plus-subscription-add-members'),

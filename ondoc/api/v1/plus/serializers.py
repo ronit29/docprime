@@ -82,7 +82,7 @@ class PlusPlansSerializer(serializers.ModelSerializer):
         data['effective_price'] = effective_price
         return data
 
-    def utilize(self, obj):
+    def get_utilize(self, obj):
         request = self.context.get('request')
         user = request.user
         plus_user = PlusUser.objects.filter(user_id=user.id).first()
