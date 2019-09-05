@@ -226,32 +226,52 @@ class PlusOrderViewSet(viewsets.GenericViewSet):
         return Response(resp)
 
 
+# class PlusProfileViewSet(viewsets.GenericViewSet):
+#     authentication_classes = (JWTAuthentication,)
+#     permission_classes = (IsAuthenticated,)
+#
+#     def profile(self, request):
+#         if settings.IS_PLUS_ACTIVE:
+#             user_id = request.user.pk
+#             resp = {}
+#             if user_id:
+#
+#                 user = User.objects.get(id=user_id)
+#                 plus_user_obj = user.active_plus_user
+#                 if not plus_user_obj or not plus_user_obj.is_valid():
+#                     return Response({"message": "Docprime Plus associated to user not found or expired."})
+#
+#                 resp['insured_members'] = plus_user_obj.plus_members.all().values('first_name', 'middle_name', 'last_name',
+#                                                                               'dob', 'relation')
+#                 resp['purchase_date'] = plus_user_obj.purchase_date
+#                 resp['expiry_date'] = plus_user_obj.expire_date
+#                 resp['premium_amount'] = plus_user_obj.amount
+#                 resp['proposer_name'] = plus_user_obj.get_primary_member_profile() if plus_user_obj.get_primary_member_profile() else ''
+#
+#                 resp['insurance_status'] = plus_user_obj.status
+#             else:
+#                 return Response({"message": "User is not valid"},
+#                                 status.HTTP_404_NOT_FOUND)
+#         else:
+#             return Response(status=status.HTTP_404_NOT_FOUND)
+#         return Response(resp)
+
+
 class PlusProfileViewSet(viewsets.GenericViewSet):
-    authentication_classes = (JWTAuthentication,)
-    permission_classes = (IsAuthenticated,)
+    authentication_classes = (JWTAuthentication, )
+    permission_classes = (IsAuthenticated, )
 
-    def profile(self, request):
-        if settings.IS_PLUS_ACTIVE:
-            user_id = request.user.pk
-            resp = {}
-            if user_id:
-
-                user = User.objects.get(id=user_id)
-                plus_user_obj = user.active_plus_user
-                if not plus_user_obj or not plus_user_obj.is_valid():
-                    return Response({"message": "Docprime Plus associated to user not found or expired."})
-
-                resp['insured_members'] = plus_user_obj.plus_members.all().values('first_name', 'middle_name', 'last_name',
-                                                                              'dob', 'relation')
-                resp['purchase_date'] = plus_user_obj.purchase_date
-                resp['expiry_date'] = plus_user_obj.expire_date
-                resp['premium_amount'] = plus_user_obj.amount
-                resp['proposer_name'] = plus_user_obj.get_primary_member_profile() if plus_user_obj.get_primary_member_profile() else ''
-                
-                resp['insurance_status'] = plus_user_obj.status
-            else:
-                return Response({"message": "User is not valid"},
-                                status.HTTP_404_NOT_FOUND)
+    def dashboard(self, request):
+        resp = {}
+        plus_user_id = request.query_params.get('id')
+        plus_user = PlusUser.objects.filter(id=plus_user_id).first()
+        plus_members = plus_user.plus_membrs
+        if len(plus_members) > 1:
+            resp['is_member_allowed'] = False
         else:
-            return Response(status=status.HTTP_404_NOT_FOUND)
-        return Response(resp)
+            resp['is_member_allowed'] = True
+        proposer_queryset = PlusProposer.objects.filter(id=plus_user.plan.proposer.id)
+        plan_body_serializer = serializers.PlusPlansSerializer(proposer_queryset, context={'request': request}, many=True)
+        resp['plan'] = plan_body_serializer.data
+        return resp
+

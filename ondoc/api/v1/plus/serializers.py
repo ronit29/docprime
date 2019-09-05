@@ -7,7 +7,7 @@ from ondoc.api.v1.doctor.serializers import CommonConditionsSerializer
 from ondoc.authentication.models import UserProfile
 from ondoc.authentication.models import User
 from ondoc.doctor.models import Hospital
-from ondoc.plus.models import (PlusProposer, PlusPlans, PlusThreshold, PlusMembers, PlusUser)
+from ondoc.plus.models import (PlusProposer, PlusPlans, PlusThreshold, PlusMembers, PlusUser, PlusUserUtilization)
 from ondoc.plus.enums import PlanParametersEnum
 from ondoc.account import models as account_models
 
@@ -25,6 +25,7 @@ class PlusPlansSerializer(serializers.ModelSerializer):
     worth = serializers.SerializerMethodField()
     you_pay = serializers.SerializerMethodField()
     you_get = serializers.SerializerMethodField()
+    utilize = serializers.SerializerMethodField()
 
     def get_content(self, obj):
         resp = defaultdict(list)
@@ -80,6 +81,13 @@ class PlusPlansSerializer(serializers.ModelSerializer):
 
         data['effective_price'] = effective_price
         return data
+
+    def utilize(self, obj):
+        request = self.context.get('request')
+        user = request.user
+        plus_user = PlusUser.objects.filter(user_id=user.id).first()
+        utilization = plus_user.get_utilization()
+        return utilization
 
     class Meta:
         model = PlusPlans
