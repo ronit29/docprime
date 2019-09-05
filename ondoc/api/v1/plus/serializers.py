@@ -164,3 +164,18 @@ class PlusUserSerializer(serializers.Serializer):
     purchase_date = serializers.DateTimeField()
     expire_date = serializers.DateTimeField()
     order = serializers.PrimaryKeyRelatedField(queryset=account_models.Order.objects.all())
+
+
+class PlusUserModelSerializer(serializers.ModelSerializer):
+
+    plan = serializers.PrimaryKeyRelatedField(queryset=PlusPlans.objects.all())
+    user = serializers.PrimaryKeyRelatedField(queryset=User.objects.all())
+    amount = serializers.IntegerField()
+    plus_members = serializers.ListSerializer(child=PlusMemberListSerializer())
+    purchase_date = serializers.DateTimeField()
+    expire_date = serializers.DateTimeField()
+    order = serializers.PrimaryKeyRelatedField(queryset=account_models.Order.objects.all())
+
+    class Meta:
+        model = PlusUser
+        fields = '__all__'

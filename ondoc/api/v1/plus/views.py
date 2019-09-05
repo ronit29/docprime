@@ -294,17 +294,23 @@ class PlusProfileViewSet(viewsets.GenericViewSet):
 
     def dashboard(self, request):
         resp = {}
-        plus_user_id = request.query_params.get('id')
-        plus_user = PlusUser.objects.filter(id=plus_user_id).first()
-        plus_members = []
+        if request.query_params.get('is_dashboard'):
+            user = request.user
+            plus_user = PlusUser.objects.filter(user=user).first()
+        elif(request.query_params.get('id') and not request.query_params.get('is_dashboard')):
+            plus_user_id = request.query_params.get('id')
+            plus_user = PlusUser.objects.filter(id=plus_user_id).first()
+        else:
+            return Response(status=status.HTTP_404_NOT_FOUND)
         plus_members = plus_user.plus_members.all()
         if len(plus_members) > 1:
             resp['is_member_allowed'] = False
         else:
             resp['is_member_allowed'] = True
         plus_plan_queryset = PlusPlans.objects.filter(id=plus_user.plan.id)
-        # proposer_queryset = PlusProposer.objects.filter(id=plus_user.plan.proposer.id)
         plan_body_serializer = serializers.PlusPlansSerializer(plus_plan_queryset, context={'request': request}, many=True)
         resp['plan'] = plan_body_serializer.data
+        plus_user_body_serializer = serializers.PlusUserModelSerializer(plus_user, context={'request': request})
+        resp['user'] = plus_user_body_serializer.data
         return Response({'data': resp})
 
