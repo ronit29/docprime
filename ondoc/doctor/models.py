@@ -2868,7 +2868,7 @@ class OpdAppointment(auth_model.TimeStampedModel, CouponsMixin, OpdAppointmentIn
             except Exception as e:
                 logger.error(str(e))
 
-            if self.is_retail_booking():
+            if self.is_retail_booking(old_instance):
                 try:
                     push_retail_appointment_to_matrix.apply_async(({'type': 'OPD_APPOINTMENT', 'appointment_id': self.id,
                                                         'product_id': 5, 'sub_product_id': 2},), countdown=5)
@@ -3477,11 +3477,10 @@ class OpdAppointment(auth_model.TimeStampedModel, CouponsMixin, OpdAppointmentIn
         except Exception as e:
             logger.error("Could not save triggered event - " + str(e))
 
-    def is_retail_booking(self):
-        if self.status == OpdAppointment.ACCEPTED and (self.payment_type == OpdAppointment.PREPAID or
-                                                                self.payment_type == OpdAppointment.COD) and \
-                                                                self.doctor.is_insurance_enabled and \
-                                                                self.hospital.enabled_for_insurance:
+    def is_retail_booking(self, old_instance):
+        if old_instance.status == OpdAppointment.BOOKED and self.status == OpdAppointment.ACCEPTED \
+                and (self.payment_type == OpdAppointment.PREPAID or self.payment_type == OpdAppointment.COD) \
+                and self.doctor.is_insurance_enabled and self.hospital.enabled_for_insurance:
             return True
         else:
             return False
