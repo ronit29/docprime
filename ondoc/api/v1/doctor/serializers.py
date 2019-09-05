@@ -2241,8 +2241,10 @@ class HospitalDetailIpdProcedureSerializer(TopHospitalForIpdProcedureSerializer)
         return True
 
     def get_specialization_doctors(self, obj):
+        specialization_ids = None
         validated_data = self.context.get('validated_data')
-        specialization_ids = validated_data.get('specialization_ids')
+        if validated_data:
+            specialization_ids = validated_data.get('specialization_ids')
         if not specialization_ids:
             return None
         from ondoc.api.v1.doctor.views import DoctorListViewSet
@@ -2293,7 +2295,7 @@ class HospitalDetailIpdProcedureSerializer(TopHospitalForIpdProcedureSerializer)
         result = [{'original': request.build_absolute_uri(img.name.url),
                    "thumbnail": request.build_absolute_uri(img.cropped_image.url) if img.cropped_image else None,
                    "cover_image": img.cover_image} for img in
-                  obj.hospitalimage_set.all() if img.name]
+                  obj.imagehospital.all() if img.name]
         if not result:
             if obj.network:
                 result = [{'original': request.build_absolute_uri(img.name.url),
@@ -2370,12 +2372,21 @@ class HospitalDetailIpdProcedureSerializer(TopHospitalForIpdProcedureSerializer)
     def get_doctors(self, obj):
         from ondoc.api.v1.doctor.views import DoctorListViewSet
         request = self.context.get('request')
+        parameters = self.context.get('parameters')
         validated_data = self.context.get('validated_data')
         doctor_list_viewset = DoctorListViewSet()
-        return doctor_list_viewset.list(request,
-                                        parameters={'hospital_id': str(obj.id), 'longitude': validated_data.get('long'),
-                                                    'latitude': validated_data.get('lat'), 'sort_on': 'experience',
-                                                    'restrict_result_count': 8}).data
+        if validated_data:
+            return doctor_list_viewset.list(request,
+                                            parameters={'hospital_id': str(obj.id), 'longitude': validated_data.get('long'),
+                                                        'latitude': validated_data.get('lat'), 'sort_on': 'experience',
+                                                        'restrict_result_count': 8}).data
+        elif parameters:
+            return doctor_list_viewset.list(request,
+                                            parameters={'hospital_id': str(obj.id),
+                                                        'longitude': parameters.get('long'),
+                                                        'latitude': parameters.get('lat'), 'sort_on': 'experience',
+                                                        'restrict_result_count': 8}).data
+
 
     def get_rating_graph(self, obj):
         from ondoc.ratings_review.models import RatingsReview

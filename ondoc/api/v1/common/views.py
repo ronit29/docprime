@@ -16,7 +16,7 @@ from django.utils.dateparse import parse_datetime
 from weasyprint import HTML
 from django.http import HttpResponse
 
-from ondoc.api.v1.doctor.serializers import TopHospitalForIpdProcedureSerializer
+from ondoc.api.v1.doctor.serializers import TopHospitalForIpdProcedureSerializer, HospitalDetailIpdProcedureSerializer
 from ondoc.api.v1.insurance.serializers import InsuranceCityEligibilitySerializer
 from ondoc.api.v1.utils import html_to_pdf, generate_short_url
 from ondoc.authentication.models import User
@@ -1304,6 +1304,6 @@ class SponsorListingViewSet(viewsets.GenericViewSet):
         #         sp_list.append({})
 
 
-        serialized_objects = TopHospitalForIpdProcedureSerializer(list_obj, many=True, context={'request': request}).data
+        serialized_objects = HospitalDetailIpdProcedureSerializer(list_obj, many=True, context={'request': request, 'parameters': parameters}).data
         return Response(serialized_objects)
 
