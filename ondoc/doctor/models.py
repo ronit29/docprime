@@ -4895,6 +4895,7 @@ class DoctorSponsoredServices(auth_model.TimeStampedModel):
 class HospitalSponsoredServices(auth_model.TimeStampedModel):
     hospital = models.ForeignKey(Hospital, related_name="hospital_services", on_delete=models.DO_NOTHING)
     sponsored_service = models.ForeignKey(SponsoredServices, on_delete=models.DO_NOTHING, blank=False, null=False, related_name='hosp_sponsored_services')
+    poc = models.ForeignKey(PurchaseOrderCreation, on_delete=models.SET_NULL, null=True, related_name='poc_hospital_services')
 
     class Meta:
         db_table = "hospital_sponsored_services"
