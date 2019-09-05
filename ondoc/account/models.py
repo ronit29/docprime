@@ -288,6 +288,8 @@ class Order(TimeStampedModel):
         amount = None
         promotional_amount = 0
         total_balance = consumer_account.get_total_balance()
+        _responsible_user=None
+        _source=None
         if appointment_data.get('_responsible_user'):
             _responsible_user = appointment_data.pop('_responsible_user')
         if appointment_data.get('_source'):
