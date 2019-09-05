@@ -296,13 +296,15 @@ class PlusProfileViewSet(viewsets.GenericViewSet):
         resp = {}
         plus_user_id = request.query_params.get('id')
         plus_user = PlusUser.objects.filter(id=plus_user_id).first()
-        plus_members = plus_user.plus_membrs
+        plus_members = []
+        plus_members = plus_user.plus_members.all()
         if len(plus_members) > 1:
             resp['is_member_allowed'] = False
         else:
             resp['is_member_allowed'] = True
-        proposer_queryset = PlusProposer.objects.filter(id=plus_user.plan.proposer.id)
-        plan_body_serializer = serializers.PlusPlansSerializer(proposer_queryset, context={'request': request}, many=True)
+        plus_plan_queryset = PlusPlans.objects.filter(id=plus_user.plan.id)
+        # proposer_queryset = PlusProposer.objects.filter(id=plus_user.plan.proposer.id)
+        plan_body_serializer = serializers.PlusPlansSerializer(plus_plan_queryset, context={'request': request}, many=True)
         resp['plan'] = plan_body_serializer.data
-        return resp
+        return Response({'data': resp})
 
