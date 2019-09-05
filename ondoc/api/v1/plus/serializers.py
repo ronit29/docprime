@@ -121,6 +121,30 @@ class PlusMemberListSerializer(serializers.Serializer):
 class PlusMembersSerializer(serializers.Serializer):
     members = serializers.ListSerializer(child=PlusMemberListSerializer())
 
+    def validate(self, attrs):
+        request = self.context.get('request')
+        user = request.user
+        active_plus_user_obj = user.active_plus_user
+        if active_plus_user_obj:
+            plus_members = active_plus_user_obj.plus_members.all()
+            existing_members_name_set = set(map(lambda m: m.get_full_name(), plus_members))
+
+            # check if there is name duplicacy or not.
+            to_be_added_member_list = attrs.get('members', [])
+            to_be_added_member_set = set(map(lambda member: "%s %s" % (member['first_name'], member['last_name']), to_be_added_member_list))
+            to_be_added_member_relation_set = set(map(lambda member: "%s" % (member['relation']), to_be_added_member_list))
+
+            if PlusMembers.Relations.SELF in to_be_added_member_relation_set:
+                raise serializers.ValidationError({'name': 'Proposer has already be added. Cannot be added and changed.'})
+
+            if len(to_be_added_member_set) != len(to_be_added_member_list):
+                raise serializers.ValidationError({'name': 'Multiple members cannot have same name'})
+
+            if to_be_added_member_set & existing_members_name_set:
+                raise serializers.ValidationError({'name': 'Member already exist. Members name need to be unique.'})
+
+        return attrs
+
 
 class PlusUserSerializer(serializers.Serializer):
 

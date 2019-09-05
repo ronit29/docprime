@@ -413,12 +413,20 @@ class PlusMembers(auth_model.TimeStampedModel):
     district_code = models.CharField(max_length=10, blank=True, null=True, default=None)
     is_primary_user = models.NullBooleanField()
 
+    def get_full_name(self):
+        return "{first_name} {last_name}".format(first_name=self.first_name, last_name=self.last_name)
+
     @classmethod
-    def create_plus_members(cls, plus_user_obj):
-        members = plus_user_obj.raw_plus_member
-        members = json.loads(members)
+    def create_plus_members(cls, plus_user_obj, *args, **kwargs):
+
+        members = kwargs.get('members_list')
+        if not members:
+            members = plus_user_obj.raw_plus_member
+            members = json.loads(members)
+
         for member in members:
             user_profile = UserProfile.objects.get(id=member.get('profile'))
+            is_primary_user = True if member['relation'] and member['relation']  == cls.Relations.SELF else False
             insured_members_obj = cls.objects.create(first_name=member.get('first_name'), title=member.get('title'),
                                                      last_name=member.get('last_name'), dob=member.get('dob'),
                                                      email=member.get('email'), address=member.get('address'),
@@ -426,7 +434,8 @@ class PlusMembers(auth_model.TimeStampedModel):
                                                      gender=member.get('gender'), profile=user_profile, town=member.get('town'),
                                                      district=member.get('district'), state=member.get('state'),
                                                      state_code = member.get('state_code'), plus_user=plus_user_obj,
-                                                     city_code=member.get('city_code'), district_code=member.get('district_code'))
+                                                     city_code=member.get('city_code'), district_code=member.get('district_code'),
+                                                     relation=member.get('relation'), is_primary_user=is_primary_user)
 
     class Meta:
         db_table = "plus_members"
