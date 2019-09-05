@@ -2871,7 +2871,7 @@ class OpdAppointment(auth_model.TimeStampedModel, CouponsMixin, OpdAppointmentIn
             except Exception as e:
                 logger.error(str(e))
 
-            if self.is_retail_booking(old_instance):
+            if old_instance and self.is_retail_booking(old_instance):
                 try:
                     push_retail_appointment_to_matrix.apply_async(({'type': 'OPD_APPOINTMENT', 'appointment_id': self.id,
                                                         'product_id': 5, 'sub_product_id': 2},), countdown=5)
