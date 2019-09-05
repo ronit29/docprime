@@ -2844,13 +2844,20 @@ class OpdAppointment(auth_model.TimeStampedModel, CouponsMixin, OpdAppointmentIn
             return True
 
     def after_commit_tasks(self, old_instance, push_to_matrix):
-        if old_instance is None:
+        sent_to_provider = True
+        if old_instance:
+            sent_to_provider = self.is_provider_notification_allowed(old_instance)
+
+        if old_instance and old_instance.payment_type == OpdAppointment.COD:
             try:
                 create_ipd_lead_from_opd_appointment.apply_async(({'obj_id': self.id},),)
                                                                  # eta=timezone.now() + timezone.timedelta(hours=1))
                 if self.send_cod_to_prepaid_request():
-                    notification_tasks.send_opd_notifications_refactored.apply_async(
-                        (self.id, NotificationAction.COD_TO_PREPAID_REQUEST), countdown=5)
+                    # notification_tasks.send_opd_notifications_refactored.apply_async((self.id, NotificationAction.COD_TO_PREPAID_REQUEST), countdown=5)
+                    notification_tasks.send_opd_notifications_refactored.apply_async(({'appointment_id': self.id,
+                                                                                       'is_valid_for_provider': sent_to_provider,
+                                                                                       'notification_type': NotificationAction.COD_TO_PREPAID_REQUEST},),
+                                                                                        countdown=1)
             except Exception as e:
                 logger.error(str(e))
 
@@ -2870,9 +2877,6 @@ class OpdAppointment(auth_model.TimeStampedModel, CouponsMixin, OpdAppointmentIn
                     logger.error(str(e))
 
         if self.is_to_send_notification(old_instance):
-            sent_to_provider = True
-            if old_instance:
-                sent_to_provider = self.is_provider_notification_allowed(old_instance)
             try:
                 notification_tasks.send_opd_notifications_refactored.apply_async(({'appointment_id': self.id,
                                                                                    'is_valid_for_provider': sent_to_provider},), countdown=1)
@@ -2893,8 +2897,11 @@ class OpdAppointment(auth_model.TimeStampedModel, CouponsMixin, OpdAppointmentIn
 
         if old_instance and old_instance.is_cod_to_prepaid != self.is_cod_to_prepaid:
             try:
-
-                notification_tasks.send_opd_notifications_refactored.apply_async((self.id, NotificationAction.COD_TO_PREPAID), countdown=1)
+                # notification_tasks.send_opd_notifications_refactored.apply_async((self.id, NotificationAction.COD_TO_PREPAID), countdown=1)
+                notification_tasks.send_opd_notifications_refactored.apply_async(({'appointment_id': self.id,
+                                                                                   'is_valid_for_provider': sent_to_provider,
+                                                                                   'notification_type': NotificationAction.COD_TO_PREPAID},),
+                                                                                    countdown=1)
             except Exception as e:
                 logger.error(str(e))
 
