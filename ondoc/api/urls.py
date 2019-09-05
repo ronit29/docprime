@@ -62,7 +62,7 @@ urlpatterns = [
     path('v2/lab/', include(lab_v2_url)),
     path('v1/integrations/', include(integrations_url)),
     path('v1/prescription/', include(prescription_url)),
-    path('v1/salespoint/', include(salespoint_url))
+    path('v1/salespoint/', include(salespoint_url)),
     path('v1/plus/', include(plus_url)),
     path('v1/bookinganalytics/', include(bookinganalytics_url))
 ]
