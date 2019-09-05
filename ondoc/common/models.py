@@ -860,7 +860,6 @@ class SponsorListingUtmTerm(auth_model.TimeStampedModel):
 
 class SponsoredListingService(auth_model.TimeStampedModel):
     poc = models.ForeignKey('doctor.PurchaseOrderCreation', on_delete=models.SET_NULL, related_name='poc_sponsor_service', null=True)
-    sponsored_service = models.ForeignKey('doctor.SponsoredServices', on_delete=models.SET_NULL, null=True, related_name='sponsoredlisting_services')
-
+    hospital_service = models.ForeignKey('doctor.HospitalSponsoredServices', on_delete=models.SET_NULL, null=True, related_name='hospservices')
     class Meta:
         db_table = 'sponsoredlisting_service'

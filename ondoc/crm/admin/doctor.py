@@ -2487,14 +2487,14 @@ class SponsoredListingServiceInline(admin.TabularInline):
 #     #     return super(SponsoredListingService, self).get_queryset(request).filter(poc=request.resolver_match.kwargs.get('object_id')).first().provider_name_hospital.hospital_services.first().sponsored_service
 
 
-class HospitalSponsoredServicesInline(admin.TabularInline):
-    model = HospitalSponsoredServices
-    extra = 0
-    can_delete = 0
-
-    def get_queryset(self, request):
-        hospital = PurchaseOrderCreation.objects.filter(id=request.resolver_match.kwargs.get('object_id')).first().provider_name_hospital.id
-        return super(HospitalSponsoredServicesInline, self).get_queryset(request).filter(hospital=hospital)
+# class HospitalSponsoredServicesInline(admin.TabularInline):
+#     model = HospitalSponsoredServices
+#     extra = 0
+#     can_delete = 0
+#
+#     def get_queryset(self, request):
+#         hospital = PurchaseOrderCreation.objects.filter(id=request.resolver_match.kwargs.get('object_id')).first().provider_name_hospital.id
+#         return super(HospitalSponsoredServicesInline, self).get_queryset(request).filter(hospital=hospital)
 
 
 
@@ -2506,7 +2506,7 @@ class PurchaseOrderCreationAdmin(CompareVersionAdmin):
     autocomplete_fields = ['provider_name_lab', 'provider_name_hospital']
     search_fields = ['provider_name_lab__name', 'provider_name_hospital__name']
 
-    inlines = [SponsorListingURLInline, SponsorListingSpecializationInline, SponsorListingUtmTermInline, SponsorListingLocationInline, HospitalSponsoredServicesInline]
+    inlines = [SponsorListingURLInline, SponsorListingSpecializationInline, SponsorListingUtmTermInline, SponsorListingLocationInline]
 
     # readonly_fields = ['provider_name', 'appointment_booked_count', 'current_appointment_count']
 
