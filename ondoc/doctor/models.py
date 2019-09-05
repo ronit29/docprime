@@ -46,6 +46,7 @@ from ondoc.doctor.tasks import doc_app_auto_cancel
 # from ondoc.account import models as account_model
 from ondoc.insurance import models as insurance_model
 from ondoc.payout import models as payout_model
+# from ondoc.communications.models import OfflineOpdAppointments
 from ondoc.notification import models as notification_models
 from ondoc.notification import tasks as notification_tasks
 from django.contrib.contenttypes.fields import GenericRelation
@@ -71,7 +72,7 @@ from django.contrib.contenttypes.fields import GenericForeignKey
 from django.contrib.contenttypes.models import ContentType
 from ondoc.matrix.tasks import push_appointment_to_matrix, push_onboarding_qcstatus_to_matrix, \
     update_onboarding_qcstatus_to_matrix, create_or_update_lead_on_matrix, push_signup_lead_to_matrix, \
-    create_ipd_lead_from_opd_appointment
+    create_ipd_lead_from_opd_appointment, push_retail_appointment_to_matrix
 # from ondoc.procedure.models import Procedure
 from ondoc.ratings_review import models as ratings_models
 from django.utils import timezone
@@ -86,6 +87,7 @@ import qrcode
 from django.utils.functional import cached_property
 from ondoc.crm.constants import constants
 from django.utils.text import slugify
+from ondoc.plus import models as plus_model
 
 logger = logging.getLogger(__name__)
 
@@ -264,6 +266,7 @@ class Hospital(auth_model.TimeStampedModel, auth_model.CreatedByModel, auth_mode
     has_proper_hospital_page = models.BooleanField(default=False)
     question_answer = GenericRelation(auth_model.GenericQuestionAnswer, related_query_name='hospital_qa')
     enabled_for_insurance = models.NullBooleanField(verbose_name='Enabled for Insurance')
+    enabled_for_plus_plans = models.NullBooleanField()
 
     def __str__(self):
         return self.name
@@ -899,6 +902,7 @@ class Doctor(auth_model.TimeStampedModel, auth_model.QCModel, SearchKey, auth_mo
     qr_code = GenericRelation(QRCode, related_name="qrcode")
     priority_score = models.IntegerField(default=0, null=False, blank=False)
     is_ipd_doctor = models.NullBooleanField(default=None)
+    enabled_for_plus_plans = models.NullBooleanField()
 
     def __str__(self):
         return '{} ({})'.format(self.name, self.id)
@@ -973,57 +977,62 @@ class Doctor(auth_model.TimeStampedModel, auth_model.QCModel, SearchKey, auth_mo
 
     def update_deal_price(self):        
         # will update only this doctor prices and will be called on save
-        query = '''update doctor_clinic_timing set deal_price = 
-					case when (custom_deal_price > 0 )
-					then custom_deal_price else floor(				 
-                    case when fees =0 then
-						case when mrp <300 then least((0.5*mrp)/0.75, mrp)
-						else  least( 0.5*mrp + 75 , mrp)
-						end 
-					else
-					case when mrp<300 then 
-					least(greatest(greatest(fees+60, 0.7*mrp), mrp-200)/0.75,mrp)
-					else least(greatest(greatest(fees+60, 0.7*mrp), mrp-200)+75, mrp)
-					end  end)
-					end
-					where doctor_clinic_id in (
-                    select id from doctor_clinic where doctor_id=%s and hospital_id!=3560) '''
-
+        query = '''update doctor_clinic_timing set deal_price=case when custom_deal_price is null then mrp else custom_deal_price end 
+                                                              where doctor_clinic_id in ( select id from doctor_clinic where doctor_id=%s) '''
         update_doctor_deal_price = RawSql(query, [self.pk]).execute()
-
-        # update nanavati hospital deal price
-
-        query1 = '''update doctor_clinic_timing set deal_price = mrp*0.80 
-                         where doctor_clinic_id  in (select id from doctor_clinic where doctor_id= %s and  hospital_id=3560 ) '''
-
-        update_all_nanavati_doctor_deal_price = RawSql(query1, [self.pk]).execute()
+        # query = '''update doctor_clinic_timing set deal_price =
+			# 		case when (custom_deal_price > 0 )
+			# 		then custom_deal_price else floor(
+        #             case when fees =0 then
+			# 			case when mrp <300 then least((0.5*mrp)/0.75, mrp)
+			# 			else  least( 0.5*mrp + 75 , mrp)
+			# 			end
+			# 		else
+			# 		case when mrp<300 then
+			# 		least(greatest(greatest(fees+60, 0.7*mrp), mrp-200)/0.75,mrp)
+			# 		else least(greatest(greatest(fees+60, 0.7*mrp), mrp-200)+75, mrp)
+			# 		end  end)
+			# 		end
+			# 		where doctor_clinic_id in (
+        #             select id from doctor_clinic where doctor_id=%s and hospital_id!=3560) '''
+        #
+        # update_doctor_deal_price = RawSql(query, [self.pk]).execute()
+        #
+        # # update nanavati hospital deal price
+        #
+        # query1 = '''update doctor_clinic_timing set deal_price = mrp*0.80
+        #                  where doctor_clinic_id  in (select id from doctor_clinic where doctor_id= %s and  hospital_id=3560 ) '''
+        #
+        # update_all_nanavati_doctor_deal_price = RawSql(query1, [self.pk]).execute()
 
     @classmethod
     def update_all_deal_price(cls):
         # will update all doctors prices
-        query = '''update doctor_clinic_timing set deal_price = 
-					case when (custom_deal_price > 0 )
-					then custom_deal_price else floor(				 
-                    case when fees =0 then
-						case when mrp <300 then least((0.5*mrp)/0.75, mrp)
-						else  least( 0.5*mrp + 75 , mrp)
-						end 
-					else
-					case when mrp<300 then 
-					least(greatest(greatest(fees+60, 0.7*mrp), mrp-200)/0.75,mrp)
-					else least(greatest(greatest(fees+60, 0.7*mrp), mrp-200)+75, mrp)
-					end  end)
-					end
-					 where doctor_clinic_id  in (select id from doctor_clinic where hospital_id!=3560 )  '''
-
+        query = '''update doctor_clinic_timing set deal_price=case when custom_deal_price is null then mrp else custom_deal_price end '''
         update_all_doctor_deal_price = RawSql(query, []).execute()
-
-        #update nanavati hospital deal price
-
-        query1 = '''update doctor_clinic_timing set deal_price = mrp*0.80 
-                 where doctor_clinic_id  in (select id from doctor_clinic where hospital_id=3560 ) '''
-
-        update_all_nanavati_doctor_deal_price = RawSql(query1, []).execute()
+        # query = '''update doctor_clinic_timing set deal_price =
+			# 		case when (custom_deal_price > 0 )
+			# 		then custom_deal_price else floor(
+        #             case when fees =0 then
+			# 			case when mrp <300 then least((0.5*mrp)/0.75, mrp)
+			# 			else  least( 0.5*mrp + 75 , mrp)
+			# 			end
+			# 		else
+			# 		case when mrp<300 then
+			# 		least(greatest(greatest(fees+60, 0.7*mrp), mrp-200)/0.75,mrp)
+			# 		else least(greatest(greatest(fees+60, 0.7*mrp), mrp-200)+75, mrp)
+			# 		end  end)
+			# 		end
+			# 		 where doctor_clinic_id  in (select id from doctor_clinic where hospital_id!=3560 )  '''
+        #
+        # update_all_doctor_deal_price = RawSql(query, []).execute()
+        #
+        # #update nanavati hospital deal price
+        #
+        # query1 = '''update doctor_clinic_timing set deal_price = mrp*0.80
+        #          where doctor_clinic_id  in (select id from doctor_clinic where hospital_id=3560 ) '''
+        #
+        # update_all_nanavati_doctor_deal_price = RawSql(query1, []).execute()
 
     def get_display_name(self):
         return "Dr. {}".format(self.name.title()) if self.name else None
@@ -1497,8 +1506,8 @@ class DoctorClinic(auth_model.TimeStampedModel, auth_model.WelcomeCallingDone):
         db_table = "doctor_clinic"
         unique_together = (('doctor', 'hospital', ),)
 
-    # def __str__(self):
-    #     return '{}-{}'.format(self.doctor, self.hospital)
+    def __str__(self):
+        return '{}-{}'.format(self.doctor, self.hospital)
 
     def is_enabled_for_cod(self):
         return self.hospital.is_enabled_for_cod()
@@ -1532,8 +1541,6 @@ class DoctorClinic(auth_model.TimeStampedModel, auth_model.WelcomeCallingDone):
         res_data = {"time_slots": slots, "upcoming_slots": upcoming_slots}
         return res_data
 
-
-
     def get_timings_v2(self, total_leaves, blocks=[]):
         clinic_timings = self.availability.order_by("start")
         booking_details = dict()
@@ -1548,7 +1555,6 @@ class DoctorClinic(auth_model.TimeStampedModel, auth_model.WelcomeCallingDone):
         upcoming_slots = timeslot_object.get_upcoming_slots(time_slots=clinic_timings)
         timing_response = {"timeslots": clinic_timings, "upcoming_slots": upcoming_slots}
         return timing_response
-
 
 
 class DoctorClinicTiming(auth_model.TimeStampedModel):
@@ -2056,6 +2062,12 @@ class HospitalNetwork(auth_model.TimeStampedModel, auth_model.CreatedByModel, au
                                      through_fields=('network', 'service'),
                                      related_name='of_hospital_network')
 
+    enabled_for_plus_plans = models.NullBooleanField()
+
+    @classmethod
+    def get_plus_enabled(cls):
+        return cls.objects.filter(enabled_for_plus_plans=True)
+
     def update_time_stamps(self):
         if self.welcome_calling_done and not self.welcome_calling_done_at:
             self.welcome_calling_done_at = timezone.now()
@@ -2255,7 +2267,7 @@ class PurchaseOrderCreation(auth_model.TimeStampedModel):
     provider_name_lab = models.ForeignKey("diagnostic.Lab", on_delete=models.DO_NOTHING, null=True, blank=True)
     provider_name_hospital = models.ForeignKey(Hospital, on_delete=models.DO_NOTHING, null=True, blank=True, related_name='hospitalpurchaseorder')
     provider_name = models.CharField(max_length=500, default='')
-    gst_number = models.CharField(max_length=1000)
+    gst_number = models.CharField(max_length=1000, null=True, blank=True)
     total_amount_paid = models.IntegerField(help_text='Inclusive of GST')
     start_date = models.DateField(null=True, blank=True)
     end_date = models.DateField(null=True, blank=True)
@@ -2307,11 +2319,13 @@ class PurchaseOrderCreation(auth_model.TimeStampedModel):
                 self.provider_name_hospital.enabled_for_cod = True
                 self.provider_name_hospital.enabled_poc = True
                 self.provider_name_hospital.save()
-                notification_tasks.purchase_order_closing_counter_automation.apply_async((self.id, ), eta=self.end_date, )    # task to disable Pay-at-clinic functionality in hospital
+                if self.end_date:
+                    notification_tasks.purchase_order_closing_counter_automation.apply_async((self.id, ), eta=self.end_date, )    # task to disable Pay-at-clinic functionality in hospital
 
             else:
-                notification_tasks.purchase_order_creation_counter_automation.apply_async((self.id, ), eta=self.start_date, ) # task to enable Pay-at-clinic functionality in hospital
-                notification_tasks.purchase_order_closing_counter_automation.apply_async((self.id, ), eta=self.end_date, )    # task to disable Pay-at-clinic functionality in hospital
+                if self.start_date and self.end_date:
+                    notification_tasks.purchase_order_creation_counter_automation.apply_async((self.id, ), eta=self.start_date, ) # task to enable Pay-at-clinic functionality in hospital
+                    notification_tasks.purchase_order_closing_counter_automation.apply_async((self.id, ), eta=self.end_date, )    # task to disable Pay-at-clinic functionality in hospital
 
     def disable_cod_functionality(self):
         remaining_poc_objects = PurchaseOrderCreation.objects.filter(is_enabled=True,
@@ -2427,6 +2441,8 @@ class OpdAppointment(auth_model.TimeStampedModel, CouponsMixin, OpdAppointmentIn
     documents = GenericRelation(Documents)
     fraud = GenericRelation(Fraud)
     appointment_type = models.PositiveSmallIntegerField(choices=APPOINTMENT_TYPE_CHOICES, null=True, blank=True)
+    plus_plan = models.ForeignKey(plus_model.PlusUser, blank=True, null=True, default=None,
+                                  on_delete=models.DO_NOTHING)
 
     def __str__(self):
         return self.profile.name + " (" + self.doctor.name + ")"
@@ -2501,7 +2517,6 @@ class OpdAppointment(auth_model.TimeStampedModel, CouponsMixin, OpdAppointmentIn
 
         return resp
 
-
     def get_city(self):
         if self.hospital and self.hospital.matrix_city:
             return self.hospital.matrix_city.id
@@ -2513,6 +2528,35 @@ class OpdAppointment(auth_model.TimeStampedModel, CouponsMixin, OpdAppointmentIn
             return self.hospital.matrix_state.id
         else:
             return None
+
+    def get_booking_analytics_data(self):
+        data = dict()
+
+        promo_cost = self.deal_price - self.effective_price if self.deal_price and self.effective_price else 0
+        department = None
+        if self.doctor:
+            if self.doctor.doctorpracticespecializations.first():
+                if self.doctor.doctorpracticespecializations.first().specialization.department.first():
+                    department = self.doctor.doctorpracticespecializations.first().specialization.department.first().id
+
+        wallet, cashback = self.get_completion_breakup()
+
+        data['Appointment_Id'] = self.id
+        data['CityId'] = self.get_city()
+        data['StateId'] = self.get_state()
+        data['SpecialityId'] = department
+        data['TypeId'] = 1
+        data['ProviderId'] = self.hospital.id
+        data['PaymentType'] = self.payment_type if self.payment_type else None
+        data['Payout'] = self.fees
+        data['CashbackUsed'] = cashback
+        data['BookingDate'] = self.created_at
+        data['CorporateDealId'] = self.get_corporate_deal_id()
+        data['PromoCost'] = max(0, promo_cost)
+        data['GMValue'] = self.deal_price
+        data['StatusId'] = self.status
+
+        return data
 
     def sync_with_booking_analytics(self):
 
@@ -2584,6 +2628,12 @@ class OpdAppointment(auth_model.TimeStampedModel, CouponsMixin, OpdAppointmentIn
             return True
         return False
 
+    def is_otp_required_wrt_hospitals(self):
+        hospital_ids = list(settings.HOSPITAL_CREDIT_LETTER_REQUIRED.values())
+        if self.hospital and self.hospital.id in hospital_ids:
+            return False
+
+        return True
 
     def get_valid_credit_letter(self):
         credit_letter = self.get_document_objects(Documents.CREDIT_LETTER).first()
@@ -2615,7 +2665,7 @@ class OpdAppointment(auth_model.TimeStampedModel, CouponsMixin, OpdAppointmentIn
         return appointments
 
     @classmethod
-    def create_appointment(cls, appointment_data):
+    def create_appointment(cls, appointment_data, responsible_user=None, source=None):
         from ondoc.insurance.models import UserInsurance
         insurance = appointment_data.get('insurance')
         appointment_status = OpdAppointment.BOOKED
@@ -2637,7 +2687,13 @@ class OpdAppointment(auth_model.TimeStampedModel, CouponsMixin, OpdAppointmentIn
             "random_coupons": appointment_data.pop("coupon_data", [])
         }
         procedure_details = appointment_data.pop('extra_details', [])
-        app_obj = cls.objects.create(**appointment_data)
+
+        # app_obj = cls.objects.create(**appointment_data)
+        _responsible_user=None
+        if responsible_user:
+            _responsible_user = auth_model.User.objects.filter(id=responsible_user).first()
+        app_obj = cls(**appointment_data)
+        app_obj.save(responsible_user=_responsible_user, source=source)
         if procedure_details:
             procedure_to_be_added = []
             for procedure in procedure_details:
@@ -2728,6 +2784,9 @@ class OpdAppointment(auth_model.TimeStampedModel, CouponsMixin, OpdAppointmentIn
         except Exception as e:
             logger.error(str(e))
 
+        if self.has_lensfit_coupon_used():
+            notification_tasks.send_lensfit_coupons.apply_async((self.id, self.PRODUCT_ID, NotificationAction.SEND_LENSFIT_COUPON), countdown=5)
+
     def get_billable_admin_level(self):
         if self.hospital.network and self.hospital.network.is_billing_enabled:
             return self.hospital.network, payout_model.Outstanding.HOSPITAL_NETWORK_LEVEL
@@ -2778,6 +2837,12 @@ class OpdAppointment(auth_model.TimeStampedModel, CouponsMixin, OpdAppointmentIn
                     result = parent.is_cod_order
         return result
 
+    def is_provider_notification_allowed(self, old_instance):
+        if old_instance.status == OpdAppointment.CREATED and self.status == OpdAppointment.CANCELLED:
+            return False
+        else:
+            return True
+
     def after_commit_tasks(self, old_instance, push_to_matrix):
         if old_instance is None:
             try:
@@ -2788,18 +2853,29 @@ class OpdAppointment(auth_model.TimeStampedModel, CouponsMixin, OpdAppointmentIn
                         (self.id, NotificationAction.COD_TO_PREPAID_REQUEST), countdown=5)
             except Exception as e:
                 logger.error(str(e))
+
         if push_to_matrix:
-        # Push the appointment data to the matrix .
+            # Push the appointment data to the matrix
             try:
                 push_appointment_to_matrix.apply_async(({'type': 'OPD_APPOINTMENT', 'appointment_id': self.id,
-                                                         'product_id': 5, 'sub_product_id': 2},), countdown=5)
-
+                                                             'product_id': 5, 'sub_product_id': 2},), countdown=5)
             except Exception as e:
                 logger.error(str(e))
 
+            if self.is_retail_booking():
+                try:
+                    push_retail_appointment_to_matrix.apply_async(({'type': 'OPD_APPOINTMENT', 'appointment_id': self.id,
+                                                        'product_id': 5, 'sub_product_id': 2},), countdown=5)
+                except Exception as e:
+                    logger.error(str(e))
+
         if self.is_to_send_notification(old_instance):
+            sent_to_provider = True
+            if old_instance:
+                sent_to_provider = self.is_provider_notification_allowed(old_instance)
             try:
-                notification_tasks.send_opd_notifications_refactored.apply_async((self.id,), countdown=1)
+                notification_tasks.send_opd_notifications_refactored.apply_async(({'appointment_id': self.id,
+                                                                                   'is_valid_for_provider': sent_to_provider},), countdown=1)
             except Exception as e:
                 logger.error(str(e))
             # notification_tasks.send_opd_notifications_refactored(self.id)
@@ -2950,10 +3026,19 @@ class OpdAppointment(auth_model.TimeStampedModel, CouponsMixin, OpdAppointmentIn
                 if to_save:
                     self.purchase_order.save()
 
-
+        responsible_user = None
+        source = None
+        if kwargs.get('source'):
+            source = kwargs.pop('source')
+        if kwargs.get('responsible_user'):
+            responsible_user = kwargs.pop('responsible_user')
         super().save(*args, **kwargs)
 
         if push_to_history:
+            if responsible_user:
+                self._responsible_user = responsible_user
+            if source:
+                self._source = source
             AppointmentHistory.create(content_object=self)
 
         transaction.on_commit(lambda: self.after_commit_tasks(database_instance, push_to_matrix))
@@ -3321,7 +3406,9 @@ class OpdAppointment(auth_model.TimeStampedModel, CouponsMixin, OpdAppointmentIn
             "is_appointment_insured": is_appointment_insured,
             "insurance": insurance_id,
             "spo_data": data["spo_data"],
-            "coupon_data": price_data.get("coupon_data")
+            "coupon_data": price_data.get("coupon_data"),
+            "_responsible_user": data.get("_responsible_user", None),
+            "_source": data.get("_source", None)
         }
 
     @staticmethod
@@ -3385,16 +3472,27 @@ class OpdAppointment(auth_model.TimeStampedModel, CouponsMixin, OpdAppointmentIn
         except Exception as e:
             logger.error("Could not save triggered event - " + str(e))
 
-    def get_matrix_data(self, order, product_id, sub_product_id):
+    def is_retail_booking(self):
+        if self.status == OpdAppointment.ACCEPTED and (self.payment_type == OpdAppointment.PREPAID or
+                                                                self.payment_type == OpdAppointment.COD) and \
+                                                                self.doctor.is_insurance_enabled and \
+                                                                self.hospital.enabled_for_insurance:
+            return True
+        else:
+            return False
+
+    def get_matrix_data(self, order, product_id, sub_product_id, lead_source=None):
         # policy_details = self.get_matrix_policy_data()
         appointment_details = self.get_matrix_appointment_data(order)
+        lead_source = 'DocPrime'
+        lead_id = self.matrix_lead_id if self.matrix_lead_id else 0
 
         request_data = {
             'DocPrimeUserId': self.user.id,
-            'LeadID': self.matrix_lead_id if self.matrix_lead_id else 0,
+            'LeadID': lead_id,
             'Name': self.profile.name,
             'PrimaryNo': self.user.phone_number,
-            'LeadSource': 'DocPrime',
+            'LeadSource': lead_source,
             'EmailId': self.profile.email,
             'Gender': 1 if self.profile.gender == 'm' else 2 if self.profile.gender == 'f' else 0,
             'CityId': 0,
@@ -3551,6 +3649,17 @@ class OpdAppointment(auth_model.TimeStampedModel, CouponsMixin, OpdAppointmentIn
         mobile_list.extend(doctor_mobiles)
 
         return mobile_list
+
+    def get_matrix_retail_booking_data(self):
+        data = {
+                "Name": self.profile.name,
+                "ProductId": 11,
+                "PrimaryNo": self.user.phone_number,
+                "ReferenceBookingId": self.id,
+                "SubProductId": 0,
+                "LeadSource": "RetailBooking"
+            }
+        return data
 
     @classmethod
     def get_insured_completed_appointment(cls, insurance_obj):
@@ -4135,6 +4244,7 @@ class OfflinePatients(auth_model.TimeStampedModel):
     error = models.BooleanField(default=False)
     error_message = models.CharField(max_length=256, blank=True, null=True)
     age = models.IntegerField(null=True, blank=True)
+    user = models.ForeignKey(auth_model.User, related_name="offline_patients", on_delete=models.SET_NULL, null=True)
 
     def __str__(self):
         return self.name
@@ -4143,15 +4253,32 @@ class OfflinePatients(auth_model.TimeStampedModel):
     def __repr__(self):
         return self.name
 
+    def get_patient_mobile(self):
+        patient_numbers = self.patient_mobiles.all()
+        patient_number = patient_numbers[0] if patient_numbers else None
+        for number in self.patient_mobiles.all():
+            if number.is_default:
+                patient_number = number
+        return patient_number
 
     @staticmethod
     def welcome_message_sms(sms_obj):
         if sms_obj:
             try:
-                default_text = '''Dear %s, you have been successfully added as a patient to %s. In case of any query, please reach out to the %s.''' \
-                               % (sms_obj['name'], sms_obj['appointment'].hospital.name, sms_obj['appointment'].hospital.name)
-                text = sms_obj['welcome_message'] if sms_obj['welcome_message'] else default_text
-                notification_tasks.send_offline_appointment_message.apply_async(kwargs={'number': sms_obj['phone_number'], 'text': text, 'type': 'Welcome SMS'}, countdown=1)
+                instance = sms_obj['appointment']
+                receivers = [{"user": None, "phone_number": sms_obj['phone_number']}]
+                # offline_opd_appointment_comm = communication_models.OfflineOpdAppointments(appointment=instance,
+                #                                                                            notification_type=NotificationAction.OFFLINE_PATIENT_WELCOME_MESSAGE,
+                #                                                                            receivers=receivers)
+                # offline_opd_appointment_comm.send()
+                # default_text = '''Dear %s, you have been successfully added as a patient to %s. In case of any query, please reach out to the %s.''' \
+                #                % (sms_obj['name'], sms_obj['appointment'].hospital.name, sms_obj['appointment'].hospital.name)
+                # text = sms_obj['welcome_message'] if sms_obj['welcome_message'] else default_text
+                # notification_tasks.send_offline_appointment_message.apply_async(kwargs={'number': sms_obj['phone_number'], 'text': text, 'type': 'Welcome SMS'}, countdown=1)
+                notification_tasks.send_offline_appointment_message.apply_async(kwargs={'appointment': instance,
+                                                                                        'notification_type': NotificationAction.OFFLINE_PATIENT_WELCOME_MESSAGE,
+                                                                                        'receivers': receivers},
+                                                                                countdown=1)
             except Exception as e:
                 logger.error("Failed to Push Offline Welcome Message SMS Task "+ str(e))
 
@@ -4214,63 +4341,107 @@ class OfflineOPDAppointments(auth_model.TimeStampedModel):
     @staticmethod
     def appointment_add_sms(sms_obj):
         try:
-            default_text = '''Dear %s, your appointment has been confirmed with %s at %s on %s.''' % (
-                sms_obj['name'], sms_obj['appointment'].doctor.get_display_name(), sms_obj['appointment'].hospital.name,
-                sms_obj['appointment'].time_slot_start.strftime("%B %d, %Y %I:%M %p"))
-            notification_tasks.send_offline_appointment_message.apply_async(
-                kwargs={'number': sms_obj['phone_number'], 'text': default_text, 'type': 'Appointment ADD'},
-                countdown=1)
+            instance = sms_obj['appointment']
+            receivers = [{"user": None, "phone_number": sms_obj['phone_number']}]
+            # offline_opd_appointment_comm = communication_models.OfflineOpdAppointments(appointment=instance,
+            #                                                                            notification_type=NotificationAction.OFFLINE_OPD_APPOINTMENT_ACCEPTED,
+            #                                                                            receivers=receivers)
+            # offline_opd_appointment_comm.send()
+            # default_text = '''Dear %s, your appointment has been confirmed with %s at %s on %s.''' % (
+            #     sms_obj['name'], sms_obj['appointment'].doctor.get_display_name(), sms_obj['appointment'].hospital.name,
+            #     sms_obj['appointment'].time_slot_start.strftime("%B %d, %Y %I:%M %p"))
+            # communication_models.SMSNotification(NotificationAction.OFFLINE_OPD_APPOINTMENT_ACCEPTED, context)
+            # notification_tasks.send_offline_appointment_message.apply_async(
+            #     kwargs={'number': sms_obj['phone_number'], 'text': default_text, 'type': 'Appointment ADD'},
+            #     countdown=1)
+            notification_tasks.send_offline_appointment_message.apply_async(kwargs={'appointment': instance,
+                                                                                    'notification_type': NotificationAction.OFFLINE_OPD_APPOINTMENT_ACCEPTED,
+                                                                                    'receivers': receivers},
+                                                                            countdown=1)
         except Exception as e:
             logger.error("Failed to Push Offline Appointment Add Message SMS Task " + str(e))
 
     @staticmethod
     def appointment_cancel_sms(sms_obj):
         try:
-            cancel_time = aware_time_zone(sms_obj['old_appointment'].time_slot_start)
-            default_text = "Dear %s, your appointment with %s at %s for %s has been cancelled. In case of any query, please reach out to the clinic." % (
-                              sms_obj['name'], sms_obj['old_appointment'].doctor.get_display_name(), sms_obj['old_appointment'].hospital.name,
-                              cancel_time.strftime("%B %d, %Y %I:%M %p"))
-            notification_tasks.send_offline_appointment_message.apply_async(
-                kwargs={'number': sms_obj['phone_number'], 'text': default_text, 'type': 'Appointment CANCEL'},
-                countdown=1)
+            instance = sms_obj['appointment']
+            receivers = [{"user": None, "phone_number": sms_obj['phone_number']}]
+            # offline_opd_appointment_comm = communication_models.OfflineOpdAppointments(appointment=instance,
+            #                                                                            notification_type=NotificationAction.OFFLINE_OPD_APPOINTMENT_CANCELLED,
+            #                                                                            receivers=receivers)
+            # offline_opd_appointment_comm.send()
+            # cancel_time = aware_time_zone(sms_obj['old_appointment'].time_slot_start)
+            # default_text = "Dear %s, your appointment with %s at %s for %s has been cancelled. In case of any query, please reach out to the clinic." % (
+            #                   sms_obj['name'], sms_obj['old_appointment'].doctor.get_display_name(), sms_obj['old_appointment'].hospital.name,
+            #                   cancel_time.strftime("%B %d, %Y %I:%M %p"))
+            # notification_tasks.send_offline_appointment_message.apply_async(
+            #     kwargs={'number': sms_obj['phone_number'], 'text': default_text, 'type': 'Appointment CANCEL'},
+            #     countdown=1)
+            notification_tasks.send_offline_appointment_message.apply_async(kwargs={'appointment': instance,
+                                                                                    'notification_type': NotificationAction.OFFLINE_OPD_APPOINTMENT_CANCELLED,
+                                                                                    'receivers': receivers},
+                                                                            countdown=1)
+
         except Exception as e:
             logger.error("Failed to Push Offline Appointment Cancel Message SMS Task " + str(e))
 
     @staticmethod
     def appointment_complete_sms(sms_obj):
         try:
-            default_text = "Dear %s, your appointment with %s at %s is complete. In case of any query, please reach out to the %s." % \
-                           (sms_obj['name'], sms_obj['appointment'].doctor.get_display_name(),
-                            sms_obj['appointment'].hospital.name, sms_obj['appointment'].hospital.name)
-            notification_tasks.send_offline_appointment_message.apply_async(
-                kwargs={'number': sms_obj['phone_number'], 'text': default_text, 'type': 'Appointment COMPLETE'},
-                countdown=1)
+            instance = sms_obj['appointment']
+            receivers = [{"user": None, "phone_number": sms_obj['phone_number']}]
+            # offline_opd_appointment_comm = communication_models.OfflineOpdAppointments(appointment=instance,
+            #                                                                            notification_type=NotificationAction.OFFLINE_OPD_APPOINTMENT_COMPLETED,
+            #                                                                            receivers=receivers)
+            # offline_opd_appointment_comm.send()
+            # default_text = "Dear %s, your appointment with %s at %s is complete. In case of any query, please reach out to the %s." % \
+            #                (sms_obj['name'], sms_obj['appointment'].doctor.get_display_name(),
+            #                 sms_obj['appointment'].hospital.name, sms_obj['appointment'].hospital.name)
+            # notification_tasks.send_offline_appointment_message.apply_async(
+            #     kwargs={'number': sms_obj['phone_number'], 'text': default_text, 'type': 'Appointment COMPLETE'},
+            #     countdown=1)
+            notification_tasks.send_offline_appointment_message.apply_async(kwargs={'appointment': instance,
+                                                                                    'notification_type': NotificationAction.OFFLINE_OPD_APPOINTMENT_COMPLETED,
+                                                                                    'receivers': receivers},
+                                                                            countdown=1)
         except Exception as e:
             logger.error("Failed to Push Offline Appointment Cancel Message SMS Task " + str(e))
 
     @staticmethod
     def appointment_reschedule_sms(sms_obj):
         try:
-            default_text = "Dear %s, your appointment with %s at %s has been rescheduled to %s. In case of any query, please reach out to the clinic." % (
-                              sms_obj['name'], sms_obj['appointment'].doctor.get_display_name(), sms_obj['appointment'].hospital.name,
-                              sms_obj['appointment'].time_slot_start.strftime("%B %d, %Y %I:%M %p"))
-            notification_tasks.send_offline_appointment_message.apply_async(
-                kwargs={'number': sms_obj['phone_number'], 'text': default_text, 'type': 'Appointment RESCHEDULE'},
-                countdown=1)
+            instance = sms_obj['appointment']
+            receivers = [{"user": None, "phone_number": sms_obj['phone_number']}]
+            # offline_opd_appointment_comm = communication_models.OfflineOpdAppointments(appointment=instance,
+            #                                                                            notification_type=NotificationAction.OFFLINE_OPD_APPOINTMENT_RESCHEDULED_DOCTOR,
+            #                                                                            receivers=receivers)
+            # offline_opd_appointment_comm.send()
+            # default_text = "Dear %s, your appointment with %s at %s has been rescheduled to %s. In case of any query, please reach out to the clinic." % (
+            #                   sms_obj['name'], sms_obj['appointment'].doctor.get_display_name(), sms_obj['appointment'].hospital.name,
+            #                   sms_obj['appointment'].time_slot_start.strftime("%B %d, %Y %I:%M %p"))
+            # notification_tasks.send_offline_appointment_message.apply_async(
+            #     kwargs={'number': sms_obj['phone_number'], 'text': default_text, 'type': 'Appointment RESCHEDULE'},
+            #     countdown=1)
+            notification_tasks.send_offline_appointment_message.apply_async(kwargs={'appointment': instance,
+                                                                                    'notification_type': NotificationAction.OFFLINE_OPD_APPOINTMENT_RESCHEDULED_DOCTOR,
+                                                                                    'receivers': receivers},
+                                                                            countdown=1)
         except Exception as e:
             logger.error("Failed to Push Offline Appointment Rescehdule Message SMS Task " + str(e))
 
     @staticmethod
     def schedule_appointment_reminder_sms(sms_obj):
         try:
-            default_text = "Appointment reminder: Dear %s, your appointment with %s at %s is scheduled on %s. Please make sure you reach the clinic premises on time." % (
-                sms_obj['name'], sms_obj['appointment'].doctor.get_display_name(), sms_obj['appointment'].hospital.name,
-                sms_obj['appointment'].time_slot_start.strftime("%B %d, %Y %I:%M %p"))
+            # default_text = "Appointment reminder: Dear %s, your appointment with %s at %s is scheduled on %s. Please make sure you reach the clinic premises on time." % (
+            #     sms_obj['name'], sms_obj['appointment'].doctor.get_display_name(), sms_obj['appointment'].hospital.name,
+            #     sms_obj['appointment'].time_slot_start.strftime("%B %d, %Y %I:%M %p"))
             notification_tasks.offline_appointment_reminder_sms_patient.apply_async(
                 kwargs={'appointment_id': sms_obj['appointment'].id,
                         'time_slot_start_timestamp': sms_obj['appointment'].time_slot_start.timestamp(),
-                        'number': sms_obj['phone_number'], 'text': default_text, 'type': 'Appointment RESCHEDULE'},
-                eta=sms_obj['appointment'].time_slot_start - datetime.timedelta(minutes=int(OfflineOPDAppointments.SMS_APPOINTMENT_REMINDER_TIME)))
+                        'number': sms_obj['phone_number']},
+                # , 'text': default_text, 'type': 'Appointment RESCHEDULE'},
+                eta=sms_obj['appointment'].time_slot_start - datetime.timedelta(
+                    minutes=int(OfflineOPDAppointments.SMS_APPOINTMENT_REMINDER_TIME)))
         except Exception as e:
             logger.error("Failed to Push Offline Appointment Reminder Message SMS Task " + str(e))
 
@@ -4755,3 +4926,40 @@ class HospitalNetworkSpeciality(auth_model.TimeStampedModel):
 
     class Meta:
         db_table = "hospital_network_speciality"
+
+
+class SponsoredServices(auth_model.TimeStampedModel):
+    name = models.CharField(max_length=200, unique=True)
+
+    def __str__(self):
+        return self.name
+
+    class Meta:
+        db_table = 'sponsored_services'
+
+
+class DoctorSponsoredServices(auth_model.TimeStampedModel):
+    doctor = models.ForeignKey(Doctor, related_name="doctor_services", on_delete=models.DO_NOTHING)
+    sponsored_service = models.ForeignKey(SponsoredServices, on_delete=models.DO_NOTHING, blank=False, null=False, related_name='doc_sponsored_services')
+
+    class Meta:
+        db_table = "doctor_sponsored_services"
+        unique_together = (("doctor", "sponsored_service"),)
+
+
+class HospitalSponsoredServices(auth_model.TimeStampedModel):
+    hospital = models.ForeignKey(Hospital, related_name="hospital_services", on_delete=models.DO_NOTHING)
+    sponsored_service = models.ForeignKey(SponsoredServices, on_delete=models.DO_NOTHING, blank=False, null=False, related_name='hosp_sponsored_services')
+
+    class Meta:
+        db_table = "hospital_sponsored_services"
+        unique_together = (("hospital", "sponsored_service"),)
+
+
+class SponsoredServicePracticeSpecialization(auth_model.TimeStampedModel):
+    sponsored_service = models.ForeignKey(SponsoredServices, on_delete=models.DO_NOTHING, blank=False, null=False, related_name='spec_sponsored_services')
+    specialization = models.ForeignKey(PracticeSpecialization, on_delete=models.DO_NOTHING, blank=False, null=False, related_name='spec_sponsored_services')
+    is_primary_specialization = models.BooleanField(default=False)
+
+    class Meta:
+        db_table = "specialization_sponsored_services"

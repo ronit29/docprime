@@ -646,25 +646,36 @@ def create_or_update_lead_on_matrix(self, data):
     from ondoc.procedure.models import IpdProcedureLead
     from ondoc.communications.models import EMAILNotification
     from ondoc.notification.models import NotificationAction
+    from ondoc.diagnostic.models import IPDMedicinePageLead
+
     try:
         obj_id = data.get('obj_id', None)
         obj_type = data.get('obj_type', None)
         if not obj_id or not obj_type:
             logger.error("CELERY ERROR: Incorrect values provided.")
             raise ValueError()
+
         product_id = matrix_product_ids.get('opd_products', 1)
         if obj_type == IpdProcedureLead.__name__:
             product_id = matrix_product_ids.get('ipd_procedure', 9)
+        if obj_type == IPDMedicinePageLead.__name__:
+            product_id = matrix_product_ids.get('consumer', 5)
+
         sub_product_id = matrix_subproduct_ids.get(obj_type.lower(), 4)
         if obj_type == ProviderSignupLead.__name__:
             sub_product_id = matrix_subproduct_ids.get(Doctor.__name__.lower(), 4)
         if obj_type == IpdProcedureLead.__name__:
             sub_product_id = matrix_subproduct_ids.get('idp_subproduct_id', 0)
+        if obj_type == IPDMedicinePageLead.__name__:
+            sub_product_id = matrix_product_ids.get(IPDMedicinePageLead.__name__.lower(), 4)
+
         ct = ContentType.objects.get(model=obj_type.lower())
         model_used = ct.model_class()
         content_type = ContentType.objects.get_for_model(model_used)
         if obj_type == ProviderSignupLead.__name__:
             exit_point_url = settings.ADMIN_BASE_URL + reverse('admin:doctor_doctor_add')
+        elif obj_type == IPDMedicinePageLead.__name__:
+            exit_point_url = ''
         else:
             exit_point_url = settings.ADMIN_BASE_URL + reverse(
                 'admin:{}_{}_change'.format(content_type.app_label, content_type.model), kwargs={"object_id": obj_id})
@@ -724,7 +735,11 @@ def create_or_update_lead_on_matrix(self, data):
             elif obj.gender and obj.gender == 'f':
                 gender = 2
             obj.update_idp_data(request_data)
+        elif obj_type == IPDMedicinePageLead.__name__:
+            lead_source = obj.lead_source
+            mobile = obj.phone_number
         mobile = int(mobile)
+
         # if not mobile:
         #     return
         if not lead_source:
@@ -766,9 +781,13 @@ def create_or_update_lead_on_matrix(self, data):
             # save the order with the matrix lead id.
             # obj = model_used.objects.select_for_update().filter(id=obj_id).first()
             if obj and hasattr(obj, 'matrix_lead_id') and not obj.matrix_lead_id:
-                obj.matrix_lead_id = resp_data.get('Id', None)
-                obj.matrix_lead_id = int(obj.matrix_lead_id)
-                obj.save()
+                # obj.matrix_lead_id = resp_data.get('Id', None)
+                # obj.matrix_lead_id = int(obj.matrix_lead_id)
+                mlid = resp_data.get('Id', None)
+                if mlid:
+                    mx_lead_id = int(mlid)
+                    queryset = model_used.objects.filter(id=obj.id)
+                    queryset.update(matrix_lead_id=mx_lead_id)
                 if lead_source == 'ProviderApp':
                     receivers = [{"user": None, "email": "kabeer@docprime.com"},
                                  {"user": None, "email": "simranjeet@docprime.com"},
@@ -1310,3 +1329,46 @@ def check_for_ipd_lead_validity(self, data):
         obj.validate_lead()
     except Exception as e:
         pass
+
+
+@task(bind=True, max_retries=2)
+def push_retail_appointment_to_matrix(self, data):
+    from ondoc.doctor.models import OpdAppointment
+
+    try:
+        appointment_id = data.get('appointment_id', None)
+        if not appointment_id:
+            raise Exception("Appointment id not found, could not push to Matrix")
+
+        appointment = OpdAppointment.objects.filter(pk=appointment_id).first()
+        if not appointment:
+            raise Exception("Appointment could not found against id - " + str(appointment_id))
+
+        if not appointment.is_retail_booking():
+            raise Exception("Not a Retail Appointment - " + str(appointment_id))
+
+        request_data = appointment.get_matrix_retail_booking_data()
+
+        url = settings.MATRIX_API_URL
+        matrix_api_token = settings.MATRIX_API_TOKEN
+        response = requests.post(url, data=json.dumps(request_data), headers={'Authorization': matrix_api_token,
+                                                                              'Content-Type': 'application/json'})
+        logger.info(json.dumps(request_data))
+        if response.status_code != status.HTTP_200_OK or not response.ok:
+            logger.error(json.dumps(request_data))
+            logger.info("[ERROR] Retail Appointment could not be published to the matrix system")
+            logger.info("[ERROR] %s", response.reason)
+
+            countdown_time = (2 ** self.request.retries) * 60 * 10
+            logging.error("Retail Appointment sync with the Matrix System failed with response - " + str(response.content))
+            print(countdown_time)
+            self.retry([data], countdown=countdown_time)
+
+        resp_data = response.json()
+        logger.info(resp_data)
+        if not resp_data.get('Id', None):
+            logger.error(json.dumps(request_data))
+            raise Exception("[ERROR] Id not recieved from the matrix while pushing retail appointment lead.")
+
+    except Exception as e:
+        logger.error("Error in Celery. Failed pushing Retail Appointment to the matrix- " + str(e))

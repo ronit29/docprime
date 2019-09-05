@@ -302,6 +302,16 @@ class DoctorAppointmentsViewSet(OndocViewSet):
                                                     models.OpdAppointment.MAX_FREE_BOOKINGS_ALLOWED)}},
                             status=status.HTTP_400_BAD_REQUEST)
 
+        #For Appointment History
+        responsible_user = None
+        if data.get('from_app') and data['from_app']:
+            data['_source'] = AppointmentHistory.CONSUMER_APP
+            responsible_user = request.user.id
+        elif data.get('from_web') and data['from_web']:
+            data['_source'] = AppointmentHistory.WEB
+            responsible_user = request.user.id
+        data['_responsible_user'] = responsible_user
+
         if validated_data.get("existing_cart_item"):
             cart_item = validated_data.get("existing_cart_item")
             old_cart_obj = Cart.objects.filter(id=validated_data.get('existing_cart_item').id).first()
@@ -328,7 +338,6 @@ class DoctorAppointmentsViewSet(OndocViewSet):
     def can_book_for_free(self, user):
         return models.OpdAppointment.objects.filter(user=user, deal_price=0)\
                    .exclude(status__in=[models.OpdAppointment.COMPLETED, models.OpdAppointment.CANCELLED]).count() < models.OpdAppointment.MAX_FREE_BOOKINGS_ALLOWED
-
     def update(self, request, pk=None):
         user = request.user
         source = request.query_params.get('source', '')
@@ -896,7 +905,6 @@ class DoctorProfileUserViewSet(viewsets.GenericViewSet):
 
         selected_procedure_ids, other_procedure_ids = get_selected_and_other_procedures(category_ids, procedure_ids, doctor, all=True)
 
-
         general_specialization = []
         spec_ids = list()
         spec_url_dict = dict()
@@ -916,7 +924,6 @@ class DoctorProfileUserViewSet(viewsets.GenericViewSet):
                                           locality_value=entity.locality_value, is_valid=True, entity_type='Doctor', url_type='SEARCHURL')
             for su in spec_urls:
                 spec_url_dict[su.specialization_id] = su.url
-
 
         serializer = serializers.DoctorProfileUserViewSerializer(doctor, many=False,
                                                                      context={"request": request
@@ -4002,7 +4009,7 @@ class OfflineCustomerViewSet(viewsets.GenericViewSet):
                 # mrp = app.mrp
                 mrp_fees = app.fees if app.fees else 0
                 #RAJIV YADAV
-                mrp = app.mrp if app.payment_type == app.COD else mrp_fees
+                mrp = app.deal_price if app.payment_type == app.COD else mrp_fees
                 payment_type = app.payment_type
                 deal_price = app.deal_price
                 mask_number = app.mask_number.all()
@@ -4482,11 +4489,50 @@ class HospitalViewSet(viewsets.GenericViewSet):
             if new_dynamic.h1_title:
                 h1_title = new_dynamic.h1_title
         schema = self.build_schema_for_hospital(hosp_serializer, hospital_obj, canonical_url)
-        response['seo'] = {'title': title, "description": description, "schema": schema, "h1_title": h1_title}
+        listing_schema = self.build_listing_schema_for_hospital(hosp_serializer)
+        breadcrumb_schema = self.build_breadcrumb_schema_for_hospital(response['breadcrumb'])
+        all_schema = [x for x in [schema, listing_schema, breadcrumb_schema] if x]
+        response['seo'] = {'title': title, "description": description, "schema": schema,
+                           "h1_title": h1_title, 'all_schema': all_schema}
         response['canonical_url'] = canonical_url
-
         return Response(response)
 
+    def build_listing_schema_for_hospital(self, serialized_data):
+        try:
+            schema = {
+                "@context": "http://schema.org",
+                "@type": "ItemList",
+            }
+            list_items = []
+            for indx, doc in enumerate(serialized_data.get('doctors', {}).get('result', [])):
+                item = {"@type": "ListItem", "position": indx + 1, "url": doc.get('new_schema', {}).get('url')}
+                list_items.append(item)
+            schema["itemListElement"] = list_items
+        except Exception as e:
+            logger.error(str(e))
+            schema = None
+        return schema
+
+    def build_breadcrumb_schema_for_hospital(self, breadcrumb):
+        try:
+            schema = {
+                "@context": "http://schema.org",
+                "@type": "BreadcrumbList"
+            }
+            list_items = []
+            for indx, doc in enumerate(breadcrumb):
+                if doc.get('url'):
+                    item = {
+                        "@type": "ListItem",
+                        "position": indx + 1,
+                        "item": {"@id": "{}/{}".format(settings.BASE_URL.strip('/'), doc.get('url')), "name": doc.get('title')}
+                    }
+                    list_items.append(item)
+            schema["itemListElement"] = list_items
+        except Exception as e:
+            logger.error(str(e))
+            schema = None
+        return schema
 
     def build_schema_for_hospital(self, serialized_data, hospital, url):
         try:

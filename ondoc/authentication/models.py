@@ -11,6 +11,7 @@ from django.utils import timezone
 from PIL import Image as Img
 from django.core.files.uploadedfile import InMemoryUploadedFile
 from io import BytesIO
+from itertools import groupby
 import math
 import os
 import re
@@ -23,7 +24,6 @@ from datetime import date, datetime, timedelta
 from safedelete import SOFT_DELETE
 from safedelete.models import SafeDeleteModel
 import reversion
-
 import requests
 import json
 from rest_framework import status
@@ -340,6 +340,11 @@ class User(AbstractBaseUser, PermissionsMixin):
         #     return self.staffprofile.name
         # return str(self.phone_number)
 
+    @cached_property
+    def active_plus_user(self):
+        active_plus_user = self.active_plus_users.filter().order_by('-id').first()
+        return active_plus_user if active_plus_user and active_plus_user.is_valid() else None
+
     @classmethod
     def get_external_login_data(cls, data):
         from ondoc.authentication.backends import JWTAuthentication
@@ -370,8 +375,8 @@ class User(AbstractBaseUser, PermissionsMixin):
         profile_data['user'] = user
         profile_data['email'] = data.get('email')
         profile_data['source'] = source
-        profile_data['dob'] = data.get('dob', "")
-        profile_data['gender'] = data.get('gender', "")
+        profile_data['dob'] = data.get('dob', None)
+        profile_data['gender'] = data.get('gender', None)
         user_profiles = user.profiles.all()
 
         if not bool(re.match(r"^[a-zA-Z ]+$", data.get('name'))):
@@ -387,9 +392,9 @@ class User(AbstractBaseUser, PermissionsMixin):
                 if not user_profile.email:
                     user_profile.email = profile_data['email'] if not user_profile.email else None
                 if not user_profile.gender and profile_data.get('gender', None):
-                    user_profile.gender = profile_data.get('gender', "")
+                    user_profile.gender = profile_data.get('gender', None)
                 if not user_profile.dob and profile_data.get('dob', None):
-                    user_profile.dob = profile_data.get('dob', "")
+                    user_profile.dob = profile_data.get('dob', None)
                 user_profile.save()
             else:
                 UserProfile.objects.create(**profile_data)
@@ -776,6 +781,26 @@ class NotificationEndpoint(TimeStampedModel):
     def __str__(self):
         return "{}-{}".format(self.user.phone_number, self.token)
 
+    @classmethod
+    def get_user_and_tokens(cls, receivers, **kwargs):
+        from ondoc.notification.models import NotificationAction
+        user_and_tokens = list()
+        if kwargs.get("action_type") == NotificationAction.E_CONSULTATION:
+            user_and_token = [{'user': token.user, 'token': token.token, 'app_name': token.app_name} for token in
+                              cls.objects.select_related('user').filter(Q(user__in=receivers), Q(Q(platform="android",
+                                                                                                   app_version__gt="2.100.13") |
+                                                                                                 Q(platform="ios",
+                                                                                                   app_version__gt="2.200.9"))) \
+                                                                .order_by('user')]
+        else:
+            user_and_token = [{'user': token.user, 'token': token.token, 'app_name': token.app_name} for token in
+                              cls.objects.select_related('user').filter(user__in=receivers).order_by('user')]
+        for user, user_token_group in groupby(user_and_token, key=lambda x: x['user']):
+            user_and_tokens.append(
+                {'user': user,
+                 'tokens': [{"token": t['token'], "app_name": t["app_name"]} for t in user_token_group]})
+        return user_and_tokens
+
 
 class Notification(TimeStampedModel):
     ACCEPTED = 1
@@ -1057,6 +1082,17 @@ class GenericLabAdmin(TimeStampedModel, CreatedByModel):
                                write_permission=write_permission,
                                read_permission=read_permission
                                )
+
+    @classmethod
+    def get_appointment_admins(cls, appoinment):
+        if not appoinment:
+            return []
+        admins = GenericLabAdmin.objects.filter(is_disabled=False, lab=appoinment.lab).distinct('user')
+        admin_users = []
+        for admin in admins:
+            if admin.user:
+                admin_users.append(admin.user)
+        return admin_users
 
 
 class GenericAdminManager(models.Manager):
