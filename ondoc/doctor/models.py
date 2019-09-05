@@ -2693,7 +2693,10 @@ class OpdAppointment(auth_model.TimeStampedModel, CouponsMixin, OpdAppointmentIn
         if responsible_user:
             _responsible_user = auth_model.User.objects.filter(id=responsible_user).first()
         app_obj = cls(**appointment_data)
-        app_obj.save(responsible_user=_responsible_user, source=source)
+        if _responsible_user and source:
+            app_obj.save(responsible_user=_responsible_user, source=source)
+        else:
+            app_obj.save()
         if procedure_details:
             procedure_to_be_added = []
             for procedure in procedure_details:
