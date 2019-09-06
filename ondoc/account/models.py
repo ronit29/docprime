@@ -198,6 +198,7 @@ class Order(TimeStampedModel):
             self.action_data['effective_price'] = self.action_data['deal_price']
             opd_obj.effective_price = Decimal(self.action_data['deal_price'])
             opd_obj.is_cod_to_prepaid = True
+            opd_obj.deal_price = self.action_data['deal_price']
             opd_obj.save()
         return opd_obj
 
