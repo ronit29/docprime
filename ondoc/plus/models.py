@@ -217,10 +217,10 @@ class PlusUser(auth_model.TimeStampedModel):
         for pp in plan_parameters:
             data[pp.parameter.key.lower()] = pp.value
 
-        resp['total_limit'] = data['DOCTOR_CONSULT_AMOUNT']
+        resp['total_limit'] = data['DOCTOR_CONSULT_AMOUNT'.lower()]
         resp['utilized'] = 0
-        resp['available'] = data['DOCTOR_CONSULT_AMOUNT']
-        resp['members_count_online_consulation'] = data['MEMBERS_COVERED_IN_PACKAGE']
+        resp['available'] = data['DOCTOR_CONSULT_AMOUNT'.lower()]
+        resp['members_count_online_consulation'] = data['MEMBERS_COVERED_IN_PACKAGE'.lower()]
 
         return resp
 
