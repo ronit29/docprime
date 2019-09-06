@@ -3776,7 +3776,7 @@ class OpdAppointment(auth_model.TimeStampedModel, CouponsMixin, OpdAppointmentIn
                     discount = ((Decimal(order_obj.action_data.get('mrp')) - Decimal(order_obj.action_data.get(
                         'deal_price'))) / Decimal(order_obj.action_data.get('mrp'))) * 100
                 # discount = str(round(discount, 2))
-                discount = float(round(discount, 2))
+                discount = float(round(discount, 2)) if discount <=10 else int(discount)
                 result = patent_id, discount
             except Exception as e:
                 result = None, None
