@@ -211,6 +211,7 @@ class PlusUser(auth_model.TimeStampedModel):
         plan_parameters = plan.plan_parameters.filter(parameter__key__in=[PlanParametersEnum.DOCTOR_CONSULT_AMOUNT,
                                                                                PlanParametersEnum.ONLINE_CHAT_AMOUNT,
                                                                                PlanParametersEnum.HEALTH_CHECKUPS_AMOUNT,
+                                                                               PlanParametersEnum.HEALTH_CHECKUPS_COUNT,
                                                                                PlanParametersEnum.MEMBERS_COVERED_IN_PACKAGE,
                                                                                PlanParametersEnum.TOTAL_TEST_COVERED_IN_PACKAGE])
 
@@ -221,6 +222,7 @@ class PlusUser(auth_model.TimeStampedModel):
         resp['utilized'] = 0
         resp['available'] = data['DOCTOR_CONSULT_AMOUNT'.lower()]
         resp['members_count_online_consulation'] = data['MEMBERS_COVERED_IN_PACKAGE'.lower()]
+        resp['remaining_body_checkup_count'] = data['HEALTH_CHECKUPS_COUNT'.lower()]
 
         return resp
 
