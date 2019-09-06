@@ -1425,3 +1425,33 @@ class EConsultationCommViewSet(viewsets.GenericViewSet):
                 logger.error('Error in send new message notification - ' + str(e))
                 return Response({"status": 0, "error": 'Error in send new message notification - ' + str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
         return Response({"status": 1, "message": "success"})
+
+
+class ProviderLabTestSamplesCollect(viewsets.GenericViewSet):
+
+    authentication_classes = (JWTAuthentication,)
+    permission_classes = (IsAuthenticated, v1_utils.IsDoctor)
+
+    def list(self, request):
+        serializer = serializers.LabTestsListSerializer(data=request.data, context={'request':request})
+        serializer.is_valid(raise_exception=True)
+        valid_data = serializer.validated_data
+        hospital = valid_data['hospital']
+        lab = valid_data['lab']
+        available_lab_tests = lab.lab_pricing_group.available_lab_tests.all()
+        response_list = list()
+        for obj in available_lab_tests:
+            ret_obj = dict()
+            sample_obj = obj.test.sample_details.all()[0] if obj.test.sample_details.all() else None
+            test = obj.test
+            ret_obj['lab_test_id'] = test.id
+            ret_obj['lab_test_name'] = test.name
+            ret_obj['sample_type'] = sample_obj.sample.name if sample_obj else None
+            ret_obj['material_required'] = sample_obj.material_required if sample_obj else None
+            ret_obj['sample_volume_required'] = sample_obj.volume if sample_obj else None
+            ret_obj['fasting_required'] = sample_obj.fasting_required if sample_obj else None
+            ret_obj['report_tat'] = sample_obj.report_tat if sample_obj else None
+            ret_obj['reference_value'] = sample_obj.reference_value if sample_obj else None
+            ret_obj['b2c_rates'] = obj.get_deal_price()
+            response_list.append(ret_obj)
+        return Response(response_list)

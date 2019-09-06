@@ -207,7 +207,7 @@ class EConsultation(auth_models.TimeStampedModel, auth_models.CreatedByModel):
         db_table = "e_consultation"
 
 
-class ProviderHospitalLabMapping(models.Model):
+class ProviderHospitalLabMapping(auth_models.TimeStampedModel):
     hospital = models.ForeignKey(doc_models.Hospital, on_delete=models.CASCADE, related_name="provider_labs")
     lab = models.ForeignKey(diag_models.Lab, on_delete=models.CASCADE, related_name="provider_hospitals")
 
@@ -216,3 +216,31 @@ class ProviderHospitalLabMapping(models.Model):
 
     class Meta:
         db_table = "provider_hospital_lab_mapping"
+
+
+class ProviderLabTestSamples(auth_models.TimeStampedModel):
+
+    name = models.CharField(max_length=128)
+
+    def __str__(self):
+        return str(self.name)
+
+    class Meta:
+        db_table = "provider_lab_test_samples"
+
+
+class ProviderLabTestSampleDetails(auth_models.TimeStampedModel):
+
+    lab_test = models.ForeignKey(diag_models.LabTest, on_delete=models.CASCADE, related_name="sample_details")
+    sample = models.ForeignKey(ProviderLabTestSamples, on_delete=models.CASCADE, related_name="details")
+    volume = models.PositiveIntegerField(null=True, blank=True)                             # in milli-litres
+    fasting_required = models.BooleanField(default=False)                                   # in milli-litres
+    report_tat = models.PositiveSmallIntegerField(null=True, blank=True)                    # in hours
+    reference_value = models.PositiveIntegerField(null=True, blank=True)
+    material_required = JSONField()
+
+    def __str__(self):
+        return str(self.lab_test.name) + '-' + str(self.sample.name)
+
+    class Meta:
+        db_table = "provider_lab_test_sample_details"

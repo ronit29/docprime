@@ -37,6 +37,7 @@ urlpatterns = [
     path('pecs/list', views.ConsumerEConsultationViewSet.as_view({'get': 'list'}), name='pecs_list'),
     path('pecs/get_id', views.ConsumerEConsultationViewSet.as_view({'get': 'get_order_consult_id'}), name='pecs_get_id'),
     path('ecs/comm', views.EConsultationCommViewSet.as_view({'post': 'communicate'}), name='ecs_communication'),
+    path('cl/list', views.ProviderLabTestSamplesCollect.as_view({'get': 'list'}), name='cl_list'),
 ]
 
 

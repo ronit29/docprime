@@ -799,3 +799,35 @@ class EConsultCommunicationSerializer(serializers.Serializer):
         attrs['receiver_rc_users'] = receiver_rc_users
         attrs['sender_rc_user'] = sender_rc_user
         return attrs
+
+
+class LabTestsListSerializer(serializers.Serializer):
+
+    hospital_id = serializers.IntegerField(min_value=1)
+    lab_id = serializers.IntegerField(min_value=1, required=False, allow_null=True)
+
+    def validate(self, attrs):
+        hospital_id = attrs.get('hospital_id')
+        lab_id = attrs.get('lab_id')
+        filter_kwargs = dict()
+        if lab_id:
+            filter_kwargs['lab_id'] = lab_id
+        hospital_lab_mapping_obj = provider_models.ProviderHospitalLabMapping.objects \
+                                                                    .prefetch_related(
+                                                                        'lab',
+                                                                        'lab__lab_pricing_group',
+                                                                        'lab__lab_pricing_group__available_lab_tests',
+                                                                        'lab__lab_pricing_group__available_lab_tests__test',
+                                                                        'lab__lab_pricing_group__available_lab_tests__test__sample_details',
+                                                                    ) \
+                                                                    .filter(hospital_id=hospital_id,
+                                                                            **filter_kwargs,
+                                                                            lab__is_b2b=True).first()
+        if not hospital_lab_mapping_obj:
+            raise serializers.ValidationError('Either Hospital id is wrong or Lab is not with given Hospital')
+        lab = hospital_lab_mapping_obj.lab
+        if not lab.lab_pricing_group:
+            raise serializers.ValidationError('Lab Pricing group needs to be set for the lab')
+        attrs['hospital'] = hospital_lab_mapping_obj.hospital
+        attrs['lab'] = lab
+        return attrs
