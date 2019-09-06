@@ -314,5 +314,6 @@ class PlusProfileViewSet(viewsets.GenericViewSet):
         resp['plan'] = plan_body_serializer.data
         plus_user_body_serializer = serializers.PlusUserModelSerializer(plus_user, context={'request': request})
         resp['user'] = plus_user_body_serializer.data
+        resp['relation_master'] = PlusMembers.Relations.availabilities()
         return Response({'data': resp})
 

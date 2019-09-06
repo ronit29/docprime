@@ -407,7 +407,7 @@ class PlusMembers(auth_model.TimeStampedModel):
     profile = models.ForeignKey(auth_model.UserProfile, related_name="plus_member", on_delete=models.CASCADE, null=True)
     title = models.CharField(max_length=20, choices=TITLE_TYPE_CHOICES, default=None)
     middle_name = models.CharField(max_length=50, null=True)
-    town = models.CharField(max_length=100, null=True, default=None)
+    city = models.CharField(max_length=100, null=True, default=None)
     district = models.CharField(max_length=100, null=True, default=None)
     state = models.CharField(max_length=100, null=True, default=None)
     state_code = models.CharField(max_length=10, default=None, null=True)
@@ -434,7 +434,7 @@ class PlusMembers(auth_model.TimeStampedModel):
                                                      last_name=member.get('last_name'), dob=member.get('dob'),
                                                      email=member.get('email'), address=member.get('address'),
                                                      pincode=member.get('pincode'), phone_number=user_profile.phone_number,
-                                                     gender=member.get('gender'), profile=user_profile, town=member.get('city'),
+                                                     gender=member.get('gender'), profile=user_profile, city=member.get('city'),
                                                      district=member.get('district'), state=member.get('state'),
                                                      state_code = member.get('state_code'), plus_user=plus_user_obj,
                                                      city_code=member.get('city_code'), district_code=member.get('district_code'),
