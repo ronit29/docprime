@@ -1433,7 +1433,7 @@ class ProviderLabTestSamplesCollect(viewsets.GenericViewSet):
     permission_classes = (IsAuthenticated, v1_utils.IsDoctor)
 
     def tests_list(self, request):
-        serializer = serializers.LabTestsListSerializer(data=request.data, context={'request':request})
+        serializer = serializers.LabTestsListSerializer(data=request.query_params, context={'request':request})
         serializer.is_valid(raise_exception=True)
         valid_data = serializer.validated_data
         hospital = valid_data['hospital']
