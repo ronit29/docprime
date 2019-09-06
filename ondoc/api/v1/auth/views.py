@@ -53,8 +53,7 @@ from ondoc.api.v1.insurance.serializers import (InsuranceTransactionSerializer)
 from ondoc.api.v1.diagnostic.views import LabAppointmentView
 from ondoc.diagnostic.models import (Lab, LabAppointment, AvailableLabTest, LabNetwork)
 from ondoc.payout.models import Outstanding
-from ondoc.authentication.backends import JWTAuthentication, BajajAllianzAuthentication, MatrixUserAuthentication, \
-    CloudLabUserAuthentication
+from ondoc.authentication.backends import JWTAuthentication, BajajAllianzAuthentication, MatrixUserAuthentication
 from ondoc.api.v1.utils import (IsConsumer, IsDoctor, opdappointment_transform, labappointment_transform,
                                 ErrorCodeMapping, IsNotAgent, GenericAdminEntity, generate_short_url)
 from django.conf import settings
@@ -2385,7 +2384,8 @@ class BajajAllianzUserViewset(GenericViewSet):
 
 
 class CloudLabUserViewSet(viewsets.GenericViewSet):
-    authentication_classes = (CloudLabUserAuthentication,)
+    authentication_classes = (JWTAuthentication,)
+    permission_classes = (IsAuthenticated, IsDoctor)
 
     @transaction.atomic()
     def user_login_via_cloud_lab(self, request):

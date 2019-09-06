@@ -1432,7 +1432,7 @@ class ProviderLabTestSamplesCollect(viewsets.GenericViewSet):
     authentication_classes = (JWTAuthentication,)
     permission_classes = (IsAuthenticated, v1_utils.IsDoctor)
 
-    def list(self, request):
+    def tests_list(self, request):
         serializer = serializers.LabTestsListSerializer(data=request.data, context={'request':request})
         serializer.is_valid(raise_exception=True)
         valid_data = serializer.validated_data
