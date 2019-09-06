@@ -859,7 +859,7 @@ class Order(TimeStampedModel):
                  "insurance": insurance_ids, "econsultation": econsult_ids, "chat" : chat_plan_ids, "plus": plus_ids, "type": "all", "id": None }
         # Handle backward compatibility, in case of single booking, return the booking id
 
-        if (len(opd_appointment_ids) + len(lab_appointment_ids) + len(user_plan_ids) + len(insurance_ids) + len(econsult_ids) + len(chat_plan_ids)) == 1:
+        if (len(opd_appointment_ids) + len(lab_appointment_ids) + len(user_plan_ids) + len(insurance_ids) + len(econsult_ids) + len(chat_plan_ids) + len(plus_ids)) == 1:
             result_type = "all"
             result_id = None
             if len(opd_appointment_ids) > 0:
