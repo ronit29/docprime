@@ -565,7 +565,7 @@ def payment_details(request, order):
         pgdata['insurerCode'] = insurer_code
 
     if plus_merchant_code:
-        pgdata['merchCode'] = plus_merchant_code
+        pgdata['insurerCode'] = plus_merchant_code
 
     secret_key, client_key = get_pg_secret_client_key(order)
     filtered_pgdata = {k: v for k, v in pgdata.items() if v is not None and v != ''}
@@ -576,6 +576,7 @@ def payment_details(request, order):
     args = {'user_id': user.id, 'order_id': order.id, 'source': 'ORDER_CREATE'}
     save_payment_status.apply_async((PaymentProcessStatus.INITIATE, args),eta=timezone.localtime(), )
     save_pg_response.apply_async((PgLogs.TXN_REQUEST, order.id, None, None, pgdata, user.id), eta=timezone.localtime(), )
+    # print(pgdata)
     return pgdata, payment_required
 
 
