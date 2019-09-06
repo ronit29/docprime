@@ -59,22 +59,23 @@ class PlusOrderLeadViewSet(viewsets.GenericViewSet):
         else:
             user = request.user
 
-        if not user.is_anonymous:
-            plus_lead = PlusLead.objects.filter(user=user).order_by('id').last()
+        if not user.is_anonymous and user.is_authenticated:
+            # plus_lead = PlusLead.objects.filter(user=user).order_by('id').last()
 
-            plus_user = user.active_plus_users.filter().order_by('id').last()
+            plus_user = user.active_plus_user
 
             if plus_user and plus_user.is_valid():
                 return Response({'success': True, "is_plus_user": True})
 
-            if not plus_lead:
-                plus_lead = PlusLead(user=user)
-            elif plus_lead and plus_user and not plus_user.is_valid():
-                active_plus_lead = PlusLead.objects.filter(created_at__gte=plus_user.expire_date, user=user).order_by('created_at').last()
-                if not active_plus_lead:
-                    plus_lead = PlusLead(user=user)
-                else:
-                    plus_lead = active_plus_lead
+            # if not plus_lead:
+            #     plus_lead = PlusLead(user=user)
+            # elif plus_lead and plus_user and not plus_user.is_valid():
+            #     active_plus_lead = PlusLead.objects.filter(created_at__gte=plus_user.expire_date, user=user).order_by('created_at').last()
+            #     if not active_plus_lead:
+            #         plus_lead = PlusLead(user=user)
+            #     else:
+            #         plus_lead = active_plus_lead
+            plus_lead = PlusLead(user=user, phone_number=user.phone_number)
 
             plus_lead.extras = request.data
             plus_lead.save()
