@@ -3292,6 +3292,7 @@ class OpdAppointment(auth_model.TimeStampedModel, CouponsMixin, OpdAppointmentIn
             end__gte=data.get("start_time")).first()
 
         effective_price = 0
+        prepaid_deal_price = 0
         if not procedures:
             if data.get("payment_type") == cls.INSURANCE:
                 effective_price = doctor_clinic_timing.deal_price
@@ -3328,6 +3329,7 @@ class OpdAppointment(auth_model.TimeStampedModel, CouponsMixin, OpdAppointmentIn
             effective_price = 0
             coupon_discount, coupon_cashback, coupon_list, random_coupon_list = 0, 0, [], []
             deal_price = doctor_clinic_timing.dct_cod_deal_price()
+            prepaid_deal_price = doctor_clinic_timing.deal_price
 
 
         return {
@@ -3346,7 +3348,8 @@ class OpdAppointment(auth_model.TimeStampedModel, CouponsMixin, OpdAppointmentIn
                 "is_enabled_for_cod": doctor_clinic_timing.is_enabled_for_cod(),
                 "insurance_fees": doctor_clinic_timing.insurance_fees
             },
-            "coupon_data" : { "random_coupon_list" : random_coupon_list }
+            "coupon_data" : { "random_coupon_list" : random_coupon_list },
+            "prepaid_deal_price" : prepaid_deal_price
         }
 
     @classmethod
@@ -3405,6 +3408,7 @@ class OpdAppointment(auth_model.TimeStampedModel, CouponsMixin, OpdAppointmentIn
             "booked_by": user,
             "fees": price_data.get("fees"),
             "deal_price": price_data.get("deal_price"),
+            "prepaid_deal_price": price_data.get("prepaid_deal_price"),
             "effective_price": effective_price,
             "mrp": price_data.get("mrp"),
             "extra_details": extra_details,
@@ -3765,10 +3769,14 @@ class OpdAppointment(auth_model.TimeStampedModel, CouponsMixin, OpdAppointmentIn
         if order_obj:
             try:
                 patent_id = order_obj.parent_id
-                discount = ((Decimal(order_obj.action_data.get('mrp')) - Decimal(order_obj.action_data.get(
-                    'deal_price'))) / Decimal(order_obj.action_data.get('mrp'))) * 100
+                if self.payment_type == OpdAppointment.COD:
+                    discount = ((Decimal(order_obj.action_data.get('mrp')) - Decimal(order_obj.action_data.get(
+                        'prepaid_deal_price'))) / Decimal(order_obj.action_data.get('mrp'))) * 100
+                else:
+                    discount = ((Decimal(order_obj.action_data.get('mrp')) - Decimal(order_obj.action_data.get(
+                        'deal_price'))) / Decimal(order_obj.action_data.get('mrp'))) * 100
                 # discount = str(round(discount, 2))
-                discount = round(discount, 2)
+                discount = float(round(discount, 2))
                 result = patent_id, discount
             except Exception as e:
                 result = None, None
