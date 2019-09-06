@@ -1222,3 +1222,26 @@ class CommentViewSet(viewsets.ModelViewSet):
             return Response(serializer.data)
 
         return Response({})
+
+
+class DocumentUploadViewSet(viewsets.GenericViewSet):
+
+    authentication_classes = (JWTAuthentication,)
+    permission_classes = (IsAuthenticated, )
+
+    def upload_document_proofs(self, request, *args, **kwargs):
+        user = request.user
+        is_plus_user = user.active_plus_user
+        if not is_plus_user:
+            return Response(status=status.HTTP_400_BAD_REQUEST, data={'error': 'User do not have active VIP membership.'})
+
+        data = dict()
+        document_data = {}
+        data['user'] = user.id
+        data['proof_file'] = request.data['proof_file']
+        serializer = serializers.DocumentProofUploadSerializer(data=data, context={'request':request})
+        serializer.is_valid(raise_exception=True)
+        document_obj = serializer.save()
+        document_data['id'] = document_obj.id
+        document_data['data'] = serializer.data
+        return Response(document_data)
