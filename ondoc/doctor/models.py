@@ -2693,7 +2693,10 @@ class OpdAppointment(auth_model.TimeStampedModel, CouponsMixin, OpdAppointmentIn
         if responsible_user:
             _responsible_user = auth_model.User.objects.filter(id=responsible_user).first()
         app_obj = cls(**appointment_data)
-        app_obj.save(responsible_user=_responsible_user, source=source)
+        if _responsible_user and source:
+            app_obj.save(responsible_user=_responsible_user, source=source)
+        else:
+            app_obj.save()
         if procedure_details:
             procedure_to_be_added = []
             for procedure in procedure_details:
@@ -2869,7 +2872,7 @@ class OpdAppointment(auth_model.TimeStampedModel, CouponsMixin, OpdAppointmentIn
             except Exception as e:
                 logger.error(str(e))
 
-            if self.is_retail_booking():
+            if old_instance and self.is_retail_booking(old_instance):
                 try:
                     push_retail_appointment_to_matrix.apply_async(({'type': 'OPD_APPOINTMENT', 'appointment_id': self.id,
                                                         'product_id': 5, 'sub_product_id': 2},), countdown=5)
@@ -3478,11 +3481,10 @@ class OpdAppointment(auth_model.TimeStampedModel, CouponsMixin, OpdAppointmentIn
         except Exception as e:
             logger.error("Could not save triggered event - " + str(e))
 
-    def is_retail_booking(self):
-        if self.status == OpdAppointment.ACCEPTED and (self.payment_type == OpdAppointment.PREPAID or
-                                                                self.payment_type == OpdAppointment.COD) and \
-                                                                self.doctor.is_insurance_enabled and \
-                                                                self.hospital.enabled_for_insurance:
+    def is_retail_booking(self, old_instance):
+        if old_instance.status == OpdAppointment.BOOKED and self.status == OpdAppointment.ACCEPTED \
+                and (self.payment_type == OpdAppointment.PREPAID or self.payment_type == OpdAppointment.COD) \
+                and self.doctor.is_insurance_enabled and self.hospital.enabled_for_insurance:
             return True
         else:
             return False
