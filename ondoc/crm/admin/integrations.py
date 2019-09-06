@@ -1,5 +1,5 @@
 from django.contrib import admin
-from ondoc.integrations.models import IntegratorMapping, IntegratorLabTestParameterMapping
+from ondoc.integrations.models import IntegratorMapping, IntegratorLabTestParameterMapping, IntegratorCity, IntegratorDoctorMappings, IntegratorHospitalMappings
 from ondoc.integrations.models import IntegratorProfileMapping, IntegratorReport, IntegratorTestMapping, IntegratorTestParameterMapping
 from ondoc.diagnostic.models import LabTest, Lab, LabPricingGroup, AvailableLabTest
 from django import forms
@@ -83,12 +83,23 @@ class IntegratorTestMappingForm(forms.ModelForm):
 class IntegratorTestMappingAdmin(admin.ModelAdmin):
     model = IntegratorTestMapping
     list_display = ('integrator_class_name', 'integrator_test_name', 'is_active')
-    fields = ('test', 'integrator_test_name', 'is_active', 'integrator_test_type')
+    fields = ('test', 'integrator_test_name', 'is_active', 'integrator_test_type', 'available_in_cities')
     form = IntegratorTestMappingForm
-    readonly_fields = ('integrator_test_name', 'integrator_test_type')
+    readonly_fields = ('integrator_test_name', 'integrator_test_type', 'available_in_cities')
+    search_fields = ('integrator_test_name',)
 
     def integrator_test_type(self, obj):
         return obj.test_type
+
+    def available_in_cities(self, obj):
+        cities = ['All']
+        mapped_city_tests = obj.mapped_city_test.all()
+        if mapped_city_tests:
+            integrator_city_ids = [mapped_city_test.integrator_city_id for mapped_city_test in mapped_city_tests]
+            if integrator_city_ids:
+                cities = IntegratorCity.objects.filter(id__in=integrator_city_ids).values('city_name')
+                cities = [c['city_name'] for c in cities]
+        return cities
 
 
 class IntegratorTestParameterMappingAdmin(admin.ModelAdmin):
@@ -98,8 +109,29 @@ class IntegratorTestParameterMappingAdmin(admin.ModelAdmin):
     autocomplete_fields = ['test_parameter']
 
 
+class IntegratorDoctorMappingsAdmin(admin.ModelAdmin):
+    model = IntegratorDoctorMappings
+    list_display = ('first_name', 'last_name', 'is_active', 'integrator_class_name')
+    fields = ('first_name', 'middle_name', 'last_name', 'hospital_name', 'city', 'is_active', 'qualification', 'specialities', 'address',
+              'primary_contact', 'secondary_contact', 'emergency_contact', 'helpline_sos', 'integrator_class_name',
+              'integrator_doctor_id', 'integrator_hospital_id', 'integrator_doctor_data', 'doctor_clinic')
+    readonly_fields = ('first_name', 'middle_name', 'last_name', 'hospital_name', 'city', 'qualification', 'specialities', 'address',
+                       'primary_contact', 'secondary_contact', 'emergency_contact', 'helpline_sos', 'integrator_class_name',
+                       'integrator_doctor_id', 'integrator_hospital_id', 'integrator_doctor_data')
+    autocomplete_fields = ['doctor_clinic']
+    search_fields = ('first_name', 'middle_name', 'last_name')
+
+
+class IntegratorHospitalMappingsAdmin(admin.ModelAdmin):
+    model = IntegratorHospitalMappings
+    list_display = ('integrator_class_name', 'integrator_hospital_name', 'is_active')
+    fields = ('hospital', 'integrator_hospital_name', 'is_active', 'integrator_class_name')
+    autocomplete_fields = ['hospital']
+
+
 class IntegratorLabTestParameterMappingAdmin(admin.ModelAdmin):
     model = IntegratorLabTestParameterMapping
     list_display = ['integrator_test_parameter_code', 'integrator_class_name']
     readonly_fields = ('integrator_test_parameter_code',)
     autocomplete_fields = ['test_parameter']
+

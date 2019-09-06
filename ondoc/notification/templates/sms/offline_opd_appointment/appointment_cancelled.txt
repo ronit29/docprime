@@ -1,0 +1,1 @@
+Dear {{ patient_name }}, your appointment with {{ doctor_name }} at {{ hospital_name }} for {{ time_slot_start|date:"D jS F Y" }} has been cancelled. In case of any query, please reach out to the clinic.
