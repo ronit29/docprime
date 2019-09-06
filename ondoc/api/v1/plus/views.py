@@ -100,6 +100,9 @@ class PlusOrderViewSet(viewsets.GenericViewSet):
         if blocked_state:
             return Response({'error': blocked_state.message}, status=status.HTTP_400_BAD_REQUEST)
 
+        if user.active_insurance:
+            return Response({'error': 'User has already purchased the OPD Insurance.'})
+
         if settings.IS_PLUS_ACTIVE:
             user = request.user
             plus_subscription = user.active_plus_user
