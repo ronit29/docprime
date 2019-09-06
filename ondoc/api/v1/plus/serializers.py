@@ -87,7 +87,7 @@ class PlusPlansSerializer(serializers.ModelSerializer):
         request = self.context.get('request')
         user = request.user
         utilization = {}
-        plus_user = user.active_plus_user
+        plus_user = user.active_plus_user if not user.is_anonymous and user.is_authenticated else None
         if plus_user:
             utilization = plus_user.get_utilization()
         return utilization
