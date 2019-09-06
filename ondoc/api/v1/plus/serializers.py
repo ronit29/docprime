@@ -87,7 +87,7 @@ class PlusPlansSerializer(serializers.ModelSerializer):
         request = self.context.get('request')
         user = request.user
         utilization = {}
-        plus_user = PlusUser.objects.filter(user_id=user.id).first()
+        plus_user = user.active_plus_user
         if plus_user:
             utilization = plus_user.get_utilization()
         return utilization

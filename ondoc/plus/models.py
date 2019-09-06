@@ -206,6 +206,7 @@ class PlusUser(auth_model.TimeStampedModel):
 
     def get_utilization(self):
         plan = self.plan
+        resp = {}
         data = {}
         plan_parameters = plan.plan_parameters.filter(parameter__key__in=[PlanParametersEnum.DOCTOR_CONSULT_AMOUNT,
                                                                                PlanParametersEnum.ONLINE_CHAT_AMOUNT,
@@ -216,8 +217,12 @@ class PlusUser(auth_model.TimeStampedModel):
         for pp in plan_parameters:
             data[pp.parameter.key.lower()] = pp.value
 
-        data['tax_rebate'] = plan.tax_rebate
-        return data
+        resp['total_limit'] = data['DOCTOR_CONSULT_AMOUNT']
+        resp['utilized'] = 0
+        resp['available'] = data['DOCTOR_CONSULT_AMOUNT']
+        resp['members_count_online_consulation'] = data['MEMBERS_COVERED_IN_PACKAGE']
+
+        return resp
 
 
     @classmethod
