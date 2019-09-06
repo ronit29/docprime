@@ -19,8 +19,10 @@ logger = logging.getLogger(__name__)
 class ProviderLabTestSampleDetailsAdmin(admin.ModelAdmin):
     list_display = ('id', 'lab_test', 'sample')
     readonly_fields = []
+    autocomplete_fields = ['lab_test', 'sample']
 
 
 class ProviderLabTestSamplesAdmin(admin.ModelAdmin):
     list_display = ('id', 'name', 'created_at', 'updated_at')
     readonly_fields = []
+    search_fields = ['name']
