@@ -187,12 +187,13 @@ class UserProfileSerializer(serializers.ModelSerializer):
     whatsapp_optin = serializers.NullBooleanField(required=False)
     whatsapp_is_declined = serializers.BooleanField(required=False)
     is_default_user = serializers.BooleanField(required=False)
+    is_vip_member = serializers.SerializerMethodField()
 
     class Meta:
         model = UserProfile
         fields = ("id", "name", "email", "gender", "phone_number", "is_otp_verified", "is_default_user", "profile_image"
                   , "age", "user", "dob", "is_insured", "updated_at", "whatsapp_optin", "whatsapp_is_declined",
-                  "insurance_status")
+                  "insurance_status", "is_vip_member")
 
     def get_is_insured(self, obj):
         if isinstance(obj, dict):
@@ -205,6 +206,19 @@ class UserProfileSerializer(serializers.ModelSerializer):
         # user_insurance_obj = UserInsurance.objects.filter(id=insured_member_obj.user_insurance_id).last()
         user_insurance_obj = insured_member_obj.user_insurance
         if user_insurance_obj and user_insurance_obj.is_valid():
+            return True
+        else:
+            return False
+
+    def get_is_vip_member(self, obj):
+        if isinstance(obj, dict):
+            return False
+        plus_member_obj = sorted(obj.plus_member.all(), key=lambda object: object.id, reverse=True)[
+            0] if obj.plus_member.all() else None
+        if not plus_member_obj:
+            return False
+        plus_user_obj = plus_member_obj.plus_user
+        if plus_user_obj and plus_user_obj.is_valid():
             return True
         else:
             return False
