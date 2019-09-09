@@ -11,6 +11,8 @@ from ondoc.api.v1.doctor.serializers import CreateAppointmentSerializer
 from django.db import transaction
 from django.conf import settings
 import copy
+
+from ondoc.coupon.models import Coupon
 from ondoc.diagnostic.models import LabTest
 from ondoc.insurance.models import InsuranceDoctorSpecializations, UserInsurance
 from ondoc.subscription_plan.models import UserPlanMapping
@@ -71,6 +73,15 @@ class CartViewSet(viewsets.GenericViewSet):
         cart_items = []
         if multiple_appointments:
             pathology_data = None
+            all_tests = []
+            for test_timing in serialized_data.get('test_timings'):
+                all_tests.append(test_timing.get('test'))
+            coupon_applicable_on_tests = Coupon.check_coupon_tests_applicability(request, serialized_data.get('coupon_obj'),
+                                                                                 serialized_data.get('profile'), all_tests)
+            coupon_applicable_on_tests = set(coupon_applicable_on_tests)
+            pathology_coupon_applied = False
+
+            request_data = data.get('data')
             for test_timing in serialized_data.get('test_timings'):
                 test_type = test_timing.get('type')
                 datetime_ist = dateutil.parser.parse(str(test_timing.get('start_date')))
@@ -78,14 +89,18 @@ class CartViewSet(viewsets.GenericViewSet):
 
                 if test_type == LabTest.PATHOLOGY:
                     if not pathology_data:
-                        pathology_data = copy.deepcopy(data.get('data'))
+                        pathology_data = copy.deepcopy(request_data)
                         pathology_data['test_ids'] = []
                         pathology_data['start_date'] = data_start_date
                         pathology_data['start_time'] = test_timing['start_time']
                         pathology_data['is_home_pickup'] = test_timing['is_home_pickup']
                     pathology_data['test_ids'].append(test_timing['test'].id)
+                    if not pathology_coupon_applied:
+                        if test_timing['test'] in coupon_applicable_on_tests:
+                            pathology_coupon_applied = True
                 elif test_type == LabTest.RADIOLOGY:
-                    new_data = copy.deepcopy(data.get('data'))
+                    new_data = copy.deepcopy(request_data)
+                    new_data.pop('coupon_code', None) if not test_timing['test'] in coupon_applicable_on_tests else None;
                     new_data['start_date'] = data_start_date
                     new_data['start_time'] = test_timing['start_time']
                     new_data['is_home_pickup'] = test_timing['is_home_pickup']
@@ -95,6 +110,8 @@ class CartViewSet(viewsets.GenericViewSet):
                         cart_items.append(cart_item)
 
             if pathology_data:
+                if not pathology_coupon_applied:
+                    pathology_data.pop('coupon_code', None)
                 cart_item = Cart.add_items_to_cart(request, serialized_data, pathology_data)
                 if cart_item:
                     cart_items.append(cart_item)

@@ -2451,6 +2451,13 @@ class LabAppointmentView(mixins.CreateModelMixin,
         cart_items = []
         if multiple_appointments:
             pathology_data = None
+            all_tests = []
+            for test_timing in validated_data.get('test_timings'):
+                all_tests.append(test_timing.get('test'))
+            coupon_applicable_on_tests = Coupon.check_coupon_tests_applicability(request, validated_data.get('coupon_obj'), validated_data.get('profile'), all_tests)
+            coupon_applicable_on_tests = set(coupon_applicable_on_tests)
+            pathology_coupon_applied = False
+
             for test_timing in validated_data.get('test_timings'):
                 test_type = test_timing.get('type')
                 datetime_ist = dateutil.parser.parse(str(test_timing.get('start_date')))
@@ -2463,8 +2470,12 @@ class LabAppointmentView(mixins.CreateModelMixin,
                         pathology_data['start_time'] = test_timing['start_time']
                         pathology_data['is_home_pickup'] = test_timing['is_home_pickup']
                     pathology_data['test_ids'].append(test_timing['test'].id)
+                    if not pathology_coupon_applied:
+                        if test_timing['test'] in coupon_applicable_on_tests:
+                            pathology_coupon_applied = True
                 elif test_type == LabTest.RADIOLOGY:
                     new_data = copy.deepcopy(data)
+                    new_data.pop('coupon_code', None) if not test_timing['test'] in coupon_applicable_on_tests else None;
                     new_data['start_date'] = data_start_date
                     new_data['start_time'] = test_timing['start_time']
                     new_data['is_home_pickup'] = test_timing['is_home_pickup']
@@ -2474,6 +2485,8 @@ class LabAppointmentView(mixins.CreateModelMixin,
                         cart_items.append(cart_item)
 
             if pathology_data:
+                if not pathology_coupon_applied:
+                    pathology_data.pop('coupon_code', None)
                 cart_item = Cart.add_items_to_cart(request, validated_data, pathology_data)
                 if cart_item:
                     cart_items.append(cart_item)
