@@ -249,6 +249,12 @@ class DoctorAppointmentsViewSet(OndocViewSet):
         user = request.user
 
         if data and data.get('appointment_id') and data.get('cod_to_prepaid'):
+            opd_app = OpdAppointment.objects.filter(id=data.get('appointment_id'),
+                                                    payment_status=OpdAppointment.PREPAID)
+            if opd_app:
+                return Response(status=status.HTTP_400_BAD_REQUEST,
+                                data={"error": 'Appointment already created, Cannot Rebook.',
+                                      "request_errors": {"message": 'Appointment already created, Cannot Rebook.'}})
             pg_order = Order.objects.filter(reference_id=validated_data.get('appointment_id')).first()
             cart_item_id = pg_order.action_data.get('cart_item_id', None)
             price_data = OpdAppointment.get_price_details(validated_data)
@@ -1014,8 +1020,8 @@ class DoctorProfileUserViewSet(viewsets.GenericViewSet):
         serializer.is_valid(raise_exception=True)
         validated_data = serializer.validated_data
         if validated_data.get('appointment_id') and validated_data.get('cod_to_prepaid'):
-            pgtrans = PgTransaction.objects.filter(reference_id=validated_data.get('appointment_id'))
-            if pgtrans:
+            opd_app = OpdAppointment.objects.filter(id=validated_data.get('appointment_id'), payment_status=OpdAppointment.PREPAID)
+            if opd_app:
                 return Response(status=status.HTTP_400_BAD_REQUEST,
                                 data={"error": 'Appointment already created, Cannot Rebook.',
                                   "request_errors": {"message": 'Appointment already created, Cannot Rebook.'}})
