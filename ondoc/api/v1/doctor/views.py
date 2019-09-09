@@ -282,7 +282,7 @@ class DoctorAppointmentsViewSet(OndocViewSet):
 
             # create a Parent order to accumulate sub-orders
             process_immediately = False
-            if total_balance >= payable_amount:
+            if validated_data.get('use_wallet') and total_balance >= payable_amount:
                 cashback_amount = min(cashback_balance, payable_amount)
                 wallet_amount = max(0, payable_amount - cashback_amount)
                 pg_order.amount=0
@@ -294,7 +294,8 @@ class DoctorAppointmentsViewSet(OndocViewSet):
                 pg_order.save()
 
                 process_immediately = True
-            else:
+
+            elif validated_data.get('use_wallet') and total_balance <= payable_amount:
                 amount_from_pg = max(0, payable_amount - total_balance)
                 required_amount = payable_amount
                 cashback_amount = min(required_amount, cashback_balance)
@@ -308,10 +309,24 @@ class DoctorAppointmentsViewSet(OndocViewSet):
                 pg_order.user = user
                 pg_order.product_id = 1
                 pg_order.save()
+                process_immediately = False
 
                 push_order_to_matrix.apply_async(
                     ({'order_id': pg_order.id},),
                     eta=timezone.now() + timezone.timedelta(minutes=settings.LEAD_VALIDITY_BUFFER_TIME))
+            else:
+                amount_from_pg = max(0, payable_amount - total_balance)
+                cashback_amount = 0
+                wallet_amount = 0
+                pg_order.amount = amount_from_pg
+                pg_order.wallet_amount = wallet_amount
+                pg_order.cashback_amount = cashback_amount
+                pg_order.payment_status = Order.PAYMENT_PENDING
+                pg_order.user = user
+                pg_order.product_id = 1
+                pg_order.save()
+                process_immediately = False
+
             # building separate orders for all fulfillments
             fulfillment_data = copy.deepcopy(fulfillment_data)
             order_list = []
