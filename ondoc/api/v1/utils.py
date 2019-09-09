@@ -386,6 +386,8 @@ def opdappointment_transform(app_data):
     app_data["profile"] = app_data["profile"].id
     app_data["user"] = app_data["user"].id
     app_data["booked_by"] = app_data["booked_by"].id
+    app_data["_responsible_user"] = app_data.get("_responsible_user", None)
+    app_data["_source"] = app_data.get("_source", None)
     if app_data.get("coupon"):
         app_data["coupon"] = list(app_data["coupon"])
     return app_data
@@ -419,6 +421,8 @@ def labappointment_transform(app_data):
         app_data["coupon"] = list(app_data["coupon"])
     if app_data.get("user_plan"):
         app_data["user_plan"] = app_data["user_plan"].id
+    app_data["_responsible_user"] = app_data.get("_responsible_user", None)
+    app_data["_source"] = app_data.get("_source", None)
     return app_data
 
 
@@ -480,6 +484,7 @@ def payment_details(request, order):
         profile_name = profile.name
 
     insurer_code = None
+    plus_merchant_code = None
     if order.product_id == Order.INSURANCE_PRODUCT_ID:
         isPreAuth = '0'
         insurance_plan_id = order.action_data.get('insurance_plan')
@@ -500,7 +505,7 @@ def payment_details(request, order):
         if not plus_plan:
             raise Exception('Invalid pg transaction as plus plan is not found.')
         proposer = plus_plan.proposer
-        # insurer_code = insurer.insurer_merchant_code
+        plus_merchant_code = proposer.merchant_code
 
         if not profile:
             if order.action_data.get('profile_detail'):
@@ -579,6 +584,9 @@ def payment_details(request, order):
     if insurer_code:
         pgdata['insurerCode'] = insurer_code
 
+    if plus_merchant_code:
+        pgdata['insurerCode'] = plus_merchant_code
+
     secret_key, client_key = get_pg_secret_client_key(order)
     filtered_pgdata = {k: v for k, v in pgdata.items() if v is not None and v != ''}
     pgdata.clear()
@@ -588,6 +596,7 @@ def payment_details(request, order):
     args = {'user_id': user.id, 'order_id': order.id, 'source': 'ORDER_CREATE'}
     save_payment_status.apply_async((PaymentProcessStatus.INITIATE, args),eta=timezone.localtime(), )
     save_pg_response.apply_async((PgLogs.TXN_REQUEST, order.id, None, None, pgdata, user.id), eta=timezone.localtime(), )
+    # print(pgdata)
     return pgdata, payment_required
 
 
@@ -605,7 +614,7 @@ def get_pg_secret_client_key(order):
     from ondoc.account.models import Order
     secret_key = client_key = ""
 
-    if order.product_id in [Order.DOCTOR_PRODUCT_ID, Order.SUBSCRIPTION_PLAN_PRODUCT_ID,  Order.CHAT_PRODUCT_ID, Order.PROVIDER_ECONSULT_PRODUCT_ID]:
+    if order.product_id in [Order.DOCTOR_PRODUCT_ID, Order.SUBSCRIPTION_PLAN_PRODUCT_ID,  Order.CHAT_PRODUCT_ID, Order.PROVIDER_ECONSULT_PRODUCT_ID, Order.VIP_PRODUCT_ID]:
         secret_key = settings.PG_SECRET_KEY_P1
         client_key = settings.PG_CLIENT_KEY_P1
     elif order.product_id == Order.LAB_PRODUCT_ID:

@@ -2443,6 +2443,16 @@ class LabAppointmentView(mixins.CreateModelMixin,
                 'insurance_message'] = False, None, ""
         # data['is_appointment_insured'], data['insurance_id'], data['insurance_message'] = Cart.check_for_insurance(validated_data, request)
 
+        # for appointment History
+        responsible_user = None
+        if data.get('from_app') and data['from_app']:
+            data['_source'] = AppointmentHistory.CONSUMER_APP
+            responsible_user = request.user.id
+        elif data.get('from_web') and data['from_web']:
+            data['_source'] = AppointmentHistory.WEB
+            responsible_user = request.user.id
+        data['_responsible_user'] = responsible_user
+
         multiple_appointments = False
         if validated_data.get('multi_timings_enabled'):
             if validated_data.get('selected_timings_type') == 'separate':

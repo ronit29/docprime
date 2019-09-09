@@ -76,20 +76,29 @@ class IntegratorReportAdmin(admin.ModelAdmin):
 
 class IntegratorTestMappingForm(forms.ModelForm):
     test = forms.ModelChoiceField(
-        queryset=LabTest.objects.filter(availablelabs__lab_pricing_group__labs__network_id=int(settings.THYROCARE_NETWORK_ID),
+        queryset=LabTest.objects.filter(availablelabs__lab_pricing_group__labs__network_id__in=[int(settings.THYROCARE_NETWORK_ID), int(settings.LAL_PATH_NETWORK_ID)],
                                         enable_for_retail=True, availablelabs__enabled=True).distinct().order_by('name'))
 
 
 class IntegratorTestMappingAdmin(admin.ModelAdmin):
     model = IntegratorTestMapping
     list_display = ('integrator_class_name', 'integrator_test_name', 'is_active')
-    fields = ('test', 'integrator_test_name', 'is_active', 'integrator_test_type', 'available_in_cities')
+    fields = ('test', 'integrator_test_name', 'is_active', 'integrator_test_type', 'available_in_cities', 'test_components', 'mrp', 'price_without_discount')
     form = IntegratorTestMappingForm
-    readonly_fields = ('integrator_test_name', 'integrator_test_type', 'available_in_cities')
+    readonly_fields = ('integrator_test_name', 'integrator_test_type', 'available_in_cities', 'mrp', 'test_components', 'price_without_discount')
     search_fields = ('integrator_test_name',)
 
     def integrator_test_type(self, obj):
         return obj.test_type
+
+    def test_components(self, obj):
+        return obj.integrator_product_data.get('TestComponents', '')
+
+    def price_without_discount(self, obj):
+        return obj.integrator_product_data.get('PriceWithoutDiscount', '')
+
+    def mrp(self, obj):
+        return obj.integrator_product_data.get('MRP', '')
 
     def available_in_cities(self, obj):
         cities = ['All']

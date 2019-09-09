@@ -885,6 +885,8 @@ class LabAppTransactionModelSerializer(serializers.Serializer):
     user_plan = serializers.PrimaryKeyRelatedField(queryset=UserPlanMapping.objects.all(), allow_null=True)
     coupon_data = serializers.JSONField(required=False)
     prescription_list = serializers.ListSerializer(child=PrescriptionDocumentSerializer(), required=False)
+    _source = serializers.CharField(required=False, allow_null=True)
+    _responsible_user = serializers.IntegerField(required=False, allow_null=True)
     # test_time_slots = serializers.ListSerializer(child=LabAppointmentTestTransactionSerializer(), required=False, allow_empty=False)
     selected_timings_type = serializers.ChoiceField(required=False, choices=(('common', 'common'), ('separate', 'separate')))
 
@@ -987,6 +989,8 @@ class LabAppointmentCreateSerializer(serializers.Serializer):
     included_in_user_plan = serializers.BooleanField(required=False, default=False)
     app_version = serializers.CharField(required=False, allow_null=True, allow_blank=True)
     prescription_list = serializers.ListSerializer(child=PrescriptionDocumentSerializer(), required=False)
+    _source = serializers.CharField(required=False, allow_null=True)
+    _responsible_user = serializers.IntegerField(required=False, allow_null=True)
     test_timings = serializers.ListSerializer(child=LabAppointmentTestSerializer(), required=False, allow_empty=False)
     multi_timings_enabled = serializers.BooleanField(required=False, default=False)
     selected_timings_type = serializers.ChoiceField(required=False, choices=(('common', 'common'), ('separate', 'separate')))

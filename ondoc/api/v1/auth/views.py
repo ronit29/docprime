@@ -1267,6 +1267,8 @@ class TransactionViewSet(viewsets.GenericViewSet):
         CHAT_ERROR_REDIRECT_URL = settings.BASE_URL + "/mobileviewchat?payment=fail&error_message=%s" % "Error processing payment, please try again."
         CHAT_REDIRECT_URL = CHAT_ERROR_REDIRECT_URL
         CHAT_SUCCESS_REDIRECT_URL = settings.BASE_URL + "/mobileviewchat?payment=success&order_id=%s"
+        PLUS_FAILURE_REDIRECT_URL = settings.BASE_URL + ""
+        PLUS_SUCCESS_REDIRECT_URL = settings.BASE_URL + "/vip-club-activated-details?payment=success&id=%s"
 
         try:
             response = None
@@ -1396,6 +1398,9 @@ class TransactionViewSet(viewsets.GenericViewSet):
                     REDIRECT_URL = ECONSULT_REDIRECT_URL % order_obj.id
                 elif processed_data.get('type') == "chat":
                     CHAT_REDIRECT_URL = CHAT_SUCCESS_REDIRECT_URL % order_obj.id
+                elif processed_data.get('type') == "plus":
+                    REDIRECT_URL = PLUS_SUCCESS_REDIRECT_URL % str(processed_data.get("id", ""))
+
         except Exception as e:
             logger.error("Error - " + str(e))
 
