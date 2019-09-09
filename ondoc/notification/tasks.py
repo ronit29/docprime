@@ -1056,7 +1056,8 @@ def push_plus_lead_to_matrix(self, data):
             plan = PlusPlans.objects.filter(id=plan_id).first()
 
         request_data = {
-            'LeadID': plus_lead_obj.matrix_lead_id if plus_lead_obj.matrix_lead_id else 0,
+            # 'LeadID': plus_lead_obj.matrix_lead_id if plus_lead_obj.matrix_lead_id else 0,
+            'LeadID':  0,
             'LeadSource': lead_source,
             'Name': extras.get('name', 'none'),
             'BookedBy': phone_number,
@@ -1068,18 +1069,7 @@ def push_plus_lead_to_matrix(self, data):
             'UtmTerm': extras.get('utm_term', ''),
             'ProductId': 11,
             'SubProductId': 0,
-            'PolicyDetails': {
-                "ProposalNo": None,
-                "BookingId": None,
-                'PolicyPaymentSTATUS': 0,
-                "ProposerName": None,
-                "PolicyId": None,
-                "InsurancePlanPurchased": plan.plan_name if plan else None,
-                "PurchaseDate": None,
-                "ExpirationDate": None,
-                "COILink": None,
-                "PeopleCovered": 0
-            }
+            'VIPPlanName': plan.plan_name if plan else None
         }
 
         url = settings.MATRIX_API_URL
