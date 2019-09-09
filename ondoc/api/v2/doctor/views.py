@@ -1437,24 +1437,27 @@ class ProviderLabTestSamplesCollect(viewsets.GenericViewSet):
         serializer = serializers.LabTestsListSerializer(data=request.query_params, context={'request':request})
         serializer.is_valid(raise_exception=True)
         valid_data = serializer.validated_data
-        hospital = valid_data['hospital']
-        lab = valid_data['lab']
-        available_lab_tests = lab.lab_pricing_group.available_lab_tests.all()
+        hosp_lab_list = valid_data['hosp_lab_list']
         response_list = list()
-        for obj in available_lab_tests:
-            ret_obj = dict()
-            sample_obj = obj.test.sample_details if obj.test.sample_details else None
-            test = obj.test
-            ret_obj['lab_test_id'] = test.id
-            ret_obj['lab_test_name'] = test.name
-            ret_obj['sample_type'] = sample_obj.sample.name if sample_obj else None
-            ret_obj['material_required'] = sample_obj.material_required if sample_obj else None
-            ret_obj['sample_volume_required'] = sample_obj.volume if sample_obj else None
-            ret_obj['fasting_required'] = sample_obj.fasting_required if sample_obj else None
-            ret_obj['report_tat'] = sample_obj.report_tat if sample_obj else None
-            ret_obj['reference_value'] = sample_obj.reference_value if sample_obj else None
-            ret_obj['b2c_rates'] = obj.get_deal_price()
-            response_list.append(ret_obj)
+        for hosp_lab_dict in hosp_lab_list:
+            hospital = hosp_lab_dict['hospital']
+            lab = hosp_lab_dict['lab']
+            available_lab_tests = lab.lab_pricing_group.available_lab_tests.all()
+            for obj in available_lab_tests:
+                ret_obj = dict()
+                sample_obj = obj.test.sample_details if obj.test.sample_details else None
+                test = obj.test
+                ret_obj['hospital_id'] = hospital.id
+                ret_obj['lab_test_id'] = test.id
+                ret_obj['lab_test_name'] = test.name
+                ret_obj['sample_type'] = sample_obj.sample.name if sample_obj else None
+                ret_obj['material_required'] = sample_obj.material_required if sample_obj else None
+                ret_obj['sample_volume_required'] = sample_obj.volume if sample_obj else None
+                ret_obj['fasting_required'] = sample_obj.fasting_required if sample_obj else None
+                ret_obj['report_tat'] = sample_obj.report_tat if sample_obj else None
+                ret_obj['reference_value'] = sample_obj.reference_value if sample_obj else None
+                ret_obj['b2c_rates'] = obj.get_deal_price()
+                response_list.append(ret_obj)
         return Response(response_list)
 
     def order_create_or_update(self, request):

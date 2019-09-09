@@ -804,16 +804,22 @@ class EConsultCommunicationSerializer(serializers.Serializer):
 
 class LabTestsListSerializer(serializers.Serializer):
 
-    hospital_id = serializers.IntegerField(min_value=1)
+    hospital_id = serializers.IntegerField(min_value=1, required=False, allow_null=True)
     lab_id = serializers.IntegerField(min_value=1, required=False, allow_null=True)
 
     def validate(self, attrs):
-        hospital_id = attrs.get('hospital_id')
+        request = self.context.get('request')
+        user = request.user
+        hospital_ids = GenericAdmin.objects.filter(phone_number=user.phone_number, hospital_id__isnull=False).values_list('hospital__id', flat=True)
+        if attrs.get('hospital_id'):
+            rqst_hosp_id_set = set()
+            rqst_hosp_id_set.add(attrs.get('hospital_id'))
+            hospital_ids = list(set(hospital_ids) & rqst_hosp_id_set)
         lab_id = attrs.get('lab_id')
         filter_kwargs = dict()
         if lab_id:
             filter_kwargs['lab_id'] = lab_id
-        hospital_lab_mapping_obj = provider_models.ProviderHospitalLabMapping.objects \
+        hospital_lab_mapping_objs = provider_models.ProviderHospitalLabMapping.objects \
                                                                     .prefetch_related(
                                                                         'lab',
                                                                         'lab__lab_pricing_group',
@@ -821,16 +827,17 @@ class LabTestsListSerializer(serializers.Serializer):
                                                                         'lab__lab_pricing_group__available_lab_tests__test',
                                                                         'lab__lab_pricing_group__available_lab_tests__test__sample_details',
                                                                     ) \
-                                                                    .filter(hospital_id=hospital_id,
+                                                                    .filter(hospital_id__in=hospital_ids,
                                                                             **filter_kwargs,
-                                                                            lab__is_b2b=True).first()
-        if not hospital_lab_mapping_obj:
-            raise serializers.ValidationError('Either Hospital id is wrong or Lab is not with given Hospital')
-        lab = hospital_lab_mapping_obj.lab
-        if not lab.lab_pricing_group:
-            raise serializers.ValidationError('Lab Pricing group needs to be set for the lab')
-        attrs['hospital'] = hospital_lab_mapping_obj.hospital
-        attrs['lab'] = lab
+                                                                            lab__is_b2b=True)
+        # if not hospital_lab_mapping_obj:
+        #     raise serializers.ValidationError('Either Hospital id is wrong or Lab is not with given Hospital')
+        hosp_lab_list = list()
+        for mapping in hospital_lab_mapping_objs:
+            if not mapping.lab.lab_pricing_group:
+                raise serializers.ValidationError('Lab Pricing group needs to be set for the lab')
+            hosp_lab_list.append({'hospital': mapping.hospital, 'lab': mapping.lab})
+        attrs['hosp_lab_list'] = hosp_lab_list
         return attrs
 
 
