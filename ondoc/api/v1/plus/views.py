@@ -38,7 +38,7 @@ class PlusListViewSet(viewsets.GenericViewSet):
         return Response(resp)
 
 
-class PlusOrderViewSet(viewsets.GenericViewSet):
+class PlusOrderLeadViewSet(viewsets.GenericViewSet):
     authentication_classes = (JWTAuthentication,)
     # permission_classes = (IsAuthenticated,)
 
@@ -59,22 +59,23 @@ class PlusOrderViewSet(viewsets.GenericViewSet):
         else:
             user = request.user
 
-        if not user.is_anonymous:
-            plus_lead = PlusLead.objects.filter(user=user).order_by('id').last()
+        if not user.is_anonymous and user.is_authenticated:
+            # plus_lead = PlusLead.objects.filter(user=user).order_by('id').last()
 
-            plus_user = user.active_plus_users.filter().order_by('id').last()
+            plus_user = user.active_plus_user
 
             if plus_user and plus_user.is_valid():
                 return Response({'success': True, "is_plus_user": True})
 
-            if not plus_lead:
-                plus_lead = PlusLead(user=user)
-            elif plus_lead and plus_user and not plus_user.is_valid():
-                active_plus_lead = PlusLead.objects.filter(created_at__gte=plus_user.expire_date, user=user).order_by('created_at').last()
-                if not active_plus_lead:
-                    plus_lead = PlusLead(user=user)
-                else:
-                    plus_lead = active_plus_lead
+            # if not plus_lead:
+            #     plus_lead = PlusLead(user=user)
+            # elif plus_lead and plus_user and not plus_user.is_valid():
+            #     active_plus_lead = PlusLead.objects.filter(created_at__gte=plus_user.expire_date, user=user).order_by('created_at').last()
+            #     if not active_plus_lead:
+            #         plus_lead = PlusLead(user=user)
+            #     else:
+            #         plus_lead = active_plus_lead
+            plus_lead = PlusLead(user=user, phone_number=user.phone_number)
 
             plus_lead.extras = request.data
             plus_lead.save()
@@ -87,6 +88,11 @@ class PlusOrderViewSet(viewsets.GenericViewSet):
 
             return Response({'success': True, 'is_plus_user': False})
 
+
+class PlusOrderViewSet(viewsets.GenericViewSet):
+    authentication_classes = (JWTAuthentication,)
+    permission_classes = (IsAuthenticated,)
+
     @transaction.atomic
     def create_order(self, request):
         user = request.user
@@ -94,6 +100,9 @@ class PlusOrderViewSet(viewsets.GenericViewSet):
         blocked_state = BlacklistUser.get_state_by_number(phone_number, BlockedStates.States.VIP)
         if blocked_state:
             return Response({'error': blocked_state.message}, status=status.HTTP_400_BAD_REQUEST)
+
+        if user.active_insurance:
+            return Response({'error': 'User has already purchased the OPD Insurance.'})
 
         if settings.IS_PLUS_ACTIVE:
             user = request.user
@@ -126,6 +135,8 @@ class PlusOrderViewSet(viewsets.GenericViewSet):
                     pre_insured_members['last_name'] = member.get('last_name') if member.get('last_name') else ''
                     pre_insured_members['address'] = member['address']
                     pre_insured_members['pincode'] = member['pincode']
+                    pre_insured_members['city'] = member['city']
+                    pre_insured_members['city_code'] = member['city_code']
                     pre_insured_members['email'] = member['email']
                     pre_insured_members['relation'] = member['relation']
                     pre_insured_members['profile'] = member.get('profile').id if member.get(
@@ -225,33 +236,88 @@ class PlusOrderViewSet(viewsets.GenericViewSet):
             return Response(status=status.HTTP_404_NOT_FOUND)
         return Response(resp)
 
+    @transaction.atomic
+    def add_members(self, request):
+        user = request.user
+
+        active_plus_subscription = user.active_plus_user
+        if not active_plus_subscription:
+            return Response({'error': 'User has not purchased the VIP plan.'})
+
+        phone_number = user.phone_number
+        blocked_state = BlacklistUser.get_state_by_number(phone_number, BlockedStates.States.VIP)
+        if blocked_state:
+            return Response({'error': blocked_state.message}, status=status.HTTP_400_BAD_REQUEST)
+
+        serializer = serializers.PlusMembersSerializer(data=request.data, context={'request': request})
+        if not serializer.is_valid() and serializer.errors:
+            logger.error(str(serializer.errors))
+
+        serializer.is_valid(raise_exception=True)
+        valid_data = serializer.validated_data
+        members_to_be_added = valid_data.get('members')
+        for member in members_to_be_added:
+            member['profile'] = PlusUser.profile_create_or_update(member, user)
+        PlusMembers.create_plus_members(active_plus_subscription, members_list=members_to_be_added)
+
+        return Response({'success': True})
+
+
+# class PlusProfileViewSet(viewsets.GenericViewSet):
+#     authentication_classes = (JWTAuthentication,)
+#     permission_classes = (IsAuthenticated,)
+#
+#     def profile(self, request):
+#         if settings.IS_PLUS_ACTIVE:
+#             user_id = request.user.pk
+#             resp = {}
+#             if user_id:
+#
+#                 user = User.objects.get(id=user_id)
+#                 plus_user_obj = user.active_plus_user
+#                 if not plus_user_obj or not plus_user_obj.is_valid():
+#                     return Response({"message": "Docprime Plus associated to user not found or expired."})
+#
+#                 resp['insured_members'] = plus_user_obj.plus_members.all().values('first_name', 'middle_name', 'last_name',
+#                                                                               'dob', 'relation')
+#                 resp['purchase_date'] = plus_user_obj.purchase_date
+#                 resp['expiry_date'] = plus_user_obj.expire_date
+#                 resp['premium_amount'] = plus_user_obj.amount
+#                 resp['proposer_name'] = plus_user_obj.get_primary_member_profile() if plus_user_obj.get_primary_member_profile() else ''
+#
+#                 resp['insurance_status'] = plus_user_obj.status
+#             else:
+#                 return Response({"message": "User is not valid"},
+#                                 status.HTTP_404_NOT_FOUND)
+#         else:
+#             return Response(status=status.HTTP_404_NOT_FOUND)
+#         return Response(resp)
+
 
 class PlusProfileViewSet(viewsets.GenericViewSet):
-    authentication_classes = (JWTAuthentication,)
-    permission_classes = (IsAuthenticated,)
+    authentication_classes = (JWTAuthentication, )
+    permission_classes = (IsAuthenticated, )
 
-    def profile(self, request):
-        if settings.IS_PLUS_ACTIVE:
-            user_id = request.user.pk
-            resp = {}
-            if user_id:
-
-                user = User.objects.get(id=user_id)
-                plus_user_obj = user.active_plus_user
-                if not plus_user_obj or not plus_user_obj.is_valid():
-                    return Response({"message": "Docprime Plus associated to user not found or expired."})
-
-                resp['insured_members'] = plus_user_obj.plus_members.all().values('first_name', 'middle_name', 'last_name',
-                                                                              'dob', 'relation')
-                resp['purchase_date'] = plus_user_obj.purchase_date
-                resp['expiry_date'] = plus_user_obj.expire_date
-                resp['premium_amount'] = plus_user_obj.amount
-                resp['proposer_name'] = plus_user_obj.get_primary_member_profile() if plus_user_obj.get_primary_member_profile() else ''
-                
-                resp['insurance_status'] = plus_user_obj.status
-            else:
-                return Response({"message": "User is not valid"},
-                                status.HTTP_404_NOT_FOUND)
+    def dashboard(self, request):
+        resp = {}
+        if request.query_params.get('is_dashboard'):
+            user = request.user
+            plus_user = PlusUser.objects.filter(user=user).first()
+        elif(request.query_params.get('id') and not request.query_params.get('is_dashboard')):
+            plus_user_id = request.query_params.get('id')
+            plus_user = PlusUser.objects.filter(id=plus_user_id).first()
         else:
             return Response(status=status.HTTP_404_NOT_FOUND)
-        return Response(resp)
+        plus_members = plus_user.plus_members.all()
+        if len(plus_members) > 1:
+            resp['is_member_allowed'] = False
+        else:
+            resp['is_member_allowed'] = True
+        plus_plan_queryset = PlusPlans.objects.filter(id=plus_user.plan.id)
+        plan_body_serializer = serializers.PlusPlansSerializer(plus_plan_queryset, context={'request': request}, many=True)
+        resp['plan'] = plan_body_serializer.data
+        plus_user_body_serializer = serializers.PlusUserModelSerializer(plus_user, context={'request': request})
+        resp['user'] = plus_user_body_serializer.data
+        resp['relation_master'] = PlusMembers.Relations.availabilities()
+        return Response({'data': resp})
+

@@ -11,10 +11,13 @@ from ondoc.authentication.models import UserProfile
 from ondoc.common.helper import Choices
 import json
 from django.db import transaction
+
+from ondoc.common.models import DocumentsProofs
 from ondoc.notification.tasks import push_plus_lead_to_matrix
 from .enums import PlanParametersEnum
 from datetime import datetime
 from django.utils.timezone import utc
+import reversion
 
 
 class LiveMixin(models.Model):
@@ -29,6 +32,7 @@ class LiveMixin(models.Model):
         abstract = True
 
 
+@reversion.register()
 class PlusProposer(auth_model.TimeStampedModel):
     name = models.CharField(max_length=250)
     min_float = models.PositiveIntegerField(default=None)
@@ -47,6 +51,7 @@ class PlusProposer(auth_model.TimeStampedModel):
     enabled = models.BooleanField(default=True)
     plus_document = models.FileField(null=True, blank=False, upload_to='plus/documents',
                                         validators=[FileExtensionValidator(allowed_extensions=['pdf'])])
+    merchant_code = models.CharField(blank=False, null=True, max_length=100)
 
     def __str__(self):
         return "{}".format(self.name)
@@ -64,6 +69,7 @@ class PlusProposer(auth_model.TimeStampedModel):
         db_table = 'plus_proposer'
 
 
+@reversion.register()
 class PlusPlans(auth_model.TimeStampedModel, LiveMixin):
     plan_name = models.CharField(max_length=300)
     proposer = models.ForeignKey(PlusProposer, related_name='plus_plans', on_delete=models.DO_NOTHING)
@@ -100,6 +106,7 @@ class PlusPlanParameters(auth_model.TimeStampedModel):
         db_table = 'plus_plan_parameters'
 
 
+@reversion.register()
 class PlusPlanParametersMapping(auth_model.TimeStampedModel):
     plus_plan = models.ForeignKey(PlusPlans, related_name="plan_parameters", null=False, blank=False, on_delete=models.CASCADE)
     parameter = models.ForeignKey(PlusPlanParameters, null=False, blank=False, on_delete=models.CASCADE)
@@ -197,6 +204,29 @@ class PlusUser(auth_model.TimeStampedModel):
 
         return None
 
+    def get_utilization(self):
+        plan = self.plan
+        resp = {}
+        data = {}
+        plan_parameters = plan.plan_parameters.filter(parameter__key__in=[PlanParametersEnum.DOCTOR_CONSULT_AMOUNT,
+                                                                               PlanParametersEnum.ONLINE_CHAT_AMOUNT,
+                                                                               PlanParametersEnum.HEALTH_CHECKUPS_AMOUNT,
+                                                                               PlanParametersEnum.HEALTH_CHECKUPS_COUNT,
+                                                                               PlanParametersEnum.MEMBERS_COVERED_IN_PACKAGE,
+                                                                               PlanParametersEnum.TOTAL_TEST_COVERED_IN_PACKAGE])
+
+        for pp in plan_parameters:
+            data[pp.parameter.key.lower()] = pp.value
+
+        resp['total_limit'] = data['DOCTOR_CONSULT_AMOUNT'.lower()]
+        resp['utilized'] = 0
+        resp['available'] = data['DOCTOR_CONSULT_AMOUNT'.lower()]
+        resp['members_count_online_consulation'] = data['MEMBERS_COVERED_IN_PACKAGE'.lower()]
+        resp['remaining_body_checkup_count'] = data['HEALTH_CHECKUPS_COUNT'.lower()]
+
+        return resp
+
+
     @classmethod
     def profile_create_or_update(cls, member, user):
         profile = {}
@@ -271,11 +301,28 @@ class PlusUser(auth_model.TimeStampedModel):
                                                           order=plus_data['order'])
 
         PlusMembers.create_plus_members(plus_membership_obj)
+        PlusUserUtilization.create_utilization(plus_membership_obj)
         return plus_membership_obj
 
     class Meta:
         db_table = 'plus_users'
         unique_together = (('user', 'plan'),)
+
+
+class PlusUserUtilization(auth_model.TimeStampedModel):
+    plus_user = models.ForeignKey(PlusUser, related_name='plus_utilization', on_delete=models.DO_NOTHING)
+    plan = models.ForeignKey(PlusPlans, related_name='plus_plans_for_utilization', on_delete=models.DO_NOTHING)
+    utilization = JSONField(blank=False, null=False)
+
+    class Meta:
+        db_table = 'plus_user_utilization'
+        unique_together = (('plus_user', 'plan'),)
+
+    @classmethod
+    def create_utilization(cls, plus_user_obj):
+        plus_plan = plus_user_obj.plan
+        utilization = plus_user_obj.get_utilization()
+        plus_utilize = cls.objects.create(plus_user=plus_user_obj, plan=plus_plan, utilization=utilization)
 
 
 class PlusTransaction(auth_model.TimeStampedModel):
@@ -367,7 +414,7 @@ class PlusMembers(auth_model.TimeStampedModel):
     profile = models.ForeignKey(auth_model.UserProfile, related_name="plus_member", on_delete=models.CASCADE, null=True)
     title = models.CharField(max_length=20, choices=TITLE_TYPE_CHOICES, default=None)
     middle_name = models.CharField(max_length=50, null=True)
-    town = models.CharField(max_length=100, null=True, default=None)
+    city = models.CharField(max_length=100, null=True, default=None)
     district = models.CharField(max_length=100, null=True, default=None)
     state = models.CharField(max_length=100, null=True, default=None)
     state_code = models.CharField(max_length=10, default=None, null=True)
@@ -376,20 +423,34 @@ class PlusMembers(auth_model.TimeStampedModel):
     district_code = models.CharField(max_length=10, blank=True, null=True, default=None)
     is_primary_user = models.NullBooleanField()
 
+    def get_full_name(self):
+        return "{first_name} {last_name}".format(first_name=self.first_name, last_name=self.last_name)
+
     @classmethod
-    def create_plus_members(cls, plus_user_obj):
-        members = plus_user_obj.raw_plus_member
-        members = json.loads(members)
+    def create_plus_members(cls, plus_user_obj, *args, **kwargs):
+
+        members = kwargs.get('members_list')
+        if not members:
+            members = plus_user_obj.raw_plus_member
+            members = json.loads(members)
+
         for member in members:
             user_profile = UserProfile.objects.get(id=member.get('profile'))
-            insured_members_obj = cls.objects.create(first_name=member.get('first_name'), title=member.get('title'),
+            is_primary_user = True if member['relation'] and member['relation']  == cls.Relations.SELF else False
+            plus_members_obj = cls(first_name=member.get('first_name'), title=member.get('title'),
                                                      last_name=member.get('last_name'), dob=member.get('dob'),
                                                      email=member.get('email'), address=member.get('address'),
                                                      pincode=member.get('pincode'), phone_number=user_profile.phone_number,
-                                                     gender=member.get('gender'), profile=user_profile, town=member.get('town'),
+                                                     gender=member.get('gender'), profile=user_profile, city=member.get('city'),
                                                      district=member.get('district'), state=member.get('state'),
                                                      state_code = member.get('state_code'), plus_user=plus_user_obj,
-                                                     city_code=member.get('city_code'), district_code=member.get('district_code'))
+                                                     city_code=member.get('city_code'), district_code=member.get('district_code'),
+                                                     relation=member.get('relation'), is_primary_user=is_primary_user)
+            plus_members_obj.save()
+            member_document_proofs = member.get('document_ids')
+            if member_document_proofs:
+                document_ids = list(map(lambda d: d.get('proof_file'), member_document_proofs))
+                DocumentsProofs.update_with_object(plus_members_obj, document_ids)
 
     class Meta:
         db_table = "plus_members"
@@ -450,9 +511,9 @@ class PlusLead(auth_model.TimeStampedModel):
         if not phone_number:
             return None
 
-        user_insurance_lead = cls.objects.filter(phone_number=phone_number).order_by('id').last()
-        if not user_insurance_lead:
-            user_insurance_lead = cls(phone_number=phone_number)
+        # user_insurance_lead = cls.objects.filter(phone_number=phone_number).order_by('id').last()
+        # if not user_insurance_lead:
+        user_insurance_lead = cls(phone_number=phone_number)
 
         user_insurance_lead.extras = request.data
         user_insurance_lead.save()
@@ -460,3 +521,5 @@ class PlusLead(auth_model.TimeStampedModel):
 
     class Meta:
         db_table = 'plus_leads'
+
+
