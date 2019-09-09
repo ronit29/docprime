@@ -618,6 +618,8 @@ class DoctorSearchHelper:
 
                 is_insurance_covered = False
                 insurance_error = None
+                is_vip_member = False
+                vip_remaining_amount = 0
                 insurance_data_dict = kwargs.get('insurance_data')
                 if doctor_clinic.hospital.enabled_for_prepaid and doctor_clinic.hospital.enabled_for_insurance and enable_online_booking and doctor.is_insurance_enabled and doctor.is_doctor_specialization_insured() and insurance_data_dict and min_price.get("mrp") is not None and \
                         min_price["mrp"] <= insurance_data_dict['insurance_threshold_amount'] and \
@@ -637,10 +639,16 @@ class DoctorSearchHelper:
                 else:
                     is_insurance_covered = False
                     insurance_error = "You have already utilised {} Oncologist consultations available in your OPD Insurance Plan.".format(settings.INSURANCE_ONCOLOGIST_LIMIT)
+                vip_data_dict = kwargs.get('vip_data')
+                if request and request.user and not request.user.is_anonymous and vip_data_dict.get('is_vip_member'):
+                    is_vip_member = vip_data_dict.get('is_vip_member')
+                    vip_remaining_amount = vip_data_dict.get('vip_remaining_amount')
                 hospitals = [{
                     "enabled_for_online_booking": enable_online_booking,
                     "is_insurance_covered": is_insurance_covered,
                     "insurance_limit_message": insurance_error,
+                    "is_vip_member": is_vip_member,
+                    "vip_remaining_amount": vip_remaining_amount,
                     "insurance_threshold_amount": insurance_data_dict['insurance_threshold_amount'],
                     "is_user_insured": insurance_data_dict['is_user_insured'],
                     "welcome_calling_done": doctor_clinic.hospital.welcome_calling_done,

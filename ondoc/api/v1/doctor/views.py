@@ -1563,15 +1563,24 @@ class DoctorListViewSet(viewsets.GenericViewSet):
             'is_user_insured': False,
             'insurance_threshold_amount': insurance_threshold.opd_amount_limit if insurance_threshold else 5000
         }
+        vip_data_dict = {
+            'is_vip_member': False,
+            'vip_remaining_amount': 0
+        }
 
         if logged_in_user.is_authenticated and not logged_in_user.is_anonymous:
             user_insurance = logged_in_user.purchased_insurance.filter().order_by('id').last()
-            if user_insurance and user_insurance.is_valid():
+            if user_insurance and user_insurance.is_valid() and not logged_in_user.active_plus_user:
                 insurance_threshold = user_insurance.insurance_plan.threshold.filter().first()
                 if insurance_threshold:
                     insurance_data_dict['insurance_threshold_amount'] = 0 if insurance_threshold.opd_amount_limit is None else \
                         insurance_threshold.opd_amount_limit
                     insurance_data_dict['is_user_insured'] = True
+            if logged_in_user.active_plus_user:
+                utilization_dict = {}
+                validated_data['is_vip_member'] = True
+                utilization_dict = logged_in_user.active_plus_user.get_utilization()
+                validated_data['vip_remaining_amount'] = utilization_dict.get('doctor_amount_available') if utilization_dict else 0
 
         validated_data['insurance_threshold_amount'] = insurance_data_dict['insurance_threshold_amount']
         validated_data['is_user_insured'] = insurance_data_dict['is_user_insured']
@@ -1613,6 +1622,7 @@ class DoctorListViewSet(viewsets.GenericViewSet):
 
         response = doctor_search_helper.prepare_search_response(doctor_data, doctor_search_result, request,
                                                                 insurance_data=insurance_data_dict,
+                                                                vip_data=vip_data_dict,
                                                                 hosp_entity_dict=hosp_entity_dict,
                                                                 hosp_locality_entity_dict=hosp_locality_entity_dict)
 
