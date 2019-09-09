@@ -218,6 +218,17 @@ class ProviderHospitalLabMapping(auth_models.TimeStampedModel):
         db_table = "provider_hospital_lab_mapping"
 
 
+class TestSamplesLabAlerts(auth_models.TimeStampedModel):
+
+    name = models.CharField(max_length=128)
+
+    def __str__(self):
+        return str(self.name)
+
+    class Meta:
+        db_table = "test_samples_lab_alerts"
+
+
 class ProviderLabTestSamples(auth_models.TimeStampedModel):
 
     name = models.CharField(max_length=128)
@@ -231,7 +242,7 @@ class ProviderLabTestSamples(auth_models.TimeStampedModel):
 
 class ProviderLabTestSampleDetails(auth_models.TimeStampedModel):
 
-    lab_test = models.ForeignKey(diag_models.LabTest, on_delete=models.CASCADE, related_name="sample_details")
+    lab_test = models.OneToOneField(diag_models.LabTest, on_delete=models.CASCADE, related_name="sample_details")
     sample = models.ForeignKey(ProviderLabTestSamples, on_delete=models.CASCADE, related_name="details")
     volume = models.PositiveIntegerField(null=True, blank=True)                             # in milli-litres
     fasting_required = models.BooleanField(default=False)
@@ -242,23 +253,34 @@ class ProviderLabTestSampleDetails(auth_models.TimeStampedModel):
     def __str__(self):
         return str(self.lab_test.name) + '-' + str(self.sample.name)
 
+    # @classmethod
+    # def get_sample_details(cls, lab_tests_queryset):
+    #     samples_set = set()
+    #     for test in lab_tests_queryset:
+    #         sample_obj = test.sample_details
+    #         if sample_obj.name not in samples_set:
+    #             samples_set.add(sample_obj)
+    #         else:
+    #             sample_set_obj = samples_set.pop()
+
     class Meta:
         db_table = "provider_lab_test_sample_details"
 
 
-# class ProviderLabSamplesCollectOrder(auth_models.TimeStampedModel):
-#
-#     user_profile = models.ForeignKey(auth_models.UserProfile, on_delete=models.CASCADE, related_name="profile_lab_samples_collect_order")
-#     patient_details = JSONField()
-#     hospital = models.ForeignKey(doc_models.Hospital, on_delete=models.CASCADE, related_name="hosp_lab_samples_collect_order")
-#     doctor = models.ForeignKey(doc_models.Doctor, on_delete=models.CASCADE, related_name="doc_lab_samples_collect_order")
-#     available_lab_tests = models.ManyToManyField(diag_models.AvailableLabTest, related_name="tests_lab_samples_collect_order")
-#     collection_datetime = models.DateTimeField()
-#     samples = models.ForeignKey(auth_models.UserProfile, on_delete=models.CASCADE, related_name="lab_samples_collect_order")
-#     lab_alerts = models.ManyToManyField(diag_models.LabAlerts)
-#
-#     def __str__(self):
-#         return str(self.user_profile.name) + '-' + str(self.hospital.name)
-#
-#     class Meta:
-#         db_table = "provider_lab_samples_collect_order"
+class ProviderLabSamplesCollectOrder(auth_models.TimeStampedModel):
+
+    offline_patient = models.ForeignKey(doc_models.OfflinePatients, on_delete=models.CASCADE, related_name="patient_lab_samples_collect_order")
+    patient_details = JSONField()
+    hospital = models.ForeignKey(doc_models.Hospital, on_delete=models.CASCADE, related_name="hosp_lab_samples_collect_order")
+    doctor = models.ForeignKey(doc_models.Doctor, on_delete=models.CASCADE, related_name="doc_lab_samples_collect_order")
+    lab = models.ForeignKey(diag_models.Lab, on_delete=models.CASCADE, related_name="lab_samples_collect_order")
+    available_lab_tests = models.ManyToManyField(diag_models.AvailableLabTest, related_name="tests_lab_samples_collect_order")
+    collection_datetime = models.DateTimeField(null=True, blank=True)
+    samples = JSONField(null=True)
+    lab_alerts = models.ManyToManyField(TestSamplesLabAlerts)
+
+    def __str__(self):
+        return str(self.offline_patient.name) + '-' + str(self.hospital.name)
+
+    class Meta:
+        db_table = "provider_lab_samples_collect_order"

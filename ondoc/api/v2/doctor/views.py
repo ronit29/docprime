@@ -8,6 +8,7 @@ from ondoc.notification import models as notif_models
 from ondoc.matrix.tasks import decrypted_invoice_pdfs, decrypted_prescription_pdfs
 from django.utils.safestring import mark_safe
 from . import serializers
+from ondoc.api.v1.doctor import serializers as v1_doc_serializer
 from ondoc.api.v1 import utils as v1_utils
 from ondoc.sms.api import send_otp
 from django.shortcuts import get_object_or_404
@@ -17,7 +18,7 @@ from rest_framework import status, permissions
 from rest_framework.permissions import IsAuthenticated
 from ondoc.authentication.backends import JWTAuthentication
 from django.db import transaction
-from django.db.models import Q, Value, Case, When, F
+from django.db.models import Q, Value, Case, When, F, Max
 from django.http import HttpResponse
 from django.template.loader import render_to_string
 from django.contrib.contenttypes.models import ContentType
@@ -1442,7 +1443,7 @@ class ProviderLabTestSamplesCollect(viewsets.GenericViewSet):
         response_list = list()
         for obj in available_lab_tests:
             ret_obj = dict()
-            sample_obj = obj.test.sample_details.all()[0] if obj.test.sample_details.all() else None
+            sample_obj = obj.test.sample_details if obj.test.sample_details else None
             test = obj.test
             ret_obj['lab_test_id'] = test.id
             ret_obj['lab_test_name'] = test.name
@@ -1455,3 +1456,44 @@ class ProviderLabTestSamplesCollect(viewsets.GenericViewSet):
             ret_obj['b2c_rates'] = obj.get_deal_price()
             response_list.append(ret_obj)
         return Response(response_list)
+
+    def order_create_or_update(self, request):
+        serializer = serializers.SampleCollectOrderCreateOrUpdateSerializer(data=request.data, context={'request': request})
+        serializer.is_valid(raise_exception=True)
+        valid_data = serializer.validated_data
+        order_obj = valid_data.get('id')
+        offline_patient = valid_data.get('offline_patient_id')
+        hospital = valid_data.get('hospital')
+        doctor = valid_data.get('doctor')
+        lab = valid_data.get('lab')
+        lab_tests = valid_data.get('lab_tests')
+        lab_alerts = valid_data.get('lab_alerts')
+        sample_details = prov_models.ProviderLabTestSampleDetails.objects.filter(lab_test__in=lab_tests)
+        max_volumes_list = sample_details.annotate(sample_type=F('sample__name')).values('sample_type').annotate(max_volume=Max('volume'))
+        max_volumes_dict = dict()
+        sample_ids_to_be_excluded = list()
+        for max_volume in max_volumes_list:
+            max_volumes_dict[max_volume['sample_type']] = max_volume['max_volume']
+        for sample_detail in sample_details:
+            if sample_detail.sample.name in max_volumes_dict and sample_detail.volume != max_volumes_dict[sample_detail.sample.name]:
+                sample_ids_to_be_excluded.append(sample_detail.id)
+        samples_set = sample_details.exclude(id__in=sample_ids_to_be_excluded)
+        samples_data = serializers.ProviderLabTestSampleDetailsModelSerializer(samples_set, many=True).data
+
+        available_lab_tests = lab_models.AvailableLabTest.objects.filter(test__in=lab_tests, lab_pricing_group=lab.lab_pricing_group)
+        if not order_obj:
+            order_obj = prov_models.ProviderLabSamplesCollectOrder()
+        order_obj.offline_patient = offline_patient
+        order_obj.patient_details = v1_doc_serializer.OfflinePatientSerializer(offline_patient).data
+        order_obj.hospital = hospital
+        order_obj.doctor = doctor
+        order_obj.lab = lab
+        order_obj.samples = samples_data
+        order_obj.collection_datetime = valid_data.get("collection_datetime")
+        order_obj.save()
+        if lab_alerts:
+            order_obj.lab_alerts.set(lab_alerts, clear=True)
+        order_obj.available_lab_tests.set(available_lab_tests, clear=True)
+        order_model_serializer = serializers.ProviderLabSamplesCollectOrderModelSerialier(order_obj)
+        return Response({"status": 1, "message": "Sample Collection Order created successfully",
+                         "data": order_model_serializer.data})

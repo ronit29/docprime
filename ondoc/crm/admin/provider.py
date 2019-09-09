@@ -16,13 +16,17 @@ import logging
 logger = logging.getLogger(__name__)
 
 
-class ProviderLabTestSampleDetailsAdmin(admin.ModelAdmin):
+class ProviderLabTestSampleDetailAdmin(admin.ModelAdmin):
     list_display = ('id', 'lab_test', 'sample')
     readonly_fields = []
     autocomplete_fields = ['lab_test', 'sample']
 
 
-class ProviderLabTestSamplesAdmin(admin.ModelAdmin):
+class ProviderLabTestSampleAdmin(admin.ModelAdmin):
     list_display = ('id', 'name', 'created_at', 'updated_at')
     readonly_fields = []
     search_fields = ['name']
+
+
+class TestSamplesLabAlertAdmin(admin.ModelAdmin):
+    list_display = ('name', )

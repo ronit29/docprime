@@ -38,6 +38,7 @@ urlpatterns = [
     path('pecs/get_id', views.ConsumerEConsultationViewSet.as_view({'get': 'get_order_consult_id'}), name='pecs_get_id'),
     path('ecs/comm', views.EConsultationCommViewSet.as_view({'post': 'communicate'}), name='ecs_communication'),
     path('partner-lab/tests', views.ProviderLabTestSamplesCollect.as_view({'get': 'tests_list'}), name='partner_lab_tests_list'),
+    path('partner-lab/order/save', views.ProviderLabTestSamplesCollect.as_view({'post': 'order_create_or_update'}), name='partner_lab_order_create'),
 ]
 
 

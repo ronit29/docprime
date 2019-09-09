@@ -9,6 +9,7 @@ from ondoc.authentication.models import (OtpVerifications, User, UserProfile, No
                                          DoctorNumber, Address, GenericAdmin, UserSecretKey,
                                          UserPermission, Address, GenericAdmin, GenericLabAdmin)
 from ondoc.doctor import models as doc_models
+from ondoc.diagnostic import models as diag_models
 from ondoc.procedure.models import Procedure
 from ondoc.diagnostic.models import LabAppointment
 from ondoc.notification.models import NotificationAction
@@ -831,3 +832,48 @@ class LabTestsListSerializer(serializers.Serializer):
         attrs['hospital'] = hospital_lab_mapping_obj.hospital
         attrs['lab'] = lab
         return attrs
+
+
+class SampleCollectOrderCreateOrUpdateSerializer(serializers.Serializer):
+
+    id = serializers.PrimaryKeyRelatedField(queryset=provider_models.ProviderLabSamplesCollectOrder.objects.all(), required=False, allow_null=True)
+    offline_patient_id = serializers.PrimaryKeyRelatedField(queryset=doc_models.OfflinePatients.objects.all())
+    hospital_id = serializers.IntegerField(min_value=1)
+    lab_id = serializers.IntegerField(min_value=1, required=False, allow_null=True)
+    doctor_id = serializers.IntegerField(min_value=1)
+    lab_test_ids = serializers.ListField(child=serializers.IntegerField(min_value=1))
+    collection_datetime = serializers.DateTimeField(required=False, allow_null=True)
+    lab_alerts = serializers.ListField(child=serializers.PrimaryKeyRelatedField(queryset=provider_models.TestSamplesLabAlerts.objects.all()), allow_empty=True, required=False)
+
+    def validate(self, attrs):
+        hospital_id = attrs.get('hospital_id')
+        lab_id = attrs.get('lab_id')
+        doctor_id = attrs.get('doctor_id')
+        lab_test_ids = attrs.get('lab_test_ids')
+        doc_clinic_obj = doc_models.DoctorClinic.objects.select_related('hospital', 'doctor').filter(
+            hospital_id=hospital_id, doctor_id=doctor_id).first()
+        if not doc_clinic_obj:
+            raise serializers.ValidationError('doctor clinic for given hospital_id and doctor_id not found.')
+        hospital = doc_clinic_obj.hospital
+        doctor = doc_clinic_obj.doctor
+        lab = hospital.get_partner_lab(lab_id=lab_id) if lab_id else hospital.get_partner_lab()
+        lab_tests = diag_models.LabTest.objects.filter(id__in=lab_test_ids)
+        attrs['hospital'] = hospital
+        attrs['doctor'] = doctor
+        attrs['lab'] = lab
+        attrs['lab_tests'] = lab_tests
+        return attrs
+
+
+class ProviderLabTestSampleDetailsModelSerializer(serializers.ModelSerializer):
+
+    class Meta:
+        model = provider_models.ProviderLabTestSampleDetails
+        fields = '__all__'
+
+
+class ProviderLabSamplesCollectOrderModelSerialier(serializers.ModelSerializer):
+
+    class Meta:
+        model = provider_models.ProviderLabSamplesCollectOrder
+        fields = '__all__'
