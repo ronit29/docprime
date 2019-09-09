@@ -1494,6 +1494,11 @@ class ProviderLabTestSamplesCollect(viewsets.GenericViewSet):
         if lab_alerts:
             order_obj.lab_alerts.set(lab_alerts, clear=True)
         order_obj.available_lab_tests.set(available_lab_tests, clear=True)
-        order_model_serializer = serializers.ProviderLabSamplesCollectOrderModelSerialier(order_obj)
+        order_model_serializer = serializers.ProviderLabSamplesCollectOrderModelSerializer(order_obj)
         return Response({"status": 1, "message": "Sample Collection Order created successfully",
                          "data": order_model_serializer.data})
+
+    def lab_alerts(self, request):
+        lab_alerts_queryset = prov_models.TestSamplesLabAlerts.objects.all()
+        data = serializers.TestSamplesLabAlertsModelSerializer(lab_alerts_queryset, many=True).data
+        return Response(data)

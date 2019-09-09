@@ -872,8 +872,15 @@ class ProviderLabTestSampleDetailsModelSerializer(serializers.ModelSerializer):
         fields = '__all__'
 
 
-class ProviderLabSamplesCollectOrderModelSerialier(serializers.ModelSerializer):
+class ProviderLabSamplesCollectOrderModelSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = provider_models.ProviderLabSamplesCollectOrder
         fields = '__all__'
+
+
+class TestSamplesLabAlertsModelSerializer(serializers.ModelSerializer):
+
+    class Meta:
+        model = provider_models.TestSamplesLabAlerts
+        fields = ('name',)
