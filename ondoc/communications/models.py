@@ -1578,7 +1578,7 @@ class OpdNotification(Notification):
         }
         return context
 
-    def send(self, is_valid_for_provider):
+    def send(self, is_valid_for_provider=True):
         context = self.get_context()
         notification_type = self.notification_type
         all_receivers = self.get_receivers(is_valid_for_provider)
@@ -1784,7 +1784,7 @@ class LabNotification(Notification):
         }
         return context
 
-    def send(self, is_valid_for_provider):
+    def send(self, is_valid_for_provider=True):
         context = self.get_context()
         notification_type = self.notification_type
         all_receivers = self.get_receivers(is_valid_for_provider)
