@@ -3304,6 +3304,7 @@ class OpdAppointment(auth_model.TimeStampedModel, CouponsMixin, OpdAppointmentIn
                     effective_price = 0
                 else:
                     effective_price = doctor_clinic_timing.deal_price - coupon_discount
+                prepaid_deal_price = doctor_clinic_timing.deal_price
             deal_price = doctor_clinic_timing.deal_price
             mrp = doctor_clinic_timing.mrp
             fees = doctor_clinic_timing.insurance_fees if doctor_clinic_timing.insurance_fees and doctor_clinic_timing.insurance_fees > 0 else doctor_clinic_timing.fees
@@ -3320,6 +3321,7 @@ class OpdAppointment(auth_model.TimeStampedModel, CouponsMixin, OpdAppointmentIn
                     effective_price = 0
                 else:
                     effective_price = total_deal_price - coupon_discount
+                prepaid_deal_price = doctor_clinic_timing.deal_price
 
             deal_price = total_deal_price
             mrp = total_mrp
