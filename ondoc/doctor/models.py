@@ -270,7 +270,7 @@ class Hospital(auth_model.TimeStampedModel, auth_model.CreatedByModel, auth_mode
     enabled_for_plus_plans = models.NullBooleanField()
 
     def __str__(self):
-        return self.name
+        return '{}-{}'.format(self.id, self.name)
 
     class Meta:
         db_table = "hospital"
