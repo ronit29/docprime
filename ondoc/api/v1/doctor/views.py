@@ -315,7 +315,7 @@ class DoctorAppointmentsViewSet(OndocViewSet):
                     ({'order_id': pg_order.id},),
                     eta=timezone.now() + timezone.timedelta(minutes=settings.LEAD_VALIDITY_BUFFER_TIME))
             else:
-                amount_from_pg = max(0, payable_amount - total_balance)
+                amount_from_pg = payable_amount
                 cashback_amount = 0
                 wallet_amount = 0
                 pg_order.amount = amount_from_pg
