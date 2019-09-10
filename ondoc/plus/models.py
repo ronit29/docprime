@@ -260,7 +260,6 @@ class PlusUser(auth_model.TimeStampedModel):
                                                                                           lab_appointment.test_mappings))
         return package_amount
 
-
     def get_doctor_plus_appointment_amount(self):
         from ondoc.doctor.models import OpdAppointment
         total_mrp = 0
