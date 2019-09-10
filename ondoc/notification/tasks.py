@@ -36,9 +36,11 @@ logger = logging.getLogger(__name__)
 
 
 @task
-def send_lab_notifications_refactored(appointment_id):
+def send_lab_notifications_refactored(data):
     from ondoc.diagnostic import models as lab_models
     from ondoc.communications.models import LabNotification
+    appointment_id = data.get('appointment_id', None)
+    is_valid_for_provider = data.get('is_valid_for_provider', False)
     instance = lab_models.LabAppointment.objects.filter(id=appointment_id).first()
     if not instance or not instance.user:
         return
@@ -58,7 +60,7 @@ def send_lab_notifications_refactored(appointment_id):
                 is_masking_done = generate_appointment_masknumber(
                     ({'type': 'LAB_APPOINTMENT', 'appointment': instance}))
         lab_notification = LabNotification(instance)
-        lab_notification.send()
+        lab_notification.send(is_valid_for_provider)
     except Exception as e:
         logger.error(str(e))
 
@@ -157,9 +159,12 @@ def send_lab_notifications(appointment_id):
 
 
 @task()
-def send_opd_notifications_refactored(appointment_id, notification_type=None):
+def send_opd_notifications_refactored(data, notification_type=None):
     from ondoc.doctor.models import OpdAppointment
     from ondoc.communications.models import OpdNotification
+    appointment_id = data.get('appointment_id', None)
+    is_valid_for_provider = data.get('is_valid_for_provider', False)
+    notification_type = data.get('notification_type', None)
     instance = OpdAppointment.objects.filter(id=appointment_id).first()
     try:
         if not instance or not instance.user:
@@ -180,7 +185,7 @@ def send_opd_notifications_refactored(appointment_id, notification_type=None):
     except Exception as e:
         logger.error(str(e))
     opd_notification = OpdNotification(instance, notification_type)
-    opd_notification.send()
+    opd_notification.send(is_valid_for_provider)
 
 
 @task
@@ -910,7 +915,8 @@ def send_lab_reports(appointment_id):
         if not instance:
             return
         lab_notification = LabNotification(instance, NotificationAction.LAB_REPORT_SEND_VIA_CRM)
-        lab_notification.send()
+        is_valid_for_provider = True
+        lab_notification.send(is_valid_for_provider)
     except Exception as e:
         logger.error(str(e))
 
@@ -1050,9 +1056,10 @@ def push_plus_lead_to_matrix(self, data):
             plan = PlusPlans.objects.filter(id=plan_id).first()
 
         request_data = {
-            'LeadID': plus_lead_obj.matrix_lead_id if plus_lead_obj.matrix_lead_id else 0,
+            # 'LeadID': plus_lead_obj.matrix_lead_id if plus_lead_obj.matrix_lead_id else 0,
+            'LeadID':  0,
             'LeadSource': lead_source,
-            'Name': 'none',
+            'Name': extras.get('name', 'none'),
             'BookedBy': phone_number,
             'PrimaryNo': phone_number,
             'PaymentStatus': 0,
@@ -1062,18 +1069,7 @@ def push_plus_lead_to_matrix(self, data):
             'UtmTerm': extras.get('utm_term', ''),
             'ProductId': 11,
             'SubProductId': 0,
-            'PolicyDetails': {
-                "ProposalNo": None,
-                "BookingId": None,
-                'PolicyPaymentSTATUS': 0,
-                "ProposerName": None,
-                "PolicyId": None,
-                "InsurancePlanPurchased": plan.plan_name if plan else None,
-                "PurchaseDate": None,
-                "ExpirationDate": None,
-                "COILink": None,
-                "PeopleCovered": 0
-            }
+            'VIPPlanName': plan.plan_name if plan else None
         }
 
         url = settings.MATRIX_API_URL

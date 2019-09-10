@@ -73,7 +73,7 @@ from django.contrib.contenttypes.fields import GenericForeignKey
 from django.contrib.contenttypes.models import ContentType
 from ondoc.matrix.tasks import push_appointment_to_matrix, push_onboarding_qcstatus_to_matrix, \
     update_onboarding_qcstatus_to_matrix, create_or_update_lead_on_matrix, push_signup_lead_to_matrix, \
-    create_ipd_lead_from_opd_appointment
+    create_ipd_lead_from_opd_appointment, push_retail_appointment_to_matrix
 # from ondoc.procedure.models import Procedure
 from ondoc.ratings_review import models as ratings_models
 from django.utils import timezone
@@ -978,57 +978,62 @@ class Doctor(auth_model.TimeStampedModel, auth_model.QCModel, SearchKey, auth_mo
 
     def update_deal_price(self):        
         # will update only this doctor prices and will be called on save
-        query = '''update doctor_clinic_timing set deal_price = 
-					case when (custom_deal_price > 0 )
-					then custom_deal_price else floor(				 
-                    case when fees =0 then
-						case when mrp <300 then least((0.5*mrp)/0.75, mrp)
-						else  least( 0.5*mrp + 75 , mrp)
-						end 
-					else
-					case when mrp<300 then 
-					least(greatest(greatest(fees+60, 0.7*mrp), mrp-200)/0.75,mrp)
-					else least(greatest(greatest(fees+60, 0.7*mrp), mrp-200)+75, mrp)
-					end  end)
-					end
-					where doctor_clinic_id in (
-                    select id from doctor_clinic where doctor_id=%s and hospital_id!=3560) '''
-
+        query = '''update doctor_clinic_timing set deal_price=case when custom_deal_price is null then mrp else custom_deal_price end 
+                                                              where doctor_clinic_id in ( select id from doctor_clinic where doctor_id=%s) '''
         update_doctor_deal_price = RawSql(query, [self.pk]).execute()
-
-        # update nanavati hospital deal price
-
-        query1 = '''update doctor_clinic_timing set deal_price = mrp*0.80 
-                         where doctor_clinic_id  in (select id from doctor_clinic where doctor_id= %s and  hospital_id=3560 ) '''
-
-        update_all_nanavati_doctor_deal_price = RawSql(query1, [self.pk]).execute()
+        # query = '''update doctor_clinic_timing set deal_price =
+			# 		case when (custom_deal_price > 0 )
+			# 		then custom_deal_price else floor(
+        #             case when fees =0 then
+			# 			case when mrp <300 then least((0.5*mrp)/0.75, mrp)
+			# 			else  least( 0.5*mrp + 75 , mrp)
+			# 			end
+			# 		else
+			# 		case when mrp<300 then
+			# 		least(greatest(greatest(fees+60, 0.7*mrp), mrp-200)/0.75,mrp)
+			# 		else least(greatest(greatest(fees+60, 0.7*mrp), mrp-200)+75, mrp)
+			# 		end  end)
+			# 		end
+			# 		where doctor_clinic_id in (
+        #             select id from doctor_clinic where doctor_id=%s and hospital_id!=3560) '''
+        #
+        # update_doctor_deal_price = RawSql(query, [self.pk]).execute()
+        #
+        # # update nanavati hospital deal price
+        #
+        # query1 = '''update doctor_clinic_timing set deal_price = mrp*0.80
+        #                  where doctor_clinic_id  in (select id from doctor_clinic where doctor_id= %s and  hospital_id=3560 ) '''
+        #
+        # update_all_nanavati_doctor_deal_price = RawSql(query1, [self.pk]).execute()
 
     @classmethod
     def update_all_deal_price(cls):
         # will update all doctors prices
-        query = '''update doctor_clinic_timing set deal_price = 
-					case when (custom_deal_price > 0 )
-					then custom_deal_price else floor(				 
-                    case when fees =0 then
-						case when mrp <300 then least((0.5*mrp)/0.75, mrp)
-						else  least( 0.5*mrp + 75 , mrp)
-						end 
-					else
-					case when mrp<300 then 
-					least(greatest(greatest(fees+60, 0.7*mrp), mrp-200)/0.75,mrp)
-					else least(greatest(greatest(fees+60, 0.7*mrp), mrp-200)+75, mrp)
-					end  end)
-					end
-					 where doctor_clinic_id  in (select id from doctor_clinic where hospital_id!=3560 )  '''
-
+        query = '''update doctor_clinic_timing set deal_price=case when custom_deal_price is null then mrp else custom_deal_price end '''
         update_all_doctor_deal_price = RawSql(query, []).execute()
-
-        #update nanavati hospital deal price
-
-        query1 = '''update doctor_clinic_timing set deal_price = mrp*0.80 
-                 where doctor_clinic_id  in (select id from doctor_clinic where hospital_id=3560 ) '''
-
-        update_all_nanavati_doctor_deal_price = RawSql(query1, []).execute()
+        # query = '''update doctor_clinic_timing set deal_price =
+			# 		case when (custom_deal_price > 0 )
+			# 		then custom_deal_price else floor(
+        #             case when fees =0 then
+			# 			case when mrp <300 then least((0.5*mrp)/0.75, mrp)
+			# 			else  least( 0.5*mrp + 75 , mrp)
+			# 			end
+			# 		else
+			# 		case when mrp<300 then
+			# 		least(greatest(greatest(fees+60, 0.7*mrp), mrp-200)/0.75,mrp)
+			# 		else least(greatest(greatest(fees+60, 0.7*mrp), mrp-200)+75, mrp)
+			# 		end  end)
+			# 		end
+			# 		 where doctor_clinic_id  in (select id from doctor_clinic where hospital_id!=3560 )  '''
+        #
+        # update_all_doctor_deal_price = RawSql(query, []).execute()
+        #
+        # #update nanavati hospital deal price
+        #
+        # query1 = '''update doctor_clinic_timing set deal_price = mrp*0.80
+        #          where doctor_clinic_id  in (select id from doctor_clinic where hospital_id=3560 ) '''
+        #
+        # update_all_nanavati_doctor_deal_price = RawSql(query1, []).execute()
 
     def get_display_name(self):
         return "Dr. {}".format(self.name.title()) if self.name else None
@@ -2667,7 +2672,7 @@ class OpdAppointment(auth_model.TimeStampedModel, CouponsMixin, OpdAppointmentIn
         return appointments
 
     @classmethod
-    def create_appointment(cls, appointment_data):
+    def create_appointment(cls, appointment_data, responsible_user=None, source=None):
         from ondoc.insurance.models import UserInsurance
         insurance = appointment_data.get('insurance')
         appointment_status = OpdAppointment.BOOKED
@@ -2689,7 +2694,16 @@ class OpdAppointment(auth_model.TimeStampedModel, CouponsMixin, OpdAppointmentIn
             "random_coupons": appointment_data.pop("coupon_data", [])
         }
         procedure_details = appointment_data.pop('extra_details', [])
-        app_obj = cls.objects.create(**appointment_data)
+
+        # app_obj = cls.objects.create(**appointment_data)
+        _responsible_user=None
+        if responsible_user:
+            _responsible_user = auth_model.User.objects.filter(id=responsible_user).first()
+        app_obj = cls(**appointment_data)
+        if _responsible_user and source:
+            app_obj.save(responsible_user=_responsible_user, source=source)
+        else:
+            app_obj.save()
         if procedure_details:
             procedure_to_be_added = []
             for procedure in procedure_details:
@@ -2833,28 +2847,48 @@ class OpdAppointment(auth_model.TimeStampedModel, CouponsMixin, OpdAppointmentIn
                     result = parent.is_cod_order
         return result
 
+    def is_provider_notification_allowed(self, old_instance):
+        if old_instance.status == OpdAppointment.CREATED and self.status == OpdAppointment.CANCELLED:
+            return False
+        else:
+            return True
+
     def after_commit_tasks(self, old_instance, push_to_matrix):
+        sent_to_provider = True
+        if old_instance:
+            sent_to_provider = self.is_provider_notification_allowed(old_instance)
+
         if old_instance is None:
             try:
                 create_ipd_lead_from_opd_appointment.apply_async(({'obj_id': self.id},),)
                                                                  # eta=timezone.now() + timezone.timedelta(hours=1))
                 if self.send_cod_to_prepaid_request():
-                    notification_tasks.send_opd_notifications_refactored.apply_async(
-                        (self.id, NotificationAction.COD_TO_PREPAID_REQUEST), countdown=5)
+                    notification_tasks.send_opd_notifications_refactored.apply_async(({'appointment_id': self.id,
+                                                                                       'is_valid_for_provider': sent_to_provider,
+                                                                                       'notification_type': NotificationAction.COD_TO_PREPAID_REQUEST},),
+                                                                                        countdown=1)
             except Exception as e:
                 logger.error(str(e))
+
         if push_to_matrix:
-        # Push the appointment data to the matrix .
+            # Push the appointment data to the matrix
             try:
                 push_appointment_to_matrix.apply_async(({'type': 'OPD_APPOINTMENT', 'appointment_id': self.id,
-                                                         'product_id': 5, 'sub_product_id': 2},), countdown=5)
-
+                                                             'product_id': 5, 'sub_product_id': 2},), countdown=5)
             except Exception as e:
                 logger.error(str(e))
+
+            if old_instance and self.is_retail_booking(old_instance):
+                try:
+                    push_retail_appointment_to_matrix.apply_async(({'type': 'OPD_APPOINTMENT', 'appointment_id': self.id,
+                                                        'product_id': 5, 'sub_product_id': 2},), countdown=5)
+                except Exception as e:
+                    logger.error(str(e))
 
         if self.is_to_send_notification(old_instance):
             try:
-                notification_tasks.send_opd_notifications_refactored.apply_async((self.id,), countdown=1)
+                notification_tasks.send_opd_notifications_refactored.apply_async(({'appointment_id': self.id,
+                                                                                   'is_valid_for_provider': sent_to_provider},), countdown=1)
             except Exception as e:
                 logger.error(str(e))
             # notification_tasks.send_opd_notifications_refactored(self.id)
@@ -2872,8 +2906,11 @@ class OpdAppointment(auth_model.TimeStampedModel, CouponsMixin, OpdAppointmentIn
 
         if old_instance and old_instance.is_cod_to_prepaid != self.is_cod_to_prepaid:
             try:
-
-                notification_tasks.send_opd_notifications_refactored.apply_async((self.id, NotificationAction.COD_TO_PREPAID), countdown=1)
+                # notification_tasks.send_opd_notifications_refactored.apply_async((self.id, NotificationAction.COD_TO_PREPAID), countdown=1)
+                notification_tasks.send_opd_notifications_refactored.apply_async(({'appointment_id': self.id,
+                                                                                   'is_valid_for_provider': sent_to_provider,
+                                                                                   'notification_type': NotificationAction.COD_TO_PREPAID},),
+                                                                                    countdown=1)
             except Exception as e:
                 logger.error(str(e))
 
@@ -3005,10 +3042,19 @@ class OpdAppointment(auth_model.TimeStampedModel, CouponsMixin, OpdAppointmentIn
                 if to_save:
                     self.purchase_order.save()
 
-
+        responsible_user = None
+        source = None
+        if kwargs.get('source'):
+            source = kwargs.pop('source')
+        if kwargs.get('responsible_user'):
+            responsible_user = kwargs.pop('responsible_user')
         super().save(*args, **kwargs)
 
         if push_to_history:
+            if responsible_user:
+                self._responsible_user = responsible_user
+            if source:
+                self._source = source
             AppointmentHistory.create(content_object=self)
 
         transaction.on_commit(lambda: self.after_commit_tasks(database_instance, push_to_matrix))
@@ -3375,7 +3421,9 @@ class OpdAppointment(auth_model.TimeStampedModel, CouponsMixin, OpdAppointmentIn
             "cashback": int(price_data.get("coupon_cashback")),
             "is_appointment_insured": is_appointment_insured,
             "insurance": insurance_id,
-            "coupon_data": price_data.get("coupon_data")
+            "coupon_data": price_data.get("coupon_data"),
+            "_responsible_user": data.get("_responsible_user", None),
+            "_source": data.get("_source", None)
         }
 
     @staticmethod
@@ -3439,16 +3487,26 @@ class OpdAppointment(auth_model.TimeStampedModel, CouponsMixin, OpdAppointmentIn
         except Exception as e:
             logger.error("Could not save triggered event - " + str(e))
 
-    def get_matrix_data(self, order, product_id, sub_product_id):
+    def is_retail_booking(self, old_instance):
+        if old_instance.status == OpdAppointment.BOOKED and self.status == OpdAppointment.ACCEPTED \
+                and (self.payment_type == OpdAppointment.PREPAID or self.payment_type == OpdAppointment.COD) \
+                and self.doctor.is_insurance_enabled and self.hospital.enabled_for_insurance:
+            return True
+        else:
+            return False
+
+    def get_matrix_data(self, order, product_id, sub_product_id, lead_source=None):
         # policy_details = self.get_matrix_policy_data()
         appointment_details = self.get_matrix_appointment_data(order)
+        lead_source = 'DocPrime'
+        lead_id = self.matrix_lead_id if self.matrix_lead_id else 0
 
         request_data = {
             'DocPrimeUserId': self.user.id,
-            'LeadID': self.matrix_lead_id if self.matrix_lead_id else 0,
+            'LeadID': lead_id,
             'Name': self.profile.name,
             'PrimaryNo': self.user.phone_number,
-            'LeadSource': 'DocPrime',
+            'LeadSource': lead_source,
             'EmailId': self.profile.email,
             'Gender': 1 if self.profile.gender == 'm' else 2 if self.profile.gender == 'f' else 0,
             'CityId': 0,
@@ -3605,6 +3663,17 @@ class OpdAppointment(auth_model.TimeStampedModel, CouponsMixin, OpdAppointmentIn
         mobile_list.extend(doctor_mobiles)
 
         return mobile_list
+
+    def get_matrix_retail_booking_data(self):
+        data = {
+                "Name": self.profile.name,
+                "ProductId": 11,
+                "PrimaryNo": self.user.phone_number,
+                "ReferenceBookingId": self.id,
+                "SubProductId": 0,
+                "LeadSource": "RetailBooking"
+            }
+        return data
 
     @classmethod
     def get_insured_completed_appointment(cls, insurance_obj):

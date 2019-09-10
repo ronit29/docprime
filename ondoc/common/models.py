@@ -100,9 +100,10 @@ class AppointmentHistory(TimeStampedModel):
     D_WEB_URL = "d_web_url"
     D_TOKEN_URL = "d_token_url"
     IVR = "ivr"
+    API= "thyrocare_api"
     SOURCE_CHOICES = ((CONSUMER_APP, "Consumer App"), (CRM, "CRM"), (WEB, "Consumer Web"), (DOC_APP, "Doctor App"),
                       (DOC_WEB, "Provider Web"), (D_WEB_URL, "Doctor Web URL"), (D_TOKEN_URL, "Doctor Token URL"),
-                      (IVR, "Auto IVR"))
+                      (IVR, "Auto IVR"), (API, "Thyrocare API"))
 
     content_type = models.ForeignKey(ContentType, on_delete=models.DO_NOTHING)
     object_id = models.PositiveIntegerField()
@@ -809,6 +810,7 @@ class Fraud(auth_model.TimeStampedModel):
         unique_together = ('content_type', 'object_id',)
 
 
+
 class SponsorListingURL(auth_model.TimeStampedModel):
     poc = models.ForeignKey("doctor.PurchaseOrderCreation", on_delete=models.CASCADE, null=True, blank=True, related_name='poc_sponsorlisting')
     seo_url = models.CharField(max_length=500, null=True, blank=True)
@@ -863,3 +865,33 @@ class SponsoredListingService(auth_model.TimeStampedModel):
     hospital_service = models.ForeignKey('doctor.HospitalSponsoredServices', on_delete=models.SET_NULL, null=True, related_name='hospservices')
     class Meta:
         db_table = 'sponsoredlisting_service'
+
+
+class DocumentsProofs(auth_model.TimeStampedModel):
+
+    content_type = models.ForeignKey(ContentType, on_delete=models.DO_NOTHING, null=True)
+    object_id = models.PositiveIntegerField(null=True)
+    content_object = GenericForeignKey()
+    user = models.ForeignKey(User, null=True, on_delete=models.CASCADE)
+    proof_file = models.FileField(null=False, upload_to='document_proofs', validators=[FileExtensionValidator(allowed_extensions=['pdf', 'jpg', 'jpeg', 'png'])])
+
+    # @classmethod
+    # def prescription_exist_for_date(cls, user, date):
+    #     return cls.objects.filter(created_at__date=date, user=user, object_id__isnull=False).exists()
+
+    @classmethod
+    def update_with_object(cls, app_obj, ids):
+        content_type = ContentType.objects.get_for_model(app_obj)
+        cls.objects.filter(id__in=ids).update(content_type_id=content_type.id, object_id=app_obj.id)
+
+    @classmethod
+    def is_proof_uploaded(cls, app_obj):
+        content_type = ContentType.objects.get_for_model(app_obj)
+        document_proofs = cls.objects.filter(content_type_id=content_type.id, object_id=app_obj.id)
+        if document_proofs:
+            return True
+        else:
+            return False
+
+    class Meta:
+        db_table = 'document_proofs'

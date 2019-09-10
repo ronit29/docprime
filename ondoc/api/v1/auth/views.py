@@ -1215,7 +1215,9 @@ class TransactionViewSet(viewsets.GenericViewSet):
 
         CHAT_ERROR_REDIRECT_URL = settings.BASE_URL + "/mobileviewchat?payment=fail&error_message=%s" % "Error processing payment, please try again."
         CHAT_REDIRECT_URL = CHAT_ERROR_REDIRECT_URL
-        CHAT_SUCCESS_REDIRECT_URL = settings.BASE_URL + "/mobileviewchat?payment=success&order_id=%s"
+        CHAT_SUCCESS_REDIRECT_URL = settings.BASE_URL + "/mobileviewchat?payment=success&order_id=%s&consultation_id=%s"
+        PLUS_FAILURE_REDIRECT_URL = settings.BASE_URL + ""
+        PLUS_SUCCESS_REDIRECT_URL = settings.BASE_URL + "/vip-club-activated-details?payment=success&id=%s"
 
         try:
             response = None
@@ -1265,7 +1267,9 @@ class TransactionViewSet(viewsets.GenericViewSet):
                             pg_txn.save()
                         send_pg_acknowledge.apply_async((pg_txn.order_id, pg_txn.order_no,), countdown=1)
                         if pg_txn.product_id == Order.CHAT_PRODUCT_ID:
-                            CHAT_REDIRECT_URL = CHAT_SUCCESS_REDIRECT_URL % pg_txn.order_id
+                            chat_order = Order.objects.filter(pk=pg_txn.order_id).first()
+                            if chat_order:
+                                CHAT_REDIRECT_URL = CHAT_SUCCESS_REDIRECT_URL % (chat_order.id, chat_order.reference_id)
                             return HttpResponseRedirect(redirect_to=CHAT_REDIRECT_URL)
                         else:
                             REDIRECT_URL = (SUCCESS_REDIRECT_URL % pg_txn.order_id) + "?payment_success=true"
@@ -1344,7 +1348,9 @@ class TransactionViewSet(viewsets.GenericViewSet):
                 elif processed_data.get("type") == "econsultation":
                     REDIRECT_URL = ECONSULT_REDIRECT_URL % order_obj.id
                 elif processed_data.get('type') == "chat":
-                    CHAT_REDIRECT_URL = CHAT_SUCCESS_REDIRECT_URL % order_obj.id
+                    CHAT_REDIRECT_URL = CHAT_SUCCESS_REDIRECT_URL % (order_obj.id, str(processed_data.get("id", "")))
+                elif processed_data.get('type') == "plus":
+                    REDIRECT_URL = PLUS_SUCCESS_REDIRECT_URL % str(processed_data.get("id", ""))
         except Exception as e:
             logger.error("Error - " + str(e))
 

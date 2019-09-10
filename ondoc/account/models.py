@@ -34,6 +34,7 @@ import string
 import random
 import decimal
 
+
 logger = logging.getLogger(__name__)
 
 
@@ -95,7 +96,7 @@ class Order(TimeStampedModel):
     matrix_lead_id = models.PositiveIntegerField(null=True)
     parent = models.ForeignKey('self', on_delete=models.CASCADE, related_name="orders", blank=True, null=True)
     cart = models.ForeignKey('cart.Cart', on_delete=models.CASCADE, related_name="order", blank=True, null=True)
-    user = models.ForeignKey(User, on_delete=models.DO_NOTHING, blank=True, null=True)
+    user = models.ForeignKey(User, on_delete=models.DO_NOTHING, blank=True, null=True, related_name="orders")
     visitor_info = JSONField(blank=True, null=True)
 
     def __str__(self):
@@ -288,13 +289,19 @@ class Order(TimeStampedModel):
         amount = None
         promotional_amount = 0
         total_balance = consumer_account.get_total_balance()
+        _responsible_user=None
+        _source=None
+        if '_responsible_user' in appointment_data:
+            _responsible_user = appointment_data.pop('_responsible_user')
+        if '_source' in appointment_data:
+            _source = appointment_data.pop('_source')
 
         if self.action == Order.OPD_APPOINTMENT_CREATE:
             if total_balance >= appointment_data["effective_price"] or payment_not_required:
                 if self.reference_id:
                     appointment_obj = cod_to_prepaid_app
                 else:
-                    appointment_obj = OpdAppointment.create_appointment(appointment_data)
+                    appointment_obj = OpdAppointment.create_appointment(appointment_data, responsible_user=_responsible_user, source=_source)
                 order_dict = {
                     "reference_id": appointment_obj.id,
                     "payment_status": Order.PAYMENT_ACCEPTED
@@ -302,7 +309,7 @@ class Order(TimeStampedModel):
                 amount = appointment_obj.effective_price
         elif self.action == Order.LAB_APPOINTMENT_CREATE:
             if total_balance >= appointment_data["effective_price"] or payment_not_required:
-                appointment_obj = LabAppointment.create_appointment(appointment_data)
+                appointment_obj = LabAppointment.create_appointment(appointment_data, responsible_user=_responsible_user, source=_source)
                 order_dict = {
                     "reference_id": appointment_obj.id,
                     "payment_status": Order.PAYMENT_ACCEPTED
@@ -423,6 +430,8 @@ class Order(TimeStampedModel):
             appointment_obj.save()
 
             if promotional_amount:
+                appointment_obj.price_data["promotional_amount"] = int(promotional_amount)
+                appointment_obj.save()
                 ConsumerAccount.credit_cashback(consultation_data.get('user'), promotional_amount, appointment_obj, self.product_id)
 
         return appointment_obj, wallet_amount, cashback_amount
@@ -600,7 +609,6 @@ class Order(TimeStampedModel):
         from ondoc.matrix.tasks import push_order_to_matrix
 
         fulfillment_data = cls.transfrom_cart_items(request, cart_items)
-
         user = request.user
         resp = {}
         balance = 0
@@ -736,6 +744,7 @@ class Order(TimeStampedModel):
         from ondoc.subscription_plan.models import UserPlanMapping
         from ondoc.chat.models import ChatConsultation
         from ondoc.insurance.models import InsuranceDoctorSpecializations
+        from ondoc.plus.models import PlusUser
 
         from ondoc.provider.models import EConsultation
         orders_to_process = []
@@ -746,6 +755,7 @@ class Order(TimeStampedModel):
 
         total_cashback_used = total_wallet_used = 0
         opd_appointment_ids = []
+        plus_ids = []
         lab_appointment_ids = []
         insurance_ids = []
         user_plan_ids = []
@@ -806,6 +816,8 @@ class Order(TimeStampedModel):
                     econsult_ids.append(curr_app.id)
                 elif order.product_id == Order.CHAT_PRODUCT_ID:
                     chat_plan_ids.append(curr_app.id)
+                elif order.product_id == Order.VIP_PRODUCT_ID:
+                    plus_ids.append(curr_app.id)
 
                 total_cashback_used += curr_cashback
                 total_wallet_used += curr_wallet
@@ -820,7 +832,7 @@ class Order(TimeStampedModel):
             except Exception as e:
                 logger.error(str(e))
 
-        if not opd_appointment_ids and not lab_appointment_ids and not insurance_ids and not user_plan_ids and not econsult_ids and not chat_plan_ids:
+        if not opd_appointment_ids and not lab_appointment_ids and not insurance_ids and not user_plan_ids and not econsult_ids and not chat_plan_ids and not plus_ids:
             raise Exception("Could not process entire order")
 
         # mark order processed:
@@ -847,11 +859,14 @@ class Order(TimeStampedModel):
             EConsultation.objects.filter(id__in=econsult_ids).update(money_pool=money_pool)
         if chat_plan_ids:
             ChatConsultation.objects.filter(id__in=chat_plan_ids).update(money_pool=money_pool)
+        if plus_ids:
+            PlusUser.objects.filter(id__in=plus_ids).update(money_pool=money_pool)
+
         resp = {"opd": opd_appointment_ids , "lab": lab_appointment_ids, "plan": user_plan_ids,
-                 "insurance": insurance_ids, "econsultation": econsult_ids, "chat" : chat_plan_ids, "type": "all", "id": None }
+                 "insurance": insurance_ids, "econsultation": econsult_ids, "chat" : chat_plan_ids, "plus": plus_ids, "type": "all", "id": None }
         # Handle backward compatibility, in case of single booking, return the booking id
 
-        if (len(opd_appointment_ids) + len(lab_appointment_ids) + len(user_plan_ids) + len(insurance_ids) + len(econsult_ids) + len(chat_plan_ids)) == 1:
+        if (len(opd_appointment_ids) + len(lab_appointment_ids) + len(user_plan_ids) + len(insurance_ids) + len(econsult_ids) + len(chat_plan_ids) + len(plus_ids)) == 1:
             result_type = "all"
             result_id = None
             if len(opd_appointment_ids) > 0:
@@ -872,6 +887,9 @@ class Order(TimeStampedModel):
             elif len(chat_plan_ids) > 0:
                 result_type = "chat"
                 result_id = chat_plan_ids[0]
+            elif len(plus_ids) > 0:
+                result_type = "plus"
+                result_id = plus_ids[0]
             # resp["type"] = "doctor" if len(opd_appointment_ids) > 0 else "lab"
             # resp["id"] = opd_appointment_ids[0] if len(opd_appointment_ids) > 0 else lab_appointment_ids[0]
             resp["type"] = result_type
@@ -1099,7 +1117,7 @@ class PgTransaction(TimeStampedModel):
     @classmethod
     def is_valid_hash(cls, data, product_id):
         client_key = secret_key = ""
-        if product_id in [Order.DOCTOR_PRODUCT_ID, Order.SUBSCRIPTION_PLAN_PRODUCT_ID, Order.CHAT_PRODUCT_ID, Order.PROVIDER_ECONSULT_PRODUCT_ID]:
+        if product_id in [Order.DOCTOR_PRODUCT_ID, Order.SUBSCRIPTION_PLAN_PRODUCT_ID, Order.CHAT_PRODUCT_ID, Order.PROVIDER_ECONSULT_PRODUCT_ID, Order.VIP_PRODUCT_ID]:
             client_key = settings.PG_CLIENT_KEY_P1
             secret_key = settings.PG_SECRET_KEY_P1
         elif product_id == Order.LAB_PRODUCT_ID:
@@ -1336,10 +1354,39 @@ class ConsumerAccount(TimeStampedModel):
         ConsumerTransaction.objects.create(**consumer_tx_data)
         self.save()
 
+    def debit_promotional(self, appointment_obj):
+        cashback_deducted = balance_deducted = 0
+        promotional_amount_debit = appointment_obj.promotional_amount
+
+        if promotional_amount_debit:
+            cashback_deducted = min(self.cashback, promotional_amount_debit)
+            self.cashback -= cashback_deducted
+
+            balance_deducted = min(self.balance, promotional_amount_debit - cashback_deducted)
+            self.balance -= balance_deducted
+
+            action = ConsumerTransaction.PROMOTIONAL_DEBIT
+            tx_type = PgTransaction.DEBIT
+
+            if cashback_deducted:
+                consumer_tx_data = self.consumer_tx_appointment_data(appointment_obj.user, appointment_obj, appointment_obj.PRODUCT_ID,
+                                                                     cashback_deducted, action, tx_type,
+                                                                     ConsumerTransaction.CASHBACK_SOURCE)
+                ConsumerTransaction.objects.create(**consumer_tx_data)
+
+            if balance_deducted:
+                consumer_tx_data = self.consumer_tx_appointment_data(appointment_obj.user, appointment_obj, appointment_obj.PRODUCT_ID,
+                                                                     balance_deducted, action, tx_type,
+                                                                     ConsumerTransaction.WALLET_SOURCE)
+                ConsumerTransaction.objects.create(**consumer_tx_data)
+
+            self.save()
+        return balance_deducted, cashback_deducted
+
     @classmethod
     def credit_cashback(cls, user, cashback_amount, appointment_obj, product_id):
         # check if cashback already credited
-        if ConsumerTransaction.objects.filter(product_id=product_id, type=ConsumerTransaction.CASHBACK_CREDIT, reference_id=appointment_obj.id).exists():
+        if ConsumerTransaction.objects.filter(product_id=product_id, action=ConsumerTransaction.CASHBACK_CREDIT, reference_id=appointment_obj.id).exists():
             return
 
         consumer_account = cls.objects.select_for_update().get(user=user)
@@ -1416,12 +1463,13 @@ class ConsumerTransaction(TimeStampedModel):
     RESCHEDULE_PAYMENT = 4
     CASHBACK_CREDIT = 5
     REFERRAL_CREDIT = 6
+    PROMOTIONAL_DEBIT = 7
 
     WALLET_SOURCE = 1
     CASHBACK_SOURCE = 2
 
     SOURCE_TYPE = [(WALLET_SOURCE, "Wallet"), (CASHBACK_SOURCE, "Cashback")]
-    action_list = ["Cancellation", "Payment", "Refund", "Sale", "CashbackCredit", "ReferralCredit"]
+    action_list = ["Cancellation", "Payment", "Refund", "Sale", "CashbackCredit", "ReferralCredit", "PromotionalDebit"]
     ACTION_CHOICES = list(enumerate(action_list, 0))
     user = models.ForeignKey(User, on_delete=models.DO_NOTHING)
     product_id = models.SmallIntegerField(choices=Order.PRODUCT_IDS, blank=True, null=True)

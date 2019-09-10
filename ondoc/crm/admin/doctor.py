@@ -1575,7 +1575,14 @@ class DoctorOpdAppointmentForm(RefundableAppointmentForm):
                     raise forms.ValidationError("Can not send credit letter for COD bookings.")
                 else:
                     try:
-                        notification_tasks.send_opd_notifications_refactored.apply_async((self.instance.id, NotificationAction.APPOINTMENT_ACCEPTED), countdown=1)
+                        # notification_tasks.send_opd_notifications_refactored.apply_async((self.instance.id, NotificationAction.APPOINTMENT_ACCEPTED), countdown=1)
+
+                        # For stopping created to cancelled notification to provider
+                        sent_to_provider = True
+                        notification_tasks.send_opd_notifications_refactored.apply_async(({'appointment_id': self.instance.id,
+                                                                                           'is_valid_for_provider': sent_to_provider,
+                                                                                           'notification_type': NotificationAction.APPOINTMENT_ACCEPTED},),
+                                                                                            countdown=1)
                     except Exception as e:
                         logger.error(str(e))
 
@@ -2069,7 +2076,13 @@ class DoctorOpdAppointmentAdmin(ExportMixin, CompareVersionAdmin):
                 obj.action_completed()
             send_cod_to_prepaid_request = form.cleaned_data.get('send_cod_to_prepaid_request', False)
             if send_cod_to_prepaid_request:
-                notification_tasks.send_opd_notifications_refactored.apply_async((obj.id, NotificationAction.COD_TO_PREPAID_REQUEST), countdown=5)
+                # notification_tasks.send_opd_notifications_refactored.apply_async((obj.id, NotificationAction.COD_TO_PREPAID_REQUEST), countdown=5)
+
+                # Change to fix created to cancelled notification to provider
+                notification_tasks.send_opd_notifications_refactored.apply_async(({'appointment_id': self.id,
+                                                                                   'is_valid_for_provider': True,
+                                                                                   'notification_type': NotificationAction.COD_TO_PREPAID_REQUEST},),
+                                                                                 countdown=1)
             if form and form.cleaned_data and form.cleaned_data.get('refund_payment', False):
                 obj._refund_reason = form.cleaned_data.get('refund_reason', '')
                 obj.action_refund()
