@@ -304,6 +304,8 @@ class PlusUser(auth_model.TimeStampedModel):
         PlusUserUtilization.create_utilization(plus_membership_obj)
         return plus_membership_obj
 
+
+
     class Meta:
         db_table = 'plus_users'
         unique_together = (('user', 'plan'),)
@@ -343,7 +345,10 @@ class PlusTransaction(auth_model.TimeStampedModel):
     reason = models.PositiveSmallIntegerField(null=True, choices=REASON_CHOICES)
 
     def after_commit_tasks(self):
-        pass
+        from ondoc.plus.tasks import push_plus_buy_to_matrix
+        from ondoc.notification.tasks import send_plus_membership_notifications
+        send_plus_membership_notifications.apply_async(({'user_id': self.plus_user.user.id}, ),
+                                                 link=push_plus_buy_to_matrix.s(user_id=self.plus_user.user.id), countdown=1)
 
     def save(self, *args, **kwargs):
         #should never be saved again

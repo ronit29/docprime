@@ -416,6 +416,8 @@ class SMSNotification:
             obj = DynamicTemplates.objects.filter(template_name="Reminder_appointment", approved=True).first()
         elif notification_type == NotificationAction.SEND_LENSFIT_COUPON:
             obj = DynamicTemplates.objects.filter(template_name="Lensfit_sms", approved=True).first()
+        elif notification_type == NotificationAction.PLUS_MEMBERSHIP_CONFIRMED:
+            obj = DynamicTemplates.objects.filter(template_name="Docprime_vip_welcome_message", approved=True).first()
 
         return obj
 
@@ -2338,3 +2340,53 @@ class EConsultationComm(Notification):
             app_notification.send(all_receivers.get('app_receivers', []))
             whtsapp_notification.send(all_receivers.get('sms_receivers', []))
             push_notification.send(all_receivers.get('push_receivers', []))
+
+
+class VipNotification(Notification):
+
+    def __init__(self, plus_user_obj, notification_type=None):
+        self.plus_user_obj= plus_user_obj
+        self.notification_type = notification_type
+
+    def get_context(self):
+        instance = self.plus_user_obj
+
+        context = {
+            'expiry_date': str(aware_time_zone(instance.expiry_date).date().strftime('%d %b %Y')),
+        }
+
+        return context
+
+    def get_receivers(self):
+
+        all_receivers = {}
+        instance = self.plus_user_obj
+        if not instance:
+            return {}
+
+        user_and_phone_number = []
+        user_and_email = []
+
+        proposer = instance.get_primary_member_profile()
+
+        user_and_email.append({'user': instance.user, 'email': proposer.email})
+        user_and_phone_number.append({'user': instance.user, 'phone_number': proposer.phone_number})
+
+        all_receivers['sms_receivers'] = user_and_phone_number
+        all_receivers['email_receivers'] = user_and_email
+
+        return all_receivers
+
+    def send(self):
+        context = self.get_context()
+        notification_type = self.notification_type
+        all_receivers = self.get_receivers()
+
+        if notification_type in [NotificationAction.PLUS_MEMBERSHIP_CONFIRMED]:
+
+            # email_notification = EMAILNotification(notification_type, context)
+            # email_notification.send(all_receivers.get('email_receivers', []))
+
+            sms_notification = SMSNotification(notification_type, context)
+            sms_notification.send(all_receivers.get('sms_receivers', []))
+
