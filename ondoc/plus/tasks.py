@@ -13,6 +13,7 @@ logger = logging.getLogger(__name__)
 
 @task(bind=True, max_retries=2)
 def push_plus_buy_to_matrix(self, *args, **kwargs):
+    return
     from ondoc.authentication.models import User
     from ondoc.plus.models import PlusUser, PlusLead
     try:
@@ -39,22 +40,36 @@ def push_plus_buy_to_matrix(self, *args, **kwargs):
             plus_user_obj.save()
 
         request_data = {
-            'LeadSource': 'Docprime',
-            'Name': primary_proposer.get_full_name(),
-            'BookedBy': user_obj.phone_number,
+            "IsRadiology": False,
+            "IsPathology": False,
+            "Name": primary_proposer.get_full_name(),
+            "Address": primary_proposer.address,
+            "YearsOfExp": 0,
             'LeadID': plus_user_obj.matrix_lead_id if plus_user_obj.matrix_lead_id else 0,
-            'PrimaryNo': user_obj.phone_number,
-            'ProductId': 11,
-            'SubProductId': 0,
-            "PolicyDetails": {
-                "ProposalNo": None,
-                "BookingId": plus_user_obj.id,
-                'PolicyPaymentSTATUS': 300,
-                "ProposerName": primary_proposer.get_full_name(),
-                "InsurancePlanPurchased": plus_user_obj.insurance_plan.name,
-                "PurchaseDate": int(plus_user_obj.purchase_date.timestamp()),
-                "ExpirationDate": int(plus_user_obj.expire_date.timestamp()),
-            }
+            "CityId": 0,
+            "NumberofDoctor": 0,
+            "NumberOfClinic": 0,
+            "IsRetail": False,
+            "IsPPC": False,
+            "SpecialityIdList": None,
+            "DMCNo": None,
+            "ProductId": 11,
+            "PrimaryNo": user_obj.phone_number,
+            "Gender": "1",
+            "SubProductId": 0,
+            "LeadSource": "Docprime",
+            "PolicyDetails":
+                {
+                    "ProposalNo": "0",
+                    "BookingId": plus_user_obj.id,
+                    "ProposerName": primary_proposer.get_full_name(),
+                    "PolicyId": "0",
+                    "PolicyPaymentSTATUS": 300,
+                    "InsurancePlanPurchased": 1 if user_obj.active_insurance else 0,
+                    "PurchaseDate": int(plus_user_obj.purchase_date.timestamp()),
+                    "ExpirationDate": int(plus_user_obj.expire_date.timestamp()),
+                    "PeopleCovered": "yes"
+                }
         }
 
         url = settings.MATRIX_API_URL
@@ -80,8 +95,8 @@ def push_plus_buy_to_matrix(self, *args, **kwargs):
                 logger.error(json.dumps(request_data))
                 raise Exception("[ERROR] Id not recieved from the matrix while pushing insurance to matrix.")
 
-            user_insurance_qs = PlusUser.objects.filter(id=plus_user_obj.id)
-            user_insurance_qs.update(matrix_lead_id=resp_data.get('Id'))
+            user_plus_qs = PlusUser.objects.filter(id=plus_user_obj.id)
+            user_plus_qs.update(matrix_lead_id=resp_data.get('Id'))
 
     except Exception as e:
         logger.error("Error in Celery. Failed pushing insurance to the matrix- " + str(e))

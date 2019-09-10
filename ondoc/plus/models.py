@@ -223,7 +223,7 @@ class PlusUser(auth_model.TimeStampedModel):
         resp['utilized'] = 0
         resp['available'] = data['DOCTOR_CONSULT_AMOUNT'.lower()]
         resp['members_count_online_consulation'] = data['MEMBERS_COVERED_IN_PACKAGE'.lower()]
-        # resp['remaining_body_checkup_count'] = data['HEALTH_CHECKUPS_COUNT'.lower()]
+        resp['remaining_body_checkup_count'] = data['HEALTH_CHECKUPS_COUNT'.lower()]
 
         return resp
 
@@ -368,13 +368,12 @@ class PlusTransaction(auth_model.TimeStampedModel):
     amount = models.PositiveSmallIntegerField(default=0)
     reason = models.PositiveSmallIntegerField(null=True, choices=REASON_CHOICES)
 
-
     def after_commit_tasks(self):
         from ondoc.plus.tasks import push_plus_buy_to_matrix
         from ondoc.notification.tasks import send_plus_membership_notifications
         if self.transaction_type == self.DEBIT:
-            # send_plus_membership_notifications.apply_async(({'user_id': self.plus_user.user.id}, ),
-            #                                          link=push_plus_buy_to_matrix.s(user_id=self.plus_user.user.id), countdown=1)
+            send_plus_membership_notifications.apply_async(({'user_id': self.plus_user.user.id}, ),
+                                                     link=push_plus_buy_to_matrix.s(user_id=self.plus_user.user.id), countdown=1)
 
             # Activate the Docprime Care membership.
             self.plus_user.activate_care_membership()
