@@ -1486,26 +1486,33 @@ class PartnerLabTestSamplesCollect(viewsets.GenericViewSet):
         lab_tests = valid_data.get('lab_tests')
         lab_alerts = valid_data.get('lab_alerts')
         barcode_details = valid_data.get('barcode_details')
-        sample_collection_objs = prov_models.PartnerLabTestSampleDetails.get_sample_collection_details(lab_tests)
-        samples_data = serializers.LabTestSamplesCollectionBarCodeModelSerializer(sample_collection_objs, many=True,
-                                                                                  context={"barcode_details": barcode_details}).data
-        available_lab_tests = lab_models.AvailableLabTest.objects.filter(test__in=lab_tests, lab_pricing_group=lab.lab_pricing_group)
-        if not order_obj:
-            order_obj = prov_models.PartnerLabSamplesCollectOrder.objects.create(offline_patient=offline_patient,
-                                                                                 patient_details=v1_doc_serializer.OfflinePatientSerializer(offline_patient).data,
-                                                                                 hospital=hospital, doctor=doctor,
-                                                                                 lab=lab, samples=samples_data,
-                                                                                 collection_datetime=valid_data.get("collection_datetime"),
-                                                                                 selected_tests_details=serializers.SelectedTestsDetailsSerializer(available_lab_tests, many=True).data,
-                                                                                 )
-        else:
-            order_obj.samples = samples_data
-            order_obj.collection_datetime = valid_data.get("collection_datetime")
-            order_obj.selected_tests_details = serializers.SelectedTestsDetailsSerializer(available_lab_tests, many=True).data
+        status = valid_data.get('status')
+        only_status_update = valid_data.get('only_status_update')
+        if only_status_update:
+            order_obj.status = status
             order_obj.save()
-        if lab_alerts:
-            order_obj.lab_alerts.set(lab_alerts, clear=True)
-        order_obj.available_lab_tests.set(available_lab_tests, clear=True)
+        else:
+            sample_collection_objs = prov_models.PartnerLabTestSampleDetails.get_sample_collection_details(lab_tests)
+            samples_data = serializers.LabTestSamplesCollectionBarCodeModelSerializer(sample_collection_objs, many=True,
+                                                                                      context={"barcode_details": barcode_details}).data
+            available_lab_tests = lab_models.AvailableLabTest.objects.filter(test__in=lab_tests, lab_pricing_group=lab.lab_pricing_group)
+            if not order_obj:
+                order_obj = prov_models.PartnerLabSamplesCollectOrder.objects.create(offline_patient=offline_patient,
+                                                                                     patient_details=v1_doc_serializer.OfflinePatientSerializer(offline_patient).data,
+                                                                                     hospital=hospital, doctor=doctor,
+                                                                                     lab=lab, samples=samples_data,
+                                                                                     collection_datetime=valid_data.get("collection_datetime"),
+                                                                                     selected_tests_details=serializers.SelectedTestsDetailsSerializer(available_lab_tests, many=True).data,
+                                                                                     status=status)
+            else:
+                order_obj.status = status
+                order_obj.samples = samples_data
+                order_obj.collection_datetime = valid_data.get("collection_datetime")
+                order_obj.selected_tests_details = serializers.SelectedTestsDetailsSerializer(available_lab_tests, many=True).data
+                order_obj.save()
+            if lab_alerts:
+                order_obj.lab_alerts.set(lab_alerts, clear=True)
+            order_obj.available_lab_tests.set(available_lab_tests, clear=True)
         order_model_serializer = serializers.PartnerLabSamplesCollectOrderModelSerializer(order_obj)
         return Response({"status": 1, "message": "Sample Collection Order created successfully",
                          "data": order_model_serializer.data})

@@ -852,8 +852,12 @@ class SampleCollectOrderCreateOrUpdateSerializer(serializers.Serializer):
     collection_datetime = serializers.DateTimeField(required=False, allow_null=True)
     lab_alerts = serializers.ListField(child=serializers.PrimaryKeyRelatedField(queryset=provider_models.TestSamplesLabAlerts.objects.all()), allow_empty=True, required=False)
     barcode_details = serializers.DictField(required=False, allow_null=True)
+    status = serializers.ChoiceField(choices=provider_models.PartnerLabSamplesCollectOrder.STATUS_CHOICES)
+    only_status_update = serializers.BooleanField(default=False)
 
     def validate(self, attrs):
+        if attrs.get('only_status_update') and not attrs.get('id'):
+            raise serializers.ValidationError('Order Id is required for just status update')
         hospital_id = attrs.get('hospital_id')
         lab_id = attrs.get('lab_id')
         doctor_id = attrs.get('doctor_id')
@@ -976,8 +980,8 @@ class PartnerLabSamplesCollectOrderModelSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = provider_models.PartnerLabSamplesCollectOrder
-        fields = ('id', 'created_at', 'updated_at', 'collection_datetime', 'samples', 'offline_patient', 'hospital',
-                  'doctor', 'lab_alerts', 'selected_tests_details')
+        fields = ('id', 'created_at', 'updated_at', 'status', 'collection_datetime', 'samples', 'offline_patient',
+                  'hospital', 'doctor', 'lab_alerts', 'selected_tests_details')
 
 
 class TestSamplesLabAlertsModelSerializer(serializers.ModelSerializer):

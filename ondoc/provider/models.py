@@ -276,6 +276,16 @@ class PartnerLabTestSampleDetails(auth_models.TimeStampedModel):
 
 class PartnerLabSamplesCollectOrder(auth_models.TimeStampedModel):
 
+    SAMPLE_SCAN_PENDING = 1
+    SAMPLE_COLLECTION_PENDING = 2
+    SAMPLE_COLLECTED = 3
+    REPORT_GENERATED = 4
+    REPORT_VIEWED = 5
+    STATUS_CHOICES = [(SAMPLE_SCAN_PENDING, "Sample Scan Pending"),
+                      (SAMPLE_COLLECTION_PENDING, "Sample Collection Pending"),
+                      (SAMPLE_COLLECTED, "Sample Collected"),
+                      (REPORT_GENERATED, "Report Generated"),
+                      (REPORT_VIEWED, "Report Viewed")]
     offline_patient = models.ForeignKey(doc_models.OfflinePatients, on_delete=models.CASCADE, related_name="patient_lab_samples_collect_order")
     patient_details = JSONField()
     hospital = models.ForeignKey(doc_models.Hospital, on_delete=models.CASCADE, related_name="hosp_lab_samples_collect_order")
@@ -286,6 +296,7 @@ class PartnerLabSamplesCollectOrder(auth_models.TimeStampedModel):
     samples = JSONField()
     selected_tests_details = JSONField()
     lab_alerts = models.ManyToManyField(TestSamplesLabAlerts)
+    status = models.SmallIntegerField(choices=STATUS_CHOICES)
 
     def __str__(self):
         return str(self.offline_patient.name) + '-' + str(self.hospital.name)
