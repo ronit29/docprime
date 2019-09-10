@@ -1465,10 +1465,12 @@ class PartnerLabTestSamplesCollect(viewsets.GenericViewSet):
                     ret_obj['updated_at'] = None
                     ret_obj['sample_name'] = None
                     ret_obj['material_required'] = None
-                    ret_obj['sample_volume_required'] = None
-                    ret_obj['fasting_required'] = None
+                    ret_obj['sample_volume'] = None
+                    ret_obj['sample_volume_unit'] = None
+                    ret_obj['is_fasting_required'] = None
                     ret_obj['report_tat'] = None
                     ret_obj['reference_value'] = None
+                    ret_obj['instructions'] = None
                 response_list.append(ret_obj)
         return Response(response_list)
 
@@ -1483,16 +1485,6 @@ class PartnerLabTestSamplesCollect(viewsets.GenericViewSet):
         lab = valid_data.get('lab')
         lab_tests = valid_data.get('lab_tests')
         lab_alerts = valid_data.get('lab_alerts')
-        # sample_details = prov_models.ProviderLabTestSampleDetails.objects.filter(lab_test__in=lab_tests)
-        # max_volumes_list = sample_details.values('sample__name').annotate(max_volume=Max('volume'))
-        # max_volumes_dict = dict()
-        # sample_ids_to_be_excluded = list()
-        # for max_volume in max_volumes_list:
-        #     max_volumes_dict[max_volume['sample__name']] = max_volume['max_volume']
-        # for sample_detail in sample_details:
-        #     if sample_detail.sample.name in max_volumes_dict and sample_detail.volume != max_volumes_dict[sample_detail.sample.name]:
-        #         sample_ids_to_be_excluded.append(sample_detail.id)
-        # samples_objs = sample_details.exclude(id__in=sample_ids_to_be_excluded)
         sample_collection_objs = prov_models.PartnerLabTestSampleDetails.get_sample_collection_details(lab_tests)
         samples_data = serializers.PartnerLabTestSampleDetailsModelSerializer(sample_collection_objs, many=True).data
         available_lab_tests = lab_models.AvailableLabTest.objects.filter(test__in=lab_tests, lab_pricing_group=lab.lab_pricing_group)

@@ -933,28 +933,26 @@ class AvailableLabTestSampleSerializer(serializers.ModelSerializer):
 class SelectedTestsDetailsSerializer(serializers.ModelSerializer):
     lab_test_id = serializers.IntegerField(source="test.id")
     lab_test_name = serializers.CharField(source="test.name")
-    b2c_rates = serializers.SerializerMethodField()
+    b2c_rate = serializers.SerializerMethodField()
 
-    def get_b2c_rates(self, obj):
+    def get_b2c_rate(self, obj):
         return int(obj.get_deal_price())
 
     class Meta:
         model = diag_models.AvailableLabTest
-        fields = ('lab_test_id', 'lab_test_name', 'b2c_rates')
+        fields = ('lab_test_id', 'lab_test_name', 'b2c_rate')
 
 
 class PartnerLabTestSampleDetailsModelSerializer(serializers.ModelSerializer):
     sample_details_id = serializers.IntegerField(source="id")
     sample_name = serializers.CharField(source="sample.name")
-    sample_volume = serializers.CharField(source='volume')
-
-    # def get_sample_name(self, obj):
-    #     return obj.sample.name
+    sample_volume = serializers.IntegerField(source='volume')
+    sample_volume_unit = serializers.CharField(source='volume_unit')
 
     class Meta:
         model = provider_models.PartnerLabTestSampleDetails
         fields = ('sample_details_id', 'created_at', 'updated_at', 'sample_name', 'material_required', 'sample_volume',
-                  'is_fasting_required', 'report_tat', 'reference_value', 'instructions')
+                  'sample_volume_unit', 'is_fasting_required', 'report_tat', 'reference_value', 'instructions')
 
 
 class PartnerLabSamplesCollectOrderModelSerializer(serializers.ModelSerializer):

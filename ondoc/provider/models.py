@@ -241,13 +241,15 @@ class PartnerLabTestSamples(auth_models.TimeStampedModel):
 
 
 class PartnerLabTestSampleDetails(auth_models.TimeStampedModel):
-
+    ML = 'ml'
+    VOLUME_UNIT_CHOICES = [(ML, "ml")]
     lab_test = models.OneToOneField(diag_models.LabTest, on_delete=models.CASCADE, related_name="sample_details")
     sample = models.ForeignKey(PartnerLabTestSamples, on_delete=models.CASCADE, related_name="details")
-    volume = models.PositiveIntegerField(null=True, blank=True)                             # in milli-litres
+    volume = models.PositiveIntegerField(null=True, blank=True)
+    volume_unit = models.CharField(max_length=16, default=None, null=True, blank=True, choices=VOLUME_UNIT_CHOICES)
     is_fasting_required = models.BooleanField(default=False)
     report_tat = models.PositiveSmallIntegerField(null=True, blank=True)                    # in hours
-    reference_value = models.PositiveIntegerField(null=True, blank=True)
+    reference_value = models.CharField(max_length=64, null=True, blank=True)
     material_required = JSONField(null=True)
     instructions = models.CharField(max_length=256, null=True, blank=True)
 
@@ -281,8 +283,8 @@ class PartnerLabSamplesCollectOrder(auth_models.TimeStampedModel):
     lab = models.ForeignKey(diag_models.Lab, on_delete=models.CASCADE, related_name="lab_samples_collect_order")
     available_lab_tests = models.ManyToManyField(diag_models.AvailableLabTest, related_name="tests_lab_samples_collect_order")
     collection_datetime = models.DateTimeField(null=True, blank=True)
-    samples = JSONField(null=True)
-    selected_tests_details = JSONField(null=True)
+    samples = JSONField()
+    selected_tests_details = JSONField()
     lab_alerts = models.ManyToManyField(TestSamplesLabAlerts)
 
     def __str__(self):
