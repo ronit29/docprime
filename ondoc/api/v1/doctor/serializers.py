@@ -468,6 +468,7 @@ class DoctorHospitalSerializer(serializers.ModelSerializer):
     enabled_for_cod = serializers.BooleanField(source='doctor_clinic.is_enabled_for_cod')
     enabled_for_prepaid = serializers.BooleanField(source='doctor_clinic.hospital.enabled_for_prepaid')
     is_price_zero = serializers.SerializerMethodField()
+    vip = serializers.SerializerMethodField()
 
     def get_show_contact(self, obj):
         if obj.doctor_clinic and obj.doctor_clinic.hospital and obj.doctor_clinic.hospital.spoc_details.all():
@@ -553,6 +554,28 @@ class DoctorHospitalSerializer(serializers.ModelSerializer):
 
         return resp
 
+    def get_vip(self, obj):
+        resp = {"is_vip_member": False, "utilization": {}}
+        request = self.context.get("request")
+        user = request.user
+        doctor_clinic = obj.doctor_clinic
+        doctor = doctor_clinic.doctor
+        hospital = doctor_clinic.hospital
+        enabled_for_online_booking = doctor_clinic.enabled_for_online_booking and doctor.enabled_for_online_booking and \
+                                        hospital.enabled_for_online_booking and hospital.enabled_for_prepaid \
+                                        and hospital.enabled_for_plus_plans and doctor.enabled_for_plus_plans
+
+        if enabled_for_online_booking and obj.mrp is not None:
+
+            plus_user = None if not user.is_authenticated or user.is_anonymous else user.active_plus_user
+            if not plus_user:
+                return resp
+            utilization = plus_user.get_utilization()
+            resp['is_vip_member'] = True
+            resp['utilization'] = utilization
+        return resp
+
+
     def get_is_price_zero(self, obj):
         if obj.fees is not None and obj.fees == 0:
             return True
@@ -569,7 +592,7 @@ class DoctorHospitalSerializer(serializers.ModelSerializer):
         fields = ('doctor', 'hospital_name', 'address','short_address', 'hospital_id', 'start', 'end', 'day', 'deal_price',
                   'discounted_fees', 'hospital_thumbnail', 'mrp', 'lat', 'long', 'id','enabled_for_online_booking',
                   'insurance', 'show_contact', 'enabled_for_cod', 'enabled_for_prepaid', 'is_price_zero', 'cod_deal_price', 'hospital_city',
-                  'url', 'fees', 'insurance_fees', 'is_ipd_hospital')
+                  'url', 'fees', 'insurance_fees', 'is_ipd_hospital', 'vip')
 
         # fields = ('doctor', 'hospital_name', 'address', 'hospital_id', 'start', 'end', 'day', 'deal_price', 'fees',
         #           'discounted_fees', 'hospital_thumbnail', 'mrp',)
