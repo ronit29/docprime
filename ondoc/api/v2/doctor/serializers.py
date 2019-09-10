@@ -977,11 +977,15 @@ class LabTestSamplesCollectionBarCodeModelSerializer(PartnerLabTestSampleDetails
 
 
 class PartnerLabSamplesCollectOrderModelSerializer(serializers.ModelSerializer):
+    lab_report = serializers.SerializerMethodField()
+
+    def get_lab_report(self, obj):
+        return [{"lab_test":["CBC","XRAY"],"url":"http://www.africau.edu/images/default/sample.pdf"},{"lab_test":["XAZ","XRAY"],"url":"http://www.africau.edu/images/default/sample.pdf"}]
 
     class Meta:
         model = provider_models.PartnerLabSamplesCollectOrder
         fields = ('id', 'created_at', 'updated_at', 'status', 'collection_datetime', 'samples', 'offline_patient',
-                  'hospital', 'doctor', 'lab_alerts', 'selected_tests_details')
+                  'hospital', 'doctor', 'lab_alerts', 'selected_tests_details', 'lab_report')
 
 
 class TestSamplesLabAlertsModelSerializer(serializers.ModelSerializer):
