@@ -824,8 +824,13 @@ class SponsorListingURL(auth_model.TimeStampedModel):
 
 
 class SponsorListingSpecialization(auth_model.TimeStampedModel):
+    from django.contrib.gis.db import models as gis_models
+
     poc = models.ForeignKey("doctor.PurchaseOrderCreation", on_delete=models.CASCADE, related_name='poc_specialization', null=True)
     specialization = models.ForeignKey("doctor.PracticeSpecialization", on_delete=models.SET_NULL, null=True, blank=True, related_name='listing_specialization')
+    location = gis_models.PointField(geography=True, srid=4326, blank=True, null=True)
+    radius = models.FloatField(null=True)
+    is_enabled = models.BooleanField(default=False)
 
     class Meta:
         db_table = 'sponsor_listing_specialization'

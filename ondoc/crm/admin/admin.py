@@ -59,7 +59,7 @@ from .doctor import (DoctorAdmin, MedicalServiceAdmin, SpecializationAdmin, Qual
                      OfflinePatientAdmin,
                      UploadDoctorDataAdmin, DoctorLeaveAdmin, SimilarSpecializationGroupAdmin,
                      PurchaseOrderCreationAdmin, SponsoredServicesAdmin, HospitalSponsoredServicesAdmin,
-                     DoctorSponsoredServicesAdmin)
+                     DoctorSponsoredServicesAdmin, SponsorListingSpecializationAdmin)
 from .aboutdoctor import AboutDoctorAdmin
 from .hospital import HospitalAdmin, CommonHospitalAdmin, GenericQuestionAnswerAdmin
 from .user import CustomUserAdmin, UserNumberUpdateAdmin, UserProfileAdmin
@@ -304,7 +304,7 @@ admin.site.register(GenericQuestionAnswer, GenericQuestionAnswerAdmin)
 admin.site.register(IntegratorLabTestParameterMapping, IntegratorLabTestParameterMappingAdmin)
 admin.site.register(PurchaseOrderCreation, PurchaseOrderCreationAdmin)
 admin.site.register(SponsorListingURL)
-admin.site.register(SponsorListingSpecialization)
+admin.site.register(SponsorListingSpecialization, SponsorListingSpecializationAdmin)
 admin.site.register(SponsorListingUtmTerm)
 admin.site.register(SponsorListingLocation)
 admin.site.register(SponsoredListingService)

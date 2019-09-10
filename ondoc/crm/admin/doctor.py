@@ -2483,6 +2483,19 @@ class SponsorListingSpecializationInline(admin.TabularInline):
     model = SponsorListingSpecialization
     extra = 0
     can_delete = True
+    class Media:
+        map_width = 200
+        map_template = 'admin/gis/gmap.html'
+        js = ('js/admin/GoogleMap.js',
+                    'https://maps.googleapis.com/maps/api/js?key=AIzaSyClYPAOTREfAZ-95eRbU6hDVHU0p3XygoY&callback=initGoogleMap')
+
+
+class SponsorListingSpecializationAdmin(admin.ModelAdmin):
+    model = SponsorListingSpecialization
+    map_width = 200
+    map_template = 'admin/gis/gmap.html'
+    extra_js = ['js/admin/GoogleMap.js',
+          'https://maps.googleapis.com/maps/api/js?key=AIzaSyClYPAOTREfAZ-95eRbU6hDVHU0p3XygoY&callback=initGoogleMap']
 
 
 class SponsorListingUtmTermInline(admin.TabularInline):
