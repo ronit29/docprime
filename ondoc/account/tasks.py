@@ -599,9 +599,11 @@ def purchase_order_creation_counter_automation():
             poc_instance.is_enabled = True
             poc_instance.provider_name_hospital.enabled_poc = True
             poc_instance.provider_name_hospital.enabled_for_cod = True
+            poc_instance.save()
 
         if poc_instance and poc_instance.product_type == PurchaseOrderCreation.SPONSOR_LISTING:
             poc_instance.is_enabled = True
+            poc_instance.save()
 
 
 @task()
@@ -612,7 +614,8 @@ def purchase_order_closing_counter_automation():
 
     for poc_instance in instance:
         if poc_instance and poc_instance.product_type == PurchaseOrderCreation.PAY_AT_CLINIC:
-            instance.disable_cod_functionality()
+            poc_instance.disable_cod_functionality()
 
-        if instance and instance.product_type == PurchaseOrderCreation.SPONSOR_LISTING:
-            instance.is_enabled = False
+        if poc_instance and poc_instance.product_type == PurchaseOrderCreation.SPONSOR_LISTING:
+            poc_instance.is_enabled = False
+            poc_instance.save()
