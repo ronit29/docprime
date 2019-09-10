@@ -18,6 +18,7 @@ from .enums import PlanParametersEnum
 from datetime import datetime
 from django.utils.timezone import utc
 import reversion
+from django.conf import settings
 
 
 class LiveMixin(models.Model):
@@ -198,7 +199,7 @@ class PlusUser(auth_model.TimeStampedModel):
 
     def get_primary_member_profile(self):
         insured_members = self.plus_members.filter().order_by('id')
-        proposers = list(filter(lambda member: member.is_primary_user, insured_members))
+        proposers = list(filter(lambda member: member.is_primary_user and member.relation == PlusMembers.Relations.SELF, insured_members))
         if proposers:
             return proposers[0]
 
@@ -222,7 +223,7 @@ class PlusUser(auth_model.TimeStampedModel):
         resp['utilized'] = 0
         resp['available'] = data['DOCTOR_CONSULT_AMOUNT'.lower()]
         resp['members_count_online_consulation'] = data['MEMBERS_COVERED_IN_PACKAGE'.lower()]
-        resp['remaining_body_checkup_count'] = data['HEALTH_CHECKUPS_COUNT'.lower()]
+        # resp['remaining_body_checkup_count'] = data['HEALTH_CHECKUPS_COUNT'.lower()]
 
         return resp
 
@@ -304,7 +305,30 @@ class PlusUser(auth_model.TimeStampedModel):
         PlusUserUtilization.create_utilization(plus_membership_obj)
         return plus_membership_obj
 
+    def activate_care_membership(self):
+        from ondoc.subscription_plan.models import Plan, UserPlanMapping
+        plan = Plan.objects.filter(id=settings.CARE_PLAN_FOR_VIP).first()
+        if not plan:
+            return
 
+        extra_details = {"id": plan.id,
+                         "name": plan.name,
+                         "mrp": str(plan.mrp),
+                         "deal_price": str(plan.deal_price),
+                         "payable_amount": str(0),
+                         'via': 'VIP_MEMBERSHIP',
+                         "unlimited_online_consultation": plan.unlimited_online_consultation,
+                         "priority_queue": plan.priority_queue,
+                         "features": [{"id": feature_mapping.feature.id, "name": feature_mapping.feature.name,
+                                       "count": feature_mapping.count, "test":
+                                           feature_mapping.feature.test.id,
+                                       "test_name": feature_mapping.feature.test.name} for feature_mapping in
+                                      plan.feature_mappings.filter(enabled=True)]}
+
+        care_membership = UserPlanMapping(plan=plan, user=self.user, is_active=True, extra_details=extra_details,
+                                          status=UserPlanMapping.BOOKED, money_pool=None)
+
+        care_membership.save(plus_user_obj=self)
 
     class Meta:
         db_table = 'plus_users'
@@ -344,11 +368,18 @@ class PlusTransaction(auth_model.TimeStampedModel):
     amount = models.PositiveSmallIntegerField(default=0)
     reason = models.PositiveSmallIntegerField(null=True, choices=REASON_CHOICES)
 
+
     def after_commit_tasks(self):
         from ondoc.plus.tasks import push_plus_buy_to_matrix
         from ondoc.notification.tasks import send_plus_membership_notifications
-        send_plus_membership_notifications.apply_async(({'user_id': self.plus_user.user.id}, ),
-                                                 link=push_plus_buy_to_matrix.s(user_id=self.plus_user.user.id), countdown=1)
+        if self.transaction_type == self.DEBIT:
+            # send_plus_membership_notifications.apply_async(({'user_id': self.plus_user.user.id}, ),
+            #                                          link=push_plus_buy_to_matrix.s(user_id=self.plus_user.user.id), countdown=1)
+
+            # Activate the Docprime Care membership.
+            self.plus_user.activate_care_membership()
+
+
 
     def save(self, *args, **kwargs):
         #should never be saved again
@@ -386,6 +417,24 @@ class PlusMembers(auth_model.TimeStampedModel):
         BROTHER = "BROTHER"
         SISTER = "SISTER"
         OTHERS = "OTHERS"
+
+        @classmethod
+        def get_custom_availabilities(cls):
+            relations = {
+                'SELF': 'Self',
+                'SPOUSE': 'Spouse',
+                'FATHER': 'Father',
+                'MOTHER': 'Mother',
+                'SON': 'Son',
+                'DAUGHTER': 'Daughter',
+                'SPOUSE_FATHER': 'Father-in-law',
+                'SPOUSE_MOTHER': 'Mother-in-law',
+                'BROTHER': 'Brother',
+                'SISTER': 'Sister',
+                'OTHERS': 'Others'
+            }
+
+            return relations
 
     MALE = 'm'
     FEMALE = 'f'
@@ -454,7 +503,7 @@ class PlusMembers(auth_model.TimeStampedModel):
             plus_members_obj.save()
             member_document_proofs = member.get('document_ids')
             if member_document_proofs:
-                document_ids = list(map(lambda d: d.get('proof_file'), member_document_proofs))
+                document_ids = list(map(lambda d: d.get('proof_file').id, member_document_proofs))
                 DocumentsProofs.update_with_object(plus_members_obj, document_ids)
 
     class Meta:
