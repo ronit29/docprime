@@ -289,6 +289,7 @@ class LabList(viewsets.ReadOnlyModelViewSet):
                                ' AND "available_lab_test"."enabled" = true AND "lab"."enabled" = true AND "lab"."is_live" = true AND' \
                                ' ST_DWithin("lab"."location", St_setsrid(St_point((%(longitude)s), (%(latitude)s)), 4326), %(max_distance)s))' \
                                ' and not ST_DWithin("lab"."location", St_setsrid(St_point((%(longitude)s), (%(latitude)s)), 4326), %(min_distance)s)' \
+                               ' {lab_network_query} '\
                                ' {filter_query}' \
                                ' )x where rnk =1 {sort_query} offset {offset} limit {limit} '
 
@@ -332,6 +333,7 @@ class LabList(viewsets.ReadOnlyModelViewSet):
         filter_query = ''
         params['min_distance'] = str(min_distance)
         params['max_distance'] = str(max_distance)
+        lab_network_query = ''
         if min_price:
             filter_query += ' and case when custom_deal_price is not null then custom_deal_price>=%(min_price)s else computed_deal_price>=%(min_price)s end '
             params['min_price'] = str(min_price)
@@ -341,7 +343,10 @@ class LabList(viewsets.ReadOnlyModelViewSet):
         if home_visit and not lab_visit:
             filter_query += ' and is_home_collection_enabled = True and home_collection_possible = True '
         if lab_visit and not home_visit:
-            filter_query += " and lab.network_id IS DISTINCT FROM 43 "
+            lab_network_query = ' left join lab_network ln on ln.id=lb.network_id '
+            filter_query += " (case when  (lb.network_id is not null and ln.center_visit and ln.center_visit=true and lb.center_visit " \
+                            "and lb.center_visit=true)  or  (lb.network_id is null and lb.center_visit and lb.center_visit=true) then true  end) "
+            # filter_query += " and lab.network_id IS DISTINCT FROM 43 "
 
         if avg_ratings:
             filter_query += " and (case when (rating_data is not null and (rating_data ->> 'avg_rating')::float > 4 ) or " \
@@ -1525,12 +1530,16 @@ class LabList(viewsets.ReadOnlyModelViewSet):
                             "(rating_data ->> 'rating_count')::int >5) then (rating_data ->> 'avg_rating')::float >= (%(avg_ratings)s) end) " )
             #filtering_query.append(" (case when (rating_data is not null and (rating_data ->> 'avg_rating'::float >= (%(avg_ratings)s)) is not  null) or ( (rating_data ->> 'rating_count') is not null and (rating_data ->> 'rating_count')::int >5) then (rating_data->> 'avg_rating') end) ")
             filtering_params['avg_ratings'] = min(avg_ratings)
-
+        lab_network_query = ''
         if ids:
             if home_visit and not lab_visit:
                 filtering_query.append(' is_home_collection_enabled = True and home_collection_possible = True ')
             if lab_visit and not home_visit:
-                filtering_query.append("lb.network_id IS DISTINCT FROM 43 ")
+                # filtering_query.append("lb.network_id IS DISTINCT FROM 43 ")
+                lab_network_query = ' left join lab_network ln on ln.id=lb.network_id '
+                filtering_query.append(
+                    " (case when  (lb.network_id is not null and ln.center_visit and ln.center_visit=true and lb.center_visit "
+                    " and lb.center_visit=true)  or  (lb.network_id is null and lb.center_visit and lb.center_visit=true) then true  end) ")
         ## We are excluding THYROCARE_NETWORK_ID here which is 1
 
         filter_query_string = ""
@@ -1607,7 +1616,7 @@ class LabList(viewsets.ReadOnlyModelViewSet):
                         else St_dwithin( St_setsrid(St_point((%(longitude)s), (%(latitude)s)), 4326),lb.location, lb.search_distance ) end
                         and St_dwithin(St_setsrid(St_point((%(longitude)s), (%(latitude)s)), 4326), lb.location,  (%(min_distance)s)) = false 
                         and avlt.enabled = True 
-                        inner join lab_test lt on lt.id = avlt.test_id and lt.enable_for_retail=True 
+                        inner join lab_test lt on lt.id = avlt.test_id and lt.enable_for_retail=True  {lab_network_query}
                          where 1=1 {filter_query_string}
 
                         group by lb.id having count(distinct lt.id)=(%(length)s))a
@@ -1615,7 +1624,7 @@ class LabList(viewsets.ReadOnlyModelViewSet):
                         )r
                         where new_network_rank<=(%(page_end)s) and new_network_rank>(%(page_start)s) order by new_network_rank, rank
                          '''.format(filter_query_string=filter_query_string, 
-                            group_filter_query_string=group_filter_query_string, order=order_by, lab_timing_join=lab_timing_join)
+                            group_filter_query_string=group_filter_query_string, order=order_by, lab_timing_join=lab_timing_join, lab_network_query=lab_network_query)
 
             lab_search_result = RawSql(query, filtering_params).fetch_all()
         else:
@@ -1640,11 +1649,12 @@ class LabList(viewsets.ReadOnlyModelViewSet):
                     St_dwithin( St_setsrid(St_point((%(longitude)s), (%(latitude)s)), 4326),lb.location, (%(max_distance)s))
                     else St_dwithin( St_setsrid(St_point((%(longitude)s), (%(latitude)s)), 4326),lb.location, lb.search_distance ) end
                     and St_dwithin(St_setsrid(St_point((%(longitude)s), (%(latitude)s)), 4326), location, (%(min_distance)s)) = false
+                     {lab_network_query}
                      {filter_query_string}
                     group by lb.id)a)y )x where rank<=5)z  order by {order} )r where 
                     new_network_rank<=(%(page_end)s) and new_network_rank>(%(page_start)s) order by new_network_rank, 
                     rank'''.format(
-                    filter_query_string=filter_query_string, order=order_by, lab_timing_join=lab_timing_join)
+                    filter_query_string=filter_query_string, order=order_by, lab_timing_join=lab_timing_join, lab_network_query=lab_network_query)
 
             lab_search_result = RawSql(query1, filtering_params).fetch_all()
 
