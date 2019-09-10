@@ -220,20 +220,15 @@ class PlusUser(auth_model.TimeStampedModel):
         for pp in plan_parameters:
             data[pp.parameter.key.lower()] = pp.value
 
-        resp['doctor_amount_limit'] = data['DOCTOR_CONSULT_AMOUNT'.lower()]
+        resp['doctor_consult_amount'] = int(data['DOCTOR_CONSULT_AMOUNT'.lower()])
         resp['doctor_amount_utilized'] = self.get_doctor_plus_appointment_amount()
-        resp['doctor_amount_available'] = data['DOCTOR_CONSULT_AMOUNT'.lower()]
+        resp['doctor_amount_available'] = resp['doctor_consult_amount'] - resp['doctor_amount_utilized']
         resp['members_count_online_consultation'] = data['MEMBERS_COVERED_IN_PACKAGE'.lower()]
-        resp['total_package_amount_limit'] = data['HEALTH_CHECKUPS_AMOUNT'.lower()]
-        resp['available_package_amount'] = self.get_package_plus_appointment_amount()
-        resp['total_package_count_limit'] = data['HEALTH_CHECKUPS_COUNT'.lower()]
-        resp['available_package_count'] = self.get_package_plus_appointment_count()
+        resp['total_package_amount_limit'] = int(data['HEALTH_CHECKUPS_AMOUNT'.lower()])
+        resp['total_package_count_limit'] = int(data['HEALTH_CHECKUPS_COUNT'.lower()])
 
-        # resp['total_limit'] = data['DOCTOR_CONSULT_AMOUNT'.lower()]
-        # resp['utilized'] = 0
-        # resp['available'] = data['DOCTOR_CONSULT_AMOUNT'.lower()]
-        # resp['members_count_online_consulation'] = data['MEMBERS_COVERED_IN_PACKAGE'.lower()]
-        # resp['remaining_body_checkup_count'] = data['HEALTH_CHECKUPS_COUNT'.lower()]
+        resp['available_package_amount'] = resp['total_package_amount_limit'] - int(self.get_package_plus_appointment_amount())
+        resp['available_package_count'] = resp['total_package_count_limit'] - int(self.get_package_plus_appointment_count())
 
         return resp
 
@@ -283,32 +278,32 @@ class PlusUser(auth_model.TimeStampedModel):
             return 0
 
         for lab_appointment in lab_appointments:
-            package_count = map(lambda lab_test: lab_test.is_package, lab_appointment.test_mappings)
+            package_count = package_count + len(list(filter(lambda lab_test: lab_test.is_package, lab_appointment.test_mappings)))
         return package_count
 
     def get_package_plus_appointment_amount(self):
         from ondoc.diagnostic.models import LabAppointment
-        # total_mrp = 0
+        import functools
         package_amount = 0
         lab_appointments = LabAppointment.objects.filter(plus_plan=self)
         if not lab_appointments:
             return 0
         for lab_appointment in lab_appointments:
-            package_amount = map(lambda lab_test: package_amount + lab_test.price, filter(lambda lab_test_mapping:
-                                                                                          lab_test_mapping.is_package,
-                                                                                          lab_appointment.test_mappings))
+            package_amount = package_amount + functools.reduce(lambda a, b: a.appointment.mrp + b.appointment.mrp, list(filter(lambda lab_test_mapping: lab_test_mapping.test.is_package,
+                                                               lab_appointment.test_mappings)))
+
         return package_amount
 
     def get_doctor_plus_appointment_amount(self):
+        import functools
         from ondoc.doctor.models import OpdAppointment
         total_mrp = 0
         opd_appointments = OpdAppointment.objects.filter(plus_plan=self)
         if not opd_appointments:
             return 0
-        for opd_appointment in opd_appointments:
-            mrp = opd_appointment.mrp
-            total_mrp = total_mrp + mrp
-        return mrp
+
+        total_mrp = functools.reduce(lambda a, b: a.mrp + b.mrp, opd_appointments)
+        return total_mrp
 
     @classmethod
     def profile_create_or_update(cls, member, user):

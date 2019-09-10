@@ -1533,6 +1533,7 @@ class CustomLabTestPackageSerializer(serializers.ModelSerializer):
     tests = serializers.SerializerMethodField()
     included_in_user_plan = serializers.SerializerMethodField()
     insurance = serializers.SerializerMethodField()
+    vip = serializers.SerializerMethodField()
 
 
     class Meta:
@@ -1540,7 +1541,7 @@ class CustomLabTestPackageSerializer(serializers.ModelSerializer):
         fields = ('id', 'name', 'lab', 'mrp', 'distance', 'price', 'lab_timing', 'lab_timing_data', 'next_lab_timing',
                   'next_lab_timing_data', 'test_type', 'is_package', 'number_of_tests', 'why', 'pre_test_info',
                   'is_package', 'pickup_charges', 'pickup_available', 'distance_related_charges', 'priority',
-                  'show_details', 'categories', 'url', 'priority_score', 'category_details', 'tests', 'included_in_user_plan', 'insurance')
+                  'show_details', 'categories', 'url', 'priority_score', 'category_details', 'tests', 'included_in_user_plan', 'insurance', 'vip')
 
     def get_insurance(self, obj):
         request = self.context.get("request")
@@ -1550,6 +1551,20 @@ class CustomLabTestPackageSerializer(serializers.ModelSerializer):
 
         if obj and lab and lab.is_enabled_for_insurance and obj.mrp is not None and resp['insurance_threshold_amount'] is not None and obj.mrp <= resp['insurance_threshold_amount']:
             resp['is_insurance_covered'] = True
+
+        return resp
+
+    def get_vip(self, obj):
+        request = self.context.get("request")
+        resp = Lab.get_vip_details(request.user)
+        lab_data = self.context.get('lab_data', {})
+        lab = lab_data.get(obj.lab, None)
+        user = request.user
+        plus_obj = user.active_plus_user if not user.is_anonymous and user.is_authenticated else None
+        utilization = plus_obj.get_utilization() if plus_obj else {}
+
+        if plus_obj and obj and lab and lab.enabled_for_plus_plans and obj.mrp is not None and obj.mrp <= utilization.get('available_package_amount'):
+            resp['covered_under_vip'] = True
 
         return resp
 
