@@ -851,6 +851,7 @@ class SampleCollectOrderCreateOrUpdateSerializer(serializers.Serializer):
     lab_test_ids = serializers.ListField(child=serializers.IntegerField(min_value=1))
     collection_datetime = serializers.DateTimeField(required=False, allow_null=True)
     lab_alerts = serializers.ListField(child=serializers.PrimaryKeyRelatedField(queryset=provider_models.TestSamplesLabAlerts.objects.all()), allow_empty=True, required=False)
+    barcode_details = serializers.DictField(required=False, allow_null=True)
 
     def validate(self, attrs):
         hospital_id = attrs.get('hospital_id')
@@ -872,62 +873,62 @@ class SampleCollectOrderCreateOrUpdateSerializer(serializers.Serializer):
         return attrs
 
 
-class AvailableLabTestSampleSerializer(serializers.ModelSerializer):
-    hospital_id = serializers.SerializerMethodField()
-    lab_test_id = serializers.SerializerMethodField()
-    lab_test_name = serializers.SerializerMethodField()
-    sample_name = serializers.SerializerMethodField()
-    material_required = serializers.SerializerMethodField()
-    sample_volume = serializers.SerializerMethodField()
-    is_fasting_required = serializers.SerializerMethodField()
-    report_tat = serializers.SerializerMethodField()
-    reference_value = serializers.SerializerMethodField()
-    b2c_rates = serializers.SerializerMethodField()
-
-    def get_sample_obj(self, obj):
-        return obj.test.sample_details if obj.test.sample_details else None
-
-    def get_hospital_id(self, obj):
-        hospital = self.context.get('hospital')
-        return hospital.id if hospital else None
-
-    def get_lab_test_id(self, obj):
-        return obj.test.id
-
-    def get_lab_test_name(self, obj):
-        return obj.test.name
-
-    def get_sample_name(self, obj):
-        sample_obj = self.get_sample_obj(obj)
-        return sample_obj.sample.name if sample_obj else None
-
-    def get_material_required(self, obj):
-        sample_obj = self.get_sample_obj(obj)
-        return sample_obj.material_required if sample_obj else None
-
-    def get_sample_volume(self, obj):
-        sample_obj = self.get_sample_obj(obj)
-        return sample_obj.volume if sample_obj else None
-
-    def get_is_fasting_required(self, obj):
-        sample_obj = self.get_sample_obj(obj)
-        return sample_obj.is_fasting_required if sample_obj else None
-
-    def get_report_tat(self, obj):
-        sample_obj = self.get_sample_obj(obj)
-        return sample_obj.report_tat if sample_obj else None
-
-    def get_reference_value(self, obj):
-        sample_obj = self.get_sample_obj(obj)
-        return sample_obj.reference_value if sample_obj else None
-
-    def get_b2c_rates(self, obj):
-        return obj.get_deal_price()
-
-    class Meta:
-        model = diag_models.AvailableLabTest
-        fields = ('hospital_id', 'lab_test_id', 'lab_test_name', 'sample_name', 'material_required', 'sample_volume',
-                  'is_fasting_required', 'report_tat', 'reference_value', 'b2c_rates')
+# class AvailableLabTestSampleSerializer(serializers.ModelSerializer):
+#     hospital_id = serializers.SerializerMethodField()
+#     lab_test_id = serializers.SerializerMethodField()
+#     lab_test_name = serializers.SerializerMethodField()
+#     sample_name = serializers.SerializerMethodField()
+#     material_required = serializers.SerializerMethodField()
+#     sample_volume = serializers.SerializerMethodField()
+#     is_fasting_required = serializers.SerializerMethodField()
+#     report_tat = serializers.SerializerMethodField()
+#     reference_value = serializers.SerializerMethodField()
+#     b2c_rates = serializers.SerializerMethodField()
+#
+#     def get_sample_obj(self, obj):
+#         return obj.test.sample_details if obj.test.sample_details else None
+#
+#     def get_hospital_id(self, obj):
+#         hospital = self.context.get('hospital')
+#         return hospital.id if hospital else None
+#
+#     def get_lab_test_id(self, obj):
+#         return obj.test.id
+#
+#     def get_lab_test_name(self, obj):
+#         return obj.test.name
+#
+#     def get_sample_name(self, obj):
+#         sample_obj = self.get_sample_obj(obj)
+#         return sample_obj.sample.name if sample_obj else None
+#
+#     def get_material_required(self, obj):
+#         sample_obj = self.get_sample_obj(obj)
+#         return sample_obj.material_required if sample_obj else None
+#
+#     def get_sample_volume(self, obj):
+#         sample_obj = self.get_sample_obj(obj)
+#         return sample_obj.volume if sample_obj else None
+#
+#     def get_is_fasting_required(self, obj):
+#         sample_obj = self.get_sample_obj(obj)
+#         return sample_obj.is_fasting_required if sample_obj else None
+#
+#     def get_report_tat(self, obj):
+#         sample_obj = self.get_sample_obj(obj)
+#         return sample_obj.report_tat if sample_obj else None
+#
+#     def get_reference_value(self, obj):
+#         sample_obj = self.get_sample_obj(obj)
+#         return sample_obj.reference_value if sample_obj else None
+#
+#     def get_b2c_rates(self, obj):
+#         return obj.get_deal_price()
+#
+#     class Meta:
+#         model = diag_models.AvailableLabTest
+#         fields = ('hospital_id', 'lab_test_id', 'lab_test_name', 'sample_name', 'material_required', 'sample_volume',
+#                   'is_fasting_required', 'report_tat', 'reference_value', 'b2c_rates')
 
 
 class SelectedTestsDetailsSerializer(serializers.ModelSerializer):
@@ -955,13 +956,23 @@ class PartnerLabTestSampleDetailsModelSerializer(serializers.ModelSerializer):
                   'sample_volume_unit', 'is_fasting_required', 'report_tat', 'reference_value', 'instructions')
 
 
-class PartnerLabSamplesCollectOrderModelSerializer(serializers.ModelSerializer):
+class LabTestSamplesCollectionBarCodeModelSerializer(PartnerLabTestSampleDetailsModelSerializer):
+    barcode = serializers.SerializerMethodField()
 
-    def get_selected_tests(self, obj):
-        resp = list()
-        for available_lab_test in obj.available_lab_tests.all():
-            resp.append({"lab_test_id": available_lab_test.test.id, "lab_test_name": available_lab_test.test.name, "b2c_rates": available_lab_test.get_deal_price()})
-        return resp
+    def get_barcode(self, obj):
+        barcode_details = self.context.get('barcode_details')
+        if barcode_details and str(obj.id) in barcode_details:
+            return barcode_details.get(str(obj.id))
+        return None
+
+    class Meta:
+        model = provider_models.PartnerLabTestSampleDetails
+        fields = ('sample_details_id', 'created_at', 'updated_at', 'sample_name', 'material_required', 'sample_volume',
+                  'sample_volume_unit', 'is_fasting_required', 'report_tat', 'reference_value', 'instructions',
+                  'barcode')
+
+
+class PartnerLabSamplesCollectOrderModelSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = provider_models.PartnerLabSamplesCollectOrder
@@ -973,4 +984,4 @@ class TestSamplesLabAlertsModelSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = provider_models.TestSamplesLabAlerts
-        fields = ('name',)
+        fields = ('id', 'name')
