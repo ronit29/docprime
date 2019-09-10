@@ -1428,10 +1428,15 @@ class EConsultationCommViewSet(viewsets.GenericViewSet):
         return Response({"status": 1, "message": "success"})
 
 
-class PartnerLabTestSamplesCollect(viewsets.GenericViewSet):
+class PartnerLabTestSamplesCollectViewset(viewsets.GenericViewSet):
 
     authentication_classes = (JWTAuthentication,)
     permission_classes = (IsAuthenticated, v1_utils.IsDoctor)
+
+    def get_queryset(self):
+        request = self.request
+        return prov_models.PartnerLabSamplesCollectOrder.objects.prefetch_related('lab_alerts') \
+                                                                .filter(hospital__manageable_hospitals__phone_number=request.user.phone_number)
 
     def tests_list(self, request):
         serializer = serializers.LabTestsListSerializer(data=request.query_params, context={'request':request})
@@ -1443,19 +1448,12 @@ class PartnerLabTestSamplesCollect(viewsets.GenericViewSet):
             hospital = hosp_lab_dict['hospital']
             lab = hosp_lab_dict['lab']
             available_lab_tests = lab.lab_pricing_group.available_lab_tests.all()
-            # data = serializers.AvailableLabTestSampleSerializer(available_lab_tests, context={'hospital': hospital},
-            #                                                     many=True).data
-            # response_list.extend(data)
             for obj in available_lab_tests:
                 ret_obj = dict()
                 sample_obj = obj.test.sample_details if obj.test.sample_details else None
-                # test = obj.test
                 ret_obj['hospital_id'] = hospital.id
                 test_data = serializers.SelectedTestsDetailsSerializer(obj).data
                 ret_obj.update(test_data)
-                # ret_obj['lab_test_id'] = test.id
-                # ret_obj['lab_test_name'] = test.name
-                # ret_obj['b2c_rates'] = obj.get_deal_price()
                 if sample_obj:
                     sample_data = serializers.PartnerLabTestSampleDetailsModelSerializer(sample_obj).data
                     ret_obj.update(sample_data)
@@ -1520,4 +1518,9 @@ class PartnerLabTestSamplesCollect(viewsets.GenericViewSet):
     def lab_alerts(self, request):
         lab_alerts_queryset = prov_models.TestSamplesLabAlerts.objects.all()
         data = serializers.TestSamplesLabAlertsModelSerializer(lab_alerts_queryset, many=True).data
+        return Response(data)
+
+    def orders_list(self, request):
+        queryset = self.get_queryset()
+        data = serializers.PartnerLabSamplesCollectOrderModelSerializer(queryset, many=True).data
         return Response(data)

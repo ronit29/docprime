@@ -41,7 +41,7 @@ class Migration(migrations.Migration):
                 ('doctor', models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, related_name='doc_lab_samples_collect_order', to='doctor.Doctor')),
                 ('hospital', models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, related_name='hosp_lab_samples_collect_order', to='doctor.Hospital')),
                 ('lab', models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, related_name='lab_samples_collect_order', to='diagnostic.Lab')),
-                ('status', models.SmallIntegerField(choices=[(1, 'Sample Scan Pending'), (2, 'Sample Collection Pending'), (3, 'Sample Collected'), (4, 'Report Generated'), (5, 'Report Viewed')])),
+                ('status', models.SmallIntegerField(choices=[(1, 'Sample Scan Pending'), (2, 'Sample Collection Pending'), (3, 'Sample Collected'), (4, 'Report Generated'), (5, 'All Reports Generated'), (6, 'Report Viewed')])),
             ],
             options={
                 'db_table': 'partner_lab_samples_collect_order',
