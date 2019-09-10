@@ -242,11 +242,15 @@ class DoctorAppointmentsViewSet(OndocViewSet):
         serializer.is_valid(raise_exception=True)
         validated_data = serializer.validated_data
         data = request.data
-
+        plus_user = request.user.active_plus_user
         user_insurance = request.user.active_insurance #UserInsurance.get_user_insurance(request.user)
 
-        # data['is_appointment_insured'], data['insurance_id'], data[
-        #     'insurance_message'] = Cart.check_for_insurance(validated_data,request)
+        hospital = validated_data.get('hospital')
+        doctor = validated_data.get('doctor')
+
+        doctor_clinic = DoctorClinic.objects.filter(doctor=doctor, hospital=hospital).first()
+        profile = validated_data.get('profile')
+        payment_type = validated_data.get('payment_type')
         if user_insurance:
             if user_insurance.status == UserInsurance.ONHOLD:
                 return Response(status=status.HTTP_400_BAD_REQUEST, data={"error": 'Your documents from the last claim '
@@ -254,12 +258,7 @@ class DoctorAppointmentsViewSet(OndocViewSet):
                                                                           "request_errors": {
                                                                               "message": 'Your documents from the last claim are under '
                                                                                          'verification. Please write to customercare@docprime.com for more information'}})
-            hospital = validated_data.get('hospital')
-            doctor = validated_data.get('doctor')
 
-            doctor_clinic = DoctorClinic.objects.filter(doctor=doctor, hospital=hospital).first()
-            profile = validated_data.get('profile')
-            payment_type = validated_data.get('payment_type')
             if profile.is_insured_profile and doctor.is_enabled_for_insurance and doctor.enabled_for_online_booking and \
                     payment_type == OpdAppointment.COD and doctor_clinic and doctor_clinic.enabled_for_online_booking:
                 return Response(status=status.HTTP_400_BAD_REQUEST,
@@ -292,9 +291,18 @@ class DoctorAppointmentsViewSet(OndocViewSet):
                                                                               'request_errors': {
                                                                                   'message':'Some error occured.Please'
                                                                                             'Try again after some time.'}})
+        elif plus_user:
+            plus_user_dict = plus_user.validate_plus_appointment(validated_data)
+            data['is_vip_member'] = plus_user_dict.get('is_vip_member', False)
+            data['cover_under_vip'] = plus_user_dict.get('cover_under_vip', False)
+            data['plus_user_id'] = plus_user.id
+            if data['cover_under_vip']:
+                data['payment_type'] = OpdAppointment.VIP
+
         else:
             data['is_appointment_insured'], data['insurance_id'], data[
-                'insurance_message'] = False, None, ""
+                'insurance_message'], data['is_vip_member'], data['cover_under_vip'], \
+            data['plus_user_id'] = False, None, "", False, False, None
         cart_item_id = validated_data.get('cart_item').id if validated_data.get('cart_item') else None
         if not models.OpdAppointment.can_book_for_free(request, validated_data, cart_item_id):
             return Response({'request_errors': {"code": "invalid",
@@ -317,6 +325,8 @@ class DoctorAppointmentsViewSet(OndocViewSet):
             old_cart_obj = Cart.objects.filter(id=validated_data.get('existing_cart_item').id).first()
             payment_type = old_cart_obj.data.get('payment_type')
             if payment_type == OpdAppointment.INSURANCE and data['is_appointment_insured'] == False:
+                data['payment_type'] = OpdAppointment.PREPAID
+            if payment_type == OpdAppointment.VIP and data['cover_under_vip'] == False:
                 data['payment_type'] = OpdAppointment.PREPAID
             # cart_item.data = request.data
             cart_item.data = data

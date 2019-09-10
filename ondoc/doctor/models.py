@@ -2367,7 +2367,9 @@ class OpdAppointment(auth_model.TimeStampedModel, CouponsMixin, OpdAppointmentIn
     COD = 2
     INSURANCE = 3
     PLAN = 4
-    PAY_CHOICES = ((PREPAID, 'Prepaid'), (COD, 'COD'), (INSURANCE, 'Insurance'), (PLAN, "Subscription Plan"))
+    VIP = 5
+    PAY_CHOICES = ((PREPAID, 'Prepaid'), (COD, 'COD'), (INSURANCE, 'Insurance'), (PLAN, "Subscription Plan"),
+                    (VIP, 'VIP'))
     ACTIVE_APPOINTMENT_STATUS = [BOOKED, ACCEPTED, RESCHEDULED_PATIENT, RESCHEDULED_DOCTOR]
     STATUS_CHOICES = [(CREATED, 'Created'), (BOOKED, 'Booked'),
                       (RESCHEDULED_DOCTOR, 'Rescheduled by Doctor'),
@@ -3395,6 +3397,24 @@ class OpdAppointment(auth_model.TimeStampedModel, CouponsMixin, OpdAppointmentIn
             insurance_id = None
             is_appointment_insured = False
 
+        cover_under_vip = False
+        plus_user_id = None
+        plus_user = user.active_plus_user
+        mrp = price_data.get("mrp")
+        if plus_user:
+            plus_user_resp = plus_user.validate_plus_appointment(data)
+            cover_under_vip = plus_user_resp.get('cover_under_vip', False)
+            plus_user_id = plus_user_resp.get('plus_user_id', None)
+        if cover_under_vip and cart_data.get('cover_under_vip', None):
+            payment_type = OpdAppointment.VIP
+            utilization = plus_user.get_utilization()
+            doctor_available_amount = int(utilization.get('doctor_available_amount', 0))
+            effective_price = 0 if doctor_available_amount >= mrp else (mrp - doctor_available_amount)
+        else:
+            plus_user_id = None
+            cover_under_vip = False
+
+
         return {
             "doctor": data.get("doctor"),
             "hospital": data.get("hospital"),
@@ -3414,6 +3434,8 @@ class OpdAppointment(auth_model.TimeStampedModel, CouponsMixin, OpdAppointmentIn
             "cashback": int(price_data.get("coupon_cashback")),
             "is_appointment_insured": is_appointment_insured,
             "insurance": insurance_id,
+            "cover_under_vip": cover_under_vip,
+            "plus_user_id": plus_user_id,
             "coupon_data": price_data.get("coupon_data"),
             "_responsible_user": data.get("_responsible_user", None),
             "_source": data.get("_source", None)
