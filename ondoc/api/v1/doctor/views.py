@@ -1565,6 +1565,7 @@ class DoctorListViewSet(viewsets.GenericViewSet):
         }
         vip_data_dict = {
             'is_vip_member': False,
+            'cover_under_vip': False,
             'vip_remaining_amount': 0
         }
 
@@ -1577,12 +1578,11 @@ class DoctorListViewSet(viewsets.GenericViewSet):
                         insurance_threshold.opd_amount_limit
                     insurance_data_dict['is_user_insured'] = True
             if logged_in_user.active_plus_user:
-                utilization_dict = {}
-                validated_data['is_vip_member'] = True
                 utilization_dict = logged_in_user.active_plus_user.get_utilization()
-                validated_data['vip_remaining_amount'] = utilization_dict.get('doctor_amount_available') if utilization_dict else 0
-                vip_data_dict['is_vip_member'] = validated_data.get('is_vip_member')
-                vip_data_dict['vip_remaining_amount'] = validated_data.get('vip_remaining_amount')
+
+                vip_data_dict['vip_remaining_amount'] = utilization_dict.get('doctor_amount_available') if utilization_dict else 0
+                vip_data_dict['is_vip_member'] = True
+                vip_data_dict['cover_under_vip'] = False
 
         validated_data['insurance_threshold_amount'] = insurance_data_dict['insurance_threshold_amount']
         validated_data['is_user_insured'] = insurance_data_dict['is_user_insured']

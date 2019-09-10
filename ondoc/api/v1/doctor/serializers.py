@@ -555,7 +555,7 @@ class DoctorHospitalSerializer(serializers.ModelSerializer):
         return resp
 
     def get_vip(self, obj):
-        resp = {"is_vip_member": False, "utilization": {}}
+        resp = {"is_vip_member": False, "cover_under_vip": False, "vip_amount": 0}
         request = self.context.get("request")
         user = request.user
         doctor_clinic = obj.doctor_clinic
@@ -571,10 +571,12 @@ class DoctorHospitalSerializer(serializers.ModelSerializer):
             if not plus_user:
                 return resp
             utilization = plus_user.get_utilization()
+            available_amount = int(utilization.get('doctor_amount_available', 0))
+            mrp = int(obj.mrp)
             resp['is_vip_member'] = True
-            resp['utilization'] = utilization
+            resp['cover_under_vip'] = True if available_amount > 0 else False
+            resp['vip_amount'] = 0 if available_amount > mrp else (mrp - available_amount)
         return resp
-
 
     def get_is_price_zero(self, obj):
         if obj.fees is not None and obj.fees == 0:
