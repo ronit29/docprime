@@ -31,7 +31,7 @@ from django.http import HttpResponseRedirect
 
 import logging
 logger = logging.getLogger(__name__)
-ProviderHospitalLabMapping = apps.apps.get_model('provider', 'ProviderHospitalLabMapping')
+PartnerHospitalLabMapping = apps.apps.get_model('provider', 'PartnerHospitalLabMapping')
 
 
 class HospitalImageInline(admin.TabularInline):
@@ -481,18 +481,18 @@ class CloudLabAutocomplete(autocomplete.Select2QuerySetView):
         return queryset.distinct()
 
 
-class ProviderLabsInlineForm(forms.ModelForm):
+class PartnerLabsInlineForm(forms.ModelForm):
 
     class Meta:
-        model = ProviderHospitalLabMapping
+        model = PartnerHospitalLabMapping
         fields = ('lab',)
         widgets = {
             'lab': autocomplete.ModelSelect2(url='cloud-lab-autocomplete', forward=[]),
         }
 
 
-class ProviderLabsInline(admin.TabularInline):
-    model = ProviderHospitalLabMapping
+class PartnerLabsInline(admin.TabularInline):
+    model = PartnerHospitalLabMapping
     extra = 0
     can_delete = True
     verbose_name = "Provider Lab"
@@ -500,10 +500,10 @@ class ProviderLabsInline(admin.TabularInline):
     readonly_fields = []
     fields = ['lab']
     autocomplete_fields = []
-    form = ProviderLabsInlineForm
+    form = PartnerLabsInlineForm
 
     def get_queryset(self, request):
-        return super(ProviderLabsInline, self).get_queryset(request).select_related('hospital', 'lab').filter(lab__is_b2b=True)
+        return super(PartnerLabsInline, self).get_queryset(request).select_related('hospital', 'lab').filter(lab__is_b2b=True)
 
 
 class HospitalAdmin(admin.GeoModelAdmin, CompareVersionAdmin, ActionAdmin, QCPemAdmin):
@@ -536,7 +536,7 @@ class HospitalAdmin(admin.GeoModelAdmin, CompareVersionAdmin, ActionAdmin, QCPem
         AssociatedMerchantInline,
         RemarkInline,
         HospitalSponsoredServicesInline,
-        ProviderLabsInline,
+        PartnerLabsInline,
     ]
     map_width = 200
     map_template = 'admin/gis/gmap.html'

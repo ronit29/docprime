@@ -1428,7 +1428,7 @@ class EConsultationCommViewSet(viewsets.GenericViewSet):
         return Response({"status": 1, "message": "success"})
 
 
-class ProviderLabTestSamplesCollect(viewsets.GenericViewSet):
+class PartnerLabTestSamplesCollect(viewsets.GenericViewSet):
 
     authentication_classes = (JWTAuthentication,)
     permission_classes = (IsAuthenticated, v1_utils.IsDoctor)
@@ -1443,20 +1443,32 @@ class ProviderLabTestSamplesCollect(viewsets.GenericViewSet):
             hospital = hosp_lab_dict['hospital']
             lab = hosp_lab_dict['lab']
             available_lab_tests = lab.lab_pricing_group.available_lab_tests.all()
+            # data = serializers.AvailableLabTestSampleSerializer(available_lab_tests, context={'hospital': hospital},
+            #                                                     many=True).data
+            # response_list.extend(data)
             for obj in available_lab_tests:
                 ret_obj = dict()
                 sample_obj = obj.test.sample_details if obj.test.sample_details else None
-                test = obj.test
+                # test = obj.test
                 ret_obj['hospital_id'] = hospital.id
-                ret_obj['lab_test_id'] = test.id
-                ret_obj['lab_test_name'] = test.name
-                ret_obj['sample_type'] = sample_obj.sample.name if sample_obj else None
-                ret_obj['material_required'] = sample_obj.material_required if sample_obj else None
-                ret_obj['sample_volume_required'] = sample_obj.volume if sample_obj else None
-                ret_obj['fasting_required'] = sample_obj.fasting_required if sample_obj else None
-                ret_obj['report_tat'] = sample_obj.report_tat if sample_obj else None
-                ret_obj['reference_value'] = sample_obj.reference_value if sample_obj else None
-                ret_obj['b2c_rates'] = obj.get_deal_price()
+                test_data = serializers.SelectedTestsDetailsSerializer(obj).data
+                ret_obj.update(test_data)
+                # ret_obj['lab_test_id'] = test.id
+                # ret_obj['lab_test_name'] = test.name
+                # ret_obj['b2c_rates'] = obj.get_deal_price()
+                if sample_obj:
+                    sample_data = serializers.PartnerLabTestSampleDetailsModelSerializer(sample_obj).data
+                    ret_obj.update(sample_data)
+                else:
+                    ret_obj['sample_details_id'] = None
+                    ret_obj['created_at'] = None
+                    ret_obj['updated_at'] = None
+                    ret_obj['sample_name'] = None
+                    ret_obj['material_required'] = None
+                    ret_obj['sample_volume_required'] = None
+                    ret_obj['fasting_required'] = None
+                    ret_obj['report_tat'] = None
+                    ret_obj['reference_value'] = None
                 response_list.append(ret_obj)
         return Response(response_list)
 
@@ -1471,21 +1483,21 @@ class ProviderLabTestSamplesCollect(viewsets.GenericViewSet):
         lab = valid_data.get('lab')
         lab_tests = valid_data.get('lab_tests')
         lab_alerts = valid_data.get('lab_alerts')
-        sample_details = prov_models.ProviderLabTestSampleDetails.objects.filter(lab_test__in=lab_tests)
-        max_volumes_list = sample_details.annotate(sample_type=F('sample__name')).values('sample_type').annotate(max_volume=Max('volume'))
-        max_volumes_dict = dict()
-        sample_ids_to_be_excluded = list()
-        for max_volume in max_volumes_list:
-            max_volumes_dict[max_volume['sample_type']] = max_volume['max_volume']
-        for sample_detail in sample_details:
-            if sample_detail.sample.name in max_volumes_dict and sample_detail.volume != max_volumes_dict[sample_detail.sample.name]:
-                sample_ids_to_be_excluded.append(sample_detail.id)
-        samples_set = sample_details.exclude(id__in=sample_ids_to_be_excluded)
-        samples_data = serializers.ProviderLabTestSampleDetailsModelSerializer(samples_set, many=True).data
-
+        # sample_details = prov_models.ProviderLabTestSampleDetails.objects.filter(lab_test__in=lab_tests)
+        # max_volumes_list = sample_details.values('sample__name').annotate(max_volume=Max('volume'))
+        # max_volumes_dict = dict()
+        # sample_ids_to_be_excluded = list()
+        # for max_volume in max_volumes_list:
+        #     max_volumes_dict[max_volume['sample__name']] = max_volume['max_volume']
+        # for sample_detail in sample_details:
+        #     if sample_detail.sample.name in max_volumes_dict and sample_detail.volume != max_volumes_dict[sample_detail.sample.name]:
+        #         sample_ids_to_be_excluded.append(sample_detail.id)
+        # samples_objs = sample_details.exclude(id__in=sample_ids_to_be_excluded)
+        sample_collection_objs = prov_models.PartnerLabTestSampleDetails.get_sample_collection_details(lab_tests)
+        samples_data = serializers.PartnerLabTestSampleDetailsModelSerializer(sample_collection_objs, many=True).data
         available_lab_tests = lab_models.AvailableLabTest.objects.filter(test__in=lab_tests, lab_pricing_group=lab.lab_pricing_group)
         if not order_obj:
-            order_obj = prov_models.ProviderLabSamplesCollectOrder()
+            order_obj = prov_models.PartnerLabSamplesCollectOrder()
         order_obj.offline_patient = offline_patient
         order_obj.patient_details = v1_doc_serializer.OfflinePatientSerializer(offline_patient).data
         order_obj.hospital = hospital
@@ -1493,11 +1505,12 @@ class ProviderLabTestSamplesCollect(viewsets.GenericViewSet):
         order_obj.lab = lab
         order_obj.samples = samples_data
         order_obj.collection_datetime = valid_data.get("collection_datetime")
+        order_obj.selected_tests_details = serializers.SelectedTestsDetailsSerializer(available_lab_tests, many=True).data
         order_obj.save()
         if lab_alerts:
             order_obj.lab_alerts.set(lab_alerts, clear=True)
         order_obj.available_lab_tests.set(available_lab_tests, clear=True)
-        order_model_serializer = serializers.ProviderLabSamplesCollectOrderModelSerializer(order_obj)
+        order_model_serializer = serializers.PartnerLabSamplesCollectOrderModelSerializer(order_obj)
         return Response({"status": 1, "message": "Sample Collection Order created successfully",
                          "data": order_model_serializer.data})
 

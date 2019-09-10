@@ -819,7 +819,7 @@ class LabTestsListSerializer(serializers.Serializer):
         filter_kwargs = dict()
         if lab_id:
             filter_kwargs['lab_id'] = lab_id
-        hospital_lab_mapping_objs = provider_models.ProviderHospitalLabMapping.objects \
+        hospital_lab_mapping_objs = provider_models.PartnerHospitalLabMapping.objects \
                                                                     .prefetch_related(
                                                                         'lab',
                                                                         'lab__lab_pricing_group',
@@ -843,7 +843,7 @@ class LabTestsListSerializer(serializers.Serializer):
 
 class SampleCollectOrderCreateOrUpdateSerializer(serializers.Serializer):
 
-    id = serializers.PrimaryKeyRelatedField(queryset=provider_models.ProviderLabSamplesCollectOrder.objects.all(), required=False, allow_null=True)
+    id = serializers.PrimaryKeyRelatedField(queryset=provider_models.PartnerLabSamplesCollectOrder.objects.all(), required=False, allow_null=True)
     offline_patient_id = serializers.PrimaryKeyRelatedField(queryset=doc_models.OfflinePatients.objects.all())
     hospital_id = serializers.IntegerField(min_value=1)
     lab_id = serializers.IntegerField(min_value=1, required=False, allow_null=True)
@@ -872,18 +872,103 @@ class SampleCollectOrderCreateOrUpdateSerializer(serializers.Serializer):
         return attrs
 
 
-class ProviderLabTestSampleDetailsModelSerializer(serializers.ModelSerializer):
+class AvailableLabTestSampleSerializer(serializers.ModelSerializer):
+    hospital_id = serializers.SerializerMethodField()
+    lab_test_id = serializers.SerializerMethodField()
+    lab_test_name = serializers.SerializerMethodField()
+    sample_name = serializers.SerializerMethodField()
+    material_required = serializers.SerializerMethodField()
+    sample_volume = serializers.SerializerMethodField()
+    is_fasting_required = serializers.SerializerMethodField()
+    report_tat = serializers.SerializerMethodField()
+    reference_value = serializers.SerializerMethodField()
+    b2c_rates = serializers.SerializerMethodField()
+
+    def get_sample_obj(self, obj):
+        return obj.test.sample_details if obj.test.sample_details else None
+
+    def get_hospital_id(self, obj):
+        hospital = self.context.get('hospital')
+        return hospital.id if hospital else None
+
+    def get_lab_test_id(self, obj):
+        return obj.test.id
+
+    def get_lab_test_name(self, obj):
+        return obj.test.name
+
+    def get_sample_name(self, obj):
+        sample_obj = self.get_sample_obj(obj)
+        return sample_obj.sample.name if sample_obj else None
+
+    def get_material_required(self, obj):
+        sample_obj = self.get_sample_obj(obj)
+        return sample_obj.material_required if sample_obj else None
+
+    def get_sample_volume(self, obj):
+        sample_obj = self.get_sample_obj(obj)
+        return sample_obj.volume if sample_obj else None
+
+    def get_is_fasting_required(self, obj):
+        sample_obj = self.get_sample_obj(obj)
+        return sample_obj.is_fasting_required if sample_obj else None
+
+    def get_report_tat(self, obj):
+        sample_obj = self.get_sample_obj(obj)
+        return sample_obj.report_tat if sample_obj else None
+
+    def get_reference_value(self, obj):
+        sample_obj = self.get_sample_obj(obj)
+        return sample_obj.reference_value if sample_obj else None
+
+    def get_b2c_rates(self, obj):
+        return obj.get_deal_price()
 
     class Meta:
-        model = provider_models.ProviderLabTestSampleDetails
-        fields = '__all__'
+        model = diag_models.AvailableLabTest
+        fields = ('hospital_id', 'lab_test_id', 'lab_test_name', 'sample_name', 'material_required', 'sample_volume',
+                  'is_fasting_required', 'report_tat', 'reference_value', 'b2c_rates')
 
 
-class ProviderLabSamplesCollectOrderModelSerializer(serializers.ModelSerializer):
+class SelectedTestsDetailsSerializer(serializers.ModelSerializer):
+    lab_test_id = serializers.IntegerField(source="test.id")
+    lab_test_name = serializers.CharField(source="test.name")
+    b2c_rates = serializers.SerializerMethodField()
+
+    def get_b2c_rates(self, obj):
+        return int(obj.get_deal_price())
 
     class Meta:
-        model = provider_models.ProviderLabSamplesCollectOrder
-        fields = '__all__'
+        model = diag_models.AvailableLabTest
+        fields = ('lab_test_id', 'lab_test_name', 'b2c_rates')
+
+
+class PartnerLabTestSampleDetailsModelSerializer(serializers.ModelSerializer):
+    sample_details_id = serializers.IntegerField(source="id")
+    sample_name = serializers.CharField(source="sample.name")
+    sample_volume = serializers.CharField(source='volume')
+
+    # def get_sample_name(self, obj):
+    #     return obj.sample.name
+
+    class Meta:
+        model = provider_models.PartnerLabTestSampleDetails
+        fields = ('sample_details_id', 'created_at', 'updated_at', 'sample_name', 'material_required', 'sample_volume',
+                  'is_fasting_required', 'report_tat', 'reference_value', 'instructions')
+
+
+class PartnerLabSamplesCollectOrderModelSerializer(serializers.ModelSerializer):
+
+    def get_selected_tests(self, obj):
+        resp = list()
+        for available_lab_test in obj.available_lab_tests.all():
+            resp.append({"lab_test_id": available_lab_test.test.id, "lab_test_name": available_lab_test.test.name, "b2c_rates": available_lab_test.get_deal_price()})
+        return resp
+
+    class Meta:
+        model = provider_models.PartnerLabSamplesCollectOrder
+        fields = ('id', 'created_at', 'updated_at', 'collection_datetime', 'samples', 'offline_patient', 'hospital',
+                  'doctor', 'lab_alerts', 'selected_tests_details')
 
 
 class TestSamplesLabAlertsModelSerializer(serializers.ModelSerializer):
