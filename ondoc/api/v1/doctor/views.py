@@ -360,6 +360,7 @@ class DoctorAppointmentsViewSet(OndocViewSet):
                     order_list.append(order)
 
             if process_immediately:
+                pg_order.refresh_from_db()
                 appointment_ids = pg_order.process_pg_order(True)
                 if appointment_ids.get('id') and price_data.get('coupon_list'):
                     coupon_id  = price_data.get('coupon_list')[0]
