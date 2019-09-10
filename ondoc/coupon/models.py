@@ -198,8 +198,16 @@ class Coupon(auth_model.TimeStampedModel):
         coupon_discount = 0
         coupon_cashback = 0
 
+        coupon_codes = []
         if data.get("coupon_code"):
-            coupon_obj = RandomGeneratedCoupon.get_coupons(set(data.get("coupon_code")))
+            coupon_codes = data.get("coupon_code")
+        elif data.get('coupon'):
+            coupon_codes = cls.objects.filter(id__in=data.get('coupon'))
+            coupon_codes = list(map(lambda x: x.code, coupon_codes))
+        coupon_codes = set(coupon_codes)
+
+        if coupon_codes:
+            coupon_obj = RandomGeneratedCoupon.get_coupons(coupon_codes)
             # coupon_obj = cls.objects.filter(code__in=set(data.get("coupon_code")))
             obj = OpdAppointment()
 
