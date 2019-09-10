@@ -1,7 +1,7 @@
 from fluent_comments.models import FluentComment
 from rest_framework import serializers
 
-from ondoc.common.models import GlobalNonBookable, DeviceDetails, LastUsageTimestamp
+from ondoc.common.models import GlobalNonBookable, DeviceDetails, LastUsageTimestamp, DocumentsProofs
 from ondoc.authentication.models import UserProfile, User
 from ondoc.common.models import GlobalNonBookable, AppointmentHistory
 from ondoc.diagnostic.models import Lab
@@ -121,3 +121,8 @@ class CommentSerializer(serializers.ModelSerializer):
            )
 
 
+class DocumentProofUploadSerializer(serializers.ModelSerializer):
+    # prescription_file = serializers.FileField(max_length=None, use_url=True)
+    class Meta:
+        model = DocumentsProofs
+        fields = ('proof_file', 'user')

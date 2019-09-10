@@ -2693,7 +2693,10 @@ class OpdAppointment(auth_model.TimeStampedModel, CouponsMixin, OpdAppointmentIn
         if responsible_user:
             _responsible_user = auth_model.User.objects.filter(id=responsible_user).first()
         app_obj = cls(**appointment_data)
-        app_obj.save(responsible_user=_responsible_user, source=source)
+        if _responsible_user and source:
+            app_obj.save(responsible_user=_responsible_user, source=source)
+        else:
+            app_obj.save()
         if procedure_details:
             procedure_to_be_added = []
             for procedure in procedure_details:
@@ -2844,13 +2847,19 @@ class OpdAppointment(auth_model.TimeStampedModel, CouponsMixin, OpdAppointmentIn
             return True
 
     def after_commit_tasks(self, old_instance, push_to_matrix):
+        sent_to_provider = True
+        if old_instance:
+            sent_to_provider = self.is_provider_notification_allowed(old_instance)
+
         if old_instance is None:
             try:
                 create_ipd_lead_from_opd_appointment.apply_async(({'obj_id': self.id},),)
                                                                  # eta=timezone.now() + timezone.timedelta(hours=1))
                 if self.send_cod_to_prepaid_request():
-                    notification_tasks.send_opd_notifications_refactored.apply_async(
-                        (self.id, NotificationAction.COD_TO_PREPAID_REQUEST), countdown=5)
+                    notification_tasks.send_opd_notifications_refactored.apply_async(({'appointment_id': self.id,
+                                                                                       'is_valid_for_provider': sent_to_provider,
+                                                                                       'notification_type': NotificationAction.COD_TO_PREPAID_REQUEST},),
+                                                                                        countdown=1)
             except Exception as e:
                 logger.error(str(e))
 
@@ -2862,7 +2871,7 @@ class OpdAppointment(auth_model.TimeStampedModel, CouponsMixin, OpdAppointmentIn
             except Exception as e:
                 logger.error(str(e))
 
-            if self.is_retail_booking():
+            if old_instance and self.is_retail_booking(old_instance):
                 try:
                     push_retail_appointment_to_matrix.apply_async(({'type': 'OPD_APPOINTMENT', 'appointment_id': self.id,
                                                         'product_id': 5, 'sub_product_id': 2},), countdown=5)
@@ -2870,9 +2879,6 @@ class OpdAppointment(auth_model.TimeStampedModel, CouponsMixin, OpdAppointmentIn
                     logger.error(str(e))
 
         if self.is_to_send_notification(old_instance):
-            sent_to_provider = True
-            if old_instance:
-                sent_to_provider = self.is_provider_notification_allowed(old_instance)
             try:
                 notification_tasks.send_opd_notifications_refactored.apply_async(({'appointment_id': self.id,
                                                                                    'is_valid_for_provider': sent_to_provider},), countdown=1)
@@ -2893,8 +2899,11 @@ class OpdAppointment(auth_model.TimeStampedModel, CouponsMixin, OpdAppointmentIn
 
         if old_instance and old_instance.is_cod_to_prepaid != self.is_cod_to_prepaid:
             try:
-
-                notification_tasks.send_opd_notifications_refactored.apply_async((self.id, NotificationAction.COD_TO_PREPAID), countdown=1)
+                # notification_tasks.send_opd_notifications_refactored.apply_async((self.id, NotificationAction.COD_TO_PREPAID), countdown=1)
+                notification_tasks.send_opd_notifications_refactored.apply_async(({'appointment_id': self.id,
+                                                                                   'is_valid_for_provider': sent_to_provider,
+                                                                                   'notification_type': NotificationAction.COD_TO_PREPAID},),
+                                                                                    countdown=1)
             except Exception as e:
                 logger.error(str(e))
 
@@ -3471,11 +3480,10 @@ class OpdAppointment(auth_model.TimeStampedModel, CouponsMixin, OpdAppointmentIn
         except Exception as e:
             logger.error("Could not save triggered event - " + str(e))
 
-    def is_retail_booking(self):
-        if self.status == OpdAppointment.ACCEPTED and (self.payment_type == OpdAppointment.PREPAID or
-                                                                self.payment_type == OpdAppointment.COD) and \
-                                                                self.doctor.is_insurance_enabled and \
-                                                                self.hospital.enabled_for_insurance:
+    def is_retail_booking(self, old_instance):
+        if old_instance.status == OpdAppointment.BOOKED and self.status == OpdAppointment.ACCEPTED \
+                and (self.payment_type == OpdAppointment.PREPAID or self.payment_type == OpdAppointment.COD) \
+                and self.doctor.is_insurance_enabled and self.hospital.enabled_for_insurance:
             return True
         else:
             return False
