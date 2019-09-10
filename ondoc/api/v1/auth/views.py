@@ -1286,8 +1286,8 @@ class TransactionViewSet(viewsets.GenericViewSet):
             order_obj = Order.objects.select_for_update().filter(pk=response.get("orderId")).first()
             convert_cod_to_prepaid = False
             try:
-                if order_obj and response and order_obj.amount != Decimal(
-                        response.get('txAmount')) and order_obj.is_cod_order and order_obj.get_deal_price_without_coupon <= Decimal(response.get('txAmount')):
+                # if order_obj and response and order_obj.is_cod_order and order_obj.get_deal_price_without_coupon <= Decimal(response.get('txAmount')):
+                if order_obj and response and order_obj.is_cod_order and order_obj.amount <= Decimal(response.get('txAmount')):
                     convert_cod_to_prepaid = True
                     order_obj.amount = Decimal(response.get('txAmount'))
                     order_obj.save()
@@ -1978,7 +1978,10 @@ class OrderDetailViewSet(GenericViewSet):
 
         processed_order_data = []
         valid_for_cod_to_prepaid = order_data.is_cod_order
-        child_orders = order_data.orders.all()
+        if order_data.is_parent():
+            child_orders = order_data.orders.all()
+        else:
+            child_orders = [order_data]
 
         class OrderCartItemMapper():
             def __init__(self, order_obj):
