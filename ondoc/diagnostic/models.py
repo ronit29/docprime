@@ -340,6 +340,22 @@ class Lab(TimeStampedModel, CreatedByModel, QCModel, SearchKey, WelcomeCallingDo
 
         return resp
 
+    @classmethod
+    def get_vip_details(cls, user):
+
+        resp = {
+            'is_vip_member': False,
+            'covered_under_vip': False,
+            'vip_amount': 0
+        }
+
+        if user.is_authenticated and not user.is_anonymous:
+            plus_membership = user.active_plus_user
+            if plus_membership:
+                resp['is_vip_member'] = True
+
+        return resp
+
     def convert_min(self, min):
         min_str = str(min)
         if min/10 < 1:
