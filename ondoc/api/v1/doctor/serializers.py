@@ -127,9 +127,18 @@ class OpdAppointmentSerializer(serializers.ModelSerializer):
     reports = serializers.SerializerMethodField()
     prescription = serializers.SerializerMethodField()
     report_files = serializers.SerializerMethodField()
+    vip = serializers.SerializerMethodField()
 
     def get_report_files(self, obj):
         return []
+
+    def get_vip(self, obj):
+
+        return {
+            'is_vip_member': True if obj and obj.plus_plan else False,
+            'vip_amount': obj.effective_price,
+            'covered_under_vip': True if obj and obj.plus_plan else False
+        }
 
     def get_prescription(self, obj):
         if obj:
@@ -143,7 +152,7 @@ class OpdAppointmentSerializer(serializers.ModelSerializer):
         model = OpdAppointment
         fields = ('id', 'doctor_name', 'hospital_name', 'patient_name', 'patient_image', 'type',
                   'allowed_action', 'effective_price', 'deal_price', 'status', 'time_slot_start',
-                  'time_slot_end', 'doctor_thumbnail', 'patient_thumbnail', 'display_name', 'invoices', 'reports', 'prescription', 'report_files')
+                  'time_slot_end', 'doctor_thumbnail', 'patient_thumbnail', 'display_name', 'invoices', 'reports', 'prescription', 'report_files', 'vip')
 
     def get_patient_image(self, obj):
         if obj.profile and obj.profile.profile_image:
