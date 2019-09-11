@@ -10,6 +10,7 @@ from .views import (DoctorAppointmentsViewSet, DoctorProfileView, DoctorHospital
 urlpatterns = [
     path('appointment', DoctorAppointmentsViewSet.as_view({'get': 'list'}), name='appointment-list'),
     path('appointment/create', DoctorAppointmentsViewSet.as_view({'post': 'create'}), name='create-appointment'),
+    path('appointment/cod-to-prepaid/create', DoctorAppointmentsViewSet.as_view({'post': 'create_new'}), name='cod-to-prepaid-appointment'),
     path('appointment/<int:pk>', DoctorAppointmentsViewSet.as_view({'get': 'retrieve'}), name='get-appointment-detail'),
     path('appointment/<int:pk>/update', DoctorAppointmentsViewSet.as_view({'post': 'update'}),
          name='update-appointment-detail'),

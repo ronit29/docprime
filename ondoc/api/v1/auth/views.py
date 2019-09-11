@@ -1215,7 +1215,9 @@ class TransactionViewSet(viewsets.GenericViewSet):
 
         CHAT_ERROR_REDIRECT_URL = settings.BASE_URL + "/mobileviewchat?payment=fail&error_message=%s" % "Error processing payment, please try again."
         CHAT_REDIRECT_URL = CHAT_ERROR_REDIRECT_URL
-        CHAT_SUCCESS_REDIRECT_URL = settings.BASE_URL + "/mobileviewchat?payment=success&order_id=%s"
+        CHAT_SUCCESS_REDIRECT_URL = settings.BASE_URL + "/mobileviewchat?payment=success&order_id=%s&consultation_id=%s"
+        PLUS_FAILURE_REDIRECT_URL = settings.BASE_URL + ""
+        PLUS_SUCCESS_REDIRECT_URL = settings.BASE_URL + "/vip-club-activated-details?payment=success&id=%s"
 
         try:
             response = None
@@ -1265,7 +1267,9 @@ class TransactionViewSet(viewsets.GenericViewSet):
                             pg_txn.save()
                         send_pg_acknowledge.apply_async((pg_txn.order_id, pg_txn.order_no,), countdown=1)
                         if pg_txn.product_id == Order.CHAT_PRODUCT_ID:
-                            CHAT_REDIRECT_URL = CHAT_SUCCESS_REDIRECT_URL % pg_txn.order_id
+                            chat_order = Order.objects.filter(pk=pg_txn.order_id).first()
+                            if chat_order:
+                                CHAT_REDIRECT_URL = CHAT_SUCCESS_REDIRECT_URL % (chat_order.id, chat_order.reference_id)
                             return HttpResponseRedirect(redirect_to=CHAT_REDIRECT_URL)
                         else:
                             REDIRECT_URL = (SUCCESS_REDIRECT_URL % pg_txn.order_id) + "?payment_success=true"
@@ -1282,8 +1286,8 @@ class TransactionViewSet(viewsets.GenericViewSet):
             order_obj = Order.objects.select_for_update().filter(pk=response.get("orderId")).first()
             convert_cod_to_prepaid = False
             try:
-                if order_obj and response and order_obj.amount != Decimal(
-                        response.get('txAmount')) and order_obj.is_cod_order and order_obj.get_deal_price_without_coupon <= Decimal(response.get('txAmount')):
+                # if order_obj and response and order_obj.is_cod_order and order_obj.get_deal_price_without_coupon <= Decimal(response.get('txAmount')):
+                if order_obj and response and order_obj.is_cod_order and order_obj.amount <= Decimal(response.get('txAmount')):
                     convert_cod_to_prepaid = True
                     order_obj.amount = Decimal(response.get('txAmount'))
                     order_obj.save()
@@ -1344,7 +1348,9 @@ class TransactionViewSet(viewsets.GenericViewSet):
                 elif processed_data.get("type") == "econsultation":
                     REDIRECT_URL = ECONSULT_REDIRECT_URL % order_obj.id
                 elif processed_data.get('type') == "chat":
-                    CHAT_REDIRECT_URL = CHAT_SUCCESS_REDIRECT_URL % order_obj.id
+                    CHAT_REDIRECT_URL = CHAT_SUCCESS_REDIRECT_URL % (order_obj.id, str(processed_data.get("id", "")))
+                elif processed_data.get('type') == "plus":
+                    REDIRECT_URL = PLUS_SUCCESS_REDIRECT_URL % str(processed_data.get("id", ""))
         except Exception as e:
             logger.error("Error - " + str(e))
 
@@ -1972,7 +1978,10 @@ class OrderDetailViewSet(GenericViewSet):
 
         processed_order_data = []
         valid_for_cod_to_prepaid = order_data.is_cod_order
-        child_orders = order_data.orders.all()
+        if order_data.is_parent():
+            child_orders = order_data.orders.all()
+        else:
+            child_orders = [order_data]
 
         class OrderCartItemMapper():
             def __init__(self, order_obj):
