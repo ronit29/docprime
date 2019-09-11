@@ -284,13 +284,12 @@ class LabList(viewsets.ReadOnlyModelViewSet):
                                ' AS "rnk"' \
                                ' FROM "lab_test" inner JOIN "available_lab_test" ON ("lab_test"."id" = "available_lab_test"."test_id")' \
                                ' inner JOIN "lab_pricing_group" ON ("available_lab_test"."lab_pricing_group_id" = "lab_pricing_group"."id")' \
-                               ' inner JOIN "lab" ON ("lab_pricing_group"."id" = "lab"."lab_pricing_group_id") WHERE' \
+                               ' inner JOIN "lab" ON ("lab_pricing_group"."id" = "lab"."lab_pricing_group_id") {lab_network_query} WHERE' \
                                ' ("lab_test"."enable_for_retail" = true AND "lab_test"."is_package" = true AND "lab_test"."searchable" = true' \
                                ' AND "available_lab_test"."enabled" = true AND "lab"."enabled" = true AND "lab"."is_live" = true AND' \
                                ' ST_DWithin("lab"."location", St_setsrid(St_point((%(longitude)s), (%(latitude)s)), 4326), %(max_distance)s))' \
                                ' and not ST_DWithin("lab"."location", St_setsrid(St_point((%(longitude)s), (%(latitude)s)), 4326), %(min_distance)s)' \
-                               ' {lab_network_query} '\
-                               ' {filter_query}' \
+                               ' {filter_query} ' \
                                ' )x where rnk =1 {sort_query} offset {offset} limit {limit} '
 
         package_count_query = '''
@@ -300,7 +299,7 @@ class LabList(viewsets.ReadOnlyModelViewSet):
                                 inner JOIN "lab_pricing_group" ON ("available_lab_test"."lab_pricing_group_id" = "lab_pricing_group"."id") 
                                 inner JOIN "lab" ON ("lab_pricing_group"."id" = "lab"."lab_pricing_group_id") 
                                 left JOIN "lab_test_recommended_category_mapping" ltrc on ltrc.lab_test_id = ltp.lab_test_id
-                                left JOIN "lab_test_category" ltc on ltrc.parent_category_id = ltc.id 
+                                left JOIN "lab_test_category" ltc on ltrc.parent_category_id = ltc.id {lab_network_query}
                                 WHERE "lab_test"."enable_for_retail" = true AND "lab_test"."is_package" = true 
                                 AND "lab_test"."searchable" = true AND "available_lab_test"."enabled" = true 
                                 AND "lab"."enabled" = true AND "lab"."is_live" = true and ltc.id is not null AND 
@@ -343,9 +342,8 @@ class LabList(viewsets.ReadOnlyModelViewSet):
         if home_visit and not lab_visit:
             filter_query += ' and is_home_collection_enabled = True and home_collection_possible = True '
         if lab_visit and not home_visit:
-            lab_network_query = ' left join lab_network ln on ln.id=lb.network_id '
-            filter_query += " and (case when  (lb.network_id is not null and ln.center_visit and ln.center_visit=true and lb.center_visit " \
-                            "and lb.center_visit=true)  or  (lb.network_id is null and lb.center_visit and lb.center_visit=true) then true  end) "
+            lab_network_query = ' left join lab_network ln on ln.id = "lab".network_id '
+            filter_query += ''' and (case when  ("lab".network_id is not null and ln.center_visit and ln.center_visit=true and "lab".center_visit  and "lab".center_visit=true)  or  ("lab".network_id is null and "lab".center_visit and "lab".center_visit=true) then true  end) '''
             # filter_query += " and lab.network_id IS DISTINCT FROM 43 "
 
         if avg_ratings:
@@ -367,6 +365,8 @@ class LabList(viewsets.ReadOnlyModelViewSet):
             filter_query += ')'
         if filter_query:
             package_count_query += filter_query
+
+        package_count_query = package_count_query.format(lab_network_query=lab_network_query)
 
         package_count = RawSql(package_count_query, params).fetch_all()
         result_count = package_count[0].get('count', 0)
