@@ -247,7 +247,8 @@ class PlusUser(auth_model.TimeStampedModel):
         response_dict = {
             'is_vip_member': False,
             'plus_user_id': None,
-            'cover_under_vip': ""
+            'cover_under_vip': "",
+            "vip_amount": 0
         }
         if appointment_data.get('payment_type') == OpdAppointment.COD:
             return response_dict
@@ -266,7 +267,6 @@ class PlusUser(auth_model.TimeStampedModel):
         price_data = OpdAppointment.get_price_details(appointment_data)
         doctor_amount_available = int(utilization.get('doctor_amount_available', 0))
         is_cover_after_utilize = True if int(price_data.get('mrp')) <= doctor_amount_available else False
-
         if 'doctor' in appointment_data:
             doctor = appointment_data['doctor']
             hospital = appointment_data['hospital']
@@ -275,6 +275,7 @@ class PlusUser(auth_model.TimeStampedModel):
                                         doctor.enabled_for_plus_plans and is_cover_after_utilize:
                 response_dict['cover_under_vip'] = True
                 response_dict['plus_user_id'] = plus_user.id
+
         else:
             pass
 

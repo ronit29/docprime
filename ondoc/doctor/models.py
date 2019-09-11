@@ -3306,6 +3306,9 @@ class OpdAppointment(auth_model.TimeStampedModel, CouponsMixin, OpdAppointmentIn
             if data.get("payment_type") == cls.INSURANCE:
                 effective_price = doctor_clinic_timing.deal_price
                 coupon_discount, coupon_cashback, coupon_list, random_coupon_list = 0, 0, [], []
+            elif data.get("payment_type") == cls.VIP:
+                effective_price = doctor_clinic_timing.deal_price
+                coupon_discount, coupon_cashback, coupon_list, random_coupon_list = 0, 0, [], []
             elif data.get("payment_type") in [cls.PREPAID]:
                 coupon_discount, coupon_cashback, coupon_list, random_coupon_list = Coupon.get_total_deduction(data,
                                                                                            doctor_clinic_timing.deal_price)
@@ -3323,6 +3326,9 @@ class OpdAppointment(auth_model.TimeStampedModel, CouponsMixin, OpdAppointmentIn
             if data.get("payment_type") == cls.INSURANCE:
                 effective_price = total_deal_price
                 fees = doctor_clinic_timing.fees
+            elif data.get("payment_type") == cls.VIP:
+                effective_price = doctor_clinic_timing.deal_price
+                coupon_discount, coupon_cashback, coupon_list, random_coupon_list = 0, 0, [], []
             elif data.get("payment_type") in [cls.PREPAID]:
                 coupon_discount, coupon_cashback, coupon_list, random_coupon_list = Coupon.get_total_deduction(data, total_deal_price)
                 if coupon_discount >= total_deal_price:
@@ -3416,7 +3422,7 @@ class OpdAppointment(auth_model.TimeStampedModel, CouponsMixin, OpdAppointmentIn
             plus_user_id = plus_user_resp.get('plus_user_id', None)
         if cover_under_vip and cart_data.get('cover_under_vip', None):
             payment_type = OpdAppointment.VIP
-            utilization = plus_user.get_utilization()
+            utilization = plus_user.get_utilization
             doctor_available_amount = int(utilization.get('doctor_available_amount', 0))
             effective_price = 0 if doctor_available_amount >= mrp else (mrp - doctor_available_amount)
         else:

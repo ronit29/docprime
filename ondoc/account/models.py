@@ -762,6 +762,7 @@ class Order(TimeStampedModel):
         econsult_ids = []
         chat_plan_ids = []
         user = self.user
+        plus_user = user.active_plus_user
         user_insurance_obj = user.active_insurance
 
         gyno_count = 0
@@ -795,7 +796,8 @@ class Order(TimeStampedModel):
                                     is_process = False
                                 else:
                                     onco_count += 1
-
+                    if app_data.get('payment_type') == OpdAppointment.VIP and plus_user:
+                        is_process = True
                     if not is_process:
                         raise Exception("Insurance invalidate, Could not process entire order")
 
