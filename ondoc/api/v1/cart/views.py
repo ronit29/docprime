@@ -132,6 +132,13 @@ class CartViewSet(viewsets.GenericViewSet):
                 validated_data = item.validate(request)
                 insurance_doctor = validated_data.get('doctor', None)
                 cart_data = validated_data.get('cart_item').data
+                if cart_data.get('cover_under_vip'):
+                    plus_user = user.active_plus_user
+                    if not plus_user:
+                        raise Exception('Member is no more VIP')
+                    vip_dict = plus_user.validate_plus_appointment(cart_data)
+                    if not vip_dict('cover_under_vip'):
+                        raise Exception('Appointment no more cover under VIP')
                 if not cart_data.get('is_appointment_insured'):
                     item.data['is_appointment_insured'] = False
                     item.data['insurance_id'] = None
@@ -258,6 +265,7 @@ class CartViewSet(viewsets.GenericViewSet):
     def process(self, request, *args, **kwargs):
 
         user = request.user
+        plus_user = user.active_plus_user
         if not user.is_authenticated:
             return Response({"status": 0}, status.HTTP_401_UNAUTHORIZED)
 
@@ -271,8 +279,16 @@ class CartViewSet(viewsets.GenericViewSet):
         if is_process:
             for item in cart_items:
                 try:
-                    item.validate(request)
-                    items_to_process.append(item)
+                    if plus_user and item.get('cover_under_vip'):
+                       vip_dict = plus_user.validate_plus_appointment(item)
+                       if vip_dict.get('cover_under_vip'):
+                           item.validate(request)
+                           items_to_process.append(item)
+                       else:
+                           raise Exception('Item is no more cover under VIP')
+                    else:
+                        item.validate(request)
+                        items_to_process.append(item)
                 except Exception as e:
                     pass
 
