@@ -212,7 +212,7 @@ class PartnerHospitalLabMapping(auth_models.TimeStampedModel):
     lab = models.ForeignKey(diag_models.Lab, on_delete=models.CASCADE, related_name="provider_hospitals")
 
     def __str__(self):
-        return str(self.hospital.name) + '-' + str(self.lab.name)
+        return str(self.lab.name)
 
     class Meta:
         db_table = "partner_hospital_lab_mapping"

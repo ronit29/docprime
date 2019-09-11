@@ -802,7 +802,7 @@ class EConsultCommunicationSerializer(serializers.Serializer):
         return attrs
 
 
-class LabTestsListSerializer(serializers.Serializer):
+class PartnerLabTestsListSerializer(serializers.Serializer):
 
     hospital_id = serializers.IntegerField(min_value=1, required=False, allow_null=True)
     lab_id = serializers.IntegerField(min_value=1, required=False, allow_null=True)
@@ -810,28 +810,25 @@ class LabTestsListSerializer(serializers.Serializer):
     def validate(self, attrs):
         request = self.context.get('request')
         user = request.user
-        hospital_ids = GenericAdmin.objects.filter(phone_number=user.phone_number, hospital_id__isnull=False).values_list('hospital__id', flat=True)
-        if attrs.get('hospital_id'):
-            rqst_hosp_id_set = set()
-            rqst_hosp_id_set.add(attrs.get('hospital_id'))
-            hospital_ids = list(set(hospital_ids) & rqst_hosp_id_set)
-        lab_id = attrs.get('lab_id')
         filter_kwargs = dict()
+        hospital_id = attrs.get('hospital_id')
+        if hospital_id:
+            filter_kwargs['hospital_id'] = hospital_id
+        lab_id = attrs.get('lab_id')
         if lab_id:
             filter_kwargs['lab_id'] = lab_id
         hospital_lab_mapping_objs = provider_models.PartnerHospitalLabMapping.objects \
+                                                                    .select_related('hospital', 'lab') \
                                                                     .prefetch_related(
-                                                                        'lab',
                                                                         'lab__lab_pricing_group',
                                                                         'lab__lab_pricing_group__available_lab_tests',
                                                                         'lab__lab_pricing_group__available_lab_tests__test',
                                                                         'lab__lab_pricing_group__available_lab_tests__test__sample_details',
+                                                                        'lab__lab_pricing_group__available_lab_tests__test__sample_details__sample',
                                                                     ) \
-                                                                    .filter(hospital_id__in=hospital_ids,
+                                                                    .filter(hospital__manageable_hospitals__phone_number=user.phone_number,
                                                                             **filter_kwargs,
                                                                             lab__is_b2b=True)
-        # if not hospital_lab_mapping_obj:
-        #     raise serializers.ValidationError('Either Hospital id is wrong or Lab is not with given Hospital')
         hosp_lab_list = list()
         for mapping in hospital_lab_mapping_objs:
             if not mapping.lab.lab_pricing_group:
@@ -843,8 +840,8 @@ class LabTestsListSerializer(serializers.Serializer):
 
 class SampleCollectOrderCreateOrUpdateSerializer(serializers.Serializer):
 
-    id = serializers.PrimaryKeyRelatedField(queryset=provider_models.PartnerLabSamplesCollectOrder.objects.all(), required=False, allow_null=True)
-    offline_patient_id = serializers.PrimaryKeyRelatedField(queryset=doc_models.OfflinePatients.objects.all())
+    id = serializers.IntegerField(min_value=1, required=False, allow_null=True)
+    offline_patient_id = serializers.UUIDField()
     hospital_id = serializers.IntegerField(min_value=1)
     lab_id = serializers.IntegerField(min_value=1, required=False, allow_null=True)
     doctor_id = serializers.IntegerField(min_value=1)
@@ -856,23 +853,63 @@ class SampleCollectOrderCreateOrUpdateSerializer(serializers.Serializer):
     only_status_update = serializers.BooleanField(default=False)
 
     def validate(self, attrs):
+        request = self.context.get('request')
+        user = request.user
         if attrs.get('only_status_update') and not attrs.get('id'):
-            raise serializers.ValidationError('Order Id is required for just status update')
+            raise serializers.ValidationError('Order id is required for just status update')
+        id = attrs.get('id')
+        order_obj = provider_models.PartnerLabSamplesCollectOrder.objects.filter(id=id).first()
+        if not order_obj:
+            raise serializers.ValidationError('invalid order id')
+        offline_patient_id = attrs.get('offline_patient_id')
+        offline_patient = doc_models.OfflinePatients.objects.filter(id=offline_patient_id).first()
+        if not offline_patient:
+            raise serializers.ValidationError('invalid offline_patient_id')
         hospital_id = attrs.get('hospital_id')
+        filter_kwargs = dict()
         lab_id = attrs.get('lab_id')
+        if lab_id:
+            filter_kwargs['lab_id'] = lab_id
         doctor_id = attrs.get('doctor_id')
         lab_test_ids = attrs.get('lab_test_ids')
-        doc_clinic_obj = doc_models.DoctorClinic.objects.select_related('hospital', 'doctor').filter(
-            hospital_id=hospital_id, doctor_id=doctor_id).first()
-        if not doc_clinic_obj:
-            raise serializers.ValidationError('doctor clinic for given hospital_id and doctor_id not found.')
-        hospital = doc_clinic_obj.hospital
-        doctor = doc_clinic_obj.doctor
-        lab = hospital.get_partner_lab(lab_id=lab_id) if lab_id else hospital.get_partner_lab()
-        lab_tests = diag_models.LabTest.objects.filter(id__in=lab_test_ids)
+        hospital_lab_mapping_obj = provider_models.PartnerHospitalLabMapping.objects \
+                                                                             .select_related('hospital', 'lab') \
+                                                                             .prefetch_related('hospital__hospital_doctors',
+                                                                                               'hospital__hospital_doctors__doctor',
+                                                                                               'lab__lab_pricing_group',
+                                                                                               'lab__lab_pricing_group__available_lab_tests',
+                                                                                               'lab__lab_pricing_group__available_lab_tests__test',
+                                                                                               'lab__lab_pricing_group__available_lab_tests__test__sample_details',
+                                                                                               'lab__lab_pricing_group__available_lab_tests__test__sample_details__sample',
+                                                                                               ) \
+                                                                             .filter(hospital__manageable_hospitals__phone_number=user.phone_number,
+                                                                                     hospital_id=hospital_id,
+                                                                                     **filter_kwargs,
+                                                                                     lab__is_b2b=True).first()
+        if not hospital_lab_mapping_obj:
+            raise serializers.ValidationError('Hospital Lab mapping not found')
+        hospital = hospital_lab_mapping_obj.hospital
+        lab = hospital_lab_mapping_obj.lab
+        all_available_lab_tests = lab.lab_pricing_group.available_lab_tests.all()
+        doctor = None
+        for doctor in hospital.hospital_doctors.all():
+            if doctor.id == doctor_id:
+                doctor = doctor
+                break
+        if not doctor:
+            raise serializers.ValidationError('Hospital Doctor Mapping not found')
+        available_lab_tests = list()
+        lab_tests = list()
+        for obj in all_available_lab_tests:
+            if obj.test.id in lab_test_ids:
+                available_lab_tests.append(obj)
+                lab_tests.append(obj.test)
+        attrs['order_obj'] = order_obj
+        attrs['offline_patient'] = offline_patient
         attrs['hospital'] = hospital
         attrs['doctor'] = doctor
         attrs['lab'] = lab
+        attrs['available_lab_tests'] = available_lab_tests
         attrs['lab_tests'] = lab_tests
         return attrs
 
@@ -962,22 +999,36 @@ class PartnerLabTestSampleDetailsModelSerializer(serializers.ModelSerializer):
 
 class LabTestSamplesCollectionBarCodeModelSerializer(PartnerLabTestSampleDetailsModelSerializer):
     barcode = serializers.SerializerMethodField()
+    barcode_scan_time = serializers.SerializerMethodField()
+
+    def get_barcode_details(self, obj):
+        all_barcode_details = self.context.get('barcode_details')
+        if all_barcode_details and type(all_barcode_details) is dict and obj.sample.name in all_barcode_details:
+            return all_barcode_details.get(obj.sample.name)
+        return None
 
     def get_barcode(self, obj):
-        barcode_details = self.context.get('barcode_details')
-        if barcode_details and str(obj.id) in barcode_details:
-            return barcode_details.get(str(obj.id))
+        barcode_details = self.get_barcode_details(obj)
+        if type(barcode_details) is dict:
+            return barcode_details.get('barcode')
+        return None
+
+    def get_barcode_scan_time(self, obj):
+        barcode_details = self.get_barcode_details(obj)
+        if type(barcode_details) is dict:
+            return barcode_details.get('barcode_scan_time')
         return None
 
     class Meta:
         model = provider_models.PartnerLabTestSampleDetails
         fields = ('sample_details_id', 'created_at', 'updated_at', 'sample_name', 'material_required', 'sample_volume',
                   'sample_volume_unit', 'is_fasting_required', 'report_tat', 'reference_value', 'instructions',
-                  'barcode')
+                  'barcode', 'barcode_scan_time')
 
 
 class PartnerLabSamplesCollectOrderModelSerializer(serializers.ModelSerializer):
     lab_report = serializers.SerializerMethodField()
+    lab_alerts = serializers.ReadOnlyField(source="lab_alerts.name")
 
     def get_lab_report(self, obj):
         return [{"lab_test":["CBC","XRAY"],"url":"http://www.africau.edu/images/default/sample.pdf"},{"lab_test":["XAZ","XRAY"],"url":"http://www.africau.edu/images/default/sample.pdf"}]

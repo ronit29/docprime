@@ -1439,7 +1439,7 @@ class PartnerLabTestSamplesCollectViewset(viewsets.GenericViewSet):
                                                                 .filter(hospital__manageable_hospitals__phone_number=request.user.phone_number)
 
     def tests_list(self, request):
-        serializer = serializers.LabTestsListSerializer(data=request.query_params, context={'request':request})
+        serializer = serializers.PartnerLabTestsListSerializer(data=request.query_params, context={'request':request})
         serializer.is_valid(raise_exception=True)
         valid_data = serializer.validated_data
         hosp_lab_list = valid_data['hosp_lab_list']
@@ -1476,12 +1476,13 @@ class PartnerLabTestSamplesCollectViewset(viewsets.GenericViewSet):
         serializer = serializers.SampleCollectOrderCreateOrUpdateSerializer(data=request.data, context={'request': request})
         serializer.is_valid(raise_exception=True)
         valid_data = serializer.validated_data
-        order_obj = valid_data.get('id')
-        offline_patient = valid_data.get('offline_patient_id')
+        order_obj = valid_data.get('order_obj')
+        offline_patient = valid_data.get('offline_patient')
         hospital = valid_data.get('hospital')
         doctor = valid_data.get('doctor')
         lab = valid_data.get('lab')
         lab_tests = valid_data.get('lab_tests')
+        available_lab_tests = valid_data.get('available_lab_tests')
         lab_alerts = valid_data.get('lab_alerts')
         barcode_details = valid_data.get('barcode_details')
         status = valid_data.get('status')
@@ -1493,7 +1494,6 @@ class PartnerLabTestSamplesCollectViewset(viewsets.GenericViewSet):
             sample_collection_objs = prov_models.PartnerLabTestSampleDetails.get_sample_collection_details(lab_tests)
             samples_data = serializers.LabTestSamplesCollectionBarCodeModelSerializer(sample_collection_objs, many=True,
                                                                                       context={"barcode_details": barcode_details}).data
-            available_lab_tests = lab_models.AvailableLabTest.objects.filter(test__in=lab_tests, lab_pricing_group=lab.lab_pricing_group)
             if not order_obj:
                 order_obj = prov_models.PartnerLabSamplesCollectOrder.objects.create(offline_patient=offline_patient,
                                                                                      patient_details=v1_doc_serializer.OfflinePatientSerializer(offline_patient).data,
@@ -1521,6 +1521,7 @@ class PartnerLabTestSamplesCollectViewset(viewsets.GenericViewSet):
         return Response(data)
 
     def orders_list(self, request):
-        queryset = self.get_queryset()
+        queryset = prov_models.PartnerLabSamplesCollectOrder.objects.prefetch_related('lab_alerts') \
+                                                                    .filter(hospital__manageable_hospitals__phone_number=request.user.phone_number)
         data = serializers.PartnerLabSamplesCollectOrderModelSerializer(queryset, many=True).data
         return Response(data)
