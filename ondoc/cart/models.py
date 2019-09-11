@@ -136,6 +136,17 @@ class Cart(auth_model.TimeStampedModel, auth_model.SoftDeleteModel):
         return fulfillment_data
 
     @classmethod
+    def check_for_plus_appointment(cls, data):
+        resp = {
+            "cover_under_vip": False,
+            "plus_user_id": None
+        }
+        user = data.user
+        plus_user = user.active_plus_user
+        utilization = plus_user.get_utilization()
+
+
+    @classmethod
     def get_pg_if_pgcoupon(cls, user, cart_item=None):
         from ondoc.coupon.models import Coupon
 

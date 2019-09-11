@@ -51,6 +51,17 @@ class CartViewSet(viewsets.GenericViewSet):
         valid_data['data']['is_appointment_insured'], valid_data['data']['insurance_id'], valid_data['data'][
             'insurance_message'] = Cart.check_for_insurance(serialized_data, user=user, booked_by=booked_by)
 
+        plus_user = user.active_plus_user
+        vip_data_dict = {
+            "is_vip_member": False,
+            "cover_under_vip": False,
+            "plus_user_id": None
+        }
+        if plus_user:
+            vip_data_dict = plus_user.validate_plus_appointment(serialized_data)
+        valid_data['data']['cover_under_vip'] = vip_data_dict.get('cover_under_vip', False)
+        valid_data['data']['plus_user_id'] = vip_data_dict.get('plus_user_id', None)
+
         if valid_data['data']['is_appointment_insured']:
             valid_data['data']['payment_type'] = OpdAppointment.INSURANCE
         if serialized_data.get('cart_item'):
@@ -90,8 +101,6 @@ class CartViewSet(viewsets.GenericViewSet):
             payment_type = old_cart_obj.data.get('payment_type')
             if payment_type == OpdAppointment.PLAN and valid_data.get('data')['included_in_user_plan'] == False:
                 valid_data.get('data')['payment_type'] = OpdAppointment.PREPAID
-
-
 
     @transaction.non_atomic_requests()
     def list(self, request, *args, **kwargs):
@@ -134,7 +143,6 @@ class CartViewSet(viewsets.GenericViewSet):
                     item.data['insurance_message'] = ""
                     item.data['payment_type'] = OpdAppointment.PREPAID
                     raise Exception('Insurance expired.')
-                # is_agent = True if hasattr(request, 'agent') else False
                 if not insurance_doctor and cart_data.get('is_appointment_insured') and user_insurance and user_insurance.is_valid():
                     # is_lab_insured, insurance_id, insurance_message = user_insurance.validate_insurance(
                     #     validated_data)

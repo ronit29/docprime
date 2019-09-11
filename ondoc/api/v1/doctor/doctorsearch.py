@@ -621,6 +621,7 @@ class DoctorSearchHelper:
                 vip_data_dict = kwargs.get('vip_data')
                 is_vip_member = vip_data_dict.get('is_vip_member', False)
                 vip_remaining_amount = int(vip_data_dict.get('vip_remaining_amount', 0))
+                vip_amount = 0
                 cover_under_vip = vip_data_dict.get('cover_under_vip', False)
                 insurance_data_dict = kwargs.get('insurance_data')
                 if doctor_clinic.hospital.enabled_for_prepaid and doctor_clinic.hospital.enabled_for_insurance and enable_online_booking and doctor.is_insurance_enabled and doctor.is_doctor_specialization_insured() and insurance_data_dict and min_price.get("mrp") is not None and \

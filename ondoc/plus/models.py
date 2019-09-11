@@ -232,6 +232,14 @@ class PlusUser(auth_model.TimeStampedModel):
 
         return resp
 
+    def update_doctor_utilization(self, appointment_obj):
+        pass
+        # mrp = appointment_obj.mrp
+        # user = self.user
+        # plan = self.plan
+        # plan_parameters = plan.plan_parameters
+        # utilization = self.get_utilization()
+
     def validate_plus_appointment(self, appointment_data):
         from ondoc.doctor.models import OpdAppointment
         response_dict = {

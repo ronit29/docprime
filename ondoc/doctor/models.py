@@ -2853,6 +2853,9 @@ class OpdAppointment(auth_model.TimeStampedModel, CouponsMixin, OpdAppointmentIn
         if old_instance:
             sent_to_provider = self.is_provider_notification_allowed(old_instance)
 
+        if self.is_plus_appointment:
+            self.user.active_plus_user.update_doctor_utilization(self)
+
         if old_instance is None:
             try:
                 create_ipd_lead_from_opd_appointment.apply_async(({'obj_id': self.id},),)
