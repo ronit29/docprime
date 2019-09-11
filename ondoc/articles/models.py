@@ -45,7 +45,7 @@ class Article(TimeStampedModel, CreatedByModel):
     published_date = models.DateField(default=datetime.date.today)
     linked_articles = models.ManyToManyField('self', symmetrical=False, through='LinkedArticle',
                                              through_fields=('article', 'linked_article'))
-    pharmeasy_url = models.TextField(blank=False, null=True, unique=True)
+    pharmeasy_url = models.TextField(blank=False, null=True)
     pharmeasy_product_id = models.PositiveIntegerField(null=True)
     is_widget_available = models.NullBooleanField()
 
