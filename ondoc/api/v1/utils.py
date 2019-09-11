@@ -549,17 +549,17 @@ def payment_details(request, order):
     couponPgMode = ''
     discountedAmnt = ''
 
-    if order.is_cod_order:
-        txAmount = str(round(decimal.Decimal(order.get_deal_price_without_coupon), 2))
+    # if order.is_cod_order:
+    #     txAmount = str(round(decimal.Decimal(order.get_deal_price_without_coupon), 2))
+    # else:
+    usedPgCoupons = order.used_pgspecific_coupons
+    if usedPgCoupons and usedPgCoupons[0].payment_option:
+        couponCode = usedPgCoupons[0].code
+        couponPgMode = get_coupon_pg_mode(usedPgCoupons[0])
+        discountedAmnt = str(round(decimal.Decimal(order.amount), 2))
+        txAmount = str(round(decimal.Decimal(order.get_amount_without_pg_coupon), 2))
     else:
-        usedPgCoupons = order.used_pgspecific_coupons
-        if usedPgCoupons and usedPgCoupons[0].payment_option:
-            couponCode = usedPgCoupons[0].code
-            couponPgMode = get_coupon_pg_mode(usedPgCoupons[0])
-            discountedAmnt = str(round(decimal.Decimal(order.amount), 2))
-            txAmount = str(round(decimal.Decimal(order.get_amount_without_pg_coupon), 2))
-        else:
-            txAmount = str(round(decimal.Decimal(order.amount), 2))
+        txAmount = str(round(decimal.Decimal(order.amount), 2))
 
 
     pgdata = {

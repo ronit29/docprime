@@ -227,6 +227,8 @@ class CreateAppointmentSerializer(serializers.Serializer):
     _source = serializers.CharField(required=False, allow_null=True)
     _responsible_user = serializers.IntegerField(required=False, allow_null=True)
     cart_item = serializers.PrimaryKeyRelatedField(queryset=Cart.objects.all(), required=False, allow_null=True)
+    appointment_id = serializers.IntegerField(required=False)
+    cod_to_prepaid = serializers.BooleanField(required=False)
     # procedure_category_ids = serializers.ListField(child=serializers.PrimaryKeyRelatedField(queryset=ProcedureCategory.objects.filter(is_live=True)), required=False, default=[])
     # time_slot_end = serializers.DateTimeField()
 
@@ -255,7 +257,8 @@ class CreateAppointmentSerializer(serializers.Serializer):
         if OpdAppointment.objects.filter(profile=data.get("profile"), doctor=data.get("doctor"),
                                          hospital=data.get("hospital"), time_slot_start=time_slot_start) \
                                 .exclude(status__in=[OpdAppointment.COMPLETED, OpdAppointment.CANCELLED]).exists():
-            raise serializers.ValidationError("Appointment for the selected date & time already exists. Please change the date & time of the appointment.")
+            if not data.get('cod_to_prepaid'):
+                raise serializers.ValidationError("Appointment for the selected date & time already exists. Please change the date & time of the appointment.")
 
         if not is_valid_testing_data(request.user, data["doctor"]):
             logger.error("Error 'Both User and Doctor should be for testing' for opd appointment with data - " + json.dumps(request.data))
@@ -306,7 +309,7 @@ class CreateAppointmentSerializer(serializers.Serializer):
         # if OpdAppointment.objects.filter(status__in=ACTIVE_APPOINTMENT_STATUS, doctor=data.get('doctor'), profile=data.get('profile')).exists():
         #     raise serializers.ValidationError('A previous appointment with this doctor already exists. Cancel it before booking new Appointment.')
 
-        if OpdAppointment.objects.filter(status__in=ACTIVE_APPOINTMENT_STATUS, profile = data.get('profile')).count()>=MAX_APPOINTMENTS_ALLOWED:
+        if not data.get('cod_to_prepaid') and OpdAppointment.objects.filter(status__in=ACTIVE_APPOINTMENT_STATUS, profile = data.get('profile')).count()>=MAX_APPOINTMENTS_ALLOWED:
             logger.error(
                 "Error 'Max active appointments reached' for opd appointment with data - " + json.dumps(
                     request.data))
@@ -1801,6 +1804,8 @@ class DoctorDetailsRequestSerializer(serializers.Serializer):
     procedure_category_ids = CommaSepratedToListField(required=False, max_length=500)
     procedure_ids = CommaSepratedToListField(required=False, max_length=500)
     hospital_id = serializers.IntegerField(required=False)
+    appointment_id = serializers.IntegerField(required=False)
+    cod_to_prepaid = serializers.BooleanField(required=False)
 
     def validate(self, attrs):
         return super().validate(attrs)
@@ -1830,6 +1835,13 @@ class DoctorDetailsRequestSerializer(serializers.Serializer):
                 return attrs
         except:
             raise serializers.ValidationError('Invalid Hospital ID.')
+
+    def validate_appointment_id(self, attrs):
+        temp_attr = int(attrs)
+        if OpdAppointment.objects.filter(id=temp_attr).count():
+            return attrs
+        else:
+            raise serializers.ValidationError('Invalid Appointment ID.')
 
 
 class OfflinePatientBodySerializer(serializers.Serializer):
