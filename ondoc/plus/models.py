@@ -234,6 +234,44 @@ class PlusUser(auth_model.TimeStampedModel):
 
         return resp
 
+    def validate_plus_appointment(self, appointment_data):
+        from ondoc.doctor.models import OpdAppointment
+        response_dict = {
+            'is_vip_member': False,
+            'plus_user_id': None,
+            'cover_under_vip': ""
+        }
+        if appointment_data.get('payment_type') == OpdAppointment.COD:
+            return response_dict
+        profile = appointment_data.get('profile', None)
+        user = profile.user
+        plus_user = user.active_plus_user
+        if not plus_user:
+            return response_dict
+        plus_members = plus_user.plus_members.all().filter(profile=profile)
+        if not plus_members.exist():
+            return response_dict
+
+        response_dict['is_vip_member'] = True
+        utilization = plus_user.get_utilization()
+        price_data = OpdAppointment.get_price_details(appointment_data)
+        doctor_amount_available = int(utilization.get('doctor_amount_available', 0))
+        is_cover_after_utilize = True if int(price_data.get('mrp')) <= doctor_amount_available else False
+
+        if 'doctor' in appointment_data:
+            doctor = appointment_data['doctor']
+            hospital = appointment_data['hospital']
+            if doctor.enabled_for_online_booking and hospital.enabled_for_online_booking and \
+                                        hospital.enabled_for_prepaid and hospital.enabled_for_plus_plans and \
+                                        doctor.enabled_for_plus_plans and is_cover_after_utilize:
+                response_dict['cover_under_vip'] = True
+                response_dict['plus_user_id'] = plus_user.id
+        else:
+            pass
+
+        return response_dict
+
+
     def get_package_plus_appointment_count(self):
         from ondoc.diagnostic.models import LabAppointment
         package_count = 0
