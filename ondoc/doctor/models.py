@@ -75,6 +75,7 @@ from ondoc.matrix.tasks import push_appointment_to_matrix, push_onboarding_qcsta
     update_onboarding_qcstatus_to_matrix, create_or_update_lead_on_matrix, push_signup_lead_to_matrix, \
     create_ipd_lead_from_opd_appointment, push_retail_appointment_to_matrix
 # from ondoc.procedure.models import Procedure
+from ondoc.plus.models import PlusAppointmentMapping
 from ondoc.ratings_review import models as ratings_models
 from django.utils import timezone
 from random import randint
@@ -2445,6 +2446,7 @@ class OpdAppointment(auth_model.TimeStampedModel, CouponsMixin, OpdAppointmentIn
     appointment_type = models.PositiveSmallIntegerField(choices=APPOINTMENT_TYPE_CHOICES, null=True, blank=True)
     plus_plan = models.ForeignKey(plus_model.PlusUser, blank=True, null=True, default=None,
                                   on_delete=models.DO_NOTHING)
+    plus_plan_data = GenericRelation(PlusAppointmentMapping, related_name="plus_plan_mapping")
 
     def __str__(self):
         return self.profile.name + " (" + self.doctor.name + ")"

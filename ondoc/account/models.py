@@ -218,6 +218,7 @@ class Order(TimeStampedModel):
         from ondoc.subscription_plan.models import UserPlanMapping
         from ondoc.insurance.models import UserInsurance, InsuranceTransaction
         from ondoc.api.v1.chat.serializers import ChatTransactionModelSerializer
+        from ondoc.plus.models import PlusAppointmentMapping
 
         # skip if order already processed, except if appointment is COD and can be converted to prepaid
         cod_to_prepaid_app = None
@@ -311,8 +312,9 @@ class Order(TimeStampedModel):
                 else:
                     appointment_obj = OpdAppointment.create_appointment(appointment_data, responsible_user=_responsible_user, source=_source)
                     if appointment_obj.plus_plan:
-                        # Need to create Entry for Plus Plan Mapping
-                        pass
+                        data = {"plus_user": appointment_obj.plus_plan, "plus_plan": appointment_obj.plus_plan.plan,
+                                "content_object": appointment_obj}
+                        PlusAppointmentMapping.objects.create(**data)
 
                 order_dict = {
                     "reference_id": appointment_obj.id,
