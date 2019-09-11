@@ -253,6 +253,7 @@ class AvailableLabTestPackageSerializer(serializers.ModelSerializer):
     package = serializers.SerializerMethodField()
     parameters = serializers.SerializerMethodField()
     insurance = serializers.SerializerMethodField()
+    vip = serializers.SerializerMethodField()
     hide_price = serializers.ReadOnlyField(source='test.hide_price')
     included_in_user_plan = serializers.SerializerMethodField()
     is_price_zero = serializers.SerializerMethodField()
@@ -286,6 +287,20 @@ class AvailableLabTestPackageSerializer(serializers.ModelSerializer):
     #         return False
     #
     #   return data.get('prescription_needed', False)
+
+    def get_vip(self, obj):
+        request = self.context.get("request")
+        lab_obj = self.context.get("lab")
+        resp = Lab.get_vip_details(request.user)
+        user = request.user
+
+        plus_obj = user.active_plus_user if not user.is_anonymous and user.is_authenticated else None
+        utilization = plus_obj.get_utilization if plus_obj else {}
+
+        if plus_obj and lab_obj and obj and lab_obj.enabled_for_plus_plans and obj.mrp is not None and obj.mrp <= utilization.get('available_package_amount', 0):
+            resp['covered_under_vip'] = True
+
+        return resp
 
     def get_insurance(self, obj):
         request = self.context.get("request")
@@ -424,7 +439,8 @@ class AvailableLabTestPackageSerializer(serializers.ModelSerializer):
         model = AvailableLabTest
         fields = ('test_id', 'mrp', 'test', 'agreed_price', 'deal_price', 'enabled', 'is_home_collection_enabled',
                   'package', 'parameters', 'is_package', 'number_of_tests', 'why', 'pre_test_info', 'expected_tat',
-                  'hide_price', 'included_in_user_plan', 'insurance', 'is_price_zero', 'insurance_agreed_price', 'lensfit_offer')
+                  'hide_price', 'included_in_user_plan', 'insurance', 'is_price_zero', 'insurance_agreed_price',
+                  'lensfit_offer', 'vip')
 
 class AvailableLabTestSerializer(serializers.ModelSerializer):
     test = LabTestSerializer()
@@ -433,6 +449,7 @@ class AvailableLabTestSerializer(serializers.ModelSerializer):
     deal_price = serializers.SerializerMethodField()
     is_home_collection_enabled = serializers.SerializerMethodField()
     insurance = serializers.SerializerMethodField()
+    vip = serializers.SerializerMethodField()
     is_package = serializers.SerializerMethodField()
     included_in_user_plan = serializers.SerializerMethodField()
     is_price_zero = serializers.SerializerMethodField()
@@ -464,6 +481,20 @@ class AvailableLabTestSerializer(serializers.ModelSerializer):
         deal_price = obj.computed_deal_price if obj.custom_deal_price is None else obj.custom_deal_price
         return deal_price
 
+    def get_vip(self, obj):
+        request = self.context.get("request")
+        lab_obj = self.context.get("lab")
+        resp = Lab.get_vip_details(request.user)
+        user = request.user
+
+        plus_obj = user.active_plus_user if not user.is_anonymous and user.is_authenticated else None
+        utilization = plus_obj.get_utilization if plus_obj else {}
+
+        if plus_obj and lab_obj and obj and lab_obj.enabled_for_plus_plans and obj.mrp is not None and obj.mrp <= utilization.get('available_package_amount', 0):
+            resp['covered_under_vip'] = True
+
+        return resp
+
     def get_insurance(self, obj):
         request = self.context.get("request")
         lab_obj = self.context.get("lab")
@@ -494,7 +525,7 @@ class AvailableLabTestSerializer(serializers.ModelSerializer):
     class Meta:
         model = AvailableLabTest
         fields = ('test_id', 'mrp', 'test', 'agreed_price', 'deal_price', 'enabled', 'is_home_collection_enabled',
-                  'insurance', 'is_package', 'included_in_user_plan', 'is_price_zero', 'insurance_agreed_price')
+                  'insurance', 'is_package', 'included_in_user_plan', 'is_price_zero', 'insurance_agreed_price', 'vip')
 
     def get_is_package(self, obj):
         return obj.test.is_package
@@ -1561,9 +1592,9 @@ class CustomLabTestPackageSerializer(serializers.ModelSerializer):
         lab = lab_data.get(obj.lab, None)
         user = request.user
         plus_obj = user.active_plus_user if not user.is_anonymous and user.is_authenticated else None
-        utilization = plus_obj.get_utilization() if plus_obj else {}
+        utilization = plus_obj.get_utilization if plus_obj else {}
 
-        if plus_obj and obj and lab and lab.enabled_for_plus_plans and obj.mrp is not None and obj.mrp <= utilization.get('available_package_amount'):
+        if plus_obj and obj and lab and lab.enabled_for_plus_plans and obj.mrp is not None and obj.mrp <= utilization.get('available_package_amount', 0):
             resp['covered_under_vip'] = True
 
         return resp
