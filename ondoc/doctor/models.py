@@ -425,7 +425,10 @@ class Hospital(auth_model.TimeStampedModel, auth_model.CreatedByModel, auth_mode
         # update search and profile urls
         hospital_urls.hospital_urls()
 
-    def is_enabled_for_cod(self):
+    def is_enabled_for_cod(self, *args, **kwargs):
+        if kwargs.get('user') and kwargs.get('user').active_plus_user:
+            return False
+
         if self.enabled_for_cod:
             return True
         else:
