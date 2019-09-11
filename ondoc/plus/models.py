@@ -276,6 +276,7 @@ class PlusUser(auth_model.TimeStampedModel):
 
         amount_available = int(utilization.get('doctor_amount_available', 0)) if appointment_type == OPD else int(utilization.get('available_package_amount', 0))
         is_cover_after_utilize = True
+        amount_paid = 0
 
         mrp = int(price_data.get('mrp'))
         if amount_available > 0 or mrp <= amount_available:
@@ -284,13 +285,13 @@ class PlusUser(auth_model.TimeStampedModel):
             is_cover_after_utilize = False
 
         if is_cover_after_utilize and amount_available >= mrp:
-            vip_amount = mrp
+            amount_paid = 0
 
         elif is_cover_after_utilize and (amount_available > 0) and (amount_available <= mrp):
-            vip_amount = amount_available
+            amount_paid = mrp - amount_available
         else:
-            vip_amount = 0
-        response_dict['vip_amount'] = vip_amount
+            amount_paid = 0
+        response_dict['vip_amount'] = amount_paid
 
         if appointment_type == OPD:
             doctor = appointment_data['doctor']

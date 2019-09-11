@@ -616,6 +616,9 @@ class Order(TimeStampedModel):
         for app in fulfillment_data:
             if app.get('payment_type') == OpdAppointment.VIP:
                 plus_user = PlusUser.objects.filter(id=app.get('plus_plan')).first()
+                if not plus_user:
+                    payable_amount += app.get('effective_price')
+                    return payable_amount
                 utilization = plus_user.get_utilization
                 if "doctor" in app:
                     doctor_available_amount = int(utilization.get('doctor_amount_available', 0))
