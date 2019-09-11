@@ -570,7 +570,7 @@ class DoctorHospitalSerializer(serializers.ModelSerializer):
             plus_user = None if not user.is_authenticated or user.is_anonymous else user.active_plus_user
             if not plus_user:
                 return resp
-            utilization = plus_user.get_utilization()
+            utilization = plus_user.get_utilization
             available_amount = int(utilization.get('doctor_amount_available', 0))
             mrp = int(obj.mrp)
             resp['is_vip_member'] = True

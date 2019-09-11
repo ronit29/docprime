@@ -89,7 +89,7 @@ class PlusPlansSerializer(serializers.ModelSerializer):
         utilization = {}
         plus_user = user.active_plus_user if not user.is_anonymous and user.is_authenticated else None
         if plus_user:
-            utilization = plus_user.get_utilization()
+            utilization = plus_user.get_utilization
         return utilization
 
     class Meta:

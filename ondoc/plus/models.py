@@ -19,6 +19,7 @@ from datetime import datetime
 from django.utils.timezone import utc
 import reversion
 from django.conf import settings
+from django.utils.functional import cached_property
 
 
 class LiveMixin(models.Model):
@@ -206,6 +207,7 @@ class PlusUser(auth_model.TimeStampedModel):
 
         return None
 
+    @cached_property
     def get_utilization(self):
         plan = self.plan
         resp = {}
@@ -432,7 +434,7 @@ class PlusUserUtilization(auth_model.TimeStampedModel):
     @classmethod
     def create_utilization(cls, plus_user_obj):
         plus_plan = plus_user_obj.plan
-        utilization = plus_user_obj.get_utilization()
+        utilization = plus_user_obj.get_utilization
         plus_utilize = cls.objects.create(plus_user=plus_user_obj, plan=plus_plan, utilization=utilization)
 
 
