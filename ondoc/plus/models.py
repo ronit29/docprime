@@ -11,7 +11,7 @@ from ondoc.authentication.models import UserProfile
 from ondoc.common.helper import Choices
 import json
 from django.db import transaction
-
+from django.db.models import Q
 from ondoc.common.models import DocumentsProofs
 from ondoc.notification.tasks import push_plus_lead_to_matrix
 from .enums import PlanParametersEnum
