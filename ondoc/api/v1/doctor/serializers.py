@@ -48,6 +48,7 @@ from django.conf import settings
 from ondoc.insurance.models import UserInsurance, InsuranceThreshold, InsuranceDoctorSpecializations
 from ondoc.authentication import models as auth_models
 from ondoc.location.models import EntityUrls, EntityAddress
+from ondoc.plus.models import PlusUser
 from ondoc.procedure.models import DoctorClinicProcedure, Procedure, ProcedureCategory, \
     get_included_doctor_clinic_procedure, get_procedure_categories_with_procedures, IpdProcedure, \
     IpdProcedureFeatureMapping, IpdProcedureLead, DoctorClinicIpdProcedure, IpdProcedureDetail, Offer
@@ -203,6 +204,8 @@ class OpdAppTransactionModelSerializer(serializers.Serializer):
     coupon_data = serializers.JSONField(required=False)
     _source = serializers.CharField(required=False, allow_null=True)
     _responsible_user = serializers.IntegerField(required=False, allow_null=True)
+    plus_plan = serializers.PrimaryKeyRelatedField(queryset=PlusUser.objects.all(), allow_null=True)
+    plus_amount = serializers.DecimalField(max_digits=10, decimal_places=2)
 
 
 class OpdAppointmentPermissionSerializer(serializers.Serializer):

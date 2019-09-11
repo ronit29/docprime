@@ -1,6 +1,6 @@
 from django.db import models
 from ondoc.authentication import models as auth_model
-from django.contrib.contenttypes.fields import GenericRelation
+from django.contrib.contenttypes.fields import GenericRelation, GenericForeignKey
 from django.contrib.contenttypes.models import ContentType
 from django.contrib.gis.geos import Point
 from django.core.validators import FileExtensionValidator, MaxValueValidator, MinValueValidator
@@ -326,7 +326,8 @@ class PlusUser(auth_model.TimeStampedModel):
         if not opd_appointments:
             return 0
 
-        total_mrp = functools.reduce(lambda a, b: a.mrp + b.mrp, opd_appointments)
+        opd_appointments_mrp = list(map(lambda appointment:appointment.mrp, opd_appointments))
+        total_mrp = functools.reduce(lambda a, b: a + b, opd_appointments_mrp)
         return total_mrp
 
     @classmethod
@@ -676,4 +677,14 @@ class PlusLead(auth_model.TimeStampedModel):
     class Meta:
         db_table = 'plus_leads'
 
+
+class PlusAppointmentMapping(auth_model.TimeStampedModel):
+    plus_user = models.ForeignKey(PlusUser, related_name='appointment_mapping', on_delete=models.DO_NOTHING)
+    plus_plan = models.ForeignKey(PlusPlans, related_name='plan_appointment', on_delete=models.DO_NOTHING)
+    content_type = models.ForeignKey(ContentType, on_delete=models.DO_NOTHING)
+    object_id = models.PositiveIntegerField()
+    content_object = GenericForeignKey()
+
+    class Meta:
+        db_table = 'plus_appointment_mapping'
 
