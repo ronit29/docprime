@@ -141,7 +141,8 @@ def testcsvupload(request):
                                 data[headers[j]] = cell.value
                                 j = j + 1
                         i = i + 1
-                        excel_data.append(data)
+                        if data:
+                            excel_data.append(data)
                     output = update_records_from_excel(lpg_queryset, excel_data)
                     # output = update_records_from_csv(lpg_queryset, sheet)
                     return JsonResponse(output)
