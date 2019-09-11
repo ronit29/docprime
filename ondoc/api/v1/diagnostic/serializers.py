@@ -112,10 +112,13 @@ class LabModelSerializer(serializers.ModelSerializer):
         return False
 
     def get_center_visit_enabled(self, obj):
-        if obj and obj.network and settings.THYROCARE_NETWORK_ID:
-            if obj.network.id == settings.THYROCARE_NETWORK_ID:
-                return False
-        return True
+        if obj and obj.center_visit and ((obj.network and obj.network.center_visit) or not obj.network):
+            return True
+        return False
+        # if obj and obj.network and settings.THYROCARE_NETWORK_ID:
+        #     if obj.network.id == settings.THYROCARE_NETWORK_ID:
+        #         return False
+        # return True
 
     def get_rating(self, obj):
         if self.parent:
