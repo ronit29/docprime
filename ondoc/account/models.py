@@ -237,7 +237,12 @@ class Order(TimeStampedModel):
             serializer = OpdAppTransactionModelSerializer(data=appointment_data)
             serializer.is_valid(raise_exception=True)
             appointment_data = serializer.validated_data
-            if appointment_data['payment_type'] == OpdAppointment.COD:
+            if appointment_data['payment_type'] == OpdAppointment.VIP:
+                if appointment_data['plus_amount'] > 0:
+                    payment_not_required = False
+                else:
+                    payment_not_required = True
+            elif appointment_data['payment_type'] == OpdAppointment.COD:
                 if self.reference_id and cod_to_prepaid_app:
                     payment_not_required = False
                 else:
@@ -291,10 +296,13 @@ class Order(TimeStampedModel):
         total_balance = consumer_account.get_total_balance()
         _responsible_user=None
         _source=None
+        plus_amount = 0
         if '_responsible_user' in appointment_data:
             _responsible_user = appointment_data.pop('_responsible_user')
         if '_source' in appointment_data:
             _source = appointment_data.pop('_source')
+        if 'plus_amount' in appointment_data:
+            plus_amount = appointment_data.pop('plus_amount')
 
         if self.action == Order.OPD_APPOINTMENT_CREATE:
             if total_balance >= appointment_data["effective_price"] or payment_not_required:
@@ -302,6 +310,10 @@ class Order(TimeStampedModel):
                     appointment_obj = cod_to_prepaid_app
                 else:
                     appointment_obj = OpdAppointment.create_appointment(appointment_data, responsible_user=_responsible_user, source=_source)
+                    if appointment_obj.plus_plan:
+                        # Need to create Entry for Plus Plan Mapping
+                        pass
+
                 order_dict = {
                     "reference_id": appointment_obj.id,
                     "payment_status": Order.PAYMENT_ACCEPTED
@@ -586,8 +598,14 @@ class Order(TimeStampedModel):
     @classmethod
     def get_total_payable_amount(cls, fulfillment_data):
         from ondoc.doctor.models import OpdAppointment
+        from ondoc.plus.models import PlusUser
         payable_amount = 0
         for app in fulfillment_data:
+            if app.get('payment_type') == OpdAppointment.VIP:
+                plus_user = PlusUser.objects.filter(id=app.get('plus_plan')).first()
+                utilization = plus_user.get_utilization
+                doctor_available_amount = int(utilization.get('doctor_amount_available', 0))
+                payable_amount = 0 if doctor_available_amount >= app.get('mrp') else (app.get('mrp') - doctor_available_amount)
             if app.get("payment_type") == OpdAppointment.PREPAID:
                 payable_amount += app.get('effective_price')
         return payable_amount
