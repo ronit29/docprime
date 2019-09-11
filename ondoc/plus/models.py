@@ -257,11 +257,12 @@ class PlusUser(auth_model.TimeStampedModel):
         if not plus_user:
             return response_dict
         plus_members = plus_user.plus_members.all().filter(profile=profile)
-        if not plus_members.exist():
+        if not plus_members.exists():
             return response_dict
 
         response_dict['is_vip_member'] = True
-        utilization = plus_user.get_utilization()
+        # utilization = dict()
+        utilization = plus_user.get_utilization
         price_data = OpdAppointment.get_price_details(appointment_data)
         doctor_amount_available = int(utilization.get('doctor_amount_available', 0))
         is_cover_after_utilize = True if int(price_data.get('mrp')) <= doctor_amount_available else False
