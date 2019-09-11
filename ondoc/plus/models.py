@@ -217,11 +217,13 @@ class PlusUser(auth_model.TimeStampedModel):
                                                                                PlanParametersEnum.HEALTH_CHECKUPS_AMOUNT,
                                                                                PlanParametersEnum.HEALTH_CHECKUPS_COUNT,
                                                                                PlanParametersEnum.MEMBERS_COVERED_IN_PACKAGE,
+                                                                               PlanParametersEnum.PACKAGE_IDS,
                                                                                PlanParametersEnum.TOTAL_TEST_COVERED_IN_PACKAGE])
 
         for pp in plan_parameters:
             data[pp.parameter.key.lower()] = pp.value
-
+        
+        resp['allowed_package_ids'] = list(map(lambda x: int(x), data['package_ids'].split(','))) if data.get('package_ids') else []
         resp['doctor_consult_amount'] = int(data['DOCTOR_CONSULT_AMOUNT'.lower()])
         resp['doctor_amount_utilized'] = self.get_doctor_plus_appointment_amount()
         resp['doctor_amount_available'] = resp['doctor_consult_amount'] - resp['doctor_amount_utilized']
@@ -297,24 +299,27 @@ class PlusUser(auth_model.TimeStampedModel):
     def get_package_plus_appointment_count(self):
         from ondoc.diagnostic.models import LabAppointment
         package_count = 0
-        lab_appointments = LabAppointment.objects.filter(plus_plan=self)
+        lab_appointments = LabAppointment.objects.filter(plus_plan=self).exclude(status=LabAppointment.CANCELLED)
         if not lab_appointments:
             return 0
 
         for lab_appointment in lab_appointments:
-            package_count = package_count + len(list(filter(lambda lab_test: lab_test.is_package, lab_appointment.test_mappings)))
+            package_count = package_count + len(list(filter(lambda lab_test: lab_test.test.is_package, lab_appointment.test_mappings.all())))
         return package_count
 
     def get_package_plus_appointment_amount(self):
         from ondoc.diagnostic.models import LabAppointment
+        from ondoc.doctor.models import OpdAppointment
+
         import functools
         package_amount = 0
-        lab_appointments = LabAppointment.objects.filter(plus_plan=self)
+        lab_appointments = LabAppointment.objects.filter(plus_plan=self).exclude(status=OpdAppointment.CANCELLED)
         if not lab_appointments:
             return 0
         for lab_appointment in lab_appointments:
-            package_amount = package_amount + functools.reduce(lambda a, b: a.appointment.mrp + b.appointment.mrp, list(filter(lambda lab_test_mapping: lab_test_mapping.test.is_package,
-                                                               lab_appointment.test_mappings)))
+            pacakge_appointments = list(filter(lambda lab_test_mapping: lab_test_mapping.test.is_package, lab_appointment.test_mappings.all()))
+            lab_appointments_mrp = list(map(lambda appointment: appointment.mrp, pacakge_appointments))
+            package_amount = package_amount + functools.reduce(lambda a, b: a + b, lab_appointments_mrp)
 
         return package_amount
 
@@ -322,7 +327,7 @@ class PlusUser(auth_model.TimeStampedModel):
         import functools
         from ondoc.doctor.models import OpdAppointment
         total_mrp = 0
-        opd_appointments = OpdAppointment.objects.filter(plus_plan=self)
+        opd_appointments = OpdAppointment.objects.filter(plus_plan=self).exclude(status=OpdAppointment.CANCELLED)
         if not opd_appointments:
             return 0
 

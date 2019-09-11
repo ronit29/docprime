@@ -299,7 +299,7 @@ class AvailableLabTestPackageSerializer(serializers.ModelSerializer):
         utilization = plus_obj.get_utilization if plus_obj else {}
         package_amount_balance = utilization.get('available_package_amount', 0)
 
-        if plus_obj and lab_obj and obj and lab_obj.enabled_for_plus_plans and obj.mrp:
+        if plus_obj and lab_obj and obj and lab_obj.enabled_for_plus_plans and obj.mrp and obj.id in utilization.get('allowed_package_ids', []):
             resp['covered_under_vip'] = True
 
             if obj.mrp <= package_amount_balance:
@@ -498,7 +498,7 @@ class AvailableLabTestSerializer(serializers.ModelSerializer):
         utilization = plus_obj.get_utilization if plus_obj else {}
         package_amount_balance = utilization.get('available_package_amount', 0)
 
-        if plus_obj and lab_obj and obj and lab_obj.enabled_for_plus_plans and obj.mrp:
+        if plus_obj and lab_obj and obj and lab_obj.enabled_for_plus_plans and obj.mrp and obj.id in utilization.get('allowed_package_ids', []):
             resp['covered_under_vip'] = True
 
             if obj.mrp <= package_amount_balance:
@@ -1610,7 +1610,7 @@ class CustomLabTestPackageSerializer(serializers.ModelSerializer):
         utilization = plus_obj.get_utilization if plus_obj else {}
         package_amount_balance = utilization.get('available_package_amount', 0)
 
-        if plus_obj and lab and obj and lab.enabled_for_plus_plans and obj.mrp:
+        if plus_obj and lab and obj and lab.enabled_for_plus_plans and obj.mrp and obj.id in utilization.get('allowed_package_ids', []):
             resp['covered_under_vip'] = True
 
             if obj.mrp <= package_amount_balance:
