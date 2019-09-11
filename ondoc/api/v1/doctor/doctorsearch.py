@@ -96,7 +96,7 @@ class DoctorSearchHelper:
         counter=1
         spec_filter_str = ''
         if len(specialization_filter_ids) > 0 and len(procedure_ids)==0 and len(procedure_category_ids)==0:
-            spec_filter_str = ' and d.id in (select doctor_id from doctor_practice_specialization where specialization_id IN('
+            spec_filter_str = ' d.id in (select doctor_id from doctor_practice_specialization where specialization_id IN('
             for id in specialization_filter_ids:
 
                 if not counter == 1:
@@ -285,14 +285,14 @@ class DoctorSearchHelper:
             params['insurance_threshold_amount'] = self.query_params.get('insurance_threshold_amount')
 
         result = {}
-        if not filtering_params:
+        if not filtering_params and not spec_filter_str:
             result['string'] = "1=1"
             result['params'] = params
             return result
-
-        result['string'] = " and ".join(filtering_params)
+        if filtering_params:
+            result['string'] = " and ".join(filtering_params)
         if spec_filter_str:
-            result['string'] = result.get('string') + spec_filter_str
+            result['string'] = result.get('string') + ' and ' + spec_filter_str if result.get('string') else spec_filter_str
         result['params'] = params
         if len(procedure_ids) > 0:
             result['count_of_procedure'] = len(procedure_ids)
