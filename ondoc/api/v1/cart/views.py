@@ -55,12 +55,15 @@ class CartViewSet(viewsets.GenericViewSet):
         vip_data_dict = {
             "is_vip_member": False,
             "cover_under_vip": False,
-            "plus_user_id": None
+            "plus_user_id": None,
+            "vip_amount": 0
         }
         if plus_user:
             vip_data_dict = plus_user.validate_plus_appointment(serialized_data)
         valid_data['data']['cover_under_vip'] = vip_data_dict.get('cover_under_vip', False)
         valid_data['data']['plus_user_id'] = vip_data_dict.get('plus_user_id', None)
+        valid_data['data']['is_valid_member'] = vip_data_dict.get('is_valid_member', False)
+        valid_data['data']['vip_amount'] = vip_data_dict.get('vip_amount')
 
         if valid_data['data']['is_appointment_insured']:
             valid_data['data']['payment_type'] = OpdAppointment.INSURANCE
@@ -283,8 +286,8 @@ class CartViewSet(viewsets.GenericViewSet):
         if is_process:
             for item in cart_items:
                 try:
-                    if plus_user and item.get('cover_under_vip'):
-                       vip_dict = plus_user.validate_plus_appointment(item)
+                    if plus_user and item.data.get('cover_under_vip'):
+                       vip_dict = plus_user.validate_plus_appointment(item.data)
                        if vip_dict.get('cover_under_vip'):
                            item.validate(request)
                            items_to_process.append(item)
