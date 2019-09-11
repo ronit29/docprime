@@ -259,7 +259,10 @@ class Order(TimeStampedModel):
             elif appointment_data['payment_type'] == OpdAppointment.INSURANCE:
                 payment_not_required = True
             elif appointment_data['payment_type'] == OpdAppointment.VIP:
-                payment_not_required = True
+                if appointment_data['plus_amount'] > 0:
+                    payment_not_required = False
+                else:
+                    payment_not_required = True
             elif appointment_data['payment_type'] == OpdAppointment.PLAN:
                 payment_not_required = True
         elif self.product_id == self.INSURANCE_PRODUCT_ID:
@@ -315,7 +318,7 @@ class Order(TimeStampedModel):
                     appointment_obj = OpdAppointment.create_appointment(appointment_data, responsible_user=_responsible_user, source=_source)
                     if appointment_obj.plus_plan:
                         data = {"plus_user": appointment_obj.plus_plan, "plus_plan": appointment_obj.plus_plan.plan,
-                                "content_object": appointment_obj}
+                                "content_object": appointment_obj, 'amount': plus_amount}
                         PlusAppointmentMapping.objects.create(**data)
 
                 order_dict = {
@@ -326,6 +329,12 @@ class Order(TimeStampedModel):
         elif self.action == Order.LAB_APPOINTMENT_CREATE:
             if total_balance >= appointment_data["effective_price"] or payment_not_required:
                 appointment_obj = LabAppointment.create_appointment(appointment_data, responsible_user=_responsible_user, source=_source)
+
+                if appointment_obj.plus_plan:
+                    data = {"plus_user": appointment_obj.plus_plan, "plus_plan": appointment_obj.plus_plan.plan,
+                            "content_object": appointment_obj, 'amount': plus_amount}
+                    PlusAppointmentMapping.objects.create(**data)
+
                 order_dict = {
                     "reference_id": appointment_obj.id,
                     "payment_status": Order.PAYMENT_ACCEPTED
@@ -608,8 +617,13 @@ class Order(TimeStampedModel):
             if app.get('payment_type') == OpdAppointment.VIP:
                 plus_user = PlusUser.objects.filter(id=app.get('plus_plan')).first()
                 utilization = plus_user.get_utilization
-                doctor_available_amount = int(utilization.get('doctor_amount_available', 0))
-                payable_amount = 0 if doctor_available_amount >= app.get('mrp') else (app.get('mrp') - doctor_available_amount)
+                if "doctor" in app:
+                    doctor_available_amount = int(utilization.get('doctor_amount_available', 0))
+                    payable_amount = 0 if doctor_available_amount >= app.get('mrp') else (app.get('mrp') - doctor_available_amount)
+                else:
+                    package_available_amount = int(utilization.get('available_package_amount', 0))
+                    payable_amount = 0 if package_available_amount >= app.get('mrp') else (app.get('mrp') - package_available_amount)
+
             if app.get("payment_type") == OpdAppointment.PREPAID:
                 payable_amount += app.get('effective_price')
         return payable_amount

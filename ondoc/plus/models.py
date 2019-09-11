@@ -684,6 +684,7 @@ class PlusAppointmentMapping(auth_model.TimeStampedModel):
     content_type = models.ForeignKey(ContentType, on_delete=models.DO_NOTHING)
     object_id = models.PositiveIntegerField()
     content_object = GenericForeignKey()
+    amount = models.DecimalField(default=0, max_digits=10, decimal_places=2)
 
     class Meta:
         db_table = 'plus_appointment_mapping'

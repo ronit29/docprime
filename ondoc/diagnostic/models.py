@@ -56,6 +56,7 @@ from ondoc.matrix.tasks import push_appointment_to_matrix, push_onboarding_qcsta
     create_ipd_lead_from_lab_appointment, create_or_update_lead_on_matrix
 from ondoc.integrations.task import push_lab_appointment_to_integrator, get_integrator_order_status
 from ondoc.location import models as location_models
+from ondoc.plus.models import PlusAppointmentMapping
 from ondoc.ratings_review import models as ratings_models
 # from ondoc.api.v1.common import serializers as common_serializers
 from ondoc.common.models import AppointmentHistory, AppointmentMaskNumber, Remark, GlobalNonBookable, \
@@ -1646,6 +1647,7 @@ class LabAppointment(TimeStampedModel, CouponsMixin, LabAppointmentInvoiceMixin,
     reports_physically_collected = models.NullBooleanField()
     plus_plan = models.ForeignKey(plus_model.PlusUser, blank=True, null=True, default=None,
                                   on_delete=models.DO_NOTHING)
+    plus_plan_data = GenericRelation(PlusAppointmentMapping)
 
     @cached_property
     def is_thyrocare(self):
@@ -2614,6 +2616,7 @@ class LabAppointment(TimeStampedModel, CouponsMixin, LabAppointmentInvoiceMixin,
         plus_user_id = None
         plus_user = user.active_plus_user
         mrp = price_data.get("mrp")
+        vip_amount = 0
         if plus_user:
             plus_user_resp = plus_user.validate_plus_appointment(data)
             cover_under_vip = plus_user_resp.get('cover_under_vip', False)
@@ -2623,6 +2626,8 @@ class LabAppointment(TimeStampedModel, CouponsMixin, LabAppointmentInvoiceMixin,
             utilization = plus_user.get_utilization
             available_amount = int(utilization.get('available_package_amount', 0))
             effective_price = 0 if available_amount >= mrp else (mrp - available_amount)
+            vip_amount = available_amount if mrp >= available_amount else mrp
+
         else:
             plus_user_id = False
             cover_under_vip = None
@@ -2654,6 +2659,7 @@ class LabAppointment(TimeStampedModel, CouponsMixin, LabAppointmentInvoiceMixin,
             "insurance": insurance_id,
             "cover_under_vip": cover_under_vip,
             "plus_plan": plus_user_id,
+            'plus_amount': vip_amount,
             "coupon_data": price_data.get("coupon_data"),
             "prescription_list": data.get('prescription_list', []),
             "_responsible_user": data.get("_responsible_user", None),

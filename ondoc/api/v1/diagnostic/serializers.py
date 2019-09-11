@@ -860,6 +860,7 @@ class LabAppTransactionModelSerializer(serializers.Serializer):
     discount = serializers.DecimalField(max_digits=10, decimal_places=2)
     insurance = serializers.PrimaryKeyRelatedField(queryset=UserInsurance.objects.all(), allow_null=True)
     plus_plan = serializers.PrimaryKeyRelatedField(queryset=PlusUser.objects.all(), allow_null=True)
+    plus_amount = serializers.DecimalField(max_digits=10, decimal_places=2)
 
     cashback = serializers.DecimalField(max_digits=10, decimal_places=2)
     extra_details = serializers.JSONField(required=False)
