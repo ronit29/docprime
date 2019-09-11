@@ -252,6 +252,8 @@ class Order(TimeStampedModel):
                 payment_not_required = True
             elif appointment_data['payment_type'] == OpdAppointment.INSURANCE:
                 payment_not_required = True
+            elif appointment_data['payment_type'] == OpdAppointment.VIP:
+                payment_not_required = True
             elif appointment_data['payment_type'] == OpdAppointment.PLAN:
                 payment_not_required = True
         elif self.product_id == self.INSURANCE_PRODUCT_ID:
