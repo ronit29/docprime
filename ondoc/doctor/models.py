@@ -2851,11 +2851,12 @@ class OpdAppointment(auth_model.TimeStampedModel, CouponsMixin, OpdAppointmentIn
         if old_instance:
             sent_to_provider = self.is_provider_notification_allowed(old_instance)
 
-        if old_instance is None:
+        if old_instance and old_instance.payment_type == OpdAppointment.COD:
             try:
                 create_ipd_lead_from_opd_appointment.apply_async(({'obj_id': self.id},),)
                                                                  # eta=timezone.now() + timezone.timedelta(hours=1))
                 if self.send_cod_to_prepaid_request():
+                    # notification_tasks.send_opd_notifications_refactored.apply_async((self.id, NotificationAction.COD_TO_PREPAID_REQUEST), countdown=5)
                     notification_tasks.send_opd_notifications_refactored.apply_async(({'appointment_id': self.id,
                                                                                        'is_valid_for_provider': sent_to_provider,
                                                                                        'notification_type': NotificationAction.COD_TO_PREPAID_REQUEST},),
@@ -3291,6 +3292,7 @@ class OpdAppointment(auth_model.TimeStampedModel, CouponsMixin, OpdAppointmentIn
             end__gte=data.get("start_time")).first()
 
         effective_price = 0
+        prepaid_deal_price = 0
         if not procedures:
             if data.get("payment_type") == cls.INSURANCE:
                 effective_price = doctor_clinic_timing.deal_price
@@ -3302,6 +3304,7 @@ class OpdAppointment(auth_model.TimeStampedModel, CouponsMixin, OpdAppointmentIn
                     effective_price = 0
                 else:
                     effective_price = doctor_clinic_timing.deal_price - coupon_discount
+                prepaid_deal_price = doctor_clinic_timing.deal_price
             deal_price = doctor_clinic_timing.deal_price
             mrp = doctor_clinic_timing.mrp
             fees = doctor_clinic_timing.insurance_fees if doctor_clinic_timing.insurance_fees and doctor_clinic_timing.insurance_fees > 0 else doctor_clinic_timing.fees
@@ -3318,6 +3321,7 @@ class OpdAppointment(auth_model.TimeStampedModel, CouponsMixin, OpdAppointmentIn
                     effective_price = 0
                 else:
                     effective_price = total_deal_price - coupon_discount
+                prepaid_deal_price = doctor_clinic_timing.deal_price
 
             deal_price = total_deal_price
             mrp = total_mrp
@@ -3327,6 +3331,7 @@ class OpdAppointment(auth_model.TimeStampedModel, CouponsMixin, OpdAppointmentIn
             effective_price = 0
             coupon_discount, coupon_cashback, coupon_list, random_coupon_list = 0, 0, [], []
             deal_price = doctor_clinic_timing.dct_cod_deal_price()
+            prepaid_deal_price = doctor_clinic_timing.deal_price
 
 
         return {
@@ -3345,11 +3350,12 @@ class OpdAppointment(auth_model.TimeStampedModel, CouponsMixin, OpdAppointmentIn
                 "is_enabled_for_cod": doctor_clinic_timing.is_enabled_for_cod(),
                 "insurance_fees": doctor_clinic_timing.insurance_fees
             },
-            "coupon_data" : { "random_coupon_list" : random_coupon_list }
+            "coupon_data" : { "random_coupon_list" : random_coupon_list },
+            "prepaid_deal_price" : prepaid_deal_price
         }
 
     @classmethod
-    def create_fulfillment_data(cls, user, data, price_data):
+    def create_fulfillment_data(cls, user, data, price_data, cart_item_id=None):
         from ondoc.insurance.models import UserInsurance
         procedures = data.get('procedure_ids', [])
         selected_hospital = data.get('hospital')
@@ -3376,7 +3382,7 @@ class OpdAppointment(auth_model.TimeStampedModel, CouponsMixin, OpdAppointmentIn
 
         payment_type = data.get("payment_type")
         effective_price = price_data.get("effective_price")
-        cart_data = data.get('cart_item').data
+        cart_data = data.get('cart_item').data if data.get('cart_item') and data.get('cart_item').data else cart_item_id
         # is_appointment_insured = cart_data.get('is_appointment_insured', None)
         # insurance_id = cart_data.get('insurance_id', None)
 
@@ -3404,6 +3410,7 @@ class OpdAppointment(auth_model.TimeStampedModel, CouponsMixin, OpdAppointmentIn
             "booked_by": user,
             "fees": price_data.get("fees"),
             "deal_price": price_data.get("deal_price"),
+            "prepaid_deal_price": price_data.get("prepaid_deal_price"),
             "effective_price": effective_price,
             "mrp": price_data.get("mrp"),
             "extra_details": extra_details,
@@ -3764,9 +3771,14 @@ class OpdAppointment(auth_model.TimeStampedModel, CouponsMixin, OpdAppointmentIn
         if order_obj:
             try:
                 patent_id = order_obj.parent_id
-                discount = ((Decimal(order_obj.action_data.get('mrp')) - Decimal(order_obj.action_data.get(
-                    'deal_price'))) / Decimal(order_obj.action_data.get('mrp'))) * 100
-                discount = str(round(discount, 2))
+                if self.payment_type == OpdAppointment.COD:
+                    discount = ((Decimal(order_obj.action_data.get('mrp')) - Decimal(order_obj.action_data.get(
+                        'prepaid_deal_price'))) / Decimal(order_obj.action_data.get('mrp'))) * 100
+                else:
+                    discount = ((Decimal(order_obj.action_data.get('mrp')) - Decimal(order_obj.action_data.get(
+                        'deal_price'))) / Decimal(order_obj.action_data.get('mrp'))) * 100
+                # discount = str(round(discount, 2))
+                discount = float(round(discount, 2)) if discount <=10 else int(discount)
                 result = patent_id, discount
             except Exception as e:
                 result = None, None
@@ -3776,7 +3788,8 @@ class OpdAppointment(auth_model.TimeStampedModel, CouponsMixin, OpdAppointmentIn
         result = None, None
         order_id, discount = self.get_master_order_id_and_discount()
         if order_id:
-            url = settings.BASE_URL + '/order/paymentSummary?order_id={}&token={}'.format(order_id, token)
+	        #url = settings.BASE_URL + '/order/paymentSummary?order_id={}&token={}'.format(order_id, token)
+            url = settings.BASE_URL + '/opd/doctor/{}/{}/bookdetails?appointment_id={}&token={}&cod_to_prepaid=true'.format(self.doctor_id, self.hospital_id, self.id, token)
             result = url, discount
         return result
 
