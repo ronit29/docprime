@@ -404,7 +404,9 @@ class SMSNotification:
     def get_template_object(self, user):
         notification_type = self.notification_type
         obj = None
-        if notification_type == NotificationAction.APPOINTMENT_ACCEPTED:
+        if notification_type == NotificationAction.COD_TO_PREPAID_REQUEST:
+            obj = DynamicTemplates.objects.filter(template_name="COD_to_Prepaid_SMS_to_customer", approved=True).first()
+        elif notification_type == NotificationAction.APPOINTMENT_ACCEPTED:
             obj = DynamicTemplates.objects.filter(template_name="Confirmation_IPD_OPD", approved=True).first()
         elif notification_type == NotificationAction.APPOINTMENT_BOOKED and (not user or user.user_type == User.DOCTOR) and (self.context.get('payment_type') == 2):
             obj = DynamicTemplates.objects.filter(template_name="Booking_Provider_Pay_at_clinic", approved=True).first()
@@ -1576,7 +1578,7 @@ class OpdNotification(Notification):
         }
         return context
 
-    def send(self, is_valid_for_provider):
+    def send(self, is_valid_for_provider=True):
         context = self.get_context()
         notification_type = self.notification_type
         all_receivers = self.get_receivers(is_valid_for_provider)
@@ -1632,10 +1634,12 @@ class OpdNotification(Notification):
 
         doctor_spocs = instance.hospital.get_spocs_for_communication() if instance.hospital else []
         spocs_to_be_communicated = []
-        if notification_type in [NotificationAction.APPOINTMENT_ACCEPTED,
+        if notification_type in [NotificationAction.DOCTOR_INVOICE]:
+            if instance.payment_type not in [2, 3]:
+                receivers.append(instance.user)
+        elif notification_type in [NotificationAction.APPOINTMENT_ACCEPTED,
                                  NotificationAction.APPOINTMENT_RESCHEDULED_BY_DOCTOR,
                                  NotificationAction.PRESCRIPTION_UPLOADED,
-                                 NotificationAction.DOCTOR_INVOICE,
                                  NotificationAction.OPD_OTP_BEFORE_APPOINTMENT,
                                  NotificationAction.OPD_CONFIRMATION_CHECK_AFTER_APPOINTMENT,
                                  NotificationAction.OPD_CONFIRMATION_SECOND_CHECK_AFTER_APPOINTMENT,
@@ -1782,7 +1786,7 @@ class LabNotification(Notification):
         }
         return context
 
-    def send(self, is_valid_for_provider):
+    def send(self, is_valid_for_provider=True):
         context = self.get_context()
         notification_type = self.notification_type
         all_receivers = self.get_receivers(is_valid_for_provider)
@@ -1836,10 +1840,12 @@ class LabNotification(Notification):
         # lab_spocs = instance.get_lab_admins()
         lab_managers = instance.lab.get_managers_for_communication() if instance.lab else []
         lab_managers_to_be_communicated = []
-        if notification_type in [NotificationAction.LAB_APPOINTMENT_ACCEPTED,
+        if notification_type in [NotificationAction.LAB_INVOICE]:
+            if instance.payment_type not in [2, 3]:
+                receivers.append(instance.user)
+        elif notification_type in [NotificationAction.LAB_APPOINTMENT_ACCEPTED,
                                  NotificationAction.LAB_APPOINTMENT_RESCHEDULED_BY_LAB,
                                  NotificationAction.LAB_REPORT_UPLOADED,
-                                 NotificationAction.LAB_INVOICE,
                                  NotificationAction.LAB_OTP_BEFORE_APPOINTMENT,
                                  NotificationAction.LAB_CONFIRMATION_CHECK_AFTER_APPOINTMENT,
                                  NotificationAction.LAB_CONFIRMATION_SECOND_CHECK_AFTER_APPOINTMENT,

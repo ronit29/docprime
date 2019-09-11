@@ -2251,7 +2251,10 @@ class LabAppointment(TimeStampedModel, CouponsMixin, LabAppointmentInvoiceMixin,
         if responsible_user:
             _responsible_user = auth_model.User.objects.filter(id=responsible_user).first()
         app_obj = cls(**appointment_data)
-        app_obj.save(responsible_user=_responsible_user, source=source)
+        if _responsible_user and source:
+            app_obj.save(responsible_user=_responsible_user, source=source)
+        else:
+            app_obj.save()
         AppointmentPrescription.update_with_appointment(app_obj, prescription_id_list)
         test_mappings = []
         for test in extra_details:

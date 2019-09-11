@@ -1,14 +1,16 @@
 from rest_framework import serializers
-from ondoc.diagnostic.models import AvailableLabTest
+from ondoc.diagnostic.models import AvailableLabTest, LabTest, LabPricingGroup
 from rest_framework.validators import UniqueTogetherValidator
 
 
 class AjaxAvailableLabTestSerializer(serializers.ModelSerializer):
     id = serializers.IntegerField(required=False)
     mrp = serializers.DecimalField(max_digits=10, decimal_places=2)
-    custom_agreed_price = serializers.DecimalField(max_digits=10, decimal_places=2, required=False, allow_null=True)    
+    custom_agreed_price = serializers.DecimalField(max_digits=10, decimal_places=2, required=False, allow_null=True)
     custom_deal_price = serializers.DecimalField(max_digits=10, decimal_places=2, required=False, allow_null=True)
     insurance_agreed_price = serializers.DecimalField(max_digits=10, decimal_places=2, required=False, allow_null=True)
+    lab_pricing_group = serializers.PrimaryKeyRelatedField(queryset=LabPricingGroup.objects.all(), required=False, allow_null=True)
+    test = serializers.PrimaryKeyRelatedField(queryset=LabTest.objects.all(), required=False, allow_null=True)
 
     class Meta:
         model = AvailableLabTest

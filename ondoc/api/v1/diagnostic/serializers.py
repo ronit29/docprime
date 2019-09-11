@@ -821,8 +821,8 @@ class LabAppTransactionModelSerializer(serializers.Serializer):
     coupon_data = serializers.JSONField(required=False)
     prescription_list = serializers.ListSerializer(child=PrescriptionDocumentSerializer(), required=False)
     spo_data = serializers.JSONField(required=False, default={})
-    _source = serializers.CharField(required=False)
-    _responsible_user = serializers.IntegerField(required=False)
+    _source = serializers.CharField(required=False, allow_null=True)
+    _responsible_user = serializers.IntegerField(required=False, allow_null=True)
 
 
 class LabAppRescheduleModelSerializer(serializers.ModelSerializer):
@@ -899,8 +899,8 @@ class LabAppointmentCreateSerializer(serializers.Serializer):
     utm_spo_tags = serializers.JSONField(required=False, default={})
     app_version = serializers.CharField(required=False, allow_null=True, allow_blank=True)
     prescription_list = serializers.ListSerializer(child=PrescriptionDocumentSerializer(), required=False)
-    _source = serializers.CharField(required=False)
-    _responsible_user = serializers.IntegerField(required=False)
+    _source = serializers.CharField(required=False, allow_null=True)
+    _responsible_user = serializers.IntegerField(required=False, allow_null=True)
 
     def validate(self, data):
         MAX_APPOINTMENTS_ALLOWED = 10

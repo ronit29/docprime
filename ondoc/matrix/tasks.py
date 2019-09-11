@@ -1344,8 +1344,8 @@ def push_retail_appointment_to_matrix(self, data):
         if not appointment:
             raise Exception("Appointment could not found against id - " + str(appointment_id))
 
-        if not appointment.is_retail_booking():
-            raise Exception("Not a Retail Appointment - " + str(appointment_id))
+        # if not appointment.is_retail_booking():
+        #     raise Exception("Not a Retail Appointment - " + str(appointment_id))
 
         request_data = appointment.get_matrix_retail_booking_data()
 
