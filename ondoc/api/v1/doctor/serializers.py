@@ -486,7 +486,7 @@ class DoctorHospitalSerializer(serializers.ModelSerializer):
     def get_enabled_for_cod(self, obj):
         request = self.context.get('request')
         user = request.user
-        return obj.enabled_for_cod(user=user)
+        return obj.doctor_clinic.hospital.is_enabled_for_cod(user=user)
 
     def get_show_contact(self, obj):
         if obj.doctor_clinic and obj.doctor_clinic.hospital and obj.doctor_clinic.hospital.spoc_details.all():

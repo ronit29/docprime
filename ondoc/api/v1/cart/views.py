@@ -136,9 +136,11 @@ class CartViewSet(viewsets.GenericViewSet):
                     plus_user = user.active_plus_user
                     if not plus_user:
                         raise Exception('Member is no more VIP')
-                    vip_dict = plus_user.validate_plus_appointment(cart_data)
-                    if not vip_dict('cover_under_vip'):
+                    vip_dict = plus_user.validate_plus_appointment(validated_data)
+                    if not vip_dict.get('cover_under_vip'):
                         raise Exception('Appointment no more cover under VIP')
+                    item.data['vip_amount'] = vip_dict.get('vip_amount')
+                    item.data['is_vip_member'] = vip_dict.get('is_vip_member')
                 if not cart_data.get('is_appointment_insured'):
                     item.data['is_appointment_insured'] = False
                     item.data['insurance_id'] = None
