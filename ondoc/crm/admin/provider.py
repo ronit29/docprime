@@ -30,3 +30,31 @@ class PartnerLabTestSampleAdmin(admin.ModelAdmin):
 
 class TestSamplesLabAlertAdmin(admin.ModelAdmin):
     list_display = ('name', )
+
+
+class ReportsInline(admin.TabularInline):
+    model = prov_models.PartnerLabTestSamplesOrderReportMapping
+    extra = 0
+    can_delete = True
+    verbose_name = "Report"
+    verbose_name_plural = "Reports"
+    readonly_fields = []
+    fields = ['report']
+    autocomplete_fields = []
+
+
+class PartnerLabSamplesCollectOrderAdmin(admin.ModelAdmin):
+
+    list_display = ('id', 'offline_patient', 'hospital', 'doctor', 'lab')
+    readonly_fields = ['offline_patient', 'patient_details', 'hospital', 'doctor', 'lab', 'available_lab_tests',
+                       'collection_datetime', 'samples', 'selected_tests_details', 'lab_alerts']
+    search_fields = ['offline_patient']
+    inlines = [
+        ReportsInline,
+    ]
+
+    def has_add_permission(self, request, obj=None):
+        return False
+
+    def has_delete_permission(self, request, obj=None):
+        return False

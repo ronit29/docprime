@@ -4199,7 +4199,7 @@ class OfflinePatients(auth_model.TimeStampedModel):
     user = models.ForeignKey(auth_model.User, related_name="offline_patients", on_delete=models.SET_NULL, null=True)
 
     def __str__(self):
-        return self.name
+        return str(self.name)
 
 
     def __repr__(self):

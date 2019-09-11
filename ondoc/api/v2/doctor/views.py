@@ -1511,7 +1511,7 @@ class PartnerLabTestSamplesCollectViewset(viewsets.GenericViewSet):
             if lab_alerts:
                 order_obj.lab_alerts.set(lab_alerts, clear=True)
             order_obj.available_lab_tests.set(available_lab_tests, clear=True)
-        order_model_serializer = serializers.PartnerLabSamplesCollectOrderModelSerializer(order_obj)
+        order_model_serializer = serializers.PartnerLabSamplesCollectOrderModelSerializer(order_obj, context={'request': request})
         return Response({"status": 1, "message": "Sample Collection Order created successfully",
                          "data": order_model_serializer.data})
 
@@ -1521,7 +1521,7 @@ class PartnerLabTestSamplesCollectViewset(viewsets.GenericViewSet):
         return Response(data)
 
     def orders_list(self, request):
-        queryset = prov_models.PartnerLabSamplesCollectOrder.objects.prefetch_related('lab_alerts') \
+        queryset = prov_models.PartnerLabSamplesCollectOrder.objects.prefetch_related('lab_alerts', 'reports') \
                                                                     .filter(hospital__manageable_hospitals__phone_number=request.user.phone_number)
-        data = serializers.PartnerLabSamplesCollectOrderModelSerializer(queryset, many=True).data
+        data = serializers.PartnerLabSamplesCollectOrderModelSerializer(queryset, context={'request': request}, many=True).data
         return Response(data)

@@ -859,7 +859,7 @@ class SampleCollectOrderCreateOrUpdateSerializer(serializers.Serializer):
             raise serializers.ValidationError('Order id is required for just status update')
         id = attrs.get('id')
         order_obj = provider_models.PartnerLabSamplesCollectOrder.objects.filter(id=id).first()
-        if not order_obj:
+        if id and not order_obj:
             raise serializers.ValidationError('invalid order id')
         offline_patient_id = attrs.get('offline_patient_id')
         offline_patient = doc_models.OfflinePatients.objects.filter(id=offline_patient_id).first()
@@ -1027,16 +1027,24 @@ class LabTestSamplesCollectionBarCodeModelSerializer(PartnerLabTestSampleDetails
 
 
 class PartnerLabSamplesCollectOrderModelSerializer(serializers.ModelSerializer):
-    lab_report = serializers.SerializerMethodField()
-    lab_alerts = serializers.ReadOnlyField(source="lab_alerts.name")
+    lab_reports = serializers.SerializerMethodField()
+    # lab_alerts = serializers.ReadOnlyField(source="lab_alerts.name")
 
-    def get_lab_report(self, obj):
-        return [{"lab_test":["CBC","XRAY"],"url":"http://www.africau.edu/images/default/sample.pdf"},{"lab_test":["XAZ","XRAY"],"url":"http://www.africau.edu/images/default/sample.pdf"}]
+    # def get_lab_report(self, obj):
+    #     return [{"lab_test":["CBC","XRAY"],"url":"http://www.africau.edu/images/default/sample.pdf"},{"lab_test":["XAZ","XRAY"],"url":"http://www.africau.edu/images/default/sample.pdf"}]
+
+    def get_lab_reports(self, obj):
+        request = self.context.get('request')
+        report_mappings = obj.reports.all()
+        response = list()
+        for mapping in report_mappings:
+            response.append(request.build_absolute_uri(mapping.report.url))
+        return response
 
     class Meta:
         model = provider_models.PartnerLabSamplesCollectOrder
         fields = ('id', 'created_at', 'updated_at', 'status', 'collection_datetime', 'samples', 'offline_patient',
-                  'hospital', 'doctor', 'lab_alerts', 'selected_tests_details', 'lab_report')
+                  'hospital', 'doctor', 'lab_alerts', 'selected_tests_details', 'lab_reports')
 
 
 class TestSamplesLabAlertsModelSerializer(serializers.ModelSerializer):

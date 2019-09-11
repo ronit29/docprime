@@ -307,3 +307,15 @@ class PartnerLabSamplesCollectOrder(auth_models.TimeStampedModel):
 
     class Meta:
         db_table = "partner_lab_samples_collect_order"
+
+
+class PartnerLabTestSamplesOrderReportMapping(auth_models.TimeStampedModel):
+    from django.core.validators import FileExtensionValidator
+    order = models.ForeignKey(PartnerLabSamplesCollectOrder, on_delete=models.CASCADE, related_name="reports")
+    report = models.FileField(upload_to='provider/cloud-lab/reports', validators=[FileExtensionValidator(allowed_extensions=['pdf', 'jpeg', 'jpg', 'png'])])
+
+    def __str__(self):
+        return str(self.report)
+
+    class Meta:
+        db_table = 'partner_lab_test_sample_order_report_mapping'
