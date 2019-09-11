@@ -296,9 +296,15 @@ class AvailableLabTestPackageSerializer(serializers.ModelSerializer):
 
         plus_obj = user.active_plus_user if not user.is_anonymous and user.is_authenticated else None
         utilization = plus_obj.get_utilization if plus_obj else {}
+        package_amount_balance = utilization.get('available_package_amount', 0)
 
-        if plus_obj and lab_obj and obj and lab_obj.enabled_for_plus_plans and obj.mrp is not None and obj.mrp <= utilization.get('available_package_amount', 0):
+        if plus_obj and lab_obj and obj and lab_obj.enabled_for_plus_plans and obj.mrp:
             resp['covered_under_vip'] = True
+
+            if obj.mrp <= package_amount_balance:
+                resp['vip_amount'] = 0
+            else:
+                resp['vip_amount'] = obj.mrp - package_amount_balance
 
         return resp
 
@@ -489,9 +495,15 @@ class AvailableLabTestSerializer(serializers.ModelSerializer):
 
         plus_obj = user.active_plus_user if not user.is_anonymous and user.is_authenticated else None
         utilization = plus_obj.get_utilization if plus_obj else {}
+        package_amount_balance = utilization.get('available_package_amount', 0)
 
-        if plus_obj and lab_obj and obj and lab_obj.enabled_for_plus_plans and obj.mrp is not None and obj.mrp <= utilization.get('available_package_amount', 0):
+        if plus_obj and lab_obj and obj and lab_obj.enabled_for_plus_plans and obj.mrp:
             resp['covered_under_vip'] = True
+
+            if obj.mrp <= package_amount_balance:
+                resp['vip_amount'] = 0
+            else:
+                resp['vip_amount'] = obj.mrp - package_amount_balance
 
         return resp
 
@@ -1593,9 +1605,15 @@ class CustomLabTestPackageSerializer(serializers.ModelSerializer):
         user = request.user
         plus_obj = user.active_plus_user if not user.is_anonymous and user.is_authenticated else None
         utilization = plus_obj.get_utilization if plus_obj else {}
+        package_amount_balance = utilization.get('available_package_amount', 0)
 
-        if plus_obj and obj and lab and lab.enabled_for_plus_plans and obj.mrp is not None and obj.mrp <= utilization.get('available_package_amount', 0):
+        if plus_obj and lab and obj and lab.enabled_for_plus_plans and obj.mrp:
             resp['covered_under_vip'] = True
+
+            if obj.mrp <= package_amount_balance:
+                resp['vip_amount'] = 0
+            else:
+                resp['vip_amount'] = obj.mrp - package_amount_balance
 
         return resp
 
