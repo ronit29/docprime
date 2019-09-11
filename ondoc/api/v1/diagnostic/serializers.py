@@ -755,6 +755,14 @@ class LabAppointmentModelSerializer(serializers.ModelSerializer):
     reports = serializers.SerializerMethodField()
     report_files = serializers.SerializerMethodField()
     prescription = serializers.SerializerMethodField()
+    vip = serializers.SerializerMethodField()
+
+    def get_vip(self, obj):
+        return {
+            'is_vip_member': True if obj and obj.plus_plan else False,
+            'vip_amount': obj.effective_price,
+            'covered_under_vip': True if obj and obj.plus_plan else False
+        }
 
     def get_prescription(self, obj):
         return []
@@ -796,7 +804,7 @@ class LabAppointmentModelSerializer(serializers.ModelSerializer):
         model = LabAppointment
         fields = ('id', 'lab', 'lab_test', 'profile', 'type', 'lab_name', 'status', 'deal_price', 'effective_price', 'time_slot_start', 'time_slot_end',
                    'is_home_pickup', 'lab_thumbnail', 'lab_image', 'patient_thumbnail', 'patient_name', 'allowed_action', 'address', 'invoices', 'reports', 'report_files',
-                  'prescription')
+                  'prescription', 'vip')
 
 
 class LabAppointmentBillingSerializer(serializers.ModelSerializer):

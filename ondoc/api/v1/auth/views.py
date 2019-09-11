@@ -2004,6 +2004,13 @@ class OrderDetailViewSet(GenericViewSet):
 
             item = OrderCartItemMapper(order)
             temp_time_slot_start = convert_datetime_str_to_iso_str(order.action_data["time_slot_start"])
+
+            appointment = None
+            if order.product_id == Order.DOCTOR_PRODUCT_ID:
+                appointment = opd_appoint
+            elif order.product_id == Order.LAB_PRODUCT_ID:
+                appointment = LabAppointment.objects.filter(id=order.reference_id).first()
+
             curr = {
                 "mrp": order.action_data["mrp"] if "mrp" in order.action_data else order.action_data["agreed_price"],
                 "deal_price": order.action_data["deal_price"],
@@ -2013,7 +2020,10 @@ class OrderDetailViewSet(GenericViewSet):
                 "time_slot_start": temp_time_slot_start,
                 "payment_type": order.action_data["payment_type"],
                 "cod_deal_price": cod_deal_price,
-                "enabled_for_cod": enabled_for_cod
+                "enabled_for_cod": enabled_for_cod,
+                "is_vip_member": True if appointment and appointment.plus_plan else False,
+                "covered_under_vip": True if appointment and appointment.plus_plan else False,
+                'vip_amount': order.action_data["effective_price"]
             }
             processed_order_data.append(curr)
 
