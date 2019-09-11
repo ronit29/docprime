@@ -34,9 +34,8 @@ class SalespointAppointmentViewSet(viewsets.GenericViewSet):
         status_list = LabAppointment.STATUS_CHOICES
         resp_status = list()
         for status in status_list:
-            if status[0] in [6, 7]:
-                status_dict = {'id': status[0], 'status': status[1]}
-                resp_status.append(status_dict)
+            status_dict = {'id': status[0], 'status': status[1]}
+            resp_status.append(status_dict)
 
         return Response({'status_master': resp_status})
 
