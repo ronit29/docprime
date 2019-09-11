@@ -3450,7 +3450,7 @@ class OpdAppointment(auth_model.TimeStampedModel, CouponsMixin, OpdAppointmentIn
             "is_appointment_insured": is_appointment_insured,
             "insurance": insurance_id,
             "cover_under_vip": cover_under_vip,
-            "plus_user_id": plus_user_id,
+            "vip": plus_user_id,
             "coupon_data": price_data.get("coupon_data"),
             "_responsible_user": data.get("_responsible_user", None),
             "_source": data.get("_source", None)

@@ -2414,6 +2414,7 @@ class LabAppointmentView(mixins.CreateModelMixin,
 
         booked_by = 'agent' if hasattr(request, 'agent') else 'user'
         user_insurance = UserInsurance.get_user_insurance(request.user)
+        plus_user = request.user.active_plus_user
         if user_insurance:
             if user_insurance.status == UserInsurance.ONHOLD:
                 return Response(status=status.HTTP_400_BAD_REQUEST,
@@ -2437,10 +2438,18 @@ class LabAppointmentView(mixins.CreateModelMixin,
                                           'request_errors': {
                                               'message': 'Some error occured. Please try again after some time.'
                                           }})
+        elif plus_user:
+            plus_user_dict = plus_user.validate_plus_appointment(validated_data)
+            data['is_vip_member'] = plus_user_dict.get('is_vip_member', False)
+            data['cover_under_vip'] = plus_user_dict.get('cover_under_vip', False)
+            data['plus_user_id'] = plus_user.id
+            if data['cover_under_vip']:
+                data['payment_type'] = OpdAppointment.VIP
 
         else:
-            data['is_appointment_insured'], data['insurance_id'], data[
-                'insurance_message'] = False, None, ""
+            data['is_appointment_insured'], data['insurance_id'], data['insurance_message'], data['is_vip_member'],\
+            data['cover_under_vip'], data['plus_user_id'] = False, None, "", False, False, None
+
         # data['is_appointment_insured'], data['insurance_id'], data['insurance_message'] = Cart.check_for_insurance(validated_data, request)
 
         cart_item_id = validated_data.get('cart_item').id if validated_data.get('cart_item') else None

@@ -693,7 +693,7 @@ class Order(TimeStampedModel):
                     cart_id=appointment_detail["cart_item_id"],
                     user=user
                 )
-            elif appointment_detail.get('payment_type') == OpdAppointment.INSURANCE:
+            elif appointment_detail.get('payment_type') in [OpdAppointment.INSURANCE, OpdAppointment.VIP]:
                 order = cls.objects.create(
                     product_id=product_id,
                     action=action,

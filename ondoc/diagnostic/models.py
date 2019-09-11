@@ -2540,6 +2540,10 @@ class LabAppointment(TimeStampedModel, CouponsMixin, LabAppointmentInvoiceMixin,
             total_agreed = total_insurance_agreed_price if  total_insurance_agreed_price and total_insurance_agreed_price > 0 else total_agreed
             coupon_discount, coupon_cashback, coupon_list, random_coupon_list = 0, 0, [], []
 
+        if data.get("payment_type") in [OpdAppointment.VIP]:
+            effective_price = effective_price
+            coupon_discount, coupon_cashback, coupon_list, random_coupon_list = 0, 0, [], []
+
         return {
             "deal_price" : total_deal_price,
             "mrp" : total_mrp,
@@ -2606,6 +2610,27 @@ class LabAppointment(TimeStampedModel, CouponsMixin, LabAppointmentInvoiceMixin,
                 payment_type = data["payment_type"]
 
 
+        cover_under_vip = False
+        plus_user_id = None
+        plus_user = user.active_plus_user
+        mrp = price_data.get("mrp")
+        if plus_user:
+            plus_user_resp = plus_user.validate_plus_appointment(data)
+            cover_under_vip = plus_user_resp.get('cover_under_vip', False)
+            plus_user_id = plus_user_resp.get('plus_user_id', None)
+        if cover_under_vip and cart_data.get('cover_under_vip', None):
+            payment_type = OpdAppointment.VIP
+            utilization = plus_user.get_utilization
+            available_amount = int(utilization.get('available_package_amount', 0))
+            effective_price = 0 if available_amount >= mrp else (mrp - available_amount)
+        else:
+            plus_user_id = False
+            cover_under_vip = None
+            if data["payment_type"] == OpdAppointment.VIP:
+                payment_type = OpdAppointment.PREPAID
+            else:
+                payment_type = data["payment_type"]
+
         fulfillment_data = {
             "lab": data["lab"],
             "user": user,
@@ -2627,6 +2652,8 @@ class LabAppointment(TimeStampedModel, CouponsMixin, LabAppointmentInvoiceMixin,
             "cashback": int(price_data.get("coupon_cashback")),
             "is_appointment_insured": is_appointment_insured,
             "insurance": insurance_id,
+            "cover_under_vip": cover_under_vip,
+            "vip": plus_user_id,
             "coupon_data": price_data.get("coupon_data"),
             "prescription_list": data.get('prescription_list', []),
             "_responsible_user": data.get("_responsible_user", None),
