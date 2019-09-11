@@ -279,6 +279,8 @@ class Coupon(auth_model.TimeStampedModel):
         from ondoc.doctor.models import OpdAppointment
         from ondoc.diagnostic.models import LabAppointment
         from ondoc.diagnostic.models import LabTest
+
+        test_applicabile = []
         if coupons_obj:
             coupon_obj = coupons_obj[0]
             user_opd_booked = Prefetch('opd_appointment_coupon',
@@ -294,7 +296,6 @@ class Coupon(auth_model.TimeStampedModel):
 
             if coupon:
                 coupon_recommender = CouponRecommender(request.user, profile, 'lab', 2, coupon_obj.code, None)
-                test_applicabile = []
                 pathology_tests = []
                 radiology_tests = []
                 user_coupon_count = 0
