@@ -3095,12 +3095,18 @@ class LabTimingListView(mixins.ListModelMixin,
             resp_data = {
                 'all': {
                     'timeslots': intersect_resp['timeslots'],
+                    'tests': intersect_resp['tests'],
+                    'upcoming_slots': intersect_resp['upcoming_slots'],
+                    'is_thyrocare': intersect_resp['is_thyrocare'],
                     'today_min': None,
                     'tomorrow_min': None,
                     'today_max': None
                 },
                 'pathology': {
                     'timeslots': pathology_resp['timeslots'],
+                    'tests': pathology_resp['tests'],
+                    'upcoming_slots': pathology_resp['upcoming_slots'],
+                    'is_thyrocare': pathology_resp['is_thyrocare'],
                     'today_min': None,
                     'tomorrow_min': None,
                     'today_max': None
@@ -3108,16 +3114,14 @@ class LabTimingListView(mixins.ListModelMixin,
             }
 
             if radiology_resp:
-                agent_radiology_resp = {'radiology': []}
+                agent_radiology_resp = {'radiology': {'tests': []}}
                 for radiology_test_resp in radiology_resp['tests']:
                     agent_radiology_test_resp = {
                                                     'name': radiology_test_resp['name'],
-                                                    'timeslots': radiology_test_resp['timings']['timeslots'],
-                                                    'today_min': None,
-                                                    'tomorrow_min': None,
-                                                    'today_max': None
+                                                    'tests_id': radiology_test_resp['tests_id'],
+                                                    'timings': radiology_test_resp['timings']
                                                 }
-                    agent_radiology_resp['radiology'].append(agent_radiology_test_resp)
+                    agent_radiology_resp['radiology']['tests'].append(agent_radiology_test_resp)
                 resp_data.update(agent_radiology_resp)
 
         return Response(resp_data)
