@@ -276,17 +276,19 @@ class PartnerLabTestSampleDetails(auth_models.TimeStampedModel):
 
 class PartnerLabSamplesCollectOrder(auth_models.TimeStampedModel):
 
-    SAMPLE_SCAN_PENDING = 1
-    SAMPLE_COLLECTION_PENDING = 2
-    SAMPLE_COLLECTED = 3
-    REPORT_GENERATED = 4
-    ALL_REPORTS_GENERATED = 5
-    REPORT_VIEWED = 6
-    STATUS_CHOICES = [(SAMPLE_SCAN_PENDING, "Sample Scan Pending"),
-                      (SAMPLE_COLLECTION_PENDING, "Sample Collection Pending"),
-                      (SAMPLE_COLLECTED, "Sample Collected"),
+    SAMPLE_EXTRACTION_PENDING = 1
+    SAMPLE_SCAN_PENDING = 2
+    SAMPLE_PICKUP_PENDING = 3
+    SAMPLE_PICKED_UP = 4
+    PARTIAL_REPORT_GENERATED = 5
+    REPORT_GENERATED = 6
+    REPORT_VIEWED = 7
+    STATUS_CHOICES = [(SAMPLE_EXTRACTION_PENDING, "Sample Extraction Pending"),
+                      (SAMPLE_SCAN_PENDING, "Sample Scan Pending"),
+                      (SAMPLE_PICKUP_PENDING, "Sample Pickup Pending"),
+                      (SAMPLE_PICKED_UP, "Sample Picked Up"),
+                      (PARTIAL_REPORT_GENERATED, "Partial Report Generated"),
                       (REPORT_GENERATED, "Report Generated"),
-                      (ALL_REPORTS_GENERATED, "All Reports Generated"),
                       (REPORT_VIEWED, "Report Viewed")]
     offline_patient = models.ForeignKey(doc_models.OfflinePatients, on_delete=models.CASCADE, related_name="patient_lab_samples_collect_order")
     patient_details = JSONField()
