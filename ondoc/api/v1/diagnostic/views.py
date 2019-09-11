@@ -344,7 +344,7 @@ class LabList(viewsets.ReadOnlyModelViewSet):
             filter_query += ' and is_home_collection_enabled = True and home_collection_possible = True '
         if lab_visit and not home_visit:
             lab_network_query = ' left join lab_network ln on ln.id=lb.network_id '
-            filter_query += " (case when  (lb.network_id is not null and ln.center_visit and ln.center_visit=true and lb.center_visit " \
+            filter_query += " and (case when  (lb.network_id is not null and ln.center_visit and ln.center_visit=true and lb.center_visit " \
                             "and lb.center_visit=true)  or  (lb.network_id is null and lb.center_visit and lb.center_visit=true) then true  end) "
             # filter_query += " and lab.network_id IS DISTINCT FROM 43 "
 
