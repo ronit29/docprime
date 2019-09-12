@@ -207,17 +207,19 @@ class PlusUser(auth_model.TimeStampedModel):
 
         return None
 
-    def can_package_be_covered_in_vip(self, package_obj):
+    def can_package_be_covered_in_vip(self, package_obj, *args, **kwargs):
+        mrp = package_obj.mrp if package_obj else kwargs.get('mrp')
+        id = package_obj.id if package_obj else kwargs.get('id')
         utilization_dict = self.get_utilization
         if utilization_dict.get('total_package_count_limit'):
-            if utilization_dict['available_package_count'] < utilization_dict.get('total_package_count_limit') and package_obj.id in utilization_dict['allowed_package_ids']:
+            if utilization_dict['available_package_count'] < utilization_dict.get('total_package_count_limit') and id in utilization_dict['allowed_package_ids']:
                 return UtilizationCriteria.COUNT, True
             else:
                 return UtilizationCriteria.COUNT, False
         else:
-            if package_obj.mrp <= utilization_dict['available_package_amount']:
+            if mrp <= utilization_dict['available_package_amount']:
                 if utilization_dict['allowed_package_ids']:
-                    return UtilizationCriteria.AMOUNT, True if package_obj.id in utilization_dict['allowed_package_ids'] else UtilizationCriteria.AMOUNT, False
+                    return UtilizationCriteria.AMOUNT, True if id in utilization_dict['allowed_package_ids'] else UtilizationCriteria.AMOUNT, False
                 return UtilizationCriteria.AMOUNT, True
             else:
                 return UtilizationCriteria.AMOUNT, False
@@ -320,10 +322,12 @@ class PlusUser(auth_model.TimeStampedModel):
 
         elif appointment_type == LAB:
             lab = appointment_data['lab']
-            if lab and lab.enabled_for_plus_plans and is_cover_after_utilize:
-
-                response_dict['cover_under_vip'] = True
-                response_dict['plus_user_id'] = plus_user.id
+            if lab and lab.enabled_for_plus_plans:
+                mrp = int(price_data.get('mrp'))
+                utilization_criteria, coverage = plus_user.can_package_be_covered_in_vip(None, mrp=mrp, id=appointment_data['test_ids'][0])
+                if coverage:
+                    response_dict['cover_under_vip'] = True
+                    response_dict['plus_user_id'] = plus_user.id
 
         return response_dict
 

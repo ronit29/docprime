@@ -34,6 +34,7 @@ import string
 import random
 import decimal
 
+from ondoc.plus.enums import UtilizationCriteria
 
 logger = logging.getLogger(__name__)
 
@@ -624,11 +625,18 @@ class Order(TimeStampedModel):
                     doctor_available_amount = int(utilization.get('doctor_amount_available', 0))
                     payable_amount = 0 if doctor_available_amount >= app.get('mrp') else (app.get('mrp') - doctor_available_amount)
                 else:
-                    package_available_amount = int(utilization.get('available_package_amount', 0))
-                    final_amount = app.get('mrp')
-                    if app['home_pickup_charges']:
-                        final_amount = final_amount + app['home_pickup_charges']
-                    payable_amount = 0 if package_available_amount >= final_amount else (final_amount - package_available_amount)
+                    final_amount = app.get('price')
+                    utilization_criteria, coverage = plus_user.can_package_be_covered_in_vip(None, mrp=final_amount, id=app['lab_test'][0])
+                    if not coverage:
+                        payable_amount = payable_amount + app['effective_price']
+                    else:
+                        if utilization_criteria == UtilizationCriteria.COUNT:
+                            payable_amount = 0
+                        else:
+                            package_available_amount = int(utilization.get('available_package_amount', 0))
+                            if app['home_pickup_charges']:
+                                final_amount = final_amount + app['home_pickup_charges']
+                            payable_amount = 0 if package_available_amount >= final_amount else (final_amount - package_available_amount)
 
             if app.get("payment_type") == OpdAppointment.PREPAID:
                 payable_amount += app.get('effective_price')
