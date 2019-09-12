@@ -4,7 +4,7 @@ from ondoc.diagnostic.models import Lab, LabTestGroupMapping, LabTestGroupTiming
 
 
 def update_lab_test_group_timing():
-    labs = Lab.objects.prefetch_related('lab_pricing_group', 'lab_pricing_group__available_lab_tests', 'lab_pricing_group__available_lab_tests__test', 'test_group_timings', 'lab_timings').all()[:5]
+    labs = Lab.objects.prefetch_related('lab_pricing_group', 'lab_pricing_group__available_lab_tests', 'lab_pricing_group__available_lab_tests__test', 'test_group_timings', 'lab_timings').all()
     for lab in labs:
         if lab.lab_pricing_group and lab.lab_pricing_group.available_lab_tests.all():
             available_lab_tests = lab.lab_pricing_group.available_lab_tests.filter(test__test_type=LabTest.RADIOLOGY)
