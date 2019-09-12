@@ -370,22 +370,23 @@ class PlusUser(auth_model.TimeStampedModel):
         utilization = self.get_utilization
         for item in cart_items:
             data = item.data
-            validate_item = item.validate(request)
-            price_data = OpdAppointment.get_price_details(
-                validate_item) if appointment_type == OPD else LabAppointment.get_price_details(appointment_data)
+            validated_item = item.validate(request)
+            # price_data = OpdAppointment.get_price_details(
+            #     validated_item) if appointment_type == OPD else LabAppointment.get_price_details(validated_item)
+            price_data = item.get_price_details(validated_item)
             mrp = int(price_data.get('mrp', 0))
             doctor = data.get('doctor', None)
-            if doctor and data.get('cover_under_vip'):
+            if doctor and validated_item.get('cover_under_vip'):
                 doctor_available_amount = utilization.get('doctor_amount_available', 0)
                 if doctor_available_amount > 0:
                     utilization['doctor_amount_available'] = doctor_available_amount - mrp
                 else:
                     return vip_data_dict
-            elif data.get('lab') and data.get('cover_under_vip'):
+            elif validated_item.get('lab') and validated_item.get('cover_under_vip'):
                 package_available_amount = utilization.get('available_package_amount', 0)
                 package_available_count = utilization.get('available_package_count', 0)
                 package_available_ids = utilization.get('allowed_package_ids', [])
-                tests = data.get('test_ids', [])
+                tests = validated_item.get('test_ids', [])
                 # tests = LabTest.objects.filter(id__in=test_ids)
                 for test in tests:
                     if test.is_package and test.id in package_available_ids and package_available_count and package_available_count > 0:
