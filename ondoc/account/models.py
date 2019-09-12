@@ -619,17 +619,18 @@ class Order(TimeStampedModel):
                 if not plus_user:
                     payable_amount += app.get('effective_price')
                     return payable_amount
-                utilization = plus_user.get_utilization
+                # utilization = plus_user.get_utilization
                 if "doctor" in app:
-                    doctor_available_amount = int(utilization.get('doctor_amount_available', 0))
-                    payable_amount = 0 if doctor_available_amount >= app.get('mrp') else (app.get('mrp') - doctor_available_amount)
+                    # doctor_available_amount = int(utilization.get('doctor_amount_available', 0))
+                    payable_amount = app.get('effective_price', 0)
+                    # payable_amount = 0 if doctor_available_amount >= app.get('mrp') else (app.get('mrp') - doctor_available_amount)
                 else:
-                    package_available_amount = int(utilization.get('available_package_amount', 0))
+                    # package_available_amount = int(utilization.get('available_package_amount', 0))
                     final_amount = app.get('mrp')
-                    if app['home_pickup_charges']:
-                        final_amount = final_amount + app['home_pickup_charges']
-                    payable_amount = 0 if package_available_amount >= final_amount else (final_amount - package_available_amount)
-
+                    # if app['home_pickup_charges']:
+                    #     final_amount = final_amount + app['home_pickup_charges']
+                    # payable_amount = 0 if package_available_amount >= final_amount else (final_amount - package_available_amount)
+                    payable_amount = app.get('effective_price', 0)
             if app.get("payment_type") == OpdAppointment.PREPAID:
                 payable_amount += app.get('effective_price')
         return payable_amount
