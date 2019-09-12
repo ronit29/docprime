@@ -404,9 +404,7 @@ class PlusUser(auth_model.TimeStampedModel):
             current_package_count_available = updated_utilization.get('available_package_count', 0)
             current_package_amount_available = updated_utilization.get('available_package_amount', 0)
             current_package_ids = updated_utilization.get('allowed_package_ids', [])
-            test_ids = appointment_data.get('test_ids', [])
-            if test_ids:
-                tests = LabTest.objects.filter(id__in=test_ids)
+            tests = appointment_data.get('test_ids', [])
             for test in tests:
                 if test.is_package and test.id in current_package_ids and current_package_count_available > 0:
                     vip_data_dict['cover_under_vip'] = True
