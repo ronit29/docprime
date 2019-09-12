@@ -2080,7 +2080,7 @@ class OrderDetailViewSet(GenericViewSet):
 
             plus_appointment_mapping = None
             if appointment:
-                plus_appointment_mapping = PlusAppointmentMapping.objects.filter(content_object=appointment).first()
+                plus_appointment_mapping = PlusAppointmentMapping.objects.filter(object_id=appointment.id).first()
 
             curr = {
                 "mrp": order.action_data["mrp"] if "mrp" in order.action_data else order.action_data["agreed_price"],
