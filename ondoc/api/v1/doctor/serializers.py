@@ -136,7 +136,7 @@ class OpdAppointmentSerializer(serializers.ModelSerializer):
 
         plus_appointment_mapping = None
         if obj:
-            plus_appointment_mapping = PlusAppointmentMapping.objects.filter(content_object=obj).first()
+            plus_appointment_mapping = PlusAppointmentMapping.objects.filter(object_id=obj.id).first()
 
         return {
             'is_vip_member': True if obj and obj.plus_plan else False,
