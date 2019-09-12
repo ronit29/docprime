@@ -303,7 +303,7 @@ class CartViewSet(viewsets.GenericViewSet):
                                validated_data)
                            if 'doctor' in validated_data:
                                total_mrp = total_mrp + int(price_data.get('mrp', 0))
-                               if total_mrp <= utilization.get('doctor_amount_avaliable'):
+                               if total_mrp <= utilization.get('doctor_amount_available'):
                                     items_to_process.append(item)
                            else:
                                pass
