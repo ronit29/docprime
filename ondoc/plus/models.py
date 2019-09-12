@@ -383,12 +383,11 @@ class PlusUser(auth_model.TimeStampedModel):
                 package_available_amount = utilization.get('available_package_amount', 0)
                 package_available_count = utilization.get('available_package_count', 0)
                 package_available_ids = utilization.get('allowed_package_ids', [])
-                test_ids = data.get('test_ids', [])
-                if test_ids:
-                    tests = LabTest.objects.filter(id__in=test_ids)
+                tests = data.get('test_ids', [])
+                # tests = LabTest.objects.filter(id__in=test_ids)
                 for test in tests:
                     if test.is_package and test.id in package_available_ids and package_available_count and package_available_count > 0:
-                        utilization['available_package_count'] = package_available_amount - 1
+                        utilization['available_package_count'] = package_available_count - 1
                     elif test.is_package and package_available_amount and package_available_amount > 0:
                         utilization['available_package_amount'] = package_available_amount - mrp
             else:
