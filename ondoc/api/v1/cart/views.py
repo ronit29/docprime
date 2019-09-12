@@ -8,6 +8,8 @@ from ondoc.api.v1.diagnostic.serializers import LabAppointmentCreateSerializer
 from ondoc.api.v1.doctor.serializers import CreateAppointmentSerializer
 from django.db import transaction
 from django.conf import settings
+
+from ondoc.diagnostic.models import LabAppointment
 from ondoc.insurance.models import InsuranceDoctorSpecializations, UserInsurance
 from ondoc.subscription_plan.models import UserPlanMapping
 from ondoc.doctor.models import OpdAppointment
@@ -284,17 +286,27 @@ class CartViewSet(viewsets.GenericViewSet):
         use_wallet = int(request.query_params.get('use_wallet', 1))
         cart_items = Cart.objects.filter(user=user, deleted_at__isnull=True)
         items_to_process = []
+        total_mrp = 0
+        # if plus_user:
+        #     utilization = plus_user.get_utilization
         is_process, error = UserInsurance.validate_cart_items(cart_items, request)
         if is_process:
             for item in cart_items:
                 try:
                     validated_data = item.validate(request)
                     if plus_user and item.data.get('cover_under_vip'):
-
                        vip_dict = plus_user.validate_plus_appointment(validated_data)
                        if vip_dict.get('cover_under_vip'):
-                           # item.validate(request)
-                           items_to_process.append(item)
+                           utilization = plus_user.get_utilization
+                           price_data = OpdAppointment.get_price_details(
+                               validated_data) if 'doctor' in validated_data else LabAppointment.get_price_details(
+                               validated_data)
+                           if 'doctor' in validated_data:
+                               total_mrp = total_mrp + int(price_data.get('mrp', 0))
+                               if total_mrp <= utilization.get('doctor_amount_avaliable'):
+                                    items_to_process.append(item)
+                           else:
+                               pass
                        else:
                            raise Exception('Item is no more cover under VIP')
                     else:
