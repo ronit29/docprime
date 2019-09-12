@@ -213,7 +213,7 @@ class PlusUser(auth_model.TimeStampedModel):
         id = package_obj.id if package_obj else kwargs.get('id')
         utilization_dict = self.get_utilization
         if utilization_dict.get('total_package_count_limit'):
-            if utilization_dict['available_package_count'] < utilization_dict.get('total_package_count_limit') and id in utilization_dict['allowed_package_ids']:
+            if utilization_dict['available_package_count'] > 0 and id in utilization_dict['allowed_package_ids']:
                 return UtilizationCriteria.COUNT, True
             else:
                 return UtilizationCriteria.COUNT, False
@@ -325,10 +325,17 @@ class PlusUser(auth_model.TimeStampedModel):
             lab = appointment_data['lab']
             if lab and lab.enabled_for_plus_plans:
                 mrp = int(price_data.get('mrp'))
-                utilization_criteria, coverage = plus_user.can_package_be_covered_in_vip(None, mrp=mrp, id=appointment_data['test_ids'][0])
+                final_price = mrp + price_data['home_pickup_charges']
+                utilization_criteria, coverage = plus_user.can_package_be_covered_in_vip(None, mrp=final_price, id=appointment_data['test_ids'][0].id)
                 if coverage:
                     response_dict['cover_under_vip'] = True
                     response_dict['plus_user_id'] = plus_user.id
+
+                    if utilization_criteria == UtilizationCriteria.COUNT:
+                        response_dict['vip_amount'] = 0
+                    else:
+                        response_dict['vip_amount'] = final_price - utilization['available_package_amount']\
+                            if final_price > utilization['available_package_amount'] else 0
 
         return response_dict
 

@@ -56,6 +56,7 @@ from ondoc.matrix.tasks import push_appointment_to_matrix, push_onboarding_qcsta
     create_ipd_lead_from_lab_appointment, create_or_update_lead_on_matrix
 from ondoc.integrations.task import push_lab_appointment_to_integrator, get_integrator_order_status
 from ondoc.location import models as location_models
+from ondoc.plus.enums import UtilizationCriteria
 from ondoc.plus.models import PlusAppointmentMapping
 from ondoc.ratings_review import models as ratings_models
 # from ondoc.api.v1.common import serializers as common_serializers
@@ -2625,8 +2626,19 @@ class LabAppointment(TimeStampedModel, CouponsMixin, LabAppointmentInvoiceMixin,
             payment_type = OpdAppointment.VIP
             utilization = plus_user.get_utilization
             available_amount = int(utilization.get('available_package_amount', 0))
-            effective_price = 0 if available_amount >= mrp else (mrp - available_amount)
-            vip_amount = available_amount if mrp >= available_amount else mrp
+            # mrp = int(price_data.get('mrp'))
+
+            final_price = mrp + price_data['home_pickup_charges']
+
+            utilization_criteria, coverage = plus_user.can_package_be_covered_in_vip(None, mrp=final_price, id=data['test_ids'][0].id)
+
+            if coverage:
+                if utilization_criteria == UtilizationCriteria.COUNT:
+                    effective_price = 0
+                    vip_amount = mrp
+                else:
+                    effective_price = final_price - available_amount if final_price > available_amount else 0
+                    vip_amount = available_amount if final_price >= available_amount else final_price
 
         else:
             plus_user_id = False
