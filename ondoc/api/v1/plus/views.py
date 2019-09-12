@@ -262,12 +262,13 @@ class PlusOrderViewSet(viewsets.GenericViewSet):
         counter = 0
         self_counter = -1
         for member in members_to_be_added:
-            if member.get('relation') == PlusMembers.Relations.SELF and member.get('document_ids'):
+            if member.get('relation') == PlusMembers.Relations.SELF:
                 self_counter = counter
-                proposer_profile = active_plus_subscription.get_primary_member_profile()
-                if proposer_profile:
-                    document_ids = list(map(lambda d: d.get('proof_file').id, member.get('document_ids')))
-                    DocumentsProofs.update_with_object(proposer_profile, document_ids)
+                if member.get('document_ids'):
+                    proposer_profile = active_plus_subscription.get_primary_member_profile()
+                    if proposer_profile:
+                        document_ids = list(map(lambda d: d.get('proof_file').id, member.get('document_ids')))
+                        DocumentsProofs.update_with_object(proposer_profile, document_ids)
             else:
                 member['profile'] = PlusUser.profile_create_or_update(member, user)
 
