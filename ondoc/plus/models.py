@@ -348,9 +348,9 @@ class PlusUser(auth_model.TimeStampedModel):
         LAB = "LAB"
 
         appointment_type = OPD if "doctor" in appointment_data else LAB
-        price_data = OpdAppointment.get_price_details(
-            appointment_data) if appointment_type == OPD else LabAppointment.get_price_details(appointment_data)
-        mrp = int(price_data.get('mrp', 0))
+        # price_data = OpdAppointment.get_price_details(
+        #     appointment_data) if appointment_type == OPD else LabAppointment.get_price_details(appointment_data)
+        # mrp = int(price_data.get('mrp', 0))
         utilization = self.get_utilization
         for item in cart_items:
             data = item.data
@@ -368,16 +368,14 @@ class PlusUser(auth_model.TimeStampedModel):
             elif data.get('lab') and data.get('cover_under_vip'):
                 package_available_amount = utilization.get('available_package_amount', 0)
                 package_available_count = utilization.get('available_package_count', 0)
-                package_available_ids = utilization.get('allowed_package_ids')
+                package_available_ids = utilization.get('allowed_package_ids', [])
                 test_ids = data.get('test_ids', [])
                 if test_ids:
                     tests = LabTest.objects.filter(id__in=test_ids)
                 for test in tests:
-                    if test.is_package and test.id in package_available_ids and package_available_count > 0:
+                    if test.is_package and test.id in package_available_ids and package_available_count and package_available_count > 0:
                         utilization['available_package_count'] = package_available_amount - 1
-                    else:
-                        return vip_data_dict
-                    if test.is_package and package_available_amount and package_available_amount > 0:
+                    elif test.is_package and package_available_amount and package_available_amount > 0:
                         utilization['available_package_amount'] = package_available_amount - mrp
                     else:
                         return vip_data_dict
