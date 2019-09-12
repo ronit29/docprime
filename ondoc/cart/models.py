@@ -171,7 +171,7 @@ class Cart(auth_model.TimeStampedModel, auth_model.SoftDeleteModel):
 
 
     @classmethod
-    def add_items_to_cart(self, request, validated_data, data):
+    def add_items_to_cart(self, request, validated_data, data, product_id=Order.DOCTOR_PRODUCT_ID):
         from ondoc.doctor.models import OpdAppointment
         cart_item = None
         cart_item_id = validated_data.get('cart_item').id if validated_data.get('cart_item') else None
