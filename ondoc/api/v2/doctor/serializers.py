@@ -840,11 +840,11 @@ class PartnerLabTestsListSerializer(serializers.Serializer):
 class SampleCollectOrderCreateOrUpdateSerializer(serializers.Serializer):
 
     id = serializers.IntegerField(min_value=1, required=False, allow_null=True)
-    offline_patient_id = serializers.UUIDField()
-    hospital_id = serializers.IntegerField(min_value=1)
+    offline_patient_id = serializers.UUIDField(required=False)
+    hospital_id = serializers.IntegerField(min_value=1, required=False)
     lab_id = serializers.IntegerField(min_value=1, required=False, allow_null=True)
-    doctor_id = serializers.IntegerField(min_value=1)
-    lab_test_ids = serializers.ListField(child=serializers.IntegerField(min_value=1))
+    doctor_id = serializers.IntegerField(min_value=1, required=False)
+    lab_test_ids = serializers.ListField(child=serializers.IntegerField(min_value=1), required=False)
     collection_datetime = serializers.DateTimeField(required=False, allow_null=True)
     lab_alerts = serializers.ListField(child=serializers.PrimaryKeyRelatedField(queryset=provider_models.TestSamplesLabAlerts.objects.all()), allow_empty=True, required=False)
     barcode_details = serializers.DictField(required=False, allow_null=True)
@@ -854,12 +854,18 @@ class SampleCollectOrderCreateOrUpdateSerializer(serializers.Serializer):
     def validate(self, attrs):
         request = self.context.get('request')
         user = request.user
-        if attrs.get('only_status_update') and not attrs.get('id'):
-            raise serializers.ValidationError('Order id is required for just status update')
+        if not attrs.get('only_status_update') and not (attrs.get('offline_patient_id') and attrs.get('hospital_id') and attrs.get('doctor_id') and attrs.get('lab_test_ids')):
+            raise serializers.ValidationError('either patient id or hospital id or doctor id or lab_test_ids missing')
         id = attrs.get('id')
         order_obj = provider_models.PartnerLabSamplesCollectOrder.objects.filter(id=id).first()
         if id and not order_obj:
             raise serializers.ValidationError('invalid order id')
+        if attrs.get('only_status_update'):
+            if not attrs.get('id'):
+                raise serializers.ValidationError('Order id is required for just status update')
+            else:
+                attrs['order_obj'] = order_obj
+                return attrs
         offline_patient_id = attrs.get('offline_patient_id')
         offline_patient = doc_models.OfflinePatients.objects.filter(id=offline_patient_id).first()
         if not offline_patient:
@@ -912,64 +918,6 @@ class SampleCollectOrderCreateOrUpdateSerializer(serializers.Serializer):
         attrs['available_lab_tests'] = available_lab_tests
         attrs['lab_tests'] = lab_tests
         return attrs
-
-
-# class AvailableLabTestSampleSerializer(serializers.ModelSerializer):
-#     hospital_id = serializers.SerializerMethodField()
-#     lab_test_id = serializers.SerializerMethodField()
-#     lab_test_name = serializers.SerializerMethodField()
-#     sample_name = serializers.SerializerMethodField()
-#     material_required = serializers.SerializerMethodField()
-#     sample_volume = serializers.SerializerMethodField()
-#     is_fasting_required = serializers.SerializerMethodField()
-#     report_tat = serializers.SerializerMethodField()
-#     reference_value = serializers.SerializerMethodField()
-#     b2c_rates = serializers.SerializerMethodField()
-#
-#     def get_sample_obj(self, obj):
-#         return obj.test.sample_details if obj.test.sample_details else None
-#
-#     def get_hospital_id(self, obj):
-#         hospital = self.context.get('hospital')
-#         return hospital.id if hospital else None
-#
-#     def get_lab_test_id(self, obj):
-#         return obj.test.id
-#
-#     def get_lab_test_name(self, obj):
-#         return obj.test.name
-#
-#     def get_sample_name(self, obj):
-#         sample_obj = self.get_sample_obj(obj)
-#         return sample_obj.sample.name if sample_obj else None
-#
-#     def get_material_required(self, obj):
-#         sample_obj = self.get_sample_obj(obj)
-#         return sample_obj.material_required if sample_obj else None
-#
-#     def get_sample_volume(self, obj):
-#         sample_obj = self.get_sample_obj(obj)
-#         return sample_obj.volume if sample_obj else None
-#
-#     def get_is_fasting_required(self, obj):
-#         sample_obj = self.get_sample_obj(obj)
-#         return sample_obj.is_fasting_required if sample_obj else None
-#
-#     def get_report_tat(self, obj):
-#         sample_obj = self.get_sample_obj(obj)
-#         return sample_obj.report_tat if sample_obj else None
-#
-#     def get_reference_value(self, obj):
-#         sample_obj = self.get_sample_obj(obj)
-#         return sample_obj.reference_value if sample_obj else None
-#
-#     def get_b2c_rates(self, obj):
-#         return obj.get_deal_price()
-#
-#     class Meta:
-#         model = diag_models.AvailableLabTest
-#         fields = ('hospital_id', 'lab_test_id', 'lab_test_name', 'sample_name', 'material_required', 'sample_volume',
-#                   'is_fasting_required', 'report_tat', 'reference_value', 'b2c_rates')
 
 
 class SelectedTestsDetailsSerializer(serializers.ModelSerializer):
