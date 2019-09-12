@@ -3430,7 +3430,8 @@ class OpdAppointment(auth_model.TimeStampedModel, CouponsMixin, OpdAppointmentIn
             vip_amount = mrp if doctor_available_amount >= mrp else doctor_available_amount
 
         if cover_under_vip and cart_data.get('cover_under_vip', None) and vip_amount>0:
-            effective_price = 0 if doctor_available_amount >= mrp else (mrp - doctor_available_amount)
+            # effective_price = 0 if doctor_available_amount >= mrp else (mrp - doctor_available_amount)
+            effective_price = cart_data.get('vip_amount')
             payment_type = OpdAppointment.VIP
             plus_user_id = plus_user_resp.get('plus_user_id', None)
         else:

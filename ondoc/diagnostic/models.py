@@ -2625,7 +2625,8 @@ class LabAppointment(TimeStampedModel, CouponsMixin, LabAppointmentInvoiceMixin,
             payment_type = OpdAppointment.VIP
             utilization = plus_user.get_utilization
             available_amount = int(utilization.get('available_package_amount', 0))
-            effective_price = 0 if available_amount >= mrp else (mrp - available_amount)
+            # effective_price = 0 if available_amount >= mrp else (mrp - available_amount)
+            effective_price = cart_data.get('vip_amount')
             vip_amount = available_amount if mrp >= available_amount else mrp
 
         else:
