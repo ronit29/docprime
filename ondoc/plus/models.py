@@ -211,7 +211,9 @@ class PlusUser(auth_model.TimeStampedModel):
     def can_package_be_covered_in_vip(self, package_obj, *args, **kwargs):
         mrp = package_obj.mrp if package_obj else kwargs.get('mrp')
         # id = (package_obj.test.id if hasattr(package_obj, 'test') else package_obj.id) if package_obj else kwargs.get('id')
-        if package_obj.__class__.__name__ == 'LabTest':
+        if kwargs.get('id'):
+            id = kwargs.get('id')
+        elif package_obj.__class__.__name__ == 'LabTest':
             id = package_obj.id
         else:
             id = package_obj.test.id
