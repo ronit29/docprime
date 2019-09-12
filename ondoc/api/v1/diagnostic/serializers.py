@@ -744,8 +744,6 @@ class LabAppointmentModelSerializer(serializers.ModelSerializer):
     reports = serializers.SerializerMethodField()
     report_files = serializers.SerializerMethodField()
     prescription = serializers.SerializerMethodField()
-    time_slot_start = serializers.SerializerMethodField()
-    # test_time_slots = serializers.SerializerMethodField()
     selected_timings_type = serializers.SerializerMethodField()
 
     def get_prescription(self, obj):
@@ -783,24 +781,6 @@ class LabAppointmentModelSerializer(serializers.ModelSerializer):
             return obj.allowed_action(user_type, self.context.get('request'))
         else:
             return []
-
-    def get_time_slot_start(self, obj):
-        # if obj.time_slot_start:
-        #     return obj.time_slot_start
-        # else:
-        #     appointment_first_slot = obj.test_mappings.order_by('time_slot_start').first()
-        #     return appointment_first_slot.time_slot_start
-        if obj.time_slot_start:
-            return str(obj.time_slot_start)
-
-    # def get_test_time_slots(self, obj):
-    #     test_time_slots = []
-    #     if obj.time_slot_start:
-    #         return test_time_slots
-    #     else:
-    #         appointment_tests = obj.test_mappings.all()
-    #         serializer = LabAppointmentTestMappingModelSerializer(appointment_tests, many=True)
-    #         return serializer.data
 
     def get_selected_timings_type(self, obj):
         selected_timings_type = None
