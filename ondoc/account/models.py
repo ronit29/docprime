@@ -627,7 +627,7 @@ class Order(TimeStampedModel):
                     # payable_amount = 0 if doctor_available_amount >= app.get('mrp') else (app.get('mrp') - doctor_available_amount)
                 else:
                     # package_available_amount = int(utilization.get('available_package_amount', 0))
-                    final_amount = app.get('mrp')
+                    # final_amount = app.get('price')
                     # if app['home_pickup_charges']:
                     #     final_amount = final_amount + app['home_pickup_charges']
                     # payable_amount = 0 if package_available_amount >= final_amount else (final_amount - package_available_amount)
