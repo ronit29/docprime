@@ -105,14 +105,14 @@ class CartViewSet(viewsets.GenericViewSet):
                     new_data['start_time'] = test_timing['start_time']
                     new_data['is_home_pickup'] = test_timing['is_home_pickup']
                     new_data['test_ids'] = [test_timing['test'].id]
-                    cart_item = Cart.add_items_to_cart(request, serialized_data, new_data)
+                    cart_item = Cart.add_items_to_cart(request, serialized_data, new_data, product_id)
                     if cart_item:
                         cart_items.append(cart_item)
 
             if pathology_data:
                 if not pathology_coupon_applied:
                     pathology_data.pop('coupon_code', None)
-                cart_item = Cart.add_items_to_cart(request, serialized_data, pathology_data)
+                cart_item = Cart.add_items_to_cart(request, serialized_data, pathology_data, product_id)
                 if cart_item:
                     cart_items.append(cart_item)
         else:
@@ -126,7 +126,7 @@ class CartViewSet(viewsets.GenericViewSet):
                 new_data['is_home_pickup'] = test_timings[0]['is_home_pickup']
             else:
                 new_data = copy.deepcopy(data.get('data'))
-            cart_item = Cart.add_items_to_cart(request, serialized_data, new_data)
+            cart_item = Cart.add_items_to_cart(request, serialized_data, new_data, product_id)
             if cart_item:
                 cart_items.append(cart_item)
 

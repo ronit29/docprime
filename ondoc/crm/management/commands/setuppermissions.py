@@ -285,7 +285,7 @@ class Command(BaseCommand):
             SpecializationField, SpecializationDepartment, SpecializationDepartmentMapping,
             Procedure, ProcedureCategory, CommonProcedureCategory,
             ProcedureToCategoryMapping, ProcedureCategoryMapping, LabTestCategory, Merchant, CancellationReason, UploadDoctorData,
-            LabTestGroup, LabTestGroupMapping, LabTestGroupTiming
+            LabTestGroup, LabTestGroupMapping
         )
 
         for cl, ct in content_types.items():
@@ -296,7 +296,7 @@ class Command(BaseCommand):
             group.permissions.add(*permissions)
 
 
-        content_types = ContentType.objects.get_for_models(ParameterLabTest, LabTestPackage, LabTestCategoryMapping, HospitalTiming, IntegratorLabCode)
+        content_types = ContentType.objects.get_for_models(ParameterLabTest, LabTestPackage, LabTestCategoryMapping, HospitalTiming, IntegratorLabCode, LabTestGroupTiming)
 
         for cl, ct in content_types.items():
             permissions = Permission.objects.filter(
