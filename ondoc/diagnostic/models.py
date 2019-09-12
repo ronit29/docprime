@@ -1532,8 +1532,8 @@ class AvailableLabTest(TimeStampedModel):
         else:
             return None
 
-    # def __str__(self):
-    #     return "{}".format(self.test.name)
+    def __str__(self):
+        return "{} | {}".format(self.test.name, self.lab_pricing_group.group_name)
 
     class Meta:
         unique_together = (("test", "lab_pricing_group"))

@@ -282,7 +282,7 @@ class GenericAdminInline(admin.TabularInline):
     readonly_fields = ['user', 'updated_at']
     verbose_name_plural = "Admins"
     fields = ['phone_number', 'name', 'doctor', 'permission_type', 'super_user_permission',
-              'write_permission', 'user', 'updated_at']
+              'write_permission', 'is_partner_lab_admin', 'user', 'updated_at']
 
     def get_queryset(self, request):
         return super(GenericAdminInline, self).get_queryset(request).select_related('doctor', 'hospital', 'user')\

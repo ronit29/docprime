@@ -286,7 +286,7 @@ class Hospital(auth_model.TimeStampedModel, auth_model.CreatedByModel, auth_mode
     #     return None
 
     def get_partner_lab(self, **kwargs):
-        hospital_lab_mappings = self.provider_labs.all()
+        hospital_lab_mappings = self.partner_labs.all()
         if hospital_lab_mappings:
             lab = hospital_lab_mappings[0].lab
         else:

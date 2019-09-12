@@ -822,13 +822,12 @@ class PartnerLabTestsListSerializer(serializers.Serializer):
                                                                     .prefetch_related(
                                                                         'lab__lab_pricing_group',
                                                                         'lab__lab_pricing_group__available_lab_tests',
-                                                                        'lab__lab_pricing_group__available_lab_tests__test',
-                                                                        'lab__lab_pricing_group__available_lab_tests__test__sample_details',
-                                                                        'lab__lab_pricing_group__available_lab_tests__test__sample_details__sample',
+                                                                        'lab__lab_pricing_group__available_lab_tests__sample_details',
+                                                                        'lab__lab_pricing_group__available_lab_tests__sample_details__sample',
                                                                     ) \
                                                                     .filter(hospital__manageable_hospitals__phone_number=user.phone_number,
                                                                             **filter_kwargs,
-                                                                            lab__is_b2b=True)
+                                                                            lab__is_b2b=True).distinct()
         hosp_lab_list = list()
         for mapping in hospital_lab_mapping_objs:
             if not mapping.lab.lab_pricing_group:
@@ -878,9 +877,8 @@ class SampleCollectOrderCreateOrUpdateSerializer(serializers.Serializer):
                                                                                                'hospital__hospital_doctors__doctor',
                                                                                                'lab__lab_pricing_group',
                                                                                                'lab__lab_pricing_group__available_lab_tests',
-                                                                                               'lab__lab_pricing_group__available_lab_tests__test',
-                                                                                               'lab__lab_pricing_group__available_lab_tests__test__sample_details',
-                                                                                               'lab__lab_pricing_group__available_lab_tests__test__sample_details__sample',
+                                                                                               'lab__lab_pricing_group__available_lab_tests__sample_details',
+                                                                                               'lab__lab_pricing_group__available_lab_tests__sample_details__sample',
                                                                                                ) \
                                                                              .filter(hospital__manageable_hospitals__phone_number=user.phone_number,
                                                                                      hospital_id=hospital_id,
@@ -892,16 +890,16 @@ class SampleCollectOrderCreateOrUpdateSerializer(serializers.Serializer):
         lab = hospital_lab_mapping_obj.lab
         all_available_lab_tests = lab.lab_pricing_group.available_lab_tests.all()
         doctor = None
-        for doctor in hospital.hospital_doctors.all():
-            if doctor.id == doctor_id:
-                doctor = doctor
+        for mapping in hospital.hospital_doctors.all():
+            if mapping.doctor.id == doctor_id:
+                doctor = mapping.doctor
                 break
         if not doctor:
             raise serializers.ValidationError('Hospital Doctor Mapping not found')
         available_lab_tests = list()
         lab_tests = list()
         for obj in all_available_lab_tests:
-            if obj.test.id in lab_test_ids:
+            if obj.test.id in lab_test_ids and hasattr(obj, 'sample_details'):
                 available_lab_tests.append(obj)
                 lab_tests.append(obj.test)
         attrs['order_obj'] = order_obj

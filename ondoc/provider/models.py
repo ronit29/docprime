@@ -1,4 +1,5 @@
 from django.db import models, transaction
+from django.core.validators import FileExtensionValidator
 from ondoc.doctor import models as doc_models
 from ondoc.diagnostic import models as diag_models
 from ondoc.authentication import models as auth_models
@@ -208,8 +209,8 @@ class EConsultation(auth_models.TimeStampedModel, auth_models.CreatedByModel):
 
 
 class PartnerHospitalLabMapping(auth_models.TimeStampedModel):
-    hospital = models.ForeignKey(doc_models.Hospital, on_delete=models.CASCADE, related_name="provider_labs")
-    lab = models.ForeignKey(diag_models.Lab, on_delete=models.CASCADE, related_name="provider_hospitals")
+    hospital = models.ForeignKey(doc_models.Hospital, on_delete=models.CASCADE, related_name="partner_labs")
+    lab = models.ForeignKey(diag_models.Lab, on_delete=models.CASCADE, related_name="partner_hospitals")
 
     def __str__(self):
         return str(self.lab.name)
@@ -243,7 +244,7 @@ class PartnerLabTestSamples(auth_models.TimeStampedModel):
 class PartnerLabTestSampleDetails(auth_models.TimeStampedModel):
     ML = 'ml'
     VOLUME_UNIT_CHOICES = [(ML, "ml")]
-    lab_test = models.OneToOneField(diag_models.LabTest, on_delete=models.CASCADE, related_name="sample_details")
+    available_lab_test = models.OneToOneField(diag_models.AvailableLabTest, on_delete=models.CASCADE, related_name="sample_details")
     sample = models.ForeignKey(PartnerLabTestSamples, on_delete=models.CASCADE, related_name="details")
     volume = models.PositiveIntegerField(null=True, blank=True)
     volume_unit = models.CharField(max_length=16, default=None, null=True, blank=True, choices=VOLUME_UNIT_CHOICES)
@@ -254,11 +255,11 @@ class PartnerLabTestSampleDetails(auth_models.TimeStampedModel):
     instructions = models.CharField(max_length=256, null=True, blank=True)
 
     def __str__(self):
-        return str(self.lab_test.name) + '-' + str(self.sample.name)
+        return str(self.available_lab_test.test.name) + '-' + str(self.sample.name)
 
     @classmethod
     def get_sample_collection_details(cls, lab_tests_queryset):
-        sample_details = cls.objects.filter(lab_test__in=lab_tests_queryset)
+        sample_details = cls.objects.filter(available_lab_test__test__in=lab_tests_queryset)
         max_volumes_list = sample_details.values('sample__name').annotate(max_volume=models.Max('volume'))
         max_volumes_dict = dict()
         sample_ids_to_be_excluded = list()
@@ -310,7 +311,7 @@ class PartnerLabSamplesCollectOrder(auth_models.TimeStampedModel):
 
 
 class PartnerLabTestSamplesOrderReportMapping(auth_models.TimeStampedModel):
-    from django.core.validators import FileExtensionValidator
+
     order = models.ForeignKey(PartnerLabSamplesCollectOrder, on_delete=models.CASCADE, related_name="reports")
     report = models.FileField(upload_to='provider/cloud-lab/reports', validators=[FileExtensionValidator(allowed_extensions=['pdf', 'jpeg', 'jpg', 'png'])])
 

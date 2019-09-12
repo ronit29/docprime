@@ -1450,25 +1450,29 @@ class PartnerLabTestSamplesCollectViewset(viewsets.GenericViewSet):
             available_lab_tests = lab.lab_pricing_group.available_lab_tests.all()
             for obj in available_lab_tests:
                 ret_obj = dict()
-                sample_obj = obj.test.sample_details if obj.test.sample_details else None
+                sample_obj = obj.sample_details if hasattr(obj, 'sample_details') else None
+                if not sample_obj:
+                    continue
                 ret_obj['hospital_id'] = hospital.id
                 test_data = serializers.SelectedTestsDetailsSerializer(obj).data
                 ret_obj.update(test_data)
-                if sample_obj:
-                    sample_data = serializers.PartnerLabTestSampleDetailsModelSerializer(sample_obj).data
-                    ret_obj.update(sample_data)
-                else:
-                    ret_obj['sample_details_id'] = None
-                    ret_obj['created_at'] = None
-                    ret_obj['updated_at'] = None
-                    ret_obj['sample_name'] = None
-                    ret_obj['material_required'] = None
-                    ret_obj['sample_volume'] = None
-                    ret_obj['sample_volume_unit'] = None
-                    ret_obj['is_fasting_required'] = None
-                    ret_obj['report_tat'] = None
-                    ret_obj['reference_value'] = None
-                    ret_obj['instructions'] = None
+                sample_data = serializers.PartnerLabTestSampleDetailsModelSerializer(sample_obj).data
+                ret_obj.update(sample_data)
+                # if sample_obj:
+                #     sample_data = serializers.PartnerLabTestSampleDetailsModelSerializer(sample_obj).data
+                #     ret_obj.update(sample_data)
+                # else:
+                #     ret_obj['sample_details_id'] = None
+                #     ret_obj['created_at'] = None
+                #     ret_obj['updated_at'] = None
+                #     ret_obj['sample_name'] = None
+                #     ret_obj['material_required'] = None
+                #     ret_obj['sample_volume'] = None
+                #     ret_obj['sample_volume_unit'] = None
+                #     ret_obj['is_fasting_required'] = None
+                #     ret_obj['report_tat'] = None
+                #     ret_obj['reference_value'] = None
+                #     ret_obj['instructions'] = None
                 response_list.append(ret_obj)
         return Response(response_list)
 

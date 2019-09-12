@@ -1156,6 +1156,7 @@ class GenericAdmin(TimeStampedModel, CreatedByModel):
                                related_name='manageable_doctors')
     permission_type = models.PositiveSmallIntegerField(choices=type_choices, default=APPOINTMENT)
     is_doc_admin = models.BooleanField(default=False)
+    is_partner_lab_admin = models.NullBooleanField()
     is_disabled = models.BooleanField(default=False)
     super_user_permission = models.BooleanField(default=False)
     read_permission = models.BooleanField(default=False)
