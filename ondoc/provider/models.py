@@ -259,7 +259,7 @@ class PartnerLabTestSampleDetails(auth_models.TimeStampedModel):
 
     @classmethod
     def get_sample_collection_details(cls, lab_tests_queryset):
-        sample_details = cls.objects.filter(available_lab_test__test__in=lab_tests_queryset)
+        sample_details = cls.objects.filter(available_lab_test__test__in=lab_tests_queryset, available_lab_test__enabled=True)
         max_volumes_list = sample_details.values('sample__name').annotate(max_volume=models.Max('volume'))
         max_volumes_dict = dict()
         sample_ids_to_be_excluded = list()

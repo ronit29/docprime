@@ -1451,7 +1451,7 @@ class PartnerLabTestSamplesCollectViewset(viewsets.GenericViewSet):
             for obj in available_lab_tests:
                 ret_obj = dict()
                 sample_obj = obj.sample_details if hasattr(obj, 'sample_details') else None
-                if not sample_obj:
+                if not sample_obj or not obj.enabled:
                     continue
                 ret_obj['hospital_id'] = hospital.id
                 test_data = serializers.SelectedTestsDetailsSerializer(obj).data

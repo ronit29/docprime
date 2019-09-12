@@ -899,9 +899,11 @@ class SampleCollectOrderCreateOrUpdateSerializer(serializers.Serializer):
         available_lab_tests = list()
         lab_tests = list()
         for obj in all_available_lab_tests:
-            if obj.test.id in lab_test_ids and hasattr(obj, 'sample_details'):
+            if obj.test.id in lab_test_ids and hasattr(obj, 'sample_details') and obj.enabled:
                 available_lab_tests.append(obj)
                 lab_tests.append(obj.test)
+        if not available_lab_tests:
+            raise serializers.ValidationError("no valid test found.")
         attrs['order_obj'] = order_obj
         attrs['offline_patient'] = offline_patient
         attrs['hospital'] = hospital

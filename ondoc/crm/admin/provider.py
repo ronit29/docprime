@@ -14,7 +14,7 @@ class AvailableLabTestAutocomplete(autocomplete.Select2QuerySetView):
     def get_queryset(self):
         if not self.request.user.is_authenticated:
             return diag_models.AvailableLabTest.objects.none()
-        queryset = diag_models.AvailableLabTest.objects.all()
+        queryset = diag_models.AvailableLabTest.objects.filter(enabled=True)
         if self.q:
             queryset = queryset.filter(Q(test__name__istartswith=self.q) | Q(lab_pricing_group__group_name__istartswith=self.q))
         return queryset.distinct()
