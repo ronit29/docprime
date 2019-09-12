@@ -2851,7 +2851,7 @@ class OpdAppointment(auth_model.TimeStampedModel, CouponsMixin, OpdAppointmentIn
         if old_instance:
             sent_to_provider = self.is_provider_notification_allowed(old_instance)
 
-        if old_instance and old_instance.payment_type == OpdAppointment.COD:
+        if old_instance is None and self.payment_type == OpdAppointment.COD:
             try:
                 create_ipd_lead_from_opd_appointment.apply_async(({'obj_id': self.id},),)
                                                                  # eta=timezone.now() + timezone.timedelta(hours=1))
