@@ -292,7 +292,7 @@ class PlusUser(auth_model.TimeStampedModel):
         plus_user = user.active_plus_user
         if not plus_user:
             return response_dict
-        plus_members = plus_user.plus_members.all().filter(profile=profile)
+        plus_members = plus_user.plus_members.filter(profile=profile)
         if not plus_members.exists():
             return response_dict
 
