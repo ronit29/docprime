@@ -440,19 +440,15 @@ class PlusUser(auth_model.TimeStampedModel):
 
     def get_package_plus_appointment_amount(self):
         from ondoc.diagnostic.models import LabAppointment
-        from ondoc.doctor.models import OpdAppointment
 
         import functools
         package_amount = 0
+        lab_appointments_ids = LabAppointment.objects.filter(plus_plan=self).exclude(status=LabAppointment.CANCELLED).values_list('id', flat=True)
         content_type = ContentType.objects.get_for_model(LabAppointment)
-        appointment_mappings = PlusAppointmentMapping.objects.filter(plus_user=self, content_type=content_type).exclude(content_object__status=LabAppointment.CANCELLED)
+        appointment_mappings = PlusAppointmentMapping.objects.filter(object_id__in=lab_appointments_ids, content_type=content_type)
         if not appointment_mappings:
             return 0
 
-        # for appointment_mapping in appointment_mappings:
-            # lab_appointment = appointment_mapping.content_object
-            # pacakge_appointments = list(filter(lambda lab_test_mapping: lab_test_mapping.test.is_package, lab_appointment.test_mappings.all()))
-            # lab_appointments_mrp = list(map(lambda appointment: appointment.mrp, pacakge_appointments))
         appointment_mappings_amount = list(map(lambda appointment: appointment.amount, appointment_mappings))
         package_amount = package_amount + functools.reduce(lambda a, b: a + b, appointment_mappings_amount)
 
@@ -462,9 +458,10 @@ class PlusUser(auth_model.TimeStampedModel):
         import functools
         from ondoc.doctor.models import OpdAppointment
         # total_mrp = 0
+        opd_appointments_ids = OpdAppointment.objects.filter(plus_plan=self).exclude(status=OpdAppointment.CANCELLED).values_list('id', flat=True)
+
         content_type = ContentType.objects.get_for_model(OpdAppointment)
-        appointment_mappings = PlusAppointmentMapping.objects.filter(plus_user=self, content_type=content_type).exclude(content_object__status=OpdAppointment.CANCELLED)
-        # opd_appointments = OpdAppointment.objects.filter(plus_plan=self).exclude(status=OpdAppointment.CANCELLED)
+        appointment_mappings = PlusAppointmentMapping.objects.filter(object_id__in=opd_appointments_ids, content_type=content_type)
         if not appointment_mappings:
             return 0
 
