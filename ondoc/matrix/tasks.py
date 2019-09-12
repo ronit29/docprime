@@ -1372,3 +1372,68 @@ def push_retail_appointment_to_matrix(self, data):
 
     except Exception as e:
         logger.error("Error in Celery. Failed pushing Retail Appointment to the matrix- " + str(e))
+
+
+@task(bind=True, max_retries=2)
+def push_order_to_spo(self, data):
+    try:
+        if not data:
+            raise Exception('Data not received for the task.')
+
+        order_id = data.get('order_id', None)
+        if not order_id:
+            logger.error("[ERROR-SPO Order: Incorrect values provided.]")
+            raise ValueError()
+
+        order_obj = Order.objects.filter(id=order_id).first()
+
+        if not order_obj:
+            raise Exception("Order could not found against id - " + str(order_id))
+
+        if order_obj and order_obj.user and order_obj.product_id == Order.LAB_PRODUCT_ID:
+            if not order_obj.action_data.get('spo_data', None):
+                return
+
+        spo_data = order_obj.action_data.get('spo_data')
+        phone_number = order_obj.user.phone_number
+        name = order_obj.user.full_name
+
+        request_data = {
+            'LeadSource': 'DocPrime',
+            'PatientName': name,
+            'BookedBy': phone_number,
+            'OrderId': order_obj.id,
+            'PrimaryNo': phone_number,
+            'ProductId': 5,
+            'SubProductId': 2,
+            'DocPrimeUserId': order_obj.user.id,
+            'UtmTerm': spo_data.get('UtmTerm', ''),
+            'UtmMedium': spo_data.get('UtmMedium', ''),
+            'UtmCampaign': spo_data.get('UtmCampaign', ''),
+            'UtmSource': spo_data.get('UtmSource', ''),
+            'LeadID': ""
+        }
+
+        #logger.error(json.dumps(request_data))
+
+        url = settings.SPO_LEAD_URL
+        spo_api_token = settings.SPO_AUTH_TOKEN
+        response = requests.post(url, data=json.dumps(request_data), headers={'Authorization': spo_api_token,
+                                                                              'Content-Type': 'application/json'})
+        if response.status_code != status.HTTP_200_OK or not response.ok:
+            logger.error("[ERROR-SPO] Failed to push order details - " + str(json.dumps(request_data)))
+
+            countdown_time = (2 ** self.request.retries) * 60 * 10
+            self.retry([data], countdown=countdown_time)
+        else:
+            resp_data = response.json()
+            resp_data = resp_data['data']
+            if resp_data.get('error', None):
+                logger.error("[ERROR-SPO] Order could not be published to the SPO system - " + str(
+                    json.dumps(request_data)))
+                logger.info("[ERROR-SPO] %s", resp_data.get('errorDetails', []))
+            else:
+                logger.info("Order push to spo successfully.")
+
+    except Exception as e:
+        logger.error("Error in Celery. Failed pushing Appointment to the SPO- " + str(e))

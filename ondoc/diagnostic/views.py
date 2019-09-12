@@ -219,7 +219,7 @@ def update_records_from_excel(lpg_queryset, excel_data):
                         instance = AvailableLabTest(**data)
                 instance.save()
             else:
-                return {'error': 'Lab test not found for id - ' + data.get('test')}
+                return {'error': 'Lab test not found for id - ' + str(data.get('test'))}
 
     return {'success': "Uploaded Successfully"}
 

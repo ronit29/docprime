@@ -615,7 +615,7 @@ class Order(TimeStampedModel):
     @transaction.atomic()
     def create_order(cls, request, cart_items, use_wallet=True):
         from ondoc.doctor.models import OpdAppointment
-        from ondoc.matrix.tasks import push_order_to_matrix
+        from ondoc.matrix.tasks import push_order_to_matrix, push_order_to_spo
 
         fulfillment_data = cls.transfrom_cart_items(request, cart_items)
         user = request.user
@@ -724,6 +724,10 @@ class Order(TimeStampedModel):
                 )
 
             order_list.append(order)
+            try:
+                push_order_to_spo.apply_async(({'order_id': order.id},), countdown=10)
+            except Exception as e:
+                logger.log("Could not push order to spo - " + str(e))
 
         if process_immediately:
             appointment_ids = pg_order.process_pg_order()
