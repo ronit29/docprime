@@ -14,11 +14,11 @@ def update_lab_test_group_timing():
                     lab_test_group_timing = lab.test_group_timings.filter(lab_test_group=labtest_group_mapping.lab_test_group).exists()
                     if not lab_test_group_timing:
                         labs_list = list()
-                        lab_timings = lab.lab_timings.all()
+                        lab_timings = lab.lab_timings.filter(for_home_pickup=False)
                         for timing in lab_timings:
                             labs_list.append(LabTestGroupTiming(lab=lab, lab_test_group=labtest_group_mapping.lab_test_group, day=timing.day, start=timing.start, end=timing.end,
                                                                 for_home_pickup=False))
-                        bulk_created = LabTestGroupTiming.objects.bulk_create(labs_list)
+                        LabTestGroupTiming.objects.bulk_create(labs_list)
 
     # bulk_created = LabTestGroupTiming.objects.bulk_create(labs_list)
     print("success")
