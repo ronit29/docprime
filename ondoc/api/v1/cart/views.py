@@ -286,15 +286,17 @@ class CartViewSet(viewsets.GenericViewSet):
         if is_process:
             for item in cart_items:
                 try:
+                    validated_data = item.validate(request)
                     if plus_user and item.data.get('cover_under_vip'):
-                       vip_dict = plus_user.validate_plus_appointment(item.data)
+
+                       vip_dict = plus_user.validate_plus_appointment(validated_data)
                        if vip_dict.get('cover_under_vip'):
-                           item.validate(request)
+                           # item.validate(request)
                            items_to_process.append(item)
                        else:
                            raise Exception('Item is no more cover under VIP')
                     else:
-                        item.validate(request)
+                        # item.validate(request)
                         items_to_process.append(item)
                 except Exception as e:
                     pass
