@@ -392,7 +392,7 @@ class PlusUser(auth_model.TimeStampedModel):
             if current_doctor_amount_available > 0 :
                 vip_data_dict['cover_under_vip'] = True
                 vip_data_dict['plus_user_id'] = self.id
-                vip_data_dict['vip_amount'] = 0 if current_doctor_amount_available > current_item_mrp else current_doctor_amount_available
+                vip_data_dict['vip_amount'] = 0 if current_doctor_amount_available > current_item_mrp else (current_item_mrp - current_doctor_amount_available)
             else:
                 return vip_data_dict
         else:
@@ -411,7 +411,7 @@ class PlusUser(auth_model.TimeStampedModel):
                     return vip_data_dict
                 if test.is_package and current_package_amount_available and current_package_amount_available > 0:
                     vip_data_dict['cover_under_vip'] = True
-                    vip_data_dict['vip_amount'] = 0 if current_package_amount_available > current_item_mrp else current_package_amount_available
+                    vip_data_dict['vip_amount'] = 0 if current_package_amount_available > current_item_mrp else (current_item_mrp - current_package_amount_available)
                     vip_data_dict['plus_user_id'] = self.id
                 else:
                     return vip_data_dict
