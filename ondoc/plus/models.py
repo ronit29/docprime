@@ -376,13 +376,13 @@ class PlusUser(auth_model.TimeStampedModel):
             price_data = item.get_price_details(validated_item)
             mrp = int(price_data.get('mrp', 0))
             doctor = data.get('doctor', None)
-            if doctor and validated_item.get('cover_under_vip'):
+            if doctor and data.get('cover_under_vip'):
                 doctor_available_amount = utilization.get('doctor_amount_available', 0)
                 if doctor_available_amount > 0:
                     utilization['doctor_amount_available'] = doctor_available_amount - mrp
                 else:
                     return vip_data_dict
-            elif validated_item.get('lab') and validated_item.get('cover_under_vip'):
+            elif data.get('lab') and data.get('cover_under_vip'):
                 package_available_amount = utilization.get('available_package_amount', 0)
                 package_available_count = utilization.get('available_package_count', 0)
                 package_available_ids = utilization.get('allowed_package_ids', [])
