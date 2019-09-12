@@ -59,10 +59,12 @@ class CartViewSet(viewsets.GenericViewSet):
             "vip_amount": 0
         }
         if plus_user:
-            vip_data_dict = plus_user.validate_plus_appointment(serialized_data)
+            # vip_data_dict = plus_user.validate_plus_appointment(serialized_data)
+            # if vip_data_dict.get('cover_under_vip'):
+            vip_data_dict = plus_user.validate_cart_items(serialized_data, request)
         valid_data['data']['cover_under_vip'] = vip_data_dict.get('cover_under_vip', False)
         valid_data['data']['plus_user_id'] = vip_data_dict.get('plus_user_id', None)
-        valid_data['data']['is_valid_member'] = vip_data_dict.get('is_valid_member', False)
+        valid_data['data']['is_vip_member'] = vip_data_dict.get('is_vip_member', False)
         valid_data['data']['vip_amount'] = vip_data_dict.get('vip_amount')
 
         if valid_data['data']['is_appointment_insured']:
