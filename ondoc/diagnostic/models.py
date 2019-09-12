@@ -2745,7 +2745,7 @@ class LabAppointment(TimeStampedModel, CouponsMixin, LabAppointmentInvoiceMixin,
             if coverage:
                 if utilization_criteria == UtilizationCriteria.COUNT:
                     effective_price = 0
-                    vip_amount_utilized = mrp
+                    vip_amount_utilized = final_price
                 else:
                     effective_price = cart_data.get('vip_amount', 0)
                     vip_amount_utilized = available_amount if final_price >= available_amount else final_price
