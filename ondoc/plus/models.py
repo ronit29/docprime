@@ -168,6 +168,7 @@ class PlusUser(auth_model.TimeStampedModel):
     ONHOLD = 4
     CANCEL_INITIATE = 5
     CANCELLATION_APPROVED = 6
+    INACTIVE = 7
 
     STATUS_CHOICES = [(ACTIVE, "Active"), (CANCELLED, "Cancelled"), (EXPIRED, "Expired"), (ONHOLD, "Onhold"),
                       (CANCEL_INITIATE, 'Cancel Initiate'), (CANCELLATION_APPROVED, "Cancellation Approved")]
@@ -535,7 +536,8 @@ class PlusUser(auth_model.TimeStampedModel):
                                                           purchase_date=plus_data['purchase_date'],
                                                           expire_date=plus_data['expire_date'],
                                                           amount=plus_data['amount'],
-                                                          order=plus_data['order'])
+                                                          order=plus_data['order'],
+                                                          status=cls.INACTIVE)
 
         PlusMembers.create_plus_members(plus_membership_obj)
         PlusUserUtilization.create_utilization(plus_membership_obj)
