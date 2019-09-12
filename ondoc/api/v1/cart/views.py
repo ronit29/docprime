@@ -366,14 +366,14 @@ class CartViewSet(viewsets.GenericViewSet):
                                 if total_mrp <= utilization.get('doctor_amount_available'):
                                      items_to_process.append(item)
                             else:
-                                tests = validated_data.get('tests')
+                                tests = validated_data.get('test_ids')
                                 package_available_ids = utilization.get('allowed_package_ids')
                                 package_available_count = utilization.get('available_package_count')
                                 package_available_amount = utilization.get('available_package_amount')
                                 for test in tests:
                                     if test.is_package and test.id in package_available_ids and package_available_count and package_available_count > 0:
                                         total_count = total_count + 1
-                                        if total_count < package_available_count:
+                                        if total_count <= package_available_count:
                                             items_to_process.append(item)
                                     elif test.is_package and package_available_amount and package_available_amount > 0:
                                         utilization['available_package_amount'] = package_available_amount - (price_data.get('mrp') + price_data.get('home_pickup_charges'))
