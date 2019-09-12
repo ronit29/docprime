@@ -2751,8 +2751,8 @@ class LabAppointment(TimeStampedModel, CouponsMixin, LabAppointmentInvoiceMixin,
                     vip_amount_utilized = available_amount if final_price >= available_amount else final_price
 
         else:
-            plus_user_id = False
-            cover_under_vip = None
+            plus_user_id = None
+            cover_under_vip = False
             if data["payment_type"] == OpdAppointment.VIP:
                 payment_type = OpdAppointment.PREPAID
             else:
