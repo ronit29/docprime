@@ -3426,7 +3426,7 @@ class OpdAppointment(auth_model.TimeStampedModel, CouponsMixin, OpdAppointmentIn
             plus_user_resp = plus_user.validate_plus_appointment(data)
             cover_under_vip = plus_user_resp.get('cover_under_vip', False)
             utilization = plus_user.get_utilization
-            doctor_available_amount = int(utilization.get('doctor_available_amount', 0))
+            doctor_available_amount = int(utilization.get('doctor_amount_available', 0))
             vip_amount = mrp if doctor_available_amount >= mrp else doctor_available_amount
 
         if cover_under_vip and cart_data.get('cover_under_vip', None) and vip_amount>0:
