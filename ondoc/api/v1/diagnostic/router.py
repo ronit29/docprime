@@ -46,6 +46,8 @@ urlpatterns = [
          name='lab-timing-new'),
     path('labtiming_v2', LabTimingListView.as_view({'get': 'list_v2'}),
          name='lab-timing-v2'),
+    path('labtiming_v3', LabTimingListView.as_view({'get': 'list_v3'}),
+         name='lab-timing-v3'),
     path('labtest/<int:lab_id>', AvailableTestViewSet.as_view({'get': 'retrieve'}),
          name='lab-available-test'),
     path('lab-report-file', LabReportFileViewset.as_view({'get': 'list'}), name='lab-upload-list'),
