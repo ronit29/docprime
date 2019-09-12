@@ -43,8 +43,8 @@ class Cart(auth_model.TimeStampedModel, auth_model.SoftDeleteModel):
             returns True => if not similar, False => if similar
         '''
         data = dict(data)
-        data['start_date'] = format_iso_date(data['start_date'])
-        item_data['start_date'] = format_iso_date(item_data['start_date'])
+        # data['start_date'] = format_iso_date(data['start_date'])
+        # item_data['start_date'] = format_iso_date(item_data['start_date'])
 
         equal_check = ["lab", "doctor", "hospital", "profile", "start_date", "start_time"]
         subset_check = ["test_ids", "procedure_ids"]
@@ -179,3 +179,26 @@ class Cart(auth_model.TimeStampedModel, auth_model.SoftDeleteModel):
             is_appointment_insured, insurance_id, insurance_message = user_insurance.validate_insurance_for_cart(
                 validated_data, cart_items, booked_by=booked_by)
         return is_appointment_insured, insurance_id, insurance_message
+
+
+    @classmethod
+    def add_items_to_cart(self, request, validated_data, data, product_id=Order.DOCTOR_PRODUCT_ID):
+        from ondoc.doctor.models import OpdAppointment
+        cart_item = None
+        cart_item_id = validated_data.get('cart_item').id if validated_data.get('cart_item') else None
+
+        if validated_data.get("existing_cart_item"):
+            cart_item = validated_data.get("existing_cart_item")
+            old_cart_obj = Cart.objects.filter(id=validated_data.get('existing_cart_item').id).first()
+            payment_type = old_cart_obj.data.get('payment_type')
+            if payment_type == OpdAppointment.INSURANCE and data['is_appointment_insured'] == False:
+                data['payment_type'] = OpdAppointment.PREPAID
+            # cart_item.data = request.data
+            cart_item.data = data
+            cart_item.save()
+        else:
+            cart_item, is_new = Cart.objects.update_or_create(id=cart_item_id, deleted_at__isnull=True,
+                                                              product_id=Order.LAB_PRODUCT_ID,
+                                                              user=request.user, defaults={"data": data})
+
+        return cart_item

@@ -405,12 +405,17 @@ def labappointment_transform(app_data):
     app_data["profile"] = app_data["profile"].id
     app_data["home_pickup_charges"] = str(app_data.get("home_pickup_charges",0))
     prescription_objects = app_data.get("prescription_list", [])
+    test_time_slots = app_data.get('test_time_slots', [])
     if prescription_objects:
         prescription_id_list = []
         for prescription_data in prescription_objects:
             prescription_id_list.append({'prescription': prescription_data.get('prescription').id})
         app_data["prescription_list"] = prescription_id_list
 
+    if test_time_slots:
+        for test_time_slot in test_time_slots:
+            test_time_slot['time_slot_start'] = str(test_time_slot['time_slot_start'])
+        app_data['test_time_slots'] = test_time_slots
 
     if app_data.get("coupon"):
         app_data["coupon"] = list(app_data["coupon"])
@@ -513,7 +518,22 @@ def payment_details(request, order):
         first_slot = None
         if order.is_parent():
             for ord in order.orders.all():
-                ord_slot = ord.action_data.get('time_slot_start') if ord.action_data else None
+                if ord.action_data:
+                    if ord.action_data.get('time_slot_start'):
+                        ord_slot = ord.action_data.get('time_slot_start')
+                    else:
+                        first_test_slot = None
+                        test_time_slots = ord.action_data.get('test_time_slots')
+                        for test_time_slot in test_time_slots:
+                            ord_test_slot = None
+                            if test_time_slot.get('time_slot_start'):
+                                ord_test_slot = test_time_slot.get('time_slot_start')
+                            if not first_test_slot and ord_test_slot:
+                                first_test_slot = parse_datetime(ord_test_slot)
+                            if first_test_slot > parse_datetime(ord_test_slot):
+                                first_test_slot = parse_datetime(ord_test_slot)
+                        ord_slot = str(first_test_slot)
+
                 if not first_slot and ord_slot:
                     first_slot = parse_datetime(ord_slot)
                 if first_slot > parse_datetime(ord_slot):
@@ -529,17 +549,17 @@ def payment_details(request, order):
     couponPgMode = ''
     discountedAmnt = ''
 
-    if order.is_cod_order:
-        txAmount = str(round(decimal.Decimal(order.get_deal_price_without_coupon), 2))
+    # if order.is_cod_order:
+    #     txAmount = str(round(decimal.Decimal(order.get_deal_price_without_coupon), 2))
+    # else:
+    usedPgCoupons = order.used_pgspecific_coupons
+    if usedPgCoupons and usedPgCoupons[0].payment_option:
+        couponCode = usedPgCoupons[0].code
+        couponPgMode = get_coupon_pg_mode(usedPgCoupons[0])
+        discountedAmnt = str(round(decimal.Decimal(order.amount), 2))
+        txAmount = str(round(decimal.Decimal(order.get_amount_without_pg_coupon), 2))
     else:
-        usedPgCoupons = order.used_pgspecific_coupons
-        if usedPgCoupons and usedPgCoupons[0].payment_option:
-            couponCode = usedPgCoupons[0].code
-            couponPgMode = get_coupon_pg_mode(usedPgCoupons[0])
-            discountedAmnt = str(round(decimal.Decimal(order.amount), 2))
-            txAmount = str(round(decimal.Decimal(order.get_amount_without_pg_coupon), 2))
-        else:
-            txAmount = str(round(decimal.Decimal(order.amount), 2))
+        txAmount = str(round(decimal.Decimal(order.amount), 2))
 
 
     pgdata = {
