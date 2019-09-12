@@ -345,6 +345,12 @@ class User(AbstractBaseUser, PermissionsMixin):
         active_plus_user = self.active_plus_users.filter().order_by('-id').first()
         return active_plus_user if active_plus_user and active_plus_user.is_valid() else None
 
+    @cached_property
+    def inactive_plus_user(self):
+        from ondoc.plus.models import PlusUser
+        inactive_plus_user = PlusUser.objects.filter(status=PlusUser.INACTIVE, user_id=self.id).order_by('-id').first()
+        return inactive_plus_user if inactive_plus_user else None
+
     @classmethod
     def get_external_login_data(cls, data):
         from ondoc.authentication.backends import JWTAuthentication
