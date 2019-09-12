@@ -25,6 +25,7 @@ from ondoc.common.models import UserConfig, PaymentOptions, AppointmentHistory, 
 from ondoc.common.utils import get_all_upcoming_appointments
 from ondoc.coupon.models import UserSpecificCoupon, Coupon
 from ondoc.lead.models import UserLead
+from ondoc.plus.models import PlusAppointmentMapping
 from ondoc.sms.api import send_otp
 from ondoc.doctor.models import DoctorMobile, Doctor, HospitalNetwork, Hospital, DoctorHospital, DoctorClinic, \
                                 DoctorClinicTiming, ProviderSignupLead
@@ -2011,6 +2012,10 @@ class OrderDetailViewSet(GenericViewSet):
             elif order.product_id == Order.LAB_PRODUCT_ID:
                 appointment = LabAppointment.objects.filter(id=order.reference_id).first()
 
+            plus_appointment_mapping = None
+            if appointment:
+                plus_appointment_mapping = PlusAppointmentMapping.objects.filter(content_object=appointment).first()
+
             curr = {
                 "mrp": order.action_data["mrp"] if "mrp" in order.action_data else order.action_data["agreed_price"],
                 "deal_price": order.action_data["deal_price"],
@@ -2023,7 +2028,7 @@ class OrderDetailViewSet(GenericViewSet):
                 "enabled_for_cod": enabled_for_cod,
                 "is_vip_member": True if appointment and appointment.plus_plan else False,
                 "covered_under_vip": True if appointment and appointment.plus_plan else False,
-                'vip_amount': order.action_data["effective_price"]
+                'vip_amount': plus_appointment_mapping.amount if plus_appointment_mapping else 0
             }
             processed_order_data.append(curr)
 

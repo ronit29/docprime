@@ -48,7 +48,7 @@ from django.conf import settings
 from ondoc.insurance.models import UserInsurance, InsuranceThreshold, InsuranceDoctorSpecializations
 from ondoc.authentication import models as auth_models
 from ondoc.location.models import EntityUrls, EntityAddress
-from ondoc.plus.models import PlusUser
+from ondoc.plus.models import PlusUser, PlusAppointmentMapping
 from ondoc.procedure.models import DoctorClinicProcedure, Procedure, ProcedureCategory, \
     get_included_doctor_clinic_procedure, get_procedure_categories_with_procedures, IpdProcedure, \
     IpdProcedureFeatureMapping, IpdProcedureLead, DoctorClinicIpdProcedure, IpdProcedureDetail, Offer
@@ -134,9 +134,13 @@ class OpdAppointmentSerializer(serializers.ModelSerializer):
 
     def get_vip(self, obj):
 
+        plus_appointment_mapping = None
+        if obj:
+            plus_appointment_mapping = PlusAppointmentMapping.objects.filter(content_object=obj).first()
+
         return {
             'is_vip_member': True if obj and obj.plus_plan else False,
-            'vip_amount': obj.effective_price,
+            'vip_amount': plus_appointment_mapping.amount if plus_appointment_mapping else 0,
             'covered_under_vip': True if obj and obj.plus_plan else False
         }
 

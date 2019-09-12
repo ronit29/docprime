@@ -14,7 +14,7 @@ from django.db import transaction
 from django.db.models import Q
 from ondoc.common.models import DocumentsProofs
 from ondoc.notification.tasks import push_plus_lead_to_matrix
-from .enums import PlanParametersEnum
+from .enums import PlanParametersEnum, UtilizationCriteria
 from datetime import datetime
 from django.utils.timezone import utc
 import reversion
@@ -207,6 +207,21 @@ class PlusUser(auth_model.TimeStampedModel):
 
         return None
 
+    def can_package_be_covered_in_vip(self, package_obj):
+        utilization_dict = self.get_utilization
+        if utilization_dict.get('total_package_count_limit'):
+            if utilization_dict['available_package_count'] < utilization_dict.get('total_package_count_limit') and package_obj.id in utilization_dict['allowed_package_ids']:
+                return UtilizationCriteria.COUNT, True
+            else:
+                return UtilizationCriteria.COUNT, False
+        else:
+            if package_obj.mrp <= utilization_dict['available_package_amount']:
+                if utilization_dict['allowed_package_ids']:
+                    return UtilizationCriteria.AMOUNT, True if package_obj.id in utilization_dict['allowed_package_ids'] else UtilizationCriteria.AMOUNT, False
+                return UtilizationCriteria.AMOUNT, True
+            else:
+                return UtilizationCriteria.AMOUNT, False
+
     @cached_property
     def get_utilization(self):
         plan = self.plan
@@ -223,7 +238,7 @@ class PlusUser(auth_model.TimeStampedModel):
         for pp in plan_parameters:
             data[pp.parameter.key.lower()] = pp.value
         
-        resp['allowed_package_ids'] = list(map(lambda x: int(x), data['package_ids'].split(','))) if data.get('package_ids') else []
+        resp['allowed_package_ids'] = list(map(lambda x: int(x), data.get('package_ids', '').split(','))) if data.get('package_ids') else []
         resp['doctor_consult_amount'] = int(data['DOCTOR_CONSULT_AMOUNT'.lower()])
         resp['doctor_amount_utilized'] = self.get_doctor_plus_appointment_amount()
         resp['doctor_amount_available'] = resp['doctor_consult_amount'] - resp['doctor_amount_utilized']

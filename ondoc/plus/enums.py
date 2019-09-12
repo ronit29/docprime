@@ -14,3 +14,8 @@ class PlanParametersEnum(Choices):
     MEMBERS_COVERED_IN_PACKAGE = 'MEMBERS_COVERED_IN_PACKAGE'
     TOTAL_TEST_COVERED_IN_PACKAGE = 'TOTAL_TEST_COVERED_IN_PACKAGE'
     PACKAGE_IDS = 'PACKAGE_IDS'
+
+
+class UtilizationCriteria(Choices):
+    AMOUNT = "AMOUNT"
+    COUNT = "COUNT"

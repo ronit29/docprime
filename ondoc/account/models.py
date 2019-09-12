@@ -625,7 +625,10 @@ class Order(TimeStampedModel):
                     payable_amount = 0 if doctor_available_amount >= app.get('mrp') else (app.get('mrp') - doctor_available_amount)
                 else:
                     package_available_amount = int(utilization.get('available_package_amount', 0))
-                    payable_amount = 0 if package_available_amount >= app.get('mrp') else (app.get('mrp') - package_available_amount)
+                    final_amount = app.get('mrp')
+                    if app['home_pickup_charges']:
+                        final_amount = final_amount + app['home_pickup_charges']
+                    payable_amount = 0 if package_available_amount >= final_amount else (final_amount - package_available_amount)
 
             if app.get("payment_type") == OpdAppointment.PREPAID:
                 payable_amount += app.get('effective_price')
