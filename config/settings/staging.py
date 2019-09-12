@@ -5,7 +5,7 @@ ALLOWED_HOSTS = ['*']
 EMAIL_BACKEND = 'ondoc.sendemail.backends.backend.WhiteListedEmailBackend'
 SMS_BACKEND = 'ondoc.sms.backends.backend.WhitelistedSmsBackend'
 
-DEBUG=True
+DEBUG=False
 EMAIL_WHITELIST = env.list('EMAIL_WHITELIST')
 NUMBER_WHITELIST = env.list('NUMBER_WHITELIST')
 
