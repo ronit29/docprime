@@ -26,7 +26,7 @@ import logging
 import json
 
 from ondoc.insurance.models import UserInsurance, InsuranceThreshold
-from ondoc.plus.models import PlusUser
+from ondoc.plus.models import PlusUser, PlusAppointmentMapping
 from ondoc.prescription.models import AppointmentPrescription
 from ondoc.ratings_review.models import RatingsReview
 from django.db.models import Avg
@@ -36,6 +36,7 @@ from ondoc.location.models import EntityUrls, EntityAddress
 from ondoc.seo.models import NewDynamic
 from ondoc.subscription_plan.models import Plan, UserPlanMapping
 from packaging.version import parse
+from ondoc.plus.enums import UtilizationCriteria
 
 logger = logging.getLogger(__name__)
 utc = pytz.UTC
@@ -299,13 +300,20 @@ class AvailableLabTestPackageSerializer(serializers.ModelSerializer):
         utilization = plus_obj.get_utilization if plus_obj else {}
         package_amount_balance = utilization.get('available_package_amount', 0)
 
-        if plus_obj and lab_obj and obj and lab_obj.enabled_for_plus_plans and obj.mrp and obj.id in utilization.get('allowed_package_ids', []):
-            resp['covered_under_vip'] = True
+        if plus_obj and lab_obj and obj and lab_obj.enabled_for_plus_plans and obj.mrp:
+            utilization_criteria, can_be_utilized = plus_obj.can_package_be_covered_in_vip(obj)
+            if can_be_utilized:
+                resp['covered_under_vip'] = True
+            else:
+                return resp
 
-            if obj.mrp <= package_amount_balance:
+            if utilization_criteria == UtilizationCriteria.COUNT:
                 resp['vip_amount'] = 0
             else:
-                resp['vip_amount'] = obj.mrp - package_amount_balance
+                if obj.mrp <= package_amount_balance:
+                    resp['vip_amount'] = 0
+                else:
+                    resp['vip_amount'] = obj.mrp - package_amount_balance
 
         return resp
 
@@ -498,13 +506,20 @@ class AvailableLabTestSerializer(serializers.ModelSerializer):
         utilization = plus_obj.get_utilization if plus_obj else {}
         package_amount_balance = utilization.get('available_package_amount', 0)
 
-        if plus_obj and lab_obj and obj and lab_obj.enabled_for_plus_plans and obj.mrp and obj.id in utilization.get('allowed_package_ids', []):
-            resp['covered_under_vip'] = True
+        if plus_obj and lab_obj and obj and lab_obj.enabled_for_plus_plans and obj.mrp:
+            utilization_criteria, can_be_utilized = plus_obj.can_package_be_covered_in_vip(obj)
+            if can_be_utilized:
+                resp['covered_under_vip'] = True
+            else:
+                return resp
 
-            if obj.mrp <= package_amount_balance:
+            if utilization_criteria == UtilizationCriteria.COUNT:
                 resp['vip_amount'] = 0
             else:
-                resp['vip_amount'] = obj.mrp - package_amount_balance
+                if obj.mrp <= package_amount_balance:
+                    resp['vip_amount'] = 0
+                else:
+                    resp['vip_amount'] = obj.mrp - package_amount_balance
 
         return resp
 
@@ -758,9 +773,13 @@ class LabAppointmentModelSerializer(serializers.ModelSerializer):
     vip = serializers.SerializerMethodField()
 
     def get_vip(self, obj):
+        plus_appointment_mapping = None
+        if obj:
+            plus_appointment_mapping = PlusAppointmentMapping.objects.filter(content_object=obj).first()
+
         return {
             'is_vip_member': True if obj and obj.plus_plan else False,
-            'vip_amount': obj.effective_price,
+            'vip_amount': plus_appointment_mapping.amount if plus_appointment_mapping else 0,
             'covered_under_vip': True if obj and obj.plus_plan else False
         }
 
@@ -1618,13 +1637,20 @@ class CustomLabTestPackageSerializer(serializers.ModelSerializer):
         utilization = plus_obj.get_utilization if plus_obj else {}
         package_amount_balance = utilization.get('available_package_amount', 0)
 
-        if plus_obj and lab and obj and lab.enabled_for_plus_plans and obj.mrp and obj.id in utilization.get('allowed_package_ids', []):
-            resp['covered_under_vip'] = True
+        if plus_obj and lab and obj and lab.enabled_for_plus_plans and obj.mrp:
+            utilization_criteria, can_be_utilized = plus_obj.can_package_be_covered_in_vip(obj)
+            if can_be_utilized:
+                resp['covered_under_vip'] = True
+            else:
+                return resp
 
-            if obj.mrp <= package_amount_balance:
+            if utilization_criteria == UtilizationCriteria.COUNT:
                 resp['vip_amount'] = 0
             else:
-                resp['vip_amount'] = obj.mrp - package_amount_balance
+                if obj.mrp <= package_amount_balance:
+                    resp['vip_amount'] = 0
+                else:
+                    resp['vip_amount'] = obj.mrp - package_amount_balance
 
         return resp
 
