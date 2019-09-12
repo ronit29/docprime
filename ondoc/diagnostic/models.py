@@ -276,6 +276,7 @@ class Lab(TimeStampedModel, CreatedByModel, QCModel, SearchKey, WelcomeCallingDo
     related_hospital = models.ForeignKey(Hospital, null=True, blank=True, on_delete=models.SET_NULL, related_name='ipd_hospital')
     enabled_for_plus_plans = models.NullBooleanField()
     is_b2b = models.BooleanField(default=False)
+    center_visit = models.NullBooleanField()
 
     def __str__(self):
         return self.name
@@ -1005,6 +1006,7 @@ class LabNetwork(TimeStampedModel, CreatedByModel, QCModel):
     remark = GenericRelation(Remark)
     auto_ivr_enabled = models.BooleanField(default=True)
     enabled_for_plus_plans = models.NullBooleanField()
+    center_visit = models.NullBooleanField()
 
     @classmethod
     def get_plus_enabled(cls):
