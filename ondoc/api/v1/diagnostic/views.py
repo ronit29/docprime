@@ -7,6 +7,7 @@ from itertools import groupby
 import dateutil
 from django.contrib.contenttypes.models import ContentType
 
+from ondoc.account.models import Order
 from ondoc.api.v1.diagnostic.serializers import CustomLabTestPackageSerializer, SearchLabListSerializer
 from ondoc.api.v1.doctor.serializers import CommaSepratedToListField
 from ondoc.authentication.backends import JWTAuthentication
@@ -2500,14 +2501,14 @@ class LabAppointmentView(mixins.CreateModelMixin,
                     new_data['start_time'] = test_timing['start_time']
                     new_data['is_home_pickup'] = test_timing['is_home_pickup']
                     new_data['test_ids'] = [test_timing['test'].id]
-                    cart_item = Cart.add_items_to_cart(request, validated_data, new_data)
+                    cart_item = Cart.add_items_to_cart(request, validated_data, new_data, Order.LAB_PRODUCT_ID)
                     if cart_item:
                         cart_items.append(cart_item)
 
             if pathology_data:
                 if not pathology_coupon_applied:
                     pathology_data.pop('coupon_code', None)
-                cart_item = Cart.add_items_to_cart(request, validated_data, pathology_data)
+                cart_item = Cart.add_items_to_cart(request, validated_data, pathology_data, Order.LAB_PRODUCT_ID)
                 if cart_item:
                     cart_items.append(cart_item)
         else:
@@ -2521,7 +2522,7 @@ class LabAppointmentView(mixins.CreateModelMixin,
                 new_data['is_home_pickup'] = test_timings[0]['is_home_pickup']
             else:
                 new_data = copy.deepcopy(data)
-            cart_item = Cart.add_items_to_cart(request, validated_data, new_data)
+            cart_item = Cart.add_items_to_cart(request, validated_data, new_data, Order.LAB_PRODUCT_ID)
             if cart_item:
                 cart_items.append(cart_item)
 
