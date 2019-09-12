@@ -687,6 +687,7 @@ class CommonPackageSerializer(serializers.ModelSerializer):
     mrp = serializers.SerializerMethodField()
     lab = LabModelSerializer()
     discounted_price = serializers.SerializerMethodField()
+    vip = serializers.SerializerMethodField()
 
     def __init__(self, instance=None, data=None, **kwargs):
         super().__init__(instance, data, **kwargs)
@@ -747,9 +748,36 @@ class CommonPackageSerializer(serializers.ModelSerializer):
 
         return discounted_price
 
+    def get_vip(self, obj):
+        request = self.context.get("request")
+        resp = Lab.get_vip_details(request.user)
+        user = request.user
+
+        plus_obj = user.active_plus_user if not user.is_anonymous and user.is_authenticated else None
+        utilization = plus_obj.get_utilization if plus_obj else {}
+        package_amount_balance = utilization.get('available_package_amount', 0)
+        lab_obj = Lab.objects.filter(id=obj.lab_id).first()
+
+        if plus_obj and obj and obj._selected_test and lab_obj.enabled_for_plus_plans and obj._selected_test.mrp:
+            utilization_criteria, can_be_utilized = plus_obj.can_package_be_covered_in_vip(None, mrp=obj._selected_test.mrp, id=obj.package.id)
+            if can_be_utilized:
+                resp['covered_under_vip'] = True
+            else:
+                return resp
+
+            if utilization_criteria == UtilizationCriteria.COUNT:
+                resp['vip_amount'] = 0
+            else:
+                if obj.mrp <= package_amount_balance:
+                    resp['vip_amount'] = 0
+                else:
+                    resp['vip_amount'] = obj._selected_test.mrp - package_amount_balance
+
+        return resp
+
     class Meta:
         model = CommonPackage
-        fields = ('id', 'name', 'icon', 'show_details', 'url', 'no_of_tests', 'mrp', 'agreed_price', 'discounted_price', 'lab')
+        fields = ('id', 'name', 'icon', 'show_details', 'url', 'no_of_tests', 'mrp', 'agreed_price', 'discounted_price', 'lab', 'vip')
 
 
 class CommonConditionsSerializer(serializers.ModelSerializer):
