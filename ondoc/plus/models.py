@@ -445,7 +445,7 @@ class PlusUser(auth_model.TimeStampedModel):
         import functools
         package_amount = 0
         content_type = ContentType.objects.get_for_model(LabAppointment)
-        appointment_mappings = PlusAppointmentMapping.objects.filter(plus_user=self, content_type=content_type)
+        appointment_mappings = PlusAppointmentMapping.objects.filter(plus_user=self, content_type=content_type).exclude(content_object__status=LabAppointment.CANCELLED)
         if not appointment_mappings:
             return 0
 
@@ -463,7 +463,7 @@ class PlusUser(auth_model.TimeStampedModel):
         from ondoc.doctor.models import OpdAppointment
         # total_mrp = 0
         content_type = ContentType.objects.get_for_model(OpdAppointment)
-        appointment_mappings = PlusAppointmentMapping.objects.filter(plus_user=self, content_type=content_type)
+        appointment_mappings = PlusAppointmentMapping.objects.filter(plus_user=self, content_type=content_type).exclude(content_object__status=OpdAppointment.CANCELLED)
         # opd_appointments = OpdAppointment.objects.filter(plus_plan=self).exclude(status=OpdAppointment.CANCELLED)
         if not appointment_mappings:
             return 0

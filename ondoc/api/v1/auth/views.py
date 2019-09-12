@@ -2095,7 +2095,7 @@ class OrderDetailViewSet(GenericViewSet):
                 "enabled_for_cod": enabled_for_cod,
                 "is_vip_member": True if appointment and appointment.plus_plan else False,
                 "covered_under_vip": True if appointment and appointment.plus_plan else False,
-                'vip_amount': appointment.effective_price - plus_appointment_mapping.amount if plus_appointment_mapping else 0
+                'vip_amount': appointment.mrp - plus_appointment_mapping.amount if plus_appointment_mapping else 0
             }
             processed_order_data.append(curr)
 
