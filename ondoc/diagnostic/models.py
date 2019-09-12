@@ -2617,7 +2617,7 @@ class LabAppointment(TimeStampedModel, CouponsMixin, LabAppointmentInvoiceMixin,
         plus_user_id = None
         plus_user = user.active_plus_user
         mrp = price_data.get("mrp")
-        vip_amount = 0
+        vip_amount_utilized = 0
         if plus_user:
             plus_user_resp = plus_user.validate_plus_appointment(data)
             cover_under_vip = plus_user_resp.get('cover_under_vip', False)
@@ -2635,10 +2635,10 @@ class LabAppointment(TimeStampedModel, CouponsMixin, LabAppointmentInvoiceMixin,
             if coverage:
                 if utilization_criteria == UtilizationCriteria.COUNT:
                     effective_price = 0
-                    vip_amount = mrp
+                    vip_amount_utilized = mrp
                 else:
-                    effective_price = final_price - available_amount if final_price > available_amount else 0
-                    vip_amount = available_amount if final_price >= available_amount else final_price
+                    effective_price = cart_data.get('vip_amount', 0)
+                    vip_amount_utilized = available_amount if final_price >= available_amount else final_price
 
         else:
             plus_user_id = False
@@ -2671,7 +2671,7 @@ class LabAppointment(TimeStampedModel, CouponsMixin, LabAppointmentInvoiceMixin,
             "insurance": insurance_id,
             "cover_under_vip": cover_under_vip,
             "plus_plan": plus_user_id,
-            'plus_amount': int(vip_amount),
+            'plus_amount': int(vip_amount_utilized),
             "coupon_data": price_data.get("coupon_data"),
             "prescription_list": data.get('prescription_list', []),
             "_responsible_user": data.get("_responsible_user", None),

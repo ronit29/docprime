@@ -360,9 +360,6 @@ class PlusUser(auth_model.TimeStampedModel):
         LAB = "LAB"
 
         appointment_type = OPD if "doctor" in appointment_data else LAB
-        # price_data = OpdAppointment.get_price_details(
-        #     appointment_data) if appointment_type == OPD else LabAppointment.get_price_details(appointment_data)
-        # mrp = int(price_data.get('mrp', 0))
         utilization = self.get_utilization
         for item in cart_items:
             data = item.data
@@ -389,8 +386,6 @@ class PlusUser(auth_model.TimeStampedModel):
                         utilization['available_package_count'] = package_available_amount - 1
                     elif test.is_package and package_available_amount and package_available_amount > 0:
                         utilization['available_package_amount'] = package_available_amount - mrp
-                    else:
-                        return vip_data_dict
             else:
                 return vip_data_dict
         current_item_price_data = OpdAppointment.get_price_details(
@@ -417,9 +412,7 @@ class PlusUser(auth_model.TimeStampedModel):
                     vip_data_dict['cover_under_vip'] = True
                     vip_data_dict['vip_amount'] = 0
                     vip_data_dict['plus_user_id'] = self.id
-                else:
-                    return vip_data_dict
-                if test.is_package and current_package_amount_available and current_package_amount_available > 0:
+                elif test.is_package and current_package_amount_available and current_package_amount_available > 0:
                     vip_data_dict['cover_under_vip'] = True
                     vip_data_dict['vip_amount'] = 0 if current_package_amount_available > current_item_mrp else (current_item_mrp - current_package_amount_available)
                     vip_data_dict['plus_user_id'] = self.id

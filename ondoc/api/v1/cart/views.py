@@ -61,8 +61,6 @@ class CartViewSet(viewsets.GenericViewSet):
             "vip_amount": 0
         }
         if plus_user:
-            # vip_data_dict = plus_user.validate_plus_appointment(serialized_data)
-            # if vip_data_dict.get('cover_under_vip'):
             vip_data_dict = plus_user.validate_cart_items(serialized_data, request)
         valid_data['data']['cover_under_vip'] = vip_data_dict.get('cover_under_vip', False)
         valid_data['data']['plus_user_id'] = vip_data_dict.get('plus_user_id', None)
@@ -146,10 +144,6 @@ class CartViewSet(viewsets.GenericViewSet):
                     vip_dict = plus_user.validate_plus_appointment(validated_data)
                     if not vip_dict.get('cover_under_vip'):
                         raise Exception('Appointment no more cover under VIP')
-                    # item.data['vip_amount'] = vip_dict.get('vip_amount')
-                    # item.data['is_vip_member'] = vip_dict.get('is_vip_member')
-                    # item.data['cover_under_vip'] = vip_dict.get('cover_under_vip')
-                    # item.data['vip_amount'] = vip_dict.get('vip_amount')
                 if not cart_data.get('is_appointment_insured'):
                     item.data['is_appointment_insured'] = False
                     item.data['insurance_id'] = None
@@ -287,8 +281,6 @@ class CartViewSet(viewsets.GenericViewSet):
         cart_items = Cart.objects.filter(user=user, deleted_at__isnull=True)
         items_to_process = []
         total_mrp = 0
-        # if plus_user:
-        #     utilization = plus_user.get_utilization
         is_process, error = UserInsurance.validate_cart_items(cart_items, request)
         if is_process:
             for item in cart_items:

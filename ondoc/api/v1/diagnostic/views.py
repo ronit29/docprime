@@ -2443,12 +2443,13 @@ class LabAppointmentView(mixins.CreateModelMixin,
             data['is_vip_member'] = plus_user_dict.get('is_vip_member', False)
             data['cover_under_vip'] = plus_user_dict.get('cover_under_vip', False)
             data['plus_user_id'] = plus_user.id
+            data['vip_amount'] = plus_user_dict.get('vip_amount')
             if data['cover_under_vip']:
                 data['payment_type'] = OpdAppointment.VIP
 
         else:
             data['is_appointment_insured'], data['insurance_id'], data['insurance_message'], data['is_vip_member'],\
-            data['cover_under_vip'], data['plus_user_id'] = False, None, "", False, False, None
+            data['cover_under_vip'], data['plus_user_id'], data['vip_amount'] = False, None, "", False, False, None, 0
 
         # data['is_appointment_insured'], data['insurance_id'], data['insurance_message'] = Cart.check_for_insurance(validated_data, request)
 
