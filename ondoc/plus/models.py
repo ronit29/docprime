@@ -210,7 +210,12 @@ class PlusUser(auth_model.TimeStampedModel):
 
     def can_package_be_covered_in_vip(self, package_obj, *args, **kwargs):
         mrp = package_obj.mrp if package_obj else kwargs.get('mrp')
-        id = package_obj.id if package_obj else kwargs.get('id')
+        # id = (package_obj.test.id if hasattr(package_obj, 'test') else package_obj.id) if package_obj else kwargs.get('id')
+        if package_obj.__class__.__name__ == 'LabTest':
+            id = package_obj.id
+        else:
+            id = package_obj.test.id
+
         utilization_dict = self.get_utilization
         if utilization_dict.get('total_package_count_limit'):
             if utilization_dict['available_package_count'] > 0 and id in utilization_dict['allowed_package_ids']:
@@ -404,9 +409,7 @@ class PlusUser(auth_model.TimeStampedModel):
             current_package_count_available = updated_utilization.get('available_package_count', 0)
             current_package_amount_available = updated_utilization.get('available_package_amount', 0)
             current_package_ids = updated_utilization.get('allowed_package_ids', [])
-            test_ids = appointment_data.get('test_ids', [])
-            if test_ids:
-                tests = LabTest.objects.filter(id__in=test_ids)
+            tests = appointment_data.get('test_ids', [])
             for test in tests:
                 if test.is_package and test.id in current_package_ids and current_package_count_available > 0:
                     vip_data_dict['cover_under_vip'] = True

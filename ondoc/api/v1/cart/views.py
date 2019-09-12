@@ -348,6 +348,7 @@ class CartViewSet(viewsets.GenericViewSet):
         cart_items = Cart.objects.filter(user=user, deleted_at__isnull=True)
         items_to_process = []
         total_mrp = 0
+        total_count = 0
         is_process, error = UserInsurance.validate_cart_items(cart_items, request)
         if is_process:
             for item in cart_items:
@@ -365,7 +366,7 @@ class CartViewSet(viewsets.GenericViewSet):
                                if total_mrp <= utilization.get('doctor_amount_available'):
                                     items_to_process.append(item)
                            else:
-                               pass
+                                pass
                        else:
                            raise Exception('Item is no more cover under VIP')
                     else:
