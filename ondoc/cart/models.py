@@ -198,7 +198,7 @@ class Cart(auth_model.TimeStampedModel, auth_model.SoftDeleteModel):
             cart_item.save()
         else:
             cart_item, is_new = Cart.objects.update_or_create(id=cart_item_id, deleted_at__isnull=True,
-                                                              product_id=Order.LAB_PRODUCT_ID,
+                                                              product_id=product_id,
                                                               user=request.user, defaults={"data": data})
 
         return cart_item
