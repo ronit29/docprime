@@ -1525,7 +1525,11 @@ class PartnerLabTestSamplesCollectViewset(viewsets.GenericViewSet):
         return Response(data)
 
     def orders_list(self, request):
+        filter_kwargs = dict()
+        if request.query_params.get('id'):
+            filter_kwargs['id'] = request.query_params.get('id')
         queryset = prov_models.PartnerLabSamplesCollectOrder.objects.prefetch_related('lab_alerts', 'reports') \
-                                                                    .filter(hospital__manageable_hospitals__phone_number=request.user.phone_number).distinct()
+                                                                    .filter(**filter_kwargs,
+                                                                            hospital__manageable_hospitals__phone_number=request.user.phone_number).distinct()
         data = serializers.PartnerLabSamplesCollectOrderModelSerializer(queryset, context={'request': request}, many=True).data
         return Response(data)
