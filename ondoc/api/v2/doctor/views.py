@@ -18,7 +18,7 @@ from rest_framework import status, permissions
 from rest_framework.permissions import IsAuthenticated
 from ondoc.authentication.backends import JWTAuthentication
 from django.db import transaction
-from django.db.models import Q, Value, Case, When, F, Max
+from django.db.models import Q, Value, Case, When, F
 from django.http import HttpResponse
 from django.template.loader import render_to_string
 from django.contrib.contenttypes.models import ContentType
@@ -1433,10 +1433,10 @@ class PartnerLabTestSamplesCollectViewset(viewsets.GenericViewSet):
     authentication_classes = (JWTAuthentication,)
     permission_classes = (IsAuthenticated, v1_utils.IsDoctor)
 
-    def get_queryset(self):
-        request = self.request
-        return prov_models.PartnerLabSamplesCollectOrder.objects.prefetch_related('lab_alerts') \
-                                                                .filter(hospital__manageable_hospitals__phone_number=request.user.phone_number).distinct()
+    # def get_queryset(self):
+    #     request = self.request
+    #     return prov_models.PartnerLabSamplesCollectOrder.objects.prefetch_related('lab_alerts', 'reports') \
+    #                                                             .filter(hospital__manageable_hospitals__phone_number=request.user.phone_number).distinct()
 
     def tests_list(self, request):
         serializer = serializers.PartnerLabTestsListSerializer(data=request.query_params, context={'request':request})

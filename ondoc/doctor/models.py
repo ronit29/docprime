@@ -285,19 +285,6 @@ class Hospital(auth_model.TimeStampedModel, auth_model.CreatedByModel, auth_mode
     #         return self.city
     #     return None
 
-    def get_partner_lab(self, **kwargs):
-        hospital_lab_mappings = self.partner_labs.all()
-        if hospital_lab_mappings:
-            lab = hospital_lab_mappings[0].lab
-        else:
-            return None
-        lab_id = kwargs.get('lab_id')
-        if lab_id:
-            for mapping_obj in hospital_lab_mappings:
-                if mapping_obj.lab.id == lab_id:
-                    return mapping_obj.lab
-        return lab
-
     def get_all_cities(self):
         result = []
         q = MatrixMappedCity.objects.prefetch_related('state').all().order_by('name')

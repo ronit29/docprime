@@ -157,16 +157,6 @@ class HomePickupCharges(models.Model):
     content_object = GenericForeignKey()
 
 
-# class LabManager(models.Manager):
-#
-#     def filter(self, **kwargs):
-#         kwargs.pop('is_live', None)
-#         filter_kwargs = dict()
-#         if settings.CLOUD_LAB_IS_LIVE_FILTER:
-#             filter_kwargs['is_live'] = True
-#         return super().filter(**filter_kwargs, **kwargs)
-
-
 class Lab(TimeStampedModel, CreatedByModel, QCModel, SearchKey, WelcomeCallingDone, auth_model.SoftDelete, UrlsModel):
     NOT_ONBOARDED = 1
     REQUEST_SENT = 2
@@ -186,7 +176,6 @@ class Lab(TimeStampedModel, CreatedByModel, QCModel, SearchKey, WelcomeCallingDo
         (CHARGES_ISSUES, "Issue in discount % / charges"),
         (PHONE_RINGING_BUT_COULD_NOT_CONNECT, "Phone ringing but could not connect"),
         (DUPLICATE, "Duplicate"), (OTHERS, "Others (please specify)"))
-    # objects = LabManager()
     name = models.CharField(max_length=200)
     about = models.CharField(max_length=1000, blank=True)
     license = models.CharField(max_length=200, blank=True)

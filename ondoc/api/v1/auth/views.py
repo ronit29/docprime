@@ -2419,26 +2419,26 @@ class BajajAllianzUserViewset(GenericViewSet):
         return Response(response, status=status.HTTP_200_OK)
 
 
-class CloudLabUserViewSet(viewsets.GenericViewSet):
-    authentication_classes = (JWTAuthentication,)
-    permission_classes = (IsAuthenticated, IsDoctor)
-
-    @transaction.atomic()
-    def user_login_via_cloud_lab(self, request):
-        from django.http import JsonResponse
-        response = {'login': 0}
-        if request.method != 'POST':
-            return JsonResponse(response, status=405)
-        serializer = serializers.CloudLabUserLoginSerializer(data=request.data)
-        serializer.is_valid(raise_exception=True)
-        data = serializer.validated_data
-        try:
-            user_data = User.get_external_login_data(data)
-        except Exception as e:
-            logger.error(str(e))
-            return Response({'error': str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
-        token = user_data.get('token')
-        if not token:
-            return JsonResponse(response, status=400)
-
-        return Response(response, status=status.HTTP_200_OK)
+# class CloudLabUserViewSet(viewsets.GenericViewSet):
+#     authentication_classes = (JWTAuthentication,)
+#     permission_classes = (IsAuthenticated, IsDoctor)
+#
+#     @transaction.atomic()
+#     def user_login_via_cloud_lab(self, request):
+#         from django.http import JsonResponse
+#         response = {'login': 0}
+#         if request.method != 'POST':
+#             return JsonResponse(response, status=405)
+#         serializer = serializers.CloudLabUserLoginSerializer(data=request.data)
+#         serializer.is_valid(raise_exception=True)
+#         data = serializer.validated_data
+#         try:
+#             user_data = User.get_external_login_data(data)
+#         except Exception as e:
+#             logger.error(str(e))
+#             return Response({'error': str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+#         token = user_data.get('token')
+#         if not token:
+#             return JsonResponse(response, status=400)
+#
+#         return Response(response, status=status.HTTP_200_OK)

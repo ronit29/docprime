@@ -976,10 +976,6 @@ class LabTestSamplesCollectionBarCodeModelSerializer(PartnerLabTestSampleDetails
 
 class PartnerLabSamplesCollectOrderModelSerializer(serializers.ModelSerializer):
     lab_reports = serializers.SerializerMethodField()
-    # lab_alerts = serializers.ReadOnlyField(source="lab_alerts.name")
-
-    # def get_lab_report(self, obj):
-    #     return [{"lab_test":["CBC","XRAY"],"url":"http://www.africau.edu/images/default/sample.pdf"},{"lab_test":["XAZ","XRAY"],"url":"http://www.africau.edu/images/default/sample.pdf"}]
 
     def get_lab_reports(self, obj):
         request = self.context.get('request')
