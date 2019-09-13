@@ -1,10 +1,11 @@
+import dateutil
 from rest_framework import serializers
 from rest_framework.fields import CharField
 
 from ondoc.cart.models import Cart
 from ondoc.diagnostic.models import (LabTest, AvailableLabTest, Lab, LabAppointment, LabTiming, PromotedLab,
                                      CommonTest, CommonDiagnosticCondition, LabImage, LabReportFile, CommonPackage,
-                                     LabTestCategory, LabAppointmentTestMapping)
+                                     LabTestCategory, LabAppointmentTestMapping, LabTestGroup, LabTestGroupMapping)
 from django.contrib.staticfiles.templatetags.staticfiles import static
 from ondoc.authentication.models import UserProfile, Address
 from ondoc.api.v1.doctor.serializers import CreateAppointmentSerializer, CommaSepratedToListField
@@ -26,6 +27,7 @@ import logging
 import json
 
 from ondoc.insurance.models import UserInsurance, InsuranceThreshold
+from ondoc.plus.models import PlusUser, PlusAppointmentMapping
 from ondoc.prescription.models import AppointmentPrescription
 from ondoc.ratings_review.models import RatingsReview
 from django.db.models import Avg
@@ -35,6 +37,7 @@ from ondoc.location.models import EntityUrls, EntityAddress
 from ondoc.seo.models import NewDynamic
 from ondoc.subscription_plan.models import Plan, UserPlanMapping
 from packaging.version import parse
+from ondoc.plus.enums import UtilizationCriteria
 
 logger = logging.getLogger(__name__)
 utc = pytz.UTC
@@ -256,11 +259,14 @@ class AvailableLabTestPackageSerializer(serializers.ModelSerializer):
     package = serializers.SerializerMethodField()
     parameters = serializers.SerializerMethodField()
     insurance = serializers.SerializerMethodField()
+    vip = serializers.SerializerMethodField()
     hide_price = serializers.ReadOnlyField(source='test.hide_price')
     included_in_user_plan = serializers.SerializerMethodField()
     is_price_zero = serializers.SerializerMethodField()
     # is_prescription_needed = serializers.SerializerMethodField()
     lensfit_offer = serializers.SerializerMethodField()
+    is_radiology = serializers.SerializerMethodField()
+    is_pathology = serializers.SerializerMethodField()
 
     def get_is_price_zero(self, obj):
         agreed_price = obj.computed_agreed_price if obj.custom_agreed_price is None else obj.custom_agreed_price
@@ -289,6 +295,33 @@ class AvailableLabTestPackageSerializer(serializers.ModelSerializer):
     #         return False
     #
     #   return data.get('prescription_needed', False)
+
+    def get_vip(self, obj):
+        request = self.context.get("request")
+        lab_obj = self.context.get("lab")
+        resp = Lab.get_vip_details(request.user)
+        user = request.user
+
+        plus_obj = user.active_plus_user if not user.is_anonymous and user.is_authenticated else None
+        utilization = plus_obj.get_utilization if plus_obj else {}
+        package_amount_balance = utilization.get('available_package_amount', 0)
+
+        if plus_obj and lab_obj and obj and lab_obj.enabled_for_plus_plans and obj.mrp:
+            utilization_criteria, can_be_utilized = plus_obj.can_package_be_covered_in_vip(obj)
+            if can_be_utilized:
+                resp['covered_under_vip'] = True
+            else:
+                return resp
+
+            if utilization_criteria == UtilizationCriteria.COUNT:
+                resp['vip_amount'] = 0
+            else:
+                if obj.mrp <= package_amount_balance:
+                    resp['vip_amount'] = 0
+                else:
+                    resp['vip_amount'] = obj.mrp - package_amount_balance
+
+        return resp
 
     def get_insurance(self, obj):
         request = self.context.get("request")
@@ -422,12 +455,19 @@ class AvailableLabTestPackageSerializer(serializers.ModelSerializer):
 
         return offer
 
+    def get_is_radiology(self, obj):
+        return obj.test.test_type == LabTest.RADIOLOGY
+
+    def get_is_pathology(self, obj):
+        return obj.test.test_type == LabTest.PATHOLOGY
+
 
     class Meta:
         model = AvailableLabTest
         fields = ('test_id', 'mrp', 'test', 'agreed_price', 'deal_price', 'enabled', 'is_home_collection_enabled',
                   'package', 'parameters', 'is_package', 'number_of_tests', 'why', 'pre_test_info', 'expected_tat',
-                  'hide_price', 'included_in_user_plan', 'insurance', 'is_price_zero', 'insurance_agreed_price', 'lensfit_offer')
+                  'hide_price', 'included_in_user_plan', 'insurance', 'is_price_zero', 'insurance_agreed_price',
+                  'lensfit_offer', 'vip', 'is_radiology', 'is_pathology')
 
 class AvailableLabTestSerializer(serializers.ModelSerializer):
     test = LabTestSerializer()
@@ -436,9 +476,12 @@ class AvailableLabTestSerializer(serializers.ModelSerializer):
     deal_price = serializers.SerializerMethodField()
     is_home_collection_enabled = serializers.SerializerMethodField()
     insurance = serializers.SerializerMethodField()
+    vip = serializers.SerializerMethodField()
     is_package = serializers.SerializerMethodField()
     included_in_user_plan = serializers.SerializerMethodField()
     is_price_zero = serializers.SerializerMethodField()
+    is_pathology = serializers.SerializerMethodField()
+    is_radiology = serializers.SerializerMethodField()
 
     def get_is_price_zero(self, obj):
         agreed_price = obj.computed_agreed_price if obj.custom_agreed_price is None else obj.custom_agreed_price
@@ -467,6 +510,33 @@ class AvailableLabTestSerializer(serializers.ModelSerializer):
         deal_price = obj.computed_deal_price if obj.custom_deal_price is None else obj.custom_deal_price
         return deal_price
 
+    def get_vip(self, obj):
+        request = self.context.get("request")
+        lab_obj = self.context.get("lab")
+        resp = Lab.get_vip_details(request.user)
+        user = request.user
+
+        plus_obj = user.active_plus_user if not user.is_anonymous and user.is_authenticated else None
+        utilization = plus_obj.get_utilization if plus_obj else {}
+        package_amount_balance = utilization.get('available_package_amount', 0)
+
+        if plus_obj and lab_obj and obj and lab_obj.enabled_for_plus_plans and obj.mrp:
+            utilization_criteria, can_be_utilized = plus_obj.can_package_be_covered_in_vip(obj)
+            if can_be_utilized:
+                resp['covered_under_vip'] = True
+            else:
+                return resp
+
+            if utilization_criteria == UtilizationCriteria.COUNT:
+                resp['vip_amount'] = 0
+            else:
+                if obj.mrp <= package_amount_balance:
+                    resp['vip_amount'] = 0
+                else:
+                    resp['vip_amount'] = obj.mrp - package_amount_balance
+
+        return resp
+
     def get_insurance(self, obj):
         request = self.context.get("request")
         lab_obj = self.context.get("lab")
@@ -494,13 +564,21 @@ class AvailableLabTestSerializer(serializers.ModelSerializer):
 
         return resp
 
+    def get_is_package(self, obj):
+        return obj.test.is_package
+
+    def get_is_radiology(self, obj):
+        return obj.test.test_type == LabTest.RADIOLOGY
+
+    def get_is_pathology(self, obj):
+        return obj.test.test_type == LabTest.PATHOLOGY
+
     class Meta:
         model = AvailableLabTest
         fields = ('test_id', 'mrp', 'test', 'agreed_price', 'deal_price', 'enabled', 'is_home_collection_enabled',
-                  'insurance', 'is_package', 'included_in_user_plan', 'is_price_zero', 'insurance_agreed_price')
+                  'insurance', 'is_package', 'included_in_user_plan', 'is_price_zero', 'insurance_agreed_price',
+		  'is_pathology', 'is_radiology', 'vip')
 
-    def get_is_package(self, obj):
-        return obj.test.is_package
 
 
 class LabAppointmentTestMappingSerializer(serializers.ModelSerializer):
@@ -509,6 +587,7 @@ class LabAppointmentTestMappingSerializer(serializers.ModelSerializer):
     agreed_price = serializers.SerializerMethodField()
     deal_price = serializers.SerializerMethodField()
     is_home_collection_enabled = serializers.SerializerMethodField()
+    test_type = serializers.ReadOnlyField(source='test.test_type')
 
     def get_is_home_collection_enabled(self, obj):
         if self.context.get("lab") is not None:
@@ -529,8 +608,7 @@ class LabAppointmentTestMappingSerializer(serializers.ModelSerializer):
     class Meta:
         model = LabAppointmentTestMapping
         fields = ('test_id', 'mrp', 'test', 'agreed_price', 'deal_price',
-                  # 'enabled',
-                  'is_home_collection_enabled')
+                  'test_type', 'is_home_collection_enabled')
 
 
 class LabCustomSerializer(serializers.Serializer):
@@ -609,6 +687,7 @@ class CommonPackageSerializer(serializers.ModelSerializer):
     mrp = serializers.SerializerMethodField()
     lab = LabModelSerializer()
     discounted_price = serializers.SerializerMethodField()
+    vip = serializers.SerializerMethodField()
 
     def __init__(self, instance=None, data=None, **kwargs):
         super().__init__(instance, data, **kwargs)
@@ -669,9 +748,36 @@ class CommonPackageSerializer(serializers.ModelSerializer):
 
         return discounted_price
 
+    def get_vip(self, obj):
+        request = self.context.get("request")
+        resp = Lab.get_vip_details(request.user)
+        user = request.user
+
+        plus_obj = user.active_plus_user if not user.is_anonymous and user.is_authenticated else None
+        utilization = plus_obj.get_utilization if plus_obj else {}
+        package_amount_balance = utilization.get('available_package_amount', 0)
+        lab_obj = Lab.objects.filter(id=obj.lab_id).first()
+
+        if plus_obj and obj and obj._selected_test and lab_obj.enabled_for_plus_plans and obj._selected_test.mrp:
+            utilization_criteria, can_be_utilized = plus_obj.can_package_be_covered_in_vip(None, mrp=obj._selected_test.mrp, id=obj.package.id)
+            if can_be_utilized:
+                resp['covered_under_vip'] = True
+            else:
+                return resp
+
+            if utilization_criteria == UtilizationCriteria.COUNT:
+                resp['vip_amount'] = 0
+            else:
+                if obj.mrp <= package_amount_balance:
+                    resp['vip_amount'] = 0
+                else:
+                    resp['vip_amount'] = obj._selected_test.mrp - package_amount_balance
+
+        return resp
+
     class Meta:
         model = CommonPackage
-        fields = ('id', 'name', 'icon', 'show_details', 'url', 'no_of_tests', 'mrp', 'agreed_price', 'discounted_price', 'lab')
+        fields = ('id', 'name', 'icon', 'show_details', 'url', 'no_of_tests', 'mrp', 'agreed_price', 'discounted_price', 'lab', 'vip')
 
 
 class CommonConditionsSerializer(serializers.ModelSerializer):
@@ -700,6 +806,16 @@ class PromotedLabsSerializer(serializers.ModelSerializer):
         fields = ('id', 'name', )
 
 
+class LabAppointmentTestMappingModelSerializer(serializers.ModelSerializer):
+    test_id = serializers.ReadOnlyField(source="test.id")
+    test_name = serializers.ReadOnlyField(source="test.name")
+    test_type = serializers.ReadOnlyField(source="test.test_type")
+
+    class Meta:
+        model = LabAppointmentTestMapping
+        fields = ('id', 'test_id', 'test_name', 'test_type', 'time_slot_start', 'is_home_pickup')
+
+
 class LabAppointmentModelSerializer(serializers.ModelSerializer):
     LAB_TYPE = 'lab'
     type = serializers.ReadOnlyField(default="lab")
@@ -714,6 +830,19 @@ class LabAppointmentModelSerializer(serializers.ModelSerializer):
     reports = serializers.SerializerMethodField()
     report_files = serializers.SerializerMethodField()
     prescription = serializers.SerializerMethodField()
+    vip = serializers.SerializerMethodField()
+    selected_timings_type = serializers.SerializerMethodField()
+
+    def get_vip(self, obj):
+        plus_appointment_mapping = None
+        if obj:
+            plus_appointment_mapping = PlusAppointmentMapping.objects.filter(object_id=obj.id).first()
+
+        return {
+            'is_vip_member': True if obj and obj.plus_plan else False,
+            'vip_amount': plus_appointment_mapping.amount if plus_appointment_mapping else 0,
+            'covered_under_vip': True if obj and obj.plus_plan else False
+        }
 
     def get_prescription(self, obj):
         return []
@@ -751,11 +880,18 @@ class LabAppointmentModelSerializer(serializers.ModelSerializer):
         else:
             return []
 
+    def get_selected_timings_type(self, obj):
+        selected_timings_type = None
+        if obj.action_data:
+            selected_timings_type = obj.action_data.get('selected_timings_type')
+
+        return selected_timings_type
+
     class Meta:
         model = LabAppointment
         fields = ('id', 'lab', 'lab_test', 'profile', 'type', 'lab_name', 'status', 'deal_price', 'effective_price', 'time_slot_start', 'time_slot_end',
                    'is_home_pickup', 'lab_thumbnail', 'lab_image', 'patient_thumbnail', 'patient_name', 'allowed_action', 'address', 'invoices', 'reports', 'report_files',
-                  'prescription')
+                  'prescription', 'vip', 'selected_timings_type')
 
 
 class LabAppointmentBillingSerializer(serializers.ModelSerializer):
@@ -798,6 +934,12 @@ class PrescriptionDocumentSerializer(serializers.Serializer):
     prescription = serializers.PrimaryKeyRelatedField(queryset=AppointmentPrescription.objects.all())
 
 
+class LabAppointmentTestTransactionSerializer(serializers.Serializer):
+    TEST_TYPE = [(LabTest.RADIOLOGY, "Radiology"), (LabTest.PATHOLOGY, "Pathology")]
+    test_id = serializers.PrimaryKeyRelatedField(queryset=LabTest.objects.all())
+    is_home_pickup = serializers.BooleanField(default=False)
+    time_slot_start = serializers.DateTimeField()
+
 class LabAppTransactionModelSerializer(serializers.Serializer):
     id = serializers.IntegerField(required=False)
     lab = serializers.PrimaryKeyRelatedField(queryset=Lab.objects.filter(is_live=True))
@@ -807,7 +949,7 @@ class LabAppTransactionModelSerializer(serializers.Serializer):
     agreed_price = serializers.DecimalField(max_digits=10, decimal_places=2)
     deal_price = serializers.DecimalField(max_digits=10, decimal_places=2)
     effective_price = serializers.DecimalField(max_digits=10, decimal_places=2)
-    time_slot_start = serializers.DateTimeField()
+    time_slot_start = serializers.DateTimeField(required=True, allow_null=True)
     profile_detail = serializers.JSONField()
     status = serializers.IntegerField()
     payment_type = serializers.IntegerField()
@@ -818,6 +960,8 @@ class LabAppTransactionModelSerializer(serializers.Serializer):
     coupon = serializers.ListField(child=serializers.IntegerField(), required=False, default = [])
     discount = serializers.DecimalField(max_digits=10, decimal_places=2)
     insurance = serializers.PrimaryKeyRelatedField(queryset=UserInsurance.objects.all(), allow_null=True)
+    plus_plan = serializers.PrimaryKeyRelatedField(queryset=PlusUser.objects.all(), allow_null=True)
+    plus_amount = serializers.DecimalField(max_digits=10, decimal_places=2)
 
     cashback = serializers.DecimalField(max_digits=10, decimal_places=2)
     extra_details = serializers.JSONField(required=False)
@@ -826,6 +970,25 @@ class LabAppTransactionModelSerializer(serializers.Serializer):
     prescription_list = serializers.ListSerializer(child=PrescriptionDocumentSerializer(), required=False)
     _source = serializers.CharField(required=False, allow_null=True)
     _responsible_user = serializers.IntegerField(required=False, allow_null=True)
+    # test_time_slots = serializers.ListSerializer(child=LabAppointmentTestTransactionSerializer(), required=False, allow_empty=False)
+    selected_timings_type = serializers.ChoiceField(required=False, choices=(('common', 'common'), ('separate', 'separate')))
+
+    def __init__(self, instance=None, data=None, **kwargs):
+        super().__init__(instance, data, **kwargs)
+        if data.get('multi_timings_enabled'):
+            # data.pop('time_slot_start', None)
+            # data.pop('is_home_pickup', None)
+            # self.fields.fields['time_slot_start'].required = False
+            # self.fields.fields['is_home_pickup'].required = False
+            # self.fields.fields['test_time_slots'].required = True
+            self.fields.fields['selected_timings_type'].required = True
+        else:
+            data.pop('selected_timings_type', None)
+            # data.pop('test_time_slots', None)
+            # self.fields.fields['test_time_slots'].required = False
+            # self.fields.fields['selected_timings_type'].required = False
+            # self.fields.fields['time_slot_start'].required = True
+
 
 class LabAppRescheduleModelSerializer(serializers.ModelSerializer):
     class Meta:
@@ -877,6 +1040,15 @@ class LabAppointmentUpdateSerializer(serializers.Serializer):
             raise serializers.ValidationError("Cannot Cancel")
 
 
+class LabAppointmentTestSerializer(serializers.Serializer):
+    TEST_TYPE = [(LabTest.RADIOLOGY, "Radiology"), (LabTest.PATHOLOGY, "Pathology")]
+    test = serializers.PrimaryKeyRelatedField(queryset=LabTest.objects.all())
+    start_date = serializers.DateTimeField(required=True)
+    start_time = serializers.FloatField()
+    type = serializers.ChoiceField(choices=TEST_TYPE)
+    is_home_pickup = serializers.BooleanField(default=False)
+
+
 class LabAppointmentCreateSerializer(serializers.Serializer):
     lab = serializers.PrimaryKeyRelatedField(queryset=Lab.objects.filter(is_live=True))
     test_ids = serializers.ListField(child=serializers.PrimaryKeyRelatedField(queryset=LabTest.objects.all()))
@@ -902,6 +1074,19 @@ class LabAppointmentCreateSerializer(serializers.Serializer):
     prescription_list = serializers.ListSerializer(child=PrescriptionDocumentSerializer(), required=False)
     _source = serializers.CharField(required=False, allow_null=True)
     _responsible_user = serializers.IntegerField(required=False, allow_null=True)
+    test_timings = serializers.ListSerializer(child=LabAppointmentTestSerializer(), required=False, allow_empty=False)
+    multi_timings_enabled = serializers.BooleanField(required=False, default=False)
+    selected_timings_type = serializers.ChoiceField(required=False, choices=(('common', 'common'), ('separate', 'separate')))
+
+    def __init__(self, instance=None, data=None, **kwargs):
+        super().__init__(instance, data, **kwargs)
+        if kwargs.get('context') and kwargs.get('context').get('data') and kwargs.get('context').get('data').get(
+                'multi_timings_enabled'):
+            self.fields.fields['start_date'].required = False
+            self.fields.fields['start_time'].required = False
+            self.fields.fields['is_home_pickup'].required = False
+            self.fields.fields['test_timings'].required = True
+            self.fields.fields['selected_timings_type'].required = True
 
     def validate(self, data):
         MAX_APPOINTMENTS_ALLOWED = 10
@@ -916,11 +1101,32 @@ class LabAppointmentCreateSerializer(serializers.Serializer):
         if not utils.is_valid_testing_lab_data(request.user, data["lab"]):
             raise serializers.ValidationError("Both User and Lab should be for testing")
 
-        if data.get("is_home_pickup"):
+        if data.get('multi_timings_enabled') and data.get('selected_timings_type') == 'common':
+            if not data.get('test_timings'):
+                raise serializers.ValidationError("Start date and start time not found")
+            else:
+                datetime_ist = dateutil.parser.parse(str(data.get('test_timings')[0].get('start_date')))
+                data['start_date'] = datetime_ist.astimezone(tz=timezone.utc)#.isoformat()
+                data['start_time'] = data.get('test_timings')[0].get('start_time')
+                data['is_home_pickup'] = data.get('test_timings')[0].get('is_home_pickup')
+
+        address_required = False
+        if data.get('multi_timings_enabled'):
+            for test_timing in data.get('test_timings'):
+                if test_timing.get("is_home_pickup"):
+                    address_required = True
+                    break
+        else:
+            if data.get("is_home_pickup"):
+                address_required = True
+
+        if address_required:
             if data.get("address") is None:
                 raise serializers.ValidationError("Address required for home pickup")
             elif not Address.objects.filter(id=data.get("address").id, user=request.user).exists():
                 raise serializers.ValidationError("Invalid address for given user")
+        else:
+            data.pop("address", None)
 
         if not UserProfile.objects.filter(user=request.user, pk=int(data.get("profile").id)).exists():
             raise serializers.ValidationError("Invalid profile id")
@@ -959,11 +1165,6 @@ class LabAppointmentCreateSerializer(serializers.Serializer):
                 else:
                     raise serializers.ValidationError("Item already exists in cart.")
 
-        time_slot_start = (form_time_slot(data.get('start_date'), data.get('start_time'))
-                           if not data.get("time_slot_start") else data.get("time_slot_start"))
-
-        # validations for same day and next day timeslot bookings
-        selected_date = time_slot_start.strftime("%Y-%m-%d")
         lab = data.get("lab")
         pincode = data.get('pincode', None)
         address = data.get("address", None)
@@ -975,45 +1176,128 @@ class LabAppointmentCreateSerializer(serializers.Serializer):
             if not int(pincode) == int(address.pincode):
                 raise serializers.ValidationError("Entered pincode should be same as pickup address pincode.")
 
+        has_pathology_timings = False
+        has_radiology_timings = False
+        pathology_time_slot_start = None
+        pathology_slot_validated = False
+        pathology_home_pickup = False
+        if data.get('multi_timings_enabled'):
+            test_timings = data.get('test_timings')
+            for test_timing in test_timings:
+                if test_timing.get('type') == LabTest.PATHOLOGY:
+                    has_pathology_timings = True
+                    if not pathology_time_slot_start:
+                        pathology_time_slot_start = form_time_slot(test_timing.get('start_date'), test_timing.get('start_time'))
+                        if not pathology_slot_validated:
+                            params = dict()
+                            params['is_integrated'] = lab.is_integrated()
+                            params['is_home_pickup'] = test_timing.get("is_home_pickup")
+                            params['start_date'] = test_timing.get('start_date')
+                            params['start_time'] = test_timing.get('start_time')
+                            params['lab'] = lab
+                            self.pathology_time_slot_validator_v2(request, params)
+                            pathology_slot_validated = True
+                            pathology_home_pickup = test_timing.get('is_home_pickup')
+                if test_timing.get('type') == LabTest.RADIOLOGY:
+                    has_radiology_timings = True
+                    time_slot_start = form_time_slot(test_timing.get('start_date'), test_timing.get('start_time'))
+                    selected_date = time_slot_start.strftime("%Y-%m-%d")
+                    curr_time = time_slot_start.hour
+                    curr_minute = round(round(float(time_slot_start.minute) / 60, 2) * 2) / 2
+                    curr_time += curr_minute
 
-        now = datetime.datetime.now()
-        tomorrow = datetime.date.today() + datetime.timedelta(days=1)
-        is_today = now.weekday() == time_slot_start.weekday()
-        is_tomorrow = tomorrow.weekday() == time_slot_start.weekday()
-        curr_time = time_slot_start.hour
-        curr_minute = round(round(float(time_slot_start.minute) / 60, 2) * 2) / 2
-        curr_time += curr_minute
+                    # radiology for each times
+                    available_slots = lab.get_radiology_available_slots(test_timing.get('test'), test_timing.get("is_home_pickup"), pincode, selected_date)
+                    # is_integrated = lab.is_integrated()
+                    selected_day_slots = available_slots['time_slots'][selected_date]
+                    if not selected_day_slots:
+                        raise serializers.ValidationError("No time slots available")
 
-        if bool(data.get('from_app')) and data.get('app_version') and parse(data.get('app_version')) < parse('1.2'):
-            available_slots = LabTiming.timing_manager.lab_booking_slots(lab__id=data.get("lab").id, lab__is_live=True, for_home_pickup=data.get("is_home_pickup"))
-            is_integrated = False
-            if is_today and available_slots.get("today_min") and available_slots.get("today_min") > curr_time:
-                raise serializers.ValidationError("Invalid Time slot")
-            if is_tomorrow and available_slots.get("tomorrow_min") and available_slots.get("tomorrow_min") > curr_time:
-                raise serializers.ValidationError("Invalid Time slot")
-            if is_today and available_slots.get("today_max") and available_slots.get("today_max") < curr_time:
-                raise serializers.ValidationError("Invalid Time slot")
+                    current_day_slots = self.get_slots_list(selected_day_slots)
+
+                    if not curr_time in current_day_slots:
+                        raise serializers.ValidationError("Invalid Time slot")
+
+                    params = dict()
+                    params['is_integrated'] = lab.is_integrated()
+                    params['is_home_pickup'] = test_timing.get("is_home_pickup")
+                    params['start_date'] = test_timing.get('start_date')
+                    params['start_time'] = test_timing.get('start_time')
+                    params['test'] = test_timing.get('test')
+                    params['lab'] = lab
+                    self.radiology_time_slot_validator(request, params)
         else:
-            available_slots = lab.get_available_slots(data.get("is_home_pickup"), pincode, selected_date)
-            is_integrated = lab.is_integrated()
-            selected_day_slots = available_slots['time_slots'][selected_date]
-            if not selected_day_slots:
-                raise serializers.ValidationError("No time slots available")
+            has_pathology_timings = True
+            pathology_home_pickup = data.get('is_home_pickup')
+            pathology_time_slot_start = (form_time_slot(data.get('start_date'), data.get('start_time'))
+                               if not data.get("time_slot_start") else data.get("time_slot_start"))
 
-            current_day_slots = self.get_slots_list(selected_day_slots)
+        if has_pathology_timings:
+            selected_date = pathology_time_slot_start.strftime("%Y-%m-%d")
+            now = datetime.datetime.now()
+            tomorrow = datetime.date.today() + datetime.timedelta(days=1)
+            is_today = now.weekday() == pathology_time_slot_start.weekday()
+            is_tomorrow = tomorrow.weekday() == pathology_time_slot_start.weekday()
+            curr_time = pathology_time_slot_start.hour
+            curr_minute = round(round(float(pathology_time_slot_start.minute) / 60, 2) * 2) / 2
+            curr_time += curr_minute
 
-            if not curr_time in current_day_slots:
-                raise serializers.ValidationError("Invalid Time slot")
+            if bool(data.get('from_app')) and data.get('app_version') and parse(data.get('app_version')) < parse('1.2'):
+                available_slots = LabTiming.timing_manager.lab_booking_slots(lab__id=data.get("lab").id,
+                                                                             lab__is_live=True,
+                                                                             for_home_pickup=pathology_home_pickup)
+                is_integrated = False
+                if is_today and available_slots.get("today_min") and available_slots.get("today_min") > curr_time:
+                    raise serializers.ValidationError("Invalid Time slot")
+                if is_tomorrow and available_slots.get("tomorrow_min") and available_slots.get(
+                        "tomorrow_min") > curr_time:
+                    raise serializers.ValidationError("Invalid Time slot")
+                if is_today and available_slots.get("today_max") and available_slots.get("today_max") < curr_time:
+                    raise serializers.ValidationError("Invalid Time slot")
+            else:
+                available_slots = lab.get_available_slots(pathology_home_pickup, pincode, selected_date)
+                is_integrated = lab.is_integrated()
+                selected_day_slots = available_slots.get('time_slots').get(selected_date)
+                if not selected_day_slots:
+                    raise serializers.ValidationError("No time slots available")
 
-            if lab.network and lab.network.id == settings.THYROCARE_NETWORK_ID:
-                self.thyrocare_test_validator(data)
-                check_active_appointment = False
+                current_day_slots = self.get_slots_list(selected_day_slots)
+
+                if not curr_time in current_day_slots:
+                    raise serializers.ValidationError("Invalid Time slot")
+
+                if lab.network and lab.network.id == settings.THYROCARE_NETWORK_ID:
+                    self.thyrocare_test_validator(data)
+                    check_active_appointment = False
 
         if check_active_appointment:
-            if LabAppointment.objects.filter(profile=data.get("profile"), lab=data.get("lab"),
-                                             tests__in=data.get("test_ids"), time_slot_start=time_slot_start) \
-                    .exclude(status__in=[LabAppointment.COMPLETED, LabAppointment.CANCELLED]).exists():
-                raise serializers.ValidationError("One active appointment for the selected date & time already exists. Please change the date & time of the appointment.")
+            if data.get('multi_timings_enabled'):
+                # user_active_appointments = LabAppointment.objects.prefetch_related('test_mappings').filter(profile=data.get("profile"),
+                #                                                                 lab=data.get("lab")) \
+                #         .exclude(status__in=[LabAppointment.COMPLETED, LabAppointment.CANCELLED])
+                # if user_active_appointments:
+                #     # radiology_timings = list(filter(lambda x: x.get('type') == LabTest.RADIOLOGY), test_timings)
+                #     for test_timing in test_timings:
+                #         test_time_slot_start = form_time_slot(test_timing.get('start_date'), test_timing.get('start_time'))
+                #         if user_active_appointments.filter(test_mappings__test_id=test_timing.get('test'),
+                #                                            test_mappings__time_slot_start=test_time_slot_start).exists():
+                #             raise serializers.ValidationError(
+                #                 "One active appointment for the selected date & time already exists. Please change the date & time of the appointment.")
+
+                for test_timing in test_timings:
+                    test_time_slot_start = form_time_slot(test_timing.get('start_date'), test_timing.get('start_time'))
+                    if LabAppointment.objects.filter(profile=data.get("profile"), lab=data.get("lab"),
+                                                     tests__in=data.get("test_ids"),
+                                                     time_slot_start=test_time_slot_start) \
+                            .exclude(status__in=[LabAppointment.COMPLETED, LabAppointment.CANCELLED]).exists():
+                        raise serializers.ValidationError(
+                            "One active appointment for the selected date & time already exists. Please change the date & time of the appointment.")
+            else:
+                if LabAppointment.objects.filter(profile=data.get("profile"), lab=data.get("lab"),
+                                                 tests__in=data.get("test_ids"), time_slot_start=pathology_time_slot_start) \
+                        .exclude(status__in=[LabAppointment.COMPLETED, LabAppointment.CANCELLED]).exists():
+                    raise serializers.ValidationError(
+                        "One active appointment for the selected date & time already exists. Please change the date & time of the appointment.")
 
         if 'use_wallet' in data and data['use_wallet'] is False:
             data['use_wallet'] = False
@@ -1021,7 +1305,8 @@ class LabAppointmentCreateSerializer(serializers.Serializer):
             data['use_wallet'] = True
 
         self.test_lab_id_validator(data, request)
-        self.time_slot_validator(data, request, is_integrated)
+        if not data.get('multi_timings_enabled'):
+            self.time_slot_validator(data, request, lab.is_integrated())
         self.user_plan_validator(data, request, cart_item_id)
         return data
 
@@ -1150,6 +1435,94 @@ class LabAppointmentCreateSerializer(serializers.Serializer):
                     logger.error(
                         "Error 'No time slot available' for lab appointment with data - " + json.dumps(request.data))
                     raise serializers.ValidationError("No time slot available")
+
+    @staticmethod
+    def pathology_time_slot_validator_v2(request, params):
+        start_dt = (form_time_slot(params.get('start_date'), params.get('start_time')))
+
+        if start_dt < timezone.now():
+            logger.error("Error 'Cannot book in past' for lab appointment with data - " + json.dumps(request.data))
+            raise serializers.ValidationError("Cannot book in past")
+
+        day_of_week = start_dt.weekday()
+
+        lab_queryset = params.get('lab')
+
+        lab_timing_queryset = lab_queryset.lab_timings.filter(day=day_of_week, start__lte=params.get('start_time'),
+                                                              end__gte=params.get('start_time'),
+                                                              for_home_pickup=params.get('is_home_pickup')).exists()
+        if params.get('is_integrated'):
+            pass
+        else:
+            if params.get('is_home_pickup'):
+                if not lab_queryset.is_home_collection_enabled:
+                    logger.error(
+                        "Error 'Home Pickup is disabled for the lab' for lab appointment with data - " + json.dumps(
+                            request.data))
+                    raise serializers.ValidationError("Home Pickup is disabled for the lab")
+                if params.get("start_time") < 7.0 or params.get("start_time") > 19.0:
+                    logger.error(
+                        "Error 'No time slot available' for lab appointment with data - " + json.dumps(
+                            request.data))
+                    raise serializers.ValidationError("No time slot available")
+            else:
+                if not lab_queryset.always_open and not lab_timing_queryset:
+                    logger.error(
+                        "Error 'No time slot available' for lab appointment with data - " + json.dumps(request.data))
+                    raise serializers.ValidationError("No time slot available")
+
+    @staticmethod
+    def radiology_time_slot_validator(request, params):
+        start_dt = (form_time_slot(params.get('start_date'), params.get('start_time')))
+
+        if start_dt < timezone.now():
+            logger.error("Error 'Cannot book in past' for lab appointment with data - " + json.dumps(request.data))
+            raise serializers.ValidationError("Cannot book in past")
+
+        day_of_week = start_dt.weekday()
+
+        lab_queryset = params.get('lab')
+        if params.get('is_integrated'):
+            pass
+        else:
+            if params.get('is_home_pickup'):
+                if not lab_queryset.is_home_collection_enabled:
+                    logger.error(
+                        "Error 'Home Pickup is disabled for the lab' for lab appointment with data - " + json.dumps(
+                            request.data))
+                    raise serializers.ValidationError("Home Pickup is disabled for the lab")
+                if params.get("start_time") < 7.0 or params.get("start_time") > 19.0:
+                    logger.error(
+                        "Error 'No time slot available' for lab appointment with data - " + json.dumps(
+                            request.data))
+                    raise serializers.ValidationError("No time slot available")
+            else:
+                lab_test_group_mapping = LabTestGroupMapping.objects.filter(test=params.get('test')).first()
+                if lab_test_group_mapping:
+                    lab_test_group = LabTestGroup.objects.filter(id=lab_test_group_mapping.lab_test_group_id).first()
+
+                    lab_test_group_timing = False
+                    if lab_test_group:
+                        lab_test_group_timing = lab_queryset.test_group_timings.filter(lab_test_group=lab_test_group.id,
+                                                                                       day=day_of_week,
+                                                                                       start__lte=params.get('start_time'),
+                                                                                       end__gte=params.get('start_time'),
+                                                                                       for_home_pickup=params.get('is_home_pickup')).exists()
+                    else:
+                        logger.error(
+                            "Error: Mapping not found - " + json.dumps(
+                                request.data))
+                        raise serializers.ValidationError("Something went wrong.")
+
+                    if not lab_queryset.always_open and not lab_test_group_timing:
+                        logger.error(
+                            "Error 'No time slot available' for lab appointment with data - " + json.dumps(request.data))
+                        raise serializers.ValidationError("No time slot available")
+                else:
+                    logger.error(
+                        "Error: Mapping not found - " + json.dumps(
+                            request.data))
+                    raise serializers.ValidationError("Something went wrong.")
 
     def get_slots_list(self, data):
         slots = list()
@@ -1369,6 +1742,7 @@ class LabAppointmentRetrieveSerializer(LabAppointmentModelSerializer):
     invoices = serializers.SerializerMethodField()
     cancellation_reason = serializers.SerializerMethodField()
     mask_data = serializers.SerializerMethodField()
+    selected_timings_type = serializers.SerializerMethodField()
 
     def get_mask_data(self, obj):
         mask_number = obj.mask_number.first()
@@ -1411,10 +1785,17 @@ class LabAppointmentRetrieveSerializer(LabAppointmentModelSerializer):
                 resp_address += str(obj.address.get("pincode"))
         return resp_address
 
+    def get_selected_timings_type(self, obj):
+        selected_timings_type = None
+        if obj.action_data:
+            selected_timings_type = obj.action_data.get('selected_timings_type')
+
+        return selected_timings_type
+
     class Meta:
         model = LabAppointment
         fields = ('id', 'type', 'lab_name', 'status', 'deal_price', 'effective_price',
-                  'time_slot_start', 'time_slot_end', 'is_rated', 'rating_declined', 'is_home_pickup', 'lab_thumbnail',
+                  'time_slot_start', 'time_slot_end', 'selected_timings_type', 'is_rated', 'rating_declined', 'is_home_pickup', 'lab_thumbnail',
                   'lab_image', 'profile', 'allowed_action', 'lab_test', 'lab', 'otp', 'address', 'type', 'reports',
                   'report_files', 'invoices', 'prescription', 'cancellation_reason', 'mask_data', 'payment_type',
                   'price')
@@ -1536,6 +1917,7 @@ class CustomLabTestPackageSerializer(serializers.ModelSerializer):
     tests = serializers.SerializerMethodField()
     included_in_user_plan = serializers.SerializerMethodField()
     insurance = serializers.SerializerMethodField()
+    vip = serializers.SerializerMethodField()
 
 
     class Meta:
@@ -1543,7 +1925,7 @@ class CustomLabTestPackageSerializer(serializers.ModelSerializer):
         fields = ('id', 'name', 'lab', 'mrp', 'distance', 'price', 'lab_timing', 'lab_timing_data', 'next_lab_timing',
                   'next_lab_timing_data', 'test_type', 'is_package', 'number_of_tests', 'why', 'pre_test_info',
                   'is_package', 'pickup_charges', 'pickup_available', 'distance_related_charges', 'priority',
-                  'show_details', 'categories', 'url', 'priority_score', 'category_details', 'tests', 'included_in_user_plan', 'insurance')
+                  'show_details', 'categories', 'url', 'priority_score', 'category_details', 'tests', 'included_in_user_plan', 'insurance', 'vip')
 
     def get_insurance(self, obj):
         request = self.context.get("request")
@@ -1553,6 +1935,33 @@ class CustomLabTestPackageSerializer(serializers.ModelSerializer):
 
         if obj and lab and lab.is_enabled_for_insurance and obj.mrp is not None and resp['insurance_threshold_amount'] is not None and obj.mrp <= resp['insurance_threshold_amount']:
             resp['is_insurance_covered'] = True
+
+        return resp
+
+    def get_vip(self, obj):
+        request = self.context.get("request")
+        resp = Lab.get_vip_details(request.user)
+        lab_data = self.context.get('lab_data', {})
+        lab = lab_data.get(obj.lab, None)
+        user = request.user
+        plus_obj = user.active_plus_user if not user.is_anonymous and user.is_authenticated else None
+        utilization = plus_obj.get_utilization if plus_obj else {}
+        package_amount_balance = utilization.get('available_package_amount', 0)
+
+        if plus_obj and lab and obj and lab.enabled_for_plus_plans and obj.mrp:
+            utilization_criteria, can_be_utilized = plus_obj.can_package_be_covered_in_vip(obj)
+            if can_be_utilized:
+                resp['covered_under_vip'] = True
+            else:
+                return resp
+
+            if utilization_criteria == UtilizationCriteria.COUNT:
+                resp['vip_amount'] = 0
+            else:
+                if obj.mrp <= package_amount_balance:
+                    resp['vip_amount'] = 0
+                else:
+                    resp['vip_amount'] = obj.mrp - package_amount_balance
 
         return resp
 

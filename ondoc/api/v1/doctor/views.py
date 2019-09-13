@@ -392,11 +392,15 @@ class DoctorAppointmentsViewSet(OndocViewSet):
         serializer.is_valid(raise_exception=True)
         validated_data = serializer.validated_data
         data = request.data
-
+        plus_user = request.user.active_plus_user
         user_insurance = request.user.active_insurance #UserInsurance.get_user_insurance(request.user)
 
-        # data['is_appointment_insured'], data['insurance_id'], data[
-        #     'insurance_message'] = Cart.check_for_insurance(validated_data,request)
+        hospital = validated_data.get('hospital')
+        doctor = validated_data.get('doctor')
+
+        doctor_clinic = DoctorClinic.objects.filter(doctor=doctor, hospital=hospital).first()
+        profile = validated_data.get('profile')
+        payment_type = validated_data.get('payment_type')
         if user_insurance:
             if user_insurance.status == UserInsurance.ONHOLD:
                 return Response(status=status.HTTP_400_BAD_REQUEST, data={"error": 'Your documents from the last claim '
@@ -404,12 +408,7 @@ class DoctorAppointmentsViewSet(OndocViewSet):
                                                                           "request_errors": {
                                                                               "message": 'Your documents from the last claim are under '
                                                                                          'verification. Please write to customercare@docprime.com for more information'}})
-            hospital = validated_data.get('hospital')
-            doctor = validated_data.get('doctor')
 
-            doctor_clinic = DoctorClinic.objects.filter(doctor=doctor, hospital=hospital).first()
-            profile = validated_data.get('profile')
-            payment_type = validated_data.get('payment_type')
             if profile.is_insured_profile and doctor.is_enabled_for_insurance and doctor.enabled_for_online_booking and \
                     payment_type == OpdAppointment.COD and doctor_clinic and doctor_clinic.enabled_for_online_booking:
                 return Response(status=status.HTTP_400_BAD_REQUEST,
@@ -442,9 +441,19 @@ class DoctorAppointmentsViewSet(OndocViewSet):
                                                                               'request_errors': {
                                                                                   'message':'Some error occured.Please'
                                                                                             'Try again after some time.'}})
+        elif plus_user:
+            plus_user_dict = plus_user.validate_plus_appointment(validated_data)
+            data['is_vip_member'] = plus_user_dict.get('is_vip_member', False)
+            data['cover_under_vip'] = plus_user_dict.get('cover_under_vip', False)
+            data['plus_user_id'] = plus_user.id
+            data['vip_amount'] = plus_user_dict.get('vip_amount')
+            if data['cover_under_vip']:
+                data['payment_type'] = OpdAppointment.VIP
+
         else:
             data['is_appointment_insured'], data['insurance_id'], data[
-                'insurance_message'] = False, None, ""
+                'insurance_message'], data['is_vip_member'], data['cover_under_vip'], \
+            data['plus_user_id'] = False, None, "", False, False, None
         cart_item_id = validated_data.get('cart_item').id if validated_data.get('cart_item') else None
         if not models.OpdAppointment.can_book_for_free(request, validated_data, cart_item_id):
             return Response({'request_errors': {"code": "invalid",
@@ -468,6 +477,8 @@ class DoctorAppointmentsViewSet(OndocViewSet):
             old_cart_obj = Cart.objects.filter(id=validated_data.get('existing_cart_item').id).first()
             payment_type = old_cart_obj.data.get('payment_type')
             if payment_type == OpdAppointment.INSURANCE and data['is_appointment_insured'] == False:
+                data['payment_type'] = OpdAppointment.PREPAID
+            if payment_type == OpdAppointment.VIP and data['cover_under_vip'] == False:
                 data['payment_type'] = OpdAppointment.PREPAID
             # cart_item.data = request.data
             cart_item.data = data
@@ -1746,15 +1757,26 @@ class DoctorListViewSet(viewsets.GenericViewSet):
             'is_user_insured': False,
             'insurance_threshold_amount': insurance_threshold.opd_amount_limit if insurance_threshold else 5000
         }
+        vip_data_dict = {
+            'is_vip_member': False,
+            'cover_under_vip': False,
+            'vip_remaining_amount': 0
+        }
 
         if logged_in_user.is_authenticated and not logged_in_user.is_anonymous:
             user_insurance = logged_in_user.purchased_insurance.filter().order_by('id').last()
-            if user_insurance and user_insurance.is_valid():
+            if user_insurance and user_insurance.is_valid() and not logged_in_user.active_plus_user:
                 insurance_threshold = user_insurance.insurance_plan.threshold.filter().first()
                 if insurance_threshold:
                     insurance_data_dict['insurance_threshold_amount'] = 0 if insurance_threshold.opd_amount_limit is None else \
                         insurance_threshold.opd_amount_limit
                     insurance_data_dict['is_user_insured'] = True
+            if logged_in_user.active_plus_user:
+                utilization_dict = logged_in_user.active_plus_user.get_utilization
+
+                vip_data_dict['vip_remaining_amount'] = utilization_dict.get('doctor_amount_available') if utilization_dict else 0
+                vip_data_dict['is_vip_member'] = True
+                vip_data_dict['cover_under_vip'] = False
 
         validated_data['insurance_threshold_amount'] = insurance_data_dict['insurance_threshold_amount']
         validated_data['is_user_insured'] = insurance_data_dict['is_user_insured']
@@ -1796,6 +1818,7 @@ class DoctorListViewSet(viewsets.GenericViewSet):
 
         response = doctor_search_helper.prepare_search_response(doctor_data, doctor_search_result, request,
                                                                 insurance_data=insurance_data_dict,
+                                                                vip_data=vip_data_dict,
                                                                 hosp_entity_dict=hosp_entity_dict,
                                                                 hosp_locality_entity_dict=hosp_locality_entity_dict)
 

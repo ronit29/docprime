@@ -25,6 +25,7 @@ from ondoc.common.models import UserConfig, PaymentOptions, AppointmentHistory, 
 from ondoc.common.utils import get_all_upcoming_appointments
 from ondoc.coupon.models import UserSpecificCoupon, Coupon
 from ondoc.lead.models import UserLead
+from ondoc.plus.models import PlusAppointmentMapping
 from ondoc.sms.api import send_otp
 from ondoc.doctor.models import DoctorMobile, Doctor, HospitalNetwork, Hospital, DoctorHospital, DoctorClinic, \
                                 DoctorClinicTiming, ProviderSignupLead
@@ -55,7 +56,7 @@ from ondoc.diagnostic.models import (Lab, LabAppointment, AvailableLabTest, LabN
 from ondoc.payout.models import Outstanding
 from ondoc.authentication.backends import JWTAuthentication, BajajAllianzAuthentication, MatrixUserAuthentication
 from ondoc.api.v1.utils import (IsConsumer, IsDoctor, opdappointment_transform, labappointment_transform,
-                                ErrorCodeMapping, IsNotAgent, GenericAdminEntity, generate_short_url)
+                                ErrorCodeMapping, IsNotAgent, GenericAdminEntity, generate_short_url, form_time_slot)
 from django.conf import settings
 from collections import defaultdict
 import copy
@@ -689,6 +690,7 @@ class UserAppointmentsViewSet(OndocViewSet):
     def lab_appointment_update(self, request, lab_appointment, validated_data):
         resp = dict()
         resp["status"] = 1
+        selected_timings_type = ""
         if validated_data.get('status'):
             if validated_data['status'] == LabAppointment.CANCELLED:
                 lab_appointment.cancellation_type = LabAppointment.PATIENT_CANCELLED
@@ -697,75 +699,124 @@ class UserAppointmentsViewSet(OndocViewSet):
                 lab_appointment.action_cancelled(request.data.get('refund', 1))
                 resp = LabAppointmentRetrieveSerializer(lab_appointment, context={"request": request}).data
             elif validated_data.get('status') == LabAppointment.RESCHEDULED_PATIENT:
-                if validated_data.get("start_date") and validated_data.get('start_time'):
-                    time_slot_start = utils.form_time_slot(
-                        validated_data.get("start_date"),
-                        validated_data.get("start_time"))
-                    if lab_appointment.time_slot_start == time_slot_start:
+                test_time_slots = []
+                if validated_data.get('multi_timings_enabled'):
+                    same_time_slot_err = True
+                    selected_timings_type = validated_data.get('selected_timings_type', 'separate')
+                    lab_appointment_tests = lab_appointment.test_mappings.all()
+                    for test_timing in validated_data.get('test_timings'):
+                        appointment_tests = list(filter(lambda x: x.test_id == test_timing.get('test').id, lab_appointment_tests))
+                        if not appointment_tests:
+                            resp = {
+                                "status": 0,
+                                "message": "Requested test for appointment is not found."
+                            }
+                            return resp
+                        appointment_test = appointment_tests[0]
+                        if test_timing.get("start_date") and test_timing.get('start_time'):
+                            time_slot_start = utils.form_time_slot(
+                                test_timing.get("start_date"),
+                                test_timing.get("start_time"))
+                            if not appointment_test.time_slot_start == time_slot_start:
+                                same_time_slot_err = False
+                            if lab_appointment.payment_type == OpdAppointment.INSURANCE and lab_appointment.insurance_id is not None:
+                                user_insurance = UserInsurance.objects.get(id=lab_appointment.insurance_id)
+                                if user_insurance:
+                                    # insurance_threshold = user_insurance.insurance_plan.threshold.filter().first()
+                                    if time_slot_start > user_insurance.expiry_date or not user_insurance.is_valid():
+                                        resp = {
+                                            "status": 0,
+                                            "message": "Appointment time is not covered under insurance"
+                                        }
+                                        return resp
+
+                            test_level_timing = dict()
+                            test_level_timing['test_id'] = test_timing.get('test').id
+                            test_level_timing['time_slot_start'] = time_slot_start
+                            test_time_slots.append(test_level_timing)
+
+                    if same_time_slot_err:
                         resp = {
                             "status": 0,
                             "message": "Cannot Reschedule for same timeslot"
                         }
                         return resp
-                    if lab_appointment.payment_type == OpdAppointment.INSURANCE and lab_appointment.insurance_id is not None:
-                        user_insurance = UserInsurance.objects.get(id=lab_appointment.insurance_id)
-                        if user_insurance :
-                            insurance_threshold = user_insurance.insurance_plan.threshold.filter().first()
-                            if time_slot_start > user_insurance.expiry_date or not user_insurance.is_valid():
-                                resp = {
-                                    "status": 0,
-                                    "message": "Appointment time is not covered under insurance"
-                                }
-                                return resp
 
-                    test_ids = lab_appointment.lab_test.values_list('test__id', flat=True)
-                    lab_test_queryset = AvailableLabTest.objects.select_related('lab_pricing_group__labs').filter(
-                        lab_pricing_group__labs=lab_appointment.lab,
-                        test__in=test_ids)
-                    deal_price_calculation = Case(When(custom_deal_price__isnull=True, then=F('computed_deal_price')),
-                                                  When(custom_deal_price__isnull=False, then=F('custom_deal_price')))
-                    agreed_price_calculation = Case(When(custom_agreed_price__isnull=True, then=F('computed_agreed_price')),
-                                                    When(custom_agreed_price__isnull=False, then=F('custom_agreed_price')))
-                    temp_lab_test = lab_test_queryset.values('lab_pricing_group__labs').annotate(total_mrp=Sum("mrp"),
-                                                                             total_deal_price=Sum(deal_price_calculation),
-                                                                             total_agreed_price=Sum(agreed_price_calculation))
-                    # old_deal_price = lab_appointment.deal_price
-                    # old_effective_price = lab_appointment.effective_price
-                    coupon_discount = lab_appointment.discount
-                    # coupon_price = self.get_appointment_coupon_price(old_deal_price, old_effective_price)
-                    new_deal_price = temp_lab_test[0].get("total_deal_price")
+                    time_slot_start = None
+                else:
+                    if validated_data.get("start_date") and validated_data.get('start_time'):
+                        time_slot_start = utils.form_time_slot(
+                            validated_data.get("start_date"),
+                            validated_data.get("start_time"))
+                        if lab_appointment.time_slot_start == time_slot_start:
+                            resp = {
+                                "status": 0,
+                                "message": "Cannot Reschedule for same timeslot"
+                            }
+                            return resp
+                        if lab_appointment.payment_type == OpdAppointment.INSURANCE and lab_appointment.insurance_id is not None:
+                            user_insurance = UserInsurance.objects.get(id=lab_appointment.insurance_id)
+                            if user_insurance :
+                                # insurance_threshold = user_insurance.insurance_plan.threshold.filter().first()
+                                if time_slot_start > user_insurance.expiry_date or not user_insurance.is_valid():
+                                    resp = {
+                                        "status": 0,
+                                        "message": "Appointment time is not covered under insurance"
+                                    }
+                                    return resp
 
-                    if lab_appointment.home_pickup_charges:
-                        new_deal_price += lab_appointment.home_pickup_charges
+                test_ids = lab_appointment.lab_test.values_list('test__id', flat=True)
+                lab_test_queryset = AvailableLabTest.objects.select_related('lab_pricing_group__labs').filter(
+                    lab_pricing_group__labs=lab_appointment.lab,
+                    test__in=test_ids)
+                deal_price_calculation = Case(When(custom_deal_price__isnull=True, then=F('computed_deal_price')),
+                                              When(custom_deal_price__isnull=False, then=F('custom_deal_price')))
+                agreed_price_calculation = Case(When(custom_agreed_price__isnull=True, then=F('computed_agreed_price')),
+                                                When(custom_agreed_price__isnull=False, then=F('custom_agreed_price')))
+                temp_lab_test = lab_test_queryset.values('lab_pricing_group__labs').annotate(total_mrp=Sum("mrp"),
+                                                                                             total_deal_price=Sum(
+                                                                                                 deal_price_calculation),
+                                                                                             total_agreed_price=Sum(
+                                                                                                 agreed_price_calculation))
+                # old_deal_price = lab_appointment.deal_price
+                # old_effective_price = lab_appointment.effective_price
+                coupon_discount = lab_appointment.discount
+                # coupon_price = self.get_appointment_coupon_price(old_deal_price, old_effective_price)
+                new_deal_price = temp_lab_test[0].get("total_deal_price")
 
-                    if new_deal_price <= coupon_discount:
-                        new_effective_price = 0
+                if lab_appointment.home_pickup_charges:
+                    new_deal_price += lab_appointment.home_pickup_charges
+
+                if new_deal_price <= coupon_discount:
+                    new_effective_price = 0
+                else:
+                    if lab_appointment.insurance_id is None:
+                        new_effective_price = new_deal_price - coupon_discount
                     else:
-                        if lab_appointment.insurance_id is None:
-                            new_effective_price = new_deal_price - coupon_discount
-                        else:
-                            new_effective_price = 0.0
-                    # new_appointment = dict()
+                        new_effective_price = 0.0
+                # new_appointment = dict()
 
-                    new_appointment = {
-                        "id": lab_appointment.id,
-                        "lab": lab_appointment.lab,
-                        "user": lab_appointment.user,
-                        "profile": lab_appointment.profile,
-                        "price": temp_lab_test[0].get("total_mrp"),
-                        "agreed_price": temp_lab_test[0].get("total_agreed_price", 0),
-                        "deal_price": new_deal_price,
-                        "effective_price": new_effective_price,
-                        "time_slot_start": time_slot_start,
-                        "profile_detail": lab_appointment.profile_detail,
-                        "status": lab_appointment.status,
-                        "payment_type": lab_appointment.payment_type,
-                        "lab_test": lab_appointment.lab_test,
-                        "discount": coupon_discount
-                    }
+                new_appointment = {
+                    "id": lab_appointment.id,
+                    "lab": lab_appointment.lab,
+                    "user": lab_appointment.user,
+                    "profile": lab_appointment.profile,
+                    "price": temp_lab_test[0].get("total_mrp"),
+                    "agreed_price": temp_lab_test[0].get("total_agreed_price", 0),
+                    "deal_price": new_deal_price,
+                    "effective_price": new_effective_price,
+                    "time_slot_start": time_slot_start,
+                    "test_time_slots": test_time_slots,
+                    "selected_timings_type": selected_timings_type,
+                    "profile_detail": lab_appointment.profile_detail,
+                    "status": lab_appointment.status,
+                    "payment_type": lab_appointment.payment_type,
+                    "lab_test": lab_appointment.lab_test,
+                    "discount": coupon_discount
+                }
 
-                    resp = self.extract_payment_details(request, lab_appointment, new_appointment,
-                                                        account_models.Order.LAB_PRODUCT_ID)
+                resp = self.extract_payment_details(request, lab_appointment, new_appointment,
+                                                    account_models.Order.LAB_PRODUCT_ID)
         return resp
 
     @transaction.atomic
@@ -994,15 +1045,16 @@ class UserAppointmentsViewSet(OndocViewSet):
     def lab_appointment_list(self, request, params):
         user = request.user
         queryset = LabAppointment.objects.select_related('lab', 'profile', 'user')\
-                                        .prefetch_related('lab__lab_image', 'lab__lab_documents', 'reports').filter(user=user)
+                                        .prefetch_related('lab__lab_image', 'lab__lab_documents', 'reports', 'test_mappings').filter(user=user)
         if queryset and params.get('profile_id'):
             queryset = queryset.filter(profile=params['profile_id'])
         range = params.get('range')
-        if range and range == 'upcoming':
-            queryset = queryset.filter(time_slot_start__gte=timezone.now(),
-                                       status__in=LabAppointment.ACTIVE_APPOINTMENT_STATUS).order_by('time_slot_start')
-        else:
-            queryset = queryset.order_by('-time_slot_start')
+        # below code is not being used; Sorting will be done in parent method
+        # if range and range == 'upcoming':
+        #     queryset = queryset.filter(time_slot_start__gte=timezone.now(),
+        #                                status__in=LabAppointment.ACTIVE_APPOINTMENT_STATUS).order_by('time_slot_start')
+        # else:
+        #     queryset = queryset.order_by('-time_slot_start')
         queryset = paginate_queryset(queryset, request, 100)
         serializer = LabAppointmentModelSerializer(queryset, many=True, context={"request": request})
         return serializer
@@ -2033,7 +2085,33 @@ class OrderDetailViewSet(GenericViewSet):
                     enabled_for_cod = doc_clinic_timing.is_enabled_for_cod()
 
             item = OrderCartItemMapper(order)
+            temp_time_slot_start = None
+            temp_test_time_slots = []
+            # if order.action_data.get('multi_timings_enabled'):
+            #     for test_time_slot in order.action_data.get('test_time_slots'):
+            #         test_id = test_time_slot.get('test_id')
+            #         test_data = dict()
+            #         test_data['test_id'] = test_id
+            #         test_data['time_slot_start'] = convert_datetime_str_to_iso_str(test_time_slot.get('time_slot_start'))
+            #         test_data['is_home_pickup'] = test_time_slot.get('is_home_pickup')
+            #         temp_test_time_slots.append(test_data)
+            # else:
+            #     temp_time_slot_start = convert_datetime_str_to_iso_str(order.action_data["time_slot_start"])
             temp_time_slot_start = convert_datetime_str_to_iso_str(order.action_data["time_slot_start"])
+
+            appointment = None
+            appointment_amount = 0
+            if order.product_id == Order.DOCTOR_PRODUCT_ID:
+                appointment = opd_appoint
+                appointment_amount = appointment.mrp if appointment else 0
+            elif order.product_id == Order.LAB_PRODUCT_ID:
+                appointment = LabAppointment.objects.filter(id=order.reference_id).first()
+                appointment_amount = appointment.price if appointment else 0
+
+            plus_appointment_mapping = None
+            if appointment:
+                plus_appointment_mapping = PlusAppointmentMapping.objects.filter(object_id=appointment.id).first()
+
             curr = {
                 "mrp": order.action_data["mrp"] if "mrp" in order.action_data else order.action_data["agreed_price"],
                 "deal_price": order.action_data["deal_price"],
@@ -2041,9 +2119,13 @@ class OrderDetailViewSet(GenericViewSet):
                 "data": cart_serializers.CartItemSerializer(item, context={"validated_data": None}).data,
                 "booking_id": order.reference_id,
                 "time_slot_start": temp_time_slot_start,
+                "test_time_slots": temp_test_time_slots,
                 "payment_type": order.action_data["payment_type"],
                 "cod_deal_price": cod_deal_price,
-                "enabled_for_cod": enabled_for_cod
+                "enabled_for_cod": enabled_for_cod,
+                "is_vip_member": True if appointment and appointment.plus_plan else False,
+                "covered_under_vip": True if appointment and appointment.plus_plan else False,
+                'vip_amount': appointment_amount - plus_appointment_mapping.amount if plus_appointment_mapping else 0
             }
             processed_order_data.append(curr)
 

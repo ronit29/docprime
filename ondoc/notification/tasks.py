@@ -655,6 +655,27 @@ def send_insurance_notifications(self, data):
 
 
 @task(bind=True, max_retries=3)
+def send_plus_membership_notifications(self, data):
+    from ondoc.authentication import models as auth_model
+    from ondoc.communications.models import VipNotification
+    from ondoc.plus.models import PlusUser
+    try:
+        user_id = int(data.get('user_id', 0))
+        user = auth_model.User.objects.filter(id=user_id).last()
+        if not user:
+            raise Exception("Invalid user id passed for plus membership email notification. Userid %s" % str(user_id))
+
+        plus_user_obj = user.active_plus_user
+        if not plus_user_obj:
+            raise Exception("Invalid or None plus user membership found for email notification. User id %s" % str(user_id))
+
+        plus_user_notification = VipNotification(plus_user_obj, NotificationAction.PLUS_MEMBERSHIP_CONFIRMED)
+        plus_user_notification.send()
+    except Exception as e:
+        logger.error(str(e))
+
+
+@task(bind=True, max_retries=3)
 def send_insurance_endorsment_notifications(self, data):
     from ondoc.authentication import models as auth_model
     from ondoc.communications.models import InsuranceNotification
