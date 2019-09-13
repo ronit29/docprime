@@ -2853,19 +2853,19 @@ class OpdAppointment(auth_model.TimeStampedModel, CouponsMixin, OpdAppointmentIn
         else:
             return True
 
-    def is_plus_appointment(self):
-        if self.plus_plan:
-            return True
-        else:
-            return False
+    # def is_plus_appointment(self):
+    #     if self.plus_plan:
+    #         return True
+    #     else:
+    #         return False
 
     def after_commit_tasks(self, old_instance, push_to_matrix):
         sent_to_provider = True
         if old_instance:
             sent_to_provider = self.is_provider_notification_allowed(old_instance)
 
-        if self.is_plus_appointment:
-            self.user.active_plus_user.update_doctor_utilization(self)
+        # if self.is_plus_appointment:
+        #     self.user.active_plus_user.update_doctor_utilization(self)
 
         if old_instance is None and self.payment_type == OpdAppointment.COD:
             try:
