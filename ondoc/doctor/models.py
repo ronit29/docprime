@@ -426,7 +426,8 @@ class Hospital(auth_model.TimeStampedModel, auth_model.CreatedByModel, auth_mode
         hospital_urls.hospital_urls()
 
     def is_enabled_for_cod(self, *args, **kwargs):
-        if kwargs.get('user') and kwargs.get('user').active_plus_user:
+        user = kwargs.get('user')
+        if user and not user.is_anonymous and user.is_authenticated and user.active_plus_user:
             return False
 
         if self.enabled_for_cod:
