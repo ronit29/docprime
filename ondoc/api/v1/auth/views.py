@@ -2073,10 +2073,13 @@ class OrderDetailViewSet(GenericViewSet):
             temp_time_slot_start = convert_datetime_str_to_iso_str(order.action_data["time_slot_start"])
 
             appointment = None
+            appointment_amount = 0
             if order.product_id == Order.DOCTOR_PRODUCT_ID:
                 appointment = opd_appoint
+                appointment_amount = appointment.mrp
             elif order.product_id == Order.LAB_PRODUCT_ID:
                 appointment = LabAppointment.objects.filter(id=order.reference_id).first()
+                appointment_amount = appointment.price
 
             plus_appointment_mapping = None
             if appointment:
@@ -2095,7 +2098,7 @@ class OrderDetailViewSet(GenericViewSet):
                 "enabled_for_cod": enabled_for_cod,
                 "is_vip_member": True if appointment and appointment.plus_plan else False,
                 "covered_under_vip": True if appointment and appointment.plus_plan else False,
-                'vip_amount': plus_appointment_mapping.amount if plus_appointment_mapping else 0
+                'vip_amount': appointment_amount - plus_appointment_mapping.amount if plus_appointment_mapping else 0
             }
             processed_order_data.append(curr)
 

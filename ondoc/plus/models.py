@@ -1,4 +1,5 @@
 from django.db import models
+import functools
 from ondoc.authentication import models as auth_model
 from django.contrib.contenttypes.fields import GenericRelation, GenericForeignKey
 from django.contrib.contenttypes.models import ContentType
@@ -439,30 +440,33 @@ class PlusUser(auth_model.TimeStampedModel):
 
     def get_package_plus_appointment_amount(self):
         from ondoc.diagnostic.models import LabAppointment
-        from ondoc.doctor.models import OpdAppointment
 
         import functools
         package_amount = 0
-        lab_appointments = LabAppointment.objects.filter(plus_plan=self).exclude(status=OpdAppointment.CANCELLED)
-        if not lab_appointments:
+        lab_appointments_ids = LabAppointment.objects.filter(plus_plan=self).exclude(status=LabAppointment.CANCELLED).values_list('id', flat=True)
+        content_type = ContentType.objects.get_for_model(LabAppointment)
+        appointment_mappings = PlusAppointmentMapping.objects.filter(object_id__in=lab_appointments_ids, content_type=content_type)
+        if not appointment_mappings:
             return 0
-        for lab_appointment in lab_appointments:
-            pacakge_appointments = list(filter(lambda lab_test_mapping: lab_test_mapping.test.is_package, lab_appointment.test_mappings.all()))
-            lab_appointments_mrp = list(map(lambda appointment: appointment.mrp, pacakge_appointments))
-            package_amount = package_amount + functools.reduce(lambda a, b: a + b, lab_appointments_mrp)
+
+        appointment_mappings_amount = list(map(lambda appointment: appointment.amount, appointment_mappings))
+        package_amount = package_amount + functools.reduce(lambda a, b: a + b, appointment_mappings_amount)
 
         return package_amount
 
     def get_doctor_plus_appointment_amount(self):
         import functools
         from ondoc.doctor.models import OpdAppointment
-        total_mrp = 0
-        opd_appointments = OpdAppointment.objects.filter(plus_plan=self).exclude(status=OpdAppointment.CANCELLED)
-        if not opd_appointments:
+        # total_mrp = 0
+        opd_appointments_ids = OpdAppointment.objects.filter(plus_plan=self).exclude(status=OpdAppointment.CANCELLED).values_list('id', flat=True)
+
+        content_type = ContentType.objects.get_for_model(OpdAppointment)
+        appointment_mappings = PlusAppointmentMapping.objects.filter(object_id__in=opd_appointments_ids, content_type=content_type)
+        if not appointment_mappings:
             return 0
 
-        opd_appointments_mrp = list(map(lambda appointment:appointment.mrp, opd_appointments))
-        total_mrp = functools.reduce(lambda a, b: a + b, opd_appointments_mrp)
+        opd_appointments_amount = list(map(lambda appointment: appointment.amount, appointment_mappings))
+        total_mrp = functools.reduce(lambda a, b: a + b, opd_appointments_amount)
         return total_mrp
 
     @classmethod
@@ -821,6 +825,15 @@ class PlusAppointmentMapping(auth_model.TimeStampedModel):
     object_id = models.PositiveIntegerField()
     content_object = GenericForeignKey()
     amount = models.DecimalField(default=0, max_digits=10, decimal_places=2)
+
+    @classmethod
+    def get_vip_amount(cls, plus_user, content_type):
+        from ondoc.doctor.models import OpdAppointment
+        objects = cls.objects.filter(content_type=content_type, plus_user=plus_user)
+        valid_objects = list(filter(lambda obj: obj.content_object.status != OpdAppointment.CANCELLED, objects))
+        valid_amounts = list(map(lambda o: o.amount, valid_objects))
+        vip_amount = functools.reduce(lambda a, b: a + b, valid_amounts)
+        return vip_amount
 
     class Meta:
         db_table = 'plus_appointment_mapping'
