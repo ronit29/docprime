@@ -2076,10 +2076,10 @@ class OrderDetailViewSet(GenericViewSet):
             appointment_amount = 0
             if order.product_id == Order.DOCTOR_PRODUCT_ID:
                 appointment = opd_appoint
-                appointment_amount = appointment.mrp
+                appointment_amount = appointment.mrp if appointment else 0
             elif order.product_id == Order.LAB_PRODUCT_ID:
                 appointment = LabAppointment.objects.filter(id=order.reference_id).first()
-                appointment_amount = appointment.price
+                appointment_amount = appointment.price if appointment else 0
 
             plus_appointment_mapping = None
             if appointment:
