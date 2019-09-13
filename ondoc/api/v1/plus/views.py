@@ -290,7 +290,7 @@ class PlusProfileViewSet(viewsets.GenericViewSet):
         resp = {}
         if request.query_params.get('is_dashboard'):
             user = request.user
-            plus_user = PlusUser.objects.filter(user=user).first()
+            plus_user = PlusUser.objects.filter(user=user).order_by('-id').first()
         elif(request.query_params.get('id') and not request.query_params.get('is_dashboard')):
             plus_user_id = request.query_params.get('id')
             plus_user = PlusUser.objects.filter(id=plus_user_id).first()
