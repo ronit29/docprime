@@ -549,6 +549,10 @@ class PlusUser(auth_model.TimeStampedModel):
 
     def activate_care_membership(self):
         from ondoc.subscription_plan.models import Plan, UserPlanMapping
+
+        if UserPlanMapping.objects.filter(user=self.user).exists():
+            return
+
         plan = Plan.objects.filter(id=settings.CARE_PLAN_FOR_VIP).first()
         if not plan:
             return
