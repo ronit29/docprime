@@ -478,7 +478,7 @@ class DoctorSearchHelper:
 
             vip_enabled_filter_query = ''
             if self.query_params.get('vip_user'):
-                vip_enabled_filter_query = ' and not(enabled_for_cod=false and enabled_for_prepaid=false) '
+                vip_enabled_filter_query = ' and h.enabled_for_prepaid=true '
 
 
             query_string = "SELECT count(*) OVER() AS result_count, x.doctor_id, x.hospital_id, doctor_clinic_id, doctor_clinic_timing_id " \
