@@ -128,7 +128,17 @@ class OpdAppointmentSerializer(serializers.ModelSerializer):
     reports = serializers.SerializerMethodField()
     prescription = serializers.SerializerMethodField()
     report_files = serializers.SerializerMethodField()
+    specialization = serializers.ReadOnlyField(source='doctor.get_doctor_specializations')
+    payment_type = serializers.SerializerMethodField()
+    effective_price = serializers.SerializerMethodField()
     vip = serializers.SerializerMethodField()
+
+
+    def get_payment_type(self, obj):
+        return obj.payment_type
+
+    def get_effective_price(self, obj):
+        return obj.effective_price
 
     def get_report_files(self, obj):
         return []
@@ -157,7 +167,8 @@ class OpdAppointmentSerializer(serializers.ModelSerializer):
         model = OpdAppointment
         fields = ('id', 'doctor_name', 'hospital_name', 'patient_name', 'patient_image', 'type',
                   'allowed_action', 'effective_price', 'deal_price', 'status', 'time_slot_start',
-                  'time_slot_end', 'doctor_thumbnail', 'patient_thumbnail', 'display_name', 'invoices', 'reports', 'prescription', 'report_files', 'vip')
+                  'time_slot_end', 'doctor_thumbnail', 'patient_thumbnail', 'display_name', 'invoices', 'reports',
+                  'prescription', 'report_files', 'specialization', 'payment_type', 'effective_price', 'vip')
 
     def get_patient_image(self, obj):
         if obj.profile and obj.profile.profile_image:
@@ -758,11 +769,14 @@ class HospitalModelSerializer(serializers.ModelSerializer):
     lat = serializers.SerializerMethodField()
     long = serializers.SerializerMethodField()
     hospital_thumbnail = serializers.SerializerMethodField()
-
     address = serializers.SerializerMethodField()
+    matrix_city = serializers.SerializerMethodField()
 
     def get_address(self, obj):
         return obj.get_hos_address() if obj.get_hos_address() else None
+
+    def get_matrix_city(self, obj):
+        return obj.matrix_city.id if obj.matrix_city else 0
 
     def get_lat(self, obj):
         loc = obj.location
@@ -785,7 +799,7 @@ class HospitalModelSerializer(serializers.ModelSerializer):
     class Meta:
         model = Hospital
         fields = ('id', 'name', 'operational_since', 'lat', 'long', 'address', 'registration_number',
-                  'building', 'sublocality', 'locality', 'city', 'hospital_thumbnail', )
+                  'building', 'sublocality', 'locality', 'city', 'hospital_thumbnail', 'matrix_city', )
 
 
 class DoctorHospitalScheduleSerializer(serializers.ModelSerializer):

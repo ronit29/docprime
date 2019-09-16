@@ -805,6 +805,12 @@ class PromotedLabsSerializer(serializers.ModelSerializer):
         model = PromotedLab
         fields = ('id', 'name', )
 
+class LabTestNameSerializer(serializers.ModelSerializer):
+    test_name = serializers.ReadOnlyField(source='test.name')
+
+    class Meta:
+        model = LabAppointmentTestMapping
+        fields = ('test_name', )
 
 class LabAppointmentTestMappingModelSerializer(serializers.ModelSerializer):
     test_id = serializers.ReadOnlyField(source="test.id")
@@ -830,6 +836,7 @@ class LabAppointmentModelSerializer(serializers.ModelSerializer):
     reports = serializers.SerializerMethodField()
     report_files = serializers.SerializerMethodField()
     prescription = serializers.SerializerMethodField()
+    lab_test_name = serializers.SerializerMethodField()
     vip = serializers.SerializerMethodField()
     selected_timings_type = serializers.SerializerMethodField()
 
@@ -853,6 +860,9 @@ class LabAppointmentModelSerializer(serializers.ModelSerializer):
 
     def get_lab_test(self, obj):
         return list(obj.test_mappings.values_list('test_id', flat=True))
+
+    def get_lab_test_name(self, obj):
+        return LabTestNameSerializer(obj.test_mappings.all(), many=True).data
 
     def get_lab_thumbnail(self, obj):
         request = self.context.get("request")
@@ -891,7 +901,7 @@ class LabAppointmentModelSerializer(serializers.ModelSerializer):
         model = LabAppointment
         fields = ('id', 'lab', 'lab_test', 'profile', 'type', 'lab_name', 'status', 'deal_price', 'effective_price', 'time_slot_start', 'time_slot_end',
                    'is_home_pickup', 'lab_thumbnail', 'lab_image', 'patient_thumbnail', 'patient_name', 'allowed_action', 'address', 'invoices', 'reports', 'report_files',
-                  'prescription', 'vip', 'selected_timings_type')
+                  'prescription', 'lab_test_name', 'vip', 'selected_timings_type')
 
 
 class LabAppointmentBillingSerializer(serializers.ModelSerializer):

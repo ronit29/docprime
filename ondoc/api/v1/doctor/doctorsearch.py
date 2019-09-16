@@ -476,6 +476,11 @@ class DoctorSearchHelper:
             else:
                 ipd_query = ""
 
+            vip_enabled_filter_query = ''
+            if self.query_params.get('vip_user'):
+                vip_enabled_filter_query = ' and h.enabled_for_prepaid=true '
+
+
             query_string = "SELECT count(*) OVER() AS result_count, x.doctor_id, x.hospital_id, doctor_clinic_id, doctor_clinic_timing_id " \
                            "FROM (select {rank_part}, " \
                            "St_distance(St_setsrid(St_point((%(longitude)s), (%(latitude)s)), 4326), h.location) distance, " \
@@ -488,7 +493,7 @@ class DoctorSearchHelper:
                            "{bucket_query} FROM doctor d " \
                            "INNER JOIN doctor_clinic dc ON d.id = dc.doctor_id and dc.enabled=true and d.is_live=true " \
                            "and d.is_test_doctor is False and d.is_internal is False " \
-                           "INNER JOIN hospital h ON h.id = dc.hospital_id and h.is_live=true " \
+                           "INNER JOIN hospital h ON h.id = dc.hospital_id and h.is_live=true {vip_enabled_filter_query} " \
                            "INNER JOIN doctor_clinic_timing dct ON dc.id = dct.doctor_clinic_id " \
                            "{ipd_query} " \
                            "LEFT JOIN doctor_leave dl on dl.doctor_id = d.id and (%(ist_date)s) BETWEEN dl.start_date and dl.end_date " \
@@ -504,7 +509,8 @@ class DoctorSearchHelper:
                                                                               min_dist_cond=min_dist_cond,
                                                                               order_by_field=order_by_field, \
                                                                               rank_by=rank_by, ipd_query=ipd_query,
-                                                                              bucket_query=bucket_query)
+                                                                              bucket_query=bucket_query,
+                                                                              vip_enabled_filter_query=vip_enabled_filter_query)
 
         if filtering_params.get('params'):
             filtering_params.get('params')['longitude'] = longitude
