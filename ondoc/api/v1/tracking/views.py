@@ -43,9 +43,9 @@ class EventCreateViewSet(GenericViewSet):
         data.pop('visitor_info', None)
 
         error_message = ""
-        if not visitor_id or not visit_id:
-            error_message = "Couldn't save event, Couldn't create visit/visitor - " + str(visit_id) + " / " + str(visitor_id)
-            raise Exception(error_message)
+        # if not visitor_id or not visit_id:
+        #     error_message = "Couldn't save event, Couldn't create visit/visitor - " + str(visit_id) + " / " + str(visitor_id)
+        #     raise Exception(error_message)
 
         if not data or not isinstance(data, dict):
             error_message = "Couldn't save event without data - " + str(data) + " For visit/visitor - " + str(visit_id) + " / " + str(visitor_id)
