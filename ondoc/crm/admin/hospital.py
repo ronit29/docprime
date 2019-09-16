@@ -21,7 +21,7 @@ from django.contrib.admin import SimpleListFilter
 from ondoc.authentication.models import GenericAdmin, User, QCModel, DoctorNumber, AssociatedMerchant, SPOCDetails, \
     GenericQuestionAnswer
 from ondoc.authentication.admin import SPOCDetailsInline
-from django import forms
+from django import forms, apps
 from ondoc.api.v1.utils import GenericAdminEntity
 import nested_admin
 from .common import AssociatedMerchantInline, RemarkInline
@@ -31,6 +31,7 @@ from django.http import HttpResponseRedirect
 
 import logging
 logger = logging.getLogger(__name__)
+PartnerHospitalLabMapping = apps.apps.get_model('provider', 'PartnerHospitalLabMapping')
 
 
 class HospitalImageInline(admin.TabularInline):
@@ -281,7 +282,7 @@ class GenericAdminInline(admin.TabularInline):
     readonly_fields = ['user', 'updated_at']
     verbose_name_plural = "Admins"
     fields = ['phone_number', 'name', 'doctor', 'permission_type', 'super_user_permission',
-              'write_permission', 'user', 'updated_at']
+              'write_permission', 'is_partner_lab_admin', 'user', 'updated_at']
 
     def get_queryset(self, request):
         return super(GenericAdminInline, self).get_queryset(request).select_related('doctor', 'hospital', 'user')\
@@ -469,6 +470,42 @@ class QuestionAnswerInline(GenericTabularInline):
         return result
 
 
+class CloudLabAutocomplete(autocomplete.Select2QuerySetView):
+
+    def get_queryset(self):
+        if not self.request.user.is_authenticated:
+            return Lab.objects.none()
+        queryset = Lab.objects.filter(is_b2b=True)
+        if self.q:
+            queryset = queryset.filter(name__istartswith=self.q)
+        return queryset.distinct()
+
+
+class PartnerLabsInlineForm(forms.ModelForm):
+
+    class Meta:
+        model = PartnerHospitalLabMapping
+        fields = ('lab',)
+        widgets = {
+            'lab': autocomplete.ModelSelect2(url='cloud-lab-autocomplete', forward=[]),
+        }
+
+
+class PartnerLabsInline(admin.TabularInline):
+    model = PartnerHospitalLabMapping
+    extra = 0
+    can_delete = True
+    verbose_name = "Provider Lab"
+    verbose_name_plural = "Provider Labs"
+    readonly_fields = []
+    fields = ['lab']
+    autocomplete_fields = []
+    form = PartnerLabsInlineForm
+
+    def get_queryset(self, request):
+        return super(PartnerLabsInline, self).get_queryset(request).select_related('hospital', 'lab').filter(lab__is_b2b=True)
+
+
 class HospitalAdmin(admin.GeoModelAdmin, CompareVersionAdmin, ActionAdmin, QCPemAdmin):
     list_filter = ('data_status', 'welcome_calling_done', 'enabled_for_online_booking', 'enabled', CreatedByFilter,
                    HospCityFilter)
@@ -498,7 +535,8 @@ class HospitalAdmin(admin.GeoModelAdmin, CompareVersionAdmin, ActionAdmin, QCPem
         SPOCDetailsInline,
         AssociatedMerchantInline,
         RemarkInline,
-        HospitalSponsoredServicesInline
+        HospitalSponsoredServicesInline,
+        PartnerLabsInline,
     ]
     map_width = 200
     map_template = 'admin/gis/gmap.html'

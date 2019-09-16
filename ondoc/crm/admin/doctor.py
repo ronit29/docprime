@@ -2079,7 +2079,7 @@ class DoctorOpdAppointmentAdmin(ExportMixin, CompareVersionAdmin):
                 # notification_tasks.send_opd_notifications_refactored.apply_async((obj.id, NotificationAction.COD_TO_PREPAID_REQUEST), countdown=5)
 
                 # Change to fix created to cancelled notification to provider
-                notification_tasks.send_opd_notifications_refactored.apply_async(({'appointment_id': self.id,
+                notification_tasks.send_opd_notifications_refactored.apply_async(({'appointment_id': obj.id,
                                                                                    'is_valid_for_provider': True,
                                                                                    'notification_type': NotificationAction.COD_TO_PREPAID_REQUEST},),
                                                                                  countdown=1)

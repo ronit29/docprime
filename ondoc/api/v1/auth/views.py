@@ -1628,7 +1628,8 @@ class HospitalDoctorAppointmentPermissionViewSet(GenericViewSet):
         manageable_hosp_list = GenericAdmin.get_manageable_hospitals(user)
         doc_hosp_queryset = (DoctorClinic.objects
                              .select_related('doctor', 'hospital')
-                             .prefetch_related('doctor__manageable_doctors', 'hospital__manageable_hospitals')
+                             .prefetch_related('doctor__manageable_doctors', 'hospital__manageable_hospitals',
+                                               'hospital__partner_labs', 'hospital__partner_labs__lab')
                              .filter(Q(Q(doctor__is_live=True) | Q(doctor__source_type=Doctor.PROVIDER)),
                                      Q(Q(hospital__is_live=True) | Q(hospital__source_type=Hospital.PROVIDER)))
                              .annotate(doctor_gender=F('doctor__gender'),
@@ -1650,13 +1651,39 @@ class HospitalDoctorAppointmentPermissionViewSet(GenericViewSet):
                                        online_consultation_fees=F('doctor__online_consultation_fees')
                                        )
                              .filter(hospital_id__in=manageable_hosp_list)
-                             .values('hospital', 'doctor', 'hospital_name', 'doctor_name', 'doctor_gender',
-                                     'doctor_source_type', 'doctor_is_live', 'license',
-                                     'is_license_verified', 'hospital_source_type', 'hospital_is_live',
-                                     'online_consultation_fees').distinct('hospital', 'doctor')
+                             # .values('hospital', 'doctor', 'hospital_name', 'doctor_name', 'doctor_gender',
+                             #         'doctor_source_type', 'doctor_is_live', 'license',
+                             #         'is_license_verified', 'hospital_source_type', 'hospital_is_live',
+                             #         'online_consultation_fees')
+                             .distinct('hospital', 'doctor')
                              )
-
-        return Response(doc_hosp_queryset)
+        resp = []
+        for obj in doc_hosp_queryset.all():
+            resp_dict = {}
+            resp_dict['hospital'] = obj.hospital.id
+            resp_dict['doctor'] = obj.doctor.id
+            resp_dict['hospital_name'] = obj.hospital_name
+            resp_dict['doctor_name'] = obj.doctor_name
+            resp_dict['doctor_gender'] = obj.doctor_gender
+            resp_dict['doctor_source_type'] = obj.doctor_source_type
+            resp_dict['doctor_is_live'] = obj.doctor_is_live
+            resp_dict['license'] = obj.license
+            resp_dict['is_license_verified'] = obj.is_license_verified
+            resp_dict['hospital_source_type'] = obj.hospital_source_type
+            resp_dict['hospital_is_live'] = obj.hospital_is_live
+            resp_dict['online_consultation_fees'] = obj.online_consultation_fees
+            partner_labs = list()
+            hosp_lab_mappings = obj.hospital.partner_labs.all()
+            for mapping in hosp_lab_mappings:
+                lab_dict = {}
+                lab = mapping.lab
+                lab_dict['id'] = lab.id
+                lab_dict['name'] = lab.name
+                lab_dict['thumbnail'] = lab.get_thumbnail()
+                partner_labs.append(lab_dict)
+            resp_dict['partner_labs'] = partner_labs
+            resp.append(resp_dict)
+        return Response(resp)
 
 
 class UserLabViewSet(GenericViewSet):
@@ -2076,10 +2103,10 @@ class OrderDetailViewSet(GenericViewSet):
             appointment_amount = 0
             if order.product_id == Order.DOCTOR_PRODUCT_ID:
                 appointment = opd_appoint
-                appointment_amount = appointment.mrp
+                appointment_amount = appointment.mrp if appointment else 0
             elif order.product_id == Order.LAB_PRODUCT_ID:
                 appointment = LabAppointment.objects.filter(id=order.reference_id).first()
-                appointment_amount = appointment.price
+                appointment_amount = appointment.price if appointment else 0
 
             plus_appointment_mapping = None
             if appointment:
@@ -2472,3 +2499,28 @@ class BajajAllianzUserViewset(GenericViewSet):
         }
 
         return Response(response, status=status.HTTP_200_OK)
+
+
+# class CloudLabUserViewSet(viewsets.GenericViewSet):
+#     authentication_classes = (JWTAuthentication,)
+#     permission_classes = (IsAuthenticated, IsDoctor)
+#
+#     @transaction.atomic()
+#     def user_login_via_cloud_lab(self, request):
+#         from django.http import JsonResponse
+#         response = {'login': 0}
+#         if request.method != 'POST':
+#             return JsonResponse(response, status=405)
+#         serializer = serializers.CloudLabUserLoginSerializer(data=request.data)
+#         serializer.is_valid(raise_exception=True)
+#         data = serializer.validated_data
+#         try:
+#             user_data = User.get_external_login_data(data)
+#         except Exception as e:
+#             logger.error(str(e))
+#             return Response({'error': str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+#         token = user_data.get('token')
+#         if not token:
+#             return JsonResponse(response, status=400)
+#
+#         return Response(response, status=status.HTTP_200_OK)

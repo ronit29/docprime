@@ -269,6 +269,7 @@ class Hospital(auth_model.TimeStampedModel, auth_model.CreatedByModel, auth_mode
     question_answer = GenericRelation(auth_model.GenericQuestionAnswer, related_query_name='hospital_qa')
     enabled_for_insurance = models.NullBooleanField(verbose_name='Enabled for Insurance')
     enabled_for_plus_plans = models.NullBooleanField()
+    is_partner_lab_enabled = models.BooleanField(default=False)
 
     def __str__(self):
         return self.name
@@ -4316,7 +4317,7 @@ class OfflinePatients(auth_model.TimeStampedModel):
     user = models.ForeignKey(auth_model.User, related_name="offline_patients", on_delete=models.SET_NULL, null=True)
 
     def __str__(self):
-        return self.name
+        return str(self.name)
 
 
     def __repr__(self):

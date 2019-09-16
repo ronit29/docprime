@@ -635,3 +635,14 @@ class MatrixUserLoginSerializer(serializers.Serializer):
     extra = serializers.JSONField(allow_null=True, required=False)
     doctor = serializers.PrimaryKeyRelatedField(queryset=Doctor.objects.all())
     hospital = serializers.PrimaryKeyRelatedField(queryset=Hospital.objects.all())
+
+
+# class CloudLabUserLoginSerializer(serializers.Serializer):
+#     GENDER_CHOICES = UserProfile.GENDER_CHOICES
+#     name = serializers.CharField(max_length=100)
+#     phone_number = serializers.IntegerField(min_value=1000000000, max_value=9999999999)
+#     is_default_user = serializers.BooleanField(required=False)
+#     email = serializers.EmailField()
+#     dob = serializers.DateField()
+#     gender = serializers.ChoiceField(choices=GENDER_CHOICES)
+#     extra = serializers.JSONField(allow_null=True, required=False)

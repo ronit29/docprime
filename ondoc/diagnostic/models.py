@@ -266,6 +266,7 @@ class Lab(TimeStampedModel, CreatedByModel, QCModel, SearchKey, WelcomeCallingDo
     is_ipd_lab = models.BooleanField(default=False)
     related_hospital = models.ForeignKey(Hospital, null=True, blank=True, on_delete=models.SET_NULL, related_name='ipd_hospital')
     enabled_for_plus_plans = models.NullBooleanField()
+    is_b2b = models.BooleanField(default=False)
     center_visit = models.NullBooleanField()
 
     def __str__(self):
@@ -1584,8 +1585,8 @@ class AvailableLabTest(TimeStampedModel):
         else:
             return None
 
-    # def __str__(self):
-    #     return "{}".format(self.test.name)
+    def __str__(self):
+        return "{} | {}".format(self.test.name, self.lab_pricing_group.group_name)
 
     class Meta:
         unique_together = (("test", "lab_pricing_group"))
@@ -3555,5 +3556,3 @@ class IPDMedicinePageLead(auth_model.TimeStampedModel):
 
         if not self.matrix_lead_id:
             create_or_update_lead_on_matrix.apply_async(({'obj_type': self.__class__.__name__, 'obj_id': self.id}, ), countdown=5)
-
-

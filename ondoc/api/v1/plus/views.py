@@ -29,7 +29,7 @@ class PlusListViewSet(viewsets.GenericViewSet):
     def list(self, request):
         resp = {}
         user = request.user
-        if (user.active_plus_user or user.inactive_plus_user) and not user.is_anonymous:
+        if user and not user.is_anonymous and user.is_authenticated and (user.active_plus_user or user.inactive_plus_user):
             return Response(data={'certificate': True}, status=status.HTTP_200_OK)
 
         plus_proposer = self.get_queryset()

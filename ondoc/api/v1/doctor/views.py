@@ -2807,53 +2807,58 @@ class DoctorFeedbackViewSet(viewsets.GenericViewSet):
     def feedback(self, request):
         resp = {}
         user = request.user
-        subject_string = "Feedback Mail from " + str(user.phone_number)
-
         serializer = serializers.DoctorFeedbackBodySerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         valid_data = serializer.validated_data
-        message = ''
-        managers_string = ''
-        manages_string = ''
-        doctor = valid_data.pop("doctor_id") if valid_data.get("doctor_id") else None
-        hospital = valid_data.pop("hospital_id") if valid_data.get("hospital_id") else None
-        for key, value in valid_data.items():
-            if isinstance(value, list):
-                val = ' '.join(map(str, value))
-            else:
-                val = value
-            message += str(key) + "  -  " + str(val) + "<br>"
-        if doctor or hospital:
-            message = self.get_doctor_and_hospital_data(message, doctor, hospital)
-        if hasattr(user, 'doctor') and user.doctor:
-            managers_list = []
-            for managers in user.doctor.manageable_doctors.all():
-                info = {}
-                info['hospital_id'] = (str(managers.hospital_id)) if managers.hospital_id else "<br>"
-                info['hospital_name'] = (str(managers.hospital.name)) if managers.hospital else "<br>"
-                info['user_id'] = (str(managers.user_id) ) if managers.user else "<br>"
-                info['user_number'] = (str(managers.phone_number)) if managers.phone_number else "<br>"
-                info['type'] = (str(dict(auth_models.GenericAdmin.type_choices)[managers.permission_type])) if managers.permission_type else "<br>"
-                managers_list.append(info)
-            managers_string = "<br>".join(str(x) for x in managers_list)
-        if managers_string:
-            message = message + "<br><br> User's Managers <br>"+ managers_string
+        emails = list()
+        if valid_data.get('is_cloud_lab_email'):
+            subject_string = "Test Sample Pickup Request from " + str(user.phone_number)
+            message = valid_data.get('feedback')
+            emails = ["sanat@docprime.com", "kabeer@docprime.com", "prithvijeet@docprime.com", "raghavr@docprime.com"]
+        else:
+            subject_string = "Feedback Mail from " + str(user.phone_number)
+            message = ''
+            managers_string = ''
+            manages_string = ''
+            doctor = valid_data.pop("doctor_id") if valid_data.get("doctor_id") else None
+            hospital = valid_data.pop("hospital_id") if valid_data.get("hospital_id") else None
+            for key, value in valid_data.items():
+                if isinstance(value, list):
+                    val = ' '.join(map(str, value))
+                else:
+                    val = value
+                message += str(key) + "  -  " + str(val) + "<br>"
+            if doctor or hospital:
+                message = self.get_doctor_and_hospital_data(message, doctor, hospital)
+            if hasattr(user, 'doctor') and user.doctor:
+                managers_list = []
+                for managers in user.doctor.manageable_doctors.all():
+                    info = {}
+                    info['hospital_id'] = (str(managers.hospital_id)) if managers.hospital_id else "<br>"
+                    info['hospital_name'] = (str(managers.hospital.name)) if managers.hospital else "<br>"
+                    info['user_id'] = (str(managers.user_id) ) if managers.user else "<br>"
+                    info['user_number'] = (str(managers.phone_number)) if managers.phone_number else "<br>"
+                    info['type'] = (str(dict(auth_models.GenericAdmin.type_choices)[managers.permission_type])) if managers.permission_type else "<br>"
+                    managers_list.append(info)
+                managers_string = "<br>".join(str(x) for x in managers_list)
+            if managers_string:
+                message = message + "<br><br> User's Managers <br>"+ managers_string
 
-        manages_list = []
-        for manages in user.manages.all():
-            info = {}
-            info['hospital_id'] = (str(manages.hospital_id)) if manages.hospital_id else "<br>"
-            info['hospital_name'] = (str(manages.hospital.name)) if manages.hospital else "<br>"
-            info['doctor_name'] = (str(manages.doctor.name)) if manages.doctor else "<br>"
-            info['user_id'] = (str(user.id)) if user else "<br>"
-            info['doctor_number'] = (str(manages.doctor.mobiles.filter(is_primary=True).first().number)) if(manages.doctor and manages.doctor.mobiles.filter(is_primary=True)) else "<br>"
-            manages_list.append(info)
-        manages_string = "<br>".join(str(x) for x in manages_list)
-        if manages_string:
-            message = message + "<br><br> User Manages <br>"+ manages_string
-        try:
+            manages_list = []
+            for manages in user.manages.all():
+                info = {}
+                info['hospital_id'] = (str(manages.hospital_id)) if manages.hospital_id else "<br>"
+                info['hospital_name'] = (str(manages.hospital.name)) if manages.hospital else "<br>"
+                info['doctor_name'] = (str(manages.doctor.name)) if manages.doctor else "<br>"
+                info['user_id'] = (str(user.id)) if user else "<br>"
+                info['doctor_number'] = (str(manages.doctor.mobiles.filter(is_primary=True).first().number)) if(manages.doctor and manages.doctor.mobiles.filter(is_primary=True)) else "<br>"
+                manages_list.append(info)
+            manages_string = "<br>".join(str(x) for x in manages_list)
+            if manages_string:
+                message = message + "<br><br> User Manages <br>"+ manages_string
             emails = ["rajivk@policybazaar.com", "sanat@docprime.com", "arunchaudhary@docprime.com",
                       "rajendra@docprime.com", "harpreet@docprime.com", "jaspreetkaur@docprime.com"]
+        try:
             for x in emails:
                 notif_models.EmailNotification.publish_ops_email(str(x), mark_safe(message), subject_string)
             resp['status'] = "success"

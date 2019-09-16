@@ -42,6 +42,7 @@ from ondoc.procedure.models import Procedure, ProcedureCategory, CommonProcedure
     IpdProcedureSynonymMapping, IpdProcedurePracticeSpecialization, IpdProcedureLead, Offer, \
     PotentialIpdLeadPracticeSpecialization, IpdProcedureCostEstimate, \
     IpdCostEstimateRoomType, UploadCostEstimateData, DoctorClinicIpdProcedure, PotentialIpdCity
+from ondoc.provider.models import PartnerLabTestSamples, PartnerLabTestSampleDetails, TestSamplesLabAlerts, PartnerLabSamplesCollectOrder
 
 from ondoc.subscription_plan.models import Plan, PlanFeature, UserPlanMapping
 from .common import Cities, CitiesAdmin, MatrixCityMapping, MatrixCityAdmin, MerchantAdmin, MerchantPayoutAdmin, \
@@ -70,6 +71,7 @@ from .notification import (EmailNotificationAdmin, SmsNotificationAdmin,
                            PushNotificationAdmin, AppNotificationAdmin, DynamicTemplatesAdmin)
 from .report import ReportAdmin
 from .coupon import CouponAdmin, UserSpecificCouponAdmin, RandomGeneratedCouponAdmin
+from .provider import PartnerLabTestSampleAdmin, PartnerLabTestSampleDetailAdmin, TestSamplesLabAlertAdmin, PartnerLabSamplesCollectOrderAdmin
 from ondoc.reports import models as report_models
 from ondoc.authentication.models import GenericLabAdmin, UserNumberUpdate, GenericQuestionAnswer
 
@@ -306,4 +308,9 @@ admin.site.register(SponsoredServices, SponsoredServicesAdmin)
 admin.site.register(IPDMedicinePageLead)
 admin.site.register(HospitalSponsoredServices, HospitalSponsoredServicesAdmin)
 admin.site.register(DoctorSponsoredServices, DoctorSponsoredServicesAdmin)
+
+admin.site.register(PartnerLabTestSamples, PartnerLabTestSampleAdmin)
+admin.site.register(PartnerLabTestSampleDetails, PartnerLabTestSampleDetailAdmin)
+admin.site.register(TestSamplesLabAlerts, TestSamplesLabAlertAdmin)
+admin.site.register(PartnerLabSamplesCollectOrder, PartnerLabSamplesCollectOrderAdmin)
 

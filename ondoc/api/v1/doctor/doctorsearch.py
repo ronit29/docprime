@@ -644,7 +644,7 @@ class DoctorSearchHelper:
                     insurance_error = "You have already utilised {} Oncologist consultations available in your OPD Insurance Plan.".format(settings.INSURANCE_ONCOLOGIST_LIMIT)
 
                 if request and request.user and not request.user.is_anonymous and vip_data_dict.get('is_vip_member') and \
-                        doctor.enabled_for_plus_plans and doctor_clinic.hospital.enabled_for_insurance and \
+                        doctor.enabled_for_plus_plans and doctor_clinic.hospital.enabled_for_prepaid and \
                         doctor.enabled_for_online_booking and doctor_clinic.hospital.enabled_for_online_booking and \
                         doctor_clinic.enabled_for_online_booking:
                     mrp = int(min_price.get('mrp'))

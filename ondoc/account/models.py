@@ -630,7 +630,7 @@ class Order(TimeStampedModel):
                     payable_amount += app.get('effective_price')
                     return payable_amount
 
-                payable_amount = app.get('effective_price', 0)
+                payable_amount = payable_amount + app.get('effective_price', 0)
             if app.get("payment_type") == OpdAppointment.PREPAID:
                 payable_amount += app.get('effective_price')
         return payable_amount
