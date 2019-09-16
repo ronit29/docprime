@@ -1069,8 +1069,10 @@ def push_plus_lead_to_matrix(self, data):
         lead_data = extras.get('lead_data')
         if lead_data:
             provided_lead_source = lead_data.get('source')
-            if type(provided_lead_source).__name__ == 'str' and provided_lead_source.lower() == 'docprimechat':
-                lead_source = 'docprimechat'  #TODO change
+            if provided_lead_source:
+                lead_source = provided_lead_source
+            # if type(provided_lead_source).__name__ == 'str' and provided_lead_source.lower() == 'docprimechat':
+            #     lead_source = 'docprimechat'  #TODO change
 
         plan = None
         if plan_id and type(plan_id).__name__ == 'int':
