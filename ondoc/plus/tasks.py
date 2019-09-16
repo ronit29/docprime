@@ -13,7 +13,6 @@ logger = logging.getLogger(__name__)
 
 @task(bind=True, max_retries=2)
 def push_plus_buy_to_matrix(self, *args, **kwargs):
-    return
     from ondoc.authentication.models import User
     from ondoc.plus.models import PlusUser, PlusLead
     try:
@@ -65,7 +64,7 @@ def push_plus_buy_to_matrix(self, *args, **kwargs):
                     "ProposerName": primary_proposer.get_full_name(),
                     "PolicyId": "0",
                     "PolicyPaymentSTATUS": 300,
-                    "InsurancePlanPurchased": 1 if user_obj.active_insurance else 0,
+                    "InsurancePlanPurchased": "no",
                     "PurchaseDate": int(plus_user_obj.purchase_date.timestamp()),
                     "ExpirationDate": int(plus_user_obj.expire_date.timestamp()),
                     "PeopleCovered": "yes"
@@ -79,7 +78,7 @@ def push_plus_buy_to_matrix(self, *args, **kwargs):
 
         if response.status_code != status.HTTP_200_OK or not response.ok:
             logger.error(json.dumps(request_data))
-            logger.info("[ERROR] Insurance could not be published to the matrix system")
+            logger.info("[ERROR] Vip membership could not be published to the matrix system")
             logger.info("[ERROR] %s", response.reason)
 
             countdown_time = (2 ** self.request.retries) * 60 * 10
@@ -99,4 +98,4 @@ def push_plus_buy_to_matrix(self, *args, **kwargs):
             user_plus_qs.update(matrix_lead_id=resp_data.get('Id'))
 
     except Exception as e:
-        logger.error("Error in Celery. Failed pushing insurance to the matrix- " + str(e))
+        logger.error("Error in Celery. Failed pushing vip to the matrix- " + str(e))
