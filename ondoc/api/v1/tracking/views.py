@@ -43,19 +43,22 @@ class EventCreateViewSet(GenericViewSet):
         data.pop('visitor_info', None)
 
         error_message = ""
-        # if not visitor_id or not visit_id:
-        #     error_message = "Couldn't save event, Couldn't create visit/visitor - " + str(visit_id) + " / " + str(visitor_id)
-        #     raise Exception(error_message)
+        if not visitor_id or not visit_id:
+            error_message = "Couldn't save event, Couldn't create visit/visitor - " + str(visit_id) + " / " + str(visitor_id)
+            # raise Exception(error_message)
+            resp['error'] = error_message
 
         if not data or not isinstance(data, dict):
             error_message = "Couldn't save event without data - " + str(data) + " For visit/visitor - " + str(visit_id) + " / " + str(visitor_id)
-            raise Exception(error_message)
+            # raise Exception(error_message)
+            resp['error'] = error_message
 
         event_name = data.get('event', None) or data.get('Action', None)
 
         if not event_name:
             error_message = "Couldn't save anonymous event - " + str(data) + " For visit/visitor - " + str(visit_id) + " / " + str(visitor_id)
-            raise Exception(error_message)
+            #raise Exception(error_message)
+            resp['error'] = error_message
 
         userAgent = data.get('userAgent', None)
         data.pop('userAgent', None)
@@ -77,7 +80,8 @@ class EventCreateViewSet(GenericViewSet):
             if settings.MONGO_STORE:
                 track_mongo_models.TrackingEvent.save_event(visitor_id=visitor_id, event_name=event_name, data=data,
                                                             visit_id=visit_id, user=user, triggered_at=triggered_at)
-            resp['success'] = "Event Saved Successfully!"
+            if not "error" in resp:
+                resp['success'] = "Event Saved Successfully!"
         except Exception as e:
             # logger.error("Error saving event - " + str(e))
             resp['error'] = "Error Processing Event Data!"
