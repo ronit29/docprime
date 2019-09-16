@@ -1763,7 +1763,10 @@ class DoctorListViewSet(viewsets.GenericViewSet):
             'vip_remaining_amount': 0
         }
 
+        vip_user = None
+
         if logged_in_user.is_authenticated and not logged_in_user.is_anonymous:
+            vip_user = logged_in_user.active_plus_user
             user_insurance = logged_in_user.purchased_insurance.filter().order_by('id').last()
             if user_insurance and user_insurance.is_valid() and not logged_in_user.active_plus_user:
                 insurance_threshold = user_insurance.insurance_plan.threshold.filter().first()
@@ -1777,7 +1780,7 @@ class DoctorListViewSet(viewsets.GenericViewSet):
                 vip_data_dict['vip_remaining_amount'] = utilization_dict.get('doctor_amount_available') if utilization_dict else 0
                 vip_data_dict['is_vip_member'] = True
                 vip_data_dict['cover_under_vip'] = False
-
+        validated_data['vip_user'] = vip_user
         validated_data['insurance_threshold_amount'] = insurance_data_dict['insurance_threshold_amount']
         validated_data['is_user_insured'] = insurance_data_dict['is_user_insured']
 
