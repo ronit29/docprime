@@ -1262,54 +1262,29 @@ class SponsorListingViewSet(viewsets.GenericViewSet):
             important_ids = important_ids | set(utm_matching_ids)
 
         if spec_id:
-            spec_and_lat_long_ids = sponsorlisting_objects.filter(
-                poc_specialization__location__dwithin=(
-                    Point(float(long),
-                          float(lat)),
-                    D(m=F('radius'))),
-                poc_specialization__specialization__id=spec_id,
-                poc_specialization__is_enabled=True).values_list('provider_name_hospital', flat=True).distinct()
+            sepc_lat_matching_ids = []
 
-            if spec_and_lat_long_ids:
-                important_ids = important_ids | set(spec_and_lat_long_ids)
-            else:
-                lat_long_ids = sponsorlisting_objects.filter(
-                poc_specialization__location__dwithin=(
-                    Point(float(long),
-                          float(lat)),
-                    D(m=F('radius'))),
-                poc_specialization__is_enabled=True).values_list('provider_name_hospital', flat=True).distinct()
+            for specialization_obj in sponsorlisting_objects:
+                for spec in specialization_obj.poc_specialization.all():
+                    specialization = spec.specialization.id
+                    latitude = spec.latitude if spec.latitude else None
+                    longitude = spec.longitude if spec.longitude else None
+                    radius = spec.radius if spec.radius else None
+                    if specialization and latitude and longitude and radius:
+                        pnt1 = Point(float(longitude), float(latitude))
+                        pnt2 = Point(float(long), float(lat))
+                        if pnt1.distance(pnt2) * 100 <= radius and specialization == spec_id:
+                            hospital_id = spec.poc.provider_name_hospital.id
+                            sepc_lat_matching_ids.append(hospital_id)
 
-                if lat_long_ids:
-                    important_ids = important_ids | set(lat_long_ids)
+                    elif latitude and longitude and radius and not specialization:
+                        pnt1 = Point(float(longitude), float(latitude))
+                        pnt2 = Point(float(long), float(lat))
+                        if pnt1.distance(pnt2) * 100 <= radius:
+                            hospital_id = spec.poc.provider_name_hospital.id
+                            sepc_lat_matching_ids.append(hospital_id)
 
-        #
-        # sepc_lat_matching_ids = []
-        # for sponsor in sponsorlisting_objects:
-        #
-        #     for spec in sponsor.poc_specialization.all():
-        #         for loc in sponsor.poc_lat_long.all():
-        #             latitude = loc.latitude
-        #             longitude = loc.longitude
-        #             radius = loc.radius
-        #             if spec_id:
-        #                 specialization_id = spec.specialization.id
-        #                 if latitude and longitude and radius and specialization_id:
-        #                     pnt1 = Point(float(longitude), float(latitude))
-        #                     pnt2 = Point(float(long), float(lat))
-        #                     if pnt1.distance(pnt2) * 100 <= radius and specialization_id == spec_id:
-        #                         hospital_id = spec.poc.provider_name_hospital.id
-        #                         sepc_lat_matching_ids.append(hospital_id)
-        #
-        #
-        #             elif latitude and longitude and radius:
-        #                 pnt1 = Point(float(longitude), float(latitude))
-        #                 pnt2 = Point(float(long), float(lat))
-        #                 if pnt1.distance(pnt2) * 100 <= radius:
-        #                     hospital_id = spec.poc.provider_name_hospital.id
-        #                     sepc_lat_matching_ids.append(hospital_id)
-        #
-        # important_ids = important_ids | set(sepc_lat_matching_ids)
+                    important_ids = important_ids | set(sepc_lat_matching_ids)
 
         list_obj = Hospital.objects.prefetch_related('hospitalcertification_set',
                                                             'hospital_documents',
@@ -1318,17 +1293,10 @@ class SponsorListingViewSet(viewsets.GenericViewSet):
                                                             'network__hospital_network_documents',
                                                             'hospitalspeciality_set').filter(id__in=important_ids)
 
-        # for hospital in list_obj:
-        #     sp_list = []
-        #     resp={}
-        #     for sp_service in hospital.hospital_services.all():
-        #         resp['name'] = sp_service.sponsored_service.name
-        #         resp['id'] = sp_service.sponsored_service.id
-        #         sp_list.append({})
-
 
         serialized_objects = HospitalDetailIpdProcedureSerializer(list_obj, many=True, context={'request': request, 'parameters': parameters}).data
         return Response(serialized_objects)
+
 
 class DocumentUploadViewSet(viewsets.GenericViewSet):
 

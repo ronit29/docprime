@@ -26,7 +26,7 @@ from dal import autocomplete
 from reversion_compare.admin import CompareVersionAdmin
 
 from ondoc.api.v1.utils import GenericAdminEntity, util_absolute_url, util_file_name
-from ondoc.common.models import AppointmentHistory, SponsorListingURL, SponsorListingSpecialization, SponsorListingUtmTerm, SponsoredListingService, SponsorListingLocation
+from ondoc.common.models import AppointmentHistory, SponsorListingURL, SponsorListingSpecialization, SponsorListingUtmTerm, SponsoredListingService
 from django.contrib import messages
 from django.http import HttpResponseRedirect
 
@@ -2468,11 +2468,6 @@ class PurchaseOrderCreationForm(forms.ModelForm):
         return super().clean()
 
 
-class SponsorListingLocationInline(admin.TabularInline):
-    model = SponsorListingLocation
-    extra = 2
-    can_delete = True
-
 class SponsorListingURLInline(admin.TabularInline):
     model = SponsorListingURL
     extra = 0
@@ -2483,19 +2478,6 @@ class SponsorListingSpecializationInline(admin.TabularInline):
     model = SponsorListingSpecialization
     extra = 0
     can_delete = True
-    class Media:
-        map_width = 200
-        map_template = 'admin/gis/gmap.html'
-        js = ('js/admin/GoogleMap.js',
-                    'https://maps.googleapis.com/maps/api/js?key=AIzaSyClYPAOTREfAZ-95eRbU6hDVHU0p3XygoY&callback=initGoogleMap')
-
-
-class SponsorListingSpecializationAdmin(admin.ModelAdmin):
-    model = SponsorListingSpecialization
-    map_width = 200
-    map_template = 'admin/gis/gmap.html'
-    extra_js = ['js/admin/GoogleMap.js',
-          'https://maps.googleapis.com/maps/api/js?key=AIzaSyClYPAOTREfAZ-95eRbU6hDVHU0p3XygoY&callback=initGoogleMap']
 
 
 class SponsorListingUtmTermInline(admin.TabularInline):
@@ -2527,7 +2509,7 @@ class PurchaseOrderCreationAdmin(CompareVersionAdmin):
     autocomplete_fields = ['provider_name_lab', 'provider_name_hospital']
     search_fields = ['provider_name_lab__name', 'provider_name_hospital__name']
 
-    inlines = [SponsorListingURLInline, SponsorListingSpecializationInline, SponsorListingUtmTermInline, SponsorListingLocationInline, SponsoredListingServiceInline]
+    inlines = [SponsorListingURLInline, SponsorListingSpecializationInline, SponsorListingUtmTermInline, SponsoredListingServiceInline]
 
     # readonly_fields = ['provider_name', 'appointment_booked_count', 'current_appointment_count']
 
