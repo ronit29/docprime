@@ -375,11 +375,15 @@ def set_order_dummy_transaction(self, order_id, user_id):
 
 @task
 def send_offline_appointment_message(**kwargs):
+    from ondoc.doctor.models import OfflineOPDAppointments
     from ondoc.communications.models import OfflineOpdAppointments
+    appointment_id = kwargs.get('appointment_id')
     appointment = kwargs.get('appointment')
     notification_type = kwargs.get('notification_type')
     receivers = kwargs.get('receivers')
     try:
+        if appointment_id and not appointment:
+            appointment = OfflineOPDAppointments.objects.filter(id=appointment_id).first()
         offline_opd_appointment_comm = OfflineOpdAppointments(appointment=appointment,
                                                               notification_type=notification_type,
                                                               receivers=receivers)
