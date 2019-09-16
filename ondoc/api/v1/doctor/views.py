@@ -488,12 +488,17 @@ class DoctorAppointmentsViewSet(OndocViewSet):
                                                   user=request.user, defaults={"data": data})
 
         resp = None
+        is_agent = False
         if hasattr(request, 'agent') and request.agent:
             user = User.objects.filter(id=request.agent).first()
             if user and not user.groups.filter(name=constants['APPOINTMENT_OTP_BYPASS_AGENT_TEAM']).exists():
-                resp = {'is_agent': True, "status": 1}
+                # resp = {'is_agent': True, "status": 1}
+                is_agent = True
         if not resp:
             resp = account_models.Order.create_order(request, [cart_item], validated_data.get("use_wallet"))
+
+        if is_agent:
+            resp['is_agent'] = True
 
         return Response(data=resp)
 
