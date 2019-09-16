@@ -27,6 +27,7 @@ import logging
 import json
 
 from ondoc.insurance.models import UserInsurance, InsuranceThreshold
+from ondoc.plus.models import PlusUser, PlusAppointmentMapping
 from ondoc.prescription.models import AppointmentPrescription
 from ondoc.ratings_review.models import RatingsReview
 from django.db.models import Avg
@@ -36,6 +37,7 @@ from ondoc.location.models import EntityUrls, EntityAddress
 from ondoc.seo.models import NewDynamic
 from ondoc.subscription_plan.models import Plan, UserPlanMapping
 from packaging.version import parse
+from ondoc.plus.enums import UtilizationCriteria
 
 logger = logging.getLogger(__name__)
 utc = pytz.UTC
@@ -257,6 +259,7 @@ class AvailableLabTestPackageSerializer(serializers.ModelSerializer):
     package = serializers.SerializerMethodField()
     parameters = serializers.SerializerMethodField()
     insurance = serializers.SerializerMethodField()
+    vip = serializers.SerializerMethodField()
     hide_price = serializers.ReadOnlyField(source='test.hide_price')
     included_in_user_plan = serializers.SerializerMethodField()
     is_price_zero = serializers.SerializerMethodField()
@@ -292,6 +295,33 @@ class AvailableLabTestPackageSerializer(serializers.ModelSerializer):
     #         return False
     #
     #   return data.get('prescription_needed', False)
+
+    def get_vip(self, obj):
+        request = self.context.get("request")
+        lab_obj = self.context.get("lab")
+        resp = Lab.get_vip_details(request.user)
+        user = request.user
+
+        plus_obj = user.active_plus_user if not user.is_anonymous and user.is_authenticated else None
+        utilization = plus_obj.get_utilization if plus_obj else {}
+        package_amount_balance = utilization.get('available_package_amount', 0)
+
+        if plus_obj and lab_obj and obj and lab_obj.enabled_for_plus_plans and obj.mrp:
+            utilization_criteria, can_be_utilized = plus_obj.can_package_be_covered_in_vip(obj)
+            if can_be_utilized:
+                resp['covered_under_vip'] = True
+            else:
+                return resp
+
+            if utilization_criteria == UtilizationCriteria.COUNT:
+                resp['vip_amount'] = 0
+            else:
+                if obj.mrp <= package_amount_balance:
+                    resp['vip_amount'] = 0
+                else:
+                    resp['vip_amount'] = obj.mrp - package_amount_balance
+
+        return resp
 
     def get_insurance(self, obj):
         request = self.context.get("request")
@@ -436,8 +466,8 @@ class AvailableLabTestPackageSerializer(serializers.ModelSerializer):
         model = AvailableLabTest
         fields = ('test_id', 'mrp', 'test', 'agreed_price', 'deal_price', 'enabled', 'is_home_collection_enabled',
                   'package', 'parameters', 'is_package', 'number_of_tests', 'why', 'pre_test_info', 'expected_tat',
-                  'hide_price', 'included_in_user_plan', 'insurance', 'is_price_zero', 'insurance_agreed_price', 'lensfit_offer',
-		  'is_radiology', 'is_pathology')
+                  'hide_price', 'included_in_user_plan', 'insurance', 'is_price_zero', 'insurance_agreed_price',
+                  'lensfit_offer', 'vip', 'is_radiology', 'is_pathology')
 
 class AvailableLabTestSerializer(serializers.ModelSerializer):
     test = LabTestSerializer()
@@ -446,6 +476,7 @@ class AvailableLabTestSerializer(serializers.ModelSerializer):
     deal_price = serializers.SerializerMethodField()
     is_home_collection_enabled = serializers.SerializerMethodField()
     insurance = serializers.SerializerMethodField()
+    vip = serializers.SerializerMethodField()
     is_package = serializers.SerializerMethodField()
     included_in_user_plan = serializers.SerializerMethodField()
     is_price_zero = serializers.SerializerMethodField()
@@ -478,6 +509,33 @@ class AvailableLabTestSerializer(serializers.ModelSerializer):
     def get_deal_price(self, obj):
         deal_price = obj.computed_deal_price if obj.custom_deal_price is None else obj.custom_deal_price
         return deal_price
+
+    def get_vip(self, obj):
+        request = self.context.get("request")
+        lab_obj = self.context.get("lab")
+        resp = Lab.get_vip_details(request.user)
+        user = request.user
+
+        plus_obj = user.active_plus_user if not user.is_anonymous and user.is_authenticated else None
+        utilization = plus_obj.get_utilization if plus_obj else {}
+        package_amount_balance = utilization.get('available_package_amount', 0)
+
+        if plus_obj and lab_obj and obj and lab_obj.enabled_for_plus_plans and obj.mrp:
+            utilization_criteria, can_be_utilized = plus_obj.can_package_be_covered_in_vip(obj)
+            if can_be_utilized:
+                resp['covered_under_vip'] = True
+            else:
+                return resp
+
+            if utilization_criteria == UtilizationCriteria.COUNT:
+                resp['vip_amount'] = 0
+            else:
+                if obj.mrp <= package_amount_balance:
+                    resp['vip_amount'] = 0
+                else:
+                    resp['vip_amount'] = obj.mrp - package_amount_balance
+
+        return resp
 
     def get_insurance(self, obj):
         request = self.context.get("request")
@@ -519,7 +577,7 @@ class AvailableLabTestSerializer(serializers.ModelSerializer):
         model = AvailableLabTest
         fields = ('test_id', 'mrp', 'test', 'agreed_price', 'deal_price', 'enabled', 'is_home_collection_enabled',
                   'insurance', 'is_package', 'included_in_user_plan', 'is_price_zero', 'insurance_agreed_price',
-		  'is_pathology', 'is_radiology')
+		  'is_pathology', 'is_radiology', 'vip')
 
 
 
@@ -629,6 +687,7 @@ class CommonPackageSerializer(serializers.ModelSerializer):
     mrp = serializers.SerializerMethodField()
     lab = LabModelSerializer()
     discounted_price = serializers.SerializerMethodField()
+    vip = serializers.SerializerMethodField()
 
     def __init__(self, instance=None, data=None, **kwargs):
         super().__init__(instance, data, **kwargs)
@@ -689,9 +748,36 @@ class CommonPackageSerializer(serializers.ModelSerializer):
 
         return discounted_price
 
+    def get_vip(self, obj):
+        request = self.context.get("request")
+        resp = Lab.get_vip_details(request.user)
+        user = request.user
+
+        plus_obj = user.active_plus_user if not user.is_anonymous and user.is_authenticated else None
+        utilization = plus_obj.get_utilization if plus_obj else {}
+        package_amount_balance = utilization.get('available_package_amount', 0)
+        lab_obj = Lab.objects.filter(id=obj.lab_id).first()
+
+        if plus_obj and obj and obj._selected_test and lab_obj.enabled_for_plus_plans and obj._selected_test.mrp:
+            utilization_criteria, can_be_utilized = plus_obj.can_package_be_covered_in_vip(None, mrp=obj._selected_test.mrp, id=obj.package.id)
+            if can_be_utilized:
+                resp['covered_under_vip'] = True
+            else:
+                return resp
+
+            if utilization_criteria == UtilizationCriteria.COUNT:
+                resp['vip_amount'] = 0
+            else:
+                if obj.mrp <= package_amount_balance:
+                    resp['vip_amount'] = 0
+                else:
+                    resp['vip_amount'] = obj._selected_test.mrp - package_amount_balance
+
+        return resp
+
     class Meta:
         model = CommonPackage
-        fields = ('id', 'name', 'icon', 'show_details', 'url', 'no_of_tests', 'mrp', 'agreed_price', 'discounted_price', 'lab')
+        fields = ('id', 'name', 'icon', 'show_details', 'url', 'no_of_tests', 'mrp', 'agreed_price', 'discounted_price', 'lab', 'vip')
 
 
 class CommonConditionsSerializer(serializers.ModelSerializer):
@@ -719,6 +805,12 @@ class PromotedLabsSerializer(serializers.ModelSerializer):
         model = PromotedLab
         fields = ('id', 'name', )
 
+class LabTestNameSerializer(serializers.ModelSerializer):
+    test_name = serializers.ReadOnlyField(source='test.name')
+
+    class Meta:
+        model = LabAppointmentTestMapping
+        fields = ('test_name', )
 
 class LabAppointmentTestMappingModelSerializer(serializers.ModelSerializer):
     test_id = serializers.ReadOnlyField(source="test.id")
@@ -744,7 +836,20 @@ class LabAppointmentModelSerializer(serializers.ModelSerializer):
     reports = serializers.SerializerMethodField()
     report_files = serializers.SerializerMethodField()
     prescription = serializers.SerializerMethodField()
+    lab_test_name = serializers.SerializerMethodField()
+    vip = serializers.SerializerMethodField()
     selected_timings_type = serializers.SerializerMethodField()
+
+    def get_vip(self, obj):
+        plus_appointment_mapping = None
+        if obj:
+            plus_appointment_mapping = PlusAppointmentMapping.objects.filter(object_id=obj.id).first()
+
+        return {
+            'is_vip_member': True if obj and obj.plus_plan else False,
+            'vip_amount': plus_appointment_mapping.amount if plus_appointment_mapping else 0,
+            'covered_under_vip': True if obj and obj.plus_plan else False
+        }
 
     def get_prescription(self, obj):
         return []
@@ -755,6 +860,9 @@ class LabAppointmentModelSerializer(serializers.ModelSerializer):
 
     def get_lab_test(self, obj):
         return list(obj.test_mappings.values_list('test_id', flat=True))
+
+    def get_lab_test_name(self, obj):
+        return LabTestNameSerializer(obj.test_mappings.all(), many=True).data
 
     def get_lab_thumbnail(self, obj):
         request = self.context.get("request")
@@ -793,7 +901,7 @@ class LabAppointmentModelSerializer(serializers.ModelSerializer):
         model = LabAppointment
         fields = ('id', 'lab', 'lab_test', 'profile', 'type', 'lab_name', 'status', 'deal_price', 'effective_price', 'time_slot_start', 'time_slot_end',
                    'is_home_pickup', 'lab_thumbnail', 'lab_image', 'patient_thumbnail', 'patient_name', 'allowed_action', 'address', 'invoices', 'reports', 'report_files',
-                  'prescription', 'selected_timings_type')
+                  'prescription', 'lab_test_name', 'vip', 'selected_timings_type')
 
 
 class LabAppointmentBillingSerializer(serializers.ModelSerializer):
@@ -862,6 +970,8 @@ class LabAppTransactionModelSerializer(serializers.Serializer):
     coupon = serializers.ListField(child=serializers.IntegerField(), required=False, default = [])
     discount = serializers.DecimalField(max_digits=10, decimal_places=2)
     insurance = serializers.PrimaryKeyRelatedField(queryset=UserInsurance.objects.all(), allow_null=True)
+    plus_plan = serializers.PrimaryKeyRelatedField(queryset=PlusUser.objects.all(), allow_null=True)
+    plus_amount = serializers.DecimalField(max_digits=10, decimal_places=2)
 
     cashback = serializers.DecimalField(max_digits=10, decimal_places=2)
     extra_details = serializers.JSONField(required=False)
@@ -1817,6 +1927,7 @@ class CustomLabTestPackageSerializer(serializers.ModelSerializer):
     tests = serializers.SerializerMethodField()
     included_in_user_plan = serializers.SerializerMethodField()
     insurance = serializers.SerializerMethodField()
+    vip = serializers.SerializerMethodField()
 
 
     class Meta:
@@ -1824,7 +1935,7 @@ class CustomLabTestPackageSerializer(serializers.ModelSerializer):
         fields = ('id', 'name', 'lab', 'mrp', 'distance', 'price', 'lab_timing', 'lab_timing_data', 'next_lab_timing',
                   'next_lab_timing_data', 'test_type', 'is_package', 'number_of_tests', 'why', 'pre_test_info',
                   'is_package', 'pickup_charges', 'pickup_available', 'distance_related_charges', 'priority',
-                  'show_details', 'categories', 'url', 'priority_score', 'category_details', 'tests', 'included_in_user_plan', 'insurance')
+                  'show_details', 'categories', 'url', 'priority_score', 'category_details', 'tests', 'included_in_user_plan', 'insurance', 'vip')
 
     def get_insurance(self, obj):
         request = self.context.get("request")
@@ -1834,6 +1945,33 @@ class CustomLabTestPackageSerializer(serializers.ModelSerializer):
 
         if obj and lab and lab.is_enabled_for_insurance and obj.mrp is not None and resp['insurance_threshold_amount'] is not None and obj.mrp <= resp['insurance_threshold_amount']:
             resp['is_insurance_covered'] = True
+
+        return resp
+
+    def get_vip(self, obj):
+        request = self.context.get("request")
+        resp = Lab.get_vip_details(request.user)
+        lab_data = self.context.get('lab_data', {})
+        lab = lab_data.get(obj.lab, None)
+        user = request.user
+        plus_obj = user.active_plus_user if not user.is_anonymous and user.is_authenticated else None
+        utilization = plus_obj.get_utilization if plus_obj else {}
+        package_amount_balance = utilization.get('available_package_amount', 0)
+
+        if plus_obj and lab and obj and lab.enabled_for_plus_plans and obj.mrp:
+            utilization_criteria, can_be_utilized = plus_obj.can_package_be_covered_in_vip(obj)
+            if can_be_utilized:
+                resp['covered_under_vip'] = True
+            else:
+                return resp
+
+            if utilization_criteria == UtilizationCriteria.COUNT:
+                resp['vip_amount'] = 0
+            else:
+                if obj.mrp <= package_amount_balance:
+                    resp['vip_amount'] = 0
+                else:
+                    resp['vip_amount'] = obj.mrp - package_amount_balance
 
         return resp
 
