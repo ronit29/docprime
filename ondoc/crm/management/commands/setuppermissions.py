@@ -67,7 +67,7 @@ from ondoc.prescription.models import AppointmentPrescription
 
 from ondoc.diagnostic.models import LabPricing
 from ondoc.integrations.models import IntegratorMapping, IntegratorProfileMapping, IntegratorReport, \
-    IntegratorTestMapping, IntegratorTestParameterMapping, IntegratorLabTestParameterMapping
+    IntegratorTestMapping, IntegratorTestParameterMapping, IntegratorLabTestParameterMapping, IntegratorLabCode
 from ondoc.subscription_plan.models import Plan, PlanFeature, PlanFeatureMapping, UserPlanMapping
 
 from ondoc.web.models import Career, OnlineLead, UploadImage
@@ -132,7 +132,7 @@ class Command(BaseCommand):
 
             group.permissions.add(*permissions)
 
-        content_types = ContentType.objects.get_for_models(Lab, LabNetwork)
+        content_types = ContentType.objects.get_for_models(Lab, LabNetwork, IntegratorLabCode)
         for cl, ct in content_types.items():
 
             permissions = Permission.objects.filter(
@@ -177,7 +177,7 @@ class Command(BaseCommand):
                 Q(content_type=ct), Q(codename='change_' + ct.model))
             group.permissions.add(*permissions)
 
-        content_types = ContentType.objects.get_for_models(Lab, LabNetwork)
+        content_types = ContentType.objects.get_for_models(Lab, LabNetwork, IntegratorLabCode)
         for cl, ct in content_types.items():
             permissions = Permission.objects.filter(
                 Q(content_type=ct), Q(codename='change_' + ct.model))
@@ -286,7 +286,7 @@ class Command(BaseCommand):
             SpecializationField, SpecializationDepartment, SpecializationDepartmentMapping,
             Procedure, ProcedureCategory, CommonProcedureCategory,
             ProcedureToCategoryMapping, ProcedureCategoryMapping, LabTestCategory, Merchant, CancellationReason, UploadDoctorData,
-            LabTestGroup, LabTestGroupMapping, LabTestGroupTiming
+            LabTestGroup, LabTestGroupMapping
         )
 
         for cl, ct in content_types.items():
@@ -297,7 +297,7 @@ class Command(BaseCommand):
             group.permissions.add(*permissions)
 
 
-        content_types = ContentType.objects.get_for_models(ParameterLabTest, LabTestPackage, LabTestCategoryMapping, HospitalTiming)
+        content_types = ContentType.objects.get_for_models(ParameterLabTest, LabTestPackage, LabTestCategoryMapping, HospitalTiming, IntegratorLabCode, LabTestGroupTiming)
 
         for cl, ct in content_types.items():
             permissions = Permission.objects.filter(

@@ -5,6 +5,7 @@ from uuid import UUID
 from django.contrib.gis.db.models.functions import Distance
 from django.contrib.gis.measure import D
 
+from ondoc.account.models import Order, ConsumerAccount, PgTransaction
 from ondoc.api.v1.auth.serializers import UserProfileSerializer
 from ondoc.api.v1.doctor.city_match import city_match
 from ondoc.api.v1.doctor.serializers import HospitalModelSerializer, AppointmentRetrieveDoctorSerializer, \
@@ -13,6 +14,7 @@ from ondoc.api.v1.doctor.DoctorSearchByHospitalHelper import DoctorSearchByHospi
 from ondoc.api.v1.procedure.serializers import CommonProcedureCategorySerializer, ProcedureInSerializer, \
     ProcedureSerializer, DoctorClinicProcedureSerializer, CommonProcedureSerializer, CommonIpdProcedureSerializer, \
     CommonHospitalSerializer, CommonCategoriesSerializer
+from ondoc.authentication.models import UserProfile
 from ondoc.cart.models import Cart
 from ondoc.crm.constants import constants
 from ondoc.diagnostic.models import LabTestCategory
@@ -23,7 +25,8 @@ from ondoc.insurance.models import UserInsurance, InsuredMembers
 from ondoc.notification import tasks as notification_tasks
 #from ondoc.doctor.models import Hospital, DoctorClinic,Doctor,  OpdAppointment
 from ondoc.doctor.models import DoctorClinic, OpdAppointment, DoctorAssociation, DoctorQualification, Doctor, Hospital, \
-    HealthInsuranceProvider, ProviderSignupLead, HospitalImage, CommonHospital, PracticeSpecialization, SpecializationDepartmentMapping, DoctorPracticeSpecialization
+    HealthInsuranceProvider, ProviderSignupLead, HospitalImage, CommonHospital, PracticeSpecialization, \
+    SpecializationDepartmentMapping, DoctorPracticeSpecialization, DoctorClinicTiming
 from ondoc.notification.models import EmailNotification
 from django.utils.safestring import mark_safe
 from ondoc.coupon.models import Coupon, CouponRecommender
@@ -235,6 +238,153 @@ class DoctorAppointmentsViewSet(OndocViewSet):
         opd_appointment_serializer = serializers.DoctorAppointmentRetrieveSerializer(opd_appointment, context={'request': request})
         return Response(opd_appointment_serializer.data)
 
+    @transaction.atomic
+    def create_new(self, request):
+        serializer = serializers.CreateAppointmentSerializer(data=request.data,
+                                                             context={'request': request, 'data': request.data,
+                                                                      'use_duplicate': True})
+        serializer.is_valid(raise_exception=True)
+        validated_data = serializer.validated_data
+        data = request.data
+        user = request.user
+
+        if data and data.get('appointment_id') and data.get('cod_to_prepaid'):
+            opd_app = OpdAppointment.objects.filter(id=data.get('appointment_id'),
+                                                    payment_type=OpdAppointment.PREPAID)
+            if opd_app:
+                return Response(status=status.HTTP_400_BAD_REQUEST,
+                                data={"error": 'Appointment already created, Cannot Rebook.',
+                                      "request_errors": {"message": 'Appointment already created, Cannot Rebook.'}})
+            pg_order = Order.objects.filter(reference_id=validated_data.get('appointment_id')).first()
+            cart_item_id = pg_order.action_data.get('cart_item_id', None)
+            price_data = OpdAppointment.get_price_details(validated_data)
+            fulfillment_data = [OpdAppointment.create_fulfillment_data(user, validated_data, price_data, cart_item_id)]
+
+            resp = {}
+            balance = 0
+            cashback_balance = 0
+
+            if validated_data.get('use_wallet'):
+                consumer_account = ConsumerAccount.objects.get_or_create(user=user)
+                consumer_account = ConsumerAccount.objects.select_for_update().get(user=user)
+                balance = consumer_account.balance
+                cashback_balance = consumer_account.cashback
+
+            total_balance = balance + cashback_balance
+            payable_amount = Order.get_total_payable_amount(fulfillment_data)
+
+            # utility to fetch and save visitor info for an parent order
+            # visitor_info = None
+            # try:
+            #     from ondoc.api.v1.tracking.views import EventCreateViewSet
+            #     with transaction.atomic():
+            #         event_api = EventCreateViewSet()
+            #         visitor_id, visit_id = event_api.get_visit(request)
+            #         visitor_info = {"visitor_id": visitor_id, "visit_id": visit_id,
+            #                         "from_app": request.data.get("from_app", None),
+            #                         "app_version": request.data.get("app_version", None)}
+            # except Exception as e:
+            #     logger.log("Could not fecth visitor info - " + str(e))
+
+            # create a Parent order to accumulate sub-orders
+            process_immediately = False
+            if validated_data.get('use_wallet') and total_balance >= payable_amount:
+                cashback_amount = min(cashback_balance, payable_amount)
+                wallet_amount = max(0, payable_amount - cashback_amount)
+                pg_order.amount=0
+                pg_order.wallet_amount=wallet_amount
+                pg_order.cashback_amount=cashback_amount
+                pg_order.payment_status=Order.PAYMENT_PENDING
+                pg_order.user=user
+                pg_order.product_id=1
+                pg_order.save()
+
+                process_immediately = True
+
+            elif validated_data.get('use_wallet') and total_balance <= payable_amount:
+                amount_from_pg = max(0, payable_amount - total_balance)
+                required_amount = payable_amount
+                cashback_amount = min(required_amount, cashback_balance)
+                wallet_amount = 0
+                if cashback_amount < required_amount:
+                    wallet_amount = min(balance, required_amount - cashback_amount)
+                pg_order.amount = amount_from_pg
+                pg_order.wallet_amount = wallet_amount
+                pg_order.cashback_amount = cashback_amount
+                pg_order.payment_status = Order.PAYMENT_PENDING
+                pg_order.user = user
+                pg_order.product_id = 1
+                pg_order.save()
+                process_immediately = False
+
+                push_order_to_matrix.apply_async(
+                    ({'order_id': pg_order.id},),
+                    eta=timezone.now() + timezone.timedelta(minutes=settings.LEAD_VALIDITY_BUFFER_TIME))
+            else:
+                amount_from_pg = payable_amount
+                cashback_amount = 0
+                wallet_amount = 0
+                pg_order.amount = amount_from_pg
+                pg_order.wallet_amount = wallet_amount
+                pg_order.cashback_amount = cashback_amount
+                pg_order.payment_status = Order.PAYMENT_PENDING
+                pg_order.user = user
+                pg_order.product_id = 1
+                pg_order.save()
+                process_immediately = False
+
+            # building separate orders for all fulfillments
+            fulfillment_data = copy.deepcopy(fulfillment_data)
+            order_list = []
+            order = None
+
+            for appointment_detail in fulfillment_data:
+
+                product_id = Order.DOCTOR_PRODUCT_ID if appointment_detail.get('doctor') else Order.LAB_PRODUCT_ID
+                action = None
+                if product_id == Order.DOCTOR_PRODUCT_ID:
+                    appointment_detail = opdappointment_transform(appointment_detail)
+                    action = Order.OPD_APPOINTMENT_CREATE
+
+                if appointment_detail.get('payment_type') == OpdAppointment.PREPAID:
+                    order = Order.objects.filter(reference_id=validated_data.get('appointment_id')).first()
+                    order.product_id = product_id
+                    order.action = action
+                    order.action_data = appointment_detail
+                    order.payment_status = Order.PAYMENT_PENDING
+                    order.user = user
+                    # order.parent = pg_order
+                    order.cart_id = cart_item_id
+                    order.save()
+                if order:
+                    order_list.append(order)
+
+            if process_immediately:
+                pg_order.refresh_from_db()
+                appointment_ids = pg_order.process_pg_order(True)
+                if appointment_ids.get('id') and price_data.get('coupon_list'):
+                    coupon_id  = price_data.get('coupon_list')[0]
+                    opd_app = OpdAppointment.objects.filter(id=appointment_ids.get('id')).first()
+                    opd_app.coupon.add(coupon_id)
+                    opd_app.save()
+
+
+                resp["status"] = 1
+                resp["payment_required"] = False
+                resp["data"] = {
+                    "orderId": pg_order.id,
+                    "type": appointment_ids.get("type", "all"),
+                    "id": appointment_ids.get("id", None)
+                }
+                resp["appointments"] = appointment_ids
+
+            else:
+                resp["status"] = 1
+                resp['data'], resp["payment_required"] = payment_details(request, pg_order)
+            return Response(resp)
+
+        return Response({})
+
 
     @transaction.atomic
     def create(self, request):
@@ -310,7 +460,8 @@ class DoctorAppointmentsViewSet(OndocViewSet):
         elif data.get('from_web') and data['from_web']:
             data['_source'] = AppointmentHistory.WEB
             responsible_user = request.user.id
-        data['_responsible_user'] = responsible_user
+        if responsible_user:
+            data['_responsible_user'] = responsible_user
 
         if validated_data.get("existing_cart_item"):
             cart_item = validated_data.get("existing_cart_item")
@@ -869,6 +1020,12 @@ class DoctorProfileUserViewSet(viewsets.GenericViewSet):
         serializer = serializers.DoctorDetailsRequestSerializer(data=request.query_params)
         serializer.is_valid(raise_exception=True)
         validated_data = serializer.validated_data
+        if validated_data.get('appointment_id') and validated_data.get('cod_to_prepaid'):
+            opd_app = OpdAppointment.objects.filter(id=validated_data.get('appointment_id'), payment_type=OpdAppointment.PREPAID)
+            if opd_app:
+                return Response(status=status.HTTP_400_BAD_REQUEST,
+                                data={"error": 'Appointment already created, Cannot Rebook.',
+                                  "request_errors": {"message": 'Appointment already created, Cannot Rebook.'}})
         response_data = []
         category_ids = validated_data.get('procedure_category_ids', None)
         procedure_ids = validated_data.get('procedure_ids', None)
@@ -1066,9 +1223,35 @@ class DoctorProfileUserViewSet(viewsets.GenericViewSet):
 
                     google_rating.update(hosp_reviews_dict)
 
+        cod_to_prepaid = dict()
+        doctor_id = None
+        if pk:
+            doctor_id = pk
+
+        if validated_data and validated_data.get('cod_to_prepaid') and validated_data.get('appointment_id') and validated_data.get('hospital_id') and doctor_id:
+            opd_appoint = OpdAppointment.objects.filter(id=validated_data['appointment_id'])
+            if opd_appoint:
+                opd_appoint = opd_appoint[0]
+                cod_to_prepaid['profile_id'] = opd_appoint.profile.id if opd_appoint.profile else None
+                cod_to_prepaid['time_slot_start'] = opd_appoint.time_slot_start
+                cod_to_prepaid['time_slot_end'] = opd_appoint.time_slot_end
+                cod_to_prepaid['user_id'] = opd_appoint.user.id if opd_appoint.user else None
+                cod_to_prepaid['fees'] = opd_appoint.fees
+                cod_to_prepaid['effective_price'] = opd_appoint.effective_price
+                cod_to_prepaid['mrp'] = opd_appoint.mrp
+                cod_to_prepaid['payment_status'] = opd_appoint.payment_status
+                cod_to_prepaid['payment_type'] = opd_appoint.payment_type
+                cod_to_prepaid['is_cod_to_prepaid'] = opd_appoint.is_cod_to_prepaid
+                cod_to_prepaid['formatted_date'] = opd_appoint.time_slot_start.date() if opd_appoint.time_slot_start else None
+                day = opd_appoint.time_slot_start.weekday()
+                doc_clinic_timing = DoctorClinicTiming.objects.filter(doctor_clinic__doctor = doctor_id, doctor_clinic__hospital=validated_data.get('hospital_id'), day = day)
+                if doc_clinic_timing:
+                    cod_to_prepaid['deal_price'] = doc_clinic_timing[0].deal_price
+
         response_data['google_rating'] = google_rating
         response_data['potential_ipd'] = potential_ipd
         response_data['all_cities'] = all_cities
+        response_data['cod_to_prepaid'] = cod_to_prepaid
         return Response(response_data)
 
 

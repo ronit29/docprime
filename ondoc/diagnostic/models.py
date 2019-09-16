@@ -264,6 +264,7 @@ class Lab(TimeStampedModel, CreatedByModel, QCModel, SearchKey, WelcomeCallingDo
     is_ipd_lab = models.BooleanField(default=False)
     related_hospital = models.ForeignKey(Hospital, null=True, blank=True, on_delete=models.SET_NULL, related_name='ipd_hospital')
     enabled_for_plus_plans = models.NullBooleanField()
+    center_visit = models.NullBooleanField()
 
     def __str__(self):
         return self.name
@@ -678,7 +679,8 @@ class Lab(TimeStampedModel, CreatedByModel, QCModel, SearchKey, WelcomeCallingDo
         res_data = {"time_slots": resp_list, "upcoming_slots": upcoming_slots, "is_thyrocare": False}
         return res_data
 
-    def get_timing_v2(self, is_home_pickup):
+    def get_timing_v2(self, is_home_pickup, total_leaves=None):
+        is_thyrocare = False
         if not is_home_pickup and self.always_open:
             lab_timing_queryset = list()
             for day in range(0, 7):
@@ -687,19 +689,39 @@ class Lab(TimeStampedModel, CreatedByModel, QCModel, SearchKey, WelcomeCallingDo
         else:
             lab_timing_queryset = self.lab_timings.filter(for_home_pickup=is_home_pickup)
 
-        global_non_bookables = GlobalNonBookable.get_non_bookables(GlobalNonBookable.LAB)
-        total_leaves = global_non_bookables
+        if not total_leaves:
+            global_non_bookables = GlobalNonBookable.get_non_bookables(GlobalNonBookable.LAB)
+            total_leaves = global_non_bookables
 
         booking_details = {"type": "lab", "is_home_pickup": is_home_pickup}
         timeslot_object = TimeSlotExtraction()
-        is_thyrocare = False
-        if self.id and settings.THYROCARE_NETWORK_ID:
-            if Lab.objects.filter(id=self.id, network_id=settings.THYROCARE_NETWORK_ID).exists():
-                is_thyrocare = True
         timeslots = timeslot_object.format_timing_to_datetime_v2(lab_timing_queryset, total_leaves, booking_details, is_thyrocare)
         upcoming_slots = timeslot_object.get_upcoming_slots(time_slots=timeslots)
         timing_response = {"time_slots": timeslots, "upcoming_slots": upcoming_slots, "is_thyrocare": is_thyrocare}
         return timing_response
+
+    def get_radiology_timing(self, test, total_leaves=None):
+        is_thyrocare = False
+        lab_test_group_timing = []
+        lab_test_group_mapping = LabTestGroupMapping.objects.filter(test=test).first()
+        if lab_test_group_mapping:
+            lab_test_group = LabTestGroup.objects.filter(id=lab_test_group_mapping.lab_test_group_id).first()
+
+            if lab_test_group:
+                lab_test_group_timing = LabTestGroupTiming.objects.filter(lab=self, lab_test_group=lab_test_group)
+
+        if not total_leaves:
+            global_non_bookables = GlobalNonBookable.get_non_bookables(GlobalNonBookable.LAB)
+            total_leaves = global_non_bookables
+
+        booking_details = {"type": "lab", "is_home_pickup": False}
+        timeslot_object = TimeSlotExtraction()
+        timeslots = timeslot_object.format_timing_to_datetime_v2(lab_test_group_timing, total_leaves, booking_details,
+                                                                 is_thyrocare)
+        upcoming_slots = timeslot_object.get_upcoming_slots(time_slots=timeslots)
+        timing_response = {"time_slots": timeslots, "upcoming_slots": upcoming_slots, "is_thyrocare": is_thyrocare}
+        return timing_response
+
 
     def get_available_slots(self, is_home_pickup, pincode, date):
         from ondoc.integrations.models import IntegratorTestMapping
@@ -717,7 +739,32 @@ class Lab(TimeStampedModel, CreatedByModel, QCModel, SearchKey, WelcomeCallingDo
                     integration_dict = None
 
         if not integration_dict:
-            available_slots = lab.get_timing(is_home_pickup)
+            available_slots = lab.get_timing_v2(is_home_pickup)
+        else:
+            class_name = integration_dict['class_name']
+            integrator_obj = service.create_integrator_obj(class_name)
+            available_slots = integrator_obj.get_appointment_slots(pincode, date,
+                                                                   is_home_pickup=is_home_pickup)
+
+        return available_slots
+
+    def get_radiology_available_slots(self, test, is_home_pickup, pincode, date):
+        from ondoc.integrations.models import IntegratorTestMapping
+        from ondoc.integrations import service
+
+        integration_dict = None
+        lab = Lab.objects.filter(id=self.id).first()
+        if lab:
+            if lab.network and lab.network.id:
+                integration_dict = IntegratorTestMapping.get_if_third_party_integration(network_id=lab.network.id)
+
+                if lab.network.id == settings.THYROCARE_NETWORK_ID and settings.THYROCARE_INTEGRATION_ENABLED:
+                    pass
+                else:
+                    integration_dict = None
+
+        if not integration_dict:
+            available_slots = lab.get_radiology_timing(test)
         else:
             class_name = integration_dict['class_name']
             integrator_obj = service.create_integrator_obj(class_name)
@@ -993,6 +1040,7 @@ class LabNetwork(TimeStampedModel, CreatedByModel, QCModel):
     remark = GenericRelation(Remark)
     auto_ivr_enabled = models.BooleanField(default=True)
     enabled_for_plus_plans = models.NullBooleanField()
+    center_visit = models.NullBooleanField()
 
     @classmethod
     def get_plus_enabled(cls):
@@ -1628,6 +1676,7 @@ class LabAppointment(TimeStampedModel, CouponsMixin, LabAppointmentInvoiceMixin,
     appointment_prescriptions = GenericRelation("prescription.AppointmentPrescription", related_query_name="appointment_prescriptions")
     hospital_reference_id = models.CharField(max_length=1000, null=True, blank=True)
     reports_physically_collected = models.NullBooleanField()
+    action_data = JSONField(blank=True, null=True)
     plus_plan = models.ForeignKey(plus_model.PlusUser, blank=True, null=True, default=None,
                                   on_delete=models.DO_NOTHING)
 
@@ -1829,18 +1878,28 @@ class LabAppointment(TimeStampedModel, CouponsMixin, LabAppointmentInvoiceMixin,
             # return []
 
         current_datetime = timezone.now()
-        if user_type == User.CONSUMER and current_datetime <= self.time_slot_start:
-            if self.status in (self.BOOKED, self.ACCEPTED, self.RESCHEDULED_LAB, self.RESCHEDULED_PATIENT):
-                allowed = [self.RESCHEDULED_PATIENT]
-                if all([x.is_cancellable for x in self.tests.all()]):
-                    allowed += [self.CANCELLED]
-        if user_type == User.DOCTOR and self.time_slot_start.date() >= current_datetime.date():
-            if self.status in [self.BOOKED, self.RESCHEDULED_PATIENT]:
-                allowed = [self.ACCEPTED, self.RESCHEDULED_LAB]
-            elif self.status == self.ACCEPTED:
-                allowed = [self.RESCHEDULED_LAB, self.COMPLETED]
-            elif self.status == self.RESCHEDULED_LAB:
-                allowed = [self.ACCEPTED]
+        first_time_slot = None
+
+        if self.time_slot_start:
+            first_time_slot = self.time_slot_start
+        # else:
+        #     first_time_slot_test = self.test_mappings.order_by('time_slot_start').first()
+        #     if first_time_slot_test:
+        #         first_time_slot = first_time_slot_test.time_slot_start
+
+        if first_time_slot:
+            if user_type == User.CONSUMER and current_datetime <= first_time_slot:
+                if self.status in (self.BOOKED, self.ACCEPTED, self.RESCHEDULED_LAB, self.RESCHEDULED_PATIENT):
+                    allowed = [self.RESCHEDULED_PATIENT]
+                    if all([x.is_cancellable for x in self.tests.all()]):
+                        allowed += [self.CANCELLED]
+            if user_type == User.DOCTOR and first_time_slot.date() >= current_datetime.date():
+                if self.status in [self.BOOKED, self.RESCHEDULED_PATIENT]:
+                    allowed = [self.ACCEPTED, self.RESCHEDULED_LAB]
+                elif self.status == self.ACCEPTED:
+                    allowed = [self.RESCHEDULED_LAB, self.COMPLETED]
+                elif self.status == self.RESCHEDULED_LAB:
+                    allowed = [self.ACCEPTED]
 
         return allowed
 
@@ -2216,12 +2275,16 @@ class LabAppointment(TimeStampedModel, CouponsMixin, LabAppointmentInvoiceMixin,
         appointment_data["status"] = appointment_status
         appointment_data["otp"] = otp
         appointment_data["user_plan_used"] = appointment_data.pop("user_plan", None)
+        appointment_data["action_data"] = dict()
+        appointment_data["action_data"]["selected_timings_type"] = appointment_data.pop('selected_timings_type', 'separate')
         lab_ids = appointment_data.pop("lab_test")
+        # test_timeslots = appointment_data.pop('test_time_slots') if appointment_data.get('test_time_slots', []) else []
         coupon_list = appointment_data.pop("coupon", None)
         coupon_data = {
             "random_coupons": appointment_data.pop("coupon_data", [])
         }
         extra_details = deepcopy(appointment_data.pop("extra_details", None))
+
         prescription_objects = deepcopy(appointment_data.pop("prescription_list", []))
         prescription_id_list = []
         for prescription in prescription_objects:
@@ -2247,6 +2310,8 @@ class LabAppointment(TimeStampedModel, CouponsMixin, LabAppointmentInvoiceMixin,
             test['computed_deal_price'] = Decimal(test['computed_deal_price']) if test['computed_deal_price'] != 'None' else None
             test['custom_agreed_price'] = Decimal(test['custom_agreed_price']) if test['custom_agreed_price'] != 'None' else None
             test['computed_agreed_price'] = Decimal(test['computed_agreed_price']) if test['computed_agreed_price'] != 'None' else None
+            # test['time_slot_start'] = test['time_slot_start'] if test['time_slot_start'] != 'None' else None
+            # test['is_home_pickup'] = test['is_home_pickup'] if test['is_home_pickup'] != 'None' else False
             test_mappings.append(LabAppointmentTestMapping(**test))
         LabAppointmentTestMapping.objects.bulk_create(test_mappings)
         app_obj.lab_test.add(*lab_ids)
@@ -2267,8 +2332,17 @@ class LabAppointment(TimeStampedModel, CouponsMixin, LabAppointmentInvoiceMixin,
         self.price = data.get('price', self.price)
         self.deal_price = data.get('deal_price', self.deal_price)
         self.effective_price = data.get('effective_price', self.effective_price)
+        if data.get('selected_timings_type'):
+            self.action_data = dict()
+            self.action_data['selected_timings_type'] = data.get('selected_timings_type', '')
 
         self.save()
+
+        if data and data.get('test_time_slots'):
+            for test_time_slot in data.get('test_time_slots'):
+                appointment_test = self.test_mappings.filter(test_id=test_time_slot.get('test_id')).first()
+                appointment_test.time_slot_start = test_time_slot.get('time_slot_start')
+                appointment_test.save()
 
     def action_accepted(self):
         self.status = self.ACCEPTED
@@ -2544,8 +2618,43 @@ class LabAppointment(TimeStampedModel, CouponsMixin, LabAppointmentInvoiceMixin,
         lab_test_queryset = AvailableLabTest.objects.filter(lab_pricing_group__labs=data["lab"], test__in=data['test_ids'])
         test_ids_list = list()
         extra_details = list()
+        time_slot_details = ''
+        test_time_slots = list()
+        is_home_pickup = False
+        pathology_home_pickup = False
+        radiology_home_pickup = False
+        time_slot_dict = dict()
+
+        # if data.get('multi_timings_enabled'):
+        #     for test_timing in data.get('test_timings'):
+        #         test_id = test_timing.get('test').id
+        #         test_data = dict()
+        #         test_data['test_id'] = test_id
+        #         time_slot_start = form_time_slot(test_timing["start_date"], test_timing["start_time"])
+        #         test_data['time_slot_start'] = time_slot_start
+        #         time_slot_dict[test_id] = time_slot_start
+        #         test_data['is_home_pickup'] = test_timing.get('is_home_pickup')
+        #         test_time_slots.append(test_data)
+        #         if test_timing.get('type') == LabTest.PATHOLOGY:
+        #             if not pathology_home_pickup:
+        #                 pathology_home_pickup = test_timing.get('is_home_pickup')
+        #         if test_timing.get('type') == LabTest.RADIOLOGY:
+        #             if not radiology_home_pickup:
+        #                 radiology_home_pickup = test_timing.get('is_home_pickup')
+        # else:
+        #     time_slot_details = form_time_slot(data["start_date"], data["start_time"])
+        #     is_home_pickup = data["is_home_pickup"]
+
+        time_slot_details = form_time_slot(data["start_date"], data["start_time"])
+        is_home_pickup = data["is_home_pickup"]
+
         for obj in lab_test_queryset:
             test_ids_list.append(obj.id)
+            home_pickup = False
+            if obj.test.test_type == LabTest.PATHOLOGY:
+                home_pickup = pathology_home_pickup
+            elif obj.test.test_type == LabTest.RADIOLOGY:
+                home_pickup = radiology_home_pickup
             extra_details.append({
                 "id": str(obj.test.id),
                 "name": str(obj.test.name),
@@ -2553,10 +2662,11 @@ class LabAppointment(TimeStampedModel, CouponsMixin, LabAppointmentInvoiceMixin,
                 "computed_deal_price": str(obj.computed_deal_price),
                 "mrp": str(obj.mrp),
                 "computed_agreed_price": str(obj.computed_agreed_price),
-                "custom_agreed_price": str(obj.custom_agreed_price)
+                "custom_agreed_price": str(obj.custom_agreed_price),
+                # "is_home_pickup": home_pickup,
+                # "time_slot_start": str(time_slot_dict.get(obj.test.id)) if time_slot_dict.get(obj.test.id) else None
             })
 
-        start_dt = form_time_slot(data["start_date"], data["start_time"])
         profile_detail = {
             "name": data["profile"].name,
             "gender": data["profile"].gender,
@@ -2589,7 +2699,7 @@ class LabAppointment(TimeStampedModel, CouponsMixin, LabAppointmentInvoiceMixin,
             else:
                 payment_type = data["payment_type"]
 
-
+        # "test_time_slots": test_time_slots,
         fulfillment_data = {
             "lab": data["lab"],
             "user": user,
@@ -2599,8 +2709,8 @@ class LabAppointment(TimeStampedModel, CouponsMixin, LabAppointmentInvoiceMixin,
             "deal_price": price_data.get("deal_price"),
             "effective_price": effective_price,
             "home_pickup_charges": price_data.get("home_pickup_charges"),
-            "time_slot_start": start_dt,
-            "is_home_pickup": data["is_home_pickup"],
+            "time_slot_start": time_slot_details,
+            "is_home_pickup": is_home_pickup,
             "profile_detail": profile_detail,
             "status": LabAppointment.BOOKED,
             "payment_type": payment_type,
@@ -2614,7 +2724,9 @@ class LabAppointment(TimeStampedModel, CouponsMixin, LabAppointmentInvoiceMixin,
             "coupon_data": price_data.get("coupon_data"),
             "prescription_list": data.get('prescription_list', []),
             "_responsible_user": data.get("_responsible_user", None),
-            "_source": data.get("_source", None)
+            "_source": data.get("_source", None),
+            "multi_timings_enabled": data.get('multi_timings_enabled'),
+            "selected_timings_type": data.get('selected_timings_type')
         }
 
         if data.get('included_in_user_plan', False):
@@ -2622,7 +2734,7 @@ class LabAppointment(TimeStampedModel, CouponsMixin, LabAppointmentInvoiceMixin,
         else:
             fulfillment_data.update({'user_plan': None})
 
-        if data.get("is_home_pickup") is True:
+        if is_home_pickup or pathology_home_pickup or radiology_home_pickup:
             address = Address.objects.filter(pk=data.get("address").id).first()
             address_serialzer = AddressSerializer(address)
             fulfillment_data.update({
@@ -3269,7 +3381,7 @@ class LabAppointmentTestMapping(models.Model):
 class LabTestGroupTiming(TimeStampedModel):
     TIME_CHOICES = LabTiming.TIME_CHOICES
 
-    lab = models.ForeignKey(Lab, on_delete=models.CASCADE, null=True, blank=True)
+    lab = models.ForeignKey(Lab, on_delete=models.CASCADE, null=True, blank=True, related_name='test_group_timings')
     lab_test_group = models.ForeignKey(LabTestGroup, on_delete=models.CASCADE, null=False)
     day = models.PositiveSmallIntegerField(blank=False, null=False,
                                            choices=[(0, "Monday"), (1, "Tuesday"), (2, "Wednesday"), (3, "Thursday"),

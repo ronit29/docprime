@@ -194,11 +194,20 @@ class Order(TimeStampedModel):
         if update_order_and_appointment:
             self.payment_type = OpdAppointment.PREPAID
             opd_obj.payment_type = OpdAppointment.PREPAID
+            effective_price = 0
+            prepaid_deal_price = self.action_data.get('prepaid_deal_price') or self.action_data.get('deal_price')
+            coupon_discount, coupon_cashback, coupon_list, random_coupon_list = Coupon.get_total_deduction(self.action_data, prepaid_deal_price)
+            if coupon_discount >= prepaid_deal_price:
+                effective_price = 0
+            else:
+                effective_price = prepaid_deal_price - coupon_discount
             # self.action_data['appointment_id'] = self.reference_id
             self.action_data['payment_type'] = OpdAppointment.PREPAID
-            self.action_data['effective_price'] = self.action_data['deal_price']
-            opd_obj.effective_price = Decimal(self.action_data['deal_price'])
+            self.action_data['effective_price'] = effective_price
+            # self.action_data['deal_price'] = prepaid_deal_price
+            opd_obj.effective_price = Decimal(effective_price)
             opd_obj.is_cod_to_prepaid = True
+            opd_obj.deal_price = prepaid_deal_price
             opd_obj.save()
         return opd_obj
 
