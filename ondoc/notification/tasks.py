@@ -36,9 +36,11 @@ logger = logging.getLogger(__name__)
 
 
 @task
-def send_lab_notifications_refactored(appointment_id):
+def send_lab_notifications_refactored(data):
     from ondoc.diagnostic import models as lab_models
     from ondoc.communications.models import LabNotification
+    appointment_id = data.get('appointment_id', None)
+    is_valid_for_provider = data.get('is_valid_for_provider', False)
     instance = lab_models.LabAppointment.objects.filter(id=appointment_id).first()
     if not instance or not instance.user:
         return
@@ -58,7 +60,7 @@ def send_lab_notifications_refactored(appointment_id):
                 is_masking_done = generate_appointment_masknumber(
                     ({'type': 'LAB_APPOINTMENT', 'appointment': instance}))
         lab_notification = LabNotification(instance)
-        lab_notification.send()
+        lab_notification.send(is_valid_for_provider)
     except Exception as e:
         logger.error(str(e))
 
@@ -157,9 +159,12 @@ def send_lab_notifications(appointment_id):
 
 
 @task()
-def send_opd_notifications_refactored(appointment_id, notification_type=None):
+def send_opd_notifications_refactored(data, notification_type=None):
     from ondoc.doctor.models import OpdAppointment
     from ondoc.communications.models import OpdNotification
+    appointment_id = data.get('appointment_id', None)
+    is_valid_for_provider = data.get('is_valid_for_provider', False)
+    notification_type = data.get('notification_type', None)
     instance = OpdAppointment.objects.filter(id=appointment_id).first()
     try:
         if not instance or not instance.user:
@@ -180,7 +185,7 @@ def send_opd_notifications_refactored(appointment_id, notification_type=None):
     except Exception as e:
         logger.error(str(e))
     opd_notification = OpdNotification(instance, notification_type)
-    opd_notification.send()
+    opd_notification.send(is_valid_for_provider)
 
 
 @task
@@ -369,12 +374,16 @@ def set_order_dummy_transaction(self, order_id, user_id):
         self.retry([order_id, user_id], countdown=300)
 
 @task
-def send_offline_appointment_message(number, text, type):
-    data = {}
-    data['phone_number'] = number
-    data['text'] = mark_safe(text)
+def send_offline_appointment_message(**kwargs):
+    from ondoc.communications.models import OfflineOpdAppointments
+    appointment = kwargs.get('appointment')
+    notification_type = kwargs.get('notification_type')
+    receivers = kwargs.get('receivers')
     try:
-        notification_models.SmsNotification.send_rating_link(data)
+        offline_opd_appointment_comm = OfflineOpdAppointments(appointment=appointment,
+                                                              notification_type=notification_type,
+                                                              receivers=receivers)
+        offline_opd_appointment_comm.send()
     except Exception as e:
         logger.error("Error sending " + str(type) + " message - " + str(e))
 
@@ -646,6 +655,27 @@ def send_insurance_notifications(self, data):
 
 
 @task(bind=True, max_retries=3)
+def send_plus_membership_notifications(self, data):
+    from ondoc.authentication import models as auth_model
+    from ondoc.communications.models import VipNotification
+    from ondoc.plus.models import PlusUser
+    try:
+        user_id = int(data.get('user_id', 0))
+        user = auth_model.User.objects.filter(id=user_id).last()
+        if not user:
+            raise Exception("Invalid user id passed for plus membership email notification. Userid %s" % str(user_id))
+
+        plus_user_obj = user.active_plus_user
+        if not plus_user_obj:
+            raise Exception("Invalid or None plus user membership found for email notification. User id %s" % str(user_id))
+
+        plus_user_notification = VipNotification(plus_user_obj, NotificationAction.PLUS_MEMBERSHIP_CONFIRMED)
+        plus_user_notification.send()
+    except Exception as e:
+        logger.error(str(e))
+
+
+@task(bind=True, max_retries=3)
 def send_insurance_endorsment_notifications(self, data):
     from ondoc.authentication import models as auth_model
     from ondoc.communications.models import InsuranceNotification
@@ -800,10 +830,13 @@ def docprime_appointment_reminder_sms_provider(appointment_id, appointment_updat
 
 
 @task()
-def offline_appointment_reminder_sms_patient(appointment_id, time_slot_start_timestamp, **kwargs):
+def offline_appointment_reminder_sms_patient(appointment_id, time_slot_start_timestamp, number):
     from ondoc.doctor.models import OfflineOPDAppointments
+    from ondoc.communications.models import SMSNotification, OfflineOpdAppointments
     try:
-        instance = OfflineOPDAppointments.objects.filter(id=appointment_id).first()
+        instance = OfflineOPDAppointments.objects.select_related('user', 'doctor', 'hospital')\
+                                                 .prefetch_related('hospital__assoc_doctors')\
+                                                 .filter(id=appointment_id).first()
         if not instance or \
                 not instance.user or \
                 math.floor(instance.time_slot_start.timestamp()) != time_slot_start_timestamp \
@@ -813,10 +846,15 @@ def offline_appointment_reminder_sms_patient(appointment_id, time_slot_start_tim
             #                                                previous_appointment_date_time,
             #                                                str(math.floor(instance.time_slot_start.timestamp()))))
             return
-        data = {}
-        data['phone_number'] = kwargs.get('number')
-        data['text'] = mark_safe(kwargs.get('text'))
-        notification_models.SmsNotification.send_rating_link(data)
+        receivers = [{"user": None, "phone_number": number}]
+        offline_opd_comm_obj = OfflineOpdAppointments(appointment=instance,
+                                                      notification_type=NotificationAction.OFFLINE_APPOINTMENT_REMINDER_PROVIDER_SMS,
+                                                      receivers=receivers)
+        offline_opd_comm_obj.send()
+        # data = {}
+        # data['phone_number'] = kwargs.get('number')
+        # data['text'] = mark_safe(kwargs.get('text'))
+        # notification_models.SmsNotification.send_rating_link(data)
     except Exception as e:
         logger.error(str(e))
 
@@ -898,7 +936,8 @@ def send_lab_reports(appointment_id):
         if not instance:
             return
         lab_notification = LabNotification(instance, NotificationAction.LAB_REPORT_SEND_VIA_CRM)
-        lab_notification.send()
+        is_valid_for_provider = True
+        lab_notification.send(is_valid_for_provider)
     except Exception as e:
         logger.error(str(e))
 
@@ -999,6 +1038,89 @@ def refund_breakup_sms_task(obj_id):
         sms_notification.send(receivers)
     except Exception as e:
         logger.error(str(e))
+
+
+@task(bind=True, max_retries=2)
+def push_plus_lead_to_matrix(self, data):
+    from ondoc.plus.models import PlusLead, PlusPlans
+    try:
+        if not data:
+            raise Exception('Data not received for banner lead.')
+
+        id = data.get('id', None)
+        if not id:
+            logger.error("[CELERY ERROR: Incorrect values provided.]")
+            raise ValueError()
+
+        plus_lead_obj = PlusLead.objects.filter(id=id).first()
+
+        if not plus_lead_obj:
+            raise Exception("Plus lead object could not found against id - " + str(id))
+
+        if plus_lead_obj.user:
+            phone_number = plus_lead_obj.user.phone_number
+        else:
+            phone_number = plus_lead_obj.phone_number
+
+        extras = plus_lead_obj.extras
+        plan_id = extras.get('plan_id', None)
+
+        lead_source = "Docprime"
+        lead_data = extras.get('lead_data')
+        if lead_data:
+            provided_lead_source = lead_data.get('source')
+            if type(provided_lead_source).__name__ == 'str' and provided_lead_source.lower() == 'docprimechat':
+                lead_source = 'docprimechat'  #TODO change
+
+        plan = None
+        if plan_id and type(plan_id).__name__ == 'int':
+            plan = PlusPlans.objects.filter(id=plan_id).first()
+
+        request_data = {
+            # 'LeadID': plus_lead_obj.matrix_lead_id if plus_lead_obj.matrix_lead_id else 0,
+            'LeadID':  0,
+            'LeadSource': lead_source,
+            'Name': extras.get('name', 'none'),
+            'BookedBy': phone_number,
+            'PrimaryNo': phone_number,
+            'PaymentStatus': 0,
+            'UtmCampaign': extras.get('utm_campaign', ''),
+            'UTMMedium': extras.get('utm_medium', ''),
+            'UtmSource': extras.get('utm_source', ''),
+            'UtmTerm': extras.get('utm_term', ''),
+            'ProductId': 11,
+            'SubProductId': 0,
+            'VIPPlanName': plan.plan_name if plan else None
+        }
+
+        url = settings.MATRIX_API_URL
+        matrix_api_token = settings.MATRIX_API_TOKEN
+        response = requests.post(url, data=json.dumps(request_data), headers={'Authorization': matrix_api_token,
+                                                                              'Content-Type': 'application/json'})
+
+        if response.status_code != status.HTTP_200_OK or not response.ok:
+            logger.error(json.dumps(request_data))
+            logger.info("[ERROR] Plus lead could not be published to the matrix system")
+            logger.info("[ERROR] %s", response.reason)
+
+            countdown_time = (2 ** self.request.retries) * 60 * 10
+            logging.error("Lead sync with the Matrix System failed with response - " + str(response.content))
+            print(countdown_time)
+            self.retry([data], countdown=countdown_time)
+        else:
+            resp_data = response.json()
+            if not resp_data:
+                raise Exception('Data received from matrix is null or empty.')
+
+            if not resp_data.get('Id', None):
+                logger.error(json.dumps(request_data))
+                raise Exception("[ERROR] Id not recieved from the matrix while pushing plus lead to matrix.")
+
+            plus_lead_qs = PlusLead.objects.filter(id=id)
+            plus_lead_qs.update(matrix_lead_id=resp_data.get('Id'))
+
+    except Exception as e:
+        logger.error("Error in Celery. Failed pushing Plus lead to the matrix- " + str(e))
 
 
 @task(bind=True, max_retries=2)
@@ -1427,3 +1549,30 @@ def purchase_order_closing_counter_automation(purchase_order_id):
     if instance:
         if (instance.end_date < timezone.now().date()):
             instance.disable_cod_functionality()
+
+
+@task(bind=True)
+def send_lensfit_coupons(self, appointment_id, product_id, notification_type=None):
+    from ondoc.account.models import Order
+    from ondoc.doctor.models import OpdAppointment
+    from ondoc.diagnostic.models import LabAppointment
+    from ondoc.coupon.models import Coupon
+    from ondoc.communications.models import OpdNotification
+    from ondoc.communications.models import LabNotification
+    try:
+        if product_id == Order.DOCTOR_PRODUCT_ID:
+            cls = OpdAppointment
+        elif product_id == Order.LAB_PRODUCT_ID:
+            cls = LabAppointment
+        appointment_obj =cls.objects.filter(pk=appointment_id).first()
+        if not appointment_obj or not appointment_obj.user:
+            return
+        if appointment_obj.status == OpdAppointment.COMPLETED:
+            lensfit_coupon = Coupon.get_lensfit_coupon()
+            if product_id == Order.DOCTOR_PRODUCT_ID:
+                notification = OpdNotification(appointment_obj, notification_type, {"lensfit_coupon": lensfit_coupon})
+            elif product_id == Order.LAB_PRODUCT_ID:
+                notification = LabNotification(appointment_obj, notification_type, {"lensfit_coupon": lensfit_coupon})
+            notification.send()
+    except Exception as e:
+        logger.error(str(e))

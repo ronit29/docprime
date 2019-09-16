@@ -2,7 +2,7 @@ from rest_framework import serializers
 from ondoc.authentication.models import (OtpVerifications, User, UserProfile, Notification, NotificationEndpoint,
                                          DoctorNumber, Address, GenericAdmin, UserSecretKey,
                                          UserPermission, Address, GenericAdmin, GenericLabAdmin, UserProfileEmailUpdate)
-from ondoc.doctor.models import DoctorMobile, ProviderSignupLead, Hospital
+from ondoc.doctor.models import DoctorMobile, ProviderSignupLead, Hospital, Doctor
 from ondoc.common.models import AppointmentHistory
 from ondoc.doctor.models import DoctorMobile
 from ondoc.insurance.models import InsuredMembers, UserInsurance
@@ -187,12 +187,13 @@ class UserProfileSerializer(serializers.ModelSerializer):
     whatsapp_optin = serializers.NullBooleanField(required=False)
     whatsapp_is_declined = serializers.BooleanField(required=False)
     is_default_user = serializers.BooleanField(required=False)
+    is_vip_member = serializers.SerializerMethodField()
 
     class Meta:
         model = UserProfile
         fields = ("id", "name", "email", "gender", "phone_number", "is_otp_verified", "is_default_user", "profile_image"
                   , "age", "user", "dob", "is_insured", "updated_at", "whatsapp_optin", "whatsapp_is_declined",
-                  "insurance_status")
+                  "insurance_status", "is_vip_member")
 
     def get_is_insured(self, obj):
         if isinstance(obj, dict):
@@ -205,6 +206,19 @@ class UserProfileSerializer(serializers.ModelSerializer):
         # user_insurance_obj = UserInsurance.objects.filter(id=insured_member_obj.user_insurance_id).last()
         user_insurance_obj = insured_member_obj.user_insurance
         if user_insurance_obj and user_insurance_obj.is_valid():
+            return True
+        else:
+            return False
+
+    def get_is_vip_member(self, obj):
+        if isinstance(obj, dict):
+            return False
+        plus_member_obj = sorted(obj.plus_member.all(), key=lambda object: object.id, reverse=True)[
+            0] if obj.plus_member.all() else None
+        if not plus_member_obj:
+            return False
+        plus_user_obj = plus_member_obj.plus_user
+        if plus_user_obj and plus_user_obj.is_valid():
             return True
         else:
             return False
@@ -600,3 +614,35 @@ class ProfileEmailUpdateProcessSerializer(serializers.Serializer):
 
         return attrs
 
+
+class ExternalLoginSerializer(serializers.Serializer):
+    phone_number = serializers.IntegerField(min_value=1000000000,max_value=9999999999)
+    name = serializers.CharField(max_length=100)
+    is_default_user = serializers.BooleanField(required=False)
+    email = serializers.EmailField(required=True, allow_null=True, allow_blank=True)
+    extra = serializers.JSONField(allow_null=True, required=False)
+    redirect_type = serializers.ChoiceField(choices=[('doctor',"Doctor"), ('lab',"Lab")])
+
+
+class MatrixUserLoginSerializer(serializers.Serializer):
+    GENDER_CHOICES = UserProfile.GENDER_CHOICES
+    name = serializers.CharField(max_length=100)
+    phone_number = serializers.IntegerField(min_value=1000000000, max_value=9999999999)
+    is_default_user = serializers.BooleanField(required=False)
+    email = serializers.EmailField()
+    dob = serializers.DateField()
+    gender = serializers.ChoiceField(choices=GENDER_CHOICES)
+    extra = serializers.JSONField(allow_null=True, required=False)
+    doctor = serializers.PrimaryKeyRelatedField(queryset=Doctor.objects.all())
+    hospital = serializers.PrimaryKeyRelatedField(queryset=Hospital.objects.all())
+
+
+# class CloudLabUserLoginSerializer(serializers.Serializer):
+#     GENDER_CHOICES = UserProfile.GENDER_CHOICES
+#     name = serializers.CharField(max_length=100)
+#     phone_number = serializers.IntegerField(min_value=1000000000, max_value=9999999999)
+#     is_default_user = serializers.BooleanField(required=False)
+#     email = serializers.EmailField()
+#     dob = serializers.DateField()
+#     gender = serializers.ChoiceField(choices=GENDER_CHOICES)
+#     extra = serializers.JSONField(allow_null=True, required=False)

@@ -6,7 +6,7 @@ import string
 import random
 from django.core.files.uploadedfile import SimpleUploadedFile, InMemoryUploadedFile
 from weasyprint.fonts import FontConfiguration
-from hardcopy import bytestring_to_pdf
+# from hardcopy import bytestring_to_pdf
 import io
 #from tempfile import NamedTemporaryFile
 from django.core.files.storage import default_storage
@@ -58,30 +58,30 @@ class PDFTester(models.Model):
     css = models.TextField(max_length=50000000, blank=True)
     file = models.FileField(upload_to='common/pdf/test', blank=True)
 
-    def save(self, *args, **kwargs):
-
-        random_string = ''.join([random.choice(string.ascii_letters + string.digits) for n in range(12)])
-        path = 'common/pdf/test/' + random_string + '.pdf'
-        fs = FileSystemStorage()
-        file = fs.open(path, 'wb')
-
-        extra_args = {
-            'virtual-time-budget': 6000
-        }
-
-        bytestring_to_pdf(self.html.encode(), file, **extra_args)
-
-        file.close()
-
-        ff = File(fs.open(path, 'rb'))
-
-        random_string = ''.join([random.choice(string.ascii_letters + string.digits) for n in range(12)])
-        name = random_string+'.pdf'
-
-        self.file = InMemoryUploadedFile(ff.file, None, 'aaa.pdf', 'application/pdf', ff.file.tell(), None)
-
-
-        super().save(*args, **kwargs)
+    # def save(self, *args, **kwargs):
+    #
+    #     random_string = ''.join([random.choice(string.ascii_letters + string.digits) for n in range(12)])
+    #     path = 'common/pdf/test/' + random_string + '.pdf'
+    #     fs = FileSystemStorage()
+    #     file = fs.open(path, 'wb')
+    #
+    #     extra_args = {
+    #         'virtual-time-budget': 6000
+    #     }
+    #
+    #     bytestring_to_pdf(self.html.encode(), file, **extra_args)
+    #
+    #     file.close()
+    #
+    #     ff = File(fs.open(path, 'rb'))
+    #
+    #     random_string = ''.join([random.choice(string.ascii_letters + string.digits) for n in range(12)])
+    #     name = random_string+'.pdf'
+    #
+    #     self.file = InMemoryUploadedFile(ff.file, None, 'aaa.pdf', 'application/pdf', ff.file.tell(), None)
+    #
+    #
+    #     super().save(*args, **kwargs)
 
 
     class Meta:
@@ -97,9 +97,10 @@ class AppointmentHistory(TimeStampedModel):
     D_WEB_URL = "d_web_url"
     D_TOKEN_URL = "d_token_url"
     IVR = "ivr"
+    API= "thyrocare_api"
     SOURCE_CHOICES = ((CONSUMER_APP, "Consumer App"), (CRM, "CRM"), (WEB, "Consumer Web"), (DOC_APP, "Doctor App"),
                       (DOC_WEB, "Provider Web"), (D_WEB_URL, "Doctor Web URL"), (D_TOKEN_URL, "Doctor Token URL"),
-                      (IVR, "Auto IVR"))
+                      (IVR, "Auto IVR"), (API, "Thyrocare API"))
 
     content_type = models.ForeignKey(ContentType, on_delete=models.DO_NOTHING)
     object_id = models.PositiveIntegerField()
@@ -337,6 +338,15 @@ class MatrixMappedState(TimeStampedModel):
         db_table = 'matrix_mapped_state'
         verbose_name_plural = "Matrix Mapped States"
 
+    def get_booking_analytics_data(self):
+        data = dict()
+
+        data['CreatedOn'] = self.updated_at
+        data['StateId'] = self.id
+        data['StateName'] = self.name
+
+        return data
+
 
     def sync_with_booking_analytics(self):
         obj = DP_StateMaster.objects.filter(StateId=self.id).first()
@@ -369,6 +379,14 @@ class MatrixMappedCity(TimeStampedModel):
         db_table = 'matrix_mapped_city'
         verbose_name_plural = "Matrix Mapped Cities"
 
+    def get_booking_analytics_data(self):
+        data = dict()
+
+        data['CreatedOn'] = self.updated_at
+        data['CityId'] = self.id
+        data['CityName'] = self.name
+
+        return data
 
     def sync_with_booking_analytics(self):
         obj = DP_CityMaster.objects.filter(CityId=self.id).first()
@@ -601,6 +619,7 @@ class BlockedStates(TimeStampedModel):
     class States(Choices):
         LOGIN = 'LOGIN'
         INSURANCE = 'INSURANCE'
+        VIP = 'VIP'
 
     state_name = models.CharField(max_length=50, null=False, blank=False, choices=States.as_choices(), unique=True)
     message = models.TextField()
@@ -787,3 +806,32 @@ class Fraud(auth_model.TimeStampedModel):
         db_table = 'fraud'
         unique_together = ('content_type', 'object_id',)
 
+
+class DocumentsProofs(auth_model.TimeStampedModel):
+
+    content_type = models.ForeignKey(ContentType, on_delete=models.DO_NOTHING, null=True)
+    object_id = models.PositiveIntegerField(null=True)
+    content_object = GenericForeignKey()
+    user = models.ForeignKey(User, null=True, on_delete=models.CASCADE)
+    proof_file = models.FileField(null=False, upload_to='document_proofs', validators=[FileExtensionValidator(allowed_extensions=['pdf', 'jpg', 'jpeg', 'png'])])
+
+    # @classmethod
+    # def prescription_exist_for_date(cls, user, date):
+    #     return cls.objects.filter(created_at__date=date, user=user, object_id__isnull=False).exists()
+
+    @classmethod
+    def update_with_object(cls, app_obj, ids):
+        content_type = ContentType.objects.get_for_model(app_obj)
+        cls.objects.filter(id__in=ids).update(content_type_id=content_type.id, object_id=app_obj.id)
+
+    @classmethod
+    def is_proof_uploaded(cls, app_obj):
+        content_type = ContentType.objects.get_for_model(app_obj)
+        document_proofs = cls.objects.filter(content_type_id=content_type.id, object_id=app_obj.id)
+        if document_proofs:
+            return True
+        else:
+            return False
+
+    class Meta:
+        db_table = 'document_proofs'

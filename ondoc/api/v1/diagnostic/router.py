@@ -2,7 +2,8 @@ from django.urls import path
 from .views import (LabTestList, LabList, LabAppointmentView, SearchPageViewSet, LabTimingListView,
                     AvailableTestViewSet, LabReportFileViewset, DoctorLabAppointmentsViewSet,
                     DoctorLabAppointmentsNoAuthViewSet, TestDetailsViewset, LabTestCategoryListViewSet,
-                    CompareLabPackagesViewSet, DigitalReports, LabTestCategoryLandingUrlViewSet)
+                    CompareLabPackagesViewSet, DigitalReports, LabTestCategoryLandingUrlViewSet,
+                    IPDMedicinePageLeadViewSet, AllMatrixCitiesViewSet)
 
 # from rest_framework.routers import DefaultRouter
 #
@@ -45,6 +46,8 @@ urlpatterns = [
          name='lab-timing-new'),
     path('labtiming_v2', LabTimingListView.as_view({'get': 'list_v2'}),
          name='lab-timing-v2'),
+    path('labtiming_v3', LabTimingListView.as_view({'get': 'list_v3'}),
+         name='lab-timing-v3'),
     path('labtest/<int:lab_id>', AvailableTestViewSet.as_view({'get': 'retrieve'}),
          name='lab-available-test'),
     path('lab-report-file', LabReportFileViewset.as_view({'get': 'list'}), name='lab-upload-list'),
@@ -61,4 +64,6 @@ urlpatterns = [
     path('compare_lab_packages_by_url', CompareLabPackagesViewSet.as_view({'post': 'retrieve_by_url'}), name='lab_packages_comparison_by_url'),
     # path('digital/report/<int:booking_id>', DigitalReports.as_view({'get': 'retrieve'}), name='digital_report'),
     path('lab-test-category-landing-urls', LabTestCategoryLandingUrlViewSet.as_view({'get': 'category_landing_url'}), name='lab_test_category_landing_urls'),
+    path('ipdmedicinepagelead', IPDMedicinePageLeadViewSet.as_view({'post': 'store'}), name='ipd_medicine_page_lead'),
+    path('allmatrixcities', AllMatrixCitiesViewSet.as_view({'get': 'retrieve'}), name='get_all_cities'),
 ]

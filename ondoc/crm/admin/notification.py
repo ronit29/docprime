@@ -29,6 +29,8 @@ class DynamicTemplateForm(forms.ModelForm):
 
     subject = forms.CharField(required=False)
     recipient = forms.CharField(required=False, help_text="Email address or mobile number according to the template type.")
+    cc = forms.CharField(max_length=512, required=False, help_text="Email which needs to be in the cc. Please provide comma (,) seperated emails.")
+    bcc = forms.CharField(max_length=512, required=False, help_text="Email which needs to be in the bcc. Please provide comma (,) seperated emails.")
 
     def clean(self):
         super().clean()
@@ -50,10 +52,19 @@ class DynamicTemplateForm(forms.ModelForm):
                     raise forms.ValidationError("Invalid recipient Number")
 
             elif cleaned_data.get('template_type') == DynamicTemplates.TemplateType.EMAIL:
+                emails_list = []
+                if cleaned_data.get('cc'):
+                    emails_list.extend(cleaned_data.get('cc').split(','))
+                if cleaned_data.get('bcc'):
+                    emails_list.extend(cleaned_data.get('bcc').split(','))
+
+                emails_list.append(recipient_address)
+
                 try:
-                    validate_email(recipient_address)
+                    for email in emails_list:
+                        validate_email(email)
                 except ValidationError as e:
-                    raise forms.ValidationError('Invalid recipient address.')
+                    raise forms.ValidationError('Invalid email address in recipient or cc or bcc.')
 
         return cleaned_data
 
@@ -62,7 +73,7 @@ class DynamicTemplatesAdmin(VersionAdmin):
     form = DynamicTemplateForm
     model = DynamicTemplates
     list_display = ('template_type', 'template_name', 'preview_url')
-    fields = ('template_type', 'subject', 'template_name', 'content', 'sample_parameters', 'recipient', 'approved')
+    fields = ('template_type', 'subject', 'template_name', 'content', 'sample_parameters', 'recipient', 'cc', 'bcc', 'approved')
 
     def save_model(self, request, obj, form, change):
         responsible_user = request.user

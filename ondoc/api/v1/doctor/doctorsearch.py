@@ -1,5 +1,4 @@
 import operator
-from pyodbc import Date
 
 from django.contrib.gis.geos import Point
 from django.utils import timezone
@@ -97,7 +96,7 @@ class DoctorSearchHelper:
         counter=1
         spec_filter_str = ''
         if len(specialization_filter_ids) > 0 and len(procedure_ids)==0 and len(procedure_category_ids)==0:
-            spec_filter_str = 'and d.id in (select doctor_id from doctor_practice_specialization where specialization_id IN('
+            spec_filter_str = ' d.id in (select doctor_id from doctor_practice_specialization where specialization_id IN('
             for id in specialization_filter_ids:
 
                 if not counter == 1:
@@ -204,7 +203,7 @@ class DoctorSearchHelper:
         if self.query_params.get('availability'):
             aval_query = "( "
             availability = self.query_params.get('availability')
-            today = Date.today().weekday()
+            today = datetime.now().weekday()
             currentDT = timezone.now()
             today_time = aware_time_zone(currentDT).strftime("%H.%M")
             avail_days =list(map(int, availability))
@@ -263,9 +262,9 @@ class DoctorSearchHelper:
             #         )
             # params['doctor_name'] = '%'+search_key+'%'
             params['order_doctor'] = search_key
-            params['doctor_name1'] = search_key + ' %'
-            params['doctor_name2'] = '% ' + search_key + ' %'
-            params['doctor_name3'] = '% ' + search_key
+            params['doctor_name1'] = search_key + '%'
+            params['doctor_name2'] = '%' + search_key + '%'
+            params['doctor_name3'] = '%' + search_key
 
         if self.query_params.get('gender'):
             filtering_params.append("d.gender=(%(gender)s)")
@@ -286,14 +285,14 @@ class DoctorSearchHelper:
             params['insurance_threshold_amount'] = self.query_params.get('insurance_threshold_amount')
 
         result = {}
-        if not filtering_params:
+        if not filtering_params and not spec_filter_str:
             result['string'] = "1=1"
             result['params'] = params
             return result
-
-        result['string'] = " and ".join(filtering_params)
+        if filtering_params:
+            result['string'] = " and ".join(filtering_params)
         if spec_filter_str:
-            result['string'] = result.get('string') + spec_filter_str
+            result['string'] = result.get('string') + ' and ' + spec_filter_str if result.get('string') else spec_filter_str
         result['params'] = params
         if len(procedure_ids) > 0:
             result['count_of_procedure'] = len(procedure_ids)
@@ -350,7 +349,11 @@ class DoctorSearchHelper:
                     order_by_field = " distance ASC, deal_price ASC, priority desc "
                     rank_by = " rnk=1 "
             else:
-                order_by_field = ' welcome_calling_done DESC, floor(distance/{bucket_size}) ASC, is_license_verified DESC, search_score desc '.format(bucket_size=str(bucket_size))
+                if self.query_params.get("specialization_ids") and len(self.query_params.get("specialization_ids")) == 1:
+                    order_by_field = ' welcome_calling_done DESC, floor(distance/bucket_size) ASC, is_license_verified DESC, search_score desc '
+
+                else:
+                    order_by_field = ' welcome_calling_done DESC, floor(distance/{bucket_size}) ASC, is_license_verified DESC, search_score desc '.format(bucket_size=str(bucket_size))
                 rank_by = "rnk=1"
 
             order_by_field = "{}, {} ".format(' enabled_for_online_booking DESC ', order_by_field)
@@ -439,10 +442,13 @@ class DoctorSearchHelper:
             sp_cond = ''
             min_dist_cond = ''
             search_distance =''
+            bucket_query = ''
             rank_part = " Row_number() OVER( partition BY d.id  ORDER BY " \
                 "St_distance(St_setsrid(St_point((%(longitude)s), (%(latitude)s)), 4326 ), h.location),dct.deal_price ASC) rnk " \
 
             if len(specialization_ids)>0 or len(condition_ids)>0:
+                if len(specialization_ids) == 1:
+                    bucket_query = ' , gs.bucket_size as bucket_size '
                 sp_cond = " LEFT JOIN doctor_practice_specialization ds on ds.doctor_id = d.id " \
                        " LEFT JOIN practice_specialization gs on ds.specialization_id = gs.id "
 
@@ -478,7 +484,8 @@ class DoctorSearchHelper:
                            "dct.id as doctor_clinic_timing_id,practicing_since, " \
                            "d.enabled_for_online_booking and dc.enabled_for_online_booking and h.enabled_for_online_booking as enabled_for_online_booking, " \
                            "is_license_verified, dc.priority,deal_price, h.welcome_calling_done, " \
-                           "dc.hospital_id as hospital_id, d.search_score FROM doctor d " \
+                           "dc.hospital_id as hospital_id, d.search_score " \
+                           "{bucket_query} FROM doctor d " \
                            "INNER JOIN doctor_clinic dc ON d.id = dc.doctor_id and dc.enabled=true and d.is_live=true " \
                            "and d.is_test_doctor is False and d.is_internal is False " \
                            "INNER JOIN hospital h ON h.id = dc.hospital_id and h.is_live=true " \
@@ -496,7 +503,8 @@ class DoctorSearchHelper:
                                                                                   'string'), search_distance=search_distance,\
                                                                               min_dist_cond=min_dist_cond,
                                                                               order_by_field=order_by_field, \
-                                                                              rank_by=rank_by, ipd_query=ipd_query)
+                                                                              rank_by=rank_by, ipd_query=ipd_query,
+                                                                              bucket_query=bucket_query)
 
         if filtering_params.get('params'):
             filtering_params.get('params')['longitude'] = longitude
@@ -610,6 +618,11 @@ class DoctorSearchHelper:
 
                 is_insurance_covered = False
                 insurance_error = None
+                vip_data_dict = kwargs.get('vip_data')
+                is_vip_member = vip_data_dict.get('is_vip_member', False)
+                vip_remaining_amount = int(vip_data_dict.get('vip_remaining_amount', 0))
+                vip_amount = 0
+                cover_under_vip = vip_data_dict.get('cover_under_vip', False)
                 insurance_data_dict = kwargs.get('insurance_data')
                 if doctor_clinic.hospital.enabled_for_prepaid and doctor_clinic.hospital.enabled_for_insurance and enable_online_booking and doctor.is_insurance_enabled and doctor.is_doctor_specialization_insured() and insurance_data_dict and min_price.get("mrp") is not None and \
                         min_price["mrp"] <= insurance_data_dict['insurance_threshold_amount'] and \
@@ -629,10 +642,21 @@ class DoctorSearchHelper:
                 else:
                     is_insurance_covered = False
                     insurance_error = "You have already utilised {} Oncologist consultations available in your OPD Insurance Plan.".format(settings.INSURANCE_ONCOLOGIST_LIMIT)
+
+                if request and request.user and not request.user.is_anonymous and vip_data_dict.get('is_vip_member') and \
+                        doctor.enabled_for_plus_plans and doctor_clinic.hospital.enabled_for_prepaid and \
+                        doctor.enabled_for_online_booking and doctor_clinic.hospital.enabled_for_online_booking and \
+                        doctor_clinic.enabled_for_online_booking:
+                    mrp = int(min_price.get('mrp'))
+                    cover_under_vip = True if vip_remaining_amount > 0 else False
+                    vip_amount = 0 if vip_remaining_amount > mrp else mrp - vip_remaining_amount
                 hospitals = [{
                     "enabled_for_online_booking": enable_online_booking,
                     "is_insurance_covered": is_insurance_covered,
                     "insurance_limit_message": insurance_error,
+                    "is_vip_member": is_vip_member,
+                    "cover_under_vip": cover_under_vip,
+                    "vip_amount": vip_amount,
                     "insurance_threshold_amount": insurance_data_dict['insurance_threshold_amount'],
                     "is_user_insured": insurance_data_dict['is_user_insured'],
                     "welcome_calling_done": doctor_clinic.hospital.welcome_calling_done,
@@ -846,6 +870,7 @@ class DoctorSearchHelper:
                     "name": doctor_clinic.hospital.name,
                     "priceRange": min_price["deal_price"],
                     "image": doctor_clinic.hospital.get_thumbnail() if doctor_clinic.hospital.get_thumbnail() else None,
+                    "url": kwargs.get('hosp_entity_dict', {}).get(doctor_clinic.hospital.id),
                     "address":
                         {
                             "@type": 'PostalAddress',

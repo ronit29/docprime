@@ -69,27 +69,31 @@ FILE_UPLOAD_PERMISSIONS = 0o664
 # Database
 # https://docs.djangoproject.com/en/2.0/ref/settings/#databases
 
-
+DATABASE_ROUTERS = ['config.settings.db_router.DatabaseRouter']
 DATABASES = {
-    'default': env.db('DATABASE_URL')
+    'default': env.db('DATABASE_URL'),
 }
 
 DATABASES['default']['ENGINE'] = 'django.contrib.gis.db.backends.postgis'
+# if (env('DJANGO_SETTINGS_MODULE') == 'config.settings.production'):
+#     DATABASES['doc_read'] = env.db('READ_DATABASE_URL')
+#     DATABASES['doc_read']['ENGINE'] = 'django.contrib.gis.db.backends.postgis'
 
-try:
-    if env('MSSQL_HOST') and env('MSSQL_USERNAME') and env('MSSQL_PASSWORD'):
-        DATABASES['sql_server'] = {
-             'ENGINE': 'sql_server.pyodbc',
-             'HOST': env('MSSQL_HOST'),
-             'USER': env('MSSQL_USERNAME'),
-             'PASSWORD': env('MSSQL_PASSWORD'),
-             'NAME': env('MSSQL_DB'),
-             'OPTIONS': {
-                  'driver' : 'ODBC Driver 17 for SQL Server'
-            }
-        }
-except Exception as e:
-    print(str(e))
+# try:
+#     if env('MSSQL_HOST') and env('MSSQL_USERNAME') and env('MSSQL_PASSWORD'):
+#         DATABASES['sql_server'] = {
+#              'ENGINE': 'sql_server.pyodbc',
+#              'HOST': env('MSSQL_HOST'),
+#              'USER': env('MSSQL_USERNAME'),
+#              'PASSWORD': env('MSSQL_PASSWORD'),
+#              'NAME': env('MSSQL_DB'),
+#              'OPTIONS': {
+#                   'driver' : 'ODBC Driver 17 for SQL Server'
+#             }
+#         }
+# except Exception as e:
+#     print(str(e))
+
 
 
 
@@ -107,9 +111,6 @@ except Exception as e:
     print(e)
     print('Failed to connect to mongo')
     MONGO_STORE = False
-
-
-DATABASE_ROUTERS = ['config.settings.db_router.DatabaseRouter']
 
 # Application definition
 
@@ -188,6 +189,8 @@ LOCAL_APPS = (
     'ondoc.bookinganalytics',
     'ondoc.prescription',
     'ondoc.corporate_booking',
+    'ondoc.plus',
+    'ondoc.provider',
 )
 
 INSTALLED_APPS = DJANGO_APPS + THIRD_PARTY_APPS + LOCAL_APPS
@@ -410,6 +413,7 @@ NO_OF_WEEKS_FOR_TIME_SLOTS=env('NO_OF_WEEKS_FOR_TIME_SLOTS')
 THYROCARE_INTEGRATION_ENABLED= env.bool('THYROCARE_INTEGRATION_ENABLED')
 ORDER_SUMMARY_CRON_TIME = env('ORDER_SUMMARY_CRON_TIME')
 THYROCARE_REPORT_CRON_TIME = env('THYROCARE_REPORT_CRON_TIME')
+COUNT_DOWN_FOR_REMINDER=env('COUNT_DOWN_FOR_REMINDER')
 
 NODAL_BENEFICIARY_API=env('NODAL_BENEFICIARY_API')
 NODAL_BENEFICIARY_TOKEN=env('NODAL_BENEFICIARY_TOKEN')
@@ -420,6 +424,7 @@ SETTLEMENT_DETAILS_API=env('SETTLEMENT_DETAILS_API', default=None)
 SETTLEMENT_AUTH=env('SETTLEMENT_AUTH', default=None)
 THYROCARE_NAME_PARAM_REQUIRED_TESTS = env('THYROCARE_NAME_PARAM_REQUIRED_TESTS', default='')
 IS_INSURANCE_ACTIVE = env.bool('IS_INSURANCE_ACTIVE')
+IS_PLUS_ACTIVE = env.bool('IS_PLUS_ACTIVE')
 
 
 ANYMAIL = {
@@ -501,4 +506,25 @@ LEAD_VALIDITY_BUFFER_TIME = env.int('LEAD_VALIDITY_BUFFER_TIME', default=10)  # 
 LEAD_AND_APPOINTMENT_BUFFER_TIME = env.int('LEAD_AND_APPOINTMENT_BUFFER_TIME', default=10)  # In mins
 MEDICINE_TOP_SPECIALIZATIONS = env.list('MEDICINE_TOP_SPECIALIZATIONS')
 MEDICINE_TOP_TESTS = env.list('MEDICINE_TOP_TESTS')
+
+ROCKETCHAT_SERVER = env('ROCKETCHAT_SERVER')
+ROCKETCHAT_SUPERUSER = env('ROCKETCHAT_SUPERUSER')
+ROCKETCHAT_PASSWORD = env('ROCKETCHAT_PASSWORD')
+JITSI_SERVER = env('JITSI_SERVER')
 CHAT_AUTH_TOKEN=env('CHAT_AUTH_TOKEN')
+BAJAJ_ALLIANZ_AUTH_TOKEN=env('BAJAJ_ALLIANZ_AUTH_TOKEN')
+MATRIX_USER_AUTH_TOKEN=env('MATRIX_USER_AUTH_TOKEN')
+ODBC_BASE_URL=env('ODBC_BASE_URL')
+LAL_PATH_BASE_URL=env('LAL_PATH_BASE_URL')
+LAL_PATH_USERNAME=env('LAL_PATH_USERNAME')
+LAL_PATH_PASSWORD=env('LAL_PATH_PASSWORD')
+LAL_PATH_DATA_API_KEY=env('LAL_PATH_DATA_API_KEY')
+SIMS_BASE_URL = env('SIMS_BASE_URL')
+MEDANTA_DOCTOR_LIST_URL=env('MEDANTA_DOCTOR_LIST_URL')
+MEDANTA_DOCTOR_LIST_USER_HEADER=env('MEDANTA_DOCTOR_LIST_USER_HEADER')
+MEDANTA_DOCTOR_LIST_USER_VALUE=env('MEDANTA_DOCTOR_LIST_USER_VALUE')
+MEDANTA_DOCTOR_LIST_PASSWORD_HEADER=env('MEDANTA_DOCTOR_LIST_PASSWORD_HEADER')
+MEDANTA_DOCTOR_LIST_PASSWORD_VALUE=env('MEDANTA_DOCTOR_LIST_PASSWORD_VALUE')
+ECS_COMM_API_KEY=env('ECS_COMM_API_KEY')
+LENSFIT_COUPONS=env.list('LENSFIT_COUPONS')
+CARE_PLAN_FOR_VIP=env('CARE_PLAN_FOR_VIP')

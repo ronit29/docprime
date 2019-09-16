@@ -51,7 +51,9 @@ from ondoc.doctor.models import (Doctor, DoctorQualification,
                                  GoogleDetailing, VisitReason, VisitReasonMapping, PracticeSpecializationContent,
                                  PatientMobile, DoctorMobileOtp,
                                  UploadDoctorData, CancellationReason, Prescription, PrescriptionFile,
-                                 SimilarSpecializationGroup, SimilarSpecializationGroupMapping, PurchaseOrderCreation)
+                                 SimilarSpecializationGroup, SimilarSpecializationGroupMapping, PurchaseOrderCreation,
+                                 DoctorSponsoredServices, SponsoredServicePracticeSpecialization, SponsoredServices,
+                                 HospitalSponsoredServices)
 
 from ondoc.authentication.models import User
 from .common import *
@@ -1099,6 +1101,14 @@ class CompetitorMonthlyVisitsInline(ReadOnlyInline):
     verbose_name_plural = 'Monthly Visits through Competitor Info'
 
 
+class DoctorSponsoredServicesInline(nested_admin.NestedTabularInline):
+    model = DoctorSponsoredServices
+    extra = 0
+    can_delete = True
+    show_change_link = True
+    fields = ['sponsored_service', ]
+
+
 class DoctorAdmin(AutoComplete, ImportExportMixin, CompareVersionAdmin, ActionAdmin, QCPemAdmin, nested_admin.NestedModelAdmin):
     # class DoctorAdmin(nested_admin.NestedModelAdmin):
     resource_class = DoctorResource
@@ -1171,7 +1181,8 @@ class DoctorAdmin(AutoComplete, ImportExportMixin, CompareVersionAdmin, ActionAd
         DoctorDocumentInline,
         GenericAdminInline,
         AssociatedMerchantInline,
-        RemarkInline
+        RemarkInline,
+        DoctorSponsoredServicesInline
     ]
 
     search_fields = ['name']
@@ -1564,7 +1575,14 @@ class DoctorOpdAppointmentForm(RefundableAppointmentForm):
                     raise forms.ValidationError("Can not send credit letter for COD bookings.")
                 else:
                     try:
-                        notification_tasks.send_opd_notifications_refactored.apply_async((self.instance.id, NotificationAction.APPOINTMENT_ACCEPTED), countdown=1)
+                        # notification_tasks.send_opd_notifications_refactored.apply_async((self.instance.id, NotificationAction.APPOINTMENT_ACCEPTED), countdown=1)
+
+                        # For stopping created to cancelled notification to provider
+                        sent_to_provider = True
+                        notification_tasks.send_opd_notifications_refactored.apply_async(({'appointment_id': self.instance.id,
+                                                                                           'is_valid_for_provider': sent_to_provider,
+                                                                                           'notification_type': NotificationAction.APPOINTMENT_ACCEPTED},),
+                                                                                            countdown=1)
                     except Exception as e:
                         logger.error(str(e))
 
@@ -2058,7 +2076,13 @@ class DoctorOpdAppointmentAdmin(ExportMixin, CompareVersionAdmin):
                 obj.action_completed()
             send_cod_to_prepaid_request = form.cleaned_data.get('send_cod_to_prepaid_request', False)
             if send_cod_to_prepaid_request:
-                notification_tasks.send_opd_notifications_refactored.apply_async((obj.id, NotificationAction.COD_TO_PREPAID_REQUEST), countdown=5)
+                # notification_tasks.send_opd_notifications_refactored.apply_async((obj.id, NotificationAction.COD_TO_PREPAID_REQUEST), countdown=5)
+
+                # Change to fix created to cancelled notification to provider
+                notification_tasks.send_opd_notifications_refactored.apply_async(({'appointment_id': obj.id,
+                                                                                   'is_valid_for_provider': True,
+                                                                                   'notification_type': NotificationAction.COD_TO_PREPAID_REQUEST},),
+                                                                                 countdown=1)
             if form and form.cleaned_data and form.cleaned_data.get('refund_payment', False):
                 obj._refund_reason = form.cleaned_data.get('refund_reason', '')
                 obj.action_refund()
@@ -2294,7 +2318,6 @@ class PracticeSpecializationDepartmentMappingInline(admin.TabularInline):
     show_change_link = False
 
 
-
 class PracticeSpecializationAdmin(AutoComplete, ImportExportMixin, VersionAdmin):
     formats = (base_formats.XLS, base_formats.XLSX,)
     list_display = ('name', )
@@ -2412,6 +2435,17 @@ class SimilarSpecializationGroupAdmin(VersionAdmin):
     list_display = ['id', 'name']
 
 
+class DoctorClinicAdmin(VersionAdmin):
+    list_display = ('doctor', 'hospital', 'updated_at')
+    date_hierarchy = 'created_at'
+    search_fields = ['doctor__name', 'hospital__name']
+    autocomplete_fields = ['doctor', 'hospital']
+    inlines = [DoctorClinicTimingInline]
+
+    def get_queryset(self, request):
+        return super(DoctorClinicAdmin, self).get_queryset(request).select_related('doctor', 'hospital')
+
+
 class PurchaseOrderCreationForm(forms.ModelForm):
     def clean(self):
         cleaned_data = self.cleaned_data
@@ -2437,7 +2471,7 @@ class PurchaseOrderCreationForm(forms.ModelForm):
 class PurchaseOrderCreationAdmin(admin.ModelAdmin):
     model = PurchaseOrderCreation
     form = PurchaseOrderCreationForm
-    list_display = ['provider_type', 'start_date', 'end_date', 'provider_name_lab', 'provider_name_hospital', 'total_appointment_count',
+    list_display = ['provider_type', 'created_at', 'start_date', 'end_date', 'provider_name_hospital', 'total_appointment_count',
                     'appointment_booked_count', 'current_appointment_count']
     autocomplete_fields = ['provider_name_lab', 'provider_name_hospital']
     search_fields = ['provider_name_lab__name', 'provider_name_hospital__name']
@@ -2446,7 +2480,83 @@ class PurchaseOrderCreationAdmin(admin.ModelAdmin):
     def get_readonly_fields(self, request, obj=None):
         read_only_fields = ['provider_name', 'appointment_booked_count', 'current_appointment_count']
         if obj and obj.id:
-            read_only_fields += ['start_date', 'end_date', 'total_appointment_count', 'provider_name_hospital', 'total_amount_paid', 'gst_number',
+            read_only_fields += ['total_appointment_count', 'provider_name_hospital', 'total_amount_paid', 'gst_number',
                                  'provider_type', 'product_type']
 
+        if obj and obj.id and obj.start_date != None:
+            read_only_fields += ['start_date']
+
+        if obj and obj.id and obj.end_date != None:
+            read_only_fields += ['end_date']
+
         return read_only_fields
+
+
+class SponsoredServicePracticeSpecializationFormSet(forms.BaseInlineFormSet):
+    def clean(self):
+        super().clean()
+        if any(self.errors):
+            return
+        is_primary_spec = False
+        if self.cleaned_data:
+            for value in self.cleaned_data:
+                if value.get('is_primary_specialization') and not is_primary_spec:
+                    is_primary_spec = True
+                elif value.get('is_primary_specialization') and is_primary_spec:
+                    raise forms.ValidationError("Only one Specialization can be marked as Primary")
+
+            if not is_primary_spec:
+                raise forms.ValidationError('Alteast one sponsored service should be marked as primary')
+
+
+class SponsoredServicePracticeSpecializationInline(admin.TabularInline):
+    model = SponsoredServicePracticeSpecialization
+    formset = SponsoredServicePracticeSpecializationFormSet
+    extra = 0
+    can_delete = True
+    show_change_link = True
+    fields = ['sponsored_service', 'specialization', 'is_primary_specialization']
+
+
+class SponsoredServicesResource(resources.ModelResource):
+    class Meta:
+        model = SponsoredServices
+        fields = ('id', 'name')
+        export_order = ('id', 'name')
+
+
+class SponsoredServicesAdmin(ImportExportMixin, admin.ModelAdmin):
+    search_fields = ['name']
+    formats = (base_formats.XLS, base_formats.XLSX,)
+    inlines = [ SponsoredServicePracticeSpecializationInline ]
+    resource_class = SponsoredServicesResource
+
+
+class HospitalSponsoredServicesAdminResource(resources.ModelResource):
+    class Meta:
+        model = HospitalSponsoredServices
+        fields = ('id', 'hospital', 'sponsored_service')
+        export_order = ('id', 'hospital', 'sponsored_service')
+
+
+class HospitalSponsoredServicesAdmin(ImportExportMixin, admin.ModelAdmin):
+    search_fields = ['hospital']
+    list_display = ['hospital', 'sponsored_service']
+    formats = (base_formats.XLS, base_formats.XLSX,)
+    resource_class = HospitalSponsoredServicesAdminResource
+
+
+class DoctorSponsoredServicesResource(resources.ModelResource):
+
+    class Meta:
+        model = DoctorSponsoredServices
+        fields = ('id', 'doctor', 'sponsored_service')
+        export_order = ('id', 'doctor', 'sponsored_service')
+
+
+class DoctorSponsoredServicesAdmin(ImportExportMixin, admin.ModelAdmin):
+    search_fields = ['doctor']
+    list_display = ['doctor', 'sponsored_service']
+    formats = (base_formats.XLS, base_formats.XLSX,)
+    resource_class = DoctorSponsoredServicesResource
+

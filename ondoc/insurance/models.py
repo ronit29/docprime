@@ -29,11 +29,11 @@ from django.core.files.uploadedfile import TemporaryUploadedFile
 from datetime import timedelta
 from django.utils import timezone
 from django.conf import settings
-from ondoc.api.v1.utils import RawSql, aware_time_zone
+from ondoc.api.v1.utils import RawSql, aware_time_zone, html_to_pdf
 from django.core.files.uploadedfile import InMemoryUploadedFile
 from django.template.loader import render_to_string
 from num2words import num2words
-from hardcopy import bytestring_to_pdf
+# from hardcopy import bytestring_to_pdf
 import math
 import reversion
 import numbers
@@ -962,18 +962,20 @@ class UserInsurance(auth_model.TimeStampedModel, MerchantPayoutMixin):
         policy_number = self.policy_number
         certificate_number = policy_number.split('/')[-1]
         filename = "{}.pdf".format(str(certificate_number))
+        #
+        # extra_args = {
+        #     'virtual-time-budget': 6000
+        # }
+        # file = TemporaryUploadedFile(filename, 'byte', 1000, 'utf-8')
+        # f = open(file.temporary_file_path())
+        # bytestring_to_pdf(html_body.encode(), f, **extra_args)
+        # f.seek(0)
+        # f.flush()
+        # f.content_type = 'application/pdf'
+        #
+        # self.coi = InMemoryUploadedFile(file, None, filename, 'application/pdf', file.tell(), None)
+        self.coi = html_to_pdf(html_body, filename)
 
-        extra_args = {
-            'virtual-time-budget': 6000
-        }
-        file = TemporaryUploadedFile(filename, 'byte', 1000, 'utf-8')
-        f = open(file.temporary_file_path())
-        bytestring_to_pdf(html_body.encode(), f, **extra_args)
-        f.seek(0)
-        f.flush()
-        f.content_type = 'application/pdf'
-
-        self.coi = InMemoryUploadedFile(file, None, filename, 'application/pdf', file.tell(), None)
         self.save()
 
 
@@ -1223,12 +1225,40 @@ class UserInsurance(auth_model.TimeStampedModel, MerchantPayoutMixin):
         profile = appointment_data.get('profile', None)
         user = profile.user
         user_insurance = UserInsurance.get_user_insurance(user)
-        if not user_insurance or not user_insurance.is_valid() or \
-                not user_insurance.is_appointment_valid(appointment_data['start_date']):
+        if not user_insurance or not user_insurance.is_valid():
             response_dict['insurance_message'] = 'Not covered under insurance'
             return response_dict
         else:
-            response_dict['insurance_id'] = user_insurance.id
+            if appointment_data.get('multi_timings_enabled'):
+                if appointment_data.get('selected_timings_type') == 'separate':
+                    if appointment_data.get('test_timings'):
+                        for test_timing in appointment_data.get('test_timings'):
+                            start_date = test_timing.get('start_date')
+                            if not user_insurance.is_appointment_valid(start_date):
+                                response_dict['insurance_message'] = 'Date Not covered under insurance'
+                                return response_dict
+                        response_dict['insurance_id'] = user_insurance.id
+                    else:
+                        response_dict['insurance_message'] = 'Bad Time Request'
+                        return response_dict
+                else:  # common
+                    if appointment_data.get('test_timings'):
+                        test_timing = appointment_data.get('test_timings')[0]
+                        start_date = test_timing.get('start_date')
+                        if not user_insurance.is_appointment_valid(start_date):
+                            response_dict['insurance_message'] = 'Not covered under insurance'
+                            return response_dict
+                        else:
+                            response_dict['insurance_id'] = user_insurance.id
+                    else:
+                        response_dict['insurance_message'] = 'Bad Time Request'
+                        return response_dict
+            else:
+                if not user_insurance.is_appointment_valid(appointment_data['start_date']):
+                    response_dict['insurance_message'] = 'Not covered under insurance'
+                    return response_dict
+                else:
+                    response_dict['insurance_id'] = user_insurance.id
 
         insured_members = user_insurance.members.all().filter(profile=profile)
         if not insured_members.exists():

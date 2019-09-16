@@ -27,6 +27,20 @@ urlpatterns = [
     path('invoice/create', views.PartnersAppInvoice.as_view({'post': 'create'}), name='create-invoice'),
     path('invoice/update', views.PartnersAppInvoice.as_view({'post': 'update'}), name='update-invoice'),
     path('invoice/<str:encoded_filename>', views.PartnersAppInvoicePDF.as_view({'get': 'download_pdf'}), name='invoice-pdf'),
+    path('ecs/create', views.PartnerEConsultationViewSet.as_view({'post': 'create'}), name='ecs_create'),
+    path('ecs/list', views.PartnerEConsultationViewSet.as_view({'get': 'list'}), name='ecs_list'),
+    path('ecs/share', views.PartnerEConsultationViewSet.as_view({'get': 'share'}), name='ecs_share'),
+    path('ecs/complete', views.PartnerEConsultationViewSet.as_view({'post': 'complete'}), name='ecs_complete'),
+    path('ecs/video_link', views.PartnerEConsultationViewSet.as_view({'post': 'video_link_share'}), name='ecs_video_link_share'),
+    path('ecs/pres/upload', views.PartnerEConsultationViewSet.as_view({'post': 'prescription_upload'}), name='ecs_prescription_upload'),
+    path('pecs/pay', views.ConsumerEConsultationViewSet.as_view({'post': 'create_order'}), name='pecs_pay'),
+    path('pecs/list', views.ConsumerEConsultationViewSet.as_view({'get': 'list'}), name='pecs_list'),
+    path('pecs/get_id', views.ConsumerEConsultationViewSet.as_view({'get': 'get_order_consult_id'}), name='pecs_get_id'),
+    path('ecs/comm', views.EConsultationCommViewSet.as_view({'post': 'communicate'}), name='ecs_communication'),
+    path('partner-lab/tests', views.PartnerLabTestSamplesCollectViewset.as_view({'get': 'tests_list'}), name='partner_lab_tests_list'),
+    path('partner-lab/order/save', views.PartnerLabTestSamplesCollectViewset.as_view({'post': 'order_create_or_update'}), name='partner_lab_order_create'),
+    path('partner-lab/lab-alerts', views.PartnerLabTestSamplesCollectViewset.as_view({'get': 'lab_alerts'}), name='test_samples_lab_alerts'),
+    path('partner-lab/order/list', views.PartnerLabTestSamplesCollectViewset.as_view({'get': 'orders_list'}), name='partner_lab_orders_list'),
 ]
 
 
