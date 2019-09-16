@@ -34,6 +34,7 @@ import string
 import random
 import decimal
 
+from ondoc.plus.enums import UtilizationCriteria
 
 logger = logging.getLogger(__name__)
 
@@ -227,6 +228,7 @@ class Order(TimeStampedModel):
         from ondoc.subscription_plan.models import UserPlanMapping
         from ondoc.insurance.models import UserInsurance, InsuranceTransaction
         from ondoc.api.v1.chat.serializers import ChatTransactionModelSerializer
+        from ondoc.plus.models import PlusAppointmentMapping
 
         # skip if order already processed, except if appointment is COD and can be converted to prepaid
         cod_to_prepaid_app = None
@@ -246,7 +248,12 @@ class Order(TimeStampedModel):
             serializer = OpdAppTransactionModelSerializer(data=appointment_data)
             serializer.is_valid(raise_exception=True)
             appointment_data = serializer.validated_data
-            if appointment_data['payment_type'] == OpdAppointment.COD:
+            if appointment_data['payment_type'] == OpdAppointment.VIP:
+                if appointment_data['plus_amount'] > 0:
+                    payment_not_required = False
+                else:
+                    payment_not_required = True
+            elif appointment_data['payment_type'] == OpdAppointment.COD:
                 if self.reference_id and cod_to_prepaid_app:
                     payment_not_required = False
                 else:
@@ -261,6 +268,11 @@ class Order(TimeStampedModel):
                 payment_not_required = True
             elif appointment_data['payment_type'] == OpdAppointment.INSURANCE:
                 payment_not_required = True
+            elif appointment_data['payment_type'] == OpdAppointment.VIP:
+                if appointment_data['plus_amount'] > 0:
+                    payment_not_required = False
+                else:
+                    payment_not_required = True
             elif appointment_data['payment_type'] == OpdAppointment.PLAN:
                 payment_not_required = True
         elif self.product_id == self.INSURANCE_PRODUCT_ID:
@@ -300,10 +312,13 @@ class Order(TimeStampedModel):
         total_balance = consumer_account.get_total_balance()
         _responsible_user=None
         _source=None
+        plus_amount = 0
         if '_responsible_user' in appointment_data:
             _responsible_user = appointment_data.pop('_responsible_user')
         if '_source' in appointment_data:
             _source = appointment_data.pop('_source')
+        if 'plus_amount' in appointment_data:
+            plus_amount = appointment_data.pop('plus_amount')
 
         if self.action == Order.OPD_APPOINTMENT_CREATE:
             if total_balance >= appointment_data["effective_price"] or payment_not_required:
@@ -311,6 +326,11 @@ class Order(TimeStampedModel):
                     appointment_obj = cod_to_prepaid_app
                 else:
                     appointment_obj = OpdAppointment.create_appointment(appointment_data, responsible_user=_responsible_user, source=_source)
+                    if appointment_obj.plus_plan:
+                        data = {"plus_user": appointment_obj.plus_plan, "plus_plan": appointment_obj.plus_plan.plan,
+                                "content_object": appointment_obj, 'amount': plus_amount}
+                        PlusAppointmentMapping.objects.create(**data)
+
                 order_dict = {
                     "reference_id": appointment_obj.id,
                     "payment_status": Order.PAYMENT_ACCEPTED
@@ -319,6 +339,12 @@ class Order(TimeStampedModel):
         elif self.action == Order.LAB_APPOINTMENT_CREATE:
             if total_balance >= appointment_data["effective_price"] or payment_not_required:
                 appointment_obj = LabAppointment.create_appointment(appointment_data, responsible_user=_responsible_user, source=_source)
+
+                if appointment_obj.plus_plan:
+                    data = {"plus_user": appointment_obj.plus_plan, "plus_plan": appointment_obj.plus_plan.plan,
+                            "content_object": appointment_obj, 'amount': plus_amount}
+                    PlusAppointmentMapping.objects.create(**data)
+
                 order_dict = {
                     "reference_id": appointment_obj.id,
                     "payment_status": Order.PAYMENT_ACCEPTED
@@ -595,8 +621,16 @@ class Order(TimeStampedModel):
     @classmethod
     def get_total_payable_amount(cls, fulfillment_data):
         from ondoc.doctor.models import OpdAppointment
+        from ondoc.plus.models import PlusUser
         payable_amount = 0
         for app in fulfillment_data:
+            if app.get('payment_type') == OpdAppointment.VIP:
+                plus_user = PlusUser.objects.filter(id=app.get('plus_plan')).first()
+                if not plus_user:
+                    payable_amount += app.get('effective_price')
+                    return payable_amount
+
+                payable_amount = payable_amount + app.get('effective_price', 0)
             if app.get("payment_type") == OpdAppointment.PREPAID:
                 payable_amount += app.get('effective_price')
         return payable_amount
@@ -641,7 +675,7 @@ class Order(TimeStampedModel):
                 visitor_id, visit_id = event_api.get_visit(request)
                 visitor_info = { "visitor_id": visitor_id, "visit_id": visit_id, "from_app": request.data.get("from_app", None), "app_version": request.data.get("app_version", None)}
         except Exception as e:
-            logger.log("Could not fecth visitor info - " + str(e))
+            logger.log("Could not fetch visitor info - " + str(e))
 
         # create a Parent order to accumulate sub-orders
         process_immediately = False
@@ -702,7 +736,7 @@ class Order(TimeStampedModel):
                     cart_id=appointment_detail["cart_item_id"],
                     user=user
                 )
-            elif appointment_detail.get('payment_type') == OpdAppointment.INSURANCE:
+            elif appointment_detail.get('payment_type') in [OpdAppointment.INSURANCE, OpdAppointment.VIP]:
                 order = cls.objects.create(
                     product_id=product_id,
                     action=action,
@@ -771,6 +805,7 @@ class Order(TimeStampedModel):
         econsult_ids = []
         chat_plan_ids = []
         user = self.user
+        plus_user = user.active_plus_user
         user_insurance_obj = user.active_insurance
 
         gyno_count = 0
@@ -804,7 +839,8 @@ class Order(TimeStampedModel):
                                     is_process = False
                                 else:
                                     onco_count += 1
-
+                    if app_data.get('payment_type') == OpdAppointment.VIP and plus_user:
+                        is_process = True
                     if not is_process:
                         raise Exception("Insurance invalidate, Could not process entire order")
 

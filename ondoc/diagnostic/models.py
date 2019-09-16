@@ -56,6 +56,8 @@ from ondoc.matrix.tasks import push_appointment_to_matrix, push_onboarding_qcsta
     create_ipd_lead_from_lab_appointment, create_or_update_lead_on_matrix
 from ondoc.integrations.task import push_lab_appointment_to_integrator, get_integrator_order_status
 from ondoc.location import models as location_models
+from ondoc.plus.enums import UtilizationCriteria
+from ondoc.plus.models import PlusAppointmentMapping
 from ondoc.ratings_review import models as ratings_models
 # from ondoc.api.v1.common import serializers as common_serializers
 from ondoc.common.models import AppointmentHistory, AppointmentMaskNumber, Remark, GlobalNonBookable, \
@@ -264,6 +266,7 @@ class Lab(TimeStampedModel, CreatedByModel, QCModel, SearchKey, WelcomeCallingDo
     is_ipd_lab = models.BooleanField(default=False)
     related_hospital = models.ForeignKey(Hospital, null=True, blank=True, on_delete=models.SET_NULL, related_name='ipd_hospital')
     enabled_for_plus_plans = models.NullBooleanField()
+    is_b2b = models.BooleanField(default=False)
     center_visit = models.NullBooleanField()
 
     def __str__(self):
@@ -338,6 +341,22 @@ class Lab(TimeStampedModel, CreatedByModel, QCModel, SearchKey, WelcomeCallingDo
                     resp['insurance_threshold_amount'] = 0 if insurance_threshold.lab_amount_limit is None else \
                         insurance_threshold.lab_amount_limit
                     resp['is_user_insured'] = True
+
+        return resp
+
+    @classmethod
+    def get_vip_details(cls, user):
+
+        resp = {
+            'is_vip_member': False,
+            'covered_under_vip': False,
+            'vip_amount': 0
+        }
+
+        if user.is_authenticated and not user.is_anonymous:
+            plus_membership = user.active_plus_user
+            if plus_membership:
+                resp['is_vip_member'] = True
 
         return resp
 
@@ -1566,8 +1585,8 @@ class AvailableLabTest(TimeStampedModel):
         else:
             return None
 
-    # def __str__(self):
-    #     return "{}".format(self.test.name)
+    def __str__(self):
+        return "{} | {}".format(self.test.name, self.lab_pricing_group.group_name)
 
     class Meta:
         unique_together = (("test", "lab_pricing_group"))
@@ -1679,6 +1698,7 @@ class LabAppointment(TimeStampedModel, CouponsMixin, LabAppointmentInvoiceMixin,
     action_data = JSONField(blank=True, null=True)
     plus_plan = models.ForeignKey(plus_model.PlusUser, blank=True, null=True, default=None,
                                   on_delete=models.DO_NOTHING)
+    plus_plan_data = GenericRelation(PlusAppointmentMapping)
 
     @cached_property
     def is_thyrocare(self):
@@ -2598,6 +2618,10 @@ class LabAppointment(TimeStampedModel, CouponsMixin, LabAppointmentInvoiceMixin,
             total_agreed = total_insurance_agreed_price if  total_insurance_agreed_price and total_insurance_agreed_price > 0 else total_agreed
             coupon_discount, coupon_cashback, coupon_list, random_coupon_list = 0, 0, [], []
 
+        if data.get("payment_type") in [OpdAppointment.VIP]:
+            effective_price = effective_price
+            coupon_discount, coupon_cashback, coupon_list, random_coupon_list = 0, 0, [], []
+
         return {
             "deal_price" : total_deal_price,
             "mrp" : total_mrp,
@@ -2699,7 +2723,42 @@ class LabAppointment(TimeStampedModel, CouponsMixin, LabAppointmentInvoiceMixin,
             else:
                 payment_type = data["payment_type"]
 
-        # "test_time_slots": test_time_slots,
+
+        cover_under_vip = False
+        plus_user_id = None
+        plus_user = user.active_plus_user
+        mrp = price_data.get("mrp")
+        vip_amount_utilized = 0
+        if plus_user:
+            plus_user_resp = plus_user.validate_plus_appointment(data)
+            cover_under_vip = plus_user_resp.get('cover_under_vip', False)
+            plus_user_id = plus_user_resp.get('plus_user_id', None)
+        if cover_under_vip and cart_data.get('cover_under_vip', None):
+            payment_type = OpdAppointment.VIP
+            utilization = plus_user.get_utilization
+            available_amount = int(utilization.get('available_package_amount', 0))
+            # mrp = int(price_data.get('mrp'))
+
+            final_price = mrp + price_data['home_pickup_charges']
+
+            utilization_criteria, coverage = plus_user.can_package_be_covered_in_vip(None, mrp=final_price, id=data['test_ids'][0].id)
+
+            if coverage:
+                if utilization_criteria == UtilizationCriteria.COUNT:
+                    effective_price = 0
+                    vip_amount_utilized = final_price
+                else:
+                    effective_price = cart_data.get('vip_amount', 0)
+                    vip_amount_utilized = available_amount if final_price >= available_amount else final_price
+
+        else:
+            plus_user_id = None
+            cover_under_vip = False
+            if data["payment_type"] == OpdAppointment.VIP:
+                payment_type = OpdAppointment.PREPAID
+            else:
+                payment_type = data["payment_type"]
+
         fulfillment_data = {
             "lab": data["lab"],
             "user": user,
@@ -2721,6 +2780,9 @@ class LabAppointment(TimeStampedModel, CouponsMixin, LabAppointmentInvoiceMixin,
             "cashback": int(price_data.get("coupon_cashback")),
             "is_appointment_insured": is_appointment_insured,
             "insurance": insurance_id,
+            "cover_under_vip": cover_under_vip,
+            "plus_plan": plus_user_id,
+            'plus_amount': int(vip_amount_utilized),
             "coupon_data": price_data.get("coupon_data"),
             "prescription_list": data.get('prescription_list', []),
             "_responsible_user": data.get("_responsible_user", None),
@@ -3494,5 +3556,3 @@ class IPDMedicinePageLead(auth_model.TimeStampedModel):
 
         if not self.matrix_lead_id:
             create_or_update_lead_on_matrix.apply_async(({'obj_type': self.__class__.__name__, 'obj_id': self.id}, ), countdown=5)
-
-

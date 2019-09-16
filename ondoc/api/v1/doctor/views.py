@@ -392,11 +392,15 @@ class DoctorAppointmentsViewSet(OndocViewSet):
         serializer.is_valid(raise_exception=True)
         validated_data = serializer.validated_data
         data = request.data
-
+        plus_user = request.user.active_plus_user
         user_insurance = request.user.active_insurance #UserInsurance.get_user_insurance(request.user)
 
-        # data['is_appointment_insured'], data['insurance_id'], data[
-        #     'insurance_message'] = Cart.check_for_insurance(validated_data,request)
+        hospital = validated_data.get('hospital')
+        doctor = validated_data.get('doctor')
+
+        doctor_clinic = DoctorClinic.objects.filter(doctor=doctor, hospital=hospital).first()
+        profile = validated_data.get('profile')
+        payment_type = validated_data.get('payment_type')
         if user_insurance:
             if user_insurance.status == UserInsurance.ONHOLD:
                 return Response(status=status.HTTP_400_BAD_REQUEST, data={"error": 'Your documents from the last claim '
@@ -404,12 +408,7 @@ class DoctorAppointmentsViewSet(OndocViewSet):
                                                                           "request_errors": {
                                                                               "message": 'Your documents from the last claim are under '
                                                                                          'verification. Please write to customercare@docprime.com for more information'}})
-            hospital = validated_data.get('hospital')
-            doctor = validated_data.get('doctor')
 
-            doctor_clinic = DoctorClinic.objects.filter(doctor=doctor, hospital=hospital).first()
-            profile = validated_data.get('profile')
-            payment_type = validated_data.get('payment_type')
             if profile.is_insured_profile and doctor.is_enabled_for_insurance and doctor.enabled_for_online_booking and \
                     payment_type == OpdAppointment.COD and doctor_clinic and doctor_clinic.enabled_for_online_booking:
                 return Response(status=status.HTTP_400_BAD_REQUEST,
@@ -442,9 +441,19 @@ class DoctorAppointmentsViewSet(OndocViewSet):
                                                                               'request_errors': {
                                                                                   'message':'Some error occured.Please'
                                                                                             'Try again after some time.'}})
+        elif plus_user:
+            plus_user_dict = plus_user.validate_plus_appointment(validated_data)
+            data['is_vip_member'] = plus_user_dict.get('is_vip_member', False)
+            data['cover_under_vip'] = plus_user_dict.get('cover_under_vip', False)
+            data['plus_user_id'] = plus_user.id
+            data['vip_amount'] = plus_user_dict.get('vip_amount')
+            if data['cover_under_vip']:
+                data['payment_type'] = OpdAppointment.VIP
+
         else:
             data['is_appointment_insured'], data['insurance_id'], data[
-                'insurance_message'] = False, None, ""
+                'insurance_message'], data['is_vip_member'], data['cover_under_vip'], \
+            data['plus_user_id'] = False, None, "", False, False, None
         cart_item_id = validated_data.get('cart_item').id if validated_data.get('cart_item') else None
         if not models.OpdAppointment.can_book_for_free(request, validated_data, cart_item_id):
             return Response({'request_errors': {"code": "invalid",
@@ -469,6 +478,8 @@ class DoctorAppointmentsViewSet(OndocViewSet):
             payment_type = old_cart_obj.data.get('payment_type')
             if payment_type == OpdAppointment.INSURANCE and data['is_appointment_insured'] == False:
                 data['payment_type'] = OpdAppointment.PREPAID
+            if payment_type == OpdAppointment.VIP and data['cover_under_vip'] == False:
+                data['payment_type'] = OpdAppointment.PREPAID
             # cart_item.data = request.data
             cart_item.data = data
             cart_item.save()
@@ -477,12 +488,19 @@ class DoctorAppointmentsViewSet(OndocViewSet):
                                                   user=request.user, defaults={"data": data})
 
         resp = None
+        is_agent = False
         if hasattr(request, 'agent') and request.agent:
             user = User.objects.filter(id=request.agent).first()
             if user and not user.groups.filter(name=constants['APPOINTMENT_OTP_BYPASS_AGENT_TEAM']).exists():
-                resp = {'is_agent': True, "status": 1}
+                if payment_type == OpdAppointment.COD:
+                    is_agent = True
+                else:
+                    resp = {'is_agent': True, "status": 1}
         if not resp:
             resp = account_models.Order.create_order(request, [cart_item], validated_data.get("use_wallet"))
+
+        if is_agent:
+            resp['is_agent'] = True
 
         return Response(data=resp)
 
@@ -1746,16 +1764,30 @@ class DoctorListViewSet(viewsets.GenericViewSet):
             'is_user_insured': False,
             'insurance_threshold_amount': insurance_threshold.opd_amount_limit if insurance_threshold else 5000
         }
+        vip_data_dict = {
+            'is_vip_member': False,
+            'cover_under_vip': False,
+            'vip_remaining_amount': 0
+        }
+
+        vip_user = None
 
         if logged_in_user.is_authenticated and not logged_in_user.is_anonymous:
+            vip_user = logged_in_user.active_plus_user
             user_insurance = logged_in_user.purchased_insurance.filter().order_by('id').last()
-            if user_insurance and user_insurance.is_valid():
+            if user_insurance and user_insurance.is_valid() and not logged_in_user.active_plus_user:
                 insurance_threshold = user_insurance.insurance_plan.threshold.filter().first()
                 if insurance_threshold:
                     insurance_data_dict['insurance_threshold_amount'] = 0 if insurance_threshold.opd_amount_limit is None else \
                         insurance_threshold.opd_amount_limit
                     insurance_data_dict['is_user_insured'] = True
+            if logged_in_user.active_plus_user:
+                utilization_dict = logged_in_user.active_plus_user.get_utilization
 
+                vip_data_dict['vip_remaining_amount'] = utilization_dict.get('doctor_amount_available') if utilization_dict else 0
+                vip_data_dict['is_vip_member'] = True
+                vip_data_dict['cover_under_vip'] = False
+        validated_data['vip_user'] = vip_user
         validated_data['insurance_threshold_amount'] = insurance_data_dict['insurance_threshold_amount']
         validated_data['is_user_insured'] = insurance_data_dict['is_user_insured']
 
@@ -1796,6 +1828,7 @@ class DoctorListViewSet(viewsets.GenericViewSet):
 
         response = doctor_search_helper.prepare_search_response(doctor_data, doctor_search_result, request,
                                                                 insurance_data=insurance_data_dict,
+                                                                vip_data=vip_data_dict,
                                                                 hosp_entity_dict=hosp_entity_dict,
                                                                 hosp_locality_entity_dict=hosp_locality_entity_dict)
 
@@ -2784,53 +2817,58 @@ class DoctorFeedbackViewSet(viewsets.GenericViewSet):
     def feedback(self, request):
         resp = {}
         user = request.user
-        subject_string = "Feedback Mail from " + str(user.phone_number)
-
         serializer = serializers.DoctorFeedbackBodySerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         valid_data = serializer.validated_data
-        message = ''
-        managers_string = ''
-        manages_string = ''
-        doctor = valid_data.pop("doctor_id") if valid_data.get("doctor_id") else None
-        hospital = valid_data.pop("hospital_id") if valid_data.get("hospital_id") else None
-        for key, value in valid_data.items():
-            if isinstance(value, list):
-                val = ' '.join(map(str, value))
-            else:
-                val = value
-            message += str(key) + "  -  " + str(val) + "<br>"
-        if doctor or hospital:
-            message = self.get_doctor_and_hospital_data(message, doctor, hospital)
-        if hasattr(user, 'doctor') and user.doctor:
-            managers_list = []
-            for managers in user.doctor.manageable_doctors.all():
-                info = {}
-                info['hospital_id'] = (str(managers.hospital_id)) if managers.hospital_id else "<br>"
-                info['hospital_name'] = (str(managers.hospital.name)) if managers.hospital else "<br>"
-                info['user_id'] = (str(managers.user_id) ) if managers.user else "<br>"
-                info['user_number'] = (str(managers.phone_number)) if managers.phone_number else "<br>"
-                info['type'] = (str(dict(auth_models.GenericAdmin.type_choices)[managers.permission_type])) if managers.permission_type else "<br>"
-                managers_list.append(info)
-            managers_string = "<br>".join(str(x) for x in managers_list)
-        if managers_string:
-            message = message + "<br><br> User's Managers <br>"+ managers_string
+        emails = list()
+        if valid_data.get('is_cloud_lab_email'):
+            subject_string = "Test Sample Pickup Request from " + str(user.phone_number)
+            message = valid_data.get('feedback')
+            emails = ["sanat@docprime.com", "kabeer@docprime.com", "prithvijeet@docprime.com", "raghavr@docprime.com"]
+        else:
+            subject_string = "Feedback Mail from " + str(user.phone_number)
+            message = ''
+            managers_string = ''
+            manages_string = ''
+            doctor = valid_data.pop("doctor_id") if valid_data.get("doctor_id") else None
+            hospital = valid_data.pop("hospital_id") if valid_data.get("hospital_id") else None
+            for key, value in valid_data.items():
+                if isinstance(value, list):
+                    val = ' '.join(map(str, value))
+                else:
+                    val = value
+                message += str(key) + "  -  " + str(val) + "<br>"
+            if doctor or hospital:
+                message = self.get_doctor_and_hospital_data(message, doctor, hospital)
+            if hasattr(user, 'doctor') and user.doctor:
+                managers_list = []
+                for managers in user.doctor.manageable_doctors.all():
+                    info = {}
+                    info['hospital_id'] = (str(managers.hospital_id)) if managers.hospital_id else "<br>"
+                    info['hospital_name'] = (str(managers.hospital.name)) if managers.hospital else "<br>"
+                    info['user_id'] = (str(managers.user_id) ) if managers.user else "<br>"
+                    info['user_number'] = (str(managers.phone_number)) if managers.phone_number else "<br>"
+                    info['type'] = (str(dict(auth_models.GenericAdmin.type_choices)[managers.permission_type])) if managers.permission_type else "<br>"
+                    managers_list.append(info)
+                managers_string = "<br>".join(str(x) for x in managers_list)
+            if managers_string:
+                message = message + "<br><br> User's Managers <br>"+ managers_string
 
-        manages_list = []
-        for manages in user.manages.all():
-            info = {}
-            info['hospital_id'] = (str(manages.hospital_id)) if manages.hospital_id else "<br>"
-            info['hospital_name'] = (str(manages.hospital.name)) if manages.hospital else "<br>"
-            info['doctor_name'] = (str(manages.doctor.name)) if manages.doctor else "<br>"
-            info['user_id'] = (str(user.id)) if user else "<br>"
-            info['doctor_number'] = (str(manages.doctor.mobiles.filter(is_primary=True).first().number)) if(manages.doctor and manages.doctor.mobiles.filter(is_primary=True)) else "<br>"
-            manages_list.append(info)
-        manages_string = "<br>".join(str(x) for x in manages_list)
-        if manages_string:
-            message = message + "<br><br> User Manages <br>"+ manages_string
-        try:
+            manages_list = []
+            for manages in user.manages.all():
+                info = {}
+                info['hospital_id'] = (str(manages.hospital_id)) if manages.hospital_id else "<br>"
+                info['hospital_name'] = (str(manages.hospital.name)) if manages.hospital else "<br>"
+                info['doctor_name'] = (str(manages.doctor.name)) if manages.doctor else "<br>"
+                info['user_id'] = (str(user.id)) if user else "<br>"
+                info['doctor_number'] = (str(manages.doctor.mobiles.filter(is_primary=True).first().number)) if(manages.doctor and manages.doctor.mobiles.filter(is_primary=True)) else "<br>"
+                manages_list.append(info)
+            manages_string = "<br>".join(str(x) for x in manages_list)
+            if manages_string:
+                message = message + "<br><br> User Manages <br>"+ manages_string
             emails = ["rajivk@policybazaar.com", "sanat@docprime.com", "arunchaudhary@docprime.com",
                       "rajendra@docprime.com", "harpreet@docprime.com", "jaspreetkaur@docprime.com"]
+        try:
             for x in emails:
                 notif_models.EmailNotification.publish_ops_email(str(x), mark_safe(message), subject_string)
             resp['status'] = "success"

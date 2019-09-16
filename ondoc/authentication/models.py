@@ -345,6 +345,12 @@ class User(AbstractBaseUser, PermissionsMixin):
         active_plus_user = self.active_plus_users.filter().order_by('-id').first()
         return active_plus_user if active_plus_user and active_plus_user.is_valid() else None
 
+    @cached_property
+    def inactive_plus_user(self):
+        from ondoc.plus.models import PlusUser
+        inactive_plus_user = PlusUser.objects.filter(status=PlusUser.INACTIVE, user_id=self.id).order_by('-id').first()
+        return inactive_plus_user if inactive_plus_user else None
+
     @classmethod
     def get_external_login_data(cls, data):
         from ondoc.authentication.backends import JWTAuthentication
@@ -1156,6 +1162,7 @@ class GenericAdmin(TimeStampedModel, CreatedByModel):
                                related_name='manageable_doctors')
     permission_type = models.PositiveSmallIntegerField(choices=type_choices, default=APPOINTMENT)
     is_doc_admin = models.BooleanField(default=False)
+    is_partner_lab_admin = models.NullBooleanField()
     is_disabled = models.BooleanField(default=False)
     super_user_permission = models.BooleanField(default=False)
     read_permission = models.BooleanField(default=False)
