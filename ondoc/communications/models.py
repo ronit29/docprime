@@ -1721,7 +1721,7 @@ class LabNotification(Notification):
         if notification_type:
             self.notification_type = notification_type
         else:
-            self.notification_type = self.LAB_NOTIFICATION_TYPE_MAPPING[appointment.status]
+            self.notification_type = self.LAB_NOTIFICATION_TYPE_MAPPING.get(appointment.status)
 
     def get_context(self):
         instance = self.appointment
@@ -1775,6 +1775,8 @@ class LabNotification(Notification):
             "pickup_address": self.appointment.get_pickup_address(),
             "coupon_discount": str(self.appointment.discount) if self.appointment.discount else None,
             "time_slot_start": time_slot_start,
+            "time_slot_start_date": str(time_slot_start.strftime("%b %d %Y")),
+            "time_slot_start_time": str(time_slot_start.strftime("%I:%M %p")),
             "tests": tests,
             "reports": report_file_links,
             "attachments": {},  # Updated later
