@@ -612,7 +612,7 @@ class DoctorHospitalSerializer(serializers.ModelSerializer):
         return resp
 
     def get_vip(self, obj):
-        resp = {"is_vip_member": False, "cover_under_vip": False, "vip_amount": 0}
+        resp = {"is_vip_member": False, "cover_under_vip": False, "vip_amount": 0, "is_enable_for_vip": False}
         request = self.context.get("request")
         user = request.user
         doctor_clinic = obj.doctor_clinic
@@ -623,7 +623,7 @@ class DoctorHospitalSerializer(serializers.ModelSerializer):
                                         and hospital.enabled_for_plus_plans and doctor.enabled_for_plus_plans
 
         if enabled_for_online_booking and obj.mrp is not None:
-
+            resp['is_enable_for_vip'] = True
             plus_user = None if not user.is_authenticated or user.is_anonymous else user.active_plus_user
             if not plus_user:
                 return resp
