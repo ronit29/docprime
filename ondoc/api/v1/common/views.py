@@ -39,7 +39,7 @@ from django.template.loader import render_to_string
 from ondoc.procedure.models import IpdProcedure, IpdProcedureLead
 from . import serializers
 from ondoc.common.models import Cities, PaymentOptions, UserConfig, DeviceDetails, LastUsageTimestamp, \
-    AppointmentHistory, SponsorListingURL, SponsorListingSpecialization
+    AppointmentHistory, SponsorListingURL
 from ondoc.common.utils import send_email, send_sms
 from ondoc.authentication.backends import JWTAuthentication, WhatsappAuthentication
 from django.core.files.uploadedfile import SimpleUploadedFile, TemporaryUploadedFile, InMemoryUploadedFile

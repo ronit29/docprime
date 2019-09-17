@@ -831,7 +831,7 @@ class SponsorListingSpecialization(auth_model.TimeStampedModel):
     specialization = models.ForeignKey("doctor.PracticeSpecialization", on_delete=models.SET_NULL, null=True, blank=True, related_name='listing_specialization')
     latitude = models.FloatField(null=True, blank=True)
     longitude = models.FloatField(null=True, blank=True)
-    location = models.FloatField(null=True, blank=True)
+    location = gis_models.PointField(geography=True, srid=4326, blank=True, null=True)
     radius = models.FloatField(null=True)
     is_enabled = models.BooleanField(default=False)
 

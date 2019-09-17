@@ -7,7 +7,9 @@ from .views import (CitiesViewSet, ServicesViewSet, SmsServiceViewSet, UpdateXls
                     UploadMembershipViewSet, SearchLeadViewSet, GetPaymentOptionsViewSet, GetSearchUrlViewSet,
                     GetKeyDataViewSet, AllUrlsViewset, DeviceDetailsSave, AppointmentPrerequisiteViewSet,
 
-                    SiteSettingsViewSet, DepartmentRouting, CommentViewSet, SponsorListingViewSet, DocumentUploadViewSet)
+                    SiteSettingsViewSet, DepartmentRouting, CommentViewSet, DocumentUploadViewSet,
+                    SponsorListingViewSet)
+                    # SponsorListingViewSet)
 
 
 urlpatterns = [

@@ -26,7 +26,8 @@ from dal import autocomplete
 from reversion_compare.admin import CompareVersionAdmin
 
 from ondoc.api.v1.utils import GenericAdminEntity, util_absolute_url, util_file_name
-from ondoc.common.models import AppointmentHistory, SponsorListingURL, SponsorListingSpecialization, SponsorListingUtmTerm, SponsoredListingService
+from ondoc.common.models import AppointmentHistory, SponsorListingURL, SponsorListingUtmTerm, SponsoredListingService, \
+    SponsorListingSpecialization
 from django.contrib import messages
 from django.http import HttpResponseRedirect
 
