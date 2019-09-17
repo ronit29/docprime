@@ -2489,6 +2489,7 @@ class SponsorListingSpecializationInline(admin.TabularInline):
     extra = 0
     can_delete = True
     form = SponsorListingSpecializationForm
+    exclude = ['location']
 
 
 class SponsorListingUtmTermInline(admin.TabularInline):

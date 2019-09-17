@@ -2242,9 +2242,9 @@ class TopHospitalForIpdProcedureSerializer(serializers.ModelSerializer):
                     id = sp_service.sponsored_service.id
                     name = sp_service.sponsored_service.name
                     sp_list.append({'id': id, 'name': name})
+                count = len(sp_list)
             else:
                 sp_list = None
-            count = len(sp_list)
         return count
 
     def get_hospital_image(self, obj):
