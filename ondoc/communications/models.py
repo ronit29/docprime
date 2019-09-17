@@ -1724,6 +1724,7 @@ class LabNotification(Notification):
     def get_context(self):
         instance = self.appointment
         patient_name = instance.profile.name.title() if instance.profile.name else ""
+        patient_age = instance.profile.get_age()
         lab_name = instance.lab.name.title() if instance.lab.name else ""
         est = pytz.timezone(settings.TIME_ZONE)
         time_slot_start = self.appointment.time_slot_start.astimezone(est)
@@ -1762,6 +1763,7 @@ class LabNotification(Notification):
         context = {
             "lab_name": lab_name,
             "patient_name": patient_name,
+            "age": patient_age,
             "id": instance.id,
             "instance": instance,
             "url": "/lab/appointment/{}".format(instance.id),
@@ -1784,7 +1786,8 @@ class LabNotification(Notification):
             "is_thyrocare_report": is_thyrocare_report,
             "chat_url": chat_url,
             "show_amounts": bool(self.appointment.payment_type != OpdAppointment.INSURANCE),
-            "lensfit_coupon": lensfit_coupon
+            "lensfit_coupon": lensfit_coupon,
+            "visit_type": 'home' if instance.is_home_pickup else 'lab'
         }
         return context
 
