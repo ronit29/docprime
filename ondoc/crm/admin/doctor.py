@@ -2474,10 +2474,20 @@ class SponsorListingURLInline(admin.TabularInline):
     can_delete = True
 
 
+class SponsorListingSpecializationForm(forms.ModelForm):
+    def clean(self):
+        cleaned_date = self.cleaned_data
+        if not cleaned_date.get('latitude') or not cleaned_date.get('latitude'):
+            raise forms.ValidationError('Latitude and Longitude must be entered')
+
+        return super().clean()
+
+
 class SponsorListingSpecializationInline(admin.TabularInline):
     model = SponsorListingSpecialization
     extra = 0
     can_delete = True
+    form = SponsorListingSpecializationForm
 
 
 class SponsorListingUtmTermInline(admin.TabularInline):

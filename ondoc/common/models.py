@@ -1,3 +1,4 @@
+from django.contrib.gis.geos import Point
 from django.contrib.postgres.fields import JSONField
 from django.core.validators import FileExtensionValidator, MinValueValidator, MaxValueValidator
 from django.db import models, transaction
@@ -830,14 +831,24 @@ class SponsorListingSpecialization(auth_model.TimeStampedModel):
     specialization = models.ForeignKey("doctor.PracticeSpecialization", on_delete=models.SET_NULL, null=True, blank=True, related_name='listing_specialization')
     latitude = models.FloatField(null=True, blank=True)
     longitude = models.FloatField(null=True, blank=True)
+    location = models.FloatField(null=True, blank=True)
     radius = models.FloatField(null=True)
     is_enabled = models.BooleanField(default=False)
+
+    def save(self, force_insert=False, force_update=False, using=None, update_fields=None):
+        if self.latitude and self.longitude:
+            self.location = Point(float(self.longitude), float(self.latitude))
+
+        super().save(force_insert, force_update, using, update_fields)
+
 
     class Meta:
         db_table = 'sponsor_listing_specialization'
 
     # def __str__(self):
     #     return self.id
+
+
 
 
 class SponsorListingUtmTerm(auth_model.TimeStampedModel):
