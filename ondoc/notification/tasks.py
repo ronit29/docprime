@@ -375,15 +375,18 @@ def set_order_dummy_transaction(self, order_id, user_id):
 
 @task
 def send_offline_appointment_message(**kwargs):
+    from ondoc.doctor.models import OfflineOPDAppointments
     from ondoc.communications.models import OfflineOpdAppointments
-    appointment = kwargs.get('appointment')
+    appointment_id = kwargs.get('appointment_id')
     notification_type = kwargs.get('notification_type')
     receivers = kwargs.get('receivers')
     try:
-        offline_opd_appointment_comm = OfflineOpdAppointments(appointment=appointment,
-                                                              notification_type=notification_type,
-                                                              receivers=receivers)
-        offline_opd_appointment_comm.send()
+        if appointment_id:
+            appointment = OfflineOPDAppointments.objects.filter(id=appointment_id).first()
+            offline_opd_appointment_comm = OfflineOpdAppointments(appointment=appointment,
+                                                                  notification_type=notification_type,
+                                                                  receivers=receivers)
+            offline_opd_appointment_comm.send()
     except Exception as e:
         logger.error("Error sending " + str(type) + " message - " + str(e))
 
