@@ -4344,9 +4344,10 @@ class OfflinePatients(auth_model.TimeStampedModel):
     @staticmethod
     def welcome_message_sms(appointment, receivers):
         try:
-            notification_tasks.send_offline_appointment_message(appointment=appointment,
-                                                                notification_type=NotificationAction.OFFLINE_PATIENT_WELCOME_MESSAGE,
-                                                                receivers=receivers)
+            notification_tasks.send_offline_appointment_message.apply_async(kwargs={'appointment_id': appointment.id,
+                                                                                    'notification_type': NotificationAction.OFFLINE_PATIENT_WELCOME_MESSAGE,
+                                                                                    'receivers': receivers},
+                                                                            countdown=1)
         except Exception as e:
             logger.error("Failed to Push Offline Welcome Message SMS Task "+ str(e))
 
@@ -4409,37 +4410,40 @@ class OfflineOPDAppointments(auth_model.TimeStampedModel):
     @staticmethod
     def appointment_add_sms(appointment, receivers):
         try:
-            notification_tasks.send_offline_appointment_message(appointment=appointment,
-                                                                notification_type=NotificationAction.OFFLINE_OPD_APPOINTMENT_ACCEPTED,
-                                                                receivers=receivers)
+            notification_tasks.send_offline_appointment_message.apply_async(kwargs={'appointment_id': appointment.id,
+                                                                                    'notification_type': NotificationAction.OFFLINE_OPD_APPOINTMENT_ACCEPTED,
+                                                                                    'receivers': receivers},
+                                                                            countdown=2)
         except Exception as e:
             logger.error("Failed to Push Offline Appointment Add Message SMS Task " + str(e))
 
     @staticmethod
     def appointment_cancel_sms(appointment, receivers):
         try:
-            notification_tasks.send_offline_appointment_message(appointment=appointment,
-                                                                notification_type=NotificationAction.OFFLINE_OPD_APPOINTMENT_CANCELLED,
-                                                                receivers=receivers)
-
+            notification_tasks.send_offline_appointment_message.apply_async(kwargs={'appointment_id': appointment.id,
+                                                                                    'notification_type': NotificationAction.OFFLINE_OPD_APPOINTMENT_CANCELLED,
+                                                                                    'receivers': receivers},
+                                                                            countdown=2)
         except Exception as e:
             logger.error("Failed to Push Offline Appointment Cancel Message SMS Task " + str(e))
 
     @staticmethod
     def appointment_complete_sms(appointment, receivers):
         try:
-            notification_tasks.send_offline_appointment_message(appointment=appointment,
-                                                                notification_type=NotificationAction.OFFLINE_OPD_APPOINTMENT_COMPLETED,
-                                                                receivers=receivers)
+            notification_tasks.send_offline_appointment_message.apply_async(kwargs={'appointment_id': appointment.id,
+                                                                                    'notification_type': NotificationAction.OFFLINE_OPD_APPOINTMENT_COMPLETED,
+                                                                                    'receivers': receivers},
+                                                                            countdown=2)
         except Exception as e:
             logger.error("Failed to Push Offline Appointment Cancel Message SMS Task " + str(e))
 
     @staticmethod
     def appointment_reschedule_sms(appointment, receivers):
         try:
-            notification_tasks.send_offline_appointment_message(appointment=appointment,
-                                                                notification_type=NotificationAction.OFFLINE_OPD_APPOINTMENT_RESCHEDULED_DOCTOR,
-                                                                receivers=receivers)
+            notification_tasks.send_offline_appointment_message.apply_async(kwargs={'appointment_id': appointment.id,
+                                                                                    'notification_type': NotificationAction.OFFLINE_OPD_APPOINTMENT_RESCHEDULED_DOCTOR,
+                                                                                    'receivers': receivers},
+                                                                            countdown=2)
         except Exception as e:
             logger.error("Failed to Push Offline Appointment Rescehdule Message SMS Task " + str(e))
 

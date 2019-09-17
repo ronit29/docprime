@@ -378,16 +378,15 @@ def send_offline_appointment_message(**kwargs):
     from ondoc.doctor.models import OfflineOPDAppointments
     from ondoc.communications.models import OfflineOpdAppointments
     appointment_id = kwargs.get('appointment_id')
-    appointment = kwargs.get('appointment')
     notification_type = kwargs.get('notification_type')
     receivers = kwargs.get('receivers')
     try:
-        if appointment_id and not appointment:
+        if appointment_id:
             appointment = OfflineOPDAppointments.objects.filter(id=appointment_id).first()
-        offline_opd_appointment_comm = OfflineOpdAppointments(appointment=appointment,
-                                                              notification_type=notification_type,
-                                                              receivers=receivers)
-        offline_opd_appointment_comm.send()
+            offline_opd_appointment_comm = OfflineOpdAppointments(appointment=appointment,
+                                                                  notification_type=notification_type,
+                                                                  receivers=receivers)
+            offline_opd_appointment_comm.send()
     except Exception as e:
         logger.error("Error sending " + str(type) + " message - " + str(e))
 
