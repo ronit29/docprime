@@ -31,7 +31,7 @@ class EntityUrlsAdminForm(forms.ModelForm):
 class EntityUrlsAdmin(AutoComplete, VersionAdmin):
     model = EntityUrls
     form = EntityUrlsAdminForm
-    search_fields = ['url', 'url_value', 'entity_id']
+    search_fields = ['url', 'entity_id']
 
     def get_queryset(self, request):
         queryset = super().get_queryset(request)
