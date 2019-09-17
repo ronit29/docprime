@@ -33,27 +33,6 @@ EMAIL_BACKEND = 'ondoc.sendemail.backends.backend.ConsoleEmailBackend'
 # EMAIL_HOST = 'localhost'
 # EMAIL_PORT = 1025
 
-# LOGGING = {
-#     'version': 1,
-#     'disable_existing_loggers': False,
-#     'handlers': {
-#         'file': {
-#             'level': 'ERROR',
-#             'class': 'logging.FileHandler',
-#             'filename': '../djangologs/debug.log',
-#         },
-#     },
-#     'loggers': {
-#         'django': {
-#             'handlers': ['file'],
-#             'level': 'DEBUG',
-#             'propagate': True,
-#         },
-#     },
-# }
-
-
-
 # RABBITMQ_CONNECTION_SETTINGS = {
 #     'CONNECTION_URL': 'amqp://guest:guest@localhost:5672/%2F',
 #     'NOTIFICATION_QUEUE': 'notifications'
@@ -73,10 +52,10 @@ LOGGING = {
         },
     },
     'handlers': {
-        'sentry': {
-            'level': 'INFO',
-            'class': 'raven.contrib.django.raven_compat.handlers.SentryHandler',
-        },
+        # 'sentry': {
+        #     'level': 'INFO',
+        #     'class': 'raven.contrib.django.raven_compat.handlers.SentryHandler',
+        # },
         'console': {
             'level': 'INFO',
             'class': 'logging.StreamHandler',
@@ -89,16 +68,16 @@ LOGGING = {
             'handlers': ['console', ],
             'propagate': False,
         },
-        'raven': {
-            'level': 'DEBUG',
-            'handlers': ['console', ],
-            'propagate': False,
-        },
-        'sentry.errors': {
-            'level': 'DEBUG',
-            'handlers': ['console', ],
-            'propagate': False,
-        },
+        # 'raven': {
+        #     'level': 'DEBUG',
+        #     'handlers': ['console', ],
+        #     'propagate': False,
+        # },
+        # 'sentry.errors': {
+        #     'level': 'DEBUG',
+        #     'handlers': ['console', ],
+        #     'propagate': False,
+        # },
         'django.security.DisallowedHost': {
             'level': 'ERROR',
             'handlers': ['console'],
