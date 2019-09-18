@@ -1297,7 +1297,7 @@ class SponsorListingViewSet(viewsets.GenericViewSet):
                 latitude = spec.latitude if spec.latitude else None
                 longitude = spec.longitude if spec.longitude else None
                 radius = spec.radius if spec.radius else None
-                if specialization and specialization == spec_id and latitude and longitude and radius:
+                if specialization and specialization == int(spec_id) and latitude and longitude and radius:
                     pnt1 = Point(float(longitude), float(latitude))
                     pnt2 = Point(float(long), float(lat))
                     if pnt1.distance(pnt2) * 100 <= radius:
