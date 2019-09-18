@@ -296,6 +296,10 @@ class PlusProfileViewSet(viewsets.GenericViewSet):
             plus_user = PlusUser.objects.filter(id=plus_user_id).first()
         else:
             return Response(status=status.HTTP_404_NOT_FOUND)
+
+        if not plus_user:
+            return Response(status=status.HTTP_404_NOT_FOUND)
+
         plus_members = plus_user.plus_members.all()
         if len(plus_members) > 1:
             resp['is_member_allowed'] = False
