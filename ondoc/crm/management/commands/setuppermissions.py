@@ -42,7 +42,7 @@ from ondoc.diagnostic.models import (Lab, LabTiming, LabImage, GenericLabAdmin,
                                      CommonPackage, LabTestCategory, LabTestCategoryMapping,
                                      LabTestRecommendedCategoryMapping, QuestionAnswer, FrequentlyAddedTogetherTests,
                                      LabTestGroup, LabTestGroupMapping, LabTestGroupTiming, LabTestCategoryLandingURLS,
-                                     LabTestCategoryUrls)
+                                     LabTestCategoryUrls, LabTestThresholds)
 
 from ondoc.insurance.models import (Insurer, InsurancePlans, InsuranceThreshold, InsuranceCity, StateGSTCode,
                                     InsuranceDistrict, InsuranceTransaction, InsuranceDeal, InsuranceDisease,
@@ -604,7 +604,7 @@ class Command(BaseCommand):
                                                            SimilarSpecializationGroupMapping, LabTestCategoryLandingURLS, LabTestCategoryUrls,
                                                            HospitalNetworkImage, HospitalNetworkTiming,
                                                            HospitalNetworkServiceMapping,
-                                                           HospitalNetworkSpeciality, DynamicTemplates)
+                                                           HospitalNetworkSpeciality, DynamicTemplates, LabTestThresholds)
 
         for cl, ct in content_types.items():
             permissions = Permission.objects.filter(
