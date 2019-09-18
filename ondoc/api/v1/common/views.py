@@ -1304,7 +1304,7 @@ class SponsorListingViewSet(viewsets.GenericViewSet):
                         hospital_id = spec.poc.provider_name_hospital.id
                         sepc_lat_matching_ids.append(hospital_id)
 
-                elif latitude and longitude and radius and not specialization:
+                elif latitude and longitude and radius and (not specialization or specialization != int(spec_id)):
                     pnt1 = Point(float(longitude), float(latitude))
                     pnt2 = Point(float(long), float(lat))
                     if pnt1.distance(pnt2) * 100 <= radius:
