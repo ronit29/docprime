@@ -39,8 +39,9 @@ class PlusListViewSet(viewsets.GenericViewSet):
 
         utm_source = request.query_params.get('utm_source', None)
         if utm_source:
+            # plus_proposer = self.get_queryset()
             plans = self.get_plan_queryset(utm_source)
-            body_serializer = serializers.PlusPlansSerializer(plans, context={'request': request}, many=True)
+            body_serializer = serializers.PlusProposerSerializer(plans, context={'request': request}, many=True)
             resp['plus_data'] = body_serializer.data
         else:
             plus_proposer = self.get_queryset()
@@ -343,16 +344,13 @@ class PlusDataViewSet(viewsets.GenericViewSet):
         user = request.user
         res = {}
         if not user:
-            res['error'] = "user not found"
-            return Response(error=res, status=status.HTTP_400_BAD_REQUEST)
+            return Response(data=res, status=status.HTTP_200_OK)
         dummy_data = PlusDummyData.objects.filter(user=user).order_by('-id').first()
         if not dummy_data:
-            res['error'] = "data not found"
-            return Response(error=res, status=status.HTTP_400_BAD_REQUEST)
+            return Response(data=res, status=status.HTTP_200_OK)
         member_data = dummy_data.data
         if not member_data:
-            res['error'] = "data not found"
-            return Response(error=res, status=status.HTTP_400_BAD_REQUEST)
+            return Response(data=res, status=status.HTTP_200_OK)
         res['data'] = member_data
         return Response(data=res, status=status.HTTP_200_OK)
 
