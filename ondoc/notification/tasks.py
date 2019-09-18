@@ -1122,8 +1122,9 @@ def push_plus_lead_to_matrix(self, data):
                 raise Exception('Data received from matrix is null or empty.')
 
             if not resp_data.get('Id', None):
-                logger.error(json.dumps(request_data))
-                raise Exception("[ERROR] Id not recieved from the matrix while pushing plus lead to matrix.")
+                return
+                # logger.error(json.dumps(request_data))
+                # raise Exception("[ERROR] Id not recieved from the matrix while pushing plus lead to matrix.")
 
             plus_lead_qs = PlusLead.objects.filter(id=id)
             plus_lead_qs.update(matrix_lead_id=resp_data.get('Id'))
@@ -1217,8 +1218,9 @@ def push_insurance_banner_lead_to_matrix(self, data):
                 raise Exception('Data received from matrix is null or empty.')
 
             if not resp_data.get('Id', None):
-                logger.error(json.dumps(request_data))
-                raise Exception("[ERROR] Id not recieved from the matrix while pushing insurance banner lead to matrix.")
+                return
+                # logger.error(json.dumps(request_data))
+                # raise Exception("[ERROR] Id not recieved from the matrix while pushing insurance banner lead to matrix.")
 
             insurance_banner_qs = InsuranceLead.objects.filter(id=id)
             insurance_banner_qs.update(matrix_lead_id=resp_data.get('Id'))
