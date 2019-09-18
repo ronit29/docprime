@@ -650,7 +650,7 @@ class DoctorSearchHelper:
                     is_insurance_covered = False
                     insurance_error = "You have already utilised {} Oncologist consultations available in your OPD Insurance Plan.".format(settings.INSURANCE_ONCOLOGIST_LIMIT)
 
-                if request and doctor.enabled_for_plus_plans and doctor_clinic.hospital.enabled_for_prepaid and \
+                if doctor.enabled_for_plus_plans and doctor_clinic.hospital.enabled_for_prepaid and \
                         doctor.enabled_for_online_booking and doctor_clinic.hospital.enabled_for_online_booking and \
                         doctor_clinic.enabled_for_online_booking:
                     is_enable_for_vip = True
