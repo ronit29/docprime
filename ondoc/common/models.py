@@ -1,3 +1,4 @@
+from django.contrib.gis.geos import Point
 from django.contrib.postgres.fields import JSONField
 from django.core.validators import FileExtensionValidator, MinValueValidator, MaxValueValidator
 from django.db import models, transaction
@@ -30,6 +31,9 @@ from django.utils import timezone
 
 from ondoc.common.helper import Choices
 from django.conf import settings
+
+# from ondoc.doctor.models import PurchaseOrderCreation, PracticeSpecialization
+
 
 
 class Cities(models.Model):
@@ -805,6 +809,65 @@ class Fraud(auth_model.TimeStampedModel):
     class Meta:
         db_table = 'fraud'
         unique_together = ('content_type', 'object_id',)
+
+
+
+class SponsorListingURL(auth_model.TimeStampedModel):
+    poc = models.ForeignKey("doctor.PurchaseOrderCreation", on_delete=models.CASCADE, null=True, blank=True, related_name='poc_sponsorlisting')
+    seo_url = models.CharField(max_length=500, null=True, blank=True)
+    is_enabled = models.BooleanField(default=False)
+
+    class Meta:
+        db_table = 'sponsor_listing_url'
+
+    def __str__(self):
+        return self.seo_url
+
+
+class SponsorListingSpecialization(auth_model.TimeStampedModel):
+    from django.contrib.gis.db import models as gis_models
+
+    poc = models.ForeignKey("doctor.PurchaseOrderCreation", on_delete=models.CASCADE, related_name='poc_specialization', null=True)
+    specialization = models.ForeignKey("doctor.PracticeSpecialization", on_delete=models.SET_NULL, null=True, blank=True, related_name='listing_specialization')
+    latitude = models.FloatField(null=True, blank=True)
+    longitude = models.FloatField(null=True, blank=True)
+    location = gis_models.PointField(geography=True, srid=4326, blank=True, null=True)
+    radius = models.FloatField(null=True)
+    is_enabled = models.BooleanField(default=False)
+
+    def save(self, force_insert=False, force_update=False, using=None, update_fields=None):
+        if self.latitude and self.longitude:
+            self.location = Point(float(self.longitude), float(self.latitude))
+
+        super().save(force_insert, force_update, using, update_fields)
+
+
+    class Meta:
+        db_table = 'sponsor_listing_specialization'
+
+    # def __str__(self):
+    #     return self.id
+
+
+
+
+class SponsorListingUtmTerm(auth_model.TimeStampedModel):
+    poc = models.ForeignKey('doctor.PurchaseOrderCreation', on_delete=models.CASCADE, related_name='poc_utm_term', null=True)
+    utm_term = models.CharField(max_length=1000, null=True, blank=True)
+    is_enabled = models.BooleanField(default=False)
+
+    class Meta:
+        db_table = 'sponsor_listing_utm_term'
+
+    def __str__(self):
+        return self.utm_term
+
+
+class SponsoredListingService(auth_model.TimeStampedModel):
+    poc = models.ForeignKey('doctor.PurchaseOrderCreation', on_delete=models.SET_NULL, related_name='poc_sponsor_service', null=True)
+    hospital_service = models.ForeignKey('doctor.HospitalSponsoredServices', on_delete=models.SET_NULL, null=True, related_name='hospservices')
+    class Meta:
+        db_table = 'sponsoredlisting_service'
 
 
 class DocumentsProofs(auth_model.TimeStampedModel):
