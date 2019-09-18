@@ -30,17 +30,17 @@ class EventCreateViewSet(GenericViewSet):
     @transaction.non_atomic_requests
     def create(self, request):
         from ondoc.tracking.models import TrackingSaveLogs
-        try:
-            with transaction.atomic():
-                TrackingSaveLogs.objects.create(data=request.data)
-        except Exception as e:
-            logger.error(str(e))
 
         visitor_id, visit_id = self.get_visit(request)
         resp = {}
         data = request.data
 
         if data and isinstance(data, dict):
+            try:
+                with transaction.atomic():
+                    TrackingSaveLogs.objects.create(data=data)
+            except Exception as e:
+                logger.error(str(e))
 
             data = deepcopy(data)
             data.pop('visitor_info', None)
