@@ -102,6 +102,6 @@ def setup_periodic_tasks(sender, **kwargs):
     sender.add_periodic_task(crontab(hour=0, minute=30), doctors_daily_schedule.s(), name="Doctor's Daily Schedule")
     sender.add_periodic_task(crontab(day_of_week=1, hour=22, minute=0), update_rc_super_user.s(), name="Update Rocket Chat Super User Token")
     # sender.add_periodic_task(crontab(hour=21, minute=00), add_net_revenue_for_merchant.s(), name='Add net revenue for merchants')
-    sender.add_periodic_task(crontab(hour=0, minute=00), purchase_order_creation_counter_automation(), name="Enable Purchase Order Creation")
+    sender.add_periodic_task(crontab(hour=18, minute=30), purchase_order_creation_counter_automation(), name="Enable Purchase Order Creation")
     sender.add_periodic_task(crontab(hour=18, minute=30), purchase_order_closing_counter_automation(),
                              name="Disable Purchase Order Creation")
