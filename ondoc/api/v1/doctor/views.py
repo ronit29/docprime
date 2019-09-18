@@ -4649,7 +4649,7 @@ class HospitalViewSet(viewsets.GenericViewSet):
                                                          'hospitalcertification_set',
                                                          'hosp_availability',
                                                          'question_answer',
-                                                         'hospitalspeciality_set', Prefetch('hospitalimage_set',
+                                                         'hospitalspeciality_set', Prefetch('imagehospital',
                                                                                             HospitalImage.objects.all().order_by(
                                                                                                 '-cover_image'))).filter(
             id=pk, is_live=True).first()
