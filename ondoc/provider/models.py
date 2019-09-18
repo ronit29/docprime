@@ -250,7 +250,7 @@ class PartnerLabTestSampleDetails(auth_models.TimeStampedModel):
     volume_unit = models.CharField(max_length=16, default=None, null=True, blank=True, choices=VOLUME_UNIT_CHOICES)
     is_fasting_required = models.BooleanField(default=False)
     report_tat = models.PositiveSmallIntegerField(null=True, blank=True)                    # in hours
-    reference_value = models.CharField(max_length=256, null=True, blank=True)
+    reference_value = models.TextField(blank=True, null=True)
     material_required = JSONField(null=True)
     instructions = models.CharField(max_length=256, null=True, blank=True)
 
