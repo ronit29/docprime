@@ -1239,7 +1239,7 @@ class SponsorListingViewSet(viewsets.GenericViewSet):
 
         parameters = request.query_params
         url = parameters.get('url')
-        spec_id = parameters.get('specialization_id')
+        spec_id = parameters.get('spec_id')
         lat = parameters.get('lat')
         long = parameters.get('long')
         utm = parameters.get('utm_term')
