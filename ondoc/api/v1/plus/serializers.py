@@ -112,6 +112,12 @@ class PlusProposerSerializer(serializers.ModelSerializer):
         fields = ('id', 'name', 'logo', 'website', 'phone_number', 'email', 'plans')
 
 
+class PlusProposerUTMSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = PlusProposer
+        fields = ('id', 'name', 'logo', 'website', 'phone_number', 'email', 'plans')
+
+
 class PlusMembersDocumentSerializer(serializers.Serializer):
     proof_file = serializers.PrimaryKeyRelatedField(queryset=DocumentsProofs.objects.all())
 

@@ -11,7 +11,7 @@ from ondoc.authentication.backends import JWTAuthentication
 from ondoc.account import models as account_models
 from ondoc.authentication.models import User, UserProfile
 from ondoc.common.models import BlacklistUser, BlockedStates, DocumentsProofs
-from ondoc.plus.models import (PlusProposer, PlusPlans, PlusThreshold, PlusMembers, PlusUser, PlusLead)
+from ondoc.plus.models import (PlusProposer, PlusPlans, PlusThreshold, PlusMembers, PlusUser, PlusLead, PlusDummyData)
 from . import serializers
 import datetime
 from datetime import timedelta
@@ -26,15 +26,27 @@ class PlusListViewSet(viewsets.GenericViewSet):
     def get_queryset(self):
         return PlusProposer.objects.filter(is_live=True)
 
+    def get_plan_queryset(self, utm_source):
+        plans = PlusPlans.objects.filter(is_live=True, utm_source__contains={'utm_source': utm_source})
+        # plans_with_utm = plans.filter()
+        return plans
+
     def list(self, request):
         resp = {}
         user = request.user
         if user and not user.is_anonymous and user.is_authenticated and (user.active_plus_user or user.inactive_plus_user):
             return Response(data={'certificate': True}, status=status.HTTP_200_OK)
 
-        plus_proposer = self.get_queryset()
-        body_serializer = serializers.PlusProposerSerializer(plus_proposer, context={'request': request}, many=True)
-        resp['plus_data'] = body_serializer.data
+        utm_source = request.query_params.get('utm_source', None)
+        if utm_source:
+            plans = self.get_plan_queryset(utm_source)
+            body_serializer = serializers.PlusPlansSerializer(plans, context={'request': request}, many=True)
+            resp['plus_data'] = body_serializer.data
+        else:
+            plus_proposer = self.get_queryset()
+            body_serializer = serializers.PlusProposerSerializer(plus_proposer, context={'request': request}, many=True)
+            resp['plus_data'] = body_serializer.data
+
         return Response(resp)
 
 
@@ -311,4 +323,36 @@ class PlusProfileViewSet(viewsets.GenericViewSet):
         available_relations.pop(PlusMembers.Relations.SELF)
         resp['relation_master'] = available_relations
         return Response({'data': resp})
+
+
+class PlusDataViewSet(viewsets.GenericViewSet):
+    authentication_classes = (JWTAuthentication,)
+    permission_classes = (IsAuthenticated,)
+
+    def push_dummy_data(self, request):
+        try:
+            user = request.user
+            data = request.data
+            PlusDummyData.objects.create(user=user, data=data)
+            return Response(data="save successfully!!", status=status.HTTP_200_OK )
+        except Exception as e:
+            logger.error(str(e))
+            return Response(data="could not save data", status=status.HTTP_400_BAD_REQUEST)
+
+    def show_dummy_data(self, request):
+        user = request.user
+        res = {}
+        if not user:
+            res['error'] = "user not found"
+            return Response(error=res, status=status.HTTP_400_BAD_REQUEST)
+        dummy_data = PlusDummyData.objects.filter(user=user).order_by('-id').first()
+        if not dummy_data:
+            res['error'] = "data not found"
+            return Response(error=res, status=status.HTTP_400_BAD_REQUEST)
+        member_data = dummy_data.data
+        if not member_data:
+            res['error'] = "data not found"
+            return Response(error=res, status=status.HTTP_400_BAD_REQUEST)
+        res['data'] = member_data
+        return Response(data=res, status=status.HTTP_200_OK)
 

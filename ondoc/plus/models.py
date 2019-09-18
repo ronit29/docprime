@@ -12,6 +12,7 @@ from ondoc.authentication.models import UserProfile
 from ondoc.cart.models import Cart
 from ondoc.common.helper import Choices
 import json
+from ondoc.authentication.models import UserProfile, User
 from django.db import transaction
 from django.db.models import Q
 from ondoc.common.models import DocumentsProofs
@@ -88,6 +89,15 @@ class PlusPlans(auth_model.TimeStampedModel, LiveMixin):
     is_selected = models.BooleanField(default=False)
     features = JSONField(blank=False, null=False, default=dict)
     utm_source = JSONField(blank=True, null=True)
+
+    @property
+    def get_active_plans_with_utm(self, utm):
+        plans = self.objects.filter(utm_source__contains={'utm_source': utm})
+        if plans:
+            return plans
+        else:
+            return self.objects.filter(utm_source__contains={'utm_source': ""})
+        # return self.plus_plans.filter(is_live=True).order_by('id')
 
     @classmethod
     def all_active_plans(cls):
@@ -842,4 +852,12 @@ class PlusAppointmentMapping(auth_model.TimeStampedModel):
 
     class Meta:
         db_table = 'plus_appointment_mapping'
+
+
+class PlusDummyData(auth_model.TimeStampedModel):
+    user = models.ForeignKey(User, related_name='plus_user_dummy_data', on_delete=models.DO_NOTHING)
+    data = JSONField(null=False, blank=False)
+
+    class Meta:
+        db_table = 'plus_dummy_data'
 
