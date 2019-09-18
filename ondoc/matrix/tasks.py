@@ -401,8 +401,9 @@ def push_appointment_to_matrix(self, data):
         resp_data = response.json()
 
         if not resp_data.get('Id', None):
-            logger.error(json.dumps(request_data))
-            raise Exception("[ERROR] Id not recieved from the matrix while pushing appointment lead.")
+            return
+            # logger.error(json.dumps(request_data))
+            # raise Exception("[ERROR] Id not recieved from the matrix while pushing appointment lead.")
 
         # save the appointment with the matrix lead id.
 

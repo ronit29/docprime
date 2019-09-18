@@ -95,8 +95,9 @@ def push_plus_buy_to_matrix(self, *args, **kwargs):
                 raise Exception('Data received from matrix is null or empty.')
 
             if not resp_data.get('Id', None):
-                logger.error(json.dumps(request_data))
-                raise Exception("[ERROR] Id not recieved from the matrix while pushing insurance to matrix.")
+                return
+                # logger.error(json.dumps(request_data))
+                # raise Exception("[ERROR] Id not recieved from the matrix while pushing insurance to matrix.")
 
             user_plus_qs = PlusUser.objects.filter(id=plus_user_obj.id)
             user_plus_qs.update(matrix_lead_id=resp_data.get('Id'))
