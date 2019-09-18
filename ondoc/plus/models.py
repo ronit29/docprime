@@ -87,6 +87,7 @@ class PlusPlans(auth_model.TimeStampedModel, LiveMixin):
     total_allowed_members = models.PositiveSmallIntegerField(default=0)
     is_selected = models.BooleanField(default=False)
     features = JSONField(blank=False, null=False, default=dict)
+    utm_source = JSONField(blank=True, null=True)
 
     @classmethod
     def all_active_plans(cls):
