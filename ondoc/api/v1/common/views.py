@@ -1293,7 +1293,7 @@ class SponsorListingViewSet(viewsets.GenericViewSet):
 
         for specialization_obj in sponsorlisting_objects:
             for spec in specialization_obj.poc_specialization.all():
-                specialization = spec.specialization.id
+                specialization = spec.specialization.id if spec.specialization else None
                 latitude = spec.latitude if spec.latitude else None
                 longitude = spec.longitude if spec.longitude else None
                 radius = spec.radius if spec.radius else None
