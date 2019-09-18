@@ -146,12 +146,17 @@ class OpdAppointmentSerializer(serializers.ModelSerializer):
     def get_vip(self, obj):
 
         plus_appointment_mapping = None
+        vip_amount = 0
         if obj:
             plus_appointment_mapping = PlusAppointmentMapping.objects.filter(object_id=obj.id).first()
 
+        if plus_appointment_mapping:
+            if not (int(plus_appointment_mapping.amount) > int(obj.mrp)):
+                vip_amount = int(obj.mrp) - int(plus_appointment_mapping.amount)
+
         return {
             'is_vip_member': True if obj and obj.plus_plan else False,
-            'vip_amount': plus_appointment_mapping.amount if plus_appointment_mapping else 0,
+            'vip_amount': vip_amount,
             'covered_under_vip': True if obj and obj.plus_plan else False
         }
 
@@ -1585,13 +1590,18 @@ class AppointmentRetrieveSerializer(OpdAppointmentSerializer):
         return resp
 
     def get_vip(self, obj):
+        vip_amount = 0
         plus_appointment_mapping = None
         if obj:
             plus_appointment_mapping = PlusAppointmentMapping.objects.filter(object_id=obj.id).first()
 
+        if plus_appointment_mapping:
+            if not (int(plus_appointment_mapping.amount) > int(obj.mrp)):
+                vip_amount = int(obj.mrp) - int(plus_appointment_mapping.amount)
+
         return {
             'is_vip_member': True if obj and obj.plus_plan else False,
-            'vip_amount': plus_appointment_mapping.amount if plus_appointment_mapping else 0,
+            'vip_amount': vip_amount,
             'covered_under_vip': True if obj and obj.plus_plan else False
         }
 

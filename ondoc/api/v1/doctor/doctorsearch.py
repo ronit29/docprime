@@ -650,12 +650,19 @@ class DoctorSearchHelper:
                     is_insurance_covered = False
                     insurance_error = "You have already utilised {} Oncologist consultations available in your OPD Insurance Plan.".format(settings.INSURANCE_ONCOLOGIST_LIMIT)
 
+                if doctor.enabled_for_plus_plans and doctor_clinic.hospital.enabled_for_prepaid and \
+                        doctor.enabled_for_online_booking and doctor_clinic.hospital.enabled_for_online_booking and \
+                        doctor_clinic.enabled_for_online_booking:
+                    if request and request.user and not request.user.is_anonymous and request.user.active_insurance:
+                        is_enable_for_vip = False
+                    else:
+                        is_enable_for_vip = True
+
                 if request and request.user and not request.user.is_anonymous and vip_data_dict.get('is_vip_member') and \
                         doctor.enabled_for_plus_plans and doctor_clinic.hospital.enabled_for_prepaid and \
                         doctor.enabled_for_online_booking and doctor_clinic.hospital.enabled_for_online_booking and \
                         doctor_clinic.enabled_for_online_booking:
                     mrp = int(min_price.get('mrp'))
-                    is_enable_for_vip = True
                     cover_under_vip = True if vip_remaining_amount > 0 else False
                     vip_amount = 0 if vip_remaining_amount > mrp else mrp - vip_remaining_amount
                 hospitals = [{

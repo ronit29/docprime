@@ -9,6 +9,8 @@ import requests
 import json
 import logging
 
+from ondoc.matrix.mongo_models import MatrixLog
+
 logger = logging.getLogger(__name__)
 
 
@@ -145,6 +147,8 @@ def push_insurance_buy_to_matrix(self, *args, **kwargs):
         matrix_api_token = settings.MATRIX_API_TOKEN
         response = requests.post(url, data=json.dumps(request_data), headers={'Authorization': matrix_api_token,
                                                                               'Content-Type': 'application/json'})
+
+        MatrixLog.create_matrix_logs(user_insurance, request_data, response.json())
 
         if response.status_code != status.HTTP_200_OK or not response.ok:
             logger.error(json.dumps(request_data))

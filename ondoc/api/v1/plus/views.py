@@ -65,7 +65,7 @@ class PlusOrderLeadViewSet(viewsets.GenericViewSet):
             plus_user = user.active_plus_user
 
             if plus_user and plus_user.is_valid():
-                return Response({'success': True, "is_plus_user": True})
+                return Response({'success': True, "is_plus_user": True, 'lead_id': None})
 
             # if not plus_lead:
             #     plus_lead = PlusLead(user=user)
@@ -80,13 +80,13 @@ class PlusOrderLeadViewSet(viewsets.GenericViewSet):
             plus_lead.extras = request.data
             plus_lead.save()
 
-            return Response({'success': True, 'is_plus_user': False})
+            return Response({'success': True, 'is_plus_user': False, 'lead_id': plus_lead.id})
         else:
             lead = PlusLead.create_lead_by_phone_number(request)
             if not lead:
-                return Response({'success': False, 'is_plus_user': False})
+                return Response({'success': False, 'is_plus_user': False, 'lead_id': None})
 
-            return Response({'success': True, 'is_plus_user': False})
+            return Response({'success': True, 'is_plus_user': False, 'lead_id': lead.id})
 
 
 class PlusOrderViewSet(viewsets.GenericViewSet):
@@ -296,6 +296,10 @@ class PlusProfileViewSet(viewsets.GenericViewSet):
             plus_user = PlusUser.objects.filter(id=plus_user_id).first()
         else:
             return Response(status=status.HTTP_404_NOT_FOUND)
+
+        if not plus_user:
+            return Response(status=status.HTTP_400_BAD_REQUEST)
+
         plus_members = plus_user.plus_members.all()
         if len(plus_members) > 1:
             resp['is_member_allowed'] = False
