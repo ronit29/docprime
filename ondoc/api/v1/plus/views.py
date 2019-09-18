@@ -39,9 +39,11 @@ class PlusListViewSet(viewsets.GenericViewSet):
 
         utm_source = request.query_params.get('utm_source', None)
         if utm_source:
-            # plus_proposer = self.get_queryset()
-            plans = self.get_plan_queryset(utm_source)
-            body_serializer = serializers.PlusPlansSerializer(plans, context={'request': request}, many=True)
+            # plans = self.get_plan_queryset(utm_source)
+            # body_serializer = serializers.PlusPlansSerializer(plans, context={'request': request}, many=True)
+            # resp['plus_data'] = body_serializer.data
+            plus_proposer = self.get_queryset()
+            body_serializer = serializers.PlusProposerSerializer(plus_proposer, context={'request': request}, many=True)
             resp['plus_data'] = body_serializer.data
         else:
             plus_proposer = self.get_queryset()
