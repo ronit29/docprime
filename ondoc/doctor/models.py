@@ -921,6 +921,21 @@ class Doctor(auth_model.TimeStampedModel, auth_model.QCModel, SearchKey, auth_mo
         # update search and profile urls
         doctor_search_urls_new.doctor_urls()
 
+    def is_congot_doctor(self):
+        from ondoc.procedure.models import PotentialIpdLeadPracticeSpecialization
+        # general_specialization = []
+        # spec_ids = list()
+
+        all_potential_spec = set(PotentialIpdLeadPracticeSpecialization.objects.all().values_list('practice_specialization', flat=True))
+        is_congot = False
+
+        for dps in self.doctorpracticespecializations.all():
+            # general_specialization.append(dps.specialization)
+            # spec_ids.append(dps.specialization.id)
+            if dps.specialization.id in all_potential_spec:
+                is_congot = True
+
+        return is_congot
 
     # @property
     @cached_property
@@ -2879,7 +2894,7 @@ class OpdAppointment(auth_model.TimeStampedModel, CouponsMixin, OpdAppointmentIn
         # if self.is_plus_appointment:
         #     self.user.active_plus_user.update_doctor_utilization(self)
 
-        if old_instance is None and self.payment_type == OpdAppointment.COD:
+        if old_instance is None:
             try:
                 create_ipd_lead_from_opd_appointment.apply_async(({'obj_id': self.id},),)
                                                                  # eta=timezone.now() + timezone.timedelta(hours=1))
@@ -3548,9 +3563,20 @@ class OpdAppointment(auth_model.TimeStampedModel, CouponsMixin, OpdAppointmentIn
             logger.error("Could not save triggered event - " + str(e))
 
     def is_retail_booking(self, old_instance):
+        # if old_instance.status == OpdAppointment.BOOKED and self.status == OpdAppointment.ACCEPTED \
+        #         and (self.payment_type == OpdAppointment.PREPAID or self.payment_type == OpdAppointment.COD) \
+        #         and self.doctor.is_insurance_enabled and self.hospital.enabled_for_insurance:
+        #     return True
+
+        if self.doctor and self.doctor.is_congot_doctor():
+            return False
+
         if old_instance.status == OpdAppointment.BOOKED and self.status == OpdAppointment.ACCEPTED \
-                and (self.payment_type == OpdAppointment.PREPAID or self.payment_type == OpdAppointment.COD) \
-                and self.doctor.is_insurance_enabled and self.hospital.enabled_for_insurance:
+                and (self.payment_type == OpdAppointment.PREPAID or self.payment_type == OpdAppointment.COD):
+
+            if self.user and self.user.active_insurance:
+                return False
+
             return True
         else:
             return False

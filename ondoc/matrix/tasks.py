@@ -17,6 +17,7 @@ from django.apps import apps
 from ondoc.crm.constants import matrix_product_ids, matrix_subproduct_ids, constants
 
 logger = logging.getLogger(__name__)
+from ondoc.matrix.mongo_models import MatrixLog
 
 
 # def prepare_and_hit(self, data):
@@ -379,6 +380,14 @@ def push_appointment_to_matrix(self, data):
         response = requests.post(url, data=json.dumps(request_data), headers={'Authorization': matrix_api_token,
                                                                               'Content-Type': 'application/json'})
 
+        qs = None
+        if data.get('type') == 'OPD_APPOINTMENT':
+            qs = OpdAppointment.objects.filter(id=appointment.id)
+        elif data.get('type') == 'LAB_APPOINTMENT':
+            qs = LabAppointment.objects.filter(id=appointment.id)
+
+        MatrixLog.create_matrix_logs(qs.first(), request_data, response.json())
+
         if response.status_code != status.HTTP_200_OK or not response.ok:
             logger.error(json.dumps(request_data))
             logger.info("[ERROR] Appointment could not be published to the matrix system")
@@ -396,14 +405,10 @@ def push_appointment_to_matrix(self, data):
             raise Exception("[ERROR] Id not recieved from the matrix while pushing appointment lead.")
 
         # save the appointment with the matrix lead id.
-        qs = None
-        if data.get('type') == 'OPD_APPOINTMENT':
-            qs = OpdAppointment.objects.filter(id=appointment.id)
-        elif data.get('type') == 'LAB_APPOINTMENT':
-            qs = LabAppointment.objects.filter(id=appointment.id)
 
         if qs:
             qs.update(matrix_lead_id=int(resp_data.get('Id')))
+
 
     except Exception as e:
         logger.error("Error in Celery. Failed pushing Appointment to the matrix- " + str(e))

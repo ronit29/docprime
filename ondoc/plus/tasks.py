@@ -8,6 +8,8 @@ import requests
 import json
 import logging
 
+from ondoc.matrix.mongo_models import MatrixLog
+
 logger = logging.getLogger(__name__)
 
 
@@ -26,7 +28,7 @@ def push_plus_buy_to_matrix(self, *args, **kwargs):
         if not user_obj:
             raise Exception("User could not found against id - " + str(user_id))
 
-        plus_user_obj = user_obj.active_plus_user
+        plus_user_obj = PlusUser.objects.filter(user=user_obj).order_by('id').last()
         if not plus_user_obj:
             raise Exception("Invalid or None plus membership found for user id %s " % str(user_id))
 
@@ -75,6 +77,8 @@ def push_plus_buy_to_matrix(self, *args, **kwargs):
         matrix_api_token = settings.MATRIX_API_TOKEN
         response = requests.post(url, data=json.dumps(request_data), headers={'Authorization': matrix_api_token,
                                                                               'Content-Type': 'application/json'})
+
+        MatrixLog.create_matrix_logs(plus_user_obj, request_data, response.json())
 
         if response.status_code != status.HTTP_200_OK or not response.ok:
             logger.error(json.dumps(request_data))
