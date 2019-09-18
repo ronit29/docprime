@@ -923,15 +923,15 @@ class Doctor(auth_model.TimeStampedModel, auth_model.QCModel, SearchKey, auth_mo
 
     def is_congot_doctor(self):
         from ondoc.procedure.models import PotentialIpdLeadPracticeSpecialization
-        general_specialization = []
-        spec_ids = list()
+        # general_specialization = []
+        # spec_ids = list()
 
         all_potential_spec = set(PotentialIpdLeadPracticeSpecialization.objects.all().values_list('practice_specialization', flat=True))
         is_congot = False
 
         for dps in self.doctorpracticespecializations.all():
-            general_specialization.append(dps.specialization)
-            spec_ids.append(dps.specialization.id)
+            # general_specialization.append(dps.specialization)
+            # spec_ids.append(dps.specialization.id)
             if dps.specialization.id in all_potential_spec:
                 is_congot = True
 
