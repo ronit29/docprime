@@ -62,12 +62,13 @@ class ScreenViewSet(viewsets.GenericViewSet):
                 'longitude': long
             }
 
-            serializer = InsuranceCityEligibilitySerializer(data=data)
-            serializer.is_valid(raise_exception=True)
-            data = serializer.validated_data
-            city_name = InsuranceEligibleCities.get_nearest_city(data.get('latitude'), data.get('longitude'))
-            if city_name:
-                insurance_availability = True
+            # serializer = InsuranceCityEligibilitySerializer(data=data)
+            # serializer.is_valid(raise_exception=True)
+            # data = serializer.validated_data
+            # Commented for App - As we are not showing Insurance anywhere in App.
+            # city_name = InsuranceEligibleCities.get_nearest_city(data.get('latitude'), data.get('longitude'))
+            # if city_name:
+            #     insurance_availability = True
 
         if UserConfig.objects.filter(key="app_update").exists():
             app_update = UserConfig.objects.filter(key="app_update").values_list('data', flat=True).first()

@@ -146,12 +146,17 @@ class OpdAppointmentSerializer(serializers.ModelSerializer):
     def get_vip(self, obj):
 
         plus_appointment_mapping = None
+        vip_amount = 0
         if obj:
             plus_appointment_mapping = PlusAppointmentMapping.objects.filter(object_id=obj.id).first()
 
+        if plus_appointment_mapping:
+            if not (int(plus_appointment_mapping.amount) > int(obj.mrp)):
+                vip_amount = int(obj.mrp) - int(plus_appointment_mapping.amount)
+
         return {
             'is_vip_member': True if obj and obj.plus_plan else False,
-            'vip_amount': plus_appointment_mapping.amount if plus_appointment_mapping else 0,
+            'vip_amount': vip_amount,
             'covered_under_vip': True if obj and obj.plus_plan else False
         }
 
@@ -612,7 +617,7 @@ class DoctorHospitalSerializer(serializers.ModelSerializer):
         return resp
 
     def get_vip(self, obj):
-        resp = {"is_vip_member": False, "cover_under_vip": False, "vip_amount": 0}
+        resp = {"is_vip_member": False, "cover_under_vip": False, "vip_amount": 0, "is_enable_for_vip": False}
         request = self.context.get("request")
         user = request.user
         doctor_clinic = obj.doctor_clinic
@@ -623,7 +628,7 @@ class DoctorHospitalSerializer(serializers.ModelSerializer):
                                         and hospital.enabled_for_plus_plans and doctor.enabled_for_plus_plans
 
         if enabled_for_online_booking and obj.mrp is not None:
-
+            resp['is_enable_for_vip'] = True
             plus_user = None if not user.is_authenticated or user.is_anonymous else user.active_plus_user
             if not plus_user:
                 return resp
@@ -1549,6 +1554,7 @@ class AppointmentRetrieveSerializer(OpdAppointmentSerializer):
     insurance = serializers.SerializerMethodField()
     invoices = serializers.SerializerMethodField()
     cancellation_reason = serializers.SerializerMethodField()
+    vip = serializers.SerializerMethodField()
 
     class Meta:
         model = OpdAppointment
@@ -1556,7 +1562,7 @@ class AppointmentRetrieveSerializer(OpdAppointmentSerializer):
                   'allowed_action', 'effective_price', 'deal_price', 'status', 'time_slot_start', 'time_slot_end',
                   'doctor', 'hospital', 'allowed_action', 'doctor_thumbnail', 'patient_thumbnail', 'procedures', 'mrp',
                   'insurance', 'invoices', 'cancellation_reason', 'payment_type', 'display_name', 'reports', 'prescription',
-                  'report_files')
+                  'report_files', 'vip')
 
     def get_insurance(self, obj):
         request = self.context.get("request")
@@ -1582,6 +1588,22 @@ class AppointmentRetrieveSerializer(OpdAppointmentSerializer):
                         resp['is_appointment_insured'] = False
 
         return resp
+
+    def get_vip(self, obj):
+        vip_amount = 0
+        plus_appointment_mapping = None
+        if obj:
+            plus_appointment_mapping = PlusAppointmentMapping.objects.filter(object_id=obj.id).first()
+
+        if plus_appointment_mapping:
+            if not (int(plus_appointment_mapping.amount) > int(obj.mrp)):
+                vip_amount = int(obj.mrp) - int(plus_appointment_mapping.amount)
+
+        return {
+            'is_vip_member': True if obj and obj.plus_plan else False,
+            'vip_amount': vip_amount,
+            'covered_under_vip': True if obj and obj.plus_plan else False
+        }
 
     def get_procedures(self, obj):
         if obj:
