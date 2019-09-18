@@ -1868,7 +1868,7 @@ class DoctorDocument(auth_model.TimeStampedModel, auth_model.Document):
 
 
 class HospitalImage(auth_model.TimeStampedModel, auth_model.Image):
-    hospital = models.ForeignKey(Hospital, on_delete=models.CASCADE)
+    hospital = models.ForeignKey(Hospital, on_delete=models.CASCADE, related_name='imagehospital')
     name = models.ImageField(upload_to='hospital/images', height_field='height', width_field='width')
     cropped_image = models.ImageField(upload_to='hospital/images', height_field='height', width_field='width',
                                       blank=True, null=True)
@@ -2325,6 +2325,8 @@ class PurchaseOrderCreation(auth_model.TimeStampedModel):
         elif self.provider_name_lab:
             self.provider_name = self.provider_name_lab.name
         save_now = False
+        sponsor_listing = False
+
         if not self.id:
             save_now =True
             if self.product_type == self.PAY_AT_CLINIC:
@@ -2337,6 +2339,10 @@ class PurchaseOrderCreation(auth_model.TimeStampedModel):
                 #     self.provider_name_hospital.save()
                 #     Hospital.objects.filter(id=self.provider_name_hospital.id, enabled_for_cod=True, enabled_poc=True)
 
+            if self.product_type == self.SPONSOR_LISTING:
+                if self.start_date == timezone.now().date():
+                    self.is_enabled = True
+
         if self.id:
             if self.is_enabled == False:
                 self.disable_cod_functionality()
@@ -2346,18 +2352,19 @@ class PurchaseOrderCreation(auth_model.TimeStampedModel):
 
         super().save(force_insert, force_update, using, update_fields)
 
-        if save_now:
+        if save_now and self.PAY_AT_CLINIC:
             if self.start_date == timezone.now().date():
                 self.provider_name_hospital.enabled_for_cod = True
                 self.provider_name_hospital.enabled_poc = True
                 self.provider_name_hospital.save()
-                if self.end_date:
-                    notification_tasks.purchase_order_closing_counter_automation.apply_async((self.id, ), eta=self.end_date, )    # task to disable Pay-at-clinic functionality in hospital
+            #     if self.end_date:
+            #         notification_tasks.purchase_order_closing_counter_automation.apply_async((self.id, ), eta=self.end_date, )    # task to disable Pay-at-clinic functionality in hospital
+            #
+            # else:
+            #     if self.start_date and self.end_date:
+            #         notification_tasks.purchase_order_creation_counter_automation.apply_async((self.id, ), eta=self.start_date, ) # task to enable Pay-at-clinic functionality in hospital
+            #         notification_tasks.purchase_order_closing_counter_automation.apply_async((self.id, ), eta=self.end_date, )    # task to disable Pay-at-clinic functionality in hospital
 
-            else:
-                if self.start_date and self.end_date:
-                    notification_tasks.purchase_order_creation_counter_automation.apply_async((self.id, ), eta=self.start_date, ) # task to enable Pay-at-clinic functionality in hospital
-                    notification_tasks.purchase_order_closing_counter_automation.apply_async((self.id, ), eta=self.end_date, )    # task to disable Pay-at-clinic functionality in hospital
 
     def disable_cod_functionality(self):
         remaining_poc_objects = PurchaseOrderCreation.objects.filter(is_enabled=True,
@@ -5001,7 +5008,10 @@ class HospitalSponsoredServices(auth_model.TimeStampedModel):
         db_table = "hospital_sponsored_services"
         unique_together = (("hospital", "sponsored_service"),)
 
+    def __str__(self):
+        return '{}-{}'.format(self.hospital.name, self.sponsored_service.name)
 
+@reversion.register()
 class SponsoredServicePracticeSpecialization(auth_model.TimeStampedModel):
     sponsored_service = models.ForeignKey(SponsoredServices, on_delete=models.DO_NOTHING, blank=False, null=False, related_name='spec_sponsored_services')
     specialization = models.ForeignKey(PracticeSpecialization, on_delete=models.DO_NOTHING, blank=False, null=False, related_name='spec_sponsored_services')

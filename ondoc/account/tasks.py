@@ -587,3 +587,35 @@ def appointment_wise_revenue(all_appointments):
                 else:
                     MerchantNetRevenue.objects.create(merchant=merchant, total_revenue=booking_net_revenue,
                                                       financial_year=financial_year)
+
+
+@task()
+def purchase_order_creation_counter_automation():
+
+    from ondoc.doctor.models import PurchaseOrderCreation
+    instance = PurchaseOrderCreation.objects.filter(start_date=timezone.now().date())
+    for poc_instance in instance:
+        if poc_instance and poc_instance.product_type == PurchaseOrderCreation.PAY_AT_CLINIC:
+            poc_instance.is_enabled = True
+            poc_instance.provider_name_hospital.enabled_poc = True
+            poc_instance.provider_name_hospital.enabled_for_cod = True
+            poc_instance.save()
+
+        if poc_instance and poc_instance.product_type == PurchaseOrderCreation.SPONSOR_LISTING:
+            poc_instance.is_enabled = True
+            poc_instance.save()
+
+
+@task()
+def purchase_order_closing_counter_automation():
+
+    from ondoc.doctor.models import PurchaseOrderCreation
+    instance = PurchaseOrderCreation.objects.filter(end_date=timezone.now().date())
+
+    for poc_instance in instance:
+        if poc_instance and poc_instance.product_type == PurchaseOrderCreation.PAY_AT_CLINIC:
+            poc_instance.disable_cod_functionality()
+
+        if poc_instance and poc_instance.product_type == PurchaseOrderCreation.SPONSOR_LISTING:
+            poc_instance.is_enabled = False
+            poc_instance.save()
