@@ -298,7 +298,7 @@ class PlusProfileViewSet(viewsets.GenericViewSet):
             return Response(status=status.HTTP_404_NOT_FOUND)
 
         if not plus_user:
-            return Response(status=status.HTTP_404_NOT_FOUND)
+            return Response(status=status.HTTP_400_BAD_REQUEST)
 
         plus_members = plus_user.plus_members.all()
         if len(plus_members) > 1:
