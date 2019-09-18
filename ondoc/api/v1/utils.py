@@ -2215,10 +2215,10 @@ def log_requests_on():
 
     HTTPConnection.debuglevel = 1
     requests_log = logging.getLogger("urllib3")
-    requests_log.setLevel(logging.DEBUG)
+    requests_log.setLevel(logging.INFO)
     requests_log.propagate = True
     ch = logging.StreamHandler()
-    ch.setLevel(logging.DEBUG)
+    ch.setLevel(logging.INFO)
     requests_log.addHandler(ch)
 
 
