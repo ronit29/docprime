@@ -1262,33 +1262,6 @@ class SponsorListingViewSet(viewsets.GenericViewSet):
                 'provider_name_hospital', flat=True).distinct()
             important_ids = important_ids | set(utm_matching_ids)
 
-        # if spec_id:
-        #     spec_and_lat_long_ids = sponsorlisting_objects.filter(
-        #         poc_specialization__location__dwithin=(Point(float(long), float(lat)),
-        #                                                D(km=F('radius'))),
-        #         poc_specialization__specialization__id=spec_id,
-        #         poc_specialization__is_enabled=True).values_list(
-        #         'provider_name_hospital', flat=True).distinct()
-        #
-        #     if spec_and_lat_long_ids:
-        #         important_ids = important_ids | set(spec_and_lat_long_ids)
-        # else:
-        #     # x = common_models.SponsorListingSpecialization.objects.filter(location__dwithin=(
-        #     #         Point(float(long),
-        #     #               float(lat)),
-        #     #         D(km=F('radius')))).first().poc
-        #     lat_long_ids = sponsorlisting_objects.filter(
-        #         poc_specialization__location__dwithin=(
-        #             Point(float(long),
-        #                   float(lat)),
-        #             D(km=50)),
-        #         poc_specialization__is_enabled=True).values_list(
-        #         'provider_name_hospital', flat=True).distinct()
-        #
-        #     if lat_long_ids:
-        #         important_ids = important_ids | set(lat_long_ids)
-
-
         sepc_lat_matching_ids = []
 
         for specialization_obj in sponsorlisting_objects:
