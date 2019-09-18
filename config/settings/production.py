@@ -61,6 +61,10 @@ LOGGING = {
             'format': '%(levelname)s %(asctime)s %(module)s '
                       '%(process)d %(thread)d %(message)s'
         },
+        'elk_format': {
+            'format': '%(asctime)s %(module)s '
+                      '%(message)s'
+        },
     },
     'handlers': {
         'console': {
@@ -78,15 +82,20 @@ LOGGING = {
         'raven': {
             'level': 'DEBUG',
             'handlers': ['console', ],
-            'propagate': False,
+            'propagate': True,
         },
         'sentry.errors': {
             'level': 'DEBUG',
             'handlers': ['console', ],
-            'propagate': False,
+            'propagate': True,
         },
         'django.security.DisallowedHost': {
             'level': 'ERROR',
+            'handlers': ['console', ],
+            'propagate': False,
+        },
+        'elk': {
+            'level': 'INFO',
             'handlers': ['console', ],
             'propagate': False,
         },
