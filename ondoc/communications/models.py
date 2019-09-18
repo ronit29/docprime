@@ -545,7 +545,7 @@ class SMSNotification:
         click_login_token_objects = list()
         for receiver in receivers:
             if receiver.get('user') and receiver.get('user').user_type == User.DOCTOR:
-                context, click_login_token_obj = self.save_token_to_context(context, receiver['user'])
+                context, click_login_token_obj = self.save_token_to_context(context, receiver.get('user'))
                 click_login_token_objects.append(click_login_token_obj)
             elif context.get('provider_login_url'):
                 context.pop('provider_login_url')
@@ -554,7 +554,7 @@ class SMSNotification:
             if not obj:
                 receivers_left.append(receiver)
             else:
-                click_login_token_objects = list()
+                # click_login_token_objects = list()
                 user = receiver.get('user')
                 phone_number = receiver.get('phone_number')
                 if not phone_number:
