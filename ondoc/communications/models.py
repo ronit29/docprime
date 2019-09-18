@@ -516,7 +516,6 @@ class SMSNotification:
         return context, click_login_token_obj
 
     def send(self, receivers):
-
         dispatch_response, receivers = self.dispatch(receivers)
         if dispatch_response:
             return
@@ -543,7 +542,14 @@ class SMSNotification:
 
         receivers_left = list()
 
+        click_login_token_objects = list()
         for receiver in receivers:
+            if receiver.get('user') and receiver.get('user').user_type == User.DOCTOR:
+                context, click_login_token_obj = self.save_token_to_context(context, receiver['user'])
+                click_login_token_objects.append(click_login_token_obj)
+            elif context.get('provider_login_url'):
+                context.pop('provider_login_url')
+
             obj = self.get_template_object(receiver.get('user'))
             if not obj:
                 receivers_left.append(receiver)
@@ -553,13 +559,6 @@ class SMSNotification:
                 phone_number = receiver.get('phone_number')
                 if not phone_number:
                     phone_number = user.phone_number
-
-                # if user and user.user_type == User.DOCTOR:
-                #     context, click_login_token_obj = self.save_token_to_context(context, receiver['user'])
-                #     click_login_token_objects.append(click_login_token_obj)
-                # elif context.get('provider_login_url'):
-                #     context.pop('provider_login_url')
-                # ClickLoginToken.objects.bulk_create(click_login_token_objects)
 
                 instance = context.get('instance')
 
@@ -573,6 +572,8 @@ class SMSNotification:
                         continue
 
                 obj.send_notification(context, phone_number, self.notification_type, user=user)
+
+        ClickLoginToken.objects.bulk_create(click_login_token_objects) if click_login_token_objects else None
 
         if not receivers_left:
             return True, receivers_left
