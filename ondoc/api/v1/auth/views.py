@@ -69,7 +69,7 @@ from ondoc.notification.tasks import send_pg_acknowledge, save_pg_response, save
 
 from ondoc.ratings_review import models as rate_models
 from django.contrib.contenttypes.models import ContentType
-
+from ondoc.api.v1.plus.plusintegration import PlusIntegration
 import re
 from ondoc.matrix.tasks import push_order_to_matrix
 
@@ -99,6 +99,7 @@ class LoginOTP(GenericViewSet):
         response = {'exists': 0}
         # if request.data.get("phone_number"):
         #     expire_otp(phone_number=request.data.get("phone_number"))
+
         serializer = serializers.OTPSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
 
@@ -142,6 +143,16 @@ class LoginOTP(GenericViewSet):
             send_otp(otp_message, phone_number, retry_send, via_sms=via_sms, via_whatsapp=via_whatsapp, call_source=call_source)
             if User.objects.filter(phone_number=phone_number, user_type=User.CONSUMER).exists():
                 response['exists'] = 1
+
+
+        request_data = request.data
+        utm_source = request_data.get('utm_source', None)
+        if utm_source:
+            utm_param_dict = PlusIntegration.get_response(request_data)
+            if utm_param_dict is not None:
+                url = utm_param_dict.get('url', "")
+                request_data = utm_param_dict.get('request_data', {})
+                auth_token = utm_param_dict.get('auth_token', "")
 
         return Response(response)
 
