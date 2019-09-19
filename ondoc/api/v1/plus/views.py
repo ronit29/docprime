@@ -41,6 +41,9 @@ class PlusListViewSet(viewsets.GenericViewSet):
         if utm_source:
             # plans = self.get_plan_queryset(utm_source)
             # body_serializer = serializers.PlusPlansSerializer(plans, context={'request': request}, many=True)
+            proposer_serializer = serializers.PlusProposerUTMSerializer(self.get_queryset(), context={'request': request}, many=True)
+
+            # resp.update(proposer_serializer.data)
             # resp['plus_data'] = body_serializer.data
             plus_proposer = self.get_queryset()
             body_serializer = serializers.PlusProposerUTMSerializer(plus_proposer, context={'request': request, 'utm': utm_source}, many=True)
@@ -175,6 +178,9 @@ class PlusOrderViewSet(viewsets.GenericViewSet):
                             user_profile = {"name": member['first_name'] + " " + last_name, "email":
                                 member['email'], "dob": member['dob']}
 
+            utm_source = request.data.get('utm_source', None)
+            is_utm_agent = request.data.get('is_agent', None)
+            utm_parameter = {"utm_source": utm_source, "is_utm_agent": is_utm_agent}
             plus_plan = PlusPlans.objects.get(id=plus_plan_id)
             transaction_date = datetime.datetime.now()
             amount = plus_plan.deal_price
@@ -186,7 +192,7 @@ class PlusOrderViewSet(viewsets.GenericViewSet):
                                    'purchase_date': transaction_date, 'expire_date': expiry_date, 'amount': amount,
                                    'user': request.user.pk, "plus_members": plus_members}
             plus_subscription_data = {"profile_detail": user_profile, "plus_plan": plus_plan.id,
-                              "user": request.user.pk, "plus_user": plus_user_data}
+                              "user": request.user.pk, "plus_user": plus_user_data, "utm_parameter": utm_parameter}
 
             consumer_account = account_models.ConsumerAccount.objects.get_or_create(user=user)
             consumer_account = account_models.ConsumerAccount.objects.select_for_update().get(user=user)

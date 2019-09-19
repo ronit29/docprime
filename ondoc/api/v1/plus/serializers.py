@@ -113,7 +113,6 @@ class PlusProposerSerializer(serializers.ModelSerializer):
 
 
 class PlusProposerUTMSerializer(serializers.ModelSerializer):
-    # plans = PlusPlansSerializer(source='get_active_plans', many=True)
     plans = serializers.SerializerMethodField()
 
     def get_plans(self, obj):
@@ -128,6 +127,16 @@ class PlusProposerUTMSerializer(serializers.ModelSerializer):
     class Meta:
         model = PlusProposer
         fields = ('id', 'name', 'logo', 'website', 'phone_number', 'email', 'plans')
+
+    def get_plans(self, obj):
+        request = self.context.get('request')
+        utm_source = request.query_params.get('utm_source', None)
+        plans = PlusPlans.objects.filter(is_live=True, utm_source__contains={'utm_source': utm_source})
+        plan_serializer = PlusPlansSerializer(plans)
+        if plan_serializer:
+            return plan_serializer.data
+        else:
+            return []
 
 
 class PlusMembersDocumentSerializer(serializers.Serializer):
