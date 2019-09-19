@@ -82,7 +82,7 @@ class PlusIntegration:
                             "DocPrimeUserId": None,
                             "LeadID": 0,
                             "Name": data.get('name', ""),
-                            "PrimaryNo": data.get('phone_number', None),
+                            "PrimaryNo": str(data.get('phone_number', None)),
                             "LeadSource": "DocPrime",
                             "EmailId": "",
                             "Gender": None,

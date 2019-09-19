@@ -400,5 +400,8 @@ class PlusIntegrationViewSet(viewsets.GenericViewSet):
             except Exception as e:
                 logger.error(json.dumps(request_data))
                 logger.info("[ERROR] {}".format(e))
+        else:
+            resp['error'] = "UTM source required!!"
+            return Response(data=resp, status=status.HTTP_200_OK)
 
 
