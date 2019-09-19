@@ -62,19 +62,18 @@ LOGGING = {
                       '%(process)d %(thread)d %(message)s'
         },
         'elk_format': {
-            'format': '%(asctime)s %(module)s '
-                      '%(message)s'
+            'format': '%(asctime)s %(module)s %(process)d %(thread)d %(message)s'
         },
     },
     'handlers': {
         'console': {
-            'level': 'DEBUG',
+            'level': 'INFO',
             'class': 'logging.StreamHandler',
-            'formatter': 'verbose'
+            'formatter': 'elk_format'
         }
     },
     'loggers': {
-        '': {
+        'django': {
             'handlers': ['console',],
             'level': 'ERROR',
             'propagate': False,
@@ -95,6 +94,10 @@ SENTRY_DSN = env('DJANGO_SENTRY_DSN')
 
 if env('ENABLE_SENTRY', default=False):
     LOGGING['disable_existing_loggers'] = True
+    LOGGING['handlers']['sentry'] = {
+        'level': 'ERROR',
+        'class': 'raven.contrib.django.raven_compat.handlers.SentryHandler',
+    }
     LOGGING['root']['handlers'] = ['sentry', ]
     LOGGING['loggers']['raven'] = {
         'level': 'DEBUG',
@@ -106,7 +109,6 @@ if env('ENABLE_SENTRY', default=False):
         'handlers': ['console', ],
         'propagate': False,
     }
-
     INSTALLED_APPS += ('raven.contrib.django.raven_compat',)
     RAVEN_MIDDLEWARE = ['raven.contrib.django.raven_compat.middleware.SentryResponseErrorIdMiddleware']
     MIDDLEWARE = RAVEN_MIDDLEWARE + MIDDLEWARE
@@ -118,10 +120,7 @@ if env('ENABLE_SENTRY', default=False):
         'DSN': SENTRY_DSN,
         # 'release': raven.fetch_git_sha(os.path.abspath(os.pardir)),
     }
-    LOGGING['handlers']['sentry'] = {
-                                    'level': 'ERROR',
-                                    'class': 'raven.contrib.django.raven_compat.handlers.SentryHandler',
-                                     }
+
     LOGGING['loggers']['django.security.DisallowedHost']['handlers'] = ['console', 'sentry', ]
 
 
