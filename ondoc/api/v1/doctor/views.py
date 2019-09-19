@@ -4458,6 +4458,29 @@ class AppointmentMessageViewset(viewsets.GenericViewSet):
 
 class HospitalViewSet(viewsets.GenericViewSet):
 
+    def near_you_hospitals(self, request):
+        request_data = request.query_params
+        serializer = serializers.HospitalNearYouSerializer(data=request_data)
+        serializer.is_valid(raise_exception=True)
+        validated_data = serializer.validated_data
+        result_count = 0
+        if validated_data and validated_data.get('long') and validated_data.get('lat'):
+            point_string = 'POINT(' + str(validated_data.get('long')) + ' ' + str(validated_data.get('lat')) + ')'
+            pnt = GEOSGeometry(point_string, srid=4326)
+
+            hospital_queryset = Hospital.objects.prefetch_related('hospital_doctors').annotate(
+                bookable_doctors_count=Count(Q(enabled_for_online_booking=True,
+                                               hospital_doctors__enabled_for_online_booking=True,
+                                               hospital_doctors__doctor__enabled_for_online_booking=True,
+                                               hospital_doctors__doctor__is_live=True, is_live=True)),
+                distance=Distance('location', pnt)).filter(bookable_doctors_count__gte=20).order_by('distance')
+            result_count = hospital_queryset.count()
+            hospital_serializer = serializers.HospitalModelSerializer(hospital_queryset[:20], many=True,
+                                                                      context={"request": request})
+
+            return Response({'count': result_count, 'hospitals': hospital_serializer.data})
+        return Response({})
+
     def list_by_url(self, request, url, *args, **kwargs):
         url = url.lower()
         entity = EntityUrls.objects.filter(url=url, url_type=EntityUrls.UrlType.SEARCHURL,
