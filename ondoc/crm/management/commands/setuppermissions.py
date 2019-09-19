@@ -52,7 +52,8 @@ from ondoc.insurance.models import (Insurer, InsurancePlans, InsuranceThreshold,
                                     ThirdPartyAdministrator,
                                     UserBank, UserBankDocument, InsurerAccountTransfer, BankHolidays)
 from ondoc.notification.models import DynamicTemplates
-from ondoc.plus.models import PlusPlans, PlusPlanParameters, PlusProposer, PlusPlanParametersMapping, PlusPlanContent
+from ondoc.plus.models import PlusPlans, PlusPlanParameters, PlusProposer, PlusPlanParametersMapping, PlusPlanContent, \
+    PlusPlanUtmSources, PlusPlanUtmSourceMapping
 
 from ondoc.procedure.models import Procedure, ProcedureCategory, CommonProcedureCategory, DoctorClinicProcedure, \
     ProcedureCategoryMapping, ProcedureToCategoryMapping, CommonProcedure, IpdProcedure, IpdProcedureFeatureMapping, \
@@ -1159,7 +1160,7 @@ class Command(BaseCommand):
         group.permissions.clear()
 
         content_types = ContentType.objects.get_for_models(PlusProposer, PlusPlans, PlusPlanParameters,
-                                                           PlusPlanParametersMapping, PlusPlanContent)
+                                                           PlusPlanParametersMapping, PlusPlanContent, PlusPlanUtmSources, PlusPlanUtmSourceMapping)
 
         for cl, ct in content_types.items():
             permissions = Permission.objects.filter(

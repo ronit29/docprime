@@ -111,8 +111,9 @@ from .integrations import IntegratorProfileMapping, IntegratorProfileMappingAdmi
 from .integrations import IntegratorReport, IntegratorReportAdmin, IntegratorDoctorMappingsAdmin
 from .integrations import IntegratorTestMapping, IntegratorTestMappingAdmin
 from .integrations import IntegratorTestParameterMapping, IntegratorTestParameterMappingAdmin
-from .plus import PlusPlansAdmin, PlusProposerAdmin, PlusThresholdAdmin, PlusUserAdmin, PlusPlanParametersAdmin
-from ondoc.plus.models import PlusUser, PlusProposer, PlusPlans, PlusThreshold, PlusPlanParameters
+from .plus import PlusPlansAdmin, PlusProposerAdmin, PlusThresholdAdmin, PlusUserAdmin, PlusPlanParametersAdmin, \
+    PlusPlanUtmSourceAdmin
+from ondoc.plus.models import PlusUser, PlusProposer, PlusPlans, PlusThreshold, PlusPlanParameters, PlusPlanUtmSources
 
 User = get_user_model()
 
@@ -128,6 +129,7 @@ admin.site.register(PlusPlans, PlusPlansAdmin)
 admin.site.register(PlusUser, PlusUserAdmin)
 admin.site.register(PlusProposer, PlusProposerAdmin)
 admin.site.register(PlusPlanParameters, PlusPlanParametersAdmin)
+admin.site.register(PlusPlanUtmSources, PlusPlanUtmSourceAdmin)
 
 admin.site.register(OtpVerifications)
 # admin.site.register(OpdAppointment)

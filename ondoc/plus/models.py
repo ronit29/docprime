@@ -88,16 +88,13 @@ class PlusPlans(auth_model.TimeStampedModel, LiveMixin):
     total_allowed_members = models.PositiveSmallIntegerField(default=0)
     is_selected = models.BooleanField(default=False)
     features = JSONField(blank=False, null=False, default=dict)
-    utm_source = JSONField(blank=True, null=True)
 
-    @property
-    def get_active_plans_with_utm(self, utm):
-        plans = self.objects.filter(utm_source__contains={'utm_source': utm})
-        if plans:
-            return plans
-        else:
-            return self.objects.filter(utm_source__contains={'utm_source': ""})
-        # return self.plus_plans.filter(is_live=True).order_by('id')
+    @classmethod
+    def get_active_plans_via_utm(cls, utm):
+        plans_via_utm = PlusPlanUtmSourceMapping.objects.filter(utm_source__source=utm, plus_plan__is_live=True, plus_plan__enabled=True)\
+            .values_list('plus_plan', flat=True)
+
+        return plans_via_utm
 
     @classmethod
     def all_active_plans(cls):
@@ -108,6 +105,30 @@ class PlusPlans(auth_model.TimeStampedModel, LiveMixin):
 
     class Meta:
         db_table = 'plus_plans'
+
+
+class PlusPlanUtmSources(auth_model.TimeStampedModel):
+    source = models.CharField(max_length=100, null=False, blank=False)
+    source_details = models.CharField(max_length=500, null=True, blank=True)
+
+    def __str__(self):
+        return "{}".format(self.source)
+
+    class Meta:
+        db_table = 'plus_plan_utmsources'
+
+
+@reversion.register()
+class PlusPlanUtmSourceMapping(auth_model.TimeStampedModel):
+    plus_plan = models.ForeignKey(PlusPlans, related_name="plan_utmsources", null=False, blank=False, on_delete=models.CASCADE)
+    utm_source = models.ForeignKey(PlusPlanUtmSources, null=False, blank=False, on_delete=models.CASCADE)
+    # value = models.CharField(max_length=100, null=False, blank=False)
+
+    def __str__(self):
+        return "{} - {}".format(self.plus_plan, self.utm_source)
+
+    class Meta:
+        db_table = 'plus_plan_utmsources_mapping'
 
 
 class PlusPlanParameters(auth_model.TimeStampedModel):
