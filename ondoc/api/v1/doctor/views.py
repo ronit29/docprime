@@ -2485,7 +2485,7 @@ class DoctorListViewSet(viewsets.GenericViewSet):
                     insurance_data_dict['insurance_threshold_amount'] = 0 if insurance_threshold.opd_amount_limit is None else \
                         insurance_threshold.opd_amount_limit
                     insurance_data_dict['is_user_insured'] = True
-            if logged_in_user.active_plus_user:
+            if vip_user:
                 utilization_dict = logged_in_user.active_plus_user.get_utilization
 
                 vip_data_dict['vip_remaining_amount'] = utilization_dict.get(
@@ -2592,7 +2592,7 @@ class DoctorListViewSet(viewsets.GenericViewSet):
                     insurance_data_dict['insurance_threshold_amount'] = 0 if insurance_threshold.opd_amount_limit is None else \
                         insurance_threshold.opd_amount_limit
                     insurance_data_dict['is_user_insured'] = True
-            if logged_in_user.active_plus_user:
+            if vip_user:
                 utilization_dict = logged_in_user.active_plus_user.get_utilization
 
                 vip_data_dict['vip_remaining_amount'] = utilization_dict.get(
