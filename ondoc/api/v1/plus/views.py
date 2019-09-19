@@ -46,7 +46,9 @@ class PlusListViewSet(viewsets.GenericViewSet):
 
             # resp.update(proposer_serializer.data)
             # resp['plus_data'] = body_serializer.data
-            resp['plus_data'] = proposer_serializer.data
+            plus_proposer = self.get_queryset()
+            body_serializer = serializers.PlusProposerUTMSerializer(plus_proposer, context={'request': request, 'utm': utm_source}, many=True)
+            resp['plus_data'] = body_serializer.data
         else:
             plus_proposer = self.get_queryset()
             body_serializer = serializers.PlusProposerSerializer(plus_proposer, context={'request': request}, many=True)

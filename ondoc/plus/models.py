@@ -91,8 +91,11 @@ class PlusPlans(auth_model.TimeStampedModel, LiveMixin):
 
     @classmethod
     def get_active_plans_via_utm(cls, utm):
-        plans_via_utm = PlusPlanUtmSourceMapping.objects.filter(utm_source__source=utm, plus_plan__is_live=True, plus_plan__enabled=True)\
-            .values_list('plus_plan', flat=True)
+        qs = PlusPlanUtmSourceMapping.objects.filter(utm_source__source=utm, plus_plan__is_live=True, plus_plan__enabled=True)
+        if not qs:
+            return []
+
+        plans_via_utm = list(map(lambda obj: obj.plus_plan, qs))
 
         return plans_via_utm
 
