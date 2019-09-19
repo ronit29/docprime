@@ -53,7 +53,7 @@ LOGGING = {
     'version': 1,
     'disable_existing_loggers': True,
     'root': {
-        'level': 'WARNING',
+        'level': 'INFO',
         'handlers': ['console', ],
     },
     'formatters': {
@@ -79,23 +79,13 @@ LOGGING = {
             'handlers': ['console', ],
             'propagate': False,
         },
-        'raven': {
-            'level': 'DEBUG',
-            'handlers': ['console', ],
-            'propagate': True,
-        },
-        'sentry.errors': {
-            'level': 'DEBUG',
-            'handlers': ['console', ],
-            'propagate': True,
+        'django.request': {
+            'handlers': ['console',],
+            'level': 'ERROR',
+            'propagate': False,
         },
         'django.security.DisallowedHost': {
             'level': 'ERROR',
-            'handlers': ['console', ],
-            'propagate': False,
-        },
-        'elk': {
-            'level': 'INFO',
             'handlers': ['console', ],
             'propagate': False,
         },
@@ -121,6 +111,16 @@ if env('ENABLE_SENTRY', default=False):
                                      }
     LOGGING['loggers']['django.security.DisallowedHost']['handlers'] = ['console', 'sentry', ]
     LOGGING['root']['handlers'] = ['sentry', ]
+    LOGGING['loggers']['raven'] = {
+                                    'level': 'DEBUG',
+                                    'handlers': ['console', ],
+                                    'propagate': False,
+                                  }
+    LOGGING['loggers']['sentry.errors'] = {
+                                            'level': 'DEBUG',
+                                            'handlers': ['console', ],
+                                            'propagate': False,
+                                          }
 
 
 EMAIL_HOST = env('EMAIL_HOST')
