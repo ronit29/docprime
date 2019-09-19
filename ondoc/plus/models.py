@@ -64,15 +64,15 @@ class PlusProposer(auth_model.TimeStampedModel):
 
     @property
     def get_active_plans(self):
-        plans = list(self.plus_plans.filter(is_live=True).order_by('id'))
-        index = 0
-        for plan in plans:
-            if plan.plan_utmsources.all().exists():
-                plans.pop(index)
-            else:
-                index += 1
+        return self.plus_plans.filter(is_live=True, is_retail=True).order_by('id')[:3]
+        # index = 0
+        # for plan in plans:
+        #     if plan.plan_utmsources.all().exists():
+        #         plans.pop(index)
+        #     else:
+        #         index += 1
 
-        return plans
+        # return plans
 
     @property
     def get_all_plans(self):
@@ -96,6 +96,7 @@ class PlusPlans(auth_model.TimeStampedModel, LiveMixin):
     total_allowed_members = models.PositiveSmallIntegerField(default=0)
     is_selected = models.BooleanField(default=False)
     features = JSONField(blank=False, null=False, default=dict)
+    is_retail = models.NullBooleanField()
 
     @classmethod
     def get_active_plans_via_utm(cls, utm):
