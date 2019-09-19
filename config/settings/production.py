@@ -51,7 +51,7 @@ INSTALLED_APPS += ('gunicorn',)
 SMS_BACKEND = 'ondoc.sms.backends.backend.SmsBackend'
 LOGGING = {
     'version': 1,
-    'disable_existing_loggers': True,
+    'disable_existing_loggers': False,
     'root': {
         'level': 'INFO',
         'handlers': ['console', ],
@@ -94,6 +94,19 @@ LOGGING = {
 SENTRY_DSN = env('DJANGO_SENTRY_DSN')
 
 if env('ENABLE_SENTRY', default=False):
+    LOGGING['disable_existing_loggers'] = True
+    LOGGING['root']['handlers'] = ['sentry', ]
+    LOGGING['loggers']['raven'] = {
+        'level': 'DEBUG',
+        'handlers': ['console', ],
+        'propagate': False,
+    }
+    LOGGING['loggers']['sentry.errors'] = {
+        'level': 'DEBUG',
+        'handlers': ['console', ],
+        'propagate': False,
+    }
+
     INSTALLED_APPS += ('raven.contrib.django.raven_compat',)
     RAVEN_MIDDLEWARE = ['raven.contrib.django.raven_compat.middleware.SentryResponseErrorIdMiddleware']
     MIDDLEWARE = RAVEN_MIDDLEWARE + MIDDLEWARE
@@ -110,17 +123,6 @@ if env('ENABLE_SENTRY', default=False):
                                     'class': 'raven.contrib.django.raven_compat.handlers.SentryHandler',
                                      }
     LOGGING['loggers']['django.security.DisallowedHost']['handlers'] = ['console', 'sentry', ]
-    LOGGING['root']['handlers'] = ['sentry', ]
-    LOGGING['loggers']['raven'] = {
-                                    'level': 'DEBUG',
-                                    'handlers': ['console', ],
-                                    'propagate': False,
-                                  }
-    LOGGING['loggers']['sentry.errors'] = {
-                                            'level': 'DEBUG',
-                                            'handlers': ['console', ],
-                                            'propagate': False,
-                                          }
 
 
 EMAIL_HOST = env('EMAIL_HOST')
