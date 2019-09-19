@@ -6,7 +6,7 @@ from rest_framework import serializers
 from dal import autocomplete
 from ondoc.authentication.models import User
 from ondoc.plus.models import PlusProposer, PlusPlans, PlusThreshold, PlusUser, PlusPlanContent, PlusPlanParameters, \
-    PlusPlanParametersMapping
+    PlusPlanParametersMapping, PlusPlanUtmSources, PlusPlanUtmSourceMapping
 from import_export.admin import ImportExportMixin, ImportExportModelAdmin, base_formats
 import nested_admin
 from import_export import fields, resources
@@ -29,6 +29,18 @@ class PlusPlanParametersAdmin(admin.ModelAdmin):
     list_display = ('key',)
 
 
+class PlusPlanUtmSourceAdmin(admin.ModelAdmin):
+    model = PlusPlanUtmSources
+    fields = ('source', 'source_details')
+    list_display = ('source',)
+
+
+class PlusPlanUtmSourceMappingInline(admin.TabularInline):
+    model = PlusPlanUtmSourceMapping
+    fields = ('plus_plan', 'utm_source')
+    extra = 0
+
+
 class PlusPlanParametersMappingInline(admin.TabularInline):
     model = PlusPlanParametersMapping
     fields = ('plus_plan', 'parameter', 'value')
@@ -43,7 +55,7 @@ class PlusPlanContentInline(admin.TabularInline):
 
 class PlusPlansAdmin(admin.ModelAdmin):
     model = PlusPlans
-    inlines = [PlusPlanContentInline, PlusPlanParametersMappingInline]
+    inlines = [PlusPlanContentInline, PlusPlanParametersMappingInline, PlusPlanUtmSourceMappingInline]
     display = ("plan_name", "proposer", "internal_name", "mrp", "deal_price", "tenure", "enabled", "is_live", "total_allowed_members", "is_selected", )
     list_display = ('plan_name', 'proposer', 'mrp', "deal_price")
 
