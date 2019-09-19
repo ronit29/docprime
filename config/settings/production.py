@@ -74,14 +74,14 @@ LOGGING = {
         }
     },
     'loggers': {
+        '': {
+            'handlers': ['console',],
+            'level': 'ERROR',
+            'propagate': False,
+        },
         'django.db.backends': {
             'level': 'ERROR',
             'handlers': ['console', ],
-            'propagate': False,
-        },
-        'django.request': {
-            'handlers': ['console',],
-            'level': 'ERROR',
             'propagate': False,
         },
         'django.security.DisallowedHost': {
