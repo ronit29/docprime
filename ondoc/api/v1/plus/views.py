@@ -6,6 +6,7 @@ from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework import status
 
+from ondoc.api.v1.plus.plusintegration import PlusIntegration
 from ondoc.api.v1.utils import plus_subscription_transform, payment_details
 from ondoc.authentication.backends import JWTAuthentication
 from ondoc.account import models as account_models
@@ -359,4 +360,18 @@ class PlusDataViewSet(viewsets.GenericViewSet):
             return Response(data=res, status=status.HTTP_200_OK)
         res['data'] = member_data
         return Response(data=res, status=status.HTTP_200_OK)
+
+
+class PlusIntegrationViewSet(viewsets.GenericViewSet):
+
+    def push_vip_integration_leads(self, request):
+        request_data = request.data
+        utm_source = request_data.get('utm_source', None)
+        if utm_source:
+            utm_param_dict = PlusIntegration.get_response(request_data)
+            if utm_param_dict is not None:
+                url = utm_param_dict.get('url', "")
+                request_data = utm_param_dict.get('request_data', {})
+                auth_token = utm_param_dict.get('auth_token', "")
+
 

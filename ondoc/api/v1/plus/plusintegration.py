@@ -1,5 +1,5 @@
 import operator
-from ondoc.plus.models import PlusUser, PlusMembers, PlusPlans
+from ondoc.plus.models import PlusUser, PlusMembers, PlusPlans, PlusPlanUtmSources, PlusPlanUtmSourceMapping
 from django.conf import settings
 
 
@@ -8,13 +8,17 @@ class PlusIntegration:
     def get_response(self, data):
         resp = {}
         utm_source = data.get('utm_source', None)
-        plus_plan = PlusPlans.objects.filter(is_live=True, utm_source__containing=utm_source).first()
+        utm_source_obj = PlusPlanUtmSources.objects.filter(source=utm_source).first()
+        utm_mapping_obj = PlusPlanUtmSourceMapping.objects.filter(utm_source=utm_source_obj).first()
+        plus_plan = utm_mapping_obj.plus_plan
+        # plus_plan = PlusPlans.objects.filter(is_live=True, utm_source__containing=utm_source).first()
         if not utm_source or not plus_plan:
             return {}
         if utm_source == "docprime":
             resp['url'] = settings.VIP_SALESPOINT_URL
             resp['auth_token'] = settings.VIP_SALESPOINT_AUTHTOKEN
             resp['request_data'] = self.get_docprime_data(data)
+
 
         return resp
 
