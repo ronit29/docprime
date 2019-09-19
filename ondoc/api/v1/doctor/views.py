@@ -2668,8 +2668,15 @@ class DoctorAvailabilityTimingViewSet(viewsets.ViewSet):
         doctor_id = request.query_params.get('doctor_id')
         hospital_id = request.query_params.get('hospital_id')
 
-        if not doctor_id or not hospital_id:
-            return Response(status=status.HTTP_400_BAD_REQUEST, data={'error': 'doctor id or hospital id is undefined.'})
+        try:
+            doctor = Doctor.objects.filter(id=doctor_id).first()
+            hospital = Hospital.objects.filter(id=hospital_id).first()
+        except ValueError as e:
+            return Response(status=status.HTTP_400_BAD_REQUEST,
+                            data={'error': 'doctor id or hospital id is undefined.'})
+
+        if not doctor or not hospital:
+            return Response(status=status.HTTP_400_BAD_REQUEST, data={'error': 'doctor id or hospital id is not available.'})
 
         doctor_queryset = models.Doctor.objects.prefetch_related("qualifications__qualification", "qualifications__specialization")\
                                       .filter(pk=doctor_id)
@@ -4649,7 +4656,7 @@ class HospitalViewSet(viewsets.GenericViewSet):
                                                          'hospitalcertification_set',
                                                          'hosp_availability',
                                                          'question_answer',
-                                                         'hospitalspeciality_set', Prefetch('hospitalimage_set',
+                                                         'hospitalspeciality_set', Prefetch('imagehospital',
                                                                                             HospitalImage.objects.all().order_by(
                                                                                                 '-cover_image'))).filter(
             id=pk, is_live=True).first()

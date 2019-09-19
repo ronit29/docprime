@@ -921,6 +921,21 @@ class Doctor(auth_model.TimeStampedModel, auth_model.QCModel, SearchKey, auth_mo
         # update search and profile urls
         doctor_search_urls_new.doctor_urls()
 
+    def is_congot_doctor(self):
+        from ondoc.procedure.models import PotentialIpdLeadPracticeSpecialization
+        # general_specialization = []
+        # spec_ids = list()
+
+        all_potential_spec = set(PotentialIpdLeadPracticeSpecialization.objects.all().values_list('practice_specialization', flat=True))
+        is_congot = False
+
+        for dps in self.doctorpracticespecializations.all():
+            # general_specialization.append(dps.specialization)
+            # spec_ids.append(dps.specialization.id)
+            if dps.specialization.id in all_potential_spec:
+                is_congot = True
+
+        return is_congot
 
     # @property
     @cached_property
@@ -1853,7 +1868,7 @@ class DoctorDocument(auth_model.TimeStampedModel, auth_model.Document):
 
 
 class HospitalImage(auth_model.TimeStampedModel, auth_model.Image):
-    hospital = models.ForeignKey(Hospital, on_delete=models.CASCADE)
+    hospital = models.ForeignKey(Hospital, on_delete=models.CASCADE, related_name='imagehospital')
     name = models.ImageField(upload_to='hospital/images', height_field='height', width_field='width')
     cropped_image = models.ImageField(upload_to='hospital/images', height_field='height', width_field='width',
                                       blank=True, null=True)
@@ -2310,6 +2325,8 @@ class PurchaseOrderCreation(auth_model.TimeStampedModel):
         elif self.provider_name_lab:
             self.provider_name = self.provider_name_lab.name
         save_now = False
+        sponsor_listing = False
+
         if not self.id:
             save_now =True
             if self.product_type == self.PAY_AT_CLINIC:
@@ -2322,6 +2339,10 @@ class PurchaseOrderCreation(auth_model.TimeStampedModel):
                 #     self.provider_name_hospital.save()
                 #     Hospital.objects.filter(id=self.provider_name_hospital.id, enabled_for_cod=True, enabled_poc=True)
 
+            if self.product_type == self.SPONSOR_LISTING:
+                if self.start_date == timezone.now().date():
+                    self.is_enabled = True
+
         if self.id:
             if self.is_enabled == False:
                 self.disable_cod_functionality()
@@ -2331,18 +2352,19 @@ class PurchaseOrderCreation(auth_model.TimeStampedModel):
 
         super().save(force_insert, force_update, using, update_fields)
 
-        if save_now:
+        if save_now and self.PAY_AT_CLINIC:
             if self.start_date == timezone.now().date():
                 self.provider_name_hospital.enabled_for_cod = True
                 self.provider_name_hospital.enabled_poc = True
                 self.provider_name_hospital.save()
-                if self.end_date:
-                    notification_tasks.purchase_order_closing_counter_automation.apply_async((self.id, ), eta=self.end_date, )    # task to disable Pay-at-clinic functionality in hospital
+            #     if self.end_date:
+            #         notification_tasks.purchase_order_closing_counter_automation.apply_async((self.id, ), eta=self.end_date, )    # task to disable Pay-at-clinic functionality in hospital
+            #
+            # else:
+            #     if self.start_date and self.end_date:
+            #         notification_tasks.purchase_order_creation_counter_automation.apply_async((self.id, ), eta=self.start_date, ) # task to enable Pay-at-clinic functionality in hospital
+            #         notification_tasks.purchase_order_closing_counter_automation.apply_async((self.id, ), eta=self.end_date, )    # task to disable Pay-at-clinic functionality in hospital
 
-            else:
-                if self.start_date and self.end_date:
-                    notification_tasks.purchase_order_creation_counter_automation.apply_async((self.id, ), eta=self.start_date, ) # task to enable Pay-at-clinic functionality in hospital
-                    notification_tasks.purchase_order_closing_counter_automation.apply_async((self.id, ), eta=self.end_date, )    # task to disable Pay-at-clinic functionality in hospital
 
     def disable_cod_functionality(self):
         remaining_poc_objects = PurchaseOrderCreation.objects.filter(is_enabled=True,
@@ -2879,7 +2901,7 @@ class OpdAppointment(auth_model.TimeStampedModel, CouponsMixin, OpdAppointmentIn
         # if self.is_plus_appointment:
         #     self.user.active_plus_user.update_doctor_utilization(self)
 
-        if old_instance is None and self.payment_type == OpdAppointment.COD:
+        if old_instance is None:
             try:
                 create_ipd_lead_from_opd_appointment.apply_async(({'obj_id': self.id},),)
                                                                  # eta=timezone.now() + timezone.timedelta(hours=1))
@@ -3548,9 +3570,20 @@ class OpdAppointment(auth_model.TimeStampedModel, CouponsMixin, OpdAppointmentIn
             logger.error("Could not save triggered event - " + str(e))
 
     def is_retail_booking(self, old_instance):
+        # if old_instance.status == OpdAppointment.BOOKED and self.status == OpdAppointment.ACCEPTED \
+        #         and (self.payment_type == OpdAppointment.PREPAID or self.payment_type == OpdAppointment.COD) \
+        #         and self.doctor.is_insurance_enabled and self.hospital.enabled_for_insurance:
+        #     return True
+
+        if self.doctor and self.doctor.is_congot_doctor():
+            return False
+
         if old_instance.status == OpdAppointment.BOOKED and self.status == OpdAppointment.ACCEPTED \
-                and (self.payment_type == OpdAppointment.PREPAID or self.payment_type == OpdAppointment.COD) \
-                and self.doctor.is_insurance_enabled and self.hospital.enabled_for_insurance:
+                and (self.payment_type == OpdAppointment.PREPAID or self.payment_type == OpdAppointment.COD):
+
+            if self.user and self.user.active_insurance:
+                return False
+
             return True
         else:
             return False
@@ -4975,7 +5008,10 @@ class HospitalSponsoredServices(auth_model.TimeStampedModel):
         db_table = "hospital_sponsored_services"
         unique_together = (("hospital", "sponsored_service"),)
 
+    def __str__(self):
+        return '{}-{}'.format(self.hospital.name, self.sponsored_service.name)
 
+@reversion.register()
 class SponsoredServicePracticeSpecialization(auth_model.TimeStampedModel):
     sponsored_service = models.ForeignKey(SponsoredServices, on_delete=models.DO_NOTHING, blank=False, null=False, related_name='spec_sponsored_services')
     specialization = models.ForeignKey(PracticeSpecialization, on_delete=models.DO_NOTHING, blank=False, null=False, related_name='spec_sponsored_services')

@@ -2434,56 +2434,13 @@ class BajajAllianzUserViewset(GenericViewSet):
         serializer.is_valid(raise_exception=True)
         data = serializer.validated_data
         redirect_type = data.get('redirect_type')
-        # profile_data = {}
-        # source = data.get('extra').get('utm_source', 'External') if data.get('extra') else 'External'
-        # redirect_type = data.get('redirect_type')
-        #
-        # user = User.objects.filter(phone_number=data.get('phone_number'), user_type=User.CONSUMER).first()
-        # if not user:
-        #     user = User.objects.create(phone_number=data.get('phone_number'),
-        #                                is_phone_number_verified=False,
-        #                                user_type=User.CONSUMER,
-        #                                auto_created=True,
-        #                                email=data.get('email'),
-        #                                source=source,
-        #                                data=data.get('extra'))
-        #
-        # if not user:
-        #     return JsonResponse(response, status=400)
-        #
-        # profile_data['name'] = data.get('name')
-        # profile_data['phone_number'] = user.phone_number
-        # profile_data['user'] = user
-        # profile_data['email'] = data.get('email')
-        # profile_data['source'] = source
-        # user_profiles = user.profiles.all()
-        #
-        # if not bool(re.match(r"^[a-zA-Z ]+$", data.get('name'))):
-        #     return Response({"error": "Invalid Name"}, status=status.HTTP_400_BAD_REQUEST)
-        #
-        # if user_profiles:
-        #     user_profiles = list(filter(lambda x: x.name.lower() == profile_data['name'].lower(), user_profiles))
-        #     if user_profiles:
-        #         user_profile = user_profiles[0]
-        #         user_profile.phone_number = profile_data['phone_number'] if not user_profile.phone_number else None
-        #         user_profile.email = profile_data['email'] if not user_profile.email else None
-        #         user_profile.save()
-        #     else:
-        #         UserProfile.objects.create(**profile_data)
-        # else:
-        #     profile_data.update({
-        #         "is_default_user": True
-        #     })
-        #     UserProfile.objects.create(**profile_data)
-        #
-        # token_object = JWTAuthentication.generate_token(user)
         user_data = User.get_external_login_data(data)
         token_object = user_data.get('token', None)
         if not token_object or not user_data:
             return Response({'error': 'Unauthorise'}, status=status.HTTP_400_BAD_REQUEST)
 
         base_landing_url = settings.BASE_URL + '/sms/booking?token={}'.format(token_object['token'].decode("utf-8"))
-        redirect_url = 'search' if redirect_type == 'lab' else '/'
+        redirect_url = 'lab' if redirect_type == 'lab' else 'opd'
         callback_url = base_landing_url + "&callbackurl={}".format(redirect_url)
         docprime_login_url = generate_short_url(callback_url)
 
