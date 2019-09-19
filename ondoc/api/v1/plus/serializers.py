@@ -128,16 +128,6 @@ class PlusProposerUTMSerializer(serializers.ModelSerializer):
         model = PlusProposer
         fields = ('id', 'name', 'logo', 'website', 'phone_number', 'email', 'plans')
 
-    def get_plans(self, obj):
-        request = self.context.get('request')
-        utm_source = request.query_params.get('utm_source', None)
-        plans = PlusPlans.objects.filter(is_live=True, utm_source__contains={'utm_source': utm_source})
-        plan_serializer = PlusPlansSerializer(plans)
-        if plan_serializer:
-            return plan_serializer.data
-        else:
-            return []
-
 
 class PlusMembersDocumentSerializer(serializers.Serializer):
     proof_file = serializers.PrimaryKeyRelatedField(queryset=DocumentsProofs.objects.all())
