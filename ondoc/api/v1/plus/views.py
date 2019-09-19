@@ -5,6 +5,7 @@ from rest_framework import viewsets
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework import status
+import requests
 
 from ondoc.api.v1.plus.plusintegration import PlusIntegration
 from ondoc.api.v1.utils import plus_subscription_transform, payment_details
@@ -371,9 +372,22 @@ class PlusIntegrationViewSet(viewsets.GenericViewSet):
         utm_source = request_data.get('utm_source', None)
         if utm_source:
             utm_param_dict = PlusIntegration.get_response(request_data)
-            if utm_param_dict is not None:
-                url = utm_param_dict.get('url', "")
-                request_data = utm_param_dict.get('request_data', {})
-                auth_token = utm_param_dict.get('auth_token', "")
+            try:
+                if utm_param_dict is not None:
+                    url = utm_param_dict.get('url', "")
+                    request_data = utm_param_dict.get('request_data', {})
+                    auth_token = utm_param_dict.get('auth_token', "")
+
+                    response = requests.post(url, data=json.dumps(request_data), headers={'Authorization': auth_token,
+                                                                                          'Content-Type': 'application/json'})
+
+                    if response.status_code != status.HTTP_200_OK:
+                        logger.error(json.dumps(request_data))
+                        logger.info("[ERROR] could not get 200 for process VIP Lead to {}".format(utm_source))
+                else:
+                    pass
+            except Exception as e:
+                logger.error(json.dumps(request_data))
+                logger.info("[ERROR] could not process VIP Lead to {}".format(utm_source))
 
 
