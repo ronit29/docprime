@@ -1307,7 +1307,7 @@ class LabList(viewsets.ReadOnlyModelViewSet):
                     search_coupon = coupon_recommender.best_coupon(**filters)
 
                     discounted_price = lab_result["price"] if not search_coupon else search_coupon.get_search_coupon_discounted_price(lab_result["price"])
-                    lab_result["discounted_price"] = discounted_price
+                    lab_result["discounted_price"] = int(discounted_price)
 
         # result = list()
         # for data in response_queryset.items():
