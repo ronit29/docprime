@@ -1187,11 +1187,14 @@ class SmsNotification(TimeStampedModel, SmsNotificationOpdMixin, SmsNotification
         return booking_url
 
     @classmethod
-    def send_vip_booking_url(cls, token, phone_number):
+    def send_vip_booking_url(cls, token, phone_number, *args, **kwargs):
         booking_url = "{}/agent/booking?token={}".format(settings.CONSUMER_APP_DOMAIN, token)
         booking_url = booking_url + "&callbackurl=vip-club-member-details"
         short_url = generate_short_url(booking_url)
         sms_body = "Your VIP membership purchase url is - {} . Please pay to confirm".format(short_url)
+        name = kwargs.get('name', '')
+
+        sms_body = "Dear {name},\nPlease click on the link to view your Docprime VIP- Health Package details and make an online payment.\n{link} \nThanks\nTeam Docprime".format(name=name, link=short_url)
         if phone_number:
             sms_notification = {
                 "phone_number": phone_number,
