@@ -2235,7 +2235,7 @@ class UserNumberUpdate(TimeStampedModel):
 
 class UserProfileEmailUpdate(TimeStampedModel):
     profile = models.ForeignKey(UserProfile, on_delete=models.DO_NOTHING, related_name="email_updates")
-    old_email = models.CharField(max_length=256, blank=False)
+    old_email = models.CharField(max_length=256, blank=True, null=True)
     new_email = models.CharField(max_length=256, blank=False)
     otp_verified = models.BooleanField(default=False)
     is_successfull = models.BooleanField(default=False)

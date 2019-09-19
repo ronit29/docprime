@@ -412,6 +412,8 @@ class SMSNotification:
             obj = DynamicTemplates.objects.filter(template_name="Booking_Provider_Pay_at_clinic", approved=True).first()
         elif notification_type == NotificationAction.APPOINTMENT_BOOKED and (not user or user.user_type == User.DOCTOR) and (self.context.get('payment_type') == 1 or self.context.get('payment_type') == 3):
             obj = DynamicTemplates.objects.filter(template_name="Booking_Provider_SMS_OPD_Insurance_And_Prepaid", approved=True).first()
+        elif notification_type == NotificationAction.LAB_APPOINTMENT_BOOKED and (not user or user.user_type == User.DOCTOR):
+            obj = DynamicTemplates.objects.filter(template_name="provider_sms_lab_bookings_prepaid_OPD_insurance", approved=True).first()
         elif notification_type == NotificationAction.APPOINTMENT_BOOKED and user and user.user_type == User.CONSUMER and user.recent_opd_appointment.first().payment_type == 2:
             obj = DynamicTemplates.objects.filter(template_name="Booking_customer_pay_at_clinic", approved=True).first()
         elif notification_type == NotificationAction.OPD_OTP_BEFORE_APPOINTMENT:
@@ -514,7 +516,6 @@ class SMSNotification:
         return context, click_login_token_obj
 
     def send(self, receivers):
-
         dispatch_response, receivers = self.dispatch(receivers)
         if dispatch_response:
             return
@@ -541,23 +542,23 @@ class SMSNotification:
 
         receivers_left = list()
 
+        click_login_token_objects = list()
         for receiver in receivers:
+            if receiver.get('user') and receiver.get('user').user_type == User.DOCTOR:
+                context, click_login_token_obj = self.save_token_to_context(context, receiver.get('user'))
+                click_login_token_objects.append(click_login_token_obj)
+            elif context.get('provider_login_url'):
+                context.pop('provider_login_url')
+
             obj = self.get_template_object(receiver.get('user'))
             if not obj:
                 receivers_left.append(receiver)
             else:
-                click_login_token_objects = list()
+                # click_login_token_objects = list()
                 user = receiver.get('user')
                 phone_number = receiver.get('phone_number')
                 if not phone_number:
                     phone_number = user.phone_number
-
-                # if user and user.user_type == User.DOCTOR:
-                #     context, click_login_token_obj = self.save_token_to_context(context, receiver['user'])
-                #     click_login_token_objects.append(click_login_token_obj)
-                # elif context.get('provider_login_url'):
-                #     context.pop('provider_login_url')
-                # ClickLoginToken.objects.bulk_create(click_login_token_objects)
 
                 instance = context.get('instance')
 
@@ -571,6 +572,8 @@ class SMSNotification:
                         continue
 
                 obj.send_notification(context, phone_number, self.notification_type, user=user)
+
+        ClickLoginToken.objects.bulk_create(click_login_token_objects) if click_login_token_objects else None
 
         if not receivers_left:
             return True, receivers_left
@@ -1719,11 +1722,12 @@ class LabNotification(Notification):
         if notification_type:
             self.notification_type = notification_type
         else:
-            self.notification_type = self.LAB_NOTIFICATION_TYPE_MAPPING[appointment.status]
+            self.notification_type = self.LAB_NOTIFICATION_TYPE_MAPPING.get(appointment.status)
 
     def get_context(self):
         instance = self.appointment
         patient_name = instance.profile.name.title() if instance.profile.name else ""
+        patient_age = instance.profile.get_age()
         lab_name = instance.lab.name.title() if instance.lab.name else ""
         est = pytz.timezone(settings.TIME_ZONE)
         time_slot_start = self.appointment.time_slot_start.astimezone(est)
@@ -1762,6 +1766,7 @@ class LabNotification(Notification):
         context = {
             "lab_name": lab_name,
             "patient_name": patient_name,
+            "age": patient_age,
             "id": instance.id,
             "instance": instance,
             "url": "/lab/appointment/{}".format(instance.id),
@@ -1771,6 +1776,8 @@ class LabNotification(Notification):
             "pickup_address": self.appointment.get_pickup_address(),
             "coupon_discount": str(self.appointment.discount) if self.appointment.discount else None,
             "time_slot_start": time_slot_start,
+            "time_slot_start_date": str(time_slot_start.strftime("%b %d %Y")),
+            "time_slot_start_time": str(time_slot_start.strftime("%I:%M %p")),
             "tests": tests,
             "reports": report_file_links,
             "attachments": {},  # Updated later
@@ -1784,7 +1791,8 @@ class LabNotification(Notification):
             "is_thyrocare_report": is_thyrocare_report,
             "chat_url": chat_url,
             "show_amounts": bool(self.appointment.payment_type != OpdAppointment.INSURANCE),
-            "lensfit_coupon": lensfit_coupon
+            "lensfit_coupon": lensfit_coupon,
+            "visit_type": 'home' if instance.is_home_pickup else 'lab'
         }
         return context
 
