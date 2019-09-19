@@ -372,12 +372,13 @@ class PlusDataViewSet(viewsets.GenericViewSet):
 class PlusIntegrationViewSet(viewsets.GenericViewSet):
 
     def push_vip_integration_leads(self, request):
+        resp = {}
         request_data = request.data
         utm_source = request_data.get('utm_source', None)
         if utm_source:
             utm_param_dict = PlusIntegration.get_response(request_data)
             try:
-                if utm_param_dict is not None:
+                if utm_param_dict:
                     url = utm_param_dict.get('url', "")
                     request_data = utm_param_dict.get('request_data', {})
                     auth_token = utm_param_dict.get('auth_token', "")
@@ -388,10 +389,16 @@ class PlusIntegrationViewSet(viewsets.GenericViewSet):
                     if response.status_code != status.HTTP_200_OK:
                         logger.error(json.dumps(request_data))
                         logger.info("[ERROR] could not get 200 for process VIP Lead to {}".format(utm_source))
+                        resp['error'] = "Error while saving data!!"
+                        return Response(data=resp, status=status.HTTP_200_OK)
+                    else:
+                        resp['data'] = "successfully save!!"
+                        return Response(data=resp, status=status.HTTP_200_OK)
                 else:
-                    pass
+                    resp['error'] = "Not able to find Utm params"
+                    return Response(data=resp, status=status.HTTP_200_OK)
             except Exception as e:
                 logger.error(json.dumps(request_data))
-                logger.info("[ERROR] could not process VIP Lead to {}".format(utm_source))
+                logger.info("[ERROR] {}".format(e))
 
 
