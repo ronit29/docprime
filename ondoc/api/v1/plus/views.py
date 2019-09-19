@@ -5,7 +5,9 @@ from rest_framework import viewsets
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework import status
+import requests
 
+from ondoc.api.v1.plus.plusintegration import PlusIntegration
 from ondoc.api.v1.utils import plus_subscription_transform, payment_details
 from ondoc.authentication.backends import JWTAuthentication
 from ondoc.account import models as account_models
@@ -83,7 +85,7 @@ class PlusOrderLeadViewSet(viewsets.GenericViewSet):
             plus_user = user.active_plus_user
 
             if plus_user and plus_user.is_valid():
-                return Response({'success': True, "is_plus_user": True})
+                return Response({'success': True, "is_plus_user": True, 'lead_id': None})
 
             # if not plus_lead:
             #     plus_lead = PlusLead(user=user)
@@ -98,13 +100,13 @@ class PlusOrderLeadViewSet(viewsets.GenericViewSet):
             plus_lead.extras = request.data
             plus_lead.save()
 
-            return Response({'success': True, 'is_plus_user': False})
+            return Response({'success': True, 'is_plus_user': False, 'lead_id': plus_lead.id})
         else:
             lead = PlusLead.create_lead_by_phone_number(request)
             if not lead:
-                return Response({'success': False, 'is_plus_user': False})
+                return Response({'success': False, 'is_plus_user': False, 'lead_id': None})
 
-            return Response({'success': True, 'is_plus_user': False})
+            return Response({'success': True, 'is_plus_user': False, 'lead_id': lead.id})
 
 
 class PlusOrderViewSet(viewsets.GenericViewSet):
@@ -317,6 +319,10 @@ class PlusProfileViewSet(viewsets.GenericViewSet):
             plus_user = PlusUser.objects.filter(id=plus_user_id).first()
         else:
             return Response(status=status.HTTP_404_NOT_FOUND)
+
+        if not plus_user:
+            return Response(status=status.HTTP_400_BAD_REQUEST)
+
         plus_members = plus_user.plus_members.all()
         if len(plus_members) > 1:
             resp['is_member_allowed'] = False
@@ -361,4 +367,38 @@ class PlusDataViewSet(viewsets.GenericViewSet):
             return Response(data=res, status=status.HTTP_200_OK)
         res['data'] = member_data
         return Response(data=res, status=status.HTTP_200_OK)
+
+
+class PlusIntegrationViewSet(viewsets.GenericViewSet):
+
+    def push_vip_integration_leads(self, request):
+        resp = {}
+        request_data = request.data
+        utm_source = request_data.get('utm_source', None)
+        if utm_source:
+            utm_param_dict = PlusIntegration.get_response(request_data)
+            try:
+                if utm_param_dict:
+                    url = utm_param_dict.get('url', "")
+                    request_data = utm_param_dict.get('request_data', {})
+                    auth_token = utm_param_dict.get('auth_token', "")
+
+                    response = requests.post(url, data=json.dumps(request_data), headers={'Authorization': auth_token,
+                                                                                          'Content-Type': 'application/json'})
+
+                    if response.status_code != status.HTTP_200_OK:
+                        logger.error(json.dumps(request_data))
+                        logger.info("[ERROR] could not get 200 for process VIP Lead to {}".format(utm_source))
+                        resp['error'] = "Error while saving data!!"
+                        return Response(data=resp, status=status.HTTP_200_OK)
+                    else:
+                        resp['data'] = "successfully save!!"
+                        return Response(data=resp, status=status.HTTP_200_OK)
+                else:
+                    resp['error'] = "Not able to find Utm params"
+                    return Response(data=resp, status=status.HTTP_200_OK)
+            except Exception as e:
+                logger.error(json.dumps(request_data))
+                logger.info("[ERROR] {}".format(e))
+
 

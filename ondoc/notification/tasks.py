@@ -19,6 +19,7 @@ from openpyxl import load_workbook
 from ondoc.api.v1.utils import aware_time_zone, util_absolute_url, pg_seamless_hash
 from ondoc.authentication.models import UserNumberUpdate, UserProfileEmailUpdate
 from ondoc.common.models import AppointmentMaskNumber
+from ondoc.matrix.mongo_models import MatrixLog
 from ondoc.notification.labnotificationaction import LabNotificationAction
 from ondoc.notification import models as notification_models
 from celery import task
@@ -375,15 +376,18 @@ def set_order_dummy_transaction(self, order_id, user_id):
 
 @task
 def send_offline_appointment_message(**kwargs):
+    from ondoc.doctor.models import OfflineOPDAppointments
     from ondoc.communications.models import OfflineOpdAppointments
-    appointment = kwargs.get('appointment')
+    appointment_id = kwargs.get('appointment_id')
     notification_type = kwargs.get('notification_type')
     receivers = kwargs.get('receivers')
     try:
-        offline_opd_appointment_comm = OfflineOpdAppointments(appointment=appointment,
-                                                              notification_type=notification_type,
-                                                              receivers=receivers)
-        offline_opd_appointment_comm.send()
+        if appointment_id:
+            appointment = OfflineOPDAppointments.objects.filter(id=appointment_id).first()
+            offline_opd_appointment_comm = OfflineOpdAppointments(appointment=appointment,
+                                                                  notification_type=notification_type,
+                                                                  receivers=receivers)
+            offline_opd_appointment_comm.send()
     except Exception as e:
         logger.error("Error sending " + str(type) + " message - " + str(e))
 
@@ -1068,11 +1072,11 @@ def push_plus_lead_to_matrix(self, data):
         lead_source = "Docprime"
         lead_data = extras.get('lead_data')
         if lead_data:
-            provided_lead_source = lead_data.get('source')
-            if provided_lead_source:
-                lead_source = provided_lead_source
-            # if type(provided_lead_source).__name__ == 'str' and provided_lead_source.lower() == 'docprimechat':
-            #     lead_source = 'docprimechat'  #TODO change
+            provided_lead_source = lead_data.get('lead_source')
+            # if provided_lead_source:
+            #     lead_source = provided_lead_source
+            if type(provided_lead_source).__name__ == 'str' and provided_lead_source.lower() == 'AppointmentPaySuccess'.lower():
+                lead_source = provided_lead_source  #TODO change
 
         plan = None
         if plan_id and type(plan_id).__name__ == 'int':
@@ -1092,13 +1096,16 @@ def push_plus_lead_to_matrix(self, data):
             'UtmTerm': extras.get('utm_term', ''),
             'ProductId': 11,
             'SubProductId': 0,
-            'VIPPlanName': plan.plan_name if plan else None
+            'VIPPlanName': plan.plan_name if plan else None,
+            'IsInsured': 1 if plus_lead_obj and plus_lead_obj.user and plus_lead_obj.user.active_insurance else 0
         }
 
         url = settings.MATRIX_API_URL
         matrix_api_token = settings.MATRIX_API_TOKEN
         response = requests.post(url, data=json.dumps(request_data), headers={'Authorization': matrix_api_token,
                                                                               'Content-Type': 'application/json'})
+
+        MatrixLog.create_matrix_logs(plus_lead_obj, request_data, response.json())
 
         if response.status_code != status.HTTP_200_OK or not response.ok:
             logger.error(json.dumps(request_data))
@@ -1115,8 +1122,9 @@ def push_plus_lead_to_matrix(self, data):
                 raise Exception('Data received from matrix is null or empty.')
 
             if not resp_data.get('Id', None):
-                logger.error(json.dumps(request_data))
-                raise Exception("[ERROR] Id not recieved from the matrix while pushing plus lead to matrix.")
+                return
+                # logger.error(json.dumps(request_data))
+                # raise Exception("[ERROR] Id not recieved from the matrix while pushing plus lead to matrix.")
 
             plus_lead_qs = PlusLead.objects.filter(id=id)
             plus_lead_qs.update(matrix_lead_id=resp_data.get('Id'))
@@ -1193,6 +1201,8 @@ def push_insurance_banner_lead_to_matrix(self, data):
         response = requests.post(url, data=json.dumps(request_data), headers={'Authorization': matrix_api_token,
                                                                               'Content-Type': 'application/json'})
 
+        MatrixLog.create_matrix_logs(banner_obj, request_data, response.json())
+
         if response.status_code != status.HTTP_200_OK or not response.ok:
             logger.error(json.dumps(request_data))
             logger.info("[ERROR] Insurance banner lead could not be published to the matrix system")
@@ -1208,8 +1218,9 @@ def push_insurance_banner_lead_to_matrix(self, data):
                 raise Exception('Data received from matrix is null or empty.')
 
             if not resp_data.get('Id', None):
-                logger.error(json.dumps(request_data))
-                raise Exception("[ERROR] Id not recieved from the matrix while pushing insurance banner lead to matrix.")
+                return
+                # logger.error(json.dumps(request_data))
+                # raise Exception("[ERROR] Id not recieved from the matrix while pushing insurance banner lead to matrix.")
 
             insurance_banner_qs = InsuranceLead.objects.filter(id=id)
             insurance_banner_qs.update(matrix_lead_id=resp_data.get('Id'))

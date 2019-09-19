@@ -69,7 +69,7 @@ from ondoc.notification.tasks import send_pg_acknowledge, save_pg_response, save
 
 from ondoc.ratings_review import models as rate_models
 from django.contrib.contenttypes.models import ContentType
-from ondoc.api.v1.plus.plusintegration import PlusIntegration
+
 import re
 from ondoc.matrix.tasks import push_order_to_matrix
 
@@ -99,7 +99,6 @@ class LoginOTP(GenericViewSet):
         response = {'exists': 0}
         # if request.data.get("phone_number"):
         #     expire_otp(phone_number=request.data.get("phone_number"))
-
         serializer = serializers.OTPSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
 
@@ -143,16 +142,6 @@ class LoginOTP(GenericViewSet):
             send_otp(otp_message, phone_number, retry_send, via_sms=via_sms, via_whatsapp=via_whatsapp, call_source=call_source)
             if User.objects.filter(phone_number=phone_number, user_type=User.CONSUMER).exists():
                 response['exists'] = 1
-
-
-        request_data = request.data
-        utm_source = request_data.get('utm_source', None)
-        if utm_source:
-            utm_param_dict = PlusIntegration.get_response(request_data)
-            if utm_param_dict is not None:
-                url = utm_param_dict.get('url', "")
-                request_data = utm_param_dict.get('request_data', {})
-                auth_token = utm_param_dict.get('auth_token', "")
 
         return Response(response)
 
@@ -2455,56 +2444,13 @@ class BajajAllianzUserViewset(GenericViewSet):
         serializer.is_valid(raise_exception=True)
         data = serializer.validated_data
         redirect_type = data.get('redirect_type')
-        # profile_data = {}
-        # source = data.get('extra').get('utm_source', 'External') if data.get('extra') else 'External'
-        # redirect_type = data.get('redirect_type')
-        #
-        # user = User.objects.filter(phone_number=data.get('phone_number'), user_type=User.CONSUMER).first()
-        # if not user:
-        #     user = User.objects.create(phone_number=data.get('phone_number'),
-        #                                is_phone_number_verified=False,
-        #                                user_type=User.CONSUMER,
-        #                                auto_created=True,
-        #                                email=data.get('email'),
-        #                                source=source,
-        #                                data=data.get('extra'))
-        #
-        # if not user:
-        #     return JsonResponse(response, status=400)
-        #
-        # profile_data['name'] = data.get('name')
-        # profile_data['phone_number'] = user.phone_number
-        # profile_data['user'] = user
-        # profile_data['email'] = data.get('email')
-        # profile_data['source'] = source
-        # user_profiles = user.profiles.all()
-        #
-        # if not bool(re.match(r"^[a-zA-Z ]+$", data.get('name'))):
-        #     return Response({"error": "Invalid Name"}, status=status.HTTP_400_BAD_REQUEST)
-        #
-        # if user_profiles:
-        #     user_profiles = list(filter(lambda x: x.name.lower() == profile_data['name'].lower(), user_profiles))
-        #     if user_profiles:
-        #         user_profile = user_profiles[0]
-        #         user_profile.phone_number = profile_data['phone_number'] if not user_profile.phone_number else None
-        #         user_profile.email = profile_data['email'] if not user_profile.email else None
-        #         user_profile.save()
-        #     else:
-        #         UserProfile.objects.create(**profile_data)
-        # else:
-        #     profile_data.update({
-        #         "is_default_user": True
-        #     })
-        #     UserProfile.objects.create(**profile_data)
-        #
-        # token_object = JWTAuthentication.generate_token(user)
         user_data = User.get_external_login_data(data)
         token_object = user_data.get('token', None)
         if not token_object or not user_data:
             return Response({'error': 'Unauthorise'}, status=status.HTTP_400_BAD_REQUEST)
 
         base_landing_url = settings.BASE_URL + '/sms/booking?token={}'.format(token_object['token'].decode("utf-8"))
-        redirect_url = 'search' if redirect_type == 'lab' else '/'
+        redirect_url = 'lab' if redirect_type == 'lab' else 'opd'
         callback_url = base_landing_url + "&callbackurl={}".format(redirect_url)
         docprime_login_url = generate_short_url(callback_url)
 

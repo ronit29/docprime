@@ -1,23 +1,31 @@
 import operator
-from ondoc.plus.models import PlusUser, PlusMembers, PlusPlans
+from ondoc.plus.models import PlusUser, PlusMembers, PlusPlans, PlusPlanUtmSources, PlusPlanUtmSourceMapping
 from django.conf import settings
 
 
 class PlusIntegration:
 
+    @classmethod
     def get_response(self, data):
         resp = {}
         utm_source = data.get('utm_source', None)
-        plus_plan = PlusPlans.objects.filter(is_live=True, utm_source__containing=utm_source).first()
+        utm_source_obj = PlusPlanUtmSources.objects.filter(source=utm_source).first()
+        utm_mapping_obj = PlusPlanUtmSourceMapping.objects.filter(utm_source=utm_source_obj).first()
+        if not utm_mapping_obj:
+            return {}
+        plus_plan = utm_mapping_obj.plus_plan
+        # plus_plan = PlusPlans.objects.filter(is_live=True, utm_source__containing=utm_source).first()
         if not utm_source or not plus_plan:
             return {}
-        if utm_source == "docprime":
+        if utm_source == "OnlineAffiliate":
             resp['url'] = settings.VIP_SALESPOINT_URL
             resp['auth_token'] = settings.VIP_SALESPOINT_AUTHTOKEN
-            resp['request_data'] = self.get_docprime_data(data)
+            resp['request_data'] = PlusIntegration.get_docprime_data(data)
+
 
         return resp
 
+    @classmethod
     def get_docprime_data(self, data):
         request_data = { "IPDHospital": "",
                             "IsInsured": None,
@@ -25,7 +33,7 @@ class PlusIntegration:
                             "InsurancePolicyNumber": None,
                             "AppointmentStatus": None,
                             "Age": None,
-                            "Email": "",
+                            "Email": data.get('email', ""),
                             "VirtualNo": "",
                             "OTP": "",
                             "KYC": None,
@@ -42,7 +50,7 @@ class PlusIntegration:
                             "IsHomePickUp": 0,
                             "HomePickupAddress": "",
                             "PatientName": data.get('name', ""),
-                            "PatientAddress": "",
+                            "PatientAddress": data.get('address', ""),
                             "ProviderName": "",
                             "ServiceName": "",
                             "InsuranceCover": 0,
@@ -51,7 +59,7 @@ class PlusIntegration:
                             "EffectivePrice": None,
                             "MRP": None,
                             "DealPrice": None,
-                            "DOB": "",
+                            "DOB": data.get('dob', ""),
                             "ProviderAddress": "",
                             "ProviderID": None,
                             "ProviderBookingID": "",

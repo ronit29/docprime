@@ -847,11 +847,11 @@ class PlusLead(auth_model.TimeStampedModel):
 
         # user_insurance_lead = cls.objects.filter(phone_number=phone_number).order_by('id').last()
         # if not user_insurance_lead:
-        user_insurance_lead = cls(phone_number=phone_number)
+        plus_lead = cls(phone_number=phone_number)
 
-        user_insurance_lead.extras = request.data
-        user_insurance_lead.save()
-        return True
+        plus_lead.extras = request.data
+        plus_lead.save()
+        return plus_lead
 
     class Meta:
         db_table = 'plus_leads'

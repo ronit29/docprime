@@ -1655,7 +1655,9 @@ class ConsumerRefund(TimeStampedModel):
                     else:
                         raise Exception("Invalid Http response status - " + str(response.content))
                 except Exception as e:
-                    logger.error("Error in Refund of user with data - " + json.dumps(req_data) + " with exception - " + str(e))
+                    # todo - temporary commented to avoid sentry logs
+                    # logger.error("Error in Refund of user with data - " + json.dumps(req_data) + " with exception - " + str(e))
+                    print("Error in Refund of user with data - " + json.dumps(req_data) + " with exception - " + str(e))
 
     @classmethod
     def request_pending_refunds(cls):
