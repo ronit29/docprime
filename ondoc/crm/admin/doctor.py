@@ -72,6 +72,7 @@ from ondoc.sms import api
 from ondoc.ratings_review import models as rating_models
 from ondoc.notification import tasks as notification_tasks
 from django.urls import reverse
+from import_export.tmp_storages import MediaStorage
 
 
 class AutoComplete:
@@ -2571,6 +2572,8 @@ class SponsoredServicePracticeSpecializationInline(admin.TabularInline):
 
 
 class SponsoredServicesResource(resources.ModelResource):
+    tmp_storage_class = MediaStorage
+
     class Meta:
         model = SponsoredServices
         fields = ('id', 'name')
@@ -2585,6 +2588,8 @@ class SponsoredServicesAdmin(ImportExportMixin, CompareVersionAdmin):
 
 
 class HospitalSponsoredServicesAdminResource(resources.ModelResource):
+    tmp_storage_class = MediaStorage
+
     class Meta:
         model = HospitalSponsoredServices
         fields = ('id', 'hospital', 'sponsored_service')
@@ -2599,6 +2604,7 @@ class HospitalSponsoredServicesAdmin(ImportExportMixin, CompareVersionAdmin):
 
 
 class DoctorSponsoredServicesResource(resources.ModelResource):
+    tmp_storage_class = MediaStorage
 
     class Meta:
         model = DoctorSponsoredServices

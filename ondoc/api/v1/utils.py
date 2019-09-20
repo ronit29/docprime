@@ -2087,7 +2087,7 @@ def rc_user_create(auth_token, auth_user_id, name, **kwargs):
                                              "customFields": rc_req_extras
                                          }))
     if user_create_response.status_code != status.HTTP_200_OK or not user_create_response.ok:
-        logger.error("Error in Rocket Chat user create API - " + response.text)
+        logger.error("Error in Rocket Chat user create API - " + user_create_response.text)
         return None
     response_data_dict = json.loads(user_create_response._content.decode())
     return {"name": name,
@@ -2106,7 +2106,7 @@ def rc_user_login(auth_token, auth_user_id, username):
                                                  'Content-Type': 'application/json'},
                                         data=json.dumps({"username": username}))
     if user_login_response.status_code != status.HTTP_200_OK or not user_login_response.ok:
-        logger.error("Error in Rocket Chat user Login API - " + response.text)
+        logger.error("Error in Rocket Chat user Login API - " + user_login_response.text)
         return None
     response_data_dict = json.loads(user_login_response._content.decode())
     return response_data_dict
@@ -2121,7 +2121,7 @@ def rc_group_create(auth_token, auth_user_id, patient, rc_doctor):
                                                    'Content-Type': 'application/json'},
                                           data=json.dumps({"name": group_name, "members": members}))
     if group_create_response.status_code != status.HTTP_200_OK or not group_create_response.ok:
-        logger.error("Error in Rocket Chat user Login API - " + response.text)
+        logger.error("Error in Rocket Chat user Login API - " + group_create_response.text)
         return None
     response_data_dict = json.loads(group_create_response._content.decode())
     return response_data_dict
@@ -2208,6 +2208,19 @@ def is_valid_ckeditor_text(text):
     if text == "<p>&nbsp;</p>":
         return False
     return True
+
+
+def log_requests_on():
+    from http.client import HTTPConnection
+
+    HTTPConnection.debuglevel = 1
+    requests_log = logging.getLogger("urllib3")
+    requests_log.setLevel(logging.INFO)
+    requests_log.propagate = True
+    ch = logging.StreamHandler()
+    ch.setLevel(logging.INFO)
+    requests_log.addHandler(ch)
+
 
 
 

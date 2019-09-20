@@ -16,7 +16,7 @@ from django.forms import model_to_dict
 from django.utils import timezone
 from openpyxl import load_workbook
 
-from ondoc.api.v1.utils import aware_time_zone, util_absolute_url, pg_seamless_hash
+from ondoc.api.v1.utils import aware_time_zone, log_requests_on, pg_seamless_hash
 from ondoc.authentication.models import UserNumberUpdate, UserProfileEmailUpdate
 from ondoc.common.models import AppointmentMaskNumber
 from ondoc.matrix.mongo_models import MatrixLog
@@ -991,6 +991,7 @@ def upload_doctor_data(obj_id):
 
 @task()
 def send_pg_acknowledge(order_id=None, order_no=None):
+    log_requests_on()
     try:
         if order_id is None or order_no is None:
             logger.error("Cannot acknowledge without order_id and order_no")
@@ -1387,6 +1388,7 @@ def send_capture_payment_request(self, product_id, appointment_id):
     from ondoc.diagnostic.models import LabAppointment
     from ondoc.account.models import Order, PgTransaction, PaymentProcessStatus
     from ondoc.account.mongo_models import PgLogs
+    log_requests_on()
     req_data = dict()
     if product_id == Order.DOCTOR_PRODUCT_ID:
         obj = OpdAppointment
@@ -1454,6 +1456,7 @@ def send_release_payment_request(self, product_id, appointment_id):
     from ondoc.diagnostic.models import LabAppointment
     from ondoc.account.models import Order, PgTransaction, PaymentProcessStatus
     from ondoc.account.mongo_models import PgLogs
+    log_requests_on()
     req_data = dict()
     if product_id == Order.DOCTOR_PRODUCT_ID:
         obj = OpdAppointment
