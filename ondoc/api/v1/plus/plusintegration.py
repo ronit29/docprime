@@ -206,7 +206,7 @@ class PlusIntegration:
         if not utm_source:
             return
 
-        plan['plan_name'] = plus_plan.name
+        plan['plan_name'] = plus_plan.plan_name
         plan['plan_id'] = plus_plan.id
         plus_member = plus_obj.plus_members.all().filter(relation=PlusMembers.Relations.SELF).first()
         member['name'] = plus_member.first_name
