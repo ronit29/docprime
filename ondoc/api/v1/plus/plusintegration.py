@@ -6,7 +6,7 @@ from django.conf import settings
 class PlusIntegration:
 
     @classmethod
-    def get_response(self, data):
+    def get_response(cls, data):
         resp = {}
         utm_source = data.get('utm_source', None)
         utm_source_obj = PlusPlanUtmSources.objects.filter(source=utm_source).first()
@@ -17,7 +17,8 @@ class PlusIntegration:
         # plus_plan = PlusPlans.objects.filter(is_live=True, utm_source__containing=utm_source).first()
         if not utm_source or not plus_plan:
             return {}
-        if utm_source == "OnlineAffiliate":
+        data = PlusIntegration.transform_data(data)
+        if utm_source == "OfflineAffiliate":
             resp['url'] = settings.VIP_SALESPOINT_URL
             resp['auth_token'] = settings.VIP_SALESPOINT_AUTHTOKEN
             resp['request_data'] = PlusIntegration.get_docprime_data(data)
@@ -26,14 +27,34 @@ class PlusIntegration:
         return resp
 
     @classmethod
-    def get_docprime_data(self, data):
+    def get_docprime_data(cls, data):
+        plan = data.get('plan', None)
+        member = data.get('member', None)
+        email = ""
+        plan_id = None
+        plan_name = ""
+        email = ""
+        name = ""
+        address = ""
+        dob = ""
+        phone_number = ""
+        if plan:
+            plan_id = plan.get('id', None)
+            plan_name = plan.get('plan_name', "")
+        if member:
+            email = member.get('email', "")
+            name = member.get('name', "")
+            address = member.get('address', "")
+            dob = member.get('dob', "")
+            phone_number = member.get('phone_number', "")
+
         request_data = { "IPDHospital": "",
                             "IsInsured": None,
                             "PolicyLink": "",
                             "InsurancePolicyNumber": None,
                             "AppointmentStatus": None,
                             "Age": None,
-                            "Email": data.get('email', ""),
+                            "Email": email,
                             "VirtualNo": "",
                             "OTP": "",
                             "KYC": None,
@@ -49,18 +70,18 @@ class PlusIntegration:
                             "AppointmentType": "",
                             "IsHomePickUp": 0,
                             "HomePickupAddress": "",
-                            "PatientName": data.get('name', ""),
-                            "PatientAddress": data.get('address', ""),
+                            "PatientName": name,
+                            "PatientAddress": address,
                             "ProviderName": "",
-                            "ServiceID": data.get('plan_id', None),
-                            "ServiceName": data.get('plan_name', ""),
+                            "ServiceID": plan_id,
+                            "ServiceName": plan_name,
                             "InsuranceCover": 0,
                             "BookingUrl": "",
                             "Fees": None,
                             "EffectivePrice": None,
                             "MRP": None,
                             "DealPrice": None,
-                            "DOB": data.get('dob', ""),
+                            "DOB": dob,
                             "ProviderAddress": "",
                             "ProviderID": None,
                             "ProviderBookingID": "",
@@ -82,8 +103,8 @@ class PlusIntegration:
                             "HospitalName": "",
                             "DocPrimeUserId": None,
                             "LeadID": 0,
-                            "Name": data.get('name', ""),
-                            "PrimaryNo": str(data.get('phone_number', None)),
+                            "Name": name,
+                            "PrimaryNo": str(phone_number),
                             "LeadSource": "DocPrime",
                             "EmailId": "",
                             "Gender": None,
@@ -93,9 +114,26 @@ class PlusIntegration:
                             "UtmTerm": "ADRM5",
                             "UtmMedium": "ADRM5",
                             "UtmCampaign": "ADRM5",
-                            "UtmSource": data.get('utm_source', None),
-                            "PlanName": data.get('plan_name', ""),
-                            "PlanID": data.get('plan_id', None)
+                            "UtmSource": "OfflineAffiliate",
+                            "PlanName": plan_name,
+                            "PlanID": plan_id
                             }
 
         return request_data
+
+
+    @classmethod
+    def transform_data(cls, data):
+        format_data = {}
+        plan = data.get('plan', None)
+        member = data.get('members', None)
+        phone_number = data.get('phone_number', None)
+        name = data.get('name', "")
+        if plan and member:
+            format_data['plan'] = plan
+            format_data['member'] = member[0]
+        else:
+            format_data['plan'] = None
+            format_data['member'] = {"phone_number": phone_number, "name": name}
+
+        return format_data
