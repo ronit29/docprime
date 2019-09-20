@@ -1976,6 +1976,7 @@ class SendBookingUrlViewSet(GenericViewSet):
     def send_booking_url(self, request):
         type = request.data.get('type')
         purchase_type = request.data.get('purchase_type', None)
+        utm_source = request.data.get('utm_spo_tags', {}).get('utm_source', '')
 
         # agent_token = AgentToken.objects.create_token(user=request.user)
         user_token = JWTAuthentication.generate_token(request.user)
@@ -1990,8 +1991,8 @@ class SendBookingUrlViewSet(GenericViewSet):
             SmsNotification.send_insurance_booking_url(token=token, phone_number=str(user_profile.phone_number))
             EmailNotification.send_insurance_booking_url(token=token, email=user_profile.email)
         elif purchase_type == 'vip_purchase':
-            SmsNotification.send_vip_booking_url(token, str(user_profile.phone_number), name=user_profile.name)
-            EmailNotification.send_vip_booking_url(token=token, email=user_profile.email)
+            SmsNotification.send_vip_booking_url(token, str(user_profile.phone_number), name=user_profile.name, utm_source=utm_source)
+            # EmailNotification.send_vip_booking_url(token=token, email=user_profile.email)
         elif purchase_type == 'endorsement':
             SmsNotification.send_endorsement_request_url(token=token, phone_number=str(user_profile.phone_number))
             EmailNotification.send_endorsement_request_url(token=token, email=user_profile.email)

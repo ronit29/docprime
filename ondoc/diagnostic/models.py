@@ -1470,7 +1470,7 @@ class AvailableLabTest(TimeStampedModel):
 
     def update_deal_price(self):
         # will update only this available lab test prices and will be called on save
-        query = '''update available_lab_test set computed_deal_price = case when custom_deal_price is null then mrp else custom_deal_price end where id = %s '''
+        query = '''update available_lab_test set computed_deal_price = (case when custom_deal_price is null then mrp else custom_deal_price end )::integer where id = %s'''
         update_available_lab_test_deal_price = RawSql(query, [self.pk]).execute()
 
         # query = '''update available_lab_test set computed_deal_price = least(greatest( floor(GREATEST
@@ -1517,7 +1517,7 @@ class AvailableLabTest(TimeStampedModel):
         #         (select case when custom_agreed_price is null then computed_agreed_price else custom_agreed_price end as agreed_price,
         #         mrp, id from available_lab_test)x)y where y.id = available_lab_test.id )z) where available_lab_test.enabled=true'''
 
-        query = '''update available_lab_test set computed_deal_price = case when custom_deal_price is null then mrp else custom_deal_price end'''
+        query = '''update available_lab_test set computed_deal_price = (case when custom_deal_price is null then mrp else custom_deal_price end )::integer '''
 
         update_all_available_lab_test_deal_price = RawSql(query, []).execute()
 

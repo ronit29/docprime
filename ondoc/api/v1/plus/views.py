@@ -180,9 +180,12 @@ class PlusOrderViewSet(viewsets.GenericViewSet):
                             user_profile = {"name": member['first_name'] + " " + last_name, "email":
                                 member['email'], "dob": member['dob']}
 
-            utm_source = request.data.get('utm_source', None)
-            is_utm_agent = request.data.get('is_agent', None)
-            utm_parameter = {"utm_source": utm_source, "is_utm_agent": is_utm_agent}
+            utm_source = request.data.get('utm_spo_tags', {}).get('utm_source', None)
+            utm_term = request.data.get('utm_spo_tags', {}).get('utm_term', None)
+            utm_campaign = request.data.get('utm_spo_tags', {}).get('utm_campaign', None)
+            utm_medium = request.data.get('utm_spo_tags', {}).get('utm_medium', None)
+            is_utm_agent = request.data.get('utm_spo_tags', {}).get('is_agent', None)
+            utm_parameter = {"utm_source": utm_source, "is_utm_agent": is_utm_agent, 'utm_term': utm_term, 'utm_campaign': utm_campaign, 'utm_medium': utm_medium}
             plus_plan = PlusPlans.objects.get(id=plus_plan_id)
             transaction_date = datetime.datetime.now()
             amount = plus_plan.deal_price
