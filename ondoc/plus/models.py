@@ -620,16 +620,18 @@ class PlusUser(auth_model.TimeStampedModel):
 
         care_membership.save(plus_user_obj=self)
 
-    def after_commit_tasks(self):
+    def after_commit_tasks(self, *args, **kwargs):
         from ondoc.api.v1.plus.plusintegration import PlusIntegration
-        PlusIntegration.create_vip_lead_after_purchase(self)
+        if kwargs.get('is_fresh'):
+            PlusIntegration.create_vip_lead_after_purchase(self)
 
     def save(self, *args, **kwargs):
-        if self.pk:
-            return
+        is_fresh = False
+        if not self.pk:
+            is_fresh = True
 
         super().save(*args, **kwargs)
-        transaction.on_commit(lambda: self.after_commit_tasks())
+        transaction.on_commit(lambda: self.after_commit_tasks(is_fresh=is_fresh))
 
     class Meta:
         db_table = 'plus_users'
