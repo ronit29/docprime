@@ -251,12 +251,12 @@ class PlusUser(auth_model.TimeStampedModel):
             data[pp.parameter.key.lower()] = pp.value
         
         resp['allowed_package_ids'] = list(map(lambda x: int(x), data.get('package_ids', '').split(','))) if data.get('package_ids') else []
-        resp['doctor_consult_amount'] = int(data['DOCTOR_CONSULT_AMOUNT'.lower()]) if data.get('DOCTOR_CONSULT_AMOUNT') and data.get('DOCTOR_CONSULT_AMOUNT').__class__.__name__ == 'str' else 0
+        resp['doctor_consult_amount'] = int(data['doctor_consult_amount']) if data.get('doctor_consult_amount') and data.get('doctor_consult_amount').__class__.__name__ == 'str' else 0
         resp['doctor_amount_utilized'] = self.get_doctor_plus_appointment_amount()
         resp['doctor_amount_available'] = resp['doctor_consult_amount'] - resp['doctor_amount_utilized']
-        resp['members_count_online_consultation'] = data['MEMBERS_COVERED_IN_PACKAGE'.lower()] if data.get('MEMBERS_COVERED_IN_PACKAGE') and data.get('MEMBERS_COVERED_IN_PACKAGE').__class__.__name__ == 'str'  else 0
-        resp['total_package_amount_limit'] = int(data['HEALTH_CHECKUPS_AMOUNT'.lower()]) if data.get('HEALTH_CHECKUPS_AMOUNT') and data.get('HEALTH_CHECKUPS_AMOUNT').__class__.__name__ == 'str'  else 0
-        resp['total_package_count_limit'] = int(data['HEALTH_CHECKUPS_COUNT'.lower()]) if data.get('HEALTH_CHECKUPS_COUNT') and data.get('HEALTH_CHECKUPS_COUNT').__class__.__name__ == 'str'  else 0
+        resp['members_count_online_consultation'] = data['members_covered_in_package'] if data.get('members_covered_in_package') and data.get('members_covered_in_package').__class__.__name__ == 'str'  else 0
+        resp['total_package_amount_limit'] = int(data['health_checkups_amount']) if data.get('health_checkups_amount') and data.get('health_checkups_amount').__class__.__name__ == 'str'  else 0
+        resp['total_package_count_limit'] = int(data['health_checkups_count']) if data.get('health_checkups_count') and data.get('health_checkups_count').__class__.__name__ == 'str'  else 0
 
         resp['available_package_amount'] = resp['total_package_amount_limit'] - int(self.get_package_plus_appointment_amount())
         resp['available_package_count'] = resp['total_package_count_limit'] - int(self.get_package_plus_appointment_count())
