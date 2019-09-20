@@ -52,7 +52,8 @@ class PlusIntegration:
                             "PatientName": data.get('name', ""),
                             "PatientAddress": data.get('address', ""),
                             "ProviderName": "",
-                            "ServiceName": "",
+                            "ServiceID": data.get('plan_id', None),
+                            "ServiceName": data.get('plan_name', ""),
                             "InsuranceCover": 0,
                             "BookingUrl": "",
                             "Fees": None,
@@ -89,11 +90,12 @@ class PlusIntegration:
                             "CityId": 0,
                             "ProductId": 5,
                             "SubProductId": None,
-                            "UtmTerm": "",
-                            "UtmMedium": "",
-                            "UtmCampaign": "",
+                            "UtmTerm": "ADRM5",
+                            "UtmMedium": "ADRM5",
+                            "UtmCampaign": "ADRM5",
                             "UtmSource": data.get('utm_source', None),
-                            "PlanName": data.get('plan_name', "")
+                            "PlanName": data.get('plan_name', ""),
+                            "PlanID": data.get('plan_id', None)
                             }
 
         return request_data
