@@ -1,5 +1,5 @@
 from config.settings.base import *
-import logging
+import logging, warnings
 
 
 SECRET_KEY = env('DJANGO_SECRET_KEY')
@@ -171,4 +171,8 @@ THYROCARE_NETWORK_ID = 43
 PRODUCTION = True
 LAL_PATH_NETWORK_ID = 729
 
-
+warnings.filterwarnings(
+    # 'ignore', category=RuntimeWarning,
+    'ignore', r"DateTimeField .* received a naive datetime",
+     RuntimeWarning, r'django\.db\.models\.fields',
+)
