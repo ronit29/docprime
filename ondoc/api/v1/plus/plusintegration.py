@@ -224,7 +224,7 @@ class PlusIntegration:
         resp['members'] = member
         resp['booking_detail'] = booking_detail
         resp['utm_source'] = utm_source
-        resp['utm_params'] = utm_params
+        resp['utm_spo_tags'] = utm_params
 
         resp = PlusIntegration.get_response(resp)
         # return Response(data=resp, status=status.HTTP_200_OK)
