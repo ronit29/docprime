@@ -1193,6 +1193,7 @@ class SmsNotification(TimeStampedModel, SmsNotificationOpdMixin, SmsNotification
         booking_url = "{}/agent/booking?token={}".format(settings.CONSUMER_APP_DOMAIN, token)
         booking_url = booking_url + "&utm_source={utm_source}&is_agent=false&callbackurl=vip-club-member-details".format(utm_source=utm_source)
         short_url = generate_short_url(booking_url)
+        print(short_url)
         sms_body = "Your VIP membership purchase url is - {} . Please pay to confirm".format(short_url)
 
         sms_body = "Dear {name},\nPlease click on the link to view your Docprime VIP- Health Package details and make an online payment.\n{link} \nThanks\nTeam Docprime".format(name=name, link=short_url)
