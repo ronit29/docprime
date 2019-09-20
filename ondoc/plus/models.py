@@ -620,6 +620,17 @@ class PlusUser(auth_model.TimeStampedModel):
 
         care_membership.save(plus_user_obj=self)
 
+    def after_commit_tasks(self):
+        from ondoc.api.v1.plus.plusintegration import PlusIntegration
+        PlusIntegration.create_vip_lead_after_purchase(self)
+
+    def save(self, *args, **kwargs):
+        if self.pk:
+            return
+
+        super().save(*args, **kwargs)
+        transaction.on_commit(lambda: self.after_commit_tasks())
+
     class Meta:
         db_table = 'plus_users'
         unique_together = (('user', 'plan'),)

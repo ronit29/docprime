@@ -376,34 +376,36 @@ class PlusIntegrationViewSet(viewsets.GenericViewSet):
         request_data = request.data
         utm_source = request_data.get('utm_source', None)
         if utm_source:
-            utm_param_dict = PlusIntegration.get_response(request_data)
-            try:
-                if utm_param_dict:
-                    url = utm_param_dict.get('url', "")
-                    request_data = utm_param_dict.get('request_data', {})
-                    auth_token = utm_param_dict.get('auth_token', "")
-
-                    response = requests.post(url, data=json.dumps(request_data), headers={'Authorization': auth_token,
-                                                                                          'Content-Type': 'application/json'})
-
-                    if response.status_code != status.HTTP_200_OK:
-                        logger.error(json.dumps(request_data))
-                        logger.info("[ERROR] could not get 200 for process VIP Lead to {}".format(utm_source))
-                        resp['error'] = "Error while saving data!!"
-                        return Response(data=resp, status=status.HTTP_200_OK)
-                    elif response.status_code == status.HTTP_200_OK and response.get('data', None) and \
-                            response.get('data, None').get('error', False):
-                        resp['data'] = response.get('data', None).get('errorDetails', [])
-                        return Response(data=resp, status=status.HTTP_200_OK)
-                    else:
-                        resp['data'] = "successfully save!!"
-                        return Response(data=resp, status=status.HTTP_200_OK)
-                else:
-                    resp['error'] = "Not able to find Utm params"
-                    return Response(data=resp, status=status.HTTP_200_OK)
-            except Exception as e:
-                logger.error(json.dumps(request_data))
-                logger.info("[ERROR] {}".format(e))
+            resp = PlusIntegration.get_response(request_data)
+            return Response(data=resp, status=status.HTTP_200_OK)
+            # utm_param_dict = PlusIntegration.get_response(request_data)
+            # try:
+            #     if utm_param_dict:
+            #         url = utm_param_dict.get('url', "")
+            #         request_data = utm_param_dict.get('request_data', {})
+            #         auth_token = utm_param_dict.get('auth_token', "")
+            #
+            #         response = requests.post(url, data=json.dumps(request_data), headers={'Authorization': auth_token,
+            #                                                                               'Content-Type': 'application/json'})
+            #
+            #         if response.status_code != status.HTTP_200_OK:
+            #             logger.error(json.dumps(request_data))
+            #             logger.info("[ERROR] could not get 200 for process VIP Lead to {}".format(utm_source))
+            #             resp['error'] = "Error while saving data!!"
+            #             return Response(data=resp, status=status.HTTP_200_OK)
+            #         elif response.status_code == status.HTTP_200_OK and response.get('data', None) and \
+            #                 response.get('data, None').get('error', False):
+            #             resp['data'] = response.get('data', None).get('errorDetails', [])
+            #             return Response(data=resp, status=status.HTTP_200_OK)
+            #         else:
+            #             resp['data'] = "successfully save!!"
+            #             return Response(data=resp, status=status.HTTP_200_OK)
+            #     else:
+            #         resp['error'] = "Not able to find Utm params"
+            #         return Response(data=resp, status=status.HTTP_200_OK)
+            # except Exception as e:
+            #     logger.error(json.dumps(request_data))
+            #     logger.info("[ERROR] {}".format(e))
         else:
             resp['error'] = "UTM source required!!"
             return Response(data=resp, status=status.HTTP_200_OK)
