@@ -1644,6 +1644,14 @@ class SearchedItemsViewSet(viewsets.GenericViewSet):
                          "top_hospitals": top_hospitals_data,
                          'package_categories': categories_serializer.data if categories_serializer and categories_serializer.data else None})
 
+    @transaction.non_atomic_requests
+    def top_hospitals(self, request):
+        serializer = CommonConditionsSerializer(data=request.query_params)
+        serializer.is_valid(raise_exception=True)
+        validated_data = serializer.validated_data
+        top_hospitals_data = Hospital.get_top_hospitals_data(request, validated_data.get('lat'), validated_data.get('long'))
+        return Response({"top_hospitals": top_hospitals_data})
+
 
 class DoctorListViewSet(viewsets.GenericViewSet):
     queryset = models.Doctor.objects.none()
@@ -4589,12 +4597,14 @@ class HospitalViewSet(viewsets.GenericViewSet):
         provider_ids = validated_data.get('provider_ids')
         point_string = 'POINT(' + str(long) + ' ' + str(lat) + ')'
         pnt = GEOSGeometry(point_string, srid=4326)
+
         hospital_queryset = Hospital.objects.prefetch_related('hospitalcertification_set',
                                                               'hospital_documents',
                                                               'hosp_availability',
                                                               'health_insurance_providers',
                                                               'network__hospital_network_documents',
-                                                              'hospitalspeciality_set').exclude(location__dwithin=(
+                                                              'hospitalspeciality_set',
+                                                              'hospital_doctors').exclude(location__dwithin=(
             Point(float(long),
                   float(lat)),
             D(m=min_distance))).filter(
@@ -4604,7 +4614,10 @@ class HospitalViewSet(viewsets.GenericViewSet):
                 Point(float(long),
                       float(lat)),
                 D(m=max_distance))).annotate(
-            distance=Distance('location', pnt)).order_by('-is_ipd_hospital', 'distance')
+            distance=Distance('location', pnt), bookable_doctors_count=Count(Q(enabled_for_online_booking=True,
+                                           hospital_doctors__enabled_for_online_booking=True,
+                                           hospital_doctors__doctor__enabled_for_online_booking=True,
+                                           hospital_doctors__doctor__is_live=True, is_live=True))).order_by('-is_ipd_hospital', 'distance')
         if provider_ids:
             hospital_queryset = hospital_queryset.filter(health_insurance_providers__id__in=provider_ids)
         if ipd_pk:
