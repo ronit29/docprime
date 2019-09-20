@@ -391,6 +391,10 @@ class PlusIntegrationViewSet(viewsets.GenericViewSet):
                         logger.info("[ERROR] could not get 200 for process VIP Lead to {}".format(utm_source))
                         resp['error'] = "Error while saving data!!"
                         return Response(data=resp, status=status.HTTP_200_OK)
+                    elif response.status_code == status.HTTP_200_OK and response.get('data', None) and \
+                            response.get('data, None').get('error', False):
+                        resp['data'] = response.get('data', None).get('errorDetails', [])
+                        return Response(data=resp, status=status.HTTP_200_OK)
                     else:
                         resp['data'] = "successfully save!!"
                         return Response(data=resp, status=status.HTTP_200_OK)

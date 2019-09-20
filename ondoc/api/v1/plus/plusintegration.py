@@ -39,7 +39,7 @@ class PlusIntegration:
         dob = ""
         phone_number = ""
         if plan:
-            plan_id = plan.get('plan_id', None)
+            plan_id = plan.get('id', None)
             plan_name = plan.get('plan_name', "")
         if member:
             email = member.get('email', "")
