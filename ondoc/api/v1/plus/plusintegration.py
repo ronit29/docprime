@@ -18,7 +18,7 @@ class PlusIntegration:
         if not utm_source or not plus_plan:
             return {}
         data = PlusIntegration.transform_data(data)
-        if utm_source == "OnlineAffiliate":
+        if utm_source == "OfflineAffiliate":
             resp['url'] = settings.VIP_SALESPOINT_URL
             resp['auth_token'] = settings.VIP_SALESPOINT_AUTHTOKEN
             resp['request_data'] = PlusIntegration.get_docprime_data(data)
