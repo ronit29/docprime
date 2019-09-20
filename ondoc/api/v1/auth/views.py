@@ -1976,7 +1976,7 @@ class SendBookingUrlViewSet(GenericViewSet):
     def send_booking_url(self, request):
         type = request.data.get('type')
         purchase_type = request.data.get('purchase_type', None)
-        utm_source = request.data.get('utm_source', None)
+        utm_source = request.data.get('utm_spo_tags', {}).get('utm_source', '')
 
         # agent_token = AgentToken.objects.create_token(user=request.user)
         user_token = JWTAuthentication.generate_token(request.user)
