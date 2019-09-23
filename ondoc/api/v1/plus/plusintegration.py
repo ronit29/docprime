@@ -53,6 +53,10 @@ class PlusIntegration:
         user_id = None
         order_id = None
         booking_status = None
+        amount = None
+        deal_price = None
+        booking_date = ""
+        mrp = None
 
         if plan:
             plan_id = plan.get('id', None)
@@ -73,6 +77,10 @@ class PlusIntegration:
             user_id = booking_detail.get('user_id', None)
             order_id = booking_detail.get('order_id', None)
             booking_status = booking_detail.get('booking_status', None)
+            amount = booking_detail['amount']
+            booking_date = booking_detail['booking_time']
+            mrp = booking_detail['mrp']
+            deal_price = booking_detail['deal_price']
 
         request_data = { "IPDHospital": "",
                             "IsInsured": None,
@@ -90,7 +98,7 @@ class PlusIntegration:
                             "PaymentStatus": None,
                             "OrderID": order_id,
                             "DocPrimeBookingID": plus_user_id,
-                            "BookingDateTime": None,
+                            "BookingDateTime": booking_date,
                             "AppointmentDateTime": None,
                             "BookingType": "VIP",
                             "AppointmentType": "",
@@ -105,8 +113,8 @@ class PlusIntegration:
                             "BookingUrl": "",
                             "Fees": None,
                             "EffectivePrice": None,
-                            "MRP": None,
-                            "DealPrice": None,
+                            "MRP": mrp,
+                            "DealPrice": deal_price,
                             "DOB": dob,
                             "ProviderAddress": "",
                             "ProviderID": None,
@@ -114,7 +122,7 @@ class PlusIntegration:
                             "MerchantCode": "",
                             "ProviderPaymentStatus": "",
                             "PaymentURN": "",
-                            "Amount": None,
+                            "Amount": amount,
                             "SettlementDate": None,
                             "LocationVerified": 0,
                             "ReportUploaded": 0,
@@ -219,6 +227,10 @@ class PlusIntegration:
         booking_detail['user_id'] = plus_obj.user.id
         booking_detail['booking_status'] = 300
         booking_detail['order_id'] = order.id
+        booking_detail['booking_time'] = plus_obj.created_at
+        booking_detail['amount'] = plus_obj.amount
+        booking_detail['mrp'] = plus_obj.plan.mrp
+        booking_detail['deal_price'] = plus_obj.plan.deal_price
 
         resp['plan'] = plan
         resp['members'] = member
