@@ -210,7 +210,7 @@ class PlusIntegration:
         order = plus_obj.order
         action_data = order.action_data
         utm_params = action_data.get('utm_parameter', None)
-        utm_source =utm_params.get('utm_source', None)
+        utm_source = utm_params.get('utm_source', None)
         if not utm_source:
             return
 
@@ -227,7 +227,7 @@ class PlusIntegration:
         booking_detail['user_id'] = plus_obj.user.id
         booking_detail['booking_status'] = 300
         booking_detail['order_id'] = order.id
-        booking_detail['booking_time'] = plus_obj.created_at
+        booking_detail['booking_time'] = plus_obj.purchase_date
         booking_detail['amount'] = plus_obj.amount
         booking_detail['mrp'] = plus_obj.plan.mrp
         booking_detail['deal_price'] = plus_obj.plan.deal_price
