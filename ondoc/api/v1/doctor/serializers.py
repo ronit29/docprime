@@ -1231,11 +1231,11 @@ class DoctorProfileUserViewSerializer(DoctorProfileSerializer):
 
 
         if len(doc_spec_list) >= 1:
-            title += ' - '+', '.join(doc_spec_list[0])
-            description += ' is a ' + ', '.join(doc_spec_list[0])
+            title += ' - '+', '.join(doc_spec_list)
+            description += ' is a ' + ', '.join(doc_spec_list)
         if len(doc_hosp_list) >= 1:
-            title += ' in '+', '.join(doc_hosp_list[0])
-            description += ' in ' + ', '.join(doc_hosp_list[0])
+            title += ' in '+', '.join(doc_hosp_list)
+            description += ' in ' + ', '.join(doc_hosp_list)
 
         if sublocality and locality:
             title += ' , ' + sublocality + " , " + locality
