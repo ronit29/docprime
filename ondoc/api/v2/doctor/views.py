@@ -2,9 +2,13 @@ from uuid import UUID
 from ondoc.doctor import models as doc_models
 from ondoc.diagnostic import models as lab_models
 from ondoc.authentication import models as auth_models
+from ondoc.provider import models as prov_models
+from ondoc.communications import models as comm_models
+from ondoc.notification import models as notif_models
 from ondoc.matrix.tasks import decrypted_invoice_pdfs, decrypted_prescription_pdfs
 from django.utils.safestring import mark_safe
 from . import serializers
+from ondoc.api.v1.doctor import serializers as v1_doc_serializer
 from ondoc.api.v1 import utils as v1_utils
 from ondoc.sms.api import send_otp
 from django.shortcuts import get_object_or_404
@@ -22,11 +26,13 @@ from ondoc.procedure.models import Procedure
 from django.contrib.auth import get_user_model
 from django.conf import settings
 import datetime, logging, re, random, jwt, os, hashlib
-import json
+import json, decimal, requests
 from django.utils import timezone
 
 from ondoc.diagnostic.models import LabAppointment
 from ondoc.doctor.models import OpdAppointment
+from ondoc.communications.models import SMSNotification
+from ondoc.notification.models import NotificationAction
 from ondoc.api.v1.doctor import serializers as doctor_serializers
 from ondoc.api.v1.diagnostic import serializers as diagnostic_serializers
 
@@ -1110,3 +1116,420 @@ class PartnersAppInvoicePDF(viewsets.GenericViewSet):
         return response
 
 
+class PartnerEConsultationViewSet(viewsets.GenericViewSet):
+
+    authentication_classes = (JWTAuthentication,)
+    permission_classes = (IsAuthenticated, v1_utils.IsDoctor)
+
+    def get_queryset(self):
+        return None
+
+    def create(self, request):
+        serializer = serializers.EConsultCreateBodySerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        valid_data = serializer.validated_data
+        e_obj = valid_data.get('e_consultation')
+        if e_obj:
+            return Response(
+                {"already_exists": True,
+                 "data": serializers.EConsultListSerializer(e_obj, context={'request': request}).data})
+        e_obj = prov_models.EConsultation(doctor=valid_data['doctor_obj'], created_by=request.user,
+                                          fees=valid_data['fees'], validity=valid_data.get('validity', None),
+                                          status=prov_models.EConsultation.CREATED)
+        patient = valid_data['patient_obj']
+        if valid_data.get('offline_p') and valid_data['offline_p']:
+            e_obj.offline_patient = patient
+            patient_number = patient.get_patient_mobile()
+            if patient_number:
+                patient_number = str(patient_number)
+
+        else:
+            e_obj.online_patient = patient
+            patient_number = patient.phone_number
+
+        rc_super_user_obj = prov_models.RocketChatSuperUser.objects.filter(token__isnull=False).order_by('-updated_at').first()
+        if not rc_super_user_obj:
+            rc_super_user_obj = v1_utils.rc_superuser_login()
+        if not rc_super_user_obj:
+            return Response("Error in RocketChat SuperUser Login API", status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+        auth_token = rc_super_user_obj.token
+        auth_user_id = rc_super_user_obj.user_id
+        executed_fully = v1_utils.rc_users(e_obj, patient, auth_token, auth_user_id)
+        if not executed_fully:
+            logger.error('Error in e-consultation create - check logs related to RocketChat APIs')
+            return Response('Error in e-consultation create - check logs related to RocketChat APIs',
+                            status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+        e_obj.save()
+
+        if patient_number:
+            e_obj.send_sms_link(valid_data['patient_obj'], patient_number)
+
+        resp_data = serializers.EConsultListSerializer(e_obj, context={'request': request})
+
+        return Response({"already_exists": False, "data": resp_data.data})
+
+    def list(self, request):
+        filter_kwargs = dict()
+        id = request.query_params.get('id')
+        if id:
+            filter_kwargs['id'] = id
+        queryset = prov_models.EConsultation.objects.select_related('doctor', 'offline_patient', 'online_patient')\
+                                                    .filter(**filter_kwargs, created_by=request.user)
+        serializer = serializers.EConsultListSerializer(queryset, context={'request': request}, many=True)
+        return Response(serializer.data)
+
+    def share(self, request):
+        serializer = serializers.EConsultSerializer(data=request.query_params, context={'request': request})
+        serializer.is_valid(raise_exception=True)
+        valid_data = serializer.validated_data
+        e_consultation = valid_data['e_consultation']
+        if not e_consultation.link:
+            return Response({"status": 0, "error": "Consultation Link not Found"}, status=status.HTTP_404_NOT_FOUND)
+        patient, patient_number = e_consultation.get_patient_and_number()
+        result = e_consultation.send_sms_link(patient, patient_number)
+        if result.get('error'):
+            return Response({"status": 0, "message": "Error updating invoice - " + str(result.get('error'))}, status.HTTP_400_BAD_REQUEST)
+        return Response({"status": 1, "message": "e-consultation link shared"})
+
+    def complete(self, request):
+        serializer = serializers.EConsultSerializer(data=request.query_params, context={'request': request})
+        serializer.is_valid(raise_exception=True)
+        valid_data = serializer.validated_data
+        e_consultation = valid_data['e_consultation']
+        e_consultation.status = prov_models.EConsultation.COMPLETED
+        try:
+            e_consultation.save()
+        except Exception as e:
+            logger.error(str(e))
+            return Response({'status': 0,
+                             'message': 'Error changing the status of EConsultation to completed - ' + str(e)},
+                            status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+        resp_data = serializers.EConsultListSerializer(e_consultation, context={'request': request})
+        return Response({'status': 1, 'message': 'EConsultation completed successfully', 'data': resp_data.data})
+
+    def video_link_share(self, request):
+        serializer = serializers.EConsultSerializer(data=request.query_params, context={'request': request})
+        serializer.is_valid(raise_exception=True)
+        valid_data = serializer.validated_data
+        e_consultation = valid_data.get('e_consultation')
+        user_token = e_consultation.doctor.rc_user.login_token
+        user_id = e_consultation.doctor.rc_user.response_data['user']['_id']
+        msg_txt = "This is the video link: {}".format(e_consultation.get_video_chat_url())
+        request_data = {
+            "roomId": e_consultation.rc_group.group_id,
+            "text": msg_txt,
+        }
+        response, error_message = e_consultation.post_chat_message(user_id, user_token, request_data)
+        if error_message:
+            return Response({"status": 0, "message": error_message})
+        else:
+            e_consultation_notification = comm_models.EConsultationComm(e_consultation=e_consultation,
+                                                                        notification_type=notif_models.NotificationAction.E_CONSULT_VIDEO_LINK_SHARE)
+            e_consultation_notification.send()
+            return Response({"status": 1, "message": "Notifications sent"})
+
+    def prescription_upload(self, request):
+        from ondoc.api.v1.prescription.serializers import AppointmentPrescriptionUploadSerializer
+        from ondoc.prescription.models import AppointmentPrescription
+        from ondoc.api.v1.utils import util_absolute_url
+        user = request.user
+        request.data['user'] = user.id
+        pres_serializer = AppointmentPrescriptionUploadSerializer(data=request.data, context={'request': request})
+        pres_serializer.is_valid(raise_exception=True)
+        pres_data = pres_serializer.validated_data
+        e_consult_id = request.data.get('id')
+        if not e_consult_id:
+            return Response({"status": 0, "message": "e_consult id is required"}, status=status.HTTP_400_BAD_REQUEST)
+        e_consultation = prov_models.EConsultation.objects.filter(id=e_consult_id, created_by=user)\
+                                                          .exclude(status__in=[prov_models.EConsultation.COMPLETED,
+                                                                               prov_models.EConsultation.CANCELLED,
+                                                                               prov_models.EConsultation.EXPIRED]).first()
+        if not e_consultation:
+            return Response({"status": 0, "message": "e_consultation not found"}, status=status.HTTP_404_NOT_FOUND)
+        prescription_obj = AppointmentPrescription.objects.create(**pres_data, content_object=e_consultation)
+
+        user_token = e_consultation.doctor.rc_user.login_token
+        user_id = e_consultation.doctor.rc_user.response_data['user']['_id']
+        request_data = {
+            "roomId": e_consultation.rc_group.group_id,
+            "text": "Link to Prescription: {}".format(util_absolute_url(prescription_obj.prescription_file.url)),
+        }
+        response, error_message = e_consultation.post_chat_message(user_id, user_token, request_data)
+        if error_message:
+            return Response({"status": 0, "message": error_message})
+        else:
+            model_serializer = AppointmentPrescriptionUploadSerializer(prescription_obj)
+            return Response({"status": 1, "message": "Prescription uploaded successfully", "data": model_serializer.data})
+
+
+class ConsumerEConsultationViewSet(viewsets.GenericViewSet):
+
+    authentication_classes = (JWTAuthentication,)
+    permission_classes = (IsAuthenticated,)
+
+    def get_queryset(self):
+        return None
+
+    def list(self, request):
+        filter_kwargs = dict()
+        id = request.query_params.get('id')
+        if id:
+            filter_kwargs['id'] = id
+        queryset = prov_models.EConsultation.objects.select_related('doctor', 'offline_patient', 'online_patient', 'rc_group')\
+                                                    .prefetch_related('offline_patient__patient_mobiles',
+                                                                      'doctor__qualifications',
+                                                                      'doctor__qualifications__qualification',
+                                                                      'doctor__qualifications__specialization',
+                                                                      'doctor__qualifications__college',
+                                                                      )\
+                                                    .filter(Q(**filter_kwargs),
+                                                            Q(online_patient__isnull=True,
+                                                              offline_patient__user=request.user)
+                                                            |
+                                                            Q(online_patient__isnull=False,
+                                                              online_patient__user=request.user)
+                                                            ).all()
+        serializer = serializers.ConsumerEConsultListSerializer(queryset, context={'request': request}, many=True)
+        return Response(serializer.data)
+
+    @transaction.atomic()
+    def create_order(self, request):
+        from ondoc.notification.tasks import save_pg_response
+        from ondoc.account.mongo_models import PgLogs
+        from ondoc.account.models import ConsumerAccount, Order
+        user = request.user
+        data = request.data
+
+        consult_id = data.get('consult_id')
+        if not consult_id:
+            return Response({"error": "Consultation ID not provided"}, status=status.HTTP_400_BAD_REQUEST)
+        consultation = prov_models.EConsultation.objects.select_related('offline_patient', 'online_patient').filter(id=consult_id).first()
+        if not consultation:
+            return Response({"error": "Consultation not Found"}, status=status.HTTP_404_NOT_FOUND)
+
+        if user and user.is_anonymous:
+            return Response({"status": 0}, status.HTTP_401_UNAUTHORIZED)
+
+        save_pg_response.apply_async((PgLogs.ECONSULT_ORDER_REQUEST, None, None, None, data, user.id),
+                                     eta=timezone.localtime(), )
+
+        doc = consultation.doctor
+        use_wallet = data.get('use_wallet', True)
+        amount = consultation.fees
+        # promotional_amount = data.get('promotional_amount', 0)
+        error = False
+        resp = {}
+        details = {}
+        process_immediately = False
+        product_id = Order.PROVIDER_ECONSULT_PRODUCT_ID
+
+        consumer_account = ConsumerAccount.objects.get_or_create(user=user)
+        consumer_account = ConsumerAccount.objects.select_for_update().get(user=user)
+
+        wallet_balance = consumer_account.balance
+        cashback_balance = consumer_account.cashback
+        total_balance = wallet_balance + cashback_balance
+
+        amount_to_paid = amount
+
+        if use_wallet and total_balance >= amount:
+            cashback_amount = min(cashback_balance, amount_to_paid)
+            wallet_amount = max(0, amount_to_paid - cashback_amount)
+            amount_to_paid = max(0, amount_to_paid - total_balance)
+            process_immediately = True
+        elif use_wallet and total_balance < amount:
+            cashback_amount = min(amount_to_paid, cashback_balance)
+            wallet_amount = 0
+            if cashback_amount < amount_to_paid:
+                wallet_amount = min(wallet_balance, amount_to_paid - cashback_amount)
+            amount_to_paid = max(0, amount_to_paid - total_balance)
+            process_immediately = False
+        else:
+            cashback_amount = 0
+            wallet_amount = 0
+            process_immediately = False
+
+        action = Order.PROVIDER_ECONSULT_PAY
+        profile = consultation.online_patient if consultation.online_patient else consultation.offline_patient
+        action_data = {"id": consultation.id, "user": user.id, "extra_details": details, "doc_id": consultation.doctor.id, "coupon": data.get('coupon'),
+                       "effective_price": float(amount_to_paid), "profile": str(profile.id), "validity": consultation.validity.strftime("%Y-%m-%d"),
+                       "price": float(amount), "cashback": float(cashback_amount), "consultation_id": consultation.id}
+
+        pg_order = Order.objects.create(
+            amount=float(amount_to_paid),
+            action=action,
+            action_data=action_data,
+            wallet_amount=wallet_amount,
+            cashback_amount=cashback_amount,
+            payment_status=Order.PAYMENT_PENDING,
+            user=user,
+            product_id=product_id
+        )
+        if process_immediately:
+            consultation_ids = pg_order.process_pg_order()
+            resp["status"] = 1
+            resp["payment_required"] = False
+            resp["data"] = {
+                "orderId": pg_order.id,
+                "type": consultation_ids.get("type", "econsult"),
+                "id": consultation_ids.get("id", None)
+            }
+        else:
+            resp["status"] = 1
+            resp['data'], resp["payment_required"] = v1_utils.payment_details(request, pg_order)
+        return Response(resp, status=status.HTTP_200_OK)
+
+    def get_order_consult_id(self, request):
+        from ondoc.account.models import Order
+        order_id = request.query_params.get('order_id', None)
+        order_obj = None
+        econsult_id = None
+        order_obj = Order.objects.filter(id=order_id).first()
+        if not order_id or not order_obj:
+            return Response({"error": "Order Id not Found"}, status=status.HTTP_404_NOT_FOUND)
+
+        action_data = order_obj.action_data
+        if action_data:
+            econsult_id = action_data.get('consultation_id')
+        return Response({"econsult_id": econsult_id})
+
+
+class EConsultationCommViewSet(viewsets.GenericViewSet):
+
+    def communicate(self, request):
+        if not request.query_params.get('api_key') or request.query_params['api_key'] != settings.ECS_COMM_API_KEY:
+            return Response({"status": 0, "error": "Unauthorized"}, status=status.HTTP_400_BAD_REQUEST)
+        serializer = serializers.EConsultCommunicationSerializer(data=request.data, context={'request': request})
+        serializer.is_valid(raise_exception=True)
+        valid_data = serializer.validated_data
+        e_consultation = valid_data.get('e_consultation')
+        notification_types = valid_data.get('notification_types')
+        patient = valid_data.get('patient')
+        receiver_rc_users = valid_data.get('receiver_rc_users')
+        sender_rc_user = valid_data.get('sender_rc_user')
+        patient_rc_user = valid_data.get('patient_rc_user')
+        doctor_rc_user = valid_data.get('doctor_rc_user')
+        comm_types = valid_data.get('comm_types')
+
+        if NotificationAction.E_CONSULT_NEW_MESSAGE_RECEIVED in notification_types:
+            receivers = list()
+            if doctor_rc_user in receiver_rc_users:
+                receivers.append(e_consultation.created_by)
+            elif patient_rc_user in receiver_rc_users:
+                receivers.append(patient.user)
+            try:
+                e_consultation_notification = comm_models.EConsultationComm(e_consultation,
+                                                                            notification_type=NotificationAction.E_CONSULT_NEW_MESSAGE_RECEIVED,
+                                                                            receivers=receivers, comm_types=comm_types)
+                e_consultation_notification.send()
+            except Exception as e:
+                logger.error('Error in send new message notification - ' + str(e))
+                return Response({"status": 0, "error": 'Error in send new message notification - ' + str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+        return Response({"status": 1, "message": "success"})
+
+
+class PartnerLabTestSamplesCollectViewset(viewsets.GenericViewSet):
+
+    authentication_classes = (JWTAuthentication,)
+    permission_classes = (IsAuthenticated, v1_utils.IsDoctor)
+
+    # def get_queryset(self):
+    #     request = self.request
+    #     return prov_models.PartnerLabSamplesCollectOrder.objects.prefetch_related('lab_alerts', 'reports') \
+    #                                                             .filter(hospital__manageable_hospitals__phone_number=request.user.phone_number).distinct()
+
+    def tests_list(self, request):
+        serializer = serializers.PartnerLabTestsListSerializer(data=request.query_params, context={'request':request})
+        serializer.is_valid(raise_exception=True)
+        valid_data = serializer.validated_data
+        hosp_lab_list = valid_data['hosp_lab_list']
+        response_list = list()
+        for hosp_lab_dict in hosp_lab_list:
+            hospital = hosp_lab_dict['hospital']
+            lab = hosp_lab_dict['lab']
+            available_lab_tests = lab.lab_pricing_group.available_lab_tests.all()
+            for obj in available_lab_tests:
+                ret_obj = dict()
+                sample_obj = obj.sample_details if hasattr(obj, 'sample_details') else None
+                if not sample_obj or not obj.enabled:
+                    continue
+                ret_obj['hospital_id'] = hospital.id
+                test_data = serializers.SelectedTestsDetailsSerializer(obj).data
+                ret_obj.update(test_data)
+                sample_data = serializers.PartnerLabTestSampleDetailsModelSerializer(sample_obj).data
+                ret_obj.update(sample_data)
+                # if sample_obj:
+                #     sample_data = serializers.PartnerLabTestSampleDetailsModelSerializer(sample_obj).data
+                #     ret_obj.update(sample_data)
+                # else:
+                #     ret_obj['sample_details_id'] = None
+                #     ret_obj['created_at'] = None
+                #     ret_obj['updated_at'] = None
+                #     ret_obj['sample_name'] = None
+                #     ret_obj['material_required'] = None
+                #     ret_obj['sample_volume'] = None
+                #     ret_obj['sample_volume_unit'] = None
+                #     ret_obj['is_fasting_required'] = None
+                #     ret_obj['report_tat'] = None
+                #     ret_obj['reference_value'] = None
+                #     ret_obj['instructions'] = None
+                response_list.append(ret_obj)
+        return Response(response_list)
+
+    def order_create_or_update(self, request):
+        serializer = serializers.SampleCollectOrderCreateOrUpdateSerializer(data=request.data, context={'request': request})
+        serializer.is_valid(raise_exception=True)
+        valid_data = serializer.validated_data
+        order_obj = valid_data.get('order_obj')
+        offline_patient = valid_data.get('offline_patient')
+        hospital = valid_data.get('hospital')
+        doctor = valid_data.get('doctor')
+        lab = valid_data.get('lab')
+        lab_tests = valid_data.get('lab_tests')
+        available_lab_tests = valid_data.get('available_lab_tests')
+        lab_alerts = valid_data.get('lab_alerts')
+        barcode_details = valid_data.get('barcode_details')
+        status = valid_data.get('status')
+        only_status_update = valid_data.get('only_status_update')
+        if only_status_update:
+            order_obj.status = status
+            order_obj.save()
+        else:
+            sample_collection_objs = prov_models.PartnerLabTestSampleDetails.get_sample_collection_details(lab_tests)
+            samples_data = serializers.LabTestSamplesCollectionBarCodeModelSerializer(sample_collection_objs, many=True,
+                                                                                      context={"barcode_details": barcode_details}).data
+            if not order_obj:
+                order_obj = prov_models.PartnerLabSamplesCollectOrder.objects.create(offline_patient=offline_patient,
+                                                                                     patient_details=v1_doc_serializer.OfflinePatientSerializer(offline_patient).data,
+                                                                                     hospital=hospital, doctor=doctor,
+                                                                                     lab=lab, samples=samples_data,
+                                                                                     collection_datetime=valid_data.get("collection_datetime"),
+                                                                                     selected_tests_details=serializers.SelectedTestsDetailsSerializer(available_lab_tests, many=True).data,
+                                                                                     status=status)
+            else:
+                order_obj.status = status
+                order_obj.samples = samples_data
+                order_obj.collection_datetime = valid_data.get("collection_datetime")
+                order_obj.selected_tests_details = serializers.SelectedTestsDetailsSerializer(available_lab_tests, many=True).data
+                order_obj.save()
+            if lab_alerts:
+                order_obj.lab_alerts.set(lab_alerts, clear=True)
+            order_obj.available_lab_tests.set(available_lab_tests, clear=True)
+        order_model_serializer = serializers.PartnerLabSamplesCollectOrderModelSerializer(order_obj, context={'request': request})
+        return Response({"status": 1, "message": "Sample Collection Order created successfully",
+                         "data": order_model_serializer.data})
+
+    def lab_alerts(self, request):
+        lab_alerts_queryset = prov_models.TestSamplesLabAlerts.objects.all()
+        data = serializers.TestSamplesLabAlertsModelSerializer(lab_alerts_queryset, many=True).data
+        return Response(data)
+
+    def orders_list(self, request):
+        filter_kwargs = dict()
+        if request.query_params.get('id'):
+            filter_kwargs['id'] = request.query_params.get('id')
+        queryset = prov_models.PartnerLabSamplesCollectOrder.objects.prefetch_related('lab_alerts', 'reports') \
+                                                                    .filter(**filter_kwargs,
+                                                                            hospital__manageable_hospitals__phone_number=request.user.phone_number).distinct()
+        data = serializers.PartnerLabSamplesCollectOrderModelSerializer(queryset, context={'request': request}, many=True).data
+        return Response(data)

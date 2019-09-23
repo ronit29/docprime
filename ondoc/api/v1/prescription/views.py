@@ -114,7 +114,7 @@ class PrescriptionComponentsViewSet(viewsets.GenericViewSet):
         updated_at = valid_data.get('updated_at')
         obj = model.objects
         if updated_at:
-            obj = obj.filter(updated_at__gte=updated_at)
+            obj = obj.filter(updated_at__date__gte=updated_at)
 
         if valid_data.get('hospital_id'):
             obj = obj.filter(Q(hospitals__contains=[valid_data['hospital_id'].id]) | Q(moderated=True))
@@ -126,7 +126,7 @@ class PrescriptionComponentsViewSet(viewsets.GenericViewSet):
         resp = model_serializer(obj, many=True).data
         if model == prescription_models.PrescriptionTests:
             if updated_at:
-                lab_test_queryset = diagnostic_models.LabTest.objects.filter(updated_at__gte=updated_at)
+                lab_test_queryset = diagnostic_models.LabTest.objects.filter(updated_at__date__gte=updated_at)
             else:
                 lab_test_queryset = diagnostic_models.LabTest.objects.all()
             test_serializer = serializers.PrescriptionLabTestSerializer(lab_test_queryset, many=True)

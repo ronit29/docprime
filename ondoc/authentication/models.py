@@ -11,6 +11,7 @@ from django.utils import timezone
 from PIL import Image as Img
 from django.core.files.uploadedfile import InMemoryUploadedFile
 from io import BytesIO
+from itertools import groupby
 import math
 import os
 import re
@@ -23,7 +24,6 @@ from datetime import date, datetime, timedelta
 from safedelete import SOFT_DELETE
 from safedelete.models import SafeDeleteModel
 import reversion
-
 import requests
 import json
 from rest_framework import status
@@ -339,6 +339,17 @@ class User(AbstractBaseUser, PermissionsMixin):
         # if self.user_type==1 and hasattr(self, 'staffprofile'):
         #     return self.staffprofile.name
         # return str(self.phone_number)
+
+    @cached_property
+    def active_plus_user(self):
+        active_plus_user = self.active_plus_users.filter().order_by('-id').first()
+        return active_plus_user if active_plus_user and active_plus_user.is_valid() else None
+
+    @cached_property
+    def inactive_plus_user(self):
+        from ondoc.plus.models import PlusUser
+        inactive_plus_user = PlusUser.objects.filter(status=PlusUser.INACTIVE, user_id=self.id).order_by('-id').first()
+        return inactive_plus_user if inactive_plus_user else None
 
     @classmethod
     def get_external_login_data(cls, data):
@@ -776,6 +787,26 @@ class NotificationEndpoint(TimeStampedModel):
     def __str__(self):
         return "{}-{}".format(self.user.phone_number, self.token)
 
+    @classmethod
+    def get_user_and_tokens(cls, receivers, **kwargs):
+        from ondoc.notification.models import NotificationAction
+        user_and_tokens = list()
+        if kwargs.get("action_type") == NotificationAction.E_CONSULTATION:
+            user_and_token = [{'user': token.user, 'token': token.token, 'app_name': token.app_name} for token in
+                              cls.objects.select_related('user').filter(Q(user__in=receivers), Q(Q(platform="android",
+                                                                                                   app_version__gt="2.100.13") |
+                                                                                                 Q(platform="ios",
+                                                                                                   app_version__gt="2.200.9"))) \
+                                                                .order_by('user')]
+        else:
+            user_and_token = [{'user': token.user, 'token': token.token, 'app_name': token.app_name} for token in
+                              cls.objects.select_related('user').filter(user__in=receivers).order_by('user')]
+        for user, user_token_group in groupby(user_and_token, key=lambda x: x['user']):
+            user_and_tokens.append(
+                {'user': user,
+                 'tokens': [{"token": t['token'], "app_name": t["app_name"]} for t in user_token_group]})
+        return user_and_tokens
+
 
 class Notification(TimeStampedModel):
     ACCEPTED = 1
@@ -1058,6 +1089,17 @@ class GenericLabAdmin(TimeStampedModel, CreatedByModel):
                                read_permission=read_permission
                                )
 
+    @classmethod
+    def get_appointment_admins(cls, appoinment):
+        if not appoinment:
+            return []
+        admins = GenericLabAdmin.objects.filter(is_disabled=False, lab=appoinment.lab).distinct('user')
+        admin_users = []
+        for admin in admins:
+            if admin.user:
+                admin_users.append(admin.user)
+        return admin_users
+
 
 class GenericAdminManager(models.Manager):
 
@@ -1120,6 +1162,7 @@ class GenericAdmin(TimeStampedModel, CreatedByModel):
                                related_name='manageable_doctors')
     permission_type = models.PositiveSmallIntegerField(choices=type_choices, default=APPOINTMENT)
     is_doc_admin = models.BooleanField(default=False)
+    is_partner_lab_admin = models.NullBooleanField()
     is_disabled = models.BooleanField(default=False)
     super_user_permission = models.BooleanField(default=False)
     read_permission = models.BooleanField(default=False)
@@ -2101,10 +2144,13 @@ class RefundMixin(object):
         if self.payment_type == OpdAppointment.PREPAID and ConsumerTransaction.valid_appointment_for_cancellation(self.id, product_id):
             RefundDetails.log_refund(self)
             wallet_refund, cashback_refund = self.get_cancellation_breakup()
+            if hasattr(self, 'promotional_amount'):
+                consumer_account.debit_promotional(self)
             consumer_account.credit_cancellation(self, product_id, wallet_refund, cashback_refund)
             if refund_flag:
                 ctx_obj = consumer_account.debit_refund()
-                ConsumerRefund.initiate_refund(self.user, ctx_obj) if initiate_refund else None
+                if initiate_refund:
+                    ConsumerRefund.initiate_refund(self.user, ctx_obj)
 
     def can_agent_refund(self, user):
         from ondoc.crm.constants import constants
@@ -2189,7 +2235,7 @@ class UserNumberUpdate(TimeStampedModel):
 
 class UserProfileEmailUpdate(TimeStampedModel):
     profile = models.ForeignKey(UserProfile, on_delete=models.DO_NOTHING, related_name="email_updates")
-    old_email = models.CharField(max_length=256, blank=False)
+    old_email = models.CharField(max_length=256, blank=True, null=True)
     new_email = models.CharField(max_length=256, blank=False)
     otp_verified = models.BooleanField(default=False)
     is_successfull = models.BooleanField(default=False)
@@ -2271,7 +2317,7 @@ class PaymentMixin(object):
         order = Order.objects.filter(product_id=self.PRODUCT_ID,
                                          reference_id=self.id).first()
         if order:
-            order_parent = order.parent
+            order_parent = order.parent if not order.is_parent() else order;
             txn_obj = PgTransaction.objects.filter(order=order_parent).first() if order_parent else None
 
             if txn_obj and txn_obj.is_preauth():

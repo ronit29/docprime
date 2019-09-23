@@ -30,7 +30,7 @@ class CartItemSerializer(serializers.ModelSerializer):
     thumbnail = serializers.SerializerMethodField()
     date = serializers.SerializerMethodField()
     procedures = serializers.SerializerMethodField()
-
+    selected_timings_type = serializers.SerializerMethodField()
 
     def get_procedures(self, obj):
         procedures_ids = obj.data.get("procedure_ids", [])
@@ -52,7 +52,9 @@ class CartItemSerializer(serializers.ModelSerializer):
         date_field = obj.data.get("start_date").find('T')
         if date_field:
             date_field = obj.data.get("start_date")[:date_field]
-        return form_time_slot(make_aware(datetime.datetime.strptime(date_field, '%Y-%m-%d')), float(obj.data.get("start_time")))
+        selected_time = form_time_slot(make_aware(datetime.datetime.strptime(date_field, '%Y-%m-%d')), float(obj.data.get("start_time")))
+
+        return selected_time
 
     def get_thumbnail(self, obj):
         if obj.data.get('doctor'):
@@ -92,6 +94,8 @@ class CartItemSerializer(serializers.ModelSerializer):
         return None
 
     def get_tests(self, obj):
+        from django.utils.timezone import make_aware
+
         if not obj.data.get('test_ids', None) or not obj.data.get('lab', None):
             return []
         lab_pricing_group = LabPricingGroup.objects.filter(labs__in=[obj.data.get('lab')])
@@ -99,9 +103,27 @@ class CartItemSerializer(serializers.ModelSerializer):
             return []
         tests = AvailableLabTest.objects.select_related('test', 'lab')\
                                         .filter(lab_pricing_group=lab_pricing_group.first(), test_id__in=obj.data.get('test_ids'))\
-                                        .annotate(test_name=F('test__name'), deal_price=Case(When(custom_deal_price__isnull=True, then=F('computed_deal_price')),
+                                        .annotate(test_id=F('test_id'), test_name=F('test__name'), deal_price=Case(When(custom_deal_price__isnull=True, then=F('computed_deal_price')),
                                                                                              When(custom_deal_price__isnull=False, then=F('custom_deal_price'))))\
-                                        .values('test_name', 'deal_price', 'mrp')
+                                        .values('test_id', 'test_name', 'deal_price', 'mrp')
+
+        test_timings = obj.data.get('test_timings')
+        if test_timings:
+            for test in tests:
+                for test_timing in test_timings:
+                    if test_timing.get('test') == test.get('test_id'):
+                        test['is_home_pickup'] = test_timing.get('is_home_pickup')
+                        test['type'] = test_timing.get('type')
+
+                        date_field = test_timing.get("start_date").find('T')
+                        if date_field:
+                            date_field = test_timing.get("start_date")[:date_field]
+                        test_selected_time = form_time_slot(
+                            make_aware(datetime.datetime.strptime(date_field, '%Y-%m-%d')),
+                            float(test_timing.get("start_time")))
+                        test['date'] = test_selected_time
+                        break
+
         return tests
 
 
@@ -111,16 +133,20 @@ class CartItemSerializer(serializers.ModelSerializer):
             coupon_data = coupon_data.annotate(is_cashback=Case(When(coupon_type=Coupon.DISCOUNT, then=Value(0)),
                                                                 When(coupon_type=Coupon.CASHBACK, then=Value(1)), output_field=IntegerField())
                                                )\
-                                .values('code', 'id', 'is_cashback', 'random_coupon_code')
+                                .values('code', 'id', 'is_cashback', 'random_coupon_code', 'payment_option')
 
         if coupon_data and coupon_data.exists():
             coupon_list = []
             for c in coupon_data:
                 c["code"] = c["random_coupon_code"] or c["code"]
+                c["is_payment_specific"] = bool(c.pop('payment_option', None))
                 coupon_list.append(c)
             return coupon_list
         return None
 
+    def get_selected_timings_type(self, obj):
+        return obj.data.get("selected_timings_type", 'common')
+
     class Meta:
         model = Cart
-        fields = ('tests', 'profile', 'coupons', 'doctor', 'hospital', 'lab', 'thumbnail', 'date', 'procedures')
+        fields = ('tests', 'profile', 'coupons', 'doctor', 'hospital', 'lab', 'thumbnail', 'date', 'procedures', 'selected_timings_type')
