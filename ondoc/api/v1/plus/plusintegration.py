@@ -34,7 +34,7 @@ class PlusIntegration:
     @classmethod
     def get_docprime_data(cls, data):
         plan = data.get('plan', None)
-        member = data.get('member', None)
+        member = data.get('members', None)
         utm_params = data.get('utm_spo_tags', None)
         booking_detail = data.get('booking_detail', None)
         email = ""
@@ -59,7 +59,7 @@ class PlusIntegration:
         mrp = None
 
         if plan:
-            plan_id = plan.get('id', None)
+            plan_id = plan.get('plan_id', None)
             plan_name = plan.get('plan_name', "")
         if member:
             email = member.get('email', "")
@@ -73,7 +73,7 @@ class PlusIntegration:
             utm_campaign = utm_params.get('utm_campaign', "")
             utm_source = utm_params.get('utm_source', "")
         if booking_detail:
-            plus_user_id = booking_detail.get('plus_user_id', None)
+            plus_user_id = booking_detail.get('booking_id', None)
             user_id = booking_detail.get('user_id', None)
             order_id = booking_detail.get('order_id', None)
             booking_status = booking_detail.get('booking_status', None)
@@ -98,7 +98,7 @@ class PlusIntegration:
                             "PaymentStatus": None,
                             "OrderID": order_id,
                             "DocPrimeBookingID": plus_user_id,
-                            "BookingDateTime": booking_date,
+                            "BookingDateTime": int(booking_date.timestamp()),
                             "AppointmentDateTime": None,
                             "BookingType": "VIP",
                             "AppointmentType": "",
@@ -115,7 +115,7 @@ class PlusIntegration:
                             "EffectivePrice": None,
                             "MRP": mrp,
                             "DealPrice": deal_price,
-                            "DOB": dob,
+                            "DOB": str(dob),
                             "ProviderAddress": "",
                             "ProviderID": None,
                             "ProviderBookingID": "",
@@ -218,7 +218,7 @@ class PlusIntegration:
         plan['plan_id'] = plus_plan.id
         plus_member = plus_obj.plus_members.all().filter(relation=PlusMembers.Relations.SELF).first()
         member['name'] = plus_member.first_name
-        member['dob'] = plus_member.dob
+        member['dob'] = str(plus_member.dob)
         member['email'] = plus_member.email
         member['address'] = plus_member.address
         member['phone_number'] = plus_member.phone_number
@@ -228,6 +228,7 @@ class PlusIntegration:
         booking_detail['booking_status'] = 300
         booking_detail['order_id'] = order.id
         booking_detail['booking_time'] = plus_obj.purchase_date
+        # booking_detail['booking_time'] = ""
         booking_detail['amount'] = plus_obj.amount
         booking_detail['mrp'] = plus_obj.plan.mrp
         booking_detail['deal_price'] = plus_obj.plan.deal_price
