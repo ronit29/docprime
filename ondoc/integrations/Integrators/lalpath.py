@@ -207,7 +207,7 @@ class Lalpath(BaseIntegrator):
                         if response['data']:
                             res_data = sorted(response['data'], key=lambda i: i['id'], reverse=True)
                             integrator_status = res_data[0]['status_code']
-                            if int(integrator_status) == 60:
+                            if int(integrator_status) == 40:
                                 if dp_appointment.status not in [5, 6, 7]:
                                     dp_appointment._source = AppointmentHistory.API
                                     dp_appointment.action_accepted()
@@ -223,4 +223,4 @@ class Lalpath(BaseIntegrator):
                             IntegratorHistory.create_history(dp_appointment, url, response, url, 'order_summary_cron',
                                                              'Lalpath', status_code, 0, status, 'integrator_api')
                         else:
-                            print("[ERROR] %s %s" % (integrator_response.id, response.get('RESPONSE')))
+                            print("[LalPath-ERROR] %s %s" % (integrator_response.id, response.get('RESPONSE')))
