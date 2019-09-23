@@ -9,11 +9,9 @@ import requests
 import json
 import logging
 import datetime
-from datetime import date
 from ondoc.authentication.models import Address, SPOCDetails, QCModel
-from ondoc.api.v1.utils import resolve_address
+from ondoc.api.v1.utils import log_requests_on
 from ondoc.common.models import AppointmentMaskNumber
-from django.apps import apps
 from ondoc.crm.constants import matrix_product_ids, matrix_subproduct_ids, constants
 
 logger = logging.getLogger(__name__)
@@ -351,6 +349,7 @@ from ondoc.matrix.mongo_models import MatrixLog
 def push_appointment_to_matrix(self, data):
     from ondoc.doctor.models import OpdAppointment
     from ondoc.diagnostic.models import LabAppointment
+    log_requests_on()
     try:
         appointment_id = data.get('appointment_id', None)
         if not appointment_id:
@@ -473,6 +472,7 @@ def push_appointment_to_matrix(self, data):
 
 @task(bind=True, max_retries=2)
 def push_signup_lead_to_matrix(self, data):
+    log_requests_on()
     try:
         from ondoc.web.models import OnlineLead
         lead_id = data.get('lead_id', None)
@@ -557,6 +557,7 @@ def push_signup_lead_to_matrix(self, data):
 
 @task(bind=True, max_retries=2)
 def push_order_to_matrix(self, data):
+    log_requests_on()
     try:
         if not data:
             raise Exception('Data not received for the task.')
@@ -654,7 +655,7 @@ def create_or_update_lead_on_matrix(self, data):
     from ondoc.communications.models import EMAILNotification
     from ondoc.notification.models import NotificationAction
     from ondoc.diagnostic.models import IPDMedicinePageLead
-
+    log_requests_on()
     try:
         obj_id = data.get('obj_id', None)
         obj_type = data.get('obj_type', None)
@@ -814,6 +815,7 @@ def create_or_update_lead_on_matrix(self, data):
 @task(bind=True, max_retries=3)
 def update_onboarding_qcstatus_to_matrix(self, data):
     from ondoc.procedure.models import IpdProcedureLead
+    log_requests_on()
     try:
         obj_id = data.get('obj_id', None)
         obj_type = data.get('obj_type', None)
@@ -899,7 +901,7 @@ def update_onboarding_qcstatus_to_matrix(self, data):
 def push_onboarding_qcstatus_to_matrix(self, data):
     from ondoc.doctor.models import Doctor
     from ondoc.diagnostic.models import Lab
-
+    log_requests_on()
     try:
         obj_id = data.get('obj_id', None)
         obj_type = data.get('obj_type', None)
@@ -985,6 +987,7 @@ def push_onboarding_qcstatus_to_matrix(self, data):
 @task(bind=True, max_retries=2)
 def push_non_bookable_doctor_lead_to_matrix(self, nb_doc_lead_id):
     from ondoc.web.models import NonBookableDoctorLead
+    log_requests_on()
     try:
         obj = NonBookableDoctorLead.objects.filter(id= nb_doc_lead_id).first()
         if not obj:
@@ -1341,7 +1344,7 @@ def check_for_ipd_lead_validity(self, data):
 @task(bind=True, max_retries=2)
 def push_retail_appointment_to_matrix(self, data):
     from ondoc.doctor.models import OpdAppointment
-
+    log_requests_on()
     try:
         appointment_id = data.get('appointment_id', None)
         if not appointment_id:
