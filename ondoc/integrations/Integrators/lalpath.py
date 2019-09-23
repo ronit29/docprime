@@ -194,7 +194,7 @@ class Lalpath(BaseIntegrator):
                                                               content_type=lab_appointment_content_type).order_by('id').last()
         if integrator_history:
             status = integrator_history.status
-            if not dp_appointment.status in [LabAppointment.CANCELLED, LabAppointment.COMPLETED]:
+            if dp_appointment.status not in [LabAppointment.CANCELLED, LabAppointment.COMPLETED]:
                 if dp_appointment.time_slot_start + timedelta(days=1) > timezone.now():
                     url = "%s/CheckOrderStatus" % settings.LAL_PATH_BASE_URL
                     api_key = settings.LAL_PATH_DATA_API_KEY
@@ -204,3 +204,23 @@ class Lalpath(BaseIntegrator):
                         response = requests.post(url, data=json.dumps(payload), headers=headers)
                         status_code = response.status_code
                         response = response.json()
+                        if response['data']:
+                            res_data = sorted(response['data'], key=lambda i: i['id'], reverse=True)
+                            integrator_status = res_data[0]['status_code']
+                            if int(integrator_status) == 60:
+                                if dp_appointment.status not in [5, 6, 7]:
+                                    dp_appointment._source = AppointmentHistory.API
+                                    dp_appointment.action_accepted()
+                                    status = IntegratorHistory.PUSHED_AND_ACCEPTED
+                            elif int(integrator_status) in [30, 50]:
+                                if not dp_appointment.status == 6:
+                                    dp_appointment.action_cancelled(1)
+                                    status = IntegratorHistory.CANCELLED
+                            elif int(integrator_status) in [80]:
+                                if not dp_appointment.status == 7:
+                                    dp_appointment.action_completed()
+
+                            IntegratorHistory.create_history(dp_appointment, url, response, url, 'order_summary_cron',
+                                                             'Lalpath', status_code, 0, status, 'integrator_api')
+                        else:
+                            print("[ERROR] %s %s" % (integrator_response.id, response.get('RESPONSE')))
