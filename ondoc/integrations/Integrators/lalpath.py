@@ -5,11 +5,12 @@ from django.conf import settings
 from ondoc.integrations.models import IntegratorTestMapping, IntegratorCity, IntegratorTestCityMapping
 from .baseIntegrator import BaseIntegrator
 logger = logging.getLogger(__name__)
-from datetime import date
+from datetime import date, timedelta
 from django.contrib.contenttypes.models import ContentType
 from ondoc.api.v1.utils import resolve_address
 from ondoc.account.models import Order
 from rest_framework import status
+from django.utils import timezone
 
 
 class Lalpath(BaseIntegrator):
@@ -181,3 +182,25 @@ class Lalpath(BaseIntegrator):
         dob = profile.dob
         today = date.today()
         return today.year - dob.year - ((today.month, today.day) < (dob.month, dob.day))
+
+    def _order_summary(self, integrator_response):
+        from ondoc.integrations.models import IntegratorHistory
+        from ondoc.diagnostic.models import LabAppointment
+        from ondoc.common.models import AppointmentHistory
+
+        dp_appointment = integrator_response.content_object
+        lab_appointment_content_type = ContentType.objects.get_for_model(dp_appointment)
+        integrator_history = IntegratorHistory.objects.filter(object_id=dp_appointment.id,
+                                                              content_type=lab_appointment_content_type).order_by('id').last()
+        if integrator_history:
+            status = integrator_history.status
+            if not dp_appointment.status in [LabAppointment.CANCELLED, LabAppointment.COMPLETED]:
+                if dp_appointment.time_slot_start + timedelta(days=1) > timezone.now():
+                    url = "%s/CheckOrderStatus" % settings.LAL_PATH_BASE_URL
+                    api_key = settings.LAL_PATH_DATA_API_KEY
+                    if api_key:
+                        headers = {'apiKey': api_key, 'Content-Type': "application/json"}
+                        payload = {'OrderId': integrator_response.integrator_order_id}
+                        response = requests.post(url, data=json.dumps(payload), headers=headers)
+                        status_code = response.status_code
+                        response = response.json()

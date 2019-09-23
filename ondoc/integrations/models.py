@@ -110,16 +110,16 @@ class IntegratorResponse(TimeStampedModel):
         from ondoc.integrations import service
 
         integrator_responses = IntegratorResponse.objects.all()
+        is_integrator_enabled = False
         for integrator_response in integrator_responses:
             if integrator_response.integrator_class_name == 'Thyrocare':
                 if settings.THYROCARE_INTEGRATION_ENABLED:
-                    is_thyrocare_enabled = True
-                else:
-                    is_thyrocare_enabled = False
-            else:
-                is_thyrocare_enabled = True
+                    is_integrator_enabled = True
+            elif integrator_response.integrator_class_name == 'Lalpath':
+                if settings.LAL_PATH_INTEGRATION_ENABLED:
+                    is_integrator_enabled = True
 
-            if is_thyrocare_enabled:
+            if is_integrator_enabled:
                 integrator_obj = service.create_integrator_obj(integrator_response.integrator_class_name)
                 integrator_obj.get_order_summary(integrator_response)
 
