@@ -2923,6 +2923,10 @@ class LabAppointment(TimeStampedModel, CouponsMixin, LabAppointmentInvoiceMixin,
         return result
 
     def get_spo_data(self, order, product_id, sub_product_id):
+        tests = self.test_mappings.all()
+        service_id = None
+        if tests:
+            service_id = tests.first().id
         dob_value = ''
         try:
             dob_value = datetime.datetime.strptime(self.profile_detail.get('dob'), "%Y-%m-%d").strftime("%Y-%m-%d") \
@@ -2948,6 +2952,7 @@ class LabAppointment(TimeStampedModel, CouponsMixin, LabAppointmentInvoiceMixin,
         appointment_details['LocationVerified'] = 1 if self.lab.is_location_verified else 0
         appointment_details['IsInsured'] = 1 if self.insurance else 0
         appointment_details['DOB'] = dob_value
+        appointment_details['ServiceID'] = service_id
 
         appointment_details.pop('MobileList', None)
         return appointment_details
