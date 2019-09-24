@@ -118,6 +118,8 @@ class IntegratorResponse(TimeStampedModel):
             elif integrator_response.integrator_class_name == 'Lalpath':
                 if settings.LAL_PATH_INTEGRATION_ENABLED:
                     is_integrator_enabled = True
+            else:
+                is_integrator_enabled = False
 
             if is_integrator_enabled:
                 integrator_obj = service.create_integrator_obj(integrator_response.integrator_class_name)
