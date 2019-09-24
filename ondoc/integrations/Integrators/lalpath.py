@@ -47,9 +47,9 @@ class Lalpath(BaseIntegrator):
         username = settings.LAL_PATH_USERNAME
         password = settings.LAL_PATH_PASSWORD
         url = "https://lalpathlabs.com/partner/api/v1/login"
-        data = {"username": username, "password": password}
+        payload = {"username": username, "password": password}
         headers = {'Content-Type': "application/json"}
-        response = requests.post(url, data, headers=headers)
+        response = requests.post(url, data=json.dumps(payload), headers=headers)
         if response.status_code == status.HTTP_200_OK or not response.ok:
             resp_data = response.json()
             return resp_data["token"]
