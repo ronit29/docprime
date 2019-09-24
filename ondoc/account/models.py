@@ -1558,7 +1558,7 @@ class ConsumerRefund(TimeStampedModel):
     PENDING = 1
     REQUESTED = 5
     COMPLETED = 10
-    MAXREFUNDDAYS = 60
+    MAXREFUNDDAYS = 180
     state_type = [(PENDING, "Pending"), (COMPLETED, "Completed"), (REQUESTED, "Requested")]
     user = models.ForeignKey(User, on_delete=models.DO_NOTHING)
     consumer_transaction = models.ForeignKey(ConsumerTransaction, on_delete=models.DO_NOTHING)
@@ -1621,6 +1621,7 @@ class ConsumerRefund(TimeStampedModel):
         refund_curl_request(pg_data)
 
     def schedule_refund(self):
+        from ondoc.account.mongo_models import PgLogs as PgLogsMongo
         pg_data = form_pg_refund_data([self, ])
         for req_data in pg_data:
             if settings.AUTO_REFUND:
@@ -1635,6 +1636,9 @@ class ConsumerRefund(TimeStampedModel):
                     # url = 'http://localhost:8000/api/v1/doctor/test'
                     print(url)
                     response = requests.post(url, data=json.dumps(req_data), headers=headers)
+                    save_pg_response.apply_async(
+                        (PgLogsMongo.REFUND_REQUEST_RESPONSE, req_data.get('orderId'), req_data.get('refNo'), response.json(), req_data, req_data.get('user'),),
+                        eta=timezone.localtime(), )
                     if response.status_code == status.HTTP_200_OK:
                         resp_data = response.json()
                         if resp_data.get("ok") is not None and str(resp_data["ok"]) == PgTransaction.PG_REFUND_SUCCESS_OK_STATUS:
