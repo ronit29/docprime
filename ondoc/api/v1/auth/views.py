@@ -1980,7 +1980,7 @@ class SendBookingUrlViewSet(GenericViewSet):
             user_profile = request.user.get_default_profile()
 
         if purchase_type == 'vip_purchase':
-            SmsNotification.send_vip_booking_url(token, str(user_profile.phone_number), utm_source=utm_source)
+            SmsNotification.send_vip_booking_url(token, str(request.user.phone_number), utm_source=utm_source)
             return Response({"status": 1})
 
         if not user_profile:
