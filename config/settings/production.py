@@ -1,5 +1,5 @@
 from config.settings.base import *
-import logging
+import logging, warnings
 
 
 SECRET_KEY = env('DJANGO_SECRET_KEY')
@@ -51,9 +51,9 @@ INSTALLED_APPS += ('gunicorn',)
 SMS_BACKEND = 'ondoc.sms.backends.backend.SmsBackend'
 LOGGING = {
     'version': 1,
-    'disable_existing_loggers': True,
+    'disable_existing_loggers': False,
     'root': {
-        'level': 'WARNING',
+        'level': 'INFO',
         'handlers': ['console', ],
     },
     'formatters': {
@@ -61,27 +61,25 @@ LOGGING = {
             'format': '%(levelname)s %(asctime)s %(module)s '
                       '%(process)d %(thread)d %(message)s'
         },
+        'elk_format': {
+            'format': '%(asctime)s %(module)s %(process)d %(thread)d %(message)s'
+        },
     },
     'handlers': {
         'console': {
-            'level': 'DEBUG',
+            'level': 'INFO',
             'class': 'logging.StreamHandler',
-            'formatter': 'verbose'
+            'formatter': 'elk_format'
         }
     },
     'loggers': {
+        'django': {
+            'handlers': ['console',],
+            'level': 'ERROR',
+            'propagate': False,
+        },
         'django.db.backends': {
             'level': 'ERROR',
-            'handlers': ['console', ],
-            'propagate': False,
-        },
-        'raven': {
-            'level': 'DEBUG',
-            'handlers': ['console', ],
-            'propagate': False,
-        },
-        'sentry.errors': {
-            'level': 'DEBUG',
             'handlers': ['console', ],
             'propagate': False,
         },
@@ -95,6 +93,22 @@ LOGGING = {
 SENTRY_DSN = env('DJANGO_SENTRY_DSN')
 
 if env('ENABLE_SENTRY', default=False):
+    LOGGING['disable_existing_loggers'] = True
+    LOGGING['handlers']['sentry'] = {
+        'level': 'ERROR',
+        'class': 'raven.contrib.django.raven_compat.handlers.SentryHandler',
+    }
+    LOGGING['root']['handlers'] = ['sentry', ]
+    LOGGING['loggers']['raven'] = {
+        'level': 'DEBUG',
+        'handlers': ['console', ],
+        'propagate': False,
+    }
+    LOGGING['loggers']['sentry.errors'] = {
+        'level': 'DEBUG',
+        'handlers': ['console', ],
+        'propagate': False,
+    }
     INSTALLED_APPS += ('raven.contrib.django.raven_compat',)
     RAVEN_MIDDLEWARE = ['raven.contrib.django.raven_compat.middleware.SentryResponseErrorIdMiddleware']
     MIDDLEWARE = RAVEN_MIDDLEWARE + MIDDLEWARE
@@ -106,12 +120,8 @@ if env('ENABLE_SENTRY', default=False):
         'DSN': SENTRY_DSN,
         # 'release': raven.fetch_git_sha(os.path.abspath(os.pardir)),
     }
-    LOGGING['handlers']['sentry'] = {
-                                    'level': 'ERROR',
-                                    'class': 'raven.contrib.django.raven_compat.handlers.SentryHandler',
-                                     }
+
     LOGGING['loggers']['django.security.DisallowedHost']['handlers'] = ['console', 'sentry', ]
-    LOGGING['root']['handlers'] = ['sentry', ]
 
 
 EMAIL_HOST = env('EMAIL_HOST')
@@ -161,4 +171,8 @@ THYROCARE_NETWORK_ID = 43
 PRODUCTION = True
 LAL_PATH_NETWORK_ID = 729
 
-
+warnings.filterwarnings(
+    # 'ignore', category=RuntimeWarning,
+    'ignore', r"DateTimeField .* received a naive datetime",
+     RuntimeWarning, r'django\.db\.models\.fields',
+)

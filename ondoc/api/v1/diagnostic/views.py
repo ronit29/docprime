@@ -4,8 +4,10 @@ import operator
 from copy import deepcopy
 from itertools import groupby
 
+import dateutil
 from django.contrib.contenttypes.models import ContentType
 
+from ondoc.account.models import Order
 from ondoc.api.v1.diagnostic.serializers import CustomLabTestPackageSerializer, SearchLabListSerializer
 from ondoc.api.v1.doctor.serializers import CommaSepratedToListField
 from ondoc.authentication.backends import JWTAuthentication
@@ -1333,7 +1335,7 @@ class LabList(viewsets.ReadOnlyModelViewSet):
                     search_coupon = coupon_recommender.best_coupon(**filters)
 
                     discounted_price = lab_result["price"] if not search_coupon else search_coupon.get_search_coupon_discounted_price(lab_result["price"])
-                    lab_result["discounted_price"] = discounted_price
+                    lab_result["discounted_price"] = round(discounted_price)
 
         # result = list()
         # for data in response_queryset.items():
@@ -1918,7 +1920,6 @@ class LabList(viewsets.ReadOnlyModelViewSet):
 
         return lab_network
 
-
     @transaction.non_atomic_requests
     def retrieve(self, request, lab_id, profile_id=None, entity=None):
         profile = None
@@ -2450,8 +2451,8 @@ class LabAppointmentView(mixins.CreateModelMixin,
     def create(self, request, **kwargs):
         from ondoc.doctor.models import OpdAppointment
         data = dict(request.data)
-        if not data.get("is_home_pickup"):
-            data.pop("address", None)
+        # if not data.get("is_home_pickup"):
+        #     data.pop("address", None)
 
         self.update_plan_details(request, data)
         serializer = diagnostic_serializer.LabAppointmentCreateSerializer(data=data, context={'request': request, 'data': request.data, 'use_duplicate': True})
@@ -2460,6 +2461,7 @@ class LabAppointmentView(mixins.CreateModelMixin,
 
         booked_by = 'agent' if hasattr(request, 'agent') else 'user'
         user_insurance = UserInsurance.get_user_insurance(request.user)
+        plus_user = request.user.active_plus_user
         if user_insurance:
             if user_insurance.status == UserInsurance.ONHOLD:
                 return Response(status=status.HTTP_400_BAD_REQUEST,
@@ -2483,15 +2485,22 @@ class LabAppointmentView(mixins.CreateModelMixin,
                                           'request_errors': {
                                               'message': 'Some error occured. Please try again after some time.'
                                           }})
+        elif plus_user:
+            plus_user_dict = plus_user.validate_plus_appointment(validated_data)
+            data['is_vip_member'] = plus_user_dict.get('is_vip_member', False)
+            data['cover_under_vip'] = plus_user_dict.get('cover_under_vip', False)
+            data['plus_user_id'] = plus_user.id
+            data['vip_amount'] = plus_user_dict.get('vip_amount')
+            if data['cover_under_vip']:
+                data['payment_type'] = OpdAppointment.VIP
 
         else:
-            data['is_appointment_insured'], data['insurance_id'], data[
-                'insurance_message'] = False, None, ""
+            data['is_appointment_insured'], data['insurance_id'], data['insurance_message'], data['is_vip_member'],\
+            data['cover_under_vip'], data['plus_user_id'], data['vip_amount'] = False, None, "", False, False, None, 0
+
         # data['is_appointment_insured'], data['insurance_id'], data['insurance_message'] = Cart.check_for_insurance(validated_data, request)
 
-        cart_item_id = validated_data.get('cart_item').id if validated_data.get('cart_item') else None
-
-        #for appointment History
+        # for appointment History
         responsible_user = None
         if data.get('from_app') and data['from_app']:
             data['_source'] = AppointmentHistory.CONSUMER_APP
@@ -2501,25 +2510,75 @@ class LabAppointmentView(mixins.CreateModelMixin,
             responsible_user = request.user.id
         data['_responsible_user'] = responsible_user
 
-        if validated_data.get("existing_cart_item"):
-            cart_item = validated_data.get("existing_cart_item")
-            old_cart_obj = Cart.objects.filter(id=validated_data.get('existing_cart_item').id).first()
-            payment_type = old_cart_obj.data.get('payment_type')
-            if payment_type == OpdAppointment.INSURANCE and data['is_appointment_insured'] == False:
-                data['payment_type'] = OpdAppointment.PREPAID
-            # cart_item.data = request.data
-            cart_item.data = data
-            cart_item.save()
+        multiple_appointments = False
+        if validated_data.get('multi_timings_enabled'):
+            if validated_data.get('selected_timings_type') == 'separate':
+                multiple_appointments = True
+
+        cart_items = []
+        if multiple_appointments:
+            pathology_data = None
+            all_tests = []
+            for test_timing in validated_data.get('test_timings'):
+                all_tests.append(test_timing.get('test'))
+            coupon_applicable_on_tests = Coupon.check_coupon_tests_applicability(request, validated_data.get('coupon_obj'), validated_data.get('profile'), all_tests)
+            coupon_applicable_on_tests = set(coupon_applicable_on_tests)
+            pathology_coupon_applied = False
+
+            for test_timing in validated_data.get('test_timings'):
+                test_type = test_timing.get('type')
+                datetime_ist = dateutil.parser.parse(str(test_timing.get('start_date')))
+                data_start_date = datetime_ist.astimezone(tz=timezone.utc).isoformat()
+                if test_type == LabTest.PATHOLOGY:
+                    if not pathology_data:
+                        pathology_data = copy.deepcopy(data)
+                        pathology_data['test_ids'] = []
+                        pathology_data['start_date'] = data_start_date
+                        pathology_data['start_time'] = test_timing['start_time']
+                        pathology_data['is_home_pickup'] = test_timing['is_home_pickup']
+                    pathology_data['test_ids'].append(test_timing['test'].id)
+                    if not pathology_coupon_applied:
+                        if test_timing['test'] in coupon_applicable_on_tests:
+                            pathology_coupon_applied = True
+                elif test_type == LabTest.RADIOLOGY:
+                    new_data = copy.deepcopy(data)
+                    new_data.pop('coupon_code', None) if not test_timing['test'] in coupon_applicable_on_tests else None;
+                    new_data['start_date'] = data_start_date
+                    new_data['start_time'] = test_timing['start_time']
+                    new_data['is_home_pickup'] = test_timing['is_home_pickup']
+                    new_data['test_ids'] = [test_timing['test'].id]
+                    cart_item = Cart.add_items_to_cart(request, validated_data, new_data, Order.LAB_PRODUCT_ID)
+                    if cart_item:
+                        cart_items.append(cart_item)
+
+            if pathology_data:
+                if not pathology_coupon_applied:
+                    pathology_data.pop('coupon_code', None)
+                cart_item = Cart.add_items_to_cart(request, validated_data, pathology_data, Order.LAB_PRODUCT_ID)
+                if cart_item:
+                    cart_items.append(cart_item)
         else:
-            cart_item, is_new = Cart.objects.update_or_create(id=cart_item_id, deleted_at__isnull=True, product_id=account_models.Order.LAB_PRODUCT_ID,
-                                                  user=request.user, defaults={"data": data})
+            test_timings = validated_data.get('test_timings')
+            if test_timings:
+                datetime_ist = dateutil.parser.parse(str(test_timings[0].get('start_date')))
+                data_start_date = datetime_ist.astimezone(tz=timezone.utc).isoformat()
+                new_data = copy.deepcopy(data)
+                new_data['start_date'] = data_start_date
+                new_data['start_time'] = test_timings[0]['start_time']
+                new_data['is_home_pickup'] = test_timings[0]['is_home_pickup']
+            else:
+                new_data = copy.deepcopy(data)
+            cart_item = Cart.add_items_to_cart(request, validated_data, new_data, Order.LAB_PRODUCT_ID)
+            if cart_item:
+                cart_items.append(cart_item)
 
         if hasattr(request, 'agent') and request.agent:
-            resp = { 'is_agent': True , "status" : 1 }
+            resp = {'is_agent': True, "status":1}
         else:
-            resp = account_models.Order.create_order(request, [cart_item], validated_data.get("use_wallet"))
+            resp = account_models.Order.create_order(request, cart_items, validated_data.get("use_wallet"))
 
         return Response(data=resp)
+
 
     def form_lab_app_data(self, request, data):
         deal_price_calculation = Case(When(custom_deal_price__isnull=True, then=F('computed_deal_price')),
@@ -2872,6 +2931,9 @@ class LabTimingListView(mixins.ListModelMixin,
         date = params.get('date')
         integration_dict = None
 
+        global_non_bookables = GlobalNonBookable.get_non_bookables(GlobalNonBookable.LAB)
+        total_leaves = global_non_bookables
+
         lab_timings = dict()
         if lab:
             lab_obj = Lab.objects.filter(id=int(lab), is_live=True).first()
@@ -2881,7 +2943,7 @@ class LabTimingListView(mixins.ListModelMixin,
 
             if not integration_dict:
                 if lab_obj:
-                    lab_timings = lab_obj.get_timing_v2(for_home_pickup)
+                    lab_timings = lab_obj.get_timing_v2(for_home_pickup, total_leaves)
             else:
                 class_name = integration_dict['class_name']
                 integrator_obj = service.create_integrator_obj(class_name)
@@ -2897,6 +2959,217 @@ class LabTimingListView(mixins.ListModelMixin,
                 "tomorrow_min": None,
                 "today_max": None
             }
+
+        return Response(resp_data)
+
+    @transaction.non_atomic_requests
+    def list_v3(self, request, *args, **kwargs):
+        from ondoc.integrations import service
+        params = request.query_params
+
+        pathology_pickup = True if int(params.get('p_pickup', 0)) else False
+        radiology_pickup = True if int(params.get('r_pickup', 0)) else False
+        lab = params.get('lab')
+        test_ids = params.get('test_ids', '')
+        test_ids = test_ids.split(',') if test_ids else []
+        radiology_tests = []
+        pathology_tests = []
+
+        intersect_resp = {
+            "tests": [],
+            "timeslots": {},
+            "upcoming_slots": {},
+            "is_thyrocare": False
+        }
+        pathology_resp = intersect_resp
+        radiology_resp = {'tests': []}
+        lab_timings = dict()
+        test_timings = dict()
+        pincode = params.get('pincode')
+        date = params.get('date')
+        integration_dict = None
+
+        global_non_bookables = GlobalNonBookable.get_non_bookables(GlobalNonBookable.LAB)
+        total_leaves = global_non_bookables
+
+        if lab:
+            lab_obj = Lab.objects.filter(id=int(lab), is_live=True).first()
+            if lab_obj and lab_obj.network and lab_obj.network.id:
+                if lab_obj.network.id == settings.THYROCARE_NETWORK_ID and settings.THYROCARE_INTEGRATION_ENABLED:
+                    integration_dict = IntegratorMapping.get_if_third_party_integration(network_id=lab_obj.network.id)
+
+            tests = LabTest.objects.filter(id__in=test_ids)
+            intersect_tests = list(map(lambda x: {'id': x.id, 'name': x.name}, tests))
+            intersect_resp['tests'] = intersect_tests
+
+            for test in tests:
+                if test.test_type == LabTest.PATHOLOGY:
+                    pathology_tests.append(test)
+                if test.test_type == LabTest.RADIOLOGY:
+                    radiology_tests.append(test)
+
+            if lab_obj:
+                if not integration_dict:
+                    if pathology_tests:
+                        lab_timings = lab_obj.get_timing_v2(pathology_pickup, total_leaves)
+                else:
+                    class_name = integration_dict['class_name']
+                    integrator_obj = service.create_integrator_obj(class_name)
+                    lab_timings = integrator_obj.get_appointment_slots(pincode, date, is_home_pickup=pathology_pickup)
+
+                path_tests = list(map(lambda x: {'id': x.id, 'name': x.name}, pathology_tests))
+                pathology_resp = {"tests": path_tests,
+                                  "timeslots": lab_timings.get('time_slots', []),
+                                  "upcoming_slots": lab_timings.get('upcoming_slots', []),
+                                  "is_thyrocare": lab_timings.get('is_thyrocare', False)}
+
+                if radiology_tests:
+                    for radiology_test in radiology_tests:
+                        test_timings = lab_obj.get_radiology_timing(radiology_test, total_leaves)
+                        pathology_test_resp = {"timeslots": test_timings.get('time_slots', []),
+                                               "upcoming_slots": test_timings.get('upcoming_slots', []),
+                                               "is_thyrocare": test_timings.get('is_thyrocare', False)}
+                        timing_obj = {'tests_id': radiology_test.id, 'name': radiology_test.name, 'timings': pathology_test_resp}
+                        radiology_resp['tests'].append(timing_obj)
+
+                if pathology_tests and radiology_tests and pathology_pickup == radiology_pickup:
+                    for slot_date in pathology_resp['timeslots']:
+                        intersect_resp['timeslots'].update({slot_date: []})
+                        time_separtors = ['AM', 'PM']
+                        has_date_timings = False
+                        for i in range(len(time_separtors)):
+                            intersect_resp['timeslots'][slot_date].append({
+                                'type': time_separtors[i],
+                                'title': time_separtors[i],
+                                'timing': []
+                            })
+                            if pathology_resp['timeslots'][slot_date] and pathology_resp['timeslots'][slot_date][i]['timing']:
+                                has_intersection = True
+                                radiology_date_time_slots = []
+                                for radiology_test_resp in radiology_resp['tests']:
+                                    if radiology_test_resp['timings']['timeslots'][slot_date] and radiology_test_resp['timings']['timeslots'][slot_date][i]['timing']:
+                                        radiology_date_time_slots.append(radiology_test_resp['timings']['timeslots'][slot_date][i]['timing'])
+                                    else:
+                                        has_intersection = False
+                                    if not has_intersection:
+                                        break
+                                if has_intersection:
+                                    intersect_data = list()
+                                    intersect_dicts = list()
+                                    intersect_dicts.append(pathology_resp['timeslots'][slot_date][i]['timing'])
+                                    for radiology_date_time_slot in radiology_date_time_slots:
+                                        intersect_dicts.append(radiology_date_time_slot)
+                                    for intersect_dict in intersect_dicts:
+                                        if not intersect_data:
+                                            intersect_data = intersect_dict
+                                        else:
+                                            intersect_data = list([x for x in intersect_data if x in intersect_dict])
+                                    intersect_resp['timeslots'][slot_date][i]['timing'] = intersect_resp['timeslots'][slot_date][i]['timing'] + intersect_data
+                                else:
+                                    intersect_resp['timeslots'][slot_date][i]['timing'] = []
+
+                            if intersect_resp['timeslots'][slot_date][i]['timing']:
+                                has_date_timings = True
+
+                        if not has_date_timings:
+                            intersect_resp['timeslots'][slot_date] = []
+                    upcoming_slots = TimeSlotExtraction().get_upcoming_slots(time_slots=intersect_resp['timeslots'])
+                    intersect_resp['upcoming_slots'] = upcoming_slots
+                elif pathology_tests and not radiology_tests:
+                    intersect_resp['timeslots'] = pathology_resp['timeslots']
+                    intersect_resp['upcoming_slots'] = pathology_resp['upcoming_slots']
+                    intersect_resp['is_thyrocare'] = pathology_resp['is_thyrocare']
+                elif radiology_tests and not pathology_tests:
+                    radiology_resp_modified = copy.deepcopy(radiology_resp)
+                    first_radiology_resp_test = radiology_resp_modified['tests'].pop(0)
+                    if first_radiology_resp_test['timings'] and first_radiology_resp_test['timings']['timeslots']:
+                        for slot_date in first_radiology_resp_test['timings']['timeslots']:
+                            intersect_resp['timeslots'].update({slot_date: []})
+                            time_separtors = ['AM', 'PM']
+                            has_date_timings = False
+                            for i in range(len(time_separtors)):
+                                intersect_resp['timeslots'][slot_date].append({
+                                    'type': time_separtors[i],
+                                    'title': time_separtors[i],
+                                    'timing': []
+                                })
+                                if first_radiology_resp_test['timings']['timeslots'][slot_date] and first_radiology_resp_test['timings']['timeslots'][slot_date][i][
+                                    'timing']:
+                                    has_intersection = True
+                                    radiology_date_time_slots = []
+                                    for radiology_test_resp in radiology_resp_modified['tests']:
+                                        if radiology_test_resp['timings']['timeslots'][slot_date] and \
+                                                radiology_test_resp['timings']['timeslots'][slot_date][i]['timing']:
+                                            radiology_date_time_slots.append(
+                                                radiology_test_resp['timings']['timeslots'][slot_date][i]['timing'])
+                                        else:
+                                            has_intersection = False
+                                        if not has_intersection:
+                                            break
+                                    if has_intersection:
+                                        intersect_data = list()
+                                        intersect_dicts = list()
+                                        intersect_dicts.append(first_radiology_resp_test['timings']['timeslots'][slot_date][i]['timing'])
+                                        for radiology_date_time_slot in radiology_date_time_slots:
+                                            intersect_dicts.append(radiology_date_time_slot)
+                                        for intersect_dict in intersect_dicts:
+                                            if not intersect_data:
+                                                intersect_data = intersect_dict
+                                            else:
+                                                intersect_data = list(
+                                                    [x for x in intersect_data if x in intersect_dict])
+                                        intersect_resp['timeslots'][slot_date][i]['timing'] = \
+                                        intersect_resp['timeslots'][slot_date][i]['timing'] + intersect_data
+                                    else:
+                                        intersect_resp['timeslots'][slot_date][i]['timing'] = []
+
+                                if intersect_resp['timeslots'][slot_date][i]['timing']:
+                                    has_date_timings = True
+
+                            if not has_date_timings:
+                                intersect_resp['timeslots'][slot_date] = []
+
+                    upcoming_slots = TimeSlotExtraction().get_upcoming_slots(time_slots=intersect_resp['timeslots'])
+                    intersect_resp['upcoming_slots'] = upcoming_slots
+
+        resp_data = {
+            'all': intersect_resp,
+            'radiology': radiology_resp,
+            'pathology': pathology_resp
+        }
+
+        if hasattr(request, "agent") and request.agent:
+            resp_data = {
+                'all': {
+                    'timeslots': intersect_resp['timeslots'],
+                    'tests': intersect_resp['tests'],
+                    'upcoming_slots': intersect_resp['upcoming_slots'],
+                    'is_thyrocare': intersect_resp['is_thyrocare'],
+                    'today_min': None,
+                    'tomorrow_min': None,
+                    'today_max': None
+                },
+                'pathology': {
+                    'timeslots': pathology_resp['timeslots'],
+                    'tests': pathology_resp['tests'],
+                    'upcoming_slots': pathology_resp['upcoming_slots'],
+                    'is_thyrocare': pathology_resp['is_thyrocare'],
+                    'today_min': None,
+                    'tomorrow_min': None,
+                    'today_max': None
+                }
+            }
+
+            if radiology_resp:
+                agent_radiology_resp = {'radiology': {'tests': []}}
+                for radiology_test_resp in radiology_resp['tests']:
+                    agent_radiology_test_resp = {
+                                                    'name': radiology_test_resp['name'],
+                                                    'tests_id': radiology_test_resp['tests_id'],
+                                                    'timings': radiology_test_resp['timings']
+                                                }
+                    agent_radiology_resp['radiology']['tests'].append(agent_radiology_test_resp)
+                resp_data.update(agent_radiology_resp)
 
         return Response(resp_data)
 

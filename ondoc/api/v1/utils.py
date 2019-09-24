@@ -405,12 +405,17 @@ def labappointment_transform(app_data):
     app_data["profile"] = app_data["profile"].id
     app_data["home_pickup_charges"] = str(app_data.get("home_pickup_charges",0))
     prescription_objects = app_data.get("prescription_list", [])
+    test_time_slots = app_data.get('test_time_slots', [])
     if prescription_objects:
         prescription_id_list = []
         for prescription_data in prescription_objects:
             prescription_id_list.append({'prescription': prescription_data.get('prescription').id})
         app_data["prescription_list"] = prescription_id_list
 
+    if test_time_slots:
+        for test_time_slot in test_time_slots:
+            test_time_slot['time_slot_start'] = str(test_time_slot['time_slot_start'])
+        app_data['test_time_slots'] = test_time_slots
 
     if app_data.get("coupon"):
         app_data["coupon"] = list(app_data["coupon"])
@@ -513,7 +518,22 @@ def payment_details(request, order):
         first_slot = None
         if order.is_parent():
             for ord in order.orders.all():
-                ord_slot = ord.action_data.get('time_slot_start') if ord.action_data else None
+                if ord.action_data:
+                    if ord.action_data.get('time_slot_start'):
+                        ord_slot = ord.action_data.get('time_slot_start')
+                    else:
+                        first_test_slot = None
+                        test_time_slots = ord.action_data.get('test_time_slots')
+                        for test_time_slot in test_time_slots:
+                            ord_test_slot = None
+                            if test_time_slot.get('time_slot_start'):
+                                ord_test_slot = test_time_slot.get('time_slot_start')
+                            if not first_test_slot and ord_test_slot:
+                                first_test_slot = parse_datetime(ord_test_slot)
+                            if first_test_slot > parse_datetime(ord_test_slot):
+                                first_test_slot = parse_datetime(ord_test_slot)
+                        ord_slot = str(first_test_slot)
+
                 if not first_slot and ord_slot:
                     first_slot = parse_datetime(ord_slot)
                 if first_slot > parse_datetime(ord_slot):
@@ -2067,7 +2087,7 @@ def rc_user_create(auth_token, auth_user_id, name, **kwargs):
                                              "customFields": rc_req_extras
                                          }))
     if user_create_response.status_code != status.HTTP_200_OK or not user_create_response.ok:
-        logger.error("Error in Rocket Chat user create API - " + response.text)
+        logger.error("Error in Rocket Chat user create API - " + user_create_response.text)
         return None
     response_data_dict = json.loads(user_create_response._content.decode())
     return {"name": name,
@@ -2086,7 +2106,7 @@ def rc_user_login(auth_token, auth_user_id, username):
                                                  'Content-Type': 'application/json'},
                                         data=json.dumps({"username": username}))
     if user_login_response.status_code != status.HTTP_200_OK or not user_login_response.ok:
-        logger.error("Error in Rocket Chat user Login API - " + response.text)
+        logger.error("Error in Rocket Chat user Login API - " + user_login_response.text)
         return None
     response_data_dict = json.loads(user_login_response._content.decode())
     return response_data_dict
@@ -2101,7 +2121,7 @@ def rc_group_create(auth_token, auth_user_id, patient, rc_doctor):
                                                    'Content-Type': 'application/json'},
                                           data=json.dumps({"name": group_name, "members": members}))
     if group_create_response.status_code != status.HTTP_200_OK or not group_create_response.ok:
-        logger.error("Error in Rocket Chat user Login API - " + response.text)
+        logger.error("Error in Rocket Chat user Login API - " + group_create_response.text)
         return None
     response_data_dict = json.loads(group_create_response._content.decode())
     return response_data_dict
@@ -2188,6 +2208,19 @@ def is_valid_ckeditor_text(text):
     if text == "<p>&nbsp;</p>":
         return False
     return True
+
+
+def log_requests_on():
+    from http.client import HTTPConnection
+
+    HTTPConnection.debuglevel = 1
+    requests_log = logging.getLogger("urllib3")
+    requests_log.setLevel(logging.INFO)
+    requests_log.propagate = True
+    ch = logging.StreamHandler()
+    ch.setLevel(logging.INFO)
+    requests_log.addHandler(ch)
+
 
 
 

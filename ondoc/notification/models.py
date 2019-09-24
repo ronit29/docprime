@@ -143,6 +143,8 @@ class NotificationAction:
     SAMPLE_DYNAMIC_TEMPLATE_PREVIEW = 110
     SEND_LENSFIT_COUPON = 111
 
+    PLUS_MEMBERSHIP_CONFIRMED = 180
+
     NOTIFICATION_TYPE_CHOICES = (
         (APPOINTMENT_ACCEPTED, "Appointment Accepted"),
         (APPOINTMENT_CANCELLED, "Appointment Cancelled"),

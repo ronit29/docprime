@@ -28,7 +28,8 @@ from ondoc.doctor.models import (Doctor, Hospital, DoctorClinicTiming, DoctorCli
                                  HealthInsuranceProvider, HospitalHelpline, HospitalTiming, CommonHospital,
                                  SimilarSpecializationGroup, SimilarSpecializationGroupMapping, PurchaseOrderCreation,
                                  HospitalNetworkImage, HospitalNetworkTiming, HospitalNetworkServiceMapping,
-                                 HospitalNetworkSpeciality)
+                                 HospitalNetworkSpeciality, HospitalSponsoredServices,
+                                 SponsoredServicePracticeSpecialization, DoctorSponsoredServices, SponsoredServices)
 
 from ondoc.diagnostic.models import (Lab, LabTiming, LabImage, GenericLabAdmin,
                                      LabManager, LabAccreditation, LabAward, LabCertification,
@@ -42,7 +43,7 @@ from ondoc.diagnostic.models import (Lab, LabTiming, LabImage, GenericLabAdmin,
                                      CommonPackage, LabTestCategory, LabTestCategoryMapping,
                                      LabTestRecommendedCategoryMapping, QuestionAnswer, FrequentlyAddedTogetherTests,
                                      LabTestGroup, LabTestGroupMapping, LabTestGroupTiming, LabTestCategoryLandingURLS,
-                                     LabTestCategoryUrls)
+                                     LabTestCategoryUrls, LabTestThresholds)
 
 from ondoc.insurance.models import (Insurer, InsurancePlans, InsuranceThreshold, InsuranceCity, StateGSTCode,
                                     InsuranceDistrict, InsuranceTransaction, InsuranceDeal, InsuranceDisease,
@@ -285,7 +286,7 @@ class Command(BaseCommand):
             SpecializationField, SpecializationDepartment, SpecializationDepartmentMapping,
             Procedure, ProcedureCategory, CommonProcedureCategory,
             ProcedureToCategoryMapping, ProcedureCategoryMapping, LabTestCategory, Merchant, CancellationReason, UploadDoctorData,
-            LabTestGroup, LabTestGroupMapping, LabTestGroupTiming
+            LabTestGroup, LabTestGroupMapping
         )
 
         for cl, ct in content_types.items():
@@ -296,7 +297,7 @@ class Command(BaseCommand):
             group.permissions.add(*permissions)
 
 
-        content_types = ContentType.objects.get_for_models(ParameterLabTest, LabTestPackage, LabTestCategoryMapping, HospitalTiming, IntegratorLabCode)
+        content_types = ContentType.objects.get_for_models(ParameterLabTest, LabTestPackage, LabTestCategoryMapping, HospitalTiming, IntegratorLabCode, LabTestGroupTiming)
 
         for cl, ct in content_types.items():
             permissions = Permission.objects.filter(
@@ -604,7 +605,9 @@ class Command(BaseCommand):
                                                            SimilarSpecializationGroupMapping, LabTestCategoryLandingURLS, LabTestCategoryUrls,
                                                            HospitalNetworkImage, HospitalNetworkTiming,
                                                            HospitalNetworkServiceMapping,
-                                                           HospitalNetworkSpeciality, DynamicTemplates)
+                                                           HospitalNetworkSpeciality, DynamicTemplates, HospitalSponsoredServices,
+                                                           SponsoredServicePracticeSpecialization, DoctorSponsoredServices, SponsoredServices,LabTestThresholds)
+
 
         for cl, ct in content_types.items():
             permissions = Permission.objects.filter(

@@ -10,7 +10,7 @@ from ondoc.api.v1.utils import plus_subscription_transform, payment_details
 from ondoc.authentication.backends import JWTAuthentication
 from ondoc.account import models as account_models
 from ondoc.authentication.models import User, UserProfile
-from ondoc.common.models import BlacklistUser, BlockedStates
+from ondoc.common.models import BlacklistUser, BlockedStates, DocumentsProofs
 from ondoc.plus.models import (PlusProposer, PlusPlans, PlusThreshold, PlusMembers, PlusUser, PlusLead)
 from . import serializers
 import datetime
@@ -29,7 +29,7 @@ class PlusListViewSet(viewsets.GenericViewSet):
     def list(self, request):
         resp = {}
         user = request.user
-        if not user.is_anonymous and user.active_plus_user is not None:
+        if user and not user.is_anonymous and user.is_authenticated and (user.active_plus_user or user.inactive_plus_user):
             return Response(data={'certificate': True}, status=status.HTTP_200_OK)
 
         plus_proposer = self.get_queryset()
@@ -65,7 +65,7 @@ class PlusOrderLeadViewSet(viewsets.GenericViewSet):
             plus_user = user.active_plus_user
 
             if plus_user and plus_user.is_valid():
-                return Response({'success': True, "is_plus_user": True})
+                return Response({'success': True, "is_plus_user": True, 'lead_id': None})
 
             # if not plus_lead:
             #     plus_lead = PlusLead(user=user)
@@ -80,13 +80,13 @@ class PlusOrderLeadViewSet(viewsets.GenericViewSet):
             plus_lead.extras = request.data
             plus_lead.save()
 
-            return Response({'success': True, 'is_plus_user': False})
+            return Response({'success': True, 'is_plus_user': False, 'lead_id': plus_lead.id})
         else:
             lead = PlusLead.create_lead_by_phone_number(request)
             if not lead:
-                return Response({'success': False, 'is_plus_user': False})
+                return Response({'success': False, 'is_plus_user': False, 'lead_id': None})
 
-            return Response({'success': True, 'is_plus_user': False})
+            return Response({'success': True, 'is_plus_user': False, 'lead_id': lead.id})
 
 
 class PlusOrderViewSet(viewsets.GenericViewSet):
@@ -229,7 +229,7 @@ class PlusOrderViewSet(viewsets.GenericViewSet):
                 resp["data"] = {'id': plus_object.id}
                 resp["data"] = {
                     "orderId": order.id,
-                    "type": "insurance",
+                    "type": "plus_membership",
                     "id": plus_object.id if plus_object else None
                 }
         else:
@@ -240,8 +240,8 @@ class PlusOrderViewSet(viewsets.GenericViewSet):
     def add_members(self, request):
         user = request.user
 
-        active_plus_subscription = user.active_plus_user
-        if not active_plus_subscription:
+        inactive_plus_subscription = user.inactive_plus_user
+        if not inactive_plus_subscription:
             return Response({'error': 'User has not purchased the VIP plan.'})
 
         phone_number = user.phone_number
@@ -256,42 +256,30 @@ class PlusOrderViewSet(viewsets.GenericViewSet):
         serializer.is_valid(raise_exception=True)
         valid_data = serializer.validated_data
         members_to_be_added = valid_data.get('members')
+
+        # Remove the proposer profile. Proposer is only allowed to upload the document proofs.
+
+        counter = 0
+        self_counter = -1
         for member in members_to_be_added:
-            member['profile'] = PlusUser.profile_create_or_update(member, user)
-        PlusMembers.create_plus_members(active_plus_subscription, members_list=members_to_be_added)
+            if member.get('relation') == PlusMembers.Relations.SELF:
+                self_counter = counter
+                if member.get('document_ids'):
+                    proposer_profile = inactive_plus_subscription.get_primary_member_profile()
+                    if proposer_profile:
+                        document_ids = list(map(lambda d: d.get('proof_file').id, member.get('document_ids')))
+                        DocumentsProofs.update_with_object(proposer_profile, document_ids)
+            else:
+                member['profile'] = PlusUser.profile_create_or_update(member, user)
 
+            counter += 1
+
+        members_to_be_added.pop(self_counter)
+
+        PlusMembers.create_plus_members(inactive_plus_subscription, members_list=members_to_be_added)
+        inactive_plus_subscription.status = PlusUser.ACTIVE
+        inactive_plus_subscription.save()
         return Response({'success': True})
-
-
-# class PlusProfileViewSet(viewsets.GenericViewSet):
-#     authentication_classes = (JWTAuthentication,)
-#     permission_classes = (IsAuthenticated,)
-#
-#     def profile(self, request):
-#         if settings.IS_PLUS_ACTIVE:
-#             user_id = request.user.pk
-#             resp = {}
-#             if user_id:
-#
-#                 user = User.objects.get(id=user_id)
-#                 plus_user_obj = user.active_plus_user
-#                 if not plus_user_obj or not plus_user_obj.is_valid():
-#                     return Response({"message": "Docprime Plus associated to user not found or expired."})
-#
-#                 resp['insured_members'] = plus_user_obj.plus_members.all().values('first_name', 'middle_name', 'last_name',
-#                                                                               'dob', 'relation')
-#                 resp['purchase_date'] = plus_user_obj.purchase_date
-#                 resp['expiry_date'] = plus_user_obj.expire_date
-#                 resp['premium_amount'] = plus_user_obj.amount
-#                 resp['proposer_name'] = plus_user_obj.get_primary_member_profile() if plus_user_obj.get_primary_member_profile() else ''
-#
-#                 resp['insurance_status'] = plus_user_obj.status
-#             else:
-#                 return Response({"message": "User is not valid"},
-#                                 status.HTTP_404_NOT_FOUND)
-#         else:
-#             return Response(status=status.HTTP_404_NOT_FOUND)
-#         return Response(resp)
 
 
 class PlusProfileViewSet(viewsets.GenericViewSet):
@@ -302,12 +290,16 @@ class PlusProfileViewSet(viewsets.GenericViewSet):
         resp = {}
         if request.query_params.get('is_dashboard'):
             user = request.user
-            plus_user = PlusUser.objects.filter(user=user).first()
+            plus_user = PlusUser.objects.filter(user=user).order_by('-id').first()
         elif(request.query_params.get('id') and not request.query_params.get('is_dashboard')):
             plus_user_id = request.query_params.get('id')
             plus_user = PlusUser.objects.filter(id=plus_user_id).first()
         else:
             return Response(status=status.HTTP_404_NOT_FOUND)
+
+        if not plus_user:
+            return Response(status=status.HTTP_400_BAD_REQUEST)
+
         plus_members = plus_user.plus_members.all()
         if len(plus_members) > 1:
             resp['is_member_allowed'] = False
@@ -318,6 +310,9 @@ class PlusProfileViewSet(viewsets.GenericViewSet):
         resp['plan'] = plan_body_serializer.data
         plus_user_body_serializer = serializers.PlusUserModelSerializer(plus_user, context={'request': request})
         resp['user'] = plus_user_body_serializer.data
-        resp['relation_master'] = PlusMembers.Relations.availabilities()
+        # member_relations = plus_user.plus_members.all().values_list('relation', flat=True)
+        available_relations = PlusMembers.Relations.get_custom_availabilities()
+        available_relations.pop(PlusMembers.Relations.SELF)
+        resp['relation_master'] = available_relations
         return Response({'data': resp})
 

@@ -216,9 +216,6 @@ ROOT_URLCONF = 'config.urls'
 
 WSGI_APPLICATION = 'config.wsgi.application'
 
-
-
-
 # Password validation
 # https://docs.djangoproject.com/en/2.0/ref/settings/#auth-password-validators
 
@@ -530,3 +527,4 @@ LENSFIT_COUPONS=env.list('LENSFIT_COUPONS')
 SPO_LEAD_URL = env('SPO_LEAD_URL')
 SPO_AUTH_TOKEN = env('SPO_AUTH_TOKEN')
 SPO_DP_AUTH_TOKEN = env('SPO_DP_AUTH_TOKEN')
+CARE_PLAN_FOR_VIP=env('CARE_PLAN_FOR_VIP')
