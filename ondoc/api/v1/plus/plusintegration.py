@@ -34,7 +34,7 @@ class PlusIntegration:
     @classmethod
     def get_docprime_data(cls, data):
         plan = data.get('plan', None)
-        member = data.get('member', None)
+        member = data.get('members', None)
         utm_params = data.get('utm_spo_tags', None)
         booking_detail = data.get('booking_detail', None)
         email = ""
@@ -53,9 +53,13 @@ class PlusIntegration:
         user_id = None
         order_id = None
         booking_status = None
+        amount = None
+        deal_price = None
+        booking_date = ""
+        mrp = None
 
         if plan:
-            plan_id = plan.get('id', None)
+            plan_id = plan.get('plan_id', None)
             plan_name = plan.get('plan_name', "")
         if member:
             email = member.get('email', "")
@@ -69,10 +73,14 @@ class PlusIntegration:
             utm_campaign = utm_params.get('utm_campaign', "")
             utm_source = utm_params.get('utm_source', "")
         if booking_detail:
-            plus_user_id = booking_detail.get('plus_user_id', None)
+            plus_user_id = booking_detail.get('booking_id', None)
             user_id = booking_detail.get('user_id', None)
             order_id = booking_detail.get('order_id', None)
             booking_status = booking_detail.get('booking_status', None)
+            amount = booking_detail['amount']
+            booking_date = booking_detail['booking_time']
+            mrp = booking_detail['mrp']
+            deal_price = booking_detail['deal_price']
 
         request_data = { "IPDHospital": "",
                             "IsInsured": None,
@@ -90,7 +98,7 @@ class PlusIntegration:
                             "PaymentStatus": None,
                             "OrderID": order_id,
                             "DocPrimeBookingID": plus_user_id,
-                            "BookingDateTime": None,
+                            "BookingDateTime": int(booking_date.timestamp()),
                             "AppointmentDateTime": None,
                             "BookingType": "VIP",
                             "AppointmentType": "",
@@ -105,16 +113,16 @@ class PlusIntegration:
                             "BookingUrl": "",
                             "Fees": None,
                             "EffectivePrice": None,
-                            "MRP": None,
-                            "DealPrice": None,
-                            "DOB": dob,
+                            "MRP": mrp,
+                            "DealPrice": deal_price,
+                            "DOB": str(dob),
                             "ProviderAddress": "",
                             "ProviderID": None,
                             "ProviderBookingID": "",
                             "MerchantCode": "",
                             "ProviderPaymentStatus": "",
                             "PaymentURN": "",
-                            "Amount": None,
+                            "Amount": amount,
                             "SettlementDate": None,
                             "LocationVerified": 0,
                             "ReportUploaded": 0,
@@ -202,7 +210,7 @@ class PlusIntegration:
         order = plus_obj.order
         action_data = order.action_data
         utm_params = action_data.get('utm_parameter', None)
-        utm_source =utm_params.get('utm_source', None)
+        utm_source = utm_params.get('utm_source', None)
         if not utm_source:
             return
 
@@ -210,7 +218,7 @@ class PlusIntegration:
         plan['plan_id'] = plus_plan.id
         plus_member = plus_obj.plus_members.all().filter(relation=PlusMembers.Relations.SELF).first()
         member['name'] = plus_member.first_name
-        member['dob'] = plus_member.dob
+        member['dob'] = str(plus_member.dob)
         member['email'] = plus_member.email
         member['address'] = plus_member.address
         member['phone_number'] = plus_member.phone_number
@@ -219,6 +227,11 @@ class PlusIntegration:
         booking_detail['user_id'] = plus_obj.user.id
         booking_detail['booking_status'] = 300
         booking_detail['order_id'] = order.id
+        booking_detail['booking_time'] = plus_obj.purchase_date
+        # booking_detail['booking_time'] = ""
+        booking_detail['amount'] = plus_obj.amount
+        booking_detail['mrp'] = plus_obj.plan.mrp
+        booking_detail['deal_price'] = plus_obj.plan.deal_price
 
         resp['plan'] = plan
         resp['members'] = member
