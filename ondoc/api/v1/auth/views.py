@@ -1978,14 +1978,16 @@ class SendBookingUrlViewSet(GenericViewSet):
 
         if request.user.is_authenticated:
             user_profile = request.user.get_default_profile()
+
+        if purchase_type == 'vip_purchase':
+            SmsNotification.send_vip_booking_url(token, str(user_profile.phone_number), utm_source=utm_source)
+            return Response({"status": 1})
+
         if not user_profile:
             return Response({"status": 1})
         if purchase_type == 'insurance':
             SmsNotification.send_insurance_booking_url(token=token, phone_number=str(user_profile.phone_number))
             EmailNotification.send_insurance_booking_url(token=token, email=user_profile.email)
-        elif purchase_type == 'vip_purchase':
-            SmsNotification.send_vip_booking_url(token, str(user_profile.phone_number), name=user_profile.name, utm_source=utm_source)
-            # EmailNotification.send_vip_booking_url(token=token, email=user_profile.email)
         elif purchase_type == 'endorsement':
             SmsNotification.send_endorsement_request_url(token=token, phone_number=str(user_profile.phone_number))
             EmailNotification.send_endorsement_request_url(token=token, email=user_profile.email)
