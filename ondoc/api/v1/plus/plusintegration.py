@@ -187,13 +187,13 @@ class PlusIntegration:
                                                                                   'Content-Type': 'application/json'})
 
             if response.status_code != status.HTTP_200_OK:
-                logger.error(json.dumps(request_data))
+                # logger.error(json.dumps(request_data))
                 logger.info("[ERROR] could not get 200 for process VIP Lead ")
                 resp['error'] = "Error while saving data!!"
             else:
                 resp['data'] = "successfully save!!"
         except Exception as e:
-            logger.error(json.dumps(request_data))
+            # logger.error(json.dumps(request_data))
             logger.info("[ERROR] {}".format(e))
         return resp
 
