@@ -9,14 +9,13 @@ import requests
 import json
 import logging
 import datetime
-from datetime import date
 from ondoc.authentication.models import Address, SPOCDetails, QCModel
-from ondoc.api.v1.utils import resolve_address
+from ondoc.api.v1.utils import log_requests_on
 from ondoc.common.models import AppointmentMaskNumber
-from django.apps import apps
 from ondoc.crm.constants import matrix_product_ids, matrix_subproduct_ids, constants
 
 logger = logging.getLogger(__name__)
+from ondoc.matrix.mongo_models import MatrixLog
 
 
 # def prepare_and_hit(self, data):
@@ -350,6 +349,7 @@ logger = logging.getLogger(__name__)
 def push_appointment_to_matrix(self, data):
     from ondoc.doctor.models import OpdAppointment
     from ondoc.diagnostic.models import LabAppointment
+    log_requests_on()
     try:
         appointment_id = data.get('appointment_id', None)
         if not appointment_id:
@@ -379,6 +379,14 @@ def push_appointment_to_matrix(self, data):
         response = requests.post(url, data=json.dumps(request_data), headers={'Authorization': matrix_api_token,
                                                                               'Content-Type': 'application/json'})
 
+        qs = None
+        if data.get('type') == 'OPD_APPOINTMENT':
+            qs = OpdAppointment.objects.filter(id=appointment.id)
+        elif data.get('type') == 'LAB_APPOINTMENT':
+            qs = LabAppointment.objects.filter(id=appointment.id)
+
+        MatrixLog.create_matrix_logs(qs.first(), request_data, response.json())
+
         if response.status_code != status.HTTP_200_OK or not response.ok:
             logger.error(json.dumps(request_data))
             logger.info("[ERROR] Appointment could not be published to the matrix system")
@@ -392,18 +400,15 @@ def push_appointment_to_matrix(self, data):
         resp_data = response.json()
 
         if not resp_data.get('Id', None):
-            logger.error(json.dumps(request_data))
-            raise Exception("[ERROR] Id not recieved from the matrix while pushing appointment lead.")
+            return
+            # logger.error(json.dumps(request_data))
+            # raise Exception("[ERROR] Id not recieved from the matrix while pushing appointment lead.")
 
         # save the appointment with the matrix lead id.
-        qs = None
-        if data.get('type') == 'OPD_APPOINTMENT':
-            qs = OpdAppointment.objects.filter(id=appointment.id)
-        elif data.get('type') == 'LAB_APPOINTMENT':
-            qs = LabAppointment.objects.filter(id=appointment.id)
 
         if qs:
             qs.update(matrix_lead_id=int(resp_data.get('Id')))
+
 
     except Exception as e:
         logger.error("Error in Celery. Failed pushing Appointment to the matrix- " + str(e))
@@ -467,6 +472,7 @@ def push_appointment_to_matrix(self, data):
 
 @task(bind=True, max_retries=2)
 def push_signup_lead_to_matrix(self, data):
+    log_requests_on()
     try:
         from ondoc.web.models import OnlineLead
         lead_id = data.get('lead_id', None)
@@ -551,6 +557,7 @@ def push_signup_lead_to_matrix(self, data):
 
 @task(bind=True, max_retries=2)
 def push_order_to_matrix(self, data):
+    log_requests_on()
     try:
         if not data:
             raise Exception('Data not received for the task.')
@@ -648,7 +655,7 @@ def create_or_update_lead_on_matrix(self, data):
     from ondoc.communications.models import EMAILNotification
     from ondoc.notification.models import NotificationAction
     from ondoc.diagnostic.models import IPDMedicinePageLead
-
+    log_requests_on()
     try:
         obj_id = data.get('obj_id', None)
         obj_type = data.get('obj_type', None)
@@ -808,6 +815,7 @@ def create_or_update_lead_on_matrix(self, data):
 @task(bind=True, max_retries=3)
 def update_onboarding_qcstatus_to_matrix(self, data):
     from ondoc.procedure.models import IpdProcedureLead
+    log_requests_on()
     try:
         obj_id = data.get('obj_id', None)
         obj_type = data.get('obj_type', None)
@@ -893,7 +901,7 @@ def update_onboarding_qcstatus_to_matrix(self, data):
 def push_onboarding_qcstatus_to_matrix(self, data):
     from ondoc.doctor.models import Doctor
     from ondoc.diagnostic.models import Lab
-
+    log_requests_on()
     try:
         obj_id = data.get('obj_id', None)
         obj_type = data.get('obj_type', None)
@@ -979,6 +987,7 @@ def push_onboarding_qcstatus_to_matrix(self, data):
 @task(bind=True, max_retries=2)
 def push_non_bookable_doctor_lead_to_matrix(self, nb_doc_lead_id):
     from ondoc.web.models import NonBookableDoctorLead
+    log_requests_on()
     try:
         obj = NonBookableDoctorLead.objects.filter(id= nb_doc_lead_id).first()
         if not obj:
@@ -1335,7 +1344,7 @@ def check_for_ipd_lead_validity(self, data):
 @task(bind=True, max_retries=2)
 def push_retail_appointment_to_matrix(self, data):
     from ondoc.doctor.models import OpdAppointment
-
+    log_requests_on()
     try:
         appointment_id = data.get('appointment_id', None)
         if not appointment_id:
