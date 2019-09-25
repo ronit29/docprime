@@ -776,6 +776,7 @@ class HospitalModelSerializer(serializers.ModelSerializer):
     hospital_thumbnail = serializers.SerializerMethodField()
     address = serializers.SerializerMethodField()
     matrix_city = serializers.SerializerMethodField()
+    logo = serializers.SerializerMethodField()
 
     def get_address(self, obj):
         return obj.get_hos_address() if obj.get_hos_address() else None
@@ -801,10 +802,22 @@ class HospitalModelSerializer(serializers.ModelSerializer):
             return obj.get_thumbnail()
         return request.build_absolute_uri(obj.get_thumbnail()) if obj.get_thumbnail() else None
 
+    def get_logo(self, obj):
+        request = self.context.get('request')
+        if request:
+            for document in obj.hospital_documents.all():
+                if document.document_type == HospitalDocument.LOGO:
+                    return request.build_absolute_uri(document.name.url) if document.name else None
+            if obj.network:
+                for document in obj.network.hospital_network_documents.all():
+                    if document.document_type == HospitalNetworkDocument.LOGO:
+                        return request.build_absolute_uri(document.name.url) if document.name else None
+        return None
+
     class Meta:
         model = Hospital
         fields = ('id', 'name', 'operational_since', 'lat', 'long', 'address', 'registration_number',
-                  'building', 'sublocality', 'locality', 'city', 'hospital_thumbnail', 'matrix_city', )
+                  'building', 'sublocality', 'locality', 'city', 'hospital_thumbnail', 'matrix_city', 'logo' )
 
 
 class DoctorHospitalScheduleSerializer(serializers.ModelSerializer):
