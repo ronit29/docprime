@@ -162,7 +162,7 @@ class Lalpath(BaseIntegrator):
             "InvoiceCode": settings.LAL_PATH_INVOICE_CODE,
             "LabCode": lab_codes.lab_code if lab_codes else "",
             "WareHouseCode": lab_codes.warehouse_code if lab_codes else "",
-            "invoiceid": "DPLP-x"+str(lab_appointment.id)
+            "invoiceid": "DPLP"+str(lab_appointment.id)
         }
 
         request_data = {
