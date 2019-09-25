@@ -2163,9 +2163,12 @@ class TopHospitalForIpdProcedureSerializer(serializers.ModelSerializer):
                   'bookable_doctors_count')
 
     def get_bookable_doctors_count(self, obj):
-        if obj.bookable_doctors_count:
-            return obj.bookable_doctors_count
-        return None
+        try:
+            if obj and obj.bookable_doctors_count:
+                return obj.bookable_doctors_count
+        except:
+            return None
+
 
     def get_name_city(self, obj):
         result = obj.name
