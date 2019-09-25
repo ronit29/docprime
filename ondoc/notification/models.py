@@ -1191,9 +1191,9 @@ class SmsNotification(TimeStampedModel, SmsNotificationOpdMixin, SmsNotification
         utm_source = kwargs.get('utm_source', '')
         booking_url = "{}/agent/booking?token={}".format(settings.CONSUMER_APP_DOMAIN, token)
         if utm_source:
-            booking_url = booking_url + "&utm_source={utm_source}&is_agent=false&callbackurl=vip-club-member-details".format(utm_source=utm_source)
+            booking_url = booking_url + "&callbackurl=vip-club-member-details?utm_source={utm_source}&is_agent=false".format(utm_source=utm_source)
         else:
-            booking_url = booking_url + "&is_agent=false&callbackurl=vip-club-member-details"
+            booking_url = booking_url + "&callbackurl=vip-club-member-details?is_agent=false"
 
         short_url = generate_short_url(booking_url)
         print(short_url)
