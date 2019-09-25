@@ -1970,6 +1970,7 @@ class SendBookingUrlViewSet(GenericViewSet):
     def send_booking_url(self, request):
         type = request.data.get('type')
         purchase_type = request.data.get('purchase_type', None)
+        utm_source = request.data.get('utm_spo_tags', {}).get('utm_source', '')
 
         # agent_token = AgentToken.objects.create_token(user=request.user)
         user_token = JWTAuthentication.generate_token(request.user)
@@ -1978,6 +1979,11 @@ class SendBookingUrlViewSet(GenericViewSet):
 
         if request.user.is_authenticated:
             user_profile = request.user.get_default_profile()
+
+        if purchase_type == 'vip_purchase':
+            SmsNotification.send_vip_booking_url(token, str(request.user.phone_number), utm_source=utm_source)
+            return Response({"status": 1})
+
         if not user_profile:
             return Response({"status": 1})
         if purchase_type == 'insurance':
