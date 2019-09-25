@@ -605,7 +605,8 @@ def process_payout(payout_id):
         # update payout status
         payout_data.update_status('attempted')
         MerchantPayoutLog.create_log(payout_data, str(e))
-        logger.error("Error in processing payout - with exception - " + str(e))
+        # logger.error("Error in processing payout - with exception - " + str(e))
+        print("Error in processing payout - with exception - " + str(e))
 
 
 @task(bind=True, max_retries=3)
@@ -791,7 +792,8 @@ def request_payout(req_data, order_data):
             if success_payout:
                 return {"status": 1, "response": resp_data}
 
-    logger.error("payout failed for request data - " + str(req_data))
+    # logger.error("payout failed for request data - " + str(req_data))
+    print("payout failed for request data - " + str(req_data))
     return {"status" : 0, "response" : resp_data}
 
 
