@@ -669,7 +669,10 @@ def send_plus_membership_notifications(self, data):
         if not user:
             raise Exception("Invalid user id passed for plus membership email notification. Userid %s" % str(user_id))
 
-        plus_user_obj = user.active_plus_user if user.active_plus_user else user.inactive_plus_user
+        if user.active_plus_user:
+            plus_user_obj = user.active_plus_user
+        else:
+            plus_user_obj = user.inactive_plus_user
         if not plus_user_obj:
             raise Exception("Invalid or None plus user membership found for email notification. User id %s" % str(user_id))
 
