@@ -1,5 +1,4 @@
 import operator
-# from pyodbc import Date
 
 from django.contrib.gis.geos import Point
 from django.utils import timezone
@@ -97,7 +96,7 @@ class DoctorSearchHelper:
         counter=1
         spec_filter_str = ''
         if len(specialization_filter_ids) > 0 and len(procedure_ids)==0 and len(procedure_category_ids)==0:
-            spec_filter_str = ' and d.id in (select doctor_id from doctor_practice_specialization where specialization_id IN('
+            spec_filter_str = ' d.id in (select doctor_id from doctor_practice_specialization where specialization_id IN('
             for id in specialization_filter_ids:
 
                 if not counter == 1:
@@ -286,14 +285,14 @@ class DoctorSearchHelper:
             params['insurance_threshold_amount'] = self.query_params.get('insurance_threshold_amount')
 
         result = {}
-        if not filtering_params:
+        if not filtering_params and not spec_filter_str:
             result['string'] = "1=1"
             result['params'] = params
             return result
-
-        result['string'] = " and ".join(filtering_params)
+        if filtering_params:
+            result['string'] = " and ".join(filtering_params)
         if spec_filter_str:
-            result['string'] = result.get('string') + spec_filter_str
+            result['string'] = result.get('string') + ' and ' + spec_filter_str if result.get('string') else spec_filter_str
         result['params'] = params
         if len(procedure_ids) > 0:
             result['count_of_procedure'] = len(procedure_ids)
@@ -477,6 +476,11 @@ class DoctorSearchHelper:
             else:
                 ipd_query = ""
 
+            vip_enabled_filter_query = ''
+            if self.query_params.get('vip_user'):
+                vip_enabled_filter_query = ' and h.enabled_for_prepaid=true '
+
+
             query_string = "SELECT count(*) OVER() AS result_count, x.doctor_id, x.hospital_id, doctor_clinic_id, doctor_clinic_timing_id " \
                            "FROM (select {rank_part}, " \
                            "St_distance(St_setsrid(St_point((%(longitude)s), (%(latitude)s)), 4326), h.location) distance, " \
@@ -489,7 +493,7 @@ class DoctorSearchHelper:
                            "{bucket_query} FROM doctor d " \
                            "INNER JOIN doctor_clinic dc ON d.id = dc.doctor_id and dc.enabled=true and d.is_live=true " \
                            "and d.is_test_doctor is False and d.is_internal is False " \
-                           "INNER JOIN hospital h ON h.id = dc.hospital_id and h.is_live=true " \
+                           "INNER JOIN hospital h ON h.id = dc.hospital_id and h.is_live=true {vip_enabled_filter_query} " \
                            "INNER JOIN doctor_clinic_timing dct ON dc.id = dct.doctor_clinic_id " \
                            "{ipd_query} " \
                            "LEFT JOIN doctor_leave dl on dl.doctor_id = d.id and (%(ist_date)s) BETWEEN dl.start_date and dl.end_date " \
@@ -505,7 +509,8 @@ class DoctorSearchHelper:
                                                                               min_dist_cond=min_dist_cond,
                                                                               order_by_field=order_by_field, \
                                                                               rank_by=rank_by, ipd_query=ipd_query,
-                                                                              bucket_query=bucket_query)
+                                                                              bucket_query=bucket_query,
+                                                                              vip_enabled_filter_query=vip_enabled_filter_query)
 
         if filtering_params.get('params'):
             filtering_params.get('params')['longitude'] = longitude
@@ -619,6 +624,12 @@ class DoctorSearchHelper:
 
                 is_insurance_covered = False
                 insurance_error = None
+                vip_data_dict = kwargs.get('vip_data')
+                is_vip_member = vip_data_dict.get('is_vip_member', False)
+                is_enable_for_vip = vip_data_dict.get('is_enable_for_vip', False)
+                vip_remaining_amount = int(vip_data_dict.get('vip_remaining_amount', 0))
+                vip_amount = 0
+                cover_under_vip = vip_data_dict.get('cover_under_vip', False)
                 insurance_data_dict = kwargs.get('insurance_data')
                 if doctor_clinic.hospital.enabled_for_prepaid and doctor_clinic.hospital.enabled_for_insurance and enable_online_booking and doctor.is_insurance_enabled and doctor.is_doctor_specialization_insured() and insurance_data_dict and min_price.get("mrp") is not None and \
                         min_price["mrp"] <= insurance_data_dict['insurance_threshold_amount'] and \
@@ -638,10 +649,30 @@ class DoctorSearchHelper:
                 else:
                     is_insurance_covered = False
                     insurance_error = "You have already utilised {} Oncologist consultations available in your OPD Insurance Plan.".format(settings.INSURANCE_ONCOLOGIST_LIMIT)
+
+                if doctor.enabled_for_plus_plans and doctor_clinic.hospital.enabled_for_prepaid and \
+                        doctor.enabled_for_online_booking and doctor_clinic.hospital.enabled_for_online_booking and \
+                        doctor_clinic.enabled_for_online_booking:
+                    if request and request.user and not request.user.is_anonymous and request.user.active_insurance:
+                        is_enable_for_vip = False
+                    else:
+                        is_enable_for_vip = True
+
+                if request and request.user and not request.user.is_anonymous and vip_data_dict.get('is_vip_member') and \
+                        doctor.enabled_for_plus_plans and doctor_clinic.hospital.enabled_for_prepaid and \
+                        doctor.enabled_for_online_booking and doctor_clinic.hospital.enabled_for_online_booking and \
+                        doctor_clinic.enabled_for_online_booking:
+                    mrp = int(min_price.get('mrp'))
+                    cover_under_vip = True if vip_remaining_amount > 0 else False
+                    vip_amount = 0 if vip_remaining_amount > mrp else mrp - vip_remaining_amount
                 hospitals = [{
                     "enabled_for_online_booking": enable_online_booking,
                     "is_insurance_covered": is_insurance_covered,
                     "insurance_limit_message": insurance_error,
+                    "is_vip_member": is_vip_member,
+                    "cover_under_vip": cover_under_vip,
+                    "vip_amount": vip_amount,
+                    "is_enable_for_vip": is_enable_for_vip,
                     "insurance_threshold_amount": insurance_data_dict['insurance_threshold_amount'],
                     "is_user_insured": insurance_data_dict['is_user_insured'],
                     "welcome_calling_done": doctor_clinic.hospital.welcome_calling_done,

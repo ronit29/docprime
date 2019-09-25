@@ -7,7 +7,9 @@ from django.db.models import Prefetch, Q
 from django.utils import timezone
 from django.utils.functional import cached_property
 import sys
+import random
 import datetime
+from django.conf import settings
 from django.utils.crypto import get_random_string
 import logging
 
@@ -65,6 +67,7 @@ class Coupon(auth_model.TimeStampedModel):
     is_corporate = models.BooleanField(default=False)
     is_visible = models.BooleanField(default=True)
     is_for_insurance = models.BooleanField(default=False)
+    is_lensfit = models.NullBooleanField()
     new_user_constraint = models.BooleanField(default=False)
     coupon_type = models.IntegerField(choices=COUPON_TYPE_CHOICES, default=DISCOUNT)
     payment_option = models.ForeignKey(PaymentOptions, on_delete=models.SET_NULL, blank=True, null=True)
@@ -110,7 +113,6 @@ class Coupon(auth_model.TimeStampedModel):
         if not user.is_authenticated:
             return 0
 
-
         count = 0
         if str(self.type) == str(self.DOCTOR) or str(self.type) == str(self.ALL):
             count += OpdAppointment.objects.filter(user=user,
@@ -130,8 +132,8 @@ class Coupon(auth_model.TimeStampedModel):
                                                    coupon=self).count()
         if str(self.type) == str(self.SUBSCRIPTION_PLAN) or str(self.type) == str(self.ALL):
             count += UserPlanMapping.objects.filter(user=user,
-                                                   status__in=[UserPlanMapping.BOOKED],
-                                                   coupon=self).count()
+                                                    status__in=[UserPlanMapping.BOOKED],
+                                                    coupon=self).count()
 
         count += Cart.objects.filter(user=user, deleted_at__isnull=True, data__coupon_code__contains=self.code).exclude(id=cart_item).count()
         return count
@@ -148,12 +150,12 @@ class Coupon(auth_model.TimeStampedModel):
         count = 0
         if str(self.type) == str(self.DOCTOR) or str(self.type) == str(self.ALL):
             qs = OpdAppointment.objects.filter(status__in=[OpdAppointment.CREATED, OpdAppointment.BOOKED,
-                                                               OpdAppointment.RESCHEDULED_DOCTOR,
-                                                               OpdAppointment.RESCHEDULED_PATIENT,
-                                                               OpdAppointment.ACCEPTED,
-                                                               OpdAppointment.COMPLETED],
-                                                   coupon=self,
-                                                   coupon_data__random_coupons__random_coupon_list__contains=[code])
+                                                           OpdAppointment.RESCHEDULED_DOCTOR,
+                                                           OpdAppointment.RESCHEDULED_PATIENT,
+                                                           OpdAppointment.ACCEPTED,
+                                                           OpdAppointment.COMPLETED],
+                                               coupon=self,
+                                               coupon_data__random_coupons__random_coupon_list__contains=[code])
             if user:
                 qs = qs.filter(user=user)
             count += qs.count()
@@ -185,7 +187,6 @@ class Coupon(auth_model.TimeStampedModel):
 
         return count
 
-
     @classmethod
     def get_total_deduction(cls, data, deal_price):
         from ondoc.doctor.models import OpdAppointment
@@ -197,8 +198,16 @@ class Coupon(auth_model.TimeStampedModel):
         coupon_discount = 0
         coupon_cashback = 0
 
+        coupon_codes = []
         if data.get("coupon_code"):
-            coupon_obj = RandomGeneratedCoupon.get_coupons(set(data.get("coupon_code")))
+            coupon_codes = data.get("coupon_code")
+        elif data.get('coupon'):
+            coupon_codes = cls.objects.filter(id__in=data.get('coupon'))
+            coupon_codes = list(map(lambda x: x.code, coupon_codes))
+        coupon_codes = set(coupon_codes)
+
+        if coupon_codes:
+            coupon_obj = RandomGeneratedCoupon.get_coupons(coupon_codes)
             # coupon_obj = cls.objects.filter(code__in=set(data.get("coupon_code")))
             obj = OpdAppointment()
 
@@ -217,9 +226,9 @@ class Coupon(auth_model.TimeStampedModel):
                         curr_discount = obj.get_discount(coupon, tests_deal_price)
                     elif coupon.procedures.exists() and coupon.type == Coupon.DOCTOR and data.get("doctor") and data.get("hospital") and data.get("procedures"):
                         procedures_deal_price = obj.get_applicable_procedures_with_total_price(coupon_obj=coupon,
-                                                                                       procedures=data['procedures'],
-                                                                                       doctor=data["doctor"],
-                                                                                       hospital=data["hospital"]).get("total_price")
+                                                                                               procedures=data['procedures'],
+                                                                                               doctor=data["doctor"],
+                                                                                               hospital=data["hospital"]).get("total_price")
                         procedures_deal_price = min(remaining_deal_price, procedures_deal_price)
                         curr_discount = obj.get_discount(coupon, procedures_deal_price)
                     else:
@@ -239,9 +248,9 @@ class Coupon(auth_model.TimeStampedModel):
                         curr_cashback = obj.get_discount(coupon, tests_deal_price)
                     elif coupon.procedures.exists() and coupon.type == Coupon.DOCTOR and data.get("doctor") and data.get("hospital") and data.get("procedures"):
                         procedures_deal_price = obj.get_applicable_procedures_with_total_price(coupon_obj=coupon,
-                                                                                       procedures=data['procedures'],
-                                                                                       doctor=data["doctor"],
-                                                                                       hospital=data["hospital"]).get("total_price")
+                                                                                               procedures=data['procedures'],
+                                                                                               doctor=data["doctor"],
+                                                                                               hospital=data["hospital"]).get("total_price")
                         procedures_deal_price = min(remaining_deal_price, procedures_deal_price)
                         curr_cashback = obj.get_discount(coupon, procedures_deal_price)
                     else:
@@ -256,6 +265,84 @@ class Coupon(auth_model.TimeStampedModel):
 
     def __str__(self):
         return self.code
+
+    @classmethod
+    def get_lensfit_coupon(cls):
+        lensfit_coupons = settings.LENSFIT_COUPONS
+
+        lensfit_coupon = random.choice(lensfit_coupons)
+
+        return lensfit_coupon
+
+    @classmethod
+    def check_coupon_tests_applicability(cls, request, coupons_obj=[], profile=None, tests=[]):
+        from ondoc.doctor.models import OpdAppointment
+        from ondoc.diagnostic.models import LabAppointment
+        from ondoc.diagnostic.models import LabTest
+
+        test_applicabile = []
+        if coupons_obj:
+            coupon_obj = coupons_obj[0]
+            user_opd_booked = Prefetch('opd_appointment_coupon',
+                                       queryset=OpdAppointment.objects.filter(user=request.user)
+                                       .exclude(status__in=[OpdAppointment.CANCELLED]),
+                                       to_attr='user_opd_booked')
+
+            user_lab_booked = Prefetch('lab_appointment_coupon',
+                                       queryset=LabAppointment.objects.filter(user=request.user)
+                                       .exclude(status__in=[LabAppointment.CANCELLED]),
+                                       to_attr='user_lab_booked')
+            coupon = Coupon.objects.filter(id=coupon_obj.id).prefetch_related(user_opd_booked, user_lab_booked).first()
+
+            if coupon:
+                coupon_recommender = CouponRecommender(request.user, profile, 'lab', 2, coupon_obj.code, None)
+                pathology_tests = []
+                radiology_tests = []
+                user_coupon_count = 0
+
+                user_cart_counts = dict()
+                user_cart_purchase_items = request.user.cart_item.filter(deleted_at__isnull=True)
+
+                for item in user_cart_purchase_items:
+                    if item.data and item.data.get('coupon_code'):
+                        cart_code = item.data.get('coupon_code')[0]
+                        if not cart_code in user_cart_counts:
+                            user_cart_counts[cart_code] = 0
+                        user_cart_counts[cart_code] += 1
+
+                user_coupon_count = len(coupon.user_opd_booked) + len(coupon.user_lab_booked)
+                if user_cart_counts.get(coupon.code):
+                    user_coupon_count += user_cart_counts.get(coupon.code)
+
+                if coupon_recommender and tests:
+                    for test in tests:
+                        if test.test_type == LabTest.PATHOLOGY:
+                            pathology_tests.append(test)
+                        if test.test_type == LabTest.RADIOLOGY:
+                            radiology_tests.append(test)
+
+                    if pathology_tests:
+                        if user_coupon_count < coupon_obj.count:
+                            filters = dict()
+                            filters['tests'] = pathology_tests
+                            applicable_coupon = coupon_recommender.applicable_coupons(**filters)
+
+                            if applicable_coupon:
+                                test_applicabile = test_applicabile + pathology_tests
+                                user_coupon_count += 1
+
+                    for test in radiology_tests:
+                        if user_coupon_count < coupon_obj.count:
+                            filters = dict()
+                            filters['tests'] = [test]
+                            applicable_coupon = coupon_recommender.applicable_coupons(**filters)
+
+                            if applicable_coupon:
+                                test_applicabile.append(test)
+                                user_coupon_count += 1
+
+        return test_applicabile
+
 
     class Meta:
         db_table = "coupon"
@@ -679,7 +766,7 @@ class CouponRecommender():
                 deal_price = filters.get('deal_price')
                 if deal_price:
                     discount = obj.get_discount(coupon, deal_price)
-                    return discount > 0
+                    return discount >= 0
                 return True
 
             # sort coupons on discount granted

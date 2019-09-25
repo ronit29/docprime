@@ -6,7 +6,10 @@ from .views import (CitiesViewSet, ServicesViewSet, SmsServiceViewSet, UpdateXls
                     UploadQualificationViewSet, UploadExperienceViewSet, UploadAwardViewSet, UploadHospitalViewSet,
                     UploadMembershipViewSet, SearchLeadViewSet, GetPaymentOptionsViewSet, GetSearchUrlViewSet,
                     GetKeyDataViewSet, AllUrlsViewset, DeviceDetailsSave, AppointmentPrerequisiteViewSet,
-                    SiteSettingsViewSet, DepartmentRouting, CommentViewSet)
+
+                    SiteSettingsViewSet, DepartmentRouting, CommentViewSet, DocumentUploadViewSet,
+                    SponsorListingViewSet)
+                    # SponsorListingViewSet)
 
 
 urlpatterns = [
@@ -40,4 +43,6 @@ urlpatterns = [
     path('get_department_for_routing', DepartmentRouting.as_view({'get': 'get_department'}), name='get-department'),
     path('comment/post', CommentViewSet.as_view({'post': 'create'}), name='post-comment'),
     path('comment/list', CommentViewSet.as_view({'get': 'list'}), name='list-comment'),
+    path('sponsorlisting', SponsorListingViewSet.as_view({'get': 'list'}), name='sponsor-listing'),
+    path('upload/document-proof', DocumentUploadViewSet.as_view({'post': 'upload_document_proofs'}), name='upload_prescription')
 ]

@@ -26,7 +26,8 @@ from dal import autocomplete
 from reversion_compare.admin import CompareVersionAdmin
 
 from ondoc.api.v1.utils import GenericAdminEntity, util_absolute_url, util_file_name
-from ondoc.common.models import AppointmentHistory
+from ondoc.common.models import AppointmentHistory, SponsorListingURL, SponsorListingUtmTerm, SponsoredListingService, \
+    SponsorListingSpecialization
 from django.contrib import messages
 from django.http import HttpResponseRedirect
 
@@ -71,6 +72,7 @@ from ondoc.sms import api
 from ondoc.ratings_review import models as rating_models
 from ondoc.notification import tasks as notification_tasks
 from django.urls import reverse
+from import_export.tmp_storages import MediaStorage
 
 
 class AutoComplete:
@@ -1575,7 +1577,14 @@ class DoctorOpdAppointmentForm(RefundableAppointmentForm):
                     raise forms.ValidationError("Can not send credit letter for COD bookings.")
                 else:
                     try:
-                        notification_tasks.send_opd_notifications_refactored.apply_async((self.instance.id, NotificationAction.APPOINTMENT_ACCEPTED), countdown=1)
+                        # notification_tasks.send_opd_notifications_refactored.apply_async((self.instance.id, NotificationAction.APPOINTMENT_ACCEPTED), countdown=1)
+
+                        # For stopping created to cancelled notification to provider
+                        sent_to_provider = True
+                        notification_tasks.send_opd_notifications_refactored.apply_async(({'appointment_id': self.instance.id,
+                                                                                           'is_valid_for_provider': sent_to_provider,
+                                                                                           'notification_type': NotificationAction.APPOINTMENT_ACCEPTED},),
+                                                                                            countdown=1)
                     except Exception as e:
                         logger.error(str(e))
 
@@ -2069,7 +2078,13 @@ class DoctorOpdAppointmentAdmin(ExportMixin, CompareVersionAdmin):
                 obj.action_completed()
             send_cod_to_prepaid_request = form.cleaned_data.get('send_cod_to_prepaid_request', False)
             if send_cod_to_prepaid_request:
-                notification_tasks.send_opd_notifications_refactored.apply_async((obj.id, NotificationAction.COD_TO_PREPAID_REQUEST), countdown=5)
+                # notification_tasks.send_opd_notifications_refactored.apply_async((obj.id, NotificationAction.COD_TO_PREPAID_REQUEST), countdown=5)
+
+                # Change to fix created to cancelled notification to provider
+                notification_tasks.send_opd_notifications_refactored.apply_async(({'appointment_id': obj.id,
+                                                                                   'is_valid_for_provider': True,
+                                                                                   'notification_type': NotificationAction.COD_TO_PREPAID_REQUEST},),
+                                                                                 countdown=1)
             if form and form.cleaned_data and form.cleaned_data.get('refund_payment', False):
                 obj._refund_reason = form.cleaned_data.get('refund_reason', '')
                 obj.action_refund()
@@ -2455,22 +2470,79 @@ class PurchaseOrderCreationForm(forms.ModelForm):
         return super().clean()
 
 
-class PurchaseOrderCreationAdmin(admin.ModelAdmin):
+class SponsorListingURLInline(admin.TabularInline):
+    model = SponsorListingURL
+    extra = 0
+    can_delete = True
+
+
+class SponsorListingSpecializationForm(forms.ModelForm):
+    def clean(self):
+        cleaned_date = self.cleaned_data
+        if not cleaned_date.get('latitude') or not cleaned_date.get('latitude'):
+            raise forms.ValidationError('Latitude and Longitude must be entered')
+
+        return super().clean()
+
+
+class SponsorListingSpecializationInline(admin.TabularInline):
+    model = SponsorListingSpecialization
+    extra = 0
+    can_delete = True
+    form = SponsorListingSpecializationForm
+    exclude = ['location']
+
+
+class SponsorListingUtmTermInline(admin.TabularInline):
+    model = SponsorListingUtmTerm
+    extra = 0
+    can_delete = True
+
+
+class SponsoredListingServiceInline(admin.TabularInline):
+    model = SponsoredListingService
+    extra = 0
+    can_delete = True
+
+    def formfield_for_foreignkey(self, db_field, request=None, **kwargs):
+        if db_field.name == 'hospital_service':
+            parent_object_id = request.resolver_match.kwargs.get('object_id')
+            parent_obj = PurchaseOrderCreation.objects.filter(id=parent_object_id).first()
+            if parent_obj:
+                hospital = parent_obj.provider_name_hospital.id
+                kwargs['queryset'] = HospitalSponsoredServices.objects.select_related('hospital', 'sponsored_service').filter(hospital=hospital)
+        return super(SponsoredListingServiceInline, self).formfield_for_foreignkey(db_field, request, **kwargs)
+
+
+class PurchaseOrderCreationAdmin(CompareVersionAdmin):
     model = PurchaseOrderCreation
     form = PurchaseOrderCreationForm
-    list_display = ['provider_type', 'start_date', 'end_date', 'provider_name_lab', 'provider_name_hospital', 'total_appointment_count',
+    list_display = ['provider_type', 'created_at', 'start_date', 'end_date', 'provider_name_hospital', 'total_appointment_count',
                     'appointment_booked_count', 'current_appointment_count']
     autocomplete_fields = ['provider_name_lab', 'provider_name_hospital']
     search_fields = ['provider_name_lab__name', 'provider_name_hospital__name']
+
+    inlines = [SponsorListingURLInline, SponsorListingSpecializationInline, SponsorListingUtmTermInline, SponsoredListingServiceInline]
+
     # readonly_fields = ['provider_name', 'appointment_booked_count', 'current_appointment_count']
 
     def get_readonly_fields(self, request, obj=None):
         read_only_fields = ['provider_name', 'appointment_booked_count', 'current_appointment_count']
         if obj and obj.id:
-            read_only_fields += ['start_date', 'end_date', 'total_appointment_count', 'provider_name_hospital', 'total_amount_paid', 'gst_number',
+            read_only_fields += ['total_appointment_count', 'provider_name_hospital', 'total_amount_paid', 'gst_number',
                                  'provider_type', 'product_type']
 
+        if obj and obj.id and obj.start_date != None:
+            read_only_fields += ['start_date']
+
+        if obj and obj.id and obj.end_date != None:
+            read_only_fields += ['end_date']
+
         return read_only_fields
+
+    # def get_queryset(self, request):
+    #     return super(PurchaseOrderCreationAdmin, self).get_queryset(request).filter(id=request.resolver_match.kwargs.get('object_id')).first().provider_name_hospital.hospital_services.first().sponsored_service
+
 
 
 class SponsoredServicePracticeSpecializationFormSet(forms.BaseInlineFormSet):
@@ -2500,13 +2572,15 @@ class SponsoredServicePracticeSpecializationInline(admin.TabularInline):
 
 
 class SponsoredServicesResource(resources.ModelResource):
+    tmp_storage_class = MediaStorage
+
     class Meta:
         model = SponsoredServices
         fields = ('id', 'name')
         export_order = ('id', 'name')
 
 
-class SponsoredServicesAdmin(ImportExportMixin, admin.ModelAdmin):
+class SponsoredServicesAdmin(ImportExportMixin, CompareVersionAdmin):
     search_fields = ['name']
     formats = (base_formats.XLS, base_formats.XLSX,)
     inlines = [ SponsoredServicePracticeSpecializationInline ]
@@ -2514,13 +2588,15 @@ class SponsoredServicesAdmin(ImportExportMixin, admin.ModelAdmin):
 
 
 class HospitalSponsoredServicesAdminResource(resources.ModelResource):
+    tmp_storage_class = MediaStorage
+
     class Meta:
         model = HospitalSponsoredServices
         fields = ('id', 'hospital', 'sponsored_service')
         export_order = ('id', 'hospital', 'sponsored_service')
 
 
-class HospitalSponsoredServicesAdmin(ImportExportMixin, admin.ModelAdmin):
+class HospitalSponsoredServicesAdmin(ImportExportMixin, CompareVersionAdmin):
     search_fields = ['hospital']
     list_display = ['hospital', 'sponsored_service']
     formats = (base_formats.XLS, base_formats.XLSX,)
@@ -2528,6 +2604,7 @@ class HospitalSponsoredServicesAdmin(ImportExportMixin, admin.ModelAdmin):
 
 
 class DoctorSponsoredServicesResource(resources.ModelResource):
+    tmp_storage_class = MediaStorage
 
     class Meta:
         model = DoctorSponsoredServices
@@ -2535,7 +2612,7 @@ class DoctorSponsoredServicesResource(resources.ModelResource):
         export_order = ('id', 'doctor', 'sponsored_service')
 
 
-class DoctorSponsoredServicesAdmin(ImportExportMixin, admin.ModelAdmin):
+class DoctorSponsoredServicesAdmin(ImportExportMixin, CompareVersionAdmin):
     search_fields = ['doctor']
     list_display = ['doctor', 'sponsored_service']
     formats = (base_formats.XLS, base_formats.XLSX,)

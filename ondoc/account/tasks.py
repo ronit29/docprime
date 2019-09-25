@@ -292,6 +292,8 @@ def refund_status_update(self):
 @task(bind=True, max_retries=6)
 def refund_curl_task(self, req_data):
     from ondoc.account.models import ConsumerRefund, PgTransaction
+    from ondoc.notification.tasks import save_pg_response
+    from ondoc.account.mongo_models import PgLogs as PgLogsMongo
     if settings.AUTO_REFUND:
         print(req_data)
         try:
@@ -305,6 +307,10 @@ def refund_curl_task(self, req_data):
             # url = 'http://localhost:8000/api/v1/doctor/test'
             print(url)
             response = requests.post(url, data=json.dumps(req_data), headers=headers)
+            save_pg_response.apply_async(
+                (PgLogsMongo.REFUND_REQUEST_RESPONSE, req_data.get('orderId'), req_data.get('refNo'), response.json(),
+                 req_data, req_data.get('user'),),
+                eta=timezone.localtime(), )
             if response.status_code == status.HTTP_200_OK:
                 resp_data = response.json()
                 logger.error("Response content - " + str(response.content) + " with request data - " + json.dumps(req_data))
@@ -587,3 +593,35 @@ def appointment_wise_revenue(all_appointments):
                 else:
                     MerchantNetRevenue.objects.create(merchant=merchant, total_revenue=booking_net_revenue,
                                                       financial_year=financial_year)
+
+
+@task()
+def purchase_order_creation_counter_automation():
+
+    from ondoc.doctor.models import PurchaseOrderCreation
+    instance = PurchaseOrderCreation.objects.filter(start_date=timezone.now().date())
+    for poc_instance in instance:
+        if poc_instance and poc_instance.product_type == PurchaseOrderCreation.PAY_AT_CLINIC:
+            poc_instance.is_enabled = True
+            poc_instance.provider_name_hospital.enabled_poc = True
+            poc_instance.provider_name_hospital.enabled_for_cod = True
+            poc_instance.save()
+
+        if poc_instance and poc_instance.product_type == PurchaseOrderCreation.SPONSOR_LISTING:
+            poc_instance.is_enabled = True
+            poc_instance.save()
+
+
+@task()
+def purchase_order_closing_counter_automation():
+
+    from ondoc.doctor.models import PurchaseOrderCreation
+    instance = PurchaseOrderCreation.objects.filter(end_date=timezone.now().date())
+
+    for poc_instance in instance:
+        if poc_instance and poc_instance.product_type == PurchaseOrderCreation.PAY_AT_CLINIC:
+            poc_instance.disable_cod_functionality()
+
+        if poc_instance and poc_instance.product_type == PurchaseOrderCreation.SPONSOR_LISTING:
+            poc_instance.is_enabled = False
+            poc_instance.save()

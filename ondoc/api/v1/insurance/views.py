@@ -304,6 +304,8 @@ class InsuranceOrderViewSet(viewsets.GenericViewSet):
         if blocked_state:
             return Response({'error': blocked_state.message}, status=status.HTTP_400_BAD_REQUEST)
 
+        if user.active_plus_user:
+            return Response({'error': 'User has already purchased the Vip memership.'})
 
         if settings.IS_INSURANCE_ACTIVE:
             user = request.user
