@@ -4139,7 +4139,7 @@ class OfflineCustomerViewSet(viewsets.GenericViewSet):
         type = valid_data.get('type')
         if type == serializers.OfflineAppointmentFilterSerializer.LAB:
             lab_data = self.get_lab_appointment_list(request, request.user, valid_data)
-            if not lab_data:
+            if valid_data.get('appointment_id') and not lab_data:
                 return Response({"status": 0, "error": "data not found"}, status=status.HTTP_404_NOT_FOUND)
             return Response(lab_data)
 
