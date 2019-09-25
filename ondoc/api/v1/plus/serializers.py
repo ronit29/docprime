@@ -112,6 +112,23 @@ class PlusProposerSerializer(serializers.ModelSerializer):
         fields = ('id', 'name', 'logo', 'website', 'phone_number', 'email', 'plans')
 
 
+class PlusProposerUTMSerializer(serializers.ModelSerializer):
+    plans = serializers.SerializerMethodField()
+
+    def get_plans(self, obj):
+        request = self.context.get('request')
+        utm = self.context.get('utm')
+        if utm:
+            plus_plans_qs = PlusPlans.get_active_plans_via_utm(utm)
+            serializer_obj = PlusPlansSerializer(plus_plans_qs, context=self.context, many=True)
+            return serializer_obj.data
+        return []
+
+    class Meta:
+        model = PlusProposer
+        fields = ('id', 'name', 'logo', 'website', 'phone_number', 'email', 'plans')
+
+
 class PlusMembersDocumentSerializer(serializers.Serializer):
     proof_file = serializers.PrimaryKeyRelatedField(queryset=DocumentsProofs.objects.all())
 

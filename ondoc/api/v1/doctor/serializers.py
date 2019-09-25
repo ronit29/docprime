@@ -1251,7 +1251,7 @@ class DoctorProfileUserViewSerializer(DoctorProfileSerializer):
             description += ' in ' + ', '.join(doc_hosp_list)
 
         if sublocality and locality:
-            # title += ' in ' + sublocality + " " + locality + ' - Consult Online'
+            title += ' , ' + sublocality + " , " + locality
             description += ' , ' + sublocality + " , " + locality
         elif locality:
             title += ' ,' + locality

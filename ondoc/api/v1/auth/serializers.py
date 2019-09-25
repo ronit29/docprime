@@ -345,6 +345,7 @@ class TransactionSerializer(serializers.Serializer):
     pgTxId = serializers.CharField(max_length=200)
     pbGatewayName = serializers.CharField(max_length=200, required=False)
     hash = serializers.CharField(max_length=1000)
+    nodalId = serializers.IntegerField()
 
 
 class UserTransactionModelSerializer(serializers.ModelSerializer):
