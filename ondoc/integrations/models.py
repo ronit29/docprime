@@ -363,3 +363,12 @@ class IntegratorLabCode(TimeStampedModel):
 
     class Meta:
         db_table = 'integrator_lab_code'
+
+
+class IntegratorDoctorClinicCode(TimeStampedModel):
+    city_code = models.CharField(max_length=30, null=True, blank=True)
+    clinic_code = models.CharField(max_length=50, null=True, blank=True)
+    doctor_clinic = models.ForeignKey(DoctorClinic, null=False, blank=False, related_name='dc_code', on_delete=models.DO_NOTHING)
+
+    class Meta:
+        db_table = 'integrator_doctor_clinic_code'

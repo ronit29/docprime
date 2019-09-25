@@ -42,11 +42,14 @@ class Medanta(BaseIntegrator):
         dc_obj = kwargs.get('dc_obj', None)
         doctor_id = None
         if dc_obj:
+            dc_code = dc_obj.dc_code.all().first()
+            facility_id = dc_code.city_code
+            clinic_code = dc_code.clinic_code
             doc_mapping = IntegratorDoctorMappings.objects.filter(doctor_clinic_id=dc_obj.id, is_active=True).first()
             if doc_mapping:
                 doctor_id = doc_mapping.integrator_doctor_id
 
-        if doctor_id:
+        if doctor_id and facility_id and clinic_code:
             converted_date = datetime.strptime(date, "%Y-%m-%d").strftime("%Y/%m/%d")
             consultation_type = "In Person"
             url = "https://www.medantaeclinic.org/rest/api/user/patient/availablity?consultationType=%s&doctor=%s" \
@@ -64,14 +67,17 @@ class Medanta(BaseIntegrator):
                 if available_slots:
                     all_slots = set()
                     for avlbl_slot in available_slots:
-                        slots = avlbl_slot['slots']
-                        if slots:
-                            slots = slots.split(',')
-                            for s in slots:
-                                start = s.split("-")[0].strip()
-                                end = s.split("-")[1].strip()
-                                all_slots.add(start)
-                                all_slots.add(end)
+                        if self.slots_available_for_selected_clinic(avlbl_slot, facility_id, clinic_code):
+                            slots = avlbl_slot['slots']
+                            if slots:
+                                slots = slots.split(',')
+                                for s in slots:
+                                    start = s.split("-")[0].strip()
+                                    end = s.split("-")[1].strip()
+                                    start = (datetime.strptime(start, '%H:%M') + timedelta(hours=5, minutes=30)).strftime("%H:%M")
+                                    end = (datetime.strptime(end, '%H:%M') + timedelta(hours=5, minutes=30)).strftime("%H:%M")
+                                    all_slots.add(start)
+                                    all_slots.add(end)
 
                     sorted_slots = sorted(all_slots)
                     resp_list = self.time_slot_extraction(sorted_slots, date, dc_obj)
@@ -127,6 +133,16 @@ class Medanta(BaseIntegrator):
         time_dict[date].append(am_dict)
         time_dict[date].append(pm_dict)
         return time_dict
+
+    def slots_available_for_selected_clinic(self, avlbl_slot, facility_id, clinic_code):
+        if avlbl_slot['facilityId'] == 'GH':
+            if avlbl_slot['facilityId'] == facility_id and avlbl_slot['clinicCode'][:2] == clinic_code:
+                return True
+        else:
+            if avlbl_slot['facilityId'] == facility_id:
+                return True
+
+        return False
 
     def get_auth_token(self):
         url = '%s/login' % settings.MEDANTA_API_BASE_URL
