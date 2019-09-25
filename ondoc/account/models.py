@@ -1073,9 +1073,10 @@ class PgTransaction(TimeStampedModel, SoftDelete):
     DEBIT = 1
     TYPE_CHOICES = [(CREDIT, "Credit"), (DEBIT, "Debit")]
 
-    NODEL1 = 1
-    NODEL2 = 2
-    NODEL_CHOICES = [(NODEL1, "Nodel 1"), (NODEL2, "Nodel 2")]
+    NODAL1 = 1
+    NODAL2 = 2
+    CURRENT_ACCOUNT = 3
+    NODAL_CHOICES = [(NODAL1, "Nodal 1"), (NODAL2, "Nodal 2"), (CURRENT_ACCOUNT, "Current Account")]
 
     user = models.ForeignKey(User, on_delete=models.DO_NOTHING)
     product_id = models.SmallIntegerField(choices=Order.PRODUCT_IDS)
@@ -1098,7 +1099,7 @@ class PgTransaction(TimeStampedModel, SoftDelete):
     transaction_id = models.CharField(max_length=100, null=True, unique=True)
     pb_gateway_name = models.CharField(max_length=100, null=True, blank=True)
     payment_captured = models.BooleanField(default=False)
-    nodel_id = models.SmallIntegerField(choices=NODEL_CHOICES, null=True, blank=True)
+    nodal_id = models.SmallIntegerField(choices=NODAL_CHOICES, null=True, blank=True)
 
     @transaction.atomic
     def save(self, *args, **kwargs):
@@ -1217,19 +1218,6 @@ class PgTransaction(TimeStampedModel, SoftDelete):
 
     def is_preauth(self):
         return self.status_type == 'TXN_AUTHORIZE' or self.status_type == '27'
-
-    @classmethod
-    def get_nodel_by_product_id(cls, product_id):
-        nodel = None
-        if product_id == Order.INSURANCE_PRODUCT_ID:
-            nodel = cls.NODEL2
-        elif product_id == Order.VIP_PRODUCT_ID:
-            nodel = cls.NODEL1
-        else:
-            nodel = cls.NODEL1
-
-        return nodel
-
 
     class Meta:
         db_table = "pg_transaction"

@@ -1437,7 +1437,7 @@ class TransactionViewSet(viewsets.GenericViewSet):
         data['status_type'] = response.get('txStatus')
         data['transaction_id'] = format_return_value(response.get('pgTxId'))
         data['pb_gateway_name'] = response.get('pbGatewayName')
-        data['nodel_id'] = PgTransaction.get_nodel_by_product_id(order_obj.product_id)
+        data['nodal_id'] = response.get('nodalId')
 
         return data
 
