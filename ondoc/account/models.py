@@ -3,7 +3,7 @@ from django.contrib.postgres.fields import JSONField
 from django.forms import model_to_dict
 from django.utils.functional import cached_property
 
-from ondoc.authentication.models import TimeStampedModel, User, UserProfile, Merchant, AssociatedMerchant
+from ondoc.authentication.models import TimeStampedModel, User, UserProfile, Merchant, AssociatedMerchant, SoftDelete
 from ondoc.account.tasks import refund_curl_task
 from ondoc.coupon.models import Coupon
 from ondoc.notification.models import AppNotification, NotificationAction
@@ -1059,7 +1059,7 @@ class Order(TimeStampedModel):
         return True
 
 
-class PgTransaction(TimeStampedModel):
+class PgTransaction(TimeStampedModel, SoftDelete):
     PG_REFUND_SUCCESS_OK_STATUS = '1'
     PG_REFUND_FAILURE_OK_STATUS = '0'
     PG_REFUND_FAILURE_STATUS = 'FAIL'
@@ -1072,6 +1072,10 @@ class PgTransaction(TimeStampedModel):
     CREDIT = 0
     DEBIT = 1
     TYPE_CHOICES = [(CREDIT, "Credit"), (DEBIT, "Debit")]
+
+    NODEL1 = 1
+    NODEL2 = 2
+    NODEL_CHOICES = [(NODEL1, "Nodel 1"), (NODEL2, "Nodel 2")]
 
     user = models.ForeignKey(User, on_delete=models.DO_NOTHING)
     product_id = models.SmallIntegerField(choices=Order.PRODUCT_IDS)
@@ -1094,6 +1098,7 @@ class PgTransaction(TimeStampedModel):
     transaction_id = models.CharField(max_length=100, null=True, unique=True)
     pb_gateway_name = models.CharField(max_length=100, null=True, blank=True)
     payment_captured = models.BooleanField(default=False)
+    nodel_id = models.SmallIntegerField(choices=NODEL_CHOICES, null=True, blank=True)
 
     @transaction.atomic
     def save(self, *args, **kwargs):
@@ -1213,8 +1218,22 @@ class PgTransaction(TimeStampedModel):
     def is_preauth(self):
         return self.status_type == 'TXN_AUTHORIZE' or self.status_type == '27'
 
+    @classmethod
+    def get_nodel_by_product_id(cls, product_id):
+        nodel = None
+        if product_id == Order.INSURANCE_PRODUCT_ID:
+            nodel = cls.NODEL2
+        elif product_id == Order.VIP_PRODUCT_ID:
+            nodel = cls.NODEL1
+        else:
+            nodel = cls.NODEL1
+
+        return nodel
+
+
     class Meta:
         db_table = "pg_transaction"
+        # unique_together = (("order", "order_no", "deleted"),)
 
 
 class DummyTransactions(TimeStampedModel):
