@@ -41,7 +41,8 @@ constants = {
     'QC_MERCHANT_TEAM': 'qc_merchant_team',
     'POC_TEAM': 'poc_team',
     'COMMUNICATION_TEAM': 'communication_team',
-    'PLUS_TEAM': 'plus_team'
+    'PLUS_TEAM': 'plus_team',
+    'PARTNER_LAB_TEAM': 'partner_lab_team'
 }
 matrix_product_ids = {
     'opd_products': 1,
