@@ -233,9 +233,10 @@ class TestSamplesLabAlerts(auth_models.TimeStampedModel):
 class PartnerLabTestSamples(auth_models.TimeStampedModel):
 
     name = models.CharField(max_length=128)
+    code = models.CharField(max_length=128)
 
     def __str__(self):
-        return str(self.name)
+        return str(self.name) + '(' + str(self.code) + ')'
 
     class Meta:
         db_table = "partner_lab_test_samples"
@@ -244,14 +245,14 @@ class PartnerLabTestSamples(auth_models.TimeStampedModel):
 class PartnerLabTestSampleDetails(auth_models.TimeStampedModel):
     ML = 'ml'
     VOLUME_UNIT_CHOICES = [(ML, "ml")]
-    available_lab_test = models.OneToOneField(diag_models.AvailableLabTest, on_delete=models.CASCADE, related_name="sample_details")
+    available_lab_test = models.ForeignKey(diag_models.AvailableLabTest, on_delete=models.CASCADE, related_name="sample_details")
     sample = models.ForeignKey(PartnerLabTestSamples, on_delete=models.CASCADE, related_name="details")
     volume = models.PositiveIntegerField(null=True, blank=True)
     volume_unit = models.CharField(max_length=16, default=None, null=True, blank=True, choices=VOLUME_UNIT_CHOICES)
     is_fasting_required = models.BooleanField(default=False)
     report_tat = models.PositiveSmallIntegerField(null=True, blank=True)                    # in hours
     reference_value = models.TextField(blank=True, null=True)
-    material_required = JSONField(null=True)
+    material_required = JSONField(blank=True, null=True)
     instructions = models.CharField(max_length=256, null=True, blank=True)
 
     def __str__(self):

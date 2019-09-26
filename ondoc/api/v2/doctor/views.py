@@ -1439,7 +1439,7 @@ class PartnerLabTestSamplesCollectViewset(viewsets.GenericViewSet):
     #                                                             .filter(hospital__manageable_hospitals__phone_number=request.user.phone_number).distinct()
 
     def tests_list(self, request):
-        serializer = serializers.PartnerLabTestsListSerializer(data=request.query_params, context={'request':request})
+        serializer = serializers.PartnerLabTestsListSerializer(data=request.query_params, context={'request': request})
         serializer.is_valid(raise_exception=True)
         valid_data = serializer.validated_data
         hosp_lab_list = valid_data['hosp_lab_list']
@@ -1450,14 +1450,14 @@ class PartnerLabTestSamplesCollectViewset(viewsets.GenericViewSet):
             available_lab_tests = lab.lab_pricing_group.available_lab_tests.all()
             for obj in available_lab_tests:
                 ret_obj = dict()
-                sample_obj = obj.sample_details if hasattr(obj, 'sample_details') else None
-                if not sample_obj or not obj.enabled:
+                sample_objs = obj.sample_details.all() if hasattr(obj, 'sample_details') else None
+                if not sample_objs or not obj.enabled:
                     continue
                 ret_obj['hospital_id'] = hospital.id
                 test_data = serializers.SelectedTestsDetailsSerializer(obj).data
                 ret_obj.update(test_data)
-                sample_data = serializers.PartnerLabTestSampleDetailsModelSerializer(sample_obj).data
-                ret_obj.update(sample_data)
+                sample_data = serializers.PartnerLabTestSampleDetailsModelSerializer(sample_objs, many=True).data
+                ret_obj['sample_data'] = sample_data
                 # if sample_obj:
                 #     sample_data = serializers.PartnerLabTestSampleDetailsModelSerializer(sample_obj).data
                 #     ret_obj.update(sample_data)
