@@ -30,8 +30,6 @@ from ondoc.common.models import AppointmentHistory, SponsorListingURL, SponsorLi
     SponsorListingSpecialization
 from django.contrib import messages
 from django.http import HttpResponseRedirect
-
-from ondoc.integrations.models import IntegratorDoctorClinicCode
 from ondoc.notification.models import NotificationAction
 from ondoc.procedure.models import DoctorClinicProcedure, Procedure, DoctorClinicIpdProcedure
 
@@ -2180,19 +2178,12 @@ class HealthTipAdmin(VersionAdmin):
     search_fields = ['name']
 
 
-class DoctorClinicCodeInline(nested_admin.NestedTabularInline):
-    model = IntegratorDoctorClinicCode
-    extra = 0
-    can_delete = True
-    show_change_link = False
-
-
 class DoctorClinicAdmin(VersionAdmin):
     list_display = ('doctor', 'hospital', 'updated_at')
     date_hierarchy = 'created_at'
     search_fields = ['doctor__name', 'hospital__name']
     autocomplete_fields = ['doctor', 'hospital']
-    inlines = [DoctorClinicTimingInline, DoctorClinicCodeInline]
+    inlines = [DoctorClinicTimingInline]
 
     def get_queryset(self, request):
         return super(DoctorClinicAdmin, self).get_queryset(request).select_related('doctor', 'hospital')

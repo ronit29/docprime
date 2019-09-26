@@ -38,11 +38,12 @@ class Medanta(BaseIntegrator):
             IntegratorDoctorMappings.objects.update_or_create(integrator_doctor_id=doc_data['ID'], defaults=defaults)
 
     def _get_appointment_slots(self, pincode, date, **kwargs):
-
+        from ondoc.doctor.models import Hospital
         dc_obj = kwargs.get('dc_obj', None)
         doctor_id = None
         if dc_obj:
-            dc_code = dc_obj.dc_code.all().first()
+            hospital = Hospital.objects.filter(id=dc_obj.hospital_id).first()
+            dc_code = hospital.hos_code.all().first()
             facility_id = dc_code.city_code
             clinic_code = dc_code.clinic_code
             doc_mapping = IntegratorDoctorMappings.objects.filter(doctor_clinic_id=dc_obj.id, is_active=True).first()

@@ -365,10 +365,11 @@ class IntegratorLabCode(TimeStampedModel):
         db_table = 'integrator_lab_code'
 
 
-class IntegratorDoctorClinicCode(TimeStampedModel):
+class IntegratorHospitalCode(TimeStampedModel):
+    from ondoc.doctor.models import Hospital
     city_code = models.CharField(max_length=30, null=True, blank=True)
     clinic_code = models.CharField(max_length=50, null=True, blank=True)
-    doctor_clinic = models.ForeignKey(DoctorClinic, null=False, blank=False, related_name='dc_code', on_delete=models.DO_NOTHING)
+    hospital = models.ForeignKey(Hospital, null=False, blank=False, related_name='hos_code', on_delete=models.DO_NOTHING)
 
     class Meta:
-        db_table = 'integrator_doctor_clinic_code'
+        db_table = 'integrator_hospital_code'
