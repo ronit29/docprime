@@ -124,7 +124,7 @@ def get_integrator_order_status(self, *args, **kwargs):
 @task(bind=True, max_retries=3)
 def push_opd_appointment_to_integrator(self, data):
     from ondoc.diagnostic.models import OpdAppointment
-    from ondoc.integrations.models import IntegratorResponse, IntegratorDoctorMappings
+    from ondoc.integrations.models import IntegratorResponse, IntegratorDoctorMappings, IntegratorDoctorClinicMapping
     from ondoc.integrations import service
 
     try:
@@ -142,7 +142,12 @@ def push_opd_appointment_to_integrator(self, data):
                 raise Exception("Doctor Clinic id not found, could not push to Integrator")
 
             if appointment.status == OpdAppointment.BOOKED:
-                integrator_mapping = IntegratorDoctorMappings.objects.filter(doctor_clinic_id=dc_obj, is_active=True).first()
+                # integrator_mapping = IntegratorDoctorMappings.objects.filter(doctor_clinic_id=dc_obj, is_active=True).first()
+                dc_mapping = IntegratorDoctorClinicMapping.objects.filter(doctor_clinic_id=dc_obj.id).first()
+                if not dc_mapping:
+                    raise Exception("[ERROR] Mapping not found for doctor or hospital - appointment id %d" % appointment.id)
+
+                integrator_mapping = IntegratorDoctorMappings.objects.filter(id=dc_mapping.integrator_doctor_mapping_id).first()
                 if not integrator_mapping:
                     raise Exception("[ERROR] Mapping not found for doctor or hospital - appointment id %d" % appointment.id)
 

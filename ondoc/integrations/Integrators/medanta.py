@@ -7,7 +7,7 @@ import logging
 logger = logging.getLogger(__name__)
 from datetime import datetime, date, timedelta
 from django.contrib.contenttypes.models import ContentType
-from ondoc.integrations.models import IntegratorDoctorMappings, IntegratorHistory
+from ondoc.integrations.models import IntegratorDoctorMappings, IntegratorHistory, IntegratorDoctorClinicMapping
 from ondoc.api.v1.utils import aware_time_zone
 
 
@@ -46,8 +46,10 @@ class Medanta(BaseIntegrator):
             dc_code = hospital.hos_code.all().first()
             facility_id = dc_code.city_code
             clinic_code = dc_code.clinic_code
-            doc_mapping = IntegratorDoctorMappings.objects.filter(doctor_clinic_id=dc_obj.id, is_active=True).first()
-            if doc_mapping:
+            # doc_mapping = IntegratorDoctorMappings.objects.filter(doctor_clinic_id=dc_obj.id, is_active=True).first()
+            dc_mapping = IntegratorDoctorClinicMapping.objects.filter(doctor_clinic_id=dc_obj.id).first()
+            if dc_mapping:
+                doc_mapping = IntegratorDoctorMappings.objects.filter(id=dc_mapping.integrator_doctor_mapping_id).first()
                 doctor_id = doc_mapping.integrator_doctor_id
 
         if doctor_id and facility_id:
