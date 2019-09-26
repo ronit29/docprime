@@ -627,7 +627,8 @@ class DoctorSearchHelper:
                 vip_data_dict = kwargs.get('vip_data')
                 is_vip_member = vip_data_dict.get('is_vip_member', False)
                 is_enable_for_vip = vip_data_dict.get('is_enable_for_vip', False)
-                vip_remaining_amount = int(vip_data_dict.get('vip_remaining_amount', 0))
+                vip_utilization = vip_data_dict.get('vip_utilization', None)
+                vip_remaining_amount = int(vip_utilization.get('vip_remaining_amount', 0))
                 vip_amount = 0
                 cover_under_vip = vip_data_dict.get('cover_under_vip', False)
                 insurance_data_dict = kwargs.get('insurance_data')

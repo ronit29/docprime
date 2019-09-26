@@ -1785,7 +1785,7 @@ class DoctorListViewSet(viewsets.GenericViewSet):
             if logged_in_user.active_plus_user:
                 utilization_dict = logged_in_user.active_plus_user.get_utilization
 
-                vip_data_dict['vip_remaining_amount'] = utilization_dict.get('doctor_amount_available') if utilization_dict else 0
+                vip_data_dict['vip_utilization'] = utilization_dict
                 vip_data_dict['is_vip_member'] = True
                 vip_data_dict['cover_under_vip'] = False
                 vip_data_dict['is_enable_for_vip'] = False
