@@ -375,7 +375,8 @@ class PlusUser(auth_model.TimeStampedModel):
 
                 response_dict['cover_under_vip'] = True
                 response_dict['plus_user_id'] = plus_user.id
-                response_dict['vip_amount'] = amount_paid
+                response_dict['vip_amount'] = self.get_vip_amount(utilization, mrp)
+                # response_dict['vip_amount'] = amount_paid
 
         elif appointment_type == LAB:
             lab = appointment_data['lab']
