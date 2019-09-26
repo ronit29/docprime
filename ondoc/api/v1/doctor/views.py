@@ -1594,11 +1594,13 @@ class SearchedItemsViewSet(viewsets.GenericViewSet):
                                                                                  context={'request': request,
                                                                                           'city': city,
                                                                                           'spec_urls': spec_urls})
+        #
+        # common_procedure_categories = CommonProcedureCategory.objects.select_related('procedure_category').filter(
+        #     procedure_category__is_live=True).all().order_by("-priority")[:10]
+        # common_procedure_categories_serializer = CommonProcedureCategorySerializer(common_procedure_categories,
+        #                                                                            many=True)
 
-        common_procedure_categories = CommonProcedureCategory.objects.select_related('procedure_category').filter(
-            procedure_category__is_live=True).all().order_by("-priority")[:10]
-        common_procedure_categories_serializer = CommonProcedureCategorySerializer(common_procedure_categories,
-                                                                                   many=True)
+
 
         common_procedures = CommonProcedure.objects.select_related('procedure').filter(
             procedure__is_enabled=True).all().order_by("-priority")[:10]
@@ -1638,7 +1640,7 @@ class SearchedItemsViewSet(viewsets.GenericViewSet):
             categories_serializer = CommonCategoriesSerializer(categories, many=True, context={'request': request})
 
         return Response({"conditions": conditions_serializer.data, "specializations": specializations_serializer.data,
-                         "procedure_categories": common_procedure_categories_serializer.data,
+                         "procedure_categories": CommonProcedureCategory.common_procedure_categories(),
                          "procedures": common_procedures_serializer.data,
                          "ipd_procedures": common_ipd_procedures_serializer.data,
                          "top_hospitals": top_hospitals_data,

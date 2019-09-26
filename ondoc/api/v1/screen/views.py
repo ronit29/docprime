@@ -17,7 +17,7 @@ from ondoc.banner.models import Banner
 from ondoc.common.models import PaymentOptions, UserConfig
 from ondoc.insurance.models import InsuranceEligibleCities
 from ondoc.location.models import EntityUrls
-from ondoc.procedure.models import CommonIpdProcedure
+from ondoc.procedure.models import CommonIpdProcedure, CommonProcedureCategory
 from ondoc.tracking.models import TrackingEvent
 from ondoc.common.models import UserConfig
 from ondoc.ratings_review.models import AppRatings
@@ -117,7 +117,7 @@ class ScreenViewSet(viewsets.GenericViewSet):
 
         grid_list = [
             {
-                'priority': 4,
+                'priority': 2,
                 'title': "Book Doctor Appointment",
                 'type': "Specialization",
                 'items': specializations_serializer.data,
@@ -126,7 +126,7 @@ class ScreenViewSet(viewsets.GenericViewSet):
                 'addSearchItem': "Doctor"
             },
             {
-                'priority': 2,
+                'priority': 1,
                 'title': "Health Packages",
                 'type': "CommonPackage",
                 'items': common_package_data,
@@ -144,8 +144,14 @@ class ScreenViewSet(viewsets.GenericViewSet):
                 'addSearchItem': "Lab"
             }
         ]
-
         carousel_list = [
+
+            {
+                'priority': 4,
+                'title': "Health Package Categories",
+                'type': "PackageCategories",
+                'items': CommonProcedureCategory.common_procedure_categories(),
+            },
             {
                 'priority': 0,
                 'title': "Top Hospitals",
@@ -153,7 +159,7 @@ class ScreenViewSet(viewsets.GenericViewSet):
                 'items': top_hospitals_data,
             },
             {
-                'priority': 1,
+                'priority': 6,
                 'title': "Top Procedures",
                 'type': "IPD",
                 'items': common_ipd_procedures_serializer.data,
