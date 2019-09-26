@@ -636,8 +636,8 @@ class DoctorHospitalSerializer(serializers.ModelSerializer):
             available_amount = int(utilization.get('doctor_amount_available', 0))
             mrp = int(obj.mrp)
             resp['is_vip_member'] = True
-            resp['cover_under_vip'] = True if available_amount > 0 else False
             amount = plus_user.get_vip_amount(utilization, mrp)
+            resp['cover_under_vip'] = True if (amount < mrp) else False
             resp['vip_amount'] = amount
             # resp['vip_amount'] = 0 if available_amount > mrp else (mrp - available_amount)
         return resp
