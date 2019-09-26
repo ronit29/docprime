@@ -4558,8 +4558,11 @@ class HospitalViewSet(viewsets.GenericViewSet):
             point_string = 'POINT(' + str(validated_data.get('long')) + ' ' + str(validated_data.get('lat')) + ')'
             pnt = GEOSGeometry(point_string, srid=4326)
 
-            hospital_queryset = Hospital.objects.prefetch_related('hospital_doctors').annotate(
-                bookable_doctors_count=Count(Q(enabled_for_online_booking=True,
+            hospital_queryset = Hospital.objects.prefetch_related('hospital_doctors').filter(enabled_for_online_booking=True,
+                                               hospital_doctors__enabled_for_online_booking=True,
+                                               hospital_doctors__doctor__enabled_for_online_booking=True,
+                                               hospital_doctors__doctor__is_live=True, is_live=True).annotate(
+                                               bookable_doctors_count=Count(Q(enabled_for_online_booking=True,
                                                hospital_doctors__enabled_for_online_booking=True,
                                                hospital_doctors__doctor__enabled_for_online_booking=True,
                                                hospital_doctors__doctor__is_live=True, is_live=True)),
