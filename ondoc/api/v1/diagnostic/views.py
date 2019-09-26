@@ -1240,6 +1240,8 @@ class LabList(viewsets.ReadOnlyModelViewSet):
             'is_insurance_covered' : False
         }
 
+        vip_data_dict = Lab.get_vip_details(request.user)
+
         is_insurance_covered = False
 
         if logged_in_user.is_authenticated and not logged_in_user.is_anonymous:
@@ -1283,7 +1285,7 @@ class LabList(viewsets.ReadOnlyModelViewSet):
 
         #count = len(queryset_result)
         #paginated_queryset = paginate_queryset(queryset_result, request)
-        result = self.form_lab_search_whole_data(queryset_result, parameters.get("ids"), insurance_data_dict=insurance_data_dict)
+        result = self.form_lab_search_whole_data(queryset_result, parameters.get("ids"), insurance_data_dict=insurance_data_dict, vip_data_dict=vip_data_dict)
 
         if result:
             product_id = parameters.get('product_id', None)
@@ -1688,7 +1690,7 @@ class LabList(viewsets.ReadOnlyModelViewSet):
             queryset_order_by =' order_priority desc, distance asc'
         return queryset_order_by
 
-    def form_lab_search_whole_data(self, queryset, test_ids=None, insurance_data_dict={}):
+    def form_lab_search_whole_data(self, queryset, test_ids=None, insurance_data_dict={}, vip_data_dict={}):
         ids = [value.get('id') for value in queryset]
         # ids, id_details = self.extract_lab_ids(queryset)
         labs = Lab.objects.select_related('network').prefetch_related('lab_documents', 'lab_image', 'lab_timings','home_collection_charges')
@@ -1839,6 +1841,7 @@ class LabList(viewsets.ReadOnlyModelViewSet):
                 # lab network case as lab network have more than 1 labs under it.
 
                 res['insurance'] = deepcopy(insurance_data_dict)
+                res['vip'] = deepcopy(vip_data_dict)
                 all_tests_under_lab = res.get('tests', [])
                 bool_array = list()
                 if all_tests_under_lab and res['is_insurance_enabled']:

@@ -354,8 +354,8 @@ class Lab(TimeStampedModel, CreatedByModel, QCModel, SearchKey, WelcomeCallingDo
         }
 
         if user.is_authenticated and not user.is_anonymous:
-            plus_membership = user.active_plus_user
-            if plus_membership:
+            is_user_vip = user.active_plus_user and not user.inactive_plus_user
+            if is_user_vip:
                 resp['is_vip_member'] = True
 
         return resp
