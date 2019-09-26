@@ -1767,7 +1767,7 @@ class DoctorListViewSet(viewsets.GenericViewSet):
         vip_data_dict = {
             'is_vip_member': False,
             'cover_under_vip': False,
-            'vip_remaining_amount': 0,
+            'vip_utilization': {},
             'is_enable_for_vip': False
         }
 

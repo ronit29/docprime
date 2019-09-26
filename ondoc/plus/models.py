@@ -298,7 +298,7 @@ class PlusUser(auth_model.TimeStampedModel):
         resp['allowed_package_ids'] = list(map(lambda x: int(x), data.get('package_ids', '').split(','))) if data.get('package_ids') else []
         resp['doctor_consult_amount'] = int(data['doctor_consult_amount']) if data.get('doctor_consult_amount') and data.get('doctor_consult_amount').__class__.__name__ == 'str' else 0
         resp['doctor_amount_utilized'] = self.get_doctor_plus_appointment_amount()
-        resp['doctor_discount'] = int(data['DOCTOR_CONSULT_DISCOUNT'.lower()])
+        resp['doctor_discount'] = int(data['doctor_consult_discount']) if data.get('doctor_consult_discount') and data.get('doctor_consult_discount').__class__.__name__ == 'str' else 0
         resp['doctor_amount_available'] = resp['doctor_consult_amount'] - resp['doctor_amount_utilized']
         resp['members_count_online_consultation'] = data['members_covered_in_package'] if data.get('members_covered_in_package') and data.get('members_covered_in_package').__class__.__name__ == 'str'  else 0
         resp['total_package_amount_limit'] = int(data['health_checkups_amount']) if data.get('health_checkups_amount') and data.get('health_checkups_amount').__class__.__name__ == 'str'  else 0
@@ -622,18 +622,17 @@ class PlusUser(auth_model.TimeStampedModel):
 
         care_membership.save(plus_user_obj=self)
 
-    def get_vip_amount(self, utilization, doctor_obj):
+    def get_vip_amount(self, utilization, mrp):
         available_amount = int(utilization.get('doctor_amount_available', 0))
         available_discount = int(utilization.get('doctor_discount', None))
-        mrp = doctor_obj.mrp
-        if not available_discount or available_discount == 0:
+        if not available_discount or available_discount == 0 :
             amount = 0 if available_amount >= mrp else (mrp - available_amount)
             return amount
-        amount = self.get_discounted_amount(utilization, doctor_obj)
+        amount = self.get_discounted_amount(utilization, mrp)
         return amount
 
-    def get_discounted_amount(self, utilization, doctor_obj):
-        mrp = doctor_obj.mrp
+    def get_discounted_amount(self, utilization, mrp):
+        # mrp = doctor_obj.mrp
         available_amount = utilization.get('doctor_amount_available', 0)
         doctor_discount = utilization.get('doctor_discount', None)
         if not doctor_discount or doctor_discount == 0:

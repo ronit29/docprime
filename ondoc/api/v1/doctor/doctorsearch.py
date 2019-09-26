@@ -665,7 +665,8 @@ class DoctorSearchHelper:
                         doctor_clinic.enabled_for_online_booking:
                     mrp = int(min_price.get('mrp'))
                     cover_under_vip = True if vip_remaining_amount > 0 else False
-                    vip_amount = 0 if vip_remaining_amount > mrp else mrp - vip_remaining_amount
+                    vip_amount = request.user.active_plus_user.get_vip_amount(vip_utilization, mrp)
+                    # vip_amount = 0 if vip_remaining_amount > mrp else mrp - vip_remaining_amount
                 hospitals = [{
                     "enabled_for_online_booking": enable_online_booking,
                     "is_insurance_covered": is_insurance_covered,
