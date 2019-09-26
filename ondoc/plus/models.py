@@ -453,7 +453,8 @@ class PlusUser(auth_model.TimeStampedModel):
             if current_doctor_amount_available > 0 :
                 vip_data_dict['cover_under_vip'] = True
                 vip_data_dict['plus_user_id'] = self.id
-                vip_data_dict['vip_amount'] = 0 if current_doctor_amount_available > current_item_mrp else (current_item_mrp - current_doctor_amount_available)
+                # vip_data_dict['vip_amount'] = 0 if current_doctor_amount_available > current_item_mrp else (current_item_mrp - current_doctor_amount_available)
+                vip_data_dict['vip_amount'] = user.active_plus_user.get_vip_amount(updated_utilization, current_item_mrp)
             else:
                 return vip_data_dict
         else:
