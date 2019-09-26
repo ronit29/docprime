@@ -50,7 +50,7 @@ class Medanta(BaseIntegrator):
             if doc_mapping:
                 doctor_id = doc_mapping.integrator_doctor_id
 
-        if doctor_id and facility_id and clinic_code:
+        if doctor_id and facility_id:
             converted_date = datetime.strptime(date, "%Y-%m-%d").strftime("%Y/%m/%d")
             consultation_type = "In Person"
             url = "https://www.medantaeclinic.org/rest/api/user/patient/availablity?consultationType=%s&doctor=%s" \
