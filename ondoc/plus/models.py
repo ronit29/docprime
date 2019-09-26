@@ -12,6 +12,7 @@ from ondoc.authentication.models import UserProfile
 from ondoc.cart.models import Cart
 from ondoc.common.helper import Choices
 import json
+from ondoc.authentication.models import UserProfile, User
 from django.db import transaction
 from django.db.models import Q
 from ondoc.common.models import DocumentsProofs
@@ -63,7 +64,15 @@ class PlusProposer(auth_model.TimeStampedModel):
 
     @property
     def get_active_plans(self):
-        return self.plus_plans.filter(is_live=True).order_by('id')
+        return self.plus_plans.filter(is_live=True, is_retail=True).order_by('id')[:3]
+        # index = 0
+        # for plan in plans:
+        #     if plan.plan_utmsources.all().exists():
+        #         plans.pop(index)
+        #     else:
+        #         index += 1
+
+        # return plans
 
     @property
     def get_all_plans(self):
@@ -87,6 +96,17 @@ class PlusPlans(auth_model.TimeStampedModel, LiveMixin):
     total_allowed_members = models.PositiveSmallIntegerField(default=0)
     is_selected = models.BooleanField(default=False)
     features = JSONField(blank=False, null=False, default=dict)
+    is_retail = models.NullBooleanField()
+
+    @classmethod
+    def get_active_plans_via_utm(cls, utm):
+        qs = PlusPlanUtmSourceMapping.objects.filter(utm_source__source=utm, plus_plan__is_live=True, plus_plan__enabled=True)
+        if not qs:
+            return []
+
+        plans_via_utm = list(map(lambda obj: obj.plus_plan, qs))
+
+        return plans_via_utm
 
     @classmethod
     def all_active_plans(cls):
@@ -97,6 +117,30 @@ class PlusPlans(auth_model.TimeStampedModel, LiveMixin):
 
     class Meta:
         db_table = 'plus_plans'
+
+
+class PlusPlanUtmSources(auth_model.TimeStampedModel):
+    source = models.CharField(max_length=100, null=False, blank=False)
+    source_details = models.CharField(max_length=500, null=True, blank=True)
+
+    def __str__(self):
+        return "{}".format(self.source)
+
+    class Meta:
+        db_table = 'plus_plan_utmsources'
+
+
+@reversion.register()
+class PlusPlanUtmSourceMapping(auth_model.TimeStampedModel):
+    plus_plan = models.ForeignKey(PlusPlans, related_name="plan_utmsources", null=False, blank=False, on_delete=models.CASCADE)
+    utm_source = models.ForeignKey(PlusPlanUtmSources, null=False, blank=False, on_delete=models.CASCADE)
+    # value = models.CharField(max_length=100, null=False, blank=False)
+
+    def __str__(self):
+        return "{} - {}".format(self.plus_plan, self.utm_source)
+
+    class Meta:
+        db_table = 'plus_plan_utmsources_mapping'
 
 
 class PlusPlanParameters(auth_model.TimeStampedModel):
@@ -245,18 +289,20 @@ class PlusUser(auth_model.TimeStampedModel):
                                                                                PlanParametersEnum.HEALTH_CHECKUPS_COUNT,
                                                                                PlanParametersEnum.MEMBERS_COVERED_IN_PACKAGE,
                                                                                PlanParametersEnum.PACKAGE_IDS,
-                                                                               PlanParametersEnum.TOTAL_TEST_COVERED_IN_PACKAGE])
+                                                                               PlanParametersEnum.TOTAL_TEST_COVERED_IN_PACKAGE,
+                                                                               PlanParametersEnum.DOCTOR_CONSULT_DISCOUNT])
 
         for pp in plan_parameters:
             data[pp.parameter.key.lower()] = pp.value
         
         resp['allowed_package_ids'] = list(map(lambda x: int(x), data.get('package_ids', '').split(','))) if data.get('package_ids') else []
-        resp['doctor_consult_amount'] = int(data['DOCTOR_CONSULT_AMOUNT'.lower()])
+        resp['doctor_consult_amount'] = int(data['doctor_consult_amount']) if data.get('doctor_consult_amount') and data.get('doctor_consult_amount').__class__.__name__ == 'str' else 0
         resp['doctor_amount_utilized'] = self.get_doctor_plus_appointment_amount()
+        resp['doctor_discount'] = int(data['doctor_consult_discount']) if data.get('doctor_consult_discount') and data.get('doctor_consult_discount').__class__.__name__ == 'str' else 0
         resp['doctor_amount_available'] = resp['doctor_consult_amount'] - resp['doctor_amount_utilized']
-        resp['members_count_online_consultation'] = data['MEMBERS_COVERED_IN_PACKAGE'.lower()]
-        resp['total_package_amount_limit'] = int(data['HEALTH_CHECKUPS_AMOUNT'.lower()])
-        resp['total_package_count_limit'] = int(data['HEALTH_CHECKUPS_COUNT'.lower()])
+        resp['members_count_online_consultation'] = data['members_covered_in_package'] if data.get('members_covered_in_package') and data.get('members_covered_in_package').__class__.__name__ == 'str'  else 0
+        resp['total_package_amount_limit'] = int(data['health_checkups_amount']) if data.get('health_checkups_amount') and data.get('health_checkups_amount').__class__.__name__ == 'str'  else 0
+        resp['total_package_count_limit'] = int(data['health_checkups_count']) if data.get('health_checkups_count') and data.get('health_checkups_count').__class__.__name__ == 'str'  else 0
 
         resp['available_package_amount'] = resp['total_package_amount_limit'] - int(self.get_package_plus_appointment_amount())
         resp['available_package_count'] = resp['total_package_count_limit'] - int(self.get_package_plus_appointment_count())
@@ -329,7 +375,8 @@ class PlusUser(auth_model.TimeStampedModel):
 
                 response_dict['cover_under_vip'] = True
                 response_dict['plus_user_id'] = plus_user.id
-                response_dict['vip_amount'] = amount_paid
+                response_dict['vip_amount'] = self.get_vip_amount(utilization, mrp)
+                # response_dict['vip_amount'] = amount_paid
 
         elif appointment_type == LAB:
             lab = appointment_data['lab']
@@ -403,10 +450,11 @@ class PlusUser(auth_model.TimeStampedModel):
         updated_utilization = utilization
         if 'doctor' in appointment_data:
             current_doctor_amount_available = updated_utilization.get('doctor_amount_available', 0)
-            if current_doctor_amount_available > 0 :
+            if current_doctor_amount_available > 0:
                 vip_data_dict['cover_under_vip'] = True
                 vip_data_dict['plus_user_id'] = self.id
-                vip_data_dict['vip_amount'] = 0 if current_doctor_amount_available > current_item_mrp else (current_item_mrp - current_doctor_amount_available)
+                # vip_data_dict['vip_amount'] = 0 if current_doctor_amount_available > current_item_mrp else (current_item_mrp - current_doctor_amount_available)
+                vip_data_dict['vip_amount'] = user.active_plus_user.get_vip_amount(updated_utilization, current_item_mrp)
             else:
                 return vip_data_dict
         else:
@@ -575,6 +623,39 @@ class PlusUser(auth_model.TimeStampedModel):
                                           status=UserPlanMapping.BOOKED, money_pool=None)
 
         care_membership.save(plus_user_obj=self)
+
+    def get_vip_amount(self, utilization, mrp):
+        available_amount = int(utilization.get('doctor_amount_available', 0))
+        available_discount = int(utilization.get('doctor_discount', None))
+        if not available_discount or available_discount == 0 :
+            amount = 0 if available_amount >= mrp else (mrp - available_amount)
+            return amount
+        amount = self.get_discounted_amount(utilization, mrp)
+        return amount
+
+    def get_discounted_amount(self, utilization, mrp):
+        # mrp = doctor_obj.mrp
+        available_amount = utilization.get('doctor_amount_available', 0)
+        doctor_discount = utilization.get('doctor_discount', None)
+        if not doctor_discount or doctor_discount == 0:
+            final_amount = 0 if available_amount >= mrp else (mrp - available_amount)
+            return final_amount
+        discounted_amount = int(doctor_discount * mrp / 100)
+        final_amount = mrp - discounted_amount
+        return final_amount
+
+    def after_commit_tasks(self, *args, **kwargs):
+        from ondoc.api.v1.plus.plusintegration import PlusIntegration
+        if kwargs.get('is_fresh'):
+            PlusIntegration.create_vip_lead_after_purchase(self)
+
+    def save(self, *args, **kwargs):
+        is_fresh = False
+        if not self.pk:
+            is_fresh = True
+
+        super().save(*args, **kwargs)
+        transaction.on_commit(lambda: self.after_commit_tasks(is_fresh=is_fresh))
 
     class Meta:
         db_table = 'plus_users'
@@ -841,4 +922,12 @@ class PlusAppointmentMapping(auth_model.TimeStampedModel):
 
     class Meta:
         db_table = 'plus_appointment_mapping'
+
+
+class PlusDummyData(auth_model.TimeStampedModel):
+    user = models.ForeignKey(User, related_name='plus_user_dummy_data', on_delete=models.DO_NOTHING)
+    data = JSONField(null=False, blank=False)
+
+    class Meta:
+        db_table = 'plus_dummy_data'
 

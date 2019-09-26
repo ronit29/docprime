@@ -627,7 +627,8 @@ class DoctorSearchHelper:
                 vip_data_dict = kwargs.get('vip_data')
                 is_vip_member = vip_data_dict.get('is_vip_member', False)
                 is_enable_for_vip = vip_data_dict.get('is_enable_for_vip', False)
-                vip_remaining_amount = int(vip_data_dict.get('vip_remaining_amount', 0))
+                vip_utilization = vip_data_dict.get('vip_utilization', None)
+                vip_remaining_amount = int(vip_utilization.get('vip_remaining_amount', 0))
                 vip_amount = 0
                 cover_under_vip = vip_data_dict.get('cover_under_vip', False)
                 insurance_data_dict = kwargs.get('insurance_data')
@@ -663,8 +664,9 @@ class DoctorSearchHelper:
                         doctor.enabled_for_online_booking and doctor_clinic.hospital.enabled_for_online_booking and \
                         doctor_clinic.enabled_for_online_booking:
                     mrp = int(min_price.get('mrp'))
-                    cover_under_vip = True if vip_remaining_amount > 0 else False
-                    vip_amount = 0 if vip_remaining_amount > mrp else mrp - vip_remaining_amount
+                    vip_amount = request.user.active_plus_user.get_vip_amount(vip_utilization, mrp)
+                    cover_under_vip = True if vip_amount < mrp else False
+                    # vip_amount = 0 if vip_remaining_amount > mrp else mrp - vip_remaining_amount
                 hospitals = [{
                     "enabled_for_online_booking": enable_online_booking,
                     "is_insurance_covered": is_insurance_covered,
