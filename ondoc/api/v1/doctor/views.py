@@ -4736,7 +4736,7 @@ class HospitalViewSet(viewsets.GenericViewSet):
     def build_listing_schema_for_hospital(self, serialized_data):
         try:
             schema = {
-                "@context": "http://schema.org",
+                "@context": "https://schema.org",
                 "@type": "ItemList",
             }
             list_items = []
@@ -4752,7 +4752,7 @@ class HospitalViewSet(viewsets.GenericViewSet):
     def build_breadcrumb_schema_for_hospital(self, breadcrumb):
         try:
             schema = {
-                "@context": "http://schema.org",
+                "@context": "https://schema.org",
                 "@type": "BreadcrumbList"
             }
             list_items = []
@@ -4761,7 +4761,7 @@ class HospitalViewSet(viewsets.GenericViewSet):
                     item = {
                         "@type": "ListItem",
                         "position": indx + 1,
-                        "item": {"@id": "{}/{}".format(settings.BASE_URL.strip('/'), doc.get('url')), "name": doc.get('title')}
+                        "item": {"@id": "{}/{}".format(settings.BASE_URL.strip('/'), doc.get('url').strip('/')), "name": doc.get('title')}
                     }
                     list_items.append(item)
             schema["itemListElement"] = list_items
