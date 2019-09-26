@@ -19,3 +19,4 @@ class PlanParametersEnum(Choices):
 class UtilizationCriteria(Choices):
     AMOUNT = "AMOUNT"
     COUNT = "COUNT"
+    DISCOUNT = "DISCOUNT"
