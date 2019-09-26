@@ -150,7 +150,7 @@ class ScreenViewSet(viewsets.GenericViewSet):
                 'priority': 4,
                 'title': "Health Package Categories",
                 'type': "PackageCategories",
-                'items': CommonProcedureCategory.common_procedure_categories(),
+                'items': CommonProcedureCategory.common_procedure_categories(self),
             },
             {
                 'priority': 0,

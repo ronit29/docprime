@@ -6,7 +6,6 @@ from django.core.validators import MaxValueValidator, MinValueValidator
 from django.db import models, transaction
 from django.db.models import Q
 
-from ondoc.api.v1.procedure.serializers import CommonProcedureCategorySerializer
 from ondoc.authentication import models as auth_model
 from ondoc.authentication.models import User, UserProfile
 from ondoc.common.models import Feature, AppointmentHistory, VirtualAppointment, MatrixMappedCity
@@ -609,6 +608,7 @@ class CommonProcedureCategory(auth_model.TimeStampedModel):
 
 
     def common_procedure_categories(self):
+        from ondoc.api.v1.procedure.serializers import CommonProcedureCategorySerializer
         common_procedure_categories = CommonProcedureCategory.objects.select_related('procedure_category').filter(
             procedure_category__is_live=True).all().order_by("-priority")[:10]
         common_procedure_categories_serializer = CommonProcedureCategorySerializer(common_procedure_categories,
