@@ -273,7 +273,12 @@ class PlusUser(auth_model.TimeStampedModel):
         else:
             if mrp <= utilization_dict['available_package_amount']:
                 if utilization_dict['allowed_package_ids']:
-                    return UtilizationCriteria.AMOUNT, True if id in utilization_dict['allowed_package_ids'] else UtilizationCriteria.AMOUNT, False
+                    if id in utilization_dict['allowed_package_ids']:
+                        return UtilizationCriteria.AMOUNT, True
+                    else:
+                        return UtilizationCriteria.AMOUNT, False
+
+                    # return UtilizationCriteria.AMOUNT, True if id in utilization_dict['allowed_package_ids'] else UtilizationCriteria.AMOUNT, False
                 return UtilizationCriteria.AMOUNT, True
             else:
                 return UtilizationCriteria.AMOUNT, False
