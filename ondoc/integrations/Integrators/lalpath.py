@@ -62,7 +62,7 @@ class Lalpath(BaseIntegrator):
         retry_count = kwargs.get('retry_count', 0)
         payload = self.prepare_data(tests, lab_appointment)
         url = "%s/CreateOrder" % settings.LAL_PATH_BASE_URL
-        api_key = self.get_auth_token()
+        api_key = settings.LAL_PATH_DATA_API_KEY
         if api_key:
             headers = {'apiKey': api_key, 'Content-Type': "application/json"}
             response = requests.post(url, data=json.dumps(payload), headers=headers)
@@ -109,7 +109,7 @@ class Lalpath(BaseIntegrator):
                     gender = '2'
                     salution = '2'
 
-        number = "9560488461"
+        number = ""
         mask_number = lab_appointment.mask_number.all().filter(is_deleted=False).first()
         if mask_number:
             number = mask_number.mask_number
