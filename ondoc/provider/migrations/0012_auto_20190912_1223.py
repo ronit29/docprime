@@ -61,7 +61,7 @@ class Migration(migrations.Migration):
                 ('reference_value', models.CharField(blank=True, max_length=64, null=True)),
                 ('material_required', django.contrib.postgres.fields.jsonb.JSONField(null=True)),
                 ('instructions', models.CharField(blank=True, max_length=256, null=True)),
-                ('available_lab_test', models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, related_name='sample_details', to='diagnostic.AvailableLabTest')),
+                ('available_lab_test', models.OneToOneField(on_delete=django.db.models.deletion.CASCADE, related_name='sample_details', to='diagnostic.AvailableLabTest')),
             ],
             options={
                 'db_table': 'partner_lab_test_sample_details',
