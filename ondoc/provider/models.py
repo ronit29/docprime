@@ -233,10 +233,12 @@ class TestSamplesLabAlerts(auth_models.TimeStampedModel):
 class PartnerLabTestSamples(auth_models.TimeStampedModel):
 
     name = models.CharField(max_length=128)
-    code = models.CharField(max_length=128)
+    code = models.CharField(max_length=128, null=True, blank=True)
 
     def __str__(self):
-        return str(self.name) + '(' + str(self.code) + ')'
+        if self.code:
+            return str(self.name) + '(' + str(self.code) + ')'
+        return str(self.name)
 
     class Meta:
         db_table = "partner_lab_test_samples"
