@@ -23,6 +23,7 @@ from django.utils.timezone import utc
 import reversion
 from django.conf import settings
 from django.utils.functional import cached_property
+from .enums import UsageCriteria
 
 
 class LiveMixin(models.Model):
@@ -97,6 +98,7 @@ class PlusPlans(auth_model.TimeStampedModel, LiveMixin):
     is_selected = models.BooleanField(default=False)
     features = JSONField(blank=False, null=False, default=dict)
     is_retail = models.NullBooleanField()
+    plan_criteria = models.CharField(max_length=100, null=True, blank=False, choices=UsageCriteria.as_choices())
 
     @classmethod
     def get_active_plans_via_utm(cls, utm):
@@ -254,15 +256,25 @@ class PlusUser(auth_model.TimeStampedModel):
 
         return None
 
-    def can_package_be_covered_in_vip(self, package_obj, *args, **kwargs):
-        mrp = package_obj.mrp if package_obj else kwargs.get('mrp')
-        # id = (package_obj.test.id if hasattr(package_obj, 'test') else package_obj.id) if package_obj else kwargs.get('id')
+    def can_test_be_covered_in_vip(self, *args, **kwargs):
+        mrp = kwargs.get('mrp')
+        id = kwargs.get('id')
+
+        if not mrp:
+            return
+        utilization_dict = self.get_utilization
+
+
+
+    def can_package_be_covered_in_vip(self, obj, *args, **kwargs):
+        mrp = obj.mrp if obj else kwargs.get('mrp')
+        # id = (obj.test.id if hasattr(obj, 'test') else obj.id) if obj else kwargs.get('id')
         if kwargs.get('id'):
             id = kwargs.get('id')
-        elif package_obj.__class__.__name__ == 'LabTest':
-            id = package_obj.id
+        elif obj.__class__.__name__ == 'LabTest':
+            id = obj.id
         else:
-            id = package_obj.test.id
+            id = obj.test.id
 
         utilization_dict = self.get_utilization
         if utilization_dict.get('total_package_count_limit'):
@@ -290,6 +302,7 @@ class PlusUser(auth_model.TimeStampedModel):
                                                                                PlanParametersEnum.MEMBERS_COVERED_IN_PACKAGE,
                                                                                PlanParametersEnum.PACKAGE_IDS,
                                                                                PlanParametersEnum.TOTAL_TEST_COVERED_IN_PACKAGE,
+                                                                               PlanParametersEnum.LAB_DISCOUNT,
                                                                                PlanParametersEnum.DOCTOR_CONSULT_DISCOUNT])
 
         for pp in plan_parameters:
@@ -299,6 +312,7 @@ class PlusUser(auth_model.TimeStampedModel):
         resp['doctor_consult_amount'] = int(data['doctor_consult_amount']) if data.get('doctor_consult_amount') and data.get('doctor_consult_amount').__class__.__name__ == 'str' else 0
         resp['doctor_amount_utilized'] = self.get_doctor_plus_appointment_amount()
         resp['doctor_discount'] = int(data['doctor_consult_discount']) if data.get('doctor_consult_discount') and data.get('doctor_consult_discount').__class__.__name__ == 'str' else 0
+        resp['lab_discount'] = int(data['lab_discount']) if data.get('lab_discount') and data.get('lab_discount').__class__.__name__ == 'str' else 0
         resp['doctor_amount_available'] = resp['doctor_consult_amount'] - resp['doctor_amount_utilized']
         resp['members_count_online_consultation'] = data['members_covered_in_package'] if data.get('members_covered_in_package') and data.get('members_covered_in_package').__class__.__name__ == 'str'  else 0
         resp['total_package_amount_limit'] = int(data['health_checkups_amount']) if data.get('health_checkups_amount') and data.get('health_checkups_amount').__class__.__name__ == 'str'  else 0
