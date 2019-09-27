@@ -90,6 +90,7 @@ class Lalpath(BaseIntegrator):
     def prepare_data(self, tests, lab_appointment):
         profile = lab_appointment.profile
         patient_address = ""
+        number = ""
         if hasattr(lab_appointment, 'address') and lab_appointment.address:
             patient_address = resolve_address(lab_appointment.address)
             # address_id = lab_appointment.address.get('id')
@@ -97,6 +98,7 @@ class Lalpath(BaseIntegrator):
 
         if profile:
             age = self.calculate_age(profile)
+            number = profile.phone_number
             if profile.gender:
                 gender = profile.gender
                 if gender == 'm':
@@ -109,12 +111,11 @@ class Lalpath(BaseIntegrator):
                     gender = '2'
                     salution = '2'
 
-        number = ""
-        mask_number = lab_appointment.mask_number.all().filter(is_deleted=False).first()
-        if mask_number:
-            number = mask_number.mask_number
-            if len(number) > 10:
-                number = number[1:]
+        # mask_number = lab_appointment.mask_number.all().filter(is_deleted=False).first()
+        # if mask_number:
+        #     number = mask_number.mask_number
+        #     if len(number) > 10:
+        #         number = number[1:]
 
         lab = lab_appointment.lab
         patient_details = {
