@@ -86,12 +86,12 @@ class PartnerLabTestSampleResource(resources.ModelResource):
 
     class Meta:
         model = prov_models.PartnerLabTestSamples
-        fields = ('id', 'name',)
+        fields = ('id', 'name', 'code')
 
 
 class PartnerLabTestSampleAdmin(ImportExportModelAdmin):
     resource_class = PartnerLabTestSampleResource
-    list_display = ('id', 'name', 'created_at', 'updated_at')
+    list_display = ('id', 'name', 'code', 'created_at', 'updated_at')
     readonly_fields = []
     search_fields = ['name']
 

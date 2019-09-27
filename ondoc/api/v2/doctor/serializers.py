@@ -935,14 +935,13 @@ class SelectedTestsDetailsSerializer(serializers.ModelSerializer):
 
 class PartnerLabTestSampleDetailsModelSerializer(serializers.ModelSerializer):
     sample_details_id = serializers.IntegerField(source="id")
-    sample_name = serializers.CharField(source="sample.name")
-    sample_volume = serializers.IntegerField(source='volume')
-    sample_volume_unit = serializers.CharField(source='volume_unit')
+    name = serializers.CharField(source="sample.name")
+    code = serializers.CharField(source="sample.code")
 
     class Meta:
         model = provider_models.PartnerLabTestSampleDetails
-        fields = ('sample_details_id', 'created_at', 'updated_at', 'sample_name', 'material_required', 'sample_volume',
-                  'sample_volume_unit', 'is_fasting_required', 'report_tat', 'reference_value', 'instructions')
+        fields = ('sample_details_id', 'name', 'code', 'material_required', 'volume', 'volume_unit',
+                  'is_fasting_required', 'report_tat', 'reference_value', 'instructions')
 
 
 class LabTestSamplesCollectionBarCodeModelSerializer(PartnerLabTestSampleDetailsModelSerializer):
@@ -969,9 +968,9 @@ class LabTestSamplesCollectionBarCodeModelSerializer(PartnerLabTestSampleDetails
 
     class Meta:
         model = provider_models.PartnerLabTestSampleDetails
-        fields = ('sample_details_id', 'created_at', 'updated_at', 'sample_name', 'material_required', 'sample_volume',
-                  'sample_volume_unit', 'is_fasting_required', 'report_tat', 'reference_value', 'instructions',
-                  'barcode', 'barcode_scan_time')
+        fields = ('sample_details_id', 'name', 'code', 'material_required', 'volume', 'volume_unit',
+                  'is_fasting_required', 'report_tat', 'reference_value', 'instructions', 'barcode',
+                  'barcode_scan_time')
 
 
 class PartnerLabSamplesCollectOrderModelSerializer(serializers.ModelSerializer):
