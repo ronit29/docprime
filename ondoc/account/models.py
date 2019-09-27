@@ -1201,8 +1201,8 @@ class PgTransaction(TimeStampedModel, SoftDelete):
         encrypted_message_digest = encrypted_message_object.hexdigest()
         return encrypted_message_digest, encrypted_data_to_verify
 
-    class Meta:
-        db_table = "pg_transaction"
+    # class Meta:
+    #     db_table = "pg_transaction"
 
     @classmethod
     def create_pg_hash(cls, data, key1, key2):
