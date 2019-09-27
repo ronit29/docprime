@@ -255,7 +255,7 @@ class PartnerLabTestSampleDetails(auth_models.TimeStampedModel):
     report_tat = models.PositiveSmallIntegerField(null=True, blank=True)                    # in hours
     reference_value = models.TextField(blank=True, null=True)
     material_required = JSONField(blank=True, null=True)
-    instructions = models.CharField(max_length=256, null=True, blank=True)
+    instructions = models.TextField(null=True, blank=True)
 
     def __str__(self):
         return str(self.available_lab_test.test.name) + '-' + str(self.sample.name)
