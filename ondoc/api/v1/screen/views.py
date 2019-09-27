@@ -7,6 +7,7 @@ from ondoc.api.v1.auth.views import AppointmentViewSet
 from ondoc.api.v1.doctor.city_match import city_match
 from ondoc.api.v1.insurance.serializers import InsuranceCityEligibilitySerializer
 from ondoc.api.v1.procedure.serializers import CommonIpdProcedureSerializer, CommonCategoriesSerializer
+from ondoc.api.v1.utils import common_package_category
 from ondoc.authentication.backends import JWTAuthentication
 from ondoc.common.utils import get_all_upcoming_appointments
 from ondoc.coupon.models import CouponRecommender
@@ -144,14 +145,13 @@ class ScreenViewSet(viewsets.GenericViewSet):
                 'addSearchItem': "Lab"
             }
         ]
-        from ondoc.api.v1.doctor.views import SearchedItemsViewSet
         carousel_list = [
 
             {
                 'priority': 4,
                 'title': "Health Package Categories",
                 'type': "PackageCategories",
-                'items': SearchedItemsViewSet.common_package_category(self, request),
+                'items': common_package_category(self, request),
             },
             {
                 'priority': 0,
