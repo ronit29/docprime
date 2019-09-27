@@ -3,6 +3,7 @@ from django.contrib import admin
 from django import forms
 from import_export import fields, resources
 from import_export.admin import ImportExportModelAdmin
+from import_export.tmp_storages import MediaStorage
 from import_export import widgets
 from ondoc.provider import models as prov_models
 from ondoc.diagnostic import models as diag_models
@@ -55,7 +56,7 @@ class PartnerLabTestSampleDetailForm(forms.ModelForm):
 
 
 class PartnerLabTestSampleDetailResource(resources.ModelResource):
-
+    tmp_storage_class = MediaStorage
     sample_id = fields.Field(column_name='sample_id',
                              attribute='sample',
                              widget=widgets.ForeignKeyWidget(prov_models.PartnerLabTestSamples))
@@ -83,6 +84,7 @@ class PartnerLabTestSampleDetailAdmin(ImportExportModelAdmin):
 
 
 class PartnerLabTestSampleResource(resources.ModelResource):
+    tmp_storage_class = MediaStorage
 
     class Meta:
         model = prov_models.PartnerLabTestSamples
