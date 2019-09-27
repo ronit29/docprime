@@ -53,7 +53,8 @@ from ondoc.insurance.models import (Insurer, InsurancePlans, InsuranceThreshold,
                                     ThirdPartyAdministrator,
                                     UserBank, UserBankDocument, InsurerAccountTransfer, BankHolidays)
 from ondoc.notification.models import DynamicTemplates
-from ondoc.plus.models import PlusPlans, PlusPlanParameters, PlusProposer, PlusPlanParametersMapping, PlusPlanContent
+from ondoc.plus.models import PlusPlans, PlusPlanParameters, PlusProposer, PlusPlanParametersMapping, PlusPlanContent, \
+    PlusPlanUtmSources, PlusPlanUtmSourceMapping
 
 from ondoc.procedure.models import Procedure, ProcedureCategory, CommonProcedureCategory, DoctorClinicProcedure, \
     ProcedureCategoryMapping, ProcedureToCategoryMapping, CommonProcedure, IpdProcedure, IpdProcedureFeatureMapping, \
@@ -81,6 +82,7 @@ from ondoc.account.models import MerchantPayout, MerchantPayoutBulkProcess, Adva
 from ondoc.seo.models import Sitemap, NewDynamic
 from ondoc.elastic.models import DemoElastic
 from ondoc.location.models import EntityUrls, CompareLabPackagesSeoUrls, CompareSEOUrls, CityLatLong
+from ondoc.provider import models as prov_models
 
 #from fluent_comments.admin import CommentModel
 from threadedcomments.models import ThreadedComment
@@ -819,6 +821,9 @@ class Command(BaseCommand):
 
             group.permissions.add(*permissions)
 
+        # Creating group for partner lab
+        self.create_partner_lab_group()
+
         self.stdout.write('Successfully created groups and permissions')
 
         self.setup_comment_group()
@@ -1162,7 +1167,24 @@ class Command(BaseCommand):
         group.permissions.clear()
 
         content_types = ContentType.objects.get_for_models(PlusProposer, PlusPlans, PlusPlanParameters,
-                                                           PlusPlanParametersMapping, PlusPlanContent)
+                                                           PlusPlanParametersMapping, PlusPlanContent, PlusPlanUtmSources, PlusPlanUtmSourceMapping)
+
+        for cl, ct in content_types.items():
+            permissions = Permission.objects.filter(
+                Q(content_type=ct),
+                Q(codename='add_' + ct.model) |
+                Q(codename='change_' + ct.model))
+
+            group.permissions.add(*permissions)
+
+    def create_partner_lab_group(self):
+
+        group, created = Group.objects.get_or_create(name=constants['PARTNER_LAB_TEAM'])
+        group.permissions.clear()
+
+        content_types = ContentType.objects.get_for_models(prov_models.PartnerLabSamplesCollectOrder,
+                                                           prov_models.PartnerLabTestSamples,
+                                                           prov_models.PartnerLabTestSampleDetails)
 
         for cl, ct in content_types.items():
             permissions = Permission.objects.filter(

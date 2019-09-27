@@ -3,7 +3,7 @@ from django.contrib.postgres.fields import JSONField
 from django.forms import model_to_dict
 from django.utils.functional import cached_property
 
-from ondoc.authentication.models import TimeStampedModel, User, UserProfile, Merchant, AssociatedMerchant
+from ondoc.authentication.models import TimeStampedModel, User, UserProfile, Merchant, AssociatedMerchant, SoftDelete
 from ondoc.account.tasks import refund_curl_task
 from ondoc.coupon.models import Coupon
 from ondoc.notification.models import AppNotification, NotificationAction
@@ -1059,7 +1059,7 @@ class Order(TimeStampedModel):
         return True
 
 
-class PgTransaction(TimeStampedModel):
+class PgTransaction(TimeStampedModel, SoftDelete):
     PG_REFUND_SUCCESS_OK_STATUS = '1'
     PG_REFUND_FAILURE_OK_STATUS = '0'
     PG_REFUND_FAILURE_STATUS = 'FAIL'
@@ -1072,6 +1072,11 @@ class PgTransaction(TimeStampedModel):
     CREDIT = 0
     DEBIT = 1
     TYPE_CHOICES = [(CREDIT, "Credit"), (DEBIT, "Debit")]
+
+    NODAL1 = 1
+    NODAL2 = 2
+    CURRENT_ACCOUNT = 3
+    NODAL_CHOICES = [(NODAL1, "Nodal 1"), (NODAL2, "Nodal 2"), (CURRENT_ACCOUNT, "Current Account")]
 
     user = models.ForeignKey(User, on_delete=models.DO_NOTHING)
     product_id = models.SmallIntegerField(choices=Order.PRODUCT_IDS)
@@ -1094,6 +1099,7 @@ class PgTransaction(TimeStampedModel):
     transaction_id = models.CharField(max_length=100, null=True, unique=True)
     pb_gateway_name = models.CharField(max_length=100, null=True, blank=True)
     payment_captured = models.BooleanField(default=False)
+    nodal_id = models.SmallIntegerField(choices=NODAL_CHOICES, null=True, blank=True)
 
     @transaction.atomic
     def save(self, *args, **kwargs):
@@ -1195,8 +1201,8 @@ class PgTransaction(TimeStampedModel):
         encrypted_message_digest = encrypted_message_object.hexdigest()
         return encrypted_message_digest, encrypted_data_to_verify
 
-    class Meta:
-        db_table = "pg_transaction"
+    # class Meta:
+    #     db_table = "pg_transaction"
 
     @classmethod
     def create_pg_hash(cls, data, key1, key2):
@@ -1215,6 +1221,7 @@ class PgTransaction(TimeStampedModel):
 
     class Meta:
         db_table = "pg_transaction"
+        # unique_together = (("order", "order_no", "deleted"),)
 
 
 class DummyTransactions(TimeStampedModel):
@@ -1558,7 +1565,7 @@ class ConsumerRefund(TimeStampedModel):
     PENDING = 1
     REQUESTED = 5
     COMPLETED = 10
-    MAXREFUNDDAYS = 60
+    MAXREFUNDDAYS = 180
     state_type = [(PENDING, "Pending"), (COMPLETED, "Completed"), (REQUESTED, "Requested")]
     user = models.ForeignKey(User, on_delete=models.DO_NOTHING)
     consumer_transaction = models.ForeignKey(ConsumerTransaction, on_delete=models.DO_NOTHING)
@@ -1621,6 +1628,7 @@ class ConsumerRefund(TimeStampedModel):
         refund_curl_request(pg_data)
 
     def schedule_refund(self):
+        from ondoc.account.mongo_models import PgLogs as PgLogsMongo
         pg_data = form_pg_refund_data([self, ])
         for req_data in pg_data:
             if settings.AUTO_REFUND:
@@ -1635,6 +1643,9 @@ class ConsumerRefund(TimeStampedModel):
                     # url = 'http://localhost:8000/api/v1/doctor/test'
                     print(url)
                     response = requests.post(url, data=json.dumps(req_data), headers=headers)
+                    save_pg_response.apply_async(
+                        (PgLogsMongo.REFUND_REQUEST_RESPONSE, req_data.get('orderId'), req_data.get('refNo'), response.json(), req_data, req_data.get('user'),),
+                        eta=timezone.localtime(), )
                     if response.status_code == status.HTTP_200_OK:
                         resp_data = response.json()
                         if resp_data.get("ok") is not None and str(resp_data["ok"]) == PgTransaction.PG_REFUND_SUCCESS_OK_STATUS:

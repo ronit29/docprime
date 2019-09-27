@@ -870,6 +870,27 @@ class EmailNotification(TimeStampedModel, EmailNotificationOpdMixin, EmailNotifi
         return booking_url
 
     @classmethod
+    def send_vip_booking_url(cls, token, email):
+        booking_url = "{}/agent/booking?token={}".format(settings.CONSUMER_APP_DOMAIN, token)
+        booking_url = booking_url + "&callbackurl=vip-club-member-details"
+        short_url = generate_short_url(booking_url)
+        html_body = "Your VIP membership purchase url is - {} . Please pay to confirm".format(short_url)
+        email_subject = "VIP Purchase Url"
+        if email:
+            email_noti = {
+                "email": email,
+                "content": html_body,
+                "email_subject": email_subject
+            }
+            message = {
+                "data": email_noti,
+                "type": "email"
+            }
+            message = json.dumps(message)
+            publish_message(message)
+        return booking_url
+
+    @classmethod
     def send_endorsement_request_url(cls, token, email):
         booking_url = "{}/agent/booking?token={}".format(settings.CONSUMER_APP_DOMAIN, token)
         booking_url = booking_url + "&callbackurl=insurance/insurance-user-details-review?is_endorsement=true"
@@ -1156,6 +1177,32 @@ class SmsNotification(TimeStampedModel, SmsNotificationOpdMixin, SmsNotification
             sms_notification = {
                 "phone_number": phone_number,
                 "content": html_body,
+            }
+            message = {
+                "data": sms_notification,
+                "type": "sms"
+            }
+            message = json.dumps(message)
+            publish_message(message)
+        return booking_url
+
+    @classmethod
+    def send_vip_booking_url(cls, token, phone_number, *args, **kwargs):
+        utm_source = kwargs.get('utm_source', '')
+        booking_url = "{}/agent/booking?token={}".format(settings.CONSUMER_APP_DOMAIN, token)
+        if utm_source:
+            booking_url = booking_url + "&callbackurl=vip-club-member-details?utm_source={utm_source}&is_agent=false".format(utm_source=utm_source)
+        else:
+            booking_url = booking_url + "&callbackurl=vip-club-member-details?is_agent=false"
+
+        short_url = generate_short_url(booking_url)
+        print(short_url)
+
+        sms_body = "Hi,\nPlease click on the link to view your Docprime VIP- Health Package details and make an online payment.\n{link} \nThanks\nTeam Docprime".format(link=short_url)
+        if phone_number:
+            sms_notification = {
+                "phone_number": phone_number,
+                "content": sms_body,
             }
             message = {
                 "data": sms_notification,
