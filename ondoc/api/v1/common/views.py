@@ -1305,9 +1305,9 @@ class DocumentUploadViewSet(viewsets.GenericViewSet):
 
     def upload_document_proofs(self, request, *args, **kwargs):
         user = request.user
-        is_plus_user = user.active_plus_user
-        if not is_plus_user:
-            return Response(status=status.HTTP_400_BAD_REQUEST, data={'error': 'User do not have active VIP membership.'})
+        inactive_plus_subscription = user.inactive_plus_user
+        if not inactive_plus_subscription:
+            return Response({'error': 'User has not purchased the VIP plan.'})
 
         data = dict()
         document_data = {}

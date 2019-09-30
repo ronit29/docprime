@@ -605,7 +605,8 @@ def process_payout(payout_id):
         # update payout status
         payout_data.update_status('attempted')
         MerchantPayoutLog.create_log(payout_data, str(e))
-        logger.error("Error in processing payout - with exception - " + str(e))
+        # logger.error("Error in processing payout - with exception - " + str(e))
+        print("Error in processing payout - with exception - " + str(e))
 
 
 @task(bind=True, max_retries=3)
@@ -669,7 +670,10 @@ def send_plus_membership_notifications(self, data):
         if not user:
             raise Exception("Invalid user id passed for plus membership email notification. Userid %s" % str(user_id))
 
-        plus_user_obj = user.active_plus_user
+        if user.active_plus_user:
+            plus_user_obj = user.active_plus_user
+        else:
+            plus_user_obj = user.inactive_plus_user
         if not plus_user_obj:
             raise Exception("Invalid or None plus user membership found for email notification. User id %s" % str(user_id))
 
@@ -788,7 +792,8 @@ def request_payout(req_data, order_data):
             if success_payout:
                 return {"status": 1, "response": resp_data}
 
-    logger.error("payout failed for request data - " + str(req_data))
+    # logger.error("payout failed for request data - " + str(req_data))
+    print("payout failed for request data - " + str(req_data))
     return {"status" : 0, "response" : resp_data}
 
 
