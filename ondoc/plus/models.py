@@ -424,9 +424,9 @@ class PlusUser(auth_model.TimeStampedModel):
                     response_dict['plus_user_id'] = plus_user.id
 
                     if utilization_criteria == UtilizationCriteria.COUNT:
-                        response_dict['vip_amount'] = 0
+                        response_dict['vip_amount_deducted'] = 0
                     else:
-                        response_dict['vip_amount'] = final_price - utilization['available_package_amount']\
+                        response_dict['vip_amount_deducted'] = final_price - utilization['available_package_amount']\
                             if final_price > utilization['available_package_amount'] else 0
 
         return response_dict
