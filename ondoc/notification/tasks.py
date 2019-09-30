@@ -1597,3 +1597,21 @@ def send_lensfit_coupons(self, appointment_id, product_id, notification_type=Non
             notification.send()
     except Exception as e:
         logger.error(str(e))
+
+
+@task()
+def send_partner_lab_notifications(order_id, notification_type=None):
+    from ondoc.provider.models import PartnerLabSamplesCollectOrder
+    from ondoc.communications.models import PartnerLabNotification
+    try:
+        instance = PartnerLabSamplesCollectOrder.objects.objects.prefetch_related('lab_alerts', 'reports') \
+                                                                .filter(id=order_id).first()
+        if not instance:
+            return
+        kwargs = dict()
+        if notification_type:
+            kwargs['notification_type'] = notification_type
+        partner_lab_comm_obj = PartnerLabNotification(appointment=instance, **kwargs)
+        partner_lab_comm_obj.send()
+    except Exception as e:
+        logger.error(str(e))

@@ -903,11 +903,9 @@ class SampleCollectOrderCreateOrUpdateSerializer(serializers.Serializer):
         if not doctor:
             raise serializers.ValidationError('Hospital Doctor Mapping not found')
         available_lab_tests = list()
-        lab_tests = list()
         for obj in all_available_lab_tests:
             if obj.test.id in lab_test_ids and hasattr(obj, 'sample_details') and obj.enabled:
                 available_lab_tests.append(obj)
-                lab_tests.append(obj.test)
         if not available_lab_tests:
             raise serializers.ValidationError("no valid test found.")
         attrs['order_obj'] = order_obj
@@ -916,7 +914,6 @@ class SampleCollectOrderCreateOrUpdateSerializer(serializers.Serializer):
         attrs['doctor'] = doctor
         attrs['lab'] = lab
         attrs['available_lab_tests'] = available_lab_tests
-        attrs['lab_tests'] = lab_tests
         return attrs
 
 

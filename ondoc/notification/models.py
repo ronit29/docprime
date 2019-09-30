@@ -145,6 +145,17 @@ class NotificationAction:
 
     PLUS_MEMBERSHIP_CONFIRMED = 180
 
+    PARTNER_LAB_SAMPLE_EXTRACTION_PENDING = 200
+    PARTNER_LAB_SAMPLE_SCAN_PENDING = 201
+    PARTNER_LAB_SAMPLE_PICKUP_PENDING = 202
+    PARTNER_LAB_SAMPLE_PICKED_UP = 203
+    PARTNER_LAB_PARTIAL_REPORT_GENERATED = 204
+    PARTNER_LAB_REPORT_GENERATED = 205
+    PARTNER_LAB_REPORT_VIEWED = 206
+    PARTNER_LAB_REQUEST_RECHECK = 207
+    PARTNER_LAB_NEED_HELP = 208
+    PARTNER_LAB_REPORT_UPLOADED = 209
+
     NOTIFICATION_TYPE_CHOICES = (
         (APPOINTMENT_ACCEPTED, "Appointment Accepted"),
         (APPOINTMENT_CANCELLED, "Appointment Cancelled"),
@@ -207,18 +218,31 @@ class NotificationAction:
         (CHAT_NOTIFICATION, "Push Notification from chat"),
         (COD_TO_PREPAID, 'COD to Prepaid'),
         (COD_TO_PREPAID_REQUEST, 'COD To Prepaid Request'),
-        (OPD_DAILY_SCHEDULE, 'OPD Daily Schedule')
+        (OPD_DAILY_SCHEDULE, 'OPD Daily Schedule'),
+
+        (PARTNER_LAB_SAMPLE_EXTRACTION_PENDING, 'Partner Lab Sample Extraction Pending'),
+        (PARTNER_LAB_SAMPLE_SCAN_PENDING, 'Partner Lab Sample Scan Pending'),
+        (PARTNER_LAB_SAMPLE_PICKUP_PENDING, 'Partner Lab Sample Pickup Pending'),
+        (PARTNER_LAB_SAMPLE_PICKED_UP, 'Partner Lab Sample Picked Up'),
+        (PARTNER_LAB_PARTIAL_REPORT_GENERATED, 'Partner Lab Partial Report Generated'),
+        (PARTNER_LAB_REPORT_GENERATED, 'Partner Lab Report Generated'),
+        (PARTNER_LAB_REPORT_VIEWED, 'Partner Lab Report Viewed'),
+        (PARTNER_LAB_REQUEST_RECHECK, 'Partner Lab Request Recheck'),
+        (PARTNER_LAB_NEED_HELP, 'Partner Lab Need Help'),
+        (PARTNER_LAB_REPORT_UPLOADED, 'Partner Lab Report Uploaded'),
     )
     OPD_APPOINTMENT = "opd_appointment"
     LAB_APPOINTMENT = "lab_appoingment"
     OFFLINE_OPD_APPOINTMENT = "offline_opd_appointment"
     E_CONSULTATION = "e_consultation"
+    PARTNER_LAB = "partner_lab"
 
     ACTION_TYPE_CHOICES = (
         (OPD_APPOINTMENT, 'Opd Appointment'),
         (LAB_APPOINTMENT, 'Lab Appointment'),
         (OFFLINE_OPD_APPOINTMENT, 'Offline Opd Appointment'),
         (E_CONSULTATION, 'E Consultation'),
+        (PARTNER_LAB, 'partner_lab'),
     )
 
     APPOINTMENT = "appointment"

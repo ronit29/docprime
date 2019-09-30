@@ -15,7 +15,7 @@ from ondoc.banner.models import EmailBanner
 from ondoc.doctor.models import OpdAppointment, Hospital, OfflineOPDAppointments
 from ondoc.coupon.models import Coupon
 from ondoc.diagnostic.models import LabAppointment
-from ondoc.provider.models import EConsultation
+from ondoc.provider.models import EConsultation, PartnerLabSamplesCollectOrder
 from ondoc.common.models import UserConfig
 from django.core.files.uploadedfile import SimpleUploadedFile, TemporaryUploadedFile, InMemoryUploadedFile
 from django.forms import model_to_dict
@@ -226,6 +226,9 @@ def get_title_body(notification_type, context, user):
     elif notification_type == NotificationAction.E_CONSULT_NEW_MESSAGE_RECEIVED:
         title = "New Message"
         body = "A new message has been just posted in the econsultation chat."
+    elif notification_type == NotificationAction.PARTNER_LAB_REPORT_UPLOADED:
+        title = "Test Report(s) Generated!"
+        body = "Lab test(s) report for {} is now available.View now!".format(patient_name)
     context.update({'title': title, 'body': body})
 
 
@@ -265,11 +268,21 @@ class Notification:
         {
             EConsultation.BOOKED: NotificationAction.ECONSULTATION_BOOKED,
             EConsultation.ACCEPTED: NotificationAction.ECONSULTATION_ACCEPTED,
-            EConsultation.RESCHEDULED_DOCTOR: NotificationAction.OFFLINE_OPD_APPOINTMENT_RESCHEDULED_DOCTOR,
-            EConsultation.RESCHEDULED_PATIENT: NotificationAction.OFFLINE_OPD_APPOINTMENT_NO_SHOW,
-            EConsultation.CANCELLED: NotificationAction.OFFLINE_OPD_APPOINTMENT_CANCELLED,
-            EConsultation.COMPLETED: NotificationAction.OFFLINE_OPD_INVOICE,
-            EConsultation.EXPIRED: NotificationAction.OFFLINE_OPD_INVOICE
+            EConsultation.RESCHEDULED_DOCTOR: NotificationAction.ECONSULTATION_RESCHEDULED_DOCTOR,
+            EConsultation.RESCHEDULED_PATIENT: NotificationAction.ECONSULTATION_RESCHEDULED_PATIENT,
+            EConsultation.CANCELLED: NotificationAction.ECONSULTATION_CANCELLED,
+            EConsultation.COMPLETED: NotificationAction.ECONSULTATION_COMPLETED,
+            EConsultation.EXPIRED: NotificationAction.ECONSULTATION_EXPIRED
+        }
+    PARTNER_LAB_NOTIFICATION_TYPE_MAPPING = \
+        {
+            PartnerLabSamplesCollectOrder.SAMPLE_EXTRACTION_PENDING: NotificationAction.PARTNER_LAB_SAMPLE_EXTRACTION_PENDING,
+            PartnerLabSamplesCollectOrder.SAMPLE_SCAN_PENDING: NotificationAction.PARTNER_LAB_SAMPLE_SCAN_PENDING,
+            PartnerLabSamplesCollectOrder.SAMPLE_PICKUP_PENDING: NotificationAction.PARTNER_LAB_SAMPLE_PICKUP_PENDING,
+            PartnerLabSamplesCollectOrder.SAMPLE_PICKED_UP: NotificationAction.PARTNER_LAB_SAMPLE_PICKED_UP,
+            PartnerLabSamplesCollectOrder.PARTIAL_REPORT_GENERATED: NotificationAction.PARTNER_LAB_PARTIAL_REPORT_GENERATED,
+            PartnerLabSamplesCollectOrder.REPORT_GENERATED: NotificationAction.PARTNER_LAB_REPORT_GENERATED,
+            PartnerLabSamplesCollectOrder.REPORT_VIEWED: NotificationAction.PARTNER_LAB_REPORT_VIEWED
         }
 
 
@@ -2404,3 +2417,46 @@ class VipNotification(Notification):
             sms_notification = SMSNotification(notification_type, context)
             sms_notification.send(all_receivers.get('sms_receivers', []))
 
+
+class PartnerLabNotification(Notification):
+
+    def __init__(self, partner_lab_order_obj, notification_type=None):
+        self.partner_lab_order_obj = partner_lab_order_obj
+        self.notification_type = notification_type if notification_type else self.PARTNER_LAB_NOTIFICATION_TYPE_MAPPING[partner_lab_order_obj.status]
+
+    def get_context(self):
+        instance = self.partner_lab_order_obj
+        context = {
+            "instance": instance,
+            "patient_name": self.partner_lab_order_obj.offline_patient.name
+        }
+        return context
+
+    def get_receivers(self):
+        notification_type = self.notification_type
+        push_receivers = list()
+        all_receivers = {}
+        instance = self.partner_lab_order_obj
+        if not instance:
+            return {}
+
+        user_and_phone_number = []
+        user_and_email = []
+        if notification_type in [NotificationAction.PARTNER_LAB_REPORT_UPLOADED] and instance.created_by:
+            push_receivers.extend(instance.created_by)
+        user_and_tokens = NotificationEndpoint.get_user_and_tokens(receivers=push_receivers,
+                                                                   action_type=NotificationAction.PARTNER_LAB)
+        all_receivers['sms_receivers'] = user_and_phone_number
+        all_receivers['email_receivers'] = user_and_email
+        all_receivers['push_receivers'] = user_and_tokens
+
+        return all_receivers
+
+    def send(self):
+        context = self.get_context()
+        notification_type = self.notification_type
+        all_receivers = self.get_receivers()
+
+        if notification_type in [NotificationAction.PARTNER_LAB_REPORT_UPLOADED]:
+            push_notification = PUSHNotification(notification_type, context)
+            push_notification.send(all_receivers.get('push_receivers', []))

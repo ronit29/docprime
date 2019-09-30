@@ -6,6 +6,8 @@ from ondoc.authentication import models as auth_models
 from ondoc.common import models as common_models
 from ondoc.account import models as acct_mdoels
 from ondoc.prescription import models as pres_models
+from ondoc.notification.models import NotificationAction
+from ondoc.notification import tasks as notification_tasks
 from django.contrib.contenttypes.fields import GenericRelation
 from django.contrib.postgres.fields import JSONField
 import logging, json, uuid, requests
@@ -262,24 +264,27 @@ class PartnerLabTestSampleDetails(auth_models.TimeStampedModel):
         return str(self.available_lab_test.test.name) + '-' + str(self.sample.name)
 
     @classmethod
-    def get_sample_collection_details(cls, lab_tests_queryset):
-        sample_details = cls.objects.filter(available_lab_test__test__in=lab_tests_queryset, available_lab_test__enabled=True)
-        max_volumes_list = sample_details.values('sample__name').annotate(max_volume=models.Max('volume'))
-        max_volumes_dict = dict()
-        sample_ids_to_be_excluded = list()
-        for max_volume in max_volumes_list:
-            max_volumes_dict[max_volume['sample__name']] = max_volume['max_volume']
+    def get_sample_collection_details(cls, available_lab_tests):
+        sample_details = list()
+        collection_sample_objs = list()
+        sample_max_volumes = dict()
+        for obj in available_lab_tests:
+            sample_details.extend(obj.sample_details.all())
         for sample_detail in sample_details:
-            if sample_detail.sample.name in max_volumes_dict and sample_detail.volume != max_volumes_dict[sample_detail.sample.name]:
-                sample_ids_to_be_excluded.append(sample_detail.id)
-        samples_objs = sample_details.exclude(id__in=sample_ids_to_be_excluded)
-        return samples_objs
+            if sample_detail.sample.name not in sample_max_volumes or \
+                    (sample_detail.sample.name in sample_max_volumes and
+                     sample_detail.volume > sample_max_volumes[sample_detail.sample.name]["max_volume"]):
+                sample_max_volumes[sample_detail.sample.name] = {"id": sample_detail.id, "max_volume": sample_detail.volume}
+        for sample_detail in sample_details:
+            if sample_detail.id == sample_max_volumes[sample_detail.sample.name]['id']:
+                collection_sample_objs.append(sample_detail)
+        return collection_sample_objs
 
     class Meta:
         db_table = "partner_lab_test_sample_details"
 
 
-class PartnerLabSamplesCollectOrder(auth_models.TimeStampedModel):
+class PartnerLabSamplesCollectOrder(auth_models.TimeStampedModel, auth_models.CreatedByModel):
 
     SAMPLE_EXTRACTION_PENDING = 1
     SAMPLE_SCAN_PENDING = 2
@@ -312,6 +317,11 @@ class PartnerLabSamplesCollectOrder(auth_models.TimeStampedModel):
 
     class Meta:
         db_table = "partner_lab_samples_collect_order"
+
+    def save(self, *args, **kwargs):
+        if self.status in [PartnerLabSamplesCollectOrder.PARTIAL_REPORT_GENERATED, PartnerLabSamplesCollectOrder.REPORT_GENERATED]:
+            notification_tasks.send_partner_lab_notifications(self.id, notification_type=NotificationAction.PARTNER_LAB_REPORT_UPLOADED)
+        super(PartnerLabSamplesCollectOrder, self).save()
 
 
 class PartnerLabTestSamplesOrderReportMapping(auth_models.TimeStampedModel):
