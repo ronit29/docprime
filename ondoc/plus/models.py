@@ -306,6 +306,7 @@ class PlusUser(auth_model.TimeStampedModel):
                                                                                PlanParametersEnum.HEALTH_CHECKUPS_COUNT,
                                                                                PlanParametersEnum.MEMBERS_COVERED_IN_PACKAGE,
                                                                                PlanParametersEnum.PACKAGE_IDS,
+                                                                               PlanParametersEnum.PACKAGE_DISCOUNT,
                                                                                PlanParametersEnum.TOTAL_TEST_COVERED_IN_PACKAGE,
                                                                                PlanParametersEnum.LAB_DISCOUNT,
                                                                                PlanParametersEnum.LABTEST_AMOUNT,
@@ -321,6 +322,7 @@ class PlusUser(auth_model.TimeStampedModel):
         resp['doctor_amount_utilized'] = self.get_doctor_plus_appointment_amount()
         resp['doctor_discount'] = int(data['doctor_consult_discount']) if data.get('doctor_consult_discount') and data.get('doctor_consult_discount').__class__.__name__ == 'str' else 0
         resp['lab_discount'] = int(data['lab_discount']) if data.get('lab_discount') and data.get('lab_discount').__class__.__name__ == 'str' else 0
+        resp['package_discount'] = int(data['package_discount']) if data.get('package_discount') and data.get('package_discount').__class__.__name__ == 'str' else 0
         resp['doctor_amount_available'] = resp['doctor_consult_amount'] - resp['doctor_amount_utilized']
         resp['members_count_online_consultation'] = data['members_covered_in_package'] if data.get('members_covered_in_package') and data.get('members_covered_in_package').__class__.__name__ == 'str'  else 0
         resp['total_package_amount_limit'] = int(data['health_checkups_amount']) if data.get('health_checkups_amount') and data.get('health_checkups_amount').__class__.__name__ == 'str'  else 0
@@ -332,10 +334,12 @@ class PlusUser(auth_model.TimeStampedModel):
         resp['total_labtest_amount_limit'] = int(data['labtest_amount']) if data.get('labtest_amount') and data.get('labtest_amount').__class__.__name__ == 'str'  else 0
         resp['total_labtest_count_limit'] =  int(data['labtest_count']) if data.get('labtest_count') and data.get('labtest_count').__class__.__name__ == 'str'  else 0
 
-        resp['available_labtest_amount'] = resp['total_labtest_amount_limit'] - int(self.get_package_plus_appointment_amount())
-        resp['available_labtest_count'] = resp['total_labtest_count_limit'] - int(self.get_package_plus_appointment_count())
+        resp['available_labtest_amount'] = resp['total_labtest_amount_limit'] - int(self.get_labtest_plus_appointment_amount())
+        resp['available_labtest_count'] = resp['total_labtest_count_limit'] - int(self.get_labtest_plus_appointment_count())
         resp['total_doctor_count_limit'] = int(data['doctor_consult_count']) if data.get('doctor_consult_count') and data.get('doctor_consult_discount').__class__.__name__ == 'str' else 0
         resp['available_doctor_count'] = resp['total_doctor_count_limit'] - int(self.get_doctor_plus_appointment_count())
+
+        # resp['availabe_labtest_discount_count'] = resp['total_labtest_count_limit']
 
         return resp
 
