@@ -409,7 +409,7 @@ class PlusUser(auth_model.TimeStampedModel):
                                         hospital.enabled_for_prepaid and hospital.enabled_for_plus_plans and \
                                         doctor.enabled_for_plus_plans:
 
-                engine_response = engine.validate_booking_entity(mrp)
+                engine_response = engine.validate_booking_entity(cost=mrp)
                 response_dict['cover_under_vip'] = engine_response.get('is_covered', False)
                 response_dict['plus_user_id'] = plus_user.id
                 response_dict['vip_amount_deducted'] = engine_response.get('vip_amount_deducted', 0)
