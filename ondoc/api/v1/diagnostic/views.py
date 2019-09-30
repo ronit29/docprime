@@ -2485,7 +2485,7 @@ class LabAppointmentView(mixins.CreateModelMixin,
             data['is_vip_member'] = plus_user_dict.get('is_vip_member', False)
             data['cover_under_vip'] = plus_user_dict.get('cover_under_vip', False)
             data['plus_user_id'] = plus_user.id
-            data['vip_amount'] = plus_user_dict.get('vip_amount')
+            data['vip_amount'] = plus_user_dict.get('vip_amount_deducted')
             if data['cover_under_vip']:
                 data['payment_type'] = OpdAppointment.VIP
 

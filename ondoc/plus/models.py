@@ -422,16 +422,17 @@ class PlusUser(auth_model.TimeStampedModel):
             if lab and lab.enabled_for_plus_plans:
                 mrp = int(price_data.get('mrp'))
                 final_price = mrp + price_data['home_pickup_charges']
-                utilization_criteria, coverage = plus_user.can_package_be_covered_in_vip(None, mrp=final_price, id=appointment_data['test_ids'][0].id)
-                if coverage:
-                    response_dict['cover_under_vip'] = True
-                    response_dict['plus_user_id'] = plus_user.id
 
-                    if utilization_criteria == UtilizationCriteria.COUNT:
-                        response_dict['vip_amount_deducted'] = 0
-                    else:
-                        response_dict['vip_amount_deducted'] = final_price - utilization['available_package_amount']\
-                            if final_price > utilization['available_package_amount'] else 0
+                entity = "PACKAGE" if appointment_data['test_ids'][0].is_package else "LABTEST"
+                engine = get_class_reference(plus_user, entity)
+                if appointment_data['test_ids']:
+                    engine_response = engine.validate_booking_entity(cost=final_price, id=appointment_data['test_ids'][0].id)
+                    if not engine_response:
+                        return response_dict
+                    response_dict['cover_under_vip'] = engine_response.get('is_covered', False)
+                    response_dict['plus_user_id'] = plus_user.id
+                    response_dict['vip_amount_deducted'] = engine_response.get('vip_amount_deducted', 0)
+                    response_dict['amount_to_be_paid'] = engine_response.get('amount_to_be_paid', final_price)
 
         return response_dict
 
