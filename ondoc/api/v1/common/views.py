@@ -1166,10 +1166,10 @@ class CommentViewSet(viewsets.ModelViewSet):
         type = data['type']
         if comment and type == 'hospital':
             user_email = data['email']
-            try:
-                validate_email(user_email)
-            except ValidationError as e:
-                return Response(status=status.HTTP_400_BAD_REQUEST, data={'error': format(e.messages[0])})
+            # try:
+            #     validate_email(user_email)
+            # except ValidationError as e:
+            #     return Response(status=status.HTTP_400_BAD_REQUEST, data={'error': format(e.messages[0])})
             user_name = data['name']
             if data.get('id'):
                 object_id = data['id']
