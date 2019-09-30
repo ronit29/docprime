@@ -142,7 +142,7 @@ class LabtestAmountCount(AbstractCriteria):
         total_count_left = self.utilization.get('available_labtest_count')
         total_amount_left = self.utilization.get('available_labtest_amount')
 
-        if total_amount_left == 0 and total_count_left:
+        if total_amount_left <= 0 and total_count_left <= 0:
             return resp
 
         if total_count_left > 0:
@@ -157,8 +157,7 @@ class LabtestAmountCount(AbstractCriteria):
             elif 0 < total_amount_left < cost:
                 vip_amount_deducted = total_amount_left
                 amount_to_be_paid = cost - total_amount_left
-            else:
-                is_covered = False
+
 
         resp['vip_amount_deducted'] = vip_amount_deducted
         resp['amount_to_be_paid'] = amount_to_be_paid
@@ -177,10 +176,12 @@ class LabtestCountDiscount(AbstractCriteria):
         amount_to_be_paid = cost
 
         available_labtest_count = self.utilization.get('available_labtest_count')
+        lab_test_discount = self.utilization.get('lab_discount')
 
         if available_labtest_count > 0:
-            vip_amount_deducted = cost
-            amount_to_be_paid = 0
+            discounted_cost = self.discounted_cost(lab_test_discount, cost)
+            vip_amount_deducted = discounted_cost
+            amount_to_be_paid = cost - discounted_cost
             is_covered = True
 
         resp['vip_amount_deducted'] = vip_amount_deducted
@@ -245,6 +246,7 @@ class PackageAmountCount(AbstractCriteria):
             if id in allowed_package_ids:
                 vip_amount_deducted = cost
                 amount_to_be_paid = 0
+                is_covered = True
             else:
                 return resp
 
@@ -252,9 +254,11 @@ class PackageAmountCount(AbstractCriteria):
             if available_package_amount > cost:
                 amount_to_be_paid = 0
                 vip_amount_deducted = cost
+                is_covered = True
             elif 0 < available_package_amount < cost:
                 amount_to_be_paid = cost - available_package_amount
                 vip_amount_deducted = available_package_amount
+                is_covered = True
 
         resp['vip_amount_deducted'] = vip_amount_deducted
         resp['amount_to_be_paid'] = amount_to_be_paid
@@ -285,6 +289,7 @@ class PackageCountDiscount(AbstractCriteria):
                     discounted_cost = self.discounted_cost(available_package_discount, cost)
                     vip_amount_deducted = discounted_cost
                     amount_to_be_paid = cost - discounted_cost
+                    is_covered = True
 
                 else:
                     return resp
@@ -292,6 +297,7 @@ class PackageCountDiscount(AbstractCriteria):
                 discounted_cost = self.discounted_cost(available_package_discount, cost)
                 vip_amount_deducted = discounted_cost
                 amount_to_be_paid = cost - discounted_cost
+                is_covered = True
 
         resp['vip_amount_deducted'] = vip_amount_deducted
         resp['amount_to_be_paid'] = amount_to_be_paid
