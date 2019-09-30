@@ -447,6 +447,7 @@ class DoctorAppointmentsViewSet(OndocViewSet):
             data['cover_under_vip'] = plus_user_dict.get('cover_under_vip', False)
             data['plus_user_id'] = plus_user.id
             data['vip_amount'] = plus_user_dict.get('vip_amount_deducted')
+            data['amount_to_be_paid'] = plus_user_dict.get('amount_to_be_paid')
             if data['cover_under_vip']:
                 data['payment_type'] = OpdAppointment.VIP
 
