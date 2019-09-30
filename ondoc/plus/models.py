@@ -17,6 +17,7 @@ from django.db import transaction
 from django.db.models import Q
 from ondoc.common.models import DocumentsProofs
 from ondoc.notification.tasks import push_plus_lead_to_matrix
+from ondoc.plus.usage_criteria import get_class_reference
 from .enums import PlanParametersEnum, UtilizationCriteria
 from datetime import datetime
 from django.utils.timezone import utc
@@ -351,17 +352,18 @@ class PlusUser(auth_model.TimeStampedModel):
     def validate_plus_appointment(self, appointment_data):
         from ondoc.doctor.models import OpdAppointment
         from ondoc.diagnostic.models import LabAppointment
-        response_dict = {
-            'is_vip_member': False,
-            'plus_user_id': None,
-            'cover_under_vip': "",
-            "vip_amount": 0
-        }
-
         OPD = "OPD"
         LAB = "LAB"
-
         appointment_type = OPD if "doctor" in appointment_data else LAB
+        price_data = OpdAppointment.get_price_details(appointment_data) if appointment_type == OPD else LabAppointment.get_price_details(appointment_data)
+        mrp = int(price_data.get('mrp'))
+        response_dict = {
+            "is_vip_member": False,
+            "plus_user_id": None,
+            "cover_under_vip": "",
+            "vip_amount_deducted": 0,
+            "amount_to_be_paid": mrp
+        }
 
         if appointment_data.get('payment_type') == OpdAppointment.COD:
             return response_dict
@@ -376,37 +378,43 @@ class PlusUser(auth_model.TimeStampedModel):
 
         response_dict['is_vip_member'] = True
         utilization = plus_user.get_utilization
-        price_data = OpdAppointment.get_price_details(appointment_data) if appointment_type == OPD else LabAppointment.get_price_details(appointment_data)
-
-        amount_available = int(utilization.get('doctor_amount_available', 0)) if appointment_type == OPD else int(utilization.get('available_package_amount', 0))
-        is_cover_after_utilize = True
-        amount_paid = 0
-
-        mrp = int(price_data.get('mrp'))
-        if amount_available > 0 or mrp <= amount_available:
-            is_cover_after_utilize = True
-        else:
-            is_cover_after_utilize = False
-
-        if is_cover_after_utilize and amount_available >= mrp:
-            amount_paid = 0
-
-        elif is_cover_after_utilize and (amount_available > 0) and (amount_available <= mrp):
-            amount_paid = mrp - amount_available
-        else:
-            amount_paid = 0
-        response_dict['vip_amount'] = amount_paid
+        #
+        # amount_available = int(utilization.get('doctor_amount_available', 0)) if appointment_type == OPD else int(utilization.get('available_package_amount', 0))
+        # is_cover_after_utilize = True
+        # amount_paid = 0
+        #
+        #
+        # if amount_available > 0 or mrp <= amount_available:
+        #     is_cover_after_utilize = True
+        # else:
+        #     is_cover_after_utilize = False
+        #
+        # if is_cover_after_utilize and amount_available >= mrp:
+        #     amount_paid = 0
+        #
+        # elif is_cover_after_utilize and (amount_available > 0) and (amount_available <= mrp):
+        #     amount_paid = mrp - amount_available
+        # else:
+        #     amount_paid = 0
+        # response_dict['vip_amount'] = amount_paid
 
         if appointment_type == OPD:
+            engine = get_class_reference(plus_user, "DOCTOR")
+            if not engine:
+                return response_dict
+
             doctor = appointment_data['doctor']
             hospital = appointment_data['hospital']
             if doctor.enabled_for_online_booking and hospital.enabled_for_online_booking and \
                                         hospital.enabled_for_prepaid and hospital.enabled_for_plus_plans and \
-                                        doctor.enabled_for_plus_plans and is_cover_after_utilize:
+                                        doctor.enabled_for_plus_plans:
 
-                response_dict['cover_under_vip'] = True
+                engine_response = engine.validate_booking_entity(mrp)
+                response_dict['cover_under_vip'] = engine_response.get('is_covered', False)
                 response_dict['plus_user_id'] = plus_user.id
-                response_dict['vip_amount'] = self.get_vip_amount(utilization, mrp)
+                response_dict['vip_amount_deducted'] = engine_response.get('vip_amount_deducted', 0)
+                response_dict['amount_to_be_paid'] = engine_response.get('amount_to_be_paid', mrp)
+                # response_dict['vip_amount'] = self.get_vip_amount(utilization, mrp)
                 # response_dict['vip_amount'] = amount_paid
 
         elif appointment_type == LAB:
@@ -420,9 +428,9 @@ class PlusUser(auth_model.TimeStampedModel):
                     response_dict['plus_user_id'] = plus_user.id
 
                     if utilization_criteria == UtilizationCriteria.COUNT:
-                        response_dict['vip_amount'] = 0
+                        response_dict['vip_amount_deducted'] = 0
                     else:
-                        response_dict['vip_amount'] = final_price - utilization['available_package_amount']\
+                        response_dict['vip_amount_deducted'] = final_price - utilization['available_package_amount']\
                             if final_price > utilization['available_package_amount'] else 0
 
         return response_dict

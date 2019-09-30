@@ -43,6 +43,7 @@ class DoctorAmountCount(AbstractCriteria):
         if available_count <= 0 and available_amount <= 0:
             return resp
 
+        # lab_test_discount = self.utilization.get('doctor_discount')
         if available_count > 0:
             vip_amount_deducted = cost
             amount_to_be_paid = 0
