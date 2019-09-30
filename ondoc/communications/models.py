@@ -423,6 +423,19 @@ class SMSNotification:
         elif notification_type == NotificationAction.PLUS_MEMBERSHIP_CONFIRMED:
             obj = DynamicTemplates.objects.filter(template_name="Docprime_vip_welcome_message", approved=True).first()
 
+        elif notification_type == NotificationAction.OFFLINE_OPD_APPOINTMENT_ACCEPTED:
+            obj = DynamicTemplates.objects.filter(template_name="OFFLINE_OPD_APPOINTMENT_ACCEPTED", approved=True).first()
+        elif notification_type == NotificationAction.OFFLINE_OPD_APPOINTMENT_CANCELLED:
+            obj = DynamicTemplates.objects.filter(template_name="OFFLINE_OPD_APPOINTMENT_CANCELLED", approved=True).first()
+        elif notification_type == NotificationAction.OFFLINE_OPD_APPOINTMENT_RESCHEDULED_DOCTOR:
+            obj = DynamicTemplates.objects.filter(template_name="OFFLINE_OPD_APPOINTMENT_RESCHEDULED_DOCTOR", approved=True).first()
+        elif notification_type == NotificationAction.OFFLINE_APPOINTMENT_REMINDER_PROVIDER_SMS:
+            obj = DynamicTemplates.objects.filter(template_name="OFFLINE_APPOINTMENT_REMINDER_PROVIDER_SMS", approved=True).first()
+        elif notification_type == NotificationAction.OFFLINE_OPD_APPOINTMENT_COMPLETED:
+            obj = DynamicTemplates.objects.filter(template_name="OFFLINE_OPD_APPOINTMENT_COMPLETED", approved=True).first()
+        elif notification_type == NotificationAction.OFFLINE_PATIENT_WELCOME_MESSAGE:
+            obj = DynamicTemplates.objects.filter(template_name="OFFLINE_PATIENT_WELCOME_MESSAGE", approved=True).first()
+
         return obj
 
     def trigger(self, receiver, template, context):
@@ -2224,7 +2237,7 @@ class OfflineOpdAppointments(Notification):
             "clinic_or_hospital": clinic_or_hospital,
             "action_type": NotificationAction.OFFLINE_OPD_APPOINTMENT,
             "action_id": self.appointment.id,
-            "time_slot_start": time_slot_start,
+            "opd_time_slot_start": time_slot_start,
             "welcome_message": self.appointment.user.welcome_message
         }
         return context
