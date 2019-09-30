@@ -3353,7 +3353,7 @@ class OpdAppointment(auth_model.TimeStampedModel, CouponsMixin, OpdAppointmentIn
                 if not profile:
                     effective_price = doctor_clinic_timing.deal_price
                 else:
-                    plus_user = profile.get_plus_membership()
+                    plus_user = profile.get_plus_membership
                     if plus_user:
                         engine = get_class_reference(plus_user, "DOCTOR")
                         if engine:

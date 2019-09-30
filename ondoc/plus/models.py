@@ -409,7 +409,7 @@ class PlusUser(auth_model.TimeStampedModel):
                                         hospital.enabled_for_prepaid and hospital.enabled_for_plus_plans and \
                                         doctor.enabled_for_plus_plans:
 
-                engine_response = engine.validate_booking_entity(mrp)
+                engine_response = engine.validate_booking_entity(cost=mrp)
                 response_dict['cover_under_vip'] = engine_response.get('is_covered', False)
                 response_dict['plus_user_id'] = plus_user.id
                 response_dict['vip_amount_deducted'] = engine_response.get('vip_amount_deducted', 0)
@@ -494,7 +494,11 @@ class PlusUser(auth_model.TimeStampedModel):
                 vip_data_dict['cover_under_vip'] = True
                 vip_data_dict['plus_user_id'] = self.id
                 # vip_data_dict['vip_amount'] = 0 if current_doctor_amount_available > current_item_mrp else (current_item_mrp - current_doctor_amount_available)
-                vip_data_dict['vip_amount'] = user.active_plus_user.get_vip_amount(updated_utilization, current_item_mrp)
+                # vip_data_dict['vip_amount'] = user.active_plus_user.get_vip_amount(updated_utilization, current_item_mrp)
+                engine = get_class_reference(user.active_plus_user, "DOCTOR")
+                if engine:
+                    vip_response = engine.validate_booking_entity(cost=current_item_mrp, utilization=updated_utilization)
+                    vip_data_dict['vip_amount'] = vip_response.get('vip_amount_deducted')
             else:
                 return vip_data_dict
         else:

@@ -2457,7 +2457,7 @@ class LabAppointmentView(mixins.CreateModelMixin,
         booked_by = 'agent' if hasattr(request, 'agent') else 'user'
         user_insurance = UserInsurance.get_user_insurance(request.user)
         plus_user = request.user.active_plus_user
-        if user_insurance:
+        if user_insurance and user_insurance.status in [UserInsurance.ACTIVE, UserInsurance.ONHOLD]:
             if user_insurance.status == UserInsurance.ONHOLD:
                 return Response(status=status.HTTP_400_BAD_REQUEST,
                                 data={'error': 'Your documents from the last claim are under verification.'

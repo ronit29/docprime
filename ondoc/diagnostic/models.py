@@ -2622,7 +2622,7 @@ class LabAppointment(TimeStampedModel, CouponsMixin, LabAppointmentInvoiceMixin,
         if data.get("payment_type") in [OpdAppointment.VIP]:
             profile = data.get('profile')
             if profile:
-                plus_membership = profile.get_plus_membership()
+                plus_membership = profile.get_plus_membership
 
                 test = data['test_ids']
                 entity = "LABTEST" if not test[0].is_package else "PACKAGE"

@@ -12,6 +12,7 @@ from ondoc.api.v1.utils import clinic_convert_timings, aware_time_zone
 from ondoc.api.v1.doctor import serializers
 from ondoc.authentication.models import QCModel
 from ondoc.doctor.models import Doctor, PracticeSpecialization
+from ondoc.plus.usage_criteria import get_class_reference
 from ondoc.procedure.models import DoctorClinicProcedure, ProcedureCategory, ProcedureToCategoryMapping, \
     get_selected_and_other_procedures, get_included_doctor_clinic_procedure, \
     get_procedure_categories_with_procedures
@@ -664,8 +665,11 @@ class DoctorSearchHelper:
                         doctor.enabled_for_online_booking and doctor_clinic.hospital.enabled_for_online_booking and \
                         doctor_clinic.enabled_for_online_booking:
                     mrp = int(min_price.get('mrp'))
-                    vip_amount = request.user.active_plus_user.get_vip_amount(vip_utilization, mrp)
-                    cover_under_vip = True if vip_amount < mrp else False
+                    engine = get_class_reference(request.user.active_plus_user, "DOCTOR")
+                    if engine:
+                        vip_response_dict = engine.validate_booking_entity(cost=mrp)
+                        vip_amount = vip_response_dict.get('vip_amount_deducted', 0)
+                        cover_under_vip = True if vip_amount > 0 else False
                     # vip_amount = 0 if vip_remaining_amount > mrp else mrp - vip_remaining_amount
                 hospitals = [{
                     "enabled_for_online_booking": enable_online_booking,
