@@ -1,6 +1,7 @@
 from django.contrib.gis import admin
 from ondoc.common.models import PaymentOptions, UserConfig, Feature, Service, MatrixMappedState, MatrixMappedCity, \
-    GlobalNonBookable, QRCode, BlacklistUser, BlockedStates
+    GlobalNonBookable, QRCode, BlacklistUser, BlockedStates, SponsorListingURL, \
+    SponsorListingUtmTerm, SponsoredListingService, SponsorListingSpecialization
 from ondoc.corporate_booking.models import Corporates, CorporateDeal, CorporateDocument
 from ondoc.crm.admin.banner import BannerAdmin, SliderLocationAdmin, RecommenderAdmin, EmailBannerAdmin
 from ondoc.crm.admin.location import ComparePackagesSEOUrlsAdmin
@@ -21,7 +22,8 @@ from ondoc.doctor.models import (Doctor, Language, MedicalService, Specializatio
                                  OfflineOPDAppointments,
                                  DoctorMobileOtp, UploadDoctorData, DoctorLeave, HealthInsuranceProvider,
                                  CommonHospital, SimilarSpecializationGroup, PurchaseOrderCreation, SponsoredServices,
-                                 HospitalSponsoredServices, DoctorSponsoredServices)
+                                 HospitalSponsoredServices, DoctorSponsoredServices,
+                                 SponsoredServicePracticeSpecialization)
 
 from ondoc.diagnostic.models import (Lab, LabNetwork, LabTest, LabTestType, LabService,
                                      AvailableLabTest, LabAppointment, CommonTest, CommonDiagnosticCondition,
@@ -111,8 +113,9 @@ from .integrations import IntegratorProfileMapping, IntegratorProfileMappingAdmi
 from .integrations import IntegratorReport, IntegratorReportAdmin, IntegratorDoctorMappingsAdmin
 from .integrations import IntegratorTestMapping, IntegratorTestMappingAdmin
 from .integrations import IntegratorTestParameterMapping, IntegratorTestParameterMappingAdmin
-from .plus import PlusPlansAdmin, PlusProposerAdmin, PlusThresholdAdmin, PlusUserAdmin, PlusPlanParametersAdmin
-from ondoc.plus.models import PlusUser, PlusProposer, PlusPlans, PlusThreshold, PlusPlanParameters
+from .plus import PlusPlansAdmin, PlusProposerAdmin, PlusThresholdAdmin, PlusUserAdmin, PlusPlanParametersAdmin, \
+    PlusPlanUtmSourceAdmin
+from ondoc.plus.models import PlusUser, PlusProposer, PlusPlans, PlusThreshold, PlusPlanParameters, PlusPlanUtmSources
 
 User = get_user_model()
 
@@ -128,6 +131,7 @@ admin.site.register(PlusPlans, PlusPlansAdmin)
 admin.site.register(PlusUser, PlusUserAdmin)
 admin.site.register(PlusProposer, PlusProposerAdmin)
 admin.site.register(PlusPlanParameters, PlusPlanParametersAdmin)
+admin.site.register(PlusPlanUtmSources, PlusPlanUtmSourceAdmin)
 
 admin.site.register(OtpVerifications)
 # admin.site.register(OpdAppointment)
@@ -301,14 +305,18 @@ admin.site.register(BankHolidays)
 admin.site.register(LabTestCategoryUrls, LabTestCategoryUrlsAdmin)
 admin.site.register(UserNumberUpdate, UserNumberUpdateAdmin)
 admin.site.register(GenericQuestionAnswer, GenericQuestionAnswerAdmin)
-admin.site.register(PurchaseOrderCreation, PurchaseOrderCreationAdmin)
 admin.site.register(IntegratorLabTestParameterMapping, IntegratorLabTestParameterMappingAdmin)
+admin.site.register(PurchaseOrderCreation, PurchaseOrderCreationAdmin)
+admin.site.register(SponsorListingURL)
+admin.site.register(SponsorListingSpecialization)
+admin.site.register(SponsorListingUtmTerm)
+admin.site.register(SponsoredListingService)
 admin.site.register(DynamicTemplates, DynamicTemplatesAdmin)
 admin.site.register(SponsoredServices, SponsoredServicesAdmin)
 admin.site.register(IPDMedicinePageLead)
 admin.site.register(HospitalSponsoredServices, HospitalSponsoredServicesAdmin)
 admin.site.register(DoctorSponsoredServices, DoctorSponsoredServicesAdmin)
-
+admin.site.register(SponsoredServicePracticeSpecialization)
 admin.site.register(PartnerLabTestSamples, PartnerLabTestSampleAdmin)
 admin.site.register(PartnerLabTestSampleDetails, PartnerLabTestSampleDetailAdmin)
 admin.site.register(TestSamplesLabAlerts, TestSamplesLabAlertAdmin)

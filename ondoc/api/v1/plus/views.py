@@ -5,13 +5,15 @@ from rest_framework import viewsets
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework import status
+import requests
 
+from ondoc.api.v1.plus.plusintegration import PlusIntegration
 from ondoc.api.v1.utils import plus_subscription_transform, payment_details
 from ondoc.authentication.backends import JWTAuthentication
 from ondoc.account import models as account_models
 from ondoc.authentication.models import User, UserProfile
 from ondoc.common.models import BlacklistUser, BlockedStates, DocumentsProofs
-from ondoc.plus.models import (PlusProposer, PlusPlans, PlusThreshold, PlusMembers, PlusUser, PlusLead)
+from ondoc.plus.models import (PlusProposer, PlusPlans, PlusThreshold, PlusMembers, PlusUser, PlusLead, PlusDummyData)
 from . import serializers
 import datetime
 from datetime import timedelta
@@ -26,15 +28,33 @@ class PlusListViewSet(viewsets.GenericViewSet):
     def get_queryset(self):
         return PlusProposer.objects.filter(is_live=True)
 
+    def get_plan_queryset(self, utm_source):
+        plans = PlusPlans.objects.filter(is_live=True, utm_source__contains={'utm_source': utm_source})
+        # plans_with_utm = plans.filter()
+        return plans
+
     def list(self, request):
         resp = {}
         user = request.user
         if user and not user.is_anonymous and user.is_authenticated and (user.active_plus_user or user.inactive_plus_user):
             return Response(data={'certificate': True}, status=status.HTTP_200_OK)
 
-        plus_proposer = self.get_queryset()
-        body_serializer = serializers.PlusProposerSerializer(plus_proposer, context={'request': request}, many=True)
-        resp['plus_data'] = body_serializer.data
+        utm_source = request.query_params.get('utm_source', None)
+        if utm_source:
+            # plans = self.get_plan_queryset(utm_source)
+            # body_serializer = serializers.PlusPlansSerializer(plans, context={'request': request}, many=True)
+            # proposer_serializer = serializers.PlusProposerUTMSerializer(self.get_queryset(), context={'request': request}, many=True)
+
+            # resp.update(proposer_serializer.data)
+            # resp['plus_data'] = body_serializer.data
+            plus_proposer = self.get_queryset()
+            body_serializer = serializers.PlusProposerUTMSerializer(plus_proposer, context={'request': request, 'utm': utm_source}, many=True)
+            resp['plus_data'] = body_serializer.data
+        else:
+            plus_proposer = self.get_queryset()
+            body_serializer = serializers.PlusProposerSerializer(plus_proposer, context={'request': request}, many=True)
+            resp['plus_data'] = body_serializer.data
+
         return Response(resp)
 
 
@@ -65,7 +85,7 @@ class PlusOrderLeadViewSet(viewsets.GenericViewSet):
             plus_user = user.active_plus_user
 
             if plus_user and plus_user.is_valid():
-                return Response({'success': True, "is_plus_user": True})
+                return Response({'success': True, "is_plus_user": True, 'lead_id': None})
 
             # if not plus_lead:
             #     plus_lead = PlusLead(user=user)
@@ -80,13 +100,13 @@ class PlusOrderLeadViewSet(viewsets.GenericViewSet):
             plus_lead.extras = request.data
             plus_lead.save()
 
-            return Response({'success': True, 'is_plus_user': False})
+            return Response({'success': True, 'is_plus_user': False, 'lead_id': plus_lead.id})
         else:
             lead = PlusLead.create_lead_by_phone_number(request)
             if not lead:
-                return Response({'success': False, 'is_plus_user': False})
+                return Response({'success': False, 'is_plus_user': False, 'lead_id': None})
 
-            return Response({'success': True, 'is_plus_user': False})
+            return Response({'success': True, 'is_plus_user': False, 'lead_id': lead.id})
 
 
 class PlusOrderViewSet(viewsets.GenericViewSet):
@@ -160,6 +180,12 @@ class PlusOrderViewSet(viewsets.GenericViewSet):
                             user_profile = {"name": member['first_name'] + " " + last_name, "email":
                                 member['email'], "dob": member['dob']}
 
+            utm_source = request.data.get('utm_spo_tags', {}).get('utm_source', None)
+            utm_term = request.data.get('utm_spo_tags', {}).get('utm_term', None)
+            utm_campaign = request.data.get('utm_spo_tags', {}).get('utm_campaign', None)
+            utm_medium = request.data.get('utm_spo_tags', {}).get('utm_medium', None)
+            is_utm_agent = request.data.get('utm_spo_tags', {}).get('is_agent', None)
+            utm_parameter = {"utm_source": utm_source, "is_utm_agent": is_utm_agent, 'utm_term': utm_term, 'utm_campaign': utm_campaign, 'utm_medium': utm_medium}
             plus_plan = PlusPlans.objects.get(id=plus_plan_id)
             transaction_date = datetime.datetime.now()
             amount = plus_plan.deal_price
@@ -171,7 +197,7 @@ class PlusOrderViewSet(viewsets.GenericViewSet):
                                    'purchase_date': transaction_date, 'expire_date': expiry_date, 'amount': amount,
                                    'user': request.user.pk, "plus_members": plus_members}
             plus_subscription_data = {"profile_detail": user_profile, "plus_plan": plus_plan.id,
-                              "user": request.user.pk, "plus_user": plus_user_data}
+                              "user": request.user.pk, "plus_user": plus_user_data, "utm_parameter": utm_parameter}
 
             consumer_account = account_models.ConsumerAccount.objects.get_or_create(user=user)
             consumer_account = account_models.ConsumerAccount.objects.select_for_update().get(user=user)
@@ -296,6 +322,10 @@ class PlusProfileViewSet(viewsets.GenericViewSet):
             plus_user = PlusUser.objects.filter(id=plus_user_id).first()
         else:
             return Response(status=status.HTTP_404_NOT_FOUND)
+
+        if not plus_user:
+            return Response(status=status.HTTP_400_BAD_REQUEST)
+
         plus_members = plus_user.plus_members.all()
         if len(plus_members) > 1:
             resp['is_member_allowed'] = False
@@ -311,4 +341,76 @@ class PlusProfileViewSet(viewsets.GenericViewSet):
         available_relations.pop(PlusMembers.Relations.SELF)
         resp['relation_master'] = available_relations
         return Response({'data': resp})
+
+
+class PlusDataViewSet(viewsets.GenericViewSet):
+    authentication_classes = (JWTAuthentication,)
+    permission_classes = (IsAuthenticated,)
+
+    def push_dummy_data(self, request):
+        try:
+            user = request.user
+            data = request.data
+            PlusDummyData.objects.create(user=user, data=data)
+            return Response(data="save successfully!!", status=status.HTTP_200_OK )
+        except Exception as e:
+            logger.error(str(e))
+            return Response(data="could not save data", status=status.HTTP_400_BAD_REQUEST)
+
+    def show_dummy_data(self, request):
+        user = request.user
+        res = {}
+        if not user:
+            return Response(data=res, status=status.HTTP_200_OK)
+        dummy_data = PlusDummyData.objects.filter(user=user).order_by('-id').first()
+        if not dummy_data:
+            return Response(data=res, status=status.HTTP_200_OK)
+        member_data = dummy_data.data
+        if not member_data:
+            return Response(data=res, status=status.HTTP_200_OK)
+        res['data'] = member_data
+        return Response(data=res, status=status.HTTP_200_OK)
+
+
+class PlusIntegrationViewSet(viewsets.GenericViewSet):
+
+    def push_vip_integration_leads(self, request):
+        resp = {}
+        request_data = request.data
+        utm_source = request_data.get('utm_source', None)
+        if utm_source:
+            resp = PlusIntegration.get_response(request_data)
+            return Response(data=resp, status=status.HTTP_200_OK)
+            # utm_param_dict = PlusIntegration.get_response(request_data)
+            # try:
+            #     if utm_param_dict:
+            #         url = utm_param_dict.get('url', "")
+            #         request_data = utm_param_dict.get('request_data', {})
+            #         auth_token = utm_param_dict.get('auth_token', "")
+            #
+            #         response = requests.post(url, data=json.dumps(request_data), headers={'Authorization': auth_token,
+            #                                                                               'Content-Type': 'application/json'})
+            #
+            #         if response.status_code != status.HTTP_200_OK:
+            #             logger.error(json.dumps(request_data))
+            #             logger.info("[ERROR] could not get 200 for process VIP Lead to {}".format(utm_source))
+            #             resp['error'] = "Error while saving data!!"
+            #             return Response(data=resp, status=status.HTTP_200_OK)
+            #         elif response.status_code == status.HTTP_200_OK and response.get('data', None) and \
+            #                 response.get('data, None').get('error', False):
+            #             resp['data'] = response.get('data', None).get('errorDetails', [])
+            #             return Response(data=resp, status=status.HTTP_200_OK)
+            #         else:
+            #             resp['data'] = "successfully save!!"
+            #             return Response(data=resp, status=status.HTTP_200_OK)
+            #     else:
+            #         resp['error'] = "Not able to find Utm params"
+            #         return Response(data=resp, status=status.HTTP_200_OK)
+            # except Exception as e:
+            #     logger.error(json.dumps(request_data))
+            #     logger.info("[ERROR] {}".format(e))
+        else:
+            resp['error'] = "UTM source required!!"
+            return Response(data=resp, status=status.HTTP_200_OK)
+
 

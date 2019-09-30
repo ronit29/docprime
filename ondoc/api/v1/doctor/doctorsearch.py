@@ -626,6 +626,7 @@ class DoctorSearchHelper:
                 insurance_error = None
                 vip_data_dict = kwargs.get('vip_data')
                 is_vip_member = vip_data_dict.get('is_vip_member', False)
+                is_enable_for_vip = vip_data_dict.get('is_enable_for_vip', False)
                 vip_remaining_amount = int(vip_data_dict.get('vip_remaining_amount', 0))
                 vip_amount = 0
                 cover_under_vip = vip_data_dict.get('cover_under_vip', False)
@@ -649,6 +650,14 @@ class DoctorSearchHelper:
                     is_insurance_covered = False
                     insurance_error = "You have already utilised {} Oncologist consultations available in your OPD Insurance Plan.".format(settings.INSURANCE_ONCOLOGIST_LIMIT)
 
+                if doctor.enabled_for_plus_plans and doctor_clinic.hospital.enabled_for_prepaid and \
+                        doctor.enabled_for_online_booking and doctor_clinic.hospital.enabled_for_online_booking and \
+                        doctor_clinic.enabled_for_online_booking:
+                    if request and request.user and not request.user.is_anonymous and request.user.active_insurance:
+                        is_enable_for_vip = False
+                    else:
+                        is_enable_for_vip = True
+
                 if request and request.user and not request.user.is_anonymous and vip_data_dict.get('is_vip_member') and \
                         doctor.enabled_for_plus_plans and doctor_clinic.hospital.enabled_for_prepaid and \
                         doctor.enabled_for_online_booking and doctor_clinic.hospital.enabled_for_online_booking and \
@@ -663,6 +672,7 @@ class DoctorSearchHelper:
                     "is_vip_member": is_vip_member,
                     "cover_under_vip": cover_under_vip,
                     "vip_amount": vip_amount,
+                    "is_enable_for_vip": is_enable_for_vip,
                     "insurance_threshold_amount": insurance_data_dict['insurance_threshold_amount'],
                     "is_user_insured": insurance_data_dict['is_user_insured'],
                     "welcome_calling_done": doctor_clinic.hospital.welcome_calling_done,

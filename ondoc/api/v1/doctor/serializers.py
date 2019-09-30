@@ -146,12 +146,17 @@ class OpdAppointmentSerializer(serializers.ModelSerializer):
     def get_vip(self, obj):
 
         plus_appointment_mapping = None
+        vip_amount = 0
         if obj:
             plus_appointment_mapping = PlusAppointmentMapping.objects.filter(object_id=obj.id).first()
 
+        if plus_appointment_mapping:
+            if not (int(plus_appointment_mapping.amount) > int(obj.mrp)):
+                vip_amount = int(obj.mrp) - int(plus_appointment_mapping.amount)
+
         return {
             'is_vip_member': True if obj and obj.plus_plan else False,
-            'vip_amount': plus_appointment_mapping.amount if plus_appointment_mapping else 0,
+            'vip_amount': vip_amount,
             'covered_under_vip': True if obj and obj.plus_plan else False
         }
 
@@ -612,7 +617,7 @@ class DoctorHospitalSerializer(serializers.ModelSerializer):
         return resp
 
     def get_vip(self, obj):
-        resp = {"is_vip_member": False, "cover_under_vip": False, "vip_amount": 0}
+        resp = {"is_vip_member": False, "cover_under_vip": False, "vip_amount": 0, "is_enable_for_vip": False}
         request = self.context.get("request")
         user = request.user
         doctor_clinic = obj.doctor_clinic
@@ -623,7 +628,7 @@ class DoctorHospitalSerializer(serializers.ModelSerializer):
                                         and hospital.enabled_for_plus_plans and doctor.enabled_for_plus_plans
 
         if enabled_for_online_booking and obj.mrp is not None:
-
+            resp['is_enable_for_vip'] = True
             plus_user = None if not user.is_authenticated or user.is_anonymous else user.active_plus_user
             if not plus_user:
                 return resp
@@ -1233,7 +1238,7 @@ class DoctorProfileUserViewSerializer(DoctorProfileSerializer):
             description += ' in ' + ', '.join(doc_hosp_list)
 
         if sublocality and locality:
-            # title += ' in ' + sublocality + " " + locality + ' - Consult Online'
+            title += ' , ' + sublocality + " , " + locality
             description += ' , ' + sublocality + " , " + locality
         elif locality:
             title += ' ,' + locality
@@ -1549,6 +1554,7 @@ class AppointmentRetrieveSerializer(OpdAppointmentSerializer):
     insurance = serializers.SerializerMethodField()
     invoices = serializers.SerializerMethodField()
     cancellation_reason = serializers.SerializerMethodField()
+    vip = serializers.SerializerMethodField()
 
     class Meta:
         model = OpdAppointment
@@ -1556,7 +1562,7 @@ class AppointmentRetrieveSerializer(OpdAppointmentSerializer):
                   'allowed_action', 'effective_price', 'deal_price', 'status', 'time_slot_start', 'time_slot_end',
                   'doctor', 'hospital', 'allowed_action', 'doctor_thumbnail', 'patient_thumbnail', 'procedures', 'mrp',
                   'insurance', 'invoices', 'cancellation_reason', 'payment_type', 'display_name', 'reports', 'prescription',
-                  'report_files')
+                  'report_files', 'vip')
 
     def get_insurance(self, obj):
         request = self.context.get("request")
@@ -1582,6 +1588,22 @@ class AppointmentRetrieveSerializer(OpdAppointmentSerializer):
                         resp['is_appointment_insured'] = False
 
         return resp
+
+    def get_vip(self, obj):
+        vip_amount = 0
+        plus_appointment_mapping = None
+        if obj:
+            plus_appointment_mapping = PlusAppointmentMapping.objects.filter(object_id=obj.id).first()
+
+        if plus_appointment_mapping:
+            if not (int(plus_appointment_mapping.amount) > int(obj.mrp)):
+                vip_amount = int(obj.mrp) - int(plus_appointment_mapping.amount)
+
+        return {
+            'is_vip_member': True if obj and obj.plus_plan else False,
+            'vip_amount': vip_amount,
+            'covered_under_vip': True if obj and obj.plus_plan else False
+        }
 
     def get_procedures(self, obj):
         if obj:
@@ -2114,13 +2136,16 @@ class TopHospitalForIpdProcedureSerializer(serializers.ModelSerializer):
     locality_url = serializers.SerializerMethodField()
     name_city = serializers.SerializerMethodField()
     h1_title = serializers.SerializerMethodField()
+    hospital_services = serializers.SerializerMethodField()
+    service_count = serializers.SerializerMethodField()
+    hospital_image = serializers.SerializerMethodField()
 
     class Meta:
         model = Hospital
         fields = ('id', 'name', 'distance', 'certifications', 'bed_count', 'logo', 'avg_rating',
                   'count_of_insurance_provider', 'multi_speciality', 'address', 'short_address','open_today',
                   'insurance_provider', 'established_in', 'long', 'lat', 'url', 'locality_url', 'name_city', 'operational_since',
-                  'h1_title', 'is_ipd_hospital', 'seo_title', 'network_id')
+                  'h1_title', 'is_ipd_hospital', 'seo_title', 'network_id', 'hospital_services', 'service_count', 'hospital_image')
 
     def get_name_city(self, obj):
         result = obj.name
@@ -2205,6 +2230,41 @@ class TopHospitalForIpdProcedureSerializer(serializers.ModelSerializer):
             if timing.day == now.weekday() and timing.start < now.hour < timing.end:
                 return True
         return False
+
+    def get_hospital_services(self, obj):
+        sp_list = []
+        if obj:
+            if obj.hospital_services.all():
+                for sp_service in obj.hospital_services.all():
+                    id = sp_service.sponsored_service.id
+                    name = sp_service.sponsored_service.name
+                    sp_list.append({'id': id, 'name': name})
+            else:
+                sp_list = None
+        return sp_list
+
+    def get_service_count(self, obj):
+        sp_list = []
+        count = None
+        if obj:
+            if obj.hospital_services.all():
+                for sp_service in obj.hospital_services.all():
+                    id = sp_service.sponsored_service.id
+                    name = sp_service.sponsored_service.name
+                    sp_list.append({'id': id, 'name': name})
+                count = len(sp_list)
+            else:
+                sp_list = None
+        return count
+
+    def get_hospital_image(self, obj):
+        if obj:
+            request = self.context.get('request')
+            if obj.imagehospital.all():
+                for image in obj.imagehospital.all():
+                    image = image.name
+                    return request.build_absolute_uri(image.url) if image else None
+        return None
 
 
 class HospitalDetailIpdProcedureSerializer(TopHospitalForIpdProcedureSerializer):
@@ -2303,8 +2363,10 @@ class HospitalDetailIpdProcedureSerializer(TopHospitalForIpdProcedureSerializer)
         return True
 
     def get_specialization_doctors(self, obj):
+        specialization_ids = None
         validated_data = self.context.get('validated_data')
-        specialization_ids = validated_data.get('specialization_ids')
+        if validated_data:
+            specialization_ids = validated_data.get('specialization_ids')
         if not specialization_ids:
             return None
         from ondoc.api.v1.doctor.views import DoctorListViewSet
@@ -2355,7 +2417,7 @@ class HospitalDetailIpdProcedureSerializer(TopHospitalForIpdProcedureSerializer)
         result = [{'original': request.build_absolute_uri(img.name.url),
                    "thumbnail": request.build_absolute_uri(img.cropped_image.url) if img.cropped_image else None,
                    "cover_image": img.cover_image} for img in
-                  obj.hospitalimage_set.all() if img.name]
+                  obj.imagehospital.all() if img.name]
         if not result:
             if obj.network:
                 result = [{'original': request.build_absolute_uri(img.name.url),
@@ -2432,12 +2494,21 @@ class HospitalDetailIpdProcedureSerializer(TopHospitalForIpdProcedureSerializer)
     def get_doctors(self, obj):
         from ondoc.api.v1.doctor.views import DoctorListViewSet
         request = self.context.get('request')
+        parameters = self.context.get('parameters')
         validated_data = self.context.get('validated_data')
         doctor_list_viewset = DoctorListViewSet()
-        return doctor_list_viewset.list(request,
-                                        parameters={'hospital_id': str(obj.id), 'longitude': validated_data.get('long'),
-                                                    'latitude': validated_data.get('lat'), 'sort_on': 'experience',
-                                                    'restrict_result_count': 8}).data
+        if validated_data:
+            return doctor_list_viewset.list(request,
+                                            parameters={'hospital_id': str(obj.id), 'longitude': validated_data.get('long'),
+                                                        'latitude': validated_data.get('lat'), 'sort_on': 'experience',
+                                                        'restrict_result_count': 8}).data
+        elif parameters:
+            return doctor_list_viewset.list(request,
+                                            parameters={'hospital_id': str(obj.id),
+                                                        'longitude': parameters.get('long'),
+                                                        'latitude': parameters.get('lat'), 'sort_on': 'experience',
+                                                        'restrict_result_count': 8}).data
+
 
     def get_rating_graph(self, obj):
         from ondoc.ratings_review.models import RatingsReview

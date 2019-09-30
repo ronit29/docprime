@@ -1767,7 +1767,8 @@ class DoctorListViewSet(viewsets.GenericViewSet):
         vip_data_dict = {
             'is_vip_member': False,
             'cover_under_vip': False,
-            'vip_remaining_amount': 0
+            'vip_remaining_amount': 0,
+            'is_enable_for_vip': False
         }
 
         vip_user = None
@@ -1787,6 +1788,7 @@ class DoctorListViewSet(viewsets.GenericViewSet):
                 vip_data_dict['vip_remaining_amount'] = utilization_dict.get('doctor_amount_available') if utilization_dict else 0
                 vip_data_dict['is_vip_member'] = True
                 vip_data_dict['cover_under_vip'] = False
+                vip_data_dict['is_enable_for_vip'] = False
         validated_data['vip_user'] = vip_user
         validated_data['insurance_threshold_amount'] = insurance_data_dict['insurance_threshold_amount']
         validated_data['is_user_insured'] = insurance_data_dict['is_user_insured']
@@ -2429,9 +2431,31 @@ class DoctorListViewSet(viewsets.GenericViewSet):
             return Response({"result": [], "count": 0})
 
         parameters = request.query_params
+        entity = None
+        if parameters.get('url'):
+            url = parameters.get('url')
+            entity = EntityUrls.objects.filter(url=url, url_type=EntityUrls.UrlType.SEARCHURL,
+                                                      entity_type='Doctor').order_by('-sequence')[0]
+            parameters = doctor_query_parameters(entity, request.query_params)
+
         serializer = serializers.DoctorListSerializer(data=parameters, context={"request": request})
         serializer.is_valid(raise_exception=True)
         validated_data = serializer.validated_data
+
+        if entity:
+            validated_data['url'] = entity.url
+            validated_data['locality_value'] = entity.locality_value if entity.locality_value else None
+            validated_data['sublocality_value'] = entity.sublocality_value if entity.sublocality_value else None
+            validated_data['specialization'] = entity.specialization if entity.specialization else None
+            validated_data[
+                'sublocality_latitude'] = entity.sublocality_latitude if entity.sublocality_latitude else None
+            validated_data[
+                'sublocality_longitude'] = entity.sublocality_longitude if entity.sublocality_longitude else None
+            validated_data['locality_latitude'] = entity.locality_latitude if entity.locality_latitude else None
+            validated_data['locality_longitude'] = entity.locality_longitude if entity.locality_longitude else None
+            validated_data['breadcrumb'] = entity.breadcrumb if entity.breadcrumb else None
+            validated_data['sitemap_identifier'] = entity.sitemap_identifier if entity.sitemap_identifier else None
+            validated_data['ipd_procedure'] = entity.ipd_procedure if entity.ipd_procedure else None
         result_count = None
         response = list()
 
@@ -2443,15 +2467,34 @@ class DoctorListViewSet(viewsets.GenericViewSet):
             'insurance_threshold_amount': insurance_threshold.opd_amount_limit if insurance_threshold else 5000
         }
 
+        vip_data_dict = {
+            'is_vip_member': False,
+            'cover_under_vip': False,
+            'vip_remaining_amount': 0,
+            'is_enable_for_vip': False
+        }
+
+        vip_user = None
+
         if logged_in_user.is_authenticated and not logged_in_user.is_anonymous:
+            vip_user = logged_in_user.active_plus_user
             user_insurance = logged_in_user.purchased_insurance.filter().order_by('id').last()
-            if user_insurance and user_insurance.is_valid():
+            if user_insurance and user_insurance.is_valid() and not logged_in_user.active_plus_user:
                 insurance_threshold = user_insurance.insurance_plan.threshold.filter().first()
                 if insurance_threshold:
                     insurance_data_dict['insurance_threshold_amount'] = 0 if insurance_threshold.opd_amount_limit is None else \
                         insurance_threshold.opd_amount_limit
                     insurance_data_dict['is_user_insured'] = True
+            if vip_user:
+                utilization_dict = logged_in_user.active_plus_user.get_utilization
 
+                vip_data_dict['vip_remaining_amount'] = utilization_dict.get(
+                    'doctor_amount_available') if utilization_dict else 0
+                vip_data_dict['is_vip_member'] = True
+                vip_data_dict['cover_under_vip'] = False
+                vip_data_dict['is_enable_for_vip'] = False
+
+        validated_data['vip_user'] = vip_user
         validated_data['insurance_threshold_amount'] = insurance_data_dict['insurance_threshold_amount']
         validated_data['is_user_insured'] = insurance_data_dict['is_user_insured']
 
@@ -2495,9 +2538,31 @@ class DoctorListViewSet(viewsets.GenericViewSet):
             return Response({"result": [], "count": 0})
 
         parameters = request.query_params
+        entity = None
+        if parameters.get('url'):
+            url = parameters.get('url')
+            entity = EntityUrls.objects.filter(url=url, url_type=EntityUrls.UrlType.SEARCHURL,
+                                                      entity_type='Doctor').order_by('-sequence')[0]
+            parameters = doctor_query_parameters(entity, request.query_params)
+
         serializer = serializers.DoctorListSerializer(data=parameters, context={"request": request})
         serializer.is_valid(raise_exception=True)
         validated_data = serializer.validated_data
+
+        if entity:
+            validated_data['url'] = entity.url
+            validated_data['locality_value'] = entity.locality_value if entity.locality_value else None
+            validated_data['sublocality_value'] = entity.sublocality_value if entity.sublocality_value else None
+            validated_data['specialization'] = entity.specialization if entity.specialization else None
+            validated_data[
+                'sublocality_latitude'] = entity.sublocality_latitude if entity.sublocality_latitude else None
+            validated_data[
+                'sublocality_longitude'] = entity.sublocality_longitude if entity.sublocality_longitude else None
+            validated_data['locality_latitude'] = entity.locality_latitude if entity.locality_latitude else None
+            validated_data['locality_longitude'] = entity.locality_longitude if entity.locality_longitude else None
+            validated_data['breadcrumb'] = entity.breadcrumb if entity.breadcrumb else None
+            validated_data['sitemap_identifier'] = entity.sitemap_identifier if entity.sitemap_identifier else None
+            validated_data['ipd_procedure'] = entity.ipd_procedure if entity.ipd_procedure else None
         result_count = None
         response = list()
 
@@ -2509,15 +2574,34 @@ class DoctorListViewSet(viewsets.GenericViewSet):
             'insurance_threshold_amount': insurance_threshold.opd_amount_limit if insurance_threshold else 5000
         }
 
+        vip_data_dict = {
+            'is_vip_member': False,
+            'cover_under_vip': False,
+            'vip_remaining_amount': 0,
+            'is_enable_for_vip': False
+        }
+
+        vip_user = None
+
         if logged_in_user.is_authenticated and not logged_in_user.is_anonymous:
+            vip_user = logged_in_user.active_plus_user
             user_insurance = logged_in_user.purchased_insurance.filter().order_by('id').last()
-            if user_insurance and user_insurance.is_valid():
+            if user_insurance and user_insurance.is_valid() and not logged_in_user.active_plus_user:
                 insurance_threshold = user_insurance.insurance_plan.threshold.filter().first()
                 if insurance_threshold:
                     insurance_data_dict['insurance_threshold_amount'] = 0 if insurance_threshold.opd_amount_limit is None else \
                         insurance_threshold.opd_amount_limit
                     insurance_data_dict['is_user_insured'] = True
+            if vip_user:
+                utilization_dict = logged_in_user.active_plus_user.get_utilization
 
+                vip_data_dict['vip_remaining_amount'] = utilization_dict.get(
+                    'doctor_amount_available') if utilization_dict else 0
+                vip_data_dict['is_vip_member'] = True
+                vip_data_dict['cover_under_vip'] = False
+                vip_data_dict['is_enable_for_vip'] = False
+
+        validated_data['vip_user'] = vip_user
         validated_data['insurance_threshold_amount'] = insurance_data_dict['insurance_threshold_amount']
         validated_data['is_user_insured'] = insurance_data_dict['is_user_insured']
 
@@ -2666,8 +2750,15 @@ class DoctorAvailabilityTimingViewSet(viewsets.ViewSet):
         doctor_id = request.query_params.get('doctor_id')
         hospital_id = request.query_params.get('hospital_id')
 
-        if not doctor_id or not hospital_id:
-            return Response(status=status.HTTP_400_BAD_REQUEST, data={'error': 'doctor id or hospital id is undefined.'})
+        try:
+            doctor = Doctor.objects.filter(id=doctor_id).first()
+            hospital = Hospital.objects.filter(id=hospital_id).first()
+        except ValueError as e:
+            return Response(status=status.HTTP_400_BAD_REQUEST,
+                            data={'error': 'doctor id or hospital id is undefined.'})
+
+        if not doctor or not hospital:
+            return Response(status=status.HTTP_400_BAD_REQUEST, data={'error': 'doctor id or hospital id is not available.'})
 
         doctor_queryset = models.Doctor.objects.prefetch_related("qualifications__qualification", "qualifications__specialization")\
                                       .filter(pk=doctor_id)
@@ -4130,7 +4221,7 @@ class OfflineCustomerViewSet(viewsets.GenericViewSet):
         type = valid_data.get('type')
         if type == serializers.OfflineAppointmentFilterSerializer.LAB:
             lab_data = self.get_lab_appointment_list(request, request.user, valid_data)
-            if not lab_data:
+            if valid_data.get('appointment_id') and not lab_data:
                 return Response({"status": 0, "error": "data not found"}, status=status.HTTP_404_NOT_FOUND)
             return Response(lab_data)
 
@@ -4647,7 +4738,7 @@ class HospitalViewSet(viewsets.GenericViewSet):
                                                          'hospitalcertification_set',
                                                          'hosp_availability',
                                                          'question_answer',
-                                                         'hospitalspeciality_set', Prefetch('hospitalimage_set',
+                                                         'hospitalspeciality_set', Prefetch('imagehospital',
                                                                                             HospitalImage.objects.all().order_by(
                                                                                                 '-cover_image'))).filter(
             id=pk, is_live=True).first()
