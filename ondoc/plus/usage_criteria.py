@@ -40,15 +40,11 @@ class DoctorAmountCount(AbstractCriteria):
 
         available_amount = self.utilization.get('doctor_amount_available', 0)
         available_count = self.utilization.get('available_doctor_count', 0)
-        if available_count <= 0 and available_amount <= 0:
+        if available_count <= 0 or available_amount <= 0:
             return resp
 
         # lab_test_discount = self.utilization.get('doctor_discount')
-        if available_count > 0:
-            vip_amount_deducted = cost
-            amount_to_be_paid = 0
-            is_covered = True
-        elif available_count <= 0 and available_amount > 0:
+        if available_count > 0 or available_amount > 0:
             if available_amount > cost:
                 vip_amount_deducted = cost
                 amount_to_be_paid = 0
@@ -57,6 +53,15 @@ class DoctorAmountCount(AbstractCriteria):
                 vip_amount_deducted = available_amount
                 amount_to_be_paid = cost - available_amount
                 is_covered = True
+        # elif available_count <= 0 and available_amount > 0:
+        #     if available_amount > cost:
+        #         vip_amount_deducted = cost
+        #         amount_to_be_paid = 0
+        #         is_covered = True
+        #     else:
+        #         vip_amount_deducted = available_amount
+        #         amount_to_be_paid = cost - available_amount
+        #         is_covered = True
 
         resp['vip_amount_deducted'] = vip_amount_deducted
         resp['amount_to_be_paid'] = amount_to_be_paid
