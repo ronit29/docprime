@@ -1862,23 +1862,27 @@ class LabList(viewsets.ReadOnlyModelViewSet):
                 elif res['is_insurance_enabled'] and not all_tests_under_lab:
                     res['insurance']['is_insurance_covered'] = True
 
+
                 # For Vip. Checking the eligibility of test to be booked under VIP.
+                engine_response = {}
                 if all_tests_under_lab and res['is_vip_enabled']:
                     for paticular_test_in_lab in all_tests_under_lab:
                         engine = get_class_reference(plus_user_obj, "LABTEST")
                         coverage = False
-                        if entity:
+                        if engine:
                             engine_response = engine.validate_booking_entity(cost=paticular_test_in_lab.get('mrp', 0))
                             coverage = engine_response.get('is_covered', False)
                         bool_array.append(coverage)
 
                     if False not in bool_array and len(bool_array) > 0:
                         res['vip']['covered_under_vip'] = True
+                        res['vip']['vip_amount'] = engine_response.get('amount_to_be_paid', 0) if engine_response else 0
 
                 elif res['is_vip_enabled'] and not all_tests_under_lab:
                     res['vip']['covered_under_vip'] = True
+                    res['vip']['vip_amount'] = 0
 
-                #existing = res
+                    #existing = res
                 key = network_id
                 if not key:
                     key = random.randint(10, 1000000000)
