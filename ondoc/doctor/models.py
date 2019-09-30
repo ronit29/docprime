@@ -2917,13 +2917,14 @@ class OpdAppointment(auth_model.TimeStampedModel, CouponsMixin, OpdAppointmentIn
                                            enabled_for_online_booking=True).first()
 
     def is_medanta_appointment(self):
-        dc_obj = self.get_doctor_clinic()
-        if dc_obj and dc_obj.is_part_of_integration():
-            integrator_dict = dc_obj.get_integration_dict()
-            if integrator_dict:
-                class_name = integrator_dict['class_name']
-                if class_name == 'Medanta':
-                    return True
+        if settings.MEDANTA_INTEGRATION_ENABLED:
+            dc_obj = self.get_doctor_clinic()
+            if dc_obj and dc_obj.is_part_of_integration():
+                integrator_dict = dc_obj.get_integration_dict()
+                if integrator_dict:
+                    class_name = integrator_dict['class_name']
+                    if class_name == 'Medanta':
+                        return True
 
         return False
 
@@ -3079,7 +3080,7 @@ class OpdAppointment(auth_model.TimeStampedModel, CouponsMixin, OpdAppointmentIn
             except Exception as e:
                 logger.error(str(e))
 
-        if self.is_medanta_appointment() and not self.created_by_native():
+        if self.is_medanta_appointment() and not self.created_by_native() and self.status == self.BOOKED:
             push_opd_appointment_to_integrator.apply_async(({'appointment_id': self.id},), countdown=5)
 
         print('all ops tasks completed')

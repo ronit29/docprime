@@ -2702,7 +2702,7 @@ class DoctorAvailabilityTimingViewSet(viewsets.ViewSet):
             for apt in active_appointments:
                 blocks.append(str(apt.time_slot_start.date()))
 
-        if dc_obj.is_part_of_integration():
+        if dc_obj.is_part_of_integration() and settings.MEDANTA_INTEGRATION_ENABLED:
             from ondoc.integrations import service
             pincode = None
             integration_dict = dc_obj.get_integration_dict()
