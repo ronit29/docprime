@@ -310,7 +310,8 @@ class PlusUser(auth_model.TimeStampedModel):
                                                                                PlanParametersEnum.LAB_DISCOUNT,
                                                                                PlanParametersEnum.LABTEST_AMOUNT,
                                                                                PlanParametersEnum.LABTEST_COUNT,
-                                                                               PlanParametersEnum.DOCTOR_CONSULT_DISCOUNT])
+                                                                               PlanParametersEnum.DOCTOR_CONSULT_DISCOUNT,
+                                                                               PlanParametersEnum.DOCTOR_CONSULT_COUNT])
 
         for pp in plan_parameters:
             data[pp.parameter.key.lower()] = pp.value
@@ -328,22 +329,20 @@ class PlusUser(auth_model.TimeStampedModel):
         resp['available_package_amount'] = resp['total_package_amount_limit'] - int(self.get_package_plus_appointment_amount())
         resp['available_package_count'] = resp['total_package_count_limit'] - int(self.get_package_plus_appointment_count())
 
-        resp['total_labtest_amount_limit'] = int(data['health_checkups_amount']) if data.get('health_checkups_amount') and data.get('health_checkups_amount').__class__.__name__ == 'str'  else 0
-        resp['total_labtest_count_limit'] = int(data['health_checkups_count']) if data.get('health_checkups_count') and data.get('health_checkups_count').__class__.__name__ == 'str'  else 0
+        resp['total_labtest_amount_limit'] = int(data['labtest_amount']) if data.get('labtest_amount') and data.get('labtest_amount').__class__.__name__ == 'str'  else 0
+        resp['total_labtest_count_limit'] =  int(data['labtest_count']) if data.get('labtest_count') and data.get('labtest_count').__class__.__name__ == 'str'  else 0
 
         resp['available_labtest_amount'] = resp['total_labtest_amount_limit'] - int(self.get_package_plus_appointment_amount())
         resp['available_labtest_count'] = resp['total_labtest_count_limit'] - int(self.get_package_plus_appointment_count())
-
+        resp['total_doctor_count_limit'] = int(data['doctor_consult_count']) if data.get('doctor_consult_count') and data.get('doctor_consult_discount').__class__.__name__ == 'str' else 0
+        resp['available_doctor_count'] = resp['total_doctor_count_limit'] - int(self.get_doctor_plus_appointment_count())
 
         return resp
 
-    def update_doctor_utilization(self, appointment_obj):
-        pass
-        # mrp = appointment_obj.mrp
-        # user = self.user
-        # plan = self.plan
-        # plan_parameters = plan.plan_parameters
-        # utilization = self.get_utilization()
+    def get_doctor_plus_appointment_count(self):
+        from ondoc.doctor.models import OpdAppointment
+        opd_appointments_count = OpdAppointment.objects.filter(plus_plan=self).exclude(status=OpdAppointment.CANCELLED).count()
+        return opd_appointments_count
 
     def validate_plus_appointment(self, appointment_data):
         from ondoc.doctor.models import OpdAppointment
