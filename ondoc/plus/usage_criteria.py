@@ -135,29 +135,25 @@ class LabtestAmountCount(AbstractCriteria):
 
     def _validate_booking_entity(self, cost, id):
         resp = {'vip_amount_deducted': 0, 'is_covered': False, 'amount_to_be_paid': cost}
-        is_covered = False
         vip_amount_deducted = 0
         amount_to_be_paid = cost
 
         total_count_left = self.utilization.get('available_labtest_count')
         total_amount_left = self.utilization.get('available_labtest_amount')
 
-        if total_amount_left <= 0 and total_count_left <= 0:
+        if not total_count_left and not total_amount_left:
             return resp
 
-        if total_count_left > 0:
-            is_covered = True
+        if total_amount_left <= 0 or total_count_left <= 0:
+            return resp
+
+        is_covered = True
+        if cost < total_amount_left:
             vip_amount_deducted = cost
             amount_to_be_paid = 0
-        elif total_amount_left > 0:
-            is_covered = True
-            if total_amount_left >= cost:
-                vip_amount_deducted = cost
-                amount_to_be_paid = 0
-            elif 0 < total_amount_left < cost:
-                vip_amount_deducted = total_amount_left
-                amount_to_be_paid = cost - total_amount_left
-
+        elif 0 < total_amount_left < cost:
+            vip_amount_deducted = total_amount_left
+            amount_to_be_paid = cost - total_amount_left
 
         resp['vip_amount_deducted'] = vip_amount_deducted
         resp['amount_to_be_paid'] = amount_to_be_paid
@@ -242,23 +238,28 @@ class PackageAmountCount(AbstractCriteria):
         if not available_package_count and not available_package_amount:
             return resp
 
-        if available_package_count > 0:
+        if available_package_amount <= 0 or available_package_count <= 0:
+            return resp
+
+        if allowed_package_ids:
             if id in allowed_package_ids:
-                vip_amount_deducted = cost
-                amount_to_be_paid = 0
                 is_covered = True
+                if cost < available_package_amount:
+                    vip_amount_deducted = cost
+                    amount_to_be_paid = 0
+                elif 0 < available_package_amount < cost:
+                    vip_amount_deducted = available_package_amount
+                    amount_to_be_paid = cost - available_package_amount
             else:
                 return resp
-
-        elif available_package_amount > 0:
-            if available_package_amount > cost:
-                amount_to_be_paid = 0
+        else:
+            is_covered = True
+            if cost < available_package_amount:
                 vip_amount_deducted = cost
-                is_covered = True
+                amount_to_be_paid = 0
             elif 0 < available_package_amount < cost:
-                amount_to_be_paid = cost - available_package_amount
                 vip_amount_deducted = available_package_amount
-                is_covered = True
+                amount_to_be_paid = cost - available_package_amount
 
         resp['vip_amount_deducted'] = vip_amount_deducted
         resp['amount_to_be_paid'] = amount_to_be_paid
