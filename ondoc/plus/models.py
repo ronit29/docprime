@@ -494,7 +494,11 @@ class PlusUser(auth_model.TimeStampedModel):
                 vip_data_dict['cover_under_vip'] = True
                 vip_data_dict['plus_user_id'] = self.id
                 # vip_data_dict['vip_amount'] = 0 if current_doctor_amount_available > current_item_mrp else (current_item_mrp - current_doctor_amount_available)
-                vip_data_dict['vip_amount'] = user.active_plus_user.get_vip_amount(updated_utilization, current_item_mrp)
+                # vip_data_dict['vip_amount'] = user.active_plus_user.get_vip_amount(updated_utilization, current_item_mrp)
+                engine = get_class_reference(user.active_plus_user, "DOCTOR")
+                if engine:
+                    vip_response = engine.validate_booking_entity(cost=current_item_mrp, utilization=updated_utilization)
+                    vip_data_dict['vip_amount'] = vip_response.get('vip_amount_deducted')
             else:
                 return vip_data_dict
         else:
