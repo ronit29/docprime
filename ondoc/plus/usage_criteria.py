@@ -1,4 +1,5 @@
 from .enums import UsageCriteria
+from math import floor
 
 
 class AbstractCriteria(object):
@@ -16,7 +17,15 @@ class AbstractCriteria(object):
         if not cost:
             return
 
-        self._validate_booking_entity(cost, id)
+        return self._validate_booking_entity(cost, id)
+
+    def after_discount_cost(self, discount, cost):
+        cost = cost - ((cost/100) * discount)
+        cost = floor(cost)
+        return cost
+
+    def discounted_cost(self, discount, cost):
+        return ((cost/100) * discount)
 
 
 class DoctorAmountCount(AbstractCriteria):
@@ -64,7 +73,34 @@ class LabtestAmountDiscount(AbstractCriteria):
         super().__init__(plus_obj)
 
     def _validate_booking_entity(self, cost, id):
-        pass
+        resp = {'vip_amount_deducted': 0, 'is_covered': False, 'amount_to_be_paid': cost}
+        is_covered = False
+        vip_amount_deducted = 0
+        amount_to_be_paid = cost
+
+        available_amount = self.utilization.get('available_labtest_amount')
+        if available_amount <= 0:
+            return resp
+
+        lab_test_discount = self.utilization.get('lab_discount')
+
+        discounted_cost = self.discounted_cost(lab_test_discount, cost)
+        after_discounted_cost =cost - discounted_cost
+
+        if discounted_cost <= available_amount:
+            vip_amount_deducted = discounted_cost
+            amount_to_be_paid = after_discounted_cost
+            is_covered = True
+        elif 0 < available_amount < discounted_cost:
+            vip_amount_deducted = available_amount
+            amount_to_be_paid = cost - available_amount
+            is_covered = True
+
+        resp['vip_amount_deducted'] = vip_amount_deducted
+        resp['amount_to_be_paid'] = amount_to_be_paid
+        resp['is_covered'] = is_covered
+
+        return resp
 
 
 class PackageAmountCount(AbstractCriteria):
@@ -110,7 +146,11 @@ usage_criteria_class_mapping = {
 }
 
 
-def get_class_reference(plus_membership_obj, entity, usage_criteria):
+def get_class_reference(plus_membership_obj, entity):
+    if not plus_membership_obj:
+        return None
+
+    usage_criteria = plus_membership_obj.plan.plan_criteria
     if entity not in ['DOCTOR', 'LABTEST', 'PACKAGE'] or usage_criteria not in UsageCriteria.availabilities():
         return None
 

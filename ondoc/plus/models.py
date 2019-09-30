@@ -308,6 +308,8 @@ class PlusUser(auth_model.TimeStampedModel):
                                                                                PlanParametersEnum.PACKAGE_IDS,
                                                                                PlanParametersEnum.TOTAL_TEST_COVERED_IN_PACKAGE,
                                                                                PlanParametersEnum.LAB_DISCOUNT,
+                                                                               PlanParametersEnum.LABTEST_AMOUNT,
+                                                                               PlanParametersEnum.LABTEST_COUNT,
                                                                                PlanParametersEnum.DOCTOR_CONSULT_DISCOUNT])
 
         for pp in plan_parameters:
@@ -325,6 +327,13 @@ class PlusUser(auth_model.TimeStampedModel):
 
         resp['available_package_amount'] = resp['total_package_amount_limit'] - int(self.get_package_plus_appointment_amount())
         resp['available_package_count'] = resp['total_package_count_limit'] - int(self.get_package_plus_appointment_count())
+
+        resp['total_labtest_amount_limit'] = int(data['health_checkups_amount']) if data.get('health_checkups_amount') and data.get('health_checkups_amount').__class__.__name__ == 'str'  else 0
+        resp['total_labtest_count_limit'] = int(data['health_checkups_count']) if data.get('health_checkups_count') and data.get('health_checkups_count').__class__.__name__ == 'str'  else 0
+
+        resp['available_labtest_amount'] = resp['total_labtest_amount_limit'] - int(self.get_package_plus_appointment_amount())
+        resp['available_labtest_count'] = resp['total_labtest_count_limit'] - int(self.get_package_plus_appointment_count())
+
 
         return resp
 
@@ -493,6 +502,37 @@ class PlusUser(auth_model.TimeStampedModel):
                 else:
                     return vip_data_dict
         return vip_data_dict
+
+
+    def get_labtest_plus_appointment_count(self):
+        from ondoc.diagnostic.models import LabAppointment
+        labtest_count = 0
+        lab_appointments = LabAppointment.objects.filter(plus_plan=self).exclude(status=LabAppointment.CANCELLED)
+        if not lab_appointments:
+            return 0
+
+        for lab_appointment in lab_appointments:
+            labtest_count = labtest_count + len(list(filter(lambda lab_test: not lab_test.test.is_package, lab_appointment.test_mappings.all())))
+        return labtest_count
+
+    def get_labtest_plus_appointment_amount(self):
+        from ondoc.diagnostic.models import LabAppointment
+
+        import functools
+        labtest_amount = 0
+        lab_appointments_ids = LabAppointment.objects.filter(plus_plan=self).exclude(status=LabAppointment.CANCELLED).values_list('id', flat=True)
+
+
+
+        content_type = ContentType.objects.get_for_model(LabAppointment)
+        appointment_mappings = PlusAppointmentMapping.objects.filter(object_id__in=lab_appointments_ids, content_type=content_type)
+        if not appointment_mappings:
+            return 0
+
+        appointment_mappings_amount = list(map(lambda appointment: appointment.amount, appointment_mappings))
+        labtest_amount = labtest_amount + functools.reduce(lambda a, b: a + b, appointment_mappings_amount)
+
+        return labtest_amount
 
     def get_package_plus_appointment_count(self):
         from ondoc.diagnostic.models import LabAppointment
