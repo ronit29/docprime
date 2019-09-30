@@ -319,9 +319,11 @@ class PartnerLabSamplesCollectOrder(auth_models.TimeStampedModel, auth_models.Cr
         db_table = "partner_lab_samples_collect_order"
 
     def save(self, *args, **kwargs):
-        if self.status in [PartnerLabSamplesCollectOrder.PARTIAL_REPORT_GENERATED, PartnerLabSamplesCollectOrder.REPORT_GENERATED]:
-            notification_tasks.send_partner_lab_notifications(self.id, notification_type=NotificationAction.PARTNER_LAB_REPORT_UPLOADED)
         super(PartnerLabSamplesCollectOrder, self).save()
+        if self.status in [PartnerLabSamplesCollectOrder.PARTIAL_REPORT_GENERATED, PartnerLabSamplesCollectOrder.REPORT_GENERATED]:
+            notification_tasks.send_partner_lab_notifications.apply_async(kwargs={'order_id': self.id,
+                                                                                  'notification_type': NotificationAction.PARTNER_LAB_REPORT_UPLOADED},
+                                                                          countdown=2)
 
 
 class PartnerLabTestSamplesOrderReportMapping(auth_models.TimeStampedModel):

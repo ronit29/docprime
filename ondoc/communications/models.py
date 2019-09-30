@@ -2443,7 +2443,7 @@ class PartnerLabNotification(Notification):
         user_and_phone_number = []
         user_and_email = []
         if notification_type in [NotificationAction.PARTNER_LAB_REPORT_UPLOADED] and instance.created_by:
-            push_receivers.extend(instance.created_by)
+            push_receivers.append(instance.created_by)
         user_and_tokens = NotificationEndpoint.get_user_and_tokens(receivers=push_receivers,
                                                                    action_type=NotificationAction.PARTNER_LAB)
         all_receivers['sms_receivers'] = user_and_phone_number
