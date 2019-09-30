@@ -42,7 +42,8 @@ from . import serializers
 from ondoc.api.v2.doctor import serializers as v2_serializers
 from ondoc.api.pagination import paginate_queryset, paginate_raw_query, paginate_queryset_refactored_consumer_app
 from ondoc.api.v1.utils import convert_timings, form_time_slot, IsDoctor, payment_details, aware_time_zone, \
-    TimeSlotExtraction, GenericAdminEntity, get_opd_pem_queryset, offline_form_time_slots, ipd_query_parameters
+    TimeSlotExtraction, GenericAdminEntity, get_opd_pem_queryset, offline_form_time_slots, ipd_query_parameters, \
+    common_package_category
 from ondoc.api.v1 import insurance as insurance_utility
 from ondoc.api.v1.doctor.doctorsearch import DoctorSearchHelper
 from django.db.models import Min, Prefetch
@@ -1595,11 +1596,11 @@ class SearchedItemsViewSet(viewsets.GenericViewSet):
                                                                                  context={'request': request,
                                                                                           'city': city,
                                                                                           'spec_urls': spec_urls})
-        #
-        # common_procedure_categories = CommonProcedureCategory.objects.select_related('procedure_category').filter(
-        #     procedure_category__is_live=True).all().order_by("-priority")[:10]
-        # common_procedure_categories_serializer = CommonProcedureCategorySerializer(common_procedure_categories,
-        #                                                                            many=True)
+
+        common_procedure_categories = CommonProcedureCategory.objects.select_related('procedure_category').filter(
+            procedure_category__is_live=True).all().order_by("-priority")[:10]
+        common_procedure_categories_serializer = CommonProcedureCategorySerializer(common_procedure_categories,
+                                                                                   many=True)
 
 
 
@@ -1641,11 +1642,11 @@ class SearchedItemsViewSet(viewsets.GenericViewSet):
         #     categories_serializer = CommonCategoriesSerializer(categories, many=True, context={'request': request})
 
         return Response({"conditions": conditions_serializer.data, "specializations": specializations_serializer.data,
-                         "procedure_categories": CommonProcedureCategory.common_procedure_categories(),
+                         "procedure_categories": common_procedure_categories_serializer.data,
                          "procedures": common_procedures_serializer.data,
                          "ipd_procedures": common_ipd_procedures_serializer.data,
                          "top_hospitals": top_hospitals_data,
-                         'package_categories': self.common_package_category(request)})
+                         'package_categories': common_package_category(self, request)})
 
 
 class DoctorListViewSet(viewsets.GenericViewSet):
