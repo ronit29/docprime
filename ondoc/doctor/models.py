@@ -31,6 +31,7 @@ from django.core.files.storage import get_storage_class
 from django.conf import settings
 from datetime import timedelta
 from dateutil import tz
+from dateutil.relativedelta import relativedelta
 from django.utils import timezone
 from ondoc.authentication import models as auth_model
 from ondoc.authentication.models import SPOCDetails, RefundMixin, MerchantTdsDeduction, PaymentMixin
@@ -4373,6 +4374,12 @@ class OfflinePatients(auth_model.TimeStampedModel):
             if number.is_default:
                 patient_number = number
         return patient_number
+
+    def get_age(self):
+        dob = self.dob if self.dob else self.calculated_dob
+        if dob:
+            return relativedelta(datetime.datetime.now(), dob).years
+        return None
 
     @staticmethod
     def welcome_message_sms(appointment, receivers):

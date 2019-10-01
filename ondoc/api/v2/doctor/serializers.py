@@ -870,6 +870,9 @@ class SampleCollectOrderCreateOrUpdateSerializer(serializers.Serializer):
         offline_patient = doc_models.OfflinePatients.objects.filter(id=offline_patient_id).first()
         if not offline_patient:
             raise serializers.ValidationError('invalid offline_patient_id')
+        if not (offline_patient.name and offline_patient.gender and offline_patient.get_patient_mobile()) or \
+                not (offline_patient.dob or offline_patient.calculated_dob):
+            raise serializers.ValidationError('patient details incomplete')
         hospital_id = attrs.get('hospital_id')
         filter_kwargs = dict()
         lab_id = attrs.get('lab_id')

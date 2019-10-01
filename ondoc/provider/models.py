@@ -272,8 +272,10 @@ class PartnerLabTestSampleDetails(auth_models.TimeStampedModel):
             sample_details.extend(obj.sample_details.all())
         for sample_detail in sample_details:
             if sample_detail.sample.name not in sample_max_volumes or \
-                    (sample_detail.sample.name in sample_max_volumes and
-                     sample_detail.volume > sample_max_volumes[sample_detail.sample.name]["max_volume"]):
+                    (sample_detail.sample.name in sample_max_volumes and sample_detail.volume and
+                     ((not sample_max_volumes[sample_detail.sample.name]["max_volume"]) or
+                      (sample_max_volumes[sample_detail.sample.name]["max_volume"] and
+                       sample_detail.volume > sample_max_volumes[sample_detail.sample.name]["max_volume"]))):
                 sample_max_volumes[sample_detail.sample.name] = {"id": sample_detail.id, "max_volume": sample_detail.volume}
         for sample_detail in sample_details:
             if sample_detail.id == sample_max_volumes[sample_detail.sample.name]['id']:
@@ -319,11 +321,16 @@ class PartnerLabSamplesCollectOrder(auth_models.TimeStampedModel, auth_models.Cr
         db_table = "partner_lab_samples_collect_order"
 
     def save(self, *args, **kwargs):
+        is_new_instance = True if not self.id else False
         super(PartnerLabSamplesCollectOrder, self).save()
+        if is_new_instance:
+            notification_tasks.send_partner_lab_notifications.apply_async(kwargs={'order_id': self.id,
+                                                                                  'notification_type': NotificationAction.PARTNER_LAB_ORDER_PLACED_SUCCESSFULLY},
+                                                                          countdown=3)
         if self.status in [PartnerLabSamplesCollectOrder.PARTIAL_REPORT_GENERATED, PartnerLabSamplesCollectOrder.REPORT_GENERATED]:
             notification_tasks.send_partner_lab_notifications.apply_async(kwargs={'order_id': self.id,
                                                                                   'notification_type': NotificationAction.PARTNER_LAB_REPORT_UPLOADED},
-                                                                          countdown=2)
+                                                                          countdown=3)
 
 
 class PartnerLabTestSamplesOrderReportMapping(auth_models.TimeStampedModel):

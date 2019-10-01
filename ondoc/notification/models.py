@@ -155,6 +155,8 @@ class NotificationAction:
     PARTNER_LAB_REQUEST_RECHECK = 207
     PARTNER_LAB_NEED_HELP = 208
     PARTNER_LAB_REPORT_UPLOADED = 209
+    PARTNER_LAB_ORDER_PLACED_SUCCESSFULLY = 210
+    PARTNER_LAB_REPORT_SUCCESS = 211
 
     NOTIFICATION_TYPE_CHOICES = (
         (APPOINTMENT_ACCEPTED, "Appointment Accepted"),
@@ -230,6 +232,8 @@ class NotificationAction:
         (PARTNER_LAB_REQUEST_RECHECK, 'Partner Lab Request Recheck'),
         (PARTNER_LAB_NEED_HELP, 'Partner Lab Need Help'),
         (PARTNER_LAB_REPORT_UPLOADED, 'Partner Lab Report Uploaded'),
+        (PARTNER_LAB_ORDER_PLACED_SUCCESSFULLY, 'Partner Lab Order Placed Successfully'),
+        (PARTNER_LAB_REPORT_SUCCESS, 'Partner Lab Report Success'),
     )
     OPD_APPOINTMENT = "opd_appointment"
     LAB_APPOINTMENT = "lab_appoingment"

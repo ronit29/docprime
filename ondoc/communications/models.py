@@ -39,6 +39,7 @@ from ondoc.notification.models import NotificationAction, SmsNotification, Email
 from ondoc.notification.rabbitmq_client import publish_message
 # import datetime
 from ondoc.api.v1.utils import aware_time_zone
+from django.http.request import HttpRequest
 
 User = get_user_model()
 logger = logging.getLogger(__name__)
@@ -449,6 +450,14 @@ class SMSNotification:
         elif notification_type == NotificationAction.OFFLINE_PATIENT_WELCOME_MESSAGE:
             obj = DynamicTemplates.objects.filter(template_name="OFFLINE_PATIENT_WELCOME_MESSAGE", approved=True).first()
 
+        elif notification_type == NotificationAction.PARTNER_LAB_ORDER_PLACED_SUCCESSFULLY and user and user.user_type == User.DOCTOR:
+            obj = DynamicTemplates.objects.filter(template_name="cloud_labs_order_success_provider", approved=True).first()
+        elif notification_type == NotificationAction.PARTNER_LAB_ORDER_PLACED_SUCCESSFULLY:
+            obj = DynamicTemplates.objects.filter(template_name="cloud_labs_order_success_patient", approved=True).first()
+        elif notification_type == NotificationAction.PARTNER_LAB_REPORT_SUCCESS and user and user.user_type == User.DOCTOR:
+            obj = DynamicTemplates.objects.filter(template_name="cloud_labs_report_success_provider", approved=True).first()
+        elif notification_type == NotificationAction.PARTNER_LAB_REPORT_SUCCESS:
+            obj = DynamicTemplates.objects.filter(template_name="cloud_labs_report_success_patient", approved=True).first()
         return obj
 
     def trigger(self, receiver, template, context):
@@ -563,6 +572,7 @@ class SMSNotification:
 
     def dispatch(self, receivers):
         context = self.context
+        instance = context.get("instance")
         if not context:
             return None, receivers
 
@@ -570,7 +580,8 @@ class SMSNotification:
 
         click_login_token_objects = list()
         for receiver in receivers:
-            if receiver.get('user') and receiver.get('user').user_type == User.DOCTOR:
+            if receiver.get('user') and receiver.get('user').user_type == User.DOCTOR \
+                    and not instance.__class__ in [PartnerLabSamplesCollectOrder]:
                 context, click_login_token_obj = self.save_token_to_context(context, receiver.get('user'))
                 click_login_token_objects.append(click_login_token_obj)
             elif context.get('provider_login_url'):
@@ -2436,12 +2447,27 @@ class PartnerLabNotification(Notification):
     def __init__(self, partner_lab_order_obj, notification_type=None):
         self.partner_lab_order_obj = partner_lab_order_obj
         self.notification_type = notification_type if notification_type else self.PARTNER_LAB_NOTIFICATION_TYPE_MAPPING[partner_lab_order_obj.status]
+        self.patient_mobile = partner_lab_order_obj.offline_patient.get_patient_mobile()
 
     def get_context(self):
         instance = self.partner_lab_order_obj
+        lab_tests_ordered = list()
+        mrp = 0
+        for obj in self.partner_lab_order_obj.selected_tests_details:
+            lab_tests_ordered.append(obj['lab_test_name'])
+            mrp += obj['b2c_rate']
         context = {
             "instance": instance,
-            "patient_name": self.partner_lab_order_obj.offline_patient.name
+            "order_id": instance.id,
+            "patient_name": self.partner_lab_order_obj.offline_patient.name,
+            "hospital_name": instance.hospital.name,
+            "patient_age": self.partner_lab_order_obj.offline_patient.get_age(),
+            "mrp": mrp if mrp else None,
+            "order_date_time": self.partner_lab_order_obj.created_at,
+            "lab_tests_ordered": lab_tests_ordered,
+            "admin_contact_no": "9971279198",
+            "support_email": "cloudlabs@docprime.com",
+            "report_list": [(HttpRequest.build_absolute_uri(mapping.report.url)) for mapping in instance.reports.all()]
         }
         return context
 
@@ -2455,8 +2481,17 @@ class PartnerLabNotification(Notification):
 
         user_and_phone_number = []
         user_and_email = []
-        if notification_type in [NotificationAction.PARTNER_LAB_REPORT_UPLOADED] and instance.created_by:
-            push_receivers.append(instance.created_by)
+        if notification_type in [NotificationAction.PARTNER_LAB_REPORT_UPLOADED]:
+            if instance.created_by:
+                push_receivers.append(instance.created_by)
+                user_and_phone_number.append({'user': instance.created_by, 'phone_number': instance.created_by.phone_number})
+            if self.patient_mobile:
+                user_and_phone_number.append({'user': instance.offline_patient.user, 'phone_number': self.patient_mobile})
+        if notification_type in [NotificationAction.PARTNER_LAB_ORDER_PLACED_SUCCESSFULLY]:
+            if instance.created_by:
+                user_and_phone_number.append({'user': instance.created_by, 'phone_number': instance.created_by.phone_number})
+            if self.patient_mobile:
+                user_and_phone_number.append({'user': instance.offline_patient.user, 'phone_number': self.patient_mobile})
         user_and_tokens = NotificationEndpoint.get_user_and_tokens(receivers=push_receivers,
                                                                    action_type=NotificationAction.PARTNER_LAB)
         all_receivers['sms_receivers'] = user_and_phone_number
@@ -2473,3 +2508,8 @@ class PartnerLabNotification(Notification):
         if notification_type in [NotificationAction.PARTNER_LAB_REPORT_UPLOADED]:
             push_notification = PUSHNotification(notification_type, context)
             push_notification.send(all_receivers.get('push_receivers', []))
+            sms_notification = SMSNotification(notification_type, context)
+            sms_notification.send(all_receivers.get('sms_receivers', []))
+        if notification_type in [NotificationAction.PARTNER_LAB_ORDER_PLACED_SUCCESSFULLY]:
+            sms_notification = SMSNotification(notification_type, context)
+            sms_notification.send(all_receivers.get('sms_receivers', []))
