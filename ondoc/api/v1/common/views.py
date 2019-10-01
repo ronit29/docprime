@@ -1166,10 +1166,10 @@ class CommentViewSet(viewsets.ModelViewSet):
         type = data['type']
         if comment and type == 'hospital':
             user_email = data['email']
-            try:
-                validate_email(user_email)
-            except ValidationError as e:
-                return Response(status=status.HTTP_400_BAD_REQUEST, data={'error': format(e.messages[0])})
+            # try:
+            #     validate_email(user_email)
+            # except ValidationError as e:
+            #     return Response(status=status.HTTP_400_BAD_REQUEST, data={'error': format(e.messages[0])})
             user_name = data['name']
             if data.get('id'):
                 object_id = data['id']
@@ -1305,9 +1305,9 @@ class DocumentUploadViewSet(viewsets.GenericViewSet):
 
     def upload_document_proofs(self, request, *args, **kwargs):
         user = request.user
-        is_plus_user = user.active_plus_user
-        if not is_plus_user:
-            return Response(status=status.HTTP_400_BAD_REQUEST, data={'error': 'User do not have active VIP membership.'})
+        inactive_plus_subscription = user.inactive_plus_user
+        if not inactive_plus_subscription:
+            return Response({'error': 'User has not purchased the VIP plan.'})
 
         data = dict()
         document_data = {}

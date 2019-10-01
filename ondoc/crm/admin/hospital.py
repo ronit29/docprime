@@ -550,7 +550,7 @@ class HospitalAdmin(admin.GeoModelAdmin, CompareVersionAdmin, ActionAdmin, QCPem
     map_width = 200
     map_template = 'admin/gis/gmap.html'
     extra_js = ['js/admin/GoogleMap.js',
-                'https://maps.googleapis.com/maps/api/js?key=AIzaSyClYPAOTREfAZ-95eRbU6hDVHU0p3XygoY&callback=initGoogleMap']
+                'https://maps.googleapis.com/maps/api/js?key=AIzaSyDFxu_VGlmLojtgiwn892OYzV6IY_Inl6I&callback=initGoogleMap']
 
     # def get_inline_instances(self, request, obj=None):
     #     res = super().get_inline_instances(request, obj)
