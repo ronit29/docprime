@@ -74,8 +74,8 @@ class Order(TimeStampedModel):
     INSURANCE_PRODUCT_ID = 3
     SUBSCRIPTION_PLAN_PRODUCT_ID = 4
     CHAT_PRODUCT_ID = 5
-    VIP_PRODUCT_ID = 11
     PROVIDER_ECONSULT_PRODUCT_ID = 6
+    VIP_PRODUCT_ID = 11
     PRODUCT_IDS = [(DOCTOR_PRODUCT_ID, "Doctor Appointment"), (LAB_PRODUCT_ID, "LAB_PRODUCT_ID"),
                    (INSURANCE_PRODUCT_ID, "INSURANCE_PRODUCT_ID"),
                    (SUBSCRIPTION_PLAN_PRODUCT_ID, "SUBSCRIPTION_PLAN_PRODUCT_ID"),
@@ -1358,41 +1358,93 @@ class ConsumerAccount(TimeStampedModel):
             ConsumerTransaction.objects.create(**consumer_tx_data)
 
         if wallet_refund_amount:
+            # check if ref transaction available
+            ctxn_obj = ConsumerTransaction.objects.filter(user_id=appointment_obj.user_id,
+                                                          reference_id=appointment_obj.id,
+                                                          action=ConsumerTransaction.SALE).last()
+            ctxn_obj.balance += wallet_refund_amount
+
             consumer_tx_data = self.consumer_tx_appointment_data(appointment_obj.user, appointment_obj, product_id, wallet_refund_amount, action, tx_type, ConsumerTransaction.WALLET_SOURCE)
             ConsumerTransaction.objects.create(**consumer_tx_data)
             
         self.save()
 
-    def debit_refund(self):
-        amount = self.balance
-        self.balance = 0
-        action = ConsumerTransaction.REFUND
-        tx_type = PgTransaction.DEBIT
-        consumer_tx_data = self.consumer_tx_pg_data({"user": self.user}, amount, action, tx_type)
-        # consumer_tx_data = self.form_consumer_tx_data({"user": self.user}, amount, action, tx_type)
-        ctx_obj = ConsumerTransaction.objects.create(**consumer_tx_data)
+    def debit_refund(self, txn_entity_obj=None):
+        ctx_objs = []
+
+        # refund appointment amount
+        if txn_entity_obj:
+            ctx_obj = self.debit_txn_refund(txn_entity_obj)
+            ctx_objs.append(ctx_obj)
+
+        # refund wallet amount
+        if self.balance:
+            ctx_obj = self.debit_balance_refund()
+            ctx_objs.append(ctx_obj)
+
         self.save()
+        return ctx_objs
+
+    def debit_txn_refund(self, txn_entity_obj):
+        tx_obj = txn_entity_obj.get_transaction()
+        if tx_obj:
+            amount = tx_obj.amount
+        else:
+            amount = Decimal(0)
+
+        data = dict()
+        data["user"] = self.user
+        data["product_id"] = txn_entity_obj.PRODUCT_ID
+        data["reference_id"] = txn_entity_obj.id
+        data["transaction_id"] = tx_obj.transaction_id if tx_obj else None
+        data["order_id"] = tx_obj.order_id if tx_obj else None
+        self.balance -= amount
+        consumer_tx_data = self.consumer_tx_pg_data(data, amount, ConsumerTransaction.REFUND, PgTransaction.DEBIT)
+        ctx_obj = ConsumerTransaction.objects.create(**consumer_tx_data)
+
+        return ctx_obj
+
+    def debit_balance_refund(self):
+        amount = self.balance
+        self.balance = self.balance - amount
+        consumer_tx_data = self.consumer_tx_pg_data({"user": self.user}, amount, ConsumerTransaction.REFUND,
+                                                    PgTransaction.DEBIT)
+        ctx_obj = ConsumerTransaction.objects.create(**consumer_tx_data)
+
         return ctx_obj
 
     def debit_schedule(self, appointment_obj, product_id, amount):
+        cashback_txns_used = wallet_txns_used = []
         if product_id == Order.SUBSCRIPTION_PLAN_PRODUCT_ID or product_id == Order.INSURANCE_PRODUCT_ID or product_id == Order.VIP_PRODUCT_ID:
             cashback_deducted = 0
         else:
             cashback_deducted = min(self.cashback, amount)
+            cashback_txns = ConsumerTransaction.get_transactions(self.user,
+                                                                 [ConsumerTransaction.CASHBACK_CREDIT,
+                                                                  ConsumerTransaction.REFERRAL_CREDIT
+                                                                  ],
+                                                                 PgTransaction.CREDIT
+                                                                 )
+            cashback_txns_used = ConsumerTransaction.update_txn_balance(cashback_txns, cashback_deducted)
             self.cashback -= cashback_deducted
 
         balance_deducted = min(self.balance, amount-cashback_deducted)
+        pg_txns = ConsumerTransaction.get_transactions(self.user,
+                                                             [ConsumerTransaction.PAYMENT],
+                                                             PgTransaction.CREDIT
+                                                             )
+        wallet_txns_used = ConsumerTransaction.update_txn_balance(pg_txns, balance_deducted)
         self.balance -= balance_deducted
 
         action = ConsumerTransaction.SALE
         tx_type = PgTransaction.DEBIT
 
         if cashback_deducted:
-            consumer_tx_data = self.consumer_tx_appointment_data(appointment_obj.user, appointment_obj, product_id, cashback_deducted, action, tx_type, ConsumerTransaction.CASHBACK_SOURCE)
+            consumer_tx_data = self.consumer_tx_appointment_data(appointment_obj.user, appointment_obj, product_id, cashback_deducted, action, tx_type, ConsumerTransaction.CASHBACK_SOURCE, cashback_txns_used)
             ConsumerTransaction.objects.create(**consumer_tx_data)
 
         if balance_deducted:
-            consumer_tx_data = self.consumer_tx_appointment_data(appointment_obj.user, appointment_obj, product_id, balance_deducted, action, tx_type, ConsumerTransaction.WALLET_SOURCE)
+            consumer_tx_data = self.consumer_tx_appointment_data(appointment_obj.user, appointment_obj, product_id, balance_deducted, action, tx_type, ConsumerTransaction.WALLET_SOURCE, wallet_txns_used)
             ConsumerTransaction.objects.create(**consumer_tx_data)
 
         self.save()
@@ -1407,8 +1459,9 @@ class ConsumerAccount(TimeStampedModel):
         self.save()
 
     def debit_promotional(self, appointment_obj):
-        cashback_deducted = balance_deducted = 0
-        promotional_amount_debit = appointment_obj.promotional_amount
+        cashback_deducted = balance_deducted = promotional_amount_debit = 0
+        if hasattr(appointment_obj, 'promotional_amount'):
+            promotional_amount_debit = appointment_obj.promotional_amount
 
         if promotional_amount_debit:
             cashback_deducted = min(self.cashback, promotional_amount_debit)
@@ -1485,9 +1538,11 @@ class ConsumerAccount(TimeStampedModel):
         consumer_tx_data['type'] = tx_type
         consumer_tx_data['action'] = action
         consumer_tx_data['amount'] = amount
+        if action == ConsumerTransaction.PAYMENT and tx_type == PgTransaction.CREDIT:
+            consumer_tx_data['balance'] = amount
         return consumer_tx_data
 
-    def consumer_tx_appointment_data(self, user, app_obj, product_id, amount, action, tx_type, source=None):
+    def consumer_tx_appointment_data(self, user, app_obj, product_id, amount, action, tx_type, source=None, ref_txns=None):
         if source is None:
             source = ConsumerTransaction.WALLET_SOURCE
 
@@ -1501,6 +1556,10 @@ class ConsumerAccount(TimeStampedModel):
         consumer_tx_data['action'] = action
         consumer_tx_data['amount'] = amount
         consumer_tx_data['source'] = source
+        if tx_type == PgTransaction.CREDIT:
+            consumer_tx_data['balance'] = amount
+        if ref_txns:
+            consumer_tx_data['ref_txns'] = ref_txns
         return consumer_tx_data
 
     class Meta:
@@ -1533,6 +1592,8 @@ class ConsumerTransaction(TimeStampedModel):
     action = models.SmallIntegerField(choices=ACTION_CHOICES)
     amount = models.DecimalField(max_digits=10, decimal_places=2, default=0)
     source = models.SmallIntegerField(choices=SOURCE_TYPE, blank=True, null=True)
+    balance = models.DecimalField(max_digits=10, decimal_places=2, default=0, null=True)
+    ref_txns = JSONField(blank=True, null=True)
 
     def save(self, *args, **kwargs):
         database_instance = ConsumerTransaction.objects.filter(pk=self.id).first()
@@ -1547,12 +1608,29 @@ class ConsumerTransaction(TimeStampedModel):
             except Exception as e:
                 logger.error(str(e))
 
-
-
     @classmethod
     def valid_appointment_for_cancellation(cls, app_id, product_id):
         return not cls.objects.filter(type=PgTransaction.CREDIT, reference_id=app_id, product_id=product_id,
                                       action=cls.CANCELLATION).exists()
+
+    @classmethod
+    def get_transactions(cls, user, txn_type=[], action=None):
+        consumer_txns = cls.objects.select_for_update().filter(user=user, action=action, type_in=txn_type, balance__gt=0).order_by("created_at")
+        return consumer_txns
+
+    def update_txn_balance(self, txns, amount):
+        txns_used = {}
+        if txns:
+            for txn in txns:
+                if amount:
+                    balance_amount = min(txn.balance, amount)
+                    txn.balance -= balance_amount
+                    amount -= balance_amount
+                    txns_used.update({txn.id: balance_amount})
+                    txn.save()
+                else:
+                    break
+        return txns_used
 
     class Meta:
         db_table = 'consumer_transaction'
@@ -1565,8 +1643,9 @@ class ConsumerRefund(TimeStampedModel):
     PENDING = 1
     REQUESTED = 5
     COMPLETED = 10
+    ARCHIVED = 15
     MAXREFUNDDAYS = 180
-    state_type = [(PENDING, "Pending"), (COMPLETED, "Completed"), (REQUESTED, "Requested")]
+    state_type = [(PENDING, "Pending"), (COMPLETED, "Completed"), (REQUESTED, "Requested"), (ARCHIVED, "Archived")]
     user = models.ForeignKey(User, on_delete=models.DO_NOTHING)
     consumer_transaction = models.ForeignKey(ConsumerTransaction, on_delete=models.DO_NOTHING)
     refund_amount = models.DecimalField(max_digits=10, decimal_places=2, default=0)
@@ -1591,6 +1670,7 @@ class ConsumerRefund(TimeStampedModel):
     def initiate_refund(cls, user, ctx_obj):
         BATCH_SIZE = 100
         pgtx_list = PgTransaction.get_transactions(user, ctx_obj.amount)
+        # pgtx_list = PgTransaction.get_transactions()
         refund_obj_data = list()
         consumer_refund_objs = list()
         num = 0

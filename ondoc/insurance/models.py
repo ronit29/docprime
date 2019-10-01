@@ -21,7 +21,7 @@ import logging
 from ondoc.authentication import models as auth_model
 from ondoc.account import models as account_model
 from django.core.validators import MaxValueValidator, MinValueValidator
-from ondoc.authentication.models import UserProfile, User
+from ondoc.authentication.models import UserProfile, User, TransactionMixin
 from django.contrib.postgres.fields import JSONField
 from django.forms import model_to_dict
 from ondoc.common.helper import Choices
@@ -525,7 +525,7 @@ class BankHolidays(auth_model.TimeStampedModel):
         db_table = "bank_holidays"
 
 
-class UserInsurance(auth_model.TimeStampedModel, MerchantPayoutMixin):
+class UserInsurance(auth_model.TimeStampedModel, MerchantPayoutMixin, TransactionMixin):
     from ondoc.account.models import MoneyPool
 
     ACTIVE = 1

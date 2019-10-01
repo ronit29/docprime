@@ -8,7 +8,7 @@ from django.core.validators import FileExtensionValidator, MaxValueValidator, Mi
 from django.contrib.postgres.fields import JSONField
 from django.utils import timezone
 from ondoc.account import models as account_model
-from ondoc.authentication.models import UserProfile
+from ondoc.authentication.models import UserProfile, TransactionMixin
 from ondoc.cart.models import Cart
 from ondoc.common.helper import Choices
 import json
@@ -204,7 +204,7 @@ class PlusThreshold(auth_model.TimeStampedModel, LiveMixin):
         return str(self.plus_plan)
 
 
-class PlusUser(auth_model.TimeStampedModel):
+class PlusUser(auth_model.TimeStampedModel, TransactionMixin):
     from ondoc.account.models import MoneyPool
 
     ACTIVE = 1

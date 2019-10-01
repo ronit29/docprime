@@ -1903,8 +1903,10 @@ class ConsumerAccountRefundViewSet(GenericViewSet):
         consumer_account = ConsumerAccount.objects.get_or_create(user=user)
         consumer_account = ConsumerAccount.objects.select_for_update().get(user=user)
         if consumer_account.balance > 0:
-            ctx_obj = consumer_account.debit_refund()
-            ConsumerRefund.initiate_refund(user, ctx_obj)
+            ctx_objs = consumer_account.debit_refund()
+            if ctx_objs:
+                for ctx_obj in ctx_objs:
+                    ConsumerRefund.initiate_refund(user, ctx_obj)
         resp = dict()
         resp["status"] = 1
         return Response(resp)

@@ -2148,9 +2148,10 @@ class RefundMixin(object):
                 consumer_account.debit_promotional(self)
             consumer_account.credit_cancellation(self, product_id, wallet_refund, cashback_refund)
             if refund_flag:
-                ctx_obj = consumer_account.debit_refund()
-                if initiate_refund:
-                    ConsumerRefund.initiate_refund(self.user, ctx_obj)
+                ctx_objs = consumer_account.debit_refund(self)
+                if ctx_objs and initiate_refund:
+                    for ctx_obj in ctx_objs:
+                        ConsumerRefund.initiate_refund(self.user, ctx_obj)
 
     def can_agent_refund(self, user):
         from ondoc.crm.constants import constants
@@ -2349,6 +2350,18 @@ class PaymentMixin(object):
             pg_transaction = PgTransaction.objects.filter(order_id=parent_order.id).first()
 
         return pg_transaction
+
+
+class TransactionMixin(object):
+
+    def get_order(self):
+        from ondoc.account.models import Order
+        order = Order.objects.filter(reference_id=self.id).first()
+
+        if not order.is_parent():
+            order = order.parent
+
+        return order
 
 
 class GenericQuestionAnswer(TimeStampedModel):

@@ -473,7 +473,8 @@ def payment_details(request, order):
         uemail = user.email
     else:
         uemail = "dummyemail@docprime.com"
-    base_url = "https://{}".format(request.get_host())
+    # base_url = "https://{}".format(request.get_host())
+    base_url = 'https://giant-owl-54.localtunnel.me'
     surl = base_url + '/api/v1/user/transaction/save'
     furl = base_url + '/api/v1/user/transaction/save'
     isPreAuth = '1'
@@ -1702,8 +1703,10 @@ def consumers_balance_refund():
             if consumer_account:
                 if consumer_account.balance > 0:
                     print("consumer account balance " + str(consumer_account.balance))
-                    ctx_obj = consumer_account.debit_refund()
-                    ConsumerRefund.initiate_refund(ctx_obj.user, ctx_obj)
+                    ctx_objs = consumer_account.debit_refund()
+                    if ctx_objs:
+                        for ctx_obj in ctx_objs:
+                            ConsumerRefund.initiate_refund(ctx_obj.user, ctx_obj)
 
 
 class GenericAdminEntity():

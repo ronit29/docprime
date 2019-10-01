@@ -1,5 +1,7 @@
 from django.db import models, transaction
 from django.core.validators import FileExtensionValidator
+
+from ondoc.authentication.models import TransactionMixin
 from ondoc.doctor import models as doc_models
 from ondoc.diagnostic import models as diag_models
 from ondoc.authentication import models as auth_models
@@ -93,7 +95,7 @@ class RocketChatGroups(auth_models.TimeStampedModel):
         db_table = "rc_groups"
 
 
-class EConsultation(auth_models.TimeStampedModel, auth_models.CreatedByModel):
+class EConsultation(auth_models.TimeStampedModel, auth_models.CreatedByModel, TransactionMixin):
 
     PAYMENT_ACCEPTED = 1
     PAYMENT_PENDING = 0
