@@ -454,9 +454,9 @@ class SMSNotification:
             obj = DynamicTemplates.objects.filter(template_name="cloud_labs_order_success_provider", approved=True).first()
         elif notification_type == NotificationAction.PARTNER_LAB_ORDER_PLACED_SUCCESSFULLY:
             obj = DynamicTemplates.objects.filter(template_name="cloud_labs_order_success_patient", approved=True).first()
-        elif notification_type == NotificationAction.PARTNER_LAB_REPORT_SUCCESS and user and user.user_type == User.DOCTOR:
+        elif notification_type == NotificationAction.PARTNER_LAB_REPORT_UPLOADED and user and user.user_type == User.DOCTOR:
             obj = DynamicTemplates.objects.filter(template_name="cloud_labs_report_success_provider", approved=True).first()
-        elif notification_type == NotificationAction.PARTNER_LAB_REPORT_SUCCESS:
+        elif notification_type == NotificationAction.PARTNER_LAB_REPORT_UPLOADED:
             obj = DynamicTemplates.objects.filter(template_name="cloud_labs_report_success_patient", approved=True).first()
         return obj
 
@@ -1493,6 +1493,7 @@ class PUSHNotification:
         context = copy.deepcopy(context)
         context.pop("instance", None)
         context.pop('time_slot_start', None)
+        context.pop('order_date_time', None)
         context.pop('hospitals_not_required_unique_code', None)
         context.pop('procedures', None)
         if user:

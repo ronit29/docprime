@@ -1497,9 +1497,11 @@ class PartnerLabTestSamplesCollectViewset(viewsets.GenericViewSet):
             sample_collection_objs = prov_models.PartnerLabTestSampleDetails.get_sample_collection_details(available_lab_tests)
             samples_data = serializers.LabTestSamplesCollectionBarCodeModelSerializer(sample_collection_objs, many=True,
                                                                                       context={"barcode_details": barcode_details}).data
+            patient_details = v1_doc_serializers.OfflinePatientSerializer(offline_patient).data
+            patient_details.update({'patient_mobile': str(offline_patient.get_patient_mobile())})
             if not order_obj:
                 order_obj = prov_models.PartnerLabSamplesCollectOrder(offline_patient=offline_patient,
-                                                                      patient_details=v1_doc_serializers.OfflinePatientSerializer(offline_patient).data,
+                                                                      patient_details=patient_details,
                                                                       hospital=hospital, doctor=doctor, lab=lab,
                                                                       samples=samples_data, created_by=request.user,
                                                                       collection_datetime=valid_data.get("collection_datetime"),
