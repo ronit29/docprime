@@ -173,7 +173,7 @@ class Medanta(BaseIntegrator):
                 h_status = IntegratorHistory.NOT_PUSHED
                 IntegratorHistory.create_history(appointment, '', response, url, 'post_order', 'Sims', status_code,
                                                  retry_count, h_status, '')
-                logger.error("[ERROR-SIMS] Failed to push appointment - %s", response.json())
+                logger.error("[ERROR-MEDANTA] Failed to push appointment - %s", response.json())
                 return None
             else:
                 response = response.json()
