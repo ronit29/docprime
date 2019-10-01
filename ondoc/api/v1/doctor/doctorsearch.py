@@ -669,7 +669,7 @@ class DoctorSearchHelper:
                     if engine:
                         vip_response_dict = engine.validate_booking_entity(cost=mrp)
                         vip_amount = vip_response_dict.get('amount_to_be_paid', 0)
-                        cover_under_vip = True if vip_amount > 0 else False
+                        cover_under_vip = vip_data_dict.get('is_covered', False)
                     # vip_amount = 0 if vip_remaining_amount > mrp else mrp - vip_remaining_amount
                 hospitals = [{
                     "enabled_for_online_booking": enable_online_booking,

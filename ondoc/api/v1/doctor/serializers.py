@@ -641,7 +641,7 @@ class DoctorHospitalSerializer(serializers.ModelSerializer):
             if engine:
                 vip_res = engine.validate_booking_entity(cost=mrp)
                 resp['vip_amount'] = vip_res.get('amount_to_be_paid', 0)
-                resp['cover_under_vip'] = True if resp['vip_amount'] > 0 else False
+                resp['cover_under_vip'] = vip_res.get('is_covered', False)
             # amount = plus_user.get_vip_amount(utilization, mrp)
             # resp['cover_under_vip'] = True if (amount < mrp) else False
             # resp['vip_amount'] = amount
