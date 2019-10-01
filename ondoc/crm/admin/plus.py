@@ -5,7 +5,6 @@ from django.db.models import F
 from rest_framework import serializers
 from dal import autocomplete
 from ondoc.authentication.models import User
-from ondoc.common.models import AppointmentHistory
 from ondoc.plus.models import PlusProposer, PlusPlans, PlusThreshold, PlusUser, PlusPlanContent, PlusPlanParameters, \
     PlusPlanParametersMapping, PlusPlanUtmSources, PlusPlanUtmSourceMapping
 from import_export.admin import ImportExportMixin, ImportExportModelAdmin, base_formats

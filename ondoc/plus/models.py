@@ -259,7 +259,7 @@ class PlusUser(auth_model.TimeStampedModel, RefundMixin):
         if completed_appointments.exists():
             return {'reason': 'User has completed opd appointments', 'can_be_cancelled': False}
 
-        # Opd Appointments
+        # Lab Appointments
         appointments_qs = LabAppointment.objects.filter(plus_plan=self)
         completed_appointments = appointments_qs.filter(status=LabAppointment.COMPLETED)
         if completed_appointments.exists():
@@ -666,12 +666,30 @@ class PlusUser(auth_model.TimeStampedModel, RefundMixin):
             PlusIntegration.create_vip_lead_after_purchase(self)
     
     def process_cancellation(self):
+        from ondoc.doctor.models import OpdAppointment
+        from ondoc.diagnostic.models import LabAppointment
         from ondoc.subscription_plan.models import Plan, UserPlanMapping
         care_obj = UserPlanMapping.objects.filter(user=self.user).order_by('id').last()
         if care_obj:
             care_obj.status = UserPlanMapping.CANCELLED
             care_obj.is_active = False
             care_obj.save()
+
+        # Cancel all the appointments which are created using the plus membership.
+
+        # Opd Appointments
+        appointments_qs = OpdAppointment.objects.filter(plus_plan=self)
+        to_be_cancelled_appointments = appointments_qs.all().exclude(status__in=[OpdAppointment.COMPLETED, OpdAppointment.CANCELLED])
+        for appointment in to_be_cancelled_appointments:
+            appointment.status = OpdAppointment.CANCELLED
+            appointment.save()
+
+        # Lab Appointments
+        appointments_qs = LabAppointment.objects.filter(plus_plan=self)
+        to_be_cancelled_appointments = appointments_qs.all().exclude(status__in=[LabAppointment.COMPLETED, LabAppointment.CANCELLED])
+        for appointment in to_be_cancelled_appointments:
+            appointment.status = LabAppointment.CANCELLED
+            appointment.save()
 
     def process_cancel_initiate(self):
         self.action_refund()
