@@ -2238,7 +2238,8 @@ class OfflineOpdAppointments(Notification):
             "action_type": NotificationAction.OFFLINE_OPD_APPOINTMENT,
             "action_id": self.appointment.id,
             "opd_time_slot_start": time_slot_start,
-            "welcome_message": self.appointment.user.welcome_message
+            "welcome_message": self.appointment.user.welcome_message,
+            "admin_phone_no": "+91-9971279198",
         }
         return context
 
