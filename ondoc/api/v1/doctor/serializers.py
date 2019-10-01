@@ -329,7 +329,7 @@ class CreateAppointmentSerializer(serializers.Serializer):
             raise serializers.ValidationError("Doctor is on leave")
 
         data["part_of_integration"] = False
-        if not bool(data.get('from_app')) and doctor_clinic.is_part_of_integration():
+        if settings.MEDANTA_INTEGRATION_ENABLED and not bool(data.get('from_app')) and doctor_clinic.is_part_of_integration():
             data["part_of_integration"] = True
             available_slots = doctor_clinic.get_available_slots(time_slot_start)
             if not available_slots[date]:
