@@ -169,7 +169,13 @@ class Thyrocare(BaseIntegrator):
             # Add details to history table
             status = IntegratorHistory.PUSHED_AND_NOT_ACCEPTED
             IntegratorHistory.create_history(lab_appointment, payload, response, url, 'post_order', 'Thyrocare', status_code, retry_count, status, '')
-            return response
+            resp_data = {
+                "lead_id": response['ORDERRESPONSE']['PostOrderDataResponse'][0]['LEAD_ID'],
+                "dp_order_id": response['ORDER_NO'],
+                "integrator_order_id": response['REF_ORDERID'],
+                "response_data": response
+            }
+            return resp_data
         else:
             status = IntegratorHistory.NOT_PUSHED
             IntegratorHistory.create_history(lab_appointment, payload, response, url, 'post_order', 'Thyrocare', status_code, retry_count, status, '')

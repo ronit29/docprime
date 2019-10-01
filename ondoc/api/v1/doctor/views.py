@@ -456,11 +456,12 @@ class DoctorAppointmentsViewSet(OndocViewSet):
                 'insurance_message'], data['is_vip_member'], data['cover_under_vip'], \
             data['plus_user_id'] = False, None, "", False, False, None
         cart_item_id = validated_data.get('cart_item').id if validated_data.get('cart_item') else None
-        if not models.OpdAppointment.can_book_for_free(request, validated_data, cart_item_id):
-            return Response({'request_errors': {"code": "invalid",
-                                                "message": "Only {} active free bookings allowed per customer".format(
-                                                    models.OpdAppointment.MAX_FREE_BOOKINGS_ALLOWED)}},
-                            status=status.HTTP_400_BAD_REQUEST)
+        if not validated_data.get("part_of_integration"):
+            if not models.OpdAppointment.can_book_for_free(request, validated_data, cart_item_id):
+                return Response({'request_errors': {"code": "invalid",
+                                                    "message": "Only {} active free bookings allowed per customer".format(
+                                                        models.OpdAppointment.MAX_FREE_BOOKINGS_ALLOWED)}},
+                                status=status.HTTP_400_BAD_REQUEST)
 
         #For Appointment History
         responsible_user = None
@@ -2774,6 +2775,7 @@ class DoctorAvailabilityTimingViewSet(viewsets.ViewSet):
         if not dc_obj:
             return HttpResponse(status=404)
 
+        date = request.query_params.get('date')
         doctor_leaves = doctor.get_leaves()
         global_non_bookables = GlobalNonBookable.get_non_bookables()
         total_leaves = doctor_leaves + global_non_bookables
@@ -2786,10 +2788,22 @@ class DoctorAvailabilityTimingViewSet(viewsets.ViewSet):
             for apt in active_appointments:
                 blocks.append(str(apt.time_slot_start.date()))
 
-        clinic_timings = dc_obj.get_timings_v2(total_leaves, blocks)
+        if dc_obj.is_part_of_integration() and settings.MEDANTA_INTEGRATION_ENABLED:
+            from ondoc.integrations import service
+            pincode = None
+            integration_dict = dc_obj.get_integration_dict()
+            class_name = integration_dict['class_name']
+            integrator_obj_id = integration_dict['id']
+            integrator_obj = service.create_integrator_obj(class_name)
+            clinic_timings = integrator_obj.get_appointment_slots(pincode, date, integrator_obj_id=integrator_obj_id,
+                                                                  blocks=blocks, dc_obj=dc_obj,
+                                                                  total_leaves=total_leaves)
+        else:
+            clinic_timings = dc_obj.get_timings_v2(total_leaves, blocks)
 
         resp_data = {"timeslots": clinic_timings.get('timeslots', []),
                      "upcoming_slots": clinic_timings.get('upcoming_slots', []),
+                     "is_integrated": clinic_timings.get('is_integrated', False),
                      "doctor_data": doctor_serializer.data}
 
         return Response(resp_data)
