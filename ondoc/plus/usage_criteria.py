@@ -41,18 +41,17 @@ class DoctorAmountCount(AbstractCriteria):
         vip_utilization = kwargs.get('utilization') if kwargs.get('utilization') else self.utilization
         # available_amount = self.utilization.get('doctor_amount_available', 0)
         # available_count = self.utilization.get('available_doctor_count', 0)
-        available_amount = vip_utilization.get('doctor_amount_available', None)
-        available_count = vip_utilization.get('available_doctor_count', None)
-        total_doctor_count = vip_utilization.get('total_doctor_count_limit', None)
+        available_amount = vip_utilization.get('doctor_amount_available', 0)
+        available_count = vip_utilization.get('available_doctor_count', 0)
+        total_doctor_count = vip_utilization.get('total_doctor_count_limit', 0)
 
         if not total_doctor_count and not available_amount and available_count:
             return resp
 
-        # if available_count <= 0 or available_amount <= 0:
-        #     return resp
-
-        if (not total_doctor_count and available_amount > 0) or (total_doctor_count and available_count > 0 and
-                                                                      available_amount > 0):
+        if (total_doctor_count <= 0 and available_amount > 0) or (total_doctor_count > 0 and available_count > 0
+                                                                  and available_amount > 0):
+        # if (not total_doctor_count and available_amount > 0) or (total_doctor_count and available_count > 0 and
+        #                                                               available_amount > 0):
             if available_amount > cost:
                 vip_amount_deducted = cost
                 amount_to_be_paid = 0
