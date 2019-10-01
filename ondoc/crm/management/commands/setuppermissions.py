@@ -68,7 +68,8 @@ from ondoc.prescription.models import AppointmentPrescription
 
 from ondoc.diagnostic.models import LabPricing
 from ondoc.integrations.models import IntegratorMapping, IntegratorProfileMapping, IntegratorReport, \
-    IntegratorTestMapping, IntegratorTestParameterMapping, IntegratorLabTestParameterMapping, IntegratorLabCode
+    IntegratorTestMapping, IntegratorTestParameterMapping, IntegratorLabTestParameterMapping, IntegratorLabCode, \
+    IntegratorHospitalCode, IntegratorDoctorClinicMapping
 from ondoc.subscription_plan.models import Plan, PlanFeature, PlanFeatureMapping, UserPlanMapping
 
 from ondoc.web.models import Career, OnlineLead, UploadImage
@@ -134,7 +135,7 @@ class Command(BaseCommand):
 
             group.permissions.add(*permissions)
 
-        content_types = ContentType.objects.get_for_models(Lab, LabNetwork, IntegratorLabCode)
+        content_types = ContentType.objects.get_for_models(Lab, LabNetwork, IntegratorLabCode, IntegratorHospitalCode)
         for cl, ct in content_types.items():
 
             permissions = Permission.objects.filter(
@@ -179,7 +180,7 @@ class Command(BaseCommand):
                 Q(content_type=ct), Q(codename='change_' + ct.model))
             group.permissions.add(*permissions)
 
-        content_types = ContentType.objects.get_for_models(Lab, LabNetwork, IntegratorLabCode)
+        content_types = ContentType.objects.get_for_models(Lab, LabNetwork, IntegratorLabCode, IntegratorHospitalCode)
         for cl, ct in content_types.items():
             permissions = Permission.objects.filter(
                 Q(content_type=ct), Q(codename='change_' + ct.model))
@@ -299,7 +300,8 @@ class Command(BaseCommand):
             group.permissions.add(*permissions)
 
 
-        content_types = ContentType.objects.get_for_models(ParameterLabTest, LabTestPackage, LabTestCategoryMapping, HospitalTiming, IntegratorLabCode, LabTestGroupTiming)
+        content_types = ContentType.objects.get_for_models(ParameterLabTest, LabTestPackage, LabTestCategoryMapping,
+                                                           HospitalTiming, IntegratorLabCode, LabTestGroupTiming, IntegratorHospitalCode)
 
         for cl, ct in content_types.items():
             permissions = Permission.objects.filter(
@@ -484,7 +486,7 @@ class Command(BaseCommand):
         group, created = Group.objects.get_or_create(name=constants['ARTICLE_TEAM'])
         group.permissions.clear()
 
-        content_types = ContentType.objects.get_for_models(Article, Sitemap, ArticleContentBox, ArticleCategory, EntityUrls)
+        content_types = ContentType.objects.get_for_models(Article, Sitemap, ArticleContentBox, ArticleCategory, EntityUrls, IpdProcedure, IpdProcedureDetail)
 
         for cl, ct in content_types.items():
             permissions = Permission.objects.filter(
@@ -652,7 +654,7 @@ class Command(BaseCommand):
 
         content_types = ContentType.objects.get_for_models(IntegratorMapping, IntegratorProfileMapping, LabTest, LabNetwork,
                                                            IntegratorReport, IntegratorTestMapping, IntegratorTestParameterMapping,
-                                                           IntegratorLabTestParameterMapping)
+                                                           IntegratorLabTestParameterMapping, IntegratorDoctorClinicMapping)
 
         for cl, ct in content_types.items():
             permissions = Permission.objects.filter(

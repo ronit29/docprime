@@ -1,5 +1,6 @@
 from django.contrib import admin
-from ondoc.integrations.models import IntegratorMapping, IntegratorLabTestParameterMapping, IntegratorCity, IntegratorDoctorMappings, IntegratorHospitalMappings
+from ondoc.integrations.models import IntegratorMapping, IntegratorLabTestParameterMapping, IntegratorCity, \
+    IntegratorDoctorMappings, IntegratorHospitalMappings, IntegratorDoctorClinicMapping
 from ondoc.integrations.models import IntegratorProfileMapping, IntegratorReport, IntegratorTestMapping, IntegratorTestParameterMapping
 from ondoc.diagnostic.models import LabTest, Lab, LabPricingGroup, AvailableLabTest
 from django import forms
@@ -119,17 +120,26 @@ class IntegratorTestParameterMappingAdmin(admin.ModelAdmin):
     autocomplete_fields = ['test_parameter']
 
 
+class IntegratorDoctorClinicMappingInline(admin.TabularInline):
+    model = IntegratorDoctorClinicMapping
+    extra = 0
+    can_delete = True
+    show_change_link = False
+    autocomplete_fields = ['doctor_clinic', ]
+
+
 class IntegratorDoctorMappingsAdmin(admin.ModelAdmin):
     model = IntegratorDoctorMappings
     list_display = ('first_name', 'last_name', 'is_active', 'integrator_class_name')
     fields = ('first_name', 'middle_name', 'last_name', 'hospital_name', 'city', 'is_active', 'qualification', 'specialities', 'address',
               'primary_contact', 'secondary_contact', 'emergency_contact', 'helpline_sos', 'integrator_class_name',
-              'integrator_doctor_id', 'integrator_hospital_id', 'integrator_doctor_data', 'doctor_clinic')
+              'integrator_doctor_id', 'integrator_hospital_id', 'integrator_doctor_data')
     readonly_fields = ('first_name', 'middle_name', 'last_name', 'hospital_name', 'city', 'qualification', 'specialities', 'address',
                        'primary_contact', 'secondary_contact', 'emergency_contact', 'helpline_sos', 'integrator_class_name',
                        'integrator_doctor_id', 'integrator_hospital_id', 'integrator_doctor_data')
     autocomplete_fields = ['doctor_clinic']
     search_fields = ('first_name', 'middle_name', 'last_name')
+    inlines = [IntegratorDoctorClinicMappingInline]
 
 
 class IntegratorHospitalMappingsAdmin(admin.ModelAdmin):
@@ -144,4 +154,6 @@ class IntegratorLabTestParameterMappingAdmin(admin.ModelAdmin):
     list_display = ['integrator_test_parameter_code', 'integrator_class_name']
     readonly_fields = ('integrator_test_parameter_code',)
     autocomplete_fields = ['test_parameter']
+
+
 

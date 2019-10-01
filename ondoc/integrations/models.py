@@ -324,14 +324,16 @@ class IntegratorDoctorMappings(TimeStampedModel):
     @classmethod
     def get_if_third_party_integration(cls, doctor_clinic_id=None):
         if doctor_clinic_id:
-            mapping = cls.objects.filter(doctor_clinic_id=doctor_clinic_id, is_active=True).first()
+            dc_mapping = IntegratorDoctorClinicMapping.objects.filter(doctor_clinic_id=doctor_clinic_id).first()
+            # mapping = cls.objects.filter(doctor_clinic_id=doctor_clinic_id, is_active=True).first()
         else:
             return None
 
         # Return if no test exist over here and it depicts that it is not a part of integrations.
-        if not mapping:
+        if not dc_mapping:
             return None
 
+        mapping = cls.objects.filter(id=dc_mapping.integrator_doctor_mapping_id).first()
         # Part of the integrations.
         return {'class_name': mapping.integrator_class_name, 'id': mapping.id}
 
@@ -366,3 +368,21 @@ class IntegratorLabCode(TimeStampedModel):
 
     class Meta:
         db_table = 'integrator_lab_code'
+
+
+class IntegratorHospitalCode(TimeStampedModel):
+    from ondoc.doctor.models import Hospital
+    city_code = models.CharField(max_length=30, null=True, blank=True)
+    clinic_code = models.CharField(max_length=50, null=True, blank=True)
+    hospital = models.ForeignKey(Hospital, null=False, blank=False, related_name='hos_code', on_delete=models.DO_NOTHING)
+
+    class Meta:
+        db_table = 'integrator_hospital_code'
+
+
+class IntegratorDoctorClinicMapping(TimeStampedModel):
+    integrator_doctor_mapping = models.ForeignKey(IntegratorDoctorMappings, null=False, blank=False, related_name='integrator_doctor', on_delete=models.DO_NOTHING)
+    doctor_clinic = models.ForeignKey(DoctorClinic, null=False, blank=False, on_delete=models.DO_NOTHING)
+
+    class Meta:
+        db_table = 'integrator_doctor_clinic_mapping'
