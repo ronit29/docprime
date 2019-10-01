@@ -8,16 +8,17 @@ class AbstractCriteria(object):
         self.plus_plan = plus_obj.plan
         self.utilization = plus_obj.get_utilization
 
-    def _validate_booking_entity(self, cost, id):
+    def _validate_booking_entity(self, cost, id, *args, **kwargs):
         raise NotImplementedError()
 
     def validate_booking_entity(self, *args, **kwargs):
         cost = kwargs.get('cost')
         id = kwargs.get('id')
+        utilization = kwargs.get('utilization')
         if not cost:
             return {}
 
-        return self._validate_booking_entity(cost, id)
+        return self._validate_booking_entity(cost, id, utilization=utilization)
 
     def after_discount_cost(self, discount, cost):
         cost = cost - ((cost/100) * discount)
@@ -32,7 +33,7 @@ class DoctorAmountCount(AbstractCriteria):
     def __init__(self, plus_obj):
         super().__init__(plus_obj)
 
-    def _validate_booking_entity(self, cost, id, **kwargs):
+    def _validate_booking_entity(self, cost, id, *args, **kwargs):
         resp = {'vip_amount_deducted': 0, 'is_covered': False, 'amount_to_be_paid': cost}
         is_covered = False
         vip_amount_deducted = 0
@@ -91,17 +92,18 @@ class DoctorCountDiscount(AbstractCriteria):
     def __init__(self, plus_obj):
         super().__init__(plus_obj)
 
-    def _validate_booking_entity(self,cost, id):
+    def _validate_booking_entity(self,cost, id, *args, **kwargs):
         resp = {'vip_amount_deducted': 0, 'is_covered': False, 'amount_to_be_paid': cost}
         is_covered = False
         vip_amount_deducted = 0
         amount_to_be_paid = cost
+        vip_utilization = kwargs.get('utilization') if kwargs.get('utilization') else self.utilization
 
-        available_count = self.utilization.get('available_doctor_count')
+        available_count = vip_utilization.get('available_doctor_count')
         if available_count <= 0:
             return resp
 
-        doctor_discount = self.utilization.get('doctor_discount')
+        doctor_discount = vip_utilization.get('doctor_discount')
 
         discounted_cost = self.discounted_cost(doctor_discount, cost)
         after_discounted_cost = cost - discounted_cost
@@ -120,7 +122,7 @@ class DoctorAmountDiscount(AbstractCriteria):
     def __init__(self, plus_obj):
         super().__init__(plus_obj)
 
-    def _validate_booking_entity(self, cost, id, **kwargs):
+    def _validate_booking_entity(self, cost, id, *args, **kwargs):
         resp = {'vip_amount_deducted': 0, 'is_covered': False, 'amount_to_be_paid': cost}
         is_covered = False
         vip_amount_deducted = 0
@@ -158,13 +160,13 @@ class LabtestAmountCount(AbstractCriteria):
     def __init__(self, plus_obj):
         super().__init__(plus_obj)
 
-    def _validate_booking_entity(self, cost, id):
+    def _validate_booking_entity(self, cost, id, *args, **kwargs):
         resp = {'vip_amount_deducted': 0, 'is_covered': False, 'amount_to_be_paid': cost}
         vip_amount_deducted = 0
         amount_to_be_paid = cost
-
-        total_count_left = self.utilization.get('available_labtest_count')
-        total_amount_left = self.utilization.get('available_labtest_amount')
+        vip_utilization = kwargs.get('utilization') if kwargs.get('utilization') else self.utilization
+        total_count_left = vip_utilization.get('available_labtest_count')
+        total_amount_left = vip_utilization.get('available_labtest_amount')
 
         if not total_count_left and not total_amount_left:
             return resp
@@ -190,14 +192,15 @@ class LabtestCountDiscount(AbstractCriteria):
     def __init__(self, plus_obj):
         super().__init__(plus_obj)
 
-    def _validate_booking_entity(self, cost, id):
+    def _validate_booking_entity(self, cost, id, *args, **kwargs):
         resp = {'vip_amount_deducted': 0, 'is_covered': False, 'amount_to_be_paid': cost}
         is_covered = False
         vip_amount_deducted = 0
         amount_to_be_paid = cost
+        vip_utilization = kwargs.get('utilization') if kwargs.get('utilization') else self.utilization
 
-        available_labtest_count = self.utilization.get('available_labtest_count')
-        lab_test_discount = self.utilization.get('lab_discount')
+        available_labtest_count = vip_utilization.get('available_labtest_count')
+        lab_test_discount = vip_utilization.get('lab_discount')
 
         if available_labtest_count > 0:
             discounted_cost = self.discounted_cost(lab_test_discount, cost)
@@ -215,17 +218,17 @@ class LabtestAmountDiscount(AbstractCriteria):
     def __init__(self, plus_obj):
         super().__init__(plus_obj)
 
-    def _validate_booking_entity(self, cost, id):
+    def _validate_booking_entity(self, cost, id, *args, **kwargs):
         resp = {'vip_amount_deducted': 0, 'is_covered': False, 'amount_to_be_paid': cost}
         is_covered = False
         vip_amount_deducted = 0
         amount_to_be_paid = cost
-
-        available_amount = self.utilization.get('available_labtest_amount')
+        vip_utilization = kwargs.get('utilization') if kwargs.get('utilization') else self.utilization
+        available_amount = vip_utilization.get('available_labtest_amount')
         if available_amount <= 0:
             return resp
 
-        lab_test_discount = self.utilization.get('lab_discount')
+        lab_test_discount = vip_utilization.get('lab_discount')
 
         discounted_cost = self.discounted_cost(lab_test_discount, cost)
         after_discounted_cost =cost - discounted_cost
@@ -250,15 +253,16 @@ class PackageAmountCount(AbstractCriteria):
     def __init__(self, plus_obj):
         super().__init__(plus_obj)
 
-    def _validate_booking_entity(self, cost, id):
+    def _validate_booking_entity(self, cost, id, *args, **kwargs):
         resp = {'vip_amount_deducted': 0, 'is_covered': False, 'amount_to_be_paid': cost}
         is_covered = False
         vip_amount_deducted = 0
         amount_to_be_paid = cost
+        vip_utilization = kwargs.get('utilization') if kwargs.get('utilization') else self.utilization
 
-        available_package_amount = self.utilization.get('available_package_amount')
-        available_package_count = self.utilization.get('available_package_count')
-        allowed_package_ids = self.utilization.get('allowed_package_ids')
+        available_package_amount = vip_utilization.get('available_package_amount')
+        available_package_count =  vip_utilization.get('available_package_count')
+        allowed_package_ids =      vip_utilization.get('allowed_package_ids')
 
         if not available_package_count and not available_package_amount:
             return resp
@@ -296,15 +300,16 @@ class PackageCountDiscount(AbstractCriteria):
     def __init__(self, plus_obj):
         super().__init__(plus_obj)
 
-    def _validate_booking_entity(self, cost, id):
+    def _validate_booking_entity(self, cost, id, *args, **kwargs):
         resp = {'vip_amount_deducted': 0, 'is_covered': False, 'amount_to_be_paid': cost}
         is_covered = False
         vip_amount_deducted = 0
         amount_to_be_paid = cost
+        vip_utilization = kwargs.get('utilization') if kwargs.get('utilization') else self.utilization
 
-        available_package_discount = self.utilization.get('package_discount')
-        available_package_count = self.utilization.get('available_package_count')
-        allowed_package_ids = self.utilization.get('allowed_package_ids')
+        available_package_discount = vip_utilization.get('package_discount')
+        available_package_count = vip_utilization.get('available_package_count')
+        allowed_package_ids = vip_utilization.get('allowed_package_ids')
 
         if not available_package_count or not available_package_discount:
             return resp
@@ -335,17 +340,17 @@ class PackageAmountDiscount(AbstractCriteria):
     def __init__(self, plus_obj):
         super().__init__(plus_obj)
 
-    def _validate_booking_entity(self, cost, id):
+    def _validate_booking_entity(self, cost, id, *args, **kwargs):
         resp = {'vip_amount_deducted': 0, 'is_covered': False, 'amount_to_be_paid': cost}
         is_covered = False
         vip_amount_deducted = 0
         amount_to_be_paid = cost
-
-        available_amount = self.utilization.get('available_package_amount')
+        vip_utilization = kwargs.get('utilization') if kwargs.get('utilization') else self.utilization
+        available_amount = vip_utilization.get('available_package_amount')
         if available_amount <= 0:
             return resp
 
-        package_discount = self.utilization.get('package_discount')
+        package_discount = vip_utilization.get('package_discount')
 
         discounted_cost = self.discounted_cost(package_discount, cost)
         after_discounted_cost = cost - discounted_cost
