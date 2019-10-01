@@ -1374,7 +1374,7 @@ class ConsumerAccount(TimeStampedModel):
         ctx_objs = []
         if txn_entity_obj:
             ctx_sale_obj = ConsumerTransaction.objects.select_for_update().filter(user_id=txn_entity_obj.user_id,
-                                                                                  reference_id=txn_entity_obj,
+                                                                                  reference_id=txn_entity_obj.id,
                                                                                   type=PgTransaction.DEBIT,
                                                                                   action=ConsumerTransaction.SALE).last()
 
@@ -1382,7 +1382,7 @@ class ConsumerAccount(TimeStampedModel):
                 ref_txns = ctx_sale_obj.ref_txns
                 ref_txn_objs = ConsumerTransaction.objects.filter(id__in=list(ref_txns.keys()))
                 for ref_txn_obj in ref_txn_objs:
-                    ref_txn_amount = decimal.Decimal(ref_txns.get(ref_txn_obj.id, 0))
+                    ref_txn_amount = decimal.Decimal(ref_txns.get(str(ref_txn_obj.id), 0))
                     ctx_obj = self.debit_txn_refund(ref_txn_obj, ref_txn_amount)
                     ctx_sale_obj.balance -= ref_txn_amount
                     ctx_objs.append(ctx_obj)
@@ -1425,7 +1425,7 @@ class ConsumerAccount(TimeStampedModel):
 
         data = dict()
         data["user"] = self.user
-        data["product_id"] = tx_obj.PRODUCT_ID
+        data["product_id"] = tx_obj.product_id
         # data["reference_id"] = txn_entity_obj.id
         data["transaction_id"] = tx_obj.transaction_id if tx_obj else None
         data["order_id"] = tx_obj.order_id if tx_obj else None
