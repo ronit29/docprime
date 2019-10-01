@@ -473,8 +473,7 @@ def payment_details(request, order):
         uemail = user.email
     else:
         uemail = "dummyemail@docprime.com"
-    # base_url = "https://{}".format(request.get_host())
-    base_url = 'https://giant-owl-54.localtunnel.me'
+    base_url = "https://{}".format(request.get_host())
     surl = base_url + '/api/v1/user/transaction/save'
     furl = base_url + '/api/v1/user/transaction/save'
     isPreAuth = '1'
