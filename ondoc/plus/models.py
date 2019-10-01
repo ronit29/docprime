@@ -613,6 +613,7 @@ class PlusUser(auth_model.TimeStampedModel, RefundMixin):
                                                           expire_date=plus_data['expire_date'],
                                                           amount=plus_data['amount'],
                                                           order=plus_data['order'],
+                                                          payment_type=const.PREPAID,
                                                           status=cls.INACTIVE)
 
         PlusMembers.create_plus_members(plus_membership_obj)
