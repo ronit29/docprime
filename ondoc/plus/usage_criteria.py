@@ -59,7 +59,7 @@ class DoctorAmountCount(AbstractCriteria):
                 is_covered = True
             else:
                 vip_amount_deducted = available_amount
-                amount_to_be_paid = cost - available_amount
+                amount_to_be_paid = int(cost - available_amount)
                 is_covered = True
         # lab_test_discount = self.utilization.get('doctor_discount')
         # if available_count > 0 or available_amount > 0:
