@@ -81,7 +81,7 @@ class PlusUserAdminForm(forms.ModelForm):
         if self.instance.status == PlusUser.CANCELLED:
             raise forms.ValidationError('Membership is already cancelled. Cannot be changed now.')
 
-        if status == PlusUser.CANCEL_INITIATE and status != self.instance.status:
+        if status == PlusUser.CANCELLED and status != self.instance.status:
             cancel_dict = self.instance.can_be_cancelled()
             if not cancel_dict.get('can_be_cancelled', False):
                 raise forms.ValidationError(cancel_dict.get('reason'))
