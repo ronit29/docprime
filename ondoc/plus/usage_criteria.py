@@ -121,17 +121,20 @@ class DoctorAmountDiscount(AbstractCriteria):
     def __init__(self, plus_obj):
         super().__init__(plus_obj)
 
-    def _validate_booking_entity(self, cost, id):
+    def _validate_booking_entity(self, cost, id, **kwargs):
         resp = {'vip_amount_deducted': 0, 'is_covered': False, 'amount_to_be_paid': cost}
         is_covered = False
         vip_amount_deducted = 0
         amount_to_be_paid = cost
 
-        available_amount = self.utilization.get('doctor_amount_available')
+        vip_utilization = kwargs.get('utilization') if kwargs.get('utilization') else self.utilization
+        # available_amount = self.utilization.get('doctor_amount_available')
+        available_amount = vip_utilization.get('doctor_amount_available')
         if available_amount <= 0:
             return resp
 
-        doctor_discount = self.utilization.get('doctor_discount')
+        # doctor_discount = self.utilization.get('doctor_discount')
+        doctor_discount = vip_utilization.get('doctor_discount')
 
         discounted_cost = self.discounted_cost(doctor_discount, cost)
         after_discounted_cost = cost - discounted_cost
