@@ -1372,35 +1372,65 @@ class ConsumerAccount(TimeStampedModel):
 
     def debit_refund(self, txn_entity_obj=None):
         ctx_objs = []
-
-        # refund appointment amount
         if txn_entity_obj:
-            ctx_obj = self.debit_txn_refund(txn_entity_obj)
-            ctx_objs.append(ctx_obj)
+            ctx_sale_obj = ConsumerTransaction.objects.select_for_update().filter(user_id=txn_entity_obj.user_id,
+                                                                                  reference_id=txn_entity_obj,
+                                                                                  type=PgTransaction.DEBIT,
+                                                                                  action=ConsumerTransaction.SALE).last()
+
+            if ctx_sale_obj and ctx_sale_obj.ref_txns:
+                ref_txns = ctx_sale_obj.ref_txns
+                ref_txn_objs = ConsumerTransaction.objects.filter(id__in=list(ref_txns.keys()))
+                for ref_txn_obj in ref_txn_objs:
+                    ref_txn_amount = decimal.Decimal(ref_txns.get(ref_txn_obj.id, 0))
+                    ctx_obj = self.debit_txn_refund(ref_txn_obj, ref_txn_amount)
+                    ctx_sale_obj.balance -= ref_txn_amount
+                    ctx_objs.append(ctx_obj)
+
+            # Refund payment amount if there after refunding ref amount
+            if ctx_sale_obj.balance:
+                pg_ctx_obj = ConsumerTransaction.objects.filter(user=self.user, action=ConsumerTransaction.PAYMENT, order_id=ctx_sale_obj.order_id).last()
+                ctx_obj = self.debit_txn_refund(pg_ctx_obj, ctx_sale_obj.balance)
+                ctx_sale_obj.balance = 0
+                ctx_objs.append(ctx_obj)
+            ctx_sale_obj.save()
 
         # refund wallet amount
         if self.balance:
-            ctx_obj = self.debit_balance_refund()
-            ctx_objs.append(ctx_obj)
+            old_txn_objs = ConsumerTransaction.get_transactions(self.user, [ConsumerTransaction.PAYMENT, ConsumerTransaction.SALE])
+            for old_txn_obj in old_txn_objs:
+                old_txn_amount = old_txn_obj.balance
+                ctx_obj = self.debit_txn_refund(old_txn_obj, old_txn_amount)
+                ctx_obj.balance -= old_txn_amount
+                ctx_objs.append(ctx_obj)
+            # ctx_obj = self.debit_balance_refund()
+            # ctx_objs.append(ctx_obj)
 
         self.save()
         return ctx_objs
 
-    def debit_txn_refund(self, txn_entity_obj):
-        tx_obj = txn_entity_obj.get_transaction()
-        if tx_obj:
-            amount = tx_obj.amount
-        else:
-            amount = Decimal(0)
+    def debit_txn_refund(self, ctx_obj, refund_amount):
+        # tx_obj = txn_entity_obj.get_transaction()
+        # if tx_obj:
+        #     amount = tx_obj.amount
+        # else:
+        #     amount = Decimal(0)
+
+        # tx_obj = None
+        tx_obj = PgTransaction.objects.filter(order_id=ctx_obj.order_id).order_by('-created_at').first()
+        # if ctx_obj.action == ConsumerTransaction.PAYMENT:
+        #     tx_obj = PgTransaction.objects.filter(order_id=ctx_obj.order_id).order_by('-created_at').first()
+        # elif ctx_obj.action == ConsumerTransaction.SALE:
+        #     tx_obj = ctx_obj.get_transaction()
 
         data = dict()
         data["user"] = self.user
-        data["product_id"] = txn_entity_obj.PRODUCT_ID
-        data["reference_id"] = txn_entity_obj.id
+        data["product_id"] = tx_obj.PRODUCT_ID
+        # data["reference_id"] = txn_entity_obj.id
         data["transaction_id"] = tx_obj.transaction_id if tx_obj else None
         data["order_id"] = tx_obj.order_id if tx_obj else None
-        self.balance -= amount
-        consumer_tx_data = self.consumer_tx_pg_data(data, amount, ConsumerTransaction.REFUND, PgTransaction.DEBIT)
+        self.balance -= refund_amount
+        consumer_tx_data = self.consumer_tx_pg_data(data, refund_amount, ConsumerTransaction.REFUND, PgTransaction.DEBIT)
         ctx_obj = ConsumerTransaction.objects.create(**consumer_tx_data)
 
         return ctx_obj
@@ -1423,17 +1453,17 @@ class ConsumerAccount(TimeStampedModel):
             cashback_txns = ConsumerTransaction.get_transactions(self.user,
                                                                  [ConsumerTransaction.CASHBACK_CREDIT,
                                                                   ConsumerTransaction.REFERRAL_CREDIT
-                                                                  ],
-                                                                 PgTransaction.CREDIT
+                                                                  ]
                                                                  )
             cashback_txns_used = ConsumerTransaction.update_txn_balance(cashback_txns, cashback_deducted)
             self.cashback -= cashback_deducted
 
         balance_deducted = min(self.balance, amount-cashback_deducted)
-        pg_txns = ConsumerTransaction.get_transactions(self.user,
-                                                        [ConsumerTransaction.PAYMENT],
-                                                       PgTransaction.CREDIT
-                                                        )
+        # pg_txns = ConsumerTransaction.get_transactions(self.user,
+        #                                                 [ConsumerTransaction.PAYMENT],
+        #                                                PgTransaction.CREDIT
+        #                                                 )
+        pg_txns = ConsumerTransaction.get_transactions(self.user, [ConsumerTransaction.PAYMENT, ConsumerTransaction.SALE])
         wallet_txns_used = ConsumerTransaction.update_txn_balance(pg_txns, balance_deducted)
         self.balance -= balance_deducted
 
@@ -1596,7 +1626,7 @@ class ConsumerTransaction(TimeStampedModel):
     action = models.SmallIntegerField(choices=ACTION_CHOICES)
     amount = models.DecimalField(max_digits=10, decimal_places=2, default=0)
     source = models.SmallIntegerField(choices=SOURCE_TYPE, blank=True, null=True)
-    balance = models.DecimalField(max_digits=10, decimal_places=2, default=0, null=True)
+    balance = models.DecimalField(max_digits=10, decimal_places=2, default=decimal.Decimal(0))
     ref_txns = JSONField(blank=True, null=True)
 
     def save(self, *args, **kwargs):
@@ -1618,9 +1648,10 @@ class ConsumerTransaction(TimeStampedModel):
                                       action=cls.CANCELLATION).exists()
 
     @classmethod
-    def get_transactions(cls, user, actions=[], txn_type=None):
-
-        consumer_txns = cls.objects.select_for_update().filter(user=user, action__in=actions, type=txn_type, balance__gt=0).order_by("created_at")
+    def get_transactions(cls, user, actions=[]):
+        # consumer_txns = cls.objects.select_for_update().filter(user=user, action__in=actions, type=txn_type, balance__gt=0).order_by("created_at")
+        consumer_txns = cls.objects.select_for_update().filter(user=user, action__in=actions,
+                                                               balance__gt=0).order_by("created_at")
         return consumer_txns
 
     @classmethod

@@ -2347,7 +2347,7 @@ class PaymentMixin(object):
             parent_order = child_order.parent
 
         if parent_order:
-            pg_transaction = PgTransaction.objects.filter(order_id=parent_order.id).first()
+            pg_transaction = PgTransaction.objects.filter(order_id=parent_order.id).order_by('-created_at').first()
 
         return pg_transaction
 

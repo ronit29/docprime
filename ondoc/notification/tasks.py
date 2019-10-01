@@ -1448,6 +1448,7 @@ def send_capture_payment_request(self, product_id, appointment_id):
                     txn_obj.payment_captured = False
                     logger.error("Error in capture the payment with data - " + json.dumps(req_data) + " with error message - " + resp_data.get('statusMsg', ''))
                 txn_obj.save()
+                # todo - store transaction_id in consumer_transaction table when successfully captured
             else:
                 raise Exception("Retry on invalid Http response status - " + str(response.content))
 
