@@ -1446,25 +1446,29 @@ class ConsumerAccount(TimeStampedModel):
 
     def debit_schedule(self, appointment_obj, product_id, amount):
         cashback_txns_used = wallet_txns_used = []
-        if product_id == Order.SUBSCRIPTION_PLAN_PRODUCT_ID or product_id == Order.INSURANCE_PRODUCT_ID or product_id == Order.VIP_PRODUCT_ID:
-            cashback_deducted = 0
-        else:
-            cashback_deducted = min(self.cashback, amount)
-            cashback_txns = ConsumerTransaction.get_transactions(self.user,
-                                                                 [ConsumerTransaction.CASHBACK_CREDIT,
-                                                                  ConsumerTransaction.REFERRAL_CREDIT
-                                                                  ]
-                                                                 )
-            cashback_txns_used = ConsumerTransaction.update_txn_balance(cashback_txns, cashback_deducted)
-            self.cashback -= cashback_deducted
+        cashback_deducted = 0
+        order = appointment_obj.get_order()
+        if not product_id in [Order.SUBSCRIPTION_PLAN_PRODUCT_ID, Order.INSURANCE_PRODUCT_ID, Order.VIP_PRODUCT_ID]:
+            if order and order.cashback_amount:
+                cashback_deducted = min(self.cashback, amount)
+                cashback_txns = ConsumerTransaction.get_transactions(self.user,
+                                                                     [ConsumerTransaction.CASHBACK_CREDIT,
+                                                                      ConsumerTransaction.REFERRAL_CREDIT
+                                                                      ]
+                                                                     )
+                cashback_txns_used = ConsumerTransaction.update_txn_balance(cashback_txns, cashback_deducted)
+                self.cashback -= cashback_deducted
 
         balance_deducted = min(self.balance, amount-cashback_deducted)
-        # pg_txns = ConsumerTransaction.get_transactions(self.user,
-        #                                                 [ConsumerTransaction.PAYMENT],
-        #                                                PgTransaction.CREDIT
-        #                                                 )
-        pg_txns = ConsumerTransaction.get_transactions(self.user, [ConsumerTransaction.PAYMENT, ConsumerTransaction.SALE])
-        wallet_txns_used = ConsumerTransaction.update_txn_balance(pg_txns, balance_deducted)
+        if order and order.wallet_amount:
+            pg_txns = ConsumerTransaction.get_transactions(self.user, [ConsumerTransaction.PAYMENT, ConsumerTransaction.SALE])
+            wallet_txns_used = ConsumerTransaction.update_txn_balance(pg_txns, balance_deducted)
+        else:
+            pg_txns = []
+            pg_txn = ConsumerTransaction.objects.select_for_update().filter(user=self.user, action=ConsumerTransaction.PAYMENT,
+                                                               balance__gt=0).order_by("-created_at").first()
+            pg_txns.append(pg_txn)
+            wallet_txns_used = ConsumerTransaction.update_txn_balance(pg_txns, balance_deducted)
         self.balance -= balance_deducted
 
         action = ConsumerTransaction.SALE
