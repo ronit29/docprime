@@ -5,6 +5,7 @@ from django.db.models import F
 from rest_framework import serializers
 from dal import autocomplete
 from ondoc.authentication.models import User
+from ondoc.common.models import AppointmentHistory
 from ondoc.plus.models import PlusProposer, PlusPlans, PlusThreshold, PlusUser, PlusPlanContent, PlusPlanParameters, \
     PlusPlanParametersMapping, PlusPlanUtmSources, PlusPlanUtmSourceMapping
 from import_export.admin import ImportExportMixin, ImportExportModelAdmin, base_formats
@@ -66,8 +67,29 @@ class PlusThresholdAdmin(admin.ModelAdmin):
     list_display = ('plus_plan', 'opd_amount_limit', 'lab_amount_limit')
 
 
+class PlusUserAdminForm(forms.ModelForm):
+
+    status = forms.ChoiceField(choices=PlusUser.STATUS_CHOICES, required=True)
+
+    def clean_status(self):
+        status = self.cleaned_data.get('status')
+        if not status:
+            raise forms.ValidationError("Status cannot be null or empty.")
+
+        if status:
+            status = int(status)
+
+        if status == PlusUser.CANCEL_INITIATE and status != self.instance.status:
+            cancel_dict = self.instance.can_be_cancelled()
+            if not cancel_dict.get('can_be_cancelled', False):
+                raise forms.ValidationError(cancel_dict.get('reason'))
+
+        return status
+
+
 class PlusUserAdmin(admin.ModelAdmin):
+    form = PlusUserAdminForm
     model = PlusUser
-    display = ("user", "plan", "purchase_date", "expire_date", "status", "matrix_lead_id")
-    readonly_fields = ("user", "plan", "purchase_date", "expire_date", "status", "matrix_lead_id")
+    fields = ("user", "plan", "purchase_date", "expire_date", "status", "matrix_lead_id")
+    readonly_fields = ("user", "plan", "purchase_date", "expire_date", "matrix_lead_id")
     list_display = ('user', 'purchase_date')

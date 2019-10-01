@@ -8,7 +8,7 @@ from django.core.validators import FileExtensionValidator, MaxValueValidator, Mi
 from django.contrib.postgres.fields import JSONField
 from django.utils import timezone
 from ondoc.account import models as account_model
-from ondoc.authentication.models import UserProfile
+from ondoc.authentication.models import UserProfile, RefundMixin
 from ondoc.cart.models import Cart
 from ondoc.common.helper import Choices
 import json
@@ -19,6 +19,7 @@ from ondoc.common.models import DocumentsProofs
 from ondoc.notification.tasks import push_plus_lead_to_matrix
 from .enums import PlanParametersEnum, UtilizationCriteria
 from datetime import datetime
+from ondoc.crm import constants as const
 from django.utils.timezone import utc
 import reversion
 from django.conf import settings
@@ -204,8 +205,10 @@ class PlusThreshold(auth_model.TimeStampedModel, LiveMixin):
         return str(self.plus_plan)
 
 
-class PlusUser(auth_model.TimeStampedModel):
+@reversion.register()
+class PlusUser(auth_model.TimeStampedModel, RefundMixin):
     from ondoc.account.models import MoneyPool
+    PRODUCT_ID = account_model.Order.VIP_PRODUCT_ID
 
     ACTIVE = 1
     CANCELLED = 2
@@ -233,6 +236,7 @@ class PlusUser(auth_model.TimeStampedModel):
     money_pool = models.ForeignKey(MoneyPool, on_delete=models.SET_NULL, null=True)
     matrix_lead_id = models.IntegerField(null=True)
     raw_plus_member = JSONField(blank=False, null=False, default=list)
+    payment_type = models.PositiveSmallIntegerField(choices=const.PAY_CHOICES, default=const.PREPAID)
 
     def is_valid(self):
         if self.expire_date >= timezone.now() and (self.status == self.ACTIVE):
@@ -245,6 +249,25 @@ class PlusUser(auth_model.TimeStampedModel):
             return True
         else:
             return False
+
+    def can_be_cancelled(self):
+        from ondoc.doctor.models import OpdAppointment
+        from ondoc.diagnostic.models import LabAppointment
+        # Opd Appointments
+        appointments_qs = OpdAppointment.objects.filter(plus_plan=self)
+        completed_appointments = appointments_qs.filter(status=OpdAppointment.COMPLETED)
+        if completed_appointments.exists():
+            return {'reason': 'User has completed opd appointments', 'can_be_cancelled': False}
+
+        # Opd Appointments
+        appointments_qs = LabAppointment.objects.filter(plus_plan=self)
+        completed_appointments = appointments_qs.filter(status=LabAppointment.COMPLETED)
+        if completed_appointments.exists():
+            return {'reason': 'User has completed lab appointments.', 'can_be_cancelled': False}
+
+        return {'reason': 'Can be cancelled.', 'can_be_cancelled': True}
+
+
 
     def get_primary_member_profile(self):
         insured_members = self.plus_members.filter().order_by('id')
@@ -625,15 +648,48 @@ class PlusUser(auth_model.TimeStampedModel):
 
         care_membership.save(plus_user_obj=self)
 
+    def get_cancellation_breakup(self):
+        wallet_refund = cashback_refund = 0
+        if self.money_pool:
+            wallet_refund, cashback_refund = self.money_pool.get_refund_breakup(self.effective_price)
+        elif self.price_data:
+            wallet_refund = self.price_data["wallet_amount"]
+            cashback_refund = self.price_data["cashback_amount"]
+        else:
+            wallet_refund = self.effective_price
+
+        return wallet_refund, cashback_refund
+
     def after_commit_tasks(self, *args, **kwargs):
         from ondoc.api.v1.plus.plusintegration import PlusIntegration
         if kwargs.get('is_fresh'):
             PlusIntegration.create_vip_lead_after_purchase(self)
+    
+    def process_cancellation(self):
+        from ondoc.subscription_plan.models import Plan, UserPlanMapping
+        care_obj = UserPlanMapping.objects.filter(user=self.user).order_by('id').last()
+        if care_obj:
+            care_obj.status = UserPlanMapping.CANCELLED
+            care_obj.is_active = False
+            care_obj.save()
+
+    def process_cancel_initiate(self):
+        self.action_refund()
 
     def save(self, *args, **kwargs):
         is_fresh = False
         if not self.pk:
             is_fresh = True
+        
+        db_instance = None
+        if self.pk:
+            db_instance = PlusUser.objects.filter(id=self.id).first()
+            
+        if db_instance and self.status == self.CANCELLED and db_instance.status != self.CANCELLED:
+            self.process_cancellation()
+
+        if db_instance and self.status == self.CANCEL_INITIATE and db_instance.status != self.CANCEL_INITIATE:
+            self.process_cancel_initiate()
 
         super().save(*args, **kwargs)
         transaction.on_commit(lambda: self.after_commit_tasks(is_fresh=is_fresh))
