@@ -1615,7 +1615,7 @@ class ConsumerTransaction(TimeStampedModel):
 
     @classmethod
     def get_transactions(cls, user, txn_type=[], action=None):
-        consumer_txns = cls.objects.select_for_update().filter(user=user, action=action, type_in=txn_type, balance__gt=0).order_by("created_at")
+        consumer_txns = cls.objects.select_for_update().filter(user=user, action=action, type__in=txn_type, balance__gt=0).order_by("created_at")
         return consumer_txns
 
     def update_txn_balance(self, txns, amount):
