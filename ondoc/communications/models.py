@@ -2263,7 +2263,7 @@ class OfflineOpdAppointments(Notification):
             "action_id": self.appointment.id,
             "opd_time_slot_start": time_slot_start,
             "welcome_message": self.appointment.user.welcome_message,
-            "admin_phone_no": "+91-9971279198",
+            "admin_phone_no": self.appointment.booked_by.phone_number,
         }
         return context
 
@@ -2448,7 +2448,7 @@ class PartnerLabNotification(Notification):
     def __init__(self, partner_lab_order_obj, notification_type=None):
         self.partner_lab_order_obj = partner_lab_order_obj
         self.notification_type = notification_type if notification_type else self.PARTNER_LAB_NOTIFICATION_TYPE_MAPPING[partner_lab_order_obj.status]
-        self.patient_mobile = partner_lab_order_obj.offline_patient.get_patient_mobile()
+        self.patient_mobile = str(partner_lab_order_obj.offline_patient.get_patient_mobile())
 
     def get_context(self):
         instance = self.partner_lab_order_obj
@@ -2466,7 +2466,7 @@ class PartnerLabNotification(Notification):
             "mrp": mrp if mrp else None,
             "order_date_time": instance.created_at,
             "lab_tests_ordered": lab_tests_ordered,
-            "admin_contact_no": "9971279198",
+            "admin_contact_no": instance.created_by.phone_number,
             "support_email": "cloudlabs@docprime.com",
             "report_list": [(HttpRequest.build_absolute_uri(mapping.report.url)) for mapping in instance.reports.all()],
             "screen": NotificationAction.PARTNER_LAB_ORDER_DETAILS,
