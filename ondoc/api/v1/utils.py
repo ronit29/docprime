@@ -2225,6 +2225,25 @@ def log_requests_on():
     requests_log.addHandler(ch)
 
 
+def common_package_category(self, request):
+    from ondoc.diagnostic.models import LabTestCategory
+    from ondoc.api.v1.procedure.serializers import CommonCategoriesSerializer
+
+    need_to_hit_query = True
+
+    if request.user and request.user.is_authenticated and not hasattr(request, 'agent') and request.user.active_insurance and request.user.active_insurance.insurance_plan and request.user.active_insurance.insurance_plan.plan_usages:
+        if request.user.active_insurance.insurance_plan.plan_usages.get('package_disabled'):
+            need_to_hit_query = False
+
+    categories_serializer = None
+
+    if need_to_hit_query:
+        categories = LabTestCategory.objects.filter(is_live=True, is_package_category=True,
+                                                    show_on_recommended_screen=True).order_by('-priority')[:15]
+
+        categories_serializer = CommonCategoriesSerializer(categories, many=True, context={'request': request})
+
+    return (categories_serializer.data)
 
 
 
