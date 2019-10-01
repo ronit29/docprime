@@ -651,7 +651,7 @@ class PlusUser(auth_model.TimeStampedModel, RefundMixin):
     def get_cancellation_breakup(self):
         wallet_refund = cashback_refund = 0
         if self.money_pool:
-            wallet_refund, cashback_refund = self.money_pool.get_refund_breakup(self.effective_price)
+            wallet_refund, cashback_refund = self.money_pool.get_refund_breakup(self.amount)
         elif self.price_data:
             wallet_refund = self.price_data["wallet_amount"]
             cashback_refund = self.price_data["cashback_amount"]
