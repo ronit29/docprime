@@ -1359,10 +1359,11 @@ class ConsumerAccount(TimeStampedModel):
 
         if wallet_refund_amount:
             # check if ref transaction available
-            ctxn_obj = ConsumerTransaction.objects.filter(user_id=appointment_obj.user_id,
+            ctxn_obj = ConsumerTransaction.objects.select_for_update().filter(user_id=appointment_obj.user_id,
                                                           reference_id=appointment_obj.id,
                                                           action=ConsumerTransaction.SALE).last()
             ctxn_obj.balance += wallet_refund_amount
+            ctxn_obj.save()
 
             consumer_tx_data = self.consumer_tx_appointment_data(appointment_obj.user, appointment_obj, product_id, wallet_refund_amount, action, tx_type, ConsumerTransaction.WALLET_SOURCE)
             ConsumerTransaction.objects.create(**consumer_tx_data)
@@ -1430,9 +1431,9 @@ class ConsumerAccount(TimeStampedModel):
 
         balance_deducted = min(self.balance, amount-cashback_deducted)
         pg_txns = ConsumerTransaction.get_transactions(self.user,
-                                                             [ConsumerTransaction.PAYMENT],
-                                                             PgTransaction.CREDIT
-                                                             )
+                                                        [ConsumerTransaction.PAYMENT],
+                                                       PgTransaction.CREDIT
+                                                        )
         wallet_txns_used = ConsumerTransaction.update_txn_balance(pg_txns, balance_deducted)
         self.balance -= balance_deducted
 
@@ -1556,10 +1557,13 @@ class ConsumerAccount(TimeStampedModel):
         consumer_tx_data['action'] = action
         consumer_tx_data['amount'] = amount
         consumer_tx_data['source'] = source
-        if tx_type == PgTransaction.CREDIT:
+        if tx_type == PgTransaction.CREDIT and not action == ConsumerTransaction.CANCELLATION:
             consumer_tx_data['balance'] = amount
         if ref_txns:
             consumer_tx_data['ref_txns'] = ref_txns
+        order = app_obj.get_order()
+        consumer_tx_data['order_id'] = order.id
+
         return consumer_tx_data
 
     class Meta:
@@ -1614,8 +1618,9 @@ class ConsumerTransaction(TimeStampedModel):
                                       action=cls.CANCELLATION).exists()
 
     @classmethod
-    def get_transactions(cls, user, txn_type=[], action=None):
-        consumer_txns = cls.objects.select_for_update().filter(user=user, action=action, type__in=txn_type, balance__gt=0).order_by("created_at")
+    def get_transactions(cls, user, actions=[], txn_type=None):
+
+        consumer_txns = cls.objects.select_for_update().filter(user=user, action__in=actions, type=txn_type, balance__gt=0).order_by("created_at")
         return consumer_txns
 
     @classmethod
@@ -1627,7 +1632,7 @@ class ConsumerTransaction(TimeStampedModel):
                     balance_amount = min(txn.balance, amount)
                     txn.balance -= balance_amount
                     amount -= balance_amount
-                    txns_used.update({txn.id: balance_amount})
+                    txns_used.update({txn.id: str(balance_amount)})
                     txn.save()
                 else:
                     break
