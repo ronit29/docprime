@@ -498,7 +498,7 @@ class PlusUser(auth_model.TimeStampedModel):
                 engine = get_class_reference(user.active_plus_user, "DOCTOR")
                 if engine:
                     vip_response = engine.validate_booking_entity(cost=current_item_mrp, utilization=updated_utilization)
-                    vip_data_dict['vip_amount'] = vip_response.get('vip_amount_deducted')
+                    vip_data_dict['vip_amount'] = vip_response.get('amount_to_be_paid')
             else:
                 return vip_data_dict
         else:
