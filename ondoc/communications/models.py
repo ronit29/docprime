@@ -2460,15 +2460,17 @@ class PartnerLabNotification(Notification):
         context = {
             "instance": instance,
             "order_id": instance.id,
-            "patient_name": self.partner_lab_order_obj.offline_patient.name,
+            "patient_name": instance.offline_patient.name,
             "hospital_name": instance.hospital.name,
-            "patient_age": self.partner_lab_order_obj.offline_patient.get_age(),
+            "patient_age": instance.offline_patient.get_age(),
             "mrp": mrp if mrp else None,
-            "order_date_time": self.partner_lab_order_obj.created_at,
+            "order_date_time": instance.created_at,
             "lab_tests_ordered": lab_tests_ordered,
             "admin_contact_no": "9971279198",
             "support_email": "cloudlabs@docprime.com",
-            "report_list": [(HttpRequest.build_absolute_uri(mapping.report.url)) for mapping in instance.reports.all()]
+            "report_list": [(HttpRequest.build_absolute_uri(mapping.report.url)) for mapping in instance.reports.all()],
+            "action_type": NotificationAction.PARTNER_LAB,
+            "action_id": instance.id,
         }
         return context
 
