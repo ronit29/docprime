@@ -649,6 +649,7 @@ class PlusUser(auth_model.TimeStampedModel):
 
     @classmethod
     def create_plus_user(cls, plus_data, user):
+        from ondoc.doctor.models import OpdAppointment
         members = plus_data['plus_members']
 
         for member in members:
@@ -664,6 +665,7 @@ class PlusUser(auth_model.TimeStampedModel):
                                                           expire_date=plus_data['expire_date'],
                                                           amount=plus_data['amount'],
                                                           order=plus_data['order'],
+                                                          payment_type=OpdAppointment.PREPAID,
                                                           status=cls.INACTIVE)
 
         PlusMembers.create_plus_members(plus_membership_obj)
