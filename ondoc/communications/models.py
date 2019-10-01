@@ -2469,8 +2469,11 @@ class PartnerLabNotification(Notification):
             "admin_contact_no": "9971279198",
             "support_email": "cloudlabs@docprime.com",
             "report_list": [(HttpRequest.build_absolute_uri(mapping.report.url)) for mapping in instance.reports.all()],
-            "action_type": NotificationAction.PARTNER_LAB,
-            "action_id": instance.id,
+            "screen": NotificationAction.PARTNER_LAB_ORDER_DETAILS,
+            "is_open_screen": True,
+            "screen_params": {
+                "id": instance.id
+            }
         }
         return context
 

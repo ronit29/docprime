@@ -251,9 +251,11 @@ class NotificationAction:
 
     APPOINTMENT = "appointment"
     E_CONSULT_CHAT_VIEW = "EConsultChatView"
+    PARTNER_LAB_ORDER_DETAILS = "TestOrderDetails"          #PartnerLabOrderDetails
     SCREEN_TYPE_CHOICES = (
         (APPOINTMENT, 'appointment'),
         (E_CONSULT_CHAT_VIEW, 'e_consult_chat_view'),
+        (PARTNER_LAB_ORDER_DETAILS, 'partner_lab_order_details'),
     )
 
     @classmethod
