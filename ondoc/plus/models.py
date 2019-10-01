@@ -666,6 +666,9 @@ class PlusUser(auth_model.TimeStampedModel, RefundMixin):
             PlusIntegration.create_vip_lead_after_purchase(self)
     
     def process_cancellation(self):
+        pass
+
+    def process_cancel_initiate(self):
         from ondoc.doctor.models import OpdAppointment
         from ondoc.diagnostic.models import LabAppointment
         from ondoc.subscription_plan.models import Plan, UserPlanMapping
@@ -674,6 +677,8 @@ class PlusUser(auth_model.TimeStampedModel, RefundMixin):
             care_obj.status = UserPlanMapping.CANCELLED
             care_obj.is_active = False
             care_obj.save()
+
+        self.action_refund()
 
         # Cancel all the appointments which are created using the plus membership.
 
@@ -690,9 +695,6 @@ class PlusUser(auth_model.TimeStampedModel, RefundMixin):
         for appointment in to_be_cancelled_appointments:
             appointment.status = LabAppointment.CANCELLED
             appointment.save()
-
-    def process_cancel_initiate(self):
-        self.action_refund()
 
     def save(self, *args, **kwargs):
         is_fresh = False
