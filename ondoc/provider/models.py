@@ -321,6 +321,7 @@ class PartnerLabSamplesCollectOrder(auth_models.TimeStampedModel, auth_models.Cr
         db_table = "partner_lab_samples_collect_order"
 
     def save(self, *args, **kwargs):
+        report_list = kwargs.get('report_list')
         is_new_instance = True if not self.id else False
         super(PartnerLabSamplesCollectOrder, self).save()
         if is_new_instance:
@@ -329,7 +330,8 @@ class PartnerLabSamplesCollectOrder(auth_models.TimeStampedModel, auth_models.Cr
                                                                           countdown=3)
         if self.status in [PartnerLabSamplesCollectOrder.PARTIAL_REPORT_GENERATED, PartnerLabSamplesCollectOrder.REPORT_GENERATED]:
             notification_tasks.send_partner_lab_notifications.apply_async(kwargs={'order_id': self.id,
-                                                                                  'notification_type': NotificationAction.PARTNER_LAB_REPORT_UPLOADED},
+                                                                                  'notification_type': NotificationAction.PARTNER_LAB_REPORT_UPLOADED,
+                                                                                  'report_list': report_list},
                                                                           countdown=3)
 
 

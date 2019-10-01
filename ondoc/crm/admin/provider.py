@@ -128,3 +128,10 @@ class PartnerLabSamplesCollectOrderAdmin(admin.ModelAdmin):
 
     def has_delete_permission(self, request, obj=None):
         return False
+
+    def save_model(self, request, obj, form, change):
+        report_list = list()
+        if obj.status in [prov_models.PartnerLabSamplesCollectOrder.PARTIAL_REPORT_GENERATED,
+                          prov_models.PartnerLabSamplesCollectOrder.REPORT_GENERATED]:
+            report_list = [(request.build_absolute_uri(mapping.report.url)) for mapping in obj.reports.all()]
+        obj.save(report_list=report_list)

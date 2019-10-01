@@ -39,7 +39,6 @@ from ondoc.notification.models import NotificationAction, SmsNotification, Email
 from ondoc.notification.rabbitmq_client import publish_message
 # import datetime
 from ondoc.api.v1.utils import aware_time_zone
-from django.http.request import HttpRequest
 
 User = get_user_model()
 logger = logging.getLogger(__name__)
@@ -2446,10 +2445,11 @@ class VipNotification(Notification):
 
 class PartnerLabNotification(Notification):
 
-    def __init__(self, partner_lab_order_obj, notification_type=None):
+    def __init__(self, partner_lab_order_obj, notification_type=None, report_list=list()):
         self.partner_lab_order_obj = partner_lab_order_obj
         self.notification_type = notification_type if notification_type else self.PARTNER_LAB_NOTIFICATION_TYPE_MAPPING[partner_lab_order_obj.status]
         self.patient_mobile = str(partner_lab_order_obj.offline_patient.get_patient_mobile())
+        self.report_list = report_list
 
     def get_context(self):
         instance = self.partner_lab_order_obj
@@ -2469,7 +2469,7 @@ class PartnerLabNotification(Notification):
             "lab_tests_ordered": lab_tests_ordered,
             "admin_contact_no": instance.created_by.phone_number,
             "support_email": "cloudlabs@docprime.com",
-            "report_list": [(HttpRequest.build_absolute_uri(mapping.report.url)) for mapping in instance.reports.all()],
+            "report_list": self.report_list,
             "screen": NotificationAction.PARTNER_LAB_ORDER_DETAILS,
             "is_open_screen": True,
             "screen_params": {
@@ -2513,10 +2513,10 @@ class PartnerLabNotification(Notification):
         all_receivers = self.get_receivers()
 
         if notification_type in [NotificationAction.PARTNER_LAB_REPORT_UPLOADED]:
-            push_notification = PUSHNotification(notification_type, context)
-            push_notification.send(all_receivers.get('push_receivers', []))
             sms_notification = SMSNotification(notification_type, context)
             sms_notification.send(all_receivers.get('sms_receivers', []))
+            push_notification = PUSHNotification(notification_type, context)
+            push_notification.send(all_receivers.get('push_receivers', []))
         if notification_type in [NotificationAction.PARTNER_LAB_ORDER_PLACED_SUCCESSFULLY]:
             sms_notification = SMSNotification(notification_type, context)
             sms_notification.send(all_receivers.get('sms_receivers', []))
