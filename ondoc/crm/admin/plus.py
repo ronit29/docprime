@@ -78,6 +78,9 @@ class PlusUserAdminForm(forms.ModelForm):
         if status:
             status = int(status)
 
+        if status != PlusUser.CANCELLED:
+            raise forms.ValidationError('Membership can only be cancelled. Nothing else.')
+
         if self.instance.status == PlusUser.CANCELLED:
             raise forms.ValidationError('Membership is already cancelled. Cannot be changed now.')
 
