@@ -2920,7 +2920,7 @@ class DoctorFeedbackViewSet(viewsets.GenericViewSet):
             subject_string = valid_data.get('subject_string')
             # subject_string = "Test Sample Pickup Request from " + str(user.phone_number)
             message = valid_data.get('feedback')
-            emails = ["rajivk@docprime.com", "navneetsingh@docprime.com", "sanat@docprime.com", "himanshubajaj@docprime.com"]
+            emails = ["navneetsingh@docprime.com", "sanat@docprime.com", "himanshubajaj@docprime.com"]
             # emails = ["sanat@docprime.com", "kabeer@docprime.com", "prithvijeet@docprime.com", "raghavr@docprime.com"]
         else:
             subject_string = "Feedback Mail from " + str(user.phone_number)
