@@ -477,7 +477,7 @@ class PlusUser(auth_model.TimeStampedModel, RefundMixin):
             if doctor and data.get('cover_under_vip'):
                 doctor_available_amount = utilization.get('doctor_amount_available', 0)
                 if doctor_available_amount > 0:
-                    utilization['doctor_amount_available'] = doctor_available_amount - data.get('vip_amount')
+                    utilization['doctor_amount_available'] = doctor_available_amount - (int(mrp) - data.get('vip_amount'))
                 else:
                     return vip_data_dict
             elif data.get('lab') and data.get('cover_under_vip'):
@@ -490,7 +490,7 @@ class PlusUser(auth_model.TimeStampedModel, RefundMixin):
                     if test.is_package and test.id in package_available_ids and package_available_count and package_available_count > 0:
                         utilization['available_package_count'] = package_available_count - 1
                     elif test.is_package and package_available_amount and package_available_amount > 0:
-                        utilization['available_package_amount'] = package_available_amount - data.get('vip_amount')
+                        utilization['available_package_amount'] = package_available_amount - (int(mrp) -data.get('vip_amount'))
             else:
                 return vip_data_dict
         current_item_price_data = OpdAppointment.get_price_details(
