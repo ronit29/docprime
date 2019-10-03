@@ -513,15 +513,14 @@ class PlusUser(auth_model.TimeStampedModel, RefundMixin):
         updated_utilization = utilization
         if 'doctor' in appointment_data:
             current_doctor_amount_available = updated_utilization.get('doctor_amount_available', 0)
-            if current_doctor_amount_available > 0:
-                vip_data_dict['cover_under_vip'] = True
-                vip_data_dict['plus_user_id'] = self.id
                 # vip_data_dict['vip_amount'] = 0 if current_doctor_amount_available > current_item_mrp else (current_item_mrp - current_doctor_amount_available)
                 # vip_data_dict['vip_amount'] = user.active_plus_user.get_vip_amount(updated_utilization, current_item_mrp)
-                engine = get_class_reference(user.active_plus_user, "DOCTOR")
-                if engine:
-                    vip_response = engine.validate_booking_entity(cost=current_item_mrp, utilization=updated_utilization)
-                    vip_data_dict['vip_amount'] = vip_response.get('amount_to_be_paid')
+            engine = get_class_reference(user.active_plus_user, "DOCTOR")
+            if engine:
+                vip_response = engine.validate_booking_entity(cost=current_item_mrp, utilization=updated_utilization)
+                vip_data_dict['vip_amount'] = vip_response.get('amount_to_be_paid')
+                vip_data_dict['cover_under_vip'] = vip_response.get('is_covered')
+                vip_data_dict['plus_user_id'] = self.id
             else:
                 return vip_data_dict
         else:
@@ -530,14 +529,22 @@ class PlusUser(auth_model.TimeStampedModel, RefundMixin):
             current_package_ids = updated_utilization.get('allowed_package_ids', [])
             tests = appointment_data.get('test_ids', [])
             for test in tests:
-                if test.is_package and test.id in current_package_ids and current_package_count_available > 0:
-                    vip_data_dict['cover_under_vip'] = True
-                    vip_data_dict['vip_amount'] = 0
+                entity = "LABTEST" if not test.is_package else "PACKAGE"
+
+                engine = get_class_reference(user.active_plus_user, entity)
+                if engine:
+                    vip_response = engine.validate_booking_entity(cost=current_item_mrp, utilization=updated_utilization)
+                    vip_data_dict['vip_amount'] = vip_response.get('amount_to_be_paid')
+                    vip_data_dict['cover_under_vip'] = vip_response.get('is_covered')
                     vip_data_dict['plus_user_id'] = self.id
-                elif test.is_package and current_package_amount_available and current_package_amount_available > 0:
-                    vip_data_dict['cover_under_vip'] = True
-                    vip_data_dict['vip_amount'] = 0 if current_package_amount_available > current_item_mrp else (current_item_mrp - current_package_amount_available)
-                    vip_data_dict['plus_user_id'] = self.id
+                # if test.is_package and test.id in current_package_ids and current_package_count_available > 0:
+                #     vip_data_dict['cover_under_vip'] = True
+                #     vip_data_dict['vip_amount'] = 0
+                #     vip_data_dict['plus_user_id'] = self.id
+                # elif test.is_package and current_package_amount_available and current_package_amount_available > 0:
+                #     vip_data_dict['cover_under_vip'] = True
+                #     vip_data_dict['vip_amount'] = 0 if current_package_amount_available > current_item_mrp else (current_item_mrp - current_package_amount_available)
+                #     vip_data_dict['plus_user_id'] = self.id
                 else:
                     return vip_data_dict
         return vip_data_dict
