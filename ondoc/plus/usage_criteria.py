@@ -53,7 +53,7 @@ class DoctorAmountCount(AbstractCriteria):
                                                                   and available_amount > 0):
         # if (not total_doctor_count and available_amount > 0) or (total_doctor_count and available_count > 0 and
         #                                                               available_amount > 0):
-            if available_amount > cost:
+            if available_amount >= cost:
                 vip_amount_deducted = cost
                 amount_to_be_paid = 0
                 is_covered = True
@@ -163,6 +163,7 @@ class LabtestAmountCount(AbstractCriteria):
     def _validate_booking_entity(self, cost, id, *args, **kwargs):
         resp = {'vip_amount_deducted': 0, 'is_covered': False, 'amount_to_be_paid': cost}
         vip_amount_deducted = 0
+        cost = int(cost)
         amount_to_be_paid = cost
         vip_utilization = kwargs.get('utilization') if kwargs.get('utilization') else self.utilization
         total_count_left = vip_utilization.get('available_labtest_count')
@@ -175,7 +176,7 @@ class LabtestAmountCount(AbstractCriteria):
             return resp
 
         is_covered = True
-        if cost < total_amount_left:
+        if cost <= total_amount_left:
             vip_amount_deducted = cost
             amount_to_be_paid = 0
         elif 0 < total_amount_left < cost:
