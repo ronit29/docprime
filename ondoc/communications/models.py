@@ -2475,7 +2475,7 @@ class PartnerLabNotification(Notification):
             "screen": NotificationAction.PARTNER_LAB_ORDER_DETAILS,
             "is_open_screen": True,
             "screen_params": {
-                "id": instance.id
+                "order_id": instance.id
             }
         }
         return context

@@ -302,6 +302,8 @@ class PartnerLabSamplesCollectOrder(auth_models.TimeStampedModel, auth_models.Cr
                       (PARTIAL_REPORT_GENERATED, "Partial Report Generated"),
                       (REPORT_GENERATED, "Report Generated"),
                       (REPORT_VIEWED, "Report Viewed")]
+
+    id = models.BigAutoField(primary_key=True)
     offline_patient = models.ForeignKey(doc_models.OfflinePatients, on_delete=models.CASCADE, related_name="patient_lab_samples_collect_order")
     patient_details = JSONField()
     hospital = models.ForeignKey(doc_models.Hospital, on_delete=models.CASCADE, related_name="hosp_lab_samples_collect_order")
