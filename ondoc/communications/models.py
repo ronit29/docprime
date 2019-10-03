@@ -2470,6 +2470,8 @@ class PartnerLabNotification(Notification):
             "admin_contact_no": instance.created_by.phone_number,
             "support_email": "cloudlabs@docprime.com",
             "report_list": self.report_list,
+            "action_type": NotificationAction.PARTNER_LAB,
+            "action_id": instance.id,
             "screen": NotificationAction.PARTNER_LAB_ORDER_DETAILS,
             "is_open_screen": True,
             "screen_params": {

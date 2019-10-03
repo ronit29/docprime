@@ -7,6 +7,8 @@ from import_export.tmp_storages import MediaStorage
 from import_export import widgets
 from ondoc.provider import models as prov_models
 from ondoc.diagnostic import models as diag_models
+from ondoc.notification import tasks as notification_tasks
+from ondoc.notification.models import NotificationAction
 from django.db.models import Q
 import logging
 import json
@@ -102,6 +104,16 @@ class TestSamplesLabAlertAdmin(admin.ModelAdmin):
     list_display = ('name', )
 
 
+class ReportsInlineFormset(forms.BaseInlineFormSet):
+    def clean(self):
+        super().clean()
+        if any(self.errors):
+            return
+        if self.instance.status in [prov_models.PartnerLabSamplesCollectOrder.PARTIAL_REPORT_GENERATED,
+                                    prov_models.PartnerLabSamplesCollectOrder.REPORT_GENERATED] and not self.cleaned_data:
+            raise forms.ValidationError("No report files found.")
+
+
 class ReportsInline(admin.TabularInline):
     model = prov_models.PartnerLabTestSamplesOrderReportMapping
     extra = 0
@@ -111,6 +123,7 @@ class ReportsInline(admin.TabularInline):
     readonly_fields = []
     fields = ['report']
     autocomplete_fields = []
+    formset = ReportsInlineFormset
 
 
 class PartnerLabSamplesCollectOrderAdmin(admin.ModelAdmin):
@@ -129,9 +142,15 @@ class PartnerLabSamplesCollectOrderAdmin(admin.ModelAdmin):
     def has_delete_permission(self, request, obj=None):
         return False
 
-    def save_model(self, request, obj, form, change):
+    def save_related(self, request, form, formsets, change):
+        super(type(self), self).save_related(request, form, formsets, change)
         report_list = list()
-        if obj.status in [prov_models.PartnerLabSamplesCollectOrder.PARTIAL_REPORT_GENERATED,
-                          prov_models.PartnerLabSamplesCollectOrder.REPORT_GENERATED]:
-            report_list = [(request.build_absolute_uri(mapping.report.url)) for mapping in obj.reports.all()]
-        obj.save(report_list=report_list)
+        for formset in formsets:
+            if isinstance(formset, ReportsInlineFormset):
+                report_list = [(request.build_absolute_uri(report_mapping.report.url)) for report_mapping in formset.instance.reports.all()]
+        if form.cleaned_data.get('status') in [prov_models.PartnerLabSamplesCollectOrder.PARTIAL_REPORT_GENERATED,
+                                               prov_models.PartnerLabSamplesCollectOrder.REPORT_GENERATED]:
+            notification_tasks.send_partner_lab_notifications.apply_async(kwargs={'order_id': form.instance.id,
+                                                                                  'notification_type': NotificationAction.PARTNER_LAB_REPORT_UPLOADED,
+                                                                                  'report_list': report_list},
+                                                                          countdown=3)
