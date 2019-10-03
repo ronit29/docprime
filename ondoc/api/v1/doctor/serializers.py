@@ -522,16 +522,16 @@ class DoctorHospitalSerializer(serializers.ModelSerializer):
 
     enabled_for_online_booking = serializers.SerializerMethodField(read_only=True)
     show_contact = serializers.SerializerMethodField(read_only=True)
-    # enabled_for_cod = serializers.BooleanField(source='doctor_clinic.is_enabled_for_cod')
-    enabled_for_cod = serializers.SerializerMethodField()
+    enabled_for_cod = serializers.BooleanField(source='doctor_clinic.is_enabled_for_cod')
+    # enabled_for_cod = serializers.SerializerMethodField()
     enabled_for_prepaid = serializers.BooleanField(source='doctor_clinic.hospital.enabled_for_prepaid')
     is_price_zero = serializers.SerializerMethodField()
     vip = serializers.SerializerMethodField()
 
-    def get_enabled_for_cod(self, obj):
-        request = self.context.get('request')
-        user = request.user
-        return obj.doctor_clinic.hospital.is_enabled_for_cod(user=user)
+    # def get_enabled_for_cod(self, obj):
+    #     request = self.context.get('request')
+    #     user = request.user
+    #     return obj.doctor_clinic.hospital.is_enabled_for_cod(user=user)
 
     def get_show_contact(self, obj):
         if obj.doctor_clinic and obj.doctor_clinic.hospital and obj.doctor_clinic.hospital.spoc_details.all():
