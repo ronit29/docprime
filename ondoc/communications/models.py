@@ -2239,7 +2239,7 @@ class OfflineOpdAppointments(Notification):
             "action_id": self.appointment.id,
             "opd_time_slot_start": time_slot_start,
             "welcome_message": self.appointment.user.welcome_message,
-            "admin_phone_no": "+91-9971279198",
+            "admin_phone_no": self.appointment.booked_by.phone_number,
         }
         return context
 
