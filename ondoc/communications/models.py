@@ -2455,7 +2455,7 @@ class PartnerLabNotification(Notification):
         instance = self.partner_lab_order_obj
         lab_tests_ordered = list()
         mrp = 0
-        for obj in self.partner_lab_order_obj.selected_tests_details:
+        for obj in instance.selected_tests_details:
             lab_tests_ordered.append(obj['lab_test_name'])
             mrp += obj['b2c_rate']
         context = {

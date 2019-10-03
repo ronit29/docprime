@@ -136,6 +136,12 @@ class PartnerLabSamplesCollectOrderAdmin(admin.ModelAdmin):
         ReportsInline,
     ]
 
+    def get_queryset(self, request):
+        return super(PartnerLabSamplesCollectOrderAdmin, self).get_queryset(request)\
+                                                              .prefetch_related('available_lab_tests__lab_pricing_group',
+                                                                                'available_lab_tests__lab_pricing_group__labs',
+                                                                                'available_lab_tests__test')
+
     def has_add_permission(self, request, obj=None):
         return False
 

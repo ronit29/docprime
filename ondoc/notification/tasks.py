@@ -1606,7 +1606,8 @@ def send_partner_lab_notifications(order_id, notification_type=None, report_list
     try:
         if not order_id:
             return
-        instance = PartnerLabSamplesCollectOrder.objects.prefetch_related('lab_alerts', 'reports') \
+        instance = PartnerLabSamplesCollectOrder.objects.select_related('doctor', 'hospital', 'offline_patient', 'created_by') \
+                                                        .prefetch_related('lab_alerts', 'reports') \
                                                         .filter(id=order_id).first()
         if not instance:
             return
