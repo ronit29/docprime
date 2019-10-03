@@ -2918,10 +2918,9 @@ class DoctorFeedbackViewSet(viewsets.GenericViewSet):
         emails = list()
         if valid_data.get('is_cloud_lab_email'):
             subject_string = valid_data.get('subject_string')
-            # subject_string = "Test Sample Pickup Request from " + str(user.phone_number)
             message = valid_data.get('feedback')
-            emails = ["rajivk@policybazaar.com", "sanat@docprime.com"]
-            # emails = ["sanat@docprime.com", "kabeer@docprime.com", "prithvijeet@docprime.com", "raghavr@docprime.com"]
+            emails = ["sanat@docprime.com", "kabeer@docprime.com", "prithvijeet@docprime.com", "raghavr@docprime.com",
+                      "rajivk@policybazaar.com"]
         else:
             valid_data.pop('subject_string', None)
             subject_string = "Feedback Mail from " + str(user.phone_number)
