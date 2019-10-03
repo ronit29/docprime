@@ -20,11 +20,11 @@ class AbstractCriteria(object):
 
         return self._validate_booking_entity(cost, id, utilization=utilization)
 
-    def _update_utilization(self, deduction_amount, utlization):
+    def _update_utilization(self, utilization, deduction_amount):
         raise NotImplementedError()
 
     def update_utilization(self, utilization, deduction_amount):
-        return self._update_utilization(deduction_amount, utilization)
+        return self._update_utilization(utilization, deduction_amount)
 
     def after_discount_cost(self, discount, cost):
         cost = cost - ((cost/100) * discount)
@@ -39,11 +39,10 @@ class DoctorAmountCount(AbstractCriteria):
     def __init__(self, plus_obj):
         super().__init__(plus_obj)
 
-    def _update_utilization(self, deduction_amount, utlization):
+    def _update_utilization(self, utilization, deducted_amount):
 
-        utlization['doctor_amount_available'] = utlization['doctor_amount_available'] - deduction_amount
-        utlization['available_doctor_count'] = utlization['available_doctor_count'] - 1
-
+        utilization['doctor_amount_available'] = int(utilization['doctor_amount_available']) - int(deducted_amount)
+        utilization['available_doctor_count'] = int(utilization['available_doctor_count']) - 1
 
     def _validate_booking_entity(self, cost, id, *args, **kwargs):
         resp = {'vip_amount_deducted': 0, 'is_covered': False, 'amount_to_be_paid': cost}
@@ -104,8 +103,8 @@ class DoctorCountDiscount(AbstractCriteria):
     def __init__(self, plus_obj):
         super().__init__(plus_obj)
 
-    def _update_utilization(self, deduction_amount, utlization):
-        utlization['available_doctor_count'] = utlization['available_doctor_count'] - 1
+    def _update_utilization(self, utilization, deducted_amount):
+        utilization['available_doctor_count'] = utilization['available_doctor_count'] - 1
 
     def _validate_booking_entity(self,cost, id, *args, **kwargs):
         resp = {'vip_amount_deducted': 0, 'is_covered': False, 'amount_to_be_paid': cost}
@@ -137,8 +136,8 @@ class DoctorAmountDiscount(AbstractCriteria):
     def __init__(self, plus_obj):
         super().__init__(plus_obj)
 
-    def _update_utilization(self, deduction_amount, utlization):
-        utlization['doctor_amount_available'] = utlization['doctor_amount_available'] - deduction_amount
+    def _update_utilization(self, utilization, deducted_amount):
+        utilization['doctor_amount_available'] = utilization['doctor_amount_available'] - deducted_amount
 
     def _validate_booking_entity(self, cost, id, *args, **kwargs):
         resp = {'vip_amount_deducted': 0, 'is_covered': False, 'amount_to_be_paid': cost}
@@ -178,10 +177,10 @@ class LabtestAmountCount(AbstractCriteria):
     def __init__(self, plus_obj):
         super().__init__(plus_obj)
 
-    def _update_utilization(self, deduction_amount, utlization):
+    def _update_utilization(self, utilization, deducted_amount):
 
-        utlization['available_labtest_amount'] = utlization['available_labtest_amount'] - deduction_amount
-        utlization['available_labtest_count'] = utlization['available_labtest_count'] - 1
+        utilization['available_labtest_amount'] = utilization['available_labtest_amount'] - deducted_amount
+        utilization['available_labtest_count'] = utilization['available_labtest_count'] - 1
 
     def _validate_booking_entity(self, cost, id, *args, **kwargs):
         resp = {'vip_amount_deducted': 0, 'is_covered': False, 'amount_to_be_paid': cost}
@@ -216,8 +215,8 @@ class LabtestCountDiscount(AbstractCriteria):
     def __init__(self, plus_obj):
         super().__init__(plus_obj)
 
-    def _update_utilization(self, deduction_amount, utlization):
-        utlization['available_labtest_count'] = utlization['available_labtest_count'] - 1
+    def _update_utilization(self, utilization, deducted_amount):
+        utilization['available_labtest_count'] = utilization['available_labtest_count'] - 1
 
     def _validate_booking_entity(self, cost, id, *args, **kwargs):
         resp = {'vip_amount_deducted': 0, 'is_covered': False, 'amount_to_be_paid': cost}
@@ -245,8 +244,8 @@ class LabtestAmountDiscount(AbstractCriteria):
     def __init__(self, plus_obj):
         super().__init__(plus_obj)
 
-    def _update_utilization(self, deduction_amount, utlization):
-        utlization['available_labtest_amount'] = utlization['available_labtest_amount'] - deduction_amount
+    def _update_utilization(self, utilization, deducted_amount):
+        utilization['available_labtest_amount'] = utilization['available_labtest_amount'] - deducted_amount
 
     def _validate_booking_entity(self, cost, id, *args, **kwargs):
         resp = {'vip_amount_deducted': 0, 'is_covered': False, 'amount_to_be_paid': cost}
@@ -283,9 +282,9 @@ class PackageAmountCount(AbstractCriteria):
     def __init__(self, plus_obj):
         super().__init__(plus_obj)
 
-    def _update_utilization(self, deduction_amount, utlization):
-        utlization['available_package_amount'] = utlization['available_package_amount'] - deduction_amount
-        utlization['available_package_count'] = utlization['available_package_count'] - 1
+    def _update_utilization(self, utilization, deducted_amount):
+        utilization['available_package_amount'] = utilization['available_package_amount'] - deducted_amount
+        utilization['available_package_count'] = utilization['available_package_count'] - 1
 
     def _validate_booking_entity(self, cost, id, *args, **kwargs):
         resp = {'vip_amount_deducted': 0, 'is_covered': False, 'amount_to_be_paid': cost}
@@ -334,8 +333,8 @@ class PackageCountDiscount(AbstractCriteria):
     def __init__(self, plus_obj):
         super().__init__(plus_obj)
 
-    def _update_utilization(self, deduction_amount, utlization):
-        utlization['available_package_count'] = utlization['available_package_count'] - 1
+    def _update_utilization(self, utilization, deducted_amount):
+        utilization['available_package_count'] = utilization['available_package_count'] - 1
 
     def _validate_booking_entity(self, cost, id, *args, **kwargs):
         resp = {'vip_amount_deducted': 0, 'is_covered': False, 'amount_to_be_paid': cost}
@@ -377,8 +376,8 @@ class PackageAmountDiscount(AbstractCriteria):
     def __init__(self, plus_obj):
         super().__init__(plus_obj)
 
-    def _update_utilization(self, deduction_amount, utlization):
-        utlization['available_package_amount'] = utlization['available_package_amount'] - deduction_amount
+    def _update_utilization(self, utilization, deducted_amount):
+        utilization['available_package_amount'] = utilization['available_package_amount'] - deducted_amount
 
     def _validate_booking_entity(self, cost, id, *args, **kwargs):
         resp = {'vip_amount_deducted': 0, 'is_covered': False, 'amount_to_be_paid': cost}

@@ -420,7 +420,7 @@ class PlusUser(auth_model.TimeStampedModel, RefundMixin):
 
                 # Only for cart items.
                 if kwargs.get('utilization') and response_dict['cover_under_vip'] and response_dict['vip_amount_deducted']:
-                    engine.update_utilization(kwargs.get('utilization'))
+                    engine.update_utilization(kwargs.get('utilization'), response_dict['vip_amount_deducted'])
 
         elif appointment_type == LAB:
             lab = appointment_data['lab']
