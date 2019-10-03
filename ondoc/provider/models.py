@@ -323,9 +323,8 @@ class PartnerLabSamplesCollectOrder(auth_models.TimeStampedModel, auth_models.Cr
         db_table = "partner_lab_samples_collect_order"
 
     def save(self, *args, **kwargs):
-        is_new_instance = True if not self.id else False
         super(PartnerLabSamplesCollectOrder, self).save()
-        if is_new_instance:
+        if self.status == self.SAMPLE_PICKUP_PENDING:
             notification_tasks.send_partner_lab_notifications.apply_async(kwargs={'order_id': self.id,
                                                                                   'notification_type': NotificationAction.PARTNER_LAB_ORDER_PLACED_SUCCESSFULLY},
                                                                           countdown=3)
