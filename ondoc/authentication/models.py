@@ -2148,8 +2148,8 @@ class RefundMixin(object):
                 consumer_account.debit_promotional(self)
             consumer_account.credit_cancellation(self, product_id, wallet_refund, cashback_refund)
             if refund_flag:
-                ctx_objs = consumer_account.debit_refund(self)
-                if ctx_objs and initiate_refund:
+                ctx_objs = consumer_account.debit_refund(self, initiate_refund)
+                if ctx_objs:
                     for ctx_obj in ctx_objs:
                         ConsumerRefund.initiate_refund(self.user, ctx_obj)
 
