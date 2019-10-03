@@ -2931,10 +2931,12 @@ class DoctorFeedbackViewSet(viewsets.GenericViewSet):
         valid_data = serializer.validated_data
         emails = list()
         if valid_data.get('is_cloud_lab_email'):
-            subject_string = "Test Sample Pickup Request from " + str(user.phone_number)
+            subject_string = valid_data.get('subject_string')
             message = valid_data.get('feedback')
-            emails = ["sanat@docprime.com", "kabeer@docprime.com", "prithvijeet@docprime.com", "raghavr@docprime.com"]
+            emails = ["sanat@docprime.com", "kabeer@docprime.com", "prithvijeet@docprime.com", "raghavr@docprime.com",
+                      "rajivk@policybazaar.com"]
         else:
+            valid_data.pop('subject_string', None)
             subject_string = "Feedback Mail from " + str(user.phone_number)
             message = ''
             managers_string = ''
