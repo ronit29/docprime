@@ -274,7 +274,7 @@ class PackageAmountCount(AbstractCriteria):
         if allowed_package_ids:
             if id in allowed_package_ids:
                 is_covered = True
-                if cost < available_package_amount:
+                if cost <= available_package_amount:
                     vip_amount_deducted = cost
                     amount_to_be_paid = 0
                 elif 0 < available_package_amount < cost:
@@ -284,7 +284,7 @@ class PackageAmountCount(AbstractCriteria):
                 return resp
         else:
             is_covered = True
-            if cost < available_package_amount:
+            if cost <= available_package_amount:
                 vip_amount_deducted = cost
                 amount_to_be_paid = 0
             elif 0 < available_package_amount < cost:
