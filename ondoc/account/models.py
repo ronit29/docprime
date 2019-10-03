@@ -1172,6 +1172,17 @@ class PgTransaction(TimeStampedModel, SoftDelete):
 
         return pgtx_details
 
+    @classmethod
+    def get_transactions_v2(cls, user, ctx_obj):
+        pgtx_details = list()
+
+        pg_txns = PgTransaction.objects.filter(user=user, transaction_id=ctx_obj.transaction_id, order_id=ctx_obj.order_id)
+
+        if pg_txns:
+            for pg_txn in pg_txns:
+                pgtx_details.append({'id': pg_txn.id, 'amount': ctx_obj.amount})
+
+        return pgtx_details
 
     @classmethod
     def is_valid_hash(cls, data, product_id):
@@ -1734,7 +1745,7 @@ class ConsumerRefund(TimeStampedModel):
     def initiate_refund(cls, user, ctx_obj):
         BATCH_SIZE = 100
         if ctx_obj.order_id:
-            pgtx_list = PgTransaction.objects.filter(user=user, transaction_id=ctx_obj.transaction_id, order_id=ctx_obj.order_id)
+            pgtx_list = PgTransaction.get_transactions_v2(user, ctx_obj)
         else:
             pgtx_list = PgTransaction.get_transactions(user, ctx_obj.amount)
         refund_obj_data = list()
