@@ -231,16 +231,26 @@ class Order(TimeStampedModel):
         from ondoc.api.v1.chat.serializers import ChatTransactionModelSerializer
         from ondoc.plus.models import PlusAppointmentMapping
 
+        appointment_data = self.action_data
+        consumer_account = ConsumerAccount.objects.get_or_create(user=appointment_data['user'])
+        consumer_account = ConsumerAccount.objects.select_for_update().get(user=appointment_data['user'])
+
         # skip if order already processed, except if appointment is COD and can be converted to prepaid
         cod_to_prepaid_app = None
         if self.reference_id:
             if convert_cod_to_prepaid:
                 cod_to_prepaid_app = self.get_cod_to_prepaid_appointment(True)
             if not cod_to_prepaid_app:
+                # Instant refund for already process VIP and Insurance orders
+                if self.product_id in [self.INSURANCE_PRODUCT_ID, self.VIP_PRODUCT_ID]:
+                    ctx_objs = consumer_account.debit_refund()
+                    if ctx_objs:
+                        for ctx_obj in ctx_objs:
+                            ConsumerRefund.initiate_refund(appointment_data['user'], ctx_obj)
+
                 raise Exception("Order already processed - " + str(self.id))
 
         # Initial validations for appointment data
-        appointment_data = self.action_data
         user_insurance_data = None
         plus_user_data = None
         # Check if payment is required at all, only when payment is required we debit consumer's account
@@ -302,9 +312,6 @@ class Order(TimeStampedModel):
             serializer = PlusUserSerializer(data=plus_data.get('plus_user'))
             serializer.is_valid(raise_exception=True)
             plus_user_data = serializer.validated_data
-
-        consumer_account = ConsumerAccount.objects.get_or_create(user=appointment_data['user'])
-        consumer_account = ConsumerAccount.objects.select_for_update().get(user=appointment_data['user'])
 
         appointment_obj = None
         order_dict = dict()

@@ -995,7 +995,7 @@ def upload_doctor_data(obj_id):
         instance.save(retry=False)
 
 @task()
-def send_pg_acknowledge(order_id=None, order_no=None):
+def send_pg_acknowledge(order_id=None, order_no=None, is_preauth=False):
     log_requests_on()
     try:
         if order_id is None or order_no is None:
@@ -1393,6 +1393,7 @@ def send_capture_payment_request(self, product_id, appointment_id):
     from ondoc.diagnostic.models import LabAppointment
     from ondoc.account.models import Order, PgTransaction, PaymentProcessStatus
     from ondoc.account.mongo_models import PgLogs
+    from ondoc.account.models import ConsumerTransaction
     log_requests_on()
     req_data = dict()
     if product_id == Order.DOCTOR_PRODUCT_ID:
@@ -1444,6 +1445,9 @@ def send_capture_payment_request(self, product_id, appointment_id):
                     txn_obj.transaction_id = resp_data.get('pgTxId')
                     txn_obj.bank_id = resp_data.get('bankTxId')
                     txn_obj.payment_captured = True
+                    ctx_txn = ConsumerTransaction.objects.filter(order_id=order.id, action=ConsumerTransaction.PAYMENT).last()
+                    ctx_txn.transaction_id = resp_data.get('pgTxId')
+                    ctx_txn.save()
                 else:
                     txn_obj.payment_captured = False
                     logger.error("Error in capture the payment with data - " + json.dumps(req_data) + " with error message - " + resp_data.get('statusMsg', ''))
