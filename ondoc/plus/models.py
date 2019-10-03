@@ -372,7 +372,7 @@ class PlusUser(auth_model.TimeStampedModel, RefundMixin):
         opd_appointments_count = OpdAppointment.objects.filter(plus_plan=self).exclude(status=OpdAppointment.CANCELLED).count()
         return opd_appointments_count
 
-    def validate_plus_appointment(self, appointment_data):
+    def validate_plus_appointment(self, appointment_data, *args, **kwargs):
         from ondoc.doctor.models import OpdAppointment
         from ondoc.diagnostic.models import LabAppointment
         OPD = "OPD"
@@ -400,26 +400,6 @@ class PlusUser(auth_model.TimeStampedModel, RefundMixin):
             return response_dict
 
         response_dict['is_vip_member'] = True
-        utilization = plus_user.get_utilization
-        #
-        # amount_available = int(utilization.get('doctor_amount_available', 0)) if appointment_type == OPD else int(utilization.get('available_package_amount', 0))
-        # is_cover_after_utilize = True
-        # amount_paid = 0
-        #
-        #
-        # if amount_available > 0 or mrp <= amount_available:
-        #     is_cover_after_utilize = True
-        # else:
-        #     is_cover_after_utilize = False
-        #
-        # if is_cover_after_utilize and amount_available >= mrp:
-        #     amount_paid = 0
-        #
-        # elif is_cover_after_utilize and (amount_available > 0) and (amount_available <= mrp):
-        #     amount_paid = mrp - amount_available
-        # else:
-        #     amount_paid = 0
-        # response_dict['vip_amount'] = amount_paid
 
         if appointment_type == OPD:
             engine = get_class_reference(plus_user, "DOCTOR")
@@ -432,13 +412,15 @@ class PlusUser(auth_model.TimeStampedModel, RefundMixin):
                                         hospital.enabled_for_prepaid and hospital.enabled_for_plus_plans and \
                                         doctor.enabled_for_plus_plans:
 
-                engine_response = engine.validate_booking_entity(cost=mrp)
+                engine_response = engine.validate_booking_entity(cost=mrp, utilization=kwargs.get('utilization'))
                 response_dict['cover_under_vip'] = engine_response.get('is_covered', False)
                 response_dict['plus_user_id'] = plus_user.id
                 response_dict['vip_amount_deducted'] = engine_response.get('vip_amount_deducted', 0)
                 response_dict['amount_to_be_paid'] = engine_response.get('amount_to_be_paid', mrp)
-                # response_dict['vip_amount'] = self.get_vip_amount(utilization, mrp)
-                # response_dict['vip_amount'] = amount_paid
+
+                # Only for cart items.
+                if kwargs.get('utilization') and response_dict['cover_under_vip'] and response_dict['vip_amount_deducted']:
+                    engine.update_utilization(kwargs.get('utilization'))
 
         elif appointment_type == LAB:
             lab = appointment_data['lab']
@@ -449,13 +431,17 @@ class PlusUser(auth_model.TimeStampedModel, RefundMixin):
                 entity = "PACKAGE" if appointment_data['test_ids'][0].is_package else "LABTEST"
                 engine = get_class_reference(plus_user, entity)
                 if appointment_data['test_ids']:
-                    engine_response = engine.validate_booking_entity(cost=final_price, id=appointment_data['test_ids'][0].id)
+                    engine_response = engine.validate_booking_entity(cost=final_price, id=appointment_data['test_ids'][0].id, utilization=kwargs.get('utilization'))
                     if not engine_response:
                         return response_dict
                     response_dict['cover_under_vip'] = engine_response.get('is_covered', False)
                     response_dict['plus_user_id'] = plus_user.id
                     response_dict['vip_amount_deducted'] = engine_response.get('vip_amount_deducted', 0)
                     response_dict['amount_to_be_paid'] = engine_response.get('amount_to_be_paid', final_price)
+
+                    # Only for cart items.
+                    if kwargs.get('utilization') and response_dict['cover_under_vip'] and response_dict['vip_amount_deducted']:
+                        engine.update_utilization(kwargs.get('utilization'), response_dict['vip_amount_deducted'])
 
         return response_dict
 
