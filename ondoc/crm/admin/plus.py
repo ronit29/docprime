@@ -5,6 +5,8 @@ from django.db.models import F
 from rest_framework import serializers
 from dal import autocomplete
 from ondoc.authentication.models import User
+from ondoc.diagnostic.models import LabAppointment
+from ondoc.doctor.models import OpdAppointment
 from ondoc.plus.models import PlusProposer, PlusPlans, PlusThreshold, PlusUser, PlusPlanContent, PlusPlanParameters, \
     PlusPlanParametersMapping, PlusPlanUtmSources, PlusPlanUtmSourceMapping
 from import_export.admin import ImportExportMixin, ImportExportModelAdmin, base_formats
@@ -98,9 +100,26 @@ class PlusUserAdminForm(forms.ModelForm):
         return status
 
 
+class PlusOpdAppointmentInline(admin.TabularInline):
+    model = OpdAppointment
+    fields = ('id', 'status', 'time_slot_start', 'doctor', 'matrix_lead_id')
+    readonly_fields = fields
+    can_delete = False
+    extra = 0
+
+
+class PlusLabAppointmentInline(admin.TabularInline):
+    model = LabAppointment
+    fields = ('id', 'status', 'time_slot_start', 'lab', 'matrix_lead_id')
+    readonly_fields = fields
+    can_delete = False
+    extra = 0
+
+
 class PlusUserAdmin(admin.ModelAdmin):
     form = PlusUserAdminForm
     model = PlusUser
+    inlines = [PlusOpdAppointmentInline, PlusLabAppointmentInline]
     fields = ("user", "plan", "purchase_date", "expire_date", "status", "matrix_lead_id")
     readonly_fields = ("user", "plan", "purchase_date", "expire_date", "matrix_lead_id")
     list_display = ('user', 'purchase_date')
