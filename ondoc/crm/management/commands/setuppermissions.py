@@ -1186,7 +1186,9 @@ class Command(BaseCommand):
 
         content_types = ContentType.objects.get_for_models(prov_models.PartnerLabSamplesCollectOrder,
                                                            prov_models.PartnerLabTestSamples,
-                                                           prov_models.PartnerLabTestSampleDetails)
+                                                           prov_models.PartnerLabTestSampleDetails,
+                                                           prov_models.PartnerLabTestSamplesOrderReportMapping,
+                                                           prov_models.PartnerHospitalLabMapping)
 
         for cl, ct in content_types.items():
             permissions = Permission.objects.filter(
