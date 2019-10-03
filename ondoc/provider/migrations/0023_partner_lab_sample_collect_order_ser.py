@@ -11,6 +11,6 @@ class Migration(migrations.Migration):
 
     operations = [
         migrations.RunSQL(
-            'ALTER SEQUENCE partner_lab_samples_collect_order_id_seq RESTART WITH 7000000000;'
+            'ALTER SEQUENCE partner_lab_samples_collect_order_id_seq RESTART WITH 700000000;'
         ),
     ]
