@@ -1643,6 +1643,7 @@ class ConsumerTransaction(TimeStampedModel):
         ref_txn_objs = ConsumerTransaction.objects.filter(id__in=list(ref_txns.keys()))
         for ref_txn_obj in ref_txn_objs:
             cashback_txn = False
+            is_preauth_txn = False
             if ref_txn_obj.action in [self.CASHBACK_CREDIT, self.REFERRAL_CREDIT]:
                 cashback_txn = True
             if parent_ref:
@@ -1663,14 +1664,16 @@ class ConsumerTransaction(TimeStampedModel):
             else:
                 pg_txn = PgTransaction.objects.filter(user=self.user, order_id=ref_txn_obj.order_id).order_by(
                     '-created_at').first()
+                if pg_txn.is_preauth() or pg_txn.status_type == 'TXN_RELEASE':
+                    is_preauth_txn = True
                 if pg_txn:
-                    if not (pg_txn.is_preauth() or pg_txn.status_type == 'TXN_RELEASE'):
+                    if not is_preauth_txn:
                         ctx_objs.append(ctx_obj)
                 else:
                     if not cashback_txn:
                         ctx_objs.append(ctx_obj)
 
-            if ref_txn_obj.balance and not cashback_txn:
+            if ref_txn_obj.balance and not cashback_txn and not is_preauth_txn:
                 ctx_objs.append(ref_txn_obj.debit_from_balance(consumer_account))
         self.save()
 
