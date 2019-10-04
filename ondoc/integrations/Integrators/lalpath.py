@@ -221,7 +221,7 @@ class Lalpath(BaseIntegrator):
                                 if not dp_appointment.status == 7:
                                     dp_appointment.action_completed()
 
-                            IntegratorHistory.create_history(dp_appointment, url, response, url, 'order_summary_cron',
+                            IntegratorHistory.create_history(dp_appointment, payload, response, url, 'order_summary_cron',
                                                              'Lalpath', status_code, 0, status, 'integrator_api')
                         else:
                             print("[LalPath-ERROR] %s %s" % (integrator_response.id, response.get('RESPONSE')))
