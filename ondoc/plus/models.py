@@ -26,6 +26,7 @@ import reversion
 from django.conf import settings
 from django.utils.functional import cached_property
 from .enums import UsageCriteria
+from copy import deepcopy
 
 
 class LiveMixin(models.Model):
@@ -448,7 +449,6 @@ class PlusUser(auth_model.TimeStampedModel, RefundMixin):
     def validate_cart_items(self, appointment_data, request):
         from ondoc.doctor.models import OpdAppointment
         from ondoc.diagnostic.models import LabAppointment
-        from ondoc.diagnostic.models import LabTest
         vip_data_dict = {
             "is_vip_member": True,
             "cover_under_vip": False,
@@ -465,45 +465,17 @@ class PlusUser(auth_model.TimeStampedModel, RefundMixin):
         LAB = "LAB"
 
         appointment_type = OPD if "doctor" in appointment_data else LAB
-        utilization = self.get_utilization
+        deep_utilization = deepcopy(self.get_utilization)
         for item in cart_items:
-            data = item.data
             validated_item = item.validate(request)
-            # price_data = OpdAppointment.get_price_details(
-            #     validated_item) if appointment_type == OPD else LabAppointment.get_price_details(validated_item)
-            price_data = item.get_price_details(validated_item)
-            mrp = int(price_data.get('mrp', 0))
-            doctor = data.get('doctor', None)
-            if doctor and data.get('cover_under_vip'):
-                doctor_available_amount = utilization.get('doctor_amount_available', 0)
-                if doctor_available_amount > 0:
-                    utilization['doctor_amount_available'] = doctor_available_amount - (int(mrp) - data.get('vip_amount'))
-                else:
-                    return vip_data_dict
-            elif data.get('lab') and data.get('cover_under_vip'):
-                package_available_amount = utilization.get('available_package_amount', 0)
-                package_available_count = utilization.get('available_package_count', 0)
-                package_available_ids = utilization.get('allowed_package_ids', [])
-                tests = validated_item.get('test_ids', [])
-                # tests = LabTest.objects.filter(id__in=test_ids)
-                for test in tests:
-                    if test.is_package and test.id in package_available_ids and package_available_count and package_available_count > 0:
-                        utilization['available_package_count'] = package_available_count - 1
-                    elif test.is_package and package_available_amount and package_available_amount > 0:
-                        utilization['available_package_amount'] = package_available_amount - (int(mrp) -data.get('vip_amount'))
-            else:
-                return vip_data_dict
+            self.validate_plus_appointment(validated_item, utilization=deep_utilization)
         current_item_price_data = OpdAppointment.get_price_details(
             appointment_data) if appointment_type == OPD else LabAppointment.get_price_details(appointment_data)
         current_item_mrp = int(current_item_price_data.get('mrp', 0))
-        updated_utilization = utilization
         if 'doctor' in appointment_data:
-            current_doctor_amount_available = updated_utilization.get('doctor_amount_available', 0)
-                # vip_data_dict['vip_amount'] = 0 if current_doctor_amount_available > current_item_mrp else (current_item_mrp - current_doctor_amount_available)
-                # vip_data_dict['vip_amount'] = user.active_plus_user.get_vip_amount(updated_utilization, current_item_mrp)
-            engine = get_class_reference(user.active_plus_user, "DOCTOR")
+            engine = get_class_reference(self, "DOCTOR")
             if engine:
-                vip_response = engine.validate_booking_entity(cost=current_item_mrp, utilization=updated_utilization)
+                vip_response = engine.validate_booking_entity(cost=current_item_mrp, utilization=deep_utilization)
                 vip_data_dict['vip_amount'] = vip_response.get('amount_to_be_paid')
                 vip_data_dict['amount_to_be_paid'] = vip_response.get('amount_to_be_paid')
                 vip_data_dict['cover_under_vip'] = vip_response.get('is_covered')
@@ -511,28 +483,17 @@ class PlusUser(auth_model.TimeStampedModel, RefundMixin):
             else:
                 return vip_data_dict
         else:
-            current_package_count_available = updated_utilization.get('available_package_count', 0)
-            current_package_amount_available = updated_utilization.get('available_package_amount', 0)
-            current_package_ids = updated_utilization.get('allowed_package_ids', [])
             tests = appointment_data.get('test_ids', [])
             for test in tests:
                 entity = "LABTEST" if not test.is_package else "PACKAGE"
 
-                engine = get_class_reference(user.active_plus_user, entity)
+                engine = get_class_reference(self, entity)
                 if engine:
-                    vip_response = engine.validate_booking_entity(cost=current_item_mrp, utilization=updated_utilization)
+                    vip_response = engine.validate_booking_entity(cost=current_item_mrp, utilization=deep_utilization)
                     vip_data_dict['vip_amount'] = vip_response.get('amount_to_be_paid')
                     vip_data_dict['amount_to_be_paid'] = vip_response.get('amount_to_be_paid')
                     vip_data_dict['cover_under_vip'] = vip_response.get('is_covered')
                     vip_data_dict['plus_user_id'] = self.id
-                # if test.is_package and test.id in current_package_ids and current_package_count_available > 0:
-                #     vip_data_dict['cover_under_vip'] = True
-                #     vip_data_dict['vip_amount'] = 0
-                #     vip_data_dict['plus_user_id'] = self.id
-                # elif test.is_package and current_package_amount_available and current_package_amount_available > 0:
-                #     vip_data_dict['cover_under_vip'] = True
-                #     vip_data_dict['vip_amount'] = 0 if current_package_amount_available > current_item_mrp else (current_item_mrp - current_package_amount_available)
-                #     vip_data_dict['plus_user_id'] = self.id
                 else:
                     return vip_data_dict
         return vip_data_dict
