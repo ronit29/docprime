@@ -1043,6 +1043,7 @@ class LabAppointmentAdmin(nested_admin.NestedModelAdmin, CompareVersionAdmin):
 
     def thyrocare_booking_id(self, obj):
         return obj.thyrocare_booking_no()
+    thyrocare_booking_id.short_description = 'Integrator Order ID'
 
     def accepted_through(self, obj):
         return obj.accepted_through()
