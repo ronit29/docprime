@@ -115,37 +115,44 @@ def availablelabtestajaxsave(request):
 
 
 def testcsvupload(request):
+    import csv
     import openpyxl
     if request.POST and request.POST['lpg_id']:
         pk = request.POST['lpg_id']
         lpg_queryset = LabPricingGroup.objects.filter(id=pk).first()
         if lpg_queryset:
             if request.FILES and request.FILES['csv']:
-                csv = request.FILES['csv']
-                try:
-                    book = openpyxl.load_workbook(csv)
-                except Exception as e:
-                    return JsonResponse({'error': "Invalid File - " + str(e)})
-                if book:
-                    sheet = book.active
-                    excel_data = list()
-                    headers = list()
-                    i = 0
-                    for row in sheet.iter_rows():
-                        j = 0
-                        data = {}
-                        for cell in row:
-                            if i == 0:
-                                headers.append(str(cell.value))
-                            else:
-                                data[headers[j]] = cell.value
-                                j = j + 1
-                        i = i + 1
-                        if data:
-                            excel_data.append(data)
-                    output = update_records_from_excel(lpg_queryset, excel_data)
-                    # output = update_records_from_csv(lpg_queryset, sheet)
-                    return JsonResponse(output)
+                excel_data = list()
+                csv_file = request.FILES['csv']
+                decoded_file = csv_file.read().decode('utf-8').splitlines()
+                reader = csv.DictReader(decoded_file)
+                for row in reader:
+                    excel_data.append(row)
+
+                # try:
+                #     book = openpyxl.load_workbook(csv)
+                # except Exception as e:
+                #     return JsonResponse({'error': "Invalid File - " + str(e)})
+                # if book:
+                #     sheet = book.active
+                #     excel_data = list()
+                #     headers = list()
+                #     i = 0
+                #     for row in sheet.iter_rows():
+                #         j = 0
+                #         data = {}
+                #         for cell in row:
+                #             if i == 0:
+                #                 headers.append(str(cell.value))
+                #             else:
+                #                 data[headers[j]] = cell.value
+                #                 j = j + 1
+                #         i = i + 1
+                #         if data:
+                #             excel_data.append(data)
+                output = update_records_from_excel(lpg_queryset, excel_data)
+                # output = update_records_from_csv(lpg_queryset, sheet)
+                return JsonResponse(output)
             else:
                 return JsonResponse({'error': "Invalid File"})
         else:
@@ -191,6 +198,7 @@ def update_records_from_excel(lpg_queryset, excel_data):
         return {'error': "Lab pricing group not found"}
 
     for data in excel_data:
+        print(data)
         if not data.get('mrp', None):
             return {'error': "Mrp cannot be blank."}
 

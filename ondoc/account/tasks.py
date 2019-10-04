@@ -292,6 +292,8 @@ def refund_status_update(self):
 @task(bind=True, max_retries=6)
 def refund_curl_task(self, req_data):
     from ondoc.account.models import ConsumerRefund, PgTransaction
+    from ondoc.notification.tasks import save_pg_response
+    from ondoc.account.mongo_models import PgLogs as PgLogsMongo
     if settings.AUTO_REFUND:
         print(req_data)
         try:
@@ -305,6 +307,10 @@ def refund_curl_task(self, req_data):
             # url = 'http://localhost:8000/api/v1/doctor/test'
             print(url)
             response = requests.post(url, data=json.dumps(req_data), headers=headers)
+            save_pg_response.apply_async(
+                (PgLogsMongo.REFUND_REQUEST_RESPONSE, req_data.get('orderId'), req_data.get('refNo'), response.json(),
+                 req_data, req_data.get('user'),),
+                eta=timezone.localtime(), )
             if response.status_code == status.HTTP_200_OK:
                 resp_data = response.json()
                 logger.error("Response content - " + str(response.content) + " with request data - " + json.dumps(req_data))
@@ -590,6 +596,11 @@ def appointment_wise_revenue(all_appointments):
 
 
 @task()
+def update_lal_path_test_data():
+    from ondoc.integrations.Integrators import Lalpath
+    Lalpath.get_test_data()
+
+
 def purchase_order_creation_counter_automation():
 
     from ondoc.doctor.models import PurchaseOrderCreation

@@ -117,7 +117,9 @@ from .salespoint import SalesPointAdmin, SalesPointAvailableTestMappingAdmin
 from ondoc.salespoint.models import SalesPoint, SalespointTestmapping
 from .plus import PlusPlansAdmin, PlusProposerAdmin, PlusThresholdAdmin, PlusUserAdmin, PlusPlanParametersAdmin
 from ondoc.plus.models import PlusUser, PlusProposer, PlusPlans, PlusThreshold, PlusPlanParameters
-
+from .plus import PlusPlansAdmin, PlusProposerAdmin, PlusThresholdAdmin, PlusUserAdmin, PlusPlanParametersAdmin, \
+    PlusPlanUtmSourceAdmin
+from ondoc.plus.models import PlusUser, PlusProposer, PlusPlans, PlusThreshold, PlusPlanParameters, PlusPlanUtmSources
 
 User = get_user_model()
 
@@ -133,6 +135,7 @@ admin.site.register(PlusPlans, PlusPlansAdmin)
 admin.site.register(PlusUser, PlusUserAdmin)
 admin.site.register(PlusProposer, PlusProposerAdmin)
 admin.site.register(PlusPlanParameters, PlusPlanParametersAdmin)
+admin.site.register(PlusPlanUtmSources, PlusPlanUtmSourceAdmin)
 
 admin.site.register(OtpVerifications)
 # admin.site.register(OpdAppointment)
@@ -324,4 +327,5 @@ admin.site.register(PartnerLabTestSamples, PartnerLabTestSampleAdmin)
 admin.site.register(PartnerLabTestSampleDetails, PartnerLabTestSampleDetailAdmin)
 admin.site.register(TestSamplesLabAlerts, TestSamplesLabAlertAdmin)
 admin.site.register(PartnerLabSamplesCollectOrder, PartnerLabSamplesCollectOrderAdmin)
+
 

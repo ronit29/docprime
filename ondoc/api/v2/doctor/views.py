@@ -8,7 +8,7 @@ from ondoc.notification import models as notif_models
 from ondoc.matrix.tasks import decrypted_invoice_pdfs, decrypted_prescription_pdfs
 from django.utils.safestring import mark_safe
 from . import serializers
-from ondoc.api.v1.doctor import serializers as v1_doc_serializer
+from ondoc.api.v1.doctor import serializers as v1_doc_serializers
 from ondoc.api.v1 import utils as v1_utils
 from ondoc.sms.api import send_otp
 from django.shortcuts import get_object_or_404
@@ -1439,7 +1439,7 @@ class PartnerLabTestSamplesCollectViewset(viewsets.GenericViewSet):
     #                                                             .filter(hospital__manageable_hospitals__phone_number=request.user.phone_number).distinct()
 
     def tests_list(self, request):
-        serializer = serializers.PartnerLabTestsListSerializer(data=request.query_params, context={'request':request})
+        serializer = serializers.PartnerLabTestsListSerializer(data=request.query_params, context={'request': request})
         serializer.is_valid(raise_exception=True)
         valid_data = serializer.validated_data
         hosp_lab_list = valid_data['hosp_lab_list']
@@ -1450,14 +1450,14 @@ class PartnerLabTestSamplesCollectViewset(viewsets.GenericViewSet):
             available_lab_tests = lab.lab_pricing_group.available_lab_tests.all()
             for obj in available_lab_tests:
                 ret_obj = dict()
-                sample_obj = obj.sample_details if hasattr(obj, 'sample_details') else None
-                if not sample_obj or not obj.enabled:
+                sample_objs = obj.sample_details.all() if hasattr(obj, 'sample_details') else None
+                if not sample_objs or not obj.enabled:
                     continue
                 ret_obj['hospital_id'] = hospital.id
                 test_data = serializers.SelectedTestsDetailsSerializer(obj).data
                 ret_obj.update(test_data)
-                sample_data = serializers.PartnerLabTestSampleDetailsModelSerializer(sample_obj).data
-                ret_obj.update(sample_data)
+                sample_data = serializers.PartnerLabTestSampleDetailsModelSerializer(sample_objs, many=True).data
+                ret_obj['sample_data'] = sample_data
                 # if sample_obj:
                 #     sample_data = serializers.PartnerLabTestSampleDetailsModelSerializer(sample_obj).data
                 #     ret_obj.update(sample_data)
@@ -1485,7 +1485,6 @@ class PartnerLabTestSamplesCollectViewset(viewsets.GenericViewSet):
         hospital = valid_data.get('hospital')
         doctor = valid_data.get('doctor')
         lab = valid_data.get('lab')
-        lab_tests = valid_data.get('lab_tests')
         available_lab_tests = valid_data.get('available_lab_tests')
         lab_alerts = valid_data.get('lab_alerts')
         barcode_details = valid_data.get('barcode_details')
@@ -1495,23 +1494,25 @@ class PartnerLabTestSamplesCollectViewset(viewsets.GenericViewSet):
             order_obj.status = status
             order_obj.save()
         else:
-            sample_collection_objs = prov_models.PartnerLabTestSampleDetails.get_sample_collection_details(lab_tests)
+            sample_collection_objs = prov_models.PartnerLabTestSampleDetails.get_sample_collection_details(available_lab_tests)
             samples_data = serializers.LabTestSamplesCollectionBarCodeModelSerializer(sample_collection_objs, many=True,
                                                                                       context={"barcode_details": barcode_details}).data
+            patient_details = v1_doc_serializers.OfflinePatientSerializer(offline_patient).data
+            patient_details.update({'patient_mobile': str(offline_patient.get_patient_mobile())})
             if not order_obj:
-                order_obj = prov_models.PartnerLabSamplesCollectOrder.objects.create(offline_patient=offline_patient,
-                                                                                     patient_details=v1_doc_serializer.OfflinePatientSerializer(offline_patient).data,
-                                                                                     hospital=hospital, doctor=doctor,
-                                                                                     lab=lab, samples=samples_data,
-                                                                                     collection_datetime=valid_data.get("collection_datetime"),
-                                                                                     selected_tests_details=serializers.SelectedTestsDetailsSerializer(available_lab_tests, many=True).data,
-                                                                                     status=status)
+                order_obj = prov_models.PartnerLabSamplesCollectOrder(offline_patient=offline_patient,
+                                                                      patient_details=patient_details,
+                                                                      hospital=hospital, doctor=doctor, lab=lab,
+                                                                      samples=samples_data, created_by=request.user,
+                                                                      collection_datetime=valid_data.get("collection_datetime"),
+                                                                      selected_tests_details=serializers.SelectedTestsDetailsSerializer(available_lab_tests, many=True).data,
+                                                                      status=status)
             else:
                 order_obj.status = status
                 order_obj.samples = samples_data
                 order_obj.collection_datetime = valid_data.get("collection_datetime")
                 order_obj.selected_tests_details = serializers.SelectedTestsDetailsSerializer(available_lab_tests, many=True).data
-                order_obj.save()
+            order_obj.save()
             if lab_alerts:
                 order_obj.lab_alerts.set(lab_alerts, clear=True)
             order_obj.available_lab_tests.set(available_lab_tests, clear=True)

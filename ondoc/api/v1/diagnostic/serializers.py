@@ -1182,10 +1182,10 @@ class LabAppointmentCreateSerializer(serializers.Serializer):
         address = data.get("address", None)
         check_active_appointment = True
 
-        if bool(data.get("is_thyrocare")):
+        if bool(data.get("is_thyrocare")) :
             if not pincode:
                 raise serializers.ValidationError("Pincode required for thyrocare.")
-            if not int(pincode) == int(address.pincode):
+            if address and not (int(pincode) == int(address.pincode)):
                 raise serializers.ValidationError("Entered pincode should be same as pickup address pincode.")
 
         has_pathology_timings = False
