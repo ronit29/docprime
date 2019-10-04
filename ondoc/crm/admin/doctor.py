@@ -763,6 +763,8 @@ class DoctorForm(FormCleanMixin):
                 if data.get('disable_reason', None) and data.get('disable_reason', None) == Doctor.OTHERS and not data.get(
                         'disable_comments', None):
                     raise forms.ValidationError("Must have disable comments if disable reason is others.")
+            if self.cleaned_data.get('is_enabled') == False and (not self.request.user.is_superuser == True):
+                raise forms.ValidationError('User is not a Super user')
         # if '_mark_in_progress' in self.data and data.get('enabled'):
         #     raise forms.ValidationError("Must be disabled before rejecting.")
 
