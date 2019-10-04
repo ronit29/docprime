@@ -218,7 +218,10 @@ class CartViewSet(viewsets.GenericViewSet):
                     if not vip_dict.get('cover_under_vip'):
                         raise Exception('Appointment no more cover under VIP')
                     item.data['amount_to_be_paid'] = vip_dict['amount_to_be_paid']
-                    item.data['vip_amount'] = vip_dict['vip_amount_deducted']
+                    item.data['vip_amount'] = vip_dict['amount_to_be_paid']
+                    # cart_data['amount_to_be_paid'] = vip_dict['amount_to_be_paid']
+                    # cart_data['amount_to_be_paid'] = vip_dict['amount_to_be_paid']
+                    # validated_data.save()
                 if not cart_data.get('is_appointment_insured'):
                     item.data['is_appointment_insured'] = False
                     item.data['insurance_id'] = None
