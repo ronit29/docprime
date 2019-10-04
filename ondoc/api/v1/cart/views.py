@@ -199,6 +199,11 @@ class CartViewSet(viewsets.GenericViewSet):
             # if not specialization_count_dict:
             #     return is_insured, insurance_id, insurance_message
 
+
+        plus_user_obj = user.active_plus_user
+        utilization = plus_user_obj.get_utilization if plus_user_obj else {}
+        deep_utilization = copy.deepcopy(utilization)
+
         for item in cart_items:
             try:
                 validated_data = item.validate(request)
@@ -208,7 +213,7 @@ class CartViewSet(viewsets.GenericViewSet):
                     plus_user = user.active_plus_user
                     if not plus_user:
                         raise Exception('Member is no more VIP')
-                    vip_dict = plus_user.validate_plus_appointment(validated_data)
+                    vip_dict = plus_user.validate_plus_appointment(validated_data, utilization=deep_utilization)
                     if not vip_dict.get('cover_under_vip'):
                         raise Exception('Appointment no more cover under VIP')
                 if not cart_data.get('is_appointment_insured'):
@@ -351,7 +356,7 @@ class CartViewSet(viewsets.GenericViewSet):
         total_count = 0
         is_process, error = UserInsurance.validate_cart_items(cart_items, request)
         if is_process:
-            deep_utilization = copy.deepcopy(plus_user.get_utilization)
+            deep_utilization = copy.deepcopy(plus_user.get_utilization) if plus_user else {}
             for item in cart_items:
                 try:
                     validated_data = item.validate(request)
