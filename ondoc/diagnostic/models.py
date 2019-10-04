@@ -3123,7 +3123,7 @@ class LabAppointment(TimeStampedModel, CouponsMixin, LabAppointmentInvoiceMixin,
 
         appointment_details = self.get_matrix_appointment_data(order)
         appointment_details['DocPrimeUserId'] = self.user.id
-        appointment_details['LeadID'] = self.matrix_lead_id if self.matrix_lead_id else 0
+        appointment_details['LeadID'] = 0
         appointment_details['Name'] = self.profile.name
         appointment_details['PrimaryNo'] = self.user.phone_number
         appointment_details['LeadSource'] = 'DocPrime'
