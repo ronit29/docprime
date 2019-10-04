@@ -31,6 +31,7 @@ from django.core.files.storage import get_storage_class
 from django.conf import settings
 from datetime import timedelta
 from dateutil import tz
+from dateutil.relativedelta import relativedelta
 from django.utils import timezone
 from ondoc.authentication import models as auth_model
 from ondoc.authentication.models import SPOCDetails, RefundMixin, MerchantTdsDeduction, PaymentMixin
@@ -74,6 +75,7 @@ from django.contrib.contenttypes.models import ContentType
 from ondoc.matrix.tasks import push_appointment_to_matrix, push_onboarding_qcstatus_to_matrix, \
     update_onboarding_qcstatus_to_matrix, create_or_update_lead_on_matrix, push_signup_lead_to_matrix, \
     create_ipd_lead_from_opd_appointment, push_retail_appointment_to_matrix
+from ondoc.integrations.task import push_opd_appointment_to_integrator
 # from ondoc.procedure.models import Procedure
 from ondoc.plus.models import PlusAppointmentMapping
 from ondoc.ratings_review import models as ratings_models
@@ -1588,6 +1590,36 @@ class DoctorClinic(auth_model.TimeStampedModel, auth_model.WelcomeCallingDone):
         timing_response = {"timeslots": clinic_timings, "upcoming_slots": upcoming_slots}
         return timing_response
 
+    def is_part_of_integration(self):
+        from ondoc.integrations.models import IntegratorDoctorMappings
+        integration_dict = IntegratorDoctorMappings.get_if_third_party_integration(doctor_clinic_id=self.id)
+        if integration_dict:
+            return True
+
+        return False
+
+    def get_integration_dict(self):
+        from ondoc.integrations.models import IntegratorDoctorMappings
+        if self.is_part_of_integration():
+            return IntegratorDoctorMappings.get_if_third_party_integration(doctor_clinic_id=self.id)
+
+        return None
+
+    def get_available_slots(self, time_slot_start):
+        from ondoc.integrations.models import IntegratorDoctorMappings
+        from ondoc.integrations import service
+        date = time_slot_start.strftime("%Y-%m-%d")
+        integration_dict = IntegratorDoctorMappings.get_if_third_party_integration(doctor_clinic_id=self.id)
+        if integration_dict:
+            pincode = None
+            class_name = integration_dict['class_name']
+            integrator_obj_id = integration_dict['id']
+            integrator_obj = service.create_integrator_obj(class_name)
+            data = integrator_obj.get_appointment_slots(pincode, date, integrator_obj_id=integrator_obj_id, dc_obj=self)
+            if data:
+                return data['timeslots']
+
+            return None
 
 class DoctorClinicTiming(auth_model.TimeStampedModel):
     DAY_CHOICES = [(0, "Monday"), (1, "Tuesday"), (2, "Wednesday"), (3, "Thursday"), (4, "Friday"), (5, "Saturday"), (6, "Sunday")]
@@ -2881,6 +2913,36 @@ class OpdAppointment(auth_model.TimeStampedModel, CouponsMixin, OpdAppointmentIn
                     result = parent.is_cod_order
         return result
 
+    def get_doctor_clinic(self):
+        return DoctorClinic.objects.filter(doctor_id=self.doctor_id, hospital_id=self.hospital_id,
+                                           enabled_for_online_booking=True).first()
+
+    def is_medanta_appointment(self):
+        if settings.MEDANTA_INTEGRATION_ENABLED:
+            dc_obj = self.get_doctor_clinic()
+            if dc_obj and dc_obj.is_part_of_integration():
+                integrator_dict = dc_obj.get_integration_dict()
+                if integrator_dict:
+                    class_name = integrator_dict['class_name']
+                    if class_name == 'Medanta':
+                        return True
+
+        return False
+
+    def created_by_native(self):
+        from packaging.version import parse
+        child_order = Order.objects.filter(reference_id=self.id, product_id=self.PRODUCT_ID).first()
+        parent_order = None
+        from_app = False
+
+        if child_order:
+            parent_order = child_order.parent
+
+        if parent_order and parent_order.visitor_info:
+            from_app = parent_order.visitor_info.get('from_app', False)
+
+        return from_app
+
     def is_provider_notification_allowed(self, old_instance):
         if old_instance.status == OpdAppointment.CREATED and self.status == OpdAppointment.CANCELLED:
             return False
@@ -3018,6 +3080,9 @@ class OpdAppointment(auth_model.TimeStampedModel, CouponsMixin, OpdAppointmentIn
                             hours=int(settings.PAYMENT_AUTO_CAPTURE_DURATION)), )
             except Exception as e:
                 logger.error(str(e))
+
+        if self.is_medanta_appointment() and not self.created_by_native() and self.status == self.BOOKED:
+            push_opd_appointment_to_integrator.apply_async(({'appointment_id': self.id},), countdown=5)
 
         print('all ops tasks completed')
 
@@ -3334,12 +3399,19 @@ class OpdAppointment(auth_model.TimeStampedModel, CouponsMixin, OpdAppointmentIn
         doctor = data.get('doctor')
         time_slot_start = form_time_slot(data.get("start_date"), data.get("start_time"))
 
-        doctor_clinic_timing = DoctorClinicTiming.objects.filter(
-            doctor_clinic__doctor=data.get('doctor'),
-            doctor_clinic__hospital=data.get('hospital'),
-            doctor_clinic__doctor__is_live=True, doctor_clinic__hospital__is_live=True,
-            day=time_slot_start.weekday(), start__lte=data.get("start_time"),
-            end__gte=data.get("start_time")).first()
+        doctor_clinic = DoctorClinic.objects.filter(doctor=data.get('doctor'), hospital=data.get('hospital'), enabled=True).first()
+        if doctor_clinic.is_part_of_integration():
+            doctor_clinic_timing = DoctorClinicTiming.objects.filter(
+                doctor_clinic__doctor=data.get('doctor'),
+                doctor_clinic__hospital=data.get('hospital'),
+                doctor_clinic__doctor__is_live=True, doctor_clinic__hospital__is_live=True).first()
+        else:
+            doctor_clinic_timing = DoctorClinicTiming.objects.filter(
+                doctor_clinic__doctor=data.get('doctor'),
+                doctor_clinic__hospital=data.get('hospital'),
+                doctor_clinic__doctor__is_live=True, doctor_clinic__hospital__is_live=True,
+                day=time_slot_start.weekday(), start__lte=data.get("start_time"),
+                end__gte=data.get("start_time")).first()
 
         effective_price = 0
         prepaid_deal_price = 0
@@ -3923,6 +3995,14 @@ class OpdAppointment(auth_model.TimeStampedModel, CouponsMixin, OpdAppointmentIn
         artemis_hospital = Hospital.objects.filter(id=settings.ARTEMIS_HOSPITAL_ID).first()
         return self.hospital == artemis_hospital if artemis_hospital else False
 
+    def integrator_response_available(self):
+        from ondoc.integrations.models import IntegratorResponse
+        content_type = ContentType.objects.get_for_model(self)
+        if IntegratorResponse.objects.filter(object_id=self.id, content_type_id=content_type).first():
+            return True
+        else:
+            return False
+
 
 @reversion.register()
 class OpdAppointmentProcedureMapping(models.Model):
@@ -4373,6 +4453,12 @@ class OfflinePatients(auth_model.TimeStampedModel):
             if number.is_default:
                 patient_number = number
         return patient_number
+
+    def get_age(self):
+        dob = self.dob if self.dob else self.calculated_dob
+        if dob:
+            return relativedelta(datetime.datetime.now(), dob).years
+        return None
 
     @staticmethod
     def welcome_message_sms(appointment, receivers):

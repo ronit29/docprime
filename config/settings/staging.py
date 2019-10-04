@@ -16,6 +16,7 @@ AWS_S3_CUSTOM_DOMAIN = "qacdn.docprime.com" # to make sure the url that the file
 
 RATING_SMS_NOTIF=env('RATING_SMS_NOTIF_QA', default=30)
 THYROCARE_NETWORK_ID = 43
+LAL_PATH_NETWORK_ID = 729
 
 DATABASES['default']['CONN_MAX_AGE'] = 0
 PRODUCTION = False

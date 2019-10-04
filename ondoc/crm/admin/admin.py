@@ -322,3 +322,4 @@ admin.site.register(PartnerLabTestSampleDetails, PartnerLabTestSampleDetailAdmin
 admin.site.register(TestSamplesLabAlerts, TestSamplesLabAlertAdmin)
 admin.site.register(PartnerLabSamplesCollectOrder, PartnerLabSamplesCollectOrderAdmin)
 
+
