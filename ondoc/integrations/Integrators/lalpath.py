@@ -208,7 +208,7 @@ class Lalpath(BaseIntegrator):
                         if response['data']:
                             res_data = sorted(response['data'], key=lambda i: i['id'], reverse=True)
                             integrator_status = res_data[0]['status_code']
-                            if int(integrator_status) == 40:
+                            if int(integrator_status) in [40, 60, 70]:
                                 if dp_appointment.status not in [5, 6, 7]:
                                     dp_appointment._source = AppointmentHistory.API
                                     dp_appointment.action_accepted()
