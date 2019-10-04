@@ -1642,20 +1642,23 @@ class ConsumerTransaction(TimeStampedModel):
         ref_txns = self.ref_txns
         ref_txn_objs = ConsumerTransaction.objects.filter(id__in=list(ref_txns.keys()))
         for ref_txn_obj in ref_txn_objs:
+            cashback_txn = False
+            if ref_txn_obj.action in [self.CASHBACK_CREDIT, self.REFERRAL_CREDIT]:
+                cashback_txn = True
             if parent_ref:
                 refund_amount = decimal.Decimal(ref_txns.get(str(ref_txn_obj.id), 0))
             if ref_txn_obj.ref_txns:
                 ctx_obj = ref_txn_obj.debit_from_ref_txn(consumer_account, refund_amount)
             else:
-                if not ref_txn_obj.action in [self.CASHBACK_CREDIT, self.REFERRAL_CREDIT]:
+                if not cashback_txn:
                     ctx_obj = ref_txn_obj.debit_txn_refund(consumer_account, refund_amount)
                 else:
                    ctx_obj = None
-            if self.balance:
+            if self.balance and not cashback_txn:
                 self.balance -= refund_amount
 
             if initiate_refund:
-                if not ref_txn_obj.action in [self.CASHBACK_CREDIT, self.REFERRAL_CREDIT]:
+                if not cashback_txn:
                     ctx_objs.append(ctx_obj)
             else:
                 pg_txn = PgTransaction.objects.filter(user=self.user, order_id=ref_txn_obj.order_id).order_by(
@@ -1664,10 +1667,10 @@ class ConsumerTransaction(TimeStampedModel):
                     if not (pg_txn.is_preauth() or pg_txn.status_type == 'TXN_RELEASE'):
                         ctx_objs.append(ctx_obj)
                 else:
-                    if not ref_txn_obj.action in [self.CASHBACK_CREDIT, self.REFERRAL_CREDIT]:
+                    if not cashback_txn:
                         ctx_objs.append(ctx_obj)
 
-            if ref_txn_obj.balance and not ref_txn_obj.action in [self.CASHBACK_CREDIT, self.REFERRAL_CREDIT]:
+            if ref_txn_obj.balance and not cashback_txn:
                 ctx_objs.append(ref_txn_obj.debit_from_balance(consumer_account))
         self.save()
 
