@@ -1211,8 +1211,10 @@ class DoctorProfileUserViewSerializer(DoctorProfileSerializer):
             return None
 
         specializations = [doctor_specialization.specialization for doctor_specialization in obj.doctorpracticespecializations.all()]
+        specialization_ids = [doctor_specialization.specialization.id for doctor_specialization in obj.doctorpracticespecializations.all()]
         clinics = [clinic_hospital for clinic_hospital in obj.doctor_clinics.all()]
-        hospitals = [hos.name for hos in obj.hospitals.all()]
+        hospital_names = [hos.name for hos in obj.hospitals.all()]
+        hospital_ids = [hos.name for hos in obj.hospitals.all()]
         # entity = EntityUrls.objects.filter(entity_id=obj.id, sitemap_identifier=EntityUrls.SitemapIdentifier.DOCTOR_PAGE,
         #                                    is_valid=True)
         sublocality = None
@@ -1232,19 +1234,41 @@ class DoctorProfileUserViewSerializer(DoctorProfileSerializer):
 
         doc_spec_list = []
         doc_hosp_list = []
+        show_hospital = None
+        new_hospital_list = []
+        new_spec_list = []
 
-        for name in specializations:
-            doc_spec_list.append(str(name))
-        for hosp_name in hospitals:
-            doc_hosp_list.append(str(hosp_name))
+        if not self.context.get('spec_id'):
+            for name in specializations:
+                doc_spec_list.append(str(name))
+        if not self.context.get('hospital_id'):
+            for hosp_name in hospital_names:
+                doc_hosp_list.append(str(hosp_name))
+        if self.context.get('hospital_id'):
+            for hosp_id in hospital_ids:
+                if hosp_id == self.context.get('hospital_id'):
+                    hospital_name = Hospital.objects.filter(id=hosp_id).first().name
+                    new_hospital_list.append(hospital_name)
+        if self.context.get('spec_id'):
+            for spec in specialization_ids:
+                if spec == self.context.get('spec_id'):
+                    specialization_name = PracticeSpecialization.objects.filter(id=spec).first().name
+                    new_spec_list.append(specialization_name)
+
+        if len(new_hospital_list) > 0:
+            title += ' - '+', '.join(new_spec_list)
+            description += ' is a ' + ', '.join(new_spec_list)
+        if len(new_spec_list) > 0:
+            title += ' in '+', '.join(new_hospital_list)
+            description += ' in ' + ', '.join(new_hospital_list)
 
 
         if len(doc_spec_list) >= 1:
-            title += ' - '+', '.join(doc_spec_list)
-            description += ' is a ' + ', '.join(doc_spec_list)
+            title += ' - '+', '.join(doc_spec_list[0])
+            description += ' is a ' + ', '.join(doc_spec_list[0])
         if len(doc_hosp_list) >= 1:
-            title += ' in '+', '.join(doc_hosp_list)
-            description += ' in ' + ', '.join(doc_hosp_list)
+            title += ' in '+', '.join(doc_hosp_list[0])
+            description += ' in ' + ', '.join(doc_hosp_list[0])
 
         if sublocality and locality:
             title += ' , ' + sublocality + " , " + locality
