@@ -76,6 +76,7 @@ class CartViewSet(viewsets.GenericViewSet):
         valid_data['data']['plus_user_id'] = vip_data_dict.get('plus_user_id', None)
         valid_data['data']['is_vip_member'] = vip_data_dict.get('is_vip_member', False)
         valid_data['data']['vip_amount'] = vip_data_dict.get('vip_amount')
+        valid_data['data']['amount_to_be_paid'] = vip_data_dict.get('vip_amount')
 
         if valid_data['data']['is_appointment_insured']:
             valid_data['data']['payment_type'] = OpdAppointment.INSURANCE
