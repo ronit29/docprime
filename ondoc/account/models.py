@@ -1180,7 +1180,7 @@ class PgTransaction(TimeStampedModel, SoftDelete):
 
         if pg_txns:
             for pg_txn in pg_txns:
-                pgtx_details.append({'id': pg_txn.id, 'amount': ctx_obj.amount})
+                pgtx_details.append({'id': pg_txn, 'amount': ctx_obj.amount})
 
         return pgtx_details
 
@@ -1633,11 +1633,15 @@ class ConsumerTransaction(TimeStampedModel):
             if ref_txn_obj.ref_txns:
                 ctx_obj = ref_txn_obj.debit_from_ref_txn(consumer_account, refund_amount)
             else:
+                #if not ref_txn_obj.action in [self.CASHBACK_CREDIT, self.REFERRAL_CREDIT]:
                 ctx_obj = ref_txn_obj.debit_txn_refund(consumer_account, refund_amount)
+                #else:
+                #    ctx_obj = None
             if self.balance:
                 self.balance -= refund_amount
 
             if initiate_refund:
+                #if ctx_obj:
                 ctx_objs.append(ctx_obj)
             else:
                 pg_txn = PgTransaction.objects.filter(user=self.user, order_id=ref_txn_obj.order_id).order_by(
@@ -1646,9 +1650,10 @@ class ConsumerTransaction(TimeStampedModel):
                     if not (pg_txn.is_preauth() or pg_txn.status_type == 'TXN_RELEASE'):
                         ctx_objs.append(ctx_obj)
                 else:
+                    #if ctx_obj:
                     ctx_objs.append(ctx_obj)
 
-            if ref_txn_obj.balance:
+            if ref_txn_obj.balance and not ref_txn_obj.action in [self.CASHBACK_CREDIT, self.REFERRAL_CREDIT]:
                 ctx_objs.append(ref_txn_obj.debit_from_balance(consumer_account))
         self.save()
 
