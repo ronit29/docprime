@@ -217,6 +217,8 @@ class CartViewSet(viewsets.GenericViewSet):
                     vip_dict = plus_user.validate_plus_appointment(validated_data, utilization=deep_utilization)
                     if not vip_dict.get('cover_under_vip'):
                         raise Exception('Appointment no more cover under VIP')
+                    item.data['amount_to_be_paid'] = vip_dict['amount_to_be_paid']
+                    item.data['vip_amount'] = vip_dict['vip_amount_deducted']
                 if not cart_data.get('is_appointment_insured'):
                     item.data['is_appointment_insured'] = False
                     item.data['insurance_id'] = None
