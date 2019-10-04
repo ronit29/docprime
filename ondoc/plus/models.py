@@ -505,6 +505,7 @@ class PlusUser(auth_model.TimeStampedModel, RefundMixin):
             if engine:
                 vip_response = engine.validate_booking_entity(cost=current_item_mrp, utilization=updated_utilization)
                 vip_data_dict['vip_amount'] = vip_response.get('amount_to_be_paid')
+                vip_data_dict['amount_to_be_paid'] = vip_response.get('amount_to_be_paid')
                 vip_data_dict['cover_under_vip'] = vip_response.get('is_covered')
                 vip_data_dict['plus_user_id'] = self.id
             else:
@@ -521,6 +522,7 @@ class PlusUser(auth_model.TimeStampedModel, RefundMixin):
                 if engine:
                     vip_response = engine.validate_booking_entity(cost=current_item_mrp, utilization=updated_utilization)
                     vip_data_dict['vip_amount'] = vip_response.get('amount_to_be_paid')
+                    vip_data_dict['amount_to_be_paid'] = vip_response.get('amount_to_be_paid')
                     vip_data_dict['cover_under_vip'] = vip_response.get('is_covered')
                     vip_data_dict['plus_user_id'] = self.id
                 # if test.is_package and test.id in current_package_ids and current_package_count_available > 0:
