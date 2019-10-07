@@ -35,12 +35,12 @@ class OTPSerializer(serializers.Serializer):
 
     def validate(self, attrs):
         otp_obj = OtpVerifications.objects.filter(phone_number=attrs.get('phone_number')).order_by('-id').first()
-        if otp_obj:
-            attrs['otp_obj'] = otp_obj
         if not attrs.get('via_whatsapp') and otp_obj and not otp_obj.is_expired and (
                 datetime.datetime.now(tz=pytz.timezone(settings.TIME_ZONE)) - v1_utils.aware_time_zone(
-                otp_obj.created_at)).total_seconds() < 30:
+                otp_obj.updated_at)).total_seconds() < OtpVerifications.TIME_BETWEEN_CONSECUTIVE_REQUESTS:
             raise serializers.ValidationError('Please try again in a moment.')
+        if otp_obj:
+            attrs['otp_obj'] = otp_obj
         return attrs
 
 class OTPVerificationSerializer(serializers.Serializer):
