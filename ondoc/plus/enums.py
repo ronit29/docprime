@@ -19,6 +19,7 @@ class PlanParametersEnum(Choices):
     LABTEST_AMOUNT = 'LABTEST_AMOUNT'
     LABTEST_COUNT = 'LABTEST_COUNT'
     PACKAGE_DISCOUNT = 'PACKAGE_DISCOUNT'
+    TOTAL_WORTH = 'TOTAL_WORTH'
 
 
 class UtilizationCriteria(Choices):
@@ -31,3 +32,4 @@ class UsageCriteria(Choices):
     AMOUNT_COUNT = "AMOUNT_COUNT"
     COUNT_DISCOUNT = "COUNT_DISCOUNT"
     AMOUNT_DISCOUNT = "AMOUNT_DISCOUNT"
+    TOTAL_WORTH = "TOTAL_WORTH"
