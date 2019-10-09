@@ -652,6 +652,15 @@ class UserProfile(TimeStampedModel):
         return None
         # return static('doctor_images/no_image.png')
 
+    @cached_property
+    def get_plus_membership(self):
+        plus_member = self.plus_member.all().order_by('-id').first()
+        if plus_member:
+            return plus_member.plus_user if plus_member.plus_user.is_valid() else None
+
+        return None
+
+
     def has_image_changed(self):
         if not self.pk:
             return True

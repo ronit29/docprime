@@ -16,6 +16,8 @@ from ondoc.api.v1.auth.serializers import AddressSerializer
 from ondoc.integrations.models import IntegratorTestMapping, IntegratorReport, IntegratorMapping
 from ondoc.cart.models import Cart
 from ondoc.common.models import UserConfig, GlobalNonBookable, AppointmentHistory, MatrixMappedCity
+from ondoc.plus.models import PlusUser
+from ondoc.plus.usage_criteria import get_class_reference
 from ondoc.ratings_review import models as rating_models
 from ondoc.diagnostic.models import (LabTest, AvailableLabTest, Lab, LabAppointment, LabTiming, PromotedLab,
                                      CommonDiagnosticCondition, CommonTest, CommonPackage,
@@ -1268,6 +1270,8 @@ class LabList(viewsets.ReadOnlyModelViewSet):
             'is_insurance_covered' : False
         }
 
+        vip_data_dict = Lab.get_vip_details(request.user)
+
         is_insurance_covered = False
 
         if logged_in_user.is_authenticated and not logged_in_user.is_anonymous:
@@ -1311,7 +1315,7 @@ class LabList(viewsets.ReadOnlyModelViewSet):
 
         #count = len(queryset_result)
         #paginated_queryset = paginate_queryset(queryset_result, request)
-        result = self.form_lab_search_whole_data(queryset_result, parameters.get("ids"), insurance_data_dict=insurance_data_dict)
+        result = self.form_lab_search_whole_data(queryset_result, parameters.get("ids"), insurance_data_dict=insurance_data_dict, vip_data_dict=vip_data_dict, user=request.user)
 
         if result:
             product_id = parameters.get('product_id', None)
@@ -1716,7 +1720,7 @@ class LabList(viewsets.ReadOnlyModelViewSet):
             queryset_order_by =' order_priority desc, distance asc'
         return queryset_order_by
 
-    def form_lab_search_whole_data(self, queryset, test_ids=None, insurance_data_dict={}):
+    def form_lab_search_whole_data(self, queryset, test_ids=None, insurance_data_dict={}, vip_data_dict={}, user=None):
         ids = [value.get('id') for value in queryset]
         # ids, id_details = self.extract_lab_ids(queryset)
         labs = Lab.objects.select_related('network').prefetch_related('lab_documents', 'lab_image', 'lab_timings','home_collection_charges')
@@ -1790,6 +1794,7 @@ class LabList(viewsets.ReadOnlyModelViewSet):
             row['home_pickup_charges'] = lab_obj.home_pickup_charges
             row['is_home_collection_enabled'] = lab_obj.is_home_collection_enabled
             row['is_insurance_enabled'] = lab_obj.is_insurance_enabled
+            row['is_vip_enabled'] = lab_obj.enabled_for_plus_plans
             row['avg_rating'] = lab_obj.rating_data.get('avg_rating') if lab_obj.display_rating_on_list() else None
             row['rating_count'] = lab_obj.rating_data.get('rating_count') if lab_obj.display_rating_on_list() else None
 
@@ -1852,6 +1857,9 @@ class LabList(viewsets.ReadOnlyModelViewSet):
             else:
                 row['url'] = ''
 
+        plus_user_obj = None
+        if user and user.is_authenticated and not user.is_anonymous:
+            plus_user_obj = user.active_plus_user if user.active_plus_user and user.active_plus_user.status == PlusUser.ACTIVE else None
 
         lab_network = OrderedDict()
         for res in queryset:
@@ -1867,8 +1875,11 @@ class LabList(viewsets.ReadOnlyModelViewSet):
                 # lab network case as lab network have more than 1 labs under it.
 
                 res['insurance'] = deepcopy(insurance_data_dict)
+                res['vip'] = deepcopy(vip_data_dict)
                 all_tests_under_lab = res.get('tests', [])
                 bool_array = list()
+
+                # For Insurance. Checking the eligibility of test to be booked under Insurance.
                 if all_tests_under_lab and res['is_insurance_enabled']:
                     for paticular_test_in_lab in all_tests_under_lab:
                         insurance_coverage = paticular_test_in_lab.get('mrp', 0) <= insurance_data_dict['insurance_threshold_amount']
@@ -1879,7 +1890,27 @@ class LabList(viewsets.ReadOnlyModelViewSet):
                 elif res['is_insurance_enabled'] and not all_tests_under_lab:
                     res['insurance']['is_insurance_covered'] = True
 
-                #existing = res
+
+                # For Vip. Checking the eligibility of test to be booked under VIP.
+                engine_response = {}
+                if all_tests_under_lab and res['is_vip_enabled']:
+                    for paticular_test_in_lab in all_tests_under_lab:
+                        engine = get_class_reference(plus_user_obj, "LABTEST")
+                        coverage = False
+                        if engine:
+                            engine_response = engine.validate_booking_entity(cost=paticular_test_in_lab.get('mrp', 0))
+                            coverage = engine_response.get('is_covered', False)
+                        bool_array.append(coverage)
+
+                    if False not in bool_array and len(bool_array) > 0:
+                        res['vip']['covered_under_vip'] = True
+                        res['vip']['vip_amount'] = engine_response.get('amount_to_be_paid', 0) if engine_response else 0
+
+                elif res['is_vip_enabled'] and not all_tests_under_lab:
+                    res['vip']['covered_under_vip'] = True
+                    res['vip']['vip_amount'] = 0
+
+                    #existing = res
                 key = network_id
                 if not key:
                     key = random.randint(10, 1000000000)
@@ -2462,7 +2493,7 @@ class LabAppointmentView(mixins.CreateModelMixin,
         booked_by = 'agent' if hasattr(request, 'agent') else 'user'
         user_insurance = UserInsurance.get_user_insurance(request.user)
         plus_user = request.user.active_plus_user
-        if user_insurance:
+        if user_insurance and user_insurance.status in [UserInsurance.ACTIVE, UserInsurance.ONHOLD]:
             if user_insurance.status == UserInsurance.ONHOLD:
                 return Response(status=status.HTTP_400_BAD_REQUEST,
                                 data={'error': 'Your documents from the last claim are under verification.'
@@ -2490,7 +2521,8 @@ class LabAppointmentView(mixins.CreateModelMixin,
             data['is_vip_member'] = plus_user_dict.get('is_vip_member', False)
             data['cover_under_vip'] = plus_user_dict.get('cover_under_vip', False)
             data['plus_user_id'] = plus_user.id
-            data['vip_amount'] = plus_user_dict.get('vip_amount')
+            data['vip_amount'] = plus_user_dict.get('vip_amount_deducted')
+            data['amount_to_be_paid'] = plus_user_dict.get('amount_to_be_paid')
             if data['cover_under_vip']:
                 data['payment_type'] = OpdAppointment.VIP
 

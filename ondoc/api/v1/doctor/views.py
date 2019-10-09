@@ -447,7 +447,8 @@ class DoctorAppointmentsViewSet(OndocViewSet):
             data['is_vip_member'] = plus_user_dict.get('is_vip_member', False)
             data['cover_under_vip'] = plus_user_dict.get('cover_under_vip', False)
             data['plus_user_id'] = plus_user.id
-            data['vip_amount'] = plus_user_dict.get('vip_amount')
+            data['vip_amount'] = plus_user_dict.get('vip_amount_deducted')
+            data['amount_to_be_paid'] = plus_user_dict.get('amount_to_be_paid')
             if data['cover_under_vip']:
                 data['payment_type'] = OpdAppointment.VIP
 
@@ -1772,7 +1773,7 @@ class DoctorListViewSet(viewsets.GenericViewSet):
         vip_data_dict = {
             'is_vip_member': False,
             'cover_under_vip': False,
-            'vip_remaining_amount': 0,
+            'vip_utilization': {},
             'is_enable_for_vip': False
         }
 
@@ -1790,7 +1791,7 @@ class DoctorListViewSet(viewsets.GenericViewSet):
             if logged_in_user.active_plus_user:
                 utilization_dict = logged_in_user.active_plus_user.get_utilization
 
-                vip_data_dict['vip_remaining_amount'] = utilization_dict.get('doctor_amount_available') if utilization_dict else 0
+                vip_data_dict['vip_utilization'] = utilization_dict
                 vip_data_dict['is_vip_member'] = True
                 vip_data_dict['cover_under_vip'] = False
                 vip_data_dict['is_enable_for_vip'] = False

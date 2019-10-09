@@ -59,6 +59,7 @@ from ondoc.integrations.task import push_lab_appointment_to_integrator, get_inte
 from ondoc.location import models as location_models
 from ondoc.plus.enums import UtilizationCriteria
 from ondoc.plus.models import PlusAppointmentMapping
+from ondoc.plus.usage_criteria import get_class_reference
 from ondoc.ratings_review import models as ratings_models
 # from ondoc.api.v1.common import serializers as common_serializers
 from ondoc.common.models import AppointmentHistory, AppointmentMaskNumber, Remark, GlobalNonBookable, \
@@ -355,8 +356,8 @@ class Lab(TimeStampedModel, CreatedByModel, QCModel, SearchKey, WelcomeCallingDo
         }
 
         if user.is_authenticated and not user.is_anonymous:
-            plus_membership = user.active_plus_user
-            if plus_membership:
+            is_user_vip = user.active_plus_user and not user.inactive_plus_user
+            if is_user_vip:
                 resp['is_vip_member'] = True
 
         return resp
@@ -2653,7 +2654,20 @@ class LabAppointment(TimeStampedModel, CouponsMixin, LabAppointmentInvoiceMixin,
             coupon_discount, coupon_cashback, coupon_list, random_coupon_list = 0, 0, [], []
 
         if data.get("payment_type") in [OpdAppointment.VIP]:
-            effective_price = effective_price
+            profile = data.get('profile')
+            if profile:
+                plus_membership = profile.get_plus_membership
+
+                test = data['test_ids']
+                entity = "LABTEST" if not test[0].is_package else "PACKAGE"
+                engine = get_class_reference(plus_membership, entity)
+                if engine:
+                    engine_response = engine.validate_booking_entity(cost=effective_price, id=data['test_ids'][0].id)
+                    effective_price = engine_response.get('amount_to_be_paid')
+                else:
+                    effective_price = effective_price
+            else:
+                effective_price = effective_price
             coupon_discount, coupon_cashback, coupon_list, random_coupon_list = 0, 0, [], []
 
         return {
@@ -2788,21 +2802,24 @@ class LabAppointment(TimeStampedModel, CouponsMixin, LabAppointmentInvoiceMixin,
             plus_user_id = plus_user_resp.get('plus_user_id', None)
         if cover_under_vip and cart_data.get('cover_under_vip', None):
             payment_type = OpdAppointment.VIP
-            utilization = plus_user.get_utilization
-            available_amount = int(utilization.get('available_package_amount', 0))
+
+            effective_price = plus_user_resp['amount_to_be_paid']
+            vip_amount_utilized = plus_user_resp['vip_amount_deducted']
+            # utilization = plus_user.get_utilization
+            # available_amount = int(utilization.get('available_package_amount', 0))
             # mrp = int(price_data.get('mrp'))
 
-            final_price = mrp + price_data['home_pickup_charges']
+            # final_price = mrp + price_data['home_pickup_charges']
 
-            utilization_criteria, coverage = plus_user.can_package_be_covered_in_vip(None, mrp=final_price, id=data['test_ids'][0].id)
-
-            if coverage:
-                if utilization_criteria == UtilizationCriteria.COUNT:
-                    effective_price = 0
-                    vip_amount_utilized = final_price
-                else:
-                    effective_price = cart_data.get('vip_amount', 0)
-                    vip_amount_utilized = available_amount if final_price >= available_amount else final_price
+            # utilization_criteria, coverage = plus_user.can_package_be_covered_in_vip(None, mrp=final_price, id=data['test_ids'][0].id)
+            #
+            # if coverage:
+            #     if utilization_criteria == UtilizationCriteria.COUNT:
+            #         effective_price = 0
+            #         vip_amount_utilized = final_price
+            #     else:
+            #         effective_price = cart_data.get('amount_to_be_paid', 0)
+            #         vip_amount_utilized = available_amount if final_price >= available_amount else final_price
 
         else:
             plus_user_id = None
