@@ -4,6 +4,8 @@ import requests
 from celery import task
 import logging
 from django.conf import settings
+from rest_framework import status
+import json
 
 logger = logging.getLogger(__name__)
 
@@ -121,6 +123,56 @@ def get_integrator_order_status(self, *args, **kwargs):
         self.retry(**kwargs, countdown=countdown_time)
 
 
+@task(bind=True, max_retries=2)
+def push_appointment_to_spo(self, data):
+    from ondoc.diagnostic.models import LabAppointment
+    from ondoc.account.models import Order
+    try:
+        appointment_id = data.get('appointment_id', None)
+        if not appointment_id:
+            raise Exception("Appointment id not found, could not push to Matrix")
+
+        product_id = data.get('product_id')
+        sub_product_id = data.get('sub_product_id')
+
+        order_product_id = 2
+        appointment = LabAppointment.objects.filter(pk=appointment_id).first()
+        if not appointment:
+            raise Exception("Appointment could not found against id - " + str(appointment_id))
+
+        appointment_order = Order.objects.filter(product_id=order_product_id, reference_id=appointment_id).first()
+        request_data = appointment.get_spo_data(appointment_order, product_id, sub_product_id)
+
+        url = settings.VIP_SALESPOINT_URL
+        spo_api_token = settings.VIP_SALESPOINT_AUTHTOKEN
+        response = requests.post(url, data=json.dumps(request_data), headers={'Authorization': spo_api_token,
+                                                                              'Content-Type': 'application/json'})
+        if response.status_code != status.HTTP_200_OK or not response.ok:
+            logger.error("[ERROR-SPO] Failed to push appointment details - " + str(json.dumps(request_data)))
+
+            countdown_time = (2 ** self.request.retries) * 60 * 10
+            self.retry([data], countdown=countdown_time)
+        else:
+            resp_data = response.json()
+            resp_data = resp_data['data']
+            if resp_data.get('error', None):
+                logger.error("[ERROR-SPO] Appointment could not be published to the SPO system - " + str(json.dumps(request_data)))
+                logger.info("[ERROR-SPO] %s", resp_data.get('errorDetails', []))
+            else:
+                logger.error("Response = " + str(resp_data))
+                lead_id = resp_data.get('leadId', '')
+                logger.error("[SUCCESS-SPO] Lead ID is- " + str(lead_id))
+                if lead_id:
+                    logger.error("[SUCCESS-SPO] Lead ID is- " + str(lead_id))
+                    # save the appointment with the spo lead id.
+                    qs = LabAppointment.objects.filter(id=appointment.id)
+                    if qs:
+                        qs.update(spo_lead_id=int(lead_id))
+        # logger.error("[NO_SUCCESS-SPO] Lead ID")
+    except Exception as e:
+        logger.error("Error in Celery. Failed pushing Appointment to the SPO- " + str(e))
+
+
 @task(bind=True, max_retries=3)
 def push_opd_appointment_to_integrator(self, data):
     from ondoc.diagnostic.models import OpdAppointment
@@ -184,3 +236,4 @@ def push_opd_appointment_to_integrator(self, data):
 
     except Exception as e:
         logger.error(str(e))
+

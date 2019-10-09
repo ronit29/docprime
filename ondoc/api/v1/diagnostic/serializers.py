@@ -972,12 +972,12 @@ class LabAppTransactionModelSerializer(serializers.Serializer):
     insurance = serializers.PrimaryKeyRelatedField(queryset=UserInsurance.objects.all(), allow_null=True)
     plus_plan = serializers.PrimaryKeyRelatedField(queryset=PlusUser.objects.all(), allow_null=True)
     plus_amount = serializers.DecimalField(max_digits=10, decimal_places=2)
-
     cashback = serializers.DecimalField(max_digits=10, decimal_places=2)
     extra_details = serializers.JSONField(required=False)
     user_plan = serializers.PrimaryKeyRelatedField(queryset=UserPlanMapping.objects.all(), allow_null=True)
     coupon_data = serializers.JSONField(required=False)
     prescription_list = serializers.ListSerializer(child=PrescriptionDocumentSerializer(), required=False)
+    spo_data = serializers.JSONField(required=False, default={})
     _source = serializers.CharField(required=False, allow_null=True)
     _responsible_user = serializers.IntegerField(required=False, allow_null=True)
     # test_time_slots = serializers.ListSerializer(child=LabAppointmentTestTransactionSerializer(), required=False, allow_empty=False)
@@ -998,6 +998,7 @@ class LabAppTransactionModelSerializer(serializers.Serializer):
             # self.fields.fields['test_time_slots'].required = False
             # self.fields.fields['selected_timings_type'].required = False
             # self.fields.fields['time_slot_start'].required = True
+
 
 
 class LabAppRescheduleModelSerializer(serializers.ModelSerializer):
@@ -1080,6 +1081,7 @@ class LabAppointmentCreateSerializer(serializers.Serializer):
     from_app = serializers.BooleanField(required=False, default=False)
     user_plan = serializers.PrimaryKeyRelatedField(queryset=UserPlanMapping.objects.all(), required=False, allow_null=True, default=None)
     included_in_user_plan = serializers.BooleanField(required=False, default=False)
+    utm_spo_tags = serializers.JSONField(required=False, default={})
     app_version = serializers.CharField(required=False, allow_null=True, allow_blank=True)
     prescription_list = serializers.ListSerializer(child=PrescriptionDocumentSerializer(), required=False)
     _source = serializers.CharField(required=False, allow_null=True)
