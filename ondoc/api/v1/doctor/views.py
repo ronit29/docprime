@@ -4794,21 +4794,21 @@ class HospitalViewSet(viewsets.GenericViewSet):
 
                 breadcrumb.append({'title':  hospital_obj.name, 'url': None, 'link_title': None})
                 response['breadcrumb'] = breadcrumb
-            else:
-
-                breadcrumb = [{'url': '/', 'title': 'Home', 'link_title': 'Home'},
-                              {"title": "Hospitals", "url": "hospitals", "link_title": "Hospitals"}]
-                if entity.locality_value:
-                    breadcrumb.append({"title": "{} Hospitals".format(entity.locality_value),
-                                       "url": "hospitals/hospitals-in-{}-hspcit".format(entity.locality_value),
-                                       "link_title": "{} Hospitals".format(entity.locality_value)})
-                if entity.sublocality_value:
-                    breadcrumb.append({"title": "{}".format(entity.sublocality_value),
-                                       "url": "hospitals/hospitals-in-{}-{}-hsplitcit".format(entity.sublocality_value,
-                                                                                              entity.locality_value),
-                                       "link_title": "{}".format(entity.sublocality_value)})
-                breadcrumb.append({'title': hospital_obj.name, 'url': None, 'link_title': None})
-                response['breadcrumb'] = breadcrumb
+            # else:
+            #
+            #     breadcrumb = [{'url': '/', 'title': 'Home', 'link_title': 'Home'},
+            #                   {"title": "Hospitals", "url": "hospitals", "link_title": "Hospitals"}]
+            #     if entity.locality_value:
+            #         breadcrumb.append({"title": "{} Hospitals".format(entity.locality_value),
+            #                            "url": "hospitals/hospitals-in-{}-hspcit".format(entity.locality_value),
+            #                            "link_title": "{} Hospitals".format(entity.locality_value)})
+            #     if entity.sublocality_value:
+            #         breadcrumb.append({"title": "{}".format(entity.sublocality_value),
+            #                            "url": "hospitals/hospitals-in-{}-{}-hsplitcit".format(entity.sublocality_value,
+            #                                                                                   entity.locality_value),
+            #                            "link_title": "{}".format(entity.sublocality_value)})
+            #     breadcrumb.append({'title': hospital_obj.name, 'url': None, 'link_title': None})
+            #     response['breadcrumb'] = breadcrumb
 
             if hospital_obj.name and entity.locality_value:
                 title = hospital_obj.name
