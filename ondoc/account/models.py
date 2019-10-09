@@ -1644,6 +1644,8 @@ class ConsumerTransaction(TimeStampedModel):
             is_preauth_txn = False
             if ref_txn_obj.action in [ConsumerTransaction.CASHBACK_CREDIT, ConsumerTransaction.REFERRAL_CREDIT]:
                 cashback_txn = True
+            elif ref_txn_obj.action == ConsumerTransaction.SALE and ref_txn_obj.source == ConsumerTransaction.CASHBACK_SOURCE:
+                cashback_txn = True
             if parent_ref:
                 refund_amount = decimal.Decimal(ref_txns.get(str(ref_txn_obj.id), 0))
             if ref_txn_obj.ref_txns:
