@@ -1216,7 +1216,12 @@ class DoctorProfileUserViewSet(viewsets.GenericViewSet):
                     ratings_graph = None
                     hosp_reviews = hospital.hospital_place_details.all()
                     if hosp_reviews:
-                        reviews_data = hosp_reviews[0].reviews
+                        reviews_data = dict()
+                        reviews_data['user_reviews'] = None
+                        if hosp_reviews:
+                            reviews_data['user_reviews'] = hosp_reviews[0].reviews.get('user_reviews')
+                        reviews_data['user_avg_rating'] = hospital.google_avg_rating
+                        reviews_data['user_ratings_total'] = hospital.google_ratings_count
 
                         if reviews_data and reviews_data.get('user_reviews'):
                             ratings_graph = GoogleRatingsGraphSerializer(reviews_data, many=False,
