@@ -870,6 +870,9 @@ class SampleCollectOrderCreateOrUpdateSerializer(serializers.Serializer):
         offline_patient = doc_models.OfflinePatients.objects.filter(id=offline_patient_id).first()
         if not offline_patient:
             raise serializers.ValidationError('invalid offline_patient_id')
+        if not (offline_patient.name and offline_patient.gender and offline_patient.get_patient_mobile()) or \
+                not (offline_patient.dob or offline_patient.calculated_dob):
+            raise serializers.ValidationError('patient details incomplete')
         hospital_id = attrs.get('hospital_id')
         filter_kwargs = dict()
         lab_id = attrs.get('lab_id')
@@ -903,11 +906,9 @@ class SampleCollectOrderCreateOrUpdateSerializer(serializers.Serializer):
         if not doctor:
             raise serializers.ValidationError('Hospital Doctor Mapping not found')
         available_lab_tests = list()
-        lab_tests = list()
         for obj in all_available_lab_tests:
             if obj.test.id in lab_test_ids and hasattr(obj, 'sample_details') and obj.enabled:
                 available_lab_tests.append(obj)
-                lab_tests.append(obj.test)
         if not available_lab_tests:
             raise serializers.ValidationError("no valid test found.")
         attrs['order_obj'] = order_obj
@@ -916,7 +917,6 @@ class SampleCollectOrderCreateOrUpdateSerializer(serializers.Serializer):
         attrs['doctor'] = doctor
         attrs['lab'] = lab
         attrs['available_lab_tests'] = available_lab_tests
-        attrs['lab_tests'] = lab_tests
         return attrs
 
 
@@ -935,14 +935,13 @@ class SelectedTestsDetailsSerializer(serializers.ModelSerializer):
 
 class PartnerLabTestSampleDetailsModelSerializer(serializers.ModelSerializer):
     sample_details_id = serializers.IntegerField(source="id")
-    sample_name = serializers.CharField(source="sample.name")
-    sample_volume = serializers.IntegerField(source='volume')
-    sample_volume_unit = serializers.CharField(source='volume_unit')
+    name = serializers.CharField(source="sample.name")
+    code = serializers.CharField(source="sample.code")
 
     class Meta:
         model = provider_models.PartnerLabTestSampleDetails
-        fields = ('sample_details_id', 'created_at', 'updated_at', 'sample_name', 'material_required', 'sample_volume',
-                  'sample_volume_unit', 'is_fasting_required', 'report_tat', 'reference_value', 'instructions')
+        fields = ('sample_details_id', 'name', 'code', 'material_required', 'volume', 'volume_unit',
+                  'is_fasting_required', 'report_tat', 'reference_value', 'instructions')
 
 
 class LabTestSamplesCollectionBarCodeModelSerializer(PartnerLabTestSampleDetailsModelSerializer):
@@ -969,9 +968,9 @@ class LabTestSamplesCollectionBarCodeModelSerializer(PartnerLabTestSampleDetails
 
     class Meta:
         model = provider_models.PartnerLabTestSampleDetails
-        fields = ('sample_details_id', 'created_at', 'updated_at', 'sample_name', 'material_required', 'sample_volume',
-                  'sample_volume_unit', 'is_fasting_required', 'report_tat', 'reference_value', 'instructions',
-                  'barcode', 'barcode_scan_time')
+        fields = ('sample_details_id', 'name', 'code', 'material_required', 'volume', 'volume_unit',
+                  'is_fasting_required', 'report_tat', 'reference_value', 'instructions', 'barcode',
+                  'barcode_scan_time')
 
 
 class PartnerLabSamplesCollectOrderModelSerializer(serializers.ModelSerializer):

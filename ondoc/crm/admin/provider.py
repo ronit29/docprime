@@ -3,9 +3,12 @@ from django.contrib import admin
 from django import forms
 from import_export import fields, resources
 from import_export.admin import ImportExportModelAdmin
+from import_export.tmp_storages import MediaStorage
 from import_export import widgets
 from ondoc.provider import models as prov_models
 from ondoc.diagnostic import models as diag_models
+from ondoc.notification import tasks as notification_tasks
+from ondoc.notification.models import NotificationAction
 from django.db.models import Q
 import logging
 import json
@@ -38,7 +41,7 @@ class AvailableLabTestAutocomplete(autocomplete.Select2QuerySetView):
     def get_queryset(self):
         if not self.request.user.is_authenticated:
             return diag_models.AvailableLabTest.objects.none()
-        queryset = diag_models.AvailableLabTest.objects.filter(enabled=True)
+        queryset = diag_models.AvailableLabTest.objects.filter(enabled=True, lab_pricing_group__labs__is_b2b=True)
         if self.q:
             queryset = queryset.filter(Q(test__name__istartswith=self.q) | Q(lab_pricing_group__group_name__istartswith=self.q))
         return queryset.distinct()
@@ -55,7 +58,7 @@ class PartnerLabTestSampleDetailForm(forms.ModelForm):
 
 
 class PartnerLabTestSampleDetailResource(resources.ModelResource):
-
+    tmp_storage_class = MediaStorage
     sample_id = fields.Field(column_name='sample_id',
                              attribute='sample',
                              widget=widgets.ForeignKeyWidget(prov_models.PartnerLabTestSamples))
@@ -83,21 +86,32 @@ class PartnerLabTestSampleDetailAdmin(ImportExportModelAdmin):
 
 
 class PartnerLabTestSampleResource(resources.ModelResource):
+    tmp_storage_class = MediaStorage
 
     class Meta:
         model = prov_models.PartnerLabTestSamples
-        fields = ('id', 'name',)
+        fields = ('id', 'name', 'code')
 
 
 class PartnerLabTestSampleAdmin(ImportExportModelAdmin):
     resource_class = PartnerLabTestSampleResource
-    list_display = ('id', 'name', 'created_at', 'updated_at')
+    list_display = ('id', 'name', 'code', 'created_at', 'updated_at')
     readonly_fields = []
     search_fields = ['name']
 
 
 class TestSamplesLabAlertAdmin(admin.ModelAdmin):
     list_display = ('name', )
+
+
+class ReportsInlineFormset(forms.BaseInlineFormSet):
+    def clean(self):
+        super().clean()
+        if any(self.errors):
+            return
+        if self.instance.status in [prov_models.PartnerLabSamplesCollectOrder.PARTIAL_REPORT_GENERATED,
+                                    prov_models.PartnerLabSamplesCollectOrder.REPORT_GENERATED] and not self.cleaned_data:
+            raise forms.ValidationError("No report files found.")
 
 
 class ReportsInline(admin.TabularInline):
@@ -109,6 +123,7 @@ class ReportsInline(admin.TabularInline):
     readonly_fields = []
     fields = ['report']
     autocomplete_fields = []
+    formset = ReportsInlineFormset
 
 
 class PartnerLabSamplesCollectOrderAdmin(admin.ModelAdmin):
@@ -121,8 +136,27 @@ class PartnerLabSamplesCollectOrderAdmin(admin.ModelAdmin):
         ReportsInline,
     ]
 
+    def get_queryset(self, request):
+        return super(PartnerLabSamplesCollectOrderAdmin, self).get_queryset(request)\
+                                                              .prefetch_related('available_lab_tests__lab_pricing_group',
+                                                                                'available_lab_tests__lab_pricing_group__labs',
+                                                                                'available_lab_tests__test')
+
     def has_add_permission(self, request, obj=None):
         return False
 
     def has_delete_permission(self, request, obj=None):
         return False
+
+    def save_related(self, request, form, formsets, change):
+        super(type(self), self).save_related(request, form, formsets, change)
+        report_list = list()
+        for formset in formsets:
+            if isinstance(formset, ReportsInlineFormset):
+                report_list = [(request.build_absolute_uri(report_mapping.report.url)) for report_mapping in formset.instance.reports.all()]
+        if form.cleaned_data.get('status') in [prov_models.PartnerLabSamplesCollectOrder.PARTIAL_REPORT_GENERATED,
+                                               prov_models.PartnerLabSamplesCollectOrder.REPORT_GENERATED]:
+            notification_tasks.send_partner_lab_notifications.apply_async(kwargs={'order_id': form.instance.id,
+                                                                                  'notification_type': NotificationAction.PARTNER_LAB_REPORT_UPLOADED,
+                                                                                  'report_list': report_list},
+                                                                          countdown=3)

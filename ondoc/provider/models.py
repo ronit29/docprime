@@ -6,6 +6,8 @@ from ondoc.authentication import models as auth_models
 from ondoc.common import models as common_models
 from ondoc.account import models as acct_mdoels
 from ondoc.prescription import models as pres_models
+from ondoc.notification.models import NotificationAction
+from ondoc.notification import tasks as notification_tasks
 from django.contrib.contenttypes.fields import GenericRelation
 from django.contrib.postgres.fields import JSONField
 import logging, json, uuid, requests
@@ -233,8 +235,11 @@ class TestSamplesLabAlerts(auth_models.TimeStampedModel):
 class PartnerLabTestSamples(auth_models.TimeStampedModel):
 
     name = models.CharField(max_length=128)
+    code = models.CharField(max_length=128, null=True, blank=True)
 
     def __str__(self):
+        if self.code:
+            return str(self.name) + '(' + str(self.code) + ')'
         return str(self.name)
 
     class Meta:
@@ -243,39 +248,45 @@ class PartnerLabTestSamples(auth_models.TimeStampedModel):
 
 class PartnerLabTestSampleDetails(auth_models.TimeStampedModel):
     ML = 'ml'
-    VOLUME_UNIT_CHOICES = [(ML, "ml")]
-    available_lab_test = models.OneToOneField(diag_models.AvailableLabTest, on_delete=models.CASCADE, related_name="sample_details")
+    MG = 'mg'
+    VOLUME_UNIT_CHOICES = [(ML, "ml"), (MG, "mg")]
+    available_lab_test = models.ForeignKey(diag_models.AvailableLabTest, on_delete=models.CASCADE, related_name="sample_details")
     sample = models.ForeignKey(PartnerLabTestSamples, on_delete=models.CASCADE, related_name="details")
     volume = models.PositiveIntegerField(null=True, blank=True)
     volume_unit = models.CharField(max_length=16, default=None, null=True, blank=True, choices=VOLUME_UNIT_CHOICES)
     is_fasting_required = models.BooleanField(default=False)
     report_tat = models.PositiveSmallIntegerField(null=True, blank=True)                    # in hours
     reference_value = models.TextField(blank=True, null=True)
-    material_required = JSONField(null=True)
-    instructions = models.CharField(max_length=256, null=True, blank=True)
+    material_required = JSONField(blank=True, null=True)
+    instructions = models.TextField(null=True, blank=True)
 
     def __str__(self):
         return str(self.available_lab_test.test.name) + '-' + str(self.sample.name)
 
     @classmethod
-    def get_sample_collection_details(cls, lab_tests_queryset):
-        sample_details = cls.objects.filter(available_lab_test__test__in=lab_tests_queryset, available_lab_test__enabled=True)
-        max_volumes_list = sample_details.values('sample__name').annotate(max_volume=models.Max('volume'))
-        max_volumes_dict = dict()
-        sample_ids_to_be_excluded = list()
-        for max_volume in max_volumes_list:
-            max_volumes_dict[max_volume['sample__name']] = max_volume['max_volume']
+    def get_sample_collection_details(cls, available_lab_tests):
+        sample_details = list()
+        collection_sample_objs = list()
+        sample_max_volumes = dict()
+        for obj in available_lab_tests:
+            sample_details.extend(obj.sample_details.all())
         for sample_detail in sample_details:
-            if sample_detail.sample.name in max_volumes_dict and sample_detail.volume != max_volumes_dict[sample_detail.sample.name]:
-                sample_ids_to_be_excluded.append(sample_detail.id)
-        samples_objs = sample_details.exclude(id__in=sample_ids_to_be_excluded)
-        return samples_objs
+            if sample_detail.sample.name not in sample_max_volumes or \
+                    (sample_detail.sample.name in sample_max_volumes and sample_detail.volume and
+                     ((not sample_max_volumes[sample_detail.sample.name]["max_volume"]) or
+                      (sample_max_volumes[sample_detail.sample.name]["max_volume"] and
+                       sample_detail.volume > sample_max_volumes[sample_detail.sample.name]["max_volume"]))):
+                sample_max_volumes[sample_detail.sample.name] = {"id": sample_detail.id, "max_volume": sample_detail.volume}
+        for sample_detail in sample_details:
+            if sample_detail.id == sample_max_volumes[sample_detail.sample.name]['id']:
+                collection_sample_objs.append(sample_detail)
+        return collection_sample_objs
 
     class Meta:
         db_table = "partner_lab_test_sample_details"
 
 
-class PartnerLabSamplesCollectOrder(auth_models.TimeStampedModel):
+class PartnerLabSamplesCollectOrder(auth_models.TimeStampedModel, auth_models.CreatedByModel):
 
     SAMPLE_EXTRACTION_PENDING = 1
     SAMPLE_SCAN_PENDING = 2
@@ -291,6 +302,8 @@ class PartnerLabSamplesCollectOrder(auth_models.TimeStampedModel):
                       (PARTIAL_REPORT_GENERATED, "Partial Report Generated"),
                       (REPORT_GENERATED, "Report Generated"),
                       (REPORT_VIEWED, "Report Viewed")]
+
+    id = models.BigAutoField(primary_key=True)
     offline_patient = models.ForeignKey(doc_models.OfflinePatients, on_delete=models.CASCADE, related_name="patient_lab_samples_collect_order")
     patient_details = JSONField()
     hospital = models.ForeignKey(doc_models.Hospital, on_delete=models.CASCADE, related_name="hosp_lab_samples_collect_order")
@@ -308,6 +321,13 @@ class PartnerLabSamplesCollectOrder(auth_models.TimeStampedModel):
 
     class Meta:
         db_table = "partner_lab_samples_collect_order"
+
+    def save(self, *args, **kwargs):
+        super(PartnerLabSamplesCollectOrder, self).save()
+        if self.status == self.SAMPLE_PICKUP_PENDING:
+            notification_tasks.send_partner_lab_notifications.apply_async(kwargs={'order_id': self.id,
+                                                                                  'notification_type': NotificationAction.PARTNER_LAB_ORDER_PLACED_SUCCESSFULLY},
+                                                                          countdown=3)
 
 
 class PartnerLabTestSamplesOrderReportMapping(auth_models.TimeStampedModel):
