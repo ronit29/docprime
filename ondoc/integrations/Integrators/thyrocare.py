@@ -169,7 +169,13 @@ class Thyrocare(BaseIntegrator):
             # Add details to history table
             status = IntegratorHistory.PUSHED_AND_NOT_ACCEPTED
             IntegratorHistory.create_history(lab_appointment, payload, response, url, 'post_order', 'Thyrocare', status_code, retry_count, status, '')
-            return response
+            resp_data = {
+                "lead_id": response['ORDERRESPONSE']['PostOrderDataResponse'][0]['LEAD_ID'],
+                "dp_order_id": response['ORDER_NO'],
+                "integrator_order_id": response['REF_ORDERID'],
+                "response_data": response
+            }
+            return resp_data
         else:
             status = IntegratorHistory.NOT_PUSHED
             IntegratorHistory.create_history(lab_appointment, payload, response, url, 'post_order', 'Thyrocare', status_code, retry_count, status, '')
@@ -334,6 +340,13 @@ class Thyrocare(BaseIntegrator):
                 lab_report, created = LabReport.objects.update_or_create(appointment_id=report.integrator_response.object_id)
                 if lab_report:
                     LabReportFile.objects.create(report_id=lab_report.id, name=in_memory_file)
+                    # Send Reports to Patient
+                    from ondoc.notification.tasks import send_lab_reports
+                    if format == 'pdf':
+                        try:
+                            send_lab_reports.apply_async((report.integrator_response.object_id,), countdown=1)
+                        except Exception as e:
+                            logger.error(str(e))
         except Exception as e:
             logger.error(str(e))
 

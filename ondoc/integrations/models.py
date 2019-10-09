@@ -6,7 +6,7 @@ from ondoc.authentication.models import TimeStampedModel
 from ondoc.common.helper import Choices
 from django.contrib.postgres.fields import JSONField, ArrayField
 from django.db import transaction
-
+import reversion
 from ondoc.doctor.models import DoctorClinic
 from ondoc.matrix.tasks import push_appointment_to_matrix
 from ondoc.diagnostic.models import TestParameter
@@ -110,16 +110,18 @@ class IntegratorResponse(TimeStampedModel):
         from ondoc.integrations import service
 
         integrator_responses = IntegratorResponse.objects.all()
+        is_integrator_enabled = False
         for integrator_response in integrator_responses:
             if integrator_response.integrator_class_name == 'Thyrocare':
                 if settings.THYROCARE_INTEGRATION_ENABLED:
-                    is_thyrocare_enabled = True
-                else:
-                    is_thyrocare_enabled = False
+                    is_integrator_enabled = True
+            elif integrator_response.integrator_class_name == 'Lalpath':
+                if settings.LAL_PATH_INTEGRATION_ENABLED:
+                    is_integrator_enabled = True
             else:
-                is_thyrocare_enabled = True
+                is_integrator_enabled = False
 
-            if is_thyrocare_enabled:
+            if is_integrator_enabled:
                 integrator_obj = service.create_integrator_obj(integrator_response.integrator_class_name)
                 integrator_obj.get_order_summary(integrator_response)
 
@@ -233,6 +235,7 @@ class IntegratorCity(TimeStampedModel):
         db_table = 'integrator_city'
 
 
+@reversion.register()
 class IntegratorTestMapping(TimeStampedModel):
     from ondoc.diagnostic.models import LabTest
 
@@ -321,14 +324,16 @@ class IntegratorDoctorMappings(TimeStampedModel):
     @classmethod
     def get_if_third_party_integration(cls, doctor_clinic_id=None):
         if doctor_clinic_id:
-            mapping = cls.objects.filter(doctor_clinic_id=doctor_clinic_id, is_active=True).first()
+            dc_mapping = IntegratorDoctorClinicMapping.objects.filter(doctor_clinic_id=doctor_clinic_id).first()
+            # mapping = cls.objects.filter(doctor_clinic_id=doctor_clinic_id, is_active=True).first()
         else:
             return None
 
         # Return if no test exist over here and it depicts that it is not a part of integrations.
-        if not mapping:
+        if not dc_mapping:
             return None
 
+        mapping = cls.objects.filter(id=dc_mapping.integrator_doctor_mapping_id).first()
         # Part of the integrations.
         return {'class_name': mapping.integrator_class_name, 'id': mapping.id}
 
@@ -363,3 +368,21 @@ class IntegratorLabCode(TimeStampedModel):
 
     class Meta:
         db_table = 'integrator_lab_code'
+
+
+class IntegratorHospitalCode(TimeStampedModel):
+    from ondoc.doctor.models import Hospital
+    city_code = models.CharField(max_length=30, null=True, blank=True)
+    clinic_code = models.CharField(max_length=50, null=True, blank=True)
+    hospital = models.ForeignKey(Hospital, null=False, blank=False, related_name='hos_code', on_delete=models.DO_NOTHING)
+
+    class Meta:
+        db_table = 'integrator_hospital_code'
+
+
+class IntegratorDoctorClinicMapping(TimeStampedModel):
+    integrator_doctor_mapping = models.ForeignKey(IntegratorDoctorMappings, null=False, blank=False, related_name='integrator_doctor', on_delete=models.DO_NOTHING)
+    doctor_clinic = models.ForeignKey(DoctorClinic, null=False, blank=False, on_delete=models.DO_NOTHING)
+
+    class Meta:
+        db_table = 'integrator_doctor_clinic_mapping'

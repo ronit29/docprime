@@ -1,1 +1,1 @@
-Dear {{ patient_name }}, your appointment with {{ doctor_name_name }} at {{ hospital_name }} has been rescheduled to {{ time_slot_start|date:"D jS F Y" }}. In case of any query, please reach out to the clinic.
+Dear {{ patient_name }}, your appointment with {{ doctor_name_name }} at {{ hospital_name }} has been rescheduled to {{ opd_time_slot_start|date:"D jS F Y" }}. In case of any query, please reach out to the clinic.

@@ -30,7 +30,6 @@ from ondoc.common.models import AppointmentHistory, SponsorListingURL, SponsorLi
     SponsorListingSpecialization
 from django.contrib import messages
 from django.http import HttpResponseRedirect
-
 from ondoc.notification.models import NotificationAction
 from ondoc.procedure.models import DoctorClinicProcedure, Procedure, DoctorClinicIpdProcedure
 
@@ -2437,15 +2436,15 @@ class SimilarSpecializationGroupAdmin(VersionAdmin):
     list_display = ['id', 'name']
 
 
-class DoctorClinicAdmin(VersionAdmin):
-    list_display = ('doctor', 'hospital', 'updated_at')
-    date_hierarchy = 'created_at'
-    search_fields = ['doctor__name', 'hospital__name']
-    autocomplete_fields = ['doctor', 'hospital']
-    inlines = [DoctorClinicTimingInline]
-
-    def get_queryset(self, request):
-        return super(DoctorClinicAdmin, self).get_queryset(request).select_related('doctor', 'hospital')
+# class DoctorClinicAdmin(VersionAdmin):
+#     list_display = ('doctor', 'hospital', 'updated_at')
+#     date_hierarchy = 'created_at'
+#     search_fields = ['doctor__name', 'hospital__name']
+#     autocomplete_fields = ['doctor', 'hospital']
+#     inlines = [DoctorClinicTimingInline, DoctorClinicCodeInline]
+#
+#     def get_queryset(self, request):
+#         return super(DoctorClinicAdmin, self).get_queryset(request).select_related('doctor', 'hospital')
 
 
 class PurchaseOrderCreationForm(forms.ModelForm):

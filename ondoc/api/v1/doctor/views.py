@@ -42,7 +42,8 @@ from . import serializers
 from ondoc.api.v2.doctor import serializers as v2_serializers
 from ondoc.api.pagination import paginate_queryset, paginate_raw_query, paginate_queryset_refactored_consumer_app
 from ondoc.api.v1.utils import convert_timings, form_time_slot, IsDoctor, payment_details, aware_time_zone, \
-    TimeSlotExtraction, GenericAdminEntity, get_opd_pem_queryset, offline_form_time_slots, ipd_query_parameters
+    TimeSlotExtraction, GenericAdminEntity, get_opd_pem_queryset, offline_form_time_slots, ipd_query_parameters, \
+    common_package_category
 from ondoc.api.v1 import insurance as insurance_utility
 from ondoc.api.v1.doctor.doctorsearch import DoctorSearchHelper
 from django.db.models import Min, Prefetch
@@ -446,7 +447,8 @@ class DoctorAppointmentsViewSet(OndocViewSet):
             data['is_vip_member'] = plus_user_dict.get('is_vip_member', False)
             data['cover_under_vip'] = plus_user_dict.get('cover_under_vip', False)
             data['plus_user_id'] = plus_user.id
-            data['vip_amount'] = plus_user_dict.get('vip_amount')
+            data['vip_amount'] = plus_user_dict.get('vip_amount_deducted')
+            data['amount_to_be_paid'] = plus_user_dict.get('amount_to_be_paid')
             if data['cover_under_vip']:
                 data['payment_type'] = OpdAppointment.VIP
 
@@ -455,11 +457,12 @@ class DoctorAppointmentsViewSet(OndocViewSet):
                 'insurance_message'], data['is_vip_member'], data['cover_under_vip'], \
             data['plus_user_id'] = False, None, "", False, False, None
         cart_item_id = validated_data.get('cart_item').id if validated_data.get('cart_item') else None
-        if not models.OpdAppointment.can_book_for_free(request, validated_data, cart_item_id):
-            return Response({'request_errors': {"code": "invalid",
-                                                "message": "Only {} active free bookings allowed per customer".format(
-                                                    models.OpdAppointment.MAX_FREE_BOOKINGS_ALLOWED)}},
-                            status=status.HTTP_400_BAD_REQUEST)
+        if not validated_data.get("part_of_integration"):
+            if not models.OpdAppointment.can_book_for_free(request, validated_data, cart_item_id):
+                return Response({'request_errors': {"code": "invalid",
+                                                    "message": "Only {} active free bookings allowed per customer".format(
+                                                        models.OpdAppointment.MAX_FREE_BOOKINGS_ALLOWED)}},
+                                status=status.HTTP_400_BAD_REQUEST)
 
         #For Appointment History
         responsible_user = None
@@ -1564,6 +1567,7 @@ class SearchedItemsViewSet(viewsets.GenericViewSet):
                             # , "procedure_categories": procedure_categories
                          })
 
+
     @transaction.non_atomic_requests
     def common_conditions(self, request):
         city = None
@@ -1605,6 +1609,8 @@ class SearchedItemsViewSet(viewsets.GenericViewSet):
         common_procedure_categories_serializer = CommonProcedureCategorySerializer(common_procedure_categories,
                                                                                    many=True)
 
+
+
         common_procedures = CommonProcedure.objects.select_related('procedure').filter(
             procedure__is_enabled=True).all().order_by("-priority")[:10]
         common_procedures_serializer = CommonProcedureSerializer(common_procedures, many=True)
@@ -1628,26 +1634,26 @@ class SearchedItemsViewSet(viewsets.GenericViewSet):
         top_hospitals_data = Hospital.get_top_hospitals_data(request, validated_data.get('lat'), validated_data.get('long'))
 
         categories = []
-        need_to_hit_query = True
-
-        if request.user and request.user.is_authenticated and not hasattr(request, 'agent') and request.user.active_insurance and request.user.active_insurance.insurance_plan and request.user.active_insurance.insurance_plan.plan_usages:
-            if request.user.active_insurance.insurance_plan.plan_usages.get('package_disabled'):
-                need_to_hit_query = False
-
-        categories_serializer = None
-
-        if need_to_hit_query:
-            categories = LabTestCategory.objects.filter(is_live=True, is_package_category=True,
-                                                        show_on_recommended_screen=True).order_by('-priority')[:15]
-
-            categories_serializer = CommonCategoriesSerializer(categories, many=True, context={'request': request})
+        # need_to_hit_query = True
+        #
+        # if request.user and request.user.is_authenticated and not hasattr(request, 'agent') and request.user.active_insurance and request.user.active_insurance.insurance_plan and request.user.active_insurance.insurance_plan.plan_usages:
+        #     if request.user.active_insurance.insurance_plan.plan_usages.get('package_disabled'):
+        #         need_to_hit_query = False
+        #
+        # categories_serializer = None
+        #
+        # if need_to_hit_query:
+        #     categories = LabTestCategory.objects.filter(is_live=True, is_package_category=True,
+        #                                                 show_on_recommended_screen=True).order_by('-priority')[:15]
+        #
+        #     categories_serializer = CommonCategoriesSerializer(categories, many=True, context={'request': request})
 
         return Response({"conditions": conditions_serializer.data, "specializations": specializations_serializer.data,
                          "procedure_categories": common_procedure_categories_serializer.data,
                          "procedures": common_procedures_serializer.data,
                          "ipd_procedures": common_ipd_procedures_serializer.data,
                          "top_hospitals": top_hospitals_data,
-                         'package_categories': categories_serializer.data if categories_serializer and categories_serializer.data else None})
+                         'package_categories': common_package_category(self, request)})
 
 
 class DoctorListViewSet(viewsets.GenericViewSet):
@@ -1772,7 +1778,7 @@ class DoctorListViewSet(viewsets.GenericViewSet):
         vip_data_dict = {
             'is_vip_member': False,
             'cover_under_vip': False,
-            'vip_remaining_amount': 0,
+            'vip_utilization': {},
             'is_enable_for_vip': False
         }
 
@@ -1790,7 +1796,7 @@ class DoctorListViewSet(viewsets.GenericViewSet):
             if logged_in_user.active_plus_user:
                 utilization_dict = logged_in_user.active_plus_user.get_utilization
 
-                vip_data_dict['vip_remaining_amount'] = utilization_dict.get('doctor_amount_available') if utilization_dict else 0
+                vip_data_dict['vip_utilization'] = utilization_dict
                 vip_data_dict['is_vip_member'] = True
                 vip_data_dict['cover_under_vip'] = False
                 vip_data_dict['is_enable_for_vip'] = False
@@ -2775,6 +2781,7 @@ class DoctorAvailabilityTimingViewSet(viewsets.ViewSet):
         if not dc_obj:
             return HttpResponse(status=404)
 
+        date = request.query_params.get('date')
         doctor_leaves = doctor.get_leaves()
         global_non_bookables = GlobalNonBookable.get_non_bookables()
         total_leaves = doctor_leaves + global_non_bookables
@@ -2787,10 +2794,22 @@ class DoctorAvailabilityTimingViewSet(viewsets.ViewSet):
             for apt in active_appointments:
                 blocks.append(str(apt.time_slot_start.date()))
 
-        clinic_timings = dc_obj.get_timings_v2(total_leaves, blocks)
+        if dc_obj.is_part_of_integration() and settings.MEDANTA_INTEGRATION_ENABLED:
+            from ondoc.integrations import service
+            pincode = None
+            integration_dict = dc_obj.get_integration_dict()
+            class_name = integration_dict['class_name']
+            integrator_obj_id = integration_dict['id']
+            integrator_obj = service.create_integrator_obj(class_name)
+            clinic_timings = integrator_obj.get_appointment_slots(pincode, date, integrator_obj_id=integrator_obj_id,
+                                                                  blocks=blocks, dc_obj=dc_obj,
+                                                                  total_leaves=total_leaves)
+        else:
+            clinic_timings = dc_obj.get_timings_v2(total_leaves, blocks)
 
         resp_data = {"timeslots": clinic_timings.get('timeslots', []),
                      "upcoming_slots": clinic_timings.get('upcoming_slots', []),
+                     "is_integrated": clinic_timings.get('is_integrated', False),
                      "doctor_data": doctor_serializer.data}
 
         return Response(resp_data)
@@ -2918,10 +2937,12 @@ class DoctorFeedbackViewSet(viewsets.GenericViewSet):
         valid_data = serializer.validated_data
         emails = list()
         if valid_data.get('is_cloud_lab_email'):
-            subject_string = "Test Sample Pickup Request from " + str(user.phone_number)
+            subject_string = valid_data.get('subject_string')
             message = valid_data.get('feedback')
-            emails = ["sanat@docprime.com", "kabeer@docprime.com", "prithvijeet@docprime.com", "raghavr@docprime.com"]
+            emails = ["sanat@docprime.com", "kabeer@docprime.com", "prithvijeet@docprime.com", "raghavr@docprime.com",
+                      "rajivk@policybazaar.com"]
         else:
+            valid_data.pop('subject_string', None)
             subject_string = "Feedback Mail from " + str(user.phone_number)
             message = ''
             managers_string = ''
@@ -4602,7 +4623,7 @@ class HospitalViewSet(viewsets.GenericViewSet):
         if entity:
             breadcrumb = deepcopy(entity.breadcrumb) if isinstance(entity.breadcrumb, list) else []
             breadcrumb.insert(0, {"title": "Home", "url": "/", "link_title": "Home"})
-            breadcrumb.insert(1, {"title": "Hospitals in India", "url": "hospitals", "link_title": "Hospitals in India"})
+            breadcrumb.insert(1, {"title": "Hospitals", "url": "hospitals", "link_title": "Hospitals"})
             locality = entity.sublocality_value
             city = entity.locality_value
             url = entity.url
@@ -4771,7 +4792,7 @@ class HospitalViewSet(viewsets.GenericViewSet):
             response['url'] = entity.url
             if entity.breadcrumb:
                 breadcrumb = [{'url': '/', 'title': 'Home', 'link_title': 'Home'}
-                    , {"title": "Hospitals in India", "url": "hospitals", "link_title": "Hospitals in India"}
+                    , {"title": "Hospitals", "url": "hospitals", "link_title": "Hospitals"}
                               ]
                 if entity.locality_value:
                     # breadcrumb.append({'url': request.build_absolute_uri('/'+ entity.locality_value), 'title': entity.locality_value, 'link_title': entity.locality_value})
@@ -4780,9 +4801,15 @@ class HospitalViewSet(viewsets.GenericViewSet):
                 breadcrumb.append({'title':  hospital_obj.name, 'url': None, 'link_title': None})
                 response['breadcrumb'] = breadcrumb
             else:
+
                 breadcrumb = [{'url': '/', 'title': 'Home', 'link_title': 'Home'},
-                              {"title": "Hospitals in India", "url": "hospitals", "link_title": "Hospitals in India"},
-                              {'title': hospital_obj.name, 'url': None, 'link_title': None}]
+                              {"title": "Hospitals", "url": "hospitals", "link_title": "Hospitals"}]
+                if entity.locality_value:
+                    breadcrumb.append({"title": "{} Hospitals".format(entity.locality_value), "url": "hospitals", "link_title": "{} Hospitals".format(entity.locality_value)})
+                if entity.sublocality_value:
+                    breadcrumb.append({"title": "{}".format(entity.sublocality_value), "url": "hospitals",
+                                       "link_title": "{}".format(entity.sublocality_value)})
+                breadcrumb.append({'title': hospital_obj.name, 'url': None, 'link_title': None})
                 response['breadcrumb'] = breadcrumb
 
             if hospital_obj.name and entity.locality_value:
@@ -4817,7 +4844,7 @@ class HospitalViewSet(viewsets.GenericViewSet):
     def build_listing_schema_for_hospital(self, serialized_data):
         try:
             schema = {
-                "@context": "http://schema.org",
+                "@context": "https://schema.org",
                 "@type": "ItemList",
             }
             list_items = []
@@ -4833,7 +4860,7 @@ class HospitalViewSet(viewsets.GenericViewSet):
     def build_breadcrumb_schema_for_hospital(self, breadcrumb):
         try:
             schema = {
-                "@context": "http://schema.org",
+                "@context": "https://schema.org",
                 "@type": "BreadcrumbList"
             }
             list_items = []
@@ -4842,7 +4869,7 @@ class HospitalViewSet(viewsets.GenericViewSet):
                     item = {
                         "@type": "ListItem",
                         "position": indx + 1,
-                        "item": {"@id": "{}/{}".format(settings.BASE_URL.strip('/'), doc.get('url')), "name": doc.get('title')}
+                        "item": {"@id": "{}/{}".format(settings.BASE_URL.strip('/'), doc.get('url').strip('/')), "name": doc.get('title')}
                     }
                     list_items.append(item)
             schema["itemListElement"] = list_items

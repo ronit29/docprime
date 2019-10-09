@@ -54,10 +54,12 @@ from django.contrib.contenttypes.fields import GenericForeignKey
 from django.contrib.contenttypes.models import ContentType
 from ondoc.matrix.tasks import push_appointment_to_matrix, push_onboarding_qcstatus_to_matrix, \
     create_ipd_lead_from_lab_appointment, create_or_update_lead_on_matrix
-from ondoc.integrations.task import push_lab_appointment_to_integrator, get_integrator_order_status
+from ondoc.integrations.task import push_lab_appointment_to_integrator, get_integrator_order_status, \
+    push_appointment_to_spo
 from ondoc.location import models as location_models
 from ondoc.plus.enums import UtilizationCriteria
 from ondoc.plus.models import PlusAppointmentMapping
+from ondoc.plus.usage_criteria import get_class_reference
 from ondoc.ratings_review import models as ratings_models
 # from ondoc.api.v1.common import serializers as common_serializers
 from ondoc.common.models import AppointmentHistory, AppointmentMaskNumber, Remark, GlobalNonBookable, \
@@ -354,8 +356,8 @@ class Lab(TimeStampedModel, CreatedByModel, QCModel, SearchKey, WelcomeCallingDo
         }
 
         if user.is_authenticated and not user.is_anonymous:
-            plus_membership = user.active_plus_user
-            if plus_membership:
+            is_user_vip = user.active_plus_user and not user.inactive_plus_user
+            if is_user_vip:
                 resp['is_vip_member'] = True
 
         return resp
@@ -1170,7 +1172,6 @@ class LabTestSubType(TimeStampedModel):
     class Meta:
         db_table = "lab_test_sub_type"
 
-
 # class RadiologyTestType(TimeStampedModel):
 #     name = models.CharField(max_length=200)
 
@@ -1179,7 +1180,6 @@ class LabTestSubType(TimeStampedModel):
 
 #     class Meta:
 #         db_table = "radiology_test_type"
-
 
 class TestParameter(TimeStampedModel):
     name = models.CharField(max_length=200, unique=True)
@@ -1465,6 +1465,9 @@ class AvailableLabTest(TimeStampedModel):
     rating = GenericRelation(ratings_models.RatingsReview)
     insurance_agreed_price = models.DecimalField(max_digits=10, decimal_places=2, default=None, null=True, blank=True)
 
+    def __str__(self):
+        return "{}-{}".format(self.lab, self.test)
+
     def get_deal_price(self):
         return self.custom_deal_price if self.custom_deal_price else self.computed_deal_price
 
@@ -1687,6 +1690,7 @@ class LabAppointment(TimeStampedModel, CouponsMixin, LabAppointmentInvoiceMixin,
                                        related_name='appointment_using')
     synced_analytics = GenericRelation(SyncBookingAnalytics, related_name="lab_booking_analytics")
     integrator_response = GenericRelation(IntegratorResponse)
+    spo_data = JSONField(blank=True, null=True)
     auto_ivr_data = JSONField(default=list(), null=True)
     history = GenericRelation(AppointmentHistory)
     refund_details = GenericRelation(RefundDetails, related_query_name="lab_appointment_detail")
@@ -1695,6 +1699,7 @@ class LabAppointment(TimeStampedModel, CouponsMixin, LabAppointmentInvoiceMixin,
     appointment_prescriptions = GenericRelation("prescription.AppointmentPrescription", related_query_name="appointment_prescriptions")
     hospital_reference_id = models.CharField(max_length=1000, null=True, blank=True)
     reports_physically_collected = models.NullBooleanField()
+    spo_lead_id = models.IntegerField(null=True, blank=True)
     action_data = JSONField(blank=True, null=True)
     plus_plan = models.ForeignKey(plus_model.PlusUser, blank=True, null=True, default=None,
                                   on_delete=models.DO_NOTHING)
@@ -1885,7 +1890,6 @@ class LabAppointment(TimeStampedModel, CouponsMixin, LabAppointmentInvoiceMixin,
                     resp.append({"url": file_url, "type": mime_type})
         return resp
 
-
     def get_reports(self):
         return self.reports.all()
 
@@ -1961,6 +1965,36 @@ class LabAppointment(TimeStampedModel, CouponsMixin, LabAppointmentInvoiceMixin,
         else:
             return False
 
+    def booked_by_spo(self):
+        if self.spo_data:
+            return True
+
+        return False
+
+    def is_part_of_integration(self):
+        network_id = None
+        if self.lab and self.lab.network and self.lab.network.id:
+            network_id = self.lab.network.id
+
+        if network_id == settings.THYROCARE_NETWORK_ID:
+            return True
+        elif network_id == settings.LAL_PATH_NETWORK_ID:
+            return True
+
+        return False
+
+    def can_push_to_integrator(self):
+        network_id = None
+        if self.lab and self.lab.network and self.lab.network.id:
+            network_id = self.lab.network.id
+
+        if network_id == settings.THYROCARE_NETWORK_ID and settings.THYROCARE_INTEGRATION_ENABLED:
+            return True
+        elif network_id == settings.LAL_PATH_NETWORK_ID and settings.LAL_PATH_INTEGRATION_ENABLED:
+            return True
+
+        return False
+
     def is_provider_notification_allowed(self, old_instance):
         if old_instance.status == OpdAppointment.CREATED and self.status == OpdAppointment.CANCELLED:
             return False
@@ -1983,20 +2017,21 @@ class LabAppointment(TimeStampedModel, CouponsMixin, LabAppointmentInvoiceMixin,
             except Exception as e:
                 logger.error(str(e))
 
-        is_thyrocare_enabled = False
-        if not self.created_by_native():
-            if push_to_integrator:
-                if self.lab.network and self.lab.network.id == settings.THYROCARE_NETWORK_ID:
-                    if settings.THYROCARE_INTEGRATION_ENABLED:
-                        is_thyrocare_enabled = True
+        if push_to_matrix and self.booked_by_spo():
+            try:
+                push_appointment_to_spo.apply_async(({'type': 'LAB_APPOINTMENT', 'appointment_id': self.id, 'product_id': 5,
+                                                    'sub_product_id': 2},), countdown=5)
+            except Exception as e:
+                logger.error(str(e))
 
+        if not self.created_by_native():
+            if self.is_part_of_integration() and self.can_push_to_integrator():
                 try:
-                    if is_thyrocare_enabled:
-                        if old_instance:
-                            if (old_instance.status != self.CANCELLED and self.status == self.CANCELLED) or (old_instance.status == self.CREATED and self.status == self.BOOKED):
-                                push_lab_appointment_to_integrator.apply_async(({'appointment_id': self.id},), countdown=5)
-                        else:
+                    if old_instance:
+                        if (old_instance.status != self.CANCELLED and self.status == self.CANCELLED) or (old_instance.status == self.CREATED and self.status == self.BOOKED):
                             push_lab_appointment_to_integrator.apply_async(({'appointment_id': self.id},), countdown=5)
+                    else:
+                        push_lab_appointment_to_integrator.apply_async(({'appointment_id': self.id},), countdown=5)
                 except Exception as e:
                     logger.error(str(e))
 
@@ -2619,7 +2654,20 @@ class LabAppointment(TimeStampedModel, CouponsMixin, LabAppointmentInvoiceMixin,
             coupon_discount, coupon_cashback, coupon_list, random_coupon_list = 0, 0, [], []
 
         if data.get("payment_type") in [OpdAppointment.VIP]:
-            effective_price = effective_price
+            profile = data.get('profile')
+            if profile:
+                plus_membership = profile.get_plus_membership
+
+                test = data['test_ids']
+                entity = "LABTEST" if not test[0].is_package else "PACKAGE"
+                engine = get_class_reference(plus_membership, entity)
+                if engine:
+                    engine_response = engine.validate_booking_entity(cost=effective_price, id=data['test_ids'][0].id)
+                    effective_price = engine_response.get('amount_to_be_paid')
+                else:
+                    effective_price = effective_price
+            else:
+                effective_price = effective_price
             coupon_discount, coupon_cashback, coupon_list, random_coupon_list = 0, 0, [], []
 
         return {
@@ -2638,6 +2686,7 @@ class LabAppointment(TimeStampedModel, CouponsMixin, LabAppointmentInvoiceMixin,
     def create_fulfillment_data(cls, user, data, price_data, request):
         from ondoc.api.v1.auth.serializers import AddressSerializer
         from ondoc.insurance.models import UserInsurance
+        from ondoc.salespoint.models import SalespointTestmapping, SalesPoint
 
         lab_test_queryset = AvailableLabTest.objects.filter(lab_pricing_group__labs=data["lab"], test__in=data['test_ids'])
         test_ids_list = list()
@@ -2699,6 +2748,7 @@ class LabAppointment(TimeStampedModel, CouponsMixin, LabAppointmentInvoiceMixin,
         payment_type = data.get("payment_type")
         effective_price = price_data.get("effective_price")
         cart_data = data.get('cart_item').data
+
         # is_appointment_insured = cart_data.get('is_appointment_insured', None)
         # insurance_id = cart_data.get('insurance_id', None)
 
@@ -2723,6 +2773,23 @@ class LabAppointment(TimeStampedModel, CouponsMixin, LabAppointmentInvoiceMixin,
             else:
                 payment_type = data["payment_type"]
 
+        # check if test mapped with affiliates
+        mapped_with_affiliates = None
+        source = data["utm_spo_tags"].get("UtmSource", None)
+        if source:
+            mapped_with_affiliates = True
+            affiliate = SalesPoint.objects.filter(name=data["utm_spo_tags"]["UtmSource"]).first()
+            if affiliate:
+                for test_id in test_ids_list:
+                    spo_mapping = SalespointTestmapping.objects.filter(salespoint_id=affiliate.id,
+                                                                       available_tests_id=test_id).first()
+                    if not spo_mapping:
+                        mapped_with_affiliates = False
+
+        if mapped_with_affiliates:
+            spo_data = data["utm_spo_tags"]
+        else:
+            spo_data = {}
 
         cover_under_vip = False
         plus_user_id = None
@@ -2735,21 +2802,24 @@ class LabAppointment(TimeStampedModel, CouponsMixin, LabAppointmentInvoiceMixin,
             plus_user_id = plus_user_resp.get('plus_user_id', None)
         if cover_under_vip and cart_data.get('cover_under_vip', None):
             payment_type = OpdAppointment.VIP
-            utilization = plus_user.get_utilization
-            available_amount = int(utilization.get('available_package_amount', 0))
+
+            effective_price = plus_user_resp['amount_to_be_paid']
+            vip_amount_utilized = plus_user_resp['vip_amount_deducted']
+            # utilization = plus_user.get_utilization
+            # available_amount = int(utilization.get('available_package_amount', 0))
             # mrp = int(price_data.get('mrp'))
 
-            final_price = mrp + price_data['home_pickup_charges']
+            # final_price = mrp + price_data['home_pickup_charges']
 
-            utilization_criteria, coverage = plus_user.can_package_be_covered_in_vip(None, mrp=final_price, id=data['test_ids'][0].id)
-
-            if coverage:
-                if utilization_criteria == UtilizationCriteria.COUNT:
-                    effective_price = 0
-                    vip_amount_utilized = final_price
-                else:
-                    effective_price = cart_data.get('vip_amount', 0)
-                    vip_amount_utilized = available_amount if final_price >= available_amount else final_price
+            # utilization_criteria, coverage = plus_user.can_package_be_covered_in_vip(None, mrp=final_price, id=data['test_ids'][0].id)
+            #
+            # if coverage:
+            #     if utilization_criteria == UtilizationCriteria.COUNT:
+            #         effective_price = 0
+            #         vip_amount_utilized = final_price
+            #     else:
+            #         effective_price = cart_data.get('amount_to_be_paid', 0)
+            #         vip_amount_utilized = available_amount if final_price >= available_amount else final_price
 
         else:
             plus_user_id = None
@@ -2780,6 +2850,7 @@ class LabAppointment(TimeStampedModel, CouponsMixin, LabAppointmentInvoiceMixin,
             "cashback": int(price_data.get("coupon_cashback")),
             "is_appointment_insured": is_appointment_insured,
             "insurance": insurance_id,
+            "spo_data": spo_data,
             "cover_under_vip": cover_under_vip,
             "plus_plan": plus_user_id,
             'plus_amount': int(vip_amount_utilized),
@@ -3054,6 +3125,41 @@ class LabAppointment(TimeStampedModel, CouponsMixin, LabAppointmentInvoiceMixin,
                 result['dob'] = default_user_profile.dob
         result['data'] = {'lab_appointment_id': self.id}
         return result
+
+    def get_spo_data(self, order, product_id, sub_product_id):
+        tests = self.test_mappings.all()
+        service_id = None
+        if tests:
+            service_id = tests.first().id
+        dob_value = ''
+        try:
+            dob_value = datetime.datetime.strptime(self.profile_detail.get('dob'), "%Y-%m-%d").strftime("%Y-%m-%d") \
+                if self.profile_detail.get('dob', None) else ''
+        except Exception as e:
+            pass
+
+        appointment_details = self.get_matrix_appointment_data(order)
+        appointment_details['DocPrimeUserId'] = self.user.id
+        appointment_details['LeadID'] = 0
+        appointment_details['Name'] = self.profile.name
+        appointment_details['PrimaryNo'] = self.user.phone_number
+        appointment_details['LeadSource'] = 'DocPrime'
+        appointment_details['EmailId'] = self.profile.email
+        appointment_details['Gender'] = 1 if self.profile.gender == 'm' else 2 if self.profile.gender == 'f' else 0
+        appointment_details['CityId'] = 0
+        appointment_details['ProductId'] = product_id
+        appointment_details['SubProductId'] = sub_product_id
+        appointment_details['UtmTerm'] = self.spo_data.get('UtmTerm', '')
+        appointment_details['UtmMedium'] = self.spo_data.get('UtmMedium', '')
+        appointment_details['UtmCampaign'] = self.spo_data.get('UtmCampaign', '')
+        appointment_details['UtmSource'] = self.spo_data.get('UtmSource', '')
+        appointment_details['LocationVerified'] = 1 if self.lab.is_location_verified else 0
+        appointment_details['IsInsured'] = 1 if self.insurance else 0
+        appointment_details['DOB'] = dob_value
+        appointment_details['ServiceID'] = service_id
+
+        appointment_details.pop('MobileList', None)
+        return appointment_details
 
     def __str__(self):
         return "{}, {}".format(self.profile.name if self.profile else "", self.lab.name)
