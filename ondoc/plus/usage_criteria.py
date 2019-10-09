@@ -1,4 +1,4 @@
-from .enums import UsageCriteria
+from .enums import UsageCriteria, PriceCriteria
 from math import floor
 
 
@@ -25,6 +25,12 @@ class AbstractCriteria(object):
 
     def update_utilization(self, utilization, deduction_amount):
         return self._update_utilization(utilization, deduction_amount)
+
+    def _get_price(self, price_data):
+        raise NotImplementedError()
+
+    def get_price(self, price_data):
+        return self._get_price(price_data)
 
     def after_discount_cost(self, discount, cost):
         cost = cost - ((cost/100) * discount)
@@ -521,6 +527,102 @@ usage_criteria_class_mapping = {
 }
 
 
+class DoctorMrp(AbstractCriteria):
+    def __init__(self, plus_obj):
+        super().__init__(plus_obj)
+
+    def _get_price(self, price_data):
+        if not price_data:
+            return None
+        return price_data.get('mrp', 0)
+
+
+class DoctorDealPrice(AbstractCriteria):
+    def __init__(self, plus_obj):
+        super().__init__(plus_obj)
+
+    def _get_price(self, price_data):
+        if not price_data:
+            return None
+        return price_data.get('mrp', 0)
+
+
+class DoctorAgreedPrice(AbstractCriteria):
+    def __init__(self, plus_obj):
+        super().__init__(plus_obj)
+
+    def _get_price(self, price_data):
+        if not price_data:
+            return None
+        return price_data.get('mrp', 0)
+
+
+class DoctorCodDealPrice(AbstractCriteria):
+    def __init__(self, plus_obj):
+        super().__init__(plus_obj)
+
+    def _get_price(self, price_data):
+        if not price_data:
+            return None
+        return price_data.get('mrp', 0)
+
+
+class LabtestMrp(AbstractCriteria):
+    def __init__(self, plus_obj):
+        super().__init__(plus_obj)
+
+    def _get_price(self, price_data):
+        if not price_data:
+            return None
+        return price_data.get('mrp', 0)
+
+
+class LabtestDealPrice(AbstractCriteria):
+    def __init__(self, plus_obj):
+        super().__init__(plus_obj)
+
+    def _get_price(self, price_data):
+        if not price_data:
+            return None
+        return price_data.get('deal_price', 0)
+
+
+class LabtestAgreedPrice(AbstractCriteria):
+    def __init__(self, plus_obj):
+        super().__init__(plus_obj)
+
+    def _get_price(self, price_data):
+        if not price_data:
+            return None
+        return price_data.get('fees', 0)
+
+
+class LabtestCodDealPrice(AbstractCriteria):
+    def __init__(self, plus_obj):
+        super().__init__(plus_obj)
+
+    def _get_price(self, price_data):
+        if not price_data:
+            return None
+        return price_data.get('deal_price', 0)
+
+
+price_criteria_class_mapping = {
+    'DOCTOR': {
+        'MRP': DoctorMrp,
+        'DEAL_PRICE': DoctorDealPrice,
+        'AGREED_PRICE': DoctorAgreedPrice,
+        'COD_DEAL_PRICE': DoctorCodDealPrice
+    },
+    'LABTEST': {
+        'MRP': LabtestMrp,
+        'DEAL_PRICE': LabtestDealPrice,
+        'AGREED_PRICE': LabtestAgreedPrice,
+        'COD_DEAL_PRICE': LabtestCodDealPrice
+    }
+}
+
+
 def get_class_reference(plus_membership_obj, entity):
     if not plus_membership_obj:
         return None
@@ -531,6 +633,19 @@ def get_class_reference(plus_membership_obj, entity):
 
     class_reference = usage_criteria_class_mapping[entity][usage_criteria]
     return class_reference(plus_membership_obj)
+
+
+def get_price_reference(plus_membership_obj, entity):
+    if not plus_membership_obj:
+        return None
+
+    price_criteria = plus_membership_obj.plan.price_criteria
+    if entity not in ['DOCTOR', 'LABTEST'] or price_criteria not in PriceCriteria.availabilities():
+        return None
+
+    class_reference = price_criteria_class_mapping[entity][price_criteria]
+    return class_reference(plus_membership_obj)
+
 
 
 

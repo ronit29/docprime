@@ -33,3 +33,10 @@ class UsageCriteria(Choices):
     COUNT_DISCOUNT = "COUNT_DISCOUNT"
     AMOUNT_DISCOUNT = "AMOUNT_DISCOUNT"
     TOTAL_WORTH = "TOTAL_WORTH"
+
+
+class PriceCriteria(Choices):
+    MRP = "MRP"
+    DEAL_PRICE = "DEAL_PRICE"
+    AGREED_PRICE = "AGREED_PRICE"
+    COD_DEAL_PRICE = "COD_DEAL_PRICE"

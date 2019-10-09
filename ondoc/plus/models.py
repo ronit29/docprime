@@ -18,7 +18,7 @@ from django.db.models import Q
 from ondoc.common.models import DocumentsProofs
 from ondoc.notification.tasks import push_plus_lead_to_matrix
 from ondoc.plus.usage_criteria import get_class_reference
-from .enums import PlanParametersEnum, UtilizationCriteria
+from .enums import PlanParametersEnum, UtilizationCriteria, PriceCriteria
 from datetime import datetime
 from ondoc.crm import constants as const
 from django.utils.timezone import utc
@@ -102,6 +102,7 @@ class PlusPlans(auth_model.TimeStampedModel, LiveMixin):
     features = JSONField(blank=False, null=False, default=dict)
     is_retail = models.NullBooleanField()
     plan_criteria = models.CharField(max_length=100, null=True, blank=False, choices=UsageCriteria.as_choices())
+    price_criteria = models.CharField(max_length=100, null=True, blank=False, choices=PriceCriteria.as_choices())
 
     @classmethod
     def get_active_plans_via_utm(cls, utm):
