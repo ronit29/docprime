@@ -1603,8 +1603,6 @@ class SearchedItemsViewSet(viewsets.GenericViewSet):
         common_procedure_categories_serializer = CommonProcedureCategorySerializer(common_procedure_categories,
                                                                                    many=True)
 
-
-
         common_procedures = CommonProcedure.objects.select_related('procedure').filter(
             procedure__is_enabled=True).all().order_by("-priority")[:10]
         common_procedures_serializer = CommonProcedureSerializer(common_procedures, many=True)
@@ -1651,10 +1649,15 @@ class SearchedItemsViewSet(viewsets.GenericViewSet):
 
     @transaction.non_atomic_requests
     def top_hospitals(self, request):
+        logged_in_user = request.user
         serializer = CommonConditionsSerializer(data=request.query_params)
         serializer.is_valid(raise_exception=True)
         validated_data = serializer.validated_data
-        top_hospitals_data = Hospital.get_top_hospitals_data(request, validated_data.get('lat'), validated_data.get('long'))
+        vip_user = None
+
+        if logged_in_user.is_authenticated and not logged_in_user.is_anonymous:
+            vip_user = logged_in_user.active_plus_user
+        top_hospitals_data = Hospital.get_top_hospitals_data(request, validated_data.get('lat'), validated_data.get('long'), vip_user)
         return Response({"top_hospitals": top_hospitals_data})
 
 
