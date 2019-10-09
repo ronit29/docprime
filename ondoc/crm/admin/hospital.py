@@ -14,6 +14,7 @@ from ondoc.doctor.models import (HospitalImage, HospitalDocument, HospitalAward,
                                  Hospital, HospitalServiceMapping, HealthInsuranceProviderHospitalMapping,
                                  HospitalHelpline, HospitalTiming, DoctorClinic, CommonHospital, HospitalNetworkImage,
                                  HospitalSponsoredServices)
+from ondoc.integrations.models import IntegratorHospitalCode
 from .common import *
 from ondoc.crm.constants import constants
 from django.utils.safestring import mark_safe
@@ -506,6 +507,13 @@ class PartnerLabsInline(admin.TabularInline):
         return super(PartnerLabsInline, self).get_queryset(request).select_related('hospital', 'lab').filter(lab__is_b2b=True)
 
 
+class HospitalCodeInline(admin.TabularInline):
+    model = IntegratorHospitalCode
+    extra = 0
+    can_delete = True
+    show_change_link = False
+
+
 class HospitalAdmin(admin.GeoModelAdmin, CompareVersionAdmin, ActionAdmin, QCPemAdmin):
     list_filter = ('data_status', 'welcome_calling_done', 'enabled_for_online_booking', 'enabled', CreatedByFilter,
                    HospCityFilter)
@@ -537,6 +545,7 @@ class HospitalAdmin(admin.GeoModelAdmin, CompareVersionAdmin, ActionAdmin, QCPem
         RemarkInline,
         HospitalSponsoredServicesInline,
         PartnerLabsInline,
+        HospitalCodeInline,
     ]
     map_width = 200
     map_template = 'admin/gis/gmap.html'
