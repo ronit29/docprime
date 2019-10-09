@@ -1420,13 +1420,13 @@ def push_order_to_spo(self, data):
             'UtmMedium': spo_data.get('UtmMedium', ''),
             'UtmCampaign': spo_data.get('UtmCampaign', ''),
             'UtmSource': spo_data.get('UtmSource', ''),
-            'LeadID': ""
+            'LeadID': 0
         }
 
         #logger.error(json.dumps(request_data))
 
-        url = settings.SPO_LEAD_URL
-        spo_api_token = settings.SPO_AUTH_TOKEN
+        url = settings.VIP_SALESPOINT_URL
+        spo_api_token = settings.VIP_SALESPOINT_AUTHTOKEN
         response = requests.post(url, data=json.dumps(request_data), headers={'Authorization': spo_api_token,
                                                                               'Content-Type': 'application/json'})
         if response.status_code != status.HTTP_200_OK or not response.ok:
