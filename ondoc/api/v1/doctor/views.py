@@ -1218,30 +1218,28 @@ class DoctorProfileUserViewSet(viewsets.GenericViewSet):
                     hosp_reviews_dict[hospital.pk]['google_rating'] = list()
                     ratings_graph = None
                     hosp_reviews = hospital.hospital_place_details.all()
+                    # if hosp_reviews:
+                    reviews_data = dict()
+                    reviews_data['user_reviews'] = None
                     if hosp_reviews:
-                        reviews_data = dict()
-                        reviews_data['user_reviews'] = None
-                        if hosp_reviews:
-                            reviews_data['user_reviews'] = hosp_reviews[0].reviews.get('user_reviews')
-                        reviews_data['user_avg_rating'] = hospital.google_avg_rating
-                        reviews_data['user_ratings_total'] = hospital.google_ratings_count
+                        reviews_data['user_reviews'] = hosp_reviews[0].reviews.get('user_reviews')
+                    reviews_data['user_avg_rating'] = hospital.google_avg_rating
+                    reviews_data['user_ratings_total'] = hospital.google_ratings_count
+                    ratings_graph = GoogleRatingsGraphSerializer(reviews_data, many=False,
+                                                                 context={"request": request})
 
-                        if reviews_data and reviews_data.get('user_reviews'):
-                            ratings_graph = GoogleRatingsGraphSerializer(reviews_data, many=False,
-                                                                         context={"request": request})
+                    if reviews_data and reviews_data.get('user_reviews'):
+                        for data in reviews_data.get('user_reviews'):
+                            if data.get('time'):
+                                date = time.strftime("%d %b %Y", time.gmtime(data.get('time')))
 
-                            for data in reviews_data.get('user_reviews'):
-                                if data.get('time'):
-                                    date = time.strftime("%d %b %Y", time.gmtime(data.get('time')))
-
-                                hosp_reviews_dict[hospital.pk]['google_rating'].append(
-                                    {'compliment': None, 'date': date, 'id': hosp_reviews[0].pk, 'is_live': hospital.is_live,
-                                     'ratings': data.get('rating'),
-                                     'review': data.get('text'), 'user': None, 'user_name': data.get('author_name')
-                                     })
-
-                        else:
-                            hosp_reviews_dict[hospital.pk]['google_rating'] = None
+                            hosp_reviews_dict[hospital.pk]['google_rating'].append(
+                                {'compliment': None, 'date': date, 'id': hosp_reviews[0].pk, 'is_live': hospital.is_live,
+                                 'ratings': data.get('rating'),
+                                 'review': data.get('text'), 'user': None, 'user_name': data.get('author_name')
+                                 })
+                    if reviews_data.get('user_avg_rating') and reviews_data.get('user_ratings_total'):
+                        hosp_reviews_dict[hospital.pk]['google_rating'] = hospital.google_avg_rating
                         hosp_reviews_dict[hospital.pk]['google_rating_graph'] = ratings_graph.data if ratings_graph else None
                     else:
                         hosp_reviews_dict[hospital.pk]['google_rating'] = None
