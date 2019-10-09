@@ -128,6 +128,7 @@ DJANGO_APPS = (
     'django.contrib.sites',
     'django.contrib.sitemaps',
     'reversion_compare',
+    'ddtrace.contrib.django',
 )
 THIRD_PARTY_APPS = (
 
