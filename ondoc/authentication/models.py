@@ -742,6 +742,8 @@ class UserProfile(TimeStampedModel):
 
 class OtpVerifications(TimeStampedModel):
     OTP_EXPIRY_TIME = 120  # In minutes
+    MAX_GENERATE_REQUESTS_COUNT = 3
+    TIME_BETWEEN_CONSECUTIVE_REQUESTS = 20 # In seconds
     phone_number = models.CharField(max_length=10)
     code = models.CharField(max_length=10)
     country_code = models.CharField(max_length=10)
@@ -749,6 +751,7 @@ class OtpVerifications(TimeStampedModel):
     otp_request_source = models.CharField(null=True, max_length=200, blank=True)
     via_whatsapp = models.NullBooleanField(null=True)
     via_sms = models.NullBooleanField(null=True)
+    req_count = models.PositiveSmallIntegerField(default=1, max_length=1, null=True, blank=True)
 
     def can_send(self):
         from ondoc.notification.models import WhtsappNotification, NotificationAction
