@@ -98,7 +98,8 @@ class LoginOTP(GenericViewSet):
         data = serializer.validated_data
         phone_number = data['phone_number']
 
-        otp_obj = OtpVerifications.objects.filter(phone_number=phone_number).order_by('-id').first()
+        otp_obj = data.get('otp_obj')
+        # otp_obj = OtpVerifications.objects.filter(phone_number=phone_number).order_by('-id').first()
         if data.get('via_whatsapp', False) and otp_obj and not otp_obj.can_send():
             return Response({'success': False})
 
