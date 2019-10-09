@@ -340,6 +340,13 @@ class Thyrocare(BaseIntegrator):
                 lab_report, created = LabReport.objects.update_or_create(appointment_id=report.integrator_response.object_id)
                 if lab_report:
                     LabReportFile.objects.create(report_id=lab_report.id, name=in_memory_file)
+                    # Send Reports to Patient
+                    from ondoc.notification.tasks import send_lab_reports
+                    if format == 'pdf':
+                        try:
+                            send_lab_reports.apply_async((report.integrator_response.object_id,), countdown=1)
+                        except Exception as e:
+                            logger.error(str(e))
         except Exception as e:
             logger.error(str(e))
 
