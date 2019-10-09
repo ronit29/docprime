@@ -1379,13 +1379,10 @@ class ConsumerAccount(TimeStampedModel):
                                                                           action=ConsumerTransaction.SALE)
         # assuming max 2 sale entries
         for ctxn_obj in ctxn_objs:
-            if ctxn_obj.ref_txns:
-                ref_txn_objs = ConsumerTransaction.objects.filter(id__in=list(ctxn_obj.ref_txns.keys()))
-                for ref_txn_obj in ref_txn_objs:
-                    if ref_txn_obj.action in [ConsumerTransaction.CASHBACK_CREDIT, ConsumerTransaction.REFERRAL_CREDIT]:
-                        cashback_txn = ctxn_obj
-                    else:
-                        wallet_txn = ctxn_obj
+            if ctxn_obj.source == ConsumerTransaction.CASHBACK_SOURCE:
+                cashback_txn = ctxn_obj
+            else:
+                wallet_txn = ctxn_obj
 
         if cashback_refund_amount:
             cashback_txn.balance += cashback_refund_amount
@@ -1416,7 +1413,8 @@ class ConsumerAccount(TimeStampedModel):
                     if ctx_sale_obj.ref_txns:
                         ctx_objs.append(ctx_sale_obj.debit_from_ref_txn(self, 0, parent_ref, initiate_refund))
                     if ctx_sale_obj.balance:
-                        ctx_objs.append(ctx_sale_obj.debit_from_balance(self))
+                        if ctx_sale_obj.source == ConsumerTransaction.WALLET_SOURCE:
+                            ctx_objs.append(ctx_sale_obj.debit_from_balance(self))
 
                     ctx_sale_obj.save()
 
@@ -1428,7 +1426,8 @@ class ConsumerAccount(TimeStampedModel):
                 if old_txn_obj.ref_txns:
                     ctx_objs.append(old_txn_obj.debit_from_ref_txn(self, 0, parent_ref))
                 if old_txn_obj.balance:
-                    ctx_objs.append(old_txn_obj.debit_from_balance(self))
+                    if old_txn_obj.source == ConsumerTransaction.WALLET_SOURCE:
+                        ctx_objs.append(old_txn_obj.debit_from_balance(self))
                 old_txn_obj.save()
 
         self.save()
@@ -1442,11 +1441,10 @@ class ConsumerAccount(TimeStampedModel):
         if not product_id in [Order.SUBSCRIPTION_PLAN_PRODUCT_ID, Order.INSURANCE_PRODUCT_ID, Order.VIP_PRODUCT_ID]:
             if order and order.cashback_amount:
                 cashback_deducted = min(self.cashback, amount)
-                cashback_txns = ConsumerTransaction.get_transactions(self.user,
-                                                                     [ConsumerTransaction.CASHBACK_CREDIT,
-                                                                      ConsumerTransaction.REFERRAL_CREDIT
-                                                                      ]
-                                                                     )
+                cashback_txns = ConsumerTransaction.objects.select_for_update().filter(user=self.user,
+                                                                                       balance__gt=0)\
+                    .filter(Q(action__in=[ConsumerTransaction.CASHBACK_CREDIT, ConsumerTransaction.REFERRAL_CREDIT])|
+                            Q(action=ConsumerTransaction.SALE, source=ConsumerTransaction.CASHBACK_SOURCE)).order_by("created_at")
                 cashback_txns_used = ConsumerTransaction.update_txn_balance(cashback_txns, cashback_deducted)
                 self.cashback -= cashback_deducted
 
@@ -1644,7 +1642,7 @@ class ConsumerTransaction(TimeStampedModel):
         for ref_txn_obj in ref_txn_objs:
             cashback_txn = False
             is_preauth_txn = False
-            if ref_txn_obj.action in [self.CASHBACK_CREDIT, self.REFERRAL_CREDIT]:
+            if ref_txn_obj.action in [ConsumerTransaction.CASHBACK_CREDIT, ConsumerTransaction.REFERRAL_CREDIT]:
                 cashback_txn = True
             if parent_ref:
                 refund_amount = decimal.Decimal(ref_txns.get(str(ref_txn_obj.id), 0))
@@ -1713,6 +1711,7 @@ class ConsumerTransaction(TimeStampedModel):
     @classmethod
     def get_transactions(cls, user, actions=[]):
         # consumer_txns = cls.objects.select_for_update().filter(user=user, action__in=actions, type=txn_type, balance__gt=0).order_by("created_at")
+        #source = source if source else [ConsumerTransaction.WALLET_SOURCE, ConsumerTransaction.CASHBACK_SOURCE]
         consumer_txns = cls.objects.select_for_update().filter(user=user, action__in=actions,
                                                                balance__gt=0).order_by("created_at")
         return consumer_txns
