@@ -83,3 +83,13 @@ matrix_status_to_ipd_lead_status_mapping = {
     matrix_status['PLANNED']: 9,
     matrix_status['IPD_CONFIRMATION']: 10,
 }
+
+
+
+PREPAID = 1
+COD = 2
+INSURANCE = 3
+PLAN = 4
+VIP = 5
+PAY_CHOICES = ((PREPAID, 'Prepaid'), (COD, 'COD'), (INSURANCE, 'Insurance'), (PLAN, "Subscription Plan"),
+                    (VIP, 'VIP'))
