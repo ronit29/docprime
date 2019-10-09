@@ -4833,7 +4833,7 @@ class HospitalViewSet(viewsets.GenericViewSet):
                 h1_title = new_dynamic.h1_title
         schema = self.build_schema_for_hospital(hosp_serializer, hospital_obj, canonical_url)
         listing_schema = self.build_listing_schema_for_hospital(hosp_serializer)
-        breadcrumb_schema = self.build_breadcrumb_schema_for_hospital(response['breadcrumb'])
+        breadcrumb_schema = self.build_breadcrumb_schema_for_hospital(response['breadcrumb']) if response.get('breadcrumb') else None
         all_schema = [x for x in [schema, listing_schema, breadcrumb_schema] if x]
         response['seo'] = {'title': title, "description": description, "schema": schema,
                            "h1_title": h1_title, 'all_schema': all_schema}
