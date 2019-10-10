@@ -590,11 +590,11 @@ class Hospital(auth_model.TimeStampedModel, auth_model.CreatedByModel, auth_mode
 
         self.create_entity_url()
 
-        if self.enabled == False:
+        if not self.enabled:
             if self.user.is_superuser:
-                self.enabled == False
+                self.enabled = False
             else:
-                self.enabled == True
+                self.enabled = True
 
         super(Hospital, self).save(*args, **kwargs)
         if self.is_appointment_manager:
