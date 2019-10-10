@@ -1604,7 +1604,7 @@ class LabAppointmentCreateSerializer(serializers.Serializer):
         booked_test_ids = list(data.get("test_ids", None))
         if booked_test_ids:
             for test in booked_test_ids:
-                integrator_test = IntegratorTestMapping.objects.filter(test_id=test).first()
+                integrator_test = IntegratorTestMapping.objects.filter(test_id=test, integrator_class_name='Thyrocare').first()
                 if integrator_test and integrator_test.integrator_product_data['code'] == 'FBS':
                     self.fbs_valid(booked_test_ids, test)
                 elif integrator_test and integrator_test.integrator_product_data['code'] in ['PPBS', 'RBS']:
@@ -1623,11 +1623,11 @@ class LabAppointmentCreateSerializer(serializers.Serializer):
             pass
 
         for test in booked_test_ids:
-            integrator_test = IntegratorTestMapping.objects.filter(test_id=test, test_type='TEST').first()
+            integrator_test = IntegratorTestMapping.objects.filter(test_id=test, test_type='TEST', integrator_class_name='Thyrocare').first()
             if integrator_test and integrator_test.integrator_product_data['fasting'] == 'CF':
                 is_profile_or_fasting_added = True
             else:
-                integrator_profile = IntegratorTestMapping.objects.filter(Q(test_id=test) & ~Q(test_type='TEST')).first()
+                integrator_profile = IntegratorTestMapping.objects.filter(Q(test_id=test) & Q(integrator_class_name='Thyrocare') & ~Q(test_type='TEST')).first()
                 if integrator_profile:
                     is_profile_or_fasting_added = True
 
@@ -1648,13 +1648,13 @@ class LabAppointmentCreateSerializer(serializers.Serializer):
             pass
 
         for test in booked_test_ids:
-            integrator_test = IntegratorTestMapping.objects.filter(test_id=test, test_type='TEST').first()
+            integrator_test = IntegratorTestMapping.objects.filter(test_id=test, test_type='TEST', integrator_class_name='Thyrocare').first()
             if integrator_test and integrator_test.integrator_product_data['code'] == 'FBS':
                 is_fbs_present = True
             elif integrator_test and integrator_test.integrator_product_data['fasting'] == 'CF':
                 is_profile_or_fasting_added = True
             else:
-                integrator_profile = IntegratorTestMapping.objects.filter(Q(test_id=test) & ~Q(test_type='TEST')).first()
+                integrator_profile = IntegratorTestMapping.objects.filter(Q(test_id=test) & Q(integrator_class_name='Thyrocare') & ~Q(test_type='TEST')).first()
                 if integrator_profile:
                     is_profile_or_fasting_added = True
 
@@ -1674,7 +1674,7 @@ class LabAppointmentCreateSerializer(serializers.Serializer):
             pass
 
         for test in booked_test_ids:
-            integrator_test = IntegratorTestMapping.objects.filter(test_id=test, test_type='TEST').first()
+            integrator_test = IntegratorTestMapping.objects.filter(test_id=test, test_type='TEST', integrator_class_name='Thyrocare').first()
             if integrator_test and integrator_test.integrator_product_data['code'] == 'INSFA':
                 insfa_test_present = True
 
