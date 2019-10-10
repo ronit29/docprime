@@ -1840,7 +1840,7 @@ class DoctorListViewSet(viewsets.GenericViewSet):
                                                 "doctor_clinics__procedures_from_doctor_clinic__procedure__parent_categories_mapping",
                                                 "qualifications__qualification","qualifications__college",
                                                 "qualifications__specialization",
-                                                "doctor_clinics__hospital__hospital_place_details"
+                                                "doctor_clinics__hospital__hospital_place_details", "rating"
                                                 ).order_by(preserved)
 
         response = doctor_search_helper.prepare_search_response(doctor_data, doctor_search_result, request,
