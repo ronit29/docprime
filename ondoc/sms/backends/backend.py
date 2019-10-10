@@ -106,9 +106,12 @@ def create_otp(phone_no, message, **kwargs):
     via_whatsapp = kwargs.get('via_whatsapp')
     otpEntry = (OtpVerifications.objects.filter(phone_number=phone_no, is_expired=False,
                                                 created_at__gte=timezone.now() - relativedelta(
-                                                    minutes=OtpVerifications.OTP_EXPIRY_TIME)).first())
+                                                    minutes=OtpVerifications.OTP_EXPIRY_TIME),
+                                                req_count__lt=OtpVerifications.MAX_GENERATE_REQUESTS_COUNT).first())
     if otpEntry:
         otp = otpEntry.code
+        otpEntry.req_count += 1 if otpEntry.req_count else 1
+        otpEntry.save()
     else:
         OtpVerifications.objects.filter(phone_number=phone_no).update(is_expired=True)
         otp = randint(100000,999999)

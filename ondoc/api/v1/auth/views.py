@@ -98,7 +98,8 @@ class LoginOTP(GenericViewSet):
         data = serializer.validated_data
         phone_number = data['phone_number']
 
-        otp_obj = OtpVerifications.objects.filter(phone_number=phone_number).order_by('-id').first()
+        otp_obj = data.get('otp_obj')
+        # otp_obj = OtpVerifications.objects.filter(phone_number=phone_number).order_by('-id').first()
         if data.get('via_whatsapp', False) and otp_obj and not otp_obj.can_send():
             return Response({'success': False})
 
@@ -2006,6 +2007,45 @@ class SendBookingUrlViewSet(GenericViewSet):
         else:
             booking_url = SmsNotification.send_booking_url(token=token, phone_number=str(user_profile.phone_number), name=user_profile.name)
             EmailNotification.send_booking_url(token=token, email=user_profile.email)
+
+        return Response({"status": 1})
+
+
+class SendCartUrlViewSet(GenericViewSet):
+    authentication_classes = (JWTAuthentication,)
+    permission_classes = (IsAuthenticated,)
+
+    def send_cart_url(self, request):
+        # order_id = request.data.get('orderId', None)
+        utm_source = request.data.get('UtmSource')
+        utm_term = request.data.get('UtmTerm')
+        utm_medium = request.data.get('UtmMedium')
+        utm_campaign = request.data.get('UtmCampaign')
+
+        utm_parameters = ""
+        if utm_source:
+            utm_source = "UtmSource=%s&" % utm_source
+            utm_parameters = utm_parameters + utm_source
+        if utm_term:
+            utm_term = "UtmTerm=%s&" % utm_term
+            utm_parameters = utm_parameters + utm_term
+        if utm_medium:
+            utm_medium = "UtmMedium=%s&" % utm_medium
+            utm_parameters = utm_parameters + utm_medium
+        if utm_campaign:
+            utm_campaign = "UtmCampaign=%s" % utm_campaign
+            utm_parameters = utm_parameters + utm_campaign
+
+        user_token = JWTAuthentication.generate_token(request.user)
+        token = user_token['token'].decode("utf-8") if 'token' in user_token else None
+        user_profile = None
+
+        if request.user.is_authenticated:
+            user_profile = request.user.get_default_profile()
+        if not user_profile:
+            return Response({"status": 1})
+
+        SmsNotification.send_cart_url(token=token, phone_number=str(user_profile.phone_number), utm=utm_parameters)
 
         return Response({"status": 1})
 

@@ -128,6 +128,7 @@ DJANGO_APPS = (
     'django.contrib.sites',
     'django.contrib.sitemaps',
     'reversion_compare',
+    'ddtrace.contrib.django',
 )
 THIRD_PARTY_APPS = (
 
@@ -189,6 +190,7 @@ LOCAL_APPS = (
     'ondoc.bookinganalytics',
     'ondoc.prescription',
     'ondoc.corporate_booking',
+    'ondoc.salespoint',
     'ondoc.plus',
     'ondoc.provider',
 )
@@ -504,7 +506,6 @@ LEAD_VALIDITY_BUFFER_TIME = env.int('LEAD_VALIDITY_BUFFER_TIME', default=10)  # 
 LEAD_AND_APPOINTMENT_BUFFER_TIME = env.int('LEAD_AND_APPOINTMENT_BUFFER_TIME', default=10)  # In mins
 MEDICINE_TOP_SPECIALIZATIONS = env.list('MEDICINE_TOP_SPECIALIZATIONS')
 MEDICINE_TOP_TESTS = env.list('MEDICINE_TOP_TESTS')
-
 ROCKETCHAT_SERVER = env('ROCKETCHAT_SERVER')
 ROCKETCHAT_SUPERUSER = env('ROCKETCHAT_SUPERUSER')
 ROCKETCHAT_PASSWORD = env('ROCKETCHAT_PASSWORD')
@@ -529,6 +530,7 @@ MEDANTA_API_BASE_URL=env('MEDANTA_API_BASE_URL')
 MEDANTA_INTEGRATION_ENABLED=env.bool('MEDANTA_INTEGRATION_ENABLED')
 ECS_COMM_API_KEY=env('ECS_COMM_API_KEY')
 LENSFIT_COUPONS=env.list('LENSFIT_COUPONS')
+SPO_DP_AUTH_TOKEN = env('SPO_DP_AUTH_TOKEN')
 CARE_PLAN_FOR_VIP=env('CARE_PLAN_FOR_VIP')
 VIP_SALESPOINT_URL=env('VIP_SALESPOINT_URL')
 VIP_SALESPOINT_AUTHTOKEN=env('VIP_SALESPOINT_AUTHTOKEN')

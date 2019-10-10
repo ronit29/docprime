@@ -12,6 +12,7 @@ from ondoc.api.v1.utils import clinic_convert_timings, aware_time_zone
 from ondoc.api.v1.doctor import serializers
 from ondoc.authentication.models import QCModel
 from ondoc.doctor.models import Doctor, PracticeSpecialization
+from ondoc.plus.usage_criteria import get_class_reference
 from ondoc.procedure.models import DoctorClinicProcedure, ProcedureCategory, ProcedureToCategoryMapping, \
     get_selected_and_other_procedures, get_included_doctor_clinic_procedure, \
     get_procedure_categories_with_procedures
@@ -476,10 +477,9 @@ class DoctorSearchHelper:
             else:
                 ipd_query = ""
 
-            vip_enabled_filter_query = ''
-            if self.query_params.get('vip_user'):
-                vip_enabled_filter_query = ' and h.enabled_for_prepaid=true '
-
+            # vip_enabled_filter_query = ''
+            # if self.query_params.get('vip_user'):
+            #     vip_enabled_filter_query = ' and h.enabled_for_prepaid=true '
 
             query_string = "SELECT count(*) OVER() AS result_count, x.doctor_id, x.hospital_id, doctor_clinic_id, doctor_clinic_timing_id " \
                            "FROM (select {rank_part}, " \
@@ -493,7 +493,7 @@ class DoctorSearchHelper:
                            "{bucket_query} FROM doctor d " \
                            "INNER JOIN doctor_clinic dc ON d.id = dc.doctor_id and dc.enabled=true and d.is_live=true " \
                            "and d.is_test_doctor is False and d.is_internal is False " \
-                           "INNER JOIN hospital h ON h.id = dc.hospital_id and h.is_live=true {vip_enabled_filter_query} " \
+                           "INNER JOIN hospital h ON h.id = dc.hospital_id and h.is_live=true  " \
                            "INNER JOIN doctor_clinic_timing dct ON dc.id = dct.doctor_clinic_id " \
                            "{ipd_query} " \
                            "LEFT JOIN doctor_leave dl on dl.doctor_id = d.id and (%(ist_date)s) BETWEEN dl.start_date and dl.end_date " \
@@ -509,8 +509,7 @@ class DoctorSearchHelper:
                                                                               min_dist_cond=min_dist_cond,
                                                                               order_by_field=order_by_field, \
                                                                               rank_by=rank_by, ipd_query=ipd_query,
-                                                                              bucket_query=bucket_query,
-                                                                              vip_enabled_filter_query=vip_enabled_filter_query)
+                                                                              bucket_query=bucket_query)
 
         if filtering_params.get('params'):
             filtering_params.get('params')['longitude'] = longitude
@@ -627,7 +626,8 @@ class DoctorSearchHelper:
                 vip_data_dict = kwargs.get('vip_data')
                 is_vip_member = vip_data_dict.get('is_vip_member', False)
                 is_enable_for_vip = vip_data_dict.get('is_enable_for_vip', False)
-                vip_remaining_amount = int(vip_data_dict.get('vip_remaining_amount', 0))
+                vip_utilization = vip_data_dict.get('vip_utilization', None)
+                vip_remaining_amount = int(vip_utilization.get('vip_remaining_amount', 0))
                 vip_amount = 0
                 cover_under_vip = vip_data_dict.get('cover_under_vip', False)
                 insurance_data_dict = kwargs.get('insurance_data')
@@ -663,8 +663,12 @@ class DoctorSearchHelper:
                         doctor.enabled_for_online_booking and doctor_clinic.hospital.enabled_for_online_booking and \
                         doctor_clinic.enabled_for_online_booking:
                     mrp = int(min_price.get('mrp'))
-                    cover_under_vip = True if vip_remaining_amount > 0 else False
-                    vip_amount = 0 if vip_remaining_amount > mrp else mrp - vip_remaining_amount
+                    engine = get_class_reference(request.user.active_plus_user, "DOCTOR")
+                    if engine:
+                        vip_response_dict = engine.validate_booking_entity(cost=mrp)
+                        vip_amount = vip_response_dict.get('amount_to_be_paid', 0)
+                        cover_under_vip = vip_response_dict.get('is_covered', False)
+                    # vip_amount = 0 if vip_remaining_amount > mrp else mrp - vip_remaining_amount
                 hospitals = [{
                     "enabled_for_online_booking": enable_online_booking,
                     "is_insurance_covered": is_insurance_covered,
