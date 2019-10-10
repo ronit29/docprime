@@ -593,6 +593,13 @@ class Hospital(auth_model.TimeStampedModel, auth_model.CreatedByModel, auth_mode
             push_to_matrix = True
 
         self.create_entity_url()
+        if self.is_enabled == False:
+            if self.user.is_superuser:
+                self.is_enabled == False
+            else:
+                self.is_enabled == True
+
+
         super(Hospital, self).save(*args, **kwargs)
         if self.is_appointment_manager:
             auth_model.GenericAdmin.objects.filter(hospital=self, entity_type=auth_model.GenericAdmin.DOCTOR, permission_type=auth_model.GenericAdmin.APPOINTMENT)\

@@ -487,7 +487,8 @@ class Command(BaseCommand):
         group, created = Group.objects.get_or_create(name=constants['ARTICLE_TEAM'])
         group.permissions.clear()
 
-        content_types = ContentType.objects.get_for_models(Article, Sitemap, ArticleContentBox, ArticleCategory, EntityUrls, IpdProcedure, IpdProcedureDetail)
+        content_types = ContentType.objects.get_for_models(Article, Sitemap, ArticleContentBox, ArticleCategory,
+                                                           EntityUrls, IpdProcedure, IpdProcedureDetail, Doctor)
 
         for cl, ct in content_types.items():
             permissions = Permission.objects.filter(
