@@ -662,6 +662,7 @@ class Command(BaseCommand):
         for cl, ct in content_types.items():
             permissions = Permission.objects.filter(
                 Q(content_type=ct),
+                Q(codename='add_' + ct.model) |
                 Q(codename='change_' + ct.model))
 
             group.permissions.add(*permissions)
