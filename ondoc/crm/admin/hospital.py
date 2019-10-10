@@ -404,7 +404,7 @@ class HospitalForm(FormCleanMixin):
                         'disable_comments', None):
                     raise forms.ValidationError("Must have disable comments if disable reason is others.")
 
-            if old_instance_enable and is_enabled == False and (not self.request.user.is_superuser == True):
+            if old_instance_enable and (not is_enabled) and (not self.request.user.is_superuser):
                 raise forms.ValidationError('Only Super User can disable the hospital.')
         # if '_mark_in_progress' in self.data and data.get('enabled'):
         #     raise forms.ValidationError("Must be disabled before rejecting.")
