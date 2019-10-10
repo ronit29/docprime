@@ -1259,6 +1259,25 @@ class SmsNotification(TimeStampedModel, SmsNotificationOpdMixin, SmsNotification
             publish_message(message)
         return booking_url
 
+    @classmethod
+    def send_cart_url(cls, token, phone_number, utm):
+        callback_url = "cart"
+        payment_page_url = "{}/agent/booking?token={}&agent=false&callbackurl={}&{}".format(settings.CONSUMER_APP_DOMAIN,
+                                                                                         token, callback_url, utm)
+        short_url = generate_short_url(payment_page_url)
+        html_body = "Your booking url is - {} . Please pay to confirm".format(short_url)
+        if phone_number:
+            sms_noti = {
+                "phone_number": phone_number,
+                "content": html_body,
+            }
+            message = {
+                "data": sms_noti,
+                "type": "sms"
+            }
+            message = json.dumps(message)
+            publish_message(message)
+        return short_url
 
     @classmethod
     def send_app_download_link(cls, phone_number, context):

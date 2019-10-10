@@ -38,8 +38,7 @@ from ondoc.authentication.models import SPOCDetails, RefundMixin, MerchantTdsDed
 from ondoc.bookinganalytics.models import DP_OpdConsultsAndTests
 # from ondoc.diagnostic.models import Lab
 from ondoc.location import models as location_models
-from ondoc.account.models import Order, ConsumerAccount, ConsumerTransaction, PgTransaction, ConsumerRefund, \
-    MerchantPayout, UserReferred, MoneyPool, Invoice
+from ondoc.account.models import Order, ConsumerAccount, ConsumerTransaction, PgTransaction, ConsumerRefund, MerchantPayout, UserReferred, MoneyPool, Invoice
 from ondoc.location.models import EntityUrls, UrlsModel
 from ondoc.notification.models import NotificationAction, EmailNotification
 from ondoc.payout.models import Outstanding
@@ -590,6 +589,13 @@ class Hospital(auth_model.TimeStampedModel, auth_model.CreatedByModel, auth_mode
             push_to_matrix = True
 
         self.create_entity_url()
+        if self.is_enabled == False:
+            if self.user.is_superuser:
+                self.is_enabled == False
+            else:
+                self.is_enabled == True
+
+
         super(Hospital, self).save(*args, **kwargs)
         if self.is_appointment_manager:
             auth_model.GenericAdmin.objects.filter(hospital=self, entity_type=auth_model.GenericAdmin.DOCTOR, permission_type=auth_model.GenericAdmin.APPOINTMENT)\
@@ -2503,6 +2509,7 @@ class OpdAppointment(auth_model.TimeStampedModel, CouponsMixin, OpdAppointmentIn
     mask_number = GenericRelation(AppointmentMaskNumber)
     history = GenericRelation(AppointmentHistory)
     email_notification = GenericRelation(EmailNotification, related_name="enotification")
+    spo_data = JSONField(blank=True, null=True)
     auto_ivr_data = JSONField(default=list(), null=True)
     synced_analytics = GenericRelation(SyncBookingAnalytics, related_name="opd_booking_analytics")
     refund_details = GenericRelation(RefundDetails, related_query_name="opd_appointment_detail")
@@ -3590,6 +3597,7 @@ class OpdAppointment(auth_model.TimeStampedModel, CouponsMixin, OpdAppointmentIn
             "cashback": int(price_data.get("coupon_cashback")),
             "is_appointment_insured": is_appointment_insured,
             "insurance": insurance_id,
+            "spo_data": data["spo_data"],
             "cover_under_vip": cover_under_vip,
             "plus_plan": plus_user_id,
             "plus_amount": vip_amount,
