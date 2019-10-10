@@ -1239,7 +1239,6 @@ class DoctorProfileUserViewSet(viewsets.GenericViewSet):
                                  'review': data.get('text'), 'user': None, 'user_name': data.get('author_name')
                                  })
                     if reviews_data.get('user_avg_rating') and reviews_data.get('user_ratings_total'):
-                        hosp_reviews_dict[hospital.pk]['google_rating'] = hospital.google_avg_rating
                         hosp_reviews_dict[hospital.pk]['google_rating_graph'] = ratings_graph.data if ratings_graph else None
                     else:
                         hosp_reviews_dict[hospital.pk]['google_rating'] = None
