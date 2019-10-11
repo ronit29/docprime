@@ -266,7 +266,7 @@ class PlusOrderViewSet(viewsets.GenericViewSet):
     def add_members(self, request):
         user = request.user
 
-        inactive_plus_subscription = user.inactive_plus_user
+        inactive_plus_subscription = (user.inactive_plus_user or user.active_plus_user)
         if not inactive_plus_subscription:
             return Response({'error': 'User has not purchased the VIP plan.'})
 
@@ -327,7 +327,14 @@ class PlusProfileViewSet(viewsets.GenericViewSet):
             return Response(status=status.HTTP_400_BAD_REQUEST)
 
         plus_members = plus_user.plus_members.all()
-        if len(plus_members) > 1:
+        total_member_allowed = plus_user.plan.total_allowed_members
+        if not total_member_allowed or total_member_allowed == 0:
+            return Response(data="Total Allowed Members not defined in plan", status=status.HTTP_400_BAD_REQUEST)
+        # if len(plus_members) > 1:
+        #     resp['is_member_allowed'] = False
+        # else:
+        #     resp['is_member_allowed'] = True
+        if len(plus_members) == int(total_member_allowed):
             resp['is_member_allowed'] = False
         else:
             resp['is_member_allowed'] = True

@@ -159,8 +159,8 @@ class PlusMembersSerializer(serializers.Serializer):
         active_plus_user_obj = user.active_plus_user
         if active_plus_user_obj:
             plus_members = active_plus_user_obj.plus_members.all()
-            if len(plus_members) > 1:
-                raise serializers.ValidationError({'members': 'Members can be added only once.'})
+            # if len(plus_members) > 1:
+            #     raise serializers.ValidationError({'members': 'Members can be added only once.'})
 
             total_allowed_members = active_plus_user_obj.plan.total_allowed_members
 
