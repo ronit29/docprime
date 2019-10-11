@@ -2901,9 +2901,10 @@ class TopCommonHospitalForIpdProcedureSerializer(serializers.ModelSerializer):
         now = aware_time_zone(now)
         if obj.hospital and obj.hospital.always_open:
             return True
-        for timing in obj.hospital.hosp_availability.all():
-            if timing.day == now.weekday() and timing.start < now.hour < timing.end:
-                return True
+        if obj.hospital:
+            for timing in obj.hospital.hosp_availability.all():
+                if timing.day == now.weekday() and timing.start < now.hour < timing.end:
+                    return True
         return False
 
     def get_hospital_services(self, obj):
