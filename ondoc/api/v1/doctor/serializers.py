@@ -2886,7 +2886,7 @@ class TopCommonHospitalForIpdProcedureSerializer(serializers.ModelSerializer):
 
     def get_logo(self, obj):
         request = self.context.get('request')
-        if request:
+        if request and obj.hospital:
             for document in obj.hospital.hospital_documents.all():
                 if document.document_type == HospitalDocument.LOGO:
                     return request.build_absolute_uri(document.name.url) if document.name else None
