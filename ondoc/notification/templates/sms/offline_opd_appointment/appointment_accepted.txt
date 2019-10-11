@@ -1,1 +1,1 @@
-Dear {{ patient_name }}, your appointment has been confirmed with {{ doctor_name }} at {{ hospital_name }} on {{ time_slot_start|date:"D jS F Y" }}.
+Dear {{ patient_name }}, your appointment has been confirmed with {{ doctor_name }} at {{ hospital_name }} on {{ opd_time_slot_start|date:"D jS F Y" }}.

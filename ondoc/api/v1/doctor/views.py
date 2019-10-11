@@ -447,7 +447,8 @@ class DoctorAppointmentsViewSet(OndocViewSet):
             data['is_vip_member'] = plus_user_dict.get('is_vip_member', False)
             data['cover_under_vip'] = plus_user_dict.get('cover_under_vip', False)
             data['plus_user_id'] = plus_user.id
-            data['vip_amount'] = plus_user_dict.get('vip_amount')
+            data['vip_amount'] = plus_user_dict.get('vip_amount_deducted')
+            data['amount_to_be_paid'] = plus_user_dict.get('amount_to_be_paid')
             if data['cover_under_vip']:
                 data['payment_type'] = OpdAppointment.VIP
 
@@ -456,11 +457,12 @@ class DoctorAppointmentsViewSet(OndocViewSet):
                 'insurance_message'], data['is_vip_member'], data['cover_under_vip'], \
             data['plus_user_id'] = False, None, "", False, False, None
         cart_item_id = validated_data.get('cart_item').id if validated_data.get('cart_item') else None
-        if not models.OpdAppointment.can_book_for_free(request, validated_data, cart_item_id):
-            return Response({'request_errors': {"code": "invalid",
-                                                "message": "Only {} active free bookings allowed per customer".format(
-                                                    models.OpdAppointment.MAX_FREE_BOOKINGS_ALLOWED)}},
-                            status=status.HTTP_400_BAD_REQUEST)
+        if not validated_data.get("part_of_integration"):
+            if not models.OpdAppointment.can_book_for_free(request, validated_data, cart_item_id):
+                return Response({'request_errors': {"code": "invalid",
+                                                    "message": "Only {} active free bookings allowed per customer".format(
+                                                        models.OpdAppointment.MAX_FREE_BOOKINGS_ALLOWED)}},
+                                status=status.HTTP_400_BAD_REQUEST)
 
         #For Appointment History
         responsible_user = None
@@ -1771,7 +1773,7 @@ class DoctorListViewSet(viewsets.GenericViewSet):
         vip_data_dict = {
             'is_vip_member': False,
             'cover_under_vip': False,
-            'vip_remaining_amount': 0,
+            'vip_utilization': {},
             'is_enable_for_vip': False
         }
 
@@ -1789,7 +1791,7 @@ class DoctorListViewSet(viewsets.GenericViewSet):
             if logged_in_user.active_plus_user:
                 utilization_dict = logged_in_user.active_plus_user.get_utilization
 
-                vip_data_dict['vip_remaining_amount'] = utilization_dict.get('doctor_amount_available') if utilization_dict else 0
+                vip_data_dict['vip_utilization'] = utilization_dict
                 vip_data_dict['is_vip_member'] = True
                 vip_data_dict['cover_under_vip'] = False
                 vip_data_dict['is_enable_for_vip'] = False
@@ -2774,6 +2776,7 @@ class DoctorAvailabilityTimingViewSet(viewsets.ViewSet):
         if not dc_obj:
             return HttpResponse(status=404)
 
+        date = request.query_params.get('date')
         doctor_leaves = doctor.get_leaves()
         global_non_bookables = GlobalNonBookable.get_non_bookables()
         total_leaves = doctor_leaves + global_non_bookables
@@ -2786,10 +2789,22 @@ class DoctorAvailabilityTimingViewSet(viewsets.ViewSet):
             for apt in active_appointments:
                 blocks.append(str(apt.time_slot_start.date()))
 
-        clinic_timings = dc_obj.get_timings_v2(total_leaves, blocks)
+        if dc_obj.is_part_of_integration() and settings.MEDANTA_INTEGRATION_ENABLED:
+            from ondoc.integrations import service
+            pincode = None
+            integration_dict = dc_obj.get_integration_dict()
+            class_name = integration_dict['class_name']
+            integrator_obj_id = integration_dict['id']
+            integrator_obj = service.create_integrator_obj(class_name)
+            clinic_timings = integrator_obj.get_appointment_slots(pincode, date, integrator_obj_id=integrator_obj_id,
+                                                                  blocks=blocks, dc_obj=dc_obj,
+                                                                  total_leaves=total_leaves)
+        else:
+            clinic_timings = dc_obj.get_timings_v2(total_leaves, blocks)
 
         resp_data = {"timeslots": clinic_timings.get('timeslots', []),
                      "upcoming_slots": clinic_timings.get('upcoming_slots', []),
+                     "is_integrated": clinic_timings.get('is_integrated', False),
                      "doctor_data": doctor_serializer.data}
 
         return Response(resp_data)
@@ -2917,10 +2932,12 @@ class DoctorFeedbackViewSet(viewsets.GenericViewSet):
         valid_data = serializer.validated_data
         emails = list()
         if valid_data.get('is_cloud_lab_email'):
-            subject_string = "Test Sample Pickup Request from " + str(user.phone_number)
+            subject_string = valid_data.get('subject_string')
             message = valid_data.get('feedback')
-            emails = ["sanat@docprime.com", "kabeer@docprime.com", "prithvijeet@docprime.com", "raghavr@docprime.com"]
+            emails = ["sanat@docprime.com", "kabeer@docprime.com", "prithvijeet@docprime.com", "raghavr@docprime.com",
+                      "rajivk@policybazaar.com"]
         else:
+            valid_data.pop('subject_string', None)
             subject_string = "Feedback Mail from " + str(user.phone_number)
             message = ''
             managers_string = ''
@@ -4782,11 +4799,15 @@ class HospitalViewSet(viewsets.GenericViewSet):
 
                 breadcrumb = [{'url': '/', 'title': 'Home', 'link_title': 'Home'},
                               {"title": "Hospitals", "url": "hospitals", "link_title": "Hospitals"}]
-                if entity.locality_value:
-                    breadcrumb.append({"title": "{} Hospitals".format(entity.locality_value), "url": "hospitals", "link_title": "{} Hospitals".format(entity.locality_value)})
-                if entity.sublocality_value:
-                    breadcrumb.append({"title": "{}".format(entity.sublocality_value), "url": "hospitals",
-                                       "link_title": "{}".format(entity.sublocality_value)})
+            #     if entity.locality_value:
+            #         breadcrumb.append({"title": "{} Hospitals".format(entity.locality_value),
+            #                            "url": "hospitals/hospitals-in-{}-hspcit".format(entity.locality_value),
+            #                            "link_title": "{} Hospitals".format(entity.locality_value)})
+            #     if entity.sublocality_value:
+            #         breadcrumb.append({"title": "{}".format(entity.sublocality_value),
+            #                            "url": "hospitals/hospitals-in-{}-{}-hsplitcit".format(entity.sublocality_value,
+            #                                                                                   entity.locality_value),
+            #                            "link_title": "{}".format(entity.sublocality_value)})
                 breadcrumb.append({'title': hospital_obj.name, 'url': None, 'link_title': None})
                 response['breadcrumb'] = breadcrumb
 
@@ -4812,7 +4833,7 @@ class HospitalViewSet(viewsets.GenericViewSet):
                 h1_title = new_dynamic.h1_title
         schema = self.build_schema_for_hospital(hosp_serializer, hospital_obj, canonical_url)
         listing_schema = self.build_listing_schema_for_hospital(hosp_serializer)
-        breadcrumb_schema = self.build_breadcrumb_schema_for_hospital(response['breadcrumb'])
+        breadcrumb_schema = self.build_breadcrumb_schema_for_hospital(response['breadcrumb']) if response.get('breadcrumb') else None
         all_schema = [x for x in [schema, listing_schema, breadcrumb_schema] if x]
         response['seo'] = {'title': title, "description": description, "schema": schema,
                            "h1_title": h1_title, 'all_schema': all_schema}

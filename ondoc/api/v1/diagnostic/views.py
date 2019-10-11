@@ -16,6 +16,8 @@ from ondoc.api.v1.auth.serializers import AddressSerializer
 from ondoc.integrations.models import IntegratorTestMapping, IntegratorReport, IntegratorMapping
 from ondoc.cart.models import Cart
 from ondoc.common.models import UserConfig, GlobalNonBookable, AppointmentHistory, MatrixMappedCity
+from ondoc.plus.models import PlusUser
+from ondoc.plus.usage_criteria import get_class_reference
 from ondoc.ratings_review import models as rating_models
 from ondoc.diagnostic.models import (LabTest, AvailableLabTest, Lab, LabAppointment, LabTiming, PromotedLab,
                                      CommonDiagnosticCondition, CommonTest, CommonPackage,
@@ -58,8 +60,8 @@ from ondoc.diagnostic import models
 from ondoc.authentication import models as auth_models
 from django.db.models import Q, Value
 from django.db.models.functions import StrIndex, Coalesce
-
 from ondoc.location.models import EntityUrls, EntityAddress, CompareSEOUrls, CompareLabPackagesSeoUrls
+from ondoc.salespoint.models import SalesPoint
 from ondoc.seo.models import NewDynamic
 from ondoc.subscription_plan.models import UserPlanMapping
 from . import serializers
@@ -256,7 +258,7 @@ class LabList(viewsets.ReadOnlyModelViewSet):
                 valid_package_ids = []
             valid_package_ids.extend(list(
                 LabTest.objects.filter(categories__id__in=package_category_ids).distinct().values_list('id',
-                                                                                               flat=True)))
+                                                                                                       flat=True)))
 
         if package_ids:
             if valid_package_ids is None:
@@ -266,9 +268,17 @@ class LabList(viewsets.ReadOnlyModelViewSet):
         if not valid_package_ids and valid_package_ids is not None:
             valid_package_ids = [-1]
 
+        utm_available = False
+        salespoint_query = ""
+        utm_source = request.query_params.get('UtmSource')
+        if utm_source and SalesPoint.is_affiliate_available(utm_source):
+            utm_available = True
+            salespoint_obj = SalesPoint.get_salespoint_via_code(request.query_params.get('UtmSource'))
+            salespoint_query = ' INNER JOIN "salespoint_test_mapping" ON ("available_lab_test"."id" = "salespoint_test_mapping"."available_tests_id")'
 
-        package_search_query = 'select x.*, CASE WHEN "x"."custom_deal_price" IS not NULL THEN "x"."custom_deal_price"'\
-                               ' else computed_deal_price END AS "price", ST_Distance(St_setsrid(St_point((%(longitude)s), (%(latitude)s)), 4326), x.location) as distance from '\
+
+        package_search_query = 'select x.*, CASE WHEN "x"."custom_deal_price" IS not NULL THEN "x"."custom_deal_price"' \
+                               ' else computed_deal_price END AS "price", ST_Distance(St_setsrid(St_point((%(longitude)s), (%(latitude)s)), 4326), x.location) as distance from ' \
                                ' (SELECT "lab_test"."id", "lab_test"."name","lab_test"."why","lab_test"."pre_test_info",' \
                                ' "lab_test"."test_type", "lab_test"."is_package", "lab_test"."number_of_tests", "lab_test"."category",' \
                                ' "lab_test"."sample_type", "lab_test"."home_collection_possible", "lab_test"."enable_for_ppc", "lab_test"."enable_for_retail", "lab_test"."about_test",' \
@@ -286,6 +296,7 @@ class LabList(viewsets.ReadOnlyModelViewSet):
                                ' AS "rnk"' \
                                ' FROM "lab_test" inner JOIN "available_lab_test" ON ("lab_test"."id" = "available_lab_test"."test_id")' \
                                ' inner JOIN "lab_pricing_group" ON ("available_lab_test"."lab_pricing_group_id" = "lab_pricing_group"."id")' \
+                               ' {salespoint_query} ' \
                                ' inner JOIN "lab" ON ("lab_pricing_group"."id" = "lab"."lab_pricing_group_id") {lab_network_query} WHERE' \
                                ' ("lab_test"."enable_for_retail" = true AND "lab_test"."is_package" = true AND "lab_test"."searchable" = true' \
                                ' AND "available_lab_test"."enabled" = true AND "lab"."enabled" = true AND "lab"."is_live" = true AND' \
@@ -299,6 +310,7 @@ class LabList(viewsets.ReadOnlyModelViewSet):
                                 left JOIN labtest_package ltp on ltp.package_id = lab_test.id
                                 inner JOIN "available_lab_test" ON ("lab_test"."id" = "available_lab_test"."test_id") 
                                 inner JOIN "lab_pricing_group" ON ("available_lab_test"."lab_pricing_group_id" = "lab_pricing_group"."id") 
+                                {salespoint_query}
                                 inner JOIN "lab" ON ("lab_pricing_group"."id" = "lab"."lab_pricing_group_id") 
                                 left JOIN "lab_test_recommended_category_mapping" ltrc on ltrc.lab_test_id = ltp.lab_test_id
                                 left JOIN "lab_test_category" ltc on ltrc.parent_category_id = ltc.id {lab_network_query}
@@ -317,7 +329,6 @@ class LabList(viewsets.ReadOnlyModelViewSet):
         #                       ' ST_DWithin("lab"."location", St_setsrid(St_point(%(longitude)s, %(latitude)s), 4326), %(max_distance)s)' \
         #                       ' and not ST_DWithin("lab"."location", St_setsrid(St_point(%(longitude)s, %(latitude)s), 4326), %(min_distance)s)'
 
-        
         params = {}
         params['latitude'] = str(lat)
         params['longitude'] = str(long)
@@ -365,11 +376,13 @@ class LabList(viewsets.ReadOnlyModelViewSet):
                 params['package_id' + str(counter)] = t_id
                 counter += 1
             filter_query += ')'
+        if utm_available:
+            filter_query += ' and salespoint_test_mapping.salespoint_id = %(s_id)s'
+            params['s_id'] = str(salespoint_obj.id)
         if filter_query:
             package_count_query += filter_query
 
-        package_count_query = package_count_query.format(lab_network_query=lab_network_query)
-
+        package_count_query = package_count_query.format(lab_network_query=lab_network_query, salespoint_query=salespoint_query)
         package_count = RawSql(package_count_query, params).fetch_all()
         result_count = package_count[0].get('count', 0)
         temp_categories_ids = package_count[0].get('category_ids', [])
@@ -377,14 +390,19 @@ class LabList(viewsets.ReadOnlyModelViewSet):
             temp_categories_ids = []
         # if filter_query:
         #     filter_query = ' and '+filter_query
-        package_search_query = package_search_query.format(filter_query=filter_query, sort_query=sort_query, offset=offset, limit=page_size, lab_network_query = lab_network_query)
+
+        package_search_query = package_search_query.format(filter_query=filter_query, sort_query=sort_query, offset=offset, limit=page_size, lab_network_query = lab_network_query, salespoint_query=salespoint_query)
         all_packages = list(LabTest.objects.raw(package_search_query, params))
+
         from django.db.models import prefetch_related_objects
-        prefetch_related_objects(all_packages, 'test','test__categories', 'test__recommended_categories', 'test__parameter', 'categories')
+        if utm_available:
+            prefetch_related_objects(all_packages, 'test', 'test__categories',  'test__recommended_categories', 'test__parameter', 'categories', 'test__availablelabs__active_sales_point_mappings')
+        else:
+            prefetch_related_objects(all_packages, 'test', 'test__categories', 'test__recommended_categories', 'test__parameter', 'categories')
+
         lab_ids = [package.lab for package in all_packages]
         entity_url_qs = EntityUrls.objects.filter(entity_id__in=lab_ids, is_valid=True, url__isnull=False,
-                                                  sitemap_identifier=EntityUrls.SitemapIdentifier.LAB_PAGE).values(
-            'url', lab_id=F('entity_id'))
+                                                  sitemap_identifier=EntityUrls.SitemapIdentifier.LAB_PAGE).values('url', lab_id=F('entity_id'))
         entity_url_dict = {}
         for item in entity_url_qs:
             entity_url_dict.setdefault(item.get('lab_id'), [])
@@ -542,10 +560,22 @@ class LabList(viewsets.ReadOnlyModelViewSet):
 
         package_free_or_not_dict = get_package_free_or_not_dict(request)
 
-        main_queryset = LabTest.objects.prefetch_related('test', 'test__recommended_categories',
-                                                         'test__parameter', 'categories').filter(enable_for_retail=True,
-                                                                                                 searchable=True,
-                                                                                                 is_package=True)
+        utm_source = request.query_params.get('UtmSource')
+        if utm_source and SalesPoint.is_affiliate_available(utm_source):
+            salespoint_obj = SalesPoint.get_salespoint_via_code(request.query_params.get('UtmSource'))
+
+            main_queryset = LabTest.objects.prefetch_related('test', 'test__recommended_categories',
+                                                             'test__parameter', 'categories',
+                                                             'test__availablelabs__active_sales_point_mappings').\
+                filter(enable_for_retail=True, searchable=True, is_package=True,
+                       availablelabs__active_sales_point_mappings__salespoint=salespoint_obj)
+
+
+        else:
+            main_queryset = LabTest.objects.prefetch_related('test', 'test__recommended_categories',
+                                                             'test__parameter', 'categories').filter(enable_for_retail=True,
+                                                                                                     searchable=True,
+                                                                                                     is_package=True)
 
         page_size = 30
 
@@ -1240,6 +1270,8 @@ class LabList(viewsets.ReadOnlyModelViewSet):
             'is_insurance_covered' : False
         }
 
+        vip_data_dict = Lab.get_vip_details(request.user)
+
         is_insurance_covered = False
 
         if logged_in_user.is_authenticated and not logged_in_user.is_anonymous:
@@ -1283,7 +1315,7 @@ class LabList(viewsets.ReadOnlyModelViewSet):
 
         #count = len(queryset_result)
         #paginated_queryset = paginate_queryset(queryset_result, request)
-        result = self.form_lab_search_whole_data(queryset_result, parameters.get("ids"), insurance_data_dict=insurance_data_dict)
+        result = self.form_lab_search_whole_data(queryset_result, parameters.get("ids"), insurance_data_dict=insurance_data_dict, vip_data_dict=vip_data_dict, user=request.user)
 
         if result:
             product_id = parameters.get('product_id', None)
@@ -1688,7 +1720,7 @@ class LabList(viewsets.ReadOnlyModelViewSet):
             queryset_order_by =' order_priority desc, distance asc'
         return queryset_order_by
 
-    def form_lab_search_whole_data(self, queryset, test_ids=None, insurance_data_dict={}):
+    def form_lab_search_whole_data(self, queryset, test_ids=None, insurance_data_dict={}, vip_data_dict={}, user=None):
         ids = [value.get('id') for value in queryset]
         # ids, id_details = self.extract_lab_ids(queryset)
         labs = Lab.objects.select_related('network').prefetch_related('lab_documents', 'lab_image', 'lab_timings','home_collection_charges')
@@ -1762,6 +1794,7 @@ class LabList(viewsets.ReadOnlyModelViewSet):
             row['home_pickup_charges'] = lab_obj.home_pickup_charges
             row['is_home_collection_enabled'] = lab_obj.is_home_collection_enabled
             row['is_insurance_enabled'] = lab_obj.is_insurance_enabled
+            row['is_vip_enabled'] = lab_obj.enabled_for_plus_plans
             row['avg_rating'] = lab_obj.rating_data.get('avg_rating') if lab_obj.display_rating_on_list() else None
             row['rating_count'] = lab_obj.rating_data.get('rating_count') if lab_obj.display_rating_on_list() else None
 
@@ -1824,6 +1857,9 @@ class LabList(viewsets.ReadOnlyModelViewSet):
             else:
                 row['url'] = ''
 
+        plus_user_obj = None
+        if user and user.is_authenticated and not user.is_anonymous:
+            plus_user_obj = user.active_plus_user if user.active_plus_user and user.active_plus_user.status == PlusUser.ACTIVE else None
 
         lab_network = OrderedDict()
         for res in queryset:
@@ -1839,8 +1875,11 @@ class LabList(viewsets.ReadOnlyModelViewSet):
                 # lab network case as lab network have more than 1 labs under it.
 
                 res['insurance'] = deepcopy(insurance_data_dict)
+                res['vip'] = deepcopy(vip_data_dict)
                 all_tests_under_lab = res.get('tests', [])
                 bool_array = list()
+
+                # For Insurance. Checking the eligibility of test to be booked under Insurance.
                 if all_tests_under_lab and res['is_insurance_enabled']:
                     for paticular_test_in_lab in all_tests_under_lab:
                         insurance_coverage = paticular_test_in_lab.get('mrp', 0) <= insurance_data_dict['insurance_threshold_amount']
@@ -1851,7 +1890,27 @@ class LabList(viewsets.ReadOnlyModelViewSet):
                 elif res['is_insurance_enabled'] and not all_tests_under_lab:
                     res['insurance']['is_insurance_covered'] = True
 
-                #existing = res
+
+                # For Vip. Checking the eligibility of test to be booked under VIP.
+                engine_response = {}
+                if all_tests_under_lab and res['is_vip_enabled']:
+                    for paticular_test_in_lab in all_tests_under_lab:
+                        engine = get_class_reference(plus_user_obj, "LABTEST")
+                        coverage = False
+                        if engine:
+                            engine_response = engine.validate_booking_entity(cost=paticular_test_in_lab.get('mrp', 0))
+                            coverage = engine_response.get('is_covered', False)
+                        bool_array.append(coverage)
+
+                    if False not in bool_array and len(bool_array) > 0:
+                        res['vip']['covered_under_vip'] = True
+                        res['vip']['vip_amount'] = engine_response.get('amount_to_be_paid', 0) if engine_response else 0
+
+                elif res['is_vip_enabled'] and not all_tests_under_lab:
+                    res['vip']['covered_under_vip'] = True
+                    res['vip']['vip_amount'] = 0
+
+                    #existing = res
                 key = network_id
                 if not key:
                     key = random.randint(10, 1000000000)
@@ -1979,6 +2038,13 @@ class LabList(viewsets.ReadOnlyModelViewSet):
         #                                    entity_type__iexact='Lab').values('url')
         # if entity.exists():
         #     lab_serializable_data['url'] = entity.first()['url'] if len(entity) == 1 else None
+
+        # agent added for SPO work
+        agent = False
+        utm_source = request.query_params.get('UtmSource')
+        if utm_source and SalesPoint.is_affiliate_available(utm_source):
+            agent = True
+
         temp_data = dict()
 
         test_serializer_data = test_serializer.data
@@ -1997,7 +2063,8 @@ class LabList(viewsets.ReadOnlyModelViewSet):
 
         temp_data['lab'] = lab_serializable_data
         temp_data['distance_related_charges'] = distance_related_charges
-        temp_data['tests'] = test_serializer_data
+        temp_data['agent'] = agent
+        temp_data['tests'] = test_serializer.data
         temp_data['lab_tests'] = lab_test_serializer.data
         temp_data['lab_timing'], temp_data["lab_timing_data"] = lab_timing, lab_timing_data
         temp_data['total_test_count'] = total_test_count
@@ -2426,7 +2493,7 @@ class LabAppointmentView(mixins.CreateModelMixin,
         booked_by = 'agent' if hasattr(request, 'agent') else 'user'
         user_insurance = UserInsurance.get_user_insurance(request.user)
         plus_user = request.user.active_plus_user
-        if user_insurance:
+        if user_insurance and user_insurance.status in [UserInsurance.ACTIVE, UserInsurance.ONHOLD]:
             if user_insurance.status == UserInsurance.ONHOLD:
                 return Response(status=status.HTTP_400_BAD_REQUEST,
                                 data={'error': 'Your documents from the last claim are under verification.'
@@ -2454,7 +2521,8 @@ class LabAppointmentView(mixins.CreateModelMixin,
             data['is_vip_member'] = plus_user_dict.get('is_vip_member', False)
             data['cover_under_vip'] = plus_user_dict.get('cover_under_vip', False)
             data['plus_user_id'] = plus_user.id
-            data['vip_amount'] = plus_user_dict.get('vip_amount')
+            data['vip_amount'] = plus_user_dict.get('vip_amount_deducted')
+            data['amount_to_be_paid'] = plus_user_dict.get('amount_to_be_paid')
             if data['cover_under_vip']:
                 data['payment_type'] = OpdAppointment.VIP
 

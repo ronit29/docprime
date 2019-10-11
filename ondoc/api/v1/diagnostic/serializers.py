@@ -28,6 +28,7 @@ import json
 
 from ondoc.insurance.models import UserInsurance, InsuranceThreshold
 from ondoc.plus.models import PlusUser, PlusAppointmentMapping
+from ondoc.plus.usage_criteria import get_class_reference
 from ondoc.prescription.models import AppointmentPrescription
 from ondoc.ratings_review.models import RatingsReview
 from django.db.models import Avg
@@ -302,26 +303,42 @@ class AvailableLabTestPackageSerializer(serializers.ModelSerializer):
         resp = Lab.get_vip_details(request.user)
         user = request.user
 
-        plus_obj = user.active_plus_user if not user.is_anonymous and user.is_authenticated else None
-        utilization = plus_obj.get_utilization if plus_obj else {}
-        package_amount_balance = utilization.get('available_package_amount', 0)
+        plus_obj = None
+        if user and user.is_authenticated and not user.is_anonymous:
+            plus_obj = user.active_plus_user if user.active_plus_user and user.active_plus_user.status == PlusUser.ACTIVE else None
 
-        if plus_obj and lab_obj and obj and lab_obj.enabled_for_plus_plans and obj.mrp:
-            utilization_criteria, can_be_utilized = plus_obj.can_package_be_covered_in_vip(obj)
-            if can_be_utilized:
-                resp['covered_under_vip'] = True
-            else:
-                return resp
+        entity = "LABTEST" if not obj.test.is_package else "PACKAGE"
+        engine = get_class_reference(plus_obj, entity)
+        if not engine:
+            return resp
 
-            if utilization_criteria == UtilizationCriteria.COUNT:
-                resp['vip_amount'] = 0
-            else:
-                if obj.mrp <= package_amount_balance:
-                    resp['vip_amount'] = 0
-                else:
-                    resp['vip_amount'] = obj.mrp - package_amount_balance
+        if engine and obj and obj.mrp and lab_obj and lab_obj.enabled_for_plus_plans:
+            engine_response = engine.validate_booking_entity(cost=obj.mrp, id=obj.test.id)
+            resp['covered_under_vip'] = engine_response['is_covered']
+            resp['vip_amount'] = engine_response['amount_to_be_paid']
 
         return resp
+
+
+        # # plus_obj = user.active_plus_user if not user.is_anonymous and user.is_authenticated else None
+        # utilization = plus_obj.get_utilization if plus_obj else {}
+        # package_amount_balance = utilization.get('available_package_amount', 0)
+        #
+        # if plus_obj and lab_obj and obj and lab_obj.enabled_for_plus_plans and obj.mrp:
+        #     utilization_criteria, can_be_utilized = plus_obj.can_package_be_covered_in_vip(obj)
+        #     if can_be_utilized:
+        #         resp['covered_under_vip'] = True
+        #     else:
+        #         return resp
+        #
+        #     if utilization_criteria == UtilizationCriteria.COUNT:
+        #         resp['vip_amount'] = 0
+        #     else:
+        #         if obj.mrp <= package_amount_balance:
+        #             resp['vip_amount'] = 0
+        #         else:
+        #             resp['vip_amount'] = obj.mrp - package_amount_balance
+
 
     def get_insurance(self, obj):
         request = self.context.get("request")
@@ -516,26 +533,42 @@ class AvailableLabTestSerializer(serializers.ModelSerializer):
         resp = Lab.get_vip_details(request.user)
         user = request.user
 
-        plus_obj = user.active_plus_user if not user.is_anonymous and user.is_authenticated else None
-        utilization = plus_obj.get_utilization if plus_obj else {}
-        package_amount_balance = utilization.get('available_package_amount', 0)
+        plus_obj = None
+        if user and user.is_authenticated and not user.is_anonymous:
+            plus_obj = user.active_plus_user if user.active_plus_user and user.active_plus_user.status == PlusUser.ACTIVE else None
 
-        if plus_obj and lab_obj and obj and lab_obj.enabled_for_plus_plans and obj.mrp:
-            utilization_criteria, can_be_utilized = plus_obj.can_package_be_covered_in_vip(obj)
-            if can_be_utilized:
-                resp['covered_under_vip'] = True
-            else:
-                return resp
+        entity = "LABTEST" if not obj.test.is_package else "PACKAGE"
+        engine = get_class_reference(plus_obj, entity)
+        if not engine:
+            return resp
 
-            if utilization_criteria == UtilizationCriteria.COUNT:
-                resp['vip_amount'] = 0
-            else:
-                if obj.mrp <= package_amount_balance:
-                    resp['vip_amount'] = 0
-                else:
-                    resp['vip_amount'] = obj.mrp - package_amount_balance
+        if engine and obj and obj.mrp and lab_obj and lab_obj.enabled_for_plus_plans:
+            engine_response = engine.validate_booking_entity(cost=obj.mrp, id=obj.test.id)
+            resp['covered_under_vip'] = engine_response['is_covered']
+            resp['vip_amount'] = engine_response['amount_to_be_paid']
 
         return resp
+
+        # plus_obj = user.active_plus_user if not user.is_anonymous and user.is_authenticated else None
+        # utilization = plus_obj.get_utilization if plus_obj else {}
+        # package_amount_balance = utilization.get('available_package_amount', 0)
+        #
+        # if plus_obj and lab_obj and obj and lab_obj.enabled_for_plus_plans and obj.mrp:
+        #     utilization_criteria, can_be_utilized = plus_obj.can_package_be_covered_in_vip(obj)
+        #     if can_be_utilized:
+        #         resp['covered_under_vip'] = True
+        #     else:
+        #         return resp
+        #
+        #     if utilization_criteria == UtilizationCriteria.COUNT:
+        #         resp['vip_amount'] = 0
+        #     else:
+        #         if obj.mrp <= package_amount_balance:
+        #             resp['vip_amount'] = 0
+        #         else:
+        #             resp['vip_amount'] = obj.mrp - package_amount_balance
+        #
+        # return resp
 
     def get_insurance(self, obj):
         request = self.context.get("request")
@@ -753,27 +786,44 @@ class CommonPackageSerializer(serializers.ModelSerializer):
         resp = Lab.get_vip_details(request.user)
         user = request.user
 
-        plus_obj = user.active_plus_user if not user.is_anonymous and user.is_authenticated else None
-        utilization = plus_obj.get_utilization if plus_obj else {}
-        package_amount_balance = utilization.get('available_package_amount', 0)
+        # plus_obj = user.active_plus_user if not user.is_anonymous and user.is_authenticated else None
+        # utilization = plus_obj.get_utilization if plus_obj else {}
+        # package_amount_balance = utilization.get('available_package_amount', 0)
+
         lab_obj = Lab.objects.filter(id=obj.lab_id).first()
 
-        if plus_obj and obj and obj._selected_test and lab_obj.enabled_for_plus_plans and obj._selected_test.mrp:
-            utilization_criteria, can_be_utilized = plus_obj.can_package_be_covered_in_vip(None, mrp=obj._selected_test.mrp, id=obj.package.id)
-            if can_be_utilized:
-                resp['covered_under_vip'] = True
-            else:
-                return resp
+        plus_obj = None
+        if user and user.is_authenticated and not user.is_anonymous:
+            plus_obj = user.active_plus_user if user.active_plus_user and user.active_plus_user.status == PlusUser.ACTIVE else None
 
-            if utilization_criteria == UtilizationCriteria.COUNT:
-                resp['vip_amount'] = 0
-            else:
-                if obj.mrp <= package_amount_balance:
-                    resp['vip_amount'] = 0
-                else:
-                    resp['vip_amount'] = obj._selected_test.mrp - package_amount_balance
+        entity = "PACKAGE"
+        engine = get_class_reference(plus_obj, entity)
+        if not engine:
+            return resp
+
+        if engine and obj and obj._selected_test and lab_obj.enabled_for_plus_plans and obj._selected_test.mrp:
+            engine_response = engine.validate_booking_entity(cost=obj._selected_test.mrp, id=obj.package.id)
+            resp['covered_under_vip'] = engine_response['is_covered']
+            resp['vip_amount'] = engine_response['amount_to_be_paid']
 
         return resp
+
+        # if plus_obj and obj and obj._selected_test and lab_obj.enabled_for_plus_plans and obj._selected_test.mrp:
+        #     utilization_criteria, can_be_utilized = plus_obj.can_package_be_covered_in_vip(None, mrp=obj._selected_test.mrp, id=obj.package.id)
+        #     if can_be_utilized:
+        #         resp['covered_under_vip'] = True
+        #     else:
+        #         return resp
+        #
+        #     if utilization_criteria == UtilizationCriteria.COUNT:
+        #         resp['vip_amount'] = 0
+        #     else:
+        #         if obj.mrp <= package_amount_balance:
+        #             resp['vip_amount'] = 0
+        #         else:
+        #             resp['vip_amount'] = obj._selected_test.mrp - package_amount_balance
+        #
+        # return resp
 
     class Meta:
         model = CommonPackage
@@ -972,12 +1022,12 @@ class LabAppTransactionModelSerializer(serializers.Serializer):
     insurance = serializers.PrimaryKeyRelatedField(queryset=UserInsurance.objects.all(), allow_null=True)
     plus_plan = serializers.PrimaryKeyRelatedField(queryset=PlusUser.objects.all(), allow_null=True)
     plus_amount = serializers.DecimalField(max_digits=10, decimal_places=2)
-
     cashback = serializers.DecimalField(max_digits=10, decimal_places=2)
     extra_details = serializers.JSONField(required=False)
     user_plan = serializers.PrimaryKeyRelatedField(queryset=UserPlanMapping.objects.all(), allow_null=True)
     coupon_data = serializers.JSONField(required=False)
     prescription_list = serializers.ListSerializer(child=PrescriptionDocumentSerializer(), required=False)
+    spo_data = serializers.JSONField(required=False, default={})
     _source = serializers.CharField(required=False, allow_null=True)
     _responsible_user = serializers.IntegerField(required=False, allow_null=True)
     # test_time_slots = serializers.ListSerializer(child=LabAppointmentTestTransactionSerializer(), required=False, allow_empty=False)
@@ -998,6 +1048,7 @@ class LabAppTransactionModelSerializer(serializers.Serializer):
             # self.fields.fields['test_time_slots'].required = False
             # self.fields.fields['selected_timings_type'].required = False
             # self.fields.fields['time_slot_start'].required = True
+
 
 
 class LabAppRescheduleModelSerializer(serializers.ModelSerializer):
@@ -1080,6 +1131,7 @@ class LabAppointmentCreateSerializer(serializers.Serializer):
     from_app = serializers.BooleanField(required=False, default=False)
     user_plan = serializers.PrimaryKeyRelatedField(queryset=UserPlanMapping.objects.all(), required=False, allow_null=True, default=None)
     included_in_user_plan = serializers.BooleanField(required=False, default=False)
+    utm_spo_tags = serializers.JSONField(required=False, default={})
     app_version = serializers.CharField(required=False, allow_null=True, allow_blank=True)
     prescription_list = serializers.ListSerializer(child=PrescriptionDocumentSerializer(), required=False)
     _source = serializers.CharField(required=False, allow_null=True)
@@ -1552,7 +1604,7 @@ class LabAppointmentCreateSerializer(serializers.Serializer):
         booked_test_ids = list(data.get("test_ids", None))
         if booked_test_ids:
             for test in booked_test_ids:
-                integrator_test = IntegratorTestMapping.objects.filter(test_id=test).first()
+                integrator_test = IntegratorTestMapping.objects.filter(test_id=test, integrator_class_name='Thyrocare').first()
                 if integrator_test and integrator_test.integrator_product_data['code'] == 'FBS':
                     self.fbs_valid(booked_test_ids, test)
                 elif integrator_test and integrator_test.integrator_product_data['code'] in ['PPBS', 'RBS']:
@@ -1571,11 +1623,11 @@ class LabAppointmentCreateSerializer(serializers.Serializer):
             pass
 
         for test in booked_test_ids:
-            integrator_test = IntegratorTestMapping.objects.filter(test_id=test, test_type='TEST').first()
+            integrator_test = IntegratorTestMapping.objects.filter(test_id=test, test_type='TEST', integrator_class_name='Thyrocare').first()
             if integrator_test and integrator_test.integrator_product_data['fasting'] == 'CF':
                 is_profile_or_fasting_added = True
             else:
-                integrator_profile = IntegratorTestMapping.objects.filter(Q(test_id=test) & ~Q(test_type='TEST')).first()
+                integrator_profile = IntegratorTestMapping.objects.filter(Q(test_id=test) & Q(integrator_class_name='Thyrocare') & ~Q(test_type='TEST')).first()
                 if integrator_profile:
                     is_profile_or_fasting_added = True
 
@@ -1596,13 +1648,13 @@ class LabAppointmentCreateSerializer(serializers.Serializer):
             pass
 
         for test in booked_test_ids:
-            integrator_test = IntegratorTestMapping.objects.filter(test_id=test, test_type='TEST').first()
+            integrator_test = IntegratorTestMapping.objects.filter(test_id=test, test_type='TEST', integrator_class_name='Thyrocare').first()
             if integrator_test and integrator_test.integrator_product_data['code'] == 'FBS':
                 is_fbs_present = True
             elif integrator_test and integrator_test.integrator_product_data['fasting'] == 'CF':
                 is_profile_or_fasting_added = True
             else:
-                integrator_profile = IntegratorTestMapping.objects.filter(Q(test_id=test) & ~Q(test_type='TEST')).first()
+                integrator_profile = IntegratorTestMapping.objects.filter(Q(test_id=test) & Q(integrator_class_name='Thyrocare') & ~Q(test_type='TEST')).first()
                 if integrator_profile:
                     is_profile_or_fasting_added = True
 
@@ -1622,7 +1674,7 @@ class LabAppointmentCreateSerializer(serializers.Serializer):
             pass
 
         for test in booked_test_ids:
-            integrator_test = IntegratorTestMapping.objects.filter(test_id=test, test_type='TEST').first()
+            integrator_test = IntegratorTestMapping.objects.filter(test_id=test, test_type='TEST', integrator_class_name='Thyrocare').first()
             if integrator_test and integrator_test.integrator_product_data['code'] == 'INSFA':
                 insfa_test_present = True
 
@@ -1954,26 +2006,42 @@ class CustomLabTestPackageSerializer(serializers.ModelSerializer):
         lab_data = self.context.get('lab_data', {})
         lab = lab_data.get(obj.lab, None)
         user = request.user
-        plus_obj = user.active_plus_user if not user.is_anonymous and user.is_authenticated else None
-        utilization = plus_obj.get_utilization if plus_obj else {}
-        package_amount_balance = utilization.get('available_package_amount', 0)
+        # plus_obj = user.active_plus_user if not user.is_anonymous and user.is_authenticated else None
+        # utilization = plus_obj.get_utilization if plus_obj else {}
+        # package_amount_balance = utilization.get('available_package_amount', 0)
 
-        if plus_obj and lab and obj and lab.enabled_for_plus_plans and obj.mrp:
-            utilization_criteria, can_be_utilized = plus_obj.can_package_be_covered_in_vip(obj)
-            if can_be_utilized:
-                resp['covered_under_vip'] = True
-            else:
-                return resp
+        plus_obj = None
+        if user and user.is_authenticated and not user.is_anonymous:
+            plus_obj = user.active_plus_user if user.active_plus_user and user.active_plus_user.status == PlusUser.ACTIVE else None
 
-            if utilization_criteria == UtilizationCriteria.COUNT:
-                resp['vip_amount'] = 0
-            else:
-                if obj.mrp <= package_amount_balance:
-                    resp['vip_amount'] = 0
-                else:
-                    resp['vip_amount'] = obj.mrp - package_amount_balance
+        entity = "LABTEST" if not obj.is_package else "PACKAGE"
+        engine = get_class_reference(plus_obj, entity)
+        if not engine:
+            return resp
+
+        if engine and obj and obj.mrp and lab and lab.enabled_for_plus_plans:
+            engine_response = engine.validate_booking_entity(cost=obj.mrp, id=obj.id)
+            resp['covered_under_vip'] = engine_response['is_covered']
+            resp['vip_amount'] = engine_response['amount_to_be_paid']
 
         return resp
+
+        # if plus_obj and lab and obj and lab.enabled_for_plus_plans and obj.mrp:
+        #     utilization_criteria, can_be_utilized = plus_obj.can_package_be_covered_in_vip(obj)
+        #     if can_be_utilized:
+        #         resp['covered_under_vip'] = True
+        #     else:
+        #         return resp
+        #
+        #     if utilization_criteria == UtilizationCriteria.COUNT:
+        #         resp['vip_amount'] = 0
+        #     else:
+        #         if obj.mrp <= package_amount_balance:
+        #             resp['vip_amount'] = 0
+        #         else:
+        #             resp['vip_amount'] = obj.mrp - package_amount_balance
+        #
+        # return resp
 
     def get_included_in_user_plan(self, obj):
         package_free_or_not_dict = self.context.get('package_free_or_not_dict', {})

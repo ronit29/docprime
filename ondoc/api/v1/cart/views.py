@@ -76,6 +76,7 @@ class CartViewSet(viewsets.GenericViewSet):
         valid_data['data']['plus_user_id'] = vip_data_dict.get('plus_user_id', None)
         valid_data['data']['is_vip_member'] = vip_data_dict.get('is_vip_member', False)
         valid_data['data']['vip_amount'] = vip_data_dict.get('vip_amount')
+        valid_data['data']['amount_to_be_paid'] = vip_data_dict.get('vip_amount')
 
         if valid_data['data']['is_appointment_insured']:
             valid_data['data']['payment_type'] = OpdAppointment.INSURANCE
@@ -199,6 +200,11 @@ class CartViewSet(viewsets.GenericViewSet):
             # if not specialization_count_dict:
             #     return is_insured, insurance_id, insurance_message
 
+
+        plus_user_obj = user.active_plus_user
+        utilization = plus_user_obj.get_utilization if plus_user_obj else {}
+        deep_utilization = copy.deepcopy(utilization)
+
         for item in cart_items:
             try:
                 validated_data = item.validate(request)
@@ -208,9 +214,14 @@ class CartViewSet(viewsets.GenericViewSet):
                     plus_user = user.active_plus_user
                     if not plus_user:
                         raise Exception('Member is no more VIP')
-                    vip_dict = plus_user.validate_plus_appointment(validated_data)
+                    vip_dict = plus_user.validate_plus_appointment(validated_data, utilization=deep_utilization)
                     if not vip_dict.get('cover_under_vip'):
                         raise Exception('Appointment no more cover under VIP')
+                    item.data['amount_to_be_paid'] = vip_dict['amount_to_be_paid']
+                    item.data['vip_amount'] = vip_dict['amount_to_be_paid']
+                    # cart_data['amount_to_be_paid'] = vip_dict['amount_to_be_paid']
+                    # cart_data['amount_to_be_paid'] = vip_dict['amount_to_be_paid']
+                    # validated_data.save()
                 if not cart_data.get('is_appointment_insured'):
                     item.data['is_appointment_insured'] = False
                     item.data['insurance_id'] = None
@@ -351,35 +362,36 @@ class CartViewSet(viewsets.GenericViewSet):
         total_count = 0
         is_process, error = UserInsurance.validate_cart_items(cart_items, request)
         if is_process:
+            deep_utilization = copy.deepcopy(plus_user.get_utilization) if plus_user else {}
             for item in cart_items:
                 try:
                     validated_data = item.validate(request)
                     if plus_user and item.data.get('cover_under_vip'):
-                        vip_dict = plus_user.validate_plus_appointment(validated_data)
+                        vip_dict = plus_user.validate_plus_appointment(validated_data, utilization=deep_utilization)
                         if vip_dict.get('cover_under_vip'):
-                            utilization = plus_user.get_utilization
-                            price_data = OpdAppointment.get_price_details(
-                                validated_data) if 'doctor' in validated_data else LabAppointment.get_price_details(
-                                validated_data)
-                            if 'doctor' in validated_data:
-                                total_mrp = total_mrp + int(price_data.get('mrp', 0))
-                                if total_mrp <= utilization.get('doctor_amount_available'):
-                                     items_to_process.append(item)
-                            else:
-                                tests = validated_data.get('test_ids')
-                                package_available_ids = utilization.get('allowed_package_ids')
-                                package_available_count = utilization.get('available_package_count')
-                                package_available_amount = utilization.get('available_package_amount')
-                                for test in tests:
-                                    if test.is_package and test.id in package_available_ids and package_available_count and package_available_count > 0:
-                                        total_count = total_count + 1
-                                        if total_count <= package_available_count:
-                                            items_to_process.append(item)
-                                    elif test.is_package and package_available_amount and package_available_amount > 0:
-                                        utilization['available_package_amount'] = package_available_amount - (price_data.get('mrp') + price_data.get('home_pickup_charges'))
-                                        total_mrp = total_mrp + price_data.get('mrp') + price_data.get('home_pickup_charges')
-                                        if total_mrp <= package_available_amount:
-                                            items_to_process.append(item)
+                            items_to_process.append(item)
+                            # price_data = OpdAppointment.get_price_details(
+                            #     validated_data) if 'doctor' in validated_data else LabAppointment.get_price_details(
+                            #     validated_data)
+
+                            # if 'doctor' in validated_data:
+                            #     total_mrp = total_mrp + int(price_data.get('mrp', 0))
+                            #     if total_mrp <= utilization.get('doctor_amount_available'):
+                            # else:
+                            #     tests = validated_data.get('test_ids')
+                            #     package_available_ids = utilization.get('allowed_package_ids')
+                            #     package_available_count = utilization.get('available_package_count')
+                            #     package_available_amount = utilization.get('available_package_amount')
+                            #     for test in tests:
+                            #         if test.is_package and test.id in package_available_ids and package_available_count and package_available_count > 0:
+                            #             total_count = total_count + 1
+                            #             if total_count <= package_available_count:
+                            #                 items_to_process.append(item)
+                            #         elif test.is_package and package_available_amount and package_available_amount > 0:
+                            #             utilization['available_package_amount'] = package_available_amount - (price_data.get('mrp') + price_data.get('home_pickup_charges'))
+                            #             total_mrp = total_mrp + price_data.get('mrp') + price_data.get('home_pickup_charges')
+                            #             if total_mrp <= package_available_amount:
+                            #                 items_to_process.append(item)
                         else:
                             raise Exception('Item is no more cover under VIP')
                     else:

@@ -1,6 +1,16 @@
 from config.settings.base import *
 import logging, warnings
+from ddtrace import tracer
 
+if (env('DJANGO_SETTINGS_MODULE')=='config.settings.production'):
+    try:
+        tracer.configure(
+            hostname='datadog-agent',
+            port=8126,
+        )
+    except Exception as e:
+        logger = logging.getLogger(__name__)
+        logger.error("Error Configuring DDtracer " + str(e))
 
 SECRET_KEY = env('DJANGO_SECRET_KEY')
 

@@ -8,7 +8,7 @@ from django.core.validators import FileExtensionValidator, MaxValueValidator, Mi
 from django.contrib.postgres.fields import JSONField
 from django.utils import timezone
 from ondoc.account import models as account_model
-from ondoc.authentication.models import UserProfile
+from ondoc.authentication.models import UserProfile, RefundMixin
 from ondoc.cart.models import Cart
 from ondoc.common.helper import Choices
 import json
@@ -17,12 +17,16 @@ from django.db import transaction
 from django.db.models import Q
 from ondoc.common.models import DocumentsProofs
 from ondoc.notification.tasks import push_plus_lead_to_matrix
+from ondoc.plus.usage_criteria import get_class_reference
 from .enums import PlanParametersEnum, UtilizationCriteria
 from datetime import datetime
+from ondoc.crm import constants as const
 from django.utils.timezone import utc
 import reversion
 from django.conf import settings
 from django.utils.functional import cached_property
+from .enums import UsageCriteria
+from copy import deepcopy
 
 
 class LiveMixin(models.Model):
@@ -97,6 +101,7 @@ class PlusPlans(auth_model.TimeStampedModel, LiveMixin):
     is_selected = models.BooleanField(default=False)
     features = JSONField(blank=False, null=False, default=dict)
     is_retail = models.NullBooleanField()
+    plan_criteria = models.CharField(max_length=100, null=True, blank=False, choices=UsageCriteria.as_choices())
 
     @classmethod
     def get_active_plans_via_utm(cls, utm):
@@ -204,8 +209,10 @@ class PlusThreshold(auth_model.TimeStampedModel, LiveMixin):
         return str(self.plus_plan)
 
 
-class PlusUser(auth_model.TimeStampedModel):
+@reversion.register()
+class PlusUser(auth_model.TimeStampedModel, RefundMixin):
     from ondoc.account.models import MoneyPool
+    PRODUCT_ID = account_model.Order.VIP_PRODUCT_ID
 
     ACTIVE = 1
     CANCELLED = 2
@@ -233,6 +240,7 @@ class PlusUser(auth_model.TimeStampedModel):
     money_pool = models.ForeignKey(MoneyPool, on_delete=models.SET_NULL, null=True)
     matrix_lead_id = models.IntegerField(null=True)
     raw_plus_member = JSONField(blank=False, null=False, default=list)
+    payment_type = models.PositiveSmallIntegerField(choices=const.PAY_CHOICES, default=const.PREPAID)
 
     def is_valid(self):
         if self.expire_date >= timezone.now() and (self.status == self.ACTIVE):
@@ -246,6 +254,25 @@ class PlusUser(auth_model.TimeStampedModel):
         else:
             return False
 
+    def can_be_cancelled(self):
+        from ondoc.doctor.models import OpdAppointment
+        from ondoc.diagnostic.models import LabAppointment
+        # Opd Appointments
+        appointments_qs = OpdAppointment.objects.filter(plus_plan=self)
+        completed_appointments = appointments_qs.filter(status=OpdAppointment.COMPLETED)
+        if completed_appointments.exists():
+            return {'reason': 'User has completed opd appointments', 'can_be_cancelled': False}
+
+        # Lab Appointments
+        appointments_qs = LabAppointment.objects.filter(plus_plan=self)
+        completed_appointments = appointments_qs.filter(status=LabAppointment.COMPLETED)
+        if completed_appointments.exists():
+            return {'reason': 'User has completed lab appointments.', 'can_be_cancelled': False}
+
+        return {'reason': 'Can be cancelled.', 'can_be_cancelled': True}
+
+
+
     def get_primary_member_profile(self):
         insured_members = self.plus_members.filter().order_by('id')
         proposers = list(filter(lambda member: member.is_primary_user and member.relation == PlusMembers.Relations.SELF, insured_members))
@@ -254,15 +281,25 @@ class PlusUser(auth_model.TimeStampedModel):
 
         return None
 
-    def can_package_be_covered_in_vip(self, package_obj, *args, **kwargs):
-        mrp = package_obj.mrp if package_obj else kwargs.get('mrp')
-        # id = (package_obj.test.id if hasattr(package_obj, 'test') else package_obj.id) if package_obj else kwargs.get('id')
+    def can_test_be_covered_in_vip(self, *args, **kwargs):
+        mrp = kwargs.get('mrp')
+        id = kwargs.get('id')
+
+        if not mrp:
+            return
+        utilization_dict = self.get_utilization
+
+
+
+    def can_package_be_covered_in_vip(self, obj, *args, **kwargs):
+        mrp = obj.mrp if obj else kwargs.get('mrp')
+        # id = (obj.test.id if hasattr(obj, 'test') else obj.id) if obj else kwargs.get('id')
         if kwargs.get('id'):
             id = kwargs.get('id')
-        elif package_obj.__class__.__name__ == 'LabTest':
-            id = package_obj.id
+        elif obj.__class__.__name__ == 'LabTest':
+            id = obj.id
         else:
-            id = package_obj.test.id
+            id = obj.test.id
 
         utilization_dict = self.get_utilization
         if utilization_dict.get('total_package_count_limit'):
@@ -294,7 +331,13 @@ class PlusUser(auth_model.TimeStampedModel):
                                                                                PlanParametersEnum.HEALTH_CHECKUPS_COUNT,
                                                                                PlanParametersEnum.MEMBERS_COVERED_IN_PACKAGE,
                                                                                PlanParametersEnum.PACKAGE_IDS,
-                                                                               PlanParametersEnum.TOTAL_TEST_COVERED_IN_PACKAGE])
+                                                                               PlanParametersEnum.PACKAGE_DISCOUNT,
+                                                                               PlanParametersEnum.TOTAL_TEST_COVERED_IN_PACKAGE,
+                                                                               PlanParametersEnum.LAB_DISCOUNT,
+                                                                               PlanParametersEnum.LABTEST_AMOUNT,
+                                                                               PlanParametersEnum.LABTEST_COUNT,
+                                                                               PlanParametersEnum.DOCTOR_CONSULT_DISCOUNT,
+                                                                               PlanParametersEnum.DOCTOR_CONSULT_COUNT])
 
         for pp in plan_parameters:
             data[pp.parameter.key.lower()] = pp.value
@@ -302,6 +345,9 @@ class PlusUser(auth_model.TimeStampedModel):
         resp['allowed_package_ids'] = list(map(lambda x: int(x), data.get('package_ids', '').split(','))) if data.get('package_ids') else []
         resp['doctor_consult_amount'] = int(data['doctor_consult_amount']) if data.get('doctor_consult_amount') and data.get('doctor_consult_amount').__class__.__name__ == 'str' else 0
         resp['doctor_amount_utilized'] = self.get_doctor_plus_appointment_amount()
+        resp['doctor_discount'] = int(data['doctor_consult_discount']) if data.get('doctor_consult_discount') and data.get('doctor_consult_discount').__class__.__name__ == 'str' else 0
+        resp['lab_discount'] = int(data['lab_discount']) if data.get('lab_discount') and data.get('lab_discount').__class__.__name__ == 'str' else 0
+        resp['package_discount'] = int(data['package_discount']) if data.get('package_discount') and data.get('package_discount').__class__.__name__ == 'str' else 0
         resp['doctor_amount_available'] = resp['doctor_consult_amount'] - resp['doctor_amount_utilized']
         resp['members_count_online_consultation'] = data['members_covered_in_package'] if data.get('members_covered_in_package') and data.get('members_covered_in_package').__class__.__name__ == 'str'  else 0
         resp['total_package_amount_limit'] = int(data['health_checkups_amount']) if data.get('health_checkups_amount') and data.get('health_checkups_amount').__class__.__name__ == 'str'  else 0
@@ -310,30 +356,38 @@ class PlusUser(auth_model.TimeStampedModel):
         resp['available_package_amount'] = resp['total_package_amount_limit'] - int(self.get_package_plus_appointment_amount())
         resp['available_package_count'] = resp['total_package_count_limit'] - int(self.get_package_plus_appointment_count())
 
+        resp['total_labtest_amount_limit'] = int(data['labtest_amount']) if data.get('labtest_amount') and data.get('labtest_amount').__class__.__name__ == 'str'  else 0
+        resp['total_labtest_count_limit'] =  int(data['labtest_count']) if data.get('labtest_count') and data.get('labtest_count').__class__.__name__ == 'str'  else 0
+
+        resp['available_labtest_amount'] = resp['total_labtest_amount_limit'] - int(self.get_labtest_plus_appointment_amount())
+        resp['available_labtest_count'] = resp['total_labtest_count_limit'] - int(self.get_labtest_plus_appointment_count())
+        resp['total_doctor_count_limit'] = int(data['doctor_consult_count']) if data.get('doctor_consult_count') and data.get('doctor_consult_discount').__class__.__name__ == 'str' else 0
+        resp['available_doctor_count'] = resp['total_doctor_count_limit'] - int(self.get_doctor_plus_appointment_count())
+
+        # resp['availabe_labtest_discount_count'] = resp['total_labtest_count_limit']
+
         return resp
 
-    def update_doctor_utilization(self, appointment_obj):
-        pass
-        # mrp = appointment_obj.mrp
-        # user = self.user
-        # plan = self.plan
-        # plan_parameters = plan.plan_parameters
-        # utilization = self.get_utilization()
+    def get_doctor_plus_appointment_count(self):
+        from ondoc.doctor.models import OpdAppointment
+        opd_appointments_count = OpdAppointment.objects.filter(plus_plan=self).exclude(status=OpdAppointment.CANCELLED).count()
+        return opd_appointments_count
 
-    def validate_plus_appointment(self, appointment_data):
+    def validate_plus_appointment(self, appointment_data, *args, **kwargs):
         from ondoc.doctor.models import OpdAppointment
         from ondoc.diagnostic.models import LabAppointment
-        response_dict = {
-            'is_vip_member': False,
-            'plus_user_id': None,
-            'cover_under_vip': "",
-            "vip_amount": 0
-        }
-
         OPD = "OPD"
         LAB = "LAB"
-
         appointment_type = OPD if "doctor" in appointment_data else LAB
+        price_data = OpdAppointment.get_price_details(appointment_data) if appointment_type == OPD else LabAppointment.get_price_details(appointment_data)
+        mrp = int(price_data.get('mrp'))
+        response_dict = {
+            "is_vip_member": False,
+            "plus_user_id": None,
+            "cover_under_vip": "",
+            "vip_amount_deducted": 0,
+            "amount_to_be_paid": mrp
+        }
 
         if appointment_data.get('payment_type') == OpdAppointment.COD:
             return response_dict
@@ -347,61 +401,54 @@ class PlusUser(auth_model.TimeStampedModel):
             return response_dict
 
         response_dict['is_vip_member'] = True
-        utilization = plus_user.get_utilization
-        price_data = OpdAppointment.get_price_details(appointment_data) if appointment_type == OPD else LabAppointment.get_price_details(appointment_data)
-
-        amount_available = int(utilization.get('doctor_amount_available', 0)) if appointment_type == OPD else int(utilization.get('available_package_amount', 0))
-        is_cover_after_utilize = True
-        amount_paid = 0
-
-        mrp = int(price_data.get('mrp'))
-        if amount_available > 0 or mrp <= amount_available:
-            is_cover_after_utilize = True
-        else:
-            is_cover_after_utilize = False
-
-        if is_cover_after_utilize and amount_available >= mrp:
-            amount_paid = 0
-
-        elif is_cover_after_utilize and (amount_available > 0) and (amount_available <= mrp):
-            amount_paid = mrp - amount_available
-        else:
-            amount_paid = 0
-        response_dict['vip_amount'] = amount_paid
 
         if appointment_type == OPD:
+            engine = get_class_reference(plus_user, "DOCTOR")
+            if not engine:
+                return response_dict
+
             doctor = appointment_data['doctor']
             hospital = appointment_data['hospital']
             if doctor.enabled_for_online_booking and hospital.enabled_for_online_booking and \
                                         hospital.enabled_for_prepaid and hospital.enabled_for_plus_plans and \
-                                        doctor.enabled_for_plus_plans and is_cover_after_utilize:
+                                        doctor.enabled_for_plus_plans:
 
-                response_dict['cover_under_vip'] = True
+                engine_response = engine.validate_booking_entity(cost=mrp, utilization=kwargs.get('utilization'))
+                response_dict['cover_under_vip'] = engine_response.get('is_covered', False)
                 response_dict['plus_user_id'] = plus_user.id
-                response_dict['vip_amount'] = amount_paid
+                response_dict['vip_amount_deducted'] = engine_response.get('vip_amount_deducted', 0)
+                response_dict['amount_to_be_paid'] = engine_response.get('amount_to_be_paid', mrp)
+
+                # Only for cart items.
+                if kwargs.get('utilization') and response_dict['cover_under_vip'] and response_dict['vip_amount_deducted']:
+                    engine.update_utilization(kwargs.get('utilization'), response_dict['vip_amount_deducted'])
 
         elif appointment_type == LAB:
             lab = appointment_data['lab']
             if lab and lab.enabled_for_plus_plans:
                 mrp = int(price_data.get('mrp'))
                 final_price = mrp + price_data['home_pickup_charges']
-                utilization_criteria, coverage = plus_user.can_package_be_covered_in_vip(None, mrp=final_price, id=appointment_data['test_ids'][0].id)
-                if coverage:
-                    response_dict['cover_under_vip'] = True
-                    response_dict['plus_user_id'] = plus_user.id
 
-                    if utilization_criteria == UtilizationCriteria.COUNT:
-                        response_dict['vip_amount'] = 0
-                    else:
-                        response_dict['vip_amount'] = final_price - utilization['available_package_amount']\
-                            if final_price > utilization['available_package_amount'] else 0
+                entity = "PACKAGE" if appointment_data['test_ids'][0].is_package else "LABTEST"
+                engine = get_class_reference(plus_user, entity)
+                if appointment_data['test_ids']:
+                    engine_response = engine.validate_booking_entity(cost=final_price, id=appointment_data['test_ids'][0].id, utilization=kwargs.get('utilization'))
+                    if not engine_response:
+                        return response_dict
+                    response_dict['cover_under_vip'] = engine_response.get('is_covered', False)
+                    response_dict['plus_user_id'] = plus_user.id
+                    response_dict['vip_amount_deducted'] = engine_response.get('vip_amount_deducted', 0)
+                    response_dict['amount_to_be_paid'] = engine_response.get('amount_to_be_paid', final_price)
+
+                    # Only for cart items.
+                    if kwargs.get('utilization') and response_dict['cover_under_vip'] and response_dict['vip_amount_deducted']:
+                        engine.update_utilization(kwargs.get('utilization'), response_dict['vip_amount_deducted'])
 
         return response_dict
 
     def validate_cart_items(self, appointment_data, request):
         from ondoc.doctor.models import OpdAppointment
         from ondoc.diagnostic.models import LabAppointment
-        from ondoc.diagnostic.models import LabTest
         vip_data_dict = {
             "is_vip_member": True,
             "cover_under_vip": False,
@@ -418,63 +465,69 @@ class PlusUser(auth_model.TimeStampedModel):
         LAB = "LAB"
 
         appointment_type = OPD if "doctor" in appointment_data else LAB
-        utilization = self.get_utilization
+        deep_utilization = deepcopy(self.get_utilization)
         for item in cart_items:
-            data = item.data
             validated_item = item.validate(request)
-            # price_data = OpdAppointment.get_price_details(
-            #     validated_item) if appointment_type == OPD else LabAppointment.get_price_details(validated_item)
-            price_data = item.get_price_details(validated_item)
-            mrp = int(price_data.get('mrp', 0))
-            doctor = data.get('doctor', None)
-            if doctor and data.get('cover_under_vip'):
-                doctor_available_amount = utilization.get('doctor_amount_available', 0)
-                if doctor_available_amount > 0:
-                    utilization['doctor_amount_available'] = doctor_available_amount - mrp
-                else:
-                    return vip_data_dict
-            elif data.get('lab') and data.get('cover_under_vip'):
-                package_available_amount = utilization.get('available_package_amount', 0)
-                package_available_count = utilization.get('available_package_count', 0)
-                package_available_ids = utilization.get('allowed_package_ids', [])
-                tests = validated_item.get('test_ids', [])
-                # tests = LabTest.objects.filter(id__in=test_ids)
-                for test in tests:
-                    if test.is_package and test.id in package_available_ids and package_available_count and package_available_count > 0:
-                        utilization['available_package_count'] = package_available_count - 1
-                    elif test.is_package and package_available_amount and package_available_amount > 0:
-                        utilization['available_package_amount'] = package_available_amount - mrp
-            else:
-                return vip_data_dict
+            self.validate_plus_appointment(validated_item, utilization=deep_utilization)
         current_item_price_data = OpdAppointment.get_price_details(
             appointment_data) if appointment_type == OPD else LabAppointment.get_price_details(appointment_data)
         current_item_mrp = int(current_item_price_data.get('mrp', 0))
-        updated_utilization = utilization
         if 'doctor' in appointment_data:
-            current_doctor_amount_available = updated_utilization.get('doctor_amount_available', 0)
-            if current_doctor_amount_available > 0 :
-                vip_data_dict['cover_under_vip'] = True
+            engine = get_class_reference(self, "DOCTOR")
+            if engine:
+                vip_response = engine.validate_booking_entity(cost=current_item_mrp, utilization=deep_utilization)
+                vip_data_dict['vip_amount'] = vip_response.get('amount_to_be_paid')
+                vip_data_dict['amount_to_be_paid'] = vip_response.get('amount_to_be_paid')
+                vip_data_dict['cover_under_vip'] = vip_response.get('is_covered')
                 vip_data_dict['plus_user_id'] = self.id
-                vip_data_dict['vip_amount'] = 0 if current_doctor_amount_available > current_item_mrp else (current_item_mrp - current_doctor_amount_available)
             else:
                 return vip_data_dict
         else:
-            current_package_count_available = updated_utilization.get('available_package_count', 0)
-            current_package_amount_available = updated_utilization.get('available_package_amount', 0)
-            current_package_ids = updated_utilization.get('allowed_package_ids', [])
             tests = appointment_data.get('test_ids', [])
             for test in tests:
-                if test.is_package and test.id in current_package_ids and current_package_count_available > 0:
-                    vip_data_dict['cover_under_vip'] = True
-                    vip_data_dict['vip_amount'] = 0
-                    vip_data_dict['plus_user_id'] = self.id
-                elif test.is_package and current_package_amount_available and current_package_amount_available > 0:
-                    vip_data_dict['cover_under_vip'] = True
-                    vip_data_dict['vip_amount'] = 0 if current_package_amount_available > current_item_mrp else (current_item_mrp - current_package_amount_available)
+                entity = "LABTEST" if not test.is_package else "PACKAGE"
+
+                engine = get_class_reference(self, entity)
+                if engine:
+                    vip_response = engine.validate_booking_entity(cost=current_item_mrp, utilization=deep_utilization)
+                    vip_data_dict['vip_amount'] = vip_response.get('amount_to_be_paid')
+                    vip_data_dict['amount_to_be_paid'] = vip_response.get('amount_to_be_paid')
+                    vip_data_dict['cover_under_vip'] = vip_response.get('is_covered')
                     vip_data_dict['plus_user_id'] = self.id
                 else:
                     return vip_data_dict
         return vip_data_dict
+
+
+    def get_labtest_plus_appointment_count(self):
+        from ondoc.diagnostic.models import LabAppointment
+        labtest_count = 0
+        lab_appointments = LabAppointment.objects.filter(plus_plan=self).exclude(status=LabAppointment.CANCELLED)
+        if not lab_appointments:
+            return 0
+
+        for lab_appointment in lab_appointments:
+            labtest_count = labtest_count + len(list(filter(lambda lab_test: not lab_test.test.is_package, lab_appointment.test_mappings.all())))
+        return labtest_count
+
+    def get_labtest_plus_appointment_amount(self):
+        from ondoc.diagnostic.models import LabAppointment
+
+        import functools
+        labtest_amount = 0
+        lab_appointments_ids = LabAppointment.objects.filter(plus_plan=self).exclude(status=LabAppointment.CANCELLED).values_list('id', flat=True)
+
+
+
+        content_type = ContentType.objects.get_for_model(LabAppointment)
+        appointment_mappings = PlusAppointmentMapping.objects.filter(object_id__in=lab_appointments_ids, content_type=content_type)
+        if not appointment_mappings:
+            return 0
+
+        appointment_mappings_amount = list(map(lambda appointment: appointment.amount, appointment_mappings))
+        labtest_amount = labtest_amount + functools.reduce(lambda a, b: a + b, appointment_mappings_amount)
+
+        return labtest_amount
 
     def get_package_plus_appointment_count(self):
         from ondoc.diagnostic.models import LabAppointment
@@ -575,6 +628,7 @@ class PlusUser(auth_model.TimeStampedModel):
 
     @classmethod
     def create_plus_user(cls, plus_data, user):
+        from ondoc.doctor.models import OpdAppointment
         members = plus_data['plus_members']
 
         for member in members:
@@ -590,6 +644,7 @@ class PlusUser(auth_model.TimeStampedModel):
                                                           expire_date=plus_data['expire_date'],
                                                           amount=plus_data['amount'],
                                                           order=plus_data['order'],
+                                                          payment_type=const.PREPAID,
                                                           status=cls.INACTIVE)
 
         PlusMembers.create_plus_members(plus_membership_obj)
@@ -625,15 +680,114 @@ class PlusUser(auth_model.TimeStampedModel):
 
         care_membership.save(plus_user_obj=self)
 
+    def get_vip_amount(self, utilization, mrp):
+        available_amount = int(utilization.get('doctor_amount_available', 0))
+        available_discount = int(utilization.get('doctor_discount', None))
+        if not available_discount or available_discount == 0 :
+            amount = 0 if available_amount >= mrp else (mrp - available_amount)
+            return amount
+        amount = self.get_discounted_amount(utilization, mrp)
+        return amount
+
+    def get_discounted_amount(self, utilization, mrp):
+        # mrp = doctor_obj.mrp
+        available_amount = utilization.get('doctor_amount_available', 0)
+        doctor_discount = utilization.get('doctor_discount', None)
+        if not doctor_discount or doctor_discount == 0:
+            final_amount = 0 if available_amount >= mrp else (mrp - available_amount)
+            return final_amount
+        discounted_amount = int(doctor_discount * mrp / 100)
+        final_amount = mrp - discounted_amount
+        return final_amount
+
+    def get_cancellation_breakup(self):
+        wallet_refund = cashback_refund = 0
+        if self.money_pool:
+            wallet_refund, cashback_refund = self.money_pool.get_refund_breakup(self.amount)
+        elif self.price_data:
+            wallet_refund = self.price_data["wallet_amount"]
+            cashback_refund = self.price_data["cashback_amount"]
+        else:
+            wallet_refund = self.effective_price
+
+        return wallet_refund, cashback_refund
+
     def after_commit_tasks(self, *args, **kwargs):
         from ondoc.api.v1.plus.plusintegration import PlusIntegration
         if kwargs.get('is_fresh'):
             PlusIntegration.create_vip_lead_after_purchase(self)
+    
+    def process_cancellation(self):
+        from ondoc.doctor.models import OpdAppointment
+        from ondoc.diagnostic.models import LabAppointment
+        from ondoc.subscription_plan.models import Plan, UserPlanMapping
+        care_obj = UserPlanMapping.objects.filter(user=self.user).order_by('id').last()
+        if care_obj:
+            care_obj.status = UserPlanMapping.CANCELLED
+            care_obj.is_active = False
+            care_obj.save()
+
+        self.action_refund()
+
+        # Cancel all the appointments which are created using the plus membership.
+
+        # Opd Appointments
+        appointments_qs = OpdAppointment.objects.filter(plus_plan=self)
+        to_be_cancelled_appointments = appointments_qs.all().exclude(status__in=[OpdAppointment.COMPLETED, OpdAppointment.CANCELLED])
+        for appointment in to_be_cancelled_appointments:
+            appointment.status = OpdAppointment.CANCELLED
+            appointment.save()
+
+        # Lab Appointments
+        appointments_qs = LabAppointment.objects.filter(plus_plan=self)
+        to_be_cancelled_appointments = appointments_qs.all().exclude(status__in=[LabAppointment.COMPLETED, LabAppointment.CANCELLED])
+        for appointment in to_be_cancelled_appointments:
+            appointment.status = LabAppointment.CANCELLED
+            appointment.save()
+
+    def process_cancel_initiate(self):
+        pass
+        # from ondoc.doctor.models import OpdAppointment
+        # from ondoc.diagnostic.models import LabAppointment
+        # from ondoc.subscription_plan.models import Plan, UserPlanMapping
+        # care_obj = UserPlanMapping.objects.filter(user=self.user).order_by('id').last()
+        # if care_obj:
+        #     care_obj.status = UserPlanMapping.CANCELLED
+        #     care_obj.is_active = False
+        #     care_obj.save()
+        #
+        # self.action_refund()
+        #
+        # # Cancel all the appointments which are created using the plus membership.
+        #
+        # # Opd Appointments
+        # appointments_qs = OpdAppointment.objects.filter(plus_plan=self)
+        # to_be_cancelled_appointments = appointments_qs.all().exclude(status__in=[OpdAppointment.COMPLETED, OpdAppointment.CANCELLED])
+        # for appointment in to_be_cancelled_appointments:
+        #     appointment.status = OpdAppointment.CANCELLED
+        #     appointment.save()
+        #
+        # # Lab Appointments
+        # appointments_qs = LabAppointment.objects.filter(plus_plan=self)
+        # to_be_cancelled_appointments = appointments_qs.all().exclude(status__in=[LabAppointment.COMPLETED, LabAppointment.CANCELLED])
+        # for appointment in to_be_cancelled_appointments:
+        #     appointment.status = LabAppointment.CANCELLED
+        #     appointment.save()
 
     def save(self, *args, **kwargs):
         is_fresh = False
         if not self.pk:
             is_fresh = True
+        
+        db_instance = None
+        if self.pk:
+            db_instance = PlusUser.objects.filter(id=self.id).first()
+            
+        if db_instance and self.status == self.CANCELLED and db_instance.status != self.CANCELLED:
+            self.process_cancellation()
+
+        if db_instance and self.status == self.CANCEL_INITIATE and db_instance.status != self.CANCEL_INITIATE:
+            self.process_cancel_initiate()
 
         super().save(*args, **kwargs)
         transaction.on_commit(lambda: self.after_commit_tasks(is_fresh=is_fresh))

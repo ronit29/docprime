@@ -50,6 +50,7 @@ from ondoc.insurance.models import UserInsurance, InsuranceThreshold, InsuranceD
 from ondoc.authentication import models as auth_models
 from ondoc.location.models import EntityUrls, EntityAddress
 from ondoc.plus.models import PlusUser, PlusAppointmentMapping
+from ondoc.plus.usage_criteria import get_class_reference
 from ondoc.procedure.models import DoctorClinicProcedure, Procedure, ProcedureCategory, \
     get_included_doctor_clinic_procedure, get_procedure_categories_with_procedures, IpdProcedure, \
     IpdProcedureFeatureMapping, IpdProcedureLead, DoctorClinicIpdProcedure, IpdProcedureDetail, Offer
@@ -231,11 +232,13 @@ class OpdAppTransactionModelSerializer(serializers.Serializer):
     insurance = serializers.PrimaryKeyRelatedField(queryset=UserInsurance.objects.all(), allow_null=True)
     cashback = serializers.DecimalField(max_digits=10, decimal_places=2)
     extra_details = serializers.JSONField(required=False)
+    spo_data = serializers.JSONField(required=False, default={})
     coupon_data = serializers.JSONField(required=False)
     _source = serializers.CharField(required=False, allow_null=True)
     _responsible_user = serializers.IntegerField(required=False, allow_null=True)
     plus_plan = serializers.PrimaryKeyRelatedField(queryset=PlusUser.objects.all(), allow_null=True)
     plus_amount = serializers.DecimalField(max_digits=10, decimal_places=2)
+
 
 
 class OpdAppointmentPermissionSerializer(serializers.Serializer):
@@ -259,8 +262,10 @@ class CreateAppointmentSerializer(serializers.Serializer):
     _source = serializers.CharField(required=False, allow_null=True)
     _responsible_user = serializers.IntegerField(required=False, allow_null=True)
     cart_item = serializers.PrimaryKeyRelatedField(queryset=Cart.objects.all(), required=False, allow_null=True)
+    spo_data = serializers.JSONField(required=False, default={})
     appointment_id = serializers.IntegerField(required=False)
     cod_to_prepaid = serializers.BooleanField(required=False)
+
     # procedure_category_ids = serializers.ListField(child=serializers.PrimaryKeyRelatedField(queryset=ProcedureCategory.objects.filter(is_live=True)), required=False, default=[])
     # time_slot_end = serializers.DateTimeField()
 
@@ -278,7 +283,7 @@ class CreateAppointmentSerializer(serializers.Serializer):
                            if not data.get("time_slot_start") else data.get("time_slot_start"))
 
         time_slot_end = None
-
+        date = time_slot_start.strftime("%Y-%m-%d")
         doctor_clinic = data.get('doctor').doctor_clinics.filter(hospital=data.get('hospital'), enabled=True).first()
         if not doctor_clinic:
             raise serializers.ValidationError("Doctor Hospital not related.")
@@ -328,15 +333,24 @@ class CreateAppointmentSerializer(serializers.Serializer):
                     request.data))
             raise serializers.ValidationError("Doctor is on leave")
 
-
-        if not DoctorClinicTiming.objects.filter(doctor_clinic__doctor=data.get('doctor'),
-                                                 doctor_clinic__hospital=data.get('hospital'),
-                                                 day=time_slot_start.weekday(), start__lte=data.get("start_time"),
-                                                 end__gte=data.get("start_time")).exists():
-            logger.error(
-                "Error 'Invalid Time slot' for opd appointment with data - " + json.dumps(
-                    request.data))
-            raise serializers.ValidationError("Invalid Time slot")
+        data["part_of_integration"] = False
+        if settings.MEDANTA_INTEGRATION_ENABLED and not bool(data.get('from_app')) and doctor_clinic.is_part_of_integration():
+            data["part_of_integration"] = True
+            available_slots = doctor_clinic.get_available_slots(time_slot_start)
+            if not available_slots[date]:
+                logger.error(
+                    "Error 'Invalid Time slot' for opd appointment with data - " + json.dumps(
+                        request.data))
+                raise serializers.ValidationError("Integration - Invalid Time slot")
+        else:
+            if not DoctorClinicTiming.objects.filter(doctor_clinic__doctor=data.get('doctor'),
+                                                     doctor_clinic__hospital=data.get('hospital'),
+                                                     day=time_slot_start.weekday(), start__lte=data.get("start_time"),
+                                                     end__gte=data.get("start_time")).exists():
+                logger.error(
+                    "Error 'Invalid Time slot' for opd appointment with data - " + json.dumps(
+                        request.data))
+                raise serializers.ValidationError("Invalid Time slot")
 
         # if OpdAppointment.objects.filter(status__in=ACTIVE_APPOINTMENT_STATUS, doctor=data.get('doctor'), profile=data.get('profile')).exists():
         #     raise serializers.ValidationError('A previous appointment with this doctor already exists. Cancel it before booking new Appointment.')
@@ -521,16 +535,16 @@ class DoctorHospitalSerializer(serializers.ModelSerializer):
 
     enabled_for_online_booking = serializers.SerializerMethodField(read_only=True)
     show_contact = serializers.SerializerMethodField(read_only=True)
-    # enabled_for_cod = serializers.BooleanField(source='doctor_clinic.is_enabled_for_cod')
-    enabled_for_cod = serializers.SerializerMethodField()
+    enabled_for_cod = serializers.BooleanField(source='doctor_clinic.is_enabled_for_cod')
+    # enabled_for_cod = serializers.SerializerMethodField()
     enabled_for_prepaid = serializers.BooleanField(source='doctor_clinic.hospital.enabled_for_prepaid')
     is_price_zero = serializers.SerializerMethodField()
     vip = serializers.SerializerMethodField()
 
-    def get_enabled_for_cod(self, obj):
-        request = self.context.get('request')
-        user = request.user
-        return obj.doctor_clinic.hospital.is_enabled_for_cod(user=user)
+    # def get_enabled_for_cod(self, obj):
+    #     request = self.context.get('request')
+    #     user = request.user
+    #     return obj.doctor_clinic.hospital.is_enabled_for_cod(user=user)
 
     def get_show_contact(self, obj):
         if obj.doctor_clinic and obj.doctor_clinic.hospital and obj.doctor_clinic.hospital.spoc_details.all():
@@ -636,8 +650,15 @@ class DoctorHospitalSerializer(serializers.ModelSerializer):
             available_amount = int(utilization.get('doctor_amount_available', 0))
             mrp = int(obj.mrp)
             resp['is_vip_member'] = True
-            resp['cover_under_vip'] = True if available_amount > 0 else False
-            resp['vip_amount'] = 0 if available_amount > mrp else (mrp - available_amount)
+            engine = get_class_reference(plus_user, "DOCTOR")
+            if engine:
+                vip_res = engine.validate_booking_entity(cost=mrp)
+                resp['vip_amount'] = vip_res.get('amount_to_be_paid', 0)
+                resp['cover_under_vip'] = vip_res.get('is_covered', False)
+            # amount = plus_user.get_vip_amount(utilization, mrp)
+            # resp['cover_under_vip'] = True if (amount < mrp) else False
+            # resp['vip_amount'] = amount
+            # resp['vip_amount'] = 0 if available_amount > mrp else (mrp - available_amount)
         return resp
 
     def get_is_price_zero(self, obj):
@@ -1747,6 +1768,7 @@ class DoctorRatingSerializer(serializers.Serializer):
 class DoctorFeedbackBodySerializer(serializers.Serializer):
     is_cloud_lab_email = serializers.BooleanField(default=False)
     rating = serializers.IntegerField(max_value=10, required=False)
+    subject_string = serializers.CharField(max_length=128, required=False)
     feedback = serializers.CharField(max_length=512, required=False)
     feedback_tags = serializers.ListField(required=False)
     email = serializers.EmailField(required=False)
