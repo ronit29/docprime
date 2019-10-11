@@ -1,6 +1,6 @@
 from rest_framework import serializers
 from ondoc.authentication.models import (OtpVerifications, User, UserProfile, Notification, NotificationEndpoint,
-                                         DoctorNumber, Address, GenericAdmin, UserSecretKey,
+                                         DoctorNumber, Address, GenericAdmin, UserSecretKey, WhiteListedLoginTokens,
                                          UserPermission, Address, GenericAdmin, GenericLabAdmin, UserProfileEmailUpdate)
 from ondoc.doctor.models import DoctorMobile, ProviderSignupLead, Hospital, Doctor
 from ondoc.common.models import AppointmentHistory
@@ -395,15 +395,17 @@ class RefreshJSONWebTokenSerializer(serializers.Serializer):
         else:
             msg = _('orig_iat missing')
             raise serializers.ValidationError(msg)
-
-        token_object = JWTAuthentication.generate_token(user)
-        token_object['payload']['orig_iat'] = orig_iat
-
-        return {
-            'token': token_object['token'],
-            'user': user,
-            'payload': token_object['payload']
-        }
+        blacllist_token = WhiteListedLoginTokens.objects.filter(token=token, user=user).delete()
+        if blacllist_token and isinstance(blacllist_token, tuple) and (blacllist_token[0] > 0):
+            token_object = JWTAuthentication.generate_token(user)
+            token_object['payload']['orig_iat'] = orig_iat
+            return {
+                'token': token_object['token'],
+                'user': user,
+                'payload': token_object['payload']
+            }
+        else:
+            return serializers.ValidationError("Token Has expired")
 
     def check_user_custom(self, payload):
         uid = payload.get('user_id')

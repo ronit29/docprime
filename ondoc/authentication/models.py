@@ -2372,3 +2372,12 @@ class GenericQuestionAnswer(TimeStampedModel):
 
     class Meta:
         db_table = "generic_question_answer"
+
+
+class WhiteListedLoginTokens(TimeStampedModel):
+
+    token = models.CharField(max_length=180)
+    user = models.ForeignKey(User, on_delete=models.CASCADE)
+
+    class Meta:
+        db_table = 'whitelisted_login_tokens'

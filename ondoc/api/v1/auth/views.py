@@ -31,7 +31,8 @@ from ondoc.doctor.models import DoctorMobile, Doctor, HospitalNetwork, Hospital,
                                 DoctorClinicTiming, ProviderSignupLead
 from ondoc.authentication.models import (OtpVerifications, NotificationEndpoint, Notification, UserProfile,
                                          Address, AppointmentTransaction, GenericAdmin, UserSecretKey, GenericLabAdmin,
-                                         AgentToken, DoctorNumber, LastLoginTimestamp, UserProfileEmailUpdate)
+                                         AgentToken, DoctorNumber, LastLoginTimestamp, UserProfileEmailUpdate,
+                                         WhiteListedLoginTokens)
 from ondoc.notification.models import SmsNotification, EmailNotification
 from ondoc.account.models import PgTransaction, ConsumerAccount, ConsumerTransaction, Order, ConsumerRefund, OrderLog, \
     UserReferrals, UserReferred, PgLogs, PaymentProcessStatus
@@ -196,6 +197,8 @@ class UserViewset(GenericViewSet):
         required_token = request.data.get("token", None)
         if required_token and request.user.is_authenticated:
             NotificationEndpoint.objects.filter(user=request.user, token=request.data.get("token")).delete()
+        blacllist_token = WhiteListedLoginTokens.objects.filter(token=required_token, user=request.user).delete()
+
         return Response({"message": "success"})
 
     @transaction.atomic

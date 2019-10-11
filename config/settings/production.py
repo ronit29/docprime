@@ -1,8 +1,8 @@
 from config.settings.base import *
 import logging, warnings
-from ddtrace import tracer
 
 if (env('DJANGO_SETTINGS_MODULE')=='config.settings.production'):
+    from ddtrace import tracer
     try:
         tracer.configure(
             hostname='datadog-agent',

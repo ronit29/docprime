@@ -4,7 +4,7 @@ import jwt
 import datetime, calendar
 from django.conf import settings
 from rest_framework import authentication, exceptions
-from ondoc.authentication.models import UserSecretKey
+from ondoc.authentication.models import UserSecretKey, WhiteListedLoginTokens
 import base64
 
 User = get_user_model()
@@ -88,10 +88,15 @@ class JWTAuthentication(authentication.BaseAuthentication):
     def _authenticate_credentials(self, request, token):
         user_key = None
         user_id = JWTAuthentication.get_unverified_user(token)
+
         if user_id:
-            user_key_object = UserSecretKey.objects.filter(user_id=user_id).first()
-            if user_key_object:
-                user_key = user_key_object.key
+            is_whitelisted = WhiteListedLoginTokens.objects.filter(token=token, user_id=user_id).first()
+            if is_whitelisted:
+                user_key_object = UserSecretKey.objects.filter(user_id=user_id).first()
+                if user_key_object:
+                    user_key = user_key_object.key
+            else:
+                raise exceptions.AuthenticationFailed("Invalid Login")
         try:
             payload = jwt.decode(token, user_key)
         except Exception as e:
@@ -153,6 +158,7 @@ class JWTAuthentication(authentication.BaseAuthentication):
         user_key = UserSecretKey.objects.get_or_create(user=user)
         payload = JWTAuthentication.jwt_payload_handler(user)
         token = jwt.encode(payload, user_key[0].key)
+        whitelist = WhiteListedLoginTokens.objects.create(token=token.decode('utf-8'), user=user)
         return {'token': token,
                 'payload': payload}
 
