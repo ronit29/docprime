@@ -1416,7 +1416,7 @@ class ConsumerAccount(TimeStampedModel):
                 for ctx_sale_obj in ctx_sale_objs:
                     if ctx_sale_obj.ref_txns:
                         ctx_objs.append(ctx_sale_obj.debit_from_ref_txn(self, 0, parent_ref, initiate_refund))
-                    if ctx_sale_obj.balance:
+                    if ctx_sale_obj.balance and ctx_sale_obj.balance > 0:
                         if ctx_sale_obj.source == ConsumerTransaction.WALLET_SOURCE:
                             ctx_objs.append(ctx_sale_obj.debit_from_balance(self))
 
@@ -1429,7 +1429,7 @@ class ConsumerAccount(TimeStampedModel):
             for old_txn_obj in old_txn_objs:
                 if old_txn_obj.ref_txns:
                     ctx_objs.append(old_txn_obj.debit_from_ref_txn(self, 0, parent_ref))
-                if old_txn_obj.balance:
+                if old_txn_obj.balance and old_txn_obj.balance > 0:
                     if old_txn_obj.source == ConsumerTransaction.WALLET_SOURCE:
                         ctx_objs.append(old_txn_obj.debit_from_balance(self))
                 old_txn_obj.save()
@@ -1677,7 +1677,7 @@ class ConsumerTransaction(TimeStampedModel):
                     if not cashback_txn:
                         ctx_objs.append(ctx_obj)
 
-            if ref_txn_obj.balance and not cashback_txn and not is_preauth_txn:
+            if ref_txn_obj.balance and ref_txn_obj.balance > 0 and not cashback_txn and not is_preauth_txn:
                 ctx_objs.append(ref_txn_obj.debit_from_balance(consumer_account))
         self.save()
 
