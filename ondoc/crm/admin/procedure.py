@@ -221,7 +221,7 @@ class IpdProcedureAdmin(VersionAdmin):
 
     def get_fields(self, request, obj=None):
         fields = super().get_fields(request, obj)
-        if request.user.is_member_of(constants['ARTICLE_TEAM']):
+        if request.user.is_member_of(constants.constants['ARTICLE_TEAM']):
             fields = ['about']
         return fields
 
