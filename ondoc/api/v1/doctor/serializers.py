@@ -2436,7 +2436,9 @@ class HospitalDetailIpdProcedureSerializer(TopHospitalForIpdProcedureSerializer)
 
     def get_images(self, obj):
         request = self.context.get('request')
-        result = [{'original': obj.name + request.build_absolute_uri(img.name.url),
+        result = [{'original': request.build_absolute_uri(img.name.url)
+                                if img.name.startswith(obj.name.lower().replace(' ', '-'))
+                      else request.build_absolute_uri(img.name.url).replace(img.name.url, obj.name.replace('-', ' ').split(' ')),
                    "thumbnail": request.build_absolute_uri(img.cropped_image.url) if img.cropped_image else None,
                    "cover_image": img.cover_image} for img in
                   obj.imagehospital.all() if img.name]
