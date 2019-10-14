@@ -288,10 +288,10 @@ class PlusOrderViewSet(viewsets.GenericViewSet):
         # Remove the proposer profile. Proposer is only allowed to upload the document proofs.
 
         counter = 0
-        self_counter = -1
+        # self_counter = -1
         for member in members_to_be_added:
             if member.get('relation') == PlusMembers.Relations.SELF:
-                self_counter = counter
+                # self_counter = counter
                 if member.get('document_ids'):
                     proposer_profile = inactive_plus_subscription.get_primary_member_profile()
                     if proposer_profile:
@@ -302,7 +302,7 @@ class PlusOrderViewSet(viewsets.GenericViewSet):
 
             counter += 1
 
-        members_to_be_added.pop(self_counter)
+        # members_to_be_added.pop(self_counter)
 
         PlusMembers.create_plus_members(inactive_plus_subscription, members_list=members_to_be_added)
         inactive_plus_subscription.status = PlusUser.ACTIVE
