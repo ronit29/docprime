@@ -487,13 +487,7 @@ class Command(BaseCommand):
         group.permissions.clear()
 
         content_types = ContentType.objects.get_for_models(Article, Sitemap, ArticleContentBox, ArticleCategory,
-                                                           EntityUrls, IpdProcedure, IpdProcedureDetail, Doctor, AboutDoctor,
-                                                           DoctorPracticeSpecialization, DoctorQualification,
-                                                           DoctorClinicTiming, DoctorClinic, DoctorLanguage,
-                                                           DoctorAward, DoctorAssociation, DoctorExperience,
-                                                           DoctorClinicProcedure,
-                                                           for_concrete_models=False
-                                                           )
+                                                           EntityUrls, IpdProcedure, IpdProcedureDetail, Doctor)
 
         for cl, ct in content_types.items():
             permissions = Permission.objects.filter(
@@ -502,6 +496,21 @@ class Command(BaseCommand):
                 Q(codename='change_' + ct.model))
 
             group.permissions.add(*permissions)
+        #
+        # content_types = ContentType.objects.get_for_models(DoctorPracticeSpecialization,
+        #                                                    DoctorQualification,
+        #                                                    DoctorClinicTiming, DoctorClinic, DoctorLanguage,
+        #                                                    DoctorAward, DoctorAssociation, DoctorExperience,
+        #                                                    DoctorClinicProcedure,
+        #                                                    for_concrete_models=False)
+        #
+        # for cl, ct in content_types.items():
+        #     permissions = Permission.objects.get_or_create(
+        #         content_type=ct, codename='change_' + ct.model)
+        #
+        #     permissions = Permission.objects.filter(
+        #         content_type=ct, codename='change_' + ct.model)
+        #     group.permissions.add(*permissions)
 
         content_types = ContentType.objects.get_for_models(ArticleLinkedUrl, LinkedArticle, NewDynamic, GenericQuestionAnswer)
 
