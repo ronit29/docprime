@@ -199,9 +199,9 @@ class PlusOrderViewSet(viewsets.GenericViewSet):
             plus_subscription_data = {"profile_detail": user_profile, "plus_plan": plus_plan.id,
                               "user": request.user.pk, "plus_user": plus_user_data, "utm_parameter": utm_parameter}
 
-            consumer_account = account_models.ConsumerAccount.objects.get_or_create(user=user)
-            consumer_account = account_models.ConsumerAccount.objects.select_for_update().get(user=user)
-            balance = consumer_account.balance
+            # consumer_account = account_models.ConsumerAccount.objects.get_or_create(user=user)
+            # consumer_account = account_models.ConsumerAccount.objects.select_for_update().get(user=user)
+            # balance = consumer_account.balance
 
             # visitor_info = None
             # try:
@@ -213,51 +213,53 @@ class PlusOrderViewSet(viewsets.GenericViewSet):
             # except Exception as e:
             #     logger.log("Could not fecth visitor info - " + str(e))
 
-            resp['is_agent'] = False
-            if hasattr(request, 'agent') and request.agent:
-                resp['is_agent'] = True
+            # resp['is_agent'] = False
+            # if hasattr(request, 'agent') and request.agent:
+            #     resp['is_agent'] = True
 
             plus_data = plus_subscription_transform(plus_subscription_data)
 
-            if balance < amount or resp['is_agent']:
-                payable_amount = amount - balance
-                order = account_models.Order.objects.create(
-                    product_id=account_models.Order.VIP_PRODUCT_ID,
-                    action=account_models.Order.VIP_CREATE,
-                    action_data=plus_data,
-                    amount=payable_amount,
-                    cashback_amount=0,
-                    wallet_amount=balance,
-                    user=user,
-                    payment_status=account_models.Order.PAYMENT_PENDING,
-                    # visitor_info=visitor_info
-                )
-                resp["status"] = 1
-                resp['data'], resp["payment_required"] = payment_details(request, order)
-            else:
-                wallet_amount = amount
-
-                order = account_models.Order.objects.create(
-                    product_id=account_models.Order.VIP_PRODUCT_ID,
-                    action=account_models.Order.VIP_CREATE,
-                    action_data=plus_data,
-                    amount=0,
-                    wallet_amount=wallet_amount,
-                    cashback_amount=0,
-                    user=user,
-                    payment_status=account_models.Order.PAYMENT_PENDING,
-                    # visitor_info=visitor_info
-                )
-
-                plus_object, wallet_amount, cashback_amount = order.process_order()
-                resp["status"] = 1
-                resp["payment_required"] = False
-                resp["data"] = {'id': plus_object.id}
-                resp["data"] = {
-                    "orderId": order.id,
-                    "type": "plus_membership",
-                    "id": plus_object.id if plus_object else None
-                }
+            # if balance < amount or resp['is_agent']:
+            # payable_amount = amount - balance
+            payable_amount = amount
+            order = account_models.Order.objects.create(
+                product_id=account_models.Order.VIP_PRODUCT_ID,
+                action=account_models.Order.VIP_CREATE,
+                action_data=plus_data,
+                amount=payable_amount,
+                cashback_amount=0,
+                # wallet_amount=balance,
+                wallet=0,
+                user=user,
+                payment_status=account_models.Order.PAYMENT_PENDING,
+                # visitor_info=visitor_info
+            )
+            resp["status"] = 1
+            resp['data'], resp["payment_required"] = payment_details(request, order)
+            # else:
+            #     wallet_amount = amount
+            #
+            #     order = account_models.Order.objects.create(
+            #         product_id=account_models.Order.VIP_PRODUCT_ID,
+            #         action=account_models.Order.VIP_CREATE,
+            #         action_data=plus_data,
+            #         amount=0,
+            #         wallet_amount=wallet_amount,
+            #         cashback_amount=0,
+            #         user=user,
+            #         payment_status=account_models.Order.PAYMENT_PENDING,
+            #         # visitor_info=visitor_info
+            #     )
+            #
+            #     plus_object, wallet_amount, cashback_amount = order.process_order()
+            #     resp["status"] = 1
+            #     resp["payment_required"] = False
+            #     resp["data"] = {'id': plus_object.id}
+            #     resp["data"] = {
+            #         "orderId": order.id,
+            #         "type": "plus_membership",
+            #         "id": plus_object.id if plus_object else None
+            #     }
         else:
             return Response(status=status.HTTP_404_NOT_FOUND)
         return Response(resp)
