@@ -78,7 +78,7 @@ from ondoc.matrix.tasks import push_appointment_to_matrix, push_onboarding_qcsta
 from ondoc.integrations.task import push_opd_appointment_to_integrator
 # from ondoc.procedure.models import Procedure
 from ondoc.plus.models import PlusAppointmentMapping
-from ondoc.plus.usage_criteria import get_class_reference
+from ondoc.plus.usage_criteria import get_class_reference, get_price_reference
 from ondoc.ratings_review import models as ratings_models
 from django.utils import timezone
 from random import randint
@@ -3427,9 +3427,14 @@ class OpdAppointment(auth_model.TimeStampedModel, CouponsMixin, OpdAppointmentIn
                 else:
                     plus_user = profile.get_plus_membership
                     if plus_user:
+                        price_data = {"mrp": doctor_clinic_timing.mrp, "cod_deal_price": doctor_clinic_timing.cod_deal_price,
+                                      "deal_price": doctor_clinic_timing.deal_price,  "fees": doctor_clinic_timing.fees}
+                        price_engine = get_price_reference(plus_user, "DOCTOR")
+                        price = price_engine.get_price(price_data)
                         engine = get_class_reference(plus_user, "DOCTOR")
                         if engine:
-                            vip_dict = engine.validate_booking_entity(cost=doctor_clinic_timing.mrp)
+                            # vip_dict = engine.validate_booking_entity(cost=doctor_clinic_timing.mrp)
+                            vip_dict = engine.validate_booking_entity(cost=price)
                             effective_price = vip_dict.get('amount_to_be_paid')
                         else:
                             effective_price = doctor_clinic_timing.deal_price

@@ -58,7 +58,7 @@ from ondoc.integrations.task import push_lab_appointment_to_integrator, get_inte
 from ondoc.location import models as location_models
 from ondoc.plus.enums import UtilizationCriteria
 from ondoc.plus.models import PlusAppointmentMapping
-from ondoc.plus.usage_criteria import get_class_reference
+from ondoc.plus.usage_criteria import get_class_reference, get_price_reference
 from ondoc.ratings_review import models as ratings_models
 # from ondoc.api.v1.common import serializers as common_serializers
 from ondoc.common.models import AppointmentHistory, AppointmentMaskNumber, Remark, GlobalNonBookable, \
@@ -2635,15 +2635,18 @@ class LabAppointment(TimeStampedModel, CouponsMixin, LabAppointmentInvoiceMixin,
             coupon_discount, coupon_cashback, coupon_list, random_coupon_list = 0, 0, [], []
 
         if data.get("payment_type") in [OpdAppointment.VIP]:
+            price_data = {"mrp": total_mrp, "fees": total_agreed, "deal_price": total_deal_price, "cod_deal_price": total_deal_price}
             profile = data.get('profile')
             if profile:
                 plus_membership = profile.get_plus_membership
-
+                price_engine = get_price_reference(plus_membership, "LABTEST")
+                price = price_engine.get_price(price_data)
                 test = data['test_ids']
                 entity = "LABTEST" if not test[0].is_package else "PACKAGE"
                 engine = get_class_reference(plus_membership, entity)
                 if engine:
-                    engine_response = engine.validate_booking_entity(cost=effective_price, id=data['test_ids'][0].id)
+                    # engine_response = engine.validate_booking_entity(cost=effective_price, id=data['test_ids'][0].id)
+                    engine_response = engine.validate_booking_entity(cost=price, id=data['test_ids'][0].id)
                     effective_price = engine_response.get('amount_to_be_paid')
                 else:
                     effective_price = effective_price

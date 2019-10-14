@@ -17,7 +17,7 @@ from ondoc.integrations.models import IntegratorTestMapping, IntegratorReport, I
 from ondoc.cart.models import Cart
 from ondoc.common.models import UserConfig, GlobalNonBookable, AppointmentHistory, MatrixMappedCity
 from ondoc.plus.models import PlusUser
-from ondoc.plus.usage_criteria import get_class_reference
+from ondoc.plus.usage_criteria import get_class_reference, get_price_reference
 from ondoc.ratings_review import models as rating_models
 from ondoc.diagnostic.models import (LabTest, AvailableLabTest, Lab, LabAppointment, LabTiming, PromotedLab,
                                      CommonDiagnosticCondition, CommonTest, CommonPackage,
@@ -1867,10 +1867,17 @@ class LabList(viewsets.ReadOnlyModelViewSet):
                 engine_response = {}
                 if all_tests_under_lab and res['is_vip_enabled']:
                     for paticular_test_in_lab in all_tests_under_lab:
+                        price_data = {"mrp": paticular_test_in_lab.get('mrp', 0),
+                                      "deal_price": paticular_test_in_lab.get('deal_price', 0),
+                                      "fees": paticular_test_in_lab.get('agreed_price', 0),
+                                      "cod_deal_price": paticular_test_in_lab.get('deal_price', 0)}
+                        price_engine = get_price_reference(plus_user_obj, "LABTEST")
+                        price = price_engine.get_price(price_data)
                         engine = get_class_reference(plus_user_obj, "LABTEST")
                         coverage = False
                         if engine:
-                            engine_response = engine.validate_booking_entity(cost=paticular_test_in_lab.get('mrp', 0))
+                            # engine_response = engine.validate_booking_entity(cost=paticular_test_in_lab.get('mrp', 0))
+                            engine_response = engine.validate_booking_entity(cost=price)
                             coverage = engine_response.get('is_covered', False)
                         bool_array.append(coverage)
 

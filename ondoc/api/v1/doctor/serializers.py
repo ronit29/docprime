@@ -50,7 +50,7 @@ from ondoc.insurance.models import UserInsurance, InsuranceThreshold, InsuranceD
 from ondoc.authentication import models as auth_models
 from ondoc.location.models import EntityUrls, EntityAddress
 from ondoc.plus.models import PlusUser, PlusAppointmentMapping
-from ondoc.plus.usage_criteria import get_class_reference
+from ondoc.plus.usage_criteria import get_class_reference, get_price_reference
 from ondoc.procedure.models import DoctorClinicProcedure, Procedure, ProcedureCategory, \
     get_included_doctor_clinic_procedure, get_procedure_categories_with_procedures, IpdProcedure, \
     IpdProcedureFeatureMapping, IpdProcedureLead, DoctorClinicIpdProcedure, IpdProcedureDetail, Offer
@@ -644,11 +644,15 @@ class DoctorHospitalSerializer(serializers.ModelSerializer):
                 return resp
             utilization = plus_user.get_utilization
             available_amount = int(utilization.get('doctor_amount_available', 0))
+            price_data = {"mrp": obj.mrp, "deal_price": obj.deal_price, "fees": obj.fees, "cod_deal_price": obj.cod_deal_price}
             mrp = int(obj.mrp)
+            price_engine = get_price_reference(plus_user, "DOCTOR")
+            price = price_engine.get_price(price_data)
             resp['is_vip_member'] = True
             engine = get_class_reference(plus_user, "DOCTOR")
             if engine:
-                vip_res = engine.validate_booking_entity(cost=mrp)
+                # vip_res = engine.validate_booking_entity(cost=mrp)
+                vip_res = engine.validate_booking_entity(cost=price)
                 resp['vip_amount'] = vip_res.get('amount_to_be_paid', 0)
                 resp['cover_under_vip'] = vip_res.get('is_covered', False)
             # amount = plus_user.get_vip_amount(utilization, mrp)
