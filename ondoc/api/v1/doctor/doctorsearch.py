@@ -568,6 +568,7 @@ class DoctorSearchHelper:
         coupon_recommender = CouponRecommender(request.user, profile, 'doctor', product_id, coupon_code, None)
         filters = dict()
 
+
         for doctor in doctor_data:
             enable_online_booking = False
             should_apply_coupon = False
@@ -752,24 +753,46 @@ class DoctorSearchHelper:
             else:
                 schema_type = 'Physician'
 
-            if doctor.rating_data and doctor.rating_data.get('rating_count')>0:
-                if doctor.rating_data.get('rating_count')<5:
-                    if doctor.rating_data.get('avg_rating') >=4:
-                        average_rating = doctor.rating_data.get('avg_rating')
-                        rating_count = doctor.rating_data.get('rating_count')
-                else:
-                    average_rating = doctor.rating_data.get('avg_rating')
-                    rating_count = doctor.rating_data.get('rating_count')
+            ratings_list = list(filter(lambda x: x.is_live == True, doctor.rating.all()))
+            rating_count = len(ratings_list)
+            average_rating = 0
+            if rating_count:
+                all_rating = []
+                for rate in ratings_list:
+                    all_rating.append(rate.ratings)
+                if all_rating:
+                    average_rating = sum(all_rating) / len(all_rating)
+            if not ((rating_count <= 5 and average_rating > 4) or  (rating_count>5)):
+                average_rating = None
+                rating_count = None
+
+            # if doctor.rating_data and doctor.rating_data.get('rating_count')>0:
+            #     if doctor.rating_data.get('rating_count')<5:
+            #         if doctor.rating_data.get('avg_rating') >=4:
+            #             average_rating = doctor.rating_data.get('avg_rating')
+            #             rating_count = doctor.rating_data.get('rating_count')
+            #     else:
+            #         average_rating = doctor.rating_data.get('avg_rating')
+            #         rating_count = doctor.rating_data.get('rating_count')
             if not average_rating:
                  if doctor_clinic and doctor_clinic.hospital:
                     hosp_reviews = doctor_clinic.hospital.hospital_place_details.all()
+                    reviews_data = dict()
+                    reviews_data['user_reviews'] = None
                     if hosp_reviews:
-                        reviews_data = hosp_reviews[0].reviews
+                        reviews_data['user_reviews'] = hosp_reviews[0].reviews.get('user_reviews')
+                    reviews_data['user_avg_rating'] = doctor_clinic.hospital.google_avg_rating
+                    reviews_data['user_ratings_total'] = doctor_clinic.hospital.google_ratings_count
 
-                        if reviews_data:
-                            ratings_graph = GoogleRatingsGraphSerializer(reviews_data, many=False,
-                                                                         context={"request": request})
-                            google_rating = ratings_graph.data
+                    ratings_graph = GoogleRatingsGraphSerializer(reviews_data, many=False, context={"request": request})
+                    google_rating = ratings_graph.data
+                    rating_count = doctor_clinic.hospital.google_ratings_count
+
+
+                        # if reviews_data:
+                        #     ratings_graph = GoogleRatingsGraphSerializer(reviews_data, many=False,
+                        #                                                  context={"request": request})
+                        #     google_rating = ratings_graph.data
 
             temp = {
                 "doctor_id": doctor.id,
