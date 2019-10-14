@@ -232,11 +232,13 @@ class OpdAppTransactionModelSerializer(serializers.Serializer):
     insurance = serializers.PrimaryKeyRelatedField(queryset=UserInsurance.objects.all(), allow_null=True)
     cashback = serializers.DecimalField(max_digits=10, decimal_places=2)
     extra_details = serializers.JSONField(required=False)
+    spo_data = serializers.JSONField(required=False, default={})
     coupon_data = serializers.JSONField(required=False)
     _source = serializers.CharField(required=False, allow_null=True)
     _responsible_user = serializers.IntegerField(required=False, allow_null=True)
     plus_plan = serializers.PrimaryKeyRelatedField(queryset=PlusUser.objects.all(), allow_null=True)
     plus_amount = serializers.DecimalField(max_digits=10, decimal_places=2)
+
 
 
 class OpdAppointmentPermissionSerializer(serializers.Serializer):
@@ -260,8 +262,10 @@ class CreateAppointmentSerializer(serializers.Serializer):
     _source = serializers.CharField(required=False, allow_null=True)
     _responsible_user = serializers.IntegerField(required=False, allow_null=True)
     cart_item = serializers.PrimaryKeyRelatedField(queryset=Cart.objects.all(), required=False, allow_null=True)
+    spo_data = serializers.JSONField(required=False, default={})
     appointment_id = serializers.IntegerField(required=False)
     cod_to_prepaid = serializers.BooleanField(required=False)
+
     # procedure_category_ids = serializers.ListField(child=serializers.PrimaryKeyRelatedField(queryset=ProcedureCategory.objects.filter(is_live=True)), required=False, default=[])
     # time_slot_end = serializers.DateTimeField()
 
