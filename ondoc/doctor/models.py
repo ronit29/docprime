@@ -3430,7 +3430,10 @@ class OpdAppointment(auth_model.TimeStampedModel, CouponsMixin, OpdAppointmentIn
                         price_data = {"mrp": doctor_clinic_timing.mrp, "cod_deal_price": doctor_clinic_timing.cod_deal_price,
                                       "deal_price": doctor_clinic_timing.deal_price,  "fees": doctor_clinic_timing.fees}
                         price_engine = get_price_reference(plus_user, "DOCTOR")
-                        price = price_engine.get_price(price_data)
+                        if not price_engine:
+                            price = doctor_clinic_timing.mrp
+                        else:
+                            price = price_engine.get_price(price_data)
                         engine = get_class_reference(plus_user, "DOCTOR")
                         if engine:
                             # vip_dict = engine.validate_booking_entity(cost=doctor_clinic_timing.mrp)

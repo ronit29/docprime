@@ -28,7 +28,7 @@ import json
 
 from ondoc.insurance.models import UserInsurance, InsuranceThreshold
 from ondoc.plus.models import PlusUser, PlusAppointmentMapping
-from ondoc.plus.usage_criteria import get_class_reference
+from ondoc.plus.usage_criteria import get_class_reference, get_price_reference
 from ondoc.prescription.models import AppointmentPrescription
 from ondoc.ratings_review.models import RatingsReview
 from django.db.models import Avg
@@ -308,12 +308,19 @@ class AvailableLabTestPackageSerializer(serializers.ModelSerializer):
             plus_obj = user.active_plus_user if user.active_plus_user and user.active_plus_user.status == PlusUser.ACTIVE else None
 
         entity = "LABTEST" if not obj.test.is_package else "PACKAGE"
+        price_data = {"mrp": obj.mrp, "deal_price": obj.deal_price, "cod_deal_price": obj.deal_price, "fees": obj.agreed_price}
+        price_engine = get_price_reference(plus_obj, "LABTEST")
+        if not price_engine:
+            price = obj.mrp
+        else:
+            price = price_engine.get_price(price_data)
         engine = get_class_reference(plus_obj, entity)
         if not engine:
             return resp
 
         if engine and obj and obj.mrp and lab_obj and lab_obj.enabled_for_plus_plans:
-            engine_response = engine.validate_booking_entity(cost=obj.mrp, id=obj.test.id)
+            # engine_response = engine.validate_booking_entity(cost=obj.mrp, id=obj.test.id)
+            engine_response = engine.validate_booking_entity(cost=price, id=obj.test.id)
             resp['covered_under_vip'] = engine_response['is_covered']
             resp['vip_amount'] = engine_response['amount_to_be_paid']
 
@@ -538,12 +545,20 @@ class AvailableLabTestSerializer(serializers.ModelSerializer):
             plus_obj = user.active_plus_user if user.active_plus_user and user.active_plus_user.status == PlusUser.ACTIVE else None
 
         entity = "LABTEST" if not obj.test.is_package else "PACKAGE"
+        price_data = {"mrp": obj.mrp, "deal_price": obj.deal_price, "cod_deal_price": obj.deal_price,
+                      "fees": obj.agreed_price}
+        price_engine = get_price_reference(plus_obj, "LABTEST")
+        if not price_engine:
+            price = obj.mrp
+        else:
+            price = price_engine.get_price(price_data)
         engine = get_class_reference(plus_obj, entity)
         if not engine:
             return resp
 
         if engine and obj and obj.mrp and lab_obj and lab_obj.enabled_for_plus_plans:
-            engine_response = engine.validate_booking_entity(cost=obj.mrp, id=obj.test.id)
+            # engine_response = engine.validate_booking_entity(cost=obj.mrp, id=obj.test.id)
+            engine_response = engine.validate_booking_entity(cost=price, id=obj.test.id)
             resp['covered_under_vip'] = engine_response['is_covered']
             resp['vip_amount'] = engine_response['amount_to_be_paid']
 
@@ -797,12 +812,21 @@ class CommonPackageSerializer(serializers.ModelSerializer):
             plus_obj = user.active_plus_user if user.active_plus_user and user.active_plus_user.status == PlusUser.ACTIVE else None
 
         entity = "PACKAGE"
+        price_data = {"mrp": obj._selected_test.mrp, "deal_price": obj._selected_test.deal_price,
+                      "cod_deal_price": obj._selected_test.deal_price,
+                      "fees": obj._selected_test.agreed_price}
+        price_engine = get_price_reference(plus_obj, "LABTEST")
+        if not price_engine:
+            price = obj._selected_test.mrp
+        else:
+            price = price_engine.get_price(price_data)
         engine = get_class_reference(plus_obj, entity)
         if not engine:
             return resp
 
         if engine and obj and obj._selected_test and lab_obj.enabled_for_plus_plans and obj._selected_test.mrp:
-            engine_response = engine.validate_booking_entity(cost=obj._selected_test.mrp, id=obj.package.id)
+            # engine_response = engine.validate_booking_entity(cost=obj._selected_test.mrp, id=obj.package.id)
+            engine_response = engine.validate_booking_entity(cost=price, id=obj.package.id)
             resp['covered_under_vip'] = engine_response['is_covered']
             resp['vip_amount'] = engine_response['amount_to_be_paid']
 
@@ -2013,12 +2037,21 @@ class CustomLabTestPackageSerializer(serializers.ModelSerializer):
             plus_obj = user.active_plus_user if user.active_plus_user and user.active_plus_user.status == PlusUser.ACTIVE else None
 
         entity = "LABTEST" if not obj.is_package else "PACKAGE"
+        price_data = {"mrp": obj.mrp, "deal_price": obj.deal_price,
+                      "cod_deal_price": obj.deal_price,
+                      "fees": obj.agreed_price}
+        price_engine = get_price_reference(plus_obj, "LABTEST")
+        if not price_engine:
+            price = obj.mrp
+        else:
+            price = price_engine.get_price(price_data)
         engine = get_class_reference(plus_obj, entity)
         if not engine:
             return resp
 
         if engine and obj and obj.mrp and lab and lab.enabled_for_plus_plans:
-            engine_response = engine.validate_booking_entity(cost=obj.mrp, id=obj.id)
+            # engine_response = engine.validate_booking_entity(cost=obj.mrp, id=obj.id)
+            engine_response = engine.validate_booking_entity(cost=price, id=obj.id)
             resp['covered_under_vip'] = engine_response['is_covered']
             resp['vip_amount'] = engine_response['amount_to_be_paid']
 

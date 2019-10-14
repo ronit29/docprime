@@ -2640,7 +2640,10 @@ class LabAppointment(TimeStampedModel, CouponsMixin, LabAppointmentInvoiceMixin,
             if profile:
                 plus_membership = profile.get_plus_membership
                 price_engine = get_price_reference(plus_membership, "LABTEST")
-                price = price_engine.get_price(price_data)
+                if not price_engine:
+                    price = effective_price
+                else:
+                    price = price_engine.get_price(price_data)
                 test = data['test_ids']
                 entity = "LABTEST" if not test[0].is_package else "PACKAGE"
                 engine = get_class_reference(plus_membership, entity)

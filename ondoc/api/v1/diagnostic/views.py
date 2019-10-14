@@ -1872,7 +1872,10 @@ class LabList(viewsets.ReadOnlyModelViewSet):
                                       "fees": paticular_test_in_lab.get('agreed_price', 0),
                                       "cod_deal_price": paticular_test_in_lab.get('deal_price', 0)}
                         price_engine = get_price_reference(plus_user_obj, "LABTEST")
-                        price = price_engine.get_price(price_data)
+                        if not price_engine:
+                            price = paticular_test_in_lab.get('mrp', 0)
+                        else:
+                            price = price_engine.get_price(price_data)
                         engine = get_class_reference(plus_user_obj, "LABTEST")
                         coverage = False
                         if engine:

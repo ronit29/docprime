@@ -12,7 +12,7 @@ from ondoc.api.v1.utils import clinic_convert_timings, aware_time_zone
 from ondoc.api.v1.doctor import serializers
 from ondoc.authentication.models import QCModel
 from ondoc.doctor.models import Doctor, PracticeSpecialization
-from ondoc.plus.usage_criteria import get_class_reference
+from ondoc.plus.usage_criteria import get_class_reference, get_price_reference
 from ondoc.procedure.models import DoctorClinicProcedure, ProcedureCategory, ProcedureToCategoryMapping, \
     get_selected_and_other_procedures, get_included_doctor_clinic_procedure, \
     get_procedure_categories_with_procedures
@@ -663,9 +663,18 @@ class DoctorSearchHelper:
                         doctor.enabled_for_online_booking and doctor_clinic.hospital.enabled_for_online_booking and \
                         doctor_clinic.enabled_for_online_booking:
                     mrp = int(min_price.get('mrp'))
+                    price_data = {"mrp": int(min_price.get('mrp')), "deal_price": int(min_price.get('deal_price')),
+                                  "cod_deal_price": int(min_price.get('cod_deal_price')),
+                                  "fees": int(min_price.get('fees'))}
+                    price_engine = get_price_reference(request.user.active_plus_user, "LABTEST")
+                    if not price_engine:
+                        price = mrp
+                    else:
+                        price = price_engine.get_price(price_data)
                     engine = get_class_reference(request.user.active_plus_user, "DOCTOR")
                     if engine:
-                        vip_response_dict = engine.validate_booking_entity(cost=mrp)
+                        # vip_response_dict = engine.validate_booking_entity(cost=mrp)
+                        vip_response_dict = engine.validate_booking_entity(cost=price)
                         vip_amount = vip_response_dict.get('amount_to_be_paid', 0)
                         cover_under_vip = vip_response_dict.get('is_covered', False)
                     # vip_amount = 0 if vip_remaining_amount > mrp else mrp - vip_remaining_amount

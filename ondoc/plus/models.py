@@ -17,7 +17,7 @@ from django.db import transaction
 from django.db.models import Q
 from ondoc.common.models import DocumentsProofs
 from ondoc.notification.tasks import push_plus_lead_to_matrix
-from ondoc.plus.usage_criteria import get_class_reference
+from ondoc.plus.usage_criteria import get_class_reference, get_price_reference
 from .enums import PlanParametersEnum, UtilizationCriteria, PriceCriteria
 from datetime import datetime
 from ondoc.crm import constants as const
@@ -404,6 +404,14 @@ class PlusUser(auth_model.TimeStampedModel, RefundMixin):
         response_dict['is_vip_member'] = True
 
         if appointment_type == OPD:
+            price_data = {"mrp": int(price_data.get('mrp')), "deal_price": int(price_data.get('deal_price')),
+                          "cod_deal_price": int(price_data.get('cod_deal_price')),
+                          "fees": int(price_data.get('fees'))}
+            price_engine = get_price_reference(plus_user, "DOCTOR")
+            if not price_engine:
+                price = int(price_data.get('mrp'))
+            else:
+                price = price_engine.get_price(price_data)
             engine = get_class_reference(plus_user, "DOCTOR")
             if not engine:
                 return response_dict
@@ -414,7 +422,8 @@ class PlusUser(auth_model.TimeStampedModel, RefundMixin):
                                         hospital.enabled_for_prepaid and hospital.enabled_for_plus_plans and \
                                         doctor.enabled_for_plus_plans:
 
-                engine_response = engine.validate_booking_entity(cost=mrp, utilization=kwargs.get('utilization'))
+                # engine_response = engine.validate_booking_entity(cost=mrp, utilization=kwargs.get('utilization'))
+                engine_response = engine.validate_booking_entity(cost=price, utilization=kwargs.get('utilization'))
                 response_dict['cover_under_vip'] = engine_response.get('is_covered', False)
                 response_dict['plus_user_id'] = plus_user.id
                 response_dict['vip_amount_deducted'] = engine_response.get('vip_amount_deducted', 0)
@@ -428,12 +437,23 @@ class PlusUser(auth_model.TimeStampedModel, RefundMixin):
             lab = appointment_data['lab']
             if lab and lab.enabled_for_plus_plans:
                 mrp = int(price_data.get('mrp'))
-                final_price = mrp + price_data['home_pickup_charges']
+                # final_price = mrp + price_data['home_pickup_charges']
 
+                price_data = {"mrp": int(price_data.get('mrp')), "deal_price": int(price_data.get('deal_price')),
+                              "cod_deal_price": int(price_data.get('deal_price')),
+                              "fees": int(price_data.get('fees'))}
+                price_engine = get_price_reference(plus_user, "LABTEST")
+                if not price_engine:
+                    price = int(price_data.get('mrp'))
+                else:
+                    price = price_engine.get_price(price_data)
+                final_price = price + price_data['home_pickup_charges']
                 entity = "PACKAGE" if appointment_data['test_ids'][0].is_package else "LABTEST"
                 engine = get_class_reference(plus_user, entity)
                 if appointment_data['test_ids']:
+                    # engine_response = engine.validate_booking_entity(cost=final_price, id=appointment_data['test_ids'][0].id, utilization=kwargs.get('utilization'))
                     engine_response = engine.validate_booking_entity(cost=final_price, id=appointment_data['test_ids'][0].id, utilization=kwargs.get('utilization'))
+
                     if not engine_response:
                         return response_dict
                     response_dict['cover_under_vip'] = engine_response.get('is_covered', False)
@@ -474,9 +494,18 @@ class PlusUser(auth_model.TimeStampedModel, RefundMixin):
             appointment_data) if appointment_type == OPD else LabAppointment.get_price_details(appointment_data)
         current_item_mrp = int(current_item_price_data.get('mrp', 0))
         if 'doctor' in appointment_data:
+            price_data = {"mrp": int(current_item_price_data.get('mrp')), "deal_price": int(current_item_price_data.get('deal_price')),
+                          "cod_deal_price": int(current_item_price_data.get('cod_deal_price')),
+                          "fees": int(current_item_price_data.get('fees'))}
+            price_engine = get_price_reference(request.user.active_plus_user, "DOCTOR")
+            if not price_engine:
+                price = current_item_mrp
+            else:
+                price = price_engine.get_price(price_data)
             engine = get_class_reference(self, "DOCTOR")
             if engine:
-                vip_response = engine.validate_booking_entity(cost=current_item_mrp, utilization=deep_utilization)
+                # vip_response = engine.validate_booking_entity(cost=current_item_mrp, utilization=deep_utilization)
+                vip_response = engine.validate_booking_entity(cost=price, utilization=deep_utilization)
                 vip_data_dict['vip_amount'] = vip_response.get('amount_to_be_paid')
                 vip_data_dict['amount_to_be_paid'] = vip_response.get('amount_to_be_paid')
                 vip_data_dict['cover_under_vip'] = vip_response.get('is_covered')
@@ -487,10 +516,19 @@ class PlusUser(auth_model.TimeStampedModel, RefundMixin):
             tests = appointment_data.get('test_ids', [])
             for test in tests:
                 entity = "LABTEST" if not test.is_package else "PACKAGE"
-
+                price_data = {"mrp": int(current_item_price_data.get('mrp')),
+                              "deal_price": int(current_item_price_data.get('deal_price')),
+                              "cod_deal_price": int(current_item_price_data.get('deal_price')),
+                              "fees": int(current_item_price_data.get('fees'))}
+                price_engine = get_price_reference(request.user.active_plus_user, "LABTEST")
+                if not price_engine:
+                    price = current_item_mrp
+                else:
+                    price = price_engine.get_price(price_data)
                 engine = get_class_reference(self, entity)
                 if engine:
-                    vip_response = engine.validate_booking_entity(cost=current_item_mrp, utilization=deep_utilization)
+                    # vip_response = engine.validate_booking_entity(cost=current_item_mrp, utilization=deep_utilization)
+                    vip_response = engine.validate_booking_entity(cost=price, utilization=deep_utilization)
                     vip_data_dict['vip_amount'] = vip_response.get('amount_to_be_paid')
                     vip_data_dict['amount_to_be_paid'] = vip_response.get('amount_to_be_paid')
                     vip_data_dict['cover_under_vip'] = vip_response.get('is_covered')

@@ -647,7 +647,10 @@ class DoctorHospitalSerializer(serializers.ModelSerializer):
             price_data = {"mrp": obj.mrp, "deal_price": obj.deal_price, "fees": obj.fees, "cod_deal_price": obj.cod_deal_price}
             mrp = int(obj.mrp)
             price_engine = get_price_reference(plus_user, "DOCTOR")
-            price = price_engine.get_price(price_data)
+            if not price_engine:
+                price = mrp
+            else:
+                price = price_engine.get_price(price_data)
             resp['is_vip_member'] = True
             engine = get_class_reference(plus_user, "DOCTOR")
             if engine:
