@@ -2435,10 +2435,11 @@ class HospitalDetailIpdProcedureSerializer(TopHospitalForIpdProcedureSerializer)
         return result
 
     def get_images(self, obj):
+        hospital_name = obj.name.lower().replace(' ', '-')
         request = self.context.get('request')
         result = [{'original': request.build_absolute_uri(img.name.url)
-                                if img.name.startswith(obj.name.lower().replace(' ', '-'))
-                      else request.build_absolute_uri(img.name.url).replace(img.name.url, obj.name.replace('-', ' ').split(' ')),
+                                if img.name.url.find(hospital_name) != -1
+                      else request.build_absolute_uri(hospital_name + img.name.url),
                    "thumbnail": request.build_absolute_uri(img.cropped_image.url) if img.cropped_image else None,
                    "cover_image": img.cover_image} for img in
                   obj.imagehospital.all() if img.name]
