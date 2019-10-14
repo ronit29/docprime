@@ -229,7 +229,7 @@ class PlusOrderViewSet(viewsets.GenericViewSet):
                 amount=payable_amount,
                 cashback_amount=0,
                 # wallet_amount=balance,
-                wallet=0,
+                wallet_amount=0,
                 user=user,
                 payment_status=account_models.Order.PAYMENT_PENDING,
                 # visitor_info=visitor_info
