@@ -18,13 +18,14 @@ from ondoc.lead.models import UserLead
 from ondoc.web.models import OnlineLead, Career, ContactUs
 from django.contrib.auth import get_user_model
 from django.contrib.staticfiles.templatetags.staticfiles import static
-import jwt
+import jwt, logging
 from django.conf import settings
 from django.db.models import Q
 from ondoc.authentication.backends import JWTAuthentication
 from ondoc.common import models as common_models
 
 User = get_user_model()
+logger = logging.getLogger(__name__)
 
 
 class OTPSerializer(serializers.Serializer):
@@ -369,9 +370,37 @@ class UserTransactionModelSerializer(serializers.ModelSerializer):
 class RefreshJSONWebTokenSerializer(serializers.Serializer):
 
     token = serializers.CharField()
+    reset = serializers.CharField(required=False)
 
     def validate(self, attrs):
-        token = attrs['token']
+
+        token = attrs.get('token')
+        reset = attrs.get('reset')
+        if reset:
+            try:
+                decrypt = v1_utils.AES_encryption.decrypt(reset, "1234567890123456")
+                if decrypt and isinstance(decrypt, tuple):
+                    decrypt = decrypt[0]
+                    data = v1_utils.AES_encryption.unpad(decrypt)
+            except Exception as e:
+                logger.error("Failed to decrypt data " + str(e))
+                raise serializers.ValidationError('Failed to decrypt!')
+            get_date = data.split('.')
+            if len(get_date) > 1:
+                uid = get_date[0]
+                date_generated = get_date[1]
+            time_elapsed = v1_utils.get_time_delta_in_minutes(date_generated)
+            if time_elapsed >2:
+                raise serializers.ValidationError('Reset Key Expired')
+            else:
+                user = User.objects.filter(id=uid).first()
+                token_object = JWTAuthentication.generate_token(user)
+                return {
+                    'token': token_object['token'],
+                    'payload': token_object['payload']
+                }
+
+
 
         payload = self.check_payload_custom(token=token)
         user = self.check_user_custom(payload=payload)
