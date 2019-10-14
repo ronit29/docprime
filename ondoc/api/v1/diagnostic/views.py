@@ -1909,7 +1909,7 @@ class LabList(viewsets.ReadOnlyModelViewSet):
                         coverage = False
                         if engine:
                             # engine_response = engine.validate_booking_entity(cost=paticular_test_in_lab.get('mrp', 0))
-                            engine_response = engine.validate_booking_entity(cost=price)
+                            engine_response = engine.validate_booking_entity(cost=price, mrp=paticular_test_in_lab.get('mrp', 0))
                             coverage = engine_response.get('is_covered', False)
                         bool_array.append(coverage)
 

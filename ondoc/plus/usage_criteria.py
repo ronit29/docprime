@@ -14,11 +14,12 @@ class AbstractCriteria(object):
     def validate_booking_entity(self, *args, **kwargs):
         cost = kwargs.get('cost')
         id = kwargs.get('id')
+        mrp = kwargs.get('mrp')
         utilization = kwargs.get('utilization')
         if not cost:
             return {}
 
-        return self._validate_booking_entity(cost, id, utilization=utilization)
+        return self._validate_booking_entity(cost, id, utilization=utilization, mrp=mrp)
 
     def _update_utilization(self, utilization, deduction_amount):
         raise NotImplementedError()
@@ -60,6 +61,8 @@ class DoctorAmountCount(AbstractCriteria):
         available_amount = vip_utilization.get('doctor_amount_available', 0)
         available_count = vip_utilization.get('available_doctor_count', 0)
         total_doctor_count = vip_utilization.get('total_doctor_count_limit', 0)
+        mrp = kwargs.get('mrp', 0)
+        plan = self.plus_plan
 
         if not total_doctor_count and not available_amount and available_count:
             return resp
