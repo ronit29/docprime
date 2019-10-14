@@ -260,7 +260,7 @@ class Hospital(auth_model.TimeStampedModel, auth_model.CreatedByModel, auth_mode
     auto_ivr_enabled = models.BooleanField(default=True)
     priority_score = models.IntegerField(default=0, null=False, blank=False)
     search_distance = models.FloatField(default=15000)
-    google_avg_rating = models.DecimalField(max_digits=5, decimal_places=2, null=True, editable=False)
+    google_avg_rating = models.DecimalField(max_digits=5, decimal_places=2, null=True, editable=True)
     # provider_encrypt = models.NullBooleanField(null=True, blank=True)
     # provider_encrypted_by = models.ForeignKey(auth_model.User, null=True, blank=True, on_delete=models.SET_NULL, related_name='encrypted_hospitals')
     # encryption_hint = models.CharField(max_length=128, null=True, blank=True)
@@ -272,6 +272,7 @@ class Hospital(auth_model.TimeStampedModel, auth_model.CreatedByModel, auth_mode
     enabled_for_insurance = models.NullBooleanField(verbose_name='Enabled for Insurance')
     enabled_for_plus_plans = models.NullBooleanField()
     is_partner_lab_enabled = models.BooleanField(default=False)
+    google_ratings_count = models.PositiveIntegerField(null=True, blank=True)
 
     def __str__(self):
         return self.name
@@ -355,6 +356,9 @@ class Hospital(auth_model.TimeStampedModel, auth_model.CreatedByModel, auth_mode
     def update_hosp_google_avg_rating(cls):
         update_hosp_google_ratings = RawSql('''update hospital h set google_avg_rating = (select (reviews->>'user_avg_rating')::float from hospital_place_details 
                                          where hospital_id=h.id limit 1)''', [] ).execute()
+
+        update_hosp_google_ratings_count = RawSql(''' update hospital h set google_ratings_count = (select (reviews->>'user_ratings_total')::int from hospital_place_details 
+                                                 where hospital_id=h.id limit 1)''', []).execute()
 
     def get_active_opd_appointments(self, user=None, user_insurance=None, appointment_date=None):
 
