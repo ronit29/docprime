@@ -380,6 +380,7 @@ class HospitalForm(FormCleanMixin):
         super().clean()
         if any(self.errors):
             return
+        old_instance_enable = self.instance.enabled
         data = self.cleaned_data
         if self.data.get('search_distance') and float(self.data.get('search_distance')) > float(50000):
             raise forms.ValidationError("Search Distance should be less than 50 KM.")
@@ -403,8 +404,8 @@ class HospitalForm(FormCleanMixin):
                         'disable_comments', None):
                     raise forms.ValidationError("Must have disable comments if disable reason is others.")
 
-            if is_enabled == False and (not self.request.user.is_superuser == True):
-                raise forms.ValidationError('User is not Super User')
+            if old_instance_enable and (not is_enabled) and (not self.request.user.is_superuser):
+                raise forms.ValidationError('Only Super User can disable the hospital.')
         # if '_mark_in_progress' in self.data and data.get('enabled'):
         #     raise forms.ValidationError("Must be disabled before rejecting.")
 

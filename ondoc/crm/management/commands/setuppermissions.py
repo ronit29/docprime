@@ -69,7 +69,8 @@ from ondoc.prescription.models import AppointmentPrescription
 from ondoc.diagnostic.models import LabPricing
 from ondoc.integrations.models import IntegratorMapping, IntegratorProfileMapping, IntegratorReport, \
     IntegratorTestMapping, IntegratorTestParameterMapping, IntegratorLabTestParameterMapping, IntegratorLabCode, \
-    IntegratorHospitalCode, IntegratorDoctorClinicMapping
+    IntegratorHospitalCode, IntegratorDoctorClinicMapping, IntegratorDoctorMappings
+from ondoc.salespoint.models import SalesPoint, SalespointTestmapping
 from ondoc.subscription_plan.models import Plan, PlanFeature, PlanFeatureMapping, UserPlanMapping
 
 from ondoc.web.models import Career, OnlineLead, UploadImage
@@ -670,11 +671,13 @@ class Command(BaseCommand):
 
         content_types = ContentType.objects.get_for_models(IntegratorMapping, IntegratorProfileMapping, LabTest, LabNetwork,
                                                            IntegratorReport, IntegratorTestMapping, IntegratorTestParameterMapping,
-                                                           IntegratorLabTestParameterMapping, IntegratorDoctorClinicMapping)
+                                                           IntegratorLabTestParameterMapping, IntegratorDoctorClinicMapping, IntegratorDoctorMappings,
+                                                           SalesPoint, SalespointTestmapping)
 
         for cl, ct in content_types.items():
             permissions = Permission.objects.filter(
                 Q(content_type=ct),
+                Q(codename='add_' + ct.model) |
                 Q(codename='change_' + ct.model))
 
             group.permissions.add(*permissions)

@@ -113,6 +113,10 @@ from .integrations import IntegratorProfileMapping, IntegratorProfileMappingAdmi
 from .integrations import IntegratorReport, IntegratorReportAdmin, IntegratorDoctorMappingsAdmin
 from .integrations import IntegratorTestMapping, IntegratorTestMappingAdmin
 from .integrations import IntegratorTestParameterMapping, IntegratorTestParameterMappingAdmin
+from .salespoint import SalesPointAdmin, SalesPointAvailableTestMappingAdmin
+from ondoc.salespoint.models import SalesPoint, SalespointTestmapping
+from .plus import PlusPlansAdmin, PlusProposerAdmin, PlusThresholdAdmin, PlusUserAdmin, PlusPlanParametersAdmin
+from ondoc.plus.models import PlusUser, PlusProposer, PlusPlans, PlusThreshold, PlusPlanParameters
 from .plus import PlusPlansAdmin, PlusProposerAdmin, PlusThresholdAdmin, PlusUserAdmin, PlusPlanParametersAdmin, \
     PlusPlanUtmSourceAdmin
 from ondoc.plus.models import PlusUser, PlusProposer, PlusPlans, PlusThreshold, PlusPlanParameters, PlusPlanUtmSources
@@ -289,6 +293,8 @@ admin.site.register(Plan, SubscriptionPlanAdmin)
 admin.site.register(PlanFeature, SubscriptionPlanFeatureAdmin)
 admin.site.register(UserPlanMapping, UserPlanMappingAdmin)
 admin.site.register(TestParameterChat, TestParameterChatAdmin)
+admin.site.register(SalesPoint, SalesPointAdmin)
+admin.site.register(SalespointTestmapping, SalesPointAvailableTestMappingAdmin)
 admin.site.register(AppRatings, AppRatingsAdmin)
 admin.site.register(AppCompliments, AppComplimentsAdmin)
 admin.site.register(ContactUs, ContactUsAdmin)

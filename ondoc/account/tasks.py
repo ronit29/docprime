@@ -600,7 +600,7 @@ def update_lal_path_test_data():
     from ondoc.integrations.Integrators import Lalpath
     Lalpath.get_test_data()
 
-
+@task()
 def purchase_order_creation_counter_automation():
 
     from ondoc.doctor.models import PurchaseOrderCreation

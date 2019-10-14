@@ -38,8 +38,7 @@ from ondoc.authentication.models import SPOCDetails, RefundMixin, MerchantTdsDed
 from ondoc.bookinganalytics.models import DP_OpdConsultsAndTests
 # from ondoc.diagnostic.models import Lab
 from ondoc.location import models as location_models
-from ondoc.account.models import Order, ConsumerAccount, ConsumerTransaction, PgTransaction, ConsumerRefund, \
-    MerchantPayout, UserReferred, MoneyPool, Invoice
+from ondoc.account.models import Order, ConsumerAccount, ConsumerTransaction, PgTransaction, ConsumerRefund, MerchantPayout, UserReferred, MoneyPool, Invoice
 from ondoc.location.models import EntityUrls, UrlsModel
 from ondoc.notification.models import NotificationAction, EmailNotification
 from ondoc.payout.models import Outstanding
@@ -78,6 +77,7 @@ from ondoc.matrix.tasks import push_appointment_to_matrix, push_onboarding_qcsta
 from ondoc.integrations.task import push_opd_appointment_to_integrator
 # from ondoc.procedure.models import Procedure
 from ondoc.plus.models import PlusAppointmentMapping
+from ondoc.plus.usage_criteria import get_class_reference
 from ondoc.ratings_review import models as ratings_models
 from django.utils import timezone
 from random import randint
@@ -589,12 +589,12 @@ class Hospital(auth_model.TimeStampedModel, auth_model.CreatedByModel, auth_mode
             push_to_matrix = True
 
         self.create_entity_url()
-        if self.is_enabled == False:
-            if self.user.is_superuser:
-                self.is_enabled == False
-            else:
-                self.is_enabled == True
 
+        # if not self.enabled:
+        #     if self.user.is_superuser:
+        #         self.enabled = False
+        #     else:
+        #         self.enabled = True
 
         super(Hospital, self).save(*args, **kwargs)
         if self.is_appointment_manager:
@@ -2509,6 +2509,7 @@ class OpdAppointment(auth_model.TimeStampedModel, CouponsMixin, OpdAppointmentIn
     mask_number = GenericRelation(AppointmentMaskNumber)
     history = GenericRelation(AppointmentHistory)
     email_notification = GenericRelation(EmailNotification, related_name="enotification")
+    spo_data = JSONField(blank=True, null=True)
     auto_ivr_data = JSONField(default=list(), null=True)
     synced_analytics = GenericRelation(SyncBookingAnalytics, related_name="opd_booking_analytics")
     refund_details = GenericRelation(RefundDetails, related_query_name="opd_appointment_detail")
@@ -3427,7 +3428,21 @@ class OpdAppointment(auth_model.TimeStampedModel, CouponsMixin, OpdAppointmentIn
                 effective_price = doctor_clinic_timing.deal_price
                 coupon_discount, coupon_cashback, coupon_list, random_coupon_list = 0, 0, [], []
             elif data.get("payment_type") == cls.VIP:
-                effective_price = doctor_clinic_timing.deal_price
+                profile = data.get('profile', None)
+                if not profile:
+                    effective_price = doctor_clinic_timing.deal_price
+                else:
+                    plus_user = profile.get_plus_membership
+                    if plus_user:
+                        engine = get_class_reference(plus_user, "DOCTOR")
+                        if engine:
+                            vip_dict = engine.validate_booking_entity(cost=doctor_clinic_timing.mrp)
+                            effective_price = vip_dict.get('amount_to_be_paid')
+                        else:
+                            effective_price = doctor_clinic_timing.deal_price
+                    else:
+                        effective_price = doctor_clinic_timing.deal_price
+                # effective_price = doctor_clinic_timing.deal_price
                 coupon_discount, coupon_cashback, coupon_list, random_coupon_list = 0, 0, [], []
             elif data.get("payment_type") in [cls.PREPAID]:
                 coupon_discount, coupon_cashback, coupon_list, random_coupon_list = Coupon.get_total_deduction(data,
@@ -3544,13 +3559,16 @@ class OpdAppointment(auth_model.TimeStampedModel, CouponsMixin, OpdAppointmentIn
         if plus_user:
             plus_user_resp = plus_user.validate_plus_appointment(data)
             cover_under_vip = plus_user_resp.get('cover_under_vip', False)
-            utilization = plus_user.get_utilization
-            doctor_available_amount = int(utilization.get('doctor_amount_available', 0))
-            vip_amount = mrp if doctor_available_amount >= mrp else doctor_available_amount
+            # utilization = plus_user.get_utilization
+            # doctor_available_amount = int(utilization.get('doctor_amount_available', 0))
+            # vip_amount = mrp if doctor_available_amount >= mrp else doctor_available_amount
+            # vip_amount = plus_user.get_vip_amount(utilization, mrp)
+            vip_amount = plus_user_resp.get('vip_amount_deducted', None)
 
-        if cover_under_vip and cart_data.get('cover_under_vip', None) and vip_amount>0:
+        if cover_under_vip and cart_data.get('cover_under_vip', None) and vip_amount > 0:
             # effective_price = 0 if doctor_available_amount >= mrp else (mrp - doctor_available_amount)
-            effective_price = cart_data.get('vip_amount')
+            # effective_price = cart_data.get('vip_amount')
+            effective_price = cart_data.get('amount_to_be_paid')
             payment_type = OpdAppointment.VIP
             plus_user_id = plus_user_resp.get('plus_user_id', None)
         else:
@@ -3579,6 +3597,7 @@ class OpdAppointment(auth_model.TimeStampedModel, CouponsMixin, OpdAppointmentIn
             "cashback": int(price_data.get("coupon_cashback")),
             "is_appointment_insured": is_appointment_insured,
             "insurance": insurance_id,
+            "spo_data": data["spo_data"],
             "cover_under_vip": cover_under_vip,
             "plus_plan": plus_user_id,
             "plus_amount": vip_amount,
