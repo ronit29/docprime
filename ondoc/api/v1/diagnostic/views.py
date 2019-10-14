@@ -1905,6 +1905,7 @@ class LabList(viewsets.ReadOnlyModelViewSet):
                         else:
                             price = price_engine.get_price(price_data)
                         engine = get_class_reference(plus_user_obj, "LABTEST")
+                        res['vip']['vip_convenience_amount'] = plus_user_obj.plan.get_convenience_charge(price)
                         coverage = False
                         if engine:
                             # engine_response = engine.validate_booking_entity(cost=paticular_test_in_lab.get('mrp', 0))

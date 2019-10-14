@@ -123,18 +123,27 @@ class PlusPlans(auth_model.TimeStampedModel, LiveMixin):
     def __str__(self):
         return "{}".format(self.plan_name)
 
-    def get_convenience_amount(self, price):
-        price_criteria = self.price_criteria
+    def get_convenience_charge(self, price):
+        if not price or price <= 0:
+            return 0
         charge = 0
-        convenience_amount = price_criteria.get('CONVENIENCE_AMOUNT', 0)
-        convenience_percentage = price_criteria.get('CONVENIENCE_PERCENTAGE', 0)
-        if convenience_percentage > 0:
+        convenience_amount = self.plan_parameters.filter(parameter__key='CONVENIENCE_AMOUNT').first().value
+        convenience_percentage = self.plan_parameters.filter(parameter__key='CONVENIENCE_PERCENTAGE').first().value
+        if not convenience_amount and not convenience_percentage:
+            return 0
+        convenience_percentage = int(convenience_percentage)
+        convenience_amount = int(convenience_amount)
+        if convenience_percentage and convenience_percentage > 0:
             charge = (convenience_percentage/100) * price
             charge = floor(charge)
+        elif convenience_amount and convenience_amount > 0:
+            return convenience_amount
+        else:
+            return 0
         if charge <= convenience_amount:
             return charge
         else:
-            convenience_amount
+            return convenience_amount
 
     class Meta:
         db_table = 'plus_plans'

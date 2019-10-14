@@ -352,7 +352,8 @@ class Lab(TimeStampedModel, CreatedByModel, QCModel, SearchKey, WelcomeCallingDo
         resp = {
             'is_vip_member': False,
             'covered_under_vip': False,
-            'vip_amount': 0
+            'vip_amount': 0,
+            'vip_convenience_amount': 0
         }
 
         if user.is_authenticated and not user.is_anonymous:
@@ -2663,6 +2664,7 @@ class LabAppointment(TimeStampedModel, CouponsMixin, LabAppointmentInvoiceMixin,
                     price = effective_price
                 else:
                     price = price_engine.get_price(price_data)
+                vip_convenience_amount = plus_membership.plan.get_convenience_charge(price)
                 test = data['test_ids']
                 entity = "LABTEST" if not test[0].is_package else "PACKAGE"
                 engine = get_class_reference(plus_membership, entity)
@@ -2670,6 +2672,7 @@ class LabAppointment(TimeStampedModel, CouponsMixin, LabAppointmentInvoiceMixin,
                     # engine_response = engine.validate_booking_entity(cost=effective_price, id=data['test_ids'][0].id)
                     engine_response = engine.validate_booking_entity(cost=price, id=data['test_ids'][0].id)
                     effective_price = engine_response.get('amount_to_be_paid')
+                    effective_price = effective_price + vip_convenience_amount
                 else:
                     effective_price = effective_price
             else:

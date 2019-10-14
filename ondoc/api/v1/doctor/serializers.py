@@ -631,7 +631,8 @@ class DoctorHospitalSerializer(serializers.ModelSerializer):
         return resp
 
     def get_vip(self, obj):
-        resp = {"is_vip_member": False, "cover_under_vip": False, "vip_amount": 0, "is_enable_for_vip": False}
+        resp = {"is_vip_member": False, "cover_under_vip": False, "vip_amount": 0, "is_enable_for_vip": False,
+                "vip_convenience_amount": 0}
         request = self.context.get("request")
         user = request.user
         doctor_clinic = obj.doctor_clinic
@@ -660,6 +661,7 @@ class DoctorHospitalSerializer(serializers.ModelSerializer):
             if engine:
                 # vip_res = engine.validate_booking_entity(cost=mrp)
                 vip_res = engine.validate_booking_entity(cost=price)
+                resp['vip_convenience_amount'] = plus_user.plan.get_convenience_charge(price)
                 resp['vip_amount'] = vip_res.get('amount_to_be_paid', 0)
                 resp['cover_under_vip'] = vip_res.get('is_covered', False)
             # amount = plus_user.get_vip_amount(utilization, mrp)

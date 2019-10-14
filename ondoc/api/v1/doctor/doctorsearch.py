@@ -585,7 +585,9 @@ class DoctorSearchHelper:
                     min_deal_price = data.deal_price
                     min_price = {
                         "deal_price": data.deal_price,
-                        "mrp": data.mrp
+                        "mrp": data.mrp,
+                        "cod_deal_price": data.cod_deal_price if data.cod_deal_price else 0,
+                        "fees": data.fees if data.fees else 0
                     }
             # min_fees = min([data.get("deal_price") for data in serializer.data if data.get("deal_price")])
 
@@ -627,6 +629,7 @@ class DoctorSearchHelper:
                 is_vip_member = vip_data_dict.get('is_vip_member', False)
                 is_enable_for_vip = vip_data_dict.get('is_enable_for_vip', False)
                 vip_utilization = vip_data_dict.get('vip_utilization', None)
+                vip_convenience_amount = 0
                 vip_remaining_amount = int(vip_utilization.get('vip_remaining_amount', 0))
                 vip_amount = 0
                 cover_under_vip = vip_data_dict.get('cover_under_vip', False)
@@ -663,14 +666,15 @@ class DoctorSearchHelper:
                         doctor.enabled_for_online_booking and doctor_clinic.hospital.enabled_for_online_booking and \
                         doctor_clinic.enabled_for_online_booking:
                     mrp = int(min_price.get('mrp'))
-                    price_data = {"mrp": int(min_price.get('mrp')), "deal_price": int(min_price.get('deal_price')),
-                                  "cod_deal_price": int(min_price.get('cod_deal_price')),
-                                  "fees": int(min_price.get('fees'))}
+                    price_data = {"mrp": int(min_price.get('mrp', 0)), "deal_price": int(min_price.get('deal_price', 0)),
+                                  "cod_deal_price": int(min_price.get('cod_deal_price', 0)),
+                                  "fees": int(min_price.get('fees', 0))}
                     price_engine = get_price_reference(request.user.active_plus_user, "LABTEST")
                     if not price_engine:
                         price = mrp
                     else:
                         price = price_engine.get_price(price_data)
+                    vip_convenience_amount = request.user.active_plus_user.plan.get_convenience_charge(price)
                     engine = get_class_reference(request.user.active_plus_user, "DOCTOR")
                     if engine:
                         # vip_response_dict = engine.validate_booking_entity(cost=mrp)
@@ -683,6 +687,7 @@ class DoctorSearchHelper:
                     "is_insurance_covered": is_insurance_covered,
                     "insurance_limit_message": insurance_error,
                     "is_vip_member": is_vip_member,
+                    "vip_convenience_amount": vip_convenience_amount,
                     "cover_under_vip": cover_under_vip,
                     "vip_amount": vip_amount,
                     "is_enable_for_vip": is_enable_for_vip,
