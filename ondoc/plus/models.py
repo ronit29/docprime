@@ -27,6 +27,7 @@ from django.conf import settings
 from django.utils.functional import cached_property
 from .enums import UsageCriteria
 from copy import deepcopy
+from math import floor
 
 
 class LiveMixin(models.Model):
@@ -103,6 +104,7 @@ class PlusPlans(auth_model.TimeStampedModel, LiveMixin):
     is_retail = models.NullBooleanField()
     plan_criteria = models.CharField(max_length=100, null=True, blank=False, choices=UsageCriteria.as_choices())
     price_criteria = models.CharField(max_length=100, null=True, blank=False, choices=PriceCriteria.as_choices())
+    is_gold = models.NullBooleanField()
 
     @classmethod
     def get_active_plans_via_utm(cls, utm):
@@ -120,6 +122,19 @@ class PlusPlans(auth_model.TimeStampedModel, LiveMixin):
 
     def __str__(self):
         return "{}".format(self.plan_name)
+
+    def get_convenience_amount(self, price):
+        price_criteria = self.price_criteria
+        charge = 0
+        convenience_amount = price_criteria.get('CONVENIENCE_AMOUNT', 0)
+        convenience_percentage = price_criteria.get('CONVENIENCE_PERCENTAGE', 0)
+        if convenience_percentage > 0:
+            charge = (convenience_percentage/100) * price
+            charge = floor(charge)
+        if charge <= convenience_amount:
+            return charge
+        else:
+            convenience_amount
 
     class Meta:
         db_table = 'plus_plans'
