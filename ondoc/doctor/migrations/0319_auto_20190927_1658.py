@@ -13,7 +13,7 @@ class Migration(migrations.Migration):
         migrations.AddField(
             model_name='hospital',
             name='google_ratings_count',
-            field=models.PositiveIntegerField(blank=True, default=None, null=True),
+            field=models.PositiveIntegerField(blank=True, null=True),
         ),
         migrations.AlterField(
             model_name='hospital',

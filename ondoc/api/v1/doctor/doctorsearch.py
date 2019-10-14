@@ -753,8 +753,6 @@ class DoctorSearchHelper:
             else:
                 schema_type = 'Physician'
 
-            # rating_count = doctor.rating.filter(is_live=True).count()
-            # ratings_list = list(lambda x: x.is_live == True, doctor.rating.all())
             ratings_list = list(filter(lambda x: x.is_live == True, doctor.rating.all()))
             rating_count = len(ratings_list)
             average_rating = 0

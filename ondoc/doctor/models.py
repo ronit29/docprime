@@ -272,7 +272,7 @@ class Hospital(auth_model.TimeStampedModel, auth_model.CreatedByModel, auth_mode
     enabled_for_insurance = models.NullBooleanField(verbose_name='Enabled for Insurance')
     enabled_for_plus_plans = models.NullBooleanField()
     is_partner_lab_enabled = models.BooleanField(default=False)
-    google_ratings_count = models.PositiveIntegerField(null=True, blank=True, default=None)
+    google_ratings_count = models.PositiveIntegerField(null=True, blank=True)
 
     def __str__(self):
         return self.name
