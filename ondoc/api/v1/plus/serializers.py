@@ -165,7 +165,8 @@ class PlusMembersSerializer(serializers.Serializer):
 
             total_allowed_members = active_plus_user_obj.plan.total_allowed_members
 
-            if len(plus_members) + len(attrs.get('members'))-1 > total_allowed_members:
+            # if len(plus_members) + len(attrs.get('members'))-1 > total_allowed_members:
+            if len(attrs.get('members')) > total_allowed_members:
                 raise serializers.ValidationError({'members': 'Cannot add members more than total allowed memebers.'})
 
             # existing_members_name_set = set(map(lambda m: m.get_full_name(), plus_members))
