@@ -13,6 +13,7 @@ from ondoc.api.v1.utils import clinic_convert_timings, aware_time_zone
 from ondoc.api.v1.doctor import serializers
 from ondoc.authentication.models import QCModel
 from ondoc.doctor.models import Doctor, PracticeSpecialization
+from ondoc.plus.models import PlusPlans
 from ondoc.plus.usage_criteria import get_class_reference, get_price_reference
 from ondoc.procedure.models import DoctorClinicProcedure, ProcedureCategory, ProcedureToCategoryMapping, \
     get_selected_and_other_procedures, get_included_doctor_clinic_procedure, \
@@ -673,6 +674,7 @@ class DoctorSearchHelper:
                         doctor.enabled_for_online_booking and doctor_clinic.hospital.enabled_for_online_booking and \
                         doctor_clinic.enabled_for_online_booking:
                     mrp = int(min_price.get('mrp'))
+                    agreed_price = int(min_price.get('fees', 0))
                     price_data = {"mrp": int(min_price.get('mrp', 0)), "deal_price": int(min_price.get('deal_price', 0)),
                                   "cod_deal_price": int(min_price.get('cod_deal_price', 0)),
                                   "fees": int(min_price.get('fees', 0))}
@@ -720,7 +722,8 @@ class DoctorSearchHelper:
                                  'long': doctor_clinic.hospital.location.x} if doctor_clinic.hospital and doctor_clinic.hospital.location else None,
                     "url": kwargs.get('hosp_entity_dict', {}).get(doctor_clinic.hospital.id),
                     "locality_url": kwargs.get('hosp_locality_entity_dict', {}).get(doctor_clinic.hospital.id),
-                    "hosp_is_gold":hosp_is_gold
+                    "hosp_is_gold":hosp_is_gold,
+                    "vip_gold_price": agreed_price
                 }]
 
             thumbnail = doctor.get_thumbnail()
