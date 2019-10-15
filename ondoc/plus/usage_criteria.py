@@ -593,7 +593,7 @@ class DoctorDealPrice(AbstractCriteria):
     def _get_price(self, price_data):
         if not price_data:
             return None
-        return price_data.get('mrp', 0)
+        return price_data.get('deal_price', 0)
 
 
 class DoctorAgreedPrice(AbstractCriteria):
@@ -603,7 +603,7 @@ class DoctorAgreedPrice(AbstractCriteria):
     def _get_price(self, price_data):
         if not price_data:
             return None
-        return price_data.get('mrp', 0)
+        return price_data.get('fees', 0)
 
 
 class DoctorCodDealPrice(AbstractCriteria):
@@ -613,7 +613,7 @@ class DoctorCodDealPrice(AbstractCriteria):
     def _get_price(self, price_data):
         if not price_data:
             return None
-        return price_data.get('mrp', 0)
+        return price_data.get('cod_deal_price', 0)
 
 
 class LabtestMrp(AbstractCriteria):
