@@ -594,9 +594,11 @@ class PlusUser(auth_model.TimeStampedModel, RefundMixin):
         current_item_price_data = OpdAppointment.get_price_details(
             appointment_data) if appointment_type == OPD else LabAppointment.get_price_details(appointment_data)
         current_item_mrp = int(current_item_price_data.get('mrp', 0))
+        cod_deal_price = current_item_price_data.get('consultation').get('cod_deal_price') if current_item_price_data \
+                            and current_item_price_data.get('consultation') and current_item_price_data.get('consultation').get('cod_deal_price') else 0
         if 'doctor' in appointment_data:
             price_data = {"mrp": int(current_item_price_data.get('mrp')), "deal_price": int(current_item_price_data.get('deal_price')),
-                          "cod_deal_price": int(current_item_price_data.get('cod_deal_price')),
+                          "cod_deal_price": int(cod_deal_price),
                           "fees": int(current_item_price_data.get('fees'))}
             price_engine = get_price_reference(request.user.active_plus_user, "DOCTOR")
             if not price_engine:
