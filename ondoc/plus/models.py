@@ -1128,10 +1128,12 @@ class PlusAppointmentMapping(auth_model.TimeStampedModel):
     @classmethod
     def get_vip_amount(cls, plus_user, content_type):
         from ondoc.doctor.models import OpdAppointment
+        vip_amount = 0
         objects = cls.objects.filter(content_type=content_type, plus_user=plus_user)
         valid_objects = list(filter(lambda obj: obj.content_object.status != OpdAppointment.CANCELLED, objects))
         valid_amounts = list(map(lambda o: o.amount, valid_objects))
-        vip_amount = functools.reduce(lambda a, b: a + b, valid_amounts)
+        if valid_amounts:
+            vip_amount = functools.reduce(lambda a, b: a + b, valid_amounts)
         return vip_amount
 
     @classmethod
