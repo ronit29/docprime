@@ -69,7 +69,7 @@ class PlusProposer(auth_model.TimeStampedModel):
 
     @property
     def get_active_plans(self):
-        return self.plus_plans.filter(is_live=True, is_retail=True).order_by('id')[:3]
+        return self.plus_plans.filter(is_live=True, is_retail=True).order_by('id')
         # index = 0
         # for plan in plans:
         #     if plan.plan_utmsources.all().exists():
