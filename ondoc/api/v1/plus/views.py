@@ -327,7 +327,7 @@ class PlusProfileViewSet(viewsets.GenericViewSet):
             plus_user_id = request.query_params.get('id')
             plus_user = PlusUser.objects.filter(id=plus_user_id).first()
         else:
-            return Response(status=status.HTTP_404_NOT_FOUND)
+            return Response(status=status.HTTP_400_BAD_REQUEST)
 
         if not plus_user:
             return Response(status=status.HTTP_400_BAD_REQUEST)
