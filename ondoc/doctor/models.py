@@ -300,7 +300,7 @@ class Hospital(auth_model.TimeStampedModel, auth_model.CreatedByModel, auth_mode
         return result
 
     @staticmethod
-    def get_top_hospitals_data(request, lat=28.450367, long=77.071848, vip_user=None):
+    def get_top_hospitals_data(request, lat=28.450367, long=77.071848, vip_user=None, from_vip_page=False):
         from ondoc.api.v1.doctor.serializers import TopHospitalForIpdProcedureSerializer
         from ondoc.seo.models import NewDynamic
         result = []
@@ -313,7 +313,8 @@ class Hospital(auth_model.TimeStampedModel, auth_model.CreatedByModel, auth_mode
                                                               Prefetch('hospital__hospital_doctors__availability',
                                                                        queryset=DoctorClinicTiming.objects.filter(
                                                                            day=day))).order_by('priority')
-        if vip_user:
+
+        if vip_user or from_vip_page:
             common_hosp_queryset = common_hosp_queryset.filter(hospital__enabled_for_prepaid=True)
         common_hosp_queryset = common_hosp_queryset[:20]
 

@@ -1665,10 +1665,12 @@ class SearchedItemsViewSet(viewsets.GenericViewSet):
         serializer.is_valid(raise_exception=True)
         validated_data = serializer.validated_data
         vip_user = None
+        from_vip_page = True
 
         if logged_in_user.is_authenticated and not logged_in_user.is_anonymous:
             vip_user = logged_in_user.active_plus_user
-        top_hospitals_data = Hospital.get_top_hospitals_data(request, validated_data.get('lat'), validated_data.get('long'), vip_user)
+        top_hospitals_data = Hospital.get_top_hospitals_data(request, validated_data.get('lat'), validated_data.get('long'), vip_user, from_vip_page)
+
         return Response({"top_hospitals": top_hospitals_data})
 
 
@@ -4594,16 +4596,21 @@ class HospitalViewSet(viewsets.GenericViewSet):
             day = datetime.datetime.today().weekday()
 
             hospital_queryset = Hospital.objects.prefetch_related('hospital_doctors', 'hospital_documents', 'matrix_city',
-                                                Prefetch('hospital_doctors__availability',
-                                                queryset=DoctorClinicTiming.objects.filter(day=day))).filter(enabled_for_online_booking=True,
-                                               hospital_doctors__enabled_for_online_booking=True,
-                                               hospital_doctors__doctor__enabled_for_online_booking=True,
-                                               hospital_doctors__doctor__is_live=True, is_live=True).annotate(
-                                               bookable_doctors_count=Count(Q(enabled_for_online_booking=True,
-                                               hospital_doctors__enabled_for_online_booking=True,
-                                               hospital_doctors__doctor__enabled_for_online_booking=True,
-                                               hospital_doctors__doctor__is_live=True, is_live=True)),
-                distance=Distance('location', pnt)).filter(bookable_doctors_count__gte=20).order_by('distance')
+                                                                  Prefetch('hospital_doctors__availability',
+                                                                  queryset=DoctorClinicTiming.objects.filter(day=day))).\
+                filter(enabled_for_online_booking=True,
+                       hospital_doctors__enabled_for_online_booking=True,
+                       hospital_doctors__doctor__enabled_for_online_booking=True,
+                       hospital_doctors__doctor__is_live=True, is_live=True).annotate(
+                       bookable_doctors_count=Count(Q(enabled_for_online_booking=True,
+                                                      hospital_doctors__enabled_for_online_booking=True,
+                                                      hospital_doctors__doctor__enabled_for_online_booking=True,
+                                                      hospital_doctors__doctor__is_live=True, is_live=True)),
+                                                      distance=Distance('location', pnt)).filter(bookable_doctors_count__gte=20).order_by('distance')
+
+            if validated_data.get('from_vip'):
+                hospital_queryset = hospital_queryset.filter(enabled_for_prepaid=True)
+
             result_count = hospital_queryset.count()
             hospital_percentage_dict = dict()
 
