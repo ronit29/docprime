@@ -706,7 +706,7 @@ class DoctorSearchHelper:
                                  'long': doctor_clinic.hospital.location.x} if doctor_clinic.hospital and doctor_clinic.hospital.location else None,
                     "url": kwargs.get('hosp_entity_dict', {}).get(doctor_clinic.hospital.id),
                     "locality_url": kwargs.get('hosp_locality_entity_dict', {}).get(doctor_clinic.hospital.id),
-                    "is_gold":hosp_is_gold
+                    "hosp_is_gold":hosp_is_gold
                 }]
 
             thumbnail = doctor.get_thumbnail()
