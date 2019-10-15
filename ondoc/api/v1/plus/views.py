@@ -13,6 +13,7 @@ from ondoc.api.v1.utils import plus_subscription_transform, payment_details
 from ondoc.authentication.backends import JWTAuthentication
 from ondoc.account import models as account_models
 from ondoc.authentication.models import User, UserProfile
+from ondoc.common.middleware import use_slave
 from ondoc.common.models import BlacklistUser, BlockedStates, DocumentsProofs
 from ondoc.diagnostic.models import LabAppointment
 from ondoc.doctor.models import OpdAppointment
@@ -37,6 +38,7 @@ class PlusListViewSet(viewsets.GenericViewSet):
         # plans_with_utm = plans.filter()
         return plans
 
+    @use_slave
     def list(self, request):
         resp = {}
         user = request.user

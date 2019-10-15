@@ -352,7 +352,6 @@ class MatrixMappedState(TimeStampedModel):
 
         return data
 
-
     def sync_with_booking_analytics(self):
         obj = DP_StateMaster.objects.filter(StateId=self.id).first()
         if not obj:

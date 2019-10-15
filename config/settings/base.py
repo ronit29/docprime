@@ -72,9 +72,11 @@ FILE_UPLOAD_PERMISSIONS = 0o664
 DATABASE_ROUTERS = ['config.settings.db_router.DatabaseRouter']
 DATABASES = {
     'default': env.db('DATABASE_URL'),
+    'slave': env.db('SLAVE_DATABASE_URL')
 }
 
 DATABASES['default']['ENGINE'] = 'django.contrib.gis.db.backends.postgis'
+DATABASES['slave']['ENGINE'] = 'django.contrib.gis.db.backends.postgis'
 # if (env('DJANGO_SETTINGS_MODULE') == 'config.settings.production'):
 #     DATABASES['doc_read'] = env.db('READ_DATABASE_URL')
 #     DATABASES['doc_read']['ENGINE'] = 'django.contrib.gis.db.backends.postgis'
@@ -534,3 +536,4 @@ CARE_PLAN_FOR_VIP=env('CARE_PLAN_FOR_VIP')
 VIP_SALESPOINT_URL=env('VIP_SALESPOINT_URL')
 VIP_SALESPOINT_AUTHTOKEN=env('VIP_SALESPOINT_AUTHTOKEN')
 VIP_CANCELLATION_PERIOD=env.int('VIP_CANCELLATION_PERIOD')
+USE_SLAVE_DB=env.bool('USE_SLAVE_DB', False)
