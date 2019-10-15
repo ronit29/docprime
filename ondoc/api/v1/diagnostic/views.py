@@ -13,6 +13,7 @@ from ondoc.api.v1.doctor.serializers import CommaSepratedToListField
 from ondoc.authentication.backends import JWTAuthentication
 from ondoc.api.v1.diagnostic import serializers as diagnostic_serializer
 from ondoc.api.v1.auth.serializers import AddressSerializer
+from ondoc.common.middleware import use_slave
 from ondoc.integrations.models import IntegratorTestMapping, IntegratorReport, IntegratorMapping
 from ondoc.cart.models import Cart
 from ondoc.common.models import UserConfig, GlobalNonBookable, AppointmentHistory, MatrixMappedCity
@@ -87,6 +88,7 @@ logger = logging.getLogger(__name__)
 class SearchPageViewSet(viewsets.ReadOnlyModelViewSet):
 
     @transaction.non_atomic_requests
+    @use_slave
     def list(self, request, *args, **kwargs):
         coupon_code = request.query_params.get('coupon_code')
         profile = request.query_params.get('profile_id')

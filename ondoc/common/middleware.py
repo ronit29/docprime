@@ -31,6 +31,10 @@ class ReplicationMiddleware:
             log.debug('state by request method: %s', state)
         routers.set_state(state)
 
+    def process_response(self, request, response):
+        routers.reset()
+        return response
+
 
 use_state = decorator_from_middleware_with_args(ReplicationMiddleware)
 use_default = use_slave = use_state(forced_state='default')

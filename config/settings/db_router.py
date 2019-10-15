@@ -1,4 +1,5 @@
 from django.conf import settings
+from django.db import DEFAULT_DB_ALIAS
 
 DATABASE_LABEL_APPS_MAPPING = {
     'bookinganalytics' : 'sql_server'
@@ -11,10 +12,8 @@ class DatabaseRouter:
     """
 
     def __init__(self):
-        from django.db import DEFAULT_DB_ALIAS
-
         self.DEFAULT_DB_ALIAS = DEFAULT_DB_ALIAS
-        self.state = 'default'
+        self.state = DEFAULT_DB_ALIAS
 
     def set_state(self, state):
         if state in list(settings.DATABASES.keys()):
@@ -22,10 +21,16 @@ class DatabaseRouter:
         else:
             self.state = 'default'
 
+    def reset(self):
+        self.DEFAULT_DB_ALIAS = DEFAULT_DB_ALIAS
+        self.state = DEFAULT_DB_ALIAS
+
     def db_for_read(self, model, **hints):
         if model._meta.app_label in DATABASE_LABEL_APPS_MAPPING:
             return DATABASE_LABEL_APPS_MAPPING[model._meta.app_label]
-        return self.state
+        # state = self.DEFAULT_DB_ALIAS
+        state = self.state
+        return state
 
     def db_for_write(self, model, **hints):
         if model._meta.app_label in DATABASE_LABEL_APPS_MAPPING:
