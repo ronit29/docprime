@@ -674,7 +674,6 @@ class DoctorSearchHelper:
                         doctor.enabled_for_online_booking and doctor_clinic.hospital.enabled_for_online_booking and \
                         doctor_clinic.enabled_for_online_booking:
                     mrp = int(min_price.get('mrp'))
-                    agreed_price = int(min_price.get('fees', 0))
                     price_data = {"mrp": int(min_price.get('mrp', 0)), "deal_price": int(min_price.get('deal_price', 0)),
                                   "cod_deal_price": int(min_price.get('cod_deal_price', 0)),
                                   "fees": int(min_price.get('fees', 0))}
@@ -723,7 +722,7 @@ class DoctorSearchHelper:
                     "url": kwargs.get('hosp_entity_dict', {}).get(doctor_clinic.hospital.id),
                     "locality_url": kwargs.get('hosp_locality_entity_dict', {}).get(doctor_clinic.hospital.id),
                     "hosp_is_gold":hosp_is_gold,
-                    "vip_gold_price": agreed_price
+                    "vip_gold_price": int(min_price.get('fees', 0))
                 }]
 
             thumbnail = doctor.get_thumbnail()
