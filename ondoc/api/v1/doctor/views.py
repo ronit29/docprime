@@ -1219,25 +1219,34 @@ class DoctorProfileUserViewSet(viewsets.GenericViewSet):
                     hosp_reviews_dict[hospital.pk]['google_rating'] = list()
                     ratings_graph = None
                     hosp_reviews = hospital.hospital_place_details.all()
+                    # if hosp_reviews:
+                    reviews_data = dict()
+                    reviews_data['user_reviews'] = None
                     if hosp_reviews:
-                        reviews_data = hosp_reviews[0].reviews
+                        reviews_data['user_reviews'] = hosp_reviews[0].reviews.get('user_reviews')
+                    reviews_data['user_avg_rating'] = hospital.google_avg_rating
+                    reviews_data['user_ratings_total'] = hospital.google_ratings_count
+                    ratings_graph = GoogleRatingsGraphSerializer(reviews_data, many=False,
+                                                                 context={"request": request})
 
-                        if reviews_data and reviews_data.get('user_reviews'):
-                            ratings_graph = GoogleRatingsGraphSerializer(reviews_data, many=False,
-                                                                         context={"request": request})
+                    if reviews_data and reviews_data.get('user_reviews'):
+                        for data in reviews_data.get('user_reviews'):
+                            if data.get('time'):
+                                date = time.strftime("%d %b %Y", time.gmtime(data.get('time')))
 
-                            for data in reviews_data.get('user_reviews'):
-                                if data.get('time'):
-                                    date = time.strftime("%d %b %Y", time.gmtime(data.get('time')))
-
-                                hosp_reviews_dict[hospital.pk]['google_rating'].append(
-                                    {'compliment': None, 'date': date, 'id': hosp_reviews[0].pk, 'is_live': hospital.is_live,
-                                     'ratings': data.get('rating'),
-                                     'review': data.get('text'), 'user': None, 'user_name': data.get('author_name')
-                                     })
-
-                        else:
-                            hosp_reviews_dict[hospital.pk]['google_rating'] = None
+                            hosp_reviews_dict[hospital.pk]['google_rating'].append(
+                                {'compliment': None, 'date': date, 'id': hosp_reviews[0].pk, 'is_live': hospital.is_live,
+                                 'ratings': data.get('rating'),
+                                 'review': data.get('text'), 'user': None, 'user_name': data.get('author_name')
+                                 })
+                    if reviews_data.get('user_avg_rating') and reviews_data.get('user_ratings_total'):
+                        if not hosp_reviews_dict[hospital.pk].get('google_rating'):
+                            hosp_reviews_dict[hospital.pk]['google_rating'].append(
+                                {'compliment': None, 'date': None, 'id': None,
+                                 'is_live': hospital.is_live,
+                                 'ratings':None,
+                                 'review': None, 'user': None, 'user_name': None
+                                 })
                         hosp_reviews_dict[hospital.pk]['google_rating_graph'] = ratings_graph.data if ratings_graph else None
                     else:
                         hosp_reviews_dict[hospital.pk]['google_rating'] = None
@@ -1606,8 +1615,6 @@ class SearchedItemsViewSet(viewsets.GenericViewSet):
         common_procedure_categories_serializer = CommonProcedureCategorySerializer(common_procedure_categories,
                                                                                    many=True)
 
-
-
         common_procedures = CommonProcedure.objects.select_related('procedure').filter(
             procedure__is_enabled=True).all().order_by("-priority")[:10]
         common_procedures_serializer = CommonProcedureSerializer(common_procedures, many=True)
@@ -1651,6 +1658,19 @@ class SearchedItemsViewSet(viewsets.GenericViewSet):
                          "ipd_procedures": common_ipd_procedures_serializer.data,
                          "top_hospitals": top_hospitals_data,
                          'package_categories': common_package_category(self, request)})
+
+    @transaction.non_atomic_requests
+    def top_hospitals(self, request):
+        logged_in_user = request.user
+        serializer = CommonConditionsSerializer(data=request.query_params)
+        serializer.is_valid(raise_exception=True)
+        validated_data = serializer.validated_data
+        vip_user = None
+
+        if logged_in_user.is_authenticated and not logged_in_user.is_anonymous:
+            vip_user = logged_in_user.active_plus_user
+        top_hospitals_data = Hospital.get_top_hospitals_data(request, validated_data.get('lat'), validated_data.get('long'), vip_user)
+        return Response({"top_hospitals": top_hospitals_data})
 
 
 class DoctorListViewSet(viewsets.GenericViewSet):
@@ -1833,7 +1853,7 @@ class DoctorListViewSet(viewsets.GenericViewSet):
                                                 "doctor_clinics__procedures_from_doctor_clinic__procedure__parent_categories_mapping",
                                                 "qualifications__qualification","qualifications__college",
                                                 "qualifications__specialization",
-                                                "doctor_clinics__hospital__hospital_place_details"
+                                                "doctor_clinics__hospital__hospital_place_details", "rating"
                                                 ).order_by(preserved)
 
         response = doctor_search_helper.prepare_search_response(doctor_data, doctor_search_result, request,
@@ -4563,6 +4583,32 @@ class AppointmentMessageViewset(viewsets.GenericViewSet):
 
 class HospitalViewSet(viewsets.GenericViewSet):
 
+    def near_you_hospitals(self, request):
+        request_data = request.query_params
+        serializer = serializers.HospitalNearYouSerializer(data=request_data)
+        serializer.is_valid(raise_exception=True)
+        validated_data = serializer.validated_data
+        result_count = 0
+        if validated_data and validated_data.get('long') and validated_data.get('lat'):
+            point_string = 'POINT(' + str(validated_data.get('long')) + ' ' + str(validated_data.get('lat')) + ')'
+            pnt = GEOSGeometry(point_string, srid=4326)
+
+            hospital_queryset = Hospital.objects.prefetch_related('hospital_doctors').filter(enabled_for_online_booking=True,
+                                               hospital_doctors__enabled_for_online_booking=True,
+                                               hospital_doctors__doctor__enabled_for_online_booking=True,
+                                               hospital_doctors__doctor__is_live=True, is_live=True).annotate(
+                                               bookable_doctors_count=Count(Q(enabled_for_online_booking=True,
+                                               hospital_doctors__enabled_for_online_booking=True,
+                                               hospital_doctors__doctor__enabled_for_online_booking=True,
+                                               hospital_doctors__doctor__is_live=True, is_live=True)),
+                distance=Distance('location', pnt)).filter(bookable_doctors_count__gte=20).order_by('distance')
+            result_count = hospital_queryset.count()
+            hospital_serializer = serializers.HospitalModelSerializer(hospital_queryset[:20], many=True,
+                                                                      context={"request": request})
+
+            return Response({'count': result_count, 'hospitals': hospital_serializer.data})
+        return Response({})
+
     def list_by_url(self, request, url, *args, **kwargs):
         url = url.lower()
         entity = EntityUrls.objects.filter(url=url, url_type=EntityUrls.UrlType.SEARCHURL,
@@ -4671,12 +4717,14 @@ class HospitalViewSet(viewsets.GenericViewSet):
         provider_ids = validated_data.get('provider_ids')
         point_string = 'POINT(' + str(long) + ' ' + str(lat) + ')'
         pnt = GEOSGeometry(point_string, srid=4326)
+
         hospital_queryset = Hospital.objects.prefetch_related('hospitalcertification_set',
                                                               'hospital_documents',
                                                               'hosp_availability',
                                                               'health_insurance_providers',
                                                               'network__hospital_network_documents',
-                                                              'hospitalspeciality_set').exclude(location__dwithin=(
+                                                              'hospitalspeciality_set',
+                                                              'hospital_doctors').exclude(location__dwithin=(
             Point(float(long),
                   float(lat)),
             D(m=min_distance))).filter(
@@ -4686,7 +4734,10 @@ class HospitalViewSet(viewsets.GenericViewSet):
                 Point(float(long),
                       float(lat)),
                 D(m=max_distance))).annotate(
-            distance=Distance('location', pnt)).order_by('-is_ipd_hospital', 'distance')
+            distance=Distance('location', pnt), bookable_doctors_count=Count(Q(enabled_for_online_booking=True,
+                                           hospital_doctors__enabled_for_online_booking=True,
+                                           hospital_doctors__doctor__enabled_for_online_booking=True,
+                                           hospital_doctors__doctor__is_live=True, is_live=True))).order_by('-is_ipd_hospital', 'distance')
         if provider_ids:
             hospital_queryset = hospital_queryset.filter(health_insurance_providers__id__in=provider_ids)
         if ipd_pk:

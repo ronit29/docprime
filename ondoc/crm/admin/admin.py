@@ -63,7 +63,7 @@ from .doctor import (DoctorAdmin, MedicalServiceAdmin, SpecializationAdmin, Qual
                      DoctorSponsoredServicesAdmin)
 from .aboutdoctor import AboutDoctorAdmin
 from .hospital import HospitalAdmin, CommonHospitalAdmin, GenericQuestionAnswerAdmin
-from .user import CustomUserAdmin, UserNumberUpdateAdmin, UserProfileAdmin
+from .user import CustomUserAdmin, UserNumberUpdateAdmin, UserProfileAdmin, PermissionAdmin
 from .hospital_network import HospitalNetworkAdmin
 from .lab import LabAdmin, LabTestAdmin, LabTestTypeAdmin, AvailableLabTestAdmin, CommonDiagnosticConditionAdmin, \
     LabAppointmentAdmin, CommonTestAdmin, TestParameterAdmin, CommonPackageAdmin, LabTestCategoryAdmin, \
@@ -120,6 +120,7 @@ from ondoc.plus.models import PlusUser, PlusProposer, PlusPlans, PlusThreshold, 
 from .plus import PlusPlansAdmin, PlusProposerAdmin, PlusThresholdAdmin, PlusUserAdmin, PlusPlanParametersAdmin, \
     PlusPlanUtmSourceAdmin
 from ondoc.plus.models import PlusUser, PlusProposer, PlusPlans, PlusThreshold, PlusPlanParameters, PlusPlanUtmSources
+from django.contrib.auth.models import Permission
 
 User = get_user_model()
 
@@ -327,5 +328,6 @@ admin.site.register(PartnerLabTestSamples, PartnerLabTestSampleAdmin)
 admin.site.register(PartnerLabTestSampleDetails, PartnerLabTestSampleDetailAdmin)
 admin.site.register(TestSamplesLabAlerts, TestSamplesLabAlertAdmin)
 admin.site.register(PartnerLabSamplesCollectOrder, PartnerLabSamplesCollectOrderAdmin)
+admin.site.register(Permission, PermissionAdmin)
 
 
