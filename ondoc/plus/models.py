@@ -142,7 +142,7 @@ class PlusPlans(auth_model.TimeStampedModel, LiveMixin):
         convenience_percentage = int(convenience_percentage)
         convenience_amount = int(convenience_amount)
         if convenience_percentage and convenience_percentage > 0:
-            charge = (convenience_percentage/100) * price
+            charge = (convenience_percentage/100) * float(price)
             charge = floor(charge)
         elif convenience_amount and convenience_amount > 0:
             return convenience_amount
@@ -170,7 +170,7 @@ class PlusPlans(auth_model.TimeStampedModel, LiveMixin):
         convenience_percentage = int(convenience_percentage)
         convenience_amount = int(convenience_amount)
         if convenience_percentage and convenience_percentage > 0:
-            charge = (convenience_percentage / 100) * price
+            charge = (float(convenience_percentage) / 100) * float(price)
             charge = floor(charge)
         elif convenience_amount and convenience_amount > 0:
             return convenience_amount
