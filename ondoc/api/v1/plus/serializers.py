@@ -180,7 +180,7 @@ class PlusMembersSerializer(serializers.Serializer):
                     to_be_added_member_list.append(each_member)
 
             to_be_added_member_set = set(
-                    map(lambda member: "%s %s" % (member['first_name'], member['last_name']), member_list))
+                    map(lambda member: "%s %s" % (member['first_name'], member['last_name']), to_be_added_member_list))
 
             # to_be_added_member_set = set(map(lambda member: "%s %s" % (member['first_name'], member['last_name']), to_be_added_member_list))
             # to_be_added_member_relation_set = set(map(lambda member: "%s" % (member['relation']), to_be_added_member_list))
@@ -189,8 +189,8 @@ class PlusMembersSerializer(serializers.Serializer):
             # if len(to_be_added_member_set) != len(to_be_added_member_list):
             #     raise serializers.ValidationError({'name': 'Multiple members cannot have same name'})
 
-            if len(to_be_added_member_set) != len(member_list):
-                raise serializers.ValidationError({'name': 'Multiple members cannot have same name'})
+            # if len(to_be_added_member_set) != len(member_list):
+            #     raise serializers.ValidationError({'name': 'Multiple members cannot have same name'})
 
             if to_be_added_member_set & existing_members_name_set:
                 raise serializers.ValidationError({'name': 'Member already exist. Members name need to be unique.'})
