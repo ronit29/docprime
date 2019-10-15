@@ -672,7 +672,7 @@ class DoctorSearchHelper:
                 if request and request.user and not request.user.is_anonymous and vip_data_dict.get('is_vip_member') and \
                         doctor.enabled_for_plus_plans and doctor_clinic.hospital.enabled_for_prepaid and \
                         doctor.enabled_for_online_booking and doctor_clinic.hospital.enabled_for_online_booking and \
-                        doctor_clinic.enabled_for_online_booking:
+                        doctor_clinic.enabled_for_online_booking and doctor_clinic.hospital.enabled_for_plus_plans:
                     mrp = int(min_price.get('mrp'))
                     price_data = {"mrp": int(min_price.get('mrp', 0)), "deal_price": int(min_price.get('deal_price', 0)),
                                   "cod_deal_price": int(min_price.get('cod_deal_price', 0)),
