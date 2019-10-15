@@ -111,16 +111,30 @@ class PlusProposerSerializer(serializers.ModelSerializer):
     gold_plans = serializers.SerializerMethodField()
 
     def get_plans(self, obj):
-        plus_plans_qs = obj.get_active_plans.filter(~Q(is_gold=True))
+        request = self.context.get('request')
+        resp = []
 
+        if request.query_params.get('is_gold'):
+            return resp
+
+        plus_plans_qs = obj.get_active_plans.filter(~Q(is_gold=True))
         serializer_obj = PlusPlansSerializer(plus_plans_qs, context=self.context, many=True)
-        return serializer_obj.data
+        resp = serializer_obj.data
+
+        return resp
 
     def get_gold_plans(self, obj):
-        plus_plans_qs = obj.get_active_plans.filter(is_gold=True)
+        request = self.context.get('request')
+        resp = []
 
-        serializer_obj = PlusPlansSerializer(plus_plans_qs, context=self.context, many=True)
-        return serializer_obj.data
+        if request.query_params.get('is_gold') or request.query_params.get('all'):
+
+            plus_plans_qs = obj.get_active_plans.filter(is_gold=True)
+
+            serializer_obj = PlusPlansSerializer(plus_plans_qs, context=self.context, many=True)
+            resp = serializer_obj.data
+
+        return resp
 
     class Meta:
         model = PlusProposer
