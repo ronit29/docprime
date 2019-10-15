@@ -16,6 +16,7 @@ from ondoc.api.v1.procedure.serializers import CommonProcedureCategorySerializer
     CommonHospitalSerializer, CommonCategoriesSerializer
 from ondoc.authentication.models import UserProfile
 from ondoc.cart.models import Cart
+from ondoc.common.middleware import use_slave
 from ondoc.crm.constants import constants
 from ondoc.diagnostic.models import LabTestCategory
 from ondoc.doctor import models
@@ -1564,6 +1565,7 @@ class SearchedItemsViewSet(viewsets.GenericViewSet):
 
 
     @transaction.non_atomic_requests
+    @use_slave
     def common_conditions(self, request):
         city = None
         serializer = CommonConditionsSerializer(data=request.query_params)

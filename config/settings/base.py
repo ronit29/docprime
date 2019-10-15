@@ -72,9 +72,11 @@ FILE_UPLOAD_PERMISSIONS = 0o664
 DATABASE_ROUTERS = ['config.settings.db_router.DatabaseRouter']
 DATABASES = {
     'default': env.db('DATABASE_URL'),
+    'slave': env.db('SLAVE_DATABASE_URL')
 }
 
 DATABASES['default']['ENGINE'] = 'django.contrib.gis.db.backends.postgis'
+DATABASES['slave']['ENGINE'] = 'django.contrib.gis.db.backends.postgis'
 # if (env('DJANGO_SETTINGS_MODULE') == 'config.settings.production'):
 #     DATABASES['doc_read'] = env.db('READ_DATABASE_URL')
 #     DATABASES['doc_read']['ENGINE'] = 'django.contrib.gis.db.backends.postgis'
