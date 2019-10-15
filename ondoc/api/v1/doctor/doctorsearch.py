@@ -6,6 +6,7 @@ from django.conf import settings
 from ondoc.api.v1.doctor.serializers import DoctorProfileUserViewSerializer
 from ondoc.api.v1.procedure.serializers import DoctorClinicProcedureSerializer
 from ondoc.api.v1.ratings.serializers import GoogleRatingsGraphSerializer
+from ondoc.common.models import SearchCriteria
 from ondoc.coupon.models import CouponRecommender
 from ondoc.doctor import models
 from ondoc.api.v1.utils import clinic_convert_timings, aware_time_zone
@@ -566,8 +567,13 @@ class DoctorSearchHelper:
         coupon_code = query_params.get("coupon_code", None)
 
         coupon_recommender = CouponRecommender(request.user, profile, 'doctor', product_id, coupon_code, None)
-        filters = dict()
+        search_criteria = SearchCriteria.objects.filter(search_key='is_gold')
+        hosp_is_gold = False
+        if search_criteria:
+            search_criteria = search_criteria.first()
+            hosp_is_gold = search_criteria.search_value
 
+        filters = dict()
 
         for doctor in doctor_data:
             enable_online_booking = False
@@ -699,7 +705,8 @@ class DoctorSearchHelper:
                     "location": {'lat': doctor_clinic.hospital.location.y,
                                  'long': doctor_clinic.hospital.location.x} if doctor_clinic.hospital and doctor_clinic.hospital.location else None,
                     "url": kwargs.get('hosp_entity_dict', {}).get(doctor_clinic.hospital.id),
-                    "locality_url": kwargs.get('hosp_locality_entity_dict', {}).get(doctor_clinic.hospital.id)
+                    "locality_url": kwargs.get('hosp_locality_entity_dict', {}).get(doctor_clinic.hospital.id),
+                    "is_gold":hosp_is_gold
                 }]
 
             thumbnail = doctor.get_thumbnail()
