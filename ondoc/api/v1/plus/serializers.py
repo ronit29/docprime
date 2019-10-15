@@ -37,15 +37,16 @@ class PlusPlansSerializer(serializers.ModelSerializer):
         return resp
 
     def get_enabled_hospital_networks(self, obj):
-        request = self.context.get('request')
-        if not request:
-            return None
-
-        serializer = CommonConditionsSerializer(data=request.query_params)
-        serializer.is_valid(raise_exception=True)
-        validated_data = serializer.validated_data
-        top_hospitals_data = Hospital.get_top_hospitals_data(request, validated_data.get('lat'), validated_data.get('long'))
-        return top_hospitals_data
+        return []
+        # request = self.context.get('request')
+        # if not request:
+        #     return None
+        #
+        # serializer = CommonConditionsSerializer(data=request.query_params)
+        # serializer.is_valid(raise_exception=True)
+        # validated_data = serializer.validated_data
+        # top_hospitals_data = Hospital.get_top_hospitals_data(request, validated_data.get('lat'), validated_data.get('long'))
+        # return top_hospitals_data
 
     def get_worth(self, obj):
         data = {}
