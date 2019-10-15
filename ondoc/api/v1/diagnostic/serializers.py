@@ -924,6 +924,7 @@ class LabAppointmentModelSerializer(serializers.ModelSerializer):
     lab_test_name = serializers.SerializerMethodField()
     vip = serializers.SerializerMethodField()
     selected_timings_type = serializers.SerializerMethodField()
+    payment_mode = serializers.SerializerMethodField()
 
     def get_vip(self, obj):
         plus_appointment_mapping = None
@@ -982,11 +983,17 @@ class LabAppointmentModelSerializer(serializers.ModelSerializer):
 
         return selected_timings_type
 
+    def get_payment_mode(self, obj):
+        payment_modes = dict(OpdAppointment.PAY_CHOICES)
+        if payment_modes:
+            return payment_modes.get(obj.payment_type, '')
+        return ''
+
     class Meta:
         model = LabAppointment
         fields = ('id', 'lab', 'lab_test', 'profile', 'type', 'lab_name', 'status', 'deal_price', 'effective_price', 'time_slot_start', 'time_slot_end',
                    'is_home_pickup', 'lab_thumbnail', 'lab_image', 'patient_thumbnail', 'patient_name', 'allowed_action', 'address', 'invoices', 'reports', 'report_files',
-                  'prescription', 'lab_test_name', 'vip', 'selected_timings_type')
+                  'prescription', 'lab_test_name', 'vip', 'selected_timings_type', 'payment_mode')
 
 
 class LabAppointmentBillingSerializer(serializers.ModelSerializer):
