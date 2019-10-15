@@ -21,6 +21,7 @@ from django.db.models import F, Sum, Max, Q, Prefetch, Case, When, Count, Value
 from django.db.models.functions import Concat, Substr
 from django.forms.models import model_to_dict
 
+from ondoc.common.middleware import use_slave
 from ondoc.common.models import UserConfig, PaymentOptions, AppointmentHistory, BlacklistUser, BlockedStates
 from ondoc.common.utils import get_all_upcoming_appointments
 from ondoc.coupon.models import UserSpecificCoupon, Coupon
@@ -527,6 +528,7 @@ class ReferralViewSet(GenericViewSet):
     # authentication_classes = (JWTAuthentication, )
     # permission_classes = (IsAuthenticated, IsNotAgent)
 
+    @use_slave
     def retrieve(self, request):
         user = request.user
         if not user.is_authenticated:
@@ -571,6 +573,7 @@ class UserAppointmentsViewSet(OndocViewSet):
         return OpdAppointment.objects.filter(user=user)
 
     @transaction.non_atomic_requests
+    @use_slave
     def list(self, request):
         params = request.query_params
         doctor_serializer = self.doctor_appointment_list(request, params)
@@ -1487,6 +1490,7 @@ class UserTransactionViewSet(viewsets.GenericViewSet):
     permission_classes = (IsAuthenticated,)
 
     @transaction.non_atomic_requests
+    @use_slave
     def list(self, request):
         user = request.user
         tx_queryset = ConsumerTransaction.objects.filter(user=user).order_by('-id')
