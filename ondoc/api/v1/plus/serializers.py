@@ -108,26 +108,23 @@ class PlusPlansSerializer(serializers.ModelSerializer):
 class PlusProposerSerializer(serializers.ModelSerializer):
     # plans = PlusPlansSerializer(source='get_active_plans', many=True)
     plans = serializers.SerializerMethodField()
+    gold_plans = serializers.SerializerMethodField()
 
     def get_plans(self, obj):
-        request = self.context.get('request')
-        is_gold = request.query_params.get('is_gold', False)
-        all_plans = request.query_params.get('all', False)
-
         plus_plans_qs = obj.get_active_plans.filter(~Q(is_gold=True))
 
-        if is_gold:
-            plus_plans_qs = obj.get_active_plans.filter(is_gold=True)
+        serializer_obj = PlusPlansSerializer(plus_plans_qs, context=self.context, many=True)
+        return serializer_obj.data
 
-        if all_plans:
-            plus_plans_qs = obj.get_active_plans
+    def get_gold_plans(self, obj):
+        plus_plans_qs = obj.get_active_plans.filter(is_gold=True)
 
         serializer_obj = PlusPlansSerializer(plus_plans_qs, context=self.context, many=True)
         return serializer_obj.data
 
     class Meta:
         model = PlusProposer
-        fields = ('id', 'name', 'logo', 'website', 'phone_number', 'email', 'plans')
+        fields = ('id', 'name', 'logo', 'website', 'phone_number', 'email', 'plans', 'gold_plans')
 
 
 class PlusProposerUTMSerializer(serializers.ModelSerializer):
