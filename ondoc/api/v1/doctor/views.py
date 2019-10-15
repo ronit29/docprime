@@ -1587,8 +1587,8 @@ class SearchedItemsViewSet(viewsets.GenericViewSet):
             count = 10
         medical_conditions = models.CommonMedicalCondition.objects.select_related('condition').prefetch_related('condition__specialization').all().order_by(
             "-priority")[:count]
-        conditions_serializer = serializers.MedicalConditionSerializer(medical_conditions, many=True,
-                                                                       context={'request': request})
+        # conditions_serializer = serializers.MedicalConditionSerializer(medical_conditions, many=True,
+        #                                                                context={'request': request})
 
         common_specializations = models.CommonSpecialization.get_specializations(count)
         common_spec_urls = list()
@@ -1651,7 +1651,7 @@ class SearchedItemsViewSet(viewsets.GenericViewSet):
         #
         #     categories_serializer = CommonCategoriesSerializer(categories, many=True, context={'request': request})
 
-        return Response({"conditions": conditions_serializer.data, "specializations": specializations_serializer.data,
+        return Response({"conditions": [], "specializations": specializations_serializer.data,
                          "procedure_categories": common_procedure_categories_serializer.data,
                          "procedures": common_procedures_serializer.data,
                          "ipd_procedures": common_ipd_procedures_serializer.data,
