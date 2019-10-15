@@ -4623,7 +4623,7 @@ class HospitalViewSet(viewsets.GenericViewSet):
                         agreed_price = doc_clinic_timing.fees
                         if agreed_price and mrp:
                             percentage = max(((mrp-(agreed_price + plan.get_convenience_amount(agreed_price, convenience_amount_obj, convenience_percentage_obj)))/mrp)*100, percentage)
-                hospital_percentage_dict[hospital.id] = percentage
+                hospital_percentage_dict[hospital.id] = round(percentage, 2)
 
             hospital_serializer = serializers.HospitalModelSerializer(hospital_queryset, many=True,
                                                                       context={"request": request})

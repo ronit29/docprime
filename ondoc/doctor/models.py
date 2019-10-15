@@ -340,7 +340,7 @@ class Hospital(auth_model.TimeStampedModel, auth_model.CreatedByModel, auth_mode
                                             agreed_price + plan.get_convenience_amount(agreed_price, convenience_amount_obj,
                                                                                        convenience_percentage_obj))) / mrp) * 100,
                                                  percentage)
-                    common_hosp_percentage_dict[common_hospital.hospital.id] = percentage
+                    common_hosp_percentage_dict[common_hospital.hospital.id] = round(percentage,2)
 
         # queryset = CommonHospital.objects.all().values_list('hospital', 'network')
         # top_hospital_ids = list(set([x[0] for x in queryset if x[0] is not None]))
