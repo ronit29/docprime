@@ -33,6 +33,7 @@ from ondoc.coupon.models import Coupon, CouponRecommender
 from ondoc.api.v1.diagnostic import serializers as diagnostic_serializer
 from ondoc.account import models as account_models
 from ondoc.location.models import EntityUrls, EntityAddress, DefaultRating
+from ondoc.plus.models import PlusPlans
 from ondoc.procedure.models import Procedure, ProcedureCategory, CommonProcedureCategory, ProcedureToCategoryMapping, \
     get_selected_and_other_procedures, CommonProcedure, CommonIpdProcedure, IpdProcedure, DoctorClinicIpdProcedure, \
     IpdProcedureFeatureMapping, IpdProcedureDetail, SimilarIpdProcedureMapping, IpdProcedureLead, Offer, \
@@ -4590,8 +4591,11 @@ class HospitalViewSet(viewsets.GenericViewSet):
         if validated_data and validated_data.get('long') and validated_data.get('lat'):
             point_string = 'POINT(' + str(validated_data.get('long')) + ' ' + str(validated_data.get('lat')) + ')'
             pnt = GEOSGeometry(point_string, srid=4326)
+            day = datetime.datetime.today().weekday()
 
-            hospital_queryset = Hospital.objects.prefetch_related('hospital_doctors').filter(enabled_for_online_booking=True,
+            hospital_queryset = Hospital.objects.prefetch_related('hospital_doctors', 'hospital_documents', 'matrix_city',
+                                                Prefetch('hospital_doctors__availability',
+                                                queryset=DoctorClinicTiming.objects.filter(day=day))).filter(enabled_for_online_booking=True,
                                                hospital_doctors__enabled_for_online_booking=True,
                                                hospital_doctors__doctor__enabled_for_online_booking=True,
                                                hospital_doctors__doctor__is_live=True, is_live=True).annotate(
@@ -4601,10 +4605,33 @@ class HospitalViewSet(viewsets.GenericViewSet):
                                                hospital_doctors__doctor__is_live=True, is_live=True)),
                 distance=Distance('location', pnt)).filter(bookable_doctors_count__gte=20).order_by('distance')
             result_count = hospital_queryset.count()
-            hospital_serializer = serializers.HospitalModelSerializer(hospital_queryset[:20], many=True,
-                                                                      context={"request": request})
+            hospital_percentage_dict = dict()
 
-            return Response({'count': result_count, 'hospitals': hospital_serializer.data})
+            plan = PlusPlans.objects.filter(is_gold=True, is_selected=True).first()
+            if not plan:
+                plan = PlusPlans.objects.filter(is_gold=True).first()
+            hospital_queryset = hospital_queryset[:20]
+            convenience_amount_obj, convenience_percentage_obj = plan.get_convenience_object('DOCTOR')
+
+            for hospital in hospital_queryset:
+                doctor_clinics = hospital.hospital_doctors.all()
+                percentage = 0
+                for doc in doctor_clinics:
+                    doc_clinic_timing = doc.availability.all()[0] if doc.availability.all() else None
+                    if doc_clinic_timing:
+                        mrp = doc_clinic_timing.mrp
+                        agreed_price = doc_clinic_timing.fees
+                        if agreed_price and mrp:
+                            percentage = max(((mrp-(agreed_price + plan.get_convenience_amount(agreed_price, convenience_amount_obj, convenience_percentage_obj)))/mrp)*100, percentage)
+                hospital_percentage_dict[hospital.id] = percentage
+
+            hospital_serializer = serializers.HospitalModelSerializer(hospital_queryset, many=True,
+                                                                      context={"request": request})
+            hospitals_result = hospital_serializer.data
+            for data in hospitals_result:
+                data['vip_percentage'] = hospital_percentage_dict[data.get('id')]
+
+            return Response({'count': result_count, 'hospitals': hospitals_result})
         return Response({})
 
     def list_by_url(self, request, url, *args, **kwargs):
