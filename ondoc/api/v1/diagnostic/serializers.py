@@ -813,13 +813,16 @@ class CommonPackageSerializer(serializers.ModelSerializer):
         if user and user.is_authenticated and not user.is_anonymous:
             plus_obj = user.active_plus_user if user.active_plus_user and user.active_plus_user.status == PlusUser.ACTIVE else None
 
+        mrp = obj._selected_test.mrp
+        deal_price = obj._selected_test.custom_deal_price if obj._selected_test.custom_deal_price else obj._selected_test.computed_deal_price
+        agreed_price = obj._selected_test.custom_agreed_price if obj._selected_test.custom_agreed_price else obj._selected_test.computed_agreed_price
         entity = "PACKAGE"
-        price_data = {"mrp": obj._selected_test.mrp, "deal_price": obj._selected_test.deal_price,
-                      "cod_deal_price": obj._selected_test.deal_price,
-                      "fees": obj._selected_test.agreed_price}
+        price_data = {"mrp": mrp, "deal_price": deal_price,
+                      "cod_deal_price": deal_price,
+                      "fees": agreed_price}
         price_engine = get_price_reference(plus_obj, "LABTEST")
         if not price_engine:
-            price = obj._selected_test.mrp
+            price = mrp
         else:
             price = price_engine.get_price(price_data)
         engine = get_class_reference(plus_obj, entity)

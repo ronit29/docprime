@@ -128,14 +128,16 @@ class PlusPlans(auth_model.TimeStampedModel, LiveMixin):
             return 0
         charge = 0
         if type == "DOCTOR":
-            convenience_amount = self.plan_parameters.filter(parameter__key='DOCTOR_CONVENIENCE_AMOUNT').first().value
-            convenience_percentage = self.plan_parameters.filter(parameter__key='DOCTOR_CONVENIENCE_PERCENTAGE').first().value
+            convenience_amount_obj = self.plan_parameters.filter(parameter__key='DOCTOR_CONVENIENCE_AMOUNT').first()
+            convenience_percentage_obj = self.plan_parameters.filter(parameter__key='DOCTOR_CONVENIENCE_PERCENTAGE').first()
         elif type == "LABTEST":
-            convenience_amount = self.plan_parameters.filter(parameter__key='LAB_CONVENIENCE_AMOUNT').first().value
-            convenience_percentage = self.plan_parameters.filter(parameter__key='LAB_CONVENIENCE_PERCENTAGE').first().value
+            convenience_amount_obj = self.plan_parameters.filter(parameter__key='LAB_CONVENIENCE_AMOUNT').first()
+            convenience_percentage_obj = self.plan_parameters.filter(parameter__key='LAB_CONVENIENCE_PERCENTAGE').first()
         else:
             return 0
-        if not convenience_amount and not convenience_percentage:
+        convenience_amount = convenience_amount_obj.value if convenience_amount_obj else 0
+        convenience_percentage = convenience_percentage_obj.value if convenience_percentage_obj else 0
+        if (not convenience_amount and not convenience_percentage) or (convenience_amount == 0 and convenience_percentage == 0):
             return 0
         convenience_percentage = int(convenience_percentage)
         convenience_amount = int(convenience_amount)
