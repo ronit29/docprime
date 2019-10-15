@@ -372,8 +372,6 @@ class PlusUser(auth_model.TimeStampedModel, RefundMixin):
 
         return {'reason': 'Can be cancelled.', 'can_be_cancelled': True}
 
-
-
     def get_primary_member_profile(self):
         insured_members = self.plus_members.filter().order_by('id')
         proposers = list(filter(lambda member: member.is_primary_user and member.relation == PlusMembers.Relations.SELF, insured_members))
@@ -389,8 +387,6 @@ class PlusUser(auth_model.TimeStampedModel, RefundMixin):
         if not mrp:
             return
         utilization_dict = self.get_utilization
-
-
 
     def can_package_be_covered_in_vip(self, obj, *args, **kwargs):
         mrp = obj.mrp if obj else kwargs.get('mrp')
@@ -644,7 +640,6 @@ class PlusUser(auth_model.TimeStampedModel, RefundMixin):
                     return vip_data_dict
         return vip_data_dict
 
-
     def get_labtest_plus_appointment_count(self):
         from ondoc.diagnostic.models import LabAppointment
         labtest_count = 0
@@ -791,7 +786,7 @@ class PlusUser(auth_model.TimeStampedModel, RefundMixin):
                                                           amount=plus_data['amount'],
                                                           order=plus_data['order'],
                                                           payment_type=const.PREPAID,
-                                                          status=cls.INACTIVE)
+                                                          status=cls.ACTIVE)
 
         PlusMembers.create_plus_members(plus_membership_obj)
         PlusUserUtilization.create_utilization(plus_membership_obj)
