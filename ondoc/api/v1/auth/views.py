@@ -2159,6 +2159,12 @@ class OrderDetailViewSet(GenericViewSet):
             if appointment:
                 plus_appointment_mapping = PlusAppointmentMapping.objects.filter(object_id=appointment.id).first()
 
+            payment_mode = ''
+            if appointment:
+                payment_modes = dict(OpdAppointment.PAY_CHOICES)
+                if payment_modes:
+                    payment_mode = payment_modes.get(appointment.payment_type, '')
+
             curr = {
                 "mrp": order.action_data["mrp"] if "mrp" in order.action_data else order.action_data["agreed_price"],
                 "deal_price": order.action_data["deal_price"],
@@ -2172,7 +2178,8 @@ class OrderDetailViewSet(GenericViewSet):
                 "enabled_for_cod": enabled_for_cod,
                 "is_vip_member": True if appointment and appointment.plus_plan else False,
                 "covered_under_vip": True if appointment and appointment.plus_plan else False,
-                'vip_amount': appointment_amount - plus_appointment_mapping.amount if plus_appointment_mapping else 0
+                'vip_amount': appointment_amount - plus_appointment_mapping.amount if plus_appointment_mapping else 0,
+                "payment_mode": payment_mode
             }
             processed_order_data.append(curr)
 
