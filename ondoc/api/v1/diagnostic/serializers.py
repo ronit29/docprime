@@ -320,7 +320,7 @@ class AvailableLabTestPackageSerializer(serializers.ModelSerializer):
         engine = get_class_reference(plus_obj, entity)
         if not engine:
             return agreed_price
-        resp['vip_gold_price'] = obj
+        resp['vip_gold_price'] = agreed_price
         if engine and obj and obj.mrp and lab_obj and lab_obj.enabled_for_plus_plans:
             # engine_response = engine.validate_booking_entity(cost=obj.mrp, id=obj.test.id)
             resp['vip_convenience_amount'] = user.active_plus_user.plan.get_convenience_charge(price, "LABTEST")
