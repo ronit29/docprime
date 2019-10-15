@@ -20,7 +20,7 @@ from ondoc.doctor.models import (OpdAppointment, Doctor, Hospital, DoctorHospita
                                  DoctorPracticeSpecialization, DoctorClinic, OfflineOPDAppointments, OfflinePatients,
                                  CancellationReason, HealthInsuranceProvider, HospitalDocument, HospitalNetworkDocument,
                                  AppointmentHistory, HospitalNetwork, ProviderEncrypt, SimilarSpecializationGroup,
-                                 PracticeSpecialization)
+                                 PracticeSpecialization, CommonHospital)
 from ondoc.diagnostic import models as lab_models
 from ondoc.authentication.models import UserProfile, DoctorNumber, GenericAdmin, GenericLabAdmin
 from django.db.models import Avg
@@ -797,6 +797,7 @@ class HospitalModelSerializer(serializers.ModelSerializer):
     hospital_thumbnail = serializers.SerializerMethodField()
     address = serializers.SerializerMethodField()
     matrix_city = serializers.SerializerMethodField()
+    logo = serializers.SerializerMethodField()
 
     def get_address(self, obj):
         return obj.get_hos_address() if obj.get_hos_address() else None
@@ -822,10 +823,22 @@ class HospitalModelSerializer(serializers.ModelSerializer):
             return obj.get_thumbnail()
         return request.build_absolute_uri(obj.get_thumbnail()) if obj.get_thumbnail() else None
 
+    def get_logo(self, obj):
+        request = self.context.get('request')
+        if request:
+            for document in obj.hospital_documents.all():
+                if document.document_type == HospitalDocument.LOGO:
+                    return request.build_absolute_uri(document.name.url) if document.name else None
+            if obj.network:
+                for document in obj.network.hospital_network_documents.all():
+                    if document.document_type == HospitalNetworkDocument.LOGO:
+                        return request.build_absolute_uri(document.name.url) if document.name else None
+        return None
+
     class Meta:
         model = Hospital
         fields = ('id', 'name', 'operational_since', 'lat', 'long', 'address', 'registration_number',
-                  'building', 'sublocality', 'locality', 'city', 'hospital_thumbnail', 'matrix_city', )
+                  'building', 'sublocality', 'locality', 'city', 'hospital_thumbnail', 'matrix_city', 'logo' )
 
 
 class DoctorHospitalScheduleSerializer(serializers.ModelSerializer):
@@ -2161,13 +2174,23 @@ class TopHospitalForIpdProcedureSerializer(serializers.ModelSerializer):
     hospital_services = serializers.SerializerMethodField()
     service_count = serializers.SerializerMethodField()
     hospital_image = serializers.SerializerMethodField()
+    bookable_doctors_count = serializers.SerializerMethodField()
 
     class Meta:
         model = Hospital
         fields = ('id', 'name', 'distance', 'certifications', 'bed_count', 'logo', 'avg_rating',
                   'count_of_insurance_provider', 'multi_speciality', 'address', 'short_address','open_today',
                   'insurance_provider', 'established_in', 'long', 'lat', 'url', 'locality_url', 'name_city', 'operational_since',
-                  'h1_title', 'is_ipd_hospital', 'seo_title', 'network_id', 'hospital_services', 'service_count', 'hospital_image')
+                  'h1_title', 'is_ipd_hospital', 'seo_title', 'network_id', 'hospital_services', 'service_count', 'hospital_image',
+                  'bookable_doctors_count')
+
+    def get_bookable_doctors_count(self, obj):
+        try:
+            if obj and obj.bookable_doctors_count:
+                return obj.bookable_doctors_count
+        except:
+            return None
+
 
     def get_name_city(self, obj):
         result = obj.name
@@ -2755,3 +2778,175 @@ class OfferSerializer(serializers.ModelSerializer):
     class Meta:
         model = Offer
         fields = '__all__'
+
+
+class HospitalNearYouSerializer(serializers.Serializer):
+    long = serializers.FloatField(default=77.071848)
+    lat = serializers.FloatField(default=28.450367)
+
+
+class TopCommonHospitalForIpdProcedureSerializer(serializers.ModelSerializer):
+    id = serializers.ReadOnlyField(source='hospital.id')
+    name = serializers.ReadOnlyField(source='hospital.name')
+    bed_count = serializers.ReadOnlyField(source='hospital.bed_count')
+    avg_rating = serializers.ReadOnlyField(source='hospital.avg_rating')
+    operational_since = serializers.ReadOnlyField(source='hospital.operational_since')
+    is_ipd_hospital = serializers.ReadOnlyField(source='hospital.is_ipd_hospital')
+    seo_title = serializers.ReadOnlyField(source='hospital.seo_title')
+    network_id = serializers.ReadOnlyField(source='hospital.network_id')
+    count_of_insurance_provider = serializers.SerializerMethodField()
+    distance = serializers.SerializerMethodField()
+    certifications = serializers.SerializerMethodField()
+    multi_speciality = serializers.SerializerMethodField()
+    address = serializers.SerializerMethodField()
+    short_address = serializers.SerializerMethodField()
+    logo = serializers.SerializerMethodField()
+    open_today = serializers.SerializerMethodField()
+    insurance_provider = serializers.SerializerMethodField()
+    established_in = serializers.SerializerMethodField()
+    lat = serializers.SerializerMethodField()
+    long = serializers.SerializerMethodField()
+    url = serializers.SerializerMethodField()
+    locality_url = serializers.SerializerMethodField()
+    name_city = serializers.SerializerMethodField()
+    h1_title = serializers.SerializerMethodField()
+    hospital_services = serializers.SerializerMethodField()
+    service_count = serializers.SerializerMethodField()
+    hospital_image = serializers.SerializerMethodField()
+
+
+    class Meta:
+        model = CommonHospital
+        fields = ('id', 'name', 'distance', 'certifications', 'bed_count', 'logo', 'avg_rating',
+                  'count_of_insurance_provider', 'multi_speciality', 'address', 'short_address','open_today',
+                  'insurance_provider', 'established_in', 'long', 'lat', 'url', 'locality_url', 'name_city', 'operational_since',
+                  'h1_title', 'is_ipd_hospital', 'seo_title', 'network_id', 'hospital_services', 'service_count', 'hospital_image', 'priority')
+
+    def get_name_city(self, obj):
+        result = None
+        if obj and obj.hospital and obj.hospital.name:
+            result = obj.hospital.name
+            if obj.hospital.city:
+                result += " {}".format(obj.hospital.city)
+        return result
+
+    def get_locality_url(self, obj):
+        entity_url = self.context.get('hosp_locality_entity_dict', {})
+        return entity_url.get(obj.hospital.id)
+
+    def get_url(self, obj):
+        entity_url = self.context.get('hosp_entity_dict', {})
+        return entity_url.get(obj.hospital.id)
+
+    def get_h1_title(self, obj):
+        entity_url = self.context.get('hosp_entity_dict', {})
+        new_dynamic_dict = self.context.get('new_dynamic_dict', {})
+        url = entity_url.get(obj.hospital.id)
+        if url:
+            new_dynamic_obj = new_dynamic_dict.get(url)
+            if new_dynamic_obj and new_dynamic_obj.h1_title:
+                return new_dynamic_obj.h1_title
+        return None
+
+    def get_lat(self, obj):
+        if obj and obj.hospital and obj.hospital.location:
+            return obj.hospital.location.y
+        return None
+
+    def get_long(self, obj):
+        if obj and obj.hospital and obj.hospital.location:
+            return obj.hospital.location.x
+        return None
+
+    def get_established_in(self, obj):
+        if obj and obj.hospital and obj.hospital.operational_since:
+            return obj.hospital.operational_since
+        return None
+
+    def get_count_of_insurance_provider(self, obj):
+        if obj and obj.hospital and obj.hospital.health_insurance_providers.all():
+            return len(list(obj.hospital.health_insurance_providers.all()))
+        return None
+
+    def get_distance(self, obj):
+        return int(obj.hospital.distance.m) if hasattr(obj.hospital, 'distance') and obj.hospital.distance else None
+
+    def get_certifications(self, obj):
+        if obj.hospital and obj.hospital.hospitalcertification_set.all():
+            certification_objs = obj.hospital.hospitalcertification_set.all()
+            names = [x.name for x in certification_objs]
+            return names
+        return None
+
+    def get_insurance_provider(self, obj):
+        return [x.name for x in obj.hospital.health_insurance_providers.all()]
+
+    def get_multi_speciality(self, obj):
+        result1 = len(obj.hospital.hospitalspeciality_set.all()) > 1 if obj.hospital else False
+        result2 = len(obj.hospital.network.hospitalnetworkspeciality_set.all()) > 1 if obj.hospital and obj.hospital.network else False
+        return result1 or result2
+
+    def get_address(self, obj):
+        return obj.hospital.get_hos_address() if obj.hospital else None
+
+    def get_short_address(self, obj):
+        return obj.hospital.get_short_address() if obj.hospital else None
+
+    def get_logo(self, obj):
+        request = self.context.get('request')
+        if request and obj.hospital:
+            for document in obj.hospital.hospital_documents.all():
+                if document.document_type == HospitalDocument.LOGO:
+                    return request.build_absolute_uri(document.name.url) if document.name else None
+            if obj.hospital and obj.hospital.network:
+                for document in obj.hospital.network.hospital_network_documents.all():
+                    if document.document_type == HospitalNetworkDocument.LOGO:
+                        return request.build_absolute_uri(document.name.url) if document.name else None
+        return None
+
+    def get_open_today(self, obj):
+        now = timezone.now()
+        now = aware_time_zone(now)
+        if obj.hospital and obj.hospital.always_open:
+            return True
+        if obj.hospital:
+            for timing in obj.hospital.hosp_availability.all():
+                if timing.day == now.weekday() and timing.start < now.hour < timing.end:
+                    return True
+        return False
+
+    def get_hospital_services(self, obj):
+        sp_list = []
+        if obj and obj.hospital:
+            if obj.hospital.hospital_services.all():
+                for sp_service in obj.hospital.hospital_services.all():
+                    id = sp_service.sponsored_service.id
+                    name = sp_service.sponsored_service.name
+                    sp_list.append({'id': id, 'name': name})
+            else:
+                sp_list = None
+        return sp_list
+
+    def get_service_count(self, obj):
+        sp_list = []
+        count = None
+        if obj:
+            if obj.hospital and obj.hospital.hospital_services.all():
+                for sp_service in obj.hospital.hospital_services.all():
+                    id = sp_service.sponsored_service.id
+                    name = sp_service.sponsored_service.name
+                    sp_list.append({'id': id, 'name': name})
+                count = len(sp_list)
+            else:
+                sp_list = None
+        return count
+
+    def get_hospital_image(self, obj):
+        if obj and obj.hospital:
+            request = self.context.get('request')
+            if obj.hospital.imagehospital.all():
+                for image in obj.hospital.imagehospital.all():
+                    image = image.name
+                    return request.build_absolute_uri(image.url) if image else None
+        return None
+
