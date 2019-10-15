@@ -69,7 +69,7 @@ class PlusProposer(auth_model.TimeStampedModel):
 
     @property
     def get_active_plans(self):
-        return self.plus_plans.filter(is_live=True, is_retail=True).order_by('id')[:3]
+        return self.plus_plans.filter(is_live=True, is_retail=True).order_by('id')
         # index = 0
         # for plan in plans:
         #     if plan.plan_utmsources.all().exists():
@@ -95,7 +95,7 @@ class PlusPlans(auth_model.TimeStampedModel, LiveMixin):
     mrp = models.PositiveIntegerField(default=0)
     deal_price = models.PositiveIntegerField(default=0)
     tax_rebate = models.PositiveIntegerField(default=0)
-    tenure = models.PositiveIntegerField(default=1)
+    tenure = models.PositiveIntegerField(default=1, help_text="Tenure is number of months of active subscription.")
     enabled = models.BooleanField(default=False)
     is_live = models.BooleanField(default=False)
     total_allowed_members = models.PositiveSmallIntegerField(default=0)
@@ -153,6 +153,7 @@ class PlusPlans(auth_model.TimeStampedModel, LiveMixin):
 
     class Meta:
         db_table = 'plus_plans'
+        unique_together = (('is_selected', 'is_gold'), )
 
 
 class PlusPlanUtmSources(auth_model.TimeStampedModel):
