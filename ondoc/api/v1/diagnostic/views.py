@@ -7,6 +7,7 @@ from itertools import groupby
 import dateutil
 from django.contrib.contenttypes.models import ContentType
 
+from config.settings.db_router import DatabaseInfo
 from ondoc.account.models import Order
 from ondoc.api.v1.diagnostic.serializers import CustomLabTestPackageSerializer, SearchLabListSerializer
 from ondoc.api.v1.doctor.serializers import CommaSepratedToListField
@@ -198,6 +199,7 @@ class LabList(viewsets.ReadOnlyModelViewSet):
     lookup_field = 'id'
 
     @transaction.non_atomic_requests
+    @use_slave
     def list_packages(self, request, **kwrgs):
         parameters = request.query_params
         serializer = diagnostic_serializer.LabPackageListSerializer(data=parameters)
@@ -385,7 +387,7 @@ class LabList(viewsets.ReadOnlyModelViewSet):
             package_count_query += filter_query
 
         package_count_query = package_count_query.format(lab_network_query=lab_network_query, salespoint_query=salespoint_query)
-        package_count = RawSql(package_count_query, params).fetch_all()
+        package_count = RawSql(package_count_query, params, DatabaseInfo.SLAVE).fetch_all()
         result_count = package_count[0].get('count', 0)
         temp_categories_ids = package_count[0].get('category_ids', [])
         if not temp_categories_ids:
@@ -1111,6 +1113,7 @@ class LabList(viewsets.ReadOnlyModelViewSet):
             return Response(status=status.HTTP_404_NOT_FOUND)
 
     @transaction.non_atomic_requests
+    @use_slave
     def list(self, request, **kwargs):
         parameters = request.query_params
         if kwargs.get('parameters'):
@@ -1257,6 +1260,7 @@ class LabList(viewsets.ReadOnlyModelViewSet):
             return Response(status=status.HTTP_404_NOT_FOUND)
 
     @transaction.non_atomic_requests
+    @use_slave
     def search(self, request, **kwargs):
         tests = []
         parameters = request.query_params
@@ -1662,7 +1666,7 @@ class LabList(viewsets.ReadOnlyModelViewSet):
                          '''.format(filter_query_string=filter_query_string, 
                             group_filter_query_string=group_filter_query_string, order=order_by, lab_timing_join=lab_timing_join, lab_network_query=lab_network_query)
 
-            lab_search_result = RawSql(query, filtering_params).fetch_all()
+            lab_search_result = RawSql(query, filtering_params, DatabaseInfo.SLAVE).fetch_all()
         else:
             query1 = '''select * from (select id, network_id, name , distance, order_priority, new_network_rank, rank,
                     max(new_network_rank) over(partition by 1) result_count from 
@@ -1692,7 +1696,7 @@ class LabList(viewsets.ReadOnlyModelViewSet):
                     rank'''.format(
                     filter_query_string=filter_query_string, order=order_by, lab_timing_join=lab_timing_join, lab_network_query=lab_network_query)
 
-            lab_search_result = RawSql(query1, filtering_params).fetch_all()
+            lab_search_result = RawSql(query1, filtering_params, DatabaseInfo.SLAVE).fetch_all()
 
         return lab_search_result
 
@@ -1954,6 +1958,7 @@ class LabList(viewsets.ReadOnlyModelViewSet):
         return lab_network
 
     @transaction.non_atomic_requests
+    @use_slave
     def retrieve(self, request, lab_id, profile_id=None, entity=None):
         profile = None
 
@@ -2997,6 +3002,7 @@ class LabTimingListView(mixins.ListModelMixin,
         return Response(resp_data)
 
     @transaction.non_atomic_requests
+    @use_slave
     def list_v3(self, request, *args, **kwargs):
         from ondoc.integrations import service
         params = request.query_params
@@ -3215,6 +3221,7 @@ class AvailableTestViewSet(mixins.RetrieveModelMixin,
     serializer_class = diagnostic_serializer.AvailableLabTestSerializer
 
     @transaction.non_atomic_requests
+    @use_slave
     def retrieve(self, request, lab_id):
         params = request.query_params
         queryset = AvailableLabTest.objects.select_related().filter(test__searchable=True,
@@ -3529,6 +3536,7 @@ class TestDetailsViewset(viewsets.GenericViewSet):
 
         return Response(final_result)
 
+    @use_slave
     def list_by_alphabet(self, request):
         alphabet = request.GET.get('alphabet')
         if not alphabet:
@@ -4079,6 +4087,7 @@ class IPDMedicinePageLeadViewSet(viewsets.GenericViewSet):
 
 class AllMatrixCitiesViewSet(viewsets.GenericViewSet):
 
+    @use_slave
     def retrieve(self, request):
 
         main_queryset = MatrixMappedCity.objects.all().values("id", "name")

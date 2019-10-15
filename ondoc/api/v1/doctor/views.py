@@ -5069,6 +5069,7 @@ class IpdProcedureViewSet(viewsets.GenericViewSet):
         response = self.ipd_procedure_detail(request, entity.ipd_procedure_id, **kwargs)
         return response
 
+    @use_slave
     def ipd_procedure_detail(self, request, pk, *args, **kwargs):
         request_data = request.query_params
         temp_request_data = kwargs.get('request_data')
@@ -5182,6 +5183,7 @@ class IpdProcedureViewSet(viewsets.GenericViewSet):
             obj.save()
         return Response({'message': 'Success'})
 
+    @use_slave
     def list_by_alphabet(self, request):
         import re
         alphabet = request.query_params.get('alphabet')
