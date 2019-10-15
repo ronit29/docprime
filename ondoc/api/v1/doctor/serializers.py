@@ -2792,6 +2792,7 @@ class OfferSerializer(serializers.ModelSerializer):
 class HospitalNearYouSerializer(serializers.Serializer):
     long = serializers.FloatField(default=77.071848)
     lat = serializers.FloatField(default=28.450367)
+    from_vip = serializers.BooleanField(default=False)
 
 
 class TopCommonHospitalForIpdProcedureSerializer(serializers.ModelSerializer):
