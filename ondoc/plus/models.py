@@ -153,6 +153,41 @@ class PlusPlans(auth_model.TimeStampedModel, LiveMixin):
         else:
             return convenience_amount
 
+    def get_convenience_object(self, type):
+        charge = 0
+        if type == "DOCTOR":
+            convenience_amount_obj = self.plan_parameters.filter(parameter__key='DOCTOR_CONVENIENCE_AMOUNT')[0]
+            convenience_percentage_obj = self.plan_parameters.filter(parameter__key='DOCTOR_CONVENIENCE_PERCENTAGE')[0]
+            return convenience_amount_obj, convenience_percentage_obj
+        elif type == "LABTEST":
+            convenience_amount_obj = self.plan_parameters.filter(parameter__key='LAB_CONVENIENCE_AMOUNT')[0]
+            convenience_percentage_obj = self.plan_parameters.filter(parameter__key='LAB_CONVENIENCE_PERCENTAGE')[0]
+            return convenience_amount_obj, convenience_percentage_obj
+        else:
+            return None, None
+
+    def get_convenience_amount(self, price, convenience_amount_obj, convenience_percentage_obj):
+        if not price or price <= 0:
+            return 0
+        charge = 0
+        convenience_amount = convenience_amount_obj.value if convenience_amount_obj else 0
+        convenience_percentage = convenience_percentage_obj.value if convenience_percentage_obj else 0
+        if (not convenience_amount and not convenience_percentage) or (convenience_amount == 0 and convenience_percentage == 0):
+            return 0
+        convenience_percentage = int(convenience_percentage)
+        convenience_amount = int(convenience_amount)
+        if convenience_percentage and convenience_percentage > 0:
+            charge = (convenience_percentage/100) * price
+            charge = floor(charge)
+        elif convenience_amount and convenience_amount > 0:
+            return convenience_amount
+        else:
+            return 0
+        if charge <= convenience_amount:
+            return charge
+        else:
+            return convenience_amount
+
     class Meta:
         db_table = 'plus_plans'
         unique_together = (('is_selected', 'is_gold'), )

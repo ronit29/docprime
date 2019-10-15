@@ -3,7 +3,7 @@ from decimal import Decimal
 from celery.task import task
 from django.contrib.gis.db.models.functions import Distance
 from django.contrib.gis.geos import GEOSGeometry
-from django.db.models import Window
+from django.db.models import Window, Prefetch
 from django.db.models.functions import RowNumber
 from django.db.models.expressions import RawSQL
 from copy import deepcopy
@@ -76,7 +76,7 @@ from ondoc.matrix.tasks import push_appointment_to_matrix, push_onboarding_qcsta
     create_ipd_lead_from_opd_appointment, push_retail_appointment_to_matrix
 from ondoc.integrations.task import push_opd_appointment_to_integrator
 # from ondoc.procedure.models import Procedure
-from ondoc.plus.models import PlusAppointmentMapping
+from ondoc.plus.models import PlusAppointmentMapping, PlusPlans
 from ondoc.plus.usage_criteria import get_class_reference, get_price_reference
 from ondoc.ratings_review import models as ratings_models
 from django.utils import timezone
@@ -304,10 +304,44 @@ class Hospital(auth_model.TimeStampedModel, auth_model.CreatedByModel, auth_mode
         from ondoc.api.v1.doctor.serializers import TopHospitalForIpdProcedureSerializer
         from ondoc.seo.models import NewDynamic
         result = []
-        common_hosp_queryset = CommonHospital.objects.all().order_by('priority')
+        day = datetime.datetime.today().weekday()
+        common_hosp_queryset = CommonHospital.objects.all().prefetch_related('hospital', 'hospital__hospital_doctors', 'hospital__health_insurance_providers',
+                                                                'hospital__hospital_documents', 'hospital__imagehospital', 'hospital__network',
+                                                                'hospital__network__hospitalnetworkspeciality_set',
+                                                                'hospital__hospital_services', 'hospital__hosp_availability',
+                                                                'hospital__hospitalcertification_set', 'hospital__hospitalspeciality_set',
+                                                              Prefetch('hospital__hospital_doctors__availability',
+                                                                       queryset=DoctorClinicTiming.objects.filter(
+                                                                           day=day))).order_by('priority')
         if vip_user:
-            common_hosp_queryset =  common_hosp_queryset.filter(hospital__enabled_for_prepaid=True)
+            common_hosp_queryset = common_hosp_queryset.filter(hospital__enabled_for_prepaid=True)
         common_hosp_queryset = common_hosp_queryset[:20]
+
+        common_hosp_percentage_dict = dict()
+
+        plan = PlusPlans.objects.filter(is_gold=True, is_selected=True).first()
+        if not plan:
+            plan = PlusPlans.objects.filter(is_gold=True).first()
+
+        convenience_amount_obj, convenience_percentage_obj = plan.get_convenience_object('DOCTOR')
+
+        for common_hospital in common_hosp_queryset:
+            if common_hospital.hospital:
+                doctor_clinics = common_hospital.hospital.hospital_doctors.all()
+                if doctor_clinics:
+                    percentage = 0
+                    for doc in doctor_clinics:
+                        doc_clinic_timing = doc.availability.all()[0] if doc.availability.all() else None
+                        if doc_clinic_timing:
+                            mrp = doc_clinic_timing.mrp
+                            agreed_price = doc_clinic_timing.fees
+                            if agreed_price and mrp:
+                                percentage = max(((mrp - (
+                                            agreed_price + plan.get_convenience_amount(agreed_price, convenience_amount_obj,
+                                                                                       convenience_percentage_obj))) / mrp) * 100,
+                                                 percentage)
+                    common_hosp_percentage_dict[common_hospital.hospital.id] = percentage
+
         # queryset = CommonHospital.objects.all().values_list('hospital', 'network')
         # top_hospital_ids = list(set([x[0] for x in queryset if x[0] is not None]))
         # top_network_ids = list(set([x[1] for x in queryset if x[1] is not None]))
@@ -355,6 +389,8 @@ class Hospital(auth_model.TimeStampedModel, auth_model.CreatedByModel, auth_mode
                                                                                          'hosp_entity_dict': hosp_entity_dict,
                                                                                          'hosp_locality_entity_dict': hosp_locality_entity_dict,
                                                                                          'new_dynamic_dict': new_dynamic_dict}).data
+        for data in result:
+            data['vip_percentage'] = common_hosp_percentage_dict[data.get('id')]
 
         return result
         # result = TopHospitalForIpdProcedureSerializer(hosp_queryset, many=True, context={'request': request,
