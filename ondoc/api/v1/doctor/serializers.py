@@ -671,6 +671,7 @@ class DoctorHospitalSerializer(serializers.ModelSerializer):
                 resp['vip_convenience_amount'] = plus_user.plan.get_convenience_charge(price, "DOCTOR")
                 resp['vip_amount'] = vip_res.get('amount_to_be_paid', 0)
                 resp['cover_under_vip'] = vip_res.get('is_covered', False)
+                resp['is_gold_member'] = True if plus_user.plan.is_gold else False
             # amount = plus_user.get_vip_amount(utilization, mrp)
             # resp['cover_under_vip'] = True if (amount < mrp) else False
             # resp['vip_amount'] = amount

@@ -612,6 +612,7 @@ class PlusUser(auth_model.TimeStampedModel, RefundMixin):
                 vip_data_dict['amount_to_be_paid'] = vip_response.get('amount_to_be_paid')
                 vip_data_dict['cover_under_vip'] = vip_response.get('is_covered')
                 vip_data_dict['plus_user_id'] = self.id
+                vip_data_dict['is_gold_member'] = True if request.user.active_plus_user.plan.is_gold else False
             else:
                 return vip_data_dict
         else:
@@ -636,6 +637,7 @@ class PlusUser(auth_model.TimeStampedModel, RefundMixin):
                     vip_data_dict['amount_to_be_paid'] = vip_response.get('amount_to_be_paid')
                     vip_data_dict['cover_under_vip'] = vip_response.get('is_covered')
                     vip_data_dict['plus_user_id'] = self.id
+                    vip_data_dict['is_gold_member'] = True if request.user.active_plus_user.plan.is_gold else False
                 else:
                     return vip_data_dict
         return vip_data_dict

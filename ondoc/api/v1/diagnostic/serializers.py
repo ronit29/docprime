@@ -327,6 +327,7 @@ class AvailableLabTestPackageSerializer(serializers.ModelSerializer):
             engine_response = engine.validate_booking_entity(cost=price, id=obj.test.id, mrp=obj.mrp)
             resp['covered_under_vip'] = engine_response['is_covered']
             resp['vip_amount'] = engine_response['amount_to_be_paid']
+            resp['is_gold_member'] = True if plus_obj.plan.is_gold else False
 
         return resp
 
@@ -569,6 +570,7 @@ class AvailableLabTestSerializer(serializers.ModelSerializer):
             engine_response = engine.validate_booking_entity(cost=price, id=obj.test.id, mrp=obj.mrp)
             resp['covered_under_vip'] = engine_response['is_covered']
             resp['vip_amount'] = engine_response['amount_to_be_paid']
+            resp['is_gold_member'] = True if plus_obj.plan.is_gold else False
 
         return resp
 
@@ -843,6 +845,7 @@ class CommonPackageSerializer(serializers.ModelSerializer):
             engine_response = engine.validate_booking_entity(cost=price, id=obj.package.id, mrp=obj._selected_test.mrp)
             resp['covered_under_vip'] = engine_response['is_covered']
             resp['vip_amount'] = engine_response['amount_to_be_paid']
+            resp['is_gold_member'] = True if plus_obj.plan.is_gold else False
 
         return resp
 
