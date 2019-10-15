@@ -25,7 +25,7 @@ class ReplicationMiddleware:
     def process_request(self, request):
         if self.forced_state is not None:
             state = self.forced_state
-            log.debug('state by .forced_state attr: %s', state)
+            log.info('state by .forced_state attr: %s', state)
         else:
             state = 'default'
             log.debug('state by request method: %s', state)
