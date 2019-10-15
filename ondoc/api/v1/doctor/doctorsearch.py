@@ -674,7 +674,7 @@ class DoctorSearchHelper:
                         price = mrp
                     else:
                         price = price_engine.get_price(price_data)
-                    vip_convenience_amount = request.user.active_plus_user.plan.get_convenience_charge(price)
+                    vip_convenience_amount = request.user.active_plus_user.plan.get_convenience_charge(price, "DOCTOR")
                     engine = get_class_reference(request.user.active_plus_user, "DOCTOR")
                     if engine:
                         # vip_response_dict = engine.validate_booking_entity(cost=mrp)
