@@ -4601,8 +4601,12 @@ class HospitalViewSet(viewsets.GenericViewSet):
                                                hospital_doctors__doctor__is_live=True, is_live=True)),
                 distance=Distance('location', pnt)).filter(bookable_doctors_count__gte=20).order_by('distance')
             result_count = hospital_queryset.count()
-            hospital_serializer = serializers.HospitalModelSerializer(hospital_queryset[:20], many=True,
-                                                                      context={"request": request})
+            temp_hospital_ids = hospital_queryset.values_list('id', flat=True)
+            hosp_entity_dict, hosp_locality_entity_dict = Hospital.get_hosp_and_locality_dict(temp_hospital_ids,
+                                                                                              EntityUrls.SitemapIdentifier.HOSPITALS_LOCALITY_CITY)
+
+            hospital_serializer = serializers.HospitalModelSerializer(hospital_queryset, many=True, context={'request': request,
+                                                                                         'hosp_entity_dict': hosp_entity_dict})
 
             return Response({'count': result_count, 'hospitals': hospital_serializer.data})
         return Response({})
