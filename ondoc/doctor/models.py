@@ -3631,6 +3631,7 @@ class OpdAppointment(auth_model.TimeStampedModel, CouponsMixin, OpdAppointmentIn
             # effective_price = cart_data.get('vip_amount')
             convenience_amount = plus_user.plan.get_convenience_charge(cart_data.get('amount_to_be_paid'), "DOCTOR")
             effective_price = cart_data.get('amount_to_be_paid') + convenience_amount
+            vip_amount = vip_amount + convenience_amount
             payment_type = OpdAppointment.VIP
             plus_user_id = plus_user_resp.get('plus_user_id', None)
         else:
