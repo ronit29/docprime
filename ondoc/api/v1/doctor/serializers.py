@@ -49,7 +49,7 @@ from django.conf import settings
 from ondoc.insurance.models import UserInsurance, InsuranceThreshold, InsuranceDoctorSpecializations
 from ondoc.authentication import models as auth_models
 from ondoc.location.models import EntityUrls, EntityAddress
-from ondoc.plus.models import PlusUser, PlusAppointmentMapping
+from ondoc.plus.models import PlusUser, PlusAppointmentMapping, PlusPlans
 from ondoc.plus.usage_criteria import get_class_reference, get_price_reference
 from ondoc.procedure.models import DoctorClinicProcedure, Procedure, ProcedureCategory, \
     get_included_doctor_clinic_procedure, get_procedure_categories_with_procedures, IpdProcedure, \
@@ -632,7 +632,7 @@ class DoctorHospitalSerializer(serializers.ModelSerializer):
 
     def get_vip(self, obj):
         resp = {"is_vip_member": False, "cover_under_vip": False, "vip_amount": 0, "is_enable_for_vip": False,
-                "vip_convenience_amount": 0}
+                "vip_convenience_amount": PlusPlans.get_default_convenience_amount(obj.fees, "DOCTOR")}
         request = self.context.get("request")
         user = request.user
         doctor_clinic = obj.doctor_clinic

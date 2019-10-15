@@ -153,6 +153,34 @@ class PlusPlans(auth_model.TimeStampedModel, LiveMixin):
         else:
             return convenience_amount
 
+    @classmethod
+    def get_default_convenience_amount(cls, price, type):
+        if not price or price <= 0:
+            return 0
+        charge = 0
+        default_plan = cls.objects.filter(is_selected=True, is_gold=True).first()
+        if not default_plan:
+            default_plan = cls.objects.filter(is_gold=True).first()
+        amount_obj, percentage_obj = default_plan.get_convenience_object(type)
+        convenience_amount = amount_obj.value if amount_obj else 0
+        convenience_percentage = percentage_obj.value if percentage_obj else 0
+        if (not convenience_amount and not convenience_percentage) or (
+                convenience_amount == 0 and convenience_percentage == 0):
+            return 0
+        convenience_percentage = int(convenience_percentage)
+        convenience_amount = int(convenience_amount)
+        if convenience_percentage and convenience_percentage > 0:
+            charge = (convenience_percentage / 100) * price
+            charge = floor(charge)
+        elif convenience_amount and convenience_amount > 0:
+            return convenience_amount
+        else:
+            return 0
+        if charge <= convenience_amount:
+            return charge
+        else:
+            return convenience_amount
+
     def get_convenience_object(self, type):
         charge = 0
         if type == "DOCTOR":
