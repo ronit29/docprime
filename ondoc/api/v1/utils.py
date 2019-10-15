@@ -6,7 +6,7 @@ from rest_framework import permissions, status
 from collections import defaultdict
 from operator import itemgetter
 from itertools import groupby
-from django.db import connection, transaction
+from django.db import connection, transaction, connections
 from django.db.models import F, Func, Q, Count, Sum, Case, When, Value, IntegerField
 from django.utils import timezone
 import math
@@ -206,24 +206,34 @@ def clinic_convert_timings(timings, is_day_human_readable=True):
     return final_dict
 
 class RawSql:
-    def __init__(self, query, parameters):
+    def __init__(self, query, parameters, db='default'):
         self.query = query
         self.parameters = parameters
-
+        self.db = db
 
     def fetch_all(self):
-        with connection.cursor() as cursor:
-            cursor.execute(self.query, self.parameters)
-            columns = [col[0] for col in cursor.description]
-            result = [
-                dict(zip(columns, row))
-                for row in cursor.fetchall()
-            ]
+        result = []
+        try:
+            with connections[self.db].cursor() as cursor:
+                cursor.execute(self.query, self.parameters)
+                columns = [col[0] for col in cursor.description]
+                result = [
+                    dict(zip(columns, row))
+                    for row in cursor.fetchall()
+                ]
+        except Exception as e:
+            print(e)
+            print('Failed to connect to slave db')
         return result
 
     def execute(self):
-        with connection.cursor() as cursor:
-            cursor.execute(self.query, self.parameters)
+        try:
+            with connections[self.db].cursor() as cursor:
+                cursor.execute(self.query, self.parameters)
+        except Exception as e:
+            print(e)
+            print('Failed to connect to slave db')
+
 
 class AgreedPriceCalculate(Func):
     function = 'labtest_agreed_price_calculate'
