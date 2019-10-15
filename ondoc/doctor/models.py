@@ -300,13 +300,13 @@ class Hospital(auth_model.TimeStampedModel, auth_model.CreatedByModel, auth_mode
         return result
 
     @staticmethod
-    def get_top_hospitals_data(request, lat=28.450367, long=77.071848, vip_user=None):
+    def get_top_hospitals_data(request, lat=28.450367, long=77.071848, vip_user=None, from_vip_page=False):
         from ondoc.api.v1.doctor.serializers import TopHospitalForIpdProcedureSerializer
         from ondoc.seo.models import NewDynamic
         result = []
         common_hosp_queryset = CommonHospital.objects.all().order_by('priority')
-        if vip_user:
-            common_hosp_queryset =  common_hosp_queryset.filter(hospital__enabled_for_prepaid=True)
+        if vip_user or from_vip_page:
+            common_hosp_queryset = common_hosp_queryset.filter(hospital__enabled_for_prepaid=True)
         common_hosp_queryset = common_hosp_queryset[:20]
         # queryset = CommonHospital.objects.all().values_list('hospital', 'network')
         # top_hospital_ids = list(set([x[0] for x in queryset if x[0] is not None]))
