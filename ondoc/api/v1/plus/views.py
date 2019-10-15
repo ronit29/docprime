@@ -1,5 +1,6 @@
 import json
 from django.conf import settings
+from django.contrib.contenttypes.models import ContentType
 from django.db import transaction
 from rest_framework import viewsets
 from rest_framework.permissions import IsAuthenticated
@@ -13,7 +14,10 @@ from ondoc.authentication.backends import JWTAuthentication
 from ondoc.account import models as account_models
 from ondoc.authentication.models import User, UserProfile
 from ondoc.common.models import BlacklistUser, BlockedStates, DocumentsProofs
-from ondoc.plus.models import (PlusProposer, PlusPlans, PlusThreshold, PlusMembers, PlusUser, PlusLead, PlusDummyData)
+from ondoc.diagnostic.models import LabAppointment
+from ondoc.doctor.models import OpdAppointment
+from ondoc.plus.models import (PlusProposer, PlusPlans, PlusThreshold, PlusMembers, PlusUser, PlusLead, PlusDummyData,
+                               PlusAppointmentMapping)
 from . import serializers
 import datetime
 from datetime import timedelta
@@ -349,6 +353,14 @@ class PlusProfileViewSet(viewsets.GenericViewSet):
         available_relations = PlusMembers.Relations.get_custom_availabilities()
         available_relations.pop(PlusMembers.Relations.SELF)
         resp['relation_master'] = available_relations
+
+        opd_content_type = ContentType.objects.get_for_model(OpdAppointment)
+        lab_appointent_content_type = ContentType.objects.get_for_model(LabAppointment)
+        amount = PlusAppointmentMapping.get_vip_amount(opd_content_type) + PlusAppointmentMapping.get_vip_amount(lab_appointent_content_type)
+        resp['lab_appointment_count'] = PlusAppointmentMapping.get_count(lab_appointent_content_type)
+        resp['opd_appointment_count'] = PlusAppointmentMapping.get_count(opd_content_type)
+        resp['total_vip_amount'] = amount
+
         return Response({'data': resp})
 
 
