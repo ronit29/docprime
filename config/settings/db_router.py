@@ -39,3 +39,8 @@ class DatabaseRouter:
         if app_label not in DATABASE_LABEL_APPS_MAPPING:
             return True
         return False
+
+
+class DatabaseInfo:
+    DEFAULT = 'default'
+    SLAVE = 'slave'

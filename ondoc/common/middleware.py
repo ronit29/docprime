@@ -1,5 +1,6 @@
 import logging
 from django import db
+from django.conf import settings
 from django.utils.decorators import decorator_from_middleware_with_args
 
 
@@ -32,6 +33,6 @@ class ReplicationMiddleware:
 
 
 use_state = decorator_from_middleware_with_args(ReplicationMiddleware)
-use_default = use_state(forced_state='default')
-use_slave = use_state(forced_state='slave')
-
+use_default = use_slave = use_state(forced_state='default')
+if settings.USE_SLAVE_DB:
+    use_slave = use_state(forced_state='slave')
