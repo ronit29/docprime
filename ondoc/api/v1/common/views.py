@@ -20,6 +20,7 @@ from ondoc.api.v1.doctor.serializers import TopHospitalForIpdProcedureSerializer
 from ondoc.api.v1.insurance.serializers import InsuranceCityEligibilitySerializer
 from ondoc.api.v1.utils import html_to_pdf, generate_short_url
 from ondoc.authentication.models import User
+from ondoc.common.middleware import use_slave
 from ondoc.diagnostic.models import Lab
 from ondoc.doctor.models import (Doctor, DoctorPracticeSpecialization, PracticeSpecialization, DoctorMobile,
                                  Qualification,
@@ -1088,6 +1089,7 @@ class AppointmentPrerequisiteViewSet(viewsets.GenericViewSet):
 class SiteSettingsViewSet(viewsets.GenericViewSet):
     authentication_classes = (JWTAuthentication,)
 
+    @use_slave
     def get_settings(self, request):
         params = request.query_params
 

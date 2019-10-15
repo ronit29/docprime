@@ -14,6 +14,7 @@ from fluent_comments.models import FluentComment
 
 from ondoc.api.v1.article.serializers import CommentAuthorSerializer
 from ondoc.comments.models import CustomComment
+from ondoc.common.middleware import use_slave
 from ondoc.seo.models import NewDynamic
 from .serializers import CommentSerializer
 from ondoc.articles import models as article_models
@@ -61,6 +62,7 @@ class ArticleViewSet(viewsets.GenericViewSet):
         return article_models.Article.objects.prefetch_related('category', 'author').filter(is_published=True)
 
     @transaction.non_atomic_requests
+    @use_slave
     def list(self, request):
         category_url = request.GET.get('categoryUrl', None)
         if not category_url:
@@ -123,6 +125,7 @@ class ArticleViewSet(viewsets.GenericViewSet):
              , 'bottom_content': bottom_content, 'recent_articles': recent_articles_dict})
 
     @transaction.non_atomic_requests
+    @use_slave
     def retrieve(self, request):
         serializer = serializers.ArticlePreviewSerializer(data=request.query_params)
         serializer.is_valid(raise_exception=True)
