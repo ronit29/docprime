@@ -503,9 +503,9 @@ class PlusUser(auth_model.TimeStampedModel, RefundMixin):
             deal_price = price_data.get('deal_price', 0)
             fees = price_data.get('fees', 0)
             cod_deal_price = price_data.get('consultation').get('cod_deal_price', 0) if (price_data.get('consultation') and price_data.get('consultation').get('cod_deal_price')) else 0
-            price_data = {"mrp": int(price_data.get('mrp')), "deal_price": int(deal_price),
-                          "cod_deal_price": int(cod_deal_price),
-                          "fees": int(fees)}
+            # price_data = {"mrp": int(price_data.get('mrp')), "deal_price": int(deal_price),
+            #               "cod_deal_price": int(cod_deal_price),
+            #               "fees": int(fees)}
             price_engine = get_price_reference(plus_user, "DOCTOR")
             if not price_engine:
                 price = int(price_data.get('mrp'))
@@ -539,9 +539,9 @@ class PlusUser(auth_model.TimeStampedModel, RefundMixin):
                 mrp = int(price_data.get('mrp'))
                 # final_price = mrp + price_data['home_pickup_charges']
 
-                price_data = {"mrp": int(price_data.get('mrp')), "deal_price": int(price_data.get('deal_price')),
-                              "cod_deal_price": int(price_data.get('deal_price')),
-                              "fees": int(price_data.get('fees'))}
+                # price_data = {"mrp": int(price_data.get('mrp')), "deal_price": int(price_data.get('deal_price')),
+                #               "cod_deal_price": int(price_data.get('deal_price')),
+                #               "fees": int(price_data.get('fees'))}
                 price_engine = get_price_reference(plus_user, "LABTEST")
                 if not price_engine:
                     price = int(price_data.get('mrp'))
@@ -612,6 +612,7 @@ class PlusUser(auth_model.TimeStampedModel, RefundMixin):
                 vip_data_dict['amount_to_be_paid'] = vip_response.get('amount_to_be_paid')
                 vip_data_dict['cover_under_vip'] = vip_response.get('is_covered')
                 vip_data_dict['plus_user_id'] = self.id
+                vip_data_dict['is_gold_member'] = True if request.user.active_plus_user.plan.is_gold else False
             else:
                 return vip_data_dict
         else:
@@ -636,6 +637,7 @@ class PlusUser(auth_model.TimeStampedModel, RefundMixin):
                     vip_data_dict['amount_to_be_paid'] = vip_response.get('amount_to_be_paid')
                     vip_data_dict['cover_under_vip'] = vip_response.get('is_covered')
                     vip_data_dict['plus_user_id'] = self.id
+                    vip_data_dict['is_gold_member'] = True if request.user.active_plus_user.plan.is_gold else False
                 else:
                     return vip_data_dict
         return vip_data_dict

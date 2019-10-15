@@ -633,6 +633,7 @@ class DoctorSearchHelper:
 
                 is_insurance_covered = False
                 insurance_error = None
+                is_gold_member = False
                 vip_data_dict = kwargs.get('vip_data')
                 is_vip_member = vip_data_dict.get('is_vip_member', False)
                 is_enable_for_vip = vip_data_dict.get('is_enable_for_vip', False)
@@ -672,7 +673,7 @@ class DoctorSearchHelper:
                 if request and request.user and not request.user.is_anonymous and vip_data_dict.get('is_vip_member') and \
                         doctor.enabled_for_plus_plans and doctor_clinic.hospital.enabled_for_prepaid and \
                         doctor.enabled_for_online_booking and doctor_clinic.hospital.enabled_for_online_booking and \
-                        doctor_clinic.enabled_for_online_booking:
+                        doctor_clinic.enabled_for_online_booking and doctor_clinic.hospital.enabled_for_plus_plans:
                     mrp = int(min_price.get('mrp'))
                     price_data = {"mrp": int(min_price.get('mrp', 0)), "deal_price": int(min_price.get('deal_price', 0)),
                                   "cod_deal_price": int(min_price.get('cod_deal_price', 0)),
@@ -689,7 +690,9 @@ class DoctorSearchHelper:
                         vip_response_dict = engine.validate_booking_entity(cost=price, mrp=mrp)
                         vip_amount = vip_response_dict.get('amount_to_be_paid', 0)
                         cover_under_vip = vip_response_dict.get('is_covered', False)
-                    # vip_amount = 0 if vip_remaining_amount > mrp else mrp - vip_remaining_amount
+                        is_gold_member = True if request.user.active_plus_user.plan.is_gold else False
+
+                        # vip_amount = 0 if vip_remaining_amount > mrp else mrp - vip_remaining_amount
                 hospitals = [{
                     "enabled_for_online_booking": enable_online_booking,
                     "is_insurance_covered": is_insurance_covered,
@@ -722,7 +725,8 @@ class DoctorSearchHelper:
                     "url": kwargs.get('hosp_entity_dict', {}).get(doctor_clinic.hospital.id),
                     "locality_url": kwargs.get('hosp_locality_entity_dict', {}).get(doctor_clinic.hospital.id),
                     "hosp_is_gold":hosp_is_gold,
-                    "vip_gold_price": int(min_price.get('fees', 0))
+                    "vip_gold_price": int(min_price.get('fees', 0)),
+                    "is_gold_member": is_gold_member
                 }]
 
             thumbnail = doctor.get_thumbnail()
