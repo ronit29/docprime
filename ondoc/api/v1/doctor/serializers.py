@@ -133,7 +133,7 @@ class OpdAppointmentSerializer(serializers.ModelSerializer):
     payment_type = serializers.SerializerMethodField()
     effective_price = serializers.SerializerMethodField()
     vip = serializers.SerializerMethodField()
-
+    payment_mode = serializers.SerializerMethodField()
 
     def get_payment_type(self, obj):
         return obj.payment_type
@@ -169,12 +169,18 @@ class OpdAppointmentSerializer(serializers.ModelSerializer):
         request = self.context.get('request')
         return obj.allowed_action(request.user.user_type, request)
 
+    def get_payment_mode(self, obj):
+        payment_modes = dict(OpdAppointment.PAY_CHOICES)
+        if payment_modes:
+            return payment_modes.get(obj.payment_type, '')
+        return ''
+
     class Meta:
         model = OpdAppointment
         fields = ('id', 'doctor_name', 'hospital_name', 'patient_name', 'patient_image', 'type',
                   'allowed_action', 'effective_price', 'deal_price', 'status', 'time_slot_start',
                   'time_slot_end', 'doctor_thumbnail', 'patient_thumbnail', 'display_name', 'invoices', 'reports',
-                  'prescription', 'report_files', 'specialization', 'payment_type', 'effective_price', 'vip')
+                  'prescription', 'report_files', 'specialization', 'payment_type', 'effective_price', 'vip', 'payment_mode')
 
     def get_patient_image(self, obj):
         if obj.profile and obj.profile.profile_image:
