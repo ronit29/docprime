@@ -2814,7 +2814,7 @@ class LabAppointment(TimeStampedModel, CouponsMixin, LabAppointmentInvoiceMixin,
             payment_type = OpdAppointment.VIP
             convenience_amount = plus_user.plan.get_convenience_charge(plus_user_resp['amount_to_be_paid'], "LABTEST")
             effective_price = plus_user_resp['amount_to_be_paid'] + convenience_amount
-            vip_amount_utilized = plus_user_resp['vip_amount_deducted']
+            vip_amount_utilized = plus_user_resp['vip_amount_deducted'] + convenience_amount
             # utilization = plus_user.get_utilization
             # available_amount = int(utilization.get('available_package_amount', 0))
             # mrp = int(price_data.get('mrp'))
