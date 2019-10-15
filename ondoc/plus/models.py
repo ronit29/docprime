@@ -153,15 +153,43 @@ class PlusPlans(auth_model.TimeStampedModel, LiveMixin):
         else:
             return convenience_amount
 
+    @classmethod
+    def get_default_convenience_amount(cls, price, type):
+        if not price or price <= 0:
+            return 0
+        charge = 0
+        default_plan = cls.objects.filter(is_selected=True, is_gold=True).first()
+        if not default_plan:
+            default_plan = cls.objects.filter(is_gold=True).first()
+        amount_obj, percentage_obj = default_plan.get_convenience_object(type)
+        convenience_amount = amount_obj.value if amount_obj else 0
+        convenience_percentage = percentage_obj.value if percentage_obj else 0
+        if (not convenience_amount and not convenience_percentage) or (
+                convenience_amount == 0 and convenience_percentage == 0):
+            return 0
+        convenience_percentage = int(convenience_percentage)
+        convenience_amount = int(convenience_amount)
+        if convenience_percentage and convenience_percentage > 0:
+            charge = (convenience_percentage / 100) * price
+            charge = floor(charge)
+        elif convenience_amount and convenience_amount > 0:
+            return convenience_amount
+        else:
+            return 0
+        if charge <= convenience_amount:
+            return charge
+        else:
+            return convenience_amount
+
     def get_convenience_object(self, type):
         charge = 0
         if type == "DOCTOR":
-            convenience_amount_obj = self.plan_parameters.filter(parameter__key='DOCTOR_CONVENIENCE_AMOUNT')[0]
-            convenience_percentage_obj = self.plan_parameters.filter(parameter__key='DOCTOR_CONVENIENCE_PERCENTAGE')[0]
+            convenience_amount_obj = self.plan_parameters.filter(parameter__key='DOCTOR_CONVENIENCE_AMOUNT').first()
+            convenience_percentage_obj = self.plan_parameters.filter(parameter__key='DOCTOR_CONVENIENCE_PERCENTAGE').first()
             return convenience_amount_obj, convenience_percentage_obj
         elif type == "LABTEST":
-            convenience_amount_obj = self.plan_parameters.filter(parameter__key='LAB_CONVENIENCE_AMOUNT')[0]
-            convenience_percentage_obj = self.plan_parameters.filter(parameter__key='LAB_CONVENIENCE_PERCENTAGE')[0]
+            convenience_amount_obj = self.plan_parameters.filter(parameter__key='LAB_CONVENIENCE_AMOUNT').first()
+            convenience_percentage_obj = self.plan_parameters.filter(parameter__key='LAB_CONVENIENCE_PERCENTAGE').first()
             return convenience_amount_obj, convenience_percentage_obj
         else:
             return None, None
@@ -344,8 +372,6 @@ class PlusUser(auth_model.TimeStampedModel, RefundMixin):
 
         return {'reason': 'Can be cancelled.', 'can_be_cancelled': True}
 
-
-
     def get_primary_member_profile(self):
         insured_members = self.plus_members.filter().order_by('id')
         proposers = list(filter(lambda member: member.is_primary_user and member.relation == PlusMembers.Relations.SELF, insured_members))
@@ -361,8 +387,6 @@ class PlusUser(auth_model.TimeStampedModel, RefundMixin):
         if not mrp:
             return
         utilization_dict = self.get_utilization
-
-
 
     def can_package_be_covered_in_vip(self, obj, *args, **kwargs):
         mrp = obj.mrp if obj else kwargs.get('mrp')
@@ -616,7 +640,6 @@ class PlusUser(auth_model.TimeStampedModel, RefundMixin):
                     return vip_data_dict
         return vip_data_dict
 
-
     def get_labtest_plus_appointment_count(self):
         from ondoc.diagnostic.models import LabAppointment
         labtest_count = 0
@@ -763,7 +786,7 @@ class PlusUser(auth_model.TimeStampedModel, RefundMixin):
                                                           amount=plus_data['amount'],
                                                           order=plus_data['order'],
                                                           payment_type=const.PREPAID,
-                                                          status=cls.INACTIVE)
+                                                          status=cls.ACTIVE)
 
         PlusMembers.create_plus_members(plus_membership_obj)
         PlusUserUtilization.create_utilization(plus_membership_obj)
