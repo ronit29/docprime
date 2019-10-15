@@ -254,6 +254,10 @@ class PlusUser(auth_model.TimeStampedModel, RefundMixin):
         else:
             return False
 
+    @classmethod
+    def get_by_user(cls, user):
+        return cls.objects.filter(user=user).order_by('id').last()
+
     def can_be_cancelled(self):
         from ondoc.doctor.models import OpdAppointment
         from ondoc.diagnostic.models import LabAppointment
