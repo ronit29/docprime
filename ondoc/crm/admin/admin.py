@@ -1,7 +1,7 @@
 from django.contrib.gis import admin
 from ondoc.common.models import PaymentOptions, UserConfig, Feature, Service, MatrixMappedState, MatrixMappedCity, \
     GlobalNonBookable, QRCode, BlacklistUser, BlockedStates, SponsorListingURL, \
-    SponsorListingUtmTerm, SponsoredListingService, SponsorListingSpecialization
+    SponsorListingUtmTerm, SponsoredListingService, SponsorListingSpecialization, SearchCriteria
 from ondoc.corporate_booking.models import Corporates, CorporateDeal, CorporateDocument
 from ondoc.crm.admin.banner import BannerAdmin, SliderLocationAdmin, RecommenderAdmin, EmailBannerAdmin
 from ondoc.crm.admin.location import ComparePackagesSEOUrlsAdmin
@@ -50,7 +50,7 @@ from ondoc.subscription_plan.models import Plan, PlanFeature, UserPlanMapping
 from .common import Cities, CitiesAdmin, MatrixCityMapping, MatrixCityAdmin, MerchantAdmin, MerchantPayoutAdmin, \
     PaymentOptionsAdmin, MatrixMappedStateAdmin, MatrixMappedCityAdmin, GlobalNonBookableAdmin, UserConfigAdmin, \
     BlacklistUserAdmin, BlockedStatesAdmin, MerchantPayoutBulkProcessAdmin, AdvanceMerchantPayoutAdmin, \
-    AdvanceMerchantAmountAdmin
+    AdvanceMerchantAmountAdmin, SearchCriteriaAdmin
 from .lead import HospitalLeadAdmin, DoctorLeadAdmin, SearchLeadAdmin
 from .doctor import (DoctorAdmin, MedicalServiceAdmin, SpecializationAdmin, QualificationAdmin, LanguageAdmin,
                      CollegeAdmin, MedicalConditionAdmin, HealthTipAdmin, DoctorClinicAdmin,
@@ -328,6 +328,8 @@ admin.site.register(PartnerLabTestSamples, PartnerLabTestSampleAdmin)
 admin.site.register(PartnerLabTestSampleDetails, PartnerLabTestSampleDetailAdmin)
 admin.site.register(TestSamplesLabAlerts, TestSamplesLabAlertAdmin)
 admin.site.register(PartnerLabSamplesCollectOrder, PartnerLabSamplesCollectOrderAdmin)
+admin.site.register(SearchCriteria, SearchCriteriaAdmin)
 admin.site.register(Permission, PermissionAdmin)
+
 
 

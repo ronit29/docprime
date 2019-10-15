@@ -15,7 +15,7 @@ from ondoc.api.v1.diagnostic import serializers as diagnostic_serializer
 from ondoc.api.v1.auth.serializers import AddressSerializer
 from ondoc.integrations.models import IntegratorTestMapping, IntegratorReport, IntegratorMapping
 from ondoc.cart.models import Cart
-from ondoc.common.models import UserConfig, GlobalNonBookable, AppointmentHistory, MatrixMappedCity
+from ondoc.common.models import UserConfig, GlobalNonBookable, AppointmentHistory, MatrixMappedCity, SearchCriteria
 from ondoc.plus.models import PlusUser
 from ondoc.plus.usage_criteria import get_class_reference, get_price_reference
 from ondoc.ratings_review import models as rating_models
@@ -1751,6 +1751,12 @@ class LabList(viewsets.ReadOnlyModelViewSet):
         tests = dict()
         lab = dict()
 
+        search_criteria = SearchCriteria.objects.filter(search_key='is_gold')
+        is_gold = False
+        if search_criteria:
+            search_criteria = search_criteria.first()
+            is_gold = search_criteria.search_value
+
         for obj in labs:
             if  insurance_data_dict and insurance_data_dict['is_user_insured'] and obj.home_pickup_charges > 0:
                 obj.is_home_collection_enabled = False
@@ -1800,6 +1806,7 @@ class LabList(viewsets.ReadOnlyModelViewSet):
 
             row['avg_rating'] = lab_obj.rating_data.get('avg_rating') if lab_obj.display_rating_on_list() else None
             row['rating_count'] = lab_obj.rating_data.get('rating_count') if lab_obj.display_rating_on_list() else None
+            row['is_gold'] = is_gold
             # if lab_obj.always_open:
             #     lab_timing = "12:00 AM - 11:45 PM"
             #     next_lab_timing_dict = {rotated_days_array[1]: "12:00 AM - 11:45 PM"}

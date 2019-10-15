@@ -1,3 +1,4 @@
+import reversion
 from django.contrib.gis.geos import Point
 from django.contrib.postgres.fields import JSONField
 from django.core.validators import FileExtensionValidator, MinValueValidator, MaxValueValidator
@@ -898,3 +899,21 @@ class DocumentsProofs(auth_model.TimeStampedModel):
 
     class Meta:
         db_table = 'document_proofs'
+
+
+@reversion.register()
+class SearchCriteria(auth_model.TimeStampedModel):
+    SEARCH_CHOICES = [("", "Select"), ("is_gold", "is_gold"), ("is_vip", "is_vip")]
+    search_key = models.CharField(max_length=500, null=True, blank=True, choices=SEARCH_CHOICES, default=None)
+    search_value = models.BooleanField(default=False)
+
+    class Meta:
+        db_table = 'search_criteria'
+
+    def save(self, *args, **kwargs):
+        search_criteria_obj = self.__class__.objects.filter(search_key=self.search_key).first()
+        if search_criteria_obj:
+            search_criteria_obj.search_value = self.search_value
+            super(SearchCriteria, self).save(*args, **kwargs)
+        else:
+            super(SearchCriteria, self).save(*args, **kwargs)
