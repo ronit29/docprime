@@ -190,7 +190,7 @@ class PlusOrderViewSet(viewsets.GenericViewSet):
             transaction_date = datetime.datetime.now()
             amount = plus_plan.deal_price
 
-            expiry_date = transaction_date + relativedelta(years=int(plus_plan.tenure))
+            expiry_date = transaction_date + relativedelta(months=int(plus_plan.tenure))
             expiry_date = expiry_date - timedelta(days=1)
             expiry_date = datetime.datetime.combine(expiry_date, datetime.datetime.max.time())
             plus_user_data = {'proposer': plus_plan.proposer.id, 'plus_plan': plus_plan.id,

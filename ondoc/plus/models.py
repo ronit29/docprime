@@ -95,7 +95,7 @@ class PlusPlans(auth_model.TimeStampedModel, LiveMixin):
     mrp = models.PositiveIntegerField(default=0)
     deal_price = models.PositiveIntegerField(default=0)
     tax_rebate = models.PositiveIntegerField(default=0)
-    tenure = models.PositiveIntegerField(default=1)
+    tenure = models.PositiveIntegerField(default=1, help_text="Tenure is number of months of active subscription.")
     enabled = models.BooleanField(default=False)
     is_live = models.BooleanField(default=False)
     total_allowed_members = models.PositiveSmallIntegerField(default=0)
