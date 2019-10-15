@@ -1917,6 +1917,7 @@ class LabList(viewsets.ReadOnlyModelViewSet):
                         else:
                             res['vip']['vip_convenience_amount'] = 0
                         coverage = False
+                        res['vip']['vip_gold_price'] = paticular_test_in_lab.get('agreed_price', 0)
                         if engine:
                             # engine_response = engine.validate_booking_entity(cost=paticular_test_in_lab.get('mrp', 0))
                             engine_response = engine.validate_booking_entity(cost=price, mrp=paticular_test_in_lab.get('mrp', 0))
