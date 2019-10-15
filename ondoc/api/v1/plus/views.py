@@ -359,9 +359,10 @@ class PlusProfileViewSet(viewsets.GenericViewSet):
         opd_content_type = ContentType.objects.get_for_model(OpdAppointment)
         lab_appointent_content_type = ContentType.objects.get_for_model(LabAppointment)
         amount = PlusAppointmentMapping.get_vip_amount(plus_user, opd_content_type) + PlusAppointmentMapping.get_vip_amount(plus_user, lab_appointent_content_type)
-        resp['lab_appointment_count'] = PlusAppointmentMapping.get_count(plus_user, lab_appointent_content_type)
-        resp['opd_appointment_count'] = PlusAppointmentMapping.get_count(plus_user, opd_content_type)
-        resp['total_vip_amount'] = amount
+        if plus_user.plan.is_gold:
+            resp['lab_appointment_count'] = PlusAppointmentMapping.get_count(plus_user, lab_appointent_content_type)
+            resp['opd_appointment_count'] = PlusAppointmentMapping.get_count(plus_user, opd_content_type)
+            resp['total_vip_amount'] = amount
 
         return Response({'data': resp})
 
