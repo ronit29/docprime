@@ -657,6 +657,7 @@ class DoctorHospitalSerializer(serializers.ModelSerializer):
             else:
                 price = price_engine.get_price(price_data)
             resp['is_vip_member'] = True
+            resp['vip_gold_price'] = obj.fees
             engine = get_class_reference(plus_user, "DOCTOR")
             if engine:
                 # vip_res = engine.validate_booking_entity(cost=mrp)
