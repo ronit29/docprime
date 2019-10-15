@@ -1127,6 +1127,13 @@ class PlusAppointmentMapping(auth_model.TimeStampedModel):
         vip_amount = functools.reduce(lambda a, b: a + b, valid_amounts)
         return vip_amount
 
+    @classmethod
+    def get_count(cls, plus_user, content_type):
+        from ondoc.doctor.models import OpdAppointment
+        objects = cls.objects.filter(content_type=content_type, plus_user=plus_user)
+        valid_objects = list(filter(lambda obj: obj.content_object.status != OpdAppointment.CANCELLED, objects))
+        return len(valid_objects)
+
     class Meta:
         db_table = 'plus_appointment_mapping'
 
