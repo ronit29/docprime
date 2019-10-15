@@ -644,6 +644,7 @@ class DoctorHospitalSerializer(serializers.ModelSerializer):
 
         if enabled_for_online_booking and obj.mrp is not None:
             resp['is_enable_for_vip'] = True
+            resp['vip_gold_price'] = obj.fees
             plus_user = None if not user.is_authenticated or user.is_anonymous else user.active_plus_user
             if not plus_user:
                 return resp
@@ -657,7 +658,6 @@ class DoctorHospitalSerializer(serializers.ModelSerializer):
             else:
                 price = price_engine.get_price(price_data)
             resp['is_vip_member'] = True
-            resp['vip_gold_price'] = obj.fees
             engine = get_class_reference(plus_user, "DOCTOR")
             if engine:
                 # vip_res = engine.validate_booking_entity(cost=mrp)
