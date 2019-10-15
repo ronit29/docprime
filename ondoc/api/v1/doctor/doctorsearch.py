@@ -633,6 +633,7 @@ class DoctorSearchHelper:
 
                 is_insurance_covered = False
                 insurance_error = None
+                is_gold_member = False
                 vip_data_dict = kwargs.get('vip_data')
                 is_vip_member = vip_data_dict.get('is_vip_member', False)
                 is_enable_for_vip = vip_data_dict.get('is_enable_for_vip', False)
