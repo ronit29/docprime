@@ -260,7 +260,7 @@ class Hospital(auth_model.TimeStampedModel, auth_model.CreatedByModel, auth_mode
     auto_ivr_enabled = models.BooleanField(default=True)
     priority_score = models.IntegerField(default=0, null=False, blank=False)
     search_distance = models.FloatField(default=15000)
-    google_avg_rating = models.DecimalField(max_digits=5, decimal_places=2, null=True, editable=False)
+    google_avg_rating = models.DecimalField(max_digits=5, decimal_places=2, null=True, editable=True)
     # provider_encrypt = models.NullBooleanField(null=True, blank=True)
     # provider_encrypted_by = models.ForeignKey(auth_model.User, null=True, blank=True, on_delete=models.SET_NULL, related_name='encrypted_hospitals')
     # encryption_hint = models.CharField(max_length=128, null=True, blank=True)
@@ -272,6 +272,7 @@ class Hospital(auth_model.TimeStampedModel, auth_model.CreatedByModel, auth_mode
     enabled_for_insurance = models.NullBooleanField(verbose_name='Enabled for Insurance')
     enabled_for_plus_plans = models.NullBooleanField()
     is_partner_lab_enabled = models.BooleanField(default=False)
+    google_ratings_count = models.PositiveIntegerField(null=True, blank=True)
 
     def __str__(self):
         return self.name
@@ -299,42 +300,47 @@ class Hospital(auth_model.TimeStampedModel, auth_model.CreatedByModel, auth_mode
         return result
 
     @staticmethod
-    def get_top_hospitals_data(request, lat=28.450367, long=77.071848):
+    def get_top_hospitals_data(request, lat=28.450367, long=77.071848, vip_user=None):
         from ondoc.api.v1.doctor.serializers import TopHospitalForIpdProcedureSerializer
         from ondoc.seo.models import NewDynamic
         result = []
-        queryset = CommonHospital.objects.all().values_list('hospital', 'network')
-        top_hospital_ids = list(set([x[0] for x in queryset if x[0] is not None]))
-        top_network_ids = list(set([x[1] for x in queryset if x[1] is not None]))
-        point_string = 'POINT(' + str(long) + ' ' + str(lat) + ')'
-        pnt = GEOSGeometry(point_string, srid=4326)
-        temp_hosp_queryset = Hospital.objects.filter(is_live=True)
-
-        # if not request.user.is_anonymous and request.user.active_insurance:
-        #     for id in top_hospital_ids:
-        #         hosp_obj = Hospital.objects.filter(pk=id).first()
-        #         if hosp_obj:
-        #             if not hosp_obj.is_hospital_doctor_insurance_enabled():
-        #                 top_hospital_ids.remove(id)
-
-        if top_network_ids:
-            network_hospital_queryset = temp_hosp_queryset.filter(network__in=top_network_ids)
-            network_hospitals = network_hospital_queryset.annotate(
-                distance=Distance('location', pnt)).annotate(rank=Window(expression=RowNumber(), order_by=F('distance').asc(),
-                            partition_by=[RawSQL('Coalesce(network_id, random())', [])])
-            )
-            for x in network_hospitals:
-                if x.rank == 1:
-                    top_hospital_ids.append(x.id)
-        hosp_queryset = Hospital.objects.prefetch_related('hospitalcertification_set',
-                                                          'hospital_documents',
-                                                          'hosp_availability',
-                                                          'health_insurance_providers',
-                                                          'network__hospital_network_documents',
-                                                          'hospitalspeciality_set').filter(
-            id__in=top_hospital_ids).annotate(
-            distance=Distance('location', pnt)).order_by('distance')
-        temp_hospital_ids = hosp_queryset.values_list('id', flat=True)
+        common_hosp_queryset = CommonHospital.objects.all().order_by('priority')
+        if vip_user:
+            common_hosp_queryset =  common_hosp_queryset.filter(hospital__enabled_for_prepaid=True)
+        common_hosp_queryset = common_hosp_queryset[:20]
+        # queryset = CommonHospital.objects.all().values_list('hospital', 'network')
+        # top_hospital_ids = list(set([x[0] for x in queryset if x[0] is not None]))
+        # top_network_ids = list(set([x[1] for x in queryset if x[1] is not None]))
+        # point_string = 'POINT(' + str(long) + ' ' + str(lat) + ')'
+        # pnt = GEOSGeometry(point_string, srid=4326)
+        # temp_hosp_queryset = Hospital.objects.filter(is_live=True)
+        #
+        # # if not request.user.is_anonymous and request.user.active_insurance:
+        # #     for id in top_hospital_ids:
+        # #         hosp_obj = Hospital.objects.filter(pk=id).first()
+        # #         if hosp_obj:
+        # #             if not hosp_obj.is_hospital_doctor_insurance_enabled():
+        # #                 top_hospital_ids.remove(id)
+        #
+        # if top_network_ids:
+        #     network_hospital_queryset = temp_hosp_queryset.filter(network__in=top_network_ids)
+        #     network_hospitals = network_hospital_queryset.annotate(
+        #         distance=Distance('location', pnt)).annotate(rank=Window(expression=RowNumber(), order_by=F('distance').asc(),
+        #                     partition_by=[RawSQL('Coalesce(network_id, random())', [])])
+        #     )
+        #     for x in network_hospitals:
+        #         if x.rank == 1:
+        #             top_hospital_ids.append(x.id)
+        # hosp_queryset = Hospital.objects.prefetch_related('hospitalcertification_set',
+        #                                                   'hospital_documents',
+        #                                                   'hosp_availability',
+        #                                                   'health_insurance_providers',
+        #                                                   'network__hospital_network_documents',
+        #                                                   'hospitalspeciality_set').filter(
+        #     id__in=top_hospital_ids).annotate(
+        #     distance=Distance('location', pnt)).order_by('distance')
+        # temp_hospital_ids = hosp_queryset.values_list('id', flat=True)
+        temp_hospital_ids = common_hosp_queryset.values_list('hospital', flat=True)
         hosp_entity_dict, hosp_locality_entity_dict = Hospital.get_hosp_and_locality_dict(temp_hospital_ids,
                                                                                           EntityUrls.SitemapIdentifier.HOSPITALS_LOCALITY_CITY)
 
@@ -344,17 +350,27 @@ class Hospital(auth_model.TimeStampedModel, auth_model.CreatedByModel, auth_mode
         all_entity_urls = list(set([x.url for x in entity_queryset]))
         new_dynamic_qs = NewDynamic.objects.filter(url_value__in=all_entity_urls)
         new_dynamic_dict = {x.url_value: x for x in new_dynamic_qs}
-        result = TopHospitalForIpdProcedureSerializer(hosp_queryset, many=True, context={'request': request,
+        from ondoc.api.v1.doctor.serializers import TopCommonHospitalForIpdProcedureSerializer
+        result = TopCommonHospitalForIpdProcedureSerializer(common_hosp_queryset, many=True, context={'request': request,
                                                                                          'hosp_entity_dict': hosp_entity_dict,
                                                                                          'hosp_locality_entity_dict': hosp_locality_entity_dict,
                                                                                          'new_dynamic_dict': new_dynamic_dict}).data
+
         return result
+        # result = TopHospitalForIpdProcedureSerializer(hosp_queryset, many=True, context={'request': request,
+        #                                                                                  'hosp_entity_dict': hosp_entity_dict,
+        #                                                                                  'hosp_locality_entity_dict': hosp_locality_entity_dict,
+        #                                                                                  'new_dynamic_dict': new_dynamic_dict}).data
+
 
 
     @classmethod
     def update_hosp_google_avg_rating(cls):
         update_hosp_google_ratings = RawSql('''update hospital h set google_avg_rating = (select (reviews->>'user_avg_rating')::float from hospital_place_details 
                                          where hospital_id=h.id limit 1)''', [] ).execute()
+
+        update_hosp_google_ratings_count = RawSql(''' update hospital h set google_ratings_count = (select (reviews->>'user_ratings_total')::int from hospital_place_details 
+                                                 where hospital_id=h.id limit 1)''', []).execute()
 
     def get_active_opd_appointments(self, user=None, user_insurance=None, appointment_date=None):
 

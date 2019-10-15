@@ -220,44 +220,46 @@ class PlusOrderViewSet(viewsets.GenericViewSet):
             plus_data = plus_subscription_transform(plus_subscription_data)
 
             # if balance < amount or resp['is_agent']:
-            #     payable_amount = amount - balance
-            #     order = account_models.Order.objects.create(
-            #         product_id=account_models.Order.VIP_PRODUCT_ID,
-            #         action=account_models.Order.VIP_CREATE,
-            #         action_data=plus_data,
-            #         amount=payable_amount,
-            #         cashback_amount=0,
-            #         wallet_amount=balance,
-            #         user=user,
-            #         payment_status=account_models.Order.PAYMENT_PENDING,
-            #         # visitor_info=visitor_info
-            #     )
-            #     resp["status"] = 1
-            #     resp['data'], resp["payment_required"] = payment_details(request, order)
-            # else:
-            wallet_amount = amount
-
+            # payable_amount = amount - balance
+            payable_amount = amount
             order = account_models.Order.objects.create(
                 product_id=account_models.Order.VIP_PRODUCT_ID,
                 action=account_models.Order.VIP_CREATE,
                 action_data=plus_data,
-                amount=0,
-                wallet_amount=wallet_amount,
+                amount=payable_amount,
                 cashback_amount=0,
+                # wallet_amount=balance,
+                wallet_amount=0,
                 user=user,
                 payment_status=account_models.Order.PAYMENT_PENDING,
                 # visitor_info=visitor_info
             )
-
-            plus_object, wallet_amount, cashback_amount = order.process_order()
             resp["status"] = 1
-            resp["payment_required"] = False
-            resp["data"] = {'id': plus_object.id}
-            resp["data"] = {
-                "orderId": order.id,
-                "type": "plus_membership",
-                "id": plus_object.id if plus_object else None
-            }
+            resp['data'], resp["payment_required"] = payment_details(request, order)
+            # else:
+            #     wallet_amount = amount
+            #
+            #     order = account_models.Order.objects.create(
+            #         product_id=account_models.Order.VIP_PRODUCT_ID,
+            #         action=account_models.Order.VIP_CREATE,
+            #         action_data=plus_data,
+            #         amount=0,
+            #         wallet_amount=wallet_amount,
+            #         cashback_amount=0,
+            #         user=user,
+            #         payment_status=account_models.Order.PAYMENT_PENDING,
+            #         # visitor_info=visitor_info
+            #     )
+            #
+            #     plus_object, wallet_amount, cashback_amount = order.process_order()
+            #     resp["status"] = 1
+            #     resp["payment_required"] = False
+            #     resp["data"] = {'id': plus_object.id}
+            #     resp["data"] = {
+            #         "orderId": order.id,
+            #         "type": "plus_membership",
+            #         "id": plus_object.id if plus_object else None
+            #     }
         else:
             return Response(status=status.HTTP_404_NOT_FOUND)
         return Response(resp)
@@ -266,7 +268,7 @@ class PlusOrderViewSet(viewsets.GenericViewSet):
     def add_members(self, request):
         user = request.user
 
-        inactive_plus_subscription = user.inactive_plus_user
+        inactive_plus_subscription = (user.inactive_plus_user or user.active_plus_user)
         if not inactive_plus_subscription:
             return Response({'error': 'User has not purchased the VIP plan.'})
 
@@ -286,10 +288,10 @@ class PlusOrderViewSet(viewsets.GenericViewSet):
         # Remove the proposer profile. Proposer is only allowed to upload the document proofs.
 
         counter = 0
-        self_counter = -1
+        # self_counter = -1
         for member in members_to_be_added:
             if member.get('relation') == PlusMembers.Relations.SELF:
-                self_counter = counter
+                # self_counter = counter
                 if member.get('document_ids'):
                     proposer_profile = inactive_plus_subscription.get_primary_member_profile()
                     if proposer_profile:
@@ -300,7 +302,7 @@ class PlusOrderViewSet(viewsets.GenericViewSet):
 
             counter += 1
 
-        members_to_be_added.pop(self_counter)
+        # members_to_be_added.pop(self_counter)
 
         PlusMembers.create_plus_members(inactive_plus_subscription, members_list=members_to_be_added)
         inactive_plus_subscription.status = PlusUser.ACTIVE
@@ -327,7 +329,14 @@ class PlusProfileViewSet(viewsets.GenericViewSet):
             return Response(status=status.HTTP_400_BAD_REQUEST)
 
         plus_members = plus_user.plus_members.all()
-        if len(plus_members) > 1:
+        total_member_allowed = plus_user.plan.total_allowed_members
+        if not total_member_allowed or total_member_allowed == 0:
+            return Response(data="Total Allowed Members not defined in plan", status=status.HTTP_400_BAD_REQUEST)
+        # if len(plus_members) > 1:
+        #     resp['is_member_allowed'] = False
+        # else:
+        #     resp['is_member_allowed'] = True
+        if len(plus_members) == int(total_member_allowed):
             resp['is_member_allowed'] = False
         else:
             resp['is_member_allowed'] = True
