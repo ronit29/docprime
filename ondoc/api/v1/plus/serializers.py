@@ -169,7 +169,7 @@ class PlusMembersSerializer(serializers.Serializer):
             if len(attrs.get('members')) > total_allowed_members:
                 raise serializers.ValidationError({'members': 'Cannot add members more than total allowed memebers.'})
 
-            # existing_members_name_set = set(map(lambda m: m.get_full_name(), plus_members))
+            existing_members_name_set = set(map(lambda m: m.get_full_name(), plus_members))
 
             # check if there is name duplicacy or not.
             member_list = attrs.get('members', [])
@@ -191,6 +191,10 @@ class PlusMembersSerializer(serializers.Serializer):
 
             if len(to_be_added_member_set) != len(member_list):
                 raise serializers.ValidationError({'name': 'Multiple members cannot have same name'})
+
+            if to_be_added_member_set & existing_members_name_set:
+                raise serializers.ValidationError({'name': 'Member already exist. Members name need to be unique.'})
+
             attrs['members'] = to_be_added_member_list
 
         return attrs
