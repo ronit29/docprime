@@ -488,6 +488,7 @@ class PlusUser(auth_model.TimeStampedModel, RefundMixin):
             else:
                 price = price_engine.get_price(price_data)
             engine = get_class_reference(plus_user, "DOCTOR")
+            response_dict['vip_gold_price'] = fees
             if not engine:
                 return response_dict
 
@@ -525,6 +526,7 @@ class PlusUser(auth_model.TimeStampedModel, RefundMixin):
                 final_price = price + price_data['home_pickup_charges']
                 entity = "PACKAGE" if appointment_data['test_ids'][0].is_package else "LABTEST"
                 engine = get_class_reference(plus_user, entity)
+                response_dict['vip_gold_price'] = int(price_data.get('fees'))
                 if appointment_data['test_ids']:
                     # engine_response = engine.validate_booking_entity(cost=final_price, id=appointment_data['test_ids'][0].id, utilization=kwargs.get('utilization'))
                     engine_response = engine.validate_booking_entity(cost=final_price, id=appointment_data['test_ids'][0].id, utilization=kwargs.get('utilization'), mrp=mrp)
@@ -578,6 +580,7 @@ class PlusUser(auth_model.TimeStampedModel, RefundMixin):
             else:
                 price = price_engine.get_price(price_data)
             engine = get_class_reference(self, "DOCTOR")
+            vip_data_dict['vip_gold_price'] = int(current_item_price_data.get('fees'))
             if engine:
                 # vip_response = engine.validate_booking_entity(cost=current_item_mrp, utilization=deep_utilization)
                 vip_response = engine.validate_booking_entity(cost=price, mrp=current_item_mrp, utilization=deep_utilization)
@@ -601,6 +604,7 @@ class PlusUser(auth_model.TimeStampedModel, RefundMixin):
                 else:
                     price = price_engine.get_price(price_data)
                 engine = get_class_reference(self, entity)
+                vip_data_dict['vip_gold_price'] = int(current_item_price_data.get('fees'))
                 if engine:
                     # vip_response = engine.validate_booking_entity(cost=current_item_mrp, utilization=deep_utilization)
                     vip_response = engine.validate_booking_entity(cost=price, utilization=deep_utilization, mrp=current_item_mrp)

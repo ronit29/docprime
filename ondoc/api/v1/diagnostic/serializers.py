@@ -316,8 +316,8 @@ class AvailableLabTestPackageSerializer(serializers.ModelSerializer):
             price = price_engine.get_price(price_data)
         engine = get_class_reference(plus_obj, entity)
         if not engine:
-            return resp
-
+            return resp.agreed_price
+        resp['vip_gold_price'] = obj
         if engine and obj and obj.mrp and lab_obj and lab_obj.enabled_for_plus_plans:
             # engine_response = engine.validate_booking_entity(cost=obj.mrp, id=obj.test.id)
             resp['vip_convenience_amount'] = user.active_plus_user.plan.get_convenience_charge(price, "LABTEST")
@@ -554,6 +554,7 @@ class AvailableLabTestSerializer(serializers.ModelSerializer):
         else:
             price = price_engine.get_price(price_data)
         engine = get_class_reference(plus_obj, entity)
+        resp['vip_gold_price'] = obj.agreed_price
         if not engine:
             return resp
 
@@ -825,6 +826,7 @@ class CommonPackageSerializer(serializers.ModelSerializer):
             price = mrp
         else:
             price = price_engine.get_price(price_data)
+        resp['vip_gold_price'] = agreed_price
         engine = get_class_reference(plus_obj, entity)
         if not engine:
             return resp
@@ -2053,6 +2055,7 @@ class CustomLabTestPackageSerializer(serializers.ModelSerializer):
             price = obj.mrp
         else:
             price = price_engine.get_price(price_data)
+        resp['vip_gold_price'] = obj.agreed_price
         engine = get_class_reference(plus_obj, entity)
         if not engine:
             return resp

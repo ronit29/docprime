@@ -1772,7 +1772,8 @@ class LabList(viewsets.ReadOnlyModelViewSet):
                         {"id": test.test_id, "name": test.test.name, "deal_price": deal_price, "mrp": test.mrp,
                          "number_of_tests": test.test.number_of_tests,
                          'categories': test.test.get_all_categories_detail(), "url": test.test.url,
-                         "insurance_agreed_price": test.insurance_agreed_price
+                         "insurance_agreed_price": test.insurance_agreed_price,
+                         "agreed_price": test.custom_agreed_price if test.custom_agreed_price else test.computed_agreed_price
                          })
 
         # day_now = timezone.now().weekday()
@@ -1917,7 +1918,7 @@ class LabList(viewsets.ReadOnlyModelViewSet):
                         else:
                             res['vip']['vip_convenience_amount'] = 0
                         coverage = False
-                        res['vip']['vip_gold_price'] = paticular_test_in_lab.get('agreed_price', 0)
+                        res['vip']['vip_gold_price'] = int(paticular_test_in_lab.get('agreed_price', 0))
                         if engine:
                             # engine_response = engine.validate_booking_entity(cost=paticular_test_in_lab.get('mrp', 0))
                             engine_response = engine.validate_booking_entity(cost=price, mrp=paticular_test_in_lab.get('mrp', 0))
