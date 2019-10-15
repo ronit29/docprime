@@ -1,3 +1,4 @@
+from django.db.models import Q
 from rest_framework import serializers
 from collections import defaultdict
 from rest_framework.fields import NullBooleanField
@@ -113,7 +114,7 @@ class PlusProposerSerializer(serializers.ModelSerializer):
         is_gold = request.query_params.get('is_gold', False)
         all_plans = request.query_params.get('all', False)
 
-        plus_plans_qs = obj.get_active_plans.filter(is_gold=False)
+        plus_plans_qs = obj.get_active_plans.filter(~Q(is_gold=True))
 
         if is_gold:
             plus_plans_qs = obj.get_active_plans.filter(is_gold=True)
