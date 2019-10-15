@@ -147,6 +147,7 @@ class PlusPlans(auth_model.TimeStampedModel, LiveMixin):
 
     class Meta:
         db_table = 'plus_plans'
+        unique_together = (('is_selected', 'is_gold'), )
 
 
 class PlusPlanUtmSources(auth_model.TimeStampedModel):
