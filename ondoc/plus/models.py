@@ -437,9 +437,12 @@ class PlusUser(auth_model.TimeStampedModel, RefundMixin):
         response_dict['is_vip_member'] = True
 
         if appointment_type == OPD:
-            price_data = {"mrp": int(price_data.get('mrp')), "deal_price": int(price_data.get('deal_price')),
-                          "cod_deal_price": int(price_data.get('cod_deal_price')),
-                          "fees": int(price_data.get('fees'))}
+            deal_price = price_data.get('deal_price', 0)
+            fees = price_data.get('fees', 0)
+            cod_deal_price = price_data.get('consultation').get('cod_deal_price', 0) if (price_data.get('consultation') and price_data.get('consultation').get('cod_deal_price')) else 0
+            price_data = {"mrp": int(price_data.get('mrp')), "deal_price": int(deal_price),
+                          "cod_deal_price": int(cod_deal_price),
+                          "fees": int(fees)}
             price_engine = get_price_reference(plus_user, "DOCTOR")
             if not price_engine:
                 price = int(price_data.get('mrp'))
