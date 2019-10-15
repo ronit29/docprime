@@ -1103,7 +1103,7 @@ class LabList(viewsets.ReadOnlyModelViewSet):
                     return Response(status=status.HTTP_404_NOT_FOUND)
 
             #entity_id = entity.entity_id
-            response = self.retrieve(request, entity.entity_id, entity)
+            response = self.retrieve(request, entity.entity_id, None, entity)
             return response
         else:
             return Response(status=status.HTTP_404_NOT_FOUND)

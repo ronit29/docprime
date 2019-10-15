@@ -926,7 +926,8 @@ class SelectedTestsDetailsSerializer(serializers.ModelSerializer):
     b2c_rate = serializers.SerializerMethodField()
 
     def get_b2c_rate(self, obj):
-        return int(obj.get_deal_price())
+        return int(obj.mrp) if obj.mrp else 0
+        # return int(obj.get_deal_price())
 
     class Meta:
         model = diag_models.AvailableLabTest
