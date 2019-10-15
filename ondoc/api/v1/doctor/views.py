@@ -4801,6 +4801,7 @@ class HospitalViewSet(viewsets.GenericViewSet):
         else:
             return Response(status=status.HTTP_404_NOT_FOUND)
 
+    @use_slave
     def retrive(self, request, pk, entity=None):
         serializer = serializers.HospitalDetailRequestSerializer(data=request.query_params)
         serializer.is_valid(raise_exception=True)

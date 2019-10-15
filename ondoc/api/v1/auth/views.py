@@ -1490,6 +1490,7 @@ class UserTransactionViewSet(viewsets.GenericViewSet):
     permission_classes = (IsAuthenticated,)
 
     @transaction.non_atomic_requests
+    @use_slave
     def list(self, request):
         user = request.user
         tx_queryset = ConsumerTransaction.objects.filter(user=user).order_by('-id')
