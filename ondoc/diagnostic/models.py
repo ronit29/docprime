@@ -2805,6 +2805,7 @@ class LabAppointment(TimeStampedModel, CouponsMixin, LabAppointmentInvoiceMixin,
         plus_user_id = None
         plus_user = user.active_plus_user
         mrp = price_data.get("mrp")
+        convenience_amount = 0
         vip_amount_utilized = 0
         if plus_user:
             plus_user_resp = plus_user.validate_plus_appointment(data)
@@ -2814,7 +2815,7 @@ class LabAppointment(TimeStampedModel, CouponsMixin, LabAppointmentInvoiceMixin,
             payment_type = OpdAppointment.VIP
             convenience_amount = plus_user.plan.get_convenience_charge(plus_user_resp['amount_to_be_paid'], "LABTEST")
             effective_price = plus_user_resp['amount_to_be_paid'] + convenience_amount
-            vip_amount_utilized = plus_user_resp['vip_amount_deducted'] + convenience_amount
+            vip_amount_utilized = plus_user_resp['vip_amount_deducted']
             # utilization = plus_user.get_utilization
             # available_amount = int(utilization.get('available_package_amount', 0))
             # mrp = int(price_data.get('mrp'))
@@ -2864,6 +2865,7 @@ class LabAppointment(TimeStampedModel, CouponsMixin, LabAppointmentInvoiceMixin,
             "cover_under_vip": cover_under_vip,
             "plus_plan": plus_user_id,
             'plus_amount': int(vip_amount_utilized),
+            'vip_convenience_amount': convenience_amount,
             "coupon_data": price_data.get("coupon_data"),
             "prescription_list": data.get('prescription_list', []),
             "_responsible_user": data.get("_responsible_user", None),

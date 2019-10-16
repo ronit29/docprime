@@ -1192,6 +1192,7 @@ class PlusAppointmentMapping(auth_model.TimeStampedModel):
     object_id = models.PositiveIntegerField()
     content_object = GenericForeignKey()
     amount = models.DecimalField(default=0, max_digits=10, decimal_places=2)
+    extra_charge = models.DecimalField(max_digits=10, decimal_places=2, null=True)
 
     @classmethod
     def get_vip_amount(cls, plus_user, content_type):
