@@ -995,7 +995,12 @@ class LabAppointmentModelSerializer(serializers.ModelSerializer):
     def get_payment_mode(self, obj):
         payment_modes = dict(OpdAppointment.PAY_CHOICES)
         if payment_modes:
-            return payment_modes.get(obj.payment_type, '')
+            effective_price = obj.effective_price
+            payment_type = obj.payment_type
+            if effective_price > 0 and payment_type == 5:
+                return 'Online'
+            else:
+                return payment_modes.get(obj.payment_type, '')
         return ''
 
     class Meta:
