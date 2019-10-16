@@ -2163,7 +2163,12 @@ class OrderDetailViewSet(GenericViewSet):
             if appointment:
                 payment_modes = dict(OpdAppointment.PAY_CHOICES)
                 if payment_modes:
-                    payment_mode = payment_modes.get(appointment.payment_type, '')
+                    effective_price = appointment.effective_price
+                    payment_type = appointment.payment_type
+                    if effective_price > 0 and payment_type == 5:
+                        payment_mode = 'Online'
+                    else:
+                        payment_mode = payment_modes.get(appointment.payment_type, '')
 
             curr = {
                 "mrp": order.action_data["mrp"] if "mrp" in order.action_data else order.action_data["agreed_price"],
