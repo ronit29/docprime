@@ -4621,25 +4621,26 @@ class HospitalViewSet(viewsets.GenericViewSet):
             if not plan:
                 plan = PlusPlans.objects.filter(is_gold=True).first()
             hospital_queryset = hospital_queryset[:20]
-            convenience_amount_obj, convenience_percentage_obj = plan.get_convenience_object('DOCTOR')
+            if plan:
+                convenience_amount_obj, convenience_percentage_obj = plan.get_convenience_object('DOCTOR')
 
-            for hospital in hospital_queryset:
-                doctor_clinics = hospital.hospital_doctors.all()
-                percentage = 0
-                for doc in doctor_clinics:
-                    doc_clinic_timing = doc.availability.all()[0] if doc.availability.all() else None
-                    if doc_clinic_timing:
-                        mrp = doc_clinic_timing.mrp
-                        agreed_price = doc_clinic_timing.fees
-                        if agreed_price and mrp:
-                            percentage = max(((mrp-(agreed_price + plan.get_convenience_amount(agreed_price, convenience_amount_obj, convenience_percentage_obj)))/mrp)*100, percentage)
-                hospital_percentage_dict[hospital.id] = round(percentage, 2)
+                for hospital in hospital_queryset:
+                    doctor_clinics = hospital.hospital_doctors.all()
+                    percentage = 0
+                    for doc in doctor_clinics:
+                        doc_clinic_timing = doc.availability.all()[0] if doc.availability.all() else None
+                        if doc_clinic_timing:
+                            mrp = doc_clinic_timing.mrp
+                            agreed_price = doc_clinic_timing.fees
+                            if agreed_price and mrp:
+                                percentage = max(((mrp-(agreed_price + plan.get_convenience_amount(agreed_price, convenience_amount_obj, convenience_percentage_obj)))/mrp)*100, percentage)
+                    hospital_percentage_dict[hospital.id] = round(percentage, 2)
 
             hospital_serializer = serializers.HospitalModelSerializer(hospital_queryset, many=True,
                                                                       context={"request": request})
             hospitals_result = hospital_serializer.data
             for data in hospitals_result:
-                data['vip_percentage'] = hospital_percentage_dict[data.get('id')]
+                data['vip_percentage'] = hospital_percentage_dict[data.get('id')] if plan else 0
 
             return Response({'count': result_count, 'hospitals': hospitals_result})
         return Response({})
