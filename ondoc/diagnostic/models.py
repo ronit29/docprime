@@ -59,7 +59,7 @@ from ondoc.integrations.task import push_lab_appointment_to_integrator, get_inte
 from ondoc.location import models as location_models
 from ondoc.plus.enums import UtilizationCriteria
 from ondoc.plus.models import PlusAppointmentMapping
-from ondoc.plus.usage_criteria import get_class_reference
+from ondoc.plus.usage_criteria import get_class_reference, get_price_reference
 from ondoc.ratings_review import models as ratings_models
 # from ondoc.api.v1.common import serializers as common_serializers
 from ondoc.common.models import AppointmentHistory, AppointmentMaskNumber, Remark, GlobalNonBookable, \
@@ -352,7 +352,9 @@ class Lab(TimeStampedModel, CreatedByModel, QCModel, SearchKey, WelcomeCallingDo
         resp = {
             'is_vip_member': False,
             'covered_under_vip': False,
-            'vip_amount': 0
+            'vip_amount': 0,
+            'vip_convenience_amount': 0,
+            'vip_gold_price': 0
         }
 
         if user.is_authenticated and not user.is_anonymous:
@@ -2654,16 +2656,24 @@ class LabAppointment(TimeStampedModel, CouponsMixin, LabAppointmentInvoiceMixin,
             coupon_discount, coupon_cashback, coupon_list, random_coupon_list = 0, 0, [], []
 
         if data.get("payment_type") in [OpdAppointment.VIP]:
+            price_data = {"mrp": total_mrp, "fees": total_agreed, "deal_price": total_deal_price, "cod_deal_price": total_deal_price}
             profile = data.get('profile')
             if profile:
                 plus_membership = profile.get_plus_membership
-
+                price_engine = get_price_reference(plus_membership, "LABTEST")
+                if not price_engine:
+                    price = effective_price
+                else:
+                    price = price_engine.get_price(price_data)
+                vip_convenience_amount = plus_membership.plan.get_convenience_charge(price, "LABTEST")
                 test = data['test_ids']
                 entity = "LABTEST" if not test[0].is_package else "PACKAGE"
                 engine = get_class_reference(plus_membership, entity)
                 if engine:
-                    engine_response = engine.validate_booking_entity(cost=effective_price, id=data['test_ids'][0].id)
+                    # engine_response = engine.validate_booking_entity(cost=effective_price, id=data['test_ids'][0].id)
+                    engine_response = engine.validate_booking_entity(cost=price, id=data['test_ids'][0].id, mrp=effective_price)
                     effective_price = engine_response.get('amount_to_be_paid')
+                    effective_price = effective_price + vip_convenience_amount
                 else:
                     effective_price = effective_price
             else:
@@ -2795,6 +2805,7 @@ class LabAppointment(TimeStampedModel, CouponsMixin, LabAppointmentInvoiceMixin,
         plus_user_id = None
         plus_user = user.active_plus_user
         mrp = price_data.get("mrp")
+        convenience_amount = 0
         vip_amount_utilized = 0
         if plus_user:
             plus_user_resp = plus_user.validate_plus_appointment(data)
@@ -2802,8 +2813,8 @@ class LabAppointment(TimeStampedModel, CouponsMixin, LabAppointmentInvoiceMixin,
             plus_user_id = plus_user_resp.get('plus_user_id', None)
         if cover_under_vip and cart_data.get('cover_under_vip', None):
             payment_type = OpdAppointment.VIP
-
-            effective_price = plus_user_resp['amount_to_be_paid']
+            convenience_amount = plus_user.plan.get_convenience_charge(plus_user_resp['amount_to_be_paid'], "LABTEST")
+            effective_price = plus_user_resp['amount_to_be_paid'] + convenience_amount
             vip_amount_utilized = plus_user_resp['vip_amount_deducted']
             # utilization = plus_user.get_utilization
             # available_amount = int(utilization.get('available_package_amount', 0))
@@ -2854,6 +2865,7 @@ class LabAppointment(TimeStampedModel, CouponsMixin, LabAppointmentInvoiceMixin,
             "cover_under_vip": cover_under_vip,
             "plus_plan": plus_user_id,
             'plus_amount': int(vip_amount_utilized),
+            'vip_convenience_amount': convenience_amount,
             "coupon_data": price_data.get("coupon_data"),
             "prescription_list": data.get('prescription_list', []),
             "_responsible_user": data.get("_responsible_user", None),

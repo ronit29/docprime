@@ -17,9 +17,9 @@ from ondoc.api.v1.auth.serializers import AddressSerializer
 from ondoc.common.middleware import use_slave
 from ondoc.integrations.models import IntegratorTestMapping, IntegratorReport, IntegratorMapping
 from ondoc.cart.models import Cart
-from ondoc.common.models import UserConfig, GlobalNonBookable, AppointmentHistory, MatrixMappedCity
-from ondoc.plus.models import PlusUser
-from ondoc.plus.usage_criteria import get_class_reference
+from ondoc.common.models import UserConfig, GlobalNonBookable, AppointmentHistory, MatrixMappedCity, SearchCriteria
+from ondoc.plus.models import PlusUser, PlusPlans
+from ondoc.plus.usage_criteria import get_class_reference, get_price_reference
 from ondoc.ratings_review import models as rating_models
 from ondoc.diagnostic.models import (LabTest, AvailableLabTest, Lab, LabAppointment, LabTiming, PromotedLab,
                                      CommonDiagnosticCondition, CommonTest, CommonPackage,
@@ -1757,6 +1757,12 @@ class LabList(viewsets.ReadOnlyModelViewSet):
         tests = dict()
         lab = dict()
 
+        search_criteria = SearchCriteria.objects.filter(search_key='is_gold')
+        is_gold = False
+        if search_criteria:
+            search_criteria = search_criteria.first()
+            is_gold = search_criteria.search_value
+
         for obj in labs:
             if  insurance_data_dict and insurance_data_dict['is_user_insured'] and obj.home_pickup_charges > 0:
                 obj.is_home_collection_enabled = False
@@ -1772,7 +1778,8 @@ class LabList(viewsets.ReadOnlyModelViewSet):
                         {"id": test.test_id, "name": test.test.name, "deal_price": deal_price, "mrp": test.mrp,
                          "number_of_tests": test.test.number_of_tests,
                          'categories': test.test.get_all_categories_detail(), "url": test.test.url,
-                         "insurance_agreed_price": test.insurance_agreed_price
+                         "insurance_agreed_price": test.insurance_agreed_price,
+                         "agreed_price": test.custom_agreed_price if test.custom_agreed_price else test.computed_agreed_price
                          })
 
         # day_now = timezone.now().weekday()
@@ -1806,6 +1813,7 @@ class LabList(viewsets.ReadOnlyModelViewSet):
 
             row['avg_rating'] = lab_obj.rating_data.get('avg_rating') if lab_obj.display_rating_on_list() else None
             row['rating_count'] = lab_obj.rating_data.get('rating_count') if lab_obj.display_rating_on_list() else None
+            row['is_gold'] = is_gold
             # if lab_obj.always_open:
             #     lab_timing = "12:00 AM - 11:45 PM"
             #     next_lab_timing_dict = {rotated_days_array[1]: "12:00 AM - 11:45 PM"}
@@ -1901,10 +1909,27 @@ class LabList(viewsets.ReadOnlyModelViewSet):
                 engine_response = {}
                 if all_tests_under_lab and res['is_vip_enabled']:
                     for paticular_test_in_lab in all_tests_under_lab:
+                        price_data = {"mrp": paticular_test_in_lab.get('mrp', 0),
+                                      "deal_price": paticular_test_in_lab.get('deal_price', 0),
+                                      "fees": paticular_test_in_lab.get('agreed_price', 0),
+                                      "cod_deal_price": paticular_test_in_lab.get('deal_price', 0)}
+                        price_engine = get_price_reference(plus_user_obj, "LABTEST")
+                        if not price_engine:
+                            price = paticular_test_in_lab.get('mrp', 0)
+                        else:
+                            price = price_engine.get_price(price_data)
                         engine = get_class_reference(plus_user_obj, "LABTEST")
+                        if plus_user_obj and plus_user_obj.plan:
+                            res['vip']['vip_convenience_amount'] = plus_user_obj.plan.get_convenience_charge(price, "LABTEST")
+                            res['vip']['is_gold_member'] = True if plus_user_obj.plan.is_gold else False
+                        else:
+                            res['vip']['is_gold_member'] = False
+                            res['vip']['vip_convenience_amount'] = PlusPlans.get_default_convenience_amount(paticular_test_in_lab.get('agreed_price', 0), "LABTEST")
                         coverage = False
+                        res['vip']['vip_gold_price'] = int(paticular_test_in_lab.get('agreed_price', 0))
                         if engine:
-                            engine_response = engine.validate_booking_entity(cost=paticular_test_in_lab.get('mrp', 0))
+                            # engine_response = engine.validate_booking_entity(cost=paticular_test_in_lab.get('mrp', 0))
+                            engine_response = engine.validate_booking_entity(cost=price, mrp=paticular_test_in_lab.get('mrp', 0))
                             coverage = engine_response.get('is_covered', False)
                         bool_array.append(coverage)
 

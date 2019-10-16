@@ -3,7 +3,7 @@ from decimal import Decimal
 from celery.task import task
 from django.contrib.gis.db.models.functions import Distance
 from django.contrib.gis.geos import GEOSGeometry
-from django.db.models import Window
+from django.db.models import Window, Prefetch
 from django.db.models.functions import RowNumber
 from django.db.models.expressions import RawSQL
 from copy import deepcopy
@@ -76,8 +76,8 @@ from ondoc.matrix.tasks import push_appointment_to_matrix, push_onboarding_qcsta
     create_ipd_lead_from_opd_appointment, push_retail_appointment_to_matrix
 from ondoc.integrations.task import push_opd_appointment_to_integrator
 # from ondoc.procedure.models import Procedure
-from ondoc.plus.models import PlusAppointmentMapping
-from ondoc.plus.usage_criteria import get_class_reference
+from ondoc.plus.models import PlusAppointmentMapping, PlusPlans
+from ondoc.plus.usage_criteria import get_class_reference, get_price_reference
 from ondoc.ratings_review import models as ratings_models
 from django.utils import timezone
 from random import randint
@@ -300,14 +300,49 @@ class Hospital(auth_model.TimeStampedModel, auth_model.CreatedByModel, auth_mode
         return result
 
     @staticmethod
-    def get_top_hospitals_data(request, lat=28.450367, long=77.071848, vip_user=None):
+    def get_top_hospitals_data(request, lat=28.450367, long=77.071848, vip_user=None, from_vip_page=False):
         from ondoc.api.v1.doctor.serializers import TopHospitalForIpdProcedureSerializer
         from ondoc.seo.models import NewDynamic
         result = []
-        common_hosp_queryset = CommonHospital.objects.all().order_by('priority')
-        if vip_user:
-            common_hosp_queryset =  common_hosp_queryset.filter(hospital__enabled_for_prepaid=True)
+        day = datetime.datetime.today().weekday()
+        common_hosp_queryset = CommonHospital.objects.all().prefetch_related('hospital', 'hospital__hospital_doctors', 'hospital__health_insurance_providers',
+                                                                'hospital__hospital_documents', 'hospital__imagehospital', 'hospital__network',
+                                                                'hospital__network__hospitalnetworkspeciality_set',
+                                                                'hospital__hospital_services', 'hospital__hosp_availability',
+                                                                'hospital__hospitalcertification_set', 'hospital__hospitalspeciality_set',
+                                                              Prefetch('hospital__hospital_doctors__availability',
+                                                                       queryset=DoctorClinicTiming.objects.filter(
+                                                                           day=day))).order_by('priority')
+
+        if vip_user or from_vip_page:
+            common_hosp_queryset = common_hosp_queryset.filter(hospital__enabled_for_prepaid=True)
         common_hosp_queryset = common_hosp_queryset[:20]
+
+        common_hosp_percentage_dict = dict()
+
+        plan = PlusPlans.objects.filter(is_gold=True, is_selected=True).first()
+        if not plan:
+            plan = PlusPlans.objects.filter(is_gold=True).first()
+
+        convenience_amount_obj, convenience_percentage_obj = plan.get_convenience_object('DOCTOR')
+
+        for common_hospital in common_hosp_queryset:
+            if common_hospital.hospital:
+                doctor_clinics = common_hospital.hospital.hospital_doctors.all()
+                if doctor_clinics:
+                    percentage = 0
+                    for doc in doctor_clinics:
+                        doc_clinic_timing = doc.availability.all()[0] if doc.availability.all() else None
+                        if doc_clinic_timing:
+                            mrp = doc_clinic_timing.mrp
+                            agreed_price = doc_clinic_timing.fees
+                            if agreed_price and mrp:
+                                percentage = max(((mrp - (
+                                            agreed_price + plan.get_convenience_amount(agreed_price, convenience_amount_obj,
+                                                                                       convenience_percentage_obj))) / mrp) * 100,
+                                                 percentage)
+                    common_hosp_percentage_dict[common_hospital.hospital.id] = round(percentage,2)
+
         # queryset = CommonHospital.objects.all().values_list('hospital', 'network')
         # top_hospital_ids = list(set([x[0] for x in queryset if x[0] is not None]))
         # top_network_ids = list(set([x[1] for x in queryset if x[1] is not None]))
@@ -355,6 +390,8 @@ class Hospital(auth_model.TimeStampedModel, auth_model.CreatedByModel, auth_mode
                                                                                          'hosp_entity_dict': hosp_entity_dict,
                                                                                          'hosp_locality_entity_dict': hosp_locality_entity_dict,
                                                                                          'new_dynamic_dict': new_dynamic_dict}).data
+        for data in result:
+            data['vip_percentage'] = common_hosp_percentage_dict[data.get('id')]
 
         return result
         # result = TopHospitalForIpdProcedureSerializer(hosp_queryset, many=True, context={'request': request,
@@ -3450,9 +3487,17 @@ class OpdAppointment(auth_model.TimeStampedModel, CouponsMixin, OpdAppointmentIn
                 else:
                     plus_user = profile.get_plus_membership
                     if plus_user:
+                        price_data = {"mrp": doctor_clinic_timing.mrp, "cod_deal_price": doctor_clinic_timing.cod_deal_price,
+                                      "deal_price": doctor_clinic_timing.deal_price,  "fees": doctor_clinic_timing.fees}
+                        price_engine = get_price_reference(plus_user, "DOCTOR")
+                        if not price_engine:
+                            price = doctor_clinic_timing.mrp
+                        else:
+                            price = price_engine.get_price(price_data)
                         engine = get_class_reference(plus_user, "DOCTOR")
                         if engine:
-                            vip_dict = engine.validate_booking_entity(cost=doctor_clinic_timing.mrp)
+                            # vip_dict = engine.validate_booking_entity(cost=doctor_clinic_timing.mrp)
+                            vip_dict = engine.validate_booking_entity(cost=price, mrp=doctor_clinic_timing.mrp)
                             effective_price = vip_dict.get('amount_to_be_paid')
                         else:
                             effective_price = doctor_clinic_timing.deal_price
@@ -3570,6 +3615,7 @@ class OpdAppointment(auth_model.TimeStampedModel, CouponsMixin, OpdAppointmentIn
         cover_under_vip = False
         plus_user_id = None
         vip_amount = 0
+        convenience_amount = 0
         plus_user = user.active_plus_user
         mrp = price_data.get("mrp")
         if plus_user:
@@ -3584,7 +3630,9 @@ class OpdAppointment(auth_model.TimeStampedModel, CouponsMixin, OpdAppointmentIn
         if cover_under_vip and cart_data.get('cover_under_vip', None) and vip_amount > 0:
             # effective_price = 0 if doctor_available_amount >= mrp else (mrp - doctor_available_amount)
             # effective_price = cart_data.get('vip_amount')
-            effective_price = cart_data.get('amount_to_be_paid')
+            convenience_amount = plus_user.plan.get_convenience_charge(cart_data.get('amount_to_be_paid'), "DOCTOR")
+            effective_price = cart_data.get('amount_to_be_paid') + convenience_amount
+            # vip_amount = vip_amount + convenience_amount
             payment_type = OpdAppointment.VIP
             plus_user_id = plus_user_resp.get('plus_user_id', None)
         else:
@@ -3617,6 +3665,7 @@ class OpdAppointment(auth_model.TimeStampedModel, CouponsMixin, OpdAppointmentIn
             "cover_under_vip": cover_under_vip,
             "plus_plan": plus_user_id,
             "plus_amount": vip_amount,
+            "vip_convenience_amount": convenience_amount,
             "coupon_data": price_data.get("coupon_data"),
             "_responsible_user": data.get("_responsible_user", None),
             "_source": data.get("_source", None)

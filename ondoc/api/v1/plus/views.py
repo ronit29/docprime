@@ -1,5 +1,6 @@
 import json
 from django.conf import settings
+from django.contrib.contenttypes.models import ContentType
 from django.db import transaction
 from rest_framework import viewsets
 from rest_framework.permissions import IsAuthenticated
@@ -14,7 +15,10 @@ from ondoc.account import models as account_models
 from ondoc.authentication.models import User, UserProfile
 from ondoc.common.middleware import use_slave
 from ondoc.common.models import BlacklistUser, BlockedStates, DocumentsProofs
-from ondoc.plus.models import (PlusProposer, PlusPlans, PlusThreshold, PlusMembers, PlusUser, PlusLead, PlusDummyData)
+from ondoc.diagnostic.models import LabAppointment
+from ondoc.doctor.models import OpdAppointment
+from ondoc.plus.models import (PlusProposer, PlusPlans, PlusThreshold, PlusMembers, PlusUser, PlusLead, PlusDummyData,
+                               PlusAppointmentMapping)
 from . import serializers
 import datetime
 from datetime import timedelta
@@ -192,7 +196,7 @@ class PlusOrderViewSet(viewsets.GenericViewSet):
             transaction_date = datetime.datetime.now()
             amount = plus_plan.deal_price
 
-            expiry_date = transaction_date + relativedelta(years=int(plus_plan.tenure))
+            expiry_date = transaction_date + relativedelta(months=int(plus_plan.tenure))
             expiry_date = expiry_date - timedelta(days=1)
             expiry_date = datetime.datetime.combine(expiry_date, datetime.datetime.max.time())
             plus_user_data = {'proposer': plus_plan.proposer.id, 'plus_plan': plus_plan.id,
@@ -290,10 +294,10 @@ class PlusOrderViewSet(viewsets.GenericViewSet):
         # Remove the proposer profile. Proposer is only allowed to upload the document proofs.
 
         counter = 0
-        # self_counter = -1
+        self_counter = -1
         for member in members_to_be_added:
             if member.get('relation') == PlusMembers.Relations.SELF:
-                # self_counter = counter
+                self_counter = counter
                 if member.get('document_ids'):
                     proposer_profile = inactive_plus_subscription.get_primary_member_profile()
                     if proposer_profile:
@@ -304,7 +308,7 @@ class PlusOrderViewSet(viewsets.GenericViewSet):
 
             counter += 1
 
-        # members_to_be_added.pop(self_counter)
+        members_to_be_added.pop(self_counter)
 
         PlusMembers.create_plus_members(inactive_plus_subscription, members_list=members_to_be_added)
         inactive_plus_subscription.status = PlusUser.ACTIVE
@@ -325,7 +329,7 @@ class PlusProfileViewSet(viewsets.GenericViewSet):
             plus_user_id = request.query_params.get('id')
             plus_user = PlusUser.objects.filter(id=plus_user_id).first()
         else:
-            return Response(status=status.HTTP_404_NOT_FOUND)
+            return Response(status=status.HTTP_400_BAD_REQUEST)
 
         if not plus_user:
             return Response(status=status.HTTP_400_BAD_REQUEST)
@@ -351,6 +355,15 @@ class PlusProfileViewSet(viewsets.GenericViewSet):
         available_relations = PlusMembers.Relations.get_custom_availabilities()
         available_relations.pop(PlusMembers.Relations.SELF)
         resp['relation_master'] = available_relations
+
+        opd_content_type = ContentType.objects.get_for_model(OpdAppointment)
+        lab_appointent_content_type = ContentType.objects.get_for_model(LabAppointment)
+        amount = PlusAppointmentMapping.get_vip_amount(plus_user, opd_content_type) + PlusAppointmentMapping.get_vip_amount(plus_user, lab_appointent_content_type)
+        if plus_user.plan.is_gold:
+            resp['lab_appointment_count'] = PlusAppointmentMapping.get_count(plus_user, lab_appointent_content_type)
+            resp['opd_appointment_count'] = PlusAppointmentMapping.get_count(plus_user, opd_content_type)
+            resp['total_vip_amount'] = amount
+
         return Response({'data': resp})
 
 

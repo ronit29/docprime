@@ -1,3 +1,4 @@
+from django.db.models import Q
 from rest_framework import serializers
 from collections import defaultdict
 from rest_framework.fields import NullBooleanField
@@ -36,15 +37,16 @@ class PlusPlansSerializer(serializers.ModelSerializer):
         return resp
 
     def get_enabled_hospital_networks(self, obj):
-        request = self.context.get('request')
-        if not request:
-            return None
-
-        serializer = CommonConditionsSerializer(data=request.query_params)
-        serializer.is_valid(raise_exception=True)
-        validated_data = serializer.validated_data
-        top_hospitals_data = Hospital.get_top_hospitals_data(request, validated_data.get('lat'), validated_data.get('long'))
-        return top_hospitals_data
+        return []
+        # request = self.context.get('request')
+        # if not request:
+        #     return None
+        #
+        # serializer = CommonConditionsSerializer(data=request.query_params)
+        # serializer.is_valid(raise_exception=True)
+        # validated_data = serializer.validated_data
+        # top_hospitals_data = Hospital.get_top_hospitals_data(request, validated_data.get('lat'), validated_data.get('long'))
+        # return top_hospitals_data
 
     def get_worth(self, obj):
         data = {}
@@ -101,15 +103,43 @@ class PlusPlansSerializer(serializers.ModelSerializer):
     class Meta:
         model = PlusPlans
         fields = ('id', 'plan_name', 'worth', 'mrp', 'tax_rebate', 'you_pay', 'you_get', 'deal_price', 'is_selected',
-                  'tenure', 'total_allowed_members', 'content', 'enabled_hospital_networks', 'utilize')
+                  'tenure', 'total_allowed_members', 'content', 'enabled_hospital_networks', 'utilize', 'is_gold')
 
 
 class PlusProposerSerializer(serializers.ModelSerializer):
-    plans = PlusPlansSerializer(source='get_active_plans', many=True)
+    # plans = PlusPlansSerializer(source='get_active_plans', many=True)
+    plans = serializers.SerializerMethodField()
+    gold_plans = serializers.SerializerMethodField()
+
+    def get_plans(self, obj):
+        request = self.context.get('request')
+        resp = []
+
+        if request.query_params.get('is_gold'):
+            return resp
+
+        plus_plans_qs = obj.get_active_plans.filter(~Q(is_gold=True))
+        serializer_obj = PlusPlansSerializer(plus_plans_qs, context=self.context, many=True)
+        resp = serializer_obj.data
+
+        return resp
+
+    def get_gold_plans(self, obj):
+        request = self.context.get('request')
+        resp = []
+
+        if request.query_params.get('is_gold') or request.query_params.get('all'):
+
+            plus_plans_qs = obj.get_active_plans.filter(is_gold=True)
+
+            serializer_obj = PlusPlansSerializer(plus_plans_qs, context=self.context, many=True)
+            resp = serializer_obj.data
+
+        return resp
 
     class Meta:
         model = PlusProposer
-        fields = ('id', 'name', 'logo', 'website', 'phone_number', 'email', 'plans')
+        fields = ('id', 'name', 'logo', 'website', 'phone_number', 'email', 'plans', 'gold_plans')
 
 
 class PlusProposerUTMSerializer(serializers.ModelSerializer):
@@ -175,12 +205,16 @@ class PlusMembersSerializer(serializers.Serializer):
             member_list = attrs.get('members', [])
             # to_be_added_member_list = attrs.get('members', [])
             to_be_added_member_list = []
+            proposer_name = None
             for each_member in member_list:
-                if not each_member.get('id'):
+                if not each_member.get('id') or each_member['relation'] == PlusMembers.Relations.SELF:
                     to_be_added_member_list.append(each_member)
+                if each_member['relation'] == PlusMembers.Relations.SELF:
+                    proposer_name = "%s %s" % (each_member['first_name'], each_member['last_name'])
 
             to_be_added_member_set = set(
                     map(lambda member: "%s %s" % (member['first_name'], member['last_name']), to_be_added_member_list))
+            to_be_added_member_set.remove(proposer_name)
 
             # to_be_added_member_set = set(map(lambda member: "%s %s" % (member['first_name'], member['last_name']), to_be_added_member_list))
             # to_be_added_member_relation_set = set(map(lambda member: "%s" % (member['relation']), to_be_added_member_list))
