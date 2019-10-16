@@ -156,7 +156,7 @@ class OpdAppointmentSerializer(serializers.ModelSerializer):
                 vip_amount = int(obj.mrp) - int(plus_appointment_mapping.amount)
 
         return {
-            'is_vip_member': True if obj and obj.plus_plan and not obj.plus_plan.is_gold else False,
+            'is_vip_member': True if obj and obj.plus_plan and obj.plus_plan.plan and not obj.plus_plan.plan.is_gold else False,
             'vip_amount': vip_amount,
             'is_gold_member': True if plus_appointment_mapping and plus_appointment_mapping.plus_plan.is_gold else False,
             'covered_under_vip': True if obj and obj.plus_plan else False
