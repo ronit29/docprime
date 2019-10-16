@@ -320,8 +320,7 @@ class Order(TimeStampedModel):
             _source = appointment_data.pop('_source')
         if 'plus_amount' in appointment_data:
             plus_amount = appointment_data.pop('plus_amount')
-            if plus_amount > 0:
-                convenience_amount = int(appointment_data.pop('vip_convenience_amount'))
+            convenience_amount = int(appointment_data.pop('vip_convenience_amount'))
 
         if self.action == Order.OPD_APPOINTMENT_CREATE:
             if total_balance >= appointment_data["effective_price"] or payment_not_required:

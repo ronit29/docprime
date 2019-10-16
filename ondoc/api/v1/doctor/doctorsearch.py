@@ -685,13 +685,12 @@ class DoctorSearchHelper:
                         price = price_engine.get_price(price_data)
                     vip_convenience_amount = request.user.active_plus_user.plan.get_convenience_charge(price, "DOCTOR")
                     engine = get_class_reference(request.user.active_plus_user, "DOCTOR")
+                    is_gold_member = True if request.user.active_plus_user.plan.is_gold else False
                     if engine:
                         # vip_response_dict = engine.validate_booking_entity(cost=mrp)
                         vip_response_dict = engine.validate_booking_entity(cost=price, mrp=mrp)
                         vip_amount = vip_response_dict.get('amount_to_be_paid', 0)
                         cover_under_vip = vip_response_dict.get('is_covered', False)
-                        is_gold_member = True if request.user.active_plus_user.plan.is_gold else False
-
                         # vip_amount = 0 if vip_remaining_amount > mrp else mrp - vip_remaining_amount
                 hospitals = [{
                     "enabled_for_online_booking": enable_online_booking,
