@@ -1091,8 +1091,8 @@ class PlusMembers(auth_model.TimeStampedModel):
     @classmethod
     def create_plus_members(cls, plus_user_obj, *args, **kwargs):
 
-        members = kwargs.get('members_list')
-        if not members:
+        members = kwargs.get('members_list', None)
+        if members is None:
             members = plus_user_obj.raw_plus_member
             members = json.loads(members)
 
