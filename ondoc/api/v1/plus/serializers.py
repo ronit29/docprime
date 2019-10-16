@@ -36,7 +36,7 @@ class PlusPlansSerializer(serializers.ModelSerializer):
         if not online_chat_param:
             return False
 
-        parameter_mapping = PlusPlanParametersMapping.objects.filter(parameter_id=online_chat_param.id).first()
+        parameter_mapping = PlusPlanParametersMapping.objects.filter(plus_plan_id=obj.id, parameter_id=online_chat_param.id).first()
         if parameter_mapping and parameter_mapping.value:
             return True
 
