@@ -2068,28 +2068,38 @@ class CustomLabTestPackageSerializer(serializers.ModelSerializer):
         # package_amount_balance = utilization.get('available_package_amount', 0)
 
         plus_obj = None
+        deal_price = 0
+        agreed_price = 0
+        mrp = 0
         if user and user.is_authenticated and not user.is_anonymous:
             plus_obj = user.active_plus_user if user.active_plus_user and user.active_plus_user.status == PlusUser.ACTIVE else None
 
         entity = "LABTEST" if not obj.is_package else "PACKAGE"
-        price_data = {"mrp": obj.mrp, "deal_price": obj.deal_price,
-                      "cod_deal_price": obj.deal_price,
-                      "fees": obj.agreed_price}
+        if lab:
+            avl_obj = obj.availablelabs.filter(lab_pricing_group=lab.lab_pricing_group).first()
+            if avl_obj:
+                mrp = avl_obj.mrp
+                deal_price = avl_obj.custom_deal_price if avl_obj.custom_deal_price else avl_obj.computed_deal_price
+                agreed_price = avl_obj.custom_agreed_price if avl_obj.custom_agreed_price else avl_obj.computed_agreed_price
+
+        price_data = {"mrp": mrp, "deal_price": deal_price,
+                      "cod_deal_price": deal_price,
+                      "fees": agreed_price}
         price_engine = get_price_reference(plus_obj, "LABTEST")
         if not price_engine:
-            price = obj.mrp
+            price = mrp
         else:
             price = price_engine.get_price(price_data)
-        resp['vip_gold_price'] = obj.agreed_price
-        resp['vip_convenience_amount'] = PlusPlans.get_default_convenience_amount(obj.agreed_price, "LABTEST")
+        resp['vip_gold_price'] = agreed_price
+        resp['vip_convenience_amount'] = PlusPlans.get_default_convenience_amount(agreed_price, "LABTEST")
         engine = get_class_reference(plus_obj, entity)
         if not engine:
             return resp
 
-        if engine and obj and obj.mrp and lab and lab.enabled_for_plus_plans:
+        if engine and obj and mrp and lab and lab.enabled_for_plus_plans:
             resp['vip_convenience_amount'] = user.active_plus_user.plan.get_convenience_charge(price, "LABTEST")
             # engine_response = engine.validate_booking_entity(cost=obj.mrp, id=obj.id)
-            engine_response = engine.validate_booking_entity(cost=price, id=obj.id, mrp=obj.mrp)
+            engine_response = engine.validate_booking_entity(cost=price, id=obj.id, mrp=mrp)
             resp['covered_under_vip'] = engine_response['is_covered']
             resp['vip_amount'] = engine_response['amount_to_be_paid']
 
