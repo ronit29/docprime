@@ -247,6 +247,7 @@ class OpdAppTransactionModelSerializer(serializers.Serializer):
     _responsible_user = serializers.IntegerField(required=False, allow_null=True)
     plus_plan = serializers.PrimaryKeyRelatedField(queryset=PlusUser.objects.all(), allow_null=True)
     plus_amount = serializers.DecimalField(max_digits=10, decimal_places=2)
+    vip_convenience_amount = serializers.DecimalField(max_digits=10, decimal_places=2, allow_null=True)
 
 
 

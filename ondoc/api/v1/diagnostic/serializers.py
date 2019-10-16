@@ -1083,6 +1083,7 @@ class LabAppTransactionModelSerializer(serializers.Serializer):
     _responsible_user = serializers.IntegerField(required=False, allow_null=True)
     # test_time_slots = serializers.ListSerializer(child=LabAppointmentTestTransactionSerializer(), required=False, allow_empty=False)
     selected_timings_type = serializers.ChoiceField(required=False, choices=(('common', 'common'), ('separate', 'separate')))
+    vip_convenience_amount = serializers.DecimalField(allow_null=True, max_digits=10, decimal_places=2)
 
     def __init__(self, instance=None, data=None, **kwargs):
         super().__init__(instance, data, **kwargs)
