@@ -938,7 +938,7 @@ class LabAppointmentModelSerializer(serializers.ModelSerializer):
             plus_appointment_mapping = PlusAppointmentMapping.objects.filter(object_id=obj.id).first()
 
         return {
-            'is_vip_member': True if obj and obj.plus_plan and not obj.plus_plan.is_gold else False,
+            'is_vip_member': True if obj and obj.plus_plan and obj.plus_plan.plan and not obj.plus_plan.plan.is_gold else False,
             'vip_amount': plus_appointment_mapping.amount if plus_appointment_mapping else 0,
             'is_gold_member': True if plus_appointment_mapping and plus_appointment_mapping.plus_plan.is_gold else False,
             'vip_amount_deducted': plus_appointment_mapping.amount if plus_appointment_mapping else 0,
