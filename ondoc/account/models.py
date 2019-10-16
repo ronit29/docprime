@@ -313,13 +313,15 @@ class Order(TimeStampedModel):
         _responsible_user=None
         _source=None
         plus_amount = 0
+        convenience_amount = 0
         if '_responsible_user' in appointment_data:
             _responsible_user = appointment_data.pop('_responsible_user')
         if '_source' in appointment_data:
             _source = appointment_data.pop('_source')
         if 'plus_amount' in appointment_data:
             plus_amount = appointment_data.pop('plus_amount')
-            convenience_amount = appointment_data.pop('vip_convenience_amount')
+            if plus_amount > 0:
+                convenience_amount = appointment_data.pop('vip_convenience_amount')
 
         if self.action == Order.OPD_APPOINTMENT_CREATE:
             if total_balance >= appointment_data["effective_price"] or payment_not_required:

@@ -1658,7 +1658,8 @@ class AppointmentRetrieveSerializer(OpdAppointmentSerializer):
             'vip_amount': vip_amount,
             'vip_amount_deducted': plus_appointment_mapping.amount if plus_appointment_mapping else 0,
             'is_gold_member': True if plus_appointment_mapping and plus_appointment_mapping.plus_plan.is_gold else False,
-            'covered_under_vip': True if obj and obj.plus_plan else False
+            'covered_under_vip': True if obj and obj.plus_plan else False,
+            'extra_charge': plus_appointment_mapping.extra_charge if plus_appointment_mapping else 0
         }
 
     def get_procedures(self, obj):
