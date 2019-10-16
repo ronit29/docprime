@@ -306,7 +306,9 @@ class AvailableLabTestPackageSerializer(serializers.ModelSerializer):
         plus_obj = None
         if user and user.is_authenticated and not user.is_anonymous:
             plus_obj = user.active_plus_user if user.active_plus_user and user.active_plus_user.status == PlusUser.ACTIVE else None
-
+        if not plus_obj:
+            return resp
+        resp['is_gold_member'] = True if plus_obj.plan.is_gold else False
         entity = "LABTEST" if not obj.test.is_package else "PACKAGE"
         deal_price = obj.custom_deal_price if obj.custom_deal_price  else obj.computed_deal_price
         agreed_price = obj.custom_agreed_price if obj.custom_agreed_price  else obj.computed_agreed_price
@@ -327,7 +329,6 @@ class AvailableLabTestPackageSerializer(serializers.ModelSerializer):
             engine_response = engine.validate_booking_entity(cost=price, id=obj.test.id, mrp=obj.mrp)
             resp['covered_under_vip'] = engine_response['is_covered']
             resp['vip_amount'] = engine_response['amount_to_be_paid']
-            resp['is_gold_member'] = True if plus_obj.plan.is_gold else False
 
         return resp
 
@@ -548,7 +549,9 @@ class AvailableLabTestSerializer(serializers.ModelSerializer):
         plus_obj = None
         if user and user.is_authenticated and not user.is_anonymous:
             plus_obj = user.active_plus_user if user.active_plus_user and user.active_plus_user.status == PlusUser.ACTIVE else None
-
+        if not plus_obj:
+            return resp
+        resp['is_gold_member'] = True if plus_obj.plan.is_gold else False
         entity = "LABTEST" if not obj.test.is_package else "PACKAGE"
         deal_price = obj.custom_deal_price if obj.custom_deal_price else obj.computed_deal_price
         agreed_price = obj.custom_agreed_price if obj.custom_agreed_price else obj.computed_agreed_price
@@ -570,7 +573,6 @@ class AvailableLabTestSerializer(serializers.ModelSerializer):
             engine_response = engine.validate_booking_entity(cost=price, id=obj.test.id, mrp=obj.mrp)
             resp['covered_under_vip'] = engine_response['is_covered']
             resp['vip_amount'] = engine_response['amount_to_be_paid']
-            resp['is_gold_member'] = True if plus_obj.plan.is_gold else False
 
         return resp
 
@@ -820,7 +822,9 @@ class CommonPackageSerializer(serializers.ModelSerializer):
         plus_obj = None
         if user and user.is_authenticated and not user.is_anonymous:
             plus_obj = user.active_plus_user if user.active_plus_user and user.active_plus_user.status == PlusUser.ACTIVE else None
-
+        if not plus_obj:
+            return resp
+        resp['is_gold_member'] = True if plus_obj.plan.is_gold else False
         mrp = obj._selected_test.mrp
         deal_price = obj._selected_test.custom_deal_price if obj._selected_test.custom_deal_price else obj._selected_test.computed_deal_price
         agreed_price = obj._selected_test.custom_agreed_price if obj._selected_test.custom_agreed_price else obj._selected_test.computed_agreed_price
@@ -845,7 +849,6 @@ class CommonPackageSerializer(serializers.ModelSerializer):
             engine_response = engine.validate_booking_entity(cost=price, id=obj.package.id, mrp=obj._selected_test.mrp)
             resp['covered_under_vip'] = engine_response['is_covered']
             resp['vip_amount'] = engine_response['amount_to_be_paid']
-            resp['is_gold_member'] = True if plus_obj.plan.is_gold else False
 
         return resp
 
@@ -2073,7 +2076,9 @@ class CustomLabTestPackageSerializer(serializers.ModelSerializer):
         mrp = 0
         if user and user.is_authenticated and not user.is_anonymous:
             plus_obj = user.active_plus_user if user.active_plus_user and user.active_plus_user.status == PlusUser.ACTIVE else None
-
+        if not plus_obj:
+            return resp
+        resp['is_gold_member'] = True if plus_obj.plan.is_gold else False
         entity = "LABTEST" if not obj.is_package else "PACKAGE"
         if lab:
             avl_obj = obj.availablelabs.filter(lab_pricing_group=lab.lab_pricing_group).first()

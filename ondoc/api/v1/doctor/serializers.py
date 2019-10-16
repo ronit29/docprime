@@ -158,7 +158,7 @@ class OpdAppointmentSerializer(serializers.ModelSerializer):
         return {
             'is_vip_member': True if obj and obj.plus_plan and obj.plus_plan.plan and not obj.plus_plan.plan.is_gold else False,
             'vip_amount': vip_amount,
-            'is_gold_member': True if plus_appointment_mapping and plus_appointment_mapping.plus_plan.is_gold else False,
+            'is_gold_member': True if plus_appointment_mapping and plus_appointment_mapping.plus_plan and plus_appointment_mapping.plus_plan.is_gold else False,
             'vip_amount_deducted': plus_appointment_mapping.amount if plus_appointment_mapping else 0,
             'covered_under_vip': True if obj and obj.plus_plan else False,
             'extra_charge': plus_appointment_mapping.extra_charge if plus_appointment_mapping else 0
@@ -663,6 +663,7 @@ class DoctorHospitalSerializer(serializers.ModelSerializer):
             plus_user = None if not user.is_authenticated or user.is_anonymous else user.active_plus_user
             if not plus_user:
                 return resp
+            resp['is_gold_member'] = True if plus_user.plan.is_gold else False
             utilization = plus_user.get_utilization
             available_amount = int(utilization.get('doctor_amount_available', 0))
             price_data = {"mrp": obj.mrp, "deal_price": obj.deal_price, "fees": obj.fees, "cod_deal_price": obj.cod_deal_price}
@@ -680,7 +681,6 @@ class DoctorHospitalSerializer(serializers.ModelSerializer):
                 resp['vip_convenience_amount'] = plus_user.plan.get_convenience_charge(price, "DOCTOR")
                 resp['vip_amount'] = vip_res.get('amount_to_be_paid', 0)
                 resp['cover_under_vip'] = vip_res.get('is_covered', False)
-                resp['is_gold_member'] = True if plus_user.plan.is_gold else False
             # amount = plus_user.get_vip_amount(utilization, mrp)
             # resp['cover_under_vip'] = True if (amount < mrp) else False
             # resp['vip_amount'] = amount
@@ -1663,7 +1663,7 @@ class AppointmentRetrieveSerializer(OpdAppointmentSerializer):
             'is_vip_member': True if obj and obj.plus_plan else False,
             'vip_amount': vip_amount,
             'vip_amount_deducted': plus_appointment_mapping.amount if plus_appointment_mapping else 0,
-            'is_gold_member': True if plus_appointment_mapping and plus_appointment_mapping.plus_plan.is_gold else False,
+            'is_gold_member': True if plus_appointment_mapping and plus_appointment_mapping.plus_plan and plus_appointment_mapping.plus_plan.is_gold else False,
             'covered_under_vip': True if obj and obj.plus_plan else False,
             'extra_charge': plus_appointment_mapping.extra_charge if plus_appointment_mapping else 0
         }
