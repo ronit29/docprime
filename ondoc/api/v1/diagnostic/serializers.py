@@ -2067,6 +2067,8 @@ class CustomLabTestPackageSerializer(serializers.ModelSerializer):
         lab = lab_data.get(obj.lab, None)
         if lab and lab.enabled_for_plus_plans:
             resp['is_enable_for_vip'] = True
+        else:
+            resp['is_enable_for_vip'] = False
         user = request.user
         # plus_obj = user.active_plus_user if not user.is_anonymous and user.is_authenticated else None
         # utilization = plus_obj.get_utilization if plus_obj else {}
