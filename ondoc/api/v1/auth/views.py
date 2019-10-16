@@ -1441,7 +1441,11 @@ class TransactionViewSet(viewsets.GenericViewSet):
         data['status_type'] = response.get('txStatus')
         data['transaction_id'] = format_return_value(response.get('pgTxId'))
         data['pb_gateway_name'] = response.get('pbGatewayName')
-        data['nodal_id'] = response.get('nodalId')
+        # data['nodal_id'] = response.get('nodalId')
+        if order_obj.product_id == Order.INSURANCE_PRODUCT_ID:
+            data['nodal_id'] = PgTransaction.NODAL2
+        else:
+            data['nodal_id'] = PgTransaction.NODAL1
 
         return data
 
