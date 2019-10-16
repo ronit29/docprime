@@ -84,7 +84,7 @@ LOGGING = {
     },
     'loggers': {
         'django': {
-            'handlers': ['console',],
+            'handlers': ['console', ],
             'level': 'ERROR',
             'propagate': False,
         },
@@ -119,7 +119,7 @@ if env('ENABLE_SENTRY', default=False):
         'handlers': ['console', ],
         'propagate': False,
     }
-    INSTALLED_APPS += ('raven.contrib.django.raven_compat',)
+    INSTALLED_APPS += ('raven.contrib.django.raven_compat', )
     RAVEN_MIDDLEWARE = ['raven.contrib.django.raven_compat.middleware.SentryResponseErrorIdMiddleware']
     MIDDLEWARE = RAVEN_MIDDLEWARE + MIDDLEWARE
     # Sentry Configuration
