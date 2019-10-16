@@ -161,6 +161,8 @@ class PlusPlans(auth_model.TimeStampedModel, LiveMixin):
         default_plan = cls.objects.filter(is_selected=True, is_gold=True).first()
         if not default_plan:
             default_plan = cls.objects.filter(is_gold=True).first()
+        if not default_plan:
+            return 0
         amount_obj, percentage_obj = default_plan.get_convenience_object(type)
         convenience_amount = amount_obj.value if amount_obj else 0
         convenience_percentage = percentage_obj.value if percentage_obj else 0
