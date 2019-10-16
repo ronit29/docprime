@@ -2070,26 +2070,25 @@ class CustomLabTestPackageSerializer(serializers.ModelSerializer):
         else:
             resp['is_enable_for_vip'] = False
         user = request.user
-        # plus_obj = user.active_plus_user if not user.is_anonymous and user.is_authenticated else None
-        # utilization = plus_obj.get_utilization if plus_obj else {}
-        # package_amount_balance = utilization.get('available_package_amount', 0)
-
         plus_obj = None
         deal_price = 0
         agreed_price = 0
         mrp = 0
-        if user and user.is_authenticated and not user.is_anonymous:
-            plus_obj = user.active_plus_user if user.active_plus_user and user.active_plus_user.status == PlusUser.ACTIVE else None
-        if not plus_obj:
-            return resp
-        resp['is_gold_member'] = True if plus_obj.plan.is_gold else False
-        entity = "LABTEST" if not obj.is_package else "PACKAGE"
         if lab:
             avl_obj = obj.availablelabs.filter(lab_pricing_group=lab.lab_pricing_group).first()
             if avl_obj:
                 mrp = avl_obj.mrp
                 deal_price = avl_obj.custom_deal_price if avl_obj.custom_deal_price else avl_obj.computed_deal_price
                 agreed_price = avl_obj.custom_agreed_price if avl_obj.custom_agreed_price else avl_obj.computed_agreed_price
+
+        if user and user.is_authenticated and not user.is_anonymous:
+            plus_obj = user.active_plus_user if user.active_plus_user and user.active_plus_user.status == PlusUser.ACTIVE else None
+        resp['vip_gold_price'] = agreed_price
+        resp['vip_convenience_amount'] = PlusPlans.get_default_convenience_amount(agreed_price, "LABTEST")
+        if not plus_obj:
+            return resp
+        resp['is_gold_member'] = True if plus_obj.plan.is_gold else False
+        entity = "LABTEST" if not obj.is_package else "PACKAGE"
 
         price_data = {"mrp": mrp, "deal_price": deal_price,
                       "cod_deal_price": deal_price,
@@ -2099,8 +2098,6 @@ class CustomLabTestPackageSerializer(serializers.ModelSerializer):
             price = mrp
         else:
             price = price_engine.get_price(price_data)
-        resp['vip_gold_price'] = agreed_price
-        resp['vip_convenience_amount'] = PlusPlans.get_default_convenience_amount(agreed_price, "LABTEST")
         engine = get_class_reference(plus_obj, entity)
         if not engine:
             return resp
