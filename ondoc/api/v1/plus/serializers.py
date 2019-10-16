@@ -9,7 +9,8 @@ from ondoc.authentication.models import UserProfile
 from ondoc.authentication.models import User
 from ondoc.common.models import DocumentsProofs
 from ondoc.doctor.models import Hospital
-from ondoc.plus.models import (PlusProposer, PlusPlans, PlusThreshold, PlusMembers, PlusUser, PlusUserUtilization)
+from ondoc.plus.models import (PlusProposer, PlusPlans, PlusThreshold, PlusMembers, PlusUser, PlusUserUtilization,
+                               PlusPlanParameters, PlusPlanParametersMapping)
 from ondoc.plus.enums import PlanParametersEnum
 from ondoc.account import models as account_models
 
@@ -28,6 +29,18 @@ class PlusPlansSerializer(serializers.ModelSerializer):
     you_pay = serializers.SerializerMethodField()
     you_get = serializers.SerializerMethodField()
     utilize = serializers.SerializerMethodField()
+    show_consultation_text = serializers.SerializerMethodField()
+
+    def get_show_consultation_text(self, obj):
+        online_chat_param = PlusPlanParameters.objects.filter(key='ONLINE_CHAT_AMOUNT').first()
+        if not online_chat_param:
+            return False
+
+        parameter_mapping = PlusPlanParametersMapping.objects.filter(parameter_id=online_chat_param.id).first()
+        if parameter_mapping and parameter_mapping.value:
+            return True
+
+        return False
 
     def get_content(self, obj):
         resp = defaultdict(list)
@@ -103,7 +116,8 @@ class PlusPlansSerializer(serializers.ModelSerializer):
     class Meta:
         model = PlusPlans
         fields = ('id', 'plan_name', 'worth', 'mrp', 'tax_rebate', 'you_pay', 'you_get', 'deal_price', 'is_selected',
-                  'tenure', 'total_allowed_members', 'content', 'enabled_hospital_networks', 'utilize', 'is_gold')
+                  'tenure', 'total_allowed_members', 'content', 'enabled_hospital_networks', 'utilize', 'is_gold',
+                  'show_consultation_text')
 
 
 class PlusProposerSerializer(serializers.ModelSerializer):
