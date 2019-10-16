@@ -205,12 +205,16 @@ class PlusMembersSerializer(serializers.Serializer):
             member_list = attrs.get('members', [])
             # to_be_added_member_list = attrs.get('members', [])
             to_be_added_member_list = []
+            proposer_name = None
             for each_member in member_list:
-                if not each_member.get('id'):
+                if not each_member.get('id') or each_member['relation'] == PlusMembers.Relations.SELF:
                     to_be_added_member_list.append(each_member)
+                if each_member['relation'] == PlusMembers.Relations.SELF:
+                    proposer_name = "%s %s" % (each_member['first_name'], each_member['last_name'])
 
             to_be_added_member_set = set(
                     map(lambda member: "%s %s" % (member['first_name'], member['last_name']), to_be_added_member_list))
+            to_be_added_member_set.remove(proposer_name)
 
             # to_be_added_member_set = set(map(lambda member: "%s %s" % (member['first_name'], member['last_name']), to_be_added_member_list))
             # to_be_added_member_relation_set = set(map(lambda member: "%s" % (member['relation']), to_be_added_member_list))
