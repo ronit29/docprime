@@ -356,6 +356,7 @@ class Lab(TimeStampedModel, CreatedByModel, QCModel, SearchKey, WelcomeCallingDo
             'vip_convenience_amount': 0,
             'vip_gold_price': 0,
             'is_gold_member': False
+            'hosp_is_gold': False
         }
 
         if user.is_authenticated and not user.is_anonymous:

@@ -568,10 +568,9 @@ class DoctorSearchHelper:
         coupon_code = query_params.get("coupon_code", None)
 
         coupon_recommender = CouponRecommender(request.user, profile, 'doctor', product_id, coupon_code, None)
-        search_criteria = SearchCriteria.objects.filter(search_key='is_gold')
+        search_criteria = SearchCriteria.objects.filter(search_key='is_gold').first()
         hosp_is_gold = False
         if search_criteria:
-            search_criteria = search_criteria.first()
             hosp_is_gold = search_criteria.search_value
 
         filters = dict()
