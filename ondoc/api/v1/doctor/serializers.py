@@ -659,6 +659,7 @@ class DoctorHospitalSerializer(serializers.ModelSerializer):
 
         resp = {"is_vip_member": False, "cover_under_vip": False, "vip_amount": 0, "is_enable_for_vip": False,
                 "vip_convenience_amount": PlusPlans.get_default_convenience_amount(obj.fees, "DOCTOR"), 'hosp_is_gold': False}
+        resp['hosp_is_gold'] = hosp_is_gold
         request = self.context.get("request")
         user = request.user
         doctor_clinic = obj.doctor_clinic
@@ -691,7 +692,7 @@ class DoctorHospitalSerializer(serializers.ModelSerializer):
                 resp['vip_convenience_amount'] = plus_user.plan.get_convenience_charge(price, "DOCTOR")
                 resp['vip_amount'] = vip_res.get('amount_to_be_paid', 0)
                 resp['cover_under_vip'] = vip_res.get('is_covered', False)
-                resp['hosp_is_gold'] = hosp_is_gold
+
             # amount = plus_user.get_vip_amount(utilization, mrp)
             # resp['cover_under_vip'] = True if (amount < mrp) else False
             # resp['vip_amount'] = amount
