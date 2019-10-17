@@ -299,11 +299,6 @@ class AvailableLabTestPackageSerializer(serializers.ModelSerializer):
     #   return data.get('prescription_needed', False)
 
     def get_vip(self, obj):
-        search_criteria = SearchCriteria.objects.filter(search_key='is_gold').first()
-        hosp_is_gold = False
-        if search_criteria:
-            hosp_is_gold = search_criteria.search_value
-
         request = self.context.get("request")
         lab_obj = self.context.get("lab")
         resp = Lab.get_vip_details(request.user)
@@ -335,7 +330,6 @@ class AvailableLabTestPackageSerializer(serializers.ModelSerializer):
             engine_response = engine.validate_booking_entity(cost=price, id=obj.test.id, mrp=obj.mrp)
             resp['covered_under_vip'] = engine_response['is_covered']
             resp['vip_amount'] = engine_response['amount_to_be_paid']
-            resp['is_gold'] = hosp_is_gold
 
         return resp
 
@@ -548,11 +542,6 @@ class AvailableLabTestSerializer(serializers.ModelSerializer):
         return deal_price
 
     def get_vip(self, obj):
-        search_criteria = SearchCriteria.objects.filter(search_key='is_gold').first()
-        hosp_is_gold = False
-        if search_criteria:
-            hosp_is_gold = search_criteria.search_value
-
         request = self.context.get("request")
         lab_obj = self.context.get("lab")
         resp = Lab.get_vip_details(request.user)
@@ -585,7 +574,6 @@ class AvailableLabTestSerializer(serializers.ModelSerializer):
             engine_response = engine.validate_booking_entity(cost=price, id=obj.test.id, mrp=obj.mrp)
             resp['covered_under_vip'] = engine_response['is_covered']
             resp['vip_amount'] = engine_response['amount_to_be_paid']
-            resp['is_gold'] = hosp_is_gold
 
         return resp
 
@@ -822,11 +810,6 @@ class CommonPackageSerializer(serializers.ModelSerializer):
         return discounted_price
 
     def get_vip(self, obj):
-        search_criteria = SearchCriteria.objects.filter(search_key='is_gold').first()
-        hosp_is_gold = False
-        if search_criteria:
-            hosp_is_gold = search_criteria.search_value
-
         request = self.context.get("request")
         resp = Lab.get_vip_details(request.user)
         user = request.user
@@ -867,7 +850,6 @@ class CommonPackageSerializer(serializers.ModelSerializer):
             engine_response = engine.validate_booking_entity(cost=price, id=obj.package.id, mrp=obj._selected_test.mrp)
             resp['covered_under_vip'] = engine_response['is_covered']
             resp['vip_amount'] = engine_response['amount_to_be_paid']
-            resp['is_gold'] = hosp_is_gold
 
         return resp
 
@@ -2086,16 +2068,11 @@ class CustomLabTestPackageSerializer(serializers.ModelSerializer):
         return resp
 
     def get_vip(self, obj):
-        search_criteria = SearchCriteria.objects.filter(search_key='is_gold').first()
-        hosp_is_gold = False
-        if search_criteria:
-            hosp_is_gold = search_criteria.search_value
-
         request = self.context.get("request")
         resp = Lab.get_vip_details(request.user)
         lab_data = self.context.get('lab_data', {})
         lab = lab_data.get(obj.lab, None)
-        if lab and lab.enabled_for_plus_plans:
+        if lab and lab.is_enabled_for_plus_plans():
             resp['is_enable_for_vip'] = True
         else:
             resp['is_enable_for_vip'] = False
@@ -2132,13 +2109,12 @@ class CustomLabTestPackageSerializer(serializers.ModelSerializer):
         if not engine:
             return resp
 
-        if engine and obj and mrp and lab and lab.enabled_for_plus_plans:
+        if engine and obj and mrp and lab and lab.is_enabled_for_plus_plans():
             resp['vip_convenience_amount'] = user.active_plus_user.plan.get_convenience_charge(price, "LABTEST")
             # engine_response = engine.validate_booking_entity(cost=obj.mrp, id=obj.id)
             engine_response = engine.validate_booking_entity(cost=price, id=obj.id, mrp=mrp)
             resp['covered_under_vip'] = engine_response['is_covered']
             resp['vip_amount'] = engine_response['amount_to_be_paid']
-            resp['is_gold'] = hosp_is_gold
 
         return resp
 
