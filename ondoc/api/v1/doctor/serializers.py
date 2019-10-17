@@ -647,7 +647,7 @@ class DoctorHospitalSerializer(serializers.ModelSerializer):
 
     def get_vip(self, obj):
         resp = {"is_vip_member": False, "cover_under_vip": False, "vip_amount": 0, "is_enable_for_vip": False,
-                "vip_convenience_amount": PlusPlans.get_default_convenience_amount(obj.fees, "DOCTOR")}
+                "vip_convenience_amount": PlusPlans.get_default_convenience_amount(obj.fees, "DOCTOR"), "vip_gold_price": 0}
         request = self.context.get("request")
         user = request.user
         doctor_clinic = obj.doctor_clinic
