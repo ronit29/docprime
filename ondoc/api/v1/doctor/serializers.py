@@ -666,7 +666,7 @@ class DoctorHospitalSerializer(serializers.ModelSerializer):
         hospital = doctor_clinic.hospital
         enabled_for_online_booking = doctor_clinic.enabled_for_online_booking and doctor.enabled_for_online_booking and \
                                         hospital.enabled_for_online_booking and hospital.enabled_for_prepaid \
-                                        and hospital.enabled_for_plus_plans and doctor.enabled_for_plus_plans
+                                        and hospital.is_enabled_for_plus_plans() and doctor.enabled_for_plus_plans
         plus_user = None if not user.is_authenticated or user.is_anonymous else user.active_plus_user
         resp['is_gold_member'] = True if plus_user and plus_user.plan and plus_user.plan.is_gold else False
         if enabled_for_online_booking and obj.mrp is not None:

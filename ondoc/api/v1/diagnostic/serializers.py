@@ -324,7 +324,7 @@ class AvailableLabTestPackageSerializer(serializers.ModelSerializer):
         if not engine:
             return agreed_price
         resp['vip_gold_price'] = agreed_price
-        if engine and obj and obj.mrp and lab_obj and lab_obj.enabled_for_plus_plans:
+        if engine and obj and obj.mrp and lab_obj and lab_obj.is_enabled_for_plus_plans():
             # engine_response = engine.validate_booking_entity(cost=obj.mrp, id=obj.test.id)
             resp['vip_convenience_amount'] = user.active_plus_user.plan.get_convenience_charge(price, "LABTEST")
             engine_response = engine.validate_booking_entity(cost=price, id=obj.test.id, mrp=obj.mrp)
@@ -568,7 +568,7 @@ class AvailableLabTestSerializer(serializers.ModelSerializer):
         if not engine:
             return resp
 
-        if engine and obj and obj.mrp and lab_obj and lab_obj.enabled_for_plus_plans:
+        if engine and obj and obj.mrp and lab_obj and lab_obj.is_enabled_for_plus_plans():
             # engine_response = engine.validate_booking_entity(cost=obj.mrp, id=obj.test.id)
             resp['vip_convenience_amount'] = user.active_plus_user.plan.get_convenience_charge(price, "LABTEST")
             engine_response = engine.validate_booking_entity(cost=price, id=obj.test.id, mrp=obj.mrp)
@@ -844,7 +844,7 @@ class CommonPackageSerializer(serializers.ModelSerializer):
         if not engine:
             return resp
 
-        if engine and obj and obj._selected_test and lab_obj.enabled_for_plus_plans and obj._selected_test.mrp:
+        if engine and obj and obj._selected_test and lab_obj.is_enabled_for_plus_plans() and obj._selected_test.mrp:
             # engine_response = engine.validate_booking_entity(cost=obj._selected_test.mrp, id=obj.package.id)
             resp['vip_convenience_amount'] = user.active_plus_user.plan.get_convenience_charge(price, "LABTEST")
             engine_response = engine.validate_booking_entity(cost=price, id=obj.package.id, mrp=obj._selected_test.mrp)

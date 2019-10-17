@@ -522,7 +522,7 @@ class PlusUser(auth_model.TimeStampedModel, RefundMixin):
             doctor = appointment_data['doctor']
             hospital = appointment_data['hospital']
             if doctor.enabled_for_online_booking and hospital.enabled_for_online_booking and \
-                                        hospital.enabled_for_prepaid and hospital.enabled_for_plus_plans and \
+                                        hospital.enabled_for_prepaid and hospital.is_enabled_for_plus_plans() and \
                                         doctor.enabled_for_plus_plans:
 
                 # engine_response = engine.validate_booking_entity(cost=mrp, utilization=kwargs.get('utilization'))

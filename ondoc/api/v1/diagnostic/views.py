@@ -1807,7 +1807,7 @@ class LabList(viewsets.ReadOnlyModelViewSet):
             row['home_pickup_charges'] = lab_obj.home_pickup_charges
             row['is_home_collection_enabled'] = lab_obj.is_home_collection_enabled
             row['is_insurance_enabled'] = lab_obj.is_insurance_enabled
-            row['is_vip_enabled'] = lab_obj.enabled_for_plus_plans
+            row['is_vip_enabled'] = lab_obj.is_enabled_for_plus_plans()
             row['avg_rating'] = lab_obj.rating_data.get('avg_rating') if lab_obj.display_rating_on_list() else None
             row['rating_count'] = lab_obj.rating_data.get('rating_count') if lab_obj.display_rating_on_list() else None
 
