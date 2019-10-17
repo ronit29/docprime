@@ -9,7 +9,7 @@ from collections import defaultdict, OrderedDict
 from ondoc.api.v1.procedure.serializers import DoctorClinicProcedureSerializer, OpdAppointmentProcedureMappingSerializer
 from ondoc.api.v1.ratings.serializers import RatingsGraphSerializer
 from ondoc.cart.models import Cart
-from ondoc.common.models import Feature, MatrixMappedCity
+from ondoc.common.models import Feature, MatrixMappedCity, SearchCriteria
 from ondoc.diagnostic.models import LabTest
 from ondoc.doctor.models import (OpdAppointment, Doctor, Hospital, DoctorHospital, DoctorClinicTiming,
                                  DoctorAssociation,
@@ -146,6 +146,11 @@ class OpdAppointmentSerializer(serializers.ModelSerializer):
 
     def get_vip(self, obj):
 
+        search_criteria = SearchCriteria.objects.filter(search_key='is_gold').first()
+        hosp_is_gold = False
+        if search_criteria:
+            hosp_is_gold = search_criteria.search_value
+
         plus_appointment_mapping = None
         vip_amount = 0
         if obj:
@@ -161,7 +166,8 @@ class OpdAppointmentSerializer(serializers.ModelSerializer):
             'is_gold_member': True if plus_appointment_mapping and plus_appointment_mapping.plus_plan and plus_appointment_mapping.plus_plan.is_gold else False,
             'vip_amount_deducted': plus_appointment_mapping.amount if plus_appointment_mapping else 0,
             'covered_under_vip': True if obj and obj.plus_plan else False,
-            'extra_charge': plus_appointment_mapping.extra_charge if plus_appointment_mapping else 0
+            'extra_charge': plus_appointment_mapping.extra_charge if plus_appointment_mapping else 0,
+            'hosp_is_gold': hosp_is_gold
         }
 
     def get_prescription(self, obj):
@@ -646,8 +652,13 @@ class DoctorHospitalSerializer(serializers.ModelSerializer):
         return resp
 
     def get_vip(self, obj):
+        search_criteria = SearchCriteria.objects.filter(search_key='is_gold').first()
+        hosp_is_gold = False
+        if search_criteria:
+            hosp_is_gold = search_criteria.search_value
+
         resp = {"is_vip_member": False, "cover_under_vip": False, "vip_amount": 0, "is_enable_for_vip": False,
-                "vip_convenience_amount": PlusPlans.get_default_convenience_amount(obj.fees, "DOCTOR")}
+                "vip_convenience_amount": PlusPlans.get_default_convenience_amount(obj.fees, "DOCTOR"), 'hosp_is_gold': False}
         request = self.context.get("request")
         user = request.user
         doctor_clinic = obj.doctor_clinic
@@ -680,6 +691,7 @@ class DoctorHospitalSerializer(serializers.ModelSerializer):
                 resp['vip_convenience_amount'] = plus_user.plan.get_convenience_charge(price, "DOCTOR")
                 resp['vip_amount'] = vip_res.get('amount_to_be_paid', 0)
                 resp['cover_under_vip'] = vip_res.get('is_covered', False)
+                resp['hosp_is_gold'] = hosp_is_gold
             # amount = plus_user.get_vip_amount(utilization, mrp)
             # resp['cover_under_vip'] = True if (amount < mrp) else False
             # resp['vip_amount'] = amount
@@ -1649,6 +1661,11 @@ class AppointmentRetrieveSerializer(OpdAppointmentSerializer):
         return resp
 
     def get_vip(self, obj):
+        search_criteria = SearchCriteria.objects.filter(search_key='is_gold').first()
+        hosp_is_gold = False
+        if search_criteria:
+            hosp_is_gold = search_criteria.search_value
+
         vip_amount = 0
         plus_appointment_mapping = None
         if obj:
@@ -1664,7 +1681,8 @@ class AppointmentRetrieveSerializer(OpdAppointmentSerializer):
             'vip_amount_deducted': plus_appointment_mapping.amount if plus_appointment_mapping else 0,
             'is_gold_member': True if plus_appointment_mapping and plus_appointment_mapping.plus_plan and plus_appointment_mapping.plus_plan.is_gold else False,
             'covered_under_vip': True if obj and obj.plus_plan else False,
-            'extra_charge': plus_appointment_mapping.extra_charge if plus_appointment_mapping else 0
+            'extra_charge': plus_appointment_mapping.extra_charge if plus_appointment_mapping else 0,
+            'hosp_is_gold': hosp_is_gold
         }
 
     def get_procedures(self, obj):

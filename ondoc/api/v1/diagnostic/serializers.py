@@ -3,6 +3,7 @@ from rest_framework import serializers
 from rest_framework.fields import CharField
 
 from ondoc.cart.models import Cart
+from ondoc.common.models import SearchCriteria
 from ondoc.diagnostic.models import (LabTest, AvailableLabTest, Lab, LabAppointment, LabTiming, PromotedLab,
                                      CommonTest, CommonDiagnosticCondition, LabImage, LabReportFile, CommonPackage,
                                      LabTestCategory, LabAppointmentTestMapping, LabTestGroup, LabTestGroupMapping)
@@ -298,6 +299,11 @@ class AvailableLabTestPackageSerializer(serializers.ModelSerializer):
     #   return data.get('prescription_needed', False)
 
     def get_vip(self, obj):
+        search_criteria = SearchCriteria.objects.filter(search_key='is_gold').first()
+        hosp_is_gold = False
+        if search_criteria:
+            hosp_is_gold = search_criteria.search_value
+
         request = self.context.get("request")
         lab_obj = self.context.get("lab")
         resp = Lab.get_vip_details(request.user)
@@ -329,6 +335,7 @@ class AvailableLabTestPackageSerializer(serializers.ModelSerializer):
             engine_response = engine.validate_booking_entity(cost=price, id=obj.test.id, mrp=obj.mrp)
             resp['covered_under_vip'] = engine_response['is_covered']
             resp['vip_amount'] = engine_response['amount_to_be_paid']
+            resp['is_gold'] = hosp_is_gold
 
         return resp
 
@@ -541,6 +548,11 @@ class AvailableLabTestSerializer(serializers.ModelSerializer):
         return deal_price
 
     def get_vip(self, obj):
+        search_criteria = SearchCriteria.objects.filter(search_key='is_gold').first()
+        hosp_is_gold = False
+        if search_criteria:
+            hosp_is_gold = search_criteria.search_value
+
         request = self.context.get("request")
         lab_obj = self.context.get("lab")
         resp = Lab.get_vip_details(request.user)
@@ -573,6 +585,7 @@ class AvailableLabTestSerializer(serializers.ModelSerializer):
             engine_response = engine.validate_booking_entity(cost=price, id=obj.test.id, mrp=obj.mrp)
             resp['covered_under_vip'] = engine_response['is_covered']
             resp['vip_amount'] = engine_response['amount_to_be_paid']
+            resp['is_gold'] = hosp_is_gold
 
         return resp
 
@@ -809,6 +822,11 @@ class CommonPackageSerializer(serializers.ModelSerializer):
         return discounted_price
 
     def get_vip(self, obj):
+        search_criteria = SearchCriteria.objects.filter(search_key='is_gold').first()
+        hosp_is_gold = False
+        if search_criteria:
+            hosp_is_gold = search_criteria.search_value
+
         request = self.context.get("request")
         resp = Lab.get_vip_details(request.user)
         user = request.user
@@ -849,6 +867,7 @@ class CommonPackageSerializer(serializers.ModelSerializer):
             engine_response = engine.validate_booking_entity(cost=price, id=obj.package.id, mrp=obj._selected_test.mrp)
             resp['covered_under_vip'] = engine_response['is_covered']
             resp['vip_amount'] = engine_response['amount_to_be_paid']
+            resp['is_gold'] = hosp_is_gold
 
         return resp
 
@@ -936,6 +955,11 @@ class LabAppointmentModelSerializer(serializers.ModelSerializer):
     payment_mode = serializers.SerializerMethodField()
 
     def get_vip(self, obj):
+        search_criteria = SearchCriteria.objects.filter(search_key='is_gold').first()
+        hosp_is_gold = False
+        if search_criteria:
+            hosp_is_gold = search_criteria.search_value
+
         plus_appointment_mapping = None
         if obj:
             plus_appointment_mapping = PlusAppointmentMapping.objects.filter(object_id=obj.id).first()
@@ -946,7 +970,8 @@ class LabAppointmentModelSerializer(serializers.ModelSerializer):
             'is_gold_member': True if plus_appointment_mapping and plus_appointment_mapping.plus_plan.is_gold else False,
             'vip_amount_deducted': plus_appointment_mapping.amount if plus_appointment_mapping else 0,
             'covered_under_vip': True if obj and obj.plus_plan else False,
-            'extra_charge': plus_appointment_mapping.extra_charge if plus_appointment_mapping else 0
+            'extra_charge': plus_appointment_mapping.extra_charge if plus_appointment_mapping else 0,
+            'is_gold': hosp_is_gold
         }
 
     def get_prescription(self, obj):
@@ -2061,6 +2086,11 @@ class CustomLabTestPackageSerializer(serializers.ModelSerializer):
         return resp
 
     def get_vip(self, obj):
+        search_criteria = SearchCriteria.objects.filter(search_key='is_gold').first()
+        hosp_is_gold = False
+        if search_criteria:
+            hosp_is_gold = search_criteria.search_value
+
         request = self.context.get("request")
         resp = Lab.get_vip_details(request.user)
         lab_data = self.context.get('lab_data', {})
@@ -2108,6 +2138,7 @@ class CustomLabTestPackageSerializer(serializers.ModelSerializer):
             engine_response = engine.validate_booking_entity(cost=price, id=obj.id, mrp=mrp)
             resp['covered_under_vip'] = engine_response['is_covered']
             resp['vip_amount'] = engine_response['amount_to_be_paid']
+            resp['is_gold'] = hosp_is_gold
 
         return resp
 
