@@ -11,6 +11,8 @@ from ondoc.api.v1.doctor.serializers import CreateAppointmentSerializer
 from django.db import transaction
 from django.conf import settings
 import copy
+
+from ondoc.common.models import SearchCriteria
 from ondoc.diagnostic.models import LabAppointment
 
 from ondoc.coupon.models import Coupon
@@ -183,6 +185,11 @@ class CartViewSet(viewsets.GenericViewSet):
     def list(self, request, *args, **kwargs):
         from ondoc.insurance.models import UserInsurance
 
+        search_criteria = SearchCriteria.objects.filter(search_key='is_gold').first()
+        hosp_is_gold = False
+        if search_criteria:
+            hosp_is_gold = search_criteria.search_value
+
         user = request.user
         if not user.is_authenticated:
             return Response({"status": 0}, status.HTTP_401_UNAUTHORIZED)
@@ -331,7 +338,8 @@ class CartViewSet(viewsets.GenericViewSet):
                     "consultation" : price_data.get("consultation", None),
                     "cod_deal_price": price_data.get("consultation", {}).get('cod_deal_price'),
                     "is_enabled_for_cod" : price_data.get("consultation", {}).get('is_enabled_for_cod'),
-                    "is_price_zero": True if price_data['fees'] is not None and price_data['fees']==0 else False
+                    "is_price_zero": True if price_data['fees'] is not None and price_data['fees']==0 else False,
+                    'is_gold': hosp_is_gold
                 })
             except Exception as e:
                 # error = custom_exception_handler(e, None)

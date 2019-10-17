@@ -335,7 +335,7 @@ class AvailableLabTestPackageSerializer(serializers.ModelSerializer):
             engine_response = engine.validate_booking_entity(cost=price, id=obj.test.id, mrp=obj.mrp)
             resp['covered_under_vip'] = engine_response['is_covered']
             resp['vip_amount'] = engine_response['amount_to_be_paid']
-            resp['hosp_is_gold'] = hosp_is_gold
+            resp['is_gold'] = hosp_is_gold
 
         return resp
 
@@ -585,7 +585,7 @@ class AvailableLabTestSerializer(serializers.ModelSerializer):
             engine_response = engine.validate_booking_entity(cost=price, id=obj.test.id, mrp=obj.mrp)
             resp['covered_under_vip'] = engine_response['is_covered']
             resp['vip_amount'] = engine_response['amount_to_be_paid']
-            resp['hosp_is_gold'] = hosp_is_gold
+            resp['is_gold'] = hosp_is_gold
 
         return resp
 
@@ -867,7 +867,7 @@ class CommonPackageSerializer(serializers.ModelSerializer):
             engine_response = engine.validate_booking_entity(cost=price, id=obj.package.id, mrp=obj._selected_test.mrp)
             resp['covered_under_vip'] = engine_response['is_covered']
             resp['vip_amount'] = engine_response['amount_to_be_paid']
-            resp['hosp_is_gold'] = hosp_is_gold
+            resp['is_gold'] = hosp_is_gold
 
         return resp
 
@@ -971,7 +971,7 @@ class LabAppointmentModelSerializer(serializers.ModelSerializer):
             'vip_amount_deducted': plus_appointment_mapping.amount if plus_appointment_mapping else 0,
             'covered_under_vip': True if obj and obj.plus_plan else False,
             'extra_charge': plus_appointment_mapping.extra_charge if plus_appointment_mapping else 0,
-            'hosp_is_gold': hosp_is_gold
+            'is_gold': hosp_is_gold
         }
 
     def get_prescription(self, obj):
@@ -2138,7 +2138,7 @@ class CustomLabTestPackageSerializer(serializers.ModelSerializer):
             engine_response = engine.validate_booking_entity(cost=price, id=obj.id, mrp=mrp)
             resp['covered_under_vip'] = engine_response['is_covered']
             resp['vip_amount'] = engine_response['amount_to_be_paid']
-            resp['hosp_is_gold'] = hosp_is_gold
+            resp['is_gold'] = hosp_is_gold
 
         return resp
 
