@@ -8,6 +8,8 @@ import datetime
 from django.utils import timezone
 from django.contrib.gis import forms
 from django.core.exceptions import ObjectDoesNotExist
+from reversion_compare.admin import CompareVersionAdmin
+
 from ondoc.crm.constants import constants
 from dateutil import tz
 from django.conf import settings
@@ -15,7 +17,7 @@ from django.utils.dateparse import parse_datetime
 from ondoc.authentication.models import Merchant, AssociatedMerchant, QCModel
 from ondoc.account.models import MerchantPayout, MerchantPayoutBulkProcess, PayoutMapping
 from ondoc.common.models import Cities, MatrixCityMapping, PaymentOptions, Remark, MatrixMappedCity, MatrixMappedState, \
-    GlobalNonBookable, UserConfig, BlacklistUser, BlockedStates, Fraud
+    GlobalNonBookable, UserConfig, BlacklistUser, BlockedStates, Fraud, SearchCriteria
 from import_export import resources, fields
 from import_export.admin import ImportMixin, base_formats, ImportExportMixin, ImportExportModelAdmin, ExportMixin
 from reversion.admin import VersionAdmin
@@ -964,3 +966,9 @@ class AdvanceMerchantAmountAdmin(admin.ModelAdmin):
     fields = ['id', 'total_amount', 'amount', 'merchant_id']
     list_display = ('id', 'total_amount', 'amount', 'merchant_id')
     readonly_fields = ['id', 'total_amount', 'amount', 'merchant_id']
+
+
+class SearchCriteriaAdmin(CompareVersionAdmin):
+    model = SearchCriteria
+    list_display = ('id', 'search_key', 'search_value')
+    fields = ('search_key', 'search_value')

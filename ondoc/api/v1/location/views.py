@@ -4,6 +4,9 @@ from django.db import transaction
 from django.db.models import F, CharField, Value
 from django.db.models.functions import Concat
 from django_extensions.db.fields import json
+
+from config.settings.db_router import DatabaseInfo
+from ondoc.common.middleware import use_slave
 from ondoc.doctor.models import DoctorPracticeSpecialization, PracticeSpecialization
 from ondoc.location import models as location_models
 from ondoc.doctor import models as doctor_models
@@ -773,7 +776,7 @@ class SearchUrlsViewSet(viewsets.GenericViewSet):
                      group by eu.locality_value order by max(sc.rank) asc nulls last,count(*) desc 
                      '''
 
-        sql_urls = RawSql(query, []).fetch_all()
+        sql_urls = RawSql(query, [], DatabaseInfo.SLAVE).fetch_all()
 
         result =[]
 
@@ -788,7 +791,7 @@ class SearchUrlsViewSet(viewsets.GenericViewSet):
                      where eu.sitemap_identifier='HOSPITALS_CITY' and eu.is_valid =True
                      order by sc.rank asc nulls last'''
 
-        sql_urls = RawSql(query, []).fetch_all()
+        sql_urls = RawSql(query, [], DatabaseInfo.SLAVE).fetch_all()
 
         # result = []
         #
@@ -851,7 +854,7 @@ class SearchUrlsViewSet(viewsets.GenericViewSet):
         #         and eur.sitemap_identifier = 'SPECIALIZATION_LOCALITY_CITY'
         #         group by eu.specialization_id order by count(*) desc'''
 
-        result = RawSql(query,[]).fetch_all()
+        result = RawSql(query,[], DatabaseInfo.SLAVE).fetch_all()
 
 
         # specializations = location_models.EntityUrls.objects.filter(url_type='SEARCHURL', entity_type__iexact='Doctor',
@@ -881,7 +884,7 @@ class SearchUrlsViewSet(viewsets.GenericViewSet):
 
         query1 ='''{query} order by city_num, row_num'''.format(query=query)
 
-        sql_urls = RawSql(query1,[specialization_id]).fetch_all()
+        sql_urls = RawSql(query1,[specialization_id], DatabaseInfo.SLAVE).fetch_all()
         if sql_urls:
             pages = int(sql_urls[-1].get('city_num')/25)
             if not sql_urls[-1].get('city_num') % 25 == 0:
@@ -963,7 +966,7 @@ class SearchUrlsViewSet(viewsets.GenericViewSet):
                    on sc.city iLIKE eu.locality_value and eu.sitemap_identifier=%s 
                    and eu.is_valid=True order by rank limit 10;'''
 
-        sql_urls = RawSql(query, [sitemap_identifier]).fetch_all()
+        sql_urls = RawSql(query, [sitemap_identifier], DatabaseInfo.SLAVE).fetch_all()
 
         result = []
 
@@ -986,7 +989,7 @@ class SearchUrlsViewSet(viewsets.GenericViewSet):
                     inner join 
                     entity_urls eu on eu.is_valid=true and eu.sitemap_identifier='SPECIALIZATION_CITY' and lower(x.city) = lower(eu.locality_value) 
                     and eu.specialization_id=x.specialization_id order by city_rank nulls last ,city, specialization_rank nulls last, x.specialization_id'''
-        result = RawSql(query, []).fetch_all()
+        result = RawSql(query, [], DatabaseInfo.SLAVE).fetch_all()
         for data in result:
             if not resp.get(data.get('city')):
                 title = 'Doctors in ' + data.get('city')

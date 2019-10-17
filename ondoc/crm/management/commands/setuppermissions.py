@@ -5,7 +5,7 @@ from django.db.models import Q
 
 from ondoc.banner.models import Banner, SliderLocation, BannerLocation, EmailBanner, RecommenderThrough, Recommender
 from ondoc.common.models import PaymentOptions, UserConfig, Feature, Service, Remark, MatrixMappedCity, \
-    MatrixMappedState, GenericNotes, BlacklistUser, BlockedStates, VirtualAppointment, Fraud
+    MatrixMappedState, GenericNotes, BlacklistUser, BlockedStates, VirtualAppointment, Fraud, SearchCriteria
 from ondoc.corporate_booking.models import CorporateDeal, Corporates, CorporateDocument
 from ondoc.coupon.models import Coupon, UserSpecificCoupon, RandomGeneratedCoupon
 from ondoc.crm.constants import constants
@@ -497,6 +497,21 @@ class Command(BaseCommand):
                 Q(codename='change_' + ct.model))
 
             group.permissions.add(*permissions)
+        #
+        # content_types = ContentType.objects.get_for_models(DoctorPracticeSpecialization,
+        #                                                    DoctorQualification,
+        #                                                    DoctorClinicTiming, DoctorClinic, DoctorLanguage,
+        #                                                    DoctorAward, DoctorAssociation, DoctorExperience,
+        #                                                    DoctorClinicProcedure,
+        #                                                    for_concrete_models=False)
+        #
+        # for cl, ct in content_types.items():
+        #     permissions = Permission.objects.get_or_create(
+        #         content_type=ct, codename='change_' + ct.model)
+        #
+        #     permissions = Permission.objects.filter(
+        #         content_type=ct, codename='change_' + ct.model)
+        #     group.permissions.add(*permissions)
 
         content_types = ContentType.objects.get_for_models(ArticleLinkedUrl, LinkedArticle, NewDynamic, GenericQuestionAnswer)
 
@@ -612,7 +627,8 @@ class Command(BaseCommand):
                                                            HospitalNetworkImage, HospitalNetworkTiming,
                                                            HospitalNetworkServiceMapping,
                                                            HospitalNetworkSpeciality, DynamicTemplates, HospitalSponsoredServices,
-                                                           SponsoredServicePracticeSpecialization, DoctorSponsoredServices, SponsoredServices,LabTestThresholds)
+                                                           SponsoredServicePracticeSpecialization, DoctorSponsoredServices, SponsoredServices,LabTestThresholds,
+                                                           SearchCriteria)
 
 
         for cl, ct in content_types.items():
