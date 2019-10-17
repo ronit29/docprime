@@ -304,6 +304,8 @@ class AvailableLabTestPackageSerializer(serializers.ModelSerializer):
         resp = Lab.get_vip_details(request.user)
         user = request.user
 
+        resp['is_enable_for_vip'] = True if lab_obj and lab_obj.is_enabled_for_plus_plans() else False
+
         plus_obj = None
         if user and user.is_authenticated and not user.is_anonymous:
             plus_obj = user.active_plus_user if user.active_plus_user and user.active_plus_user.status == PlusUser.ACTIVE else None
@@ -546,6 +548,8 @@ class AvailableLabTestSerializer(serializers.ModelSerializer):
         lab_obj = self.context.get("lab")
         resp = Lab.get_vip_details(request.user)
         user = request.user
+
+        resp['is_enable_for_vip'] = True if lab_obj and lab_obj.is_enabled_for_plus_plans() else False
 
         plus_obj = None
         if user and user.is_authenticated and not user.is_anonymous:
@@ -819,6 +823,8 @@ class CommonPackageSerializer(serializers.ModelSerializer):
         # package_amount_balance = utilization.get('available_package_amount', 0)
 
         lab_obj = Lab.objects.filter(id=obj.lab_id).first()
+
+        resp['is_enable_for_vip'] = True if lab_obj and lab_obj.is_enabled_for_plus_plans() else False
 
         plus_obj = None
         if user and user.is_authenticated and not user.is_anonymous:
@@ -2072,10 +2078,8 @@ class CustomLabTestPackageSerializer(serializers.ModelSerializer):
         resp = Lab.get_vip_details(request.user)
         lab_data = self.context.get('lab_data', {})
         lab = lab_data.get(obj.lab, None)
-        if lab and lab.is_enabled_for_plus_plans():
-            resp['is_enable_for_vip'] = True
-        else:
-            resp['is_enable_for_vip'] = False
+
+        resp['is_enable_for_vip'] = True if lab and lab.is_enabled_for_plus_plans() else False
         user = request.user
         plus_obj = None
         deal_price = 0
