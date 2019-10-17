@@ -64,7 +64,7 @@ from ondoc.ratings_review import models as ratings_models
 # from ondoc.api.v1.common import serializers as common_serializers
 from ondoc.common.models import AppointmentHistory, AppointmentMaskNumber, Remark, GlobalNonBookable, \
     SyncBookingAnalytics, CompletedBreakupMixin, RefundDetails, MatrixMappedState, \
-    MatrixMappedCity, TdsDeductionMixin, MatrixDataMixin, MerchantPayoutMixin, Fraud
+    MatrixMappedCity, TdsDeductionMixin, MatrixDataMixin, MerchantPayoutMixin, Fraud, SearchCriteria
 import reversion
 from decimal import Decimal
 from django.utils.text import slugify
@@ -317,6 +317,12 @@ class Lab(TimeStampedModel, CreatedByModel, QCModel, SearchKey, WelcomeCallingDo
 
         return False
 
+    def is_enabled_for_plus_plans(self):
+        if (self.network and self.network.enabled_for_plus_plans) or (not self.network and self.enabled_for_plus_plans):
+            return True
+
+        return False
+
     def is_auto_ivr_enabled(self):
         if (self.network and self.network.auto_ivr_enabled) or (not self.network and self.auto_ivr_enabled):
             return True
@@ -349,6 +355,11 @@ class Lab(TimeStampedModel, CreatedByModel, QCModel, SearchKey, WelcomeCallingDo
     @classmethod
     def get_vip_details(cls, user):
 
+        search_criteria = SearchCriteria.objects.filter(search_key='is_gold').first()
+        hosp_is_gold = False
+        if search_criteria:
+            hosp_is_gold = search_criteria.search_value
+
         resp = {
             'is_vip_member': False,
             'covered_under_vip': False,
@@ -356,7 +367,7 @@ class Lab(TimeStampedModel, CreatedByModel, QCModel, SearchKey, WelcomeCallingDo
             'vip_convenience_amount': 0,
             'vip_gold_price': 0,
             'is_gold_member': False,
-            'is_gold': False
+            'is_gold': hosp_is_gold
         }
 
         if user.is_authenticated and not user.is_anonymous:

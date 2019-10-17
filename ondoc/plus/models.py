@@ -538,7 +538,7 @@ class PlusUser(auth_model.TimeStampedModel, RefundMixin):
 
         elif appointment_type == LAB:
             lab = appointment_data['lab']
-            if lab and lab.enabled_for_plus_plans:
+            if lab and lab.is_enabled_for_plus_plans():
                 mrp = int(price_data.get('mrp'))
                 # final_price = mrp + price_data['home_pickup_charges']
 
