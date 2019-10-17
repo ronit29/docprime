@@ -112,6 +112,8 @@ class ReportsInlineFormset(forms.BaseInlineFormSet):
         if self.instance.status in [prov_models.PartnerLabSamplesCollectOrder.PARTIAL_REPORT_GENERATED,
                                     prov_models.PartnerLabSamplesCollectOrder.REPORT_GENERATED] and not self.cleaned_data:
             raise forms.ValidationError("No report files found.")
+        if self.instance.status < self.instance.PARTIAL_REPORT_GENERATED and self.cleaned_data:
+            raise forms.ValidationError("Reports can't be uploaded for present status")
 
 
 class ReportsInline(admin.TabularInline):
@@ -126,6 +128,16 @@ class ReportsInline(admin.TabularInline):
     formset = ReportsInlineFormset
 
 
+class PartnerLabSamplesCollectOrderForm(forms.ModelForm):
+
+    def clean(self):
+        super().clean()
+        cleaned_data = self.cleaned_data
+        if 'status' in self.changed_data and not self.instance.status_update_checks(cleaned_data['status']):
+            raise forms.ValidationError("Incorrect Status Update")
+        return cleaned_data
+
+
 class PartnerLabSamplesCollectOrderAdmin(admin.ModelAdmin):
 
     list_display = ('id', 'offline_patient', 'hospital', 'doctor', 'lab')
@@ -135,6 +147,7 @@ class PartnerLabSamplesCollectOrderAdmin(admin.ModelAdmin):
     inlines = [
         ReportsInline,
     ]
+    form = PartnerLabSamplesCollectOrderForm
 
     def get_queryset(self, request):
         return super(PartnerLabSamplesCollectOrderAdmin, self).get_queryset(request)\
