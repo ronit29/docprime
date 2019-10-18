@@ -860,7 +860,7 @@ class SampleCollectOrderCreateOrUpdateSerializer(serializers.Serializer):
         order_obj = provider_models.PartnerLabSamplesCollectOrder.objects.filter(id=id).first()
         if id and not order_obj:
             raise serializers.ValidationError('invalid order id')
-        if attrs.get('status') and not order_obj.status_update_checks(attrs.get('status')):
+        if attrs.get('status') and order_obj and not order_obj.status_update_checks(attrs.get('status')):
             raise serializers.ValidationError("incorrect status update")
         if attrs.get('only_status_update'):
             if not attrs.get('id'):
