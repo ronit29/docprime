@@ -663,7 +663,7 @@ class DoctorSearchHelper:
 
                 if doctor.enabled_for_plus_plans and doctor_clinic.hospital.enabled_for_prepaid and \
                         doctor.enabled_for_online_booking and doctor_clinic.hospital.enabled_for_online_booking and \
-                        doctor_clinic.enabled_for_online_booking:
+                        doctor_clinic.enabled_for_online_booking and doctor_clinic.hospital.is_enabled_for_plus_plans():
                     if request and request.user and not request.user.is_anonymous and request.user.active_insurance:
                         is_enable_for_vip = False
                     else:

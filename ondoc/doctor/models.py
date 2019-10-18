@@ -4101,6 +4101,17 @@ class OpdAppointment(auth_model.TimeStampedModel, CouponsMixin, OpdAppointmentIn
         else:
             return False
 
+    def integrator_booking_no(self):
+        from ondoc.integrations.models import IntegratorResponse
+
+        opd_appointment_content_type = ContentType.objects.get_for_model(self)
+        integrator_response = IntegratorResponse.objects.filter(object_id=self.id,
+                                                                content_type=opd_appointment_content_type).order_by('id').last()
+        if not integrator_response:
+            return 'Not Found'
+
+        return [integrator_response.lead_id, integrator_response.integrator_order_id]
+
 
 @reversion.register()
 class OpdAppointmentProcedureMapping(models.Model):

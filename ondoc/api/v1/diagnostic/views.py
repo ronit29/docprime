@@ -1907,6 +1907,7 @@ class LabList(viewsets.ReadOnlyModelViewSet):
 
                 # For Vip. Checking the eligibility of test to be booked under VIP.
                 engine_response = {}
+                res['vip']['is_gold_member'] = True if plus_user_obj and plus_user_obj.plan.is_gold else False
                 if all_tests_under_lab and res['is_vip_enabled']:
                     for paticular_test_in_lab in all_tests_under_lab:
                         price_data = {"mrp": paticular_test_in_lab.get('mrp', 0),
@@ -1921,9 +1922,9 @@ class LabList(viewsets.ReadOnlyModelViewSet):
                         engine = get_class_reference(plus_user_obj, "LABTEST")
                         if plus_user_obj and plus_user_obj.plan:
                             res['vip']['vip_convenience_amount'] = plus_user_obj.plan.get_convenience_charge(price, "LABTEST")
-                            res['vip']['is_gold_member'] = True if plus_user_obj.plan.is_gold else False
+                            # res['vip']['is_gold_member'] = True if plus_user_obj.plan.is_gold else False
                         else:
-                            res['vip']['is_gold_member'] = False
+                            # res['vip']['is_gold_member'] = False
                             res['vip']['vip_convenience_amount'] = PlusPlans.get_default_convenience_amount(paticular_test_in_lab.get('agreed_price', 0), "LABTEST")
                         coverage = False
                         res['vip']['vip_gold_price'] = int(paticular_test_in_lab.get('agreed_price', 0))

@@ -2185,8 +2185,8 @@ class OrderDetailViewSet(GenericViewSet):
                 "payment_type": order.action_data["payment_type"],
                 "cod_deal_price": cod_deal_price,
                 "enabled_for_cod": enabled_for_cod,
-                "is_gold_member": True if appointment and appointment.plus_plan and appointment.plus_plan.is_gold else False,
-                "is_vip_member": True if appointment and appointment.plus_plan and not appointment.plus_plan.is_gold else False,
+                "is_gold_member": True if appointment and appointment.plus_plan and appointment.plus_plan.plan.is_gold else False,
+                "is_vip_member": True if appointment and appointment.plus_plan and not appointment.plus_plan.plan.is_gold else False,
                 "covered_under_vip": True if appointment and appointment.plus_plan else False,
                 'vip_amount': appointment_amount - plus_appointment_mapping.amount if plus_appointment_mapping else 0,
                 "payment_mode": payment_mode
