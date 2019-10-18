@@ -110,8 +110,10 @@ class ReportsInlineFormset(forms.BaseInlineFormSet):
         if any(self.errors):
             return
         if self.instance.status in [prov_models.PartnerLabSamplesCollectOrder.PARTIAL_REPORT_GENERATED,
-                                    prov_models.PartnerLabSamplesCollectOrder.REPORT_GENERATED] and not self.cleaned_data:
-            raise forms.ValidationError("No report files found.")
+                                    prov_models.PartnerLabSamplesCollectOrder.REPORT_GENERATED,
+                                    prov_models.PartnerLabSamplesCollectOrder.REPORT_VIEWED] and \
+                (not self.cleaned_data or len(self.cleaned_data) == len(self.deleted_forms)):
+            raise forms.ValidationError("Report file required.")
         if self.instance.status < self.instance.PARTIAL_REPORT_GENERATED and self.cleaned_data:
             raise forms.ValidationError("Reports can't be uploaded for present status")
 
