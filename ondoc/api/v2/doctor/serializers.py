@@ -990,7 +990,7 @@ class PartnerLabSamplesCollectOrderModelSerializer(serializers.ModelSerializer):
     class Meta:
         model = provider_models.PartnerLabSamplesCollectOrder
         fields = ('id', 'created_at', 'updated_at', 'status', 'collection_datetime', 'samples', 'offline_patient',
-                  'hospital', 'doctor', 'lab_alerts', 'selected_tests_details', 'lab_reports')
+                  'lab', 'hospital', 'doctor', 'lab_alerts', 'selected_tests_details', 'lab_reports')
 
 
 class TestSamplesLabAlertsModelSerializer(serializers.ModelSerializer):
