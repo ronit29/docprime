@@ -80,6 +80,7 @@ def update_seo_urls():
     from ondoc.doctor.models import Doctor, Hospital
     from ondoc.diagnostic.models import Lab
     from ondoc.procedure.models import IpdProcedure
+    from ondoc.api.v1.utils import RawSql
 
     # update doctor seo urls
     Doctor.update_doctors_seo_urls()
@@ -96,6 +97,8 @@ def update_seo_urls():
     # update labs, doctors and hospitals profile urls
     from ondoc.location.models import UrlsModel
     UrlsModel.update_profile_urls()
+    # Truncate temp_url table
+    RawSql('truncate table temp_url', []).execute()
     return True
 
 

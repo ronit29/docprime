@@ -270,6 +270,8 @@ class Lab(TimeStampedModel, CreatedByModel, QCModel, SearchKey, WelcomeCallingDo
     enabled_for_plus_plans = models.NullBooleanField()
     is_b2b = models.BooleanField(default=False)
     center_visit = models.NullBooleanField()
+    search_url_locality_radius = models.FloatField(blank=True, null=True)
+    search_url_sublocality_radius = models.FloatField(blank=True, null=True)
 
     def __str__(self):
         return self.name
