@@ -3041,6 +3041,17 @@ class LabAppointment(TimeStampedModel, CouponsMixin, LabAppointmentInvoiceMixin,
         mobile_list = self.get_matrix_spoc_data()
         refund_data = self.refund_details_data()
 
+        from ondoc.ratings_review.models import RatingsReview
+        appointment_rating = RatingsReview.objects.filter(appointment_id=self.id).first()
+        rating = appointment_rating.ratings if appointment_rating else ''
+        avg_rating = self.lab.rating_data.get('avg_rating', '') if self.lab else ""
+        unsatisfied_customer = ""
+        if rating:
+            if rating < 3:
+                unsatisfied_customer = 'Yes'
+            else:
+                unsatisfied_customer = 'No'
+
         insurance_link = None
         if user_insurance:
             insurance_link = '%s/admin/insurance/userinsurance/%s/change' % (settings.ADMIN_BASE_URL, user_insurance.id)
@@ -3098,7 +3109,10 @@ class LabAppointment(TimeStampedModel, CouponsMixin, LabAppointmentInvoiceMixin,
             "RefundToWallet": float(refund_data['promotional_wallet_refund']) if refund_data['promotional_wallet_refund'] else None,
             "RefundInitiationDate": int(refund_data['refund_initiated_at']) if refund_data['refund_initiated_at'] else None,
             "RefundURN": refund_data['refund_urn'],
-            "HospitalName": hospital_name
+            "HospitalName": hospital_name,
+            "Rating": rating,
+            "AvgRating": avg_rating,
+            "UnsatisfiedCustomer": unsatisfied_customer
         }
         return appointment_details
 

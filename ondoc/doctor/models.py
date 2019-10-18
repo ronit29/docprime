@@ -3806,6 +3806,17 @@ class OpdAppointment(auth_model.TimeStampedModel, CouponsMixin, OpdAppointmentIn
         if mask_number_instance:
             mask_number = mask_number_instance.mask_number
 
+        from ondoc.ratings_review.models import RatingsReview
+        appointment_rating = RatingsReview.objects.filter(appointment_id=self.id).first()
+        rating = appointment_rating.ratings if appointment_rating else ''
+        avg_rating = self.doctor.rating_data.get('avg_rating', '') if self.doctor else ""
+        unsatisfied_customer = ""
+        if rating:
+            if rating < 3:
+                unsatisfied_customer = 'Yes'
+            else:
+                unsatisfied_customer = 'No'
+
         provider_booking_id = ''
         merchant_code = ''
         is_ipd_hospital = '1' if self.hospital and self.hospital.has_ipd_doctors() else '0'
@@ -3887,7 +3898,10 @@ class OpdAppointment(auth_model.TimeStampedModel, CouponsMixin, OpdAppointmentIn
             "RefundToWallet": float(refund_data['promotional_wallet_refund']) if refund_data['promotional_wallet_refund'] else None,
             "RefundInitiationDate": int(refund_data['refund_initiated_at']) if refund_data['refund_initiated_at'] else None,
             "RefundURN": refund_data['refund_urn'],
-            "OPD_AppointmentType": opd_appointment_type
+            "OPD_AppointmentType": opd_appointment_type,
+            "Rating": rating,
+            "AvgRating": avg_rating,
+            "UnsatisfiedCustomer": unsatisfied_customer
         }
         return appointment_details
 
