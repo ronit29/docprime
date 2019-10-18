@@ -568,10 +568,9 @@ class DoctorSearchHelper:
         coupon_code = query_params.get("coupon_code", None)
 
         coupon_recommender = CouponRecommender(request.user, profile, 'doctor', product_id, coupon_code, None)
-        search_criteria = SearchCriteria.objects.filter(search_key='is_gold')
+        search_criteria = SearchCriteria.objects.filter(search_key='is_gold').first()
         hosp_is_gold = False
         if search_criteria:
-            search_criteria = search_criteria.first()
             hosp_is_gold = search_criteria.search_value
 
         filters = dict()
@@ -673,7 +672,7 @@ class DoctorSearchHelper:
                 if request and request.user and not request.user.is_anonymous and vip_data_dict.get('is_vip_member') and \
                         doctor.enabled_for_plus_plans and doctor_clinic.hospital.enabled_for_prepaid and \
                         doctor.enabled_for_online_booking and doctor_clinic.hospital.enabled_for_online_booking and \
-                        doctor_clinic.enabled_for_online_booking and doctor_clinic.hospital.enabled_for_plus_plans:
+                        doctor_clinic.enabled_for_online_booking and doctor_clinic.hospital.is_enabled_for_plus_plans():
                     mrp = int(min_price.get('mrp'))
                     price_data = {"mrp": int(min_price.get('mrp', 0)), "deal_price": int(min_price.get('deal_price', 0)),
                                   "cod_deal_price": int(min_price.get('cod_deal_price', 0)),

@@ -2420,12 +2420,12 @@ class MerchantPayout(TimeStampedModel):
             return 2
         else:
             appointment = self.get_appointment()
-            if appointment.payment_type == OpdAppointment.PREPAID:
-                return 1
-            elif appointment.payment_type == OpdAppointment.INSURANCE:
+            if appointment.payment_type == OpdAppointment.INSURANCE:
                 return 2
-
-        return 0
+            elif appointment.payment_type == OpdAppointment.PREPAID:
+                return 1
+            else:
+                return 1
 
     class Meta:
         db_table = "merchant_payout"
