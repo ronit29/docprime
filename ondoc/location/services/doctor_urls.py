@@ -666,7 +666,7 @@ class DoctorURL():
 
         #update for doctor profile from city speciality if null
         RawSql('''update temp_url tu set breadcrumb = (select  breadcrumb || 
-            jsonb_build_array(jsonb_build_object('title', locality_value, 'url', url, 'link_title', concat(specialization, ' in ', locality_value) ))
+            jsonb_build_array(jsonb_build_object('title', specialization, 'url', url, 'link_title', concat(specialization, ' in ', locality_value) ))
             from temp_url  where sitemap_identifier ='SPECIALIZATION_CITY' and lower(locality_value)=lower(tu.locality_value)
             and specialization_id = tu.specialization_id order by st_distance(location, tu.location) asc limit 1) 
             where sitemap_identifier ='DOCTOR_PAGE' and breadcrumb is null ''', []).execute()
