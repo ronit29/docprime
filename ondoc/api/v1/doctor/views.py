@@ -68,7 +68,7 @@ from ondoc.api.v1.utils import RawSql, is_valid_testing_data, doctor_query_param
 from django.contrib.auth import get_user_model
 from django.conf import settings
 from django.db.models import F, Count
-from django.db.models.functions import StrIndex
+from django.db.models.functions import StrIndex, Length
 import datetime, logging, copy, re
 from ondoc.api.v1.utils import opdappointment_transform
 from ondoc.location import models as location_models
