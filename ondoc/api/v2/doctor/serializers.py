@@ -928,21 +928,31 @@ class SelectedTestsDetailsSerializer(serializers.ModelSerializer):
     lab_test_name = serializers.CharField(source="test.name")
     lab_test_is_package = serializers.BooleanField(source="test.is_package")
     lab_test_package_details = serializers.SerializerMethodField()
+    lab_test_parameter_details = serializers.SerializerMethodField()
 
     def get_b2c_rate(self, obj):
         return int(obj.mrp) if obj.mrp else 0
         # return int(obj.get_deal_price())
 
     def get_lab_test_package_details(self, obj):
-        details = list()
+        package_details = list()
         if obj.test.is_package and hasattr(obj.test, 'packages'):
             for package_mapping in obj.test.packages.all():
-                details.append({"test_id": package_mapping.lab_test.id, "test_name": package_mapping.lab_test.name})
-        return details
+                package_details.append({"test_id": package_mapping.lab_test.id,
+                                        "test_name": package_mapping.lab_test.name})
+        return package_details
+
+    def get_lab_test_parameter_details(self, obj):
+        parameter_details = list()
+        if not obj.test.is_package and hasattr(obj.test, 'parameter'):
+            for parameter in obj.test.parameter.all():
+                parameter_details.append({"id": parameter.id, "name": parameter.name})
+        return parameter_details
 
     class Meta:
         model = diag_models.AvailableLabTest
-        fields = ('lab_test_id', 'lab_test_name', 'b2c_rate', 'lab_test_is_package', 'lab_test_package_details')
+        fields = ('b2c_rate', 'lab_test_id', 'lab_test_name', 'lab_test_is_package', 'lab_test_package_details',
+                  'lab_test_parameter_details')
 
 
 class PartnerLabTestSampleDetailsModelSerializer(serializers.ModelSerializer):
