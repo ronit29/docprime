@@ -2814,18 +2814,18 @@ class DoctorAvailabilityTimingViewSet(viewsets.ViewSet):
             for apt in active_appointments:
                 blocks.append(str(apt.time_slot_start.date()))
 
-        if dc_obj.is_part_of_integration() and settings.MEDANTA_INTEGRATION_ENABLED:
-            from ondoc.integrations import service
-            pincode = None
-            integration_dict = dc_obj.get_integration_dict()
-            class_name = integration_dict['class_name']
-            integrator_obj_id = integration_dict['id']
-            integrator_obj = service.create_integrator_obj(class_name)
-            clinic_timings = integrator_obj.get_appointment_slots(pincode, date, integrator_obj_id=integrator_obj_id,
-                                                                  blocks=blocks, dc_obj=dc_obj,
-                                                                  total_leaves=total_leaves)
-        else:
-            clinic_timings = dc_obj.get_timings_v2(total_leaves, blocks)
+        # if dc_obj.is_part_of_integration() and settings.MEDANTA_INTEGRATION_ENABLED:
+        #     from ondoc.integrations import service
+        #     pincode = None
+        #     integration_dict = dc_obj.get_integration_dict()
+        #     class_name = integration_dict['class_name']
+        #     integrator_obj_id = integration_dict['id']
+        #     integrator_obj = service.create_integrator_obj(class_name)
+        #     clinic_timings = integrator_obj.get_appointment_slots(pincode, date, integrator_obj_id=integrator_obj_id,
+        #                                                           blocks=blocks, dc_obj=dc_obj,
+        #                                                           total_leaves=total_leaves)
+        # else:
+        clinic_timings = dc_obj.get_timings_v2(total_leaves, blocks)
 
         resp_data = {"timeslots": clinic_timings.get('timeslots', []),
                      "upcoming_slots": clinic_timings.get('upcoming_slots', []),
