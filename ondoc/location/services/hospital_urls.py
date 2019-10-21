@@ -454,9 +454,9 @@ class HospitalURL():
                      'link_title', concat(locality_value, ' Hospitals') ))
                     from entity_urls  where sitemap_identifier ='HOSPITALS_CITY' and is_valid=True and lower(locality_value)=lower(tu.locality_value)
                      order by st_distance(location, tu.location) asc limit 1) 
-                    where sitemap_identifier ='HOSPITAL_PAGE' and is_valid=True and breadcrumb ='[]'  ''', []).execute()
+                    where sitemap_identifier ='HOSPITAL_PAGE' and is_valid=True and breadcrumb is null  ''', []).execute()
 
-        # RawSql('''update entity_urls tu set breadcrumb=json_build_array() where breadcrumb is null  and is_valid=True and entity_type='Hospital' ''', []).execute()
+        RawSql('''update entity_urls tu set breadcrumb=json_build_array() where breadcrumb is null  and is_valid=True and entity_type='Hospital' ''', []).execute()
 
     def create_hospital_page_urls(self):
 

@@ -184,10 +184,13 @@ class RatingsModelSerializer(serializers.ModelSerializer):
         if app:
             profile = app.profile
         else:
-            for pro in obj.user.profiles.all():
-                if pro.is_default_user:
-                    profile = pro
-                    break
+            try:
+                for pro in obj.user.profiles.all():
+                    if pro.is_default_user:
+                        profile = pro
+                        break
+            except:
+                pass
         if profile:
             name = profile.name
         return name
