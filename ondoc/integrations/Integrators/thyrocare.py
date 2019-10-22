@@ -278,6 +278,7 @@ class Thyrocare(BaseIntegrator):
                 integrator_bookings = IntegratorResponse.objects.filter(integrator_class_name=Thyrocare.__name__, report_received=False)
                 formats = ['pdf', 'xml']
                 for booking in integrator_bookings:
+                    print(booking.id)
                     dp_appointment = booking.content_object
                     if dp_appointment.time_slot_start + timedelta(days=1) <= timezone.now():
                         lead_id = booking.lead_id
@@ -286,6 +287,7 @@ class Thyrocare(BaseIntegrator):
 
                         for format in formats:
                             url = "%s/order.svc/%s/GETREPORTS/%s/%s/%s/Myreport" % (settings.THYROCARE_BASE_URL, settings.THYROCARE_API_KEY, lead_id, format, mobile)
+                            print(url)
                             response = requests.get(url)
                             response = response.json()
                             if response.get('RES_ID') == 'RES0000':
