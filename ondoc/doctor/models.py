@@ -3810,6 +3810,8 @@ class OpdAppointment(auth_model.TimeStampedModel, CouponsMixin, OpdAppointmentIn
         appointment_rating = RatingsReview.objects.filter(appointment_id=self.id).first()
         rating = appointment_rating.ratings if appointment_rating else ''
         avg_rating = self.doctor.rating_data.get('avg_rating', '') if self.doctor else ""
+        if avg_rating is None:
+            avg_rating = ""
         unsatisfied_customer = ""
         if rating:
             if rating < 3:
@@ -3822,7 +3824,10 @@ class OpdAppointment(auth_model.TimeStampedModel, CouponsMixin, OpdAppointmentIn
         is_ipd_hospital = '1' if self.hospital and self.hospital.has_ipd_doctors() else '0'
         location_verified = self.hospital.is_location_verified
         provider_id = self.doctor.id
-        merchant = self.doctor.merchant.all().last()
+        merchant = self.hospital.merchant.all().last()
+        if not merchant:
+            merchant = self.doctor.merchant.all().last()
+
         if merchant:
             merchant_code = merchant.id
 
@@ -3898,10 +3903,7 @@ class OpdAppointment(auth_model.TimeStampedModel, CouponsMixin, OpdAppointmentIn
             "RefundToWallet": float(refund_data['promotional_wallet_refund']) if refund_data['promotional_wallet_refund'] else None,
             "RefundInitiationDate": int(refund_data['refund_initiated_at']) if refund_data['refund_initiated_at'] else None,
             "RefundURN": refund_data['refund_urn'],
-            "OPD_AppointmentType": opd_appointment_type,
-            "Rating": rating,
-            "AvgRating": avg_rating,
-            "UnsatisfiedCustomer": unsatisfied_customer
+            "OPD_AppointmentType": opd_appointment_type
         }
         return appointment_details
 

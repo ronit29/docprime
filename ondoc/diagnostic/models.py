@@ -3002,6 +3002,9 @@ class LabAppointment(TimeStampedModel, CouponsMixin, LabAppointmentInvoiceMixin,
         location_verified = self.lab.is_location_verified
         provider_id = self.lab.id
         merchant = self.lab.merchant.all().last()
+        if not merchant:
+            merchant = self.lab.network.merchant.all().last()
+
         if merchant:
             merchant_code = merchant.id
 
