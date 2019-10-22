@@ -16,7 +16,7 @@ class AbstractCriteria(object):
         id = kwargs.get('id')
         mrp = kwargs.get('mrp')
         utilization = kwargs.get('utilization')
-        if not cost:
+        if cost is None or cost < 0:
             return {}
 
         return self._validate_booking_entity(cost, id, utilization=utilization, mrp=mrp)
@@ -308,8 +308,8 @@ class PackageAmountCount(AbstractCriteria):
         if not available_package_count and not available_package_amount:
             return resp
 
-        if available_package_amount <= 0 or available_package_count <= 0:
-            return resp
+        # if available_package_amount <= 0 or available_package_count <= 0:
+        #     return resp
 
         if (total_count <= 0 and available_package_amount > 0) or (total_count > 0 and available_package_count > 0 and available_package_amount > 0):
 

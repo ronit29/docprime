@@ -3806,12 +3806,28 @@ class OpdAppointment(auth_model.TimeStampedModel, CouponsMixin, OpdAppointmentIn
         if mask_number_instance:
             mask_number = mask_number_instance.mask_number
 
+        from ondoc.ratings_review.models import RatingsReview
+        appointment_rating = RatingsReview.objects.filter(appointment_id=self.id).first()
+        rating = appointment_rating.ratings if appointment_rating else 0
+        avg_rating = self.doctor.rating_data.get('avg_rating', '') if self.doctor else 0
+        if avg_rating is None:
+            avg_rating = 0
+        unsatisfied_customer = ""
+        if rating and rating > 0:
+            if rating < 3:
+                unsatisfied_customer = 'Yes'
+            else:
+                unsatisfied_customer = 'No'
+
         provider_booking_id = ''
         merchant_code = ''
         is_ipd_hospital = '1' if self.hospital and self.hospital.has_ipd_doctors() else '0'
         location_verified = self.hospital.is_location_verified
         provider_id = self.doctor.id
-        merchant = self.doctor.merchant.all().last()
+        merchant = self.hospital.merchant.all().last()
+        if not merchant:
+            merchant = self.doctor.merchant.all().last()
+
         if merchant:
             merchant_code = merchant.id
 
@@ -3887,7 +3903,10 @@ class OpdAppointment(auth_model.TimeStampedModel, CouponsMixin, OpdAppointmentIn
             "RefundToWallet": float(refund_data['promotional_wallet_refund']) if refund_data['promotional_wallet_refund'] else None,
             "RefundInitiationDate": int(refund_data['refund_initiated_at']) if refund_data['refund_initiated_at'] else None,
             "RefundURN": refund_data['refund_urn'],
-            "OPD_AppointmentType": opd_appointment_type
+            "OPD_AppointmentType": opd_appointment_type,
+            "AvgRating": avg_rating,
+            "UnsatisfiedCustomer": unsatisfied_customer,
+            "Rating": rating
         }
         return appointment_details
 
@@ -4100,6 +4119,17 @@ class OpdAppointment(auth_model.TimeStampedModel, CouponsMixin, OpdAppointmentIn
             return True
         else:
             return False
+
+    def integrator_booking_no(self):
+        from ondoc.integrations.models import IntegratorResponse
+
+        opd_appointment_content_type = ContentType.objects.get_for_model(self)
+        integrator_response = IntegratorResponse.objects.filter(object_id=self.id,
+                                                                content_type=opd_appointment_content_type).order_by('id').last()
+        if not integrator_response:
+            return 'Not Found'
+
+        return [integrator_response.lead_id, integrator_response.integrator_order_id]
 
 
 @reversion.register()

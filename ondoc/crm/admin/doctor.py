@@ -1726,6 +1726,10 @@ class DoctorOpdAppointmentAdmin(ExportMixin, CompareVersionAdmin):
             return "False"
     get_is_fraud.short_description = 'Is Fraud'
 
+    def integrator_order_no(self, obj):
+        return obj.integrator_booking_no()
+    integrator_order_no.short_description = 'Integrator Order ID'
+
     def response_change(self, request, obj):
         if "_capture-payment" in request.POST:
             if request.user.is_superuser:
@@ -1833,7 +1837,7 @@ class DoctorOpdAppointmentAdmin(ExportMixin, CompareVersionAdmin):
         #             'cancellation_reason', 'cancellation_comments', 'ratings',
         #             'start_date', 'start_time', 'payment_type', 'otp', 'insurance', 'outstanding', 'invoice_urls', 'payment_type')
         # elif request.user.groups.filter(name=constants['OPD_APPOINTMENT_MANAGEMENT_TEAM']).exists():
-        all_fields = ('booking_id', 'doctor_name', 'doctor_id', 'doctor_details', 'hospital_name', 'hospital_details',
+        all_fields = ('booking_id', 'integrator_order_no', 'doctor_name', 'doctor_id', 'doctor_details', 'hospital_name', 'hospital_details',
                 'kyc', 'contact_details', 'used_profile_name',
                 'used_profile_number', 'default_profile_name',
                 'default_profile_number', 'user_id', 'user_number', 'booked_by', 'procedures_details',
@@ -1862,7 +1866,7 @@ class DoctorOpdAppointmentAdmin(ExportMixin, CompareVersionAdmin):
         #     return ('booking_id', 'doctor_id', 'doctor_details', 'contact_details', 'hospital_details', 'kyc',
         #             'procedures_details', 'invoice_urls', 'ratings', 'payment_type')
         # elif request.user.groups.filter(name=constants['OPD_APPOINTMENT_MANAGEMENT_TEAM']).exists():
-        read_only = ('booking_id', 'doctor_name', 'doctor_id', 'doctor_details', 'hospital_name',
+        read_only = ('booking_id', 'doctor_name', 'integrator_order_no', 'doctor_id', 'doctor_details', 'hospital_name',
                      'hospital_details', 'kyc', 'contact_details',
                      'used_profile_name', 'used_profile_number', 'default_profile_name',
                      'default_profile_number', 'user_id', 'user_number', 'booked_by',
