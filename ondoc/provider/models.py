@@ -327,13 +327,19 @@ class PartnerLabSamplesCollectOrder(auth_models.TimeStampedModel, auth_models.Cr
         db_table = "partner_lab_samples_collect_order"
 
     def status_update_checks(self, new_status):
+        if not new_status:
+            return {"is_correct": False, "message": "new status not found"}
         if self.status in [self.CANCELLED_BY_DOCTOR, self.CANCELLED_BY_LAB]:
-            return False
+            return {"is_correct": False, "message": "Status can't be updated once cancelled"}
+        if new_status in [self.CANCELLED_BY_DOCTOR, self.CANCELLED_BY_LAB] \
+                and self.status in [self.PARTIAL_REPORT_GENERATED, self.REPORT_GENERATED, self.REPORT_VIEWED]:
+            return {"is_correct": False,
+                    "message": "Order can't be cancelled if status is 'Partial Report Generated' or 'Report Generated' or 'Report Viewed'"}
         if new_status not in [self.CANCELLED_BY_DOCTOR, self.CANCELLED_BY_LAB] and self.status > new_status:
-            return False
+            return {"is_correct": False, "message": "Incorrect status update"}
         if self.status < self.SAMPLE_PICKED_UP and new_status in [self.REPORT_GENERATED, self.PARTIAL_REPORT_GENERATED]:
-            return False
-        return True
+            return {"is_correct": False, "message": "Report can't be generated until sample is picked"}
+        return {"is_correct": True, "message": ""}
 
     def save(self, *args, **kwargs):
         super(PartnerLabSamplesCollectOrder, self).save()
