@@ -3048,6 +3048,8 @@ class LabAppointment(TimeStampedModel, CouponsMixin, LabAppointmentInvoiceMixin,
         appointment_rating = RatingsReview.objects.filter(appointment_id=self.id).first()
         rating = appointment_rating.ratings if appointment_rating else ''
         avg_rating = self.lab.rating_data.get('avg_rating', '') if self.lab else ""
+        if avg_rating is None:
+            avg_rating = ""
         unsatisfied_customer = ""
         if rating:
             if rating < 3:

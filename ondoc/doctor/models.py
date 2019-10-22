@@ -3903,7 +3903,10 @@ class OpdAppointment(auth_model.TimeStampedModel, CouponsMixin, OpdAppointmentIn
             "RefundToWallet": float(refund_data['promotional_wallet_refund']) if refund_data['promotional_wallet_refund'] else None,
             "RefundInitiationDate": int(refund_data['refund_initiated_at']) if refund_data['refund_initiated_at'] else None,
             "RefundURN": refund_data['refund_urn'],
-            "OPD_AppointmentType": opd_appointment_type
+            "OPD_AppointmentType": opd_appointment_type,
+            "AvgRating": avg_rating,
+            "UnsatisfiedCustomer": unsatisfied_customer,
+            "Rating": rating
         }
         return appointment_details
 
