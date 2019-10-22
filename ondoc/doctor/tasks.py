@@ -89,7 +89,7 @@ def update_seo_urls():
     Hospital.update_hospital_seo_urls()
 
     # update lab seo urls()
-    Lab.update_labs_seo_urls()
+    # Lab.update_labs_seo_urls()
 
     # update ipd_procedure urls
     IpdProcedure.update_ipd_seo_urls()
