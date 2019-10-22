@@ -822,6 +822,9 @@ class PartnerLabTestsListSerializer(serializers.Serializer):
                                                                     .prefetch_related(
                                                                         'lab__lab_pricing_group',
                                                                         'lab__lab_pricing_group__available_lab_tests',
+                                                                        'lab__lab_pricing_group__available_lab_tests__test',
+                                                                        'lab__lab_pricing_group__available_lab_tests__test__packages',
+                                                                        'lab__lab_pricing_group__available_lab_tests__test__parameter',
                                                                         'lab__lab_pricing_group__available_lab_tests__sample_details',
                                                                         'lab__lab_pricing_group__available_lab_tests__sample_details__sample',
                                                                     ) \
@@ -888,6 +891,9 @@ class SampleCollectOrderCreateOrUpdateSerializer(serializers.Serializer):
                                                                                                'hospital__hospital_doctors__doctor',
                                                                                                'lab__lab_pricing_group',
                                                                                                'lab__lab_pricing_group__available_lab_tests',
+                                                                                               'lab__lab_pricing_group__available_lab_tests__test',
+                                                                                               'lab__lab_pricing_group__available_lab_tests__test__packages',
+                                                                                               'lab__lab_pricing_group__available_lab_tests__test__parameter',
                                                                                                'lab__lab_pricing_group__available_lab_tests__sample_details',
                                                                                                'lab__lab_pricing_group__available_lab_tests__sample_details__sample',
                                                                                                ) \
