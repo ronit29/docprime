@@ -1833,7 +1833,7 @@ class DoctorListViewSet(viewsets.GenericViewSet):
                                                                   order_by_field, rank_by)
             query_string['query'] = paginate_raw_query(request, query_string['query'])
             doctor_search_result = RawSql(query_string.get('query'),
-                                         query_string.get('params'), DatabaseInfo.SLAVE).fetch_all()
+                                         query_string.get('params'), (DatabaseInfo.SLAVE if settings.USE_SLAVE_DB else DatabaseInfo.DEFAULT)).fetch_all()
 
             if doctor_search_result:
                 result_count = doctor_search_result[0]['result_count']
