@@ -3046,12 +3046,12 @@ class LabAppointment(TimeStampedModel, CouponsMixin, LabAppointmentInvoiceMixin,
 
         from ondoc.ratings_review.models import RatingsReview
         appointment_rating = RatingsReview.objects.filter(appointment_id=self.id).first()
-        rating = appointment_rating.ratings if appointment_rating else ''
-        avg_rating = self.lab.rating_data.get('avg_rating', '') if self.lab else ""
+        rating = appointment_rating.ratings if appointment_rating else 0
+        avg_rating = self.lab.rating_data.get('avg_rating', '') if self.lab else 0
         if avg_rating is None:
-            avg_rating = ""
+            avg_rating = 0
         unsatisfied_customer = ""
-        if rating:
+        if rating and rating > 0:
             if rating < 3:
                 unsatisfied_customer = 'Yes'
             else:
