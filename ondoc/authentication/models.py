@@ -660,7 +660,6 @@ class UserProfile(TimeStampedModel):
 
         return None
 
-
     def has_image_changed(self):
         if not self.pk:
             return True
