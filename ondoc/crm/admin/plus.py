@@ -83,19 +83,21 @@ class PlusUserAdminForm(forms.ModelForm):
         if status:
             status = int(status)
 
-        if timezone.now() > self.instance.created_at + timedelta(days=settings.VIP_CANCELLATION_PERIOD):
-            raise forms.ValidationError('Membership can only be cancelled within the period of %d days' % settings.VIP_CANCELLATION_PERIOD)
+        if status != self.instance.status:
 
-        if status != PlusUser.CANCELLED:
-            raise forms.ValidationError('Membership can only be cancelled. Nothing else.')
+            if status == PlusUser.CANCELLED and  timezone.now() > self.instance.created_at + timedelta(days=settings.VIP_CANCELLATION_PERIOD):
+                raise forms.ValidationError('Membership can only be cancelled within the period of %d days' % settings.VIP_CANCELLATION_PERIOD)
 
-        if self.instance.status == PlusUser.CANCELLED:
-            raise forms.ValidationError('Membership is already cancelled. Cannot be changed now.')
+            if status != PlusUser.CANCELLED:
+                raise forms.ValidationError('Membership can only be cancelled. Nothing else.')
 
-        if status == PlusUser.CANCELLED and status != self.instance.status:
-            cancel_dict = self.instance.can_be_cancelled()
-            if not cancel_dict.get('can_be_cancelled', False):
-                raise forms.ValidationError(cancel_dict.get('reason'))
+            if self.instance.status == PlusUser.CANCELLED:
+                raise forms.ValidationError('Membership is already cancelled. Cannot be changed now.')
+
+            if status == PlusUser.CANCELLED and status != self.instance.status:
+                cancel_dict = self.instance.can_be_cancelled()
+                if not cancel_dict.get('can_be_cancelled', False):
+                    raise forms.ValidationError(cancel_dict.get('reason'))
 
         return status
 
