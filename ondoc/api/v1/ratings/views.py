@@ -1,4 +1,5 @@
 from ondoc.api.pagination import paginate_queryset
+from ondoc.common.middleware import use_slave
 from ondoc.diagnostic import models as lab_models
 from ondoc.ratings_review import models
 from django.db import transaction
@@ -275,6 +276,7 @@ class ListRatingViewSet(viewsets.GenericViewSet):
 
         return queryset, graph_queryset, appointment
 
+    @use_slave
     def list(self, request):
         serializer = serializers.RatingListBodySerializerdata(data=request.query_params)
         serializer.is_valid(raise_exception=True)

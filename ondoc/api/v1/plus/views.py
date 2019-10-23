@@ -1,5 +1,6 @@
 import json
 from django.conf import settings
+from django.contrib.contenttypes.models import ContentType
 from django.db import transaction
 from rest_framework import viewsets
 from rest_framework.permissions import IsAuthenticated
@@ -12,8 +13,12 @@ from ondoc.api.v1.utils import plus_subscription_transform, payment_details
 from ondoc.authentication.backends import JWTAuthentication
 from ondoc.account import models as account_models
 from ondoc.authentication.models import User, UserProfile
+from ondoc.common.middleware import use_slave
 from ondoc.common.models import BlacklistUser, BlockedStates, DocumentsProofs
-from ondoc.plus.models import (PlusProposer, PlusPlans, PlusThreshold, PlusMembers, PlusUser, PlusLead, PlusDummyData)
+from ondoc.diagnostic.models import LabAppointment
+from ondoc.doctor.models import OpdAppointment
+from ondoc.plus.models import (PlusProposer, PlusPlans, PlusThreshold, PlusMembers, PlusUser, PlusLead, PlusDummyData,
+                               PlusAppointmentMapping)
 from . import serializers
 import datetime
 from datetime import timedelta
@@ -33,6 +38,7 @@ class PlusListViewSet(viewsets.GenericViewSet):
         # plans_with_utm = plans.filter()
         return plans
 
+    @use_slave
     def list(self, request):
         resp = {}
         user = request.user
@@ -180,17 +186,17 @@ class PlusOrderViewSet(viewsets.GenericViewSet):
                             user_profile = {"name": member['first_name'] + " " + last_name, "email":
                                 member['email'], "dob": member['dob']}
 
-            utm_source = request.data.get('utm_spo_tags', {}).get('utm_source', None)
-            utm_term = request.data.get('utm_spo_tags', {}).get('utm_term', None)
-            utm_campaign = request.data.get('utm_spo_tags', {}).get('utm_campaign', None)
-            utm_medium = request.data.get('utm_spo_tags', {}).get('utm_medium', None)
+            utm_source = request.data.get('utm_spo_tags', {}).get('UtmSource', None)
+            utm_term = request.data.get('utm_spo_tags', {}).get('UtmTerm', None)
+            utm_campaign = request.data.get('utm_spo_tags', {}).get('UtmCampaign', None)
+            utm_medium = request.data.get('utm_spo_tags', {}).get('UtmMedium', None)
             is_utm_agent = request.data.get('utm_spo_tags', {}).get('is_agent', None)
             utm_parameter = {"utm_source": utm_source, "is_utm_agent": is_utm_agent, 'utm_term': utm_term, 'utm_campaign': utm_campaign, 'utm_medium': utm_medium}
             plus_plan = PlusPlans.objects.get(id=plus_plan_id)
             transaction_date = datetime.datetime.now()
             amount = plus_plan.deal_price
 
-            expiry_date = transaction_date + relativedelta(years=int(plus_plan.tenure))
+            expiry_date = transaction_date + relativedelta(months=int(plus_plan.tenure))
             expiry_date = expiry_date - timedelta(days=1)
             expiry_date = datetime.datetime.combine(expiry_date, datetime.datetime.max.time())
             plus_user_data = {'proposer': plus_plan.proposer.id, 'plus_plan': plus_plan.id,
@@ -199,9 +205,9 @@ class PlusOrderViewSet(viewsets.GenericViewSet):
             plus_subscription_data = {"profile_detail": user_profile, "plus_plan": plus_plan.id,
                               "user": request.user.pk, "plus_user": plus_user_data, "utm_parameter": utm_parameter}
 
-            consumer_account = account_models.ConsumerAccount.objects.get_or_create(user=user)
-            consumer_account = account_models.ConsumerAccount.objects.select_for_update().get(user=user)
-            balance = consumer_account.balance
+            # consumer_account = account_models.ConsumerAccount.objects.get_or_create(user=user)
+            # consumer_account = account_models.ConsumerAccount.objects.select_for_update().get(user=user)
+            # balance = consumer_account.balance
 
             # visitor_info = None
             # try:
@@ -213,51 +219,53 @@ class PlusOrderViewSet(viewsets.GenericViewSet):
             # except Exception as e:
             #     logger.log("Could not fecth visitor info - " + str(e))
 
-            resp['is_agent'] = False
-            if hasattr(request, 'agent') and request.agent:
-                resp['is_agent'] = True
+            # resp['is_agent'] = False
+            # if hasattr(request, 'agent') and request.agent:
+            #     resp['is_agent'] = True
 
             plus_data = plus_subscription_transform(plus_subscription_data)
 
-            if balance < amount or resp['is_agent']:
-                payable_amount = amount - balance
-                order = account_models.Order.objects.create(
-                    product_id=account_models.Order.VIP_PRODUCT_ID,
-                    action=account_models.Order.VIP_CREATE,
-                    action_data=plus_data,
-                    amount=payable_amount,
-                    cashback_amount=0,
-                    wallet_amount=balance,
-                    user=user,
-                    payment_status=account_models.Order.PAYMENT_PENDING,
-                    # visitor_info=visitor_info
-                )
-                resp["status"] = 1
-                resp['data'], resp["payment_required"] = payment_details(request, order)
-            else:
-                wallet_amount = amount
-
-                order = account_models.Order.objects.create(
-                    product_id=account_models.Order.VIP_PRODUCT_ID,
-                    action=account_models.Order.VIP_CREATE,
-                    action_data=plus_data,
-                    amount=0,
-                    wallet_amount=wallet_amount,
-                    cashback_amount=0,
-                    user=user,
-                    payment_status=account_models.Order.PAYMENT_PENDING,
-                    # visitor_info=visitor_info
-                )
-
-                plus_object, wallet_amount, cashback_amount = order.process_order()
-                resp["status"] = 1
-                resp["payment_required"] = False
-                resp["data"] = {'id': plus_object.id}
-                resp["data"] = {
-                    "orderId": order.id,
-                    "type": "plus_membership",
-                    "id": plus_object.id if plus_object else None
-                }
+            # if balance < amount or resp['is_agent']:
+            # payable_amount = amount - balance
+            payable_amount = amount
+            order = account_models.Order.objects.create(
+                product_id=account_models.Order.VIP_PRODUCT_ID,
+                action=account_models.Order.VIP_CREATE,
+                action_data=plus_data,
+                amount=payable_amount,
+                cashback_amount=0,
+                # wallet_amount=balance,
+                wallet_amount=0,
+                user=user,
+                payment_status=account_models.Order.PAYMENT_PENDING,
+                # visitor_info=visitor_info
+            )
+            resp["status"] = 1
+            resp['data'], resp["payment_required"] = payment_details(request, order)
+            # else:
+            #     wallet_amount = amount
+            #
+            #     order = account_models.Order.objects.create(
+            #         product_id=account_models.Order.VIP_PRODUCT_ID,
+            #         action=account_models.Order.VIP_CREATE,
+            #         action_data=plus_data,
+            #         amount=0,
+            #         wallet_amount=wallet_amount,
+            #         cashback_amount=0,
+            #         user=user,
+            #         payment_status=account_models.Order.PAYMENT_PENDING,
+            #         # visitor_info=visitor_info
+            #     )
+            #
+            #     plus_object, wallet_amount, cashback_amount = order.process_order()
+            #     resp["status"] = 1
+            #     resp["payment_required"] = False
+            #     resp["data"] = {'id': plus_object.id}
+            #     resp["data"] = {
+            #         "orderId": order.id,
+            #         "type": "plus_membership",
+            #         "id": plus_object.id if plus_object else None
+            #     }
         else:
             return Response(status=status.HTTP_404_NOT_FOUND)
         return Response(resp)
@@ -266,7 +274,7 @@ class PlusOrderViewSet(viewsets.GenericViewSet):
     def add_members(self, request):
         user = request.user
 
-        inactive_plus_subscription = user.inactive_plus_user
+        inactive_plus_subscription = (user.inactive_plus_user or user.active_plus_user)
         if not inactive_plus_subscription:
             return Response({'error': 'User has not purchased the VIP plan.'})
 
@@ -321,13 +329,20 @@ class PlusProfileViewSet(viewsets.GenericViewSet):
             plus_user_id = request.query_params.get('id')
             plus_user = PlusUser.objects.filter(id=plus_user_id).first()
         else:
-            return Response(status=status.HTTP_404_NOT_FOUND)
+            return Response(status=status.HTTP_400_BAD_REQUEST)
 
         if not plus_user:
             return Response(status=status.HTTP_400_BAD_REQUEST)
 
         plus_members = plus_user.plus_members.all()
-        if len(plus_members) > 1:
+        total_member_allowed = plus_user.plan.total_allowed_members
+        if not total_member_allowed or total_member_allowed == 0:
+            return Response(data="Total Allowed Members not defined in plan", status=status.HTTP_400_BAD_REQUEST)
+        # if len(plus_members) > 1:
+        #     resp['is_member_allowed'] = False
+        # else:
+        #     resp['is_member_allowed'] = True
+        if len(plus_members) == int(total_member_allowed):
             resp['is_member_allowed'] = False
         else:
             resp['is_member_allowed'] = True
@@ -340,6 +355,15 @@ class PlusProfileViewSet(viewsets.GenericViewSet):
         available_relations = PlusMembers.Relations.get_custom_availabilities()
         available_relations.pop(PlusMembers.Relations.SELF)
         resp['relation_master'] = available_relations
+
+        opd_content_type = ContentType.objects.get_for_model(OpdAppointment)
+        lab_appointent_content_type = ContentType.objects.get_for_model(LabAppointment)
+        amount = PlusAppointmentMapping.get_vip_amount(plus_user, opd_content_type) + PlusAppointmentMapping.get_vip_amount(plus_user, lab_appointent_content_type)
+        if plus_user.plan.is_gold:
+            resp['lab_appointment_count'] = PlusAppointmentMapping.get_count(plus_user, lab_appointent_content_type)
+            resp['opd_appointment_count'] = PlusAppointmentMapping.get_count(plus_user, opd_content_type)
+            resp['total_vip_amount'] = amount
+
         return Response({'data': resp})
 
 

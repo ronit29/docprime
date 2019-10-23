@@ -321,12 +321,14 @@ class Order(TimeStampedModel):
         _responsible_user=None
         _source=None
         plus_amount = 0
+        convenience_amount = 0
         if '_responsible_user' in appointment_data:
             _responsible_user = appointment_data.pop('_responsible_user')
         if '_source' in appointment_data:
             _source = appointment_data.pop('_source')
         if 'plus_amount' in appointment_data:
             plus_amount = appointment_data.pop('plus_amount')
+            convenience_amount = int(appointment_data.pop('vip_convenience_amount'))
 
         if self.action == Order.OPD_APPOINTMENT_CREATE:
             if total_balance >= appointment_data["effective_price"] or payment_not_required:
@@ -336,7 +338,7 @@ class Order(TimeStampedModel):
                     appointment_obj = OpdAppointment.create_appointment(appointment_data, responsible_user=_responsible_user, source=_source)
                     if appointment_obj.plus_plan:
                         data = {"plus_user": appointment_obj.plus_plan, "plus_plan": appointment_obj.plus_plan.plan,
-                                "content_object": appointment_obj, 'amount': plus_amount}
+                                "content_object": appointment_obj, 'amount': plus_amount, 'extra_charge': convenience_amount}
                         PlusAppointmentMapping.objects.create(**data)
 
                 order_dict = {
@@ -350,7 +352,7 @@ class Order(TimeStampedModel):
 
                 if appointment_obj.plus_plan:
                     data = {"plus_user": appointment_obj.plus_plan, "plus_plan": appointment_obj.plus_plan.plan,
-                            "content_object": appointment_obj, 'amount': plus_amount}
+                            "content_object": appointment_obj, 'amount': plus_amount, 'extra_charge': convenience_amount}
                     PlusAppointmentMapping.objects.create(**data)
 
                 order_dict = {
@@ -2601,12 +2603,12 @@ class MerchantPayout(TimeStampedModel):
             return 2
         else:
             appointment = self.get_appointment()
-            if appointment.payment_type == OpdAppointment.PREPAID:
-                return 1
-            elif appointment.payment_type == OpdAppointment.INSURANCE:
+            if appointment.payment_type == OpdAppointment.INSURANCE:
                 return 2
-
-        return 0
+            elif appointment.payment_type == OpdAppointment.PREPAID:
+                return 1
+            else:
+                return 1
 
     class Meta:
         db_table = "merchant_payout"

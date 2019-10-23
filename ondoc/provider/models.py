@@ -324,6 +324,13 @@ class PartnerLabSamplesCollectOrder(auth_models.TimeStampedModel, auth_models.Cr
     class Meta:
         db_table = "partner_lab_samples_collect_order"
 
+    def status_update_checks(self, new_status):
+        if self.status > new_status:
+            return False
+        if self.status < self.SAMPLE_PICKED_UP and new_status in [self.REPORT_GENERATED, self.PARTIAL_REPORT_GENERATED]:
+            return False
+        return True
+
     def save(self, *args, **kwargs):
         super(PartnerLabSamplesCollectOrder, self).save()
         if self.status == self.SAMPLE_PICKUP_PENDING:
