@@ -1189,7 +1189,7 @@ class Command(BaseCommand):
         group.permissions.clear()
 
         content_types = ContentType.objects.get_for_models(PlusProposer, PlusPlans, PlusPlanParameters,
-                                                           PlusPlanParametersMapping, PlusPlanContent, PlusPlanUtmSources, PlusPlanUtmSourceMapping, PlusMembers)
+                                                           PlusPlanParametersMapping, PlusPlanContent, PlusPlanUtmSources, PlusPlanUtmSourceMapping)
 
         for cl, ct in content_types.items():
             permissions = Permission.objects.filter(
