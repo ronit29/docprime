@@ -387,7 +387,11 @@ class LabList(viewsets.ReadOnlyModelViewSet):
             package_count_query += filter_query
 
         package_count_query = package_count_query.format(lab_network_query=lab_network_query, salespoint_query=salespoint_query)
-        package_count = RawSql(package_count_query, params, DatabaseInfo.SLAVE).fetch_all()
+        db = DatabaseInfo.DEFAULT
+        if settings.USE_SLAVE_DB:
+            db = DatabaseInfo.SLAVE
+
+        package_count = RawSql(package_count_query, params, db).fetch_all()
         result_count = package_count[0].get('count', 0)
         temp_categories_ids = package_count[0].get('category_ids', [])
         if not temp_categories_ids:
