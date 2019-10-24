@@ -6,13 +6,15 @@ from django.conf import settings
 from ondoc.api.v1.doctor.serializers import DoctorProfileUserViewSerializer
 from ondoc.api.v1.procedure.serializers import DoctorClinicProcedureSerializer
 from ondoc.api.v1.ratings.serializers import GoogleRatingsGraphSerializer
+from ondoc.common.models import SearchCriteria
 from ondoc.coupon.models import CouponRecommender
 from ondoc.doctor import models
 from ondoc.api.v1.utils import clinic_convert_timings, aware_time_zone
 from ondoc.api.v1.doctor import serializers
 from ondoc.authentication.models import QCModel
 from ondoc.doctor.models import Doctor, PracticeSpecialization
-from ondoc.plus.usage_criteria import get_class_reference
+from ondoc.plus.models import PlusPlans
+from ondoc.plus.usage_criteria import get_class_reference, get_price_reference
 from ondoc.procedure.models import DoctorClinicProcedure, ProcedureCategory, ProcedureToCategoryMapping, \
     get_selected_and_other_procedures, get_included_doctor_clinic_procedure, \
     get_procedure_categories_with_procedures
@@ -566,8 +568,12 @@ class DoctorSearchHelper:
         coupon_code = query_params.get("coupon_code", None)
 
         coupon_recommender = CouponRecommender(request.user, profile, 'doctor', product_id, coupon_code, None)
-        filters = dict()
+        search_criteria = SearchCriteria.objects.filter(search_key='is_gold').first()
+        hosp_is_gold = False
+        if search_criteria:
+            hosp_is_gold = search_criteria.search_value
 
+        filters = dict()
 
         for doctor in doctor_data:
             enable_online_booking = False
@@ -586,7 +592,9 @@ class DoctorSearchHelper:
                     min_deal_price = data.deal_price
                     min_price = {
                         "deal_price": data.deal_price,
-                        "mrp": data.mrp
+                        "mrp": data.mrp,
+                        "cod_deal_price": data.cod_deal_price if data.cod_deal_price else 0,
+                        "fees": data.fees if data.fees else 0
                     }
             # min_fees = min([data.get("deal_price") for data in serializer.data if data.get("deal_price")])
 
@@ -624,10 +632,12 @@ class DoctorSearchHelper:
 
                 is_insurance_covered = False
                 insurance_error = None
+                is_gold_member = False
                 vip_data_dict = kwargs.get('vip_data')
                 is_vip_member = vip_data_dict.get('is_vip_member', False)
                 is_enable_for_vip = vip_data_dict.get('is_enable_for_vip', False)
                 vip_utilization = vip_data_dict.get('vip_utilization', None)
+                vip_convenience_amount = PlusPlans.get_default_convenience_amount(int(min_price.get('fees', 0)), "DOCTOR")
                 vip_remaining_amount = int(vip_utilization.get('vip_remaining_amount', 0))
                 vip_amount = 0
                 cover_under_vip = vip_data_dict.get('cover_under_vip', False)
@@ -653,7 +663,7 @@ class DoctorSearchHelper:
 
                 if doctor.enabled_for_plus_plans and doctor_clinic.hospital.enabled_for_prepaid and \
                         doctor.enabled_for_online_booking and doctor_clinic.hospital.enabled_for_online_booking and \
-                        doctor_clinic.enabled_for_online_booking:
+                        doctor_clinic.enabled_for_online_booking and doctor_clinic.hospital.is_enabled_for_plus_plans():
                     if request and request.user and not request.user.is_anonymous and request.user.active_insurance:
                         is_enable_for_vip = False
                     else:
@@ -662,19 +672,31 @@ class DoctorSearchHelper:
                 if request and request.user and not request.user.is_anonymous and vip_data_dict.get('is_vip_member') and \
                         doctor.enabled_for_plus_plans and doctor_clinic.hospital.enabled_for_prepaid and \
                         doctor.enabled_for_online_booking and doctor_clinic.hospital.enabled_for_online_booking and \
-                        doctor_clinic.enabled_for_online_booking:
+                        doctor_clinic.enabled_for_online_booking and doctor_clinic.hospital.is_enabled_for_plus_plans():
                     mrp = int(min_price.get('mrp'))
+                    price_data = {"mrp": int(min_price.get('mrp', 0)), "deal_price": int(min_price.get('deal_price', 0)),
+                                  "cod_deal_price": int(min_price.get('cod_deal_price', 0)),
+                                  "fees": int(min_price.get('fees', 0))}
+                    price_engine = get_price_reference(request.user.active_plus_user, "LABTEST")
+                    if not price_engine:
+                        price = mrp
+                    else:
+                        price = price_engine.get_price(price_data)
+                    vip_convenience_amount = request.user.active_plus_user.plan.get_convenience_charge(price, "DOCTOR")
                     engine = get_class_reference(request.user.active_plus_user, "DOCTOR")
+                    is_gold_member = True if request.user.active_plus_user.plan.is_gold else False
                     if engine:
-                        vip_response_dict = engine.validate_booking_entity(cost=mrp)
+                        # vip_response_dict = engine.validate_booking_entity(cost=mrp)
+                        vip_response_dict = engine.validate_booking_entity(cost=price, mrp=mrp)
                         vip_amount = vip_response_dict.get('amount_to_be_paid', 0)
                         cover_under_vip = vip_response_dict.get('is_covered', False)
-                    # vip_amount = 0 if vip_remaining_amount > mrp else mrp - vip_remaining_amount
+                        # vip_amount = 0 if vip_remaining_amount > mrp else mrp - vip_remaining_amount
                 hospitals = [{
                     "enabled_for_online_booking": enable_online_booking,
                     "is_insurance_covered": is_insurance_covered,
                     "insurance_limit_message": insurance_error,
                     "is_vip_member": is_vip_member,
+                    "vip_convenience_amount": vip_convenience_amount,
                     "cover_under_vip": cover_under_vip,
                     "vip_amount": vip_amount,
                     "is_enable_for_vip": is_enable_for_vip,
@@ -699,7 +721,10 @@ class DoctorSearchHelper:
                     "location": {'lat': doctor_clinic.hospital.location.y,
                                  'long': doctor_clinic.hospital.location.x} if doctor_clinic.hospital and doctor_clinic.hospital.location else None,
                     "url": kwargs.get('hosp_entity_dict', {}).get(doctor_clinic.hospital.id),
-                    "locality_url": kwargs.get('hosp_locality_entity_dict', {}).get(doctor_clinic.hospital.id)
+                    "locality_url": kwargs.get('hosp_locality_entity_dict', {}).get(doctor_clinic.hospital.id),
+                    "hosp_is_gold":hosp_is_gold,
+                    "vip_gold_price": int(min_price.get('fees', 0)),
+                    "is_gold_member": is_gold_member
                 }]
 
             thumbnail = doctor.get_thumbnail()

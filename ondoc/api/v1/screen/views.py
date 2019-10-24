@@ -145,7 +145,7 @@ class ScreenViewSet(viewsets.GenericViewSet):
 
         grid_list = [
             {
-                'priority': 4,
+                'priority': 3,
                 'title': "Book Doctor Appointment",
                 'type': "Specialization",
                 'items': specializations_serializer.data,
@@ -213,7 +213,7 @@ class ScreenViewSet(viewsets.GenericViewSet):
             if banner.get('slider_location') == 'home_page':
                 banner_list_homepage.append(banner)
         banner = [{
-            'priority': 3,
+            'priority': 4,
             'type': "Banners",
             'title': "Banners",
             'items': banner_list_homepage

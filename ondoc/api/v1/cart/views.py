@@ -11,6 +11,8 @@ from ondoc.api.v1.doctor.serializers import CreateAppointmentSerializer
 from django.db import transaction
 from django.conf import settings
 import copy
+
+from ondoc.common.models import SearchCriteria
 from ondoc.diagnostic.models import LabAppointment
 
 from ondoc.coupon.models import Coupon
@@ -68,7 +70,9 @@ class CartViewSet(viewsets.GenericViewSet):
             "is_vip_member": False,
             "cover_under_vip": False,
             "plus_user_id": None,
-            "vip_amount": 0
+            "vip_amount": 0,
+            "is_gold_member": False,
+            "vip_convenience_amount": 0
         }
         if plus_user:
             vip_data_dict = plus_user.validate_cart_items(serialized_data, request)
@@ -77,6 +81,8 @@ class CartViewSet(viewsets.GenericViewSet):
         valid_data['data']['is_vip_member'] = vip_data_dict.get('is_vip_member', False)
         valid_data['data']['vip_amount'] = vip_data_dict.get('vip_amount')
         valid_data['data']['amount_to_be_paid'] = vip_data_dict.get('vip_amount')
+        valid_data['data']['is_gold_member'] = vip_data_dict.get('is_gold_member')
+        valid_data['data']['vip_convenience_amount'] = vip_data_dict.get('vip_convenience_amount')
 
         if valid_data['data']['is_appointment_insured']:
             valid_data['data']['payment_type'] = OpdAppointment.INSURANCE
@@ -178,6 +184,11 @@ class CartViewSet(viewsets.GenericViewSet):
     @transaction.non_atomic_requests()
     def list(self, request, *args, **kwargs):
         from ondoc.insurance.models import UserInsurance
+
+        search_criteria = SearchCriteria.objects.filter(search_key='is_gold').first()
+        hosp_is_gold = False
+        if search_criteria:
+            hosp_is_gold = search_criteria.search_value
 
         user = request.user
         if not user.is_authenticated:
@@ -327,7 +338,8 @@ class CartViewSet(viewsets.GenericViewSet):
                     "consultation" : price_data.get("consultation", None),
                     "cod_deal_price": price_data.get("consultation", {}).get('cod_deal_price'),
                     "is_enabled_for_cod" : price_data.get("consultation", {}).get('is_enabled_for_cod'),
-                    "is_price_zero": True if price_data['fees'] is not None and price_data['fees']==0 else False
+                    "is_price_zero": True if price_data['fees'] is not None and price_data['fees']==0 else False,
+                    'is_gold': hosp_is_gold
                 })
             except Exception as e:
                 # error = custom_exception_handler(e, None)

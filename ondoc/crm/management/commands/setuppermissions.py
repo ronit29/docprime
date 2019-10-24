@@ -5,7 +5,7 @@ from django.db.models import Q
 
 from ondoc.banner.models import Banner, SliderLocation, BannerLocation, EmailBanner, RecommenderThrough, Recommender
 from ondoc.common.models import PaymentOptions, UserConfig, Feature, Service, Remark, MatrixMappedCity, \
-    MatrixMappedState, GenericNotes, BlacklistUser, BlockedStates, VirtualAppointment, Fraud
+    MatrixMappedState, GenericNotes, BlacklistUser, BlockedStates, VirtualAppointment, Fraud, SearchCriteria
 from ondoc.corporate_booking.models import CorporateDeal, Corporates, CorporateDocument
 from ondoc.coupon.models import Coupon, UserSpecificCoupon, RandomGeneratedCoupon
 from ondoc.crm.constants import constants
@@ -54,7 +54,7 @@ from ondoc.insurance.models import (Insurer, InsurancePlans, InsuranceThreshold,
                                     UserBank, UserBankDocument, InsurerAccountTransfer, BankHolidays)
 from ondoc.notification.models import DynamicTemplates
 from ondoc.plus.models import PlusPlans, PlusPlanParameters, PlusProposer, PlusPlanParametersMapping, PlusPlanContent, \
-    PlusPlanUtmSources, PlusPlanUtmSourceMapping
+    PlusPlanUtmSources, PlusPlanUtmSourceMapping, PlusMembers
 
 from ondoc.procedure.models import Procedure, ProcedureCategory, CommonProcedureCategory, DoctorClinicProcedure, \
     ProcedureCategoryMapping, ProcedureToCategoryMapping, CommonProcedure, IpdProcedure, IpdProcedureFeatureMapping, \
@@ -627,7 +627,8 @@ class Command(BaseCommand):
                                                            HospitalNetworkImage, HospitalNetworkTiming,
                                                            HospitalNetworkServiceMapping,
                                                            HospitalNetworkSpeciality, DynamicTemplates, HospitalSponsoredServices,
-                                                           SponsoredServicePracticeSpecialization, DoctorSponsoredServices, SponsoredServices,LabTestThresholds)
+                                                           SponsoredServicePracticeSpecialization, DoctorSponsoredServices, SponsoredServices,LabTestThresholds,
+                                                           SearchCriteria)
 
 
         for cl, ct in content_types.items():

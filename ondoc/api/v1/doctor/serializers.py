@@ -9,7 +9,7 @@ from collections import defaultdict, OrderedDict
 from ondoc.api.v1.procedure.serializers import DoctorClinicProcedureSerializer, OpdAppointmentProcedureMappingSerializer
 from ondoc.api.v1.ratings.serializers import RatingsGraphSerializer
 from ondoc.cart.models import Cart
-from ondoc.common.models import Feature, MatrixMappedCity
+from ondoc.common.models import Feature, MatrixMappedCity, SearchCriteria
 from ondoc.diagnostic.models import LabTest
 from ondoc.doctor.models import (OpdAppointment, Doctor, Hospital, DoctorHospital, DoctorClinicTiming,
                                  DoctorAssociation,
@@ -49,8 +49,8 @@ from django.conf import settings
 from ondoc.insurance.models import UserInsurance, InsuranceThreshold, InsuranceDoctorSpecializations
 from ondoc.authentication import models as auth_models
 from ondoc.location.models import EntityUrls, EntityAddress
-from ondoc.plus.models import PlusUser, PlusAppointmentMapping
-from ondoc.plus.usage_criteria import get_class_reference
+from ondoc.plus.models import PlusUser, PlusAppointmentMapping, PlusPlans
+from ondoc.plus.usage_criteria import get_class_reference, get_price_reference
 from ondoc.procedure.models import DoctorClinicProcedure, Procedure, ProcedureCategory, \
     get_included_doctor_clinic_procedure, get_procedure_categories_with_procedures, IpdProcedure, \
     IpdProcedureFeatureMapping, IpdProcedureLead, DoctorClinicIpdProcedure, IpdProcedureDetail, Offer
@@ -133,7 +133,7 @@ class OpdAppointmentSerializer(serializers.ModelSerializer):
     payment_type = serializers.SerializerMethodField()
     effective_price = serializers.SerializerMethodField()
     vip = serializers.SerializerMethodField()
-
+    payment_mode = serializers.SerializerMethodField()
 
     def get_payment_type(self, obj):
         return obj.payment_type
@@ -146,6 +146,11 @@ class OpdAppointmentSerializer(serializers.ModelSerializer):
 
     def get_vip(self, obj):
 
+        search_criteria = SearchCriteria.objects.filter(search_key='is_gold').first()
+        hosp_is_gold = False
+        if search_criteria:
+            hosp_is_gold = search_criteria.search_value
+
         plus_appointment_mapping = None
         vip_amount = 0
         if obj:
@@ -156,9 +161,13 @@ class OpdAppointmentSerializer(serializers.ModelSerializer):
                 vip_amount = int(obj.mrp) - int(plus_appointment_mapping.amount)
 
         return {
-            'is_vip_member': True if obj and obj.plus_plan else False,
+            'is_vip_member': True if obj and obj.plus_plan and obj.plus_plan.plan and not obj.plus_plan.plan.is_gold else False,
             'vip_amount': vip_amount,
-            'covered_under_vip': True if obj and obj.plus_plan else False
+            'is_gold_member': True if plus_appointment_mapping and plus_appointment_mapping.plus_plan and plus_appointment_mapping.plus_plan.is_gold else False,
+            'vip_amount_deducted': plus_appointment_mapping.amount if plus_appointment_mapping else 0,
+            'covered_under_vip': True if obj and obj.plus_plan else False,
+            'extra_charge': plus_appointment_mapping.extra_charge if plus_appointment_mapping else 0,
+            'hosp_is_gold': hosp_is_gold
         }
 
     def get_prescription(self, obj):
@@ -169,12 +178,23 @@ class OpdAppointmentSerializer(serializers.ModelSerializer):
         request = self.context.get('request')
         return obj.allowed_action(request.user.user_type, request)
 
+    def get_payment_mode(self, obj):
+        payment_modes = dict(OpdAppointment.PAY_CHOICES)
+        if payment_modes:
+            effective_price = obj.effective_price
+            payment_type = obj.payment_type
+            if effective_price > 0 and payment_type == 5:
+                return 'Online'
+            else:
+                return payment_modes.get(obj.payment_type, '')
+        return ''
+
     class Meta:
         model = OpdAppointment
         fields = ('id', 'doctor_name', 'hospital_name', 'patient_name', 'patient_image', 'type',
                   'allowed_action', 'effective_price', 'deal_price', 'status', 'time_slot_start',
                   'time_slot_end', 'doctor_thumbnail', 'patient_thumbnail', 'display_name', 'invoices', 'reports',
-                  'prescription', 'report_files', 'specialization', 'payment_type', 'effective_price', 'vip')
+                  'prescription', 'report_files', 'specialization', 'payment_type', 'effective_price', 'vip', 'payment_mode')
 
     def get_patient_image(self, obj):
         if obj.profile and obj.profile.profile_image:
@@ -238,6 +258,7 @@ class OpdAppTransactionModelSerializer(serializers.Serializer):
     _responsible_user = serializers.IntegerField(required=False, allow_null=True)
     plus_plan = serializers.PrimaryKeyRelatedField(queryset=PlusUser.objects.all(), allow_null=True)
     plus_amount = serializers.DecimalField(max_digits=10, decimal_places=2)
+    vip_convenience_amount = serializers.DecimalField(max_digits=10, decimal_places=2, allow_null=True)
 
 
 
@@ -631,7 +652,15 @@ class DoctorHospitalSerializer(serializers.ModelSerializer):
         return resp
 
     def get_vip(self, obj):
-        resp = {"is_vip_member": False, "cover_under_vip": False, "vip_amount": 0, "is_enable_for_vip": False}
+        search_criteria = SearchCriteria.objects.filter(search_key='is_gold').first()
+        hosp_is_gold = False
+        if search_criteria:
+            hosp_is_gold = search_criteria.search_value
+        resp = {"is_vip_member": False, "cover_under_vip": False, "vip_amount": 0, "is_enable_for_vip": False,
+                "vip_convenience_amount": PlusPlans.get_default_convenience_amount(obj.fees, "DOCTOR"),
+                "vip_gold_price": 0, 'hosp_is_gold': False, "is_gold_member": False}
+
+        resp['hosp_is_gold'] = hosp_is_gold
         request = self.context.get("request")
         user = request.user
         doctor_clinic = obj.doctor_clinic
@@ -639,22 +668,32 @@ class DoctorHospitalSerializer(serializers.ModelSerializer):
         hospital = doctor_clinic.hospital
         enabled_for_online_booking = doctor_clinic.enabled_for_online_booking and doctor.enabled_for_online_booking and \
                                         hospital.enabled_for_online_booking and hospital.enabled_for_prepaid \
-                                        and hospital.enabled_for_plus_plans and doctor.enabled_for_plus_plans
-
+                                        and hospital.is_enabled_for_plus_plans() and doctor.enabled_for_plus_plans
+        plus_user = None if not user.is_authenticated or user.is_anonymous else user.active_plus_user
         if enabled_for_online_booking and obj.mrp is not None:
             resp['is_enable_for_vip'] = True
-            plus_user = None if not user.is_authenticated or user.is_anonymous else user.active_plus_user
+            resp['vip_gold_price'] = obj.fees
             if not plus_user:
                 return resp
             utilization = plus_user.get_utilization
             available_amount = int(utilization.get('doctor_amount_available', 0))
+            price_data = {"mrp": obj.mrp, "deal_price": obj.deal_price, "fees": obj.fees, "cod_deal_price": obj.cod_deal_price}
             mrp = int(obj.mrp)
+            price_engine = get_price_reference(plus_user, "DOCTOR")
+            if not price_engine:
+                price = mrp
+            else:
+                price = price_engine.get_price(price_data)
             resp['is_vip_member'] = True
+            resp['is_gold_member'] = True if plus_user and plus_user.plan and plus_user.plan.is_gold else False
             engine = get_class_reference(plus_user, "DOCTOR")
             if engine:
-                vip_res = engine.validate_booking_entity(cost=mrp)
+                # vip_res = engine.validate_booking_entity(cost=mrp)
+                vip_res = engine.validate_booking_entity(cost=price, mrp=mrp)
+                resp['vip_convenience_amount'] = plus_user.plan.get_convenience_charge(price, "DOCTOR")
                 resp['vip_amount'] = vip_res.get('amount_to_be_paid', 0)
                 resp['cover_under_vip'] = vip_res.get('is_covered', False)
+
             # amount = plus_user.get_vip_amount(utilization, mrp)
             # resp['cover_under_vip'] = True if (amount < mrp) else False
             # resp['vip_amount'] = amount
@@ -1629,6 +1668,11 @@ class AppointmentRetrieveSerializer(OpdAppointmentSerializer):
         return resp
 
     def get_vip(self, obj):
+        search_criteria = SearchCriteria.objects.filter(search_key='is_gold').first()
+        hosp_is_gold = False
+        if search_criteria:
+            hosp_is_gold = search_criteria.search_value
+
         vip_amount = 0
         plus_appointment_mapping = None
         if obj:
@@ -1641,7 +1685,11 @@ class AppointmentRetrieveSerializer(OpdAppointmentSerializer):
         return {
             'is_vip_member': True if obj and obj.plus_plan else False,
             'vip_amount': vip_amount,
-            'covered_under_vip': True if obj and obj.plus_plan else False
+            'vip_amount_deducted': plus_appointment_mapping.amount if plus_appointment_mapping else 0,
+            'is_gold_member': True if plus_appointment_mapping and plus_appointment_mapping.plus_plan and plus_appointment_mapping.plus_plan.is_gold else False,
+            'covered_under_vip': True if obj and obj.plus_plan else False,
+            'extra_charge': plus_appointment_mapping.extra_charge if plus_appointment_mapping else 0,
+            'hosp_is_gold': hosp_is_gold
         }
 
     def get_procedures(self, obj):
@@ -2788,6 +2836,7 @@ class OfferSerializer(serializers.ModelSerializer):
 class HospitalNearYouSerializer(serializers.Serializer):
     long = serializers.FloatField(default=77.071848)
     lat = serializers.FloatField(default=28.450367)
+    from_vip = serializers.BooleanField(default=False)
 
 
 class TopCommonHospitalForIpdProcedureSerializer(serializers.ModelSerializer):

@@ -1454,6 +1454,8 @@ class PartnerLabTestSamplesCollectViewset(viewsets.GenericViewSet):
                 if not sample_objs or not obj.enabled:
                     continue
                 ret_obj['hospital_id'] = hospital.id
+                ret_obj['lab_id'] = lab.id
+                ret_obj['lab_name'] = lab.name
                 test_data = serializers.SelectedTestsDetailsSerializer(obj).data
                 ret_obj.update(test_data)
                 sample_data = serializers.PartnerLabTestSampleDetailsModelSerializer(sample_objs, many=True).data
