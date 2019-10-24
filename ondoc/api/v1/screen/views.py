@@ -4,7 +4,7 @@ from rest_framework import viewsets, serializers
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 
-import ondoc
+from ondoc.api.v1.doctor import serializers
 from ondoc.api.v1.auth.views import AppointmentViewSet
 from ondoc.api.v1.doctor.city_match import city_match
 from ondoc.api.v1.insurance.serializers import InsuranceCityEligibilitySerializer
@@ -36,6 +36,7 @@ class ScreenViewSet(viewsets.GenericViewSet):
 
 
     def home_page(self, request, *args, **kwargs):
+        from django.contrib.gis.geos import GEOSGeometry
 
         show_search_header = True
         show_footer = True
@@ -118,13 +119,12 @@ class ScreenViewSet(viewsets.GenericViewSet):
                                                                         context={'entity_dict': ipd_entity_dict,
                                                                                  'request': request})
         request_data = request.query_params
-        serializer = ondoc.api.v1.doctor.serializers.HospitalNearYouSerializer(data=request_data)
+        serializer = serializers.HospitalNearYouSerializer(data=request_data)
         serializer.is_valid(raise_exception=True)
         validated_data = serializer.validated_data
         result_count = 0
         if validated_data and validated_data.get('long') and validated_data.get('lat'):
             point_string = 'POINT(' + str(validated_data.get('long')) + ' ' + str(validated_data.get('lat')) + ')'
-            from django.contrib.gis.geos import GEOSGeometry
             pnt = GEOSGeometry(point_string, srid=4326)
 
             hospital_queryset = Hospital.objects.prefetch_related('hospital_doctors').filter(enabled_for_online_booking=True,
@@ -140,7 +140,7 @@ class ScreenViewSet(viewsets.GenericViewSet):
             temp_hospital_ids = hospital_queryset.values_list('id', flat=True)
             hosp_entity_dict, hosp_locality_entity_dict = Hospital.get_hosp_and_locality_dict(temp_hospital_ids,
                                                                                               EntityUrls.SitemapIdentifier.HOSPITALS_LOCALITY_CITY)
-            hospital_serializer = ondoc.api.v1.doctor.serializers.HospitalModelSerializer(hospital_queryset, many=True, context={'request': request,
+            hospital_serializer = serializers.HospitalModelSerializer(hospital_queryset, many=True, context={'request': request,
                                                                                          'hosp_entity_dict': hosp_entity_dict})
 
         grid_list = [
