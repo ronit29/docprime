@@ -1720,7 +1720,7 @@ class CommonPackageAdmin(VersionAdmin):
 
     def get_form(self, request, obj=None, **kwargs):
         form = super(CommonPackageAdmin, self).get_form(request, obj=obj, **kwargs)
-        form.base_fields['package'].queryset = LabTest.objects.filter(is_package=True)
+        form.base_fields['package'].queryset = LabTest.objects.filter(is_package=True).order_by('name')
         return form
 
 
