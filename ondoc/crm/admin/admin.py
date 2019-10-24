@@ -116,9 +116,9 @@ from .integrations import IntegratorTestParameterMapping, IntegratorTestParamete
 from .salespoint import SalesPointAdmin, SalesPointAvailableTestMappingAdmin
 from ondoc.salespoint.models import SalesPoint, SalespointTestmapping
 from .plus import PlusPlansAdmin, PlusProposerAdmin, PlusThresholdAdmin, PlusUserAdmin, PlusPlanParametersAdmin
-from ondoc.plus.models import PlusUser, PlusProposer, PlusPlans, PlusThreshold, PlusPlanParameters
+from ondoc.plus.models import PlusUser, PlusProposer, PlusPlans, PlusThreshold, PlusPlanParameters, PlusMembers
 from .plus import PlusPlansAdmin, PlusProposerAdmin, PlusThresholdAdmin, PlusUserAdmin, PlusPlanParametersAdmin, \
-    PlusPlanUtmSourceAdmin
+    PlusPlanUtmSourceAdmin, PlusMemberAdmin
 from ondoc.plus.models import PlusUser, PlusProposer, PlusPlans, PlusThreshold, PlusPlanParameters, PlusPlanUtmSources
 from django.contrib.auth.models import Permission
 
@@ -134,6 +134,7 @@ admin.site.index_title = 'CRM Administration'
 admin.site.register(PlusThreshold, PlusThresholdAdmin)
 admin.site.register(PlusPlans, PlusPlansAdmin)
 admin.site.register(PlusUser, PlusUserAdmin)
+admin.site.register(PlusMembers, PlusMemberAdmin)
 admin.site.register(PlusProposer, PlusProposerAdmin)
 admin.site.register(PlusPlanParameters, PlusPlanParametersAdmin)
 admin.site.register(PlusPlanUtmSources, PlusPlanUtmSourceAdmin)

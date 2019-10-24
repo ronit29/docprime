@@ -4593,6 +4593,7 @@ class HospitalViewSet(viewsets.GenericViewSet):
         serializer.is_valid(raise_exception=True)
         validated_data = serializer.validated_data
         result_count = 0
+        hospital_serializer = None
         if validated_data and validated_data.get('long') and validated_data.get('lat'):
             point_string = 'POINT(' + str(validated_data.get('long')) + ' ' + str(validated_data.get('lat')) + ')'
             pnt = GEOSGeometry(point_string, srid=4326)
@@ -4615,6 +4616,13 @@ class HospitalViewSet(viewsets.GenericViewSet):
                 hospital_queryset = hospital_queryset.filter(enabled_for_prepaid=True)
 
             result_count = hospital_queryset.count()
+
+            temp_hospital_ids = hospital_queryset.values_list('id', flat=True)
+            hosp_entity_dict, hosp_locality_entity_dict = Hospital.get_hosp_and_locality_dict(temp_hospital_ids,
+                                                                                              EntityUrls.SitemapIdentifier.HOSPITALS_LOCALITY_CITY)
+
+            hospital_serializer = serializers.HospitalModelSerializer(hospital_queryset, many=True, context={'request': request,
+                                                                                         'hosp_entity_dict': hosp_entity_dict})
             hospital_percentage_dict = dict()
 
             plan = PlusPlans.objects.filter(is_gold=True, is_selected=True).first()
@@ -4636,11 +4644,11 @@ class HospitalViewSet(viewsets.GenericViewSet):
                                 percentage = max(((mrp-(agreed_price + plan.get_convenience_amount(agreed_price, convenience_amount_obj, convenience_percentage_obj)))/mrp)*100, percentage)
                     hospital_percentage_dict[hospital.id] = round(percentage, 2)
 
-            hospital_serializer = serializers.HospitalModelSerializer(hospital_queryset, many=True,
-                                                                      context={"request": request})
+            # hospital_serializer = serializers.HospitalModelSerializer(hospital_queryset, many=True,
+            #                                                           context={"request": request})
             hospitals_result = hospital_serializer.data
             for data in hospitals_result:
-                data['vip_percentage'] = hospital_percentage_dict[data.get('id')] if plan else 0
+                data['vip_percentage'] = hospital_percentage_dict[data.get('id')] if plan and hospital_percentage_dict.get(data.get('id')) else 0
 
             return Response({'count': result_count, 'hospitals': hospitals_result})
         return Response({})

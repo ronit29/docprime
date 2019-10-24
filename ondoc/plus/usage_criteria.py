@@ -16,7 +16,7 @@ class AbstractCriteria(object):
         id = kwargs.get('id')
         mrp = kwargs.get('mrp')
         utilization = kwargs.get('utilization')
-        if not cost:
+        if cost is None or cost < 0:
             return {}
 
         return self._validate_booking_entity(cost, id, utilization=utilization, mrp=mrp)
