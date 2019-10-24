@@ -4596,6 +4596,7 @@ class HospitalViewSet(viewsets.GenericViewSet):
 
     @use_slave
     def near_you_hospitals(self, request):
+        return Response({})
         request_data = request.query_params
         serializer = serializers.HospitalNearYouSerializer(data=request_data)
         serializer.is_valid(raise_exception=True)
