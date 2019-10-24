@@ -4648,7 +4648,7 @@ class HospitalViewSet(viewsets.GenericViewSet):
             #                                                           context={"request": request})
             hospitals_result = hospital_serializer.data
             for data in hospitals_result:
-                data['vip_percentage'] = hospital_percentage_dict[data.get('id')] if plan else 0
+                data['vip_percentage'] = hospital_percentage_dict[data.get('id')] if plan and hospital_percentage_dict.get(data.get('id')) else 0
 
             return Response({'count': result_count, 'hospitals': hospitals_result})
         return Response({})
