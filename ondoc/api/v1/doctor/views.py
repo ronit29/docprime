@@ -2398,8 +2398,12 @@ class DoctorListViewSet(viewsets.GenericViewSet):
 
         query_string = doctor_search_helper.prepare_raw_query(filtering_params,
                                                               order_by_field, rank_by, page)
+        db = DatabaseInfo.DEFAULT
+        if settings.USE_SLAVE_DB:
+            db = DatabaseInfo.SLAVE
+
         doctor_search_result = RawSql(query_string.get('query'),
-                                      query_string.get('params'), DatabaseInfo.SLAVE).fetch_all()
+                                      query_string.get('params'), db).fetch_all()
 
         result_count = 0
         if len(doctor_search_result)>0:

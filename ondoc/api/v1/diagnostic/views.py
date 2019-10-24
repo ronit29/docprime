@@ -1625,7 +1625,9 @@ class LabList(viewsets.ReadOnlyModelViewSet):
         #     price_result['string'] = 'where price>=0'
 
         order_by = self.apply_search_sort(parameters)
-
+        db = DatabaseInfo.DEFAULT
+        if settings.USE_SLAVE_DB:
+            db = DatabaseInfo.SLAVE
         if ids:
             query = ''' select * from (select id,network_id, name ,price, count, mrp, pickup_charges, distance, order_priority, new_network_rank, rank,
             max(new_network_rank) over(partition by 1) result_count
@@ -1670,7 +1672,7 @@ class LabList(viewsets.ReadOnlyModelViewSet):
                          '''.format(filter_query_string=filter_query_string, 
                             group_filter_query_string=group_filter_query_string, order=order_by, lab_timing_join=lab_timing_join, lab_network_query=lab_network_query)
 
-            lab_search_result = RawSql(query, filtering_params, DatabaseInfo.SLAVE).fetch_all()
+            lab_search_result = RawSql(query, filtering_params, db).fetch_all()
         else:
             query1 = '''select * from (select id, network_id, name , distance, order_priority, new_network_rank, rank,
                     max(new_network_rank) over(partition by 1) result_count from 
@@ -1700,7 +1702,7 @@ class LabList(viewsets.ReadOnlyModelViewSet):
                     rank'''.format(
                     filter_query_string=filter_query_string, order=order_by, lab_timing_join=lab_timing_join, lab_network_query=lab_network_query)
 
-            lab_search_result = RawSql(query1, filtering_params, DatabaseInfo.SLAVE).fetch_all()
+            lab_search_result = RawSql(query1, filtering_params, db).fetch_all()
 
         return lab_search_result
 
