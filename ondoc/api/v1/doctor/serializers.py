@@ -679,6 +679,7 @@ class DoctorHospitalSerializer(serializers.ModelSerializer):
             available_amount = int(utilization.get('doctor_amount_available', 0))
             price_data = {"mrp": obj.mrp, "deal_price": obj.deal_price, "fees": obj.fees, "cod_deal_price": obj.cod_deal_price}
             mrp = int(obj.mrp)
+            deal_price = obj.deal_price
             price_engine = get_price_reference(plus_user, "DOCTOR")
             if not price_engine:
                 price = mrp
@@ -689,7 +690,7 @@ class DoctorHospitalSerializer(serializers.ModelSerializer):
             engine = get_class_reference(plus_user, "DOCTOR")
             if engine:
                 # vip_res = engine.validate_booking_entity(cost=mrp)
-                vip_res = engine.validate_booking_entity(cost=price, mrp=mrp)
+                vip_res = engine.validate_booking_entity(cost=price, mrp=mrp, deal_price=deal_price)
                 resp['vip_convenience_amount'] = plus_user.plan.get_convenience_charge(price, "DOCTOR")
                 resp['vip_amount'] = vip_res.get('amount_to_be_paid', 0)
                 resp['cover_under_vip'] = vip_res.get('is_covered', False)

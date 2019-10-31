@@ -1936,7 +1936,7 @@ class LabList(viewsets.ReadOnlyModelViewSet):
                         res['vip']['vip_gold_price'] = int(paticular_test_in_lab.get('agreed_price', 0))
                         if engine:
                             # engine_response = engine.validate_booking_entity(cost=paticular_test_in_lab.get('mrp', 0))
-                            engine_response = engine.validate_booking_entity(cost=price, mrp=paticular_test_in_lab.get('mrp', 0))
+                            engine_response = engine.validate_booking_entity(cost=price, mrp=paticular_test_in_lab.get('mrp', 0), deal_price=paticular_test_in_lab.get('deal_price', 0))
                             coverage = engine_response.get('is_covered', False)
                         bool_array.append(coverage)
 

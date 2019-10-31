@@ -687,7 +687,7 @@ class DoctorSearchHelper:
                     is_gold_member = True if request.user.active_plus_user.plan.is_gold else False
                     if engine:
                         # vip_response_dict = engine.validate_booking_entity(cost=mrp)
-                        vip_response_dict = engine.validate_booking_entity(cost=price, mrp=mrp)
+                        vip_response_dict = engine.validate_booking_entity(cost=price, mrp=mrp, deal_price=int(min_price.get('deal_price', 0)))
                         vip_amount = vip_response_dict.get('amount_to_be_paid', 0)
                         cover_under_vip = vip_response_dict.get('is_covered', False)
                         # vip_amount = 0 if vip_remaining_amount > mrp else mrp - vip_remaining_amount
