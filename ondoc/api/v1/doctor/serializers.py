@@ -614,7 +614,8 @@ class DoctorHospitalSerializer(serializers.ModelSerializer):
     def get_insurance(self, obj):
         request = self.context.get("request")
         user = request.user
-        resp = Doctor.get_insurance_details(user)
+        ins_threshold_amount = self.context.get('ins_threshold_amount', None)
+        resp = Doctor.get_insurance_details(user, ins_threshold_amount)
 
         # enabled for online booking check
         resp['error_message'] = ""
@@ -1466,6 +1467,10 @@ class DoctorProfileUserViewSerializer(DoctorProfileSerializer):
         hosp_entity_dict, hosp_locality_entity_dict = Hospital.get_hosp_and_locality_dict(all_hospital_ids, EntityUrls.SitemapIdentifier.DOCTORS_LOCALITY_CITY)
         self.context['hosp_entity_dict']=hosp_entity_dict
         self.context['hosp_locality_entity_dict']=hosp_locality_entity_dict
+        # Part of Optimisation. Query reason Unknown
+        insurance_threshold_obj = InsuranceThreshold.objects.all().order_by('-opd_amount_limit').first()
+        insurance_threshold_amount = insurance_threshold_obj.opd_amount_limit if insurance_threshold_obj else 1500
+        self.context['ins_threshold_amount'] = insurance_threshold_amount
         if obj:
             doctor_specialization = InsuranceDoctorSpecializations.get_doctor_insurance_specializations(obj)
             if doctor_specialization:
