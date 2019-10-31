@@ -7,7 +7,7 @@ from django.db import migrations
 class Migration(migrations.Migration):
 
     dependencies = [
-        ('provider', '0024_auto_20191022_1325'),
+        ('provider', '0023_partner_lab_sample_collect_order_ser'),
     ]
 
     operations = [
