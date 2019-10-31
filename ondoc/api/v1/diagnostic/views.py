@@ -387,7 +387,11 @@ class LabList(viewsets.ReadOnlyModelViewSet):
             package_count_query += filter_query
 
         package_count_query = package_count_query.format(lab_network_query=lab_network_query, salespoint_query=salespoint_query)
-        package_count = RawSql(package_count_query, params, DatabaseInfo.SLAVE).fetch_all()
+        db = DatabaseInfo.DEFAULT
+        if settings.USE_SLAVE_DB:
+            db = DatabaseInfo.SLAVE
+
+        package_count = RawSql(package_count_query, params, db).fetch_all()
         result_count = package_count[0].get('count', 0)
         temp_categories_ids = package_count[0].get('category_ids', [])
         if not temp_categories_ids:
@@ -1621,7 +1625,9 @@ class LabList(viewsets.ReadOnlyModelViewSet):
         #     price_result['string'] = 'where price>=0'
 
         order_by = self.apply_search_sort(parameters)
-
+        db = DatabaseInfo.DEFAULT
+        if settings.USE_SLAVE_DB:
+            db = DatabaseInfo.SLAVE
         if ids:
             query = ''' select * from (select id,network_id, name ,price, count, mrp, pickup_charges, distance, order_priority, new_network_rank, rank,
             max(new_network_rank) over(partition by 1) result_count
@@ -1666,7 +1672,7 @@ class LabList(viewsets.ReadOnlyModelViewSet):
                          '''.format(filter_query_string=filter_query_string, 
                             group_filter_query_string=group_filter_query_string, order=order_by, lab_timing_join=lab_timing_join, lab_network_query=lab_network_query)
 
-            lab_search_result = RawSql(query, filtering_params, DatabaseInfo.SLAVE).fetch_all()
+            lab_search_result = RawSql(query, filtering_params, db).fetch_all()
         else:
             query1 = '''select * from (select id, network_id, name , distance, order_priority, new_network_rank, rank,
                     max(new_network_rank) over(partition by 1) result_count from 
@@ -1696,7 +1702,7 @@ class LabList(viewsets.ReadOnlyModelViewSet):
                     rank'''.format(
                     filter_query_string=filter_query_string, order=order_by, lab_timing_join=lab_timing_join, lab_network_query=lab_network_query)
 
-            lab_search_result = RawSql(query1, filtering_params, DatabaseInfo.SLAVE).fetch_all()
+            lab_search_result = RawSql(query1, filtering_params, db).fetch_all()
 
         return lab_search_result
 
@@ -1907,6 +1913,7 @@ class LabList(viewsets.ReadOnlyModelViewSet):
 
                 # For Vip. Checking the eligibility of test to be booked under VIP.
                 engine_response = {}
+                res['vip']['is_gold_member'] = True if plus_user_obj and plus_user_obj.plan.is_gold else False
                 if all_tests_under_lab and res['is_vip_enabled']:
                     for paticular_test_in_lab in all_tests_under_lab:
                         price_data = {"mrp": paticular_test_in_lab.get('mrp', 0),
@@ -1921,9 +1928,9 @@ class LabList(viewsets.ReadOnlyModelViewSet):
                         engine = get_class_reference(plus_user_obj, "LABTEST")
                         if plus_user_obj and plus_user_obj.plan:
                             res['vip']['vip_convenience_amount'] = plus_user_obj.plan.get_convenience_charge(price, "LABTEST")
-                            res['vip']['is_gold_member'] = True if plus_user_obj.plan.is_gold else False
+                            # res['vip']['is_gold_member'] = True if plus_user_obj.plan.is_gold else False
                         else:
-                            res['vip']['is_gold_member'] = False
+                            # res['vip']['is_gold_member'] = False
                             res['vip']['vip_convenience_amount'] = PlusPlans.get_default_convenience_amount(paticular_test_in_lab.get('agreed_price', 0), "LABTEST")
                         coverage = False
                         res['vip']['vip_gold_price'] = int(paticular_test_in_lab.get('agreed_price', 0))

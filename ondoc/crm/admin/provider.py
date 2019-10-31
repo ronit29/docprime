@@ -110,8 +110,12 @@ class ReportsInlineFormset(forms.BaseInlineFormSet):
         if any(self.errors):
             return
         if self.instance.status in [prov_models.PartnerLabSamplesCollectOrder.PARTIAL_REPORT_GENERATED,
-                                    prov_models.PartnerLabSamplesCollectOrder.REPORT_GENERATED] and not self.cleaned_data:
-            raise forms.ValidationError("No report files found.")
+                                    prov_models.PartnerLabSamplesCollectOrder.REPORT_GENERATED,
+                                    prov_models.PartnerLabSamplesCollectOrder.REPORT_VIEWED] and \
+                (not self.cleaned_data or len(self.cleaned_data) == len(self.deleted_forms)):
+            raise forms.ValidationError("Report file required.")
+        if self.instance.status < self.instance.PARTIAL_REPORT_GENERATED and self.cleaned_data:
+            raise forms.ValidationError("Reports can't be uploaded for present status")
 
 
 class ReportsInline(admin.TabularInline):
@@ -126,15 +130,28 @@ class ReportsInline(admin.TabularInline):
     formset = ReportsInlineFormset
 
 
+class PartnerLabSamplesCollectOrderForm(forms.ModelForm):
+
+    def clean(self):
+        super().clean()
+        cleaned_data = self.cleaned_data
+        if 'status' in self.changed_data:
+            status_update_check = self.instance.status_update_checks(cleaned_data['status'])
+            if not status_update_check["is_correct"]:
+                raise forms.ValidationError(status_update_check["message"])
+        return cleaned_data
+
+
 class PartnerLabSamplesCollectOrderAdmin(admin.ModelAdmin):
 
-    list_display = ('id', 'offline_patient', 'hospital', 'doctor', 'lab')
+    list_display = ('id', 'created_at', 'status', 'offline_patient', 'hospital', 'doctor', 'lab')
     readonly_fields = ['offline_patient', 'patient_details', 'hospital', 'doctor', 'lab', 'available_lab_tests',
                        'collection_datetime', 'samples', 'selected_tests_details', 'lab_alerts']
     search_fields = ['offline_patient']
     inlines = [
         ReportsInline,
     ]
+    form = PartnerLabSamplesCollectOrderForm
 
     def get_queryset(self, request):
         return super(PartnerLabSamplesCollectOrderAdmin, self).get_queryset(request)\
