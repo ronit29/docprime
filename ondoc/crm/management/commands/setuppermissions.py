@@ -43,7 +43,7 @@ from ondoc.diagnostic.models import (Lab, LabTiming, LabImage, GenericLabAdmin,
                                      CommonPackage, LabTestCategory, LabTestCategoryMapping,
                                      LabTestRecommendedCategoryMapping, QuestionAnswer, FrequentlyAddedTogetherTests,
                                      LabTestGroup, LabTestGroupMapping, LabTestGroupTiming, LabTestCategoryLandingURLS,
-                                     LabTestCategoryUrls, LabTestThresholds)
+                                     LabTestCategoryUrls, LabTestThresholds, AvailableLabTest)
 
 from ondoc.insurance.models import (Insurer, InsurancePlans, InsuranceThreshold, InsuranceCity, StateGSTCode,
                                     InsuranceDistrict, InsuranceTransaction, InsuranceDeal, InsuranceDisease,
@@ -193,7 +193,9 @@ class Command(BaseCommand):
                                                            Qualification, Specialization, Language, MedicalService,
                                                            College, SpecializationDepartment,
                                                            SpecializationField,
-                                                           SpecializationDepartmentMapping, UploadDoctorData, Remark, PartnerLabSamplesCollectOrder, PartnerLabTestSampleDetails, PartnerLabTestSamples, TestSamplesLabAlerts
+                                                           SpecializationDepartmentMapping, UploadDoctorData, Remark,
+                                                           PartnerLabSamplesCollectOrder, PartnerLabTestSampleDetails,
+                                                           PartnerLabTestSamples, TestSamplesLabAlerts, AvailableLabTest
                                                            )
 
         for cl, ct in content_types.items():
@@ -292,7 +294,8 @@ class Command(BaseCommand):
             SpecializationField, SpecializationDepartment, SpecializationDepartmentMapping,
             Procedure, ProcedureCategory, CommonProcedureCategory,
             ProcedureToCategoryMapping, ProcedureCategoryMapping, LabTestCategory, Merchant, CancellationReason, UploadDoctorData,
-            LabTestGroup, LabTestGroupMapping, PartnerLabSamplesCollectOrder, PartnerLabTestSampleDetails, PartnerLabTestSamples, TestSamplesLabAlerts
+            LabTestGroup, LabTestGroupMapping, PartnerLabSamplesCollectOrder, PartnerLabTestSampleDetails,
+            PartnerLabTestSamples, TestSamplesLabAlerts, AvailableLabTest
         )
 
         for cl, ct in content_types.items():
