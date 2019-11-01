@@ -1045,10 +1045,13 @@ class Doctor(auth_model.TimeStampedModel, auth_model.QCModel, SearchKey, auth_mo
         update_insured_doctors = RawSql(query, []).execute()
 
     @classmethod
-    def get_insurance_details(cls, user):
+    def get_insurance_details(cls, user, ins_threshold_amt=None):
         from ondoc.insurance.models import InsuranceThreshold
-        insurance_threshold_obj = InsuranceThreshold.objects.all().order_by('-opd_amount_limit').first()
-        insurance_threshold_amount = insurance_threshold_obj.opd_amount_limit if insurance_threshold_obj else 1500
+        if not ins_threshold_amt:
+            insurance_threshold_obj = InsuranceThreshold.objects.all().order_by('-opd_amount_limit').first()
+            insurance_threshold_amount = insurance_threshold_obj.opd_amount_limit if insurance_threshold_obj else 1500
+        else:
+            insurance_threshold_amount = ins_threshold_amt
         resp = {
             'is_insurance_covered': False,
             'insurance_threshold_amount': insurance_threshold_amount,
@@ -1423,12 +1426,18 @@ class Doctor(auth_model.TimeStampedModel, auth_model.QCModel, SearchKey, auth_mo
 
     def is_doctor_specialization_insured(self):
         dps = self.doctorpracticespecializations.all()
-        if len(dps) == 0:
+        # if len(dps) == 0:
+        #     return False
+        has_data = False
+        not_enabled = True
+        for d in dps:
+            has_data = True
+            if not d.specialization.is_insurance_enabled:
+                not_enabled = False
+                break
+        if (not has_data) or (not not_enabled):
             return False
 
-        for d in dps:
-            if not d.specialization.is_insurance_enabled:
-                return False
 
         # doctor_specializations = DoctorPracticeSpecialization.objects.filter(doctor=self).values_list('specialization_id', flat=True)
         # if not doctor_specializations:

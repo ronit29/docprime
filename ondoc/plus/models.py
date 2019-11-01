@@ -154,13 +154,16 @@ class PlusPlans(auth_model.TimeStampedModel, LiveMixin):
             return convenience_amount
 
     @classmethod
-    def get_default_convenience_amount(cls, price, type):
+    def get_default_convenience_amount(cls, price, type, default_plan_query=None):
         if not price or price <= 0:
             return 0
         charge = 0
-        default_plan = cls.objects.filter(is_selected=True, is_gold=True).first()
-        if not default_plan:
-            default_plan = cls.objects.filter(is_gold=True).first()
+        if not default_plan_query:
+            default_plan = cls.objects.filter(is_selected=True, is_gold=True).first()
+            if not default_plan:
+                default_plan = cls.objects.filter(is_gold=True).first()
+        else:
+            default_plan = default_plan_query
         if not default_plan:
             return 0
         amount_obj, percentage_obj = default_plan.get_convenience_object(type)
