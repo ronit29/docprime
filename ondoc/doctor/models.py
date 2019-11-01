@@ -392,7 +392,7 @@ class Hospital(auth_model.TimeStampedModel, auth_model.CreatedByModel, auth_mode
                                                                                          'hosp_locality_entity_dict': hosp_locality_entity_dict,
                                                                                          'new_dynamic_dict': new_dynamic_dict}).data
         for data in result:
-            data['vip_percentage'] = common_hosp_percentage_dict[data.get('id')] if plan else 0
+            data['vip_percentage'] = common_hosp_percentage_dict[data.get('id')] if plan and common_hosp_percentage_dict[data.get('id')]  else 0
 
         return result
         # result = TopHospitalForIpdProcedureSerializer(hosp_queryset, many=True, context={'request': request,
@@ -3809,7 +3809,11 @@ class OpdAppointment(auth_model.TimeStampedModel, CouponsMixin, OpdAppointmentIn
         from ondoc.ratings_review.models import RatingsReview
         appointment_rating = RatingsReview.objects.filter(appointment_id=self.id).first()
         rating = appointment_rating.ratings if appointment_rating else 0
-        avg_rating = self.doctor.rating_data.get('avg_rating', '') if self.doctor else 0
+        if self.doctor and self.doctor.rating_data:
+            avg_rating = self.doctor.rating_data.get('avg_rating', 0)
+        else:
+            avg_rating = 0
+
         if avg_rating is None:
             avg_rating = 0
         unsatisfied_customer = ""

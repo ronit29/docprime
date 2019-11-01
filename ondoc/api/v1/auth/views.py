@@ -1689,6 +1689,7 @@ class HospitalDoctorAppointmentPermissionViewSet(GenericViewSet):
                 lab_dict['id'] = lab.id
                 lab_dict['name'] = lab.name
                 lab_dict['thumbnail'] = lab.get_thumbnail()
+                lab_dict['is_b2b'] = lab.is_b2b
                 partner_labs.append(lab_dict)
             resp_dict['partner_labs'] = partner_labs
             resp.append(resp_dict)
