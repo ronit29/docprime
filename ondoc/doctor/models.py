@@ -3745,8 +3745,11 @@ class OpdAppointment(auth_model.TimeStampedModel, CouponsMixin, OpdAppointmentIn
         #         and self.doctor.is_insurance_enabled and self.hospital.enabled_for_insurance:
         #     return True
 
-        if self.doctor and self.doctor.is_congot_doctor():
+        if self.doctor:
             return False
+
+        # if self.doctor and self.doctor.is_congot_doctor():
+        #     return False
 
         if old_instance.status == OpdAppointment.BOOKED and self.status == OpdAppointment.ACCEPTED \
                 and (self.payment_type == OpdAppointment.PREPAID or self.payment_type == OpdAppointment.COD):
