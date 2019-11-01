@@ -8,7 +8,7 @@ from ondoc.authentication.models import User
 from ondoc.diagnostic.models import LabAppointment
 from ondoc.doctor.models import OpdAppointment
 from ondoc.plus.models import PlusProposer, PlusPlans, PlusThreshold, PlusUser, PlusPlanContent, PlusPlanParameters, \
-    PlusPlanParametersMapping, PlusPlanUtmSources, PlusPlanUtmSourceMapping
+    PlusPlanParametersMapping, PlusPlanUtmSources, PlusPlanUtmSourceMapping, PlusMembers
 from import_export.admin import ImportExportMixin, ImportExportModelAdmin, base_formats
 import nested_admin
 from import_export import fields, resources
@@ -83,19 +83,21 @@ class PlusUserAdminForm(forms.ModelForm):
         if status:
             status = int(status)
 
-        if timezone.now() > self.instance.created_at + timedelta(days=settings.VIP_CANCELLATION_PERIOD):
-            raise forms.ValidationError('Membership can only be cancelled within the period of %d days' % settings.VIP_CANCELLATION_PERIOD)
+        if status != self.instance.status:
 
-        if status != PlusUser.CANCELLED:
-            raise forms.ValidationError('Membership can only be cancelled. Nothing else.')
+            if status == PlusUser.CANCELLED and  timezone.now() > self.instance.created_at + timedelta(days=settings.VIP_CANCELLATION_PERIOD):
+                raise forms.ValidationError('Membership can only be cancelled within the period of %d days' % settings.VIP_CANCELLATION_PERIOD)
 
-        if self.instance.status == PlusUser.CANCELLED:
-            raise forms.ValidationError('Membership is already cancelled. Cannot be changed now.')
+            if status != PlusUser.CANCELLED:
+                raise forms.ValidationError('Membership can only be cancelled. Nothing else.')
 
-        if status == PlusUser.CANCELLED and status != self.instance.status:
-            cancel_dict = self.instance.can_be_cancelled()
-            if not cancel_dict.get('can_be_cancelled', False):
-                raise forms.ValidationError(cancel_dict.get('reason'))
+            if self.instance.status == PlusUser.CANCELLED:
+                raise forms.ValidationError('Membership is already cancelled. Cannot be changed now.')
+
+            if status == PlusUser.CANCELLED and status != self.instance.status:
+                cancel_dict = self.instance.can_be_cancelled()
+                if not cancel_dict.get('can_be_cancelled', False):
+                    raise forms.ValidationError(cancel_dict.get('reason'))
 
         return status
 
@@ -121,5 +123,15 @@ class PlusUserAdmin(admin.ModelAdmin):
     model = PlusUser
     inlines = [PlusOpdAppointmentInline, PlusLabAppointmentInline]
     fields = ("user", "plan", "purchase_date", "expire_date", "status", "matrix_lead_id")
-    readonly_fields = ("user", "plan", "purchase_date", "expire_date", "matrix_lead_id")
+    readonly_fields = ("user", "plan", "purchase_date", "matrix_lead_id")
     list_display = ('user', 'purchase_date')
+
+
+class PlusMemberAdmin(admin.ModelAdmin):
+    model = PlusMembers
+    fields = ("first_name", "last_name", "dob", "email", "relation", "pincode", "address", "gender", "phone_number",
+              "profile", "title", "middle_name", "city", "district", "state", "state_code", "plus_user", "city_code",
+              "district_code", "is_primary_user")
+    readonly_fields = ("relation", "phone_number", "profile", "city", "district", "state", "state_code", "plus_user",
+                       "city_code", "district_code", "is_primary_user")
+    list_display = ("first_name", "last_name", "plus_user", "is_primary_user")
