@@ -836,7 +836,7 @@ class DoctorProfileView(viewsets.GenericViewSet):
 class DoctorProfileUserViewSet(viewsets.GenericViewSet):
 
     def prepare_response(self, response_data, selected_hospital, profile=None, product_id=None, coupon_code=None):
-        import operator 
+        # import operator
         # hospitals = sorted(response_data.get('hospitals'), key=itemgetter("hospital_id"))
         # [d['value'] for d in l if 'value' in d]
         hospital_ids = set(data['hospital_id'] for data in response_data.get('hospitals') if 'hospital_id' in data)
@@ -1015,6 +1015,7 @@ class DoctorProfileUserViewSet(viewsets.GenericViewSet):
         return about_doctor
 
     @transaction.non_atomic_requests
+    @use_slave
     def retrieve_by_url(self, request):
         url = request.GET.get('url')
         if not url:
@@ -1042,6 +1043,7 @@ class DoctorProfileUserViewSet(viewsets.GenericViewSet):
     @transaction.non_atomic_requests
     @use_slave
     def retrieve(self, request, pk, entity=None, *args, **kwargs):
+        from ondoc.procedure.models import PotentialIpdLeadPracticeSpecialization
         serializer = serializers.DoctorDetailsRequestSerializer(data=request.query_params)
         serializer.is_valid(raise_exception=True)
         validated_data = serializer.validated_data
@@ -1091,7 +1093,6 @@ class DoctorProfileUserViewSet(viewsets.GenericViewSet):
         spec_ids = list()
         spec_url_dict = dict()
 
-        from ondoc.procedure.models import PotentialIpdLeadPracticeSpecialization
         all_potential_spec = set(PotentialIpdLeadPracticeSpecialization.objects.all().values_list('practice_specialization', flat=True))
         is_congot = False
 
@@ -1178,7 +1179,7 @@ class DoctorProfileUserViewSet(viewsets.GenericViewSet):
                 lat = hospital.get('lat')
                 long = hospital.get('long')
             else:
-                hospital = doctor.hospitals.all().first()
+                hospital = doctor.hospitals.first()
                 if hospital and hospital.location:
                     lat = hospital.location.coords[1]
                     long = hospital.location.coords[0]
