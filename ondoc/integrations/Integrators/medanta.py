@@ -171,14 +171,14 @@ class Medanta(BaseIntegrator):
             status_code = response.status_code
             if response.status_code != status.HTTP_200_OK or not response.ok:
                 h_status = IntegratorHistory.NOT_PUSHED
-                IntegratorHistory.create_history(appointment, '', response, url, 'post_order', 'Sims', status_code,
+                IntegratorHistory.create_history(appointment, '', response, url, 'post_order', 'Medanta', status_code,
                                                  retry_count, h_status, '')
                 logger.error("[ERROR-MEDANTA] Failed to push appointment - %s", response.json())
                 return None
             else:
                 response = response.json()
                 h_status = IntegratorHistory.PUSHED_AND_NOT_ACCEPTED
-                IntegratorHistory.create_history(appointment, '', response, url, 'post_order', 'Sims', status_code,
+                IntegratorHistory.create_history(appointment, '', response, url, 'post_order', 'Medanta', status_code,
                                                  retry_count, h_status, '')
                 return response
 

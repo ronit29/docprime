@@ -274,10 +274,10 @@ class LabList(viewsets.ReadOnlyModelViewSet):
 
         utm_available = False
         salespoint_query = ""
-        utm_source = request.query_params.get('UtmSource')
+        utm_source = request.query_params.get('utm_source')
         if utm_source and SalesPoint.is_affiliate_available(utm_source):
             utm_available = True
-            salespoint_obj = SalesPoint.get_salespoint_via_code(request.query_params.get('UtmSource'))
+            salespoint_obj = SalesPoint.get_salespoint_via_code(request.query_params.get('utm_source'))
             salespoint_query = ' INNER JOIN "salespoint_test_mapping" ON ("available_lab_test"."id" = "salespoint_test_mapping"."available_tests_id")'
 
 
@@ -568,9 +568,9 @@ class LabList(viewsets.ReadOnlyModelViewSet):
 
         package_free_or_not_dict = get_package_free_or_not_dict(request)
 
-        utm_source = request.query_params.get('UtmSource')
+        utm_source = request.query_params.get('utm_source')
         if utm_source and SalesPoint.is_affiliate_available(utm_source):
-            salespoint_obj = SalesPoint.get_salespoint_via_code(request.query_params.get('UtmSource'))
+            salespoint_obj = SalesPoint.get_salespoint_via_code(request.query_params.get('utm_source'))
 
             main_queryset = LabTest.objects.prefetch_related('test', 'test__recommended_categories',
                                                              'test__parameter', 'categories',
