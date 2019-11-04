@@ -305,12 +305,13 @@ class Thyrocare(BaseIntegrator):
         from ondoc.integrations.models import IntegratorResponse, IntegratorReport
 
         # Save reports URL
-        obj, created = IntegratorReport.objects.get_or_create(integrator_response_id=integrator_response.id, pdf_url=result["pdf"], xml_url=result["xml"])
+        if result.get('pdf', '') and result.get('xml', ''):
+            obj, created = IntegratorReport.objects.get_or_create(integrator_response_id=integrator_response.id, pdf_url=result["pdf"], xml_url=result["xml"])
 
-        # Update integrator response when both type of report present
-        if obj.pdf_url and obj.xml_url:
-            cls.upload_report(obj)
-            IntegratorResponse.objects.filter(pk=integrator_response.pk).update(report_received=True)
+            # Update integrator response when both type of report present
+            if obj.pdf_url and obj.xml_url:
+                cls.upload_report(obj)
+                IntegratorResponse.objects.filter(pk=integrator_response.pk).update(report_received=True)
 
     @classmethod
     def upload_report(cls, report):
