@@ -66,31 +66,31 @@ class DoctorURL():
             query = q1 % (start, start + self.step, int(settings.DOCTORS_COUNT))
             doctor_spec_data = RawSql(query, []).fetch_all()
             if doctor_spec_data:
-                doctor_ids = (data.get('doctor_id') for data in doctor_spec_data)
+                doctor_ids = (data.get('doctor_id', None) for data in doctor_spec_data)
                 doc_loc_obj = Doctor.objects.prefetch_related('doctor_clinics', 'doctor_clinics__hospital').filter(id__in=doctor_ids)
 
                 doc_loc_dict = dict()
                 for doc in doc_loc_obj:
                     hospital = doc.doctor_clinics.all()[0].hospital if doc.doctor_clinics.all() else None
-                    if hospital and not doc_loc_dict.get(hospital.id):
+                    if hospital and not doc_loc_dict.get(hospital.id, None):
                         doc_loc_dict[doc.id] = hospital.location
 
                 for data in doctor_spec_data:
-                    location = doc_loc_dict.get(data.get('doctor_id'))
+                    location = doc_loc_dict.get(data.get('doctor_id', None))
                     if location:
                         url_data = {}
-                        url_data['is_valid'] = data.get('is_valid')
-                        url_data['url_type'] = data.get('url_type')
-                        url_data['entity_type'] = data.get('entity_type')
-                        url_data['count'] = data.get('count')
-                        url_data['bookable_doctors_count'] = data.get('bookable_doctors_count')
+                        url_data['is_valid'] = data.get('is_valid', None)
+                        url_data['url_type'] = data.get('url_type', None)
+                        url_data['entity_type'] = data.get('entity_type', None)
+                        url_data['count'] = data.get('count', None)
+                        url_data['bookable_doctors_count'] = data.get('bookable_doctors_count', None)
                         url_data['locality_latitude'] = location.y
                         url_data['locality_longitude'] = location.x
                         url_data['location'] = location
                         url_data['locality_location'] = location
-                        url_data['locality_value'] = data.get('locality_value')
+                        url_data['locality_value'] = data.get('locality_value', None)
                         url_data['sitemap_identifier'] = 'DOCTORS_CITY'
-                        url_data['url'] = slugify('doctors-in-' + data.get('locality_value') + '-sptcit')
+                        url_data['url'] = slugify('doctors-in-' + data.get('locality_value', None) + '-sptcit')
                         to_create.append(TempURL(**url_data))
 
                         url_data['sitemap_identifier'] = 'SPECIALIZATION_CITY'
