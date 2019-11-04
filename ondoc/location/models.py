@@ -1266,18 +1266,18 @@ class EntityUrls(TimeStampedModel):
             query = lab_search_query % (start, start + step, int(settings.LAB_COUNT))
             lab_data = RawSql(query, []).fetch_all()
             if lab_data:
-                lab_ids = [data.get('lab_id') for data in lab_data]
+                lab_ids = [data.get('lab_id', None) for data in lab_data]
                 from ondoc.diagnostic.models import Lab
                 lab_loc_map = Lab.objects.filter(id__in=lab_ids).values('id', 'location')
 
                 to_create = []
                 lab_loc_dict = dict()
                 for data in lab_loc_map:
-                    if not lab_loc_dict.get(data.get('id')):
-                        lab_loc_dict[data.get('id')] = data.get('location')
+                    if not lab_loc_dict.get(data.get('id', None)):
+                        lab_loc_dict[data.get('id')] = data.get('location', None)
 
                 for data in lab_data:
-                    location = lab_loc_dict[data.get('lab_id')]
+                    location = lab_loc_dict[data.get('lab_id', None)]
                     if location:
                         url_data = {}
                         url_data['is_valid'] = data.get('is_valid')
