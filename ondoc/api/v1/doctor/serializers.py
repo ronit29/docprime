@@ -837,6 +837,7 @@ class HospitalModelSerializer(serializers.ModelSerializer):
     address = serializers.SerializerMethodField()
     matrix_city = serializers.SerializerMethodField()
     logo = serializers.SerializerMethodField()
+    url = serializers.SerializerMethodField()
 
     def get_address(self, obj):
         return obj.get_hos_address() if obj.get_hos_address() else None
@@ -874,10 +875,14 @@ class HospitalModelSerializer(serializers.ModelSerializer):
                         return request.build_absolute_uri(document.name.url) if document.name else None
         return None
 
+    def get_url(self, obj):
+        entity_url = self.context.get('hosp_entity_dict', {})
+        return entity_url.get(obj.id)
+
     class Meta:
         model = Hospital
         fields = ('id', 'name', 'operational_since', 'lat', 'long', 'address', 'registration_number',
-                  'building', 'sublocality', 'locality', 'city', 'hospital_thumbnail', 'matrix_city', 'logo' )
+                  'building', 'sublocality', 'locality', 'city', 'hospital_thumbnail', 'matrix_city', 'logo', 'url')
 
 
 class DoctorHospitalScheduleSerializer(serializers.ModelSerializer):

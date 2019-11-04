@@ -75,7 +75,7 @@ DATABASES = {
 }
 DATABASES['default']['ENGINE'] = 'django.contrib.gis.db.backends.postgis'
 
-if env('DJANGO_SETTINGS_MODULE')=='config.settings.production':
+if(env('DJANGO_SETTINGS_MODULE')=='config.settings.production'):
     DATABASES['slave'] = env.db('SLAVE_DATABASE_URL') if env.db('SLAVE_DATABASE_URL') else env.db('DATABASE_URL')
     DATABASES['slave']['ENGINE'] = 'django.contrib.gis.db.backends.postgis'
 

@@ -43,7 +43,7 @@ from ondoc.diagnostic.models import (Lab, LabTiming, LabImage, GenericLabAdmin,
                                      CommonPackage, LabTestCategory, LabTestCategoryMapping,
                                      LabTestRecommendedCategoryMapping, QuestionAnswer, FrequentlyAddedTogetherTests,
                                      LabTestGroup, LabTestGroupMapping, LabTestGroupTiming, LabTestCategoryLandingURLS,
-                                     LabTestCategoryUrls, LabTestThresholds)
+                                     LabTestCategoryUrls, LabTestThresholds, AvailableLabTest)
 
 from ondoc.insurance.models import (Insurer, InsurancePlans, InsuranceThreshold, InsuranceCity, StateGSTCode,
                                     InsuranceDistrict, InsuranceTransaction, InsuranceDeal, InsuranceDisease,
@@ -54,7 +54,7 @@ from ondoc.insurance.models import (Insurer, InsurancePlans, InsuranceThreshold,
                                     UserBank, UserBankDocument, InsurerAccountTransfer, BankHolidays)
 from ondoc.notification.models import DynamicTemplates
 from ondoc.plus.models import PlusPlans, PlusPlanParameters, PlusProposer, PlusPlanParametersMapping, PlusPlanContent, \
-    PlusPlanUtmSources, PlusPlanUtmSourceMapping
+    PlusPlanUtmSources, PlusPlanUtmSourceMapping, PlusMembers
 
 from ondoc.procedure.models import Procedure, ProcedureCategory, CommonProcedureCategory, DoctorClinicProcedure, \
     ProcedureCategoryMapping, ProcedureToCategoryMapping, CommonProcedure, IpdProcedure, IpdProcedureFeatureMapping, \
@@ -63,6 +63,8 @@ from ondoc.procedure.models import Procedure, ProcedureCategory, CommonProcedure
     IpdProcedurePracticeSpecialization, IpdProcedureLead, Offer, PotentialIpdLeadPracticeSpecialization, \
     IpdCostEstimateRoomType, IpdProcedureCostEstimate, \
     IpdCostEstimateRoomTypeMapping, IpdProcedureLeadCostEstimateMapping, UploadCostEstimateData, PotentialIpdCity
+from ondoc.provider.models import PartnerLabSamplesCollectOrder, PartnerLabTestSampleDetails, PartnerLabTestSamples, \
+    TestSamplesLabAlerts
 from ondoc.reports import models as report_models
 from ondoc.prescription.models import AppointmentPrescription
 
@@ -191,7 +193,9 @@ class Command(BaseCommand):
                                                            Qualification, Specialization, Language, MedicalService,
                                                            College, SpecializationDepartment,
                                                            SpecializationField,
-                                                           SpecializationDepartmentMapping, UploadDoctorData, Remark
+                                                           SpecializationDepartmentMapping, UploadDoctorData, Remark,
+                                                           PartnerLabSamplesCollectOrder, PartnerLabTestSampleDetails,
+                                                           PartnerLabTestSamples, TestSamplesLabAlerts, AvailableLabTest
                                                            )
 
         for cl, ct in content_types.items():
@@ -290,7 +294,8 @@ class Command(BaseCommand):
             SpecializationField, SpecializationDepartment, SpecializationDepartmentMapping,
             Procedure, ProcedureCategory, CommonProcedureCategory,
             ProcedureToCategoryMapping, ProcedureCategoryMapping, LabTestCategory, Merchant, CancellationReason, UploadDoctorData,
-            LabTestGroup, LabTestGroupMapping
+            LabTestGroup, LabTestGroupMapping, PartnerLabSamplesCollectOrder, PartnerLabTestSampleDetails,
+            PartnerLabTestSamples, TestSamplesLabAlerts, AvailableLabTest
         )
 
         for cl, ct in content_types.items():

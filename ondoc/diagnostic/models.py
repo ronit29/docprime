@@ -3004,6 +3004,9 @@ class LabAppointment(TimeStampedModel, CouponsMixin, LabAppointmentInvoiceMixin,
         location_verified = self.lab.is_location_verified
         provider_id = self.lab.id
         merchant = self.lab.merchant.all().last()
+        if not merchant:
+            merchant = self.lab.network.merchant.all().last()
+
         if merchant:
             merchant_code = merchant.id
 
@@ -3042,6 +3045,23 @@ class LabAppointment(TimeStampedModel, CouponsMixin, LabAppointmentInvoiceMixin,
         user_insurance = self.insurance
         mobile_list = self.get_matrix_spoc_data()
         refund_data = self.refund_details_data()
+
+        from ondoc.ratings_review.models import RatingsReview
+        appointment_rating = RatingsReview.objects.filter(appointment_id=self.id).first()
+        rating = appointment_rating.ratings if appointment_rating else 0
+        if self.lab and self.lab.rating_data:
+            avg_rating = self.lab.rating_data.get('avg_rating', 0)
+        else:
+            avg_rating = 0
+
+        if avg_rating is None:
+            avg_rating = 0
+        unsatisfied_customer = ""
+        if rating and rating > 0:
+            if rating < 3:
+                unsatisfied_customer = 'Yes'
+            else:
+                unsatisfied_customer = 'No'
 
         insurance_link = None
         if user_insurance:
@@ -3100,7 +3120,10 @@ class LabAppointment(TimeStampedModel, CouponsMixin, LabAppointmentInvoiceMixin,
             "RefundToWallet": float(refund_data['promotional_wallet_refund']) if refund_data['promotional_wallet_refund'] else None,
             "RefundInitiationDate": int(refund_data['refund_initiated_at']) if refund_data['refund_initiated_at'] else None,
             "RefundURN": refund_data['refund_urn'],
-            "HospitalName": hospital_name
+            "HospitalName": hospital_name,
+            "Rating": rating,
+            "AvgRating": avg_rating,
+            "UnsatisfiedCustomer": unsatisfied_customer
         }
         return appointment_details
 

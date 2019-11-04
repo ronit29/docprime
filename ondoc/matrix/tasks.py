@@ -782,7 +782,8 @@ def create_or_update_lead_on_matrix(self, data):
         else:
             resp_data = response.json()
             if not (resp_data.get('Id', None) or resp_data.get('IsSaved', False)):
-                logger.error("[ERROR] ID not received from the matrix while creating lead for {} with ID {}. ".format(obj_type, obj_id)+json.dumps(request_data))
+                return
+                # logger.error("[ERROR] ID not received from the matrix while creating lead for {} with ID {}. ".format(obj_type, obj_id)+json.dumps(request_data))
                 # raise Exception("[ERROR] ID not received from the matrix while creating lead for {} with ID {}.")
 
             # save the order with the matrix lead id.

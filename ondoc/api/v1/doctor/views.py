@@ -1832,8 +1832,11 @@ class DoctorListViewSet(viewsets.GenericViewSet):
             query_string = doctor_search_helper.prepare_raw_query(filtering_params,
                                                                   order_by_field, rank_by)
             query_string['query'] = paginate_raw_query(request, query_string['query'])
-            doctor_search_result = RawSql(query_string.get('query'),
-                                         query_string.get('params'), (DatabaseInfo.SLAVE if settings.USE_SLAVE_DB else DatabaseInfo.DEFAULT)).fetch_all()
+            db = DatabaseInfo.DEFAULT
+            if settings.USE_SLAVE_DB:
+                db = DatabaseInfo.SLAVE
+
+            doctor_search_result = RawSql(query_string.get('query'), query_string.get('params'), db).fetch_all()
 
             if doctor_search_result:
                 result_count = doctor_search_result[0]['result_count']
@@ -2394,8 +2397,12 @@ class DoctorListViewSet(viewsets.GenericViewSet):
 
         query_string = doctor_search_helper.prepare_raw_query(filtering_params,
                                                               order_by_field, rank_by, page)
+        db = DatabaseInfo.DEFAULT
+        if settings.USE_SLAVE_DB:
+            db = DatabaseInfo.SLAVE
+
         doctor_search_result = RawSql(query_string.get('query'),
-                                      query_string.get('params'), DatabaseInfo.SLAVE).fetch_all()
+                                      query_string.get('params'), db).fetch_all()
 
         result_count = 0
         if len(doctor_search_result)>0:
@@ -4588,11 +4595,13 @@ class HospitalViewSet(viewsets.GenericViewSet):
 
     @use_slave
     def near_you_hospitals(self, request):
+        return Response({})
         request_data = request.query_params
         serializer = serializers.HospitalNearYouSerializer(data=request_data)
         serializer.is_valid(raise_exception=True)
         validated_data = serializer.validated_data
         result_count = 0
+        hospital_serializer = None
         if validated_data and validated_data.get('long') and validated_data.get('lat'):
             point_string = 'POINT(' + str(validated_data.get('long')) + ' ' + str(validated_data.get('lat')) + ')'
             pnt = GEOSGeometry(point_string, srid=4326)
@@ -4615,6 +4624,13 @@ class HospitalViewSet(viewsets.GenericViewSet):
                 hospital_queryset = hospital_queryset.filter(enabled_for_prepaid=True)
 
             result_count = hospital_queryset.count()
+
+            temp_hospital_ids = hospital_queryset.values_list('id', flat=True)
+            hosp_entity_dict, hosp_locality_entity_dict = Hospital.get_hosp_and_locality_dict(temp_hospital_ids,
+                                                                                              EntityUrls.SitemapIdentifier.HOSPITALS_LOCALITY_CITY)
+
+            hospital_serializer = serializers.HospitalModelSerializer(hospital_queryset, many=True, context={'request': request,
+                                                                                         'hosp_entity_dict': hosp_entity_dict})
             hospital_percentage_dict = dict()
 
             plan = PlusPlans.objects.filter(is_gold=True, is_selected=True).first()
@@ -4636,11 +4652,11 @@ class HospitalViewSet(viewsets.GenericViewSet):
                                 percentage = max(((mrp-(agreed_price + plan.get_convenience_amount(agreed_price, convenience_amount_obj, convenience_percentage_obj)))/mrp)*100, percentage)
                     hospital_percentage_dict[hospital.id] = round(percentage, 2)
 
-            hospital_serializer = serializers.HospitalModelSerializer(hospital_queryset, many=True,
-                                                                      context={"request": request})
+            # hospital_serializer = serializers.HospitalModelSerializer(hospital_queryset, many=True,
+            #                                                           context={"request": request})
             hospitals_result = hospital_serializer.data
             for data in hospitals_result:
-                data['vip_percentage'] = hospital_percentage_dict[data.get('id')] if plan else 0
+                data['vip_percentage'] = hospital_percentage_dict[data.get('id')] if plan and hospital_percentage_dict.get(data.get('id')) else 0
 
             return Response({'count': result_count, 'hospitals': hospitals_result})
         return Response({})
