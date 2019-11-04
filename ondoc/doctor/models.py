@@ -3812,7 +3812,11 @@ class OpdAppointment(auth_model.TimeStampedModel, CouponsMixin, OpdAppointmentIn
         from ondoc.ratings_review.models import RatingsReview
         appointment_rating = RatingsReview.objects.filter(appointment_id=self.id).first()
         rating = appointment_rating.ratings if appointment_rating else 0
-        avg_rating = self.doctor.rating_data.get('avg_rating', '') if self.doctor else 0
+        if self.doctor and self.doctor.rating_data:
+            avg_rating = self.doctor.rating_data.get('avg_rating', 0)
+        else:
+            avg_rating = 0
+
         if avg_rating is None:
             avg_rating = 0
         unsatisfied_customer = ""
