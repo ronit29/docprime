@@ -17,7 +17,7 @@ def map_lab_location_urls():
 
     all_labs = Lab.objects.filter(is_live=True).all().annotate(distance=Distance('location', Point(float(77.0694707),float(28.4502948), srid=4326))).order_by('distance')
     for lab in all_labs:
-        to_create.append(LabPageUrl.create_lab_page_urls(lab, sequence, cache))
+        to_create.append(LabPageUrl.create_page_urls(lab, sequence, cache))
 
     EntityUrls.objects.bulk_create(to_create)
     print("lab page urls created")
