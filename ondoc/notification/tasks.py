@@ -855,7 +855,7 @@ def offline_appointment_reminder_sms_patient(appointment_id, time_slot_start_tim
             #                                                previous_appointment_date_time,
             #                                                str(math.floor(instance.time_slot_start.timestamp()))))
             return
-        receivers = {'sms_receivers': [{"user": None, "phone_number": number}]}
+        receivers = [{"user": None, "phone_number": number}]
         offline_opd_comm_obj = OfflineOpdAppointments(appointment=instance,
                                                       notification_type=NotificationAction.OFFLINE_APPOINTMENT_REMINDER_PROVIDER_SMS,
                                                       receivers=receivers)
