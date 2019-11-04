@@ -583,6 +583,7 @@ class DoctorSearchHelper:
             doctor_clinics = [doctor_clinic for doctor_clinic in doctor.doctor_clinics.all() if
                               doctor_clinic.hospital_id == doctor_clinic_mapping[doctor_clinic.doctor_id]]
             doctor_clinic = doctor_clinics[0]
+            # As per the discussion with Ashish Sir, we are taking max length of 12 characters for locality in search result
             if doctor_clinic and doctor_clinic.hospital and len(doctor_clinic.hospital.locality)>12:
                 continue
             filtered_insurance_fees, filtered_cod_deal_price, filtered_deal_price, filtered_mrp = self.get_doctor_fees(doctor_clinic, doctor_availability_mapping)
