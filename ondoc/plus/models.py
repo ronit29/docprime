@@ -187,17 +187,31 @@ class PlusPlans(auth_model.TimeStampedModel, LiveMixin):
             return convenience_amount
 
     def get_convenience_object(self, type):
-        charge = 0
+        string = ''
         if type == "DOCTOR":
-            convenience_amount_obj = self.plan_parameters.filter(parameter__key='DOCTOR_CONVENIENCE_AMOUNT').first()
-            convenience_percentage_obj = self.plan_parameters.filter(parameter__key='DOCTOR_CONVENIENCE_PERCENTAGE').first()
-            return convenience_amount_obj, convenience_percentage_obj
-        elif type == "LABTEST":
-            convenience_amount_obj = self.plan_parameters.filter(parameter__key='LAB_CONVENIENCE_AMOUNT').first()
-            convenience_percentage_obj = self.plan_parameters.filter(parameter__key='LAB_CONVENIENCE_PERCENTAGE').first()
-            return convenience_amount_obj, convenience_percentage_obj
+            string = 'DOCTOR'
         else:
-            return None, None
+            string = 'LAB'
+        # if type == "DOCTOR":
+        #     convenience_amount_obj = self.plan_parameters.filter(parameter__key='DOCTOR_CONVENIENCE_AMOUNT').first()
+        #     convenience_percentage_obj = self.plan_parameters.filter(parameter__key='DOCTOR_CONVENIENCE_PERCENTAGE').first()
+        #     return convenience_amount_obj, convenience_percentage_obj
+        # elif type == "LABTEST":
+        #     convenience_amount_obj = self.plan_parameters.filter(parameter__key='LAB_CONVENIENCE_AMOUNT').first()
+        #     convenience_percentage_obj = self.plan_parameters.filter(parameter__key='LAB_CONVENIENCE_PERCENTAGE').first()
+        #     return convenience_amount_obj, convenience_percentage_obj
+        convenience_amount_obj = None
+        convenience_percentage_obj = None
+        for param in self.plan_parameters.all():
+            if param.parameter and param.parameter.key:
+                if param.parameter.key == (string + '_CONVENIENCE_AMOUNT'):
+                    convenience_amount_obj = param
+                if param.parameter.key == (string + '_CONVENIENCE_PERCENTAGE'):
+                    convenience_percentage_obj = param
+            if convenience_percentage_obj and convenience_amount_obj:
+                return convenience_amount_obj, convenience_percentage_obj
+
+        return None, None
 
     def get_convenience_amount(self, price, convenience_amount_obj, convenience_percentage_obj):
         if not price or price <= 0:

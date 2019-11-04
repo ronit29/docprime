@@ -1480,9 +1480,9 @@ class DoctorProfileUserViewSerializer(DoctorProfileSerializer):
         self.context['ins_threshold_amount'] = insurance_threshold_amount
         search_criteria_query = SearchCriteria.objects.filter(search_key='is_gold').first()
         self.context['search_query'] = search_criteria_query
-        default_plan = PlusPlans.objects.filter(is_selected=True, is_gold=True).first()
+        default_plan = PlusPlans.objects.prefetch_related('plan_parameters', 'plan_parameters__parameter').filter(is_selected=True, is_gold=True).first()
         if not default_plan:
-            default_plan = PlusPlans.objects.filter(is_gold=True).first()
+            default_plan = PlusPlans.objects.prefetch_related('plan_parameters', 'plan_parameters__parameter').filter(is_gold=True).first()
         self.context['default_plan'] = default_plan
 
         if obj:
