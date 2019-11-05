@@ -916,3 +916,13 @@ class SearchCriteria(auth_model.TimeStampedModel):
             super(SearchCriteria, self).save(*args, **kwargs)
         else:
             super(SearchCriteria, self).save(*args, **kwargs)
+
+
+class Certifications(auth_model.TimeStampedModel):
+    name = models.CharField(max_length=200)
+
+    class Meta:
+        db_table = 'certifications'
+
+    def __str__(self):
+        return self.name

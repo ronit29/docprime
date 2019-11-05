@@ -358,6 +358,8 @@ class LabCertificationInline(admin.TabularInline):
     extra = 0
     can_delete = True
     show_change_link = False
+    fields = ['certification']
+    search_fields = ['certification']
 
 
 class LabForm(FormCleanMixin):

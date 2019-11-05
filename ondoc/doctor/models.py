@@ -55,7 +55,7 @@ from ondoc.api.v1.utils import get_start_end_datetime, custom_form_datetime, Cou
     form_time_slot, util_absolute_url, html_to_pdf, TimeSlotExtraction, resolve_address, generate_short_url
 from ondoc.common.models import AppointmentHistory, AppointmentMaskNumber, Service, Remark, MatrixMappedState, \
     MatrixMappedCity, GlobalNonBookable, SyncBookingAnalytics, CompletedBreakupMixin, RefundDetails, TdsDeductionMixin, \
-    Documents, MerchantPayoutMixin, Fraud
+    Documents, MerchantPayoutMixin, Fraud, Certifications
 from ondoc.common.models import QRCode, MatrixDataMixin
 from functools import reduce
 from operator import or_
@@ -834,6 +834,7 @@ class HospitalAccreditation(auth_model.TimeStampedModel):
 class HospitalCertification(auth_model.TimeStampedModel):
     hospital = models.ForeignKey(Hospital, on_delete=models.CASCADE)
     name = models.CharField(max_length=200)
+    certification = models.ForeignKey(Certifications, on_delete=models.DO_NOTHING, null=True, blank=True, related_name='hospital_certifications')
 
     def __str__(self):
         return self.hospital.name + " (" + self.name + ")"
@@ -2271,6 +2272,7 @@ class HospitalNetworkDocument(auth_model.TimeStampedModel, auth_model.Document):
 class HospitalNetworkCertification(auth_model.TimeStampedModel):
     network = models.ForeignKey(HospitalNetwork, on_delete=models.CASCADE)
     name = models.CharField(max_length=200)
+    certification = models.ForeignKey(Certifications, on_delete=models.DO_NOTHING, null=True, blank=True, related_name='hospital_network_certifications')
 
     def __str__(self):
         return self.name

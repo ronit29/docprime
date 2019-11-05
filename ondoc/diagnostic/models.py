@@ -64,7 +64,7 @@ from ondoc.ratings_review import models as ratings_models
 # from ondoc.api.v1.common import serializers as common_serializers
 from ondoc.common.models import AppointmentHistory, AppointmentMaskNumber, Remark, GlobalNonBookable, \
     SyncBookingAnalytics, CompletedBreakupMixin, RefundDetails, MatrixMappedState, \
-    MatrixMappedCity, TdsDeductionMixin, MatrixDataMixin, MerchantPayoutMixin, Fraud, SearchCriteria
+    MatrixMappedCity, TdsDeductionMixin, MatrixDataMixin, MerchantPayoutMixin, Fraud, SearchCriteria, Certifications
 import reversion
 from decimal import Decimal
 from django.utils.text import slugify
@@ -833,6 +833,7 @@ class Lab(TimeStampedModel, CreatedByModel, QCModel, SearchKey, WelcomeCallingDo
 class LabCertification(TimeStampedModel):
     lab = models.ForeignKey(Lab, related_name = 'lab_certificate', on_delete=models.CASCADE)
     name = models.CharField(max_length=200)
+    certification = models.ForeignKey(Certifications, on_delete=models.DO_NOTHING, null=True, blank=True, related_name='lab_certifications')
 
     def __str__(self):
         return self.name
@@ -1107,6 +1108,7 @@ class LabNetwork(TimeStampedModel, CreatedByModel, QCModel):
 class LabNetworkCertification(TimeStampedModel):
     network = models.ForeignKey(LabNetwork, on_delete=models.CASCADE)
     name = models.CharField(max_length=200)
+    certification = models.ForeignKey(Certifications, on_delete=models.DO_NOTHING, null=True, blank=True, related_name='lab_network_certifications')
 
     def __str__(self):
         return self.network.name + " (" + self.name + ")"
