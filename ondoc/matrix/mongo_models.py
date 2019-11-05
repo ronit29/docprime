@@ -45,7 +45,7 @@ class MatrixLog(DynamicDocument, TimeStampedModel):
             product_type = 3
 
         matrix_log_obj = cls(object_id=object_id, content_type_id=content_type_id, product_type=product_type,
-                             request_payload=request_payload, request_response=request_response,
+                             request_payload=str(request_payload), request_response=str(request_response),
                              originating_source=originating_source)
 
         matrix_log_obj.save()
