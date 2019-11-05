@@ -1,3 +1,4 @@
+from django.conf import settings
 from django.db.models import Prefetch
 from collections import OrderedDict
 from django.template.defaultfilters import slugify
@@ -23,11 +24,260 @@ class DoctorURL():
         self.max_ea = ea_limit[0]['max']
         self.step = 2000
 
-    def create(self):        
-        self.create_search_urls()
-        self.create_doctor_page_urls()        
-        self.update_breadcrumbs()
+    def create(self):
+        self.create_search_urls_new()
+        # self.create_search_urls()
+        self.create_doc_page_urls_with_hosp_details()
+        self.update_breadcrumbs_without_dist_filter()
+        # self.create_doctor_page_urls()
+        # self.update_breadcrumbs()
         self.insert_search_urls()
+
+    def create_search_urls_new(self):
+
+        q1 = ''' select specialization_id, specialization, doctor_id, sublocality_value,
+                locality_value, count, entity_type, url_type, is_valid, bookable_doctors_count from ( 
+                select specialization_id, specialization, ROW_NUMBER() OVER (PARTITION BY doc_spec_id) AS row_num, doctor_id, sublocality_value,
+                locality_value, count, entity_type, url_type, is_valid, 
+                json_build_object('bookable_doctors_count',bookable_doctors_count,'bookable_doctors_2km',bookable_doctors_2km)
+                as bookable_doctors_count from (                    
+                select  max(dps.id) as doc_spec_id, dps.specialization_id, max(spec.name) as specialization, max(d.id) as doctor_id,
+                max(h.locality) as sublocality_value, max(h.city) as locality_value, count(distinct d.id) count, ea.centroid,
+                COUNT(DISTINCT CASE WHEN d.enabled_for_online_booking=True and dc.enabled_for_online_booking=True
+                and h.enabled_for_online_booking=True then d.id else null END) as bookable_doctors_count,
+                COUNT(DISTINCT CASE WHEN d.enabled_for_online_booking=True and dc.enabled_for_online_booking=True
+                and h.enabled_for_online_booking=True 
+                and ST_DWithin(ea.centroid::geography,h.location::geography,2000)then d.id else null end) as bookable_doctors_2km,
+                'Doctor' as entity_type, 'SEARCHURL' url_type, True as is_valid
+                from entity_address ea inner join hospital h on ((ea.type = 'LOCALITY' and lower(h.city)=lower(ea.alternative_value) and 
+                ST_DWithin(ea.centroid::geography,h.location::geography,h.search_url_locality_radius)) OR 
+                (ea.type = 'SUBLOCALITY' and lower(h.locality)=lower(ea.alternative_value) and ST_DWithin(ea.centroid::geography,h.location::geography,h.search_url_sublocality_radius))) and h.is_live=true
+                and ea.type IN ('SUBLOCALITY' , 'LOCALITY') and ea.use_in_url=true 
+                inner join doctor_clinic dc on dc.hospital_id = h.id 
+                and dc.enabled=true inner join doctor d on dc.doctor_id= d.id and d.is_live=true
+                inner join doctor_practice_specialization dps on dps.doctor_id = d.id 
+                inner join practice_specialization spec on spec.id=dps.specialization_id
+                where ea.id>=%d and ea.id<%d
+                group by dps.specialization_id, ea.id having count(distinct d.id)>= %d) a)b  where row_num=1 '''
+
+        start = self.min_ea
+        to_create = []
+        while start < self.max_ea:
+            query = q1 % (start, start + self.step, int(settings.DOCTORS_COUNT))
+            doctor_spec_data = RawSql(query, []).fetch_all()
+            if doctor_spec_data:
+                doctor_ids = (data.get('doctor_id', None) for data in doctor_spec_data)
+                doc_loc_obj = Doctor.objects.prefetch_related('doctor_clinics', 'doctor_clinics__hospital').filter(id__in=doctor_ids)
+
+                doc_loc_dict = dict()
+                for doc in doc_loc_obj:
+                    hospital = doc.doctor_clinics.all()[0].hospital if doc.doctor_clinics.all() else None
+                    if hospital and not doc_loc_dict.get(hospital.id, None):
+                        doc_loc_dict[doc.id] = hospital.location
+
+                for data in doctor_spec_data:
+                    location = doc_loc_dict.get(data.get('doctor_id', None))
+                    if location:
+                        url_data = {}
+                        url_data['is_valid'] = data.get('is_valid', None)
+                        url_data['url_type'] = data.get('url_type', None)
+                        url_data['entity_type'] = data.get('entity_type', None)
+                        url_data['count'] = data.get('count', None)
+                        url_data['bookable_doctors_count'] = data.get('bookable_doctors_count', None)
+                        url_data['locality_latitude'] = location.y
+                        url_data['locality_longitude'] = location.x
+                        url_data['location'] = location
+                        url_data['locality_location'] = location
+                        url_data['locality_value'] = data.get('locality_value', None)
+                        url_data['sitemap_identifier'] = 'DOCTORS_CITY'
+                        url_data['url'] = slugify('doctors-in-' + data.get('locality_value', None) + '-sptcit')
+                        to_create.append(TempURL(**url_data))
+
+                        url_data['sitemap_identifier'] = 'SPECIALIZATION_CITY'
+                        url_data['specialization'] = data.get('specialization')
+                        url_data['specialization_id'] = data.get('specialization_id')
+
+                        url_data['url'] = slugify(data.get('specialization') + '-in-' + data.get('locality_value') + '-sptcit')
+                        to_create.append(TempURL(**url_data))
+
+                        url_data['sitemap_identifier'] = 'SPECIALIZATION_LOCALITY_CITY'
+                        url_data['sublocality_value'] = data.get('sublocality_value')
+                        url_data['sublocality_latitude'] = location.y
+                        url_data['sublocality_longitude'] = location.x
+                        url_data['sublocality_location'] = location
+                        url_data['url'] = slugify(data.get('specialization') + '-in-' + data.get('sublocality_value') + '-' + data.get('locality_value') + '-sptlitcit')
+                        to_create.append(TempURL(**url_data))
+
+                        url_data['sitemap_identifier'] = 'DOCTORS_LOCALITY_CITY'
+                        url_data['specialization'] = None
+                        url_data['specialization_id'] = None
+                        url_data['url'] = slugify('doctors-in-' + data.get('sublocality_value') + '-' +  data.get('locality_value') + '-sptlitcit')
+
+                        to_create.append(TempURL(**url_data))
+            start = start + self.step
+
+        TempURL.objects.bulk_create(to_create)
+
+        update_spec_extras_query = '''update  temp_url 
+                          set extras = case when sitemap_identifier='SPECIALIZATION_CITY' then
+                           json_build_object('specialization_id', specialization_id, 'location_json',
+                           json_build_object('locality_id', locality_id, 'locality_value', locality_value, 'locality_latitude', 
+                           locality_latitude,'locality_longitude', locality_longitude), 'specialization', specialization)
+
+                          else  json_build_object('specialization_id', specialization_id,'location_json',
+                          json_build_object('sublocality_id',sublocality_id,'sublocality_value',sublocality_value,
+                           'locality_id', locality_id, 'locality_value', locality_value,
+                           'breadcrum_url',slugify_url(specialization || '-in-' || locality_value ||'-sptcit'),
+                          'sublocality_latitude',sublocality_latitude, 'sublocality_longitude',sublocality_longitude, 
+                          'locality_latitude',locality_latitude,'locality_longitude',locality_longitude),'specialization', specialization) end
+                          where sitemap_identifier in ('SPECIALIZATION_LOCALITY_CITY','SPECIALIZATION_CITY')'''
+        update_spec_extras = RawSql(update_spec_extras_query, []).execute()
+
+        update_extras_query = '''update  temp_url 
+                               set extras = case when sitemap_identifier='DOCTORS_CITY' then
+                               json_build_object('location_json',json_build_object('locality_id',locality_id,'locality_value',locality_value, 
+                               'locality_latitude',locality_latitude,'locality_longitude',locality_longitude))
+
+                               else json_build_object('location_json',
+                               json_build_object('sublocality_id', sublocality_id,'sublocality_value', sublocality_value,
+                               'locality_id', locality_id, 'locality_value', locality_value,'breadcrum_url',slugify_url('doctors-in-' || locality_value ||'-sptcit'),
+                               'sublocality_latitude',sublocality_latitude, 'sublocality_longitude',sublocality_longitude, 'locality_latitude',locality_latitude,
+                               'locality_longitude',locality_longitude))  end
+                                where sitemap_identifier in ('DOCTORS_LOCALITY_CITY','DOCTORS_CITY')'''
+        update_extras = RawSql(update_extras_query, []).execute()
+
+
+        # clean up duplicate urls
+        RawSql('''delete from temp_url where id in (select id from 
+                (select eu.*, row_number() over(partition by url ) rownum from temp_url eu  
+                )x where rownum>1
+                ) ''', []).execute()
+        return 'success'
+
+    def create_doc_page_urls_with_hosp_details(self):
+
+        sequence = self.sequence
+
+        cache = PageUrlCache(EntityUrls.SitemapIdentifier.DOCTOR_PAGE)
+        spec_cache = SpecializationCache()
+        to_create = []
+
+        doc_obj = Doctor.objects.prefetch_related('doctorpracticespecializations',
+                                                  'doctorpracticespecializations__specialization',
+                                                  (Prefetch('hospitals',
+                                                            queryset=Hospital.objects.filter(is_live=True).order_by(
+                                                                'hospital_type', 'id')))
+                                                  ).filter(is_live=True, is_test_doctor=False).order_by('id')
+
+        for doctor in doc_obj:
+            locality_value = None
+            locality_latitude = None
+            locality_longitude = None
+            sublocality_value = None
+            sublocality_longitude = None
+            sublocality_latitude = None
+            sequence = sequence
+            hospital = None
+
+            practice_specializations = doctor.doctorpracticespecializations.all()
+            sp_dict = dict()
+            for sp in practice_specializations:
+                sp_dict[sp.specialization_id] = sp.specialization.name
+            sp_dict = OrderedDict(sorted(sp_dict.items()))
+            specializations = list(sp_dict.values())
+            specialization_ids = list(sp_dict.keys())
+
+            all_hospitals = doctor.hospitals.all()
+            for hosp in all_hospitals:
+                if hosp.is_live:
+                    hospital = hosp
+                break
+
+            top_specialization = None
+            if practice_specializations:
+                top_specialization = practice_specializations.order_by('specialization__breadcrumb_priority').first()
+
+            if not hospital:
+                print('hospital not found')
+
+            if hospital:
+                sublocality_value = hospital.locality
+                sublocality_longitude = hospital.location.x if hospital.location else None
+                sublocality_latitude = hospital.location.y if hospital.location else None
+                locality_value = hospital.city
+                locality_longitude = hospital.location.x if hospital.location else None
+                locality_latitude = hospital.location.y if hospital.location else None
+
+            if specializations:
+                url = "dr-%s-%s" % (doctor.name, "-".join(specializations))
+            else:
+                url = "dr-%s" % (doctor.name)
+
+            if sublocality_value and locality_value:
+                url = url + "-in-%s-%s" % (sublocality_value, locality_value)
+
+            elif locality_value:
+                url = url + "-in-%s" % (locality_value)
+
+            else:
+                url = url
+
+            url = slugify(url)
+            data = {}
+            data['is_valid'] = True
+            data['url_type'] = EntityUrls.UrlType.PAGEURL
+            data['entity_type'] = 'Doctor'
+            data['entity_id'] = doctor.id
+            data['sitemap_identifier'] = EntityUrls.SitemapIdentifier.DOCTOR_PAGE
+            # if doc_locality
+            data['locality_id'] = None
+            data['locality_value'] = locality_value
+            data['locality_latitude'] = locality_latitude
+            data['locality_longitude'] = locality_longitude
+
+            if locality_latitude and locality_longitude:
+                data['locality_location'] = Point(locality_longitude, locality_latitude)
+
+            if sublocality_latitude and sublocality_longitude:
+                data['sublocality_location'] = Point(sublocality_longitude, sublocality_latitude)
+
+            data['sublocality_id'] = None
+            data['sublocality_value'] = sublocality_value
+            data['sublocality_latitude'] = sublocality_latitude
+            data['sublocality_longitude'] = sublocality_longitude
+
+            if hospital:
+                data['location'] = hospital.location
+
+            extras = {}
+            extras['related_entity_id'] = doctor.id
+            extras['location_id'] = None
+            extras['locality_value'] = locality_value if locality_value else ''
+            extras['sublocality_value'] = sublocality_value if sublocality_value else ''
+            extras['breadcrums'] = []
+            data['extras'] = extras
+            if top_specialization:
+                data['specialization'] = top_specialization.specialization.name
+                data['specialization_id'] = top_specialization.specialization.id
+
+            new_url = url
+
+            is_duplicate = cache.is_duplicate(new_url + '-dpp', doctor.id)
+
+            if is_duplicate:
+                new_url = new_url + '-' + str(doctor.id)
+
+            new_url = new_url + '-dpp'
+
+            data['url'] = new_url
+            new_entity = TempURL(**data)
+
+            cache.add(new_entity)
+
+            to_create.append(new_entity)
+
+        TempURL.objects.bulk_create(to_create)
+        return ("success")
 
     def insert_search_urls(self):
 
@@ -383,6 +633,57 @@ class DoctorURL():
         RawSql('''update temp_url tu set breadcrumb=json_build_array() where breadcrumb is null ''', []).execute()
 
 
+    def update_breadcrumbs_without_dist_filter(self):
+
+        # set breadcrumbs to default empty array
+        RawSql('''update temp_url tu set breadcrumb=json_build_array()''', []).execute()
+
+        #update for speciality city
+        RawSql('''update temp_url tu set breadcrumb=(select json_build_array(json_build_object('title', locality_value, 'url', url, 'link_title', concat('Doctors in ',locality_value))) 
+            from temp_url where sitemap_identifier ='DOCTORS_CITY' and lower(locality_value)=lower(tu.locality_value)
+             order by st_distance(location, tu.location) asc limit 1)
+            where sitemap_identifier ='SPECIALIZATION_CITY' ''', []).execute()
+
+        RawSql('''update temp_url tu set breadcrumb=(select json_build_array(json_build_object('title', locality_value, 'url', url, 'link_title', concat('Doctors in ',locality_value))) 
+                   from temp_url where sitemap_identifier ='DOCTORS_CITY' and lower(locality_value)=lower(tu.locality_value)
+                    order by st_distance(location, tu.location) asc limit 1)
+                   where sitemap_identifier ='DOCTORS_LOCALITY_CITY' ''', []).execute()
+
+        #update for speciality locality city
+        RawSql('''update temp_url tu set breadcrumb = (select  breadcrumb || jsonb_build_array(jsonb_build_object('title', specialization, 'url', url, 'link_title', concat(specialization, ' in ', locality_value)))
+            from temp_url  where sitemap_identifier ='SPECIALIZATION_CITY' and lower(locality_value)=lower(tu.locality_value)
+            and specialization_id = tu.specialization_id order by st_distance(location, tu.location) asc limit 1) 
+            where sitemap_identifier ='SPECIALIZATION_LOCALITY_CITY' 
+            ''', []).execute()
+
+        #update for doctor profile
+        RawSql('''update temp_url tu set breadcrumb = (select  breadcrumb || 
+            jsonb_build_array(jsonb_build_object('title', sublocality_value, 'url', url, 'link_title', concat(specialization, ' in ', sublocality_value,' ',locality_value) ))
+            from temp_url  where sitemap_identifier ='SPECIALIZATION_LOCALITY_CITY' and lower(locality_value)=lower(tu.locality_value)
+            and lower(sublocality_value)=lower(tu.sublocality_value) and specialization_id = tu.specialization_id
+             order by st_distance(location, tu.location) asc limit 1) 
+            where sitemap_identifier ='DOCTOR_PAGE' ''', []).execute()
+
+        #update for doctor profile from city speciality if null
+        RawSql('''update temp_url tu set breadcrumb = (select  breadcrumb || 
+            jsonb_build_array(jsonb_build_object('title', specialization, 'url', url, 'link_title', concat(specialization, ' in ', locality_value) ))
+            from temp_url  where sitemap_identifier ='SPECIALIZATION_CITY' and lower(locality_value)=lower(tu.locality_value)
+            and specialization_id = tu.specialization_id order by st_distance(location, tu.location) asc limit 1) 
+            where sitemap_identifier ='DOCTOR_PAGE' and breadcrumb is null ''', []).execute()
+
+        #update for doctor profile from locality city if null
+        RawSql('''update temp_url tu set breadcrumb = (select  breadcrumb 
+            from temp_url  where sitemap_identifier ='DOCTORS_LOCALITY_CITY' and lower(locality_value)=lower(tu.locality_value)
+              and lower(sublocality_value)=lower(tu.sublocality_value) order by st_distance(location, tu.location) asc limit 1) 
+            where sitemap_identifier ='DOCTOR_PAGE' and breadcrumb is null ''', []).execute()
+
+        # update for doctor profile from city if null
+        RawSql('''update temp_url tu set breadcrumb = (select  breadcrumb 
+                    from temp_url  where sitemap_identifier ='DOCTORS_CITY' and lower(locality_value)=lower(tu.locality_value)
+                     order by st_distance(location, tu.location) asc limit 1) 
+                    where sitemap_identifier ='DOCTOR_PAGE' and breadcrumb is null ''', []).execute()
+
+        RawSql('''update temp_url tu set breadcrumb=json_build_array() where breadcrumb is null ''', []).execute()
 
     def create_doctor_page_urls(self):
 
