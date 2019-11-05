@@ -68,7 +68,7 @@ from ondoc.api.v1.utils import RawSql, is_valid_testing_data, doctor_query_param
 from django.contrib.auth import get_user_model
 from django.conf import settings
 from django.db.models import F, Count
-from django.db.models.functions import StrIndex
+from django.db.models.functions import StrIndex, Length
 import datetime, logging, copy, re
 from ondoc.api.v1.utils import opdappointment_transform
 from ondoc.location import models as location_models
@@ -836,7 +836,7 @@ class DoctorProfileView(viewsets.GenericViewSet):
 class DoctorProfileUserViewSet(viewsets.GenericViewSet):
 
     def prepare_response(self, response_data, selected_hospital, profile=None, product_id=None, coupon_code=None):
-        import operator 
+        # import operator
         # hospitals = sorted(response_data.get('hospitals'), key=itemgetter("hospital_id"))
         # [d['value'] for d in l if 'value' in d]
         hospital_ids = set(data['hospital_id'] for data in response_data.get('hospitals') if 'hospital_id' in data)
@@ -1015,6 +1015,7 @@ class DoctorProfileUserViewSet(viewsets.GenericViewSet):
         return about_doctor
 
     @transaction.non_atomic_requests
+    @use_slave
     def retrieve_by_url(self, request):
         url = request.GET.get('url')
         if not url:
@@ -1042,6 +1043,7 @@ class DoctorProfileUserViewSet(viewsets.GenericViewSet):
     @transaction.non_atomic_requests
     @use_slave
     def retrieve(self, request, pk, entity=None, *args, **kwargs):
+        from ondoc.procedure.models import PotentialIpdLeadPracticeSpecialization
         serializer = serializers.DoctorDetailsRequestSerializer(data=request.query_params)
         serializer.is_valid(raise_exception=True)
         validated_data = serializer.validated_data
@@ -1091,7 +1093,6 @@ class DoctorProfileUserViewSet(viewsets.GenericViewSet):
         spec_ids = list()
         spec_url_dict = dict()
 
-        from ondoc.procedure.models import PotentialIpdLeadPracticeSpecialization
         all_potential_spec = set(PotentialIpdLeadPracticeSpecialization.objects.all().values_list('practice_specialization', flat=True))
         is_congot = False
 
@@ -1178,7 +1179,7 @@ class DoctorProfileUserViewSet(viewsets.GenericViewSet):
                 lat = hospital.get('lat')
                 long = hospital.get('long')
             else:
-                hospital = doctor.hospitals.all().first()
+                hospital = doctor.hospitals.first()
                 if hospital and hospital.location:
                     lat = hospital.location.coords[1]
                     long = hospital.location.coords[0]
@@ -1836,8 +1837,7 @@ class DoctorListViewSet(viewsets.GenericViewSet):
             if settings.USE_SLAVE_DB:
                 db = DatabaseInfo.SLAVE
 
-            doctor_search_result = RawSql(query_string.get('query'),
-                                         query_string.get('params'), db).fetch_all()
+            doctor_search_result = RawSql(query_string.get('query'), query_string.get('params'), db).fetch_all()
 
             if doctor_search_result:
                 result_count = doctor_search_result[0]['result_count']
@@ -4780,13 +4780,13 @@ class HospitalViewSet(viewsets.GenericViewSet):
                                                               'hospital_doctors').exclude(location__dwithin=(
             Point(float(long),
                   float(lat)),
-            D(m=min_distance))).filter(
+            D(m=min_distance))).annotate(locality_len=Length('locality')).filter(
             is_live=True,
             hospital_doctors__enabled=True,
             location__dwithin=(
                 Point(float(long),
                       float(lat)),
-                D(m=max_distance))).annotate(
+                D(m=max_distance)), locality_len__lt=13).annotate(
             distance=Distance('location', pnt), bookable_doctors_count=Count(Q(enabled_for_online_booking=True,
                                            hospital_doctors__enabled_for_online_booking=True,
                                            hospital_doctors__doctor__enabled_for_online_booking=True,
