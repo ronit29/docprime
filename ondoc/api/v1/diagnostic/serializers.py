@@ -2058,7 +2058,8 @@ class CustomLabTestPackageSerializer(serializers.ModelSerializer):
 
     def get_insurance(self, obj):
         request = self.context.get("request")
-        resp = Lab.get_insurance_details(request.user)
+        ins_threshold_amt = self.context.get("insurance_threshold_amount", None)
+        resp = Lab.get_insurance_details(request.user, ins_threshold_amt)
         lab_data = self.context.get('lab_data', {})
         lab = lab_data.get(obj.lab, None)
 
@@ -2069,7 +2070,8 @@ class CustomLabTestPackageSerializer(serializers.ModelSerializer):
 
     def get_vip(self, obj):
         request = self.context.get("request")
-        resp = Lab.get_vip_details(request.user)
+        search_criteria_query = self.context.get("search_criteria_query")
+        resp = Lab.get_vip_details(request.user, search_criteria_query)
         lab_data = self.context.get('lab_data', {})
         lab = lab_data.get(obj.lab, None)
 
@@ -2080,7 +2082,16 @@ class CustomLabTestPackageSerializer(serializers.ModelSerializer):
         agreed_price = 0
         mrp = 0
         if lab:
-            avl_obj = obj.availablelabs.filter(lab_pricing_group=lab.lab_pricing_group).first()
+            avl_obj = None
+            if not self.context.get('avl_objs'):
+                avl_obj = obj.availablelabs.filter(lab_pricing_group=lab.lab_pricing_group).first()
+            else:
+                avl_objs = self.context.get('avl_objs')
+                for av in avl_objs:
+                    if av.lab_pricing_group == lab.lab_pricing_group:
+                        avl_obj = av
+                        break
+            # avl_obj = obj.availablelabs.filter(lab_pricing_group=lab.lab_pricing_group).first()
             if avl_obj:
                 mrp = avl_obj.mrp
                 deal_price = avl_obj.custom_deal_price if avl_obj.custom_deal_price else avl_obj.computed_deal_price
@@ -2089,7 +2100,8 @@ class CustomLabTestPackageSerializer(serializers.ModelSerializer):
         if user and user.is_authenticated and not user.is_anonymous:
             plus_obj = user.active_plus_user if user.active_plus_user and user.active_plus_user.status == PlusUser.ACTIVE else None
         resp['vip_gold_price'] = agreed_price
-        resp['vip_convenience_amount'] = PlusPlans.get_default_convenience_amount(agreed_price, "LABTEST")
+        default_plan_query = self.context.get('default_plan_query')
+        resp['vip_convenience_amount'] = PlusPlans.get_default_convenience_amount(agreed_price, "LABTEST", default_plan_query)
         if not plus_obj:
             return resp
         resp['is_gold_member'] = True if plus_obj.plan.is_gold else False

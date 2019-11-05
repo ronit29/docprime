@@ -194,7 +194,7 @@ class LabTestList(viewsets.ReadOnlyModelViewSet):
 
 
 class LabList(viewsets.ReadOnlyModelViewSet):
-    queryset = AvailableLabTest.objects.all()
+    queryset = AvailableLabTest.objects.none()
     serializer_class = diagnostic_serializer.LabModelSerializer
     lookup_field = 'id'
 
@@ -415,7 +415,8 @@ class LabList(viewsets.ReadOnlyModelViewSet):
         for item in entity_url_qs:
             entity_url_dict.setdefault(item.get('lab_id'), [])
             entity_url_dict[item.get('lab_id')].append(item.get('url'))
-        lab_data = Lab.objects.prefetch_related('lab_documents', 'lab_timings', 'network',
+        lab_data = Lab.objects.select_related('lab_pricing_group')\
+                              .prefetch_related('lab_documents', 'lab_timings', 'network',
                                                 'home_collection_charges').in_bulk(lab_ids)
 
         category_data = {}
@@ -461,13 +462,29 @@ class LabList(viewsets.ReadOnlyModelViewSet):
                                                                 'test_id': test_id,
                                                                 'parameter_count': parameter_count,
                                                                 'icon': icon_url, 'priority': priority}
-            single_test_data_sorted = sorted(list(single_test_data.values()), key=lambda k: k['priority'], reverse= True)
+            single_test_data_sorted = sorted(list(single_test_data.values()), key=lambda k: k['priority'], reverse=True)
             category_data[temp_package.id] = single_test_data_sorted
+
+        #APi optim
+        labdata_pricing_groups=[]
+        for key, lab in lab_data.items():
+            labdata_pricing_groups.append(lab.lab_pricing_group.id)
+        avl_objs = AvailableLabTest.objects.select_related('lab_pricing_group').filter(lab_pricing_group__id__in=labdata_pricing_groups)
+        insurance_threshold_obj = InsuranceThreshold.objects.all().order_by('-opd_amount_limit').first()
+        insurance_threshold_amount = insurance_threshold_obj.opd_amount_limit if insurance_threshold_obj else 1500
+        search_criteria = SearchCriteria.objects.filter(search_key='is_gold').first()
+        default_plan = PlusPlans.objects.prefetch_related('plan_parameters', 'plan_parameters__parameter').filter(is_selected=True, is_gold=True).first()
+        if not default_plan:
+            default_plan = PlusPlans.objects.prefetch_related('plan_parameters', 'plan_parameters__parameter').filter(is_gold=True).first()
 
         serializer = CustomLabTestPackageSerializer(all_packages, many=True,
                                                     context={'entity_url_dict': entity_url_dict, 'lab_data': lab_data,
                                                              'request': request, 'category_data': category_data,
-                                                             'package_free_or_not_dict': package_free_or_not_dict})
+                                                             'package_free_or_not_dict': package_free_or_not_dict,
+                                                             'insurance_threshold_amount':insurance_threshold_amount,
+                                                             'search_criteria_query':search_criteria,
+                                                             'avl_objs': avl_objs,
+                                                             'default_plan_query':default_plan})
 
         category_to_be_shown_in_filter_ids = set()
         category_queryset = []
@@ -3733,7 +3750,6 @@ class DigitalReports(viewsets.GenericViewSet):
 
 
 class CompareLabPackagesViewSet(viewsets.ReadOnlyModelViewSet):
-
     def retrieve_by_url(self, request, *args, **kwargs):
         url = request.data.get('url')
         if not url:

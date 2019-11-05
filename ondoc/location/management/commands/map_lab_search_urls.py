@@ -6,7 +6,8 @@ from django.contrib.gis.db.models.functions import Distance
 
 
 def map_lab_search_urls():
-    success = EntityUrls.create_lab_search_urls()
+    # success = EntityUrls.create_lab_search_urls()
+    success = EntityUrls.create_lab_search_urls_new()
     if success:
         print("Successfull")
     else:
