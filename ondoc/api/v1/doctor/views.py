@@ -68,7 +68,7 @@ from ondoc.api.v1.utils import RawSql, is_valid_testing_data, doctor_query_param
 from django.contrib.auth import get_user_model
 from django.conf import settings
 from django.db.models import F, Count
-from django.db.models.functions import StrIndex
+from django.db.models.functions import StrIndex, Length
 import datetime, logging, copy, re
 from ondoc.api.v1.utils import opdappointment_transform
 from ondoc.location import models as location_models
@@ -1837,8 +1837,7 @@ class DoctorListViewSet(viewsets.GenericViewSet):
             if settings.USE_SLAVE_DB:
                 db = DatabaseInfo.SLAVE
 
-            doctor_search_result = RawSql(query_string.get('query'),
-                                         query_string.get('params'), db).fetch_all()
+            doctor_search_result = RawSql(query_string.get('query'), query_string.get('params'), db).fetch_all()
 
             if doctor_search_result:
                 result_count = doctor_search_result[0]['result_count']
@@ -4781,13 +4780,13 @@ class HospitalViewSet(viewsets.GenericViewSet):
                                                               'hospital_doctors').exclude(location__dwithin=(
             Point(float(long),
                   float(lat)),
-            D(m=min_distance))).filter(
+            D(m=min_distance))).annotate(locality_len=Length('locality')).filter(
             is_live=True,
             hospital_doctors__enabled=True,
             location__dwithin=(
                 Point(float(long),
                       float(lat)),
-                D(m=max_distance))).annotate(
+                D(m=max_distance)), locality_len__lt=13).annotate(
             distance=Distance('location', pnt), bookable_doctors_count=Count(Q(enabled_for_online_booking=True,
                                            hospital_doctors__enabled_for_online_booking=True,
                                            hospital_doctors__doctor__enabled_for_online_booking=True,
