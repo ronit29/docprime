@@ -676,7 +676,7 @@ class Order(TimeStampedModel):
                 visitor_id, visit_id = event_api.get_visit(request)
                 visitor_info = { "visitor_id": visitor_id, "visit_id": visit_id, "from_app": request.data.get("from_app", None), "app_version": request.data.get("app_version", None)}
         except Exception as e:
-            logger.log("Could not fetch visitor info - " + str(e))
+            logger.info("Could not fetch visitor info - " + str(e))
 
         # create a Parent order to accumulate sub-orders
         process_immediately = False
