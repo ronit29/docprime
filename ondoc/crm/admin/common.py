@@ -540,7 +540,7 @@ class MerchantPayoutResource(resources.ModelResource):
         if merchant_payout.api_response and merchant_payout.api_response.get('result', []):
             result = merchant_payout.api_response.get('result')[0]
             if result.get('responseError', ''):
-                return result.get('responseError')
+                return result.get('responseError').get('errorMsg')
 
         return ''
 
