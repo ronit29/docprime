@@ -748,7 +748,7 @@ class Hospital(auth_model.TimeStampedModel, auth_model.CreatedByModel, auth_mode
 
 @reversion.register()
 class HospitalPlaceDetails(auth_model.TimeStampedModel):
-    hospital = models.ForeignKey(Hospital, on_delete=models.CASCADE, related_name='hospital_place_details')
+    hospital = models.ForeignKey(Hospital, on_delete=models.DO_NOTHING, blank=True, null=True, related_name='hospital_place_details')
     place_id = models.TextField()
     place_details = JSONField(null=True, blank=True)
     reviews = JSONField(null=True, blank=True)
