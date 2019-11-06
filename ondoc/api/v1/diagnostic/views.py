@@ -467,9 +467,9 @@ class LabList(viewsets.ReadOnlyModelViewSet):
 
         #APi optim
         labdata_pricing_groups=[]
-        for key, lab in lab_data.items():
-            labdata_pricing_groups.append(lab.lab_pricing_group.id)
-        avl_objs = AvailableLabTest.objects.select_related('lab_pricing_group').filter(lab_pricing_group__id__in=labdata_pricing_groups)
+        # for key, lab in lab_data.items():
+        #     labdata_pricing_groups.append(lab.lab_pricing_group.id)
+        # avl_objs = AvailableLabTest.objects.select_related('lab_pricing_group').filter(lab_pricing_group__id__in=labdata_pricing_groups)
         insurance_threshold_obj = InsuranceThreshold.objects.all().order_by('-opd_amount_limit').first()
         insurance_threshold_amount = insurance_threshold_obj.opd_amount_limit if insurance_threshold_obj else 1500
         search_criteria = SearchCriteria.objects.filter(search_key='is_gold').first()
@@ -483,7 +483,7 @@ class LabList(viewsets.ReadOnlyModelViewSet):
                                                              'package_free_or_not_dict': package_free_or_not_dict,
                                                              'insurance_threshold_amount':insurance_threshold_amount,
                                                              'search_criteria_query':search_criteria,
-                                                             'avl_objs': avl_objs,
+                                                             # 'avl_objs': avl_objs,
                                                              'default_plan_query':default_plan})
 
         category_to_be_shown_in_filter_ids = set()
