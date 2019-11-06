@@ -1441,6 +1441,7 @@ def send_capture_payment_request(self, product_id, appointment_id):
             status_type = PaymentProcessStatus.get_status_type(resp_data.get('statusCode'), resp_data.get('txStatus'))
             save_payment_status.apply_async((status_type, args), eta=timezone.localtime(), )
             if response.status_code == status.HTTP_200_OK:
+                txn_captured = False
                 if resp_data.get("ok") is not None and resp_data.get("ok") == '1':
                     txn_obj.status_code = resp_data.get('statusCode')
                     txn_obj.status_type = resp_data.get('txStatus')
@@ -1449,11 +1450,14 @@ def send_capture_payment_request(self, product_id, appointment_id):
                     txn_obj.transaction_id = resp_data.get('pgTxId')
                     txn_obj.bank_id = resp_data.get('bankTxId')
                     txn_obj.payment_captured = True
-                    send_pg_acknowledge.apply_async((txn_obj.order_id, txn_obj.order_no, 'capture'), countdown=1)
+                    txn_captured = True
                 else:
                     txn_obj.payment_captured = False
                     logger.error("Error in capture the payment with data - " + json.dumps(req_data) + " with error message - " + resp_data.get('statusMsg', ''))
                 txn_obj.save()
+
+                if txn_captured:
+                    send_pg_acknowledge.apply_async((txn_obj.order_id, txn_obj.order_no, 'capture'), countdown=1)
             else:
                 raise Exception("Retry on invalid Http response status - " + str(response.content))
 
@@ -1518,6 +1522,7 @@ def send_release_payment_request(self, product_id, appointment_id):
                         txn_obj.status_code = resp_data.get('statusCode')
                         txn_obj.status_type = 'TXN_RELEASE'
                         txn_obj.save()
+                        send_pg_acknowledge.apply_async((txn_obj.order_id, txn_obj.order_no, 'capture'), countdown=1)
                     else:
                         logger.error("Error in releasing the payment with data - " + json.dumps(
                             req_data) + " with error message - " + resp_data.get('statusMsg', ''))
