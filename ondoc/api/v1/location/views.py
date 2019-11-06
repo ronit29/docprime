@@ -665,7 +665,7 @@ class DoctorsCitySearchViewSet(viewsets.GenericViewSet):
                 response = footer.get_footer()
 
         except Exception as e:
-            logger.error(str(e))
+            logger.info(str(e))
 
         if entity.sitemap_identifier == 'SPECIALIZATION_LOCALITY_CITY':
             spec_city_entity = EntityUrls.objects.filter(is_valid=True, specialization=entity.specialization,
