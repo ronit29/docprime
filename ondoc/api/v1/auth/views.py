@@ -1314,6 +1314,8 @@ class TransactionViewSet(viewsets.GenericViewSet):
                             pg_txn.bank_id = response.get('bankTxId')
                             #pg_txn.payment_captured = True
                             pg_txn.save()
+                            if response.get('txStatus') in ['TXN_SUCCESS', 'TXN_RELEASE']:
+                                send_pg_acknowledge.apply_async((pg_txn.order_id, pg_txn.order_no, 'capture'), countdown=1)
                         send_pg_acknowledge.apply_async((pg_txn.order_id, pg_txn.order_no,), countdown=1)
                         if pg_txn.product_id == Order.CHAT_PRODUCT_ID:
                             chat_order = Order.objects.filter(pk=pg_txn.order_id).first()
@@ -1370,11 +1372,11 @@ class TransactionViewSet(viewsets.GenericViewSet):
                 else:
                     logger.error("Invalid pg data - " + json.dumps(resp_serializer.errors))
             elif order_obj:
-                try:
-                    if response and response.get("orderNo") and response.get("orderId"):
-                        send_pg_acknowledge.apply_async((response.get("orderId"), response.get("orderNo"),), countdown=1)
-                except Exception as e:
-                    logger.error("Error in sending pg acknowledge - " + str(e))
+                # try:
+                #     if response and response.get("orderNo") and response.get("orderId"):
+                #         send_pg_acknowledge.apply_async((response.get("orderId"), response.get("orderNo"),), countdown=1)
+                # except Exception as e:
+                #     logger.error("Error in sending pg acknowledge - " + str(e))
 
                 try:
                     has_changed = order_obj.change_payment_status(Order.PAYMENT_FAILURE)
@@ -1441,11 +1443,11 @@ class TransactionViewSet(viewsets.GenericViewSet):
         data['status_type'] = response.get('txStatus')
         data['transaction_id'] = format_return_value(response.get('pgTxId'))
         data['pb_gateway_name'] = response.get('pbGatewayName')
-        # data['nodal_id'] = response.get('nodalId')
-        if order_obj.product_id == Order.INSURANCE_PRODUCT_ID:
-            data['nodal_id'] = PgTransaction.NODAL2
-        else:
-            data['nodal_id'] = PgTransaction.NODAL1
+        data['nodal_id'] = response.get('nodalId')
+        # if order_obj.product_id == Order.INSURANCE_PRODUCT_ID:
+        #     data['nodal_id'] = PgTransaction.NODAL2
+        # else:
+        #     data['nodal_id'] = PgTransaction.NODAL1
 
         return data
 

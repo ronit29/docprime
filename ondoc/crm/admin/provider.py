@@ -146,7 +146,7 @@ class PartnerLabSamplesCollectOrderAdmin(admin.ModelAdmin):
 
     list_display = ('id', 'created_at', 'status', 'offline_patient', 'hospital', 'doctor', 'lab')
     readonly_fields = ['offline_patient', 'patient_details', 'hospital', 'doctor', 'lab', 'available_lab_tests',
-                       'collection_datetime', 'samples', 'selected_tests_details', 'lab_alerts']
+                       'collection_datetime', 'samples', 'selected_tests_details', 'lab_alerts', 'extras']
     search_fields = ['offline_patient']
     inlines = [
         ReportsInline,
