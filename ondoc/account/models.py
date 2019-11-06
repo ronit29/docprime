@@ -1225,6 +1225,14 @@ class PgTransaction(TimeStampedModel, SoftDelete):
     def is_preauth(self):
         return self.status_type == 'TXN_AUTHORIZE' or self.status_type == '27'
 
+    def has_refunded(self):
+        from ondoc.account.models import ConsumerRefund
+        refund_obj = ConsumerRefund.objects.filter(pg_transaction_id=self.id).first()
+        if refund_obj:
+            return True
+
+        return False
+
     class Meta:
         db_table = "pg_transaction"
         # unique_together = (("order", "order_no", "deleted"),)
@@ -2006,13 +2014,19 @@ class MerchantPayout(TimeStampedModel):
         if trans and trans[0].amount == self.payable_amount:
             return trans
 
+        non_refunded_trans = list()
         trans = PgTransaction.objects.filter(order=user_insurance.order)
-        if len(trans)>1:
+        if len(trans) > 1:
+            for pg_txn in trans:
+                if not pg_txn.has_refunded():
+                    non_refunded_trans.append(pg_txn)
+
+        if len(non_refunded_trans) > 1:
             raise Exception('multiple transactions found')
 
         # TO DO - Check for TDS
-        if trans and trans[0].amount == self.payable_amount:
-            return trans
+        if non_refunded_trans and non_refunded_trans[0].amount == self.payable_amount:
+            return non_refunded_trans
 
         from ondoc.insurance.models import UserInsurance
         uis = UserInsurance.objects.filter(user=user_insurance.user)
