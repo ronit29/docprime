@@ -3185,9 +3185,9 @@ class OpdAppointment(auth_model.TimeStampedModel, CouponsMixin, OpdAppointmentIn
             # while completing appointment
             if database_instance and database_instance.status != self.status and self.status == self.COMPLETED:
                 # add a merchant_payout entry
-                # if self.merchant_payout is None and self.payment_type not in [OpdAppointment.COD] and  \
-                #         not(self.appointment_type == OpdAppointment.FOLLOWUP or self.is_fraud_appointment):
-                #     self.save_merchant_payout()
+                if self.merchant_payout is None and self.payment_type not in [OpdAppointment.COD] and  \
+                        not(self.appointment_type == OpdAppointment.FOLLOWUP or self.is_fraud_appointment):
+                    self.save_merchant_payout()
 
                 # credit cashback if any
                 if self.cashback is not None and self.cashback > 0:
