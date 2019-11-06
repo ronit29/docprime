@@ -135,8 +135,10 @@ class PartnerLabSamplesCollectOrderForm(forms.ModelForm):
     def clean(self):
         super().clean()
         cleaned_data = self.cleaned_data
-        if 'status' in self.changed_data and not self.instance.status_update_checks(cleaned_data['status']):
-            raise forms.ValidationError("Incorrect Status Update")
+        if 'status' in self.changed_data:
+            status_update_check = self.instance.status_update_checks(cleaned_data['status'])
+            if not status_update_check["is_correct"]:
+                raise forms.ValidationError(status_update_check["message"])
         return cleaned_data
 
 
@@ -144,7 +146,7 @@ class PartnerLabSamplesCollectOrderAdmin(admin.ModelAdmin):
 
     list_display = ('id', 'created_at', 'status', 'offline_patient', 'hospital', 'doctor', 'lab')
     readonly_fields = ['offline_patient', 'patient_details', 'hospital', 'doctor', 'lab', 'available_lab_tests',
-                       'collection_datetime', 'samples', 'selected_tests_details', 'lab_alerts']
+                       'collection_datetime', 'samples', 'selected_tests_details', 'lab_alerts', 'extras']
     search_fields = ['offline_patient']
     inlines = [
         ReportsInline,

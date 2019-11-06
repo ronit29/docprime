@@ -260,7 +260,7 @@ class Hospital(auth_model.TimeStampedModel, auth_model.CreatedByModel, auth_mode
     auto_ivr_enabled = models.BooleanField(default=True)
     priority_score = models.IntegerField(default=0, null=False, blank=False)
     search_distance = models.FloatField(default=15000)
-    google_avg_rating = models.DecimalField(max_digits=5, decimal_places=2, null=True, editable=True)
+    google_avg_rating = models.DecimalField(max_digits=5, decimal_places=2, null=True, editable=True, blank=True)
     # provider_encrypt = models.NullBooleanField(null=True, blank=True)
     # provider_encrypted_by = models.ForeignKey(auth_model.User, null=True, blank=True, on_delete=models.SET_NULL, related_name='encrypted_hospitals')
     # encryption_hint = models.CharField(max_length=128, null=True, blank=True)
@@ -272,10 +272,12 @@ class Hospital(auth_model.TimeStampedModel, auth_model.CreatedByModel, auth_mode
     enabled_for_insurance = models.NullBooleanField(verbose_name='Enabled for Insurance')
     enabled_for_plus_plans = models.NullBooleanField()
     is_partner_lab_enabled = models.BooleanField(default=False)
+    search_url_locality_radius = models.FloatField(blank=True, null=True)
+    search_url_sublocality_radius = models.FloatField( blank=True, null=True)
     google_ratings_count = models.PositiveIntegerField(null=True, blank=True)
 
     def __str__(self):
-        return self.name
+        return '{}-{}'.format(self.id, self.name)
 
     class Meta:
         db_table = "hospital"
@@ -392,7 +394,7 @@ class Hospital(auth_model.TimeStampedModel, auth_model.CreatedByModel, auth_mode
                                                                                          'hosp_locality_entity_dict': hosp_locality_entity_dict,
                                                                                          'new_dynamic_dict': new_dynamic_dict}).data
         for data in result:
-            data['vip_percentage'] = common_hosp_percentage_dict[data.get('id')] if plan else 0
+            data['vip_percentage'] = common_hosp_percentage_dict[data.get('id')] if plan and common_hosp_percentage_dict.get(data.get('id')) else 0
 
         return result
         # result = TopHospitalForIpdProcedureSerializer(hosp_queryset, many=True, context={'request': request,
@@ -746,7 +748,7 @@ class Hospital(auth_model.TimeStampedModel, auth_model.CreatedByModel, auth_mode
 
 @reversion.register()
 class HospitalPlaceDetails(auth_model.TimeStampedModel):
-    hospital = models.ForeignKey(Hospital, on_delete=models.CASCADE, related_name='hospital_place_details')
+    hospital = models.ForeignKey(Hospital, on_delete=models.DO_NOTHING, blank=True, null=True, related_name='hospital_place_details')
     place_id = models.TextField()
     place_details = JSONField(null=True, blank=True)
     reviews = JSONField(null=True, blank=True)
@@ -1045,10 +1047,13 @@ class Doctor(auth_model.TimeStampedModel, auth_model.QCModel, SearchKey, auth_mo
         update_insured_doctors = RawSql(query, []).execute()
 
     @classmethod
-    def get_insurance_details(cls, user):
+    def get_insurance_details(cls, user, ins_threshold_amt=None):
         from ondoc.insurance.models import InsuranceThreshold
-        insurance_threshold_obj = InsuranceThreshold.objects.all().order_by('-opd_amount_limit').first()
-        insurance_threshold_amount = insurance_threshold_obj.opd_amount_limit if insurance_threshold_obj else 1500
+        if not ins_threshold_amt:
+            insurance_threshold_obj = InsuranceThreshold.objects.all().order_by('-opd_amount_limit').first()
+            insurance_threshold_amount = insurance_threshold_obj.opd_amount_limit if insurance_threshold_obj else 1500
+        else:
+            insurance_threshold_amount = ins_threshold_amt
         resp = {
             'is_insurance_covered': False,
             'insurance_threshold_amount': insurance_threshold_amount,
@@ -1423,12 +1428,18 @@ class Doctor(auth_model.TimeStampedModel, auth_model.QCModel, SearchKey, auth_mo
 
     def is_doctor_specialization_insured(self):
         dps = self.doctorpracticespecializations.all()
-        if len(dps) == 0:
+        # if len(dps) == 0:
+        #     return False
+        has_data = False
+        not_enabled = True
+        for d in dps:
+            has_data = True
+            if not d.specialization.is_insurance_enabled:
+                not_enabled = False
+                break
+        if (not has_data) or (not not_enabled):
             return False
 
-        for d in dps:
-            if not d.specialization.is_insurance_enabled:
-                return False
 
         # doctor_specializations = DoctorPracticeSpecialization.objects.filter(doctor=self).values_list('specialization_id', flat=True)
         # if not doctor_specializations:
@@ -3809,7 +3820,11 @@ class OpdAppointment(auth_model.TimeStampedModel, CouponsMixin, OpdAppointmentIn
         from ondoc.ratings_review.models import RatingsReview
         appointment_rating = RatingsReview.objects.filter(appointment_id=self.id).first()
         rating = appointment_rating.ratings if appointment_rating else 0
-        avg_rating = self.doctor.rating_data.get('avg_rating', '') if self.doctor else 0
+        if self.doctor and self.doctor.rating_data:
+            avg_rating = self.doctor.rating_data.get('avg_rating', 0)
+        else:
+            avg_rating = 0
+
         if avg_rating is None:
             avg_rating = 0
         unsatisfied_customer = ""

@@ -34,8 +34,10 @@ class Footer(object):
 
 class LabProfileFooter(Footer):
     def __init__(self, entity):
-        self.sublocality_id = int(entity.sublocality_id) if entity.sublocality_id else None
-        self.locality_id = int(entity.locality_id) if entity.locality_id else None
+        if entity.sublocality_id:
+            self.sublocality_id = int(entity.sublocality_id) if entity.sublocality_id else None
+        if entity.locality_id:
+            self.locality_id = int(entity.locality_id) if entity.locality_id else None
         self.sublocality = entity.sublocality_value
         self.locality = entity.locality_value
         self.sublocality_location = entity.sublocality_location
@@ -148,10 +150,12 @@ class LabProfileFooter(Footer):
 
 class LabLocalityCityFooter(Footer):
     def __init__(self, entity):
-        self.locality_id = int(entity.locality_id)
+        if entity.locality_id:
+            self.locality_id = int(entity.locality_id)
         self.locality = entity.locality_value
         self.centroid = entity.locality_location
-        self.sub_locality_id = int(entity.sublocality_id)
+        if entity.sublocality_id:
+            self.sub_locality_id = int(entity.sublocality_id)
         self.sub_locality = entity.sublocality_value
         self.sublocality_location = entity.sublocality_location
 
@@ -204,7 +208,8 @@ class LabLocalityCityFooter(Footer):
 
 class LabCityFooter(Footer):
     def __init__(self, entity):
-        self.locality_id = int(entity.locality_id)
+        if entity.locality_id:
+            self.locality_id = int(entity.locality_id)
         self.locality = entity.locality_value
         self.centroid = entity.locality_location
 
@@ -261,7 +266,8 @@ class LabCityFooter(Footer):
 class SpecialityCityFooter(Footer):
     def __init__(self, entity):
         self.specialization_id = int(entity.specialization_id)
-        self.locality_id = int(entity.locality_id)
+        if entity.locality_id:
+            self.locality_id = int(entity.locality_id)
         self.specialization = entity.specialization
         self.locality = entity.locality_value
         self.location = entity.locality_location
@@ -326,10 +332,12 @@ class SpecialityCityFooter(Footer):
 class SpecialityLocalityFooter(Footer):
     def __init__(self, entity):
         self.specialization_id = int(entity.specialization_id)
-        self.locality_id = int(entity.locality_id)
+        if entity.locality_id:
+            self.locality_id = int(entity.locality_id)
         self.specialization = entity.specialization
         self.locality = entity.locality_value
-        self.sublocality_id = int(entity.sublocality_id)
+        if entity.sublocality_id:
+            self.sublocality_id = int(entity.sublocality_id)
         self.sublocality = entity.sublocality_value
         self.sublocality_location = entity.sublocality_location
         self.centroid = entity.sublocality_location
@@ -402,8 +410,10 @@ class DoctorProfileFooter(Footer):
         #self.locality = entity.locality_value
         #self.centroid = entity.sublocality_location
         #self.sublocality_location = entity.sublocality_location
-        self.sublocality_id = int(entity.sublocality_id ) if entity.sublocality_id else None
-        self.locality_id = int(entity.locality_id) if entity.locality_id else None
+        if entity.sublocality_id:
+            self.sublocality_id = int(entity.sublocality_id ) if entity.sublocality_id else None
+        if entity.locality_id:
+            self.locality_id = int(entity.locality_id) if entity.locality_id else None
         self.sublocality = entity.sublocality_value
         self.locality = entity.locality_value
         self.specialization_id = entity.specialization_id
@@ -486,7 +496,8 @@ class DoctorProfileFooter(Footer):
 class DoctorCityFooter(Footer):
 
     def __init__(self, entity):
-        self.locality_id = int(entity.locality_id) if entity.locality_id else None
+        if entity.locality_id:
+            self.locality_id = int(entity.locality_id) if entity.locality_id else None
         self.locality = entity.locality_value
         self.centroid = entity.locality_location
 
@@ -528,8 +539,10 @@ class DoctorCityFooter(Footer):
 
 class DoctorLocalityCityFooter(Footer):
     def __init__(self, entity):
-        self.sublocality_id = int(entity.sublocality_id)
-        self.locality_id = int(entity.locality_id)
+        if entity.sublocality_id:
+            self.sublocality_id = int(entity.sublocality_id)
+        if entity.locality_id:
+            self.locality_id = int(entity.locality_id)
         self.sublocality = entity.sublocality_value
         self.locality = entity.locality_value
         # self.specialization_id = int(entity.specialization_id)
@@ -764,6 +777,7 @@ class SearchUrlsViewSet(viewsets.GenericViewSet):
         return Response(response)
 
     def list_cities(self, request):
+        from django.conf import settings
         # cities = location_models.EntityUrls.objects.filter(sitemap_identifier='DOCTORS_CITY',count__gt=0).order_by('-count').\
         #     extra(select={'rank':'SELECT rank FROM "seo_cities" WHERE "entity_urls".locality_value ilike "seo_cities".city'}).\
         #     extra(order_by=['rank']).values_list('locality_value', flat=True).distinct()
@@ -775,8 +789,11 @@ class SearchUrlsViewSet(viewsets.GenericViewSet):
                      where eu.sitemap_identifier='DOCTORS_CITY' and eu.is_valid =True
                      group by eu.locality_value order by max(sc.rank) asc nulls last,count(*) desc 
                      '''
+        db = DatabaseInfo.DEFAULT
+        if settings.USE_SLAVE_DB:
+            db = DatabaseInfo.SLAVE
 
-        sql_urls = RawSql(query, [], DatabaseInfo.SLAVE).fetch_all()
+        sql_urls = RawSql(query, [], db).fetch_all()
 
         result =[]
 
@@ -786,12 +803,15 @@ class SearchUrlsViewSet(viewsets.GenericViewSet):
         return Response({"cities": result})
 
     def list_cities_for_hospitals(self, request):
+        from django.conf import settings
         query = '''select eu.url, eu.locality_value as name from entity_urls eu 
                     left join seo_cities sc on eu.locality_value = sc.city
                      where eu.sitemap_identifier='HOSPITALS_CITY' and eu.is_valid =True
                      order by sc.rank asc nulls last'''
-
-        sql_urls = RawSql(query, [], DatabaseInfo.SLAVE).fetch_all()
+        db = DatabaseInfo.DEFAULT
+        if settings.USE_SLAVE_DB:
+            db = DatabaseInfo.SLAVE
+        sql_urls = RawSql(query, [], db).fetch_all()
 
         # result = []
         #
@@ -846,6 +866,7 @@ class SearchUrlsViewSet(viewsets.GenericViewSet):
             return Response(status=status.HTTP_404_NOT_FOUND)
 
     def specialists_list(self, request):
+        from django.conf import settings
         query = '''select specialization_id,max(specialization) specialization  from entity_urls where 
                  sitemap_identifier='SPECIALIZATION_LOCALITY_CITY' group by specialization_id order by count(*) desc'''
         # query = '''select eu.specialization_id, max(eu.specialization) specialization from entity_urls eu 
@@ -853,8 +874,10 @@ class SearchUrlsViewSet(viewsets.GenericViewSet):
         #         where eu.sitemap_identifier = 'SPECIALIZATION_CITY'
         #         and eur.sitemap_identifier = 'SPECIALIZATION_LOCALITY_CITY'
         #         group by eu.specialization_id order by count(*) desc'''
-
-        result = RawSql(query,[], DatabaseInfo.SLAVE).fetch_all()
+        db = DatabaseInfo.DEFAULT
+        if settings.USE_SLAVE_DB:
+            db = DatabaseInfo.SLAVE
+        result = RawSql(query,[], db).fetch_all()
 
 
         # specializations = location_models.EntityUrls.objects.filter(url_type='SEARCHURL', entity_type__iexact='Doctor',
@@ -866,6 +889,7 @@ class SearchUrlsViewSet(viewsets.GenericViewSet):
         return Response({"specialization_inventory": result})
 
     def specialities_in_localities_list(self, request, specialization_id):
+        from django.conf import settings
         if not specialization_id:
             return Response(status=status.HTTP_404_NOT_FOUND)
 
@@ -883,8 +907,11 @@ class SearchUrlsViewSet(viewsets.GenericViewSet):
                 )t ''' 
 
         query1 ='''{query} order by city_num, row_num'''.format(query=query)
+        db = DatabaseInfo.DEFAULT
+        if settings.USE_SLAVE_DB:
+            db = DatabaseInfo.SLAVE
 
-        sql_urls = RawSql(query1,[specialization_id], DatabaseInfo.SLAVE).fetch_all()
+        sql_urls = RawSql(query1,[specialization_id], db).fetch_all()
         if sql_urls:
             pages = int(sql_urls[-1].get('city_num')/25)
             if not sql_urls[-1].get('city_num') % 25 == 0:
@@ -962,11 +989,16 @@ class SearchUrlsViewSet(viewsets.GenericViewSet):
         return Response({"static_footer": static_footer_urls})
 
     def top_cities(self, sitemap_identifier):
+        from django.conf import settings
         query = '''select city from seo_cities sc inner join entity_urls eu
                    on sc.city iLIKE eu.locality_value and eu.sitemap_identifier=%s 
                    and eu.is_valid=True order by rank limit 10;'''
 
-        sql_urls = RawSql(query, [sitemap_identifier], DatabaseInfo.SLAVE).fetch_all()
+        db = DatabaseInfo.DEFAULT
+        if settings.USE_SLAVE_DB:
+            db = DatabaseInfo.SLAVE
+
+        sql_urls = RawSql(query, [sitemap_identifier], db).fetch_all()
 
         result = []
 
@@ -976,6 +1008,7 @@ class SearchUrlsViewSet(viewsets.GenericViewSet):
         return result
 
     def top_specialities_in_top_cities(self,request):
+        from django.conf import  settings
         cities = self.top_cities(EntityUrls.SitemapIdentifier.DOCTORS_CITY)
         list = []
         resp = {}
@@ -989,7 +1022,11 @@ class SearchUrlsViewSet(viewsets.GenericViewSet):
                     inner join 
                     entity_urls eu on eu.is_valid=true and eu.sitemap_identifier='SPECIALIZATION_CITY' and lower(x.city) = lower(eu.locality_value) 
                     and eu.specialization_id=x.specialization_id order by city_rank nulls last ,city, specialization_rank nulls last, x.specialization_id'''
-        result = RawSql(query, [], DatabaseInfo.SLAVE).fetch_all()
+        db = DatabaseInfo.DEFAULT
+        if settings.USE_SLAVE_DB:
+            db = DatabaseInfo.SLAVE
+
+        result = RawSql(query, [], db).fetch_all()
         for data in result:
             if not resp.get(data.get('city')):
                 title = 'Doctors in ' + data.get('city')

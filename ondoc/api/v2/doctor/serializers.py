@@ -822,6 +822,9 @@ class PartnerLabTestsListSerializer(serializers.Serializer):
                                                                     .prefetch_related(
                                                                         'lab__lab_pricing_group',
                                                                         'lab__lab_pricing_group__available_lab_tests',
+                                                                        'lab__lab_pricing_group__available_lab_tests__test',
+                                                                        'lab__lab_pricing_group__available_lab_tests__test__packages',
+                                                                        'lab__lab_pricing_group__available_lab_tests__test__parameter',
                                                                         'lab__lab_pricing_group__available_lab_tests__sample_details',
                                                                         'lab__lab_pricing_group__available_lab_tests__sample_details__sample',
                                                                     ) \
@@ -860,8 +863,10 @@ class SampleCollectOrderCreateOrUpdateSerializer(serializers.Serializer):
         order_obj = provider_models.PartnerLabSamplesCollectOrder.objects.filter(id=id).first()
         if id and not order_obj:
             raise serializers.ValidationError('invalid order id')
-        if attrs.get('status') and order_obj and not order_obj.status_update_checks(attrs.get('status')):
-            raise serializers.ValidationError("incorrect status update")
+        if attrs.get('status') and order_obj:
+            status_update_check = order_obj.status_update_checks(attrs.get('status'))
+            if not status_update_check["is_correct"]:
+                raise serializers.ValidationError(status_update_check["message"])
         if attrs.get('only_status_update'):
             if not attrs.get('id'):
                 raise serializers.ValidationError('Order id is required for just status update')
@@ -888,6 +893,9 @@ class SampleCollectOrderCreateOrUpdateSerializer(serializers.Serializer):
                                                                                                'hospital__hospital_doctors__doctor',
                                                                                                'lab__lab_pricing_group',
                                                                                                'lab__lab_pricing_group__available_lab_tests',
+                                                                                               'lab__lab_pricing_group__available_lab_tests__test',
+                                                                                               'lab__lab_pricing_group__available_lab_tests__test__packages',
+                                                                                               'lab__lab_pricing_group__available_lab_tests__test__parameter',
                                                                                                'lab__lab_pricing_group__available_lab_tests__sample_details',
                                                                                                'lab__lab_pricing_group__available_lab_tests__sample_details__sample',
                                                                                                ) \
@@ -923,7 +931,10 @@ class SampleCollectOrderCreateOrUpdateSerializer(serializers.Serializer):
 
 
 class SelectedTestsDetailsSerializer(serializers.ModelSerializer):
-    b2c_rate = serializers.SerializerMethodField()
+    b2c_rate = serializers.SerializerMethodField()              # temporarily mrp
+    mrp = serializers.FloatField()                              # mrp
+    hospital_price = serializers.SerializerMethodField()        # deal price
+    b2b_price = serializers.SerializerMethodField()             # agreed price
     lab_test_id = serializers.IntegerField(source="test.id")
     lab_test_name = serializers.CharField(source="test.name")
     lab_test_is_package = serializers.BooleanField(source="test.is_package")
@@ -931,8 +942,16 @@ class SelectedTestsDetailsSerializer(serializers.ModelSerializer):
     lab_test_parameter_details = serializers.SerializerMethodField()
 
     def get_b2c_rate(self, obj):
-        return int(obj.mrp) if obj.mrp else 0
+        return float(obj.mrp) if obj.mrp else 0
         # return int(obj.get_deal_price())
+
+    def get_hospital_price(self, obj):
+        deal_price = obj.get_deal_price()
+        return float(deal_price) if deal_price else None
+
+    def get_b2b_price(self, obj):
+        agreed_price = obj.custom_agreed_price if obj.custom_agreed_price else obj.computed_agreed_price
+        return float(agreed_price) if agreed_price else None
 
     def get_lab_test_package_details(self, obj):
         package_details = list()
@@ -951,8 +970,8 @@ class SelectedTestsDetailsSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = diag_models.AvailableLabTest
-        fields = ('b2c_rate', 'lab_test_id', 'lab_test_name', 'lab_test_is_package', 'lab_test_package_details',
-                  'lab_test_parameter_details')
+        fields = ('b2c_rate', 'mrp', 'hospital_price', 'b2b_price', 'lab_test_id', 'lab_test_name',
+                  'lab_test_is_package', 'lab_test_package_details', 'lab_test_parameter_details')
 
 
 class PartnerLabTestSampleDetailsModelSerializer(serializers.ModelSerializer):
@@ -1009,7 +1028,7 @@ class PartnerLabSamplesCollectOrderModelSerializer(serializers.ModelSerializer):
     class Meta:
         model = provider_models.PartnerLabSamplesCollectOrder
         fields = ('id', 'created_at', 'updated_at', 'status', 'collection_datetime', 'samples', 'offline_patient',
-                  'lab', 'hospital', 'doctor', 'lab_alerts', 'selected_tests_details', 'lab_reports')
+                  'lab', 'hospital', 'doctor', 'lab_alerts', 'selected_tests_details', 'lab_reports', 'extras')
 
 
 class TestSamplesLabAlertsModelSerializer(serializers.ModelSerializer):

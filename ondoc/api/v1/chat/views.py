@@ -383,3 +383,26 @@ class ChatConsultationViewSet(viewsets.GenericViewSet):
             return Response({"status": 1, "message": "Refund requested."}, status.HTTP_200_OK)
         else:
             return Response({"status": 0, "error": "Consultation already cancelled"}, status.HTTP_400_BAD_REQUEST)
+
+
+class ChatOrderAuthenticatedViewSet(viewsets.GenericViewSet):
+    authentication_classes = (ChatAuthentication,)
+
+    def status(self, request):
+        query_params = request.query_params
+        order_id = query_params.get('order_id')
+
+        order = Order.objects.filter(id=order_id, product_id=Order.CHAT_PRODUCT_ID).first()
+
+        if not order:
+            return Response({"status": 0, "error": "Order not found"}, status.HTTP_400_BAD_REQUEST)
+
+        resp = {
+            'order_id': order.id,
+            'payment_status_code': order.payment_status,
+            'payment_status': dict(Order.PAYMENT_STATUS_CHOICES).get(order.payment_status, ''),
+            'consultation_id': order.reference_id
+        }
+
+        return Response({"status": 1, "data": resp}, status.HTTP_200_OK)
+
