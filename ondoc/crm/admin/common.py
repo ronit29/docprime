@@ -538,7 +538,9 @@ class MerchantPayoutResource(resources.ModelResource):
 
     def dehydrate_api_response(self, merchant_payout):
         if merchant_payout.api_response and merchant_payout.api_response.get('result', []):
-            return merchant_payout.api_response.get('result')[0]['responseError']
+            result = merchant_payout.api_response.get('result')[0]
+            if result.get('responseError', ''):
+                return result.get('responseError')
 
         return ''
 
