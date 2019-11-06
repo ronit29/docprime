@@ -2018,23 +2018,23 @@ class SendCartUrlViewSet(GenericViewSet):
 
     def send_cart_url(self, request):
         # order_id = request.data.get('orderId', None)
-        utm_source = request.data.get('UtmSource')
-        utm_term = request.data.get('UtmTerm')
-        utm_medium = request.data.get('UtmMedium')
-        utm_campaign = request.data.get('UtmCampaign')
+        utm_source = request.data.get('utm_source')
+        utm_term = request.data.get('utm_term')
+        utm_medium = request.data.get('utm_medium')
+        utm_campaign = request.data.get('utm_campaign')
 
         utm_parameters = ""
         if utm_source:
-            utm_source = "UtmSource=%s&" % utm_source
+            utm_source = "utm_source=%s&" % utm_source
             utm_parameters = utm_parameters + utm_source
         if utm_term:
-            utm_term = "UtmTerm=%s&" % utm_term
+            utm_term = "utm_term=%s&" % utm_term
             utm_parameters = utm_parameters + utm_term
         if utm_medium:
-            utm_medium = "UtmMedium=%s&" % utm_medium
+            utm_medium = "utm_medium=%s&" % utm_medium
             utm_parameters = utm_parameters + utm_medium
         if utm_campaign:
-            utm_campaign = "UtmCampaign=%s" % utm_campaign
+            utm_campaign = "utm_campaign=%s" % utm_campaign
             utm_parameters = utm_parameters + utm_campaign
 
         user_token = JWTAuthentication.generate_token(request.user)
