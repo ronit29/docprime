@@ -2,6 +2,7 @@ from ondoc.account.models import ConsumerAccount, Order
 from ondoc.api.v1.utils import payment_details
 from ondoc.authentication.models import UserSecretKey, UserProfile
 from ondoc.chat import models
+from ondoc.chat.models import ChatConsultation
 from ondoc.doctor import models as doc_models
 from ondoc.authentication import models as auth_models
 from ondoc.api.v1.doctor import serializers as doc_serializers
@@ -322,7 +323,7 @@ class ChatOrderViewSet(viewsets.GenericViewSet):
             process_immediately = False
 
         action = Order.CHAT_CONSULTATION_CREATE
-        action_data = {"user": user.id, "plan_id": plan_id, "extra_details": details, "effective_price": float(amount_to_paid),
+        action_data = {"user": user.id, "plan_id": plan_id, "extra_details": json.loads(details), "effective_price": float(amount_to_paid),
                        "amount": float(amount), "cashback": float(cashback_amount), "promotional_amount": float(promotional_amount), "room_id": rid}
 
         pg_order = Order.objects.create(
@@ -350,3 +351,58 @@ class ChatOrderViewSet(viewsets.GenericViewSet):
             resp['data'], resp["payment_required"] = payment_details(request, pg_order)
 
         return Response(resp, status=status.HTTP_200_OK)
+
+
+class ChatConsultationViewSet(viewsets.GenericViewSet):
+
+    @transaction.atomic()
+    def cancel(self, request):
+        from ondoc.notification.tasks import save_pg_response
+        from ondoc.account.mongo_models import PgLogs
+        user = request.user
+        data = request.data
+
+        if user and user.is_anonymous:
+            return Response({"status": 0, "error": "User not found"}, status.HTTP_401_UNAUTHORIZED)
+
+        consultation_id = data.get('consultation_id')
+        consultation = user.chat_consultation.filter(pk=consultation_id).first()
+
+        if not consultation:
+            return Response({"status": 0, "error": "Consultation not found"}, status.HTTP_400_BAD_REQUEST)
+
+        order = user.orders.filter(reference_id=consultation.id).first()
+        order_id = order.id if order else None
+
+        save_pg_response.apply_async((PgLogs.CHAT_CONSULTATION_CANCEL, order_id, None, None, request.data, user.id),
+                                     eta=timezone.localtime(), )
+
+        if consultation.status != ChatConsultation.CANCELLED:
+            refund_flag = 1
+            consultation.action_cancelled(refund_flag)
+            return Response({"status": 1, "message": "Refund requested."}, status.HTTP_200_OK)
+        else:
+            return Response({"status": 0, "error": "Consultation already cancelled"}, status.HTTP_400_BAD_REQUEST)
+
+
+class ChatOrderAuthenticatedViewSet(viewsets.GenericViewSet):
+    authentication_classes = (ChatAuthentication,)
+
+    def status(self, request):
+        query_params = request.query_params
+        order_id = query_params.get('order_id')
+
+        order = Order.objects.filter(id=order_id, product_id=Order.CHAT_PRODUCT_ID).first()
+
+        if not order:
+            return Response({"status": 0, "error": "Order not found"}, status.HTTP_400_BAD_REQUEST)
+
+        resp = {
+            'order_id': order.id,
+            'payment_status_code': order.payment_status,
+            'payment_status': dict(Order.PAYMENT_STATUS_CHOICES).get(order.payment_status, ''),
+            'consultation_id': order.reference_id
+        }
+
+        return Response({"status": 1, "data": resp}, status.HTTP_200_OK)
+

@@ -15,7 +15,7 @@ from ondoc.banner.models import EmailBanner
 from ondoc.doctor.models import OpdAppointment, Hospital, OfflineOPDAppointments
 from ondoc.coupon.models import Coupon
 from ondoc.diagnostic.models import LabAppointment
-from ondoc.provider.models import EConsultation
+from ondoc.provider.models import EConsultation, PartnerLabSamplesCollectOrder
 from ondoc.common.models import UserConfig
 from django.core.files.uploadedfile import SimpleUploadedFile, TemporaryUploadedFile, InMemoryUploadedFile
 from django.forms import model_to_dict
@@ -226,6 +226,9 @@ def get_title_body(notification_type, context, user):
     elif notification_type == NotificationAction.E_CONSULT_NEW_MESSAGE_RECEIVED:
         title = "New Message"
         body = "A new message has been just posted in the econsultation chat."
+    elif notification_type == NotificationAction.PARTNER_LAB_REPORT_UPLOADED:
+        title = "Test Report(s) Generated!"
+        body = "Lab test(s) report for {} is now available.View now!".format(patient_name)
     context.update({'title': title, 'body': body})
 
 
@@ -265,11 +268,21 @@ class Notification:
         {
             EConsultation.BOOKED: NotificationAction.ECONSULTATION_BOOKED,
             EConsultation.ACCEPTED: NotificationAction.ECONSULTATION_ACCEPTED,
-            EConsultation.RESCHEDULED_DOCTOR: NotificationAction.OFFLINE_OPD_APPOINTMENT_RESCHEDULED_DOCTOR,
-            EConsultation.RESCHEDULED_PATIENT: NotificationAction.OFFLINE_OPD_APPOINTMENT_NO_SHOW,
-            EConsultation.CANCELLED: NotificationAction.OFFLINE_OPD_APPOINTMENT_CANCELLED,
-            EConsultation.COMPLETED: NotificationAction.OFFLINE_OPD_INVOICE,
-            EConsultation.EXPIRED: NotificationAction.OFFLINE_OPD_INVOICE
+            EConsultation.RESCHEDULED_DOCTOR: NotificationAction.ECONSULTATION_RESCHEDULED_DOCTOR,
+            EConsultation.RESCHEDULED_PATIENT: NotificationAction.ECONSULTATION_RESCHEDULED_PATIENT,
+            EConsultation.CANCELLED: NotificationAction.ECONSULTATION_CANCELLED,
+            EConsultation.COMPLETED: NotificationAction.ECONSULTATION_COMPLETED,
+            EConsultation.EXPIRED: NotificationAction.ECONSULTATION_EXPIRED
+        }
+    PARTNER_LAB_NOTIFICATION_TYPE_MAPPING = \
+        {
+            PartnerLabSamplesCollectOrder.SAMPLE_EXTRACTION_PENDING: NotificationAction.PARTNER_LAB_SAMPLE_EXTRACTION_PENDING,
+            PartnerLabSamplesCollectOrder.SAMPLE_SCAN_PENDING: NotificationAction.PARTNER_LAB_SAMPLE_SCAN_PENDING,
+            PartnerLabSamplesCollectOrder.SAMPLE_PICKUP_PENDING: NotificationAction.PARTNER_LAB_SAMPLE_PICKUP_PENDING,
+            PartnerLabSamplesCollectOrder.SAMPLE_PICKED_UP: NotificationAction.PARTNER_LAB_SAMPLE_PICKED_UP,
+            PartnerLabSamplesCollectOrder.PARTIAL_REPORT_GENERATED: NotificationAction.PARTNER_LAB_PARTIAL_REPORT_GENERATED,
+            PartnerLabSamplesCollectOrder.REPORT_GENERATED: NotificationAction.PARTNER_LAB_REPORT_GENERATED,
+            PartnerLabSamplesCollectOrder.REPORT_VIEWED: NotificationAction.PARTNER_LAB_REPORT_VIEWED
         }
 
 
@@ -404,19 +417,46 @@ class SMSNotification:
     def get_template_object(self, user):
         notification_type = self.notification_type
         obj = None
-        if notification_type == NotificationAction.APPOINTMENT_ACCEPTED:
+        if notification_type == NotificationAction.COD_TO_PREPAID_REQUEST:
+            obj = DynamicTemplates.objects.filter(template_name="COD_to_Prepaid_SMS_to_customer", approved=True).first()
+        elif notification_type == NotificationAction.APPOINTMENT_ACCEPTED:
             obj = DynamicTemplates.objects.filter(template_name="Confirmation_IPD_OPD", approved=True).first()
         elif notification_type == NotificationAction.APPOINTMENT_BOOKED and (not user or user.user_type == User.DOCTOR) and (self.context.get('payment_type') == 2):
             obj = DynamicTemplates.objects.filter(template_name="Booking_Provider_Pay_at_clinic", approved=True).first()
         elif notification_type == NotificationAction.APPOINTMENT_BOOKED and (not user or user.user_type == User.DOCTOR) and (self.context.get('payment_type') == 1 or self.context.get('payment_type') == 3):
             obj = DynamicTemplates.objects.filter(template_name="Booking_Provider_SMS_OPD_Insurance_And_Prepaid", approved=True).first()
+        elif notification_type == NotificationAction.LAB_APPOINTMENT_BOOKED and (not user or user.user_type == User.DOCTOR):
+            obj = DynamicTemplates.objects.filter(template_name="provider_sms_lab_bookings_prepaid_OPD_insurance", approved=True).first()
         elif notification_type == NotificationAction.APPOINTMENT_BOOKED and user and user.user_type == User.CONSUMER and user.recent_opd_appointment.first().payment_type == 2:
             obj = DynamicTemplates.objects.filter(template_name="Booking_customer_pay_at_clinic", approved=True).first()
         elif notification_type == NotificationAction.OPD_OTP_BEFORE_APPOINTMENT:
             obj = DynamicTemplates.objects.filter(template_name="Reminder_appointment", approved=True).first()
         elif notification_type == NotificationAction.SEND_LENSFIT_COUPON:
             obj = DynamicTemplates.objects.filter(template_name="Lensfit_sms", approved=True).first()
+        elif notification_type == NotificationAction.PLUS_MEMBERSHIP_CONFIRMED:
+            obj = DynamicTemplates.objects.filter(template_name="Docprime_vip_welcome_message", approved=True).first()
 
+        elif notification_type == NotificationAction.OFFLINE_OPD_APPOINTMENT_ACCEPTED:
+            obj = DynamicTemplates.objects.filter(template_name="OFFLINE_OPD_APPOINTMENT_ACCEPTED", approved=True).first()
+        elif notification_type == NotificationAction.OFFLINE_OPD_APPOINTMENT_CANCELLED:
+            obj = DynamicTemplates.objects.filter(template_name="OFFLINE_OPD_APPOINTMENT_CANCELLED", approved=True).first()
+        elif notification_type == NotificationAction.OFFLINE_OPD_APPOINTMENT_RESCHEDULED_DOCTOR:
+            obj = DynamicTemplates.objects.filter(template_name="OFFLINE_OPD_APPOINTMENT_RESCHEDULED_DOCTOR", approved=True).first()
+        elif notification_type == NotificationAction.OFFLINE_APPOINTMENT_REMINDER_PROVIDER_SMS:
+            obj = DynamicTemplates.objects.filter(template_name="OFFLINE_APPOINTMENT_REMINDER_PROVIDER_SMS", approved=True).first()
+        elif notification_type == NotificationAction.OFFLINE_OPD_APPOINTMENT_COMPLETED:
+            obj = DynamicTemplates.objects.filter(template_name="OFFLINE_OPD_APPOINTMENT_COMPLETED", approved=True).first()
+        elif notification_type == NotificationAction.OFFLINE_PATIENT_WELCOME_MESSAGE:
+            obj = DynamicTemplates.objects.filter(template_name="OFFLINE_PATIENT_WELCOME_MESSAGE", approved=True).first()
+
+        elif notification_type == NotificationAction.PARTNER_LAB_ORDER_PLACED_SUCCESSFULLY and user and user.user_type == User.DOCTOR:
+            obj = DynamicTemplates.objects.filter(template_name="cloud_labs_order_success_provider", approved=True).first()
+        elif notification_type == NotificationAction.PARTNER_LAB_ORDER_PLACED_SUCCESSFULLY:
+            obj = DynamicTemplates.objects.filter(template_name="cloud_labs_order_success_patient", approved=True).first()
+        elif notification_type == NotificationAction.PARTNER_LAB_REPORT_UPLOADED and user and user.user_type == User.DOCTOR:
+            obj = DynamicTemplates.objects.filter(template_name="cloud_labs_report_success_provider", approved=True).first()
+        elif notification_type == NotificationAction.PARTNER_LAB_REPORT_UPLOADED:
+            obj = DynamicTemplates.objects.filter(template_name="cloud_labs_report_success_patient", approved=True).first()
         return obj
 
     def trigger(self, receiver, template, context):
@@ -510,7 +550,6 @@ class SMSNotification:
         return context, click_login_token_obj
 
     def send(self, receivers):
-
         dispatch_response, receivers = self.dispatch(receivers)
         if dispatch_response:
             return
@@ -532,28 +571,30 @@ class SMSNotification:
 
     def dispatch(self, receivers):
         context = self.context
+        instance = context.get("instance")
         if not context:
             return None, receivers
 
         receivers_left = list()
 
+        click_login_token_objects = list()
         for receiver in receivers:
+            if receiver.get('user') and receiver.get('user').user_type == User.DOCTOR \
+                    and not instance.__class__ in [PartnerLabSamplesCollectOrder]:
+                context, click_login_token_obj = self.save_token_to_context(context, receiver.get('user'))
+                click_login_token_objects.append(click_login_token_obj)
+            elif context.get('provider_login_url'):
+                context.pop('provider_login_url')
+
             obj = self.get_template_object(receiver.get('user'))
             if not obj:
                 receivers_left.append(receiver)
             else:
-                click_login_token_objects = list()
+                # click_login_token_objects = list()
                 user = receiver.get('user')
                 phone_number = receiver.get('phone_number')
                 if not phone_number:
                     phone_number = user.phone_number
-
-                # if user and user.user_type == User.DOCTOR:
-                #     context, click_login_token_obj = self.save_token_to_context(context, receiver['user'])
-                #     click_login_token_objects.append(click_login_token_obj)
-                # elif context.get('provider_login_url'):
-                #     context.pop('provider_login_url')
-                # ClickLoginToken.objects.bulk_create(click_login_token_objects)
 
                 instance = context.get('instance')
 
@@ -567,6 +608,8 @@ class SMSNotification:
                         continue
 
                 obj.send_notification(context, phone_number, self.notification_type, user=user)
+
+        ClickLoginToken.objects.bulk_create(click_login_token_objects) if click_login_token_objects else None
 
         if not receivers_left:
             return True, receivers_left
@@ -1449,6 +1492,7 @@ class PUSHNotification:
         context = copy.deepcopy(context)
         context.pop("instance", None)
         context.pop('time_slot_start', None)
+        context.pop('order_date_time', None)
         context.pop('hospitals_not_required_unique_code', None)
         context.pop('procedures', None)
         if user:
@@ -1576,7 +1620,7 @@ class OpdNotification(Notification):
         }
         return context
 
-    def send(self, is_valid_for_provider):
+    def send(self, is_valid_for_provider=True):
         context = self.get_context()
         notification_type = self.notification_type
         all_receivers = self.get_receivers(is_valid_for_provider)
@@ -1632,10 +1676,12 @@ class OpdNotification(Notification):
 
         doctor_spocs = instance.hospital.get_spocs_for_communication() if instance.hospital else []
         spocs_to_be_communicated = []
-        if notification_type in [NotificationAction.APPOINTMENT_ACCEPTED,
+        if notification_type in [NotificationAction.DOCTOR_INVOICE]:
+            if instance.payment_type not in [2, 3]:
+                receivers.append(instance.user)
+        elif notification_type in [NotificationAction.APPOINTMENT_ACCEPTED,
                                  NotificationAction.APPOINTMENT_RESCHEDULED_BY_DOCTOR,
                                  NotificationAction.PRESCRIPTION_UPLOADED,
-                                 NotificationAction.DOCTOR_INVOICE,
                                  NotificationAction.OPD_OTP_BEFORE_APPOINTMENT,
                                  NotificationAction.OPD_CONFIRMATION_CHECK_AFTER_APPOINTMENT,
                                  NotificationAction.OPD_CONFIRMATION_SECOND_CHECK_AFTER_APPOINTMENT,
@@ -1713,11 +1759,12 @@ class LabNotification(Notification):
         if notification_type:
             self.notification_type = notification_type
         else:
-            self.notification_type = self.LAB_NOTIFICATION_TYPE_MAPPING[appointment.status]
+            self.notification_type = self.LAB_NOTIFICATION_TYPE_MAPPING.get(appointment.status)
 
     def get_context(self):
         instance = self.appointment
         patient_name = instance.profile.name.title() if instance.profile.name else ""
+        patient_age = instance.profile.get_age()
         lab_name = instance.lab.name.title() if instance.lab.name else ""
         est = pytz.timezone(settings.TIME_ZONE)
         time_slot_start = self.appointment.time_slot_start.astimezone(est)
@@ -1756,6 +1803,7 @@ class LabNotification(Notification):
         context = {
             "lab_name": lab_name,
             "patient_name": patient_name,
+            "age": patient_age,
             "id": instance.id,
             "instance": instance,
             "url": "/lab/appointment/{}".format(instance.id),
@@ -1765,6 +1813,8 @@ class LabNotification(Notification):
             "pickup_address": self.appointment.get_pickup_address(),
             "coupon_discount": str(self.appointment.discount) if self.appointment.discount else None,
             "time_slot_start": time_slot_start,
+            "time_slot_start_date": str(time_slot_start.strftime("%b %d %Y")),
+            "time_slot_start_time": str(time_slot_start.strftime("%I:%M %p")),
             "tests": tests,
             "reports": report_file_links,
             "attachments": {},  # Updated later
@@ -1778,11 +1828,12 @@ class LabNotification(Notification):
             "is_thyrocare_report": is_thyrocare_report,
             "chat_url": chat_url,
             "show_amounts": bool(self.appointment.payment_type != OpdAppointment.INSURANCE),
-            "lensfit_coupon": lensfit_coupon
+            "lensfit_coupon": lensfit_coupon,
+            "visit_type": 'home' if instance.is_home_pickup else 'lab'
         }
         return context
 
-    def send(self, is_valid_for_provider):
+    def send(self, is_valid_for_provider=True):
         context = self.get_context()
         notification_type = self.notification_type
         all_receivers = self.get_receivers(is_valid_for_provider)
@@ -1836,10 +1887,12 @@ class LabNotification(Notification):
         # lab_spocs = instance.get_lab_admins()
         lab_managers = instance.lab.get_managers_for_communication() if instance.lab else []
         lab_managers_to_be_communicated = []
-        if notification_type in [NotificationAction.LAB_APPOINTMENT_ACCEPTED,
+        if notification_type in [NotificationAction.LAB_INVOICE]:
+            if instance.payment_type not in [2, 3]:
+                receivers.append(instance.user)
+        elif notification_type in [NotificationAction.LAB_APPOINTMENT_ACCEPTED,
                                  NotificationAction.LAB_APPOINTMENT_RESCHEDULED_BY_LAB,
                                  NotificationAction.LAB_REPORT_UPLOADED,
-                                 NotificationAction.LAB_INVOICE,
                                  NotificationAction.LAB_OTP_BEFORE_APPOINTMENT,
                                  NotificationAction.LAB_CONFIRMATION_CHECK_AFTER_APPOINTMENT,
                                  NotificationAction.LAB_CONFIRMATION_SECOND_CHECK_AFTER_APPOINTMENT,
@@ -2208,8 +2261,9 @@ class OfflineOpdAppointments(Notification):
             "clinic_or_hospital": clinic_or_hospital,
             "action_type": NotificationAction.OFFLINE_OPD_APPOINTMENT,
             "action_id": self.appointment.id,
-            "time_slot_start": time_slot_start,
-            "welcome_message": self.appointment.user.welcome_message
+            "opd_time_slot_start": time_slot_start,
+            "welcome_message": self.appointment.user.welcome_message,
+            "admin_phone_no": self.appointment.booked_by.phone_number,
         }
         return context
 
@@ -2338,3 +2392,133 @@ class EConsultationComm(Notification):
             app_notification.send(all_receivers.get('app_receivers', []))
             whtsapp_notification.send(all_receivers.get('sms_receivers', []))
             push_notification.send(all_receivers.get('push_receivers', []))
+
+
+class VipNotification(Notification):
+
+    def __init__(self, plus_user_obj, notification_type=None):
+        self.plus_user_obj= plus_user_obj
+        self.notification_type = notification_type
+
+    def get_context(self):
+        instance = self.plus_user_obj
+
+        context = {
+            'expiry_date': str(aware_time_zone(instance.expire_date).date().strftime('%d %b %Y')),
+        }
+
+        return context
+
+    def get_receivers(self):
+
+        all_receivers = {}
+        instance = self.plus_user_obj
+        if not instance:
+            return {}
+
+        user_and_phone_number = []
+        user_and_email = []
+
+        proposer = instance.get_primary_member_profile()
+
+        user_and_email.append({'user': instance.user, 'email': proposer.email})
+        user_and_phone_number.append({'user': instance.user, 'phone_number': proposer.phone_number})
+
+        all_receivers['sms_receivers'] = user_and_phone_number
+        all_receivers['email_receivers'] = user_and_email
+
+        return all_receivers
+
+    def send(self):
+        context = self.get_context()
+        notification_type = self.notification_type
+        all_receivers = self.get_receivers()
+
+        if notification_type in [NotificationAction.PLUS_MEMBERSHIP_CONFIRMED]:
+
+            # email_notification = EMAILNotification(notification_type, context)
+            # email_notification.send(all_receivers.get('email_receivers', []))
+
+            sms_notification = SMSNotification(notification_type, context)
+            sms_notification.send(all_receivers.get('sms_receivers', []))
+
+
+class PartnerLabNotification(Notification):
+
+    def __init__(self, partner_lab_order_obj, notification_type=None, report_list=list()):
+        self.partner_lab_order_obj = partner_lab_order_obj
+        self.notification_type = notification_type if notification_type else self.PARTNER_LAB_NOTIFICATION_TYPE_MAPPING[partner_lab_order_obj.status]
+        self.patient_mobile = str(partner_lab_order_obj.offline_patient.get_patient_mobile())
+        self.report_list = report_list
+
+    def get_context(self):
+        instance = self.partner_lab_order_obj
+        lab_tests_ordered = list()
+        mrp = 0
+        for obj in instance.selected_tests_details:
+            lab_tests_ordered.append(obj['lab_test_name'])
+            mrp += obj['b2c_rate']
+        context = {
+            "instance": instance,
+            "order_id": instance.id,
+            "patient_name": instance.offline_patient.name,
+            "hospital_name": instance.hospital.name,
+            "patient_age": instance.offline_patient.get_age(),
+            "mrp": mrp if mrp else None,
+            "order_date_time": instance.created_at,
+            "lab_tests_ordered": lab_tests_ordered,
+            "admin_contact_no": instance.created_by.phone_number,
+            "support_email": "cloudlabs@docprime.com",
+            "report_list": self.report_list,
+            "action_type": NotificationAction.PARTNER_LAB,
+            "action_id": instance.id,
+            "screen": NotificationAction.PARTNER_LAB_ORDER_DETAILS,
+            "is_open_screen": True,
+            "screen_params": {
+                "order_id": instance.id
+            }
+        }
+        return context
+
+    def get_receivers(self):
+        notification_type = self.notification_type
+        push_receivers = list()
+        all_receivers = {}
+        instance = self.partner_lab_order_obj
+        if not instance:
+            return {}
+
+        user_and_phone_number = []
+        user_and_email = []
+        if notification_type in [NotificationAction.PARTNER_LAB_REPORT_UPLOADED]:
+            if instance.created_by:
+                push_receivers.append(instance.created_by)
+                user_and_phone_number.append({'user': instance.created_by, 'phone_number': instance.created_by.phone_number})
+            if self.patient_mobile:
+                user_and_phone_number.append({'user': instance.offline_patient.user, 'phone_number': self.patient_mobile})
+        if notification_type in [NotificationAction.PARTNER_LAB_ORDER_PLACED_SUCCESSFULLY]:
+            if instance.created_by:
+                user_and_phone_number.append({'user': instance.created_by, 'phone_number': instance.created_by.phone_number})
+            if self.patient_mobile:
+                user_and_phone_number.append({'user': instance.offline_patient.user, 'phone_number': self.patient_mobile})
+        user_and_tokens = NotificationEndpoint.get_user_and_tokens(receivers=push_receivers,
+                                                                   action_type=NotificationAction.PARTNER_LAB)
+        all_receivers['sms_receivers'] = user_and_phone_number
+        all_receivers['email_receivers'] = user_and_email
+        all_receivers['push_receivers'] = user_and_tokens
+
+        return all_receivers
+
+    def send(self):
+        context = self.get_context()
+        notification_type = self.notification_type
+        all_receivers = self.get_receivers()
+
+        if notification_type in [NotificationAction.PARTNER_LAB_REPORT_UPLOADED]:
+            sms_notification = SMSNotification(notification_type, context)
+            sms_notification.send(all_receivers.get('sms_receivers', []))
+            push_notification = PUSHNotification(notification_type, context)
+            push_notification.send(all_receivers.get('push_receivers', []))
+        if notification_type in [NotificationAction.PARTNER_LAB_ORDER_PLACED_SUCCESSFULLY]:
+            sms_notification = SMSNotification(notification_type, context)
+            sms_notification.send(all_receivers.get('sms_receivers', []))

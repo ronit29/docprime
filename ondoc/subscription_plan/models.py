@@ -124,7 +124,12 @@ class UserPlanMapping(auth_model.TimeStampedModel, CouponsMixin):
 
     def save(self, *args, **kwargs):
         if not self.expire_at:
-            self.expire_at = timezone.now() + datetime.timedelta(days=365)
+            if kwargs.get('plus_user_obj'):
+                self.expire_at = kwargs.get('plus_user_obj').expire_date
+                kwargs.pop('plus_user_obj')
+            else:
+                self.expire_at = timezone.now() + datetime.timedelta(days=365)
+
             super().save(*args, **kwargs)
         super().save(*args, **kwargs)
 

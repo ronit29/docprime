@@ -8,6 +8,7 @@ from ondoc.notification import models as notif_models
 from ondoc.matrix.tasks import decrypted_invoice_pdfs, decrypted_prescription_pdfs
 from django.utils.safestring import mark_safe
 from . import serializers
+from ondoc.api.v1.doctor import serializers as v1_doc_serializers
 from ondoc.api.v1 import utils as v1_utils
 from ondoc.sms.api import send_otp
 from django.shortcuts import get_object_or_404
@@ -1425,3 +1426,122 @@ class EConsultationCommViewSet(viewsets.GenericViewSet):
                 logger.error('Error in send new message notification - ' + str(e))
                 return Response({"status": 0, "error": 'Error in send new message notification - ' + str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
         return Response({"status": 1, "message": "success"})
+
+
+class PartnerLabTestSamplesCollectViewset(viewsets.GenericViewSet):
+
+    authentication_classes = (JWTAuthentication,)
+    permission_classes = (IsAuthenticated, v1_utils.IsDoctor)
+
+    # def get_queryset(self):
+    #     request = self.request
+    #     return prov_models.PartnerLabSamplesCollectOrder.objects.prefetch_related('lab_alerts', 'reports') \
+    #                                                             .filter(hospital__manageable_hospitals__phone_number=request.user.phone_number).distinct()
+
+    def tests_list(self, request):
+        serializer = serializers.PartnerLabTestsListSerializer(data=request.query_params, context={'request': request})
+        serializer.is_valid(raise_exception=True)
+        valid_data = serializer.validated_data
+        hosp_lab_list = valid_data['hosp_lab_list']
+        response_list = list()
+        for hosp_lab_dict in hosp_lab_list:
+            hospital = hosp_lab_dict['hospital']
+            lab = hosp_lab_dict['lab']
+            available_lab_tests = lab.lab_pricing_group.available_lab_tests.all()
+            for obj in available_lab_tests:
+                ret_obj = dict()
+                sample_objs = obj.sample_details.all() if hasattr(obj, 'sample_details') else None
+                if not sample_objs or not obj.enabled:
+                    continue
+                ret_obj['hospital_id'] = hospital.id
+                ret_obj['lab_id'] = lab.id
+                ret_obj['lab_name'] = lab.name
+                test_data = serializers.SelectedTestsDetailsSerializer(obj).data
+                ret_obj.update(test_data)
+                sample_data = serializers.PartnerLabTestSampleDetailsModelSerializer(sample_objs, many=True).data
+                ret_obj['sample_data'] = sample_data
+                # if sample_obj:
+                #     sample_data = serializers.PartnerLabTestSampleDetailsModelSerializer(sample_obj).data
+                #     ret_obj.update(sample_data)
+                # else:
+                #     ret_obj['sample_details_id'] = None
+                #     ret_obj['created_at'] = None
+                #     ret_obj['updated_at'] = None
+                #     ret_obj['sample_name'] = None
+                #     ret_obj['material_required'] = None
+                #     ret_obj['sample_volume'] = None
+                #     ret_obj['sample_volume_unit'] = None
+                #     ret_obj['is_fasting_required'] = None
+                #     ret_obj['report_tat'] = None
+                #     ret_obj['reference_value'] = None
+                #     ret_obj['instructions'] = None
+                response_list.append(ret_obj)
+        return Response(response_list)
+
+    def order_create_or_update(self, request):
+        serializer = serializers.SampleCollectOrderCreateOrUpdateSerializer(data=request.data, context={'request': request})
+        serializer.is_valid(raise_exception=True)
+        valid_data = serializer.validated_data
+        order_obj = valid_data.get('order_obj')
+        offline_patient = valid_data.get('offline_patient')
+        hospital = valid_data.get('hospital')
+        doctor = valid_data.get('doctor')
+        lab = valid_data.get('lab')
+        available_lab_tests = valid_data.get('available_lab_tests')
+        lab_alerts = valid_data.get('lab_alerts')
+        barcode_details = valid_data.get('barcode_details')
+        status = valid_data.get('status')
+        only_status_update = valid_data.get('only_status_update')
+        if only_status_update:
+            order_obj.status = status
+            order_obj.save()
+        else:
+            sample_collection_objs = prov_models.PartnerLabTestSampleDetails.get_sample_collection_details(available_lab_tests)
+            samples_data = serializers.LabTestSamplesCollectionBarCodeModelSerializer(sample_collection_objs, many=True,
+                                                                                      context={"barcode_details": barcode_details}).data
+            patient_details = v1_doc_serializers.OfflinePatientSerializer(offline_patient).data
+            patient_details.update({'patient_mobile': str(offline_patient.get_patient_mobile())})
+            selected_tests_details = serializers.SelectedTestsDetailsSerializer(available_lab_tests, many=True).data
+            extras = {
+                'test_count': len(available_lab_tests),
+                'mrp_total': sum(test_detail["mrp"] for test_detail in selected_tests_details),
+                'hospital_price_total': sum(test_detail["hospital_price"] for test_detail in selected_tests_details),
+                'b2b_price_total': sum(test_detail["b2b_price"] for test_detail in selected_tests_details),
+            }
+            if not order_obj:
+                order_obj = prov_models.PartnerLabSamplesCollectOrder(offline_patient=offline_patient,
+                                                                      patient_details=patient_details,
+                                                                      hospital=hospital, doctor=doctor, lab=lab,
+                                                                      samples=samples_data, created_by=request.user,
+                                                                      collection_datetime=valid_data.get("collection_datetime"),
+                                                                      selected_tests_details=selected_tests_details,
+                                                                      status=status,
+                                                                      extras=extras)
+            else:
+                order_obj.status = status
+                order_obj.samples = samples_data
+                order_obj.collection_datetime = valid_data.get("collection_datetime")
+                order_obj.selected_tests_details = selected_tests_details
+                order_obj.extras = extras
+            order_obj.save()
+            if lab_alerts:
+                order_obj.lab_alerts.set(lab_alerts, clear=True)
+            order_obj.available_lab_tests.set(available_lab_tests, clear=True)
+        order_model_serializer = serializers.PartnerLabSamplesCollectOrderModelSerializer(order_obj, context={'request': request})
+        return Response({"status": 1, "message": "Sample Collection Order created successfully",
+                         "data": order_model_serializer.data})
+
+    def lab_alerts(self, request):
+        lab_alerts_queryset = prov_models.TestSamplesLabAlerts.objects.all()
+        data = serializers.TestSamplesLabAlertsModelSerializer(lab_alerts_queryset, many=True).data
+        return Response(data)
+
+    def orders_list(self, request):
+        filter_kwargs = dict()
+        if request.query_params.get('id'):
+            filter_kwargs['id'] = request.query_params.get('id')
+        queryset = prov_models.PartnerLabSamplesCollectOrder.objects.prefetch_related('lab_alerts', 'reports') \
+                                                                    .filter(**filter_kwargs,
+                                                                            hospital__manageable_hospitals__phone_number=request.user.phone_number).distinct()
+        data = serializers.PartnerLabSamplesCollectOrderModelSerializer(queryset, context={'request': request}, many=True).data
+        return Response(data)

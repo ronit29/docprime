@@ -345,6 +345,12 @@ class User(AbstractBaseUser, PermissionsMixin):
         active_plus_user = self.active_plus_users.filter().order_by('-id').first()
         return active_plus_user if active_plus_user and active_plus_user.is_valid() else None
 
+    @cached_property
+    def inactive_plus_user(self):
+        from ondoc.plus.models import PlusUser
+        inactive_plus_user = PlusUser.objects.filter(status=PlusUser.INACTIVE, user_id=self.id).order_by('-id').first()
+        return inactive_plus_user if inactive_plus_user else None
+
     @classmethod
     def get_external_login_data(cls, data):
         from ondoc.authentication.backends import JWTAuthentication
@@ -646,6 +652,15 @@ class UserProfile(TimeStampedModel):
         return None
         # return static('doctor_images/no_image.png')
 
+    @cached_property
+    def get_plus_membership(self):
+        plus_member = self.plus_member.all().order_by('-id').first()
+        if plus_member:
+            return plus_member.plus_user if plus_member.plus_user.is_valid() else None
+
+        return None
+
+
     def has_image_changed(self):
         if not self.pk:
             return True
@@ -727,6 +742,8 @@ class UserProfile(TimeStampedModel):
 
 class OtpVerifications(TimeStampedModel):
     OTP_EXPIRY_TIME = 120  # In minutes
+    MAX_GENERATE_REQUESTS_COUNT = 3
+    TIME_BETWEEN_CONSECUTIVE_REQUESTS = 20 # In seconds
     phone_number = models.CharField(max_length=10)
     code = models.CharField(max_length=10)
     country_code = models.CharField(max_length=10)
@@ -734,6 +751,7 @@ class OtpVerifications(TimeStampedModel):
     otp_request_source = models.CharField(null=True, max_length=200, blank=True)
     via_whatsapp = models.NullBooleanField(null=True)
     via_sms = models.NullBooleanField(null=True)
+    req_count = models.PositiveSmallIntegerField(default=1, max_length=1, null=True, blank=True)
 
     def can_send(self):
         from ondoc.notification.models import WhtsappNotification, NotificationAction
@@ -1156,6 +1174,7 @@ class GenericAdmin(TimeStampedModel, CreatedByModel):
                                related_name='manageable_doctors')
     permission_type = models.PositiveSmallIntegerField(choices=type_choices, default=APPOINTMENT)
     is_doc_admin = models.BooleanField(default=False)
+    is_partner_lab_admin = models.NullBooleanField()
     is_disabled = models.BooleanField(default=False)
     super_user_permission = models.BooleanField(default=False)
     read_permission = models.BooleanField(default=False)
@@ -2137,10 +2156,13 @@ class RefundMixin(object):
         if self.payment_type == OpdAppointment.PREPAID and ConsumerTransaction.valid_appointment_for_cancellation(self.id, product_id):
             RefundDetails.log_refund(self)
             wallet_refund, cashback_refund = self.get_cancellation_breakup()
+            if hasattr(self, 'promotional_amount'):
+                consumer_account.debit_promotional(self)
             consumer_account.credit_cancellation(self, product_id, wallet_refund, cashback_refund)
             if refund_flag:
                 ctx_obj = consumer_account.debit_refund()
-                ConsumerRefund.initiate_refund(self.user, ctx_obj) if initiate_refund else None
+                if initiate_refund:
+                    ConsumerRefund.initiate_refund(self.user, ctx_obj)
 
     def can_agent_refund(self, user):
         from ondoc.crm.constants import constants
@@ -2225,7 +2247,7 @@ class UserNumberUpdate(TimeStampedModel):
 
 class UserProfileEmailUpdate(TimeStampedModel):
     profile = models.ForeignKey(UserProfile, on_delete=models.DO_NOTHING, related_name="email_updates")
-    old_email = models.CharField(max_length=256, blank=False)
+    old_email = models.CharField(max_length=256, blank=True, null=True)
     new_email = models.CharField(max_length=256, blank=False)
     otp_verified = models.BooleanField(default=False)
     is_successfull = models.BooleanField(default=False)
@@ -2307,7 +2329,7 @@ class PaymentMixin(object):
         order = Order.objects.filter(product_id=self.PRODUCT_ID,
                                          reference_id=self.id).first()
         if order:
-            order_parent = order.parent
+            order_parent = order.parent if not order.is_parent() else order;
             txn_obj = PgTransaction.objects.filter(order=order_parent).first() if order_parent else None
 
             if txn_obj and txn_obj.is_preauth():

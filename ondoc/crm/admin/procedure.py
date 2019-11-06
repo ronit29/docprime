@@ -10,6 +10,8 @@ from django.urls import reverse
 from django.utils.safestring import mark_safe
 from import_export import resources, fields, widgets
 from import_export.admin import ImportExportMixin
+
+from ondoc.crm import constants
 from ondoc.notification import tasks as notification_tasks
 from reversion.admin import VersionAdmin
 
@@ -217,6 +219,11 @@ class IpdProcedureAdmin(VersionAdmin):
                                                                             content_type.model), args=[object_id]))
         return super().delete_view(request, object_id, extra_context)
 
+    def get_fields(self, request, obj=None):
+        fields = super().get_fields(request, obj)
+        if request.user.is_member_of(constants.constants['ARTICLE_TEAM']):
+            fields = ['about']
+        return fields
 
 class FeatureAdmin(VersionAdmin):
     model = Feature

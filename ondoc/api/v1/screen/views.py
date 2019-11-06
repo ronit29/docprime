@@ -1,12 +1,15 @@
-from django.db.models import F
-from rest_framework import viewsets
+from django.contrib.gis.db.models.functions import Distance
+from django.db.models import F, Count, Q
+from rest_framework import viewsets, serializers
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 
+from ondoc.api.v1.doctor import serializers
 from ondoc.api.v1.auth.views import AppointmentViewSet
 from ondoc.api.v1.doctor.city_match import city_match
 from ondoc.api.v1.insurance.serializers import InsuranceCityEligibilitySerializer
-from ondoc.api.v1.procedure.serializers import CommonIpdProcedureSerializer
+from ondoc.api.v1.procedure.serializers import CommonIpdProcedureSerializer, CommonCategoriesSerializer
+from ondoc.api.v1.utils import common_package_category
 from ondoc.authentication.backends import JWTAuthentication
 from ondoc.common.utils import get_all_upcoming_appointments
 from ondoc.coupon.models import CouponRecommender
@@ -17,7 +20,7 @@ from ondoc.banner.models import Banner
 from ondoc.common.models import PaymentOptions, UserConfig
 from ondoc.insurance.models import InsuranceEligibleCities
 from ondoc.location.models import EntityUrls
-from ondoc.procedure.models import CommonIpdProcedure
+from ondoc.procedure.models import CommonIpdProcedure, CommonProcedureCategory
 from ondoc.tracking.models import TrackingEvent
 from ondoc.common.models import UserConfig
 from ondoc.ratings_review.models import AppRatings
@@ -33,6 +36,7 @@ class ScreenViewSet(viewsets.GenericViewSet):
 
 
     def home_page(self, request, *args, **kwargs):
+        from django.contrib.gis.geos import GEOSGeometry
 
         show_search_header = True
         show_footer = True
@@ -62,12 +66,13 @@ class ScreenViewSet(viewsets.GenericViewSet):
                 'longitude': long
             }
 
-            serializer = InsuranceCityEligibilitySerializer(data=data)
-            serializer.is_valid(raise_exception=True)
-            data = serializer.validated_data
-            city_name = InsuranceEligibleCities.get_nearest_city(data.get('latitude'), data.get('longitude'))
-            if city_name:
-                insurance_availability = True
+            # serializer = InsuranceCityEligibilitySerializer(data=data)
+            # serializer.is_valid(raise_exception=True)
+            # data = serializer.validated_data
+            # Commented for App - As we are not showing Insurance anywhere in App.
+            # city_name = InsuranceEligibleCities.get_nearest_city(data.get('latitude'), data.get('longitude'))
+            # if city_name:
+            #     insurance_availability = True
 
         if UserConfig.objects.filter(key="app_update").exists():
             app_update = UserConfig.objects.filter(key="app_update").values_list('data', flat=True).first()
@@ -113,10 +118,34 @@ class ScreenViewSet(viewsets.GenericViewSet):
         common_ipd_procedures_serializer = CommonIpdProcedureSerializer(common_ipd_procedures, many=True,
                                                                         context={'entity_dict': ipd_entity_dict,
                                                                                  'request': request})
+        request_data = request.query_params
+        serializer = serializers.HospitalNearYouSerializer(data=request_data)
+        serializer.is_valid(raise_exception=True)
+        validated_data = serializer.validated_data
+        result_count = 0
+        if validated_data and validated_data.get('long') and validated_data.get('lat'):
+            point_string = 'POINT(' + str(validated_data.get('long')) + ' ' + str(validated_data.get('lat')) + ')'
+            pnt = GEOSGeometry(point_string, srid=4326)
+
+            hospital_queryset = Hospital.objects.prefetch_related('hospital_doctors').filter(enabled_for_online_booking=True,
+                                               hospital_doctors__enabled_for_online_booking=True,
+                                               hospital_doctors__doctor__enabled_for_online_booking=True,
+                                               hospital_doctors__doctor__is_live=True, is_live=True).annotate(
+                                               bookable_doctors_count=Count(Q(enabled_for_online_booking=True,
+                                               hospital_doctors__enabled_for_online_booking=True,
+                                               hospital_doctors__doctor__enabled_for_online_booking=True,
+                                               hospital_doctors__doctor__is_live=True, is_live=True)),
+                distance=Distance('location', pnt)).filter(bookable_doctors_count__gte=20).order_by('distance')
+            result_count = hospital_queryset.count()
+            temp_hospital_ids = hospital_queryset.values_list('id', flat=True)
+            hosp_entity_dict, hosp_locality_entity_dict = Hospital.get_hosp_and_locality_dict(temp_hospital_ids,
+                                                                                              EntityUrls.SitemapIdentifier.HOSPITALS_LOCALITY_CITY)
+            hospital_serializer = serializers.HospitalModelSerializer(hospital_queryset, many=True, context={'request': request,
+                                                                                         'hosp_entity_dict': hosp_entity_dict})
 
         grid_list = [
             {
-                'priority': 4,
+                'priority': 3,
                 'title': "Book Doctor Appointment",
                 'type': "Specialization",
                 'items': specializations_serializer.data,
@@ -134,7 +163,7 @@ class ScreenViewSet(viewsets.GenericViewSet):
                 'addSearchItem': "Package"
             },
             {
-                'priority': 5,
+                'priority': 6,
                 'title': "Book a Test",
                 'type': "CommonTest",
                 'items': test_serializer.data,
@@ -143,8 +172,21 @@ class ScreenViewSet(viewsets.GenericViewSet):
                 'addSearchItem': "Lab"
             }
         ]
-
         carousel_list = [
+
+            {
+                'priority': 1,
+                'title': "Hospitals Near You",
+                'type': "Hospitals",
+                'items': hospital_serializer.data,
+                'show_view_all': True,
+            },
+            {
+                'priority': 5,
+                'title': "Health Package Categories",
+                'type': "PackageCategories",
+                'items': common_package_category(self, request),
+            },
             {
                 'priority': 0,
                 'title': "Top Hospitals",
@@ -152,7 +194,7 @@ class ScreenViewSet(viewsets.GenericViewSet):
                 'items': top_hospitals_data,
             },
             {
-                'priority': 1,
+                'priority': 7,
                 'title': "Top Procedures",
                 'type': "IPD",
                 'items': common_ipd_procedures_serializer.data,
@@ -171,7 +213,7 @@ class ScreenViewSet(viewsets.GenericViewSet):
             if banner.get('slider_location') == 'home_page':
                 banner_list_homepage.append(banner)
         banner = [{
-            'priority': 3,
+            'priority': 4,
             'type': "Banners",
             'title': "Banners",
             'items': banner_list_homepage

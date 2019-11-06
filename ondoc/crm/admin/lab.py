@@ -812,7 +812,6 @@ class LabAdmin(ImportExportMixin, admin.GeoModelAdmin, CompareVersionAdmin, Acti
     #     return read_only
 
 
-
 class LabAppointmentForm(RefundableAppointmentForm):
     start_date = forms.DateField(widget=CustomDateInput(format=('%d-%m-%Y'), attrs={'placeholder':'Select a date'}))
     start_time = forms.CharField(widget=TimePickerWidget())
@@ -1044,6 +1043,7 @@ class LabAppointmentAdmin(nested_admin.NestedModelAdmin, CompareVersionAdmin):
 
     def thyrocare_booking_id(self, obj):
         return obj.thyrocare_booking_no()
+    thyrocare_booking_id.short_description = 'Integrator Order ID'
 
     def accepted_through(self, obj):
         return obj.accepted_through()
@@ -1720,7 +1720,7 @@ class CommonPackageAdmin(VersionAdmin):
 
     def get_form(self, request, obj=None, **kwargs):
         form = super(CommonPackageAdmin, self).get_form(request, obj=obj, **kwargs)
-        form.base_fields['package'].queryset = LabTest.objects.filter(is_package=True)
+        form.base_fields['package'].queryset = LabTest.objects.filter(is_package=True).order_by('name')
         return form
 
 
@@ -1758,7 +1758,6 @@ class TestParameterChatAdmin(admin.ModelAdmin):
     form = TestParameterChatForm
     list_display = ['test_name']
     readonly_fields = ('test_name',)
-
 
 
 class LabTestCategoryLandingURLSInline(admin.TabularInline):

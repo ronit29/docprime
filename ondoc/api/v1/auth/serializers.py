@@ -8,10 +8,11 @@ from ondoc.doctor.models import DoctorMobile
 from ondoc.insurance.models import InsuredMembers, UserInsurance
 from ondoc.diagnostic.models import AvailableLabTest
 from ondoc.account.models import ConsumerAccount, Order, ConsumerTransaction
-import datetime, calendar
+import datetime, calendar, pytz
 from dateutil.relativedelta import relativedelta
 from django.utils import timezone
 from django.utils.dateparse import parse_datetime
+from ondoc.api.v1 import utils as v1_utils
 
 from ondoc.lead.models import UserLead
 from ondoc.web.models import OnlineLead, Career, ContactUs
@@ -32,6 +33,15 @@ class OTPSerializer(serializers.Serializer):
     via_whatsapp = serializers.BooleanField(default=False, required=False)
     request_source = serializers.CharField(required=False, max_length=200)
 
+    def validate(self, attrs):
+        otp_obj = OtpVerifications.objects.filter(phone_number=attrs.get('phone_number')).order_by('-id').first()
+        if not attrs.get('via_whatsapp') and otp_obj and not otp_obj.is_expired and (
+                datetime.datetime.now(tz=pytz.timezone(settings.TIME_ZONE)) - v1_utils.aware_time_zone(
+                otp_obj.updated_at)).total_seconds() < OtpVerifications.TIME_BETWEEN_CONSECUTIVE_REQUESTS:
+            raise serializers.ValidationError('Please try again in a moment.')
+        if otp_obj:
+            attrs['otp_obj'] = otp_obj
+        return attrs
 
 class OTPVerificationSerializer(serializers.Serializer):
     phone_number = serializers.IntegerField(min_value=5000000000,max_value=9999999999)
@@ -187,12 +197,14 @@ class UserProfileSerializer(serializers.ModelSerializer):
     whatsapp_optin = serializers.NullBooleanField(required=False)
     whatsapp_is_declined = serializers.BooleanField(required=False)
     is_default_user = serializers.BooleanField(required=False)
+    is_vip_member = serializers.SerializerMethodField()
+    is_vip_gold_member = serializers.SerializerMethodField()
 
     class Meta:
         model = UserProfile
         fields = ("id", "name", "email", "gender", "phone_number", "is_otp_verified", "is_default_user", "profile_image"
                   , "age", "user", "dob", "is_insured", "updated_at", "whatsapp_optin", "whatsapp_is_declined",
-                  "insurance_status")
+                  "insurance_status", "is_vip_member", "is_vip_gold_member")
 
     def get_is_insured(self, obj):
         if isinstance(obj, dict):
@@ -205,6 +217,32 @@ class UserProfileSerializer(serializers.ModelSerializer):
         # user_insurance_obj = UserInsurance.objects.filter(id=insured_member_obj.user_insurance_id).last()
         user_insurance_obj = insured_member_obj.user_insurance
         if user_insurance_obj and user_insurance_obj.is_valid():
+            return True
+        else:
+            return False
+
+    def get_is_vip_member(self, obj):
+        if isinstance(obj, dict):
+            return False
+        plus_member_obj = sorted(obj.plus_member.all(), key=lambda object: object.id, reverse=True)[
+            0] if obj.plus_member.all() else None
+        if not plus_member_obj:
+            return False
+        plus_user_obj = plus_member_obj.plus_user
+        if plus_user_obj and plus_user_obj.is_valid():
+            return True
+        else:
+            return False
+
+    def get_is_vip_gold_member(self, obj):
+        if isinstance(obj, dict):
+            return False
+        plus_member_obj = sorted(obj.plus_member.all(), key=lambda object: object.id, reverse=True)[
+            0] if obj.plus_member.all() else None
+        if not plus_member_obj:
+            return False
+        plus_user_obj = plus_member_obj.plus_user
+        if plus_user_obj and plus_user_obj.is_valid() and plus_user_obj.plan.is_gold:
             return True
         else:
             return False
@@ -331,6 +369,7 @@ class TransactionSerializer(serializers.Serializer):
     pgTxId = serializers.CharField(max_length=200)
     pbGatewayName = serializers.CharField(max_length=200, required=False)
     hash = serializers.CharField(max_length=1000)
+    # nodalId = serializers.IntegerField()
 
 
 class UserTransactionModelSerializer(serializers.ModelSerializer):
@@ -621,3 +660,14 @@ class MatrixUserLoginSerializer(serializers.Serializer):
     extra = serializers.JSONField(allow_null=True, required=False)
     doctor = serializers.PrimaryKeyRelatedField(queryset=Doctor.objects.all())
     hospital = serializers.PrimaryKeyRelatedField(queryset=Hospital.objects.all())
+
+
+# class CloudLabUserLoginSerializer(serializers.Serializer):
+#     GENDER_CHOICES = UserProfile.GENDER_CHOICES
+#     name = serializers.CharField(max_length=100)
+#     phone_number = serializers.IntegerField(min_value=1000000000, max_value=9999999999)
+#     is_default_user = serializers.BooleanField(required=False)
+#     email = serializers.EmailField()
+#     dob = serializers.DateField()
+#     gender = serializers.ChoiceField(choices=GENDER_CHOICES)
+#     extra = serializers.JSONField(allow_null=True, required=False)

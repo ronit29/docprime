@@ -73,8 +73,13 @@ DATABASE_ROUTERS = ['config.settings.db_router.DatabaseRouter']
 DATABASES = {
     'default': env.db('DATABASE_URL'),
 }
-
 DATABASES['default']['ENGINE'] = 'django.contrib.gis.db.backends.postgis'
+
+if(env('DJANGO_SETTINGS_MODULE')=='config.settings.production'):
+    DATABASES['slave'] = env.db('SLAVE_DATABASE_URL') if env.db('SLAVE_DATABASE_URL') else env.db('DATABASE_URL')
+    DATABASES['slave']['ENGINE'] = 'django.contrib.gis.db.backends.postgis'
+
+
 # if (env('DJANGO_SETTINGS_MODULE') == 'config.settings.production'):
 #     DATABASES['doc_read'] = env.db('READ_DATABASE_URL')
 #     DATABASES['doc_read']['ENGINE'] = 'django.contrib.gis.db.backends.postgis'
@@ -189,6 +194,7 @@ LOCAL_APPS = (
     'ondoc.bookinganalytics',
     'ondoc.prescription',
     'ondoc.corporate_booking',
+    'ondoc.salespoint',
     'ondoc.plus',
     'ondoc.provider',
 )
@@ -214,9 +220,6 @@ CORS_ORIGIN_ALLOW_ALL = True
 ROOT_URLCONF = 'config.urls'
 
 WSGI_APPLICATION = 'config.wsgi.application'
-
-
-
 
 # Password validation
 # https://docs.djangoproject.com/en/2.0/ref/settings/#auth-password-validators
@@ -326,10 +329,11 @@ MAP_WIDGETS = {
         ("GooglePlaceAutocompleteOptions", {'componentRestrictions': {'country': 'in'}}),
         ("markerFitZoom", 12),
     ),
-    "GOOGLE_MAP_API_KEY": "AIzaSyClYPAOTREfAZ-95eRbU6hDVHU0p3XygoY"
+    "GOOGLE_MAP_API_KEY": "AIzaSyDFxu_VGlmLojtgiwn892OYzV6IY_Inl6I"
 }
 
-GOOGLE_MAPS_API_KEY = 'AIzaSyClYPAOTREfAZ-95eRbU6hDVHU0p3XygoY'
+# GOOGLE_MAPS_API_KEY = 'AIzaSyClYPAOTREfAZ-95eRbU6hDVHU0p3XygoY'
+GOOGLE_MAPS_API_KEY = 'AIzaSyDFxu_VGlmLojtgiwn892OYzV6IY_Inl6I'
 
 
 CRISPY_TEMPLATE_PACK = 'bootstrap3'
@@ -506,7 +510,6 @@ LEAD_VALIDITY_BUFFER_TIME = env.int('LEAD_VALIDITY_BUFFER_TIME', default=10)  # 
 LEAD_AND_APPOINTMENT_BUFFER_TIME = env.int('LEAD_AND_APPOINTMENT_BUFFER_TIME', default=10)  # In mins
 MEDICINE_TOP_SPECIALIZATIONS = env.list('MEDICINE_TOP_SPECIALIZATIONS')
 MEDICINE_TOP_TESTS = env.list('MEDICINE_TOP_TESTS')
-
 ROCKETCHAT_SERVER = env('ROCKETCHAT_SERVER')
 ROCKETCHAT_SUPERUSER = env('ROCKETCHAT_SUPERUSER')
 ROCKETCHAT_PASSWORD = env('ROCKETCHAT_PASSWORD')
@@ -519,11 +522,23 @@ LAL_PATH_BASE_URL=env('LAL_PATH_BASE_URL')
 LAL_PATH_USERNAME=env('LAL_PATH_USERNAME')
 LAL_PATH_PASSWORD=env('LAL_PATH_PASSWORD')
 LAL_PATH_DATA_API_KEY=env('LAL_PATH_DATA_API_KEY')
+LAL_PATH_INTEGRATION_ENABLED=env.bool('LAL_PATH_INTEGRATION_ENABLED')
+LAL_PATH_INVOICE_CODE=env('LAL_PATH_INVOICE_CODE')
 SIMS_BASE_URL = env('SIMS_BASE_URL')
 MEDANTA_DOCTOR_LIST_URL=env('MEDANTA_DOCTOR_LIST_URL')
 MEDANTA_DOCTOR_LIST_USER_HEADER=env('MEDANTA_DOCTOR_LIST_USER_HEADER')
 MEDANTA_DOCTOR_LIST_USER_VALUE=env('MEDANTA_DOCTOR_LIST_USER_VALUE')
 MEDANTA_DOCTOR_LIST_PASSWORD_HEADER=env('MEDANTA_DOCTOR_LIST_PASSWORD_HEADER')
 MEDANTA_DOCTOR_LIST_PASSWORD_VALUE=env('MEDANTA_DOCTOR_LIST_PASSWORD_VALUE')
+MEDANTA_API_BASE_URL=env('MEDANTA_API_BASE_URL')
+MEDANTA_INTEGRATION_ENABLED=env.bool('MEDANTA_INTEGRATION_ENABLED')
 ECS_COMM_API_KEY=env('ECS_COMM_API_KEY')
 LENSFIT_COUPONS=env.list('LENSFIT_COUPONS')
+SPO_DP_AUTH_TOKEN = env('SPO_DP_AUTH_TOKEN')
+CARE_PLAN_FOR_VIP=env('CARE_PLAN_FOR_VIP')
+VIP_SALESPOINT_URL=env('VIP_SALESPOINT_URL')
+VIP_SALESPOINT_AUTHTOKEN=env('VIP_SALESPOINT_AUTHTOKEN')
+DOCTORS_COUNT=env('DOCTORS_COUNT')
+LAB_COUNT=env('LAB_COUNT')
+VIP_CANCELLATION_PERIOD=env.int('VIP_CANCELLATION_PERIOD')
+USE_SLAVE_DB=env.bool('USE_SLAVE_DB', False)

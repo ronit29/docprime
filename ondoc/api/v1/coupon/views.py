@@ -1,4 +1,5 @@
 from ondoc.cart.models import Cart
+from ondoc.common.middleware import use_slave
 from ondoc.coupon.models import Coupon, RandomGeneratedCoupon, UserSpecificCoupon, CouponRecommender
 from ondoc.account.models import Order
 from ondoc.doctor.models import OpdAppointment
@@ -328,6 +329,7 @@ class ApplicableCouponsViewSet(viewsets.GenericViewSet):
 
 #        return Response(applicable_coupons)
 
+    @use_slave
     def list_v2(self, request, *args, **kwargs):
         serializer = serializers.ProductIDSerializer(data=request.query_params)
         serializer.is_valid(raise_exception=True)

@@ -143,6 +143,20 @@ class NotificationAction:
     SAMPLE_DYNAMIC_TEMPLATE_PREVIEW = 110
     SEND_LENSFIT_COUPON = 111
 
+    PLUS_MEMBERSHIP_CONFIRMED = 180
+
+    PARTNER_LAB_SAMPLE_EXTRACTION_PENDING = 200
+    PARTNER_LAB_SAMPLE_SCAN_PENDING = 201
+    PARTNER_LAB_SAMPLE_PICKUP_PENDING = 202
+    PARTNER_LAB_SAMPLE_PICKED_UP = 203
+    PARTNER_LAB_PARTIAL_REPORT_GENERATED = 204
+    PARTNER_LAB_REPORT_GENERATED = 205
+    PARTNER_LAB_REPORT_VIEWED = 206
+    PARTNER_LAB_REQUEST_RECHECK = 207
+    PARTNER_LAB_NEED_HELP = 208
+    PARTNER_LAB_REPORT_UPLOADED = 209
+    PARTNER_LAB_ORDER_PLACED_SUCCESSFULLY = 210
+
     NOTIFICATION_TYPE_CHOICES = (
         (APPOINTMENT_ACCEPTED, "Appointment Accepted"),
         (APPOINTMENT_CANCELLED, "Appointment Cancelled"),
@@ -205,25 +219,41 @@ class NotificationAction:
         (CHAT_NOTIFICATION, "Push Notification from chat"),
         (COD_TO_PREPAID, 'COD to Prepaid'),
         (COD_TO_PREPAID_REQUEST, 'COD To Prepaid Request'),
-        (OPD_DAILY_SCHEDULE, 'OPD Daily Schedule')
+        (OPD_DAILY_SCHEDULE, 'OPD Daily Schedule'),
+
+        (PARTNER_LAB_SAMPLE_EXTRACTION_PENDING, 'Partner Lab Sample Extraction Pending'),
+        (PARTNER_LAB_SAMPLE_SCAN_PENDING, 'Partner Lab Sample Scan Pending'),
+        (PARTNER_LAB_SAMPLE_PICKUP_PENDING, 'Partner Lab Sample Pickup Pending'),
+        (PARTNER_LAB_SAMPLE_PICKED_UP, 'Partner Lab Sample Picked Up'),
+        (PARTNER_LAB_PARTIAL_REPORT_GENERATED, 'Partner Lab Partial Report Generated'),
+        (PARTNER_LAB_REPORT_GENERATED, 'Partner Lab Report Generated'),
+        (PARTNER_LAB_REPORT_VIEWED, 'Partner Lab Report Viewed'),
+        (PARTNER_LAB_REQUEST_RECHECK, 'Partner Lab Request Recheck'),
+        (PARTNER_LAB_NEED_HELP, 'Partner Lab Need Help'),
+        (PARTNER_LAB_REPORT_UPLOADED, 'Partner Lab Report Uploaded'),
+        (PARTNER_LAB_ORDER_PLACED_SUCCESSFULLY, 'Partner Lab Order Placed Successfully'),
     )
     OPD_APPOINTMENT = "opd_appointment"
     LAB_APPOINTMENT = "lab_appoingment"
     OFFLINE_OPD_APPOINTMENT = "offline_opd_appointment"
     E_CONSULTATION = "e_consultation"
+    PARTNER_LAB = "partner_lab"
 
     ACTION_TYPE_CHOICES = (
         (OPD_APPOINTMENT, 'Opd Appointment'),
         (LAB_APPOINTMENT, 'Lab Appointment'),
         (OFFLINE_OPD_APPOINTMENT, 'Offline Opd Appointment'),
         (E_CONSULTATION, 'E Consultation'),
+        (PARTNER_LAB, 'partner_lab'),
     )
 
     APPOINTMENT = "appointment"
     E_CONSULT_CHAT_VIEW = "EConsultChatView"
+    PARTNER_LAB_ORDER_DETAILS = "TestOrderDetails"          #PartnerLabOrderDetails
     SCREEN_TYPE_CHOICES = (
         (APPOINTMENT, 'appointment'),
         (E_CONSULT_CHAT_VIEW, 'e_consult_chat_view'),
+        (PARTNER_LAB_ORDER_DETAILS, 'partner_lab_order_details'),
     )
 
     @classmethod
@@ -868,6 +898,27 @@ class EmailNotification(TimeStampedModel, EmailNotificationOpdMixin, EmailNotifi
         return booking_url
 
     @classmethod
+    def send_vip_booking_url(cls, token, email):
+        booking_url = "{}/agent/booking?token={}".format(settings.CONSUMER_APP_DOMAIN, token)
+        booking_url = booking_url + "&callbackurl=vip-club-member-details"
+        short_url = generate_short_url(booking_url)
+        html_body = "Your VIP membership purchase url is - {} . Please pay to confirm".format(short_url)
+        email_subject = "VIP Purchase Url"
+        if email:
+            email_noti = {
+                "email": email,
+                "content": html_body,
+                "email_subject": email_subject
+            }
+            message = {
+                "data": email_noti,
+                "type": "email"
+            }
+            message = json.dumps(message)
+            publish_message(message)
+        return booking_url
+
+    @classmethod
     def send_endorsement_request_url(cls, token, email):
         booking_url = "{}/agent/booking?token={}".format(settings.CONSUMER_APP_DOMAIN, token)
         booking_url = booking_url + "&callbackurl=insurance/insurance-user-details-review?is_endorsement=true"
@@ -1164,6 +1215,32 @@ class SmsNotification(TimeStampedModel, SmsNotificationOpdMixin, SmsNotification
         return booking_url
 
     @classmethod
+    def send_vip_booking_url(cls, token, phone_number, *args, **kwargs):
+        utm_source = kwargs.get('utm_source', '')
+        booking_url = "{}/agent/booking?token={}".format(settings.CONSUMER_APP_DOMAIN, token)
+        if utm_source:
+            booking_url = booking_url + "&callbackurl=vip-club-member-details?utm_source={utm_source}&is_agent=false".format(utm_source=utm_source)
+        else:
+            booking_url = booking_url + "&callbackurl=vip-club-member-details?is_agent=false"
+
+        short_url = generate_short_url(booking_url)
+        print(short_url)
+
+        sms_body = "Hi,\nPlease click on the link to view your Docprime VIP- Health Package details and make an online payment.\n{link} \nThanks\nTeam Docprime".format(link=short_url)
+        if phone_number:
+            sms_notification = {
+                "phone_number": phone_number,
+                "content": sms_body,
+            }
+            message = {
+                "data": sms_notification,
+                "type": "sms"
+            }
+            message = json.dumps(message)
+            publish_message(message)
+        return booking_url
+
+    @classmethod
     def send_endorsement_request_url(cls, token, phone_number):
         booking_url = "{}/agent/booking?token={}".format(settings.CONSUMER_APP_DOMAIN, token)
         booking_url = booking_url + "&callbackurl=insurance/insurance-user-details-review?is_endorsement=true"
@@ -1182,6 +1259,25 @@ class SmsNotification(TimeStampedModel, SmsNotificationOpdMixin, SmsNotification
             publish_message(message)
         return booking_url
 
+    @classmethod
+    def send_cart_url(cls, token, phone_number, utm):
+        callback_url = "cart"
+        payment_page_url = "{}/agent/booking?token={}&agent=false&callbackurl={}&{}".format(settings.CONSUMER_APP_DOMAIN,
+                                                                                         token, callback_url, utm)
+        short_url = generate_short_url(payment_page_url)
+        html_body = "Your booking url is - {} . Please pay to confirm".format(short_url)
+        if phone_number:
+            sms_noti = {
+                "phone_number": phone_number,
+                "content": html_body,
+            }
+            message = {
+                "data": sms_noti,
+                "type": "sms"
+            }
+            message = json.dumps(message)
+            publish_message(message)
+        return short_url
 
     @classmethod
     def send_app_download_link(cls, phone_number, context):

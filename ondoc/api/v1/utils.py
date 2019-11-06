@@ -6,7 +6,7 @@ from rest_framework import permissions, status
 from collections import defaultdict
 from operator import itemgetter
 from itertools import groupby
-from django.db import connection, transaction
+from django.db import connection, transaction, connections
 from django.db.models import F, Func, Q, Count, Sum, Case, When, Value, IntegerField
 from django.utils import timezone
 import math
@@ -206,24 +206,34 @@ def clinic_convert_timings(timings, is_day_human_readable=True):
     return final_dict
 
 class RawSql:
-    def __init__(self, query, parameters):
+    def __init__(self, query, parameters, db='default'):
         self.query = query
         self.parameters = parameters
-
+        self.db = db
 
     def fetch_all(self):
-        with connection.cursor() as cursor:
-            cursor.execute(self.query, self.parameters)
-            columns = [col[0] for col in cursor.description]
-            result = [
-                dict(zip(columns, row))
-                for row in cursor.fetchall()
-            ]
+        result = []
+        try:
+            with connections[self.db].cursor() as cursor:
+                cursor.execute(self.query, self.parameters)
+                columns = [col[0] for col in cursor.description]
+                result = [
+                    dict(zip(columns, row))
+                    for row in cursor.fetchall()
+                ]
+        except Exception as e:
+            print(e)
+            print('Failed to connect to slave db')
         return result
 
     def execute(self):
-        with connection.cursor() as cursor:
-            cursor.execute(self.query, self.parameters)
+        try:
+            with connections[self.db].cursor() as cursor:
+                cursor.execute(self.query, self.parameters)
+        except Exception as e:
+            print(e)
+            print('Failed to connect to slave db')
+
 
 class AgreedPriceCalculate(Func):
     function = 'labtest_agreed_price_calculate'
@@ -405,12 +415,17 @@ def labappointment_transform(app_data):
     app_data["profile"] = app_data["profile"].id
     app_data["home_pickup_charges"] = str(app_data.get("home_pickup_charges",0))
     prescription_objects = app_data.get("prescription_list", [])
+    test_time_slots = app_data.get('test_time_slots', [])
     if prescription_objects:
         prescription_id_list = []
         for prescription_data in prescription_objects:
             prescription_id_list.append({'prescription': prescription_data.get('prescription').id})
         app_data["prescription_list"] = prescription_id_list
 
+    if test_time_slots:
+        for test_time_slot in test_time_slots:
+            test_time_slot['time_slot_start'] = str(test_time_slot['time_slot_start'])
+        app_data['test_time_slots'] = test_time_slots
 
     if app_data.get("coupon"):
         app_data["coupon"] = list(app_data["coupon"])
@@ -513,7 +528,22 @@ def payment_details(request, order):
         first_slot = None
         if order.is_parent():
             for ord in order.orders.all():
-                ord_slot = ord.action_data.get('time_slot_start') if ord.action_data else None
+                if ord.action_data:
+                    if ord.action_data.get('time_slot_start'):
+                        ord_slot = ord.action_data.get('time_slot_start')
+                    else:
+                        first_test_slot = None
+                        test_time_slots = ord.action_data.get('test_time_slots')
+                        for test_time_slot in test_time_slots:
+                            ord_test_slot = None
+                            if test_time_slot.get('time_slot_start'):
+                                ord_test_slot = test_time_slot.get('time_slot_start')
+                            if not first_test_slot and ord_test_slot:
+                                first_test_slot = parse_datetime(ord_test_slot)
+                            if first_test_slot > parse_datetime(ord_test_slot):
+                                first_test_slot = parse_datetime(ord_test_slot)
+                        ord_slot = str(first_test_slot)
+
                 if not first_slot and ord_slot:
                     first_slot = parse_datetime(ord_slot)
                 if first_slot > parse_datetime(ord_slot):
@@ -529,17 +559,17 @@ def payment_details(request, order):
     couponPgMode = ''
     discountedAmnt = ''
 
-    if order.is_cod_order:
-        txAmount = str(round(decimal.Decimal(order.get_deal_price_without_coupon), 2))
+    # if order.is_cod_order:
+    #     txAmount = str(round(decimal.Decimal(order.get_deal_price_without_coupon), 2))
+    # else:
+    usedPgCoupons = order.used_pgspecific_coupons
+    if usedPgCoupons and usedPgCoupons[0].payment_option:
+        couponCode = usedPgCoupons[0].code
+        couponPgMode = get_coupon_pg_mode(usedPgCoupons[0])
+        discountedAmnt = str(round(decimal.Decimal(order.amount), 2))
+        txAmount = str(round(decimal.Decimal(order.get_amount_without_pg_coupon), 2))
     else:
-        usedPgCoupons = order.used_pgspecific_coupons
-        if usedPgCoupons and usedPgCoupons[0].payment_option:
-            couponCode = usedPgCoupons[0].code
-            couponPgMode = get_coupon_pg_mode(usedPgCoupons[0])
-            discountedAmnt = str(round(decimal.Decimal(order.amount), 2))
-            txAmount = str(round(decimal.Decimal(order.get_amount_without_pg_coupon), 2))
-        else:
-            txAmount = str(round(decimal.Decimal(order.amount), 2))
+        txAmount = str(round(decimal.Decimal(order.amount), 2))
 
 
     pgdata = {
@@ -2067,7 +2097,7 @@ def rc_user_create(auth_token, auth_user_id, name, **kwargs):
                                              "customFields": rc_req_extras
                                          }))
     if user_create_response.status_code != status.HTTP_200_OK or not user_create_response.ok:
-        logger.error("Error in Rocket Chat user create API - " + response.text)
+        logger.error("Error in Rocket Chat user create API - " + user_create_response.text)
         return None
     response_data_dict = json.loads(user_create_response._content.decode())
     return {"name": name,
@@ -2086,7 +2116,7 @@ def rc_user_login(auth_token, auth_user_id, username):
                                                  'Content-Type': 'application/json'},
                                         data=json.dumps({"username": username}))
     if user_login_response.status_code != status.HTTP_200_OK or not user_login_response.ok:
-        logger.error("Error in Rocket Chat user Login API - " + response.text)
+        logger.error("Error in Rocket Chat user Login API - " + user_login_response.text)
         return None
     response_data_dict = json.loads(user_login_response._content.decode())
     return response_data_dict
@@ -2101,7 +2131,7 @@ def rc_group_create(auth_token, auth_user_id, patient, rc_doctor):
                                                    'Content-Type': 'application/json'},
                                           data=json.dumps({"name": group_name, "members": members}))
     if group_create_response.status_code != status.HTTP_200_OK or not group_create_response.ok:
-        logger.error("Error in Rocket Chat user Login API - " + response.text)
+        logger.error("Error in Rocket Chat user Login API - " + group_create_response.text)
         return None
     response_data_dict = json.loads(group_create_response._content.decode())
     return response_data_dict
@@ -2189,6 +2219,38 @@ def is_valid_ckeditor_text(text):
         return False
     return True
 
+
+def log_requests_on():
+    from http.client import HTTPConnection
+
+    HTTPConnection.debuglevel = 1
+    requests_log = logging.getLogger("urllib3")
+    requests_log.setLevel(logging.INFO)
+    requests_log.propagate = True
+    ch = logging.StreamHandler()
+    ch.setLevel(logging.INFO)
+    requests_log.addHandler(ch)
+
+
+def common_package_category(self, request):
+    from ondoc.diagnostic.models import LabTestCategory
+    from ondoc.api.v1.procedure.serializers import CommonCategoriesSerializer
+
+    need_to_hit_query = True
+
+    if request.user and request.user.is_authenticated and not hasattr(request, 'agent') and request.user.active_insurance and request.user.active_insurance.insurance_plan and request.user.active_insurance.insurance_plan.plan_usages:
+        if request.user.active_insurance.insurance_plan.plan_usages.get('package_disabled'):
+            need_to_hit_query = False
+
+    categories_serializer = None
+
+    if need_to_hit_query:
+        categories = LabTestCategory.objects.filter(is_live=True, is_package_category=True,
+                                                    show_on_recommended_screen=True).order_by('-priority')[:15]
+
+        categories_serializer = CommonCategoriesSerializer(categories, many=True, context={'request': request})
+
+    return (categories_serializer.data)
 
 
 

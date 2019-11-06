@@ -6,12 +6,15 @@ from django.conf import settings
 from ondoc.api.v1.doctor.serializers import DoctorProfileUserViewSerializer
 from ondoc.api.v1.procedure.serializers import DoctorClinicProcedureSerializer
 from ondoc.api.v1.ratings.serializers import GoogleRatingsGraphSerializer
+from ondoc.common.models import SearchCriteria
 from ondoc.coupon.models import CouponRecommender
 from ondoc.doctor import models
 from ondoc.api.v1.utils import clinic_convert_timings, aware_time_zone
 from ondoc.api.v1.doctor import serializers
 from ondoc.authentication.models import QCModel
 from ondoc.doctor.models import Doctor, PracticeSpecialization
+from ondoc.plus.models import PlusPlans
+from ondoc.plus.usage_criteria import get_class_reference, get_price_reference
 from ondoc.procedure.models import DoctorClinicProcedure, ProcedureCategory, ProcedureToCategoryMapping, \
     get_selected_and_other_procedures, get_included_doctor_clinic_procedure, \
     get_procedure_categories_with_procedures
@@ -96,7 +99,7 @@ class DoctorSearchHelper:
         counter=1
         spec_filter_str = ''
         if len(specialization_filter_ids) > 0 and len(procedure_ids)==0 and len(procedure_category_ids)==0:
-            spec_filter_str = ' and d.id in (select doctor_id from doctor_practice_specialization where specialization_id IN('
+            spec_filter_str = ' d.id in (select doctor_id from doctor_practice_specialization where specialization_id IN('
             for id in specialization_filter_ids:
 
                 if not counter == 1:
@@ -285,14 +288,14 @@ class DoctorSearchHelper:
             params['insurance_threshold_amount'] = self.query_params.get('insurance_threshold_amount')
 
         result = {}
-        if not filtering_params:
+        if not filtering_params and not spec_filter_str:
             result['string'] = "1=1"
             result['params'] = params
             return result
-
-        result['string'] = " and ".join(filtering_params)
+        if filtering_params:
+            result['string'] = " and ".join(filtering_params)
         if spec_filter_str:
-            result['string'] = result.get('string') + spec_filter_str
+            result['string'] = result.get('string') + ' and ' + spec_filter_str if result.get('string') else spec_filter_str
         result['params'] = params
         if len(procedure_ids) > 0:
             result['count_of_procedure'] = len(procedure_ids)
@@ -476,6 +479,10 @@ class DoctorSearchHelper:
             else:
                 ipd_query = ""
 
+            # vip_enabled_filter_query = ''
+            # if self.query_params.get('vip_user'):
+            #     vip_enabled_filter_query = ' and h.enabled_for_prepaid=true '
+
             query_string = "SELECT count(*) OVER() AS result_count, x.doctor_id, x.hospital_id, doctor_clinic_id, doctor_clinic_timing_id " \
                            "FROM (select {rank_part}, " \
                            "St_distance(St_setsrid(St_point((%(longitude)s), (%(latitude)s)), 4326), h.location) distance, " \
@@ -488,7 +495,7 @@ class DoctorSearchHelper:
                            "{bucket_query} FROM doctor d " \
                            "INNER JOIN doctor_clinic dc ON d.id = dc.doctor_id and dc.enabled=true and d.is_live=true " \
                            "and d.is_test_doctor is False and d.is_internal is False " \
-                           "INNER JOIN hospital h ON h.id = dc.hospital_id and h.is_live=true " \
+                           "INNER JOIN hospital h ON h.id = dc.hospital_id and h.is_live=true  " \
                            "INNER JOIN doctor_clinic_timing dct ON dc.id = dct.doctor_clinic_id " \
                            "{ipd_query} " \
                            "LEFT JOIN doctor_leave dl on dl.doctor_id = d.id and (%(ist_date)s) BETWEEN dl.start_date and dl.end_date " \
@@ -561,6 +568,11 @@ class DoctorSearchHelper:
         coupon_code = query_params.get("coupon_code", None)
 
         coupon_recommender = CouponRecommender(request.user, profile, 'doctor', product_id, coupon_code, None)
+        search_criteria = SearchCriteria.objects.filter(search_key='is_gold').first()
+        hosp_is_gold = False
+        if search_criteria:
+            hosp_is_gold = search_criteria.search_value
+
         filters = dict()
 
         for doctor in doctor_data:
@@ -571,6 +583,9 @@ class DoctorSearchHelper:
             doctor_clinics = [doctor_clinic for doctor_clinic in doctor.doctor_clinics.all() if
                               doctor_clinic.hospital_id == doctor_clinic_mapping[doctor_clinic.doctor_id]]
             doctor_clinic = doctor_clinics[0]
+            # As per the discussion with Ashish Sir, we are taking max length of 12 characters for locality in search result
+            if doctor_clinic and doctor_clinic.hospital and len(doctor_clinic.hospital.locality)>12:
+                continue
             filtered_insurance_fees, filtered_cod_deal_price, filtered_deal_price, filtered_mrp = self.get_doctor_fees(doctor_clinic, doctor_availability_mapping)
             # filtered_fees = self.get_doctor_fees(doctor, doctor_availability_mapping)
             min_deal_price = None
@@ -580,7 +595,9 @@ class DoctorSearchHelper:
                     min_deal_price = data.deal_price
                     min_price = {
                         "deal_price": data.deal_price,
-                        "mrp": data.mrp
+                        "mrp": data.mrp,
+                        "cod_deal_price": data.cod_deal_price if data.cod_deal_price else 0,
+                        "fees": data.fees if data.fees else 0
                     }
             # min_fees = min([data.get("deal_price") for data in serializer.data if data.get("deal_price")])
 
@@ -618,6 +635,15 @@ class DoctorSearchHelper:
 
                 is_insurance_covered = False
                 insurance_error = None
+                is_gold_member = False
+                vip_data_dict = kwargs.get('vip_data')
+                is_vip_member = vip_data_dict.get('is_vip_member', False)
+                is_enable_for_vip = vip_data_dict.get('is_enable_for_vip', False)
+                vip_utilization = vip_data_dict.get('vip_utilization', None)
+                vip_convenience_amount = PlusPlans.get_default_convenience_amount(int(min_price.get('fees', 0)), "DOCTOR")
+                vip_remaining_amount = int(vip_utilization.get('vip_remaining_amount', 0))
+                vip_amount = 0
+                cover_under_vip = vip_data_dict.get('cover_under_vip', False)
                 insurance_data_dict = kwargs.get('insurance_data')
                 if doctor_clinic.hospital.enabled_for_prepaid and doctor_clinic.hospital.enabled_for_insurance and enable_online_booking and doctor.is_insurance_enabled and doctor.is_doctor_specialization_insured() and insurance_data_dict and min_price.get("mrp") is not None and \
                         min_price["mrp"] <= insurance_data_dict['insurance_threshold_amount'] and \
@@ -637,10 +663,46 @@ class DoctorSearchHelper:
                 else:
                     is_insurance_covered = False
                     insurance_error = "You have already utilised {} Oncologist consultations available in your OPD Insurance Plan.".format(settings.INSURANCE_ONCOLOGIST_LIMIT)
+
+                if doctor.enabled_for_plus_plans and doctor_clinic.hospital.enabled_for_prepaid and \
+                        doctor.enabled_for_online_booking and doctor_clinic.hospital.enabled_for_online_booking and \
+                        doctor_clinic.enabled_for_online_booking and doctor_clinic.hospital.is_enabled_for_plus_plans():
+                    if request and request.user and not request.user.is_anonymous and request.user.active_insurance:
+                        is_enable_for_vip = False
+                    else:
+                        is_enable_for_vip = True
+
+                if request and request.user and not request.user.is_anonymous and vip_data_dict.get('is_vip_member') and \
+                        doctor.enabled_for_plus_plans and doctor_clinic.hospital.enabled_for_prepaid and \
+                        doctor.enabled_for_online_booking and doctor_clinic.hospital.enabled_for_online_booking and \
+                        doctor_clinic.enabled_for_online_booking and doctor_clinic.hospital.is_enabled_for_plus_plans():
+                    mrp = int(min_price.get('mrp'))
+                    price_data = {"mrp": int(min_price.get('mrp', 0)), "deal_price": int(min_price.get('deal_price', 0)),
+                                  "cod_deal_price": int(min_price.get('cod_deal_price', 0)),
+                                  "fees": int(min_price.get('fees', 0))}
+                    price_engine = get_price_reference(request.user.active_plus_user, "LABTEST")
+                    if not price_engine:
+                        price = mrp
+                    else:
+                        price = price_engine.get_price(price_data)
+                    vip_convenience_amount = request.user.active_plus_user.plan.get_convenience_charge(price, "DOCTOR")
+                    engine = get_class_reference(request.user.active_plus_user, "DOCTOR")
+                    is_gold_member = True if request.user.active_plus_user.plan.is_gold else False
+                    if engine:
+                        # vip_response_dict = engine.validate_booking_entity(cost=mrp)
+                        vip_response_dict = engine.validate_booking_entity(cost=price, mrp=mrp)
+                        vip_amount = vip_response_dict.get('amount_to_be_paid', 0)
+                        cover_under_vip = vip_response_dict.get('is_covered', False)
+                        # vip_amount = 0 if vip_remaining_amount > mrp else mrp - vip_remaining_amount
                 hospitals = [{
                     "enabled_for_online_booking": enable_online_booking,
                     "is_insurance_covered": is_insurance_covered,
                     "insurance_limit_message": insurance_error,
+                    "is_vip_member": is_vip_member,
+                    "vip_convenience_amount": vip_convenience_amount,
+                    "cover_under_vip": cover_under_vip,
+                    "vip_amount": vip_amount,
+                    "is_enable_for_vip": is_enable_for_vip,
                     "insurance_threshold_amount": insurance_data_dict['insurance_threshold_amount'],
                     "is_user_insured": insurance_data_dict['is_user_insured'],
                     "welcome_calling_done": doctor_clinic.hospital.welcome_calling_done,
@@ -662,7 +724,10 @@ class DoctorSearchHelper:
                     "location": {'lat': doctor_clinic.hospital.location.y,
                                  'long': doctor_clinic.hospital.location.x} if doctor_clinic.hospital and doctor_clinic.hospital.location else None,
                     "url": kwargs.get('hosp_entity_dict', {}).get(doctor_clinic.hospital.id),
-                    "locality_url": kwargs.get('hosp_locality_entity_dict', {}).get(doctor_clinic.hospital.id)
+                    "locality_url": kwargs.get('hosp_locality_entity_dict', {}).get(doctor_clinic.hospital.id),
+                    "hosp_is_gold":hosp_is_gold,
+                    "vip_gold_price": int(min_price.get('fees', 0)),
+                    "is_gold_member": is_gold_member
                 }]
 
             thumbnail = doctor.get_thumbnail()
@@ -716,24 +781,46 @@ class DoctorSearchHelper:
             else:
                 schema_type = 'Physician'
 
-            if doctor.rating_data and doctor.rating_data.get('rating_count')>0:
-                if doctor.rating_data.get('rating_count')<5:
-                    if doctor.rating_data.get('avg_rating') >=4:
-                        average_rating = doctor.rating_data.get('avg_rating')
-                        rating_count = doctor.rating_data.get('rating_count')
-                else:
-                    average_rating = doctor.rating_data.get('avg_rating')
-                    rating_count = doctor.rating_data.get('rating_count')
+            ratings_list = list(filter(lambda x: x.is_live == True, doctor.rating.all()))
+            rating_count = len(ratings_list)
+            average_rating = 0
+            if rating_count:
+                all_rating = []
+                for rate in ratings_list:
+                    all_rating.append(rate.ratings)
+                if all_rating:
+                    average_rating = sum(all_rating) / len(all_rating)
+            if not ((rating_count <= 5 and average_rating > 4) or  (rating_count>5)):
+                average_rating = None
+                rating_count = None
+
+            # if doctor.rating_data and doctor.rating_data.get('rating_count')>0:
+            #     if doctor.rating_data.get('rating_count')<5:
+            #         if doctor.rating_data.get('avg_rating') >=4:
+            #             average_rating = doctor.rating_data.get('avg_rating')
+            #             rating_count = doctor.rating_data.get('rating_count')
+            #     else:
+            #         average_rating = doctor.rating_data.get('avg_rating')
+            #         rating_count = doctor.rating_data.get('rating_count')
             if not average_rating:
                  if doctor_clinic and doctor_clinic.hospital:
                     hosp_reviews = doctor_clinic.hospital.hospital_place_details.all()
+                    reviews_data = dict()
+                    reviews_data['user_reviews'] = None
                     if hosp_reviews:
-                        reviews_data = hosp_reviews[0].reviews
+                        reviews_data['user_reviews'] = hosp_reviews[0].reviews.get('user_reviews')
+                    reviews_data['user_avg_rating'] = doctor_clinic.hospital.google_avg_rating
+                    reviews_data['user_ratings_total'] = doctor_clinic.hospital.google_ratings_count
 
-                        if reviews_data:
-                            ratings_graph = GoogleRatingsGraphSerializer(reviews_data, many=False,
-                                                                         context={"request": request})
-                            google_rating = ratings_graph.data
+                    ratings_graph = GoogleRatingsGraphSerializer(reviews_data, many=False, context={"request": request})
+                    google_rating = ratings_graph.data
+                    rating_count = doctor_clinic.hospital.google_ratings_count
+
+
+                        # if reviews_data:
+                        #     ratings_graph = GoogleRatingsGraphSerializer(reviews_data, many=False,
+                        #                                                  context={"request": request})
+                        #     google_rating = ratings_graph.data
 
             temp = {
                 "doctor_id": doctor.id,

@@ -10,6 +10,7 @@ from .views import (DoctorAppointmentsViewSet, DoctorProfileView, DoctorHospital
 urlpatterns = [
     path('appointment', DoctorAppointmentsViewSet.as_view({'get': 'list'}), name='appointment-list'),
     path('appointment/create', DoctorAppointmentsViewSet.as_view({'post': 'create'}), name='create-appointment'),
+    path('appointment/cod-to-prepaid/create', DoctorAppointmentsViewSet.as_view({'post': 'create_new'}), name='cod-to-prepaid-appointment'),
     path('appointment/<int:pk>', DoctorAppointmentsViewSet.as_view({'get': 'retrieve'}), name='get-appointment-detail'),
     path('appointment/<int:pk>/update', DoctorAppointmentsViewSet.as_view({'post': 'update'}),
          name='update-appointment-detail'),
@@ -34,6 +35,7 @@ urlpatterns = [
     path('prescription-file/remove', PrescriptionFileViewset.as_view({'delete': 'remove'}), name='remove-prescription'),
     path('searcheditems', SearchedItemsViewSet.as_view({'get': 'list'}), name='searched-items'),
     path('commonconditions', SearchedItemsViewSet.as_view({'get': 'common_conditions'}), name='common-conditions'),
+    path('top/hospitals', SearchedItemsViewSet.as_view({'get': 'top_hospitals'}), name='top-hopspitals'),
     path('doctorsearch', DoctorListViewSet.as_view({'get': 'list'}), name='search-doctor'),
     path('doctorsearchbyhospital', DoctorListViewSet.as_view({'get':'search_by_hospital'}), name='search-doctor-by-hospital'),
     path('doctorsearch_by_url', DoctorListViewSet.as_view({'get':'list_by_url'}), name='search_by_specializaton'),
@@ -78,4 +80,5 @@ urlpatterns = [
     path('licence/update', DoctorProfileView.as_view({'post': 'licence_update'}), name='licence_update'),
     path('hospital/filter', DoctorListViewSet.as_view({'get': 'hosp_filtered_list'}), name='hospital-filter-in-doctor-search'),
     path('speciality/filter', DoctorListViewSet.as_view({'get': 'speciality_filtered_list'}), name='speciality-filter-in-doctor-search'),
+    path('hospitals_near_you', HospitalViewSet.as_view({'get': 'near_you_hospitals'}), name='hospitals-near-you'),
 ]

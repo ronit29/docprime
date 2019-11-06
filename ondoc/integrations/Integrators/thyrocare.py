@@ -169,7 +169,13 @@ class Thyrocare(BaseIntegrator):
             # Add details to history table
             status = IntegratorHistory.PUSHED_AND_NOT_ACCEPTED
             IntegratorHistory.create_history(lab_appointment, payload, response, url, 'post_order', 'Thyrocare', status_code, retry_count, status, '')
-            return response
+            resp_data = {
+                "lead_id": response['ORDERRESPONSE']['PostOrderDataResponse'][0]['LEAD_ID'],
+                "dp_order_id": response['ORDER_NO'],
+                "integrator_order_id": response['REF_ORDERID'],
+                "response_data": response
+            }
+            return resp_data
         else:
             status = IntegratorHistory.NOT_PUSHED
             IntegratorHistory.create_history(lab_appointment, payload, response, url, 'post_order', 'Thyrocare', status_code, retry_count, status, '')
@@ -272,6 +278,7 @@ class Thyrocare(BaseIntegrator):
                 integrator_bookings = IntegratorResponse.objects.filter(integrator_class_name=Thyrocare.__name__, report_received=False)
                 formats = ['pdf', 'xml']
                 for booking in integrator_bookings:
+                    print(booking.id)
                     dp_appointment = booking.content_object
                     if dp_appointment.time_slot_start + timedelta(days=1) <= timezone.now():
                         lead_id = booking.lead_id
@@ -280,6 +287,7 @@ class Thyrocare(BaseIntegrator):
 
                         for format in formats:
                             url = "%s/order.svc/%s/GETREPORTS/%s/%s/%s/Myreport" % (settings.THYROCARE_BASE_URL, settings.THYROCARE_API_KEY, lead_id, format, mobile)
+                            print(url)
                             response = requests.get(url)
                             response = response.json()
                             if response.get('RES_ID') == 'RES0000':
@@ -297,12 +305,13 @@ class Thyrocare(BaseIntegrator):
         from ondoc.integrations.models import IntegratorResponse, IntegratorReport
 
         # Save reports URL
-        obj, created = IntegratorReport.objects.get_or_create(integrator_response_id=integrator_response.id, pdf_url=result["pdf"], xml_url=result["xml"])
+        if result.get('pdf', '') and result.get('xml', ''):
+            obj, created = IntegratorReport.objects.get_or_create(integrator_response_id=integrator_response.id, pdf_url=result["pdf"], xml_url=result["xml"])
 
-        # Update integrator response when both type of report present
-        if obj.pdf_url and obj.xml_url:
-            cls.upload_report(obj)
-            IntegratorResponse.objects.filter(pk=integrator_response.pk).update(report_received=True)
+            # Update integrator response when both type of report present
+            if obj.pdf_url and obj.xml_url:
+                cls.upload_report(obj)
+                IntegratorResponse.objects.filter(pk=integrator_response.pk).update(report_received=True)
 
     @classmethod
     def upload_report(cls, report):
@@ -334,6 +343,13 @@ class Thyrocare(BaseIntegrator):
                 lab_report, created = LabReport.objects.update_or_create(appointment_id=report.integrator_response.object_id)
                 if lab_report:
                     LabReportFile.objects.create(report_id=lab_report.id, name=in_memory_file)
+                    # Send Reports to Patient
+                    from ondoc.notification.tasks import send_lab_reports
+                    if format == 'pdf':
+                        try:
+                            send_lab_reports.apply_async((report.integrator_response.object_id,), countdown=1)
+                        except Exception as e:
+                            logger.error(str(e))
         except Exception as e:
             logger.error(str(e))
 

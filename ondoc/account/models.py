@@ -3,7 +3,7 @@ from django.contrib.postgres.fields import JSONField
 from django.forms import model_to_dict
 from django.utils.functional import cached_property
 
-from ondoc.authentication.models import TimeStampedModel, User, UserProfile, Merchant, AssociatedMerchant
+from ondoc.authentication.models import TimeStampedModel, User, UserProfile, Merchant, AssociatedMerchant, SoftDelete
 from ondoc.account.tasks import refund_curl_task
 from ondoc.coupon.models import Coupon
 from ondoc.notification.models import AppNotification, NotificationAction
@@ -34,6 +34,7 @@ import string
 import random
 import decimal
 
+from ondoc.plus.enums import UtilizationCriteria
 
 logger = logging.getLogger(__name__)
 
@@ -96,7 +97,7 @@ class Order(TimeStampedModel):
     matrix_lead_id = models.PositiveIntegerField(null=True)
     parent = models.ForeignKey('self', on_delete=models.CASCADE, related_name="orders", blank=True, null=True)
     cart = models.ForeignKey('cart.Cart', on_delete=models.CASCADE, related_name="order", blank=True, null=True)
-    user = models.ForeignKey(User, on_delete=models.DO_NOTHING, blank=True, null=True)
+    user = models.ForeignKey(User, on_delete=models.DO_NOTHING, blank=True, null=True, related_name="orders")
     visitor_info = JSONField(blank=True, null=True)
 
     def __str__(self):
@@ -194,11 +195,20 @@ class Order(TimeStampedModel):
         if update_order_and_appointment:
             self.payment_type = OpdAppointment.PREPAID
             opd_obj.payment_type = OpdAppointment.PREPAID
+            effective_price = 0
+            prepaid_deal_price = self.action_data.get('prepaid_deal_price') or self.action_data.get('deal_price')
+            coupon_discount, coupon_cashback, coupon_list, random_coupon_list = Coupon.get_total_deduction(self.action_data, prepaid_deal_price)
+            if coupon_discount >= prepaid_deal_price:
+                effective_price = 0
+            else:
+                effective_price = prepaid_deal_price - coupon_discount
             # self.action_data['appointment_id'] = self.reference_id
             self.action_data['payment_type'] = OpdAppointment.PREPAID
-            self.action_data['effective_price'] = self.action_data['deal_price']
-            opd_obj.effective_price = Decimal(self.action_data['deal_price'])
+            self.action_data['effective_price'] = effective_price
+            # self.action_data['deal_price'] = prepaid_deal_price
+            opd_obj.effective_price = Decimal(effective_price)
             opd_obj.is_cod_to_prepaid = True
+            opd_obj.deal_price = prepaid_deal_price
             opd_obj.save()
         return opd_obj
 
@@ -218,6 +228,7 @@ class Order(TimeStampedModel):
         from ondoc.subscription_plan.models import UserPlanMapping
         from ondoc.insurance.models import UserInsurance, InsuranceTransaction
         from ondoc.api.v1.chat.serializers import ChatTransactionModelSerializer
+        from ondoc.plus.models import PlusAppointmentMapping
 
         # skip if order already processed, except if appointment is COD and can be converted to prepaid
         cod_to_prepaid_app = None
@@ -237,7 +248,12 @@ class Order(TimeStampedModel):
             serializer = OpdAppTransactionModelSerializer(data=appointment_data)
             serializer.is_valid(raise_exception=True)
             appointment_data = serializer.validated_data
-            if appointment_data['payment_type'] == OpdAppointment.COD:
+            if appointment_data['payment_type'] == OpdAppointment.VIP:
+                if appointment_data['plus_amount'] > 0:
+                    payment_not_required = False
+                else:
+                    payment_not_required = True
+            elif appointment_data['payment_type'] == OpdAppointment.COD:
                 if self.reference_id and cod_to_prepaid_app:
                     payment_not_required = False
                 else:
@@ -252,6 +268,11 @@ class Order(TimeStampedModel):
                 payment_not_required = True
             elif appointment_data['payment_type'] == OpdAppointment.INSURANCE:
                 payment_not_required = True
+            elif appointment_data['payment_type'] == OpdAppointment.VIP:
+                if appointment_data['plus_amount'] > 0:
+                    payment_not_required = False
+                else:
+                    payment_not_required = True
             elif appointment_data['payment_type'] == OpdAppointment.PLAN:
                 payment_not_required = True
         elif self.product_id == self.INSURANCE_PRODUCT_ID:
@@ -291,10 +312,15 @@ class Order(TimeStampedModel):
         total_balance = consumer_account.get_total_balance()
         _responsible_user=None
         _source=None
+        plus_amount = 0
+        convenience_amount = 0
         if '_responsible_user' in appointment_data:
             _responsible_user = appointment_data.pop('_responsible_user')
         if '_source' in appointment_data:
             _source = appointment_data.pop('_source')
+        if 'plus_amount' in appointment_data:
+            plus_amount = appointment_data.pop('plus_amount')
+            convenience_amount = int(appointment_data.pop('vip_convenience_amount'))
 
         if self.action == Order.OPD_APPOINTMENT_CREATE:
             if total_balance >= appointment_data["effective_price"] or payment_not_required:
@@ -302,6 +328,11 @@ class Order(TimeStampedModel):
                     appointment_obj = cod_to_prepaid_app
                 else:
                     appointment_obj = OpdAppointment.create_appointment(appointment_data, responsible_user=_responsible_user, source=_source)
+                    if appointment_obj.plus_plan:
+                        data = {"plus_user": appointment_obj.plus_plan, "plus_plan": appointment_obj.plus_plan.plan,
+                                "content_object": appointment_obj, 'amount': plus_amount, 'extra_charge': convenience_amount}
+                        PlusAppointmentMapping.objects.create(**data)
+
                 order_dict = {
                     "reference_id": appointment_obj.id,
                     "payment_status": Order.PAYMENT_ACCEPTED
@@ -310,6 +341,12 @@ class Order(TimeStampedModel):
         elif self.action == Order.LAB_APPOINTMENT_CREATE:
             if total_balance >= appointment_data["effective_price"] or payment_not_required:
                 appointment_obj = LabAppointment.create_appointment(appointment_data, responsible_user=_responsible_user, source=_source)
+
+                if appointment_obj.plus_plan:
+                    data = {"plus_user": appointment_obj.plus_plan, "plus_plan": appointment_obj.plus_plan.plan,
+                            "content_object": appointment_obj, 'amount': plus_amount, 'extra_charge': convenience_amount}
+                    PlusAppointmentMapping.objects.create(**data)
+
                 order_dict = {
                     "reference_id": appointment_obj.id,
                     "payment_status": Order.PAYMENT_ACCEPTED
@@ -430,6 +467,8 @@ class Order(TimeStampedModel):
             appointment_obj.save()
 
             if promotional_amount:
+                appointment_obj.price_data["promotional_amount"] = int(promotional_amount)
+                appointment_obj.save()
                 ConsumerAccount.credit_cashback(consultation_data.get('user'), promotional_amount, appointment_obj, self.product_id)
 
         return appointment_obj, wallet_amount, cashback_amount
@@ -584,8 +623,15 @@ class Order(TimeStampedModel):
     @classmethod
     def get_total_payable_amount(cls, fulfillment_data):
         from ondoc.doctor.models import OpdAppointment
+        from ondoc.plus.models import PlusUser
         payable_amount = 0
         for app in fulfillment_data:
+            if app.get('payment_type') == OpdAppointment.VIP:
+                plus_user = PlusUser.objects.filter(id=app.get('plus_plan')).first()
+                if not plus_user:
+                    payable_amount += app.get('effective_price')
+                    return payable_amount
+                payable_amount = payable_amount + int(app.get('effective_price', 0))
             if app.get("payment_type") == OpdAppointment.PREPAID:
                 payable_amount += app.get('effective_price')
         return payable_amount
@@ -604,7 +650,7 @@ class Order(TimeStampedModel):
     @transaction.atomic()
     def create_order(cls, request, cart_items, use_wallet=True):
         from ondoc.doctor.models import OpdAppointment
-        from ondoc.matrix.tasks import push_order_to_matrix
+        from ondoc.matrix.tasks import push_order_to_matrix, push_order_to_spo
 
         fulfillment_data = cls.transfrom_cart_items(request, cart_items)
         user = request.user
@@ -630,7 +676,7 @@ class Order(TimeStampedModel):
                 visitor_id, visit_id = event_api.get_visit(request)
                 visitor_info = { "visitor_id": visitor_id, "visit_id": visit_id, "from_app": request.data.get("from_app", None), "app_version": request.data.get("app_version", None)}
         except Exception as e:
-            logger.log("Could not fecth visitor info - " + str(e))
+            logger.log("Could not fetch visitor info - " + str(e))
 
         # create a Parent order to accumulate sub-orders
         process_immediately = False
@@ -691,7 +737,7 @@ class Order(TimeStampedModel):
                     cart_id=appointment_detail["cart_item_id"],
                     user=user
                 )
-            elif appointment_detail.get('payment_type') == OpdAppointment.INSURANCE:
+            elif appointment_detail.get('payment_type') in [OpdAppointment.INSURANCE, OpdAppointment.VIP]:
                 order = cls.objects.create(
                     product_id=product_id,
                     action=action,
@@ -713,6 +759,11 @@ class Order(TimeStampedModel):
                 )
 
             order_list.append(order)
+            if order.action_data.get('spo_data', None):
+                try:
+                    push_order_to_spo.apply_async(({'order_id': order.id},), countdown=5)
+                except Exception as e:
+                    logger.log("Could not push order to spo - " + str(e))
 
         if process_immediately:
             appointment_ids = pg_order.process_pg_order()
@@ -760,6 +811,7 @@ class Order(TimeStampedModel):
         econsult_ids = []
         chat_plan_ids = []
         user = self.user
+        plus_user = user.active_plus_user
         user_insurance_obj = user.active_insurance
 
         gyno_count = 0
@@ -793,7 +845,8 @@ class Order(TimeStampedModel):
                                     is_process = False
                                 else:
                                     onco_count += 1
-
+                    if app_data.get('payment_type') == OpdAppointment.VIP and plus_user:
+                        is_process = True
                     if not is_process:
                         raise Exception("Insurance invalidate, Could not process entire order")
 
@@ -1012,7 +1065,7 @@ class Order(TimeStampedModel):
         return True
 
 
-class PgTransaction(TimeStampedModel):
+class PgTransaction(TimeStampedModel, SoftDelete):
     PG_REFUND_SUCCESS_OK_STATUS = '1'
     PG_REFUND_FAILURE_OK_STATUS = '0'
     PG_REFUND_FAILURE_STATUS = 'FAIL'
@@ -1025,6 +1078,11 @@ class PgTransaction(TimeStampedModel):
     CREDIT = 0
     DEBIT = 1
     TYPE_CHOICES = [(CREDIT, "Credit"), (DEBIT, "Debit")]
+
+    NODAL1 = 1
+    NODAL2 = 2
+    CURRENT_ACCOUNT = 3
+    NODAL_CHOICES = [(NODAL1, "Nodal 1"), (NODAL2, "Nodal 2"), (CURRENT_ACCOUNT, "Current Account")]
 
     user = models.ForeignKey(User, on_delete=models.DO_NOTHING)
     product_id = models.SmallIntegerField(choices=Order.PRODUCT_IDS)
@@ -1047,6 +1105,7 @@ class PgTransaction(TimeStampedModel):
     transaction_id = models.CharField(max_length=100, null=True, unique=True)
     pb_gateway_name = models.CharField(max_length=100, null=True, blank=True)
     payment_captured = models.BooleanField(default=False)
+    nodal_id = models.SmallIntegerField(choices=NODAL_CHOICES, null=True, blank=True)
 
     @transaction.atomic
     def save(self, *args, **kwargs):
@@ -1148,8 +1207,8 @@ class PgTransaction(TimeStampedModel):
         encrypted_message_digest = encrypted_message_object.hexdigest()
         return encrypted_message_digest, encrypted_data_to_verify
 
-    class Meta:
-        db_table = "pg_transaction"
+    # class Meta:
+    #     db_table = "pg_transaction"
 
     @classmethod
     def create_pg_hash(cls, data, key1, key2):
@@ -1168,6 +1227,7 @@ class PgTransaction(TimeStampedModel):
 
     class Meta:
         db_table = "pg_transaction"
+        # unique_together = (("order", "order_no", "deleted"),)
 
 
 class DummyTransactions(TimeStampedModel):
@@ -1352,10 +1412,39 @@ class ConsumerAccount(TimeStampedModel):
         ConsumerTransaction.objects.create(**consumer_tx_data)
         self.save()
 
+    def debit_promotional(self, appointment_obj):
+        cashback_deducted = balance_deducted = 0
+        promotional_amount_debit = appointment_obj.promotional_amount
+
+        if promotional_amount_debit:
+            cashback_deducted = min(self.cashback, promotional_amount_debit)
+            self.cashback -= cashback_deducted
+
+            balance_deducted = min(self.balance, promotional_amount_debit - cashback_deducted)
+            self.balance -= balance_deducted
+
+            action = ConsumerTransaction.PROMOTIONAL_DEBIT
+            tx_type = PgTransaction.DEBIT
+
+            if cashback_deducted:
+                consumer_tx_data = self.consumer_tx_appointment_data(appointment_obj.user, appointment_obj, appointment_obj.PRODUCT_ID,
+                                                                     cashback_deducted, action, tx_type,
+                                                                     ConsumerTransaction.CASHBACK_SOURCE)
+                ConsumerTransaction.objects.create(**consumer_tx_data)
+
+            if balance_deducted:
+                consumer_tx_data = self.consumer_tx_appointment_data(appointment_obj.user, appointment_obj, appointment_obj.PRODUCT_ID,
+                                                                     balance_deducted, action, tx_type,
+                                                                     ConsumerTransaction.WALLET_SOURCE)
+                ConsumerTransaction.objects.create(**consumer_tx_data)
+
+            self.save()
+        return balance_deducted, cashback_deducted
+
     @classmethod
     def credit_cashback(cls, user, cashback_amount, appointment_obj, product_id):
         # check if cashback already credited
-        if ConsumerTransaction.objects.filter(product_id=product_id, type=ConsumerTransaction.CASHBACK_CREDIT, reference_id=appointment_obj.id).exists():
+        if ConsumerTransaction.objects.filter(product_id=product_id, action=ConsumerTransaction.CASHBACK_CREDIT, reference_id=appointment_obj.id).exists():
             return
 
         consumer_account = cls.objects.select_for_update().get(user=user)
@@ -1432,12 +1521,13 @@ class ConsumerTransaction(TimeStampedModel):
     RESCHEDULE_PAYMENT = 4
     CASHBACK_CREDIT = 5
     REFERRAL_CREDIT = 6
+    PROMOTIONAL_DEBIT = 7
 
     WALLET_SOURCE = 1
     CASHBACK_SOURCE = 2
 
     SOURCE_TYPE = [(WALLET_SOURCE, "Wallet"), (CASHBACK_SOURCE, "Cashback")]
-    action_list = ["Cancellation", "Payment", "Refund", "Sale", "CashbackCredit", "ReferralCredit"]
+    action_list = ["Cancellation", "Payment", "Refund", "Sale", "CashbackCredit", "ReferralCredit", "PromotionalDebit"]
     ACTION_CHOICES = list(enumerate(action_list, 0))
     user = models.ForeignKey(User, on_delete=models.DO_NOTHING)
     product_id = models.SmallIntegerField(choices=Order.PRODUCT_IDS, blank=True, null=True)
@@ -1481,7 +1571,7 @@ class ConsumerRefund(TimeStampedModel):
     PENDING = 1
     REQUESTED = 5
     COMPLETED = 10
-    MAXREFUNDDAYS = 60
+    MAXREFUNDDAYS = 180
     state_type = [(PENDING, "Pending"), (COMPLETED, "Completed"), (REQUESTED, "Requested")]
     user = models.ForeignKey(User, on_delete=models.DO_NOTHING)
     consumer_transaction = models.ForeignKey(ConsumerTransaction, on_delete=models.DO_NOTHING)
@@ -1544,6 +1634,7 @@ class ConsumerRefund(TimeStampedModel):
         refund_curl_request(pg_data)
 
     def schedule_refund(self):
+        from ondoc.account.mongo_models import PgLogs as PgLogsMongo
         pg_data = form_pg_refund_data([self, ])
         for req_data in pg_data:
             if settings.AUTO_REFUND:
@@ -1558,6 +1649,9 @@ class ConsumerRefund(TimeStampedModel):
                     # url = 'http://localhost:8000/api/v1/doctor/test'
                     print(url)
                     response = requests.post(url, data=json.dumps(req_data), headers=headers)
+                    save_pg_response.apply_async(
+                        (PgLogsMongo.REFUND_REQUEST_RESPONSE, req_data.get('orderId'), req_data.get('refNo'), response.json(), req_data, req_data.get('user'),),
+                        eta=timezone.localtime(), )
                     if response.status_code == status.HTTP_200_OK:
                         resp_data = response.json()
                         if resp_data.get("ok") is not None and str(resp_data["ok"]) == PgTransaction.PG_REFUND_SUCCESS_OK_STATUS:
@@ -1578,7 +1672,9 @@ class ConsumerRefund(TimeStampedModel):
                     else:
                         raise Exception("Invalid Http response status - " + str(response.content))
                 except Exception as e:
-                    logger.error("Error in Refund of user with data - " + json.dumps(req_data) + " with exception - " + str(e))
+                    # todo - temporary commented to avoid sentry logs
+                    # logger.error("Error in Refund of user with data - " + json.dumps(req_data) + " with exception - " + str(e))
+                    print("Error in Refund of user with data - " + json.dumps(req_data) + " with exception - " + str(e))
 
     @classmethod
     def request_pending_refunds(cls):
@@ -2324,12 +2420,12 @@ class MerchantPayout(TimeStampedModel):
             return 2
         else:
             appointment = self.get_appointment()
-            if appointment.payment_type == OpdAppointment.PREPAID:
-                return 1
-            elif appointment.payment_type == OpdAppointment.INSURANCE:
+            if appointment.payment_type == OpdAppointment.INSURANCE:
                 return 2
-
-        return 0
+            elif appointment.payment_type == OpdAppointment.PREPAID:
+                return 1
+            else:
+                return 1
 
     class Meta:
         db_table = "merchant_payout"

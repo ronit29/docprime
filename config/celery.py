@@ -6,13 +6,15 @@ import raven
 import os
 from django.conf import settings
 from raven.contrib.celery import register_signal, register_logger_signal
-from ondoc.account.tasks import refund_status_update, consumer_refund_update, dump_to_elastic, integrator_order_summary,\
-    get_thyrocare_reports, elastic_alias_switch, add_net_revenue_for_merchant
+from ondoc.account.tasks import refund_status_update, consumer_refund_update, dump_to_elastic, integrator_order_summary, \
+    get_thyrocare_reports, elastic_alias_switch, add_net_revenue_for_merchant, \
+    purchase_order_creation_counter_automation, purchase_order_closing_counter_automation
 from celery.schedules import crontab
 from ondoc.doctor.tasks import save_avg_rating, update_prices, update_city_search_key, update_doctors_count, update_search_score, \
     update_all_ipd_seo_urls, update_insured_labs_and_doctors, update_seo_urls, update_hosp_google_avg_rating, \
     update_flags, doctors_daily_schedule, update_rc_super_user
-from ondoc.account.tasks import update_ben_status_from_pg,update_merchant_payout_pg_status, create_appointment_admins_from_spocs
+from ondoc.account.tasks import update_ben_status_from_pg, update_merchant_payout_pg_status, \
+    create_appointment_admins_from_spocs, update_lal_path_test_data
 from ondoc.insurance.tasks import push_mis, process_insurance_payouts
 # from ondoc.doctor.services.update_search_score import DoctorSearchScore
 from ondoc.bookinganalytics.tasks import sync_booking_data
@@ -85,6 +87,7 @@ def setup_periodic_tasks(sender, **kwargs):
 
     report_time = float(settings.THYROCARE_REPORT_CRON_TIME) * float(60.0)
     sender.add_periodic_task(report_time, get_thyrocare_reports.s(), name='Get Thyrocare Reports')
+    sender.add_periodic_task(crontab(hour=20, minute=45), update_lal_path_test_data.s(), name='Update Lalpath Lab Data')
     sender.add_periodic_task(crontab(hour=19, minute=30), update_city_search_key.s(), name='Update Hospital City Search Key')
     sender.add_periodic_task(crontab(hour=20, minute=30), update_doctors_count.s(), name='Update Doctors Count')
     sender.add_periodic_task(crontab(hour=21, minute=00),  sync_booking_data.s(), name="Sync Booking Data for analytics")
@@ -94,10 +97,13 @@ def setup_periodic_tasks(sender, **kwargs):
     doctor_search_score_creation_time = crontab(hour=21, minute=30)
     sender.add_periodic_task(doctor_search_score_creation_time, update_search_score.s(), name='Update Doctor search score')
     sender.add_periodic_task(crontab(hour=23, minute=00), update_insured_labs_and_doctors.s(), name="Update insured labs and doctors")
-    sender.add_periodic_task(crontab(hour=23, minute=30), update_hosp_google_avg_rating.s(), name="Update Hospital ratings with Google Avg Ratings")
+    sender.add_periodic_task(crontab(day_of_month=1, hour=23, minute=30), update_hosp_google_avg_rating.s(), name="Update Hospital ratings with Google Avg Ratings")
     sender.add_periodic_task(crontab(hour=18, minute=00), update_seo_urls.s(), name="Update Seo Urls")
 
     sender.add_periodic_task(crontab(hour=19, minute=00), create_appointment_admins_from_spocs.s(), name='Create Appointment Admins from SPOCs')
     sender.add_periodic_task(crontab(hour=0, minute=30), doctors_daily_schedule.s(), name="Doctor's Daily Schedule")
     sender.add_periodic_task(crontab(day_of_week=1, hour=22, minute=0), update_rc_super_user.s(), name="Update Rocket Chat Super User Token")
     # sender.add_periodic_task(crontab(hour=21, minute=00), add_net_revenue_for_merchant.s(), name='Add net revenue for merchants')
+    sender.add_periodic_task(crontab(hour=18, minute=30), purchase_order_creation_counter_automation.s(), name="Enable Purchase Order Creation")
+    sender.add_periodic_task(crontab(hour=18, minute=30), purchase_order_closing_counter_automation.s(),
+                             name="Disable Purchase Order Creation")

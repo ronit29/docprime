@@ -1225,12 +1225,40 @@ class UserInsurance(auth_model.TimeStampedModel, MerchantPayoutMixin):
         profile = appointment_data.get('profile', None)
         user = profile.user
         user_insurance = UserInsurance.get_user_insurance(user)
-        if not user_insurance or not user_insurance.is_valid() or \
-                not user_insurance.is_appointment_valid(appointment_data['start_date']):
+        if not user_insurance or not user_insurance.is_valid():
             response_dict['insurance_message'] = 'Not covered under insurance'
             return response_dict
         else:
-            response_dict['insurance_id'] = user_insurance.id
+            if appointment_data.get('multi_timings_enabled'):
+                if appointment_data.get('selected_timings_type') == 'separate':
+                    if appointment_data.get('test_timings'):
+                        for test_timing in appointment_data.get('test_timings'):
+                            start_date = test_timing.get('start_date')
+                            if not user_insurance.is_appointment_valid(start_date):
+                                response_dict['insurance_message'] = 'Date Not covered under insurance'
+                                return response_dict
+                        response_dict['insurance_id'] = user_insurance.id
+                    else:
+                        response_dict['insurance_message'] = 'Bad Time Request'
+                        return response_dict
+                else:  # common
+                    if appointment_data.get('test_timings'):
+                        test_timing = appointment_data.get('test_timings')[0]
+                        start_date = test_timing.get('start_date')
+                        if not user_insurance.is_appointment_valid(start_date):
+                            response_dict['insurance_message'] = 'Not covered under insurance'
+                            return response_dict
+                        else:
+                            response_dict['insurance_id'] = user_insurance.id
+                    else:
+                        response_dict['insurance_message'] = 'Bad Time Request'
+                        return response_dict
+            else:
+                if not user_insurance.is_appointment_valid(appointment_data['start_date']):
+                    response_dict['insurance_message'] = 'Not covered under insurance'
+                    return response_dict
+                else:
+                    response_dict['insurance_id'] = user_insurance.id
 
         insured_members = user_insurance.members.all().filter(profile=profile)
         if not insured_members.exists():
@@ -1480,12 +1508,21 @@ class UserInsurance(auth_model.TimeStampedModel, MerchantPayoutMixin):
 
     def trigger_created_event(self, visitor_info):
         from ondoc.tracking.models import TrackingEvent
+        from ondoc.tracking.mongo_models import TrackingEvent as MongoTrackingEvent
         try:
-            with transaction.atomic():
-                event_data = TrackingEvent.build_event_data(self.user, TrackingEvent.InsurancePurchased, appointmentId=self.id, visitor_info=visitor_info)
-                if event_data and visitor_info:
-                    TrackingEvent.save_event(event_name=event_data.get('event'), data=event_data, visit_id=visitor_info.get('visit_id'),
-                                             user=self.user, triggered_at=datetime.datetime.utcnow())
+            if settings.MONGO_STORE:
+                event_data = TrackingEvent.build_event_data(self.user, TrackingEvent.InsurancePurchased,
+                                                            appointmentId=self.id, visitor_info=visitor_info)
+                MongoTrackingEvent.save_event(event_name=event_data.get('event'), data=event_data,
+                                              visit_id=visitor_info.get('visit_id'),
+                                              visitor_id=visitor_info.get('visitor_id'),
+                                              user=self.user, triggered_at=datetime.datetime.utcnow())
+
+        #     with transaction.atomic():
+        #         event_data = TrackingEvent.build_event_data(self.user, TrackingEvent.InsurancePurchased, appointmentId=self.id, visitor_info=visitor_info)
+                # if event_data and visitor_info:
+                    # TrackingEvent.save_event(event_name=event_data.get('event'), data=event_data, visit_id=visitor_info.get('visit_id'),
+                    #                          user=self.user, triggered_at=datetime.datetime.utcnow())
         except Exception as e:
             logger.error("Could not save triggered event - " + str(e))
 

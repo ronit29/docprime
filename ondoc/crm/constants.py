@@ -41,7 +41,8 @@ constants = {
     'QC_MERCHANT_TEAM': 'qc_merchant_team',
     'POC_TEAM': 'poc_team',
     'COMMUNICATION_TEAM': 'communication_team',
-    'PLUS_TEAM': 'plus_team'
+    'PLUS_TEAM': 'plus_team',
+    'PARTNER_LAB_TEAM': 'partner_lab_team'
 }
 matrix_product_ids = {
     'opd_products': 1,
@@ -82,3 +83,13 @@ matrix_status_to_ipd_lead_status_mapping = {
     matrix_status['PLANNED']: 9,
     matrix_status['IPD_CONFIRMATION']: 10,
 }
+
+
+
+PREPAID = 1
+COD = 2
+INSURANCE = 3
+PLAN = 4
+VIP = 5
+PAY_CHOICES = ((PREPAID, 'Prepaid'), (COD, 'COD'), (INSURANCE, 'Insurance'), (PLAN, "Subscription Plan"),
+                    (VIP, 'VIP'))

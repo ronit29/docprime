@@ -9,7 +9,7 @@ from .views import (LoginOTP, UserViewset, NotificationEndpointViewSet,
                     OrderDetailViewSet, UserTokenViewSet, SendBookingUrlViewSet, ContactUsViewSet, CareerViewSet,
                     DoctorNumberAutocomplete, UserLeadViewSet, ReferralViewSet, UserRatingViewSet, AppointmentViewSet,
                     WhatsappOptinViewSet, DoctorScanViewSet, TokenFromUrlKey, ProfileEmailUpdateViewset,
-                    BajajAllianzUserViewset, MatrixUserViewset)
+                    BajajAllianzUserViewset, MatrixUserViewset, SendCartUrlViewSet)
 
 urlpatterns = [
     path('api-token-refresh', RefreshJSONWebToken.as_view({'post':'refresh'}), name='token-refresh'),
@@ -55,6 +55,7 @@ urlpatterns = [
     path('userlead/create', UserLeadViewSet.as_view({"post": "create"}), name='user-signup'),
     path('manageablelabs', UserLabViewSet.as_view({"get": "list"}), name='user-manageable-labs'),
     path('order/send', SendBookingUrlViewSet.as_view({"post": "send_booking_url"}), name='send-booking-url'),
+    path('send_cart_url', SendCartUrlViewSet.as_view({"post": "send_cart_url"}), name='send-cart-url'),
     path('order/<int:order_id>', OrderDetailViewSet.as_view({"get": "details"}), name='extract-order-detail'),
     path('order/summary/<int:order_id>', OrderDetailViewSet.as_view({"get": "summary"}), name='extract-order-summary'),
     path('token/exchange', UserTokenViewSet.as_view({"get": "details"}), name='create-user-token'),

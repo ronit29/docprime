@@ -5,7 +5,7 @@ from django.db.models import Q
 
 from ondoc.banner.models import Banner, SliderLocation, BannerLocation, EmailBanner, RecommenderThrough, Recommender
 from ondoc.common.models import PaymentOptions, UserConfig, Feature, Service, Remark, MatrixMappedCity, \
-    MatrixMappedState, GenericNotes, BlacklistUser, BlockedStates, VirtualAppointment, Fraud
+    MatrixMappedState, GenericNotes, BlacklistUser, BlockedStates, VirtualAppointment, Fraud, SearchCriteria
 from ondoc.corporate_booking.models import CorporateDeal, Corporates, CorporateDocument
 from ondoc.coupon.models import Coupon, UserSpecificCoupon, RandomGeneratedCoupon
 from ondoc.crm.constants import constants
@@ -28,7 +28,8 @@ from ondoc.doctor.models import (Doctor, Hospital, DoctorClinicTiming, DoctorCli
                                  HealthInsuranceProvider, HospitalHelpline, HospitalTiming, CommonHospital,
                                  SimilarSpecializationGroup, SimilarSpecializationGroupMapping, PurchaseOrderCreation,
                                  HospitalNetworkImage, HospitalNetworkTiming, HospitalNetworkServiceMapping,
-                                 HospitalNetworkSpeciality)
+                                 HospitalNetworkSpeciality, HospitalSponsoredServices,
+                                 SponsoredServicePracticeSpecialization, DoctorSponsoredServices, SponsoredServices)
 
 from ondoc.diagnostic.models import (Lab, LabTiming, LabImage, GenericLabAdmin,
                                      LabManager, LabAccreditation, LabAward, LabCertification,
@@ -42,7 +43,7 @@ from ondoc.diagnostic.models import (Lab, LabTiming, LabImage, GenericLabAdmin,
                                      CommonPackage, LabTestCategory, LabTestCategoryMapping,
                                      LabTestRecommendedCategoryMapping, QuestionAnswer, FrequentlyAddedTogetherTests,
                                      LabTestGroup, LabTestGroupMapping, LabTestGroupTiming, LabTestCategoryLandingURLS,
-                                     LabTestCategoryUrls)
+                                     LabTestCategoryUrls, LabTestThresholds, AvailableLabTest)
 
 from ondoc.insurance.models import (Insurer, InsurancePlans, InsuranceThreshold, InsuranceCity, StateGSTCode,
                                     InsuranceDistrict, InsuranceTransaction, InsuranceDeal, InsuranceDisease,
@@ -52,7 +53,8 @@ from ondoc.insurance.models import (Insurer, InsurancePlans, InsuranceThreshold,
                                     ThirdPartyAdministrator,
                                     UserBank, UserBankDocument, InsurerAccountTransfer, BankHolidays)
 from ondoc.notification.models import DynamicTemplates
-from ondoc.plus.models import PlusPlans, PlusPlanParameters, PlusProposer, PlusPlanParametersMapping, PlusPlanContent
+from ondoc.plus.models import PlusPlans, PlusPlanParameters, PlusProposer, PlusPlanParametersMapping, PlusPlanContent, \
+    PlusPlanUtmSources, PlusPlanUtmSourceMapping, PlusMembers
 
 from ondoc.procedure.models import Procedure, ProcedureCategory, CommonProcedureCategory, DoctorClinicProcedure, \
     ProcedureCategoryMapping, ProcedureToCategoryMapping, CommonProcedure, IpdProcedure, IpdProcedureFeatureMapping, \
@@ -61,12 +63,16 @@ from ondoc.procedure.models import Procedure, ProcedureCategory, CommonProcedure
     IpdProcedurePracticeSpecialization, IpdProcedureLead, Offer, PotentialIpdLeadPracticeSpecialization, \
     IpdCostEstimateRoomType, IpdProcedureCostEstimate, \
     IpdCostEstimateRoomTypeMapping, IpdProcedureLeadCostEstimateMapping, UploadCostEstimateData, PotentialIpdCity
+from ondoc.provider.models import PartnerLabSamplesCollectOrder, PartnerLabTestSampleDetails, PartnerLabTestSamples, \
+    TestSamplesLabAlerts
 from ondoc.reports import models as report_models
 from ondoc.prescription.models import AppointmentPrescription
 
 from ondoc.diagnostic.models import LabPricing
 from ondoc.integrations.models import IntegratorMapping, IntegratorProfileMapping, IntegratorReport, \
-    IntegratorTestMapping, IntegratorTestParameterMapping, IntegratorLabTestParameterMapping
+    IntegratorTestMapping, IntegratorTestParameterMapping, IntegratorLabTestParameterMapping, IntegratorLabCode, \
+    IntegratorHospitalCode, IntegratorDoctorClinicMapping, IntegratorDoctorMappings
+from ondoc.salespoint.models import SalesPoint, SalespointTestmapping
 from ondoc.subscription_plan.models import Plan, PlanFeature, PlanFeatureMapping, UserPlanMapping
 
 from ondoc.web.models import Career, OnlineLead, UploadImage
@@ -80,6 +86,7 @@ from ondoc.account.models import MerchantPayout, MerchantPayoutBulkProcess, Adva
 from ondoc.seo.models import Sitemap, NewDynamic
 from ondoc.elastic.models import DemoElastic
 from ondoc.location.models import EntityUrls, CompareLabPackagesSeoUrls, CompareSEOUrls, CityLatLong
+from ondoc.provider import models as prov_models
 
 #from fluent_comments.admin import CommentModel
 from threadedcomments.models import ThreadedComment
@@ -131,7 +138,7 @@ class Command(BaseCommand):
 
             group.permissions.add(*permissions)
 
-        content_types = ContentType.objects.get_for_models(Lab, LabNetwork)
+        content_types = ContentType.objects.get_for_models(Lab, LabNetwork, IntegratorLabCode, IntegratorHospitalCode)
         for cl, ct in content_types.items():
 
             permissions = Permission.objects.filter(
@@ -176,7 +183,7 @@ class Command(BaseCommand):
                 Q(content_type=ct), Q(codename='change_' + ct.model))
             group.permissions.add(*permissions)
 
-        content_types = ContentType.objects.get_for_models(Lab, LabNetwork)
+        content_types = ContentType.objects.get_for_models(Lab, LabNetwork, IntegratorLabCode, IntegratorHospitalCode)
         for cl, ct in content_types.items():
             permissions = Permission.objects.filter(
                 Q(content_type=ct), Q(codename='change_' + ct.model))
@@ -186,7 +193,9 @@ class Command(BaseCommand):
                                                            Qualification, Specialization, Language, MedicalService,
                                                            College, SpecializationDepartment,
                                                            SpecializationField,
-                                                           SpecializationDepartmentMapping, UploadDoctorData, Remark
+                                                           SpecializationDepartmentMapping, UploadDoctorData, Remark,
+                                                           PartnerLabSamplesCollectOrder, PartnerLabTestSampleDetails,
+                                                           PartnerLabTestSamples, TestSamplesLabAlerts, AvailableLabTest
                                                            )
 
         for cl, ct in content_types.items():
@@ -285,7 +294,8 @@ class Command(BaseCommand):
             SpecializationField, SpecializationDepartment, SpecializationDepartmentMapping,
             Procedure, ProcedureCategory, CommonProcedureCategory,
             ProcedureToCategoryMapping, ProcedureCategoryMapping, LabTestCategory, Merchant, CancellationReason, UploadDoctorData,
-            LabTestGroup, LabTestGroupMapping, LabTestGroupTiming
+            LabTestGroup, LabTestGroupMapping, PartnerLabSamplesCollectOrder, PartnerLabTestSampleDetails,
+            PartnerLabTestSamples, TestSamplesLabAlerts, AvailableLabTest
         )
 
         for cl, ct in content_types.items():
@@ -296,7 +306,8 @@ class Command(BaseCommand):
             group.permissions.add(*permissions)
 
 
-        content_types = ContentType.objects.get_for_models(ParameterLabTest, LabTestPackage, LabTestCategoryMapping, HospitalTiming)
+        content_types = ContentType.objects.get_for_models(ParameterLabTest, LabTestPackage, LabTestCategoryMapping,
+                                                           HospitalTiming, IntegratorLabCode, LabTestGroupTiming, IntegratorHospitalCode)
 
         for cl, ct in content_types.items():
             permissions = Permission.objects.filter(
@@ -481,7 +492,8 @@ class Command(BaseCommand):
         group, created = Group.objects.get_or_create(name=constants['ARTICLE_TEAM'])
         group.permissions.clear()
 
-        content_types = ContentType.objects.get_for_models(Article, Sitemap, ArticleContentBox, ArticleCategory, EntityUrls)
+        content_types = ContentType.objects.get_for_models(Article, Sitemap, ArticleContentBox, ArticleCategory,
+                                                           EntityUrls, IpdProcedure, IpdProcedureDetail, Doctor)
 
         for cl, ct in content_types.items():
             permissions = Permission.objects.filter(
@@ -490,6 +502,21 @@ class Command(BaseCommand):
                 Q(codename='change_' + ct.model))
 
             group.permissions.add(*permissions)
+        #
+        # content_types = ContentType.objects.get_for_models(DoctorPracticeSpecialization,
+        #                                                    DoctorQualification,
+        #                                                    DoctorClinicTiming, DoctorClinic, DoctorLanguage,
+        #                                                    DoctorAward, DoctorAssociation, DoctorExperience,
+        #                                                    DoctorClinicProcedure,
+        #                                                    for_concrete_models=False)
+        #
+        # for cl, ct in content_types.items():
+        #     permissions = Permission.objects.get_or_create(
+        #         content_type=ct, codename='change_' + ct.model)
+        #
+        #     permissions = Permission.objects.filter(
+        #         content_type=ct, codename='change_' + ct.model)
+        #     group.permissions.add(*permissions)
 
         content_types = ContentType.objects.get_for_models(ArticleLinkedUrl, LinkedArticle, NewDynamic, GenericQuestionAnswer)
 
@@ -604,7 +631,10 @@ class Command(BaseCommand):
                                                            SimilarSpecializationGroupMapping, LabTestCategoryLandingURLS, LabTestCategoryUrls,
                                                            HospitalNetworkImage, HospitalNetworkTiming,
                                                            HospitalNetworkServiceMapping,
-                                                           HospitalNetworkSpeciality, DynamicTemplates)
+                                                           HospitalNetworkSpeciality, DynamicTemplates, HospitalSponsoredServices,
+                                                           SponsoredServicePracticeSpecialization, DoctorSponsoredServices, SponsoredServices,LabTestThresholds,
+                                                           SearchCriteria)
+
 
         for cl, ct in content_types.items():
             permissions = Permission.objects.filter(
@@ -647,11 +677,13 @@ class Command(BaseCommand):
 
         content_types = ContentType.objects.get_for_models(IntegratorMapping, IntegratorProfileMapping, LabTest, LabNetwork,
                                                            IntegratorReport, IntegratorTestMapping, IntegratorTestParameterMapping,
-                                                           IntegratorLabTestParameterMapping)
+                                                           IntegratorLabTestParameterMapping, IntegratorDoctorClinicMapping, IntegratorDoctorMappings,
+                                                           SalesPoint, SalespointTestmapping)
 
         for cl, ct in content_types.items():
             permissions = Permission.objects.filter(
                 Q(content_type=ct),
+                Q(codename='add_' + ct.model) |
                 Q(codename='change_' + ct.model))
 
             group.permissions.add(*permissions)
@@ -815,6 +847,9 @@ class Command(BaseCommand):
                 Q(codename='change_' + ct.model))
 
             group.permissions.add(*permissions)
+
+        # Creating group for partner lab
+        self.create_partner_lab_group()
 
         self.stdout.write('Successfully created groups and permissions')
 
@@ -1159,7 +1194,26 @@ class Command(BaseCommand):
         group.permissions.clear()
 
         content_types = ContentType.objects.get_for_models(PlusProposer, PlusPlans, PlusPlanParameters,
-                                                           PlusPlanParametersMapping, PlusPlanContent)
+                                                           PlusPlanParametersMapping, PlusPlanContent, PlusPlanUtmSources, PlusPlanUtmSourceMapping)
+
+        for cl, ct in content_types.items():
+            permissions = Permission.objects.filter(
+                Q(content_type=ct),
+                Q(codename='add_' + ct.model) |
+                Q(codename='change_' + ct.model))
+
+            group.permissions.add(*permissions)
+
+    def create_partner_lab_group(self):
+
+        group, created = Group.objects.get_or_create(name=constants['PARTNER_LAB_TEAM'])
+        group.permissions.clear()
+
+        content_types = ContentType.objects.get_for_models(prov_models.PartnerLabSamplesCollectOrder,
+                                                           prov_models.PartnerLabTestSamples,
+                                                           prov_models.PartnerLabTestSampleDetails,
+                                                           prov_models.PartnerLabTestSamplesOrderReportMapping,
+                                                           prov_models.PartnerHospitalLabMapping)
 
         for cl, ct in content_types.items():
             permissions = Permission.objects.filter(
