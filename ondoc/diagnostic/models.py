@@ -270,6 +270,8 @@ class Lab(TimeStampedModel, CreatedByModel, QCModel, SearchKey, WelcomeCallingDo
     enabled_for_plus_plans = models.NullBooleanField()
     is_b2b = models.BooleanField(default=False)
     center_visit = models.NullBooleanField()
+    search_url_locality_radius = models.FloatField(blank=True, null=True)
+    search_url_sublocality_radius = models.FloatField(blank=True, null=True)
 
     def __str__(self):
         return self.name
@@ -330,11 +332,14 @@ class Lab(TimeStampedModel, CreatedByModel, QCModel, SearchKey, WelcomeCallingDo
         return False
 
     @classmethod
-    def get_insurance_details(cls, user):
+    def get_insurance_details(cls, user, ins_threshold_amt=None):
 
         from ondoc.insurance.models import InsuranceThreshold
-        insurance_threshold_obj = InsuranceThreshold.objects.all().order_by('-lab_amount_limit').first()
-        insurance_threshold_amount = insurance_threshold_obj.lab_amount_limit if insurance_threshold_obj else 1500
+        if not ins_threshold_amt:
+            insurance_threshold_obj = InsuranceThreshold.objects.all().order_by('-opd_amount_limit').first()
+            insurance_threshold_amount = insurance_threshold_obj.opd_amount_limit if insurance_threshold_obj else 1500
+        else:
+            insurance_threshold_amount = ins_threshold_amt
         resp = {
             'is_insurance_covered': False,
             'insurance_threshold_amount': insurance_threshold_amount,
@@ -353,9 +358,13 @@ class Lab(TimeStampedModel, CreatedByModel, QCModel, SearchKey, WelcomeCallingDo
         return resp
 
     @classmethod
-    def get_vip_details(cls, user):
+    def get_vip_details(cls, user, search_criteria_query=None):
 
-        search_criteria = SearchCriteria.objects.filter(search_key='is_gold').first()
+        if not search_criteria_query:
+            search_criteria = SearchCriteria.objects.filter(search_key='is_gold').first()
+        else:
+            search_criteria = search_criteria_query
+
         hosp_is_gold = False
         if search_criteria:
             hosp_is_gold = search_criteria.search_value
