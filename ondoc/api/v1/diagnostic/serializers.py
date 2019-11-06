@@ -2082,16 +2082,16 @@ class CustomLabTestPackageSerializer(serializers.ModelSerializer):
         agreed_price = 0
         mrp = 0
         if lab:
-            avl_obj = None
-            if not self.context.get('avl_objs'):
-                avl_obj = obj.availablelabs.filter(lab_pricing_group=lab.lab_pricing_group).first()
-            else:
-                avl_objs = self.context.get('avl_objs')
-                for av in avl_objs:
-                    if av.lab_pricing_group == lab.lab_pricing_group:
-                        avl_obj = av
-                        break
-            # avl_obj = obj.availablelabs.filter(lab_pricing_group=lab.lab_pricing_group).first()
+            # avl_obj = None
+            # if not self.context.get('avl_objs'):
+            #     avl_obj = obj.availablelabs.filter(lab_pricing_group=lab.lab_pricing_group).first()
+            # else:
+            #     avl_objs = self.context.get('avl_objs')
+            #     for av in avl_objs:
+            #         if av.lab_pricing_group == lab.lab_pricing_group:
+            #             avl_obj = av
+            #             break
+            avl_obj = obj.availablelabs.filter(lab_pricing_group=lab.lab_pricing_group).first()
             if avl_obj:
                 mrp = avl_obj.mrp
                 deal_price = avl_obj.custom_deal_price if avl_obj.custom_deal_price else avl_obj.computed_deal_price

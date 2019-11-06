@@ -260,7 +260,7 @@ class Hospital(auth_model.TimeStampedModel, auth_model.CreatedByModel, auth_mode
     auto_ivr_enabled = models.BooleanField(default=True)
     priority_score = models.IntegerField(default=0, null=False, blank=False)
     search_distance = models.FloatField(default=15000)
-    google_avg_rating = models.DecimalField(max_digits=5, decimal_places=2, null=True, editable=True)
+    google_avg_rating = models.DecimalField(max_digits=5, decimal_places=2, null=True, editable=True, blank=True)
     # provider_encrypt = models.NullBooleanField(null=True, blank=True)
     # provider_encrypted_by = models.ForeignKey(auth_model.User, null=True, blank=True, on_delete=models.SET_NULL, related_name='encrypted_hospitals')
     # encryption_hint = models.CharField(max_length=128, null=True, blank=True)
@@ -748,7 +748,7 @@ class Hospital(auth_model.TimeStampedModel, auth_model.CreatedByModel, auth_mode
 
 @reversion.register()
 class HospitalPlaceDetails(auth_model.TimeStampedModel):
-    hospital = models.ForeignKey(Hospital, on_delete=models.CASCADE, related_name='hospital_place_details')
+    hospital = models.ForeignKey(Hospital, on_delete=models.DO_NOTHING, blank=True, null=True, related_name='hospital_place_details')
     place_id = models.TextField()
     place_details = JSONField(null=True, blank=True)
     reviews = JSONField(null=True, blank=True)
