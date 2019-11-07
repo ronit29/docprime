@@ -1797,12 +1797,12 @@ class LabAppointment(TimeStampedModel, CouponsMixin, LabAppointmentInvoiceMixin,
 
     def sync_with_booking_analytics(self):
 
-        # try:
-        #     SyncBookingAnalytics.objects.update_or_create(object_id=self.id,
-        #                                                   content_type=ContentType.objects.get_for_model(LabAppointment),
-        #                                                   defaults={"synced_at": self.updated_at, "last_updated_at": self.updated_at})
-        # except Exception as e:
-        #     pass
+        try:
+            SyncBookingAnalytics.objects.update_or_create(object_id=self.id,
+                                                          content_type=ContentType.objects.get_for_model(LabAppointment),
+                                                          defaults={"synced_at": self.updated_at, "last_updated_at": self.updated_at})
+        except Exception as e:
+            pass
 
         # category = None
         # for t in self.tests.all():
