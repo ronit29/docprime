@@ -3584,14 +3584,14 @@ class OfflineCustomerViewSet(viewsets.GenericViewSet):
             obj = self.get_error_obj(data)
             obj['error_message'] = 'Cannot Update an invalid/error appointment!'
             obj.update(self.get_offline_response_obj(appnt, request))
-            logger.error("PROVIDER_REQUEST - Updating a invalid/error Appointment! " + str(data))
+            logger.info("PROVIDER_REQUEST - Updating a invalid/error Appointment! " + str(data))
             response['obj'] = obj
             response['break'] = True
         elif appnt.status == models.OfflineOPDAppointments.CANCELLED or appnt.status == models.OfflineOPDAppointments.NO_SHOW:
             obj = self.get_error_obj(data)
             obj['error_message'] = 'Cannot Update a Cancelled/NoShow appointment!'
             obj.update(self.get_offline_response_obj(appnt, request))
-            logger.error("PROVIDER_REQUEST - Updating a Cancelled/NoShow Appointment! " + str(data))
+            logger.info("PROVIDER_REQUEST - Updating a Cancelled/NoShow Appointment! " + str(data))
             response['obj'] = obj
             response['break'] = True
 
