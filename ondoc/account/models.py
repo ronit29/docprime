@@ -1428,9 +1428,10 @@ class ConsumerAccount(TimeStampedModel):
         if self.balance:
             old_txn_objs = ConsumerTransaction.get_transactions(self.user, [ConsumerTransaction.PAYMENT, ConsumerTransaction.SALE])
             parent_ref = True
+            balance_refund = True
             for old_txn_obj in old_txn_objs:
                 if old_txn_obj.ref_txns:
-                    ctx_objs.append(old_txn_obj.debit_from_ref_txn(self, 0, parent_ref))
+                    ctx_objs.append(old_txn_obj.debit_from_ref_txn(self, 0, parent_ref, initiate_refund, balance_refund))
                 if old_txn_obj.balance and old_txn_obj.balance > 0:
                     if old_txn_obj.source == ConsumerTransaction.WALLET_SOURCE:
                         ctx_objs.append(old_txn_obj.debit_from_balance(self))
@@ -1641,7 +1642,7 @@ class ConsumerTransaction(TimeStampedModel):
             except Exception as e:
                 logger.error(str(e))
 
-    def debit_from_ref_txn(self, consumer_account, refund_amount=0, parent_ref=False, initiate_refund=1):
+    def debit_from_ref_txn(self, consumer_account, refund_amount=0, parent_ref=False, initiate_refund=1, balance_refund=0):
         ctx_objs = []
         ref_txns = self.ref_txns
         ref_txn_objs = ConsumerTransaction.objects.filter(id__in=list(ref_txns.keys()))
@@ -1653,7 +1654,10 @@ class ConsumerTransaction(TimeStampedModel):
             elif ref_txn_obj.action == ConsumerTransaction.SALE and ref_txn_obj.source == ConsumerTransaction.CASHBACK_SOURCE:
                 cashback_txn = True
             if parent_ref:
-                refund_amount = decimal.Decimal(ref_txns.get(str(ref_txn_obj.id), 0))
+                if balance_refund:
+                    refund_amount = self.balance
+                else:
+                    refund_amount = decimal.Decimal(ref_txns.get(str(ref_txn_obj.id), 0))
             if ref_txn_obj.ref_txns:
                 ctx_obj = ref_txn_obj.debit_from_ref_txn(consumer_account, refund_amount)
             else:
@@ -1661,7 +1665,7 @@ class ConsumerTransaction(TimeStampedModel):
                     ctx_obj = ref_txn_obj.debit_txn_refund(consumer_account, refund_amount)
                 else:
                    ctx_obj = None
-            if self.balance and not cashback_txn:
+            if self.balance and not cashback_txn and parent_ref:
                 self.balance -= refund_amount
 
             if initiate_refund:
@@ -1708,6 +1712,7 @@ class ConsumerTransaction(TimeStampedModel):
                                                             order_id=self.order_id).last()
             ctx_obj = pg_ctx_obj.debit_txn_refund(consumer_account, self.balance)
             self.balance = 0
+            self.save()
             ctx_objs.append(ctx_obj)
         return ctx_objs
 
