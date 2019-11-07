@@ -881,7 +881,7 @@ class Order(TimeStampedModel):
                 if order.cart:
                     order.cart.mark_delete()
             except Exception as e:
-                logger.error(str(e))
+                raise Exception("Error in processing order - " + str(e))
 
         if not opd_appointment_ids and not lab_appointment_ids and not insurance_ids and not user_plan_ids and not econsult_ids and not chat_plan_ids and not plus_ids:
             raise Exception("Could not process entire order")

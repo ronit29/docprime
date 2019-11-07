@@ -210,7 +210,7 @@ class ChatUserViewSet(viewsets.GenericViewSet):
                                        user_type=User.CONSUMER,
                                        auto_created=True,
                                        email=data.get('email'),
-                                       source='Chat')
+                                       source=data.get('source'))
 
         if not user:
             return JsonResponse(response, status=400)
@@ -220,7 +220,7 @@ class ChatUserViewSet(viewsets.GenericViewSet):
         profile_data['gender'] = data.get('gender')
         profile_data['user'] = user
         profile_data['dob'] = data.get('dob')
-        profile_data['source'] = 'Chat'
+        profile_data['source'] = data.get('source')
         user_profiles = user.profiles.all()
 
         if not bool(re.match(r"^[a-zA-Z ]+$", data.get('name'))):

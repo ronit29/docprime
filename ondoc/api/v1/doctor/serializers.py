@@ -1855,7 +1855,7 @@ class DoctorFeedbackBodySerializer(serializers.Serializer):
     is_cloud_lab_email = serializers.BooleanField(default=False)
     rating = serializers.IntegerField(max_value=10, required=False)
     subject_string = serializers.CharField(max_length=128, required=False)
-    feedback = serializers.CharField(max_length=512, required=False)
+    feedback = serializers.CharField(required=False)
     feedback_tags = serializers.ListField(required=False)
     email = serializers.EmailField(required=False)
     app_version = serializers.CharField(required=False, allow_blank=True)

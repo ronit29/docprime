@@ -34,7 +34,8 @@ class Footer(object):
 
 class LabProfileFooter(Footer):
     def __init__(self, entity):
-        self.sublocality_id = int(entity.sublocality_id) if entity.sublocality_id else None
+        if entity.sublocality_id:
+            self.sublocality_id = int(entity.sublocality_id) if entity.sublocality_id else None
         if entity.locality_id:
             self.locality_id = int(entity.locality_id) if entity.locality_id else None
         self.sublocality = entity.sublocality_value
@@ -153,7 +154,8 @@ class LabLocalityCityFooter(Footer):
             self.locality_id = int(entity.locality_id)
         self.locality = entity.locality_value
         self.centroid = entity.locality_location
-        self.sub_locality_id = int(entity.sublocality_id)
+        if entity.sublocality_id:
+            self.sub_locality_id = int(entity.sublocality_id)
         self.sub_locality = entity.sublocality_value
         self.sublocality_location = entity.sublocality_location
 
@@ -334,7 +336,8 @@ class SpecialityLocalityFooter(Footer):
             self.locality_id = int(entity.locality_id)
         self.specialization = entity.specialization
         self.locality = entity.locality_value
-        self.sublocality_id = int(entity.sublocality_id)
+        if entity.sublocality_id:
+            self.sublocality_id = int(entity.sublocality_id)
         self.sublocality = entity.sublocality_value
         self.sublocality_location = entity.sublocality_location
         self.centroid = entity.sublocality_location
@@ -407,7 +410,8 @@ class DoctorProfileFooter(Footer):
         #self.locality = entity.locality_value
         #self.centroid = entity.sublocality_location
         #self.sublocality_location = entity.sublocality_location
-        self.sublocality_id = int(entity.sublocality_id ) if entity.sublocality_id else None
+        if entity.sublocality_id:
+            self.sublocality_id = int(entity.sublocality_id ) if entity.sublocality_id else None
         if entity.locality_id:
             self.locality_id = int(entity.locality_id) if entity.locality_id else None
         self.sublocality = entity.sublocality_value
@@ -535,7 +539,8 @@ class DoctorCityFooter(Footer):
 
 class DoctorLocalityCityFooter(Footer):
     def __init__(self, entity):
-        self.sublocality_id = int(entity.sublocality_id)
+        if entity.sublocality_id:
+            self.sublocality_id = int(entity.sublocality_id)
         if entity.locality_id:
             self.locality_id = int(entity.locality_id)
         self.sublocality = entity.sublocality_value
@@ -660,7 +665,7 @@ class DoctorsCitySearchViewSet(viewsets.GenericViewSet):
                 response = footer.get_footer()
 
         except Exception as e:
-            logger.error(str(e))
+            logger.info(str(e))
 
         if entity.sitemap_identifier == 'SPECIALIZATION_LOCALITY_CITY':
             spec_city_entity = EntityUrls.objects.filter(is_valid=True, specialization=entity.specialization,
