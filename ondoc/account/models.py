@@ -1440,14 +1440,15 @@ class ConsumerAccount(TimeStampedModel):
                             ctx_objs.append(old_txn_obj.debit_from_balance(self))
                     old_txn_obj.save()
             else:
-                amount = self.balance
-                self.balance = 0
-                action = ConsumerTransaction.REFUND
-                tx_type = PgTransaction.DEBIT
-                consumer_tx_data = self.consumer_tx_pg_data({"user": self.user}, amount, action, tx_type)
-                # consumer_tx_data = self.form_consumer_tx_data({"user": self.user}, amount, action, tx_type)
-                ctx_obj = ConsumerTransaction.objects.create(**consumer_tx_data)
-                ctx_objs.append(ctx_obj)
+                if self.balance:
+                    amount = self.balance
+                    self.balance = 0
+                    action = ConsumerTransaction.REFUND
+                    tx_type = PgTransaction.DEBIT
+                    consumer_tx_data = self.consumer_tx_pg_data({"user": self.user}, amount, action, tx_type)
+                    # consumer_tx_data = self.form_consumer_tx_data({"user": self.user}, amount, action, tx_type)
+                    ctx_obj = ConsumerTransaction.objects.create(**consumer_tx_data)
+                    ctx_objs.append(ctx_obj)
 
         self.save()
         ctx_objs = list(flatten(ctx_objs))
@@ -1657,46 +1658,51 @@ class ConsumerTransaction(TimeStampedModel):
     def debit_from_ref_txn(self, consumer_account, refund_amount=0, parent_ref=False, initiate_refund=1, balance_refund=0):
         ctx_objs = []
         ref_txns = self.ref_txns
-        ref_txn_objs = ConsumerTransaction.objects.filter(id__in=list(ref_txns.keys()))
+        ref_txn_objs = ConsumerTransaction.objects.filter(id__in=list(ref_txns.keys())).order_by('id')
+        check_further_refs = True
         for ref_txn_obj in ref_txn_objs:
-            cashback_txn = False
-            is_preauth_txn = False
-            if ref_txn_obj.action in [ConsumerTransaction.CASHBACK_CREDIT, ConsumerTransaction.REFERRAL_CREDIT]:
-                cashback_txn = True
-            elif ref_txn_obj.action == ConsumerTransaction.SALE and ref_txn_obj.source == ConsumerTransaction.CASHBACK_SOURCE:
-                cashback_txn = True
-            if parent_ref:
-                if balance_refund:
-                    refund_amount = self.balance
-                else:
-                    refund_amount = decimal.Decimal(ref_txns.get(str(ref_txn_obj.id), 0))
-            if ref_txn_obj.ref_txns:
-                ctx_obj = ref_txn_obj.debit_from_ref_txn(consumer_account, refund_amount)
-            else:
-                if not cashback_txn:
-                    ctx_obj = ref_txn_obj.debit_txn_refund(consumer_account, refund_amount)
-                else:
-                   ctx_obj = None
-            if self.balance and not cashback_txn and parent_ref:
-                self.balance -= refund_amount
-
-            if initiate_refund:
-                if not cashback_txn:
-                    ctx_objs.append(ctx_obj)
-            else:
-                pg_txn = PgTransaction.objects.filter(user=self.user, order_id=ref_txn_obj.order_id).order_by(
-                    '-created_at').first()
-                if pg_txn.is_preauth() or pg_txn.status_type == 'TXN_RELEASE':
-                    is_preauth_txn = True
-                if pg_txn:
-                    if not is_preauth_txn:
-                        ctx_objs.append(ctx_obj)
+            if check_further_refs:
+                cashback_txn = False
+                is_preauth_txn = False
+                if refund_amount:
+                    if refund_amount < decimal.Decimal(ref_txns.get(str(ref_txn_obj.id), 0)):
+                        check_further_refs = False
+                if parent_ref:
+                    if balance_refund:
+                        refund_amount = self.balance
+                    else:
+                        refund_amount = decimal.Decimal(ref_txns.get(str(ref_txn_obj.id), 0))
+                if ref_txn_obj.action in [ConsumerTransaction.CASHBACK_CREDIT, ConsumerTransaction.REFERRAL_CREDIT]:
+                    cashback_txn = True
+                elif ref_txn_obj.action == ConsumerTransaction.SALE and ref_txn_obj.source == ConsumerTransaction.CASHBACK_SOURCE:
+                    cashback_txn = True
+                if ref_txn_obj.ref_txns:
+                    ctx_obj = ref_txn_obj.debit_from_ref_txn(consumer_account, refund_amount)
                 else:
                     if not cashback_txn:
-                        ctx_objs.append(ctx_obj)
+                        ctx_obj = ref_txn_obj.debit_txn_refund(consumer_account, refund_amount)
+                    else:
+                       ctx_obj = None
+                if self.balance and not cashback_txn and parent_ref:
+                    self.balance -= refund_amount
 
-            if ref_txn_obj.balance and ref_txn_obj.balance > 0 and not cashback_txn and not is_preauth_txn:
-                ctx_objs.append(ref_txn_obj.debit_from_balance(consumer_account))
+                if initiate_refund:
+                    if not cashback_txn:
+                        ctx_objs.append(ctx_obj)
+                else:
+                    pg_txn = PgTransaction.objects.filter(user=self.user, order_id=ref_txn_obj.order_id).order_by(
+                        '-created_at').first()
+                    if pg_txn.is_preauth() or pg_txn.status_type == 'TXN_RELEASE':
+                        is_preauth_txn = True
+                    if pg_txn:
+                        if not is_preauth_txn:
+                            ctx_objs.append(ctx_obj)
+                    else:
+                        if not cashback_txn:
+                            ctx_objs.append(ctx_obj)
+
+                if ref_txn_obj.balance and ref_txn_obj.balance > 0 and not cashback_txn and not is_preauth_txn:
+                    ctx_objs.append(ref_txn_obj.debit_from_balance(consumer_account))
         self.save()
 
         return ctx_objs
@@ -1711,9 +1717,10 @@ class ConsumerTransaction(TimeStampedModel):
             # data["reference_id"] = txn_entity_obj.id
             data["transaction_id"] = tx_obj.transaction_id
             data["order_id"] = tx_obj.order_id if tx_obj else None
-        consumer_account.balance -= refund_amount
-        consumer_tx_data = consumer_account.consumer_tx_pg_data(data, refund_amount, ConsumerTransaction.REFUND, PgTransaction.DEBIT)
-        ctx_obj = ConsumerTransaction.objects.create(**consumer_tx_data)
+        if refund_amount:
+            consumer_account.balance -= refund_amount
+            consumer_tx_data = consumer_account.consumer_tx_pg_data(data, refund_amount, ConsumerTransaction.REFUND, PgTransaction.DEBIT)
+            ctx_obj = ConsumerTransaction.objects.create(**consumer_tx_data)
 
         return ctx_obj
 
