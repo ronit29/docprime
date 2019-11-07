@@ -2522,7 +2522,7 @@ class SponsoredListingServiceInline(admin.TabularInline):
 class PurchaseOrderCreationAdmin(CompareVersionAdmin):
     model = PurchaseOrderCreation
     form = PurchaseOrderCreationForm
-    list_display = ['provider_type', 'created_at', 'start_date', 'end_date', 'provider_name_hospital', 'total_appointment_count',
+    list_display = ['id', 'provider_type', 'product_type', 'created_at', 'start_date', 'end_date', 'provider_name_hospital', 'provider_name_hospital_id', 'total_appointment_count',
                     'appointment_booked_count', 'current_appointment_count']
     autocomplete_fields = ['provider_name_lab', 'provider_name_hospital']
     search_fields = ['provider_name_lab__name', 'provider_name_hospital__name']
@@ -2530,6 +2530,10 @@ class PurchaseOrderCreationAdmin(CompareVersionAdmin):
     inlines = [SponsorListingURLInline, SponsorListingSpecializationInline, SponsorListingUtmTermInline, SponsoredListingServiceInline]
 
     # readonly_fields = ['provider_name', 'appointment_booked_count', 'current_appointment_count']
+
+    def provider_name_hospital_id(self, obj):
+        return obj.provider_name_hospital.id
+    provider_name_hospital_id.self_description = 'Provider Hospital ID'
 
     def get_readonly_fields(self, request, obj=None):
         read_only_fields = ['provider_name', 'appointment_booked_count', 'current_appointment_count']

@@ -30,13 +30,24 @@ class ChatReferralNumberSerializer(serializers.Serializer):
 
 class ChatLoginSerializer(serializers.Serializer):
     GENDER_CHOICES = UserProfile.GENDER_CHOICES
-    phone_number = serializers.IntegerField(min_value=1000000000,max_value=9999999999)
+    phone_number = serializers.IntegerField(min_value=1000000000, max_value=9999999999)
     name = serializers.CharField(max_length=100)
     gender = serializers.ChoiceField(choices=GENDER_CHOICES)
     # age = serializers.SerializerMethodField()
-    dob = serializers.DateField(allow_null=True, required=True)
+    dob = serializers.DateField(allow_null=True, required=False)
     is_default_user = serializers.BooleanField(required=False)
     email = serializers.EmailField(required=False, allow_null=True, allow_blank=True)
+    source = serializers.CharField(max_length=100, required=False)
+
+    def validate(self, data):
+        if data.get('source'):
+            data['source'] = 'Chat-' + str(data.get('source'))
+        else:
+            data['source'] = 'Chat'
+            if not data.get('dob'):
+                raise serializers.ValidationError("dob is required.")
+
+        return data
 
 
 class ChatTransactionModelSerializer(serializers.Serializer):
