@@ -21,6 +21,7 @@ from django.db.models import F, Sum, Max, Q, Prefetch, Case, When, Count, Value
 from django.db.models.functions import Concat, Substr
 from django.forms.models import model_to_dict
 
+from ondoc.common.middleware import use_slave
 from ondoc.common.models import UserConfig, PaymentOptions, AppointmentHistory, BlacklistUser, BlockedStates
 from ondoc.common.utils import get_all_upcoming_appointments
 from ondoc.coupon.models import UserSpecificCoupon, Coupon
@@ -527,6 +528,7 @@ class ReferralViewSet(GenericViewSet):
     # authentication_classes = (JWTAuthentication, )
     # permission_classes = (IsAuthenticated, IsNotAgent)
 
+    @use_slave
     def retrieve(self, request):
         user = request.user
         if not user.is_authenticated:
@@ -571,6 +573,7 @@ class UserAppointmentsViewSet(OndocViewSet):
         return OpdAppointment.objects.filter(user=user)
 
     @transaction.non_atomic_requests
+    @use_slave
     def list(self, request):
         params = request.query_params
         doctor_serializer = self.doctor_appointment_list(request, params)
@@ -1291,7 +1294,7 @@ class TransactionViewSet(viewsets.GenericViewSet):
                 args = {'order_id': response.get("orderId"), 'status_code': pg_resp_code, 'source': response.get("source")}
                 status_type = PaymentProcessStatus.get_status_type(pg_resp_code, response.get('txStatus'))
 
-                PgLogs.objects.create(decoded_response=response, coded_response=coded_response)
+                # PgLogs.objects.create(decoded_response=response, coded_response=coded_response)
                 save_pg_response.apply_async((mongo_pglogs.TXN_RESPONSE, response.get("orderId"), None, response, None, response.get('customerId')), eta=timezone.localtime(), )
                 save_payment_status.apply_async((status_type, args), eta=timezone.localtime(), )
             except Exception as e:
@@ -1311,6 +1314,8 @@ class TransactionViewSet(viewsets.GenericViewSet):
                             pg_txn.bank_id = response.get('bankTxId')
                             #pg_txn.payment_captured = True
                             pg_txn.save()
+                            if response.get('txStatus') in ['TXN_SUCCESS', 'TXN_RELEASE']:
+                                send_pg_acknowledge.apply_async((pg_txn.order_id, pg_txn.order_no, 'capture'), countdown=1)
                         send_pg_acknowledge.apply_async((pg_txn.order_id, pg_txn.order_no,), countdown=1)
                         if pg_txn.product_id == Order.CHAT_PRODUCT_ID:
                             chat_order = Order.objects.filter(pk=pg_txn.order_id).first()
@@ -1367,11 +1372,11 @@ class TransactionViewSet(viewsets.GenericViewSet):
                 else:
                     logger.error("Invalid pg data - " + json.dumps(resp_serializer.errors))
             elif order_obj:
-                try:
-                    if response and response.get("orderNo") and response.get("orderId"):
-                        send_pg_acknowledge.apply_async((response.get("orderId"), response.get("orderNo"),), countdown=1)
-                except Exception as e:
-                    logger.error("Error in sending pg acknowledge - " + str(e))
+                # try:
+                #     if response and response.get("orderNo") and response.get("orderId"):
+                #         send_pg_acknowledge.apply_async((response.get("orderId"), response.get("orderNo"),), countdown=1)
+                # except Exception as e:
+                #     logger.error("Error in sending pg acknowledge - " + str(e))
 
                 try:
                     has_changed = order_obj.change_payment_status(Order.PAYMENT_FAILURE)
@@ -1439,6 +1444,10 @@ class TransactionViewSet(viewsets.GenericViewSet):
         data['transaction_id'] = format_return_value(response.get('pgTxId'))
         data['pb_gateway_name'] = response.get('pbGatewayName')
         data['nodal_id'] = response.get('nodalId')
+        # if order_obj.product_id == Order.INSURANCE_PRODUCT_ID:
+        #     data['nodal_id'] = PgTransaction.NODAL2
+        # else:
+        #     data['nodal_id'] = PgTransaction.NODAL1
 
         return data
 
@@ -1487,6 +1496,7 @@ class UserTransactionViewSet(viewsets.GenericViewSet):
     permission_classes = (IsAuthenticated,)
 
     @transaction.non_atomic_requests
+    @use_slave
     def list(self, request):
         user = request.user
         tx_queryset = ConsumerTransaction.objects.filter(user=user).order_by('-id')
@@ -1675,6 +1685,7 @@ class HospitalDoctorAppointmentPermissionViewSet(GenericViewSet):
                 lab_dict['id'] = lab.id
                 lab_dict['name'] = lab.name
                 lab_dict['thumbnail'] = lab.get_thumbnail()
+                lab_dict['is_b2b'] = lab.is_b2b
                 partner_labs.append(lab_dict)
             resp_dict['partner_labs'] = partner_labs
             resp.append(resp_dict)
@@ -2155,6 +2166,17 @@ class OrderDetailViewSet(GenericViewSet):
             if appointment:
                 plus_appointment_mapping = PlusAppointmentMapping.objects.filter(object_id=appointment.id).first()
 
+            payment_mode = ''
+            if appointment:
+                payment_modes = dict(OpdAppointment.PAY_CHOICES)
+                if payment_modes:
+                    effective_price = appointment.effective_price
+                    payment_type = appointment.payment_type
+                    if effective_price > 0 and payment_type == 5:
+                        payment_mode = 'Online'
+                    else:
+                        payment_mode = payment_modes.get(appointment.payment_type, '')
+
             curr = {
                 "mrp": order.action_data["mrp"] if "mrp" in order.action_data else order.action_data["agreed_price"],
                 "deal_price": order.action_data["deal_price"],
@@ -2166,9 +2188,11 @@ class OrderDetailViewSet(GenericViewSet):
                 "payment_type": order.action_data["payment_type"],
                 "cod_deal_price": cod_deal_price,
                 "enabled_for_cod": enabled_for_cod,
-                "is_vip_member": True if appointment and appointment.plus_plan else False,
+                "is_gold_member": True if appointment and appointment.plus_plan and appointment.plus_plan.plan.is_gold else False,
+                "is_vip_member": True if appointment and appointment.plus_plan and not appointment.plus_plan.plan.is_gold else False,
                 "covered_under_vip": True if appointment and appointment.plus_plan else False,
-                'vip_amount': appointment_amount - plus_appointment_mapping.amount if plus_appointment_mapping else 0
+                'vip_amount': appointment_amount - plus_appointment_mapping.amount if plus_appointment_mapping else 0,
+                "payment_mode": payment_mode
             }
             processed_order_data.append(curr)
 

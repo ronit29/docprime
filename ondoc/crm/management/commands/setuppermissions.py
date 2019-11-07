@@ -5,7 +5,7 @@ from django.db.models import Q
 
 from ondoc.banner.models import Banner, SliderLocation, BannerLocation, EmailBanner, RecommenderThrough, Recommender
 from ondoc.common.models import PaymentOptions, UserConfig, Feature, Service, Remark, MatrixMappedCity, \
-    MatrixMappedState, GenericNotes, BlacklistUser, BlockedStates, VirtualAppointment, Fraud
+    MatrixMappedState, GenericNotes, BlacklistUser, BlockedStates, VirtualAppointment, Fraud, SearchCriteria
 from ondoc.corporate_booking.models import CorporateDeal, Corporates, CorporateDocument
 from ondoc.coupon.models import Coupon, UserSpecificCoupon, RandomGeneratedCoupon
 from ondoc.crm.constants import constants
@@ -43,7 +43,7 @@ from ondoc.diagnostic.models import (Lab, LabTiming, LabImage, GenericLabAdmin,
                                      CommonPackage, LabTestCategory, LabTestCategoryMapping,
                                      LabTestRecommendedCategoryMapping, QuestionAnswer, FrequentlyAddedTogetherTests,
                                      LabTestGroup, LabTestGroupMapping, LabTestGroupTiming, LabTestCategoryLandingURLS,
-                                     LabTestCategoryUrls, LabTestThresholds)
+                                     LabTestCategoryUrls, LabTestThresholds, AvailableLabTest)
 
 from ondoc.insurance.models import (Insurer, InsurancePlans, InsuranceThreshold, InsuranceCity, StateGSTCode,
                                     InsuranceDistrict, InsuranceTransaction, InsuranceDeal, InsuranceDisease,
@@ -54,7 +54,7 @@ from ondoc.insurance.models import (Insurer, InsurancePlans, InsuranceThreshold,
                                     UserBank, UserBankDocument, InsurerAccountTransfer, BankHolidays)
 from ondoc.notification.models import DynamicTemplates
 from ondoc.plus.models import PlusPlans, PlusPlanParameters, PlusProposer, PlusPlanParametersMapping, PlusPlanContent, \
-    PlusPlanUtmSources, PlusPlanUtmSourceMapping
+    PlusPlanUtmSources, PlusPlanUtmSourceMapping, PlusMembers
 
 from ondoc.procedure.models import Procedure, ProcedureCategory, CommonProcedureCategory, DoctorClinicProcedure, \
     ProcedureCategoryMapping, ProcedureToCategoryMapping, CommonProcedure, IpdProcedure, IpdProcedureFeatureMapping, \
@@ -63,6 +63,8 @@ from ondoc.procedure.models import Procedure, ProcedureCategory, CommonProcedure
     IpdProcedurePracticeSpecialization, IpdProcedureLead, Offer, PotentialIpdLeadPracticeSpecialization, \
     IpdCostEstimateRoomType, IpdProcedureCostEstimate, \
     IpdCostEstimateRoomTypeMapping, IpdProcedureLeadCostEstimateMapping, UploadCostEstimateData, PotentialIpdCity
+from ondoc.provider.models import PartnerLabSamplesCollectOrder, PartnerLabTestSampleDetails, PartnerLabTestSamples, \
+    TestSamplesLabAlerts
 from ondoc.reports import models as report_models
 from ondoc.prescription.models import AppointmentPrescription
 
@@ -191,7 +193,9 @@ class Command(BaseCommand):
                                                            Qualification, Specialization, Language, MedicalService,
                                                            College, SpecializationDepartment,
                                                            SpecializationField,
-                                                           SpecializationDepartmentMapping, UploadDoctorData, Remark
+                                                           SpecializationDepartmentMapping, UploadDoctorData, Remark,
+                                                           PartnerLabSamplesCollectOrder, PartnerLabTestSampleDetails,
+                                                           PartnerLabTestSamples, TestSamplesLabAlerts, AvailableLabTest
                                                            )
 
         for cl, ct in content_types.items():
@@ -290,7 +294,8 @@ class Command(BaseCommand):
             SpecializationField, SpecializationDepartment, SpecializationDepartmentMapping,
             Procedure, ProcedureCategory, CommonProcedureCategory,
             ProcedureToCategoryMapping, ProcedureCategoryMapping, LabTestCategory, Merchant, CancellationReason, UploadDoctorData,
-            LabTestGroup, LabTestGroupMapping
+            LabTestGroup, LabTestGroupMapping, PartnerLabSamplesCollectOrder, PartnerLabTestSampleDetails,
+            PartnerLabTestSamples, TestSamplesLabAlerts, AvailableLabTest
         )
 
         for cl, ct in content_types.items():
@@ -497,6 +502,21 @@ class Command(BaseCommand):
                 Q(codename='change_' + ct.model))
 
             group.permissions.add(*permissions)
+        #
+        # content_types = ContentType.objects.get_for_models(DoctorPracticeSpecialization,
+        #                                                    DoctorQualification,
+        #                                                    DoctorClinicTiming, DoctorClinic, DoctorLanguage,
+        #                                                    DoctorAward, DoctorAssociation, DoctorExperience,
+        #                                                    DoctorClinicProcedure,
+        #                                                    for_concrete_models=False)
+        #
+        # for cl, ct in content_types.items():
+        #     permissions = Permission.objects.get_or_create(
+        #         content_type=ct, codename='change_' + ct.model)
+        #
+        #     permissions = Permission.objects.filter(
+        #         content_type=ct, codename='change_' + ct.model)
+        #     group.permissions.add(*permissions)
 
         content_types = ContentType.objects.get_for_models(ArticleLinkedUrl, LinkedArticle, NewDynamic, GenericQuestionAnswer)
 
@@ -612,7 +632,8 @@ class Command(BaseCommand):
                                                            HospitalNetworkImage, HospitalNetworkTiming,
                                                            HospitalNetworkServiceMapping,
                                                            HospitalNetworkSpeciality, DynamicTemplates, HospitalSponsoredServices,
-                                                           SponsoredServicePracticeSpecialization, DoctorSponsoredServices, SponsoredServices,LabTestThresholds)
+                                                           SponsoredServicePracticeSpecialization, DoctorSponsoredServices, SponsoredServices,LabTestThresholds,
+                                                           SearchCriteria)
 
 
         for cl, ct in content_types.items():

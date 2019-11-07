@@ -59,12 +59,12 @@ from ondoc.integrations.task import push_lab_appointment_to_integrator, get_inte
 from ondoc.location import models as location_models
 from ondoc.plus.enums import UtilizationCriteria
 from ondoc.plus.models import PlusAppointmentMapping
-from ondoc.plus.usage_criteria import get_class_reference
+from ondoc.plus.usage_criteria import get_class_reference, get_price_reference
 from ondoc.ratings_review import models as ratings_models
 # from ondoc.api.v1.common import serializers as common_serializers
 from ondoc.common.models import AppointmentHistory, AppointmentMaskNumber, Remark, GlobalNonBookable, \
     SyncBookingAnalytics, CompletedBreakupMixin, RefundDetails, MatrixMappedState, \
-    MatrixMappedCity, TdsDeductionMixin, MatrixDataMixin, MerchantPayoutMixin, Fraud
+    MatrixMappedCity, TdsDeductionMixin, MatrixDataMixin, MerchantPayoutMixin, Fraud, SearchCriteria
 import reversion
 from decimal import Decimal
 from django.utils.text import slugify
@@ -270,6 +270,8 @@ class Lab(TimeStampedModel, CreatedByModel, QCModel, SearchKey, WelcomeCallingDo
     enabled_for_plus_plans = models.NullBooleanField()
     is_b2b = models.BooleanField(default=False)
     center_visit = models.NullBooleanField()
+    search_url_locality_radius = models.FloatField(blank=True, null=True)
+    search_url_sublocality_radius = models.FloatField(blank=True, null=True)
 
     def __str__(self):
         return self.name
@@ -317,6 +319,12 @@ class Lab(TimeStampedModel, CreatedByModel, QCModel, SearchKey, WelcomeCallingDo
 
         return False
 
+    def is_enabled_for_plus_plans(self):
+        if (self.network and self.network.enabled_for_plus_plans) or (not self.network and self.enabled_for_plus_plans):
+            return True
+
+        return False
+
     def is_auto_ivr_enabled(self):
         if (self.network and self.network.auto_ivr_enabled) or (not self.network and self.auto_ivr_enabled):
             return True
@@ -324,11 +332,14 @@ class Lab(TimeStampedModel, CreatedByModel, QCModel, SearchKey, WelcomeCallingDo
         return False
 
     @classmethod
-    def get_insurance_details(cls, user):
+    def get_insurance_details(cls, user, ins_threshold_amt=None):
 
         from ondoc.insurance.models import InsuranceThreshold
-        insurance_threshold_obj = InsuranceThreshold.objects.all().order_by('-lab_amount_limit').first()
-        insurance_threshold_amount = insurance_threshold_obj.lab_amount_limit if insurance_threshold_obj else 1500
+        if not ins_threshold_amt:
+            insurance_threshold_obj = InsuranceThreshold.objects.all().order_by('-opd_amount_limit').first()
+            insurance_threshold_amount = insurance_threshold_obj.opd_amount_limit if insurance_threshold_obj else 1500
+        else:
+            insurance_threshold_amount = ins_threshold_amt
         resp = {
             'is_insurance_covered': False,
             'insurance_threshold_amount': insurance_threshold_amount,
@@ -347,12 +358,25 @@ class Lab(TimeStampedModel, CreatedByModel, QCModel, SearchKey, WelcomeCallingDo
         return resp
 
     @classmethod
-    def get_vip_details(cls, user):
+    def get_vip_details(cls, user, search_criteria_query=None):
+
+        if not search_criteria_query:
+            search_criteria = SearchCriteria.objects.filter(search_key='is_gold').first()
+        else:
+            search_criteria = search_criteria_query
+
+        hosp_is_gold = False
+        if search_criteria:
+            hosp_is_gold = search_criteria.search_value
 
         resp = {
             'is_vip_member': False,
             'covered_under_vip': False,
-            'vip_amount': 0
+            'vip_amount': 0,
+            'vip_convenience_amount': 0,
+            'vip_gold_price': 0,
+            'is_gold_member': False,
+            'is_gold': hosp_is_gold
         }
 
         if user.is_authenticated and not user.is_anonymous:
@@ -2654,16 +2678,24 @@ class LabAppointment(TimeStampedModel, CouponsMixin, LabAppointmentInvoiceMixin,
             coupon_discount, coupon_cashback, coupon_list, random_coupon_list = 0, 0, [], []
 
         if data.get("payment_type") in [OpdAppointment.VIP]:
+            price_data = {"mrp": total_mrp, "fees": total_agreed, "deal_price": total_deal_price, "cod_deal_price": total_deal_price}
             profile = data.get('profile')
             if profile:
                 plus_membership = profile.get_plus_membership
-
+                price_engine = get_price_reference(plus_membership, "LABTEST")
+                if not price_engine:
+                    price = effective_price
+                else:
+                    price = price_engine.get_price(price_data)
+                vip_convenience_amount = plus_membership.plan.get_convenience_charge(price, "LABTEST")
                 test = data['test_ids']
                 entity = "LABTEST" if not test[0].is_package else "PACKAGE"
                 engine = get_class_reference(plus_membership, entity)
                 if engine:
-                    engine_response = engine.validate_booking_entity(cost=effective_price, id=data['test_ids'][0].id)
+                    # engine_response = engine.validate_booking_entity(cost=effective_price, id=data['test_ids'][0].id)
+                    engine_response = engine.validate_booking_entity(cost=price, id=data['test_ids'][0].id, mrp=effective_price)
                     effective_price = engine_response.get('amount_to_be_paid')
+                    effective_price = effective_price + vip_convenience_amount
                 else:
                     effective_price = effective_price
             else:
@@ -2795,6 +2827,7 @@ class LabAppointment(TimeStampedModel, CouponsMixin, LabAppointmentInvoiceMixin,
         plus_user_id = None
         plus_user = user.active_plus_user
         mrp = price_data.get("mrp")
+        convenience_amount = 0
         vip_amount_utilized = 0
         if plus_user:
             plus_user_resp = plus_user.validate_plus_appointment(data)
@@ -2802,8 +2835,8 @@ class LabAppointment(TimeStampedModel, CouponsMixin, LabAppointmentInvoiceMixin,
             plus_user_id = plus_user_resp.get('plus_user_id', None)
         if cover_under_vip and cart_data.get('cover_under_vip', None):
             payment_type = OpdAppointment.VIP
-
-            effective_price = plus_user_resp['amount_to_be_paid']
+            convenience_amount = plus_user.plan.get_convenience_charge(plus_user_resp['amount_to_be_paid'], "LABTEST")
+            effective_price = plus_user_resp['amount_to_be_paid'] + convenience_amount
             vip_amount_utilized = plus_user_resp['vip_amount_deducted']
             # utilization = plus_user.get_utilization
             # available_amount = int(utilization.get('available_package_amount', 0))
@@ -2854,6 +2887,7 @@ class LabAppointment(TimeStampedModel, CouponsMixin, LabAppointmentInvoiceMixin,
             "cover_under_vip": cover_under_vip,
             "plus_plan": plus_user_id,
             'plus_amount': int(vip_amount_utilized),
+            'vip_convenience_amount': convenience_amount,
             "coupon_data": price_data.get("coupon_data"),
             "prescription_list": data.get('prescription_list', []),
             "_responsible_user": data.get("_responsible_user", None),
@@ -2883,8 +2917,8 @@ class LabAppointment(TimeStampedModel, CouponsMixin, LabAppointmentInvoiceMixin,
             with transaction.atomic():
                 event_data = TrackingEvent.build_event_data(self.user, TrackingEvent.LabAppointmentBooked, appointmentId=self.id, visitor_info=visitor_info)
                 if event_data and visitor_info:
-                    TrackingEvent.save_event(event_name=event_data.get('event'), data=event_data, visit_id=visitor_info.get('visit_id'),
-                                             user=self.user, triggered_at=datetime.datetime.utcnow())
+                    # TrackingEvent.save_event(event_name=event_data.get('event'), data=event_data, visit_id=visitor_info.get('visit_id'),
+                    #                          user=self.user, triggered_at=datetime.datetime.utcnow())
 
                     if settings.MONGO_STORE:
                         MongoTrackingEvent.save_event(event_name=event_data.get('event'), data=event_data,
@@ -2977,6 +3011,9 @@ class LabAppointment(TimeStampedModel, CouponsMixin, LabAppointmentInvoiceMixin,
         location_verified = self.lab.is_location_verified
         provider_id = self.lab.id
         merchant = self.lab.merchant.all().last()
+        if not merchant:
+            merchant = self.lab.network.merchant.all().last()
+
         if merchant:
             merchant_code = merchant.id
 
@@ -3015,6 +3052,23 @@ class LabAppointment(TimeStampedModel, CouponsMixin, LabAppointmentInvoiceMixin,
         user_insurance = self.insurance
         mobile_list = self.get_matrix_spoc_data()
         refund_data = self.refund_details_data()
+
+        from ondoc.ratings_review.models import RatingsReview
+        appointment_rating = RatingsReview.objects.filter(appointment_id=self.id).first()
+        rating = appointment_rating.ratings if appointment_rating else 0
+        if self.lab and self.lab.rating_data:
+            avg_rating = self.lab.rating_data.get('avg_rating', 0)
+        else:
+            avg_rating = 0
+
+        if avg_rating is None:
+            avg_rating = 0
+        unsatisfied_customer = ""
+        if rating and rating > 0:
+            if rating < 3:
+                unsatisfied_customer = 'Yes'
+            else:
+                unsatisfied_customer = 'No'
 
         insurance_link = None
         if user_insurance:
@@ -3073,7 +3127,10 @@ class LabAppointment(TimeStampedModel, CouponsMixin, LabAppointmentInvoiceMixin,
             "RefundToWallet": float(refund_data['promotional_wallet_refund']) if refund_data['promotional_wallet_refund'] else None,
             "RefundInitiationDate": int(refund_data['refund_initiated_at']) if refund_data['refund_initiated_at'] else None,
             "RefundURN": refund_data['refund_urn'],
-            "HospitalName": hospital_name
+            "HospitalName": hospital_name,
+            "Rating": rating,
+            "AvgRating": avg_rating,
+            "UnsatisfiedCustomer": unsatisfied_customer
         }
         return appointment_details
 

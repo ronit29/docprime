@@ -2404,7 +2404,7 @@ class VipNotification(Notification):
         instance = self.plus_user_obj
 
         context = {
-            'expiry_date': str(aware_time_zone(instance.expiry_date).date().strftime('%d %b %Y')),
+            'expiry_date': str(aware_time_zone(instance.expire_date).date().strftime('%d %b %Y')),
         }
 
         return context

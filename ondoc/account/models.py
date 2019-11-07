@@ -313,12 +313,14 @@ class Order(TimeStampedModel):
         _responsible_user=None
         _source=None
         plus_amount = 0
+        convenience_amount = 0
         if '_responsible_user' in appointment_data:
             _responsible_user = appointment_data.pop('_responsible_user')
         if '_source' in appointment_data:
             _source = appointment_data.pop('_source')
         if 'plus_amount' in appointment_data:
             plus_amount = appointment_data.pop('plus_amount')
+            convenience_amount = int(appointment_data.pop('vip_convenience_amount'))
 
         if self.action == Order.OPD_APPOINTMENT_CREATE:
             if total_balance >= appointment_data["effective_price"] or payment_not_required:
@@ -328,7 +330,7 @@ class Order(TimeStampedModel):
                     appointment_obj = OpdAppointment.create_appointment(appointment_data, responsible_user=_responsible_user, source=_source)
                     if appointment_obj.plus_plan:
                         data = {"plus_user": appointment_obj.plus_plan, "plus_plan": appointment_obj.plus_plan.plan,
-                                "content_object": appointment_obj, 'amount': plus_amount}
+                                "content_object": appointment_obj, 'amount': plus_amount, 'extra_charge': convenience_amount}
                         PlusAppointmentMapping.objects.create(**data)
 
                 order_dict = {
@@ -342,7 +344,7 @@ class Order(TimeStampedModel):
 
                 if appointment_obj.plus_plan:
                     data = {"plus_user": appointment_obj.plus_plan, "plus_plan": appointment_obj.plus_plan.plan,
-                            "content_object": appointment_obj, 'amount': plus_amount}
+                            "content_object": appointment_obj, 'amount': plus_amount, 'extra_charge': convenience_amount}
                     PlusAppointmentMapping.objects.create(**data)
 
                 order_dict = {
@@ -674,7 +676,7 @@ class Order(TimeStampedModel):
                 visitor_id, visit_id = event_api.get_visit(request)
                 visitor_info = { "visitor_id": visitor_id, "visit_id": visit_id, "from_app": request.data.get("from_app", None), "app_version": request.data.get("app_version", None)}
         except Exception as e:
-            logger.log("Could not fetch visitor info - " + str(e))
+            logger.info("Could not fetch visitor info - " + str(e))
 
         # create a Parent order to accumulate sub-orders
         process_immediately = False
@@ -879,7 +881,7 @@ class Order(TimeStampedModel):
                 if order.cart:
                     order.cart.mark_delete()
             except Exception as e:
-                logger.error(str(e))
+                raise Exception("Error in processing order - " + str(e))
 
         if not opd_appointment_ids and not lab_appointment_ids and not insurance_ids and not user_plan_ids and not econsult_ids and not chat_plan_ids and not plus_ids:
             raise Exception("Could not process entire order")
@@ -1222,6 +1224,14 @@ class PgTransaction(TimeStampedModel, SoftDelete):
 
     def is_preauth(self):
         return self.status_type == 'TXN_AUTHORIZE' or self.status_type == '27'
+
+    def has_refunded(self):
+        from ondoc.account.models import ConsumerRefund
+        refund_obj = ConsumerRefund.objects.filter(pg_transaction_id=self.id).first()
+        if refund_obj:
+            return True
+
+        return False
 
     class Meta:
         db_table = "pg_transaction"
@@ -2004,13 +2014,19 @@ class MerchantPayout(TimeStampedModel):
         if trans and trans[0].amount == self.payable_amount:
             return trans
 
+        non_refunded_trans = list()
         trans = PgTransaction.objects.filter(order=user_insurance.order)
-        if len(trans)>1:
+        if len(trans) > 1:
+            for pg_txn in trans:
+                if not pg_txn.has_refunded():
+                    non_refunded_trans.append(pg_txn)
+
+        if len(non_refunded_trans) > 1:
             raise Exception('multiple transactions found')
 
         # TO DO - Check for TDS
-        if trans and trans[0].amount == self.payable_amount:
-            return trans
+        if non_refunded_trans and non_refunded_trans[0].amount == self.payable_amount:
+            return non_refunded_trans
 
         from ondoc.insurance.models import UserInsurance
         uis = UserInsurance.objects.filter(user=user_insurance.user)
@@ -2418,12 +2434,12 @@ class MerchantPayout(TimeStampedModel):
             return 2
         else:
             appointment = self.get_appointment()
-            if appointment.payment_type == OpdAppointment.PREPAID:
-                return 1
-            elif appointment.payment_type == OpdAppointment.INSURANCE:
+            if appointment.payment_type == OpdAppointment.INSURANCE:
                 return 2
-
-        return 0
+            elif appointment.payment_type == OpdAppointment.PREPAID:
+                return 1
+            else:
+                return 1
 
     class Meta:
         db_table = "merchant_payout"
