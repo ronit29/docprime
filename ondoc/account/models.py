@@ -1710,10 +1710,11 @@ class ConsumerTransaction(TimeStampedModel):
         if self.balance:
             pg_ctx_obj = ConsumerTransaction.objects.filter(user=self.user, action=ConsumerTransaction.PAYMENT,
                                                             order_id=self.order_id).last()
-            ctx_obj = pg_ctx_obj.debit_txn_refund(consumer_account, self.balance)
-            self.balance = 0
-            self.save()
-            ctx_objs.append(ctx_obj)
+            if pg_ctx_obj:
+                ctx_obj = pg_ctx_obj.debit_txn_refund(consumer_account, self.balance)
+                self.balance = 0
+                self.save()
+                ctx_objs.append(ctx_obj)
         return ctx_objs
 
     @classmethod
