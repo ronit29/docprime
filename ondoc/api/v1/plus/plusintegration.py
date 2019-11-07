@@ -4,6 +4,9 @@ import requests
 from rest_framework import status
 import logging
 import json
+
+from ondoc.salespoint.mongo_models import SalesPointLog
+
 logger = logging.getLogger(__name__)
 
 
@@ -183,6 +186,10 @@ class PlusIntegration:
             request_data = utm_param_dict.get('request_data', {})
             auth_token = utm_param_dict.get('auth_token', "")
 
+            if request_data:
+                plus_user_id = request_data.get('DocPrimeBookingID', None)
+                plus_user_obj = PlusUser.objects.filter(id=plus_user_id).first()
+
             response = requests.post(url, data=json.dumps(request_data), headers={'Authorization': auth_token,
                                                                                   'Content-Type': 'application/json'})
 
@@ -192,6 +199,7 @@ class PlusIntegration:
                 resp['error'] = "Error while saving data!!"
             else:
                 resp['data'] = "successfully save!!"
+            SalesPointLog.create_spo_logs(plus_user_obj, request_data, response)
         except Exception as e:
             # logger.error(json.dumps(request_data))
             logger.info("[ERROR] {}".format(e))

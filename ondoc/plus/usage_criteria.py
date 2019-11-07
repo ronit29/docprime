@@ -15,11 +15,12 @@ class AbstractCriteria(object):
         cost = kwargs.get('cost')
         id = kwargs.get('id')
         mrp = kwargs.get('mrp')
+        deal_price = kwargs.get('deal_price')
         utilization = kwargs.get('utilization')
         if cost is None or cost < 0:
             return {}
 
-        return self._validate_booking_entity(cost, id, utilization=utilization, mrp=mrp)
+        return self._validate_booking_entity(cost, id, utilization=utilization, mrp=mrp, deal_price=deal_price)
 
     def _update_utilization(self, utilization, deduction_amount):
         raise NotImplementedError()
@@ -63,6 +64,12 @@ class DoctorAmountCount(AbstractCriteria):
         total_doctor_count = vip_utilization.get('total_doctor_count_limit', 0)
         mrp = kwargs.get('mrp', 0)
         plan = self.plus_plan
+        deal_price = kwargs.get('deal_price', 0)
+        convenience_charge = plan.get_convenience_charge(cost, "DOCTOR")
+        total_cost = cost + convenience_charge
+        if plan.is_gold and total_cost >= deal_price:
+            return resp
+
 
         if not total_doctor_count and not available_amount and available_count:
             return resp
@@ -188,6 +195,11 @@ class LabtestAmountCount(AbstractCriteria):
         total_amount = vip_utilization.get('total_labtest_amount_limit')
         mrp = kwargs.get('mrp', 0)
         plan = self.plus_plan
+        deal_price = kwargs.get('deal_price', 0)
+        convenience_charge = plan.get_convenience_charge(cost, "LABTEST")
+        total_cost = cost + convenience_charge
+        if plan.is_gold and total_cost >= deal_price:
+            return resp
 
         if not total_count_left and not total_amount_left:
             return resp
@@ -298,6 +310,12 @@ class PackageAmountCount(AbstractCriteria):
         amount_to_be_paid = cost
         mrp = kwargs.get('mrp', 0)
         plan = self.plus_plan
+        deal_price = kwargs.get('deal_price', 0)
+        convenience_charge = plan.get_convenience_charge(cost, "LABTEST")
+        total_cost = cost + convenience_charge
+        if plan.is_gold and total_cost >= deal_price:
+            return resp
+
         vip_utilization = kwargs.get('utilization') if kwargs.get('utilization') else self.utilization
 
         available_package_amount = vip_utilization.get('available_package_amount')
