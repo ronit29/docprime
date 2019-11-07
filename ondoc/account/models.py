@@ -1391,14 +1391,16 @@ class ConsumerAccount(TimeStampedModel):
                 wallet_txn = ctxn_obj
 
         if cashback_refund_amount:
-            cashback_txn.balance += cashback_refund_amount
-            cashback_txn.save()
+            if cashback_txn:
+                cashback_txn.balance += cashback_refund_amount
+                cashback_txn.save()
             consumer_tx_data = self.consumer_tx_appointment_data(appointment_obj.user, appointment_obj, product_id, cashback_refund_amount, action, tx_type, ConsumerTransaction.CASHBACK_SOURCE)
             ConsumerTransaction.objects.create(**consumer_tx_data)
 
         if wallet_refund_amount:
-            wallet_txn.balance += wallet_refund_amount
-            wallet_txn.save()
+            if wallet_txn:
+                wallet_txn.balance += wallet_refund_amount
+                wallet_txn.save()
             consumer_tx_data = self.consumer_tx_appointment_data(appointment_obj.user, appointment_obj, product_id, wallet_refund_amount, action, tx_type, ConsumerTransaction.WALLET_SOURCE)
             ConsumerTransaction.objects.create(**consumer_tx_data)
             
@@ -1427,15 +1429,25 @@ class ConsumerAccount(TimeStampedModel):
         # refund wallet amount
         if self.balance:
             old_txn_objs = ConsumerTransaction.get_transactions(self.user, [ConsumerTransaction.PAYMENT, ConsumerTransaction.SALE])
-            parent_ref = True
-            balance_refund = True
-            for old_txn_obj in old_txn_objs:
-                if old_txn_obj.ref_txns:
-                    ctx_objs.append(old_txn_obj.debit_from_ref_txn(self, 0, parent_ref, initiate_refund, balance_refund))
-                if old_txn_obj.balance and old_txn_obj.balance > 0:
-                    if old_txn_obj.source == ConsumerTransaction.WALLET_SOURCE:
-                        ctx_objs.append(old_txn_obj.debit_from_balance(self))
-                old_txn_obj.save()
+            if old_txn_objs:
+                parent_ref = True
+                balance_refund = True
+                for old_txn_obj in old_txn_objs:
+                    if old_txn_obj.ref_txns:
+                        ctx_objs.append(old_txn_obj.debit_from_ref_txn(self, 0, parent_ref, initiate_refund, balance_refund))
+                    if old_txn_obj.balance and old_txn_obj.balance > 0:
+                        if old_txn_obj.source == ConsumerTransaction.WALLET_SOURCE:
+                            ctx_objs.append(old_txn_obj.debit_from_balance(self))
+                    old_txn_obj.save()
+            else:
+                amount = self.balance
+                self.balance = 0
+                action = ConsumerTransaction.REFUND
+                tx_type = PgTransaction.DEBIT
+                consumer_tx_data = self.consumer_tx_pg_data({"user": self.user}, amount, action, tx_type)
+                # consumer_tx_data = self.form_consumer_tx_data({"user": self.user}, amount, action, tx_type)
+                ctx_obj = ConsumerTransaction.objects.create(**consumer_tx_data)
+                ctx_objs.append(ctx_obj)
 
         self.save()
         ctx_objs = list(flatten(ctx_objs))
