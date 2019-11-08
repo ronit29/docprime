@@ -329,7 +329,7 @@ class AvailableLabTestPackageSerializer(serializers.ModelSerializer):
         if engine and obj and obj.mrp and lab_obj and lab_obj.is_enabled_for_plus_plans():
             # engine_response = engine.validate_booking_entity(cost=obj.mrp, id=obj.test.id)
             resp['vip_convenience_amount'] = user.active_plus_user.plan.get_convenience_charge(price, "LABTEST")
-            engine_response = engine.validate_booking_entity(cost=price, id=obj.test.id, mrp=obj.mrp)
+            engine_response = engine.validate_booking_entity(cost=price, id=obj.test.id, mrp=obj.mrp, deal_price=deal_price)
             resp['covered_under_vip'] = engine_response['is_covered']
             resp['vip_amount'] = engine_response['amount_to_be_paid']
 
@@ -575,7 +575,7 @@ class AvailableLabTestSerializer(serializers.ModelSerializer):
         if engine and obj and obj.mrp and lab_obj and lab_obj.is_enabled_for_plus_plans():
             # engine_response = engine.validate_booking_entity(cost=obj.mrp, id=obj.test.id)
             resp['vip_convenience_amount'] = user.active_plus_user.plan.get_convenience_charge(price, "LABTEST")
-            engine_response = engine.validate_booking_entity(cost=price, id=obj.test.id, mrp=obj.mrp)
+            engine_response = engine.validate_booking_entity(cost=price, id=obj.test.id, mrp=obj.mrp, deal_price=deal_price)
             resp['covered_under_vip'] = engine_response['is_covered']
             resp['vip_amount'] = engine_response['amount_to_be_paid']
 
@@ -847,7 +847,7 @@ class CommonPackageSerializer(serializers.ModelSerializer):
         if engine and obj and obj._selected_test and lab_obj.is_enabled_for_plus_plans() and obj._selected_test.mrp:
             # engine_response = engine.validate_booking_entity(cost=obj._selected_test.mrp, id=obj.package.id)
             resp['vip_convenience_amount'] = user.active_plus_user.plan.get_convenience_charge(price, "LABTEST")
-            engine_response = engine.validate_booking_entity(cost=price, id=obj.package.id, mrp=obj._selected_test.mrp)
+            engine_response = engine.validate_booking_entity(cost=price, id=obj.package.id, mrp=obj._selected_test.mrp, deal_price=deal_price)
             resp['covered_under_vip'] = engine_response['is_covered']
             resp['vip_amount'] = engine_response['amount_to_be_paid']
 
@@ -2058,7 +2058,8 @@ class CustomLabTestPackageSerializer(serializers.ModelSerializer):
 
     def get_insurance(self, obj):
         request = self.context.get("request")
-        resp = Lab.get_insurance_details(request.user)
+        ins_threshold_amt = self.context.get("insurance_threshold_amount", None)
+        resp = Lab.get_insurance_details(request.user, ins_threshold_amt)
         lab_data = self.context.get('lab_data', {})
         lab = lab_data.get(obj.lab, None)
 
@@ -2069,7 +2070,8 @@ class CustomLabTestPackageSerializer(serializers.ModelSerializer):
 
     def get_vip(self, obj):
         request = self.context.get("request")
-        resp = Lab.get_vip_details(request.user)
+        search_criteria_query = self.context.get("search_criteria_query")
+        resp = Lab.get_vip_details(request.user, search_criteria_query)
         lab_data = self.context.get('lab_data', {})
         lab = lab_data.get(obj.lab, None)
 
@@ -2080,6 +2082,15 @@ class CustomLabTestPackageSerializer(serializers.ModelSerializer):
         agreed_price = 0
         mrp = 0
         if lab:
+            # avl_obj = None
+            # if not self.context.get('avl_objs'):
+            #     avl_obj = obj.availablelabs.filter(lab_pricing_group=lab.lab_pricing_group).first()
+            # else:
+            #     avl_objs = self.context.get('avl_objs')
+            #     for av in avl_objs:
+            #         if av.lab_pricing_group == lab.lab_pricing_group:
+            #             avl_obj = av
+            #             break
             avl_obj = obj.availablelabs.filter(lab_pricing_group=lab.lab_pricing_group).first()
             if avl_obj:
                 mrp = avl_obj.mrp
@@ -2089,7 +2100,8 @@ class CustomLabTestPackageSerializer(serializers.ModelSerializer):
         if user and user.is_authenticated and not user.is_anonymous:
             plus_obj = user.active_plus_user if user.active_plus_user and user.active_plus_user.status == PlusUser.ACTIVE else None
         resp['vip_gold_price'] = agreed_price
-        resp['vip_convenience_amount'] = PlusPlans.get_default_convenience_amount(agreed_price, "LABTEST")
+        default_plan_query = self.context.get('default_plan_query')
+        resp['vip_convenience_amount'] = PlusPlans.get_default_convenience_amount(agreed_price, "LABTEST", default_plan_query)
         if not plus_obj:
             return resp
         resp['is_gold_member'] = True if plus_obj.plan.is_gold else False
@@ -2110,7 +2122,7 @@ class CustomLabTestPackageSerializer(serializers.ModelSerializer):
         if engine and obj and mrp and lab and lab.is_enabled_for_plus_plans():
             resp['vip_convenience_amount'] = user.active_plus_user.plan.get_convenience_charge(price, "LABTEST")
             # engine_response = engine.validate_booking_entity(cost=obj.mrp, id=obj.id)
-            engine_response = engine.validate_booking_entity(cost=price, id=obj.id, mrp=mrp)
+            engine_response = engine.validate_booking_entity(cost=price, id=obj.id, mrp=mrp, deal_price=deal_price)
             resp['covered_under_vip'] = engine_response['is_covered']
             resp['vip_amount'] = engine_response['amount_to_be_paid']
 
