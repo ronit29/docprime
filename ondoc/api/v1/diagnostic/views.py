@@ -1502,7 +1502,7 @@ class LabList(viewsets.ReadOnlyModelViewSet):
             search_key = " ".join(search_key).lower()
             # search_key = "".join(search_key.split("."))
             filtering_query.append("lb.name ilike %(name)s")
-            filtering_params['name'] = search_key + '%'
+            filtering_params['name'] = '%' + search_key + '%'
             # filtering_params_query1.append(
             #     "name ilike %(name)s")
 
