@@ -2695,7 +2695,7 @@ class LabAppointment(TimeStampedModel, CouponsMixin, LabAppointmentInvoiceMixin,
                 engine = get_class_reference(plus_membership, entity)
                 if engine:
                     # engine_response = engine.validate_booking_entity(cost=effective_price, id=data['test_ids'][0].id)
-                    engine_response = engine.validate_booking_entity(cost=price, id=data['test_ids'][0].id, mrp=effective_price)
+                    engine_response = engine.validate_booking_entity(cost=price, id=data['test_ids'][0].id, mrp=effective_price, deal_price=total_deal_price)
                     effective_price = engine_response.get('amount_to_be_paid')
                     effective_price = effective_price + vip_convenience_amount
                 else:
@@ -2809,10 +2809,10 @@ class LabAppointment(TimeStampedModel, CouponsMixin, LabAppointmentInvoiceMixin,
 
         # check if test mapped with affiliates
         mapped_with_affiliates = None
-        source = data["utm_spo_tags"].get("UtmSource", None)
+        source = data["utm_spo_tags"].get("utm_source", None)
         if source:
             mapped_with_affiliates = True
-            affiliate = SalesPoint.objects.filter(name=data["utm_spo_tags"]["UtmSource"]).first()
+            affiliate = SalesPoint.objects.filter(name=data["utm_spo_tags"]["utm_source"]).first()
             if affiliate:
                 for test_id in test_ids_list:
                     spo_mapping = SalespointTestmapping.objects.filter(salespoint_id=affiliate.id,
@@ -3208,10 +3208,10 @@ class LabAppointment(TimeStampedModel, CouponsMixin, LabAppointmentInvoiceMixin,
         appointment_details['CityId'] = 0
         appointment_details['ProductId'] = product_id
         appointment_details['SubProductId'] = sub_product_id
-        appointment_details['UtmTerm'] = self.spo_data.get('UtmTerm', '')
-        appointment_details['UtmMedium'] = self.spo_data.get('UtmMedium', '')
-        appointment_details['UtmCampaign'] = self.spo_data.get('UtmCampaign', '')
-        appointment_details['UtmSource'] = self.spo_data.get('UtmSource', '')
+        appointment_details['UtmTerm'] = self.spo_data.get('utm_term', '')
+        appointment_details['UtmMedium'] = self.spo_data.get('utm_medium', '')
+        appointment_details['UtmCampaign'] = self.spo_data.get('utm_campaign', '')
+        appointment_details['UtmSource'] = self.spo_data.get('utm_source', '')
         appointment_details['LocationVerified'] = 1 if self.lab.is_location_verified else 0
         appointment_details['IsInsured'] = 1 if self.insurance else 0
         appointment_details['DOB'] = dob_value

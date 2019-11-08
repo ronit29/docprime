@@ -796,8 +796,8 @@ class CouponRecommender():
             applicable_coupons = list(filter(remove_invalid_coupon, applicable_coupons))
 
             applicable_coupons = list(filter(lambda x: x.coupon_type == Coupon.DISCOUNT, applicable_coupons))
-
-            best_coupon = applicable_coupons[0]
+            if applicable_coupons:
+                best_coupon = applicable_coupons[0]
 
         return best_coupon
 
