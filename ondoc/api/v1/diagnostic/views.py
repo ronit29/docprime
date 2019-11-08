@@ -1500,9 +1500,9 @@ class LabList(viewsets.ReadOnlyModelViewSet):
         if name:
             search_key = re.findall(r'[a-z0-9A-Z.:]+',name)
             search_key = " ".join(search_key).lower()
-            search_key = "".join(search_key.split("."))
+            # search_key = "".join(search_key.split("."))
             filtering_query.append("lb.name ilike %(name)s")
-            filtering_params['name'] = search_key + '%'
+            filtering_params['name'] = '%' + search_key + '%'
             # filtering_params_query1.append(
             #     "name ilike %(name)s")
 
