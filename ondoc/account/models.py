@@ -1692,7 +1692,10 @@ class ConsumerTransaction(TimeStampedModel):
                     else:
                        ctx_obj = None
                 if self.balance and not cashback_txn and parent_ref:
-                    self.balance -= refund_amount
+                    if (self.balance - refund_amount) >= 0:
+                        self.balance -= refund_amount
+                    else:
+                        logger.info('Balance refund error: ' + str(self.id) + ', Refund: ' + str(refund_amount))
 
                 if initiate_refund:
                     if not cashback_txn:
@@ -1726,9 +1729,12 @@ class ConsumerTransaction(TimeStampedModel):
             data["transaction_id"] = tx_obj.transaction_id
             data["order_id"] = tx_obj.order_id if tx_obj else None
         if refund_amount:
-            consumer_account.balance -= refund_amount
-            consumer_tx_data = consumer_account.consumer_tx_pg_data(data, refund_amount, ConsumerTransaction.REFUND, PgTransaction.DEBIT)
-            ctx_obj = ConsumerTransaction.objects.create(**consumer_tx_data)
+            if (consumer_account.balance - refund_amount) >= 0:
+                consumer_account.balance -= refund_amount
+                consumer_tx_data = consumer_account.consumer_tx_pg_data(data, refund_amount, ConsumerTransaction.REFUND, PgTransaction.DEBIT)
+                ctx_obj = ConsumerTransaction.objects.create(**consumer_tx_data)
+            else:
+                logger.info('Balance refund error: ' + str(consumer_account.id) + ', Refund: ' + str(refund_amount))
 
         return ctx_obj
 
