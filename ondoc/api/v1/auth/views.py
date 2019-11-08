@@ -1305,7 +1305,9 @@ class TransactionViewSet(viewsets.GenericViewSet):
                 if response and response.get("orderNo"):
                     pg_txn = PgTransaction.objects.filter(order_no__iexact=response.get("orderNo")).first()
                     if pg_txn:
+                        is_preauth = False
                         if pg_txn.is_preauth():
+                            is_preauth = True
                             pg_txn.status_code = response.get('statusCode')
                             pg_txn.status_type = response.get('txStatus')
                             pg_txn.payment_mode = response.get("paymentMode")
@@ -1314,6 +1316,12 @@ class TransactionViewSet(viewsets.GenericViewSet):
                             pg_txn.bank_id = response.get('bankTxId')
                             #pg_txn.payment_captured = True
                             pg_txn.save()
+
+                            ctx_txn = ConsumerTransaction.objects.filter(order_id=pg_txn.order_.id,
+                                                                         action=ConsumerTransaction.PAYMENT).last()
+                            ctx_txn.transaction_id = response.get('pgTxId')
+                            ctx_txn.save()
+
                             if response.get('txStatus') in ['TXN_SUCCESS', 'TXN_RELEASE']:
                                 send_pg_acknowledge.apply_async((pg_txn.order_id, pg_txn.order_no, 'capture'), countdown=1)
                         send_pg_acknowledge.apply_async((pg_txn.order_id, pg_txn.order_no,), countdown=1)
@@ -1915,8 +1923,10 @@ class ConsumerAccountRefundViewSet(GenericViewSet):
         consumer_account = ConsumerAccount.objects.get_or_create(user=user)
         consumer_account = ConsumerAccount.objects.select_for_update().get(user=user)
         if consumer_account.balance > 0:
-            ctx_obj = consumer_account.debit_refund()
-            ConsumerRefund.initiate_refund(user, ctx_obj)
+            ctx_objs = consumer_account.debit_refund()
+            if ctx_objs:
+                for ctx_obj in ctx_objs:
+                    ConsumerRefund.initiate_refund(user, ctx_obj)
         resp = dict()
         resp["status"] = 1
         return Response(resp)

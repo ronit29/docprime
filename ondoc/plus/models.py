@@ -8,7 +8,7 @@ from django.core.validators import FileExtensionValidator, MaxValueValidator, Mi
 from django.contrib.postgres.fields import JSONField
 from django.utils import timezone
 from ondoc.account import models as account_model
-from ondoc.authentication.models import UserProfile, RefundMixin
+from ondoc.authentication.models import UserProfile, RefundMixin, TransactionMixin
 from ondoc.cart.models import Cart
 from ondoc.common.helper import Choices
 import json
@@ -326,7 +326,7 @@ class PlusThreshold(auth_model.TimeStampedModel, LiveMixin):
 
 
 @reversion.register()
-class PlusUser(auth_model.TimeStampedModel, RefundMixin):
+class PlusUser(auth_model.TimeStampedModel, RefundMixin, TransactionMixin):
     from ondoc.account.models import MoneyPool
     PRODUCT_ID = account_model.Order.VIP_PRODUCT_ID
 
@@ -1095,7 +1095,7 @@ class PlusMembers(auth_model.TimeStampedModel):
                                           validators=[MaxValueValidator(9999999999), MinValueValidator(1000000000)])
     profile = models.ForeignKey(auth_model.UserProfile, related_name="plus_member", on_delete=models.CASCADE, null=True)
     title = models.CharField(max_length=20, choices=TITLE_TYPE_CHOICES, default=None)
-    middle_name = models.CharField(max_length=50, null=True)
+    middle_name = models.CharField(max_length=50, null=True, blank=True)
     city = models.CharField(max_length=100, null=True, default=None)
     district = models.CharField(max_length=100, null=True, default=None)
     state = models.CharField(max_length=100, null=True, default=None)
