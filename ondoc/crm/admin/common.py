@@ -536,14 +536,22 @@ class MerchantPayoutResource(resources.ModelResource):
 
         return 0
 
+    def dehydrate_api_response(self, merchant_payout):
+        if merchant_payout.api_response and merchant_payout.api_response.get('result', []):
+            result = merchant_payout.api_response.get('result')[0]
+            if result.get('responseError', ''):
+                return result.get('responseError').get('errorMsg')
+
+        return ''
+
     class Meta:
         model = MerchantPayout
         fields = ('id', 'payment_mode', 'payout_ref_id', 'charged_amount', 'payable_amount', 'payout_approved',
                   'status', 'payout_time', 'paid_to', 'utr_no', 'type', 'amount_paid',
-                  'content_type', 'object_id', 'appointment_id', 'booking_type', 'merchant', 'verified_by_finance')
+                  'content_type', 'object_id', 'appointment_id', 'booking_type', 'merchant', 'verified_by_finance', 'api_response')
 
         export_order = ('appointment_id', 'booking_type', 'id', 'payment_mode', 'payout_ref_id', 'charged_amount', 'payable_amount', 'payout_approved',
-                  'status', 'payout_time', 'merchant', 'paid_to', 'verified_by_finance', 'utr_no', 'type', 'amount_paid', 'content_type', 'object_id')
+                  'status', 'payout_time', 'merchant', 'paid_to', 'verified_by_finance', 'utr_no', 'type', 'amount_paid', 'content_type', 'object_id', 'api_response')
 
 
 class MerchantPayoutAdmin(MediaImportMixin, VersionAdmin):

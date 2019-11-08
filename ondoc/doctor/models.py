@@ -260,7 +260,7 @@ class Hospital(auth_model.TimeStampedModel, auth_model.CreatedByModel, auth_mode
     auto_ivr_enabled = models.BooleanField(default=True)
     priority_score = models.IntegerField(default=0, null=False, blank=False)
     search_distance = models.FloatField(default=15000)
-    google_avg_rating = models.DecimalField(max_digits=5, decimal_places=2, null=True, editable=True)
+    google_avg_rating = models.DecimalField(max_digits=5, decimal_places=2, null=True, editable=True, blank=True)
     # provider_encrypt = models.NullBooleanField(null=True, blank=True)
     # provider_encrypted_by = models.ForeignKey(auth_model.User, null=True, blank=True, on_delete=models.SET_NULL, related_name='encrypted_hospitals')
     # encryption_hint = models.CharField(max_length=128, null=True, blank=True)
@@ -277,7 +277,7 @@ class Hospital(auth_model.TimeStampedModel, auth_model.CreatedByModel, auth_mode
     google_ratings_count = models.PositiveIntegerField(null=True, blank=True)
 
     def __str__(self):
-        return self.name
+        return '{}-{}'.format(self.id, self.name)
 
     class Meta:
         db_table = "hospital"
@@ -394,7 +394,7 @@ class Hospital(auth_model.TimeStampedModel, auth_model.CreatedByModel, auth_mode
                                                                                          'hosp_locality_entity_dict': hosp_locality_entity_dict,
                                                                                          'new_dynamic_dict': new_dynamic_dict}).data
         for data in result:
-            data['vip_percentage'] = common_hosp_percentage_dict[data.get('id')] if plan and common_hosp_percentage_dict[data.get('id')]  else 0
+            data['vip_percentage'] = common_hosp_percentage_dict[data.get('id')] if plan and common_hosp_percentage_dict.get(data.get('id')) else 0
 
         return result
         # result = TopHospitalForIpdProcedureSerializer(hosp_queryset, many=True, context={'request': request,
@@ -748,7 +748,7 @@ class Hospital(auth_model.TimeStampedModel, auth_model.CreatedByModel, auth_mode
 
 @reversion.register()
 class HospitalPlaceDetails(auth_model.TimeStampedModel):
-    hospital = models.ForeignKey(Hospital, on_delete=models.CASCADE, related_name='hospital_place_details')
+    hospital = models.ForeignKey(Hospital, on_delete=models.DO_NOTHING, blank=True, null=True, related_name='hospital_place_details')
     place_id = models.TextField()
     place_details = JSONField(null=True, blank=True)
     reviews = JSONField(null=True, blank=True)
@@ -3515,7 +3515,7 @@ class OpdAppointment(auth_model.TimeStampedModel, CouponsMixin, OpdAppointmentIn
                         engine = get_class_reference(plus_user, "DOCTOR")
                         if engine:
                             # vip_dict = engine.validate_booking_entity(cost=doctor_clinic_timing.mrp)
-                            vip_dict = engine.validate_booking_entity(cost=price, mrp=doctor_clinic_timing.mrp)
+                            vip_dict = engine.validate_booking_entity(cost=price, mrp=doctor_clinic_timing.mrp, deal_price=doctor_clinic_timing.cod_deal_price)
                             effective_price = vip_dict.get('amount_to_be_paid')
                         else:
                             effective_price = doctor_clinic_timing.deal_price
@@ -3756,8 +3756,11 @@ class OpdAppointment(auth_model.TimeStampedModel, CouponsMixin, OpdAppointmentIn
         #         and self.doctor.is_insurance_enabled and self.hospital.enabled_for_insurance:
         #     return True
 
-        if self.doctor and self.doctor.is_congot_doctor():
+        if self.doctor:
             return False
+
+        # if self.doctor and self.doctor.is_congot_doctor():
+        #     return False
 
         if old_instance.status == OpdAppointment.BOOKED and self.status == OpdAppointment.ACCEPTED \
                 and (self.payment_type == OpdAppointment.PREPAID or self.payment_type == OpdAppointment.COD):

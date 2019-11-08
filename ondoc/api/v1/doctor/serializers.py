@@ -686,6 +686,7 @@ class DoctorHospitalSerializer(serializers.ModelSerializer):
             available_amount = int(utilization.get('doctor_amount_available', 0))
             price_data = {"mrp": obj.mrp, "deal_price": obj.deal_price, "fees": obj.fees, "cod_deal_price": obj.cod_deal_price}
             mrp = int(obj.mrp)
+            deal_price = obj.deal_price
             price_engine = get_price_reference(plus_user, "DOCTOR")
             if not price_engine:
                 price = mrp
@@ -696,7 +697,7 @@ class DoctorHospitalSerializer(serializers.ModelSerializer):
             engine = get_class_reference(plus_user, "DOCTOR")
             if engine:
                 # vip_res = engine.validate_booking_entity(cost=mrp)
-                vip_res = engine.validate_booking_entity(cost=price, mrp=mrp)
+                vip_res = engine.validate_booking_entity(cost=price, mrp=mrp, deal_price=deal_price)
                 resp['vip_convenience_amount'] = plus_user.plan.get_convenience_charge(price, "DOCTOR")
                 resp['vip_amount'] = vip_res.get('amount_to_be_paid', 0)
                 resp['cover_under_vip'] = vip_res.get('is_covered', False)
@@ -1854,7 +1855,7 @@ class DoctorFeedbackBodySerializer(serializers.Serializer):
     is_cloud_lab_email = serializers.BooleanField(default=False)
     rating = serializers.IntegerField(max_value=10, required=False)
     subject_string = serializers.CharField(max_length=128, required=False)
-    feedback = serializers.CharField(max_length=512, required=False)
+    feedback = serializers.CharField(required=False)
     feedback_tags = serializers.ListField(required=False)
     email = serializers.EmailField(required=False)
     app_version = serializers.CharField(required=False, allow_blank=True)
