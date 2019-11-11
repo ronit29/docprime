@@ -1790,7 +1790,7 @@ class ConsumerRefund(TimeStampedModel):
     REQUESTED = 5
     COMPLETED = 10
     ARCHIVED = 15
-    MAXREFUNDDAYS = 180
+    MAXREFUNDDAYS = 700
     state_type = [(PENDING, "Pending"), (COMPLETED, "Completed"), (REQUESTED, "Requested"), (ARCHIVED, "Archived")]
     user = models.ForeignKey(User, on_delete=models.DO_NOTHING)
     consumer_transaction = models.ForeignKey(ConsumerTransaction, on_delete=models.DO_NOTHING)
