@@ -1469,6 +1469,7 @@ def send_capture_payment_request(self, product_id, appointment_id):
         logger.error("Error in payment capture with data - " + json.dumps(req_data) + " with exception - " + str(e))
         self.retry([product_id, appointment_id], countdown=300)
 
+
 @task(bind=True, max_retries=5)
 def send_release_payment_request(self, product_id, appointment_id):
     from ondoc.doctor.models import OpdAppointment
@@ -1538,7 +1539,7 @@ def send_release_payment_request(self, product_id, appointment_id):
         self.retry([product_id, appointment_id], countdown=300)
 
 
-@task(bind=True)
+@task(bind=True, max_retries=3)
 def save_pg_response(self, log_type, order_id, txn_id, response, request, user_id):
     try:
         from ondoc.account.mongo_models import PgLogs
