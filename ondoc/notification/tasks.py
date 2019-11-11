@@ -1058,6 +1058,7 @@ def refund_breakup_sms_task(obj_id):
 @task(bind=True, max_retries=2)
 def push_plus_lead_to_matrix(self, data):
     from ondoc.plus.models import PlusLead, PlusPlans
+    from ondoc.plus.models import PlusPlanUtmSources
     try:
         if not data:
             raise Exception('Data not received for banner lead.')
@@ -1079,6 +1080,10 @@ def push_plus_lead_to_matrix(self, data):
 
         extras = plus_lead_obj.extras
         plan_id = extras.get('plan_id', None)
+        
+        lead_utm_source = extras.get('utm_source')
+        if lead_utm_source and PlusPlanUtmSources.objects.filter(source=lead_utm_source, create_lead=False).exists():
+            return False
 
         lead_source = "Docprime"
         lead_data = extras.get('lead_data')

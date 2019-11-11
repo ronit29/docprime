@@ -165,6 +165,7 @@ class PlusProposerUTMSerializer(serializers.ModelSerializer):
         utm = self.context.get('utm')
         if utm:
             plus_plans_qs = PlusPlans.get_active_plans_via_utm(utm)
+            plus_plans_qs = list(filter(lambda p: not p.is_gold, plus_plans_qs))
             serializer_obj = PlusPlansSerializer(plus_plans_qs, context=self.context, many=True)
             return serializer_obj.data
         return []
