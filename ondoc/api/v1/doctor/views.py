@@ -86,7 +86,7 @@ from ondoc.insurance.models import InsuranceThreshold
 import logging
 from ondoc.api.v1.auth import serializers as auth_serializers
 from copy import deepcopy
-from ondoc.common.models import GlobalNonBookable, AppointmentHistory
+from ondoc.common.models import GlobalNonBookable, AppointmentHistory, UserConfig
 from ondoc.api.v1.common import serializers as common_serializers
 from django.utils.text import slugify
 from django.urls import reverse
@@ -836,7 +836,7 @@ class DoctorProfileView(viewsets.GenericViewSet):
 class DoctorProfileUserViewSet(viewsets.GenericViewSet):
 
     def prepare_response(self, response_data, selected_hospital, profile=None, product_id=None, coupon_code=None):
-        import operator 
+        # import operator
         # hospitals = sorted(response_data.get('hospitals'), key=itemgetter("hospital_id"))
         # [d['value'] for d in l if 'value' in d]
         hospital_ids = set(data['hospital_id'] for data in response_data.get('hospitals') if 'hospital_id' in data)
@@ -1015,6 +1015,7 @@ class DoctorProfileUserViewSet(viewsets.GenericViewSet):
         return about_doctor
 
     @transaction.non_atomic_requests
+    @use_slave
     def retrieve_by_url(self, request):
         url = request.GET.get('url')
         if not url:
@@ -1042,6 +1043,7 @@ class DoctorProfileUserViewSet(viewsets.GenericViewSet):
     @transaction.non_atomic_requests
     @use_slave
     def retrieve(self, request, pk, entity=None, *args, **kwargs):
+        from ondoc.procedure.models import PotentialIpdLeadPracticeSpecialization
         serializer = serializers.DoctorDetailsRequestSerializer(data=request.query_params)
         serializer.is_valid(raise_exception=True)
         validated_data = serializer.validated_data
@@ -1091,7 +1093,6 @@ class DoctorProfileUserViewSet(viewsets.GenericViewSet):
         spec_ids = list()
         spec_url_dict = dict()
 
-        from ondoc.procedure.models import PotentialIpdLeadPracticeSpecialization
         all_potential_spec = set(PotentialIpdLeadPracticeSpecialization.objects.all().values_list('practice_specialization', flat=True))
         is_congot = False
 
@@ -1178,7 +1179,7 @@ class DoctorProfileUserViewSet(viewsets.GenericViewSet):
                 lat = hospital.get('lat')
                 long = hospital.get('long')
             else:
-                hospital = doctor.hospitals.all().first()
+                hospital = doctor.hospitals.first()
                 if hospital and hospital.location:
                     lat = hospital.location.coords[1]
                     long = hospital.location.coords[0]
@@ -2962,12 +2963,11 @@ class DoctorFeedbackViewSet(viewsets.GenericViewSet):
         serializer = serializers.DoctorFeedbackBodySerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         valid_data = serializer.validated_data
-        emails = list()
         if valid_data.get('is_cloud_lab_email'):
+            receivers_data = UserConfig.objects.filter(key='feedback_cloudlab_email_receivers').first()
+            emails = receivers_data.data if (receivers_data and type(receivers_data.data) is list) else list()
             subject_string = valid_data.get('subject_string')
             message = valid_data.get('feedback')
-            emails = ["sanat@docprime.com", "kabeer@docprime.com", "prithvijeet@docprime.com", "raghavr@docprime.com",
-                      "rajivk@policybazaar.com"]
         else:
             valid_data.pop('subject_string', None)
             subject_string = "Feedback Mail from " + str(user.phone_number)
@@ -3584,14 +3584,14 @@ class OfflineCustomerViewSet(viewsets.GenericViewSet):
             obj = self.get_error_obj(data)
             obj['error_message'] = 'Cannot Update an invalid/error appointment!'
             obj.update(self.get_offline_response_obj(appnt, request))
-            logger.error("PROVIDER_REQUEST - Updating a invalid/error Appointment! " + str(data))
+            logger.info("PROVIDER_REQUEST - Updating a invalid/error Appointment! " + str(data))
             response['obj'] = obj
             response['break'] = True
         elif appnt.status == models.OfflineOPDAppointments.CANCELLED or appnt.status == models.OfflineOPDAppointments.NO_SHOW:
             obj = self.get_error_obj(data)
             obj['error_message'] = 'Cannot Update a Cancelled/NoShow appointment!'
             obj.update(self.get_offline_response_obj(appnt, request))
-            logger.error("PROVIDER_REQUEST - Updating a Cancelled/NoShow Appointment! " + str(data))
+            logger.info("PROVIDER_REQUEST - Updating a Cancelled/NoShow Appointment! " + str(data))
             response['obj'] = obj
             response['break'] = True
 

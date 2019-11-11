@@ -189,10 +189,10 @@ class PlusOrderViewSet(viewsets.GenericViewSet):
                             user_profile = {"name": member['first_name'] + " " + last_name, "email":
                                 member['email'], "dob": member['dob']}
 
-            utm_source = request.data.get('utm_spo_tags', {}).get('UtmSource', None)
-            utm_term = request.data.get('utm_spo_tags', {}).get('UtmTerm', None)
-            utm_campaign = request.data.get('utm_spo_tags', {}).get('UtmCampaign', None)
-            utm_medium = request.data.get('utm_spo_tags', {}).get('UtmMedium', None)
+            utm_source = request.data.get('utm_spo_tags', {}).get('utm_source', None)
+            utm_term = request.data.get('utm_spo_tags', {}).get('utm_term', None)
+            utm_campaign = request.data.get('utm_spo_tags', {}).get('utm_campaign', None)
+            utm_medium = request.data.get('utm_spo_tags', {}).get('utm_medium', None)
             is_utm_agent = request.data.get('utm_spo_tags', {}).get('is_agent', None)
             utm_parameter = {"utm_source": utm_source, "is_utm_agent": is_utm_agent, 'utm_term': utm_term, 'utm_campaign': utm_campaign, 'utm_medium': utm_medium}
             plus_plan = PlusPlans.objects.get(id=plus_plan_id)
@@ -353,7 +353,22 @@ class PlusProfileViewSet(viewsets.GenericViewSet):
         plan_body_serializer = serializers.PlusPlansSerializer(plus_plan_queryset, context={'request': request}, many=True)
         resp['plan'] = plan_body_serializer.data
         plus_user_body_serializer = serializers.PlusUserModelSerializer(plus_user, context={'request': request})
-        resp['user'] = plus_user_body_serializer.data
+        plus_user_data = plus_user_body_serializer.data
+        members_data = plus_user_data['plus_members']
+        if len(members_data) > 1:
+            self_index = 0
+            count = 0
+            for member in members_data:
+                if member['relation'] == PlusMembers.Relations.SELF:
+                    self_index = count
+                count = count + 1
+
+            if self_index:
+                member_data = members_data.pop(self_index)
+                members_data.insert(0, member_data)
+
+        plus_user_data['plus_members'] = members_data
+        resp['user'] = plus_user_data
         # member_relations = plus_user.plus_members.all().values_list('relation', flat=True)
         available_relations = PlusMembers.Relations.get_custom_availabilities()
         available_relations.pop(PlusMembers.Relations.SELF)

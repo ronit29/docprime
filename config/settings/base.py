@@ -109,6 +109,8 @@ try:
         if env('MONGO_DB_USERNAME', None) and env('MONGO_DB_PASSWORD', None):
             connect(env('MONGO_DB_NAME'), host=env('MONGO_DB_HOST'), port=mongo_port, username=env('MONGO_DB_USERNAME'),
                                             password=env('MONGO_DB_PASSWORD'), authentication_source='admin')
+            # connect(host='mongodb://ankitPBpyuser:ajd87GHSd@10.20.5.148:27017,10.20.6.116:27017/DocPrimeLogs?replicaSet=rs5', authentication_source='admin')
+
         else:
             connect(env('MONGO_DB_NAME'), host=env('MONGO_DB_HOST'), port=mongo_port)
         MONGO_STORE = env.bool('MONGO_STORE', default=False)

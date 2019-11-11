@@ -8,7 +8,7 @@ import json
 from ondoc.account.mongo_models import TimeStampedModel
 
 
-class MatrixLog(DynamicDocument, TimeStampedModel):
+class SalesPointLog(DynamicDocument, TimeStampedModel):
 
     id = UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     content_type_id = LongField(null=True, blank=False, editable=False)
@@ -19,7 +19,7 @@ class MatrixLog(DynamicDocument, TimeStampedModel):
     originating_source = StringField(null=True)
 
     @classmethod
-    def create_matrix_logs(cls, obj, request_payload, request_response):
+    def create_spo_logs(cls, obj, request_payload, request_response):
         from django.contrib.contenttypes.models import ContentType
         if not request_response or not request_payload:
             return
@@ -44,11 +44,11 @@ class MatrixLog(DynamicDocument, TimeStampedModel):
         elif obj.__class__.__name__ == 'UserInsurance':
             product_type = 3
 
-        matrix_log_obj = cls(object_id=object_id, content_type_id=content_type_id, product_type=product_type,
-                             request_payload=str(request_payload), request_response=str(request_response),
-                             originating_source=originating_source)
+        spo_log_obj = cls(object_id=object_id, content_type_id=content_type_id, product_type=product_type,
+                          request_payload=str(request_payload), request_response=str(request_response),
+                          originating_source=originating_source)
 
-        matrix_log_obj.save()
+        spo_log_obj.save()
 
     class Meta:
-        db_table = 'matrix_log'
+        db_table = 'salespoint_log'
