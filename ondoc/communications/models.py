@@ -981,6 +981,31 @@ class WHTSAPPNotification:
         #         temp_short_url = generate_short_url(report)
         #         lab_reports.append(temp_short_url)
         #     self.context['lab_reports'] = lab_reports
+
+        elif notification_type == NotificationAction.PARTNER_LAB_REPORT_UPLOADED and user and user.user_type == User.DOCTOR:
+
+            instance = self.context.get('instance')
+            body_template = "cloudlabs_report_generated_partner"
+            data.append(self.context.get('order_id'))
+            data.append(datetime.strftime(aware_time_zone(self.context.get('order_date_time')), '%b %d, %Y, %-I:%M %P'))
+            data.append(self.context.get('patient_name'))
+            data.append(self.context.get('patient_age'))
+            data.append(self.context.get('lab_tests_ordered'))
+            data.append(self.context.get('report_list'))
+
+        elif notification_type == NotificationAction.PARTNER_LAB_REPORT_UPLOADED:
+
+            instance = self.context.get('instance')
+            body_template = "cloudlabs_report_generated_patient"
+            data.append(self.context.get('patient_name'))
+            data.append(self.context.get('hospital_name'))
+            data.append(self.context.get('patient_name'))
+            data.append(self.context.get('patient_age'))
+            data.append(self.context.get('order_id'))
+            data.append(datetime.strftime(aware_time_zone(self.context.get('order_date_time')), '%b %d, %Y, %-I:%M %P'))
+            data.append(self.context.get('lab_tests_ordered'))
+            data.append(self.context.get('report_list'))
+
         return body_template, data
 
     def trigger(self, receiver, template, context, **kwargs):
@@ -2519,6 +2544,8 @@ class PartnerLabNotification(Notification):
             sms_notification.send(all_receivers.get('sms_receivers', []))
             push_notification = PUSHNotification(notification_type, context)
             push_notification.send(all_receivers.get('push_receivers', []))
+            whatsapp_notification = WHTSAPPNotification(notification_type, context)
+            whatsapp_notification.send(all_receivers.get('sms_receivers', []))
         if notification_type in [NotificationAction.PARTNER_LAB_ORDER_PLACED_SUCCESSFULLY]:
             sms_notification = SMSNotification(notification_type, context)
             sms_notification.send(all_receivers.get('sms_receivers', []))
