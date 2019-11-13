@@ -278,11 +278,11 @@ class OptimusViewSet(viewsets.GenericViewSet):
 
 
     def post_analytics_data(self, request):
-        opd_appt = request.data.get('opd_appointments', None)
-        lab_appt = request.data.get('lab_appointments', None)
-        states = request.data.get('matrix_state', None)
-        cities = request.data.get('matrix_city', None)
-        corporate_deal = request.data.get('corporate_deals', None)
+        opd_appt = request.data.get('opd_appointments', [])
+        lab_appt = request.data.get('lab_appointments', [])
+        states = request.data.get('matrix_state', [])
+        cities = request.data.get('matrix_city', [])
+        corporate_deal = request.data.get('corporate_deals', [])
 
         if opd_appt:
             for opd_id in opd_appt:
