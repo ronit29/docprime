@@ -625,6 +625,17 @@ class WHTSAPPNotification:
         context.pop('time_slot_start', None)
         self.context = context
 
+    @staticmethod
+    def get_multiline_string_from_list(list):
+        multiline_string = list[0] if len(list) == 1 else ''
+        if not multiline_string:
+            list_length = len(list)
+            for index, list_element in enumerate(list, 1):
+                multiline_string += str(index) + '. ' + list_element
+                if index != list_length:
+                    multiline_string += '\n'
+        return multiline_string
+
     def get_template_and_data(self, user):
         notification_type = self.notification_type
         body_template = ''
@@ -990,8 +1001,10 @@ class WHTSAPPNotification:
             data.append(datetime.strftime(aware_time_zone(self.context.get('order_date_time')), '%b %d, %Y, %-I:%M %P'))
             data.append(self.context.get('patient_name'))
             data.append(self.context.get('patient_age'))
-            data.append(self.context.get('lab_tests_ordered'))
-            data.append(self.context.get('report_list'))
+            lab_tests_ordered_string = self.get_multiline_string_from_list(self.context.get('lab_tests_ordered'))
+            data.append(lab_tests_ordered_string)
+            report_list_string = self.get_multiline_string_from_list(self.context.get('report_list'))
+            data.append(report_list_string)
 
         elif notification_type == NotificationAction.PARTNER_LAB_REPORT_UPLOADED:
 
@@ -1003,8 +1016,10 @@ class WHTSAPPNotification:
             data.append(self.context.get('patient_age'))
             data.append(self.context.get('order_id'))
             data.append(datetime.strftime(aware_time_zone(self.context.get('order_date_time')), '%b %d, %Y, %-I:%M %P'))
-            data.append(self.context.get('lab_tests_ordered'))
-            data.append(self.context.get('report_list'))
+            lab_tests_ordered_string = self.get_multiline_string_from_list(self.context.get('lab_tests_ordered'))
+            data.append(lab_tests_ordered_string)
+            report_list_string = self.get_multiline_string_from_list(self.context.get('report_list'))
+            data.append(report_list_string)
 
         return body_template, data
 
