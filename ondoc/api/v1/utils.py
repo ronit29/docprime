@@ -1712,8 +1712,10 @@ def consumers_balance_refund():
             if consumer_account:
                 if consumer_account.balance > 0:
                     print("consumer account balance " + str(consumer_account.balance))
-                    ctx_obj = consumer_account.debit_refund()
-                    ConsumerRefund.initiate_refund(ctx_obj.user, ctx_obj)
+                    ctx_objs = consumer_account.debit_refund()
+                    if ctx_objs:
+                        for ctx_obj in ctx_objs:
+                            ConsumerRefund.initiate_refund(ctx_obj.user, ctx_obj)
 
 
 class GenericAdminEntity():

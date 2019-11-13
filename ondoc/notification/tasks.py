@@ -1398,6 +1398,7 @@ def send_capture_payment_request(self, product_id, appointment_id):
     from ondoc.diagnostic.models import LabAppointment
     from ondoc.account.models import Order, PgTransaction, PaymentProcessStatus
     from ondoc.account.mongo_models import PgLogs
+    from ondoc.account.models import ConsumerTransaction
     log_requests_on()
     req_data = dict()
     if product_id == Order.DOCTOR_PRODUCT_ID:
@@ -1450,6 +1451,9 @@ def send_capture_payment_request(self, product_id, appointment_id):
                     txn_obj.transaction_id = resp_data.get('pgTxId')
                     txn_obj.bank_id = resp_data.get('bankTxId')
                     txn_obj.payment_captured = True
+                    ctx_txn = ConsumerTransaction.objects.filter(order_id=order.id, action=ConsumerTransaction.PAYMENT).last()
+                    ctx_txn.transaction_id = resp_data.get('pgTxId')
+                    ctx_txn.save()
                     txn_captured = True
                 else:
                     txn_obj.payment_captured = False
@@ -1464,6 +1468,7 @@ def send_capture_payment_request(self, product_id, appointment_id):
     except Exception as e:
         logger.error("Error in payment capture with data - " + json.dumps(req_data) + " with exception - " + str(e))
         self.retry([product_id, appointment_id], countdown=300)
+
 
 @task(bind=True, max_retries=5)
 def send_release_payment_request(self, product_id, appointment_id):
@@ -1534,7 +1539,7 @@ def send_release_payment_request(self, product_id, appointment_id):
         self.retry([product_id, appointment_id], countdown=300)
 
 
-@task(bind=True)
+@task(bind=True, max_retries=3)
 def save_pg_response(self, log_type, order_id, txn_id, response, request, user_id):
     try:
         from ondoc.account.mongo_models import PgLogs

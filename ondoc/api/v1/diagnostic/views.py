@@ -274,10 +274,10 @@ class LabList(viewsets.ReadOnlyModelViewSet):
 
         utm_available = False
         salespoint_query = ""
-        utm_source = request.query_params.get('UtmSource')
+        utm_source = request.query_params.get('utm_source')
         if utm_source and SalesPoint.is_affiliate_available(utm_source):
             utm_available = True
-            salespoint_obj = SalesPoint.get_salespoint_via_code(request.query_params.get('UtmSource'))
+            salespoint_obj = SalesPoint.get_salespoint_via_code(request.query_params.get('utm_source'))
             salespoint_query = ' INNER JOIN "salespoint_test_mapping" ON ("available_lab_test"."id" = "salespoint_test_mapping"."available_tests_id")'
 
 
@@ -585,9 +585,9 @@ class LabList(viewsets.ReadOnlyModelViewSet):
 
         package_free_or_not_dict = get_package_free_or_not_dict(request)
 
-        utm_source = request.query_params.get('UtmSource')
+        utm_source = request.query_params.get('utm_source')
         if utm_source and SalesPoint.is_affiliate_available(utm_source):
-            salespoint_obj = SalesPoint.get_salespoint_via_code(request.query_params.get('UtmSource'))
+            salespoint_obj = SalesPoint.get_salespoint_via_code(request.query_params.get('utm_source'))
 
             main_queryset = LabTest.objects.prefetch_related('test', 'test__recommended_categories',
                                                              'test__parameter', 'categories',
@@ -1500,9 +1500,9 @@ class LabList(viewsets.ReadOnlyModelViewSet):
         if name:
             search_key = re.findall(r'[a-z0-9A-Z.:]+',name)
             search_key = " ".join(search_key).lower()
-            search_key = "".join(search_key.split("."))
+            # search_key = "".join(search_key.split("."))
             filtering_query.append("lb.name ilike %(name)s")
-            filtering_params['name'] = search_key + '%'
+            filtering_params['name'] = '%' + search_key + '%'
             # filtering_params_query1.append(
             #     "name ilike %(name)s")
 
@@ -1953,7 +1953,7 @@ class LabList(viewsets.ReadOnlyModelViewSet):
                         res['vip']['vip_gold_price'] = int(paticular_test_in_lab.get('agreed_price', 0))
                         if engine:
                             # engine_response = engine.validate_booking_entity(cost=paticular_test_in_lab.get('mrp', 0))
-                            engine_response = engine.validate_booking_entity(cost=price, mrp=paticular_test_in_lab.get('mrp', 0))
+                            engine_response = engine.validate_booking_entity(cost=price, mrp=paticular_test_in_lab.get('mrp', 0), deal_price=paticular_test_in_lab.get('deal_price', 0))
                             coverage = engine_response.get('is_covered', False)
                         bool_array.append(coverage)
 

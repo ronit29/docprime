@@ -8,7 +8,7 @@ from django.core.validators import FileExtensionValidator, MaxValueValidator, Mi
 from django.contrib.postgres.fields import JSONField
 from django.utils import timezone
 from ondoc.account import models as account_model
-from ondoc.authentication.models import UserProfile, RefundMixin
+from ondoc.authentication.models import UserProfile, RefundMixin, TransactionMixin
 from ondoc.cart.models import Cart
 from ondoc.common.helper import Choices
 import json
@@ -326,7 +326,7 @@ class PlusThreshold(auth_model.TimeStampedModel, LiveMixin):
 
 
 @reversion.register()
-class PlusUser(auth_model.TimeStampedModel, RefundMixin):
+class PlusUser(auth_model.TimeStampedModel, RefundMixin, TransactionMixin):
     from ondoc.account.models import MoneyPool
     PRODUCT_ID = account_model.Order.VIP_PRODUCT_ID
 
@@ -543,7 +543,7 @@ class PlusUser(auth_model.TimeStampedModel, RefundMixin):
                                         doctor.enabled_for_plus_plans:
 
                 # engine_response = engine.validate_booking_entity(cost=mrp, utilization=kwargs.get('utilization'))
-                engine_response = engine.validate_booking_entity(cost=price, utilization=kwargs.get('utilization'), mrp=mrp)
+                engine_response = engine.validate_booking_entity(cost=price, utilization=kwargs.get('utilization'), mrp=mrp, deal_price=deal_price)
                 response_dict['cover_under_vip'] = engine_response.get('is_covered', False)
                 response_dict['plus_user_id'] = plus_user.id
                 response_dict['vip_amount_deducted'] = engine_response.get('vip_amount_deducted', 0)
@@ -573,7 +573,7 @@ class PlusUser(auth_model.TimeStampedModel, RefundMixin):
                 response_dict['vip_gold_price'] = int(price_data.get('fees'))
                 if appointment_data['test_ids']:
                     # engine_response = engine.validate_booking_entity(cost=final_price, id=appointment_data['test_ids'][0].id, utilization=kwargs.get('utilization'))
-                    engine_response = engine.validate_booking_entity(cost=final_price, id=appointment_data['test_ids'][0].id, utilization=kwargs.get('utilization'), mrp=mrp)
+                    engine_response = engine.validate_booking_entity(cost=final_price, id=appointment_data['test_ids'][0].id, utilization=kwargs.get('utilization'), mrp=mrp, deal_price=int(price_data.get('deal_price')))
 
                     if not engine_response:
                         return response_dict
@@ -630,7 +630,7 @@ class PlusUser(auth_model.TimeStampedModel, RefundMixin):
             vip_data_dict['vip_gold_price'] = int(current_item_price_data.get('fees'))
             if engine:
                 # vip_response = engine.validate_booking_entity(cost=current_item_mrp, utilization=deep_utilization)
-                vip_response = engine.validate_booking_entity(cost=price, mrp=current_item_mrp, utilization=deep_utilization)
+                vip_response = engine.validate_booking_entity(cost=price, mrp=current_item_mrp, utilization=deep_utilization, deal_price=int(current_item_price_data.get('deal_price', 0)))
                 vip_data_dict['vip_amount'] = vip_response.get('amount_to_be_paid')
                 vip_data_dict['amount_to_be_paid'] = vip_response.get('amount_to_be_paid')
                 vip_data_dict['cover_under_vip'] = vip_response.get('is_covered')
@@ -656,7 +656,7 @@ class PlusUser(auth_model.TimeStampedModel, RefundMixin):
                 vip_data_dict['vip_gold_price'] = int(current_item_price_data.get('fees'))
                 if engine:
                     # vip_response = engine.validate_booking_entity(cost=current_item_mrp, utilization=deep_utilization)
-                    vip_response = engine.validate_booking_entity(cost=price, utilization=deep_utilization, mrp=current_item_mrp)
+                    vip_response = engine.validate_booking_entity(cost=price, utilization=deep_utilization, mrp=current_item_mrp, deal_price=int(current_item_price_data.get('deal_price', 0)))
                     vip_data_dict['vip_amount'] = vip_response.get('amount_to_be_paid')
                     vip_data_dict['amount_to_be_paid'] = vip_response.get('amount_to_be_paid')
                     vip_data_dict['cover_under_vip'] = vip_response.get('is_covered')
@@ -1095,7 +1095,7 @@ class PlusMembers(auth_model.TimeStampedModel):
                                           validators=[MaxValueValidator(9999999999), MinValueValidator(1000000000)])
     profile = models.ForeignKey(auth_model.UserProfile, related_name="plus_member", on_delete=models.CASCADE, null=True)
     title = models.CharField(max_length=20, choices=TITLE_TYPE_CHOICES, default=None)
-    middle_name = models.CharField(max_length=50, null=True)
+    middle_name = models.CharField(max_length=50, null=True, blank=True)
     city = models.CharField(max_length=100, null=True, default=None)
     district = models.CharField(max_length=100, null=True, default=None)
     state = models.CharField(max_length=100, null=True, default=None)
