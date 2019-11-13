@@ -275,3 +275,75 @@ class OptimusViewSet(viewsets.GenericViewSet):
                 data['matrix_mapped_state'].append(analytics_data)
 
         return Response(data=data)
+
+
+    def post_analytics_data(self, request):
+        opd_appt = request.data.get('opd_appointment', None)
+        lab_appt = request.data.get('lab_appointment', None)
+        states = request.data.get('matrix_mapped_state', None)
+        cities = request.data.get('matrix_mapped_city', None)
+        corporate_deal = request.data.get('corporate_deals', None)
+
+        if opd_appt:
+            for opd_id in opd_appt:
+                appt_id = opd_id
+                try:
+                    SyncBookingAnalytics.objects.update_or_create(object_id=appt_id,
+                                                                  content_type=ContentType.objects.get_for_model(
+                                                                      OpdAppointment),
+                                                                  defaults={"synced_at": datetime.now(),
+                                                                            "last_updated_at": datetime.now()})
+                except Exception as e:
+                    pass
+
+        if lab_appt:
+            for lab_id in lab_appt:
+                appt_id = lab_id
+                try:
+                    SyncBookingAnalytics.objects.update_or_create(object_id=appt_id,
+                                                                  content_type=ContentType.objects.get_for_model(
+                                                                      LabAppointment),
+                                                                  defaults={"synced_at": datetime.now(),
+                                                                            "last_updated_at": datetime.now()})
+                except Exception as e:
+                    pass
+
+        if states:
+            for state in states:
+                state_id = state
+                try:
+                    SyncBookingAnalytics.objects.update_or_create(object_id=state_id,
+                                                                  content_type=ContentType.objects.get_for_model(
+                                                                      MatrixMappedState),
+                                                                  defaults={"synced_at": datetime.now(),
+                                                                            "last_updated_at": datetime.now()})
+                except Exception as e:
+                    pass
+
+        if cities:
+            for city in cities:
+                city_id = city
+                try:
+                    SyncBookingAnalytics.objects.update_or_create(object_id=city_id,
+                                                                  content_type=ContentType.objects.get_for_model(
+                                                                      MatrixMappedCity),
+                                                                  defaults={"synced_at": datetime.now(),
+                                                                            "last_updated_at": datetime.now()})
+                except Exception as e:
+                    pass
+
+        if corporate_deal:
+            for corporate in corporate_deal:
+                corporate_id = corporate
+                try:
+                    SyncBookingAnalytics.objects.update_or_create(object_id=corporate_id,
+                                                                  content_type=ContentType.objects.get_for_model(
+                                                                      CorporateDeal),
+                                                                  defaults={"synced_at": datetime.now(),
+                                                                            "last_updated_at": datetime.now()})
+                except Exception as e:
+                    pass
+
+        return Response(status=status.HTTP_200_OK)
+
+
