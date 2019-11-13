@@ -1329,6 +1329,7 @@ class TransactionViewSet(viewsets.GenericViewSet):
                             chat_order = Order.objects.filter(pk=pg_txn.order_id).first()
                             if chat_order:
                                 CHAT_REDIRECT_URL = CHAT_SUCCESS_REDIRECT_URL % (chat_order.id, chat_order.reference_id)
+                                save_pg_response.apply_async((PgLogs.RESPONSE_TO_CHAT, chat_order.id, None, CHAT_REDIRECT_URL, None, None), eta=timezone.localtime(), )
                             return HttpResponseRedirect(redirect_to=CHAT_REDIRECT_URL)
                         else:
                             REDIRECT_URL = (SUCCESS_REDIRECT_URL % pg_txn.order_id) + "?payment_success=true"
@@ -1425,6 +1426,8 @@ class TransactionViewSet(viewsets.GenericViewSet):
 
         # return Response({"url": REDIRECT_URL})
         if order_obj.product_id == Order.CHAT_PRODUCT_ID:
+            save_pg_response.apply_async((PgLogs.RESPONSE_TO_CHAT, order_obj.id, None, CHAT_REDIRECT_URL, None, None),
+                                         eta=timezone.localtime(), )
             return HttpResponseRedirect(redirect_to=CHAT_REDIRECT_URL)
         return HttpResponseRedirect(redirect_to=REDIRECT_URL)
 

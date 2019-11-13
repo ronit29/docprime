@@ -996,6 +996,7 @@ def upload_doctor_data(obj_id):
 
 @task()
 def send_pg_acknowledge(order_id=None, order_no=None, ack_type=''):
+    from ondoc.account.mongo_models import PgLogs
     log_requests_on()
     try:
         if order_id is None or order_no is None:
@@ -1007,6 +1008,7 @@ def send_pg_acknowledge(order_id=None, order_no=None, ack_type=''):
             url += "&ack=captureAck"
         response = requests.get(url)
         if response.status_code == status.HTTP_200_OK:
+            save_pg_response.apply_async((PgLogs.ACK_TO_PG, order_id, None, url, None, None), eta=timezone.localtime(), )
             if ack_type == 'capture':
                 print("Payment capture acknowledged")
             else:
