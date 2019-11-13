@@ -614,7 +614,8 @@ class DoctorHospitalSerializer(serializers.ModelSerializer):
     def get_insurance(self, obj):
         request = self.context.get("request")
         user = request.user
-        resp = Doctor.get_insurance_details(user)
+        ins_threshold_amount = self.context.get('ins_threshold_amount', None)
+        resp = Doctor.get_insurance_details(user, ins_threshold_amount)
 
         # enabled for online booking check
         resp['error_message'] = ""
@@ -652,12 +653,18 @@ class DoctorHospitalSerializer(serializers.ModelSerializer):
         return resp
 
     def get_vip(self, obj):
-        search_criteria = SearchCriteria.objects.filter(search_key='is_gold').first()
+        search_query = self.context.get('search_query', None)
+        if not search_query:
+            search_criteria = SearchCriteria.objects.filter(search_key='is_gold').first()
+        else:
+            search_criteria = search_query
+
+        default_plan_query = self.context.get('default_plan', None)
         hosp_is_gold = False
         if search_criteria:
             hosp_is_gold = search_criteria.search_value
         resp = {"is_vip_member": False, "cover_under_vip": False, "vip_amount": 0, "is_enable_for_vip": False,
-                "vip_convenience_amount": PlusPlans.get_default_convenience_amount(obj.fees, "DOCTOR"),
+                "vip_convenience_amount": PlusPlans.get_default_convenience_amount(obj.fees, "DOCTOR", default_plan_query),
                 "vip_gold_price": 0, 'hosp_is_gold': False, "is_gold_member": False}
 
         resp['hosp_is_gold'] = hosp_is_gold
@@ -679,6 +686,7 @@ class DoctorHospitalSerializer(serializers.ModelSerializer):
             available_amount = int(utilization.get('doctor_amount_available', 0))
             price_data = {"mrp": obj.mrp, "deal_price": obj.deal_price, "fees": obj.fees, "cod_deal_price": obj.cod_deal_price}
             mrp = int(obj.mrp)
+            deal_price = obj.deal_price
             price_engine = get_price_reference(plus_user, "DOCTOR")
             if not price_engine:
                 price = mrp
@@ -689,7 +697,7 @@ class DoctorHospitalSerializer(serializers.ModelSerializer):
             engine = get_class_reference(plus_user, "DOCTOR")
             if engine:
                 # vip_res = engine.validate_booking_entity(cost=mrp)
-                vip_res = engine.validate_booking_entity(cost=price, mrp=mrp)
+                vip_res = engine.validate_booking_entity(cost=price, mrp=mrp, deal_price=deal_price)
                 resp['vip_convenience_amount'] = plus_user.plan.get_convenience_charge(price, "DOCTOR")
                 resp['vip_amount'] = vip_res.get('amount_to_be_paid', 0)
                 resp['cover_under_vip'] = vip_res.get('is_covered', False)
@@ -1147,7 +1155,7 @@ class DoctorProfileUserViewSerializer(DoctorProfileSerializer):
     doctor_specializations_ids = serializers.SerializerMethodField()
     show_popup = serializers.SerializerMethodField()
     force_popup = serializers.SerializerMethodField()
-    lensfit_offer = serializers.SerializerMethodField()
+    # lensfit_offer = s erializers.SerializerMethodField()
 
     def get_enabled_for_cod(self, obj):
         return obj.enabled_for_cod()
@@ -1466,6 +1474,18 @@ class DoctorProfileUserViewSerializer(DoctorProfileSerializer):
         hosp_entity_dict, hosp_locality_entity_dict = Hospital.get_hosp_and_locality_dict(all_hospital_ids, EntityUrls.SitemapIdentifier.DOCTORS_LOCALITY_CITY)
         self.context['hosp_entity_dict']=hosp_entity_dict
         self.context['hosp_locality_entity_dict']=hosp_locality_entity_dict
+
+        # Part of Optimisation. Query reason Unknown
+        insurance_threshold_obj = InsuranceThreshold.objects.all().order_by('-opd_amount_limit').first()
+        insurance_threshold_amount = insurance_threshold_obj.opd_amount_limit if insurance_threshold_obj else 1500
+        self.context['ins_threshold_amount'] = insurance_threshold_amount
+        search_criteria_query = SearchCriteria.objects.filter(search_key='is_gold').first()
+        self.context['search_query'] = search_criteria_query
+        default_plan = PlusPlans.objects.prefetch_related('plan_parameters', 'plan_parameters__parameter').filter(is_selected=True, is_gold=True).first()
+        if not default_plan:
+            default_plan = PlusPlans.objects.prefetch_related('plan_parameters', 'plan_parameters__parameter').filter(is_gold=True).first()
+        self.context['default_plan'] = default_plan
+
         if obj:
             doctor_specialization = InsuranceDoctorSpecializations.get_doctor_insurance_specializations(obj)
             if doctor_specialization:
@@ -1576,7 +1596,7 @@ class DoctorProfileUserViewSerializer(DoctorProfileSerializer):
                   'general_specialization', 'doctor_specializations_ids', 'thumbnail', 'license', 'is_live', 'seo',
                   'breadcrumb', 'rating', 'rating_graph',
                   'enabled_for_online_booking', 'unrated_appointment', 'display_rating_widget', 'is_gold',
-                  'search_data', 'enabled_for_cod', 'show_popup', 'force_popup', 'lensfit_offer')
+                  'search_data', 'enabled_for_cod', 'show_popup', 'force_popup')
 
 
 class DoctorAvailabilityTimingSerializer(serializers.Serializer):
@@ -1835,7 +1855,7 @@ class DoctorFeedbackBodySerializer(serializers.Serializer):
     is_cloud_lab_email = serializers.BooleanField(default=False)
     rating = serializers.IntegerField(max_value=10, required=False)
     subject_string = serializers.CharField(max_length=128, required=False)
-    feedback = serializers.CharField(max_length=512, required=False)
+    feedback = serializers.CharField(required=False)
     feedback_tags = serializers.ListField(required=False)
     email = serializers.EmailField(required=False)
     app_version = serializers.CharField(required=False, allow_blank=True)
