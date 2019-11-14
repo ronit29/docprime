@@ -1380,11 +1380,13 @@ class TransactionViewSet(viewsets.GenericViewSet):
                 else:
                     logger.error("Invalid pg data - " + json.dumps(resp_serializer.errors))
             elif order_obj:
-                # try:
-                #     if response and response.get("orderNo") and response.get("orderId"):
-                #         send_pg_acknowledge.apply_async((response.get("orderId"), response.get("orderNo"),), countdown=1)
-                # except Exception as e:
-                #     logger.error("Error in sending pg acknowledge - " + str(e))
+                # send acknowledge if status is TXN_FAILURE to stop callbacks from pg. Do not send acknowledgement if no entry in pg.
+                try:
+                    if response and response.get("orderNo") and response.get("orderId") and response.get(
+                            'txStatus') and response.get('txStatus') == 'TXN_FAILURE':
+                        send_pg_acknowledge.apply_async((response.get("orderId"), response.get("orderNo"),), countdown=1)
+                except Exception as e:
+                    logger.error("Error in sending pg acknowledge - " + str(e))
 
                 try:
                     has_changed = order_obj.change_payment_status(Order.PAYMENT_FAILURE)

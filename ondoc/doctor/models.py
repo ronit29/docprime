@@ -2712,42 +2712,43 @@ class OpdAppointment(auth_model.TimeStampedModel, CouponsMixin, OpdAppointmentIn
 
     def sync_with_booking_analytics(self):
 
-        promo_cost = self.deal_price - self.effective_price if self.deal_price and self.effective_price else 0
-        department = None
-        if self.doctor:
-            if self.doctor.doctorpracticespecializations.first():
-                if self.doctor.doctorpracticespecializations.first().specialization.department.first():
-                    department = self.doctor.doctorpracticespecializations.first().specialization.department.first().id
-
-        wallet, cashback = self.get_completion_breakup()
-
-        obj = DP_OpdConsultsAndTests.objects.filter(Appointment_Id=self.id, TypeId=1).first()
-        if not obj:
-            obj = DP_OpdConsultsAndTests()
-            obj.Appointment_Id = self.id
-            obj.CityId = self.get_city()
-            obj.StateId = self.get_state()
-            obj.SpecialityId = department
-            obj.TypeId = 1
-            obj.ProviderId = self.hospital.id
-            obj.PaymentType = self.payment_type if self.payment_type else None
-            obj.Payout = self.fees
-            obj.CashbackUsed = cashback
-            obj.BookingDate = self.created_at
-        obj.CorporateDealId = self.get_corporate_deal_id()
-        obj.PromoCost = max(0, promo_cost)
-        obj.GMValue = self.deal_price
-        obj.StatusId = self.status
-        obj.save()
+        # promo_cost = self.deal_price - self.effective_price if self.deal_price and self.effective_price else 0
+        # department = None
+        # if self.doctor:
+        #     if self.doctor.doctorpracticespecializations.first():
+        #         if self.doctor.doctorpracticespecializations.first().specialization.department.first():
+        #             department = self.doctor.doctorpracticespecializations.first().specialization.department.first().id
+        #
+        # wallet, cashback = self.get_completion_breakup()
+        #
+        # obj = DP_OpdConsultsAndTests.objects.filter(Appointment_Id=self.id, TypeId=1).first()
+        # if not obj:
+        #     obj = DP_OpdConsultsAndTests()
+        #     obj.Appointment_Id = self.id
+        #     obj.CityId = self.get_city()
+        #     obj.StateId = self.get_state()
+        #     obj.SpecialityId = department
+        #     obj.TypeId = 1
+        #     obj.ProviderId = self.hospital.id
+        #     obj.PaymentType = self.payment_type if self.payment_type else None
+        #     obj.Payout = self.fees
+        #     obj.CashbackUsed = cashback
+        #     obj.BookingDate = self.created_at
+        # obj.CorporateDealId = self.get_corporate_deal_id()
+        # obj.PromoCost = max(0, promo_cost)
+        # obj.GMValue = self.deal_price
+        # obj.StatusId = self.status
+        # obj.save()
 
         try:
             SyncBookingAnalytics.objects.update_or_create(object_id=self.id,
                                                           content_type=ContentType.objects.get_for_model(OpdAppointment),
                                                           defaults={"synced_at": self.updated_at, "last_updated_at": self.updated_at})
         except Exception as e:
+            print(str(e))
             pass
 
-        return obj
+        # return obj
 
     def get_invoice_objects(self):
         return Invoice.objects.filter(reference_id=self.id, product_id=Order.DOCTOR_PRODUCT_ID)
