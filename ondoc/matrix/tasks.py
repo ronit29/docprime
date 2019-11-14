@@ -387,7 +387,7 @@ def push_appointment_to_matrix(self, data):
             qs = LabAppointment.objects.filter(id=appointment.id)
             obj_type = 'lab_appointment'
 
-        save_matrix_logs.apply_async((qs.first().id, obj_type, request_data, response.json()), countdown=5, queue='logs')
+        save_matrix_logs.apply_async((qs.first().id, obj_type, request_data, response.json()), countdown=5, queue=settings.RABBITMQ_LOGS_QUEUE)
 
         if response.status_code != status.HTTP_200_OK or not response.ok:
             logger.error(json.dumps(request_data))

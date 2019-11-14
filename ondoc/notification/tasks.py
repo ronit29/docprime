@@ -350,7 +350,7 @@ def set_order_dummy_transaction(self, order_id, user_id):
             req_data[key] = str(req_data[key])
 
         response = requests.post(url, data=json.dumps(req_data), headers=headers)
-        save_pg_response.apply_async((PgLogs.DUMMY_TXN, order_id, None, response.json(), req_data, user_id,), eta=timezone.localtime(), queue='logs')
+        save_pg_response.apply_async((PgLogs.DUMMY_TXN, order_id, None, response.json(), req_data, user_id,), eta=timezone.localtime(), queue=settings.RABBITMQ_LOGS_QUEUE)
         if response.status_code == status.HTTP_200_OK:
             resp_data = response.json()
             #logger.error(resp_data)
@@ -780,7 +780,7 @@ def request_payout(req_data, order_data):
 
     response = requests.post(url, data=json.dumps(req_data), headers=headers)
     resp_data = response.json()
-    save_pg_response.apply_async((PgLogs.PAYOUT_PROCESS, order_data.id, None, resp_data, req_data, None), eta=timezone.localtime(), queue='logs')
+    save_pg_response.apply_async((PgLogs.PAYOUT_PROCESS, order_data.id, None, resp_data, req_data, None), eta=timezone.localtime(), queue=settings.RABBITMQ_LOGS_QUEUE)
     if response.status_code == status.HTTP_200_OK:
         if resp_data.get("ok") is not None and resp_data.get("ok") == '1':
             success_payout = False
@@ -1012,7 +1012,7 @@ def send_pg_acknowledge(order_id=None, order_no=None, ack_type=''):
                 print("Payment capture acknowledged")
             else:
                 print("Payment acknowledged")
-        save_pg_response.apply_async((PgLogs.ACK_TO_PG, order_id, None, url, None, None), eta=timezone.localtime(), queue='logs')
+        save_pg_response.apply_async((PgLogs.ACK_TO_PG, order_id, None, url, None, None), eta=timezone.localtime(), queue=settings.RABBITMQ_LOGS_QUEUE)
 
     except Exception as e:
         logger.error("Error in sending pg acknowledge - " + str(e))
@@ -1121,7 +1121,7 @@ def push_plus_lead_to_matrix(self, data):
                                                                               'Content-Type': 'application/json'})
 
         # MatrixLog.create_matrix_logs(plus_lead_obj, request_data, response.json())
-        save_matrix_logs.apply_async((plus_lead_obj.id, obj_type, request_data, response.json()), countdown=5, queue='logs')
+        save_matrix_logs.apply_async((plus_lead_obj.id, obj_type, request_data, response.json()), countdown=5, queue=settings.RABBITMQ_LOGS_QUEUE)
 
         if response.status_code != status.HTTP_200_OK or not response.ok:
             logger.error(json.dumps(request_data))
@@ -1220,7 +1220,7 @@ def push_insurance_banner_lead_to_matrix(self, data):
                                                                               'Content-Type': 'application/json'})
 
         # MatrixLog.create_matrix_logs(banner_obj, request_data, response.json())
-        save_matrix_logs.apply_async((banner_obj.id, obj_type, request_data, response.json()), countdown=5, queue='logs')
+        save_matrix_logs.apply_async((banner_obj.id, obj_type, request_data, response.json()), countdown=5, queue=settings.RABBITMQ_LOGS_QUEUE)
 
         if response.status_code != status.HTTP_200_OK or not response.ok:
             logger.error(json.dumps(request_data))
@@ -1444,7 +1444,7 @@ def send_capture_payment_request(self, product_id, appointment_id):
             response = requests.post(url, data=json.dumps(req_data), headers=headers)
 
             resp_data = response.json()
-            save_pg_response.apply_async((PgLogs.TXN_CAPTURED, order.id, txn_obj.id, resp_data, req_data, order.user_id,), eta=timezone.localtime(), queue='logs')
+            save_pg_response.apply_async((PgLogs.TXN_CAPTURED, order.id, txn_obj.id, resp_data, req_data, order.user_id,), eta=timezone.localtime(), queue=settings.RABBITMQ_LOGS_QUEUE)
 
             args = {'order_id': order.id, 'status_code': resp_data.get('statusCode'), 'source': 'CAPTURE'}
             status_type = PaymentProcessStatus.get_status_type(resp_data.get('statusCode'), resp_data.get('txStatus'))
@@ -1524,7 +1524,7 @@ def send_release_payment_request(self, product_id, appointment_id):
 
                 response = requests.post(url, data=json.dumps(req_data), headers=headers)
                 resp_data = response.json()
-                save_pg_response.apply_async((PgLogs.TXN_RELEASED, order.id, txn_obj.id, resp_data, req_data, order.user_id,), eta=timezone.localtime(), queue='logs')
+                save_pg_response.apply_async((PgLogs.TXN_RELEASED, order.id, txn_obj.id, resp_data, req_data, order.user_id,), eta=timezone.localtime(), queue=settings.RABBITMQ_LOGS_QUEUE)
 
                 args = {'order_id': order.id, 'status_code': resp_data.get('statusCode'), 'source': 'RELEASE'}
                 status_type = PaymentProcessStatus.get_status_type(resp_data.get('statusCode'),
