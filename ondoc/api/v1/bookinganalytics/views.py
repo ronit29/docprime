@@ -293,7 +293,7 @@ class OptimusViewSet(viewsets.GenericViewSet):
                                                                       OpdAppointment),
                                                                   defaults={"synced_at": datetime.now(),
                                                                             "last_updated_at": datetime.now()})
-                    print('Opd Appointment print statement')
+                    print('Opd Appointment id: {}'.format(appt_id))
                 except Exception as e:
                     pass
 
@@ -306,7 +306,7 @@ class OptimusViewSet(viewsets.GenericViewSet):
                                                                       LabAppointment),
                                                                   defaults={"synced_at": datetime.now(),
                                                                             "last_updated_at": datetime.now()})
-                    print('Lab Appointment print statement')
+                    print('Lab Appointment id : {}'.format(appt_id))
                 except Exception as e:
                     pass
 
