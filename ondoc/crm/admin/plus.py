@@ -36,7 +36,7 @@ class PlusPlanParametersAdmin(admin.ModelAdmin):
 
 class PlusPlanUtmSourceAdmin(admin.ModelAdmin):
     model = PlusPlanUtmSources
-    fields = ('source', 'source_details')
+    fields = ('source', 'source_details', 'create_lead')
     list_display = ('source',)
 
 

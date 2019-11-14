@@ -90,7 +90,7 @@ def setup_periodic_tasks(sender, **kwargs):
     sender.add_periodic_task(crontab(hour=20, minute=45), update_lal_path_test_data.s(), name='Update Lalpath Lab Data')
     sender.add_periodic_task(crontab(hour=19, minute=30), update_city_search_key.s(), name='Update Hospital City Search Key')
     sender.add_periodic_task(crontab(hour=20, minute=30), update_doctors_count.s(), name='Update Doctors Count')
-    sender.add_periodic_task(crontab(hour=21, minute=00),  sync_booking_data.s(), name="Sync Booking Data for analytics")
+    # sender.add_periodic_task(crontab(hour=21, minute=00),  sync_booking_data.s(), name="Sync Booking Data for analytics")
     #sender.add_periodic_task(crontab(hour=2, minute=30), update_all_hospitals_seo_urls.s(), name='Update Hospital Seo Urls')
     sender.add_periodic_task(crontab(hour=3, minute=30), update_all_ipd_seo_urls.s(), name='Update IPD Seo Urls')
 
