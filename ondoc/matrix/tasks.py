@@ -382,10 +382,12 @@ def push_appointment_to_matrix(self, data):
         qs = None
         if data.get('type') == 'OPD_APPOINTMENT':
             qs = OpdAppointment.objects.filter(id=appointment.id)
+            obj_type = 'opd_appointment'
         elif data.get('type') == 'LAB_APPOINTMENT':
             qs = LabAppointment.objects.filter(id=appointment.id)
+            obj_type = 'lab_appointment'
 
-        save_matrix_logs.apply_async((qs.first(), request_data, response.json()), countdown=5, queue='logs')
+        save_matrix_logs.apply_async((qs.first().id, obj_type, request_data, response.json()), countdown=5, queue='logs')
 
         if response.status_code != status.HTTP_200_OK or not response.ok:
             logger.error(json.dumps(request_data))
@@ -408,7 +410,6 @@ def push_appointment_to_matrix(self, data):
 
         if qs:
             qs.update(matrix_lead_id=int(resp_data.get('Id')))
-
 
     except Exception as e:
         logger.error("Error in Celery. Failed pushing Appointment to the matrix- " + str(e))

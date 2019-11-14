@@ -1071,6 +1071,7 @@ def push_plus_lead_to_matrix(self, data):
             raise ValueError()
 
         plus_lead_obj = PlusLead.objects.filter(id=id).first()
+        obj_type = 'plus_lead'
 
         if not plus_lead_obj:
             raise Exception("Plus lead object could not found against id - " + str(id))
@@ -1120,7 +1121,7 @@ def push_plus_lead_to_matrix(self, data):
                                                                               'Content-Type': 'application/json'})
 
         # MatrixLog.create_matrix_logs(plus_lead_obj, request_data, response.json())
-        save_matrix_logs.apply_async((plus_lead_obj, request_data, response.json()), countdown=5, queue='logs')
+        save_matrix_logs.apply_async((plus_lead_obj.id, obj_type, request_data, response.json()), countdown=5, queue='logs')
 
         if response.status_code != status.HTTP_200_OK or not response.ok:
             logger.error(json.dumps(request_data))
@@ -1162,6 +1163,7 @@ def push_insurance_banner_lead_to_matrix(self, data):
             raise ValueError()
 
         banner_obj = InsuranceLead.objects.filter(id=id).first()
+        obj_type = 'insurance_lead'
 
         if not banner_obj:
             raise Exception("Banner object could not found against id - " + str(id))
@@ -1218,7 +1220,7 @@ def push_insurance_banner_lead_to_matrix(self, data):
                                                                               'Content-Type': 'application/json'})
 
         # MatrixLog.create_matrix_logs(banner_obj, request_data, response.json())
-        save_matrix_logs.apply_async((banner_obj, request_data, response.json()), countdown=5, queue='logs')
+        save_matrix_logs.apply_async((banner_obj.id, obj_type, request_data, response.json()), countdown=5, queue='logs')
 
         if response.status_code != status.HTTP_200_OK or not response.ok:
             logger.error(json.dumps(request_data))
@@ -1644,9 +1646,29 @@ def send_partner_lab_notifications(order_id, notification_type=None, report_list
 
 
 @task(bind=True, max_retries=3)
-def save_matrix_logs(self, object, request_data, response):
+def save_matrix_logs(self, id, obj_type, request_data, response):
     try:
         from ondoc.matrix.mongo_models import MatrixLog
-        MatrixLog.create_matrix_logs(object, request_data, response)
+        from ondoc.diagnostic.models import LabAppointment
+        from ondoc.doctor.models import OpdAppointment
+        from ondoc.insurance.models import UserInsurance, InsuranceLead
+        from ondoc.plus.models import PlusUser, PlusLead
+
+        object = None
+        if obj_type == 'lab_appointment':
+            object = LabAppointment.objects.filter(id=id).first()
+        elif obj_type == 'opd_appointment':
+            object = OpdAppointment.objects.filter(id=id).first()
+        elif obj_type == 'user_insurance':
+            object = UserInsurance.objects.filter(id=id).first()
+        elif obj_type == 'plus_user':
+            object = PlusUser.objects.filter(id=id).first()
+        elif obj_type == 'plus_lead':
+            object = PlusLead.objects.filter(id=id).first()
+        elif obj_type == 'insurance_lead':
+            object = InsuranceLead.objects.filter(id=id).first()
+
+        if object:
+            MatrixLog.create_matrix_logs(object, request_data, response)
     except Exception as e:
         logger.error("Error in saving matrix logs to mongo database - " + json.dumps(response) + " with exception - " + str(e))
