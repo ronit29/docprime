@@ -1305,7 +1305,9 @@ class TransactionViewSet(viewsets.GenericViewSet):
                 if response and response.get("orderNo"):
                     pg_txn = PgTransaction.objects.filter(order_no__iexact=response.get("orderNo")).first()
                     if pg_txn:
+                        is_preauth = False
                         if pg_txn.is_preauth():
+                            is_preauth = True
                             pg_txn.status_code = response.get('statusCode')
                             pg_txn.status_type = response.get('txStatus')
                             pg_txn.payment_mode = response.get("paymentMode")
@@ -1314,6 +1316,14 @@ class TransactionViewSet(viewsets.GenericViewSet):
                             pg_txn.bank_id = response.get('bankTxId')
                             #pg_txn.payment_captured = True
                             pg_txn.save()
+
+                            ctx_txn = ConsumerTransaction.objects.filter(order_id=pg_txn.order_.id,
+                                                                         action=ConsumerTransaction.PAYMENT).last()
+                            ctx_txn.transaction_id = response.get('pgTxId')
+                            ctx_txn.save()
+
+                            if response.get('txStatus') in ['TXN_SUCCESS', 'TXN_RELEASE']:
+                                send_pg_acknowledge.apply_async((pg_txn.order_id, pg_txn.order_no, 'capture'), countdown=1)
                         send_pg_acknowledge.apply_async((pg_txn.order_id, pg_txn.order_no,), countdown=1)
                         if pg_txn.product_id == Order.CHAT_PRODUCT_ID:
                             chat_order = Order.objects.filter(pk=pg_txn.order_id).first()
@@ -1370,8 +1380,10 @@ class TransactionViewSet(viewsets.GenericViewSet):
                 else:
                     logger.error("Invalid pg data - " + json.dumps(resp_serializer.errors))
             elif order_obj:
+                # send acknowledge if status is TXN_FAILURE to stop callbacks from pg. Do not send acknowledgement if no entry in pg.
                 try:
-                    if response and response.get("orderNo") and response.get("orderId"):
+                    if response and response.get("orderNo") and response.get("orderId") and response.get(
+                            'txStatus') and response.get('txStatus') == 'TXN_FAILURE':
                         send_pg_acknowledge.apply_async((response.get("orderId"), response.get("orderNo"),), countdown=1)
                 except Exception as e:
                     logger.error("Error in sending pg acknowledge - " + str(e))
@@ -1441,11 +1453,11 @@ class TransactionViewSet(viewsets.GenericViewSet):
         data['status_type'] = response.get('txStatus')
         data['transaction_id'] = format_return_value(response.get('pgTxId'))
         data['pb_gateway_name'] = response.get('pbGatewayName')
-        # data['nodal_id'] = response.get('nodalId')
-        if order_obj.product_id == Order.INSURANCE_PRODUCT_ID:
-            data['nodal_id'] = PgTransaction.NODAL2
-        else:
-            data['nodal_id'] = PgTransaction.NODAL1
+        data['nodal_id'] = response.get('nodalId')
+        # if order_obj.product_id == Order.INSURANCE_PRODUCT_ID:
+        #     data['nodal_id'] = PgTransaction.NODAL2
+        # else:
+        #     data['nodal_id'] = PgTransaction.NODAL1
 
         return data
 
@@ -1913,8 +1925,10 @@ class ConsumerAccountRefundViewSet(GenericViewSet):
         consumer_account = ConsumerAccount.objects.get_or_create(user=user)
         consumer_account = ConsumerAccount.objects.select_for_update().get(user=user)
         if consumer_account.balance > 0:
-            ctx_obj = consumer_account.debit_refund()
-            ConsumerRefund.initiate_refund(user, ctx_obj)
+            ctx_objs = consumer_account.debit_refund()
+            if ctx_objs:
+                for ctx_obj in ctx_objs:
+                    ConsumerRefund.initiate_refund(user, ctx_obj)
         resp = dict()
         resp["status"] = 1
         return Response(resp)
@@ -2018,23 +2032,23 @@ class SendCartUrlViewSet(GenericViewSet):
 
     def send_cart_url(self, request):
         # order_id = request.data.get('orderId', None)
-        utm_source = request.data.get('UtmSource')
-        utm_term = request.data.get('UtmTerm')
-        utm_medium = request.data.get('UtmMedium')
-        utm_campaign = request.data.get('UtmCampaign')
+        utm_source = request.data.get('utm_source')
+        utm_term = request.data.get('utm_term')
+        utm_medium = request.data.get('utm_medium')
+        utm_campaign = request.data.get('utm_campaign')
 
         utm_parameters = ""
         if utm_source:
-            utm_source = "UtmSource=%s&" % utm_source
+            utm_source = "utm_source=%s&" % utm_source
             utm_parameters = utm_parameters + utm_source
         if utm_term:
-            utm_term = "UtmTerm=%s&" % utm_term
+            utm_term = "utm_term=%s&" % utm_term
             utm_parameters = utm_parameters + utm_term
         if utm_medium:
-            utm_medium = "UtmMedium=%s&" % utm_medium
+            utm_medium = "utm_medium=%s&" % utm_medium
             utm_parameters = utm_parameters + utm_medium
         if utm_campaign:
-            utm_campaign = "UtmCampaign=%s" % utm_campaign
+            utm_campaign = "utm_campaign=%s" % utm_campaign
             utm_parameters = utm_parameters + utm_campaign
 
         user_token = JWTAuthentication.generate_token(request.user)

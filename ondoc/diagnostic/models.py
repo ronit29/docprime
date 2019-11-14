@@ -11,7 +11,7 @@ from ondoc.account.models import MerchantPayout, ConsumerAccount, Order, UserRef
 from ondoc.authentication.models import (TimeStampedModel, CreatedByModel, Image, Document, QCModel, UserProfile, User,
                                          UserPermission, GenericAdmin, LabUserPermission, GenericLabAdmin,
                                          BillingAccount, SPOCDetails, RefundMixin, WelcomeCallingDone,
-                                         MerchantTdsDeduction, PaymentMixin)
+                                         MerchantTdsDeduction, PaymentMixin, TransactionMixin)
 from ondoc.bookinganalytics.models import DP_OpdConsultsAndTests
 from ondoc.doctor.models import Hospital, SearchKey, CancellationReason, Doctor
 from ondoc.crm.constants import constants
@@ -1284,6 +1284,16 @@ class LabTestRecommendedCategoryMapping(models.Model):
         unique_together = (('lab_test', 'parent_category'),)
 
 
+class LabtestNameMaster(auth_model.TimeStampedModel, auth_model.SoftDelete):
+    name = models.CharField(max_length=256, blank=False, null=False)
+
+    def __str__(self):
+        return "{}".format(self.name)
+
+    class Meta:
+        db_table = "labtest_master"
+
+
 class LabTest(TimeStampedModel, SearchKey):
     LAB_TEST_SITEMAP_IDENTIFIER = 'LAB_TEST'
     URL_SUFFIX = 'tpp'
@@ -1358,6 +1368,7 @@ class LabTest(TimeStampedModel, SearchKey):
                                on_delete=models.SET_NULL)
     is_cancellable = models.BooleanField(default=True)
     insurance_cutoff_price = models.PositiveIntegerField(default=None, null=True, blank=True)
+    search_name = models.ForeignKey(LabtestNameMaster, null=True, blank=True, on_delete=models.SET_NULL)
 
     # test_sub_type = models.ManyToManyField(
     #     LabTestSubType,
@@ -1650,7 +1661,7 @@ class LabAppointmentInvoiceMixin(object):
 
 
 @reversion.register()
-class LabAppointment(TimeStampedModel, CouponsMixin, LabAppointmentInvoiceMixin, RefundMixin, CompletedBreakupMixin, MatrixDataMixin, TdsDeductionMixin, PaymentMixin, MerchantPayoutMixin):
+class LabAppointment(TimeStampedModel, CouponsMixin, LabAppointmentInvoiceMixin, RefundMixin, CompletedBreakupMixin, MatrixDataMixin, TdsDeductionMixin, PaymentMixin, MerchantPayoutMixin, TransactionMixin):
     from ondoc.integrations.models import IntegratorResponse
     PRODUCT_ID = Order.LAB_PRODUCT_ID
     CREATED = 1
@@ -2693,7 +2704,7 @@ class LabAppointment(TimeStampedModel, CouponsMixin, LabAppointmentInvoiceMixin,
                 engine = get_class_reference(plus_membership, entity)
                 if engine:
                     # engine_response = engine.validate_booking_entity(cost=effective_price, id=data['test_ids'][0].id)
-                    engine_response = engine.validate_booking_entity(cost=price, id=data['test_ids'][0].id, mrp=effective_price)
+                    engine_response = engine.validate_booking_entity(cost=price, id=data['test_ids'][0].id, mrp=effective_price, deal_price=total_deal_price)
                     effective_price = engine_response.get('amount_to_be_paid')
                     effective_price = effective_price + vip_convenience_amount
                 else:
@@ -2807,10 +2818,10 @@ class LabAppointment(TimeStampedModel, CouponsMixin, LabAppointmentInvoiceMixin,
 
         # check if test mapped with affiliates
         mapped_with_affiliates = None
-        source = data["utm_spo_tags"].get("UtmSource", None)
+        source = data["utm_spo_tags"].get("utm_source", None)
         if source:
             mapped_with_affiliates = True
-            affiliate = SalesPoint.objects.filter(name=data["utm_spo_tags"]["UtmSource"]).first()
+            affiliate = SalesPoint.objects.filter(name=data["utm_spo_tags"]["utm_source"]).first()
             if affiliate:
                 for test_id in test_ids_list:
                     spo_mapping = SalespointTestmapping.objects.filter(salespoint_id=affiliate.id,
@@ -3206,10 +3217,10 @@ class LabAppointment(TimeStampedModel, CouponsMixin, LabAppointmentInvoiceMixin,
         appointment_details['CityId'] = 0
         appointment_details['ProductId'] = product_id
         appointment_details['SubProductId'] = sub_product_id
-        appointment_details['UtmTerm'] = self.spo_data.get('UtmTerm', '')
-        appointment_details['UtmMedium'] = self.spo_data.get('UtmMedium', '')
-        appointment_details['UtmCampaign'] = self.spo_data.get('UtmCampaign', '')
-        appointment_details['UtmSource'] = self.spo_data.get('UtmSource', '')
+        appointment_details['UtmTerm'] = self.spo_data.get('utm_term', '')
+        appointment_details['UtmMedium'] = self.spo_data.get('utm_medium', '')
+        appointment_details['UtmCampaign'] = self.spo_data.get('utm_campaign', '')
+        appointment_details['UtmSource'] = self.spo_data.get('utm_source', '')
         appointment_details['LocationVerified'] = 1 if self.lab.is_location_verified else 0
         appointment_details['IsInsured'] = 1 if self.insurance else 0
         appointment_details['DOB'] = dob_value

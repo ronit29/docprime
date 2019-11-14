@@ -34,7 +34,7 @@ from dateutil import tz
 from dateutil.relativedelta import relativedelta
 from django.utils import timezone
 from ondoc.authentication import models as auth_model
-from ondoc.authentication.models import SPOCDetails, RefundMixin, MerchantTdsDeduction, PaymentMixin
+from ondoc.authentication.models import SPOCDetails, RefundMixin, MerchantTdsDeduction, PaymentMixin, TransactionMixin
 from ondoc.bookinganalytics.models import DP_OpdConsultsAndTests
 # from ondoc.diagnostic.models import Lab
 from ondoc.location import models as location_models
@@ -277,7 +277,7 @@ class Hospital(auth_model.TimeStampedModel, auth_model.CreatedByModel, auth_mode
     google_ratings_count = models.PositiveIntegerField(null=True, blank=True)
 
     def __str__(self):
-        return self.name
+        return '{}-{}'.format(self.id, self.name)
 
     class Meta:
         db_table = "hospital"
@@ -394,7 +394,7 @@ class Hospital(auth_model.TimeStampedModel, auth_model.CreatedByModel, auth_mode
                                                                                          'hosp_locality_entity_dict': hosp_locality_entity_dict,
                                                                                          'new_dynamic_dict': new_dynamic_dict}).data
         for data in result:
-            data['vip_percentage'] = common_hosp_percentage_dict[data.get('id')] if plan and common_hosp_percentage_dict[data.get('id')]  else 0
+            data['vip_percentage'] = common_hosp_percentage_dict[data.get('id')] if plan and common_hosp_percentage_dict.get(data.get('id')) else 0
 
         return result
         # result = TopHospitalForIpdProcedureSerializer(hosp_queryset, many=True, context={'request': request,
@@ -2495,7 +2495,7 @@ class PurchaseOrderCreation(auth_model.TimeStampedModel):
 
 
 @reversion.register()
-class OpdAppointment(auth_model.TimeStampedModel, CouponsMixin, OpdAppointmentInvoiceMixin, RefundMixin, CompletedBreakupMixin, MatrixDataMixin, TdsDeductionMixin, PaymentMixin, MerchantPayoutMixin):
+class OpdAppointment(auth_model.TimeStampedModel, CouponsMixin, OpdAppointmentInvoiceMixin, RefundMixin, CompletedBreakupMixin, MatrixDataMixin, TdsDeductionMixin, PaymentMixin, MerchantPayoutMixin, TransactionMixin):
     PRODUCT_ID = Order.DOCTOR_PRODUCT_ID
     CREATED = 1
     BOOKED = 2
@@ -3515,7 +3515,7 @@ class OpdAppointment(auth_model.TimeStampedModel, CouponsMixin, OpdAppointmentIn
                         engine = get_class_reference(plus_user, "DOCTOR")
                         if engine:
                             # vip_dict = engine.validate_booking_entity(cost=doctor_clinic_timing.mrp)
-                            vip_dict = engine.validate_booking_entity(cost=price, mrp=doctor_clinic_timing.mrp)
+                            vip_dict = engine.validate_booking_entity(cost=price, mrp=doctor_clinic_timing.mrp, deal_price=doctor_clinic_timing.deal_price)
                             effective_price = vip_dict.get('amount_to_be_paid')
                         else:
                             effective_price = doctor_clinic_timing.deal_price
@@ -3756,8 +3756,11 @@ class OpdAppointment(auth_model.TimeStampedModel, CouponsMixin, OpdAppointmentIn
         #         and self.doctor.is_insurance_enabled and self.hospital.enabled_for_insurance:
         #     return True
 
-        if self.doctor and self.doctor.is_congot_doctor():
+        if self.doctor:
             return False
+
+        # if self.doctor and self.doctor.is_congot_doctor():
+        #     return False
 
         if old_instance.status == OpdAppointment.BOOKED and self.status == OpdAppointment.ACCEPTED \
                 and (self.payment_type == OpdAppointment.PREPAID or self.payment_type == OpdAppointment.COD):

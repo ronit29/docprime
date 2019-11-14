@@ -86,7 +86,7 @@ from ondoc.insurance.models import InsuranceThreshold
 import logging
 from ondoc.api.v1.auth import serializers as auth_serializers
 from copy import deepcopy
-from ondoc.common.models import GlobalNonBookable, AppointmentHistory
+from ondoc.common.models import GlobalNonBookable, AppointmentHistory, UserConfig
 from ondoc.api.v1.common import serializers as common_serializers
 from django.utils.text import slugify
 from django.urls import reverse
@@ -2963,12 +2963,11 @@ class DoctorFeedbackViewSet(viewsets.GenericViewSet):
         serializer = serializers.DoctorFeedbackBodySerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         valid_data = serializer.validated_data
-        emails = list()
         if valid_data.get('is_cloud_lab_email'):
+            receivers_data = UserConfig.objects.filter(key='feedback_cloudlab_email_receivers').first()
+            emails = receivers_data.data if (receivers_data and type(receivers_data.data) is list) else list()
             subject_string = valid_data.get('subject_string')
             message = valid_data.get('feedback')
-            emails = ["sanat@docprime.com", "kabeer@docprime.com", "prithvijeet@docprime.com", "raghavr@docprime.com",
-                      "rajivk@policybazaar.com"]
         else:
             valid_data.pop('subject_string', None)
             subject_string = "Feedback Mail from " + str(user.phone_number)
@@ -3585,14 +3584,14 @@ class OfflineCustomerViewSet(viewsets.GenericViewSet):
             obj = self.get_error_obj(data)
             obj['error_message'] = 'Cannot Update an invalid/error appointment!'
             obj.update(self.get_offline_response_obj(appnt, request))
-            logger.error("PROVIDER_REQUEST - Updating a invalid/error Appointment! " + str(data))
+            logger.info("PROVIDER_REQUEST - Updating a invalid/error Appointment! " + str(data))
             response['obj'] = obj
             response['break'] = True
         elif appnt.status == models.OfflineOPDAppointments.CANCELLED or appnt.status == models.OfflineOPDAppointments.NO_SHOW:
             obj = self.get_error_obj(data)
             obj['error_message'] = 'Cannot Update a Cancelled/NoShow appointment!'
             obj.update(self.get_offline_response_obj(appnt, request))
-            logger.error("PROVIDER_REQUEST - Updating a Cancelled/NoShow Appointment! " + str(data))
+            logger.info("PROVIDER_REQUEST - Updating a Cancelled/NoShow Appointment! " + str(data))
             response['obj'] = obj
             response['break'] = True
 
