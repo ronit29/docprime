@@ -1284,6 +1284,16 @@ class LabTestRecommendedCategoryMapping(models.Model):
         unique_together = (('lab_test', 'parent_category'),)
 
 
+class LabtestNameMaster(auth_model.TimeStampedModel, auth_model.SoftDelete):
+    name = models.CharField(max_length=256, blank=False, null=False)
+
+    def __str__(self):
+        return "{}".format(self.name)
+
+    class Meta:
+        db_table = "labtest_master"
+
+
 class LabTest(TimeStampedModel, SearchKey):
     LAB_TEST_SITEMAP_IDENTIFIER = 'LAB_TEST'
     URL_SUFFIX = 'tpp'
@@ -1358,6 +1368,7 @@ class LabTest(TimeStampedModel, SearchKey):
                                on_delete=models.SET_NULL)
     is_cancellable = models.BooleanField(default=True)
     insurance_cutoff_price = models.PositiveIntegerField(default=None, null=True, blank=True)
+    search_name = models.ForeignKey(LabtestNameMaster, null=True, blank=True, on_delete=models.SET_NULL)
 
     # test_sub_type = models.ManyToManyField(
     #     LabTestSubType,
