@@ -75,6 +75,7 @@ class CorporateDeal(auth_model.TimeStampedModel):
                                                           content_type=ContentType.objects.get_for_model(CorporateDeal),
                                                           defaults={"synced_at": self.updated_at, "last_updated_at": self.updated_at})
         except Exception as e:
+            print(str(e))
             pass
 
         # obj = DP_CorporateDeals.objects.filter(CorporateDealId=self.id).first()
