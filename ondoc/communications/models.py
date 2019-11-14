@@ -626,15 +626,19 @@ class WHTSAPPNotification:
         self.context = context
 
     @staticmethod
-    def get_multiline_string_from_list(list):
-        multiline_string = list[0] if len(list) == 1 else ''
-        if not multiline_string:
-            list_length = len(list)
+    def get_pipe_separated_string_from_list(list):
+        pipe_separared_string = list[0] if len(list) == 1 else ''
+        if not pipe_separared_string:
+            pipe_separared_string = ' | '.join(list)
+        return pipe_separared_string
+
+    @staticmethod
+    def get_indexed_string_from_list(list):
+        indexed_string = list[0] if len(list) == 1 else ''
+        if not indexed_string:
             for index, list_element in enumerate(list, 1):
-                multiline_string += str(index) + '. ' + list_element
-                if index != list_length:
-                    multiline_string += '\n'
-        return multiline_string
+                indexed_string += str(index) + '. ' + list_element + ' '
+        return indexed_string
 
     def get_template_and_data(self, user):
         notification_type = self.notification_type
@@ -1001,24 +1005,24 @@ class WHTSAPPNotification:
             data.append(datetime.strftime(aware_time_zone(self.context.get('order_date_time')), '%b %d, %Y, %-I:%M %P'))
             data.append(self.context.get('patient_name'))
             data.append(self.context.get('patient_age'))
-            lab_tests_ordered_string = self.get_multiline_string_from_list(self.context.get('lab_tests_ordered'))
+            lab_tests_ordered_string = self.get_pipe_separated_string_from_list(self.context.get('lab_tests_ordered'))
             data.append(lab_tests_ordered_string)
-            report_list_string = self.get_multiline_string_from_list(self.context.get('report_list'))
+            report_list_string = self.get_indexed_string_from_list(self.context.get('report_list'))
             data.append(report_list_string)
 
         elif notification_type == NotificationAction.PARTNER_LAB_REPORT_UPLOADED:
 
             instance = self.context.get('instance')
-            body_template = "cloudlabs_report_generated_patient"
+            body_template = "cloudlabs_report_generated_patient_v1"
             data.append(self.context.get('patient_name'))
             data.append(self.context.get('hospital_name'))
             data.append(self.context.get('patient_name'))
             data.append(self.context.get('patient_age'))
             data.append(self.context.get('order_id'))
             data.append(datetime.strftime(aware_time_zone(self.context.get('order_date_time')), '%b %d, %Y, %-I:%M %P'))
-            lab_tests_ordered_string = self.get_multiline_string_from_list(self.context.get('lab_tests_ordered'))
+            lab_tests_ordered_string = self.get_pipe_separated_string_from_list(self.context.get('lab_tests_ordered'))
             data.append(lab_tests_ordered_string)
-            report_list_string = self.get_multiline_string_from_list(self.context.get('report_list'))
+            report_list_string = self.get_indexed_string_from_list(self.context.get('report_list'))
             data.append(report_list_string)
 
         return body_template, data
