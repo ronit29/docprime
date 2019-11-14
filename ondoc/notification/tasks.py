@@ -1080,13 +1080,14 @@ def push_plus_lead_to_matrix(self, data):
 
         extras = plus_lead_obj.extras
         plan_id = extras.get('plan_id', None)
-        
-        lead_utm_source = extras.get('utm_source')
+        lead_data = extras.get('lead_data', {})
+
+        lead_utm_source = lead_data.get('utm_source')
         if lead_utm_source and PlusPlanUtmSources.objects.filter(source=lead_utm_source, create_lead=False).exists():
             return False
 
         lead_source = "Docprime"
-        lead_data = extras.get('lead_data')
+
         if lead_data:
             provided_lead_source = lead_data.get('lead_source')
             # if provided_lead_source:
