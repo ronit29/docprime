@@ -293,6 +293,7 @@ class OptimusViewSet(viewsets.GenericViewSet):
                                                                       OpdAppointment),
                                                                   defaults={"synced_at": datetime.now(),
                                                                             "last_updated_at": datetime.now()})
+                    print('Opd Appointment print statement')
                 except Exception as e:
                     pass
 
@@ -305,6 +306,7 @@ class OptimusViewSet(viewsets.GenericViewSet):
                                                                       LabAppointment),
                                                                   defaults={"synced_at": datetime.now(),
                                                                             "last_updated_at": datetime.now()})
+                    print('Lab Appointment print statement')
                 except Exception as e:
                     pass
 
@@ -317,6 +319,7 @@ class OptimusViewSet(viewsets.GenericViewSet):
                                                                       MatrixMappedState),
                                                                   defaults={"synced_at": datetime.now(),
                                                                             "last_updated_at": datetime.now()})
+                    print('Matrix State print statement')
                 except Exception as e:
                     pass
 
@@ -329,6 +332,7 @@ class OptimusViewSet(viewsets.GenericViewSet):
                                                                       MatrixMappedCity),
                                                                   defaults={"synced_at": datetime.now(),
                                                                             "last_updated_at": datetime.now()})
+                    print('Matrix City print statement')
                 except Exception as e:
                     pass
 
@@ -341,6 +345,7 @@ class OptimusViewSet(viewsets.GenericViewSet):
                                                                       CorporateDeal),
                                                                   defaults={"synced_at": datetime.now(),
                                                                             "last_updated_at": datetime.now()})
+                    print('corporate deal print statement')
                 except Exception as e:
                     pass
 
