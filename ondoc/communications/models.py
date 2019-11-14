@@ -1013,8 +1013,7 @@ class WHTSAPPNotification:
         elif notification_type == NotificationAction.PARTNER_LAB_REPORT_UPLOADED:
 
             instance = self.context.get('instance')
-            body_template = "cloudlabs_report_generated_patient_v1"
-            data.append(self.context.get('patient_name'))
+            body_template = "cloudlabs_report_generated_v2"
             data.append(self.context.get('hospital_name'))
             data.append(self.context.get('patient_name'))
             data.append(self.context.get('patient_age'))
