@@ -1058,6 +1058,7 @@ def refund_breakup_sms_task(obj_id):
 @task(bind=True, max_retries=2)
 def push_plus_lead_to_matrix(self, data):
     from ondoc.plus.models import PlusLead, PlusPlans
+    from ondoc.plus.models import PlusPlanUtmSources
     try:
         if not data:
             raise Exception('Data not received for banner lead.')
@@ -1079,9 +1080,14 @@ def push_plus_lead_to_matrix(self, data):
 
         extras = plus_lead_obj.extras
         plan_id = extras.get('plan_id', None)
+        lead_data = extras.get('lead_data', {})
+
+        lead_utm_source = lead_data.get('utm_source')
+        if lead_utm_source and PlusPlanUtmSources.objects.filter(source=lead_utm_source, create_lead=False).exists():
+            return False
 
         lead_source = "Docprime"
-        lead_data = extras.get('lead_data')
+
         if lead_data:
             provided_lead_source = lead_data.get('lead_source')
             # if provided_lead_source:
@@ -1097,7 +1103,7 @@ def push_plus_lead_to_matrix(self, data):
             # 'LeadID': plus_lead_obj.matrix_lead_id if plus_lead_obj.matrix_lead_id else 0,
             'LeadID':  0,
             'LeadSource': lead_source,
-            'Name': extras.get('name', 'none'),
+            'Name': extras.get('name', 'none') if extras.get('name', 'none') else "none",
             'BookedBy': phone_number,
             'PrimaryNo': phone_number,
             'PaymentStatus': 0,
