@@ -1012,9 +1012,8 @@ def send_pg_acknowledge(order_id=None, order_no=None, ack_type=''):
                 print("Payment capture acknowledged")
             else:
                 print("Payment acknowledged")
-        json_url = '{"url": "%s"}' % url
-        save_pg_response.apply_async((PgLogs.ACK_TO_PG, order_id, None, json_url, None, None), eta=timezone.localtime(), queue=settings.RABBITMQ_LOGS_QUEUE)
-
+        # json_url = '{"url": "%s"}' % url
+        # save_pg_response.apply_async((PgLogs.ACK_TO_PG, order_id, None, json_url, None, None), eta=timezone.localtime(), queue=settings.RABBITMQ_LOGS_QUEUE)
     except Exception as e:
         logger.error("Error in sending pg acknowledge - " + str(e))
 
