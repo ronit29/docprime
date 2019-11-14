@@ -1103,7 +1103,7 @@ def push_plus_lead_to_matrix(self, data):
             # 'LeadID': plus_lead_obj.matrix_lead_id if plus_lead_obj.matrix_lead_id else 0,
             'LeadID':  0,
             'LeadSource': lead_source,
-            'Name': extras.get('name', 'none'),
+            'Name': extras.get('name', 'none') if extras.get('name', 'none') else "none",
             'BookedBy': phone_number,
             'PrimaryNo': phone_number,
             'PaymentStatus': 0,
