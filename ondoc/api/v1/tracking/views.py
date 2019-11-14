@@ -30,9 +30,10 @@ class EventCreateViewSet(GenericViewSet):
     @transaction.non_atomic_requests
     def create(self, request):
         from ondoc.tracking.models import TrackingSaveLogs
+        resp = {}
         try:
             visitor_id, visit_id = self.get_visit(request)
-            resp = {}
+
             data = request.data
 
             if data and isinstance(data, dict):
