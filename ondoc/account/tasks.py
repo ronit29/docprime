@@ -310,7 +310,7 @@ def refund_curl_task(self, req_data):
             save_pg_response.apply_async(
                 (PgLogsMongo.REFUND_REQUEST_RESPONSE, req_data.get('orderId'), req_data.get('refNo'), response.json(),
                  req_data, req_data.get('user'),),
-                eta=timezone.localtime(), )
+                eta=timezone.localtime(), queue='logs')
             if response.status_code == status.HTTP_200_OK:
                 resp_data = response.json()
                 logger.error("Response content - " + str(response.content) + " with request data - " + json.dumps(req_data))
@@ -410,7 +410,7 @@ def set_order_dummy_transaction(self, order_id, user_id):
                 req_data[key] = str(req_data[key])
 
             response = requests.post(url, data=json.dumps(req_data), headers=headers)
-            save_pg_response.apply_async((PgLogs.DUMMY_TXN, user_insurance.order.id, None, response.json(), req_data, user.id, ), eta=timezone.localtime(), )
+            save_pg_response.apply_async((PgLogs.DUMMY_TXN, user_insurance.order.id, None, response.json(), req_data, user.id, ), eta=timezone.localtime(), queue='logs')
             if response.status_code == status.HTTP_200_OK:
                 resp_data = response.json()
                 if resp_data.get("ok") is not None and resp_data.get("ok") == 1:

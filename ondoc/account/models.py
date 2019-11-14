@@ -1873,7 +1873,7 @@ class ConsumerRefund(TimeStampedModel):
                     response = requests.post(url, data=json.dumps(req_data), headers=headers)
                     save_pg_response.apply_async(
                         (PgLogsMongo.REFUND_REQUEST_RESPONSE, req_data.get('orderId'), req_data.get('refNo'), response.json(), req_data, req_data.get('user'),),
-                        eta=timezone.localtime(), )
+                        eta=timezone.localtime(), queue='logs')
                     if response.status_code == status.HTTP_200_OK:
                         resp_data = response.json()
                         if resp_data.get("ok") is not None and str(resp_data["ok"]) == PgTransaction.PG_REFUND_SUCCESS_OK_STATUS:
@@ -2314,7 +2314,7 @@ class MerchantPayout(TimeStampedModel):
                 req_data[key] = str(req_data[key])
 
             response = requests.post(url, data=json.dumps(req_data), headers=headers)
-            save_pg_response.apply_async((PgLogsMongo.DUMMY_TXN, user_insurance.order.id, None, response.json(), req_data, user.id,), eta=timezone.localtime(), )
+            save_pg_response.apply_async((PgLogsMongo.DUMMY_TXN, user_insurance.order.id, None, response.json(), req_data, user.id,), eta=timezone.localtime(), queue='logs')
             if response.status_code == status.HTTP_200_OK:
                 resp_data = response.json()
                 #logger.error(resp_data)
@@ -2532,7 +2532,7 @@ class MerchantPayout(TimeStampedModel):
 
                 response = requests.post(url, data=json.dumps(req_data), headers=headers)
                 if order_id:
-                    save_pg_response.apply_async((PgLogsMongo.PAYOUT_SETTLEMENT_DETAIL, order_id, None, response.json(), req_data, None), eta=timezone.localtime(),)
+                    save_pg_response.apply_async((PgLogsMongo.PAYOUT_SETTLEMENT_DETAIL, order_id, None, response.json(), req_data, None), eta=timezone.localtime(), queue='logs')
                 if response.status_code == status.HTTP_200_OK:
                     resp_data = response.json()
                     self.status_api_response = resp_data

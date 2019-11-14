@@ -271,7 +271,7 @@ class ChatOrderViewSet(viewsets.GenericViewSet):
             return Response({"status": 0}, status.HTTP_401_UNAUTHORIZED)
 
         save_pg_response.apply_async((PgLogs.CHAT_ORDER_REQUEST, None, None, None, request.data, user.id),
-                                     eta=timezone.localtime(), )
+                                     eta=timezone.localtime(), queue='logs')
 
         details = data.get('details', {})
         plan_id = data.get('plan_id')
@@ -375,7 +375,7 @@ class ChatConsultationViewSet(viewsets.GenericViewSet):
         order_id = order.id if order else None
 
         save_pg_response.apply_async((PgLogs.CHAT_CONSULTATION_CANCEL, order_id, None, None, request.data, user.id),
-                                     eta=timezone.localtime(), )
+                                     eta=timezone.localtime(), queue='logs')
 
         if consultation.status != ChatConsultation.CANCELLED:
             refund_flag = 1
