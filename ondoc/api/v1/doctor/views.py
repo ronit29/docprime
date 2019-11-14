@@ -35,7 +35,7 @@ from ondoc.coupon.models import Coupon, CouponRecommender
 from ondoc.api.v1.diagnostic import serializers as diagnostic_serializer
 from ondoc.account import models as account_models
 from ondoc.location.models import EntityUrls, EntityAddress, DefaultRating
-from ondoc.plus.models import PlusPlans
+from ondoc.plus.models import PlusPlans, TempPlusUser
 from ondoc.procedure.models import Procedure, ProcedureCategory, CommonProcedureCategory, ProcedureToCategoryMapping, \
     get_selected_and_other_procedures, CommonProcedure, CommonIpdProcedure, IpdProcedure, DoctorClinicIpdProcedure, \
     IpdProcedureFeatureMapping, IpdProcedureDetail, SimilarIpdProcedureMapping, IpdProcedureLead, Offer, \
@@ -396,7 +396,10 @@ class DoctorAppointmentsViewSet(OndocViewSet):
         serializer.is_valid(raise_exception=True)
         validated_data = serializer.validated_data
         data = request.data
+        plus_plan = validated_data.get('plus_plan', None)
         plus_user = request.user.active_plus_user
+        if plus_plan and plus_user is None:
+            plus_user = TempPlusUser.objects.create(user=request.user, plan=plus_plan)
         user_insurance = request.user.active_insurance #UserInsurance.get_user_insurance(request.user)
 
         hospital = validated_data.get('hospital')
@@ -453,7 +456,10 @@ class DoctorAppointmentsViewSet(OndocViewSet):
             data['vip_amount'] = plus_user_dict.get('vip_amount_deducted')
             data['amount_to_be_paid'] = plus_user_dict.get('amount_to_be_paid')
             if data['cover_under_vip']:
-                data['payment_type'] = OpdAppointment.VIP
+                if plus_plan.is_gold:
+                    data['payment_type'] = OpdAppointment.GOLD
+                else:
+                    data['payment_type'] = OpdAppointment.VIP
 
         else:
             data['is_appointment_insured'], data['insurance_id'], data[
@@ -478,20 +484,21 @@ class DoctorAppointmentsViewSet(OndocViewSet):
         if responsible_user:
             data['_responsible_user'] = responsible_user
 
-        if validated_data.get("existing_cart_item"):
-            cart_item = validated_data.get("existing_cart_item")
-            old_cart_obj = Cart.objects.filter(id=validated_data.get('existing_cart_item').id).first()
-            payment_type = old_cart_obj.data.get('payment_type')
-            if payment_type == OpdAppointment.INSURANCE and data['is_appointment_insured'] == False:
-                data['payment_type'] = OpdAppointment.PREPAID
-            if payment_type == OpdAppointment.VIP and data['cover_under_vip'] == False:
-                data['payment_type'] = OpdAppointment.PREPAID
-            # cart_item.data = request.data
-            cart_item.data = data
-            cart_item.save()
-        else:
-            cart_item, is_new = Cart.objects.update_or_create(id=cart_item_id, deleted_at__isnull=True, product_id=account_models.Order.DOCTOR_PRODUCT_ID,
-                                                  user=request.user, defaults={"data": data})
+        if not plus_plan:
+            if validated_data.get("existing_cart_item"):
+                cart_item = validated_data.get("existing_cart_item")
+                old_cart_obj = Cart.objects.filter(id=validated_data.get('existing_cart_item').id).first()
+                payment_type = old_cart_obj.data.get('payment_type')
+                if payment_type == OpdAppointment.INSURANCE and data['is_appointment_insured'] == False:
+                    data['payment_type'] = OpdAppointment.PREPAID
+                if payment_type == OpdAppointment.VIP and data['cover_under_vip'] == False:
+                    data['payment_type'] = OpdAppointment.PREPAID
+                # cart_item.data = request.data
+                cart_item.data = data
+                cart_item.save()
+            else:
+                cart_item, is_new = Cart.objects.update_or_create(id=cart_item_id, deleted_at__isnull=True, product_id=account_models.Order.DOCTOR_PRODUCT_ID,
+                                                      user=request.user, defaults={"data": data})
 
         resp = None
         is_agent = False
@@ -502,8 +509,11 @@ class DoctorAppointmentsViewSet(OndocViewSet):
                     is_agent = True
                 else:
                     resp = {'is_agent': True, "status": 1}
-        if not resp:
+        if not resp and not plus_plan:
             resp = account_models.Order.create_order(request, [cart_item], validated_data.get("use_wallet"))
+
+        if not resp and plus_plan:
+            resp = account_models.Order.create_new_order(request, validated_data, False)
 
         if is_agent:
             resp['is_agent'] = True

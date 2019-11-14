@@ -346,6 +346,12 @@ class User(AbstractBaseUser, PermissionsMixin):
         return active_plus_user if active_plus_user and active_plus_user.is_valid() else None
 
     @cached_property
+    def get_temp_plus_user(self):
+        from ondoc.plus.models import TempPlusUser
+        temp_plus_user = TempPlusUser.objects.filter(user=self.user, deleted=0).first()
+        return temp_plus_user if temp_plus_user else None
+
+    @cached_property
     def inactive_plus_user(self):
         from ondoc.plus.models import PlusUser
         inactive_plus_user = PlusUser.objects.filter(status=PlusUser.INACTIVE, user_id=self.id).order_by('-id').first()

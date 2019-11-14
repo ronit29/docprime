@@ -793,6 +793,148 @@ class Order(TimeStampedModel):
 
         return resp
 
+    @classmethod
+    @transaction.atomic()
+    def create_new_order(cls, request, valid_data, use_wallet=False):
+        from ondoc.doctor.models import OpdAppointment
+        from ondoc.matrix.tasks import push_order_to_matrix, push_order_to_spo
+
+        fulfillment_data = cls.transfrom_cart_items(request, valid_data)
+        user = request.user
+        resp = {}
+        balance = 0
+        cashback_balance = 0
+
+        if use_wallet:
+            consumer_account = ConsumerAccount.objects.get_or_create(user=user)
+            consumer_account = ConsumerAccount.objects.select_for_update().get(user=user)
+            balance = consumer_account.balance
+            cashback_balance = consumer_account.cashback
+
+        total_balance = balance + cashback_balance
+        payable_amount = cls.get_total_payable_amount(fulfillment_data)
+
+        # utility to fetch and save visitor info for an parent order
+        visitor_info = None
+        try:
+            from ondoc.api.v1.tracking.views import EventCreateViewSet
+            with transaction.atomic():
+                event_api = EventCreateViewSet()
+                visitor_id, visit_id = event_api.get_visit(request)
+                visitor_info = {"visitor_id": visitor_id, "visit_id": visit_id,
+                                "from_app": request.data.get("from_app", None),
+                                "app_version": request.data.get("app_version", None)}
+        except Exception as e:
+            logger.info("Could not fetch visitor info - " + str(e))
+
+        # create a Parent order to accumulate sub-orders
+        process_immediately = False
+        if total_balance >= payable_amount:
+            cashback_amount = min(cashback_balance, payable_amount)
+            wallet_amount = max(0, payable_amount - cashback_amount)
+            pg_order = cls.objects.create(
+                amount=0,
+                wallet_amount=wallet_amount,
+                cashback_amount=cashback_amount,
+                payment_status=cls.PAYMENT_PENDING,
+                user=user,
+                product_id=1,  # remove later
+                visitor_info=visitor_info
+            )
+            process_immediately = True
+        else:
+            amount_from_pg = max(0, payable_amount - total_balance)
+            required_amount = payable_amount
+            cashback_amount = min(required_amount, cashback_balance)
+            wallet_amount = 0
+            if cashback_amount < required_amount:
+                wallet_amount = min(balance, required_amount - cashback_amount)
+
+            pg_order = cls.objects.create(
+                amount=amount_from_pg,
+                wallet_amount=wallet_amount,
+                cashback_amount=cashback_amount,
+                payment_status=cls.PAYMENT_PENDING,
+                user=user,
+                product_id=1,  # remove later
+                visitor_info=visitor_info
+            )
+            push_order_to_matrix.apply_async(
+                ({'order_id': pg_order.id},),
+                eta=timezone.now() + timezone.timedelta(minutes=settings.LEAD_VALIDITY_BUFFER_TIME))
+        # building separate orders for all fulfillments
+        fulfillment_data = copy.deepcopy(fulfillment_data)
+        order_list = []
+        for appointment_detail in fulfillment_data:
+
+            product_id = Order.DOCTOR_PRODUCT_ID if appointment_detail.get('doctor') else Order.LAB_PRODUCT_ID
+            action = None
+            if product_id == cls.DOCTOR_PRODUCT_ID:
+                appointment_detail = opdappointment_transform(appointment_detail)
+                action = cls.OPD_APPOINTMENT_CREATE
+            elif product_id == cls.LAB_PRODUCT_ID:
+                appointment_detail = labappointment_transform(appointment_detail)
+                action = cls.LAB_APPOINTMENT_CREATE
+
+            if appointment_detail.get('payment_type') == OpdAppointment.PREPAID:
+                order = cls.objects.create(
+                    product_id=product_id,
+                    action=action,
+                    action_data=appointment_detail,
+                    payment_status=cls.PAYMENT_PENDING,
+                    parent=pg_order,
+                    cart_id=appointment_detail["cart_item_id"],
+                    user=user
+                )
+            elif appointment_detail.get('payment_type') in [OpdAppointment.INSURANCE, OpdAppointment.VIP]:
+                order = cls.objects.create(
+                    product_id=product_id,
+                    action=action,
+                    action_data=appointment_detail,
+                    payment_status=cls.PAYMENT_PENDING,
+                    parent=pg_order,
+                    cart_id=appointment_detail["cart_item_id"],
+                    user=user
+                )
+            elif appointment_detail.get('payment_type') == OpdAppointment.COD or appointment_detail.get(
+                    'payment_type') == OpdAppointment.PLAN:
+                order = cls.objects.create(
+                    product_id=product_id,
+                    action=action,
+                    action_data=appointment_detail,
+                    payment_status=cls.PAYMENT_PENDING,
+                    parent=pg_order,
+                    cart_id=appointment_detail["cart_item_id"],
+                    user=user
+                )
+
+            order_list.append(order)
+            if order.action_data.get('spo_data', None):
+                try:
+                    push_order_to_spo.apply_async(({'order_id': order.id},), countdown=5)
+                except Exception as e:
+                    logger.log("Could not push order to spo - " + str(e))
+
+        if process_immediately:
+            appointment_ids = pg_order.process_pg_order()
+
+            resp["status"] = 1
+            resp["payment_required"] = False
+            resp["data"] = {
+                "orderId": pg_order.id,
+                "type": appointment_ids.get("type", "all"),
+                "id": appointment_ids.get("id", None)
+            }
+            resp["appointments"] = appointment_ids
+
+        else:
+            resp["status"] = 1
+            resp['data'], resp["payment_required"] = payment_details(request, pg_order)
+
+        # raise Exception("ROLLBACK FOR TESTING")
+
+        return resp
+
     @transaction.atomic()
     def process_pg_order(self, convert_cod_to_prepaid=False):
         from ondoc.doctor.models import OpdAppointment

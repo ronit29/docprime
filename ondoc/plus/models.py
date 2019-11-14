@@ -511,11 +511,14 @@ class PlusUser(auth_model.TimeStampedModel, RefundMixin, TransactionMixin):
         profile = appointment_data.get('profile', None)
         user = profile.user
         plus_user = user.active_plus_user
+        if not plus_user and appointment_data.get('plus_plan', None):
+            plus_user = user.get_temp_plus_user
         if not plus_user:
             return response_dict
-        plus_members = plus_user.plus_members.filter(profile=profile)
-        if not plus_members.exists():
-            return response_dict
+        if not appointment_data.get('plus_plan', None):
+            plus_members = plus_user.plus_members.filter(profile=profile)
+            if not plus_members.exists():
+                return response_dict
 
         response_dict['is_vip_member'] = True
 
@@ -1243,3 +1246,12 @@ class PlusDummyData(auth_model.TimeStampedModel):
     class Meta:
         db_table = 'plus_dummy_data'
 
+
+class TempPlusUser(auth_model.TimeStampedModel):
+    user = models.ForeignKey(User, related_name='temp_plus_user', on_delete=models.DO_NOTHING)
+    plan = models.ForeignKey(PlusPlans, related_name='temp_plus_plan', on_delete=models.DO_NOTHING)
+    raw_plus_member = JSONField(blank=True, null=True, default=list)
+    deleted = models.BooleanField(default=0)
+
+    class Meta:
+        db_table = 'temp_plus_user'
