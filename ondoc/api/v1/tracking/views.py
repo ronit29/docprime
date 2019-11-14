@@ -99,14 +99,14 @@ class EventCreateViewSet(GenericViewSet):
                 if settings.MONGO_STORE:
                     self.modify_visit(event_name, visit_id, visitor_id, data, userAgent, track_mongo_models.TrackingVisit, track_mongo_models.TrackingVisitor)
 
-            if "error" in resp:
-                return Response(status=status.HTTP_400_BAD_REQUEST, data=resp)
-            else:
-                return Response(status=status.HTTP_200_OK, data=resp)
-
         except Exception as e:
-            logger.info("Error saving event - " + str(e))
+            # logger.info("Error saving event - " + str(e))
             resp['error'] = "Error Processing Event Data!"
+
+        if "error" in resp:
+            return Response(status=status.HTTP_400_BAD_REQUEST, data=resp)
+        else:
+            return Response(status=status.HTTP_200_OK, data=resp)
 
 
     @transaction.non_atomic_requests
