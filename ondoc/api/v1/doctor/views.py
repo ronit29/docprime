@@ -407,7 +407,10 @@ class DoctorAppointmentsViewSet(OndocViewSet):
 
         doctor_clinic = DoctorClinic.objects.filter(doctor=doctor, hospital=hospital).first()
         profile = validated_data.get('profile')
-        payment_type = validated_data.get('payment_type')
+        if not plus_user:
+            payment_type = validated_data.get('payment_type')
+        else:
+            payment_type = OpdAppointment.GOLD
         if user_insurance:
             if user_insurance.status == UserInsurance.ONHOLD:
                 return Response(status=status.HTTP_400_BAD_REQUEST, data={"error": 'Your documents from the last claim '

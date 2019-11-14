@@ -3499,7 +3499,7 @@ class OpdAppointment(auth_model.TimeStampedModel, CouponsMixin, OpdAppointmentIn
             if data.get("payment_type") == cls.INSURANCE:
                 effective_price = doctor_clinic_timing.deal_price
                 coupon_discount, coupon_cashback, coupon_list, random_coupon_list = 0, 0, [], []
-            elif data.get("payment_type") == cls.VIP:
+            elif data.get("payment_type") == cls.VIP or data.get('payment_type') == cls.GOLD:
                 profile = data.get('profile', None)
                 if not profile:
                     effective_price = doctor_clinic_timing.deal_price
