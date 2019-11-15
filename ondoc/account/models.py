@@ -632,10 +632,13 @@ class Order(TimeStampedModel):
     def get_total_payable_amount(cls, fulfillment_data):
         from ondoc.doctor.models import OpdAppointment
         from ondoc.plus.models import PlusUser
+        from ondoc.plus.models import TempPlusUser
         payable_amount = 0
         for app in fulfillment_data:
-            if app.get('payment_type') == OpdAppointment.VIP:
+            if app.get('payment_type') == OpdAppointment.VIP or app.get('payment_type') == OpdAppointment.GOLD:
                 plus_user = PlusUser.objects.filter(id=app.get('plus_plan')).first()
+                if not plus_user:
+                    plus_user = TempPlusUser.objects.filter(id=app.get('plus_plan'), deleted=0).first()
                 if not plus_user:
                     payable_amount += app.get('effective_price')
                     return payable_amount
@@ -794,12 +797,29 @@ class Order(TimeStampedModel):
         return resp
 
     @classmethod
+    def transform_single_booking_items(cls, request, items):
+        from ondoc.doctor.models import OpdAppointment
+        from ondoc.diagnostic.models import LabAppointment
+        fulfillment_data = []
+        for item in items:
+            # validated_data = item.validate(request)
+            if 'doctor' in item:
+                price_data = OpdAppointment.get_price_details(item)
+                fd = OpdAppointment.create_fulfillment_data(request.user, item, price_data)
+            else:
+                price_data = LabAppointment.get_price_details(item)
+                fd = LabAppointment.create_fulfillment_data(request.user, item, price_data, request)
+            # fd["cart_item_id"] = item.id
+            fulfillment_data.append(fd)
+        return fulfillment_data
+
+    @classmethod
     @transaction.atomic()
     def create_new_order(cls, request, valid_data, use_wallet=False):
         from ondoc.doctor.models import OpdAppointment
         from ondoc.matrix.tasks import push_order_to_matrix, push_order_to_spo
 
-        fulfillment_data = cls.transfrom_cart_items(request, valid_data)
+        fulfillment_data = cls.transform_single_booking_items(request, [valid_data])
         user = request.user
         resp = {}
         balance = 0
@@ -843,13 +863,17 @@ class Order(TimeStampedModel):
             )
             process_immediately = True
         else:
-            amount_from_pg = max(0, payable_amount - total_balance)
-            required_amount = payable_amount
-            cashback_amount = min(required_amount, cashback_balance)
-            wallet_amount = 0
-            if cashback_amount < required_amount:
-                wallet_amount = min(balance, required_amount - cashback_amount)
-
+            if not valid_data.get('plus_plan'):
+                amount_from_pg = max(0, payable_amount - total_balance)
+                required_amount = payable_amount
+                cashback_amount = min(required_amount, cashback_balance)
+                wallet_amount = 0
+                if cashback_amount < required_amount:
+                    wallet_amount = min(balance, required_amount - cashback_amount)
+            else:
+                amount_from_pg = payable_amount
+                cashback_amount = 0
+                wallet_amount = 0
             pg_order = cls.objects.create(
                 amount=amount_from_pg,
                 wallet_amount=wallet_amount,
@@ -886,14 +910,14 @@ class Order(TimeStampedModel):
                     cart_id=appointment_detail["cart_item_id"],
                     user=user
                 )
-            elif appointment_detail.get('payment_type') in [OpdAppointment.INSURANCE, OpdAppointment.VIP]:
+            elif appointment_detail.get('payment_type') in [OpdAppointment.INSURANCE, OpdAppointment.VIP, OpdAppointment.GOLD]:
                 order = cls.objects.create(
                     product_id=product_id,
                     action=action,
                     action_data=appointment_detail,
                     payment_status=cls.PAYMENT_PENDING,
                     parent=pg_order,
-                    cart_id=appointment_detail["cart_item_id"],
+                    cart_id=appointment_detail.get('cart_item_id', None),
                     user=user
                 )
             elif appointment_detail.get('payment_type') == OpdAppointment.COD or appointment_detail.get(

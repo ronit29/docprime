@@ -3505,6 +3505,8 @@ class OpdAppointment(auth_model.TimeStampedModel, CouponsMixin, OpdAppointmentIn
                     effective_price = doctor_clinic_timing.deal_price
                 else:
                     plus_user = profile.get_plus_membership
+                    if not plus_user:
+                        plus_user = profile.get_temp_plus_membership
                     if plus_user:
                         price_data = {"mrp": doctor_clinic_timing.mrp, "cod_deal_price": doctor_clinic_timing.cod_deal_price,
                                       "deal_price": doctor_clinic_timing.deal_price,  "fees": doctor_clinic_timing.fees}
@@ -3636,23 +3638,24 @@ class OpdAppointment(auth_model.TimeStampedModel, CouponsMixin, OpdAppointmentIn
         vip_amount = 0
         convenience_amount = 0
         plus_user = user.active_plus_user
+        if not plus_user and data.get('plus_plan'):
+            plus_user = user.get_temp_plus_user
         mrp = price_data.get("mrp")
         if plus_user:
             plus_user_resp = plus_user.validate_plus_appointment(data)
             cover_under_vip = plus_user_resp.get('cover_under_vip', False)
-            # utilization = plus_user.get_utilization
-            # doctor_available_amount = int(utilization.get('doctor_amount_available', 0))
-            # vip_amount = mrp if doctor_available_amount >= mrp else doctor_available_amount
-            # vip_amount = plus_user.get_vip_amount(utilization, mrp)
             vip_amount = plus_user_resp.get('vip_amount_deducted', None)
 
-        if cover_under_vip and cart_data.get('cover_under_vip', None) and vip_amount > 0:
-            # effective_price = 0 if doctor_available_amount >= mrp else (mrp - doctor_available_amount)
-            # effective_price = cart_data.get('vip_amount')
-            convenience_amount = plus_user.plan.get_convenience_charge(cart_data.get('amount_to_be_paid'), "DOCTOR")
-            effective_price = cart_data.get('amount_to_be_paid') + convenience_amount
-            # vip_amount = vip_amount + convenience_amount
-            payment_type = OpdAppointment.VIP
+        # if cover_under_vip and cart_data.get('cover_under_vip', None) and vip_amount > 0:
+        if cover_under_vip and vip_amount > 0:
+            # convenience_amount = plus_user.plan.get_convenience_charge(cart_data.get('amount_to_be_paid'), "DOCTOR")
+            # effective_price = cart_data.get('amount_to_be_paid') + convenience_amount
+            convenience_amount = plus_user.plan.get_convenience_charge(plus_user_resp.get('amount_to_be_paid'), "DOCTOR")
+            effective_price = plus_user_resp.get('amount_to_be_paid') + convenience_amount
+            if plus_user.plan.is_gold:
+                payment_type = OpdAppointment.GOLD
+            else:
+                payment_type = OpdAppointment.VIP
             plus_user_id = plus_user_resp.get('plus_user_id', None)
         else:
             plus_user_id = None

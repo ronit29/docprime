@@ -396,10 +396,11 @@ class DoctorAppointmentsViewSet(OndocViewSet):
         serializer.is_valid(raise_exception=True)
         validated_data = serializer.validated_data
         data = request.data
+        profile = validated_data.get('profile')
         plus_plan = validated_data.get('plus_plan', None)
         plus_user = request.user.active_plus_user
         if plus_plan and plus_user is None:
-            plus_user = TempPlusUser.objects.create(user=request.user, plan=plus_plan)
+            plus_user = TempPlusUser.objects.create(user=request.user, plan=plus_plan, profile=profile)
         user_insurance = request.user.active_insurance #UserInsurance.get_user_insurance(request.user)
 
         hospital = validated_data.get('hospital')
@@ -410,7 +411,8 @@ class DoctorAppointmentsViewSet(OndocViewSet):
         if not plus_user:
             payment_type = validated_data.get('payment_type')
         else:
-            payment_type = OpdAppointment.GOLD
+            payment_type = OpdAppointment.GOLD if plus_user.plan.is_gold else OpdAppointment.VIP
+            validated_data['payment_type'] = payment_type
         if user_insurance:
             if user_insurance.status == UserInsurance.ONHOLD:
                 return Response(status=status.HTTP_400_BAD_REQUEST, data={"error": 'Your documents from the last claim '
@@ -459,7 +461,7 @@ class DoctorAppointmentsViewSet(OndocViewSet):
             data['vip_amount'] = plus_user_dict.get('vip_amount_deducted')
             data['amount_to_be_paid'] = plus_user_dict.get('amount_to_be_paid')
             if data['cover_under_vip']:
-                if plus_plan.is_gold:
+                if plus_user.plan.is_gold:
                     data['payment_type'] = OpdAppointment.GOLD
                 else:
                     data['payment_type'] = OpdAppointment.VIP

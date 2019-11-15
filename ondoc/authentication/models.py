@@ -348,7 +348,7 @@ class User(AbstractBaseUser, PermissionsMixin):
     @cached_property
     def get_temp_plus_user(self):
         from ondoc.plus.models import TempPlusUser
-        temp_plus_user = TempPlusUser.objects.filter(user=self.user, deleted=0).first()
+        temp_plus_user = TempPlusUser.objects.filter(user_id=self.id, deleted=0).first()
         return temp_plus_user if temp_plus_user else None
 
     @cached_property
@@ -665,6 +665,12 @@ class UserProfile(TimeStampedModel):
             return plus_member.plus_user if plus_member.plus_user.is_valid() else None
 
         return None
+
+    @cached_property
+    def get_temp_plus_membership(self):
+        from ondoc.plus.models import TempPlusUser
+        plus_user = TempPlusUser.objects.filter(profile=self, deleted=0).first()
+        return plus_user
 
     def has_image_changed(self):
         if not self.pk:

@@ -1251,7 +1251,170 @@ class TempPlusUser(auth_model.TimeStampedModel):
     user = models.ForeignKey(User, related_name='temp_plus_user', on_delete=models.DO_NOTHING)
     plan = models.ForeignKey(PlusPlans, related_name='temp_plus_plan', on_delete=models.DO_NOTHING)
     raw_plus_member = JSONField(blank=True, null=True, default=list)
+    profile = models.ForeignKey(UserProfile, related_name='temp_plus_user_profile', on_delete=models.DO_NOTHING)
     deleted = models.BooleanField(default=0)
 
     class Meta:
         db_table = 'temp_plus_user'
+
+    def validate_plus_appointment(self, appointment_data, *args, **kwargs):
+        from ondoc.doctor.models import OpdAppointment
+        from ondoc.diagnostic.models import LabAppointment
+        OPD = "OPD"
+        LAB = "LAB"
+        appointment_type = OPD if "doctor" in appointment_data else LAB
+        price_data = OpdAppointment.get_price_details(appointment_data) if appointment_type == OPD else LabAppointment.get_price_details(appointment_data)
+        mrp = int(price_data.get('mrp'))
+        response_dict = {
+            "is_vip_member": False,
+            "plus_user_id": None,
+            "cover_under_vip": "",
+            "vip_amount_deducted": 0,
+            "amount_to_be_paid": mrp
+        }
+
+        if appointment_data.get('payment_type') == OpdAppointment.COD:
+            return response_dict
+        profile = appointment_data.get('profile', None)
+        user = profile.user
+        plus_user = user.active_plus_user
+        if not plus_user and appointment_data.get('plus_plan', None):
+            plus_user = user.get_temp_plus_user
+        if not plus_user:
+            return response_dict
+        if not appointment_data.get('plus_plan', None):
+            plus_members = plus_user.plus_members.filter(profile=profile)
+            if not plus_members.exists():
+                return response_dict
+
+        response_dict['is_vip_member'] = True
+
+        if appointment_type == OPD:
+            deal_price = price_data.get('deal_price', 0)
+            fees = price_data.get('fees', 0)
+            cod_deal_price = price_data.get('consultation').get('cod_deal_price', 0) if (price_data.get('consultation') and price_data.get('consultation').get('cod_deal_price')) else 0
+            # price_data = {"mrp": int(price_data.get('mrp')), "deal_price": int(deal_price),
+            #               "cod_deal_price": int(cod_deal_price),
+            #               "fees": int(fees)}
+            price_engine = get_price_reference(plus_user, "DOCTOR")
+            if not price_engine:
+                price = int(price_data.get('mrp'))
+            else:
+                price = price_engine.get_price(price_data)
+            engine = get_class_reference(plus_user, "DOCTOR")
+            response_dict['vip_gold_price'] = fees
+            if not engine:
+                return response_dict
+
+            doctor = appointment_data['doctor']
+            hospital = appointment_data['hospital']
+            if doctor.enabled_for_online_booking and hospital.enabled_for_online_booking and \
+                                        hospital.enabled_for_prepaid and hospital.is_enabled_for_plus_plans() and \
+                                        doctor.enabled_for_plus_plans:
+
+                # engine_response = engine.validate_booking_entity(cost=mrp, utilization=kwargs.get('utilization'))
+                engine_response = engine.validate_booking_entity(cost=price, utilization=kwargs.get('utilization'), mrp=mrp, deal_price=deal_price)
+                response_dict['cover_under_vip'] = engine_response.get('is_covered', False)
+                response_dict['plus_user_id'] = plus_user.id
+                response_dict['vip_amount_deducted'] = engine_response.get('vip_amount_deducted', 0)
+                response_dict['amount_to_be_paid'] = engine_response.get('amount_to_be_paid', mrp)
+
+                # Only for cart items.
+                if kwargs.get('utilization') and response_dict['cover_under_vip'] and response_dict['vip_amount_deducted']:
+                    engine.update_utilization(kwargs.get('utilization'), response_dict['vip_amount_deducted'])
+
+        elif appointment_type == LAB:
+            lab = appointment_data['lab']
+            if lab and lab.is_enabled_for_plus_plans():
+                mrp = int(price_data.get('mrp'))
+                # final_price = mrp + price_data['home_pickup_charges']
+
+                # price_data = {"mrp": int(price_data.get('mrp')), "deal_price": int(price_data.get('deal_price')),
+                #               "cod_deal_price": int(price_data.get('deal_price')),
+                #               "fees": int(price_data.get('fees'))}
+                price_engine = get_price_reference(plus_user, "LABTEST")
+                if not price_engine:
+                    price = int(price_data.get('mrp'))
+                else:
+                    price = price_engine.get_price(price_data)
+                final_price = price + price_data['home_pickup_charges']
+                entity = "PACKAGE" if appointment_data['test_ids'][0].is_package else "LABTEST"
+                engine = get_class_reference(plus_user, entity)
+                response_dict['vip_gold_price'] = int(price_data.get('fees'))
+                if appointment_data['test_ids']:
+                    # engine_response = engine.validate_booking_entity(cost=final_price, id=appointment_data['test_ids'][0].id, utilization=kwargs.get('utilization'))
+                    engine_response = engine.validate_booking_entity(cost=final_price, id=appointment_data['test_ids'][0].id, utilization=kwargs.get('utilization'), mrp=mrp, deal_price=int(price_data.get('deal_price')))
+
+                    if not engine_response:
+                        return response_dict
+                    response_dict['cover_under_vip'] = engine_response.get('is_covered', False)
+                    response_dict['plus_user_id'] = plus_user.id
+                    response_dict['vip_amount_deducted'] = engine_response.get('vip_amount_deducted', 0)
+                    response_dict['amount_to_be_paid'] = engine_response.get('amount_to_be_paid', final_price)
+
+                    # Only for cart items.
+                    if kwargs.get('utilization') and response_dict['cover_under_vip'] and response_dict['vip_amount_deducted']:
+                        engine.update_utilization(kwargs.get('utilization'), response_dict['vip_amount_deducted'])
+
+        return response_dict
+
+    @cached_property
+    def get_utilization(self):
+        plan = self.plan
+        resp = {}
+        data = {}
+        plan_parameters = plan.plan_parameters.filter(parameter__key__in=[PlanParametersEnum.DOCTOR_CONSULT_AMOUNT,
+                                                                          PlanParametersEnum.ONLINE_CHAT_AMOUNT,
+                                                                          PlanParametersEnum.HEALTH_CHECKUPS_AMOUNT,
+                                                                          PlanParametersEnum.HEALTH_CHECKUPS_COUNT,
+                                                                          PlanParametersEnum.MEMBERS_COVERED_IN_PACKAGE,
+                                                                          PlanParametersEnum.PACKAGE_IDS,
+                                                                          PlanParametersEnum.PACKAGE_DISCOUNT,
+                                                                          PlanParametersEnum.TOTAL_TEST_COVERED_IN_PACKAGE,
+                                                                          PlanParametersEnum.LAB_DISCOUNT,
+                                                                          PlanParametersEnum.LABTEST_AMOUNT,
+                                                                          PlanParametersEnum.LABTEST_COUNT,
+                                                                          PlanParametersEnum.DOCTOR_CONSULT_DISCOUNT,
+                                                                          PlanParametersEnum.DOCTOR_CONSULT_COUNT])
+
+        for pp in plan_parameters:
+            data[pp.parameter.key.lower()] = pp.value
+
+        resp['allowed_package_ids'] = list(map(lambda x: int(x), data.get('package_ids', '').split(','))) if data.get(
+            'package_ids') else []
+        resp['doctor_consult_amount'] = int(data['doctor_consult_amount']) if data.get(
+            'doctor_consult_amount') and data.get('doctor_consult_amount').__class__.__name__ == 'str' else 0
+        resp['doctor_amount_utilized'] = 0
+        resp['doctor_discount'] = int(data['doctor_consult_discount']) if data.get(
+            'doctor_consult_discount') and data.get('doctor_consult_discount').__class__.__name__ == 'str' else 0
+        resp['lab_discount'] = int(data['lab_discount']) if data.get('lab_discount') and data.get(
+            'lab_discount').__class__.__name__ == 'str' else 0
+        resp['package_discount'] = int(data['package_discount']) if data.get('package_discount') and data.get(
+            'package_discount').__class__.__name__ == 'str' else 0
+        resp['doctor_amount_available'] = resp['doctor_consult_amount']
+        resp['members_count_online_consultation'] = data['members_covered_in_package'] if data.get(
+            'members_covered_in_package') and data.get('members_covered_in_package').__class__.__name__ == 'str'  else 0
+        resp['total_package_amount_limit'] = int(data['health_checkups_amount']) if data.get(
+            'health_checkups_amount') and data.get('health_checkups_amount').__class__.__name__ == 'str'  else 0
+        resp['online_chat_amount'] = int(data['online_chat_amount']) if data.get('online_chat_amount') and data.get(
+            'online_chat_amount').__class__.__name__ == 'str'  else 0
+        resp['total_package_count_limit'] = int(data['health_checkups_count']) if data.get(
+            'health_checkups_count') and data.get('health_checkups_count').__class__.__name__ == 'str'  else 0
+
+        resp['available_package_amount'] = resp['total_package_amount_limit']
+        resp['available_package_count'] = resp['total_package_count_limit']
+
+        resp['total_labtest_amount_limit'] = int(data['labtest_amount']) if data.get('labtest_amount') and data.get(
+            'labtest_amount').__class__.__name__ == 'str'  else 0
+        resp['total_labtest_count_limit'] = int(data['labtest_count']) if data.get('labtest_count') and data.get(
+            'labtest_count').__class__.__name__ == 'str'  else 0
+
+        resp['available_labtest_amount'] = resp['total_labtest_amount_limit']
+        resp['available_labtest_count'] = resp['total_labtest_count_limit']
+        resp['total_doctor_count_limit'] = int(data['doctor_consult_count']) if data.get(
+            'doctor_consult_count') and data.get('doctor_consult_discount').__class__.__name__ == 'str' else 0
+        resp['available_doctor_count'] = resp['total_doctor_count_limit']
+
+        # resp['availabe_labtest_discount_count'] = resp['total_labtest_count_limit']
+
+        return resp
