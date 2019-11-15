@@ -4779,13 +4779,13 @@ class HospitalViewSet(viewsets.GenericViewSet):
                                                               'hospital_doctors').exclude(location__dwithin=(
             Point(float(long),
                   float(lat)),
-            D(m=min_distance))).annotate(locality_len=Length('locality')).filter(
+            D(m=min_distance))).filter(
             is_live=True,
             hospital_doctors__enabled=True,
             location__dwithin=(
                 Point(float(long),
                       float(lat)),
-                D(m=max_distance)), locality_len__lt=13).annotate(
+                D(m=max_distance))).annotate(
             distance=Distance('location', pnt), bookable_doctors_count=Count(Q(enabled_for_online_booking=True,
                                            hospital_doctors__enabled_for_online_booking=True,
                                            hospital_doctors__doctor__enabled_for_online_booking=True,
