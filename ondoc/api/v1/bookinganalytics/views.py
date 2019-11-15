@@ -228,28 +228,28 @@ class OptimusViewSet(viewsets.GenericViewSet):
         data['lab_appointment'] = list()
         data['corporate_deals'] = list()
 
-        cities = MatrixMappedCity.objects.filter(synced_analytics__isnull=True)[0:1000]
+        cities = MatrixMappedCity.objects.filter(synced_analytics__isnull=True)[0:500]
         for city in cities:
             analytics_data = city.get_booking_analytics_data()
             data['matrix_mapped_city'].append(analytics_data)
 
-        states = MatrixMappedState.objects.filter(synced_analytics__isnull=True)[0:1000]
+        states = MatrixMappedState.objects.filter(synced_analytics__isnull=True)[0:500]
         for state in states:
             analytics_data = state.get_booking_analytics_data()
             data['matrix_mapped_state'].append(analytics_data)
 
-        opd_apps = OpdAppointment.objects.filter(synced_analytics__isnull=True)[0:1000]
+        opd_apps = OpdAppointment.objects.filter(synced_analytics__isnull=True)[0:500]
         for app in opd_apps:
             analytics_data = app.get_booking_analytics_data()
             data['opd_appointment'].append(analytics_data)
 
-        lab_apps = LabAppointment.objects.filter(synced_analytics__isnull=True)[0:1000]
+        lab_apps = LabAppointment.objects.filter(synced_analytics__isnull=True)[0:500]
         for app in lab_apps:
             analytics_data = app.get_booking_analytics_data()
             data['lab_appointment'].append(analytics_data)
             # print('lab-id : {} has been synced'.format(app.id))
 
-        corp_deals = CorporateDeal.objects.filter(synced_analytics__isnull=True)[0:1000]
+        corp_deals = CorporateDeal.objects.filter(synced_analytics__isnull=True)[0:500]
         for deal in corp_deals:
             analytics_data = deal.get_booking_analytics_data()
             data['corporate_deals'].append(analytics_data)
