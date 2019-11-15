@@ -678,11 +678,13 @@ class Order(TimeStampedModel):
         # utility to fetch and save visitor info for an parent order
         visitor_info = None
         try:
-            from ondoc.api.v1.tracking.views import EventCreateViewSet
-            with transaction.atomic():
-                event_api = EventCreateViewSet()
-                visitor_id, visit_id = event_api.get_visit(request)
-                visitor_info = { "visitor_id": visitor_id, "visit_id": visit_id, "from_app": request.data.get("from_app", None), "app_version": request.data.get("app_version", None)}
+            # from ondoc.api.v1.tracking.views import EventCreateViewSet
+            # with transaction.atomic():
+            #     event_api = EventCreateViewSet()
+            #     #visitor_id, visit_id = event_api.get_visit(request)
+            #     #visitor_info = { "visitor_id": visitor_id, "visit_id": visit_id, "from_app": request.data.get("from_app", None), "app_version": request.data.get("app_version", None)}
+            visitor_info = {"from_app": request.data.get("from_app", None),
+                            "app_version": request.data.get("app_version", None)}
         except Exception as e:
             logger.info("Could not fetch visitor info - " + str(e))
 
