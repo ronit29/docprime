@@ -30,79 +30,85 @@ class EventCreateViewSet(GenericViewSet):
     @transaction.non_atomic_requests
     def create(self, request):
         from ondoc.tracking.models import TrackingSaveLogs
-
-        visitor_id, visit_id = self.get_visit(request)
         resp = {}
-        data = request.data
+        try:
+            visitor_id, visit_id = self.get_visit(request)
 
-        if data and isinstance(data, dict):
-            # try:
-            #     with transaction.atomic():
-            #         TrackingSaveLogs.objects.create(data=data)
-            # except Exception as e:
-            #     logger.error(str(e))
+            data = request.data
 
-            data = deepcopy(data)
-            data.pop('visitor_info', None)
+            if data and isinstance(data, dict):
+                # try:
+                #     with transaction.atomic():
+                #         TrackingSaveLogs.objects.create(data=data)
+                # except Exception as e:
+                #     logger.error(str(e))
 
-            error_message = ""
-            if not visitor_id or not visit_id:
-                error_message = "Couldn't save event, Couldn't create visit/visitor - " + str(visit_id) + " / " + str(
-                    visitor_id)
+                data = deepcopy(data)
+                data.pop('visitor_info', None)
+
+                error_message = ""
+                if not visitor_id or not visit_id:
+                    error_message = "Couldn't save event, Couldn't create visit/visitor - " + str(visit_id) + " / " + str(
+                        visitor_id)
+                    # raise Exception(error_message)
+                    resp['error'] = error_message
+
+                event_name = data.get('event', None) or data.get('Action', None)
+
+                if not event_name:
+                    error_message = "Couldn't save anonymous event - " + str(data) + " For visit/visitor - " + str(
+                        visit_id) + " / " + str(visitor_id)
+                    # raise Exception(error_message)
+                    resp['error'] = error_message
+
+                userAgent = data.get('userAgent', None)
+                data.pop('userAgent', None)
+                triggered_at = data.get('triggered_at', None)
+                tz = pytz.timezone(settings.TIME_ZONE)
+                data.pop('created_at', None)
+
+                if triggered_at:
+                    if len(str(triggered_at)) >= 13:
+                        triggered_at = triggered_at / 1000
+                    triggered_at = datetime.datetime.fromtimestamp(triggered_at, tz)
+
+                try:
+                    user = None
+                    if request.user.is_authenticated:
+                        user = request.user
+
+                    # track_models.TrackingEvent.save_event(event_name=event_name, data=data, visit_id=visit_id, user=user,
+                    #                                       triggered_at=triggered_at)
+                    if settings.MONGO_STORE:
+                        track_mongo_models.TrackingEvent.save_event(visitor_id=visitor_id, event_name=event_name, data=data,
+                                                                    visit_id=visit_id, user=user, triggered_at=triggered_at)
+
+                    if not "error" in resp:
+                        resp['success'] = "Event Saved Successfully!"
+
+                except Exception as e:
+                    # logger.error("Error saving event - " + str(e))
+                    resp['error'] = "Error Processing Event Data!"
+
+            else:
+                error_message = "Couldn't save event without data - " + str(data) + " For visit/visitor - " + str(visit_id) + " / " + str(visitor_id)
                 # raise Exception(error_message)
                 resp['error'] = error_message
 
-            event_name = data.get('event', None) or data.get('Action', None)
-
-            if not event_name:
-                error_message = "Couldn't save anonymous event - " + str(data) + " For visit/visitor - " + str(
-                    visit_id) + " / " + str(visitor_id)
-                # raise Exception(error_message)
-                resp['error'] = error_message
-
-            userAgent = data.get('userAgent', None)
-            data.pop('userAgent', None)
-            triggered_at = data.get('triggered_at', None)
-            tz = pytz.timezone(settings.TIME_ZONE)
-            data.pop('created_at', None)
-
-            if triggered_at:
-                if len(str(triggered_at)) >= 13:
-                    triggered_at = triggered_at / 1000
-                triggered_at = datetime.datetime.fromtimestamp(triggered_at, tz)
-
-            try:
-                user = None
-                if request.user.is_authenticated:
-                    user = request.user
-
-                # track_models.TrackingEvent.save_event(event_name=event_name, data=data, visit_id=visit_id, user=user,
-                #                                       triggered_at=triggered_at)
+            if not "error" in resp:
+                # self.modify_visit(event_name, visit_id, visitor_id, data, userAgent, track_models.TrackingVisit, track_models.TrackingVisitor)
                 if settings.MONGO_STORE:
-                    track_mongo_models.TrackingEvent.save_event(visitor_id=visitor_id, event_name=event_name, data=data,
-                                                                visit_id=visit_id, user=user, triggered_at=triggered_at)
+                    self.modify_visit(event_name, visit_id, visitor_id, data, userAgent, track_mongo_models.TrackingVisit, track_mongo_models.TrackingVisitor)
 
-                if not "error" in resp:
-                    resp['success'] = "Event Saved Successfully!"
-
-            except Exception as e:
-                # logger.error("Error saving event - " + str(e))
-                resp['error'] = "Error Processing Event Data!"
-
-        else:
-            error_message = "Couldn't save event without data - " + str(data) + " For visit/visitor - " + str(visit_id) + " / " + str(visitor_id)
-            # raise Exception(error_message)
-            resp['error'] = error_message
-
-        if not "error" in resp:
-            # self.modify_visit(event_name, visit_id, visitor_id, data, userAgent, track_models.TrackingVisit, track_models.TrackingVisitor)
-            if settings.MONGO_STORE:
-                self.modify_visit(event_name, visit_id, visitor_id, data, userAgent, track_mongo_models.TrackingVisit, track_mongo_models.TrackingVisitor)
+        except Exception as e:
+            # logger.info("Error saving event - " + str(e))
+            resp['error'] = "Error Processing Event Data!"
 
         if "error" in resp:
             return Response(status=status.HTTP_400_BAD_REQUEST, data=resp)
         else:
             return Response(status=status.HTTP_200_OK, data=resp)
+
 
     @transaction.non_atomic_requests
     def modify_visit(self, event_name, visit_id, visitor_id, data, userAgent, VISIT_MODEL, VISITOR_MODEL):
