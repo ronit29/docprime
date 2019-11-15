@@ -13,6 +13,7 @@ from ondoc.authentication.models import NotificationEndpoint
 from ondoc.authentication.models import UserProfile
 from ondoc.account import models as account_model
 from ondoc.api.v1.utils import readable_status_choices, generate_short_url
+# from ondoc.doctor.models import Hospital, Doctor
 from ondoc.notification.rabbitmq_client import publish_message
 from django.contrib.auth import get_user_model
 from django.template.loader import render_to_string
@@ -36,7 +37,6 @@ from ondoc.common.helper import Choices
 from django.utils.safestring import mark_safe
 from collections import OrderedDict
 from django.template import Context, Template
-
 import copy
 import random, string
 
@@ -1641,3 +1641,25 @@ class DynamicTemplates(TimeStampedModel):
     #
     #     return parameter_dict
 
+
+class IPDIntimateEmailNotification(TimeStampedModel):
+
+    MALE = 1
+    FEMALE = 2
+    GENDER_TYPE_CHOICES = (
+        (MALE, 'male'),
+        (FEMALE, 'female')
+    )
+
+    user = models.ForeignKey(User, on_delete=models.DO_NOTHING, null=False)
+    doctor = models.ForeignKey('doctor.Doctor', on_delete=models.DO_NOTHING, null=False)
+    hospital = models.ForeignKey('doctor.Hospital', on_delete=models.DO_NOTHING, null=False)
+    phone_number = models.BigIntegerField(null=False)
+    preferred_date = models.DateTimeField(null=True, blank=True)
+    time_slot = models.DateTimeField(blank=True, null=True)
+    gender = models.PositiveIntegerField(choices=GENDER_TYPE_CHOICES, blank=True, null=True)
+    dob = models.DateField(blank=True, null=True)
+    email_notification = models.ForeignKey(EmailNotification, on_delete=models.CASCADE)
+
+    class Meta:
+        db_table = "ipd_intimate_email_notification"

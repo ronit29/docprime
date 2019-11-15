@@ -14,7 +14,7 @@ from rest_framework import status
 from django.shortcuts import HttpResponse
 from django.views import View
 from django.template import Context, Template
-from ondoc.notification.models import DynamicTemplates, RecipientEmail, NotificationAction
+from ondoc.notification.models import DynamicTemplates, RecipientEmail, NotificationAction, IPDIntimateEmailNotification
 
 
 class AppNotificationViewSet(viewsets.GenericViewSet):
@@ -145,3 +145,24 @@ class DynamicTemplate(View):
             html = obj.render_template(obj.get_parameter_json())
 
         return HttpResponse(html)
+
+
+class IPDIntimateEmailNotificationViewSet(viewsets.GenericViewSet):
+
+    def send_email_notification(self, request):
+        parameters = request.query_params
+        serializer = serializers.IPDIntimateEmailNotificationSerializer(data=parameters, context={"request": request})
+        serializer.is_valid(raise_exception=True)
+        validated_data = serializer.validated_data
+        email_notification = None
+        user_id = parameters.get('user')
+        doctor_id = parameters.get('doctor')
+        hospital_id = parameters.get('hospital')
+        phone_number = parameters.get('phone_number')
+        preferred_date = parameters.get('preferred_date', None)
+        time_slot = parameters.get('time_slot', None)
+        gender = parameters.get('gender', None)
+        dob = parameters.get('dob', None)
+        IPDIntimateEmailNotification.objects.create(user_id=user_id, doctor_id=doctor_id, hospital_id=hospital_id, phone_number=phone_number,
+                                                    preferred_date=preferred_date, time_slot=time_slot, gender=gender, dob=dob, email_notification=email_notification)
+

@@ -82,7 +82,6 @@ from ondoc.ratings_review import models as ratings_models
 from django.utils import timezone
 from random import randint
 import reversion
-from ondoc.doctor import models as doctor_models
 from django.db.models import Count
 from ondoc.api.v1.utils import RawSql
 from safedelete import SOFT_DELETE
