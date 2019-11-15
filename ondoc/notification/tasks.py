@@ -1012,8 +1012,8 @@ def send_pg_acknowledge(order_id=None, order_no=None, ack_type=''):
                 print("Payment capture acknowledged")
             else:
                 print("Payment acknowledged")
-        # json_url = '{"url": "%s"}' % url
-        # save_pg_response.apply_async((PgLogs.ACK_TO_PG, order_id, None, json_url, None, None), eta=timezone.localtime(), queue=settings.RABBITMQ_LOGS_QUEUE)
+        json_url = '{"url": "%s"}' % url
+        save_pg_response.apply_async((PgLogs.ACK_TO_PG, order_id, None, json_url, None, None), eta=timezone.localtime(), queue=settings.RABBITMQ_LOGS_QUEUE)
     except Exception as e:
         logger.error("Error in sending pg acknowledge - " + str(e))
 
@@ -1554,7 +1554,7 @@ def send_release_payment_request(self, product_id, appointment_id):
 
 
 @task(bind=True, max_retries=3)
-def save_pg_response(self, log_type, order_id, txn_id, response, request, user_id):
+def save_pg_response(self, log_type, order_id, txn_id, response, request, user_id, *args, **kwargs):
     try:
         from ondoc.account.mongo_models import PgLogs
         PgLogs.save_pg_response(log_type, order_id, txn_id, response, request, user_id)
