@@ -50,7 +50,6 @@ class PgLogs(DynamicDocument, TimeStampedModel):
             if request:
                 if not isinstance(request, dict):
                     request = json.loads(request)
-                request.pop('created_at', None)
                 request['log_type'] = log_type
                 request['type'] = "REQUEST"
                 request['created_at'] = timezone.localtime()
@@ -58,7 +57,6 @@ class PgLogs(DynamicDocument, TimeStampedModel):
             if response:
                 if not isinstance(response, dict):
                     response = json.loads(response)
-                response.pop('created_at', None)
                 response['log_type'] = log_type
                 response['type'] = "RESPONSE"
                 response['created_at'] = timezone.localtime()
