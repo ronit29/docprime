@@ -1745,9 +1745,28 @@ class ConsumerTransaction(TimeStampedModel):
                                                             order_id=self.order_id).last()
             if pg_ctx_obj:
                 ctx_obj = pg_ctx_obj.debit_txn_refund(consumer_account, self.balance)
-                self.balance = 0
-                self.save()
-                ctx_objs.append(ctx_obj)
+                if ctx_obj:
+                    self.balance = 0
+                    self.save()
+                    ctx_objs.append(ctx_obj)
+            else: # if order_id not found in self
+                cancel_ctx_obj = ConsumerTransaction.objects.filter(user=self.user, action=ConsumerTransaction.CANCELLATION,
+                                                                reference_id=self.reference_id).last()
+                if cancel_ctx_obj and cancel_ctx_obj.order_id:
+                    pg_ctx_obj = ConsumerTransaction.objects.filter(user=self.user, action=ConsumerTransaction.PAYMENT,
+                                                                    order_id=cancel_ctx_obj.order_id).last()
+                    if pg_ctx_obj:
+                        ctx_obj = pg_ctx_obj.debit_txn_refund(consumer_account, self.balance)
+                        if ctx_obj:
+                            self.balance = 0
+                            self.save()
+                            ctx_objs.append(ctx_obj)
+                    else:
+                        logger.error(
+                            'Balance refund error: ' + str(consumer_account.id) + ', Refund: ' + str(self.balance))
+                else:
+                    logger.error(
+                        'Balance refund error: ' + str(consumer_account.id) + ', Refund: ' + str(self.balance))
         return ctx_objs
 
     @classmethod
