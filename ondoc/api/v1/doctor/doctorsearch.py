@@ -495,7 +495,7 @@ class DoctorSearchHelper:
                            "{bucket_query} FROM doctor d " \
                            "INNER JOIN doctor_clinic dc ON d.id = dc.doctor_id and dc.enabled=true and d.is_live=true " \
                            "and d.is_test_doctor is False and d.is_internal is False " \
-                           "INNER JOIN hospital h ON h.id = dc.hospital_id and h.is_live=true and h.char_length(locality)>12 " \
+                           "INNER JOIN hospital h ON h.id = dc.hospital_id and h.is_live=true  " \
                            "INNER JOIN doctor_clinic_timing dct ON dc.id = dct.doctor_clinic_id " \
                            "{ipd_query} " \
                            "LEFT JOIN doctor_leave dl on dl.doctor_id = d.id and (%(ist_date)s) BETWEEN dl.start_date and dl.end_date " \
