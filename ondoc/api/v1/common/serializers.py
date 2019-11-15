@@ -135,7 +135,7 @@ class DocumentProofUploadSerializer(serializers.ModelSerializer):
 class OpdPriceUtilitySerializer(serializers.Serializer):
     doctor = serializers.PrimaryKeyRelatedField(queryset=Doctor.objects.filter(is_live=True))
     hospital = serializers.PrimaryKeyRelatedField(queryset=Hospital.objects.filter(is_live=True))
-    gold_vip_plan = serializers.PrimaryKeyRelatedField(queryset=PlusPlans.objects.filter(is_live=True, enabled=True))
+    gold_vip_plan = serializers.ListField(child=serializers.PrimaryKeyRelatedField(required=False, queryset=PlusPlans.objects.filter(is_live=True, enabled=True)),  required=False)
     start_date = serializers.DateTimeField(allow_null=True)
     start_time = serializers.FloatField(allow_null=True)
     time_slot_start = serializers.DateTimeField(required=False, allow_null=True)
@@ -154,8 +154,7 @@ class OpdPriceUtilitySerializer(serializers.Serializer):
         if data.get('start_time') and data.get('start_date') and time_slot_start:
             doctor_clinic_timing_obj = DoctorClinicTiming.objects.filter(doctor_clinic__doctor=data.get('doctor'),
                                                      doctor_clinic__hospital=data.get('hospital'),
-                                                     day=time_slot_start.weekday(), start__gte=data.get("start_time"),
-                                                     end__lte=data.get("start_time")).first()
+                                                     day=time_slot_start.weekday(), start__gte=data.get("start_time")).first()
         else:
             doctor_clinic_timing_obj = DoctorClinicTiming.objects.filter(doctor_clinic__doctor=data.get('doctor'),
                                                      doctor_clinic__hospital=data.get('hospital')).order_by('id').first()
@@ -171,4 +170,4 @@ class OpdPriceUtilitySerializer(serializers.Serializer):
 class LabPriceUtilitySerializer(serializers.Serializer):
     lab_tests = serializers.ListField(child=serializers.IntegerField(), required=True)
     lab = serializers.PrimaryKeyRelatedField(queryset=Lab.objects.all(), required=True)
-    gold_vip_plan = serializers.PrimaryKeyRelatedField(queryset=PlusPlans.objects.filter(is_live=True, enabled=True))
+    gold_vip_plan = serializers.ListField(child=serializers.PrimaryKeyRelatedField(required=False, queryset=PlusPlans.objects.filter(is_live=True, enabled=True)),  required=False)
