@@ -856,43 +856,43 @@ class Order(TimeStampedModel):
 
         # create a Parent order to accumulate sub-orders
         process_immediately = False
-        if total_balance >= payable_amount:
-            cashback_amount = min(cashback_balance, payable_amount)
-            wallet_amount = max(0, payable_amount - cashback_amount)
-            pg_order = cls.objects.create(
-                amount=0,
-                wallet_amount=wallet_amount,
-                cashback_amount=cashback_amount,
-                payment_status=cls.PAYMENT_PENDING,
-                user=user,
-                product_id=1,  # remove later
-                visitor_info=visitor_info
-            )
-            process_immediately = True
-        else:
-            if not valid_data.get('plus_plan'):
-                amount_from_pg = max(0, payable_amount - total_balance)
-                required_amount = payable_amount
-                cashback_amount = min(required_amount, cashback_balance)
-                wallet_amount = 0
-                if cashback_amount < required_amount:
-                    wallet_amount = min(balance, required_amount - cashback_amount)
-            else:
-                amount_from_pg = payable_amount
-                cashback_amount = 0
-                wallet_amount = 0
-            pg_order = cls.objects.create(
-                amount=amount_from_pg,
-                wallet_amount=wallet_amount,
-                cashback_amount=cashback_amount,
-                payment_status=cls.PAYMENT_PENDING,
-                user=user,
-                product_id=1,  # remove later
-                visitor_info=visitor_info
-            )
-            push_order_to_matrix.apply_async(
-                ({'order_id': pg_order.id},),
-                eta=timezone.now() + timezone.timedelta(minutes=settings.LEAD_VALIDITY_BUFFER_TIME))
+        # if total_balance >= payable_amount:
+        #     cashback_amount = min(cashback_balance, payable_amount)
+        #     wallet_amount = max(0, payable_amount - cashback_amount)
+        #     pg_order = cls.objects.create(
+        #         amount=0,
+        #         wallet_amount=wallet_amount,
+        #         cashback_amount=cashback_amount,
+        #         payment_status=cls.PAYMENT_PENDING,
+        #         user=user,
+        #         product_id=1,  # remove later
+        #         visitor_info=visitor_info
+        #     )
+        #     process_immediately = True
+        # else:
+        #     if not valid_data.get('plus_plan'):
+        #         amount_from_pg = max(0, payable_amount - total_balance)
+        #         required_amount = payable_amount
+        #         cashback_amount = min(required_amount, cashback_balance)
+        #         wallet_amount = 0
+        #         if cashback_amount < required_amount:
+        #             wallet_amount = min(balance, required_amount - cashback_amount)
+        #     else:
+        #         amount_from_pg = payable_amount
+        #         cashback_amount = 0
+        #         wallet_amount = 0
+        #     pg_order = cls.objects.create(
+        #         amount=amount_from_pg,
+        #         wallet_amount=wallet_amount,
+        #         cashback_amount=cashback_amount,
+        #         payment_status=cls.PAYMENT_PENDING,
+        #         user=user,
+        #         product_id=1,  # remove later
+        #         visitor_info=visitor_info
+        #     )
+        #     push_order_to_matrix.apply_async(
+        #         ({'order_id': pg_order.id},),
+        #         eta=timezone.now() + timezone.timedelta(minutes=settings.LEAD_VALIDITY_BUFFER_TIME))
         # building separate orders for all fulfillments
         fulfillment_data = copy.deepcopy(fulfillment_data)
         order_list = []
@@ -922,7 +922,7 @@ class Order(TimeStampedModel):
                     action=action,
                     action_data=appointment_detail,
                     payment_status=cls.PAYMENT_PENDING,
-                    parent=pg_order,
+                    parent=None,
                     cart_id=appointment_detail.get("cart_item_id", None),
                     user=user
                 )
@@ -934,7 +934,7 @@ class Order(TimeStampedModel):
                     action=action,
                     action_data=appointment_detail,
                     payment_status=cls.PAYMENT_PENDING,
-                    parent=pg_order,
+                    parent=None,
                     cart_id=appointment_detail.get('cart_item_id', None),
                     user=user
                 )
@@ -946,10 +946,13 @@ class Order(TimeStampedModel):
                     action=action,
                     action_data=appointment_detail,
                     payment_status=cls.PAYMENT_PENDING,
-                    parent=pg_order,
+                    parent=None,
                     cart_id=appointment_detail["cart_item_id"],
                     user=user
                 )
+            if not order.product_id == Order.VIP_PRODUCT_ID:
+                order.single_booking_id = single_booking_id
+                order.save()
 
             order_list.append(order)
             if order.action_data.get('spo_data', None):
@@ -958,25 +961,23 @@ class Order(TimeStampedModel):
                 except Exception as e:
                     logger.log("Could not push order to spo - " + str(e))
 
-            if not order.product_id == Order.VIP_PRODUCT_ID:
-                order.single_booking_id = single_booking_id
-                order.save()
+        # if process_immediately:
+        #     appointment_ids = pg_order.process_pg_order()
+        #
+        #     resp["status"] = 1
+        #     resp["payment_required"] = False
+        #     resp["data"] = {
+        #         "orderId": pg_order.id,
+        #         "type": appointment_ids.get("type", "all"),
+        #         "id": appointment_ids.get("id", None)
+        #     }
+        #     resp["appointments"] = appointment_ids
 
-        if process_immediately:
-            appointment_ids = pg_order.process_pg_order()
-
-            resp["status"] = 1
-            resp["payment_required"] = False
-            resp["data"] = {
-                "orderId": pg_order.id,
-                "type": appointment_ids.get("type", "all"),
-                "id": appointment_ids.get("id", None)
-            }
-            resp["appointments"] = appointment_ids
-
-        else:
-            resp["status"] = 1
-            resp['data'], resp["payment_required"] = payment_details(request, pg_order)
+        # else:
+        # resp["status"] = 1
+        # resp['data'], resp["payment_required"] = payment_details(request, pg_order)
+        resp["status"] = 1
+        resp['data'], resp["payment_required"] = single_booking_payment_details(request, order_list)
 
         # raise Exception("ROLLBACK FOR TESTING")
 
