@@ -729,15 +729,16 @@ class Order(TimeStampedModel):
         fulfillment_data = copy.deepcopy(fulfillment_data)
         order_list = []
         for appointment_detail in fulfillment_data:
-
             product_id = Order.DOCTOR_PRODUCT_ID if appointment_detail.get('doctor') else Order.LAB_PRODUCT_ID
             action = None
+
             if product_id == cls.DOCTOR_PRODUCT_ID:
                 appointment_detail = opdappointment_transform(appointment_detail)
                 action = cls.OPD_APPOINTMENT_CREATE
             elif product_id == cls.LAB_PRODUCT_ID:
                 appointment_detail = labappointment_transform(appointment_detail)
                 action = cls.LAB_APPOINTMENT_CREATE
+
 
             if appointment_detail.get('payment_type') == OpdAppointment.PREPAID:
                 order = cls.objects.create(
@@ -746,7 +747,7 @@ class Order(TimeStampedModel):
                     action_data=appointment_detail,
                     payment_status=cls.PAYMENT_PENDING,
                     parent=pg_order,
-                    cart_id=appointment_detail["cart_item_id"],
+                    cart_id=appointment_detail.get("cart_item_id", None),
                     user=user
                 )
             elif appointment_detail.get('payment_type') in [OpdAppointment.INSURANCE, OpdAppointment.VIP, OpdAppointment.GOLD]:
@@ -756,9 +757,10 @@ class Order(TimeStampedModel):
                     action_data=appointment_detail,
                     payment_status=cls.PAYMENT_PENDING,
                     parent=pg_order,
-                    cart_id=appointment_detail["cart_item_id"],
+                    cart_id=appointment_detail.get("cart_item_id", None),
                     user=user
                 )
+
             elif appointment_detail.get('payment_type') == OpdAppointment.COD or appointment_detail.get('payment_type') == OpdAppointment.PLAN:
                 order = cls.objects.create(
                     product_id=product_id,
@@ -827,6 +829,8 @@ class Order(TimeStampedModel):
         resp = {}
         balance = 0
         cashback_balance = 0
+        single_booking_id = None
+
 
         if use_wallet:
             consumer_account = ConsumerAccount.objects.get_or_create(user=user)
@@ -894,14 +898,23 @@ class Order(TimeStampedModel):
         order_list = []
         for appointment_detail in fulfillment_data:
 
-            product_id = Order.DOCTOR_PRODUCT_ID if appointment_detail.get('doctor') else Order.LAB_PRODUCT_ID
+            # product_id = Order.DOCTOR_PRODUCT_ID if appointment_detail.get('doctor') else Order.LAB_PRODUCT_ID
             action = None
+            if appointment_detail.get('doctor'):
+                product_id = Order.DOCTOR_PRODUCT_ID
+            elif appointment_detail.get('lab'):
+                product_id = Order.LAB_PRODUCT_ID
+            else:
+                product_id = Order.VIP_PRODUCT_ID
+
             if product_id == cls.DOCTOR_PRODUCT_ID:
                 appointment_detail = opdappointment_transform(appointment_detail)
                 action = cls.OPD_APPOINTMENT_CREATE
             elif product_id == cls.LAB_PRODUCT_ID:
                 appointment_detail = labappointment_transform(appointment_detail)
                 action = cls.LAB_APPOINTMENT_CREATE
+            else:
+                appointment_detail = plan_subscription_reverse_transform(appointment_detail)
 
             if appointment_detail.get('payment_type') == OpdAppointment.PREPAID:
                 order = cls.objects.create(
@@ -910,9 +923,11 @@ class Order(TimeStampedModel):
                     action_data=appointment_detail,
                     payment_status=cls.PAYMENT_PENDING,
                     parent=pg_order,
-                    cart_id=appointment_detail["cart_item_id"],
+                    cart_id=appointment_detail.get("cart_item_id", None),
                     user=user
                 )
+                if product_id == Order.VIP_PRODUCT_ID:
+                    single_booking_id = order.id
             elif appointment_detail.get('payment_type') in [OpdAppointment.INSURANCE, OpdAppointment.VIP, OpdAppointment.GOLD]:
                 order = cls.objects.create(
                     product_id=product_id,
@@ -923,6 +938,7 @@ class Order(TimeStampedModel):
                     cart_id=appointment_detail.get('cart_item_id', None),
                     user=user
                 )
+
             elif appointment_detail.get('payment_type') == OpdAppointment.COD or appointment_detail.get(
                     'payment_type') == OpdAppointment.PLAN:
                 order = cls.objects.create(
@@ -941,6 +957,10 @@ class Order(TimeStampedModel):
                     push_order_to_spo.apply_async(({'order_id': order.id},), countdown=5)
                 except Exception as e:
                     logger.log("Could not push order to spo - " + str(e))
+
+            if not order.product_id == Order.VIP_PRODUCT_ID:
+                order.single_booking_id = single_booking_id
+                order.save()
 
         if process_immediately:
             appointment_ids = pg_order.process_pg_order()
