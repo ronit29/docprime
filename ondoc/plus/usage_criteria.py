@@ -3,10 +3,10 @@ from math import floor
 
 
 class AbstractCriteria(object):
-    def __init__(self, plus_obj):
-        self.plus_obj = plus_obj
-        self.plus_plan = plus_obj.plan
-        self.utilization = plus_obj.get_utilization
+    def __init__(self, plus_obj, plan=None):
+        self.plus_obj = plus_obj if plus_obj.__class__.__name__ == 'PlusUser' else None
+        self.plus_plan = plus_obj.plan if plus_obj.__class__.__name__ == 'PlusUser' else plan
+        self.utilization = plus_obj.get_utilization if plus_obj.__class__.__name__ == 'PlusUser' else {}
 
     def _validate_booking_entity(self, cost, id, *args, **kwargs):
         raise NotImplementedError()
@@ -704,16 +704,19 @@ def get_class_reference(plus_membership_obj, entity):
     return class_reference(plus_membership_obj)
 
 
-def get_price_reference(plus_membership_obj, entity):
-    if not plus_membership_obj:
+def get_price_reference(obj, entity):
+    if not obj:
         return None
 
-    price_criteria = plus_membership_obj.plan.price_criteria
+    if obj.__class__.__name__ not in ['PlusUser', 'PlusPlans']:
+        return None
+
+    price_criteria = obj.plan.price_criteria if obj.__class__.__name__ == 'PlusUser' else obj.price_criteria
     if entity not in ['DOCTOR', 'LABTEST'] or price_criteria not in PriceCriteria.availabilities():
         return None
 
     class_reference = price_criteria_class_mapping[entity][price_criteria]
-    return class_reference(plus_membership_obj)
+    return class_reference(obj)
 
 
 

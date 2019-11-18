@@ -1,4 +1,6 @@
 # from hardcopy import bytestring_to_pdf
+from ondoc.api.v1.plus.serializers import PlusPlansSerializer
+from ondoc.plus.usage_criteria import get_class_reference, get_price_reference
 from django.contrib.contenttypes.models import ContentType
 from django.contrib.gis.measure import D
 from django.core.exceptions import ValidationError
@@ -21,7 +23,7 @@ from ondoc.api.v1.insurance.serializers import InsuranceCityEligibilitySerialize
 from ondoc.api.v1.utils import html_to_pdf, generate_short_url
 from ondoc.authentication.models import User
 from ondoc.common.middleware import use_slave
-from ondoc.diagnostic.models import Lab
+from ondoc.diagnostic.models import Lab, AvailableLabTest
 from ondoc.doctor.models import (Doctor, DoctorPracticeSpecialization, PracticeSpecialization, DoctorMobile,
                                  Qualification,
                                  Specialization, College, DoctorQualification, DoctorExperience, DoctorAward,
@@ -1321,3 +1323,66 @@ class DocumentUploadViewSet(viewsets.GenericViewSet):
         document_data['id'] = document_obj.id
         document_data['data'] = serializer.data
         return Response(document_data)
+
+
+class AppointmentUtilityViewSet(viewsets.GenericViewSet):
+
+    authentication_classes = (JWTAuthentication,)
+    permission_classes = (IsAuthenticated,)
+
+    def get_prices(self, request, service_type=None, *args, **kwargs):
+        if not service_type or service_type not in ['opd', 'lab']:
+            return Response(status=status.HTTP_400_BAD_REQUEST)
+        resp = {}
+        data = request.data
+        if service_type == "opd":
+            resp = {'vip_plans': []}
+            serializer = serializers.OpdPriceUtilitySerializer(data=data, context={'request': request})
+            serializer.is_valid(raise_exception=True)
+            validated_data = serializer.validated_data
+            doctor_clinic_timing_obj = validated_data['doctor_clinic_timing']
+            gold_vip_plans = validated_data['gold_vip_plan']
+            for gold_vip_plan in gold_vip_plans:
+                res = {}
+                plan_data = PlusPlansSerializer(gold_vip_plan, context={'request': request}).data
+                res.update(plan_data)
+                price_data = {"mrp": doctor_clinic_timing_obj.mrp, "deal_price": doctor_clinic_timing_obj.deal_price,
+                              "cod_deal_price": doctor_clinic_timing_obj.cod_deal_price,
+                              "fees": doctor_clinic_timing_obj.fees, 'custom_deal_price': doctor_clinic_timing_obj.custom_deal_price}
+
+                price_engine = get_price_reference(gold_vip_plan, 'DOCTOR')
+                price = price_engine.get_price(price_data)
+                price_data['gold_price'] = int(price)
+                res['opd'] = price_data
+                resp['vip_plans'].append(res)
+
+        if service_type == "lab":
+            resp = {'vip_plans': []}
+            serializer = serializers.LabPriceUtilitySerializer(data=data, context={'request': request})
+            serializer.is_valid(raise_exception=True)
+            validated_data = serializer.validated_data
+            gold_vip_plans = validated_data['gold_vip_plan']
+            for gold_vip_plan in gold_vip_plans:
+                price_engine = get_price_reference(gold_vip_plan, "LABTEST")
+                res = {'tests': {}}
+                plan_data = PlusPlansSerializer(gold_vip_plan, context={'request': request}).data
+                res.update(plan_data)
+                for test in validated_data.get('lab_tests', []):
+                    avt_obj = AvailableLabTest.objects.filter(lab_pricing_group=validated_data.get('lab').lab_pricing_group, test__id=test).first()
+
+                    price_data = {
+                        "mrp" : avt_obj.mrp,
+                        "computed_agreed_price" : avt_obj.computed_agreed_price,
+                        "custom_agreed_price" : avt_obj.custom_agreed_price,
+                        "computed_deal_price" : avt_obj.computed_deal_price,
+                        "custom_deal_price" : avt_obj.custom_deal_price,
+                        "supplier_price" : avt_obj.supplier_price,
+                        "insurance_agreed_price" : avt_obj.insurance_agreed_price
+                    }
+                    price = price_engine.get_price(price_data)
+                    price_data['gold_price'] = price if price else None
+                    res['tests'][test] = price_data
+
+                resp['vip_plans'].append(res)
+
+        return Response(data=resp)
