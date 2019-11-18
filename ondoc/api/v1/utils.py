@@ -1705,7 +1705,7 @@ class TimeSlotExtraction(object):
 def consumers_balance_refund():
     from ondoc.account.models import ConsumerAccount, ConsumerRefund
     refund_time = timezone.now() - timezone.timedelta(hours=settings.REFUND_INACTIVE_TIME)
-    consumer_accounts = ConsumerAccount.objects.filter(updated_at__lt=refund_time)
+    consumer_accounts = ConsumerAccount.objects.filter(updated_at__lt=refund_time, balance__gt=Decimal('0'))
     for account in consumer_accounts:
         with transaction.atomic():
             consumer_account = ConsumerAccount.objects.select_for_update().filter(pk=account.id).first()
