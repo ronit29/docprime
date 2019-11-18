@@ -469,6 +469,134 @@ def is_valid_testing_lab_data(user, lab):
     return True
 
 
+def single_booking_payment_details(request, orders):
+    from ondoc.account.models import PgTransaction, Order, PaymentProcessStatus
+    from ondoc.notification.tasks import save_pg_response, save_payment_status
+    from ondoc.account.mongo_models import PgLogs
+    from ondoc.plus.models import PlusPlans
+
+    payment_required = True
+    user = request.user
+    if user.email:
+        uemail = user.email
+    else:
+        uemail = "dummyemail@docprime.com"
+    base_url = "https://{}".format(request.get_host())
+    surl = base_url + '/api/v1/user/transaction/save'
+    furl = base_url + '/api/v1/user/transaction/save'
+    isPreAuth = '1'
+    profile = user.get_default_profile()
+    profile_name = ""
+    paytmMsg = ''
+    if profile:
+        profile_name = profile.name
+
+    orders_list = list()
+
+    for order in orders:
+
+        if order.product_id == Order.VIP_PRODUCT_ID:
+            isPreAuth = '0'
+            plus_plan_id = order.action_data.get('plus_plan')
+            plus_plan = PlusPlans.objects.filter(id=plus_plan_id).first()
+            if not plus_plan:
+                raise Exception('Invalid pg transaction as plus plan is not found.')
+            proposer = plus_plan.proposer
+            plus_merchant_code = proposer.merchant_code
+
+            if not profile:
+                if order.action_data.get('profile_detail'):
+                    profile_name = order.action_data.get('profile_detail').get('name', "")
+
+        if isPreAuth == '1':
+            first_slot = None
+            if order.is_parent():
+                for ord in order.orders.all():
+                    if ord.action_data:
+                        if ord.action_data.get('time_slot_start'):
+                            ord_slot = ord.action_data.get('time_slot_start')
+                        else:
+                            first_test_slot = None
+                            test_time_slots = ord.action_data.get('test_time_slots')
+                            for test_time_slot in test_time_slots:
+                                ord_test_slot = None
+                                if test_time_slot.get('time_slot_start'):
+                                    ord_test_slot = test_time_slot.get('time_slot_start')
+                                if not first_test_slot and ord_test_slot:
+                                    first_test_slot = parse_datetime(ord_test_slot)
+                                if first_test_slot > parse_datetime(ord_test_slot):
+                                    first_test_slot = parse_datetime(ord_test_slot)
+                            ord_slot = str(first_test_slot)
+
+                    if not first_slot and ord_slot:
+                        first_slot = parse_datetime(ord_slot)
+                    if first_slot > parse_datetime(ord_slot):
+                        first_slot = parse_datetime(ord_slot)
+
+            if first_slot:
+                if first_slot < (timezone.now() + timedelta(hours=int(settings.PAYMENT_AUTO_CAPTURE_DURATION))):
+                    paytmMsg = 'Your payment will be deducted from Paytm wallet on appointment completion.'
+
+        temp_product_id = order.product_id
+
+        couponCode = ''
+        couponPgMode = ''
+        discountedAmnt = ''
+
+        # if order.is_cod_order:
+        #     txAmount = str(round(decimal.Decimal(order.get_deal_price_without_coupon), 2))
+        # else:
+        usedPgCoupons = order.used_pgspecific_coupons
+        if usedPgCoupons and usedPgCoupons[0].payment_option:
+            couponCode = usedPgCoupons[0].code
+            couponPgMode = get_coupon_pg_mode(usedPgCoupons[0])
+            discountedAmnt = str(round(decimal.Decimal(order.amount), 2))
+            txAmount = str(round(decimal.Decimal(order.get_amount_without_pg_coupon), 2))
+        else:
+            txAmount = str(round(decimal.Decimal(order.amount), 2))
+
+        order_dict = {
+            "orderId": order.id,
+            "productId": temp_product_id,
+            "name": profile_name,
+            "holdPayment": False,
+            "txAmount": txAmount,
+            "insurerCode": "",
+            "refOrderId": "",
+            "refOrderNo": "",
+            "discountedAmnt": discountedAmnt
+            }
+
+        orders_list.append(order_dict)
+
+    pgdata = {
+        "custId": user.id,
+        "mobile": user.phone_number,
+        "email": uemail,
+        "surl": surl,
+        "furl": furl,
+        "blockedDuration": "2",
+        "isPreAuth": "1",
+        "paytmMsg": paytmMsg,
+        "couponCode": '',
+        "couponPgMode": '',
+        "isEMI": True,
+        "items": orders_list
+    }
+
+    secret_key, client_key = get_pg_secret_client_key(orders[0])
+    filtered_pgdata = {k: v for k, v in pgdata.items() if v is not None and v != ''}
+    pgdata.clear()
+    pgdata.update(filtered_pgdata)
+    pgdata['hash'] = PgTransaction.create_pg_hash(pgdata, secret_key, client_key)
+
+    # args = {'user_id': user.id, 'order_id': order.id, 'source': 'ORDER_CREATE'}
+    # save_payment_status.apply_async((PaymentProcessStatus.INITIATE, args), eta=timezone.localtime(),)
+    # save_pg_response.apply_async((PgLogs.TXN_REQUEST, order.id, None, None, pgdata, user.id), eta=timezone.localtime(), queue=settings.RABBITMQ_LOGS_QUEUE)
+    # print(pgdata)
+    return pgdata, payment_required
+
+
 def payment_details(request, order):
     from ondoc.authentication.models import UserProfile
     from ondoc.insurance.models import InsurancePlans
