@@ -204,7 +204,7 @@ class PlusMemberListSerializer(serializers.Serializer):
     profile = serializers.PrimaryKeyRelatedField(queryset=UserProfile.objects.all(), allow_null=True)
     city = serializers.CharField(required=False)
     city_code = serializers.CharField(required=False)
-    relation = serializers.ChoiceField(choices=PlusMembers.Relations.as_choices(), required=False)
+    relation = serializers.ChoiceField(choices=PlusMembers.Relations.as_choices(), required=False, allow_null=True, allow_blank=True)
     document_ids = serializers.ListField(required=False, allow_null=True, child=PlusMembersDocumentSerializer())
     # is_primary_user = serializers.BooleanField()
     # plan = serializers.PrimaryKeyRelatedField(queryset=PlusPlans.all_active_plans(), allow_null=False, allow_empty=False)
