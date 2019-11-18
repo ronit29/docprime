@@ -21,7 +21,7 @@ from django.db import IntegrityError
 from django.db import transaction
 from mongoengine.errors import NotUniqueError
 from copy import deepcopy
-from ondoc.tracking.tasks import save_visit_to_mongo, modify_visit_to_mongo, create_visit_to_mongo
+from ondoc.tracking.tasks import create_visit_to_mongo
 
 #from django.utils import timezone
 
@@ -30,96 +30,103 @@ class EventCreateViewSet(GenericViewSet):
 
     @transaction.non_atomic_requests
     def create(self, request):
-        data = request.data
-        client_ip, is_routable = get_client_ip(request)
-        create_visit_to_mongo.apply_async(({'client_ip': client_ip, 'is_routable': is_routable, 'req_data': data}))
-
-
-        from ondoc.tracking.models import TrackingSaveLogs
-        resp = {}
         try:
-            visitor_id, visit_id = self.get_visit(request)
-
+            user_id = None
+            if request.user.is_authenticated:
+                user_id = request.user.id
             data = request.data
-
-            if data and isinstance(data, dict):
-                # try:
-                #     with transaction.atomic():
-                #         TrackingSaveLogs.objects.create(data=data)
-                # except Exception as e:
-                #     logger.error(str(e))
-
-                data = deepcopy(data)
-                data.pop('visitor_info', None)
-
-                error_message = ""
-                if not visitor_id or not visit_id:
-                    error_message = "Couldn't save event, Couldn't create visit/visitor - " + str(visit_id) + " / " + str(
-                        visitor_id)
-                    # raise Exception(error_message)
-                    resp['error'] = error_message
-
-                event_name = data.get('event', None) or data.get('Action', None)
-
-                if not event_name:
-                    error_message = "Couldn't save anonymous event - " + str(data) + " For visit/visitor - " + str(
-                        visit_id) + " / " + str(visitor_id)
-                    # raise Exception(error_message)
-                    resp['error'] = error_message
-
-                userAgent = data.get('userAgent', None)
-                data.pop('userAgent', None)
-                triggered_at = data.get('triggered_at', None)
-                tz = pytz.timezone(settings.TIME_ZONE)
-                data.pop('created_at', None)
-
-                if triggered_at:
-                    if len(str(triggered_at)) >= 13:
-                        triggered_at = triggered_at / 1000
-                    triggered_at = datetime.datetime.fromtimestamp(triggered_at, tz)
-
-                try:
-                    user = None
-                    if request.user.is_authenticated:
-                        user = request.user
-
-                    # track_models.TrackingEvent.save_event(event_name=event_name, data=data, visit_id=visit_id,
-                    #                                       user=user,
-                    #                                       triggered_at=triggered_at)
-                    if settings.MONGO_STORE:
-                        # track_mongo_models.TrackingEvent.save_event(
-                        #                                  visitor_id=visitor_id, event_name=event_name, data=data,
-                        #                                  visit_id=visit_id, user=user, triggered_at=triggered_at)
-
-                        save_visit_to_mongo.apply_async(({'visitor_id': visitor_id, 'event_name': event_name, 'event_data': data,
-                                                          'visit_id': visit_id, 'user': user, 'triggered_at': triggered_at},), countdown=5, queue=settings.RABBITMQ_LOGS_QUEUE)
-
-                    if not "error" in resp:
-                        resp['success'] = "Event Saved Successfully!"
-
-                except Exception as e:
-                    # logger.error("Error saving event - " + str(e))
-                    resp['error'] = "Error Processing Event Data!"
-
-            else:
-                error_message = "Couldn't save event without data - " + str(data) + " For visit/visitor - " + str(visit_id) + " / " + str(visitor_id)
-                # raise Exception(error_message)
-                resp['error'] = error_message
-
-            if not "error" in resp:
-                # self.modify_visit(event_name, visit_id, visitor_id, data, userAgent, track_models.TrackingVisit, track_models.TrackingVisitor)
-                if settings.MONGO_STORE:
-                    # self.modify_visit(event_name, visit_id, visitor_id, data, userAgent, track_mongo_models.TrackingVisit, track_mongo_models.TrackingVisitor)
-                    modify_visit_to_mongo.apply_async(({'event_name': event_name, 'visit_id': visit_id, 'visitor_id': visitor_id, 'event_data': data, 'user_agent': userAgent},), countdown=5, queue=settings.RABBITMQ_LOGS_QUEUE)
-
+            client_ip, is_routable = get_client_ip(request)
+            create_visit_to_mongo.apply_async(({'client_ip': client_ip, 'is_routable': is_routable, 'req_data': data, 'user_id': user_id},), countdown=5, queue=settings.RABBITMQ_LOGS_QUEUE)
+            return Response(status=status.HTTP_200_OK, data=True)
         except Exception as e:
-            # logger.info("Error saving event - " + str(e))
-            resp['error'] = "Error Processing Event Data!"
+            print(e)
+            return Response(status=status.HTTP_400_BAD_REQUEST, data=False)
 
-        if "error" in resp:
-            return Response(status=status.HTTP_400_BAD_REQUEST, data=resp)
-        else:
-            return Response(status=status.HTTP_200_OK, data=resp)
+        # from ondoc.tracking.models import TrackingSaveLogs
+        # resp = {}
+        # try:
+        #     visitor_id, visit_id = self.get_visit(request)
+        #
+        #     data = request.data
+        #
+        #     if data and isinstance(data, dict):
+        #         # try:
+        #         #     with transaction.atomic():
+        #         #         TrackingSaveLogs.objects.create(data=data)
+        #         # except Exception as e:
+        #         #     logger.error(str(e))
+        #
+        #         data = deepcopy(data)
+        #         data.pop('visitor_info', None)
+        #
+        #         error_message = ""
+        #         if not visitor_id or not visit_id:
+        #             error_message = "Couldn't save event, Couldn't create visit/visitor - " + str(visit_id) + " / " + str(
+        #                 visitor_id)
+        #             # raise Exception(error_message)
+        #             resp['error'] = error_message
+        #
+        #         event_name = data.get('event', None) or data.get('Action', None)
+        #
+        #         if not event_name:
+        #             error_message = "Couldn't save anonymous event - " + str(data) + " For visit/visitor - " + str(
+        #                 visit_id) + " / " + str(visitor_id)
+        #             # raise Exception(error_message)
+        #             resp['error'] = error_message
+        #
+        #         userAgent = data.get('userAgent', None)
+        #         data.pop('userAgent', None)
+        #         triggered_at = data.get('triggered_at', None)
+        #         tz = pytz.timezone(settings.TIME_ZONE)
+        #         data.pop('created_at', None)
+        #
+        #         if triggered_at:
+        #             if len(str(triggered_at)) >= 13:
+        #                 triggered_at = triggered_at / 1000
+        #             triggered_at = datetime.datetime.fromtimestamp(triggered_at, tz)
+        #
+        #         try:
+        #             user = None
+        #             if request.user.is_authenticated:
+        #                 user = request.user
+        #
+        #             # track_models.TrackingEvent.save_event(event_name=event_name, data=data, visit_id=visit_id,
+        #             #                                       user=user,
+        #             #                                       triggered_at=triggered_at)
+        #             if settings.MONGO_STORE:
+        #                 # track_mongo_models.TrackingEvent.save_event(
+        #                 #                                  visitor_id=visitor_id, event_name=event_name, data=data,
+        #                 #                                  visit_id=visit_id, user=user, triggered_at=triggered_at)
+        #
+        #                 save_visit_to_mongo.apply_async(({'visitor_id': visitor_id, 'event_name': event_name, 'event_data': data,
+        #                                                   'visit_id': visit_id, 'user': user, 'triggered_at': triggered_at},), countdown=5, queue=settings.RABBITMQ_LOGS_QUEUE)
+        #
+        #             if not "error" in resp:
+        #                 resp['success'] = "Event Saved Successfully!"
+        #
+        #         except Exception as e:
+        #             # logger.error("Error saving event - " + str(e))
+        #             resp['error'] = "Error Processing Event Data!"
+        #
+        #     else:
+        #         error_message = "Couldn't save event without data - " + str(data) + " For visit/visitor - " + str(visit_id) + " / " + str(visitor_id)
+        #         # raise Exception(error_message)
+        #         resp['error'] = error_message
+        #
+        #     if not "error" in resp:
+        #         # self.modify_visit(event_name, visit_id, visitor_id, data, userAgent, track_models.TrackingVisit, track_models.TrackingVisitor)
+        #         if settings.MONGO_STORE:
+        #             # self.modify_visit(event_name, visit_id, visitor_id, data, userAgent, track_mongo_models.TrackingVisit, track_mongo_models.TrackingVisitor)
+        #             modify_visit_to_mongo.apply_async(({'event_name': event_name, 'visit_id': visit_id, 'visitor_id': visitor_id, 'event_data': data, 'user_agent': userAgent},), countdown=5, queue=settings.RABBITMQ_LOGS_QUEUE)
+        #
+        # except Exception as e:
+        #     # logger.info("Error saving event - " + str(e))
+        #     resp['error'] = "Error Processing Event Data!"
+        #
+        # if "error" in resp:
+        #     return Response(status=status.HTTP_400_BAD_REQUEST, data=resp)
+        # else:
+        #     return Response(status=status.HTTP_200_OK, data=resp)
 
 
     @transaction.non_atomic_requests
