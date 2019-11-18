@@ -1320,7 +1320,7 @@ class TransactionViewSet(viewsets.GenericViewSet):
 
                             ctx_txn = ConsumerTransaction.objects.filter(order_id=pg_txn.order_id,
                                                                          action=ConsumerTransaction.PAYMENT).last()
-                            ctx_txn.transaction_id = response.get('pgTxId')
+                            ctx_txn.transaction_id = format_return_value(response.get('pgTxId'))
                             ctx_txn.save()
 
                             # this will acknowledge all status if current status is txn_authorize
