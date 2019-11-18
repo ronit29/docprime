@@ -36,7 +36,7 @@ class EventCreateViewSet(GenericViewSet):
                 user_id = request.user.id
             data = request.data
             client_ip, is_routable = get_client_ip(request)
-            create_visit_to_mongo.apply_async(({'client_ip': client_ip, 'is_routable': is_routable, 'req_data': data, 'user_id': user_id},), countdown=5, queue=settings.RABBITMQ_LOGS_QUEUE)
+            create_visit_to_mongo.apply_async(({'client_ip': client_ip, 'is_routable': is_routable, 'req_data': data, 'user_id': user_id},), countdown=5, queue=settings.RABBITMQ_TRACKING_QUEUE)
             return Response(status=status.HTTP_200_OK, data=True)
         except Exception as e:
             print(e)
