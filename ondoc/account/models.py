@@ -17,7 +17,7 @@ from datetime import datetime, timedelta
 from django.utils import timezone
 from ondoc.api.v1.utils import refund_curl_request, form_pg_refund_data, opdappointment_transform, \
     labappointment_transform, payment_details, insurance_reverse_transform, plan_subscription_reverse_transform, \
-    plus_subscription_transform
+    plus_subscription_transform, single_booking_payment_details
 from django.conf import settings
 from rest_framework import status
 from copy import deepcopy
