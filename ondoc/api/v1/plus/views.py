@@ -179,21 +179,21 @@ class PlusOrderViewSet(viewsets.GenericViewSet):
 
                     plus_members.append(pre_insured_members.copy())
 
-                    if member['relation'] == PlusMembers.Relations.SELF:
-                        if member['profile']:
-                            user_profile = UserProfile.objects.filter(id=member['profile'].id,
-                                                                      user_id=request.user.pk).values('id', 'name',
-                                                                                                      'email',
-                                                                                                      'gender',
-                                                                                                      'user_id',
-                                                                                                      'phone_number').first()
+                    # if member['relation'] == PlusMembers.Relations.SELF:
+                    if member['profile']:
+                        user_profile = UserProfile.objects.filter(id=member['profile'].id,
+                                                                  user_id=request.user.pk).values('id', 'name',
+                                                                                                  'email',
+                                                                                                  'gender',
+                                                                                                  'user_id',
+                                                                                                  'phone_number').first()
 
-                            user_profile['dob'] = member['dob']
+                        user_profile['dob'] = member['dob']
 
-                        else:
-                            last_name = member.get('last_name') if member.get('last_name') else ''
-                            user_profile = {"name": member['first_name'] + " " + last_name, "email":
-                                member['email'], "dob": member['dob']}
+                    else:
+                        last_name = member.get('last_name') if member.get('last_name') else ''
+                        user_profile = {"name": member['first_name'] + " " + last_name, "email":
+                            member['email'], "dob": member['dob']}
 
             utm_source = request.data.get('utm_spo_tags', {}).get('utm_source', None)
             utm_term = request.data.get('utm_spo_tags', {}).get('utm_term', None)
