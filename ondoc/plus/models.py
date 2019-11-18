@@ -986,7 +986,8 @@ class PlusUser(auth_model.TimeStampedModel, RefundMixin, TransactionMixin):
                                                                                                       'email',
                                                                                                       'gender',
                                                                                                       'user_id',
-                                                                                                      'phone_number').first()
+                                                                                                      'phone_number',
+                                                                                                                'dob').first()
         plus_members.append(member.copy())
         transaction_date = datetime.datetime.now()
         expiry_date = transaction_date + relativedelta(months=int(plus_plan.tenure))
