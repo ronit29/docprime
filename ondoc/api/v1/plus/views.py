@@ -162,12 +162,18 @@ class PlusOrderViewSet(viewsets.GenericViewSet):
                     pre_insured_members['title'] = member['title']
                     pre_insured_members['first_name'] = member['first_name']
                     pre_insured_members['last_name'] = member.get('last_name') if member.get('last_name') else ''
-                    pre_insured_members['address'] = member['address']
-                    pre_insured_members['pincode'] = member['pincode']
-                    pre_insured_members['city'] = member['city']
-                    pre_insured_members['city_code'] = member['city_code']
-                    pre_insured_members['email'] = member['email']
-                    pre_insured_members['relation'] = member['relation']
+                    # pre_insured_members['address'] = member['address']
+                    # pre_insured_members['pincode'] = member['pincode']
+                    # pre_insured_members['city'] = member['city']
+                    # pre_insured_members['city_code'] = member['city_code']
+                    # pre_insured_members['email'] = member['email']
+                    # pre_insured_members['relation'] = member['relation']
+                    pre_insured_members['address'] = member.get('address', None)
+                    pre_insured_members['pincode'] = member.get('pincode', None)
+                    pre_insured_members['city'] = member.get('city', None)
+                    pre_insured_members['city_code'] = member.get('city_code', None)
+                    pre_insured_members['email'] = member.get('email', None)
+                    pre_insured_members['relation'] = member.get('relation', None)
                     pre_insured_members['profile'] = member.get('profile').id if member.get(
                         'profile') is not None else None
 
