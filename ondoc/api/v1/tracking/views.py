@@ -21,7 +21,7 @@ from django.db import IntegrityError
 from django.db import transaction
 from mongoengine.errors import NotUniqueError
 from copy import deepcopy
-from ondoc.tracking.tasks import save_visit_to_mongo, modify_visit_to_mongo
+from ondoc.tracking.tasks import save_visit_to_mongo, modify_visit_to_mongo, create_visit_to_mongo
 
 #from django.utils import timezone
 
@@ -30,6 +30,11 @@ class EventCreateViewSet(GenericViewSet):
 
     @transaction.non_atomic_requests
     def create(self, request):
+        data = request.data
+        client_ip, is_routable = get_client_ip(request)
+        create_visit_to_mongo.apply_async(({'client_ip': client_ip, 'is_routable': is_routable, 'req_data': data}))
+
+
         from ondoc.tracking.models import TrackingSaveLogs
         resp = {}
         try:
