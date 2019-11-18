@@ -135,12 +135,16 @@ class DocumentProofUploadSerializer(serializers.ModelSerializer):
 class OpdPriceUtilitySerializer(serializers.Serializer):
     doctor = serializers.PrimaryKeyRelatedField(queryset=Doctor.objects.filter(is_live=True))
     hospital = serializers.PrimaryKeyRelatedField(queryset=Hospital.objects.filter(is_live=True))
-    gold_vip_plan = serializers.ListField(child=serializers.PrimaryKeyRelatedField(required=False, queryset=PlusPlans.objects.filter(is_live=True, enabled=True)),  required=False)
+    gold_vip_plan = serializers.ListField(child=serializers.PrimaryKeyRelatedField(required=False, queryset=PlusPlans.objects.filter(is_live=True, enabled=True, is_gold=True)),  required=False)
     start_date = serializers.DateTimeField(allow_null=True)
     start_time = serializers.FloatField(allow_null=True)
     time_slot_start = serializers.DateTimeField(required=False, allow_null=True)
 
     def validate(self, data):
+
+        if not data.get('gold_vip_plan'):
+            data['gold_vip_plan'] = PlusPlans.objects.filter(is_live=True, enabled=True, is_gold=True)
+
         doctor_clinic = data.get('doctor').doctor_clinics.filter(hospital=data.get('hospital'), enabled=True).first()
         if not doctor_clinic:
             raise serializers.ValidationError("Doctor Hospital not related.")
