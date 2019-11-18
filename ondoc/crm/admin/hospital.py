@@ -488,6 +488,14 @@ class CloudLabAutocomplete(autocomplete.Select2QuerySetView):
 
 class PartnerLabsInlineForm(forms.ModelForm):
 
+    def clean(self):
+        super().clean()
+        cleaned_data = self.cleaned_data
+        lab = self.cleaned_data['lab']
+        if not (lab.is_live and lab.is_b2b and lab.lab_pricing_group):
+            raise forms.ValidationError('Error! Please remove the lab "{}" OR check if (lab is b2b || lab is live || has lab pricing group)'.format(lab.name))
+        return cleaned_data
+
     class Meta:
         model = PartnerHospitalLabMapping
         fields = ('lab',)
