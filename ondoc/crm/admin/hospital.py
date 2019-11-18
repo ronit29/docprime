@@ -480,7 +480,7 @@ class CloudLabAutocomplete(autocomplete.Select2QuerySetView):
     def get_queryset(self):
         if not self.request.user.is_authenticated:
             return Lab.objects.none()
-        queryset = Lab.objects.filter(is_b2b=True)
+        queryset = Lab.objects.filter(is_b2b=True, is_live=True, lab_pricing_group__isnull=False)
         if self.q:
             queryset = queryset.filter(name__istartswith=self.q)
         return queryset.distinct()
