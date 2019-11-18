@@ -400,6 +400,10 @@ class DoctorAppointmentsViewSet(OndocViewSet):
         plus_plan = validated_data.get('plus_plan', None)
         plus_user = request.user.active_plus_user
         if plus_plan and plus_user is None:
+            is_verified = profile.verify_profile()
+            if not is_verified:
+                return Response(status=status.HTTP_400_BAD_REQUEST, data={"error": "Profile is not completed, Please update profile first to process further"})
+        if plus_plan and plus_user is None:
             plus_user = TempPlusUser.objects.create(user=request.user, plan=plus_plan, profile=profile)
         user_insurance = request.user.active_insurance #UserInsurance.get_user_insurance(request.user)
 

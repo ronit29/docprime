@@ -1,3 +1,4 @@
+from dateutil.relativedelta import relativedelta
 from django.db import models
 import functools
 from ondoc.authentication import models as auth_model
@@ -19,7 +20,7 @@ from ondoc.common.models import DocumentsProofs
 from ondoc.notification.tasks import push_plus_lead_to_matrix
 from ondoc.plus.usage_criteria import get_class_reference, get_price_reference
 from .enums import PlanParametersEnum, UtilizationCriteria, PriceCriteria
-from datetime import datetime
+from datetime import datetime, timedelta
 from ondoc.crm import constants as const
 from django.utils.timezone import utc
 import reversion
@@ -961,6 +962,41 @@ class PlusUser(auth_model.TimeStampedModel, RefundMixin, TransactionMixin):
 
         super().save(*args, **kwargs)
         transaction.on_commit(lambda: self.after_commit_tasks(is_fresh=is_fresh))
+
+    @classmethod
+    def create_fulfillment_data(cls, data):
+        plus_user = dict()
+        resp = {}
+        plus_plan = data.get('plus_plan')
+        profile = data.get('profile', None)
+        name = profile.get('name').split(' ', 1)
+        first_name = name[0]
+        last_name = name[1] if name[1] else ''
+        dob = profile.get('dob')
+        email = profile.get('email')
+        phone_number = profile.get('phone_number', None)
+        plus_members = []
+
+        member = {"first_name": first_name, "last_name": last_name, "dob": dob, "email": email, "phone_number": phone_number}
+        primary_user_profile = UserProfile.objects.filter(user_id=profile.user.pk, is_default_user=True).values('id', 'name',
+                                                                                                      'email',
+                                                                                                      'gender',
+                                                                                                      'user_id',
+                                                                                                      'phone_number').first()
+        plus_members.append(member.copy())
+        transaction_date = datetime.datetime.now()
+        expiry_date = transaction_date + relativedelta(months=int(plus_plan.tenure))
+        expiry_date = expiry_date - timedelta(days=1)
+        expiry_date = datetime.datetime.combine(expiry_date, datetime.datetime.max.time())
+        amount = plus_plan.deal_price
+        plus_user = {'proposer': plus_plan.proposer.id, 'plus_plan': plus_plan.id,
+                          'purchase_date': transaction_date, 'expire_date': expiry_date, 'amount': amount,
+                          'user': profile.user.id, "plus_members": plus_members}
+
+        resp = {"profile_detail": primary_user_profile, "user": profile.user.id, "plus_user": plus_user,
+                "plus_plan": plus_plan.id}
+
+        return resp
 
     class Meta:
         db_table = 'plus_users'
