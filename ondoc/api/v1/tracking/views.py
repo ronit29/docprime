@@ -21,6 +21,7 @@ from django.db import IntegrityError
 from django.db import transaction
 from mongoengine.errors import NotUniqueError
 from copy import deepcopy
+from ondoc.tracking.tasks import save_visit_to_mongo, modify_visit_to_mongo
 
 #from django.utils import timezone
 
@@ -77,11 +78,16 @@ class EventCreateViewSet(GenericViewSet):
                     if request.user.is_authenticated:
                         user = request.user
 
-                    # track_models.TrackingEvent.save_event(event_name=event_name, data=data, visit_id=visit_id, user=user,
+                    # track_models.TrackingEvent.save_event(event_name=event_name, data=data, visit_id=visit_id,
+                    #                                       user=user,
                     #                                       triggered_at=triggered_at)
                     if settings.MONGO_STORE:
-                        track_mongo_models.TrackingEvent.save_event(visitor_id=visitor_id, event_name=event_name, data=data,
-                                                                    visit_id=visit_id, user=user, triggered_at=triggered_at)
+                        # track_mongo_models.TrackingEvent.save_event(
+                        #                                  visitor_id=visitor_id, event_name=event_name, data=data,
+                        #                                  visit_id=visit_id, user=user, triggered_at=triggered_at)
+
+                        save_visit_to_mongo.apply_async(({'visitor_id': visitor_id, 'event_name': event_name, 'event_data': data,
+                                                          'visit_id': visit_id, 'user': user, 'triggered_at': triggered_at},), countdown=5, queue=settings.RABBITMQ_LOGS_QUEUE)
 
                     if not "error" in resp:
                         resp['success'] = "Event Saved Successfully!"
@@ -98,7 +104,8 @@ class EventCreateViewSet(GenericViewSet):
             if not "error" in resp:
                 # self.modify_visit(event_name, visit_id, visitor_id, data, userAgent, track_models.TrackingVisit, track_models.TrackingVisitor)
                 if settings.MONGO_STORE:
-                    self.modify_visit(event_name, visit_id, visitor_id, data, userAgent, track_mongo_models.TrackingVisit, track_mongo_models.TrackingVisitor)
+                    # self.modify_visit(event_name, visit_id, visitor_id, data, userAgent, track_mongo_models.TrackingVisit, track_mongo_models.TrackingVisitor)
+                    modify_visit_to_mongo.apply_async(({'event_name': event_name, 'visit_id': visit_id, 'visitor_id': visitor_id, 'event_data': data, 'user_agent': userAgent},), countdown=5, queue=settings.RABBITMQ_LOGS_QUEUE)
 
         except Exception as e:
             # logger.info("Error saving event - " + str(e))
