@@ -162,32 +162,38 @@ class PlusOrderViewSet(viewsets.GenericViewSet):
                     pre_insured_members['title'] = member['title']
                     pre_insured_members['first_name'] = member['first_name']
                     pre_insured_members['last_name'] = member.get('last_name') if member.get('last_name') else ''
-                    pre_insured_members['address'] = member['address']
-                    pre_insured_members['pincode'] = member['pincode']
-                    pre_insured_members['city'] = member['city']
-                    pre_insured_members['city_code'] = member['city_code']
-                    pre_insured_members['email'] = member['email']
-                    pre_insured_members['relation'] = member['relation']
+                    # pre_insured_members['address'] = member['address']
+                    # pre_insured_members['pincode'] = member['pincode']
+                    # pre_insured_members['city'] = member['city']
+                    # pre_insured_members['city_code'] = member['city_code']
+                    # pre_insured_members['email'] = member['email']
+                    # pre_insured_members['relation'] = member['relation']
+                    pre_insured_members['address'] = member.get('address', None)
+                    pre_insured_members['pincode'] = member.get('pincode', None)
+                    pre_insured_members['city'] = member.get('city', None)
+                    pre_insured_members['city_code'] = member.get('city_code', None)
+                    pre_insured_members['email'] = member.get('email', None)
+                    pre_insured_members['relation'] = member.get('relation', None)
                     pre_insured_members['profile'] = member.get('profile').id if member.get(
                         'profile') is not None else None
 
                     plus_members.append(pre_insured_members.copy())
 
-                    if member['relation'] == PlusMembers.Relations.SELF:
-                        if member['profile']:
-                            user_profile = UserProfile.objects.filter(id=member['profile'].id,
-                                                                      user_id=request.user.pk).values('id', 'name',
-                                                                                                      'email',
-                                                                                                      'gender',
-                                                                                                      'user_id',
-                                                                                                      'phone_number').first()
+                    # if member['relation'] == PlusMembers.Relations.SELF:
+                    if member['profile']:
+                        user_profile = UserProfile.objects.filter(id=member['profile'].id,
+                                                                  user_id=request.user.pk).values('id', 'name',
+                                                                                                  'email',
+                                                                                                  'gender',
+                                                                                                  'user_id',
+                                                                                                  'phone_number').first()
 
-                            user_profile['dob'] = member['dob']
+                        user_profile['dob'] = member['dob']
 
-                        else:
-                            last_name = member.get('last_name') if member.get('last_name') else ''
-                            user_profile = {"name": member['first_name'] + " " + last_name, "email":
-                                member['email'], "dob": member['dob']}
+                    else:
+                        last_name = member.get('last_name') if member.get('last_name') else ''
+                        user_profile = {"name": member['first_name'] + " " + last_name, "email":
+                            member['email'], "dob": member['dob']}
 
             utm_source = request.data.get('utm_spo_tags', {}).get('utm_source', None)
             utm_term = request.data.get('utm_spo_tags', {}).get('utm_term', None)

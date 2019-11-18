@@ -666,6 +666,12 @@ class UserProfile(TimeStampedModel):
 
         return None
 
+    def verify_profile(self):
+        if self.dob and self.email and self.name:
+            return True
+        else:
+            return False
+
     @cached_property
     def get_temp_plus_membership(self):
         from ondoc.plus.models import TempPlusUser
