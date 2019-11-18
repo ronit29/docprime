@@ -1,11 +1,15 @@
+from django.utils import timezone
 from fluent_comments.models import FluentComment
 from rest_framework import serializers
 
+from ondoc.api.v1.utils import form_time_slot
 from ondoc.common.models import GlobalNonBookable, DeviceDetails, LastUsageTimestamp, DocumentsProofs
 from ondoc.authentication.models import UserProfile, User
 from ondoc.common.models import GlobalNonBookable, AppointmentHistory
 from ondoc.diagnostic.models import Lab
+from ondoc.doctor.models import Doctor, Hospital, OpdAppointment, DoctorClinicTiming
 from ondoc.lead.models import SearchLead
+from ondoc.plus.models import PlusPlans
 
 
 class EmailSerializer(serializers.Serializer):
@@ -126,3 +130,48 @@ class DocumentProofUploadSerializer(serializers.ModelSerializer):
     class Meta:
         model = DocumentsProofs
         fields = ('proof_file', 'user')
+
+
+class OpdPriceUtilitySerializer(serializers.Serializer):
+    doctor = serializers.PrimaryKeyRelatedField(queryset=Doctor.objects.filter(is_live=True))
+    hospital = serializers.PrimaryKeyRelatedField(queryset=Hospital.objects.filter(is_live=True))
+    gold_vip_plan = serializers.ListField(child=serializers.PrimaryKeyRelatedField(required=False, queryset=PlusPlans.objects.filter(is_live=True, enabled=True, is_gold=True)),  required=False)
+    start_date = serializers.DateTimeField(allow_null=True)
+    start_time = serializers.FloatField(allow_null=True)
+    time_slot_start = serializers.DateTimeField(required=False, allow_null=True)
+
+    def validate(self, data):
+
+        if not data.get('gold_vip_plan'):
+            data['gold_vip_plan'] = PlusPlans.objects.filter(is_live=True, enabled=True, is_gold=True)
+
+        doctor_clinic = data.get('doctor').doctor_clinics.filter(hospital=data.get('hospital'), enabled=True).first()
+        if not doctor_clinic:
+            raise serializers.ValidationError("Doctor Hospital not related.")
+
+        time_slot_start = data.get('time_slot_start')
+
+        if not time_slot_start:
+            if data.get('start_date') and data.get('start_time'):
+                time_slot_start = form_time_slot(data.get('start_date'), data.get('start_time'))
+
+        if data.get('start_time') and data.get('start_date') and time_slot_start:
+            doctor_clinic_timing_obj = DoctorClinicTiming.objects.filter(doctor_clinic__doctor=data.get('doctor'),
+                                                     doctor_clinic__hospital=data.get('hospital'),
+                                                     day=time_slot_start.weekday(), start__gte=data.get("start_time")).first()
+        else:
+            doctor_clinic_timing_obj = DoctorClinicTiming.objects.filter(doctor_clinic__doctor=data.get('doctor'),
+                                                     doctor_clinic__hospital=data.get('hospital')).order_by('id').first()
+
+        if not doctor_clinic_timing_obj:
+            raise serializers.ValidationError('Invalid doctor or hospital or invalid timeslot.')
+
+        data['doctor_clinic'] = doctor_clinic
+        data['doctor_clinic_timing'] = doctor_clinic_timing_obj
+        return data
+
+
+class LabPriceUtilitySerializer(serializers.Serializer):
+    lab_tests = serializers.ListField(child=serializers.IntegerField(), required=True)
+    lab = serializers.PrimaryKeyRelatedField(queryset=Lab.objects.all(), required=True)
+    gold_vip_plan = serializers.ListField(child=serializers.PrimaryKeyRelatedField(required=False, queryset=PlusPlans.objects.filter(is_live=True, enabled=True)),  required=False)

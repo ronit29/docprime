@@ -26,6 +26,8 @@ class PgLogs(DynamicDocument, TimeStampedModel):
     CHAT_CONSULTATION_CANCEL = 9
     ECONSULT_ORDER_REQUEST = 10
     REFUND_REQUEST_RESPONSE = 11
+    RESPONSE_TO_CHAT = 12
+    ACK_TO_PG = 13
 
     id = UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     order_id = LongField(null=True, blank=True, editable=False)

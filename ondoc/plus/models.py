@@ -242,8 +242,9 @@ class PlusPlans(auth_model.TimeStampedModel, LiveMixin):
 
 
 class PlusPlanUtmSources(auth_model.TimeStampedModel):
-    source = models.CharField(max_length=100, null=False, blank=False)
+    source = models.CharField(max_length=100, null=False, blank=False, unique=True)
     source_details = models.CharField(max_length=500, null=True, blank=True)
+    create_lead = models.NullBooleanField()
 
     def __str__(self):
         return "{}".format(self.source)
