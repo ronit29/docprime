@@ -4,7 +4,13 @@ from math import floor
 
 class AbstractCriteria(object):
     def __init__(self, plus_obj, plan=None):
-        self.plus_obj = plus_obj if plus_obj.__class__.__name__ == 'PlusUser' else None
+        if plus_obj.__class__.__name__ == 'PlusUser':
+            self.plus_obj = plus_obj
+        elif plus_obj.__class__.__name__ == 'TempPlusUser':
+            self.plus_obj = plus_obj
+        else:
+            self.plus_obj = None
+        # self.plus_obj = plus_obj if plus_obj.__class__.__name__ == 'PlusUser' else None
         self.plus_plan = plus_obj.plan if plus_obj.__class__.__name__ == 'PlusUser' else plan
         self.utilization = plus_obj.get_utilization if plus_obj.__class__.__name__ == 'PlusUser' else {}
 
@@ -63,7 +69,7 @@ class DoctorAmountCount(AbstractCriteria):
         available_count = vip_utilization.get('available_doctor_count', 0)
         total_doctor_count = vip_utilization.get('total_doctor_count_limit', 0)
         mrp = kwargs.get('mrp', 0)
-        plan = self.plus_plan
+        plan = self.plus_obj.plan
         deal_price = int(kwargs.get('deal_price', 0))
         convenience_charge = plan.get_convenience_charge(cost, "DOCTOR")
         total_cost = cost + convenience_charge
@@ -193,7 +199,7 @@ class LabtestAmountCount(AbstractCriteria):
         total_count = vip_utilization.get('total_labtest_count_limit')
         total_amount = vip_utilization.get('total_labtest_amount_limit')
         mrp = kwargs.get('mrp', 0)
-        plan = self.plus_plan
+        plan = self.plus_obj.plan
         deal_price = int(kwargs.get('deal_price', 0))
         convenience_charge = plan.get_convenience_charge(cost, "LABTEST")
         total_cost = cost + convenience_charge
@@ -308,7 +314,7 @@ class PackageAmountCount(AbstractCriteria):
         vip_amount_deducted = 0
         amount_to_be_paid = cost
         mrp = kwargs.get('mrp', 0)
-        plan = self.plus_plan
+        plan = self.plus_obj.plan
         deal_price = int(kwargs.get('deal_price', 0))
         convenience_charge = plan.get_convenience_charge(cost, "LABTEST")
         total_cost = cost + convenience_charge

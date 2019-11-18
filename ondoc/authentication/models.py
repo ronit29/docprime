@@ -675,7 +675,7 @@ class UserProfile(TimeStampedModel):
     @cached_property
     def get_temp_plus_membership(self):
         from ondoc.plus.models import TempPlusUser
-        plus_user = TempPlusUser.objects.filter(profile=self, deleted=0).first()
+        plus_user = TempPlusUser.objects.filter(profile_id=self.id, deleted=0).first()
         return plus_user
 
     def has_image_changed(self):
