@@ -1327,8 +1327,8 @@ class DocumentUploadViewSet(viewsets.GenericViewSet):
 
 class AppointmentUtilityViewSet(viewsets.GenericViewSet):
 
-    authentication_classes = (JWTAuthentication,)
-    permission_classes = (IsAuthenticated,)
+    # authentication_classes = (JWTAuthentication,)
+    # permission_classes = (IsAuthenticated,)
 
     def get_prices(self, request, service_type=None, *args, **kwargs):
         if not service_type or service_type not in ['opd', 'lab']:
