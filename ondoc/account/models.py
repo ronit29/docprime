@@ -2989,6 +2989,29 @@ class PaymentProcessStatus(TimeStampedModel):
         db_table = "payment_process_status"
 
     @classmethod
+    def save_single_payment_status(cls, current_status, args):
+        user_id = args.get('user_id')
+        order_ids = args.get('order_ids')
+        status_code = args.get('status_code')
+        source = args.get('source')
+
+        for order_id in order_ids:
+            if not order_id:
+                continue
+
+            payment_process_status = PaymentProcessStatus.objects.filter(order_id=order_id).first()
+            if not payment_process_status:
+                payment_process_status = PaymentProcessStatus(order_id=order_id)
+
+            if user_id:
+                payment_process_status.user_id = user_id
+            payment_process_status.status_code = status_code
+            payment_process_status.source = source
+            payment_process_status.current_status = current_status
+
+            payment_process_status.save()
+
+    @classmethod
     def save_payment_status(cls, current_status, args):
         user_id = args.get('user_id')
         order_id = args.get('order_id')

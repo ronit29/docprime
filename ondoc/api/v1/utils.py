@@ -590,9 +590,10 @@ def single_booking_payment_details(request, orders):
     pgdata.update(filtered_pgdata)
     pgdata['hash'] = PgTransaction.create_pg_hash(pgdata, secret_key, client_key)
 
-    # args = {'user_id': user.id, 'order_id': order.id, 'source': 'ORDER_CREATE'}
-    # save_payment_status.apply_async((PaymentProcessStatus.INITIATE, args), eta=timezone.localtime(),)
-    # save_pg_response.apply_async((PgLogs.TXN_REQUEST, order.id, None, None, pgdata, user.id), eta=timezone.localtime(), queue=settings.RABBITMQ_LOGS_QUEUE)
+    order_ids = list(map(lambda x: x['orderId'], orders_list))
+    args = {'user_id': user.id, 'order_ids': order_ids, 'source': 'ORDER_CREATE'}
+    save_payment_status.apply_async((PaymentProcessStatus.INITIATE, args), eta=timezone.localtime(),)
+    save_pg_response.apply_async((PgLogs.TXN_REQUEST, order_ids, None, None, pgdata, user.id), eta=timezone.localtime(), queue=settings.RABBITMQ_LOGS_QUEUE)
     # print(pgdata)
     return pgdata, payment_required
 
