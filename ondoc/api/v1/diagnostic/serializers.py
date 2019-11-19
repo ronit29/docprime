@@ -817,7 +817,7 @@ class CommonPackageSerializer(serializers.ModelSerializer):
         request = self.context.get("request")
         resp = Lab.get_vip_details(request.user)
         user = request.user
-        mrp = obj._selected_test.mrp
+        mrp = obj._selected_test.mrp if obj._selected_test else None
         deal_price = obj._selected_test.custom_deal_price if obj._selected_test.custom_deal_price else obj._selected_test.computed_deal_price
         agreed_price = obj._selected_test.custom_agreed_price if obj._selected_test.custom_agreed_price else obj._selected_test.computed_agreed_price
         lab_obj = Lab.objects.filter(id=obj.lab_id).first()
