@@ -2628,7 +2628,7 @@ class DoctorSponsoredServicesAdmin(ImportExportMixin, CompareVersionAdmin):
     resource_class = DoctorSponsoredServicesResource
 
 
-class RecordForm(forms.ModelForm):
+class GoogleMapRecordForm(forms.ModelForm):
    location = forms.CharField(widget=forms.TextInput(attrs={'class': 'form-control'}), required =True)
    text = forms.CharField(widget=forms.Textarea(attrs={'class': 'form-control'}), required = True)
 
@@ -2640,4 +2640,4 @@ class RecordForm(forms.ModelForm):
 
 
 class RecordAdmin(VersionAdmin, ActionAdmin):
-    form = RecordForm
+    form = GoogleMapRecordForm

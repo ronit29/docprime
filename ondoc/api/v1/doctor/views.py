@@ -5304,8 +5304,8 @@ def record_map(request):
 
 # create a new location
 def create_record(request):
-    from ondoc.crm.admin.doctor import RecordForm
-    form = RecordForm(request.POST or None)
+    from ondoc.crm.admin.doctor import GoogleMapRecordForm
+    form = GoogleMapRecordForm(request.POST or None)
 
     if form.is_valid():
         instance = form.save(commit=False)
