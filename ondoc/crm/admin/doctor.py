@@ -53,7 +53,7 @@ from ondoc.doctor.models import (Doctor, DoctorQualification,
                                  UploadDoctorData, CancellationReason, Prescription, PrescriptionFile,
                                  SimilarSpecializationGroup, SimilarSpecializationGroupMapping, PurchaseOrderCreation,
                                  DoctorSponsoredServices, SponsoredServicePracticeSpecialization, SponsoredServices,
-                                 HospitalSponsoredServices)
+                                 HospitalSponsoredServices, GoogleMapRecords)
 
 from ondoc.authentication.models import User
 from .common import *
@@ -2627,3 +2627,17 @@ class DoctorSponsoredServicesAdmin(ImportExportMixin, CompareVersionAdmin):
     formats = (base_formats.XLS, base_formats.XLSX,)
     resource_class = DoctorSponsoredServicesResource
 
+
+class RecordForm(forms.ModelForm):
+   location = forms.CharField(widget=forms.TextInput(attrs={'class': 'form-control'}), required =True)
+   text = forms.CharField(widget=forms.Textarea(attrs={'class': 'form-control'}), required = True)
+
+   class Meta:
+       model = GoogleMapRecords
+       fields = [
+         "location","text",
+       ]
+
+
+class RecordAdmin(VersionAdmin, ActionAdmin):
+    form = RecordForm

@@ -36,7 +36,7 @@ class DynamicTemplateForm(forms.ModelForm):
         super().clean()
         cleaned_data = self.cleaned_data
         if cleaned_data.get('template_type') == DynamicTemplates.TemplateType.EMAIL and not cleaned_data.get('subject'):
-            raise forms.ValidationError('Subject is required for email templates.')
+            raise forms.ValidationError('Subject is required for email static.')
 
         recipient_address = cleaned_data.get('recipient')
 

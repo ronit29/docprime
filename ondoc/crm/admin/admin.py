@@ -23,7 +23,7 @@ from ondoc.doctor.models import (Doctor, Language, MedicalService, Specializatio
                                  DoctorMobileOtp, UploadDoctorData, DoctorLeave, HealthInsuranceProvider,
                                  CommonHospital, SimilarSpecializationGroup, PurchaseOrderCreation, SponsoredServices,
                                  HospitalSponsoredServices, DoctorSponsoredServices,
-                                 SponsoredServicePracticeSpecialization)
+                                 SponsoredServicePracticeSpecialization, GoogleMapRecords)
 
 from ondoc.diagnostic.models import (Lab, LabNetwork, LabTest, LabTestType, LabService,
                                      AvailableLabTest, LabAppointment, CommonTest, CommonDiagnosticCondition,
@@ -331,6 +331,4 @@ admin.site.register(TestSamplesLabAlerts, TestSamplesLabAlertAdmin)
 admin.site.register(PartnerLabSamplesCollectOrder, PartnerLabSamplesCollectOrderAdmin)
 admin.site.register(SearchCriteria, SearchCriteriaAdmin)
 admin.site.register(Permission, PermissionAdmin)
-
-
-
+admin.site.register(GoogleMapRecords)

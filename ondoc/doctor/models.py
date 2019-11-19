@@ -5252,3 +5252,15 @@ class SponsoredServicePracticeSpecialization(auth_model.TimeStampedModel):
 
     class Meta:
         db_table = "specialization_sponsored_services"
+
+
+class GoogleMapRecords(auth_model.TimeStampedModel):
+    location = models.CharField(max_length=100)
+    text = models.CharField(max_length=500)
+    latitude = models.DecimalField(max_digits=9, decimal_places=6, default=None)
+    longitude = models.DecimalField(max_digits=9, decimal_places=6, default=None)
+    label = models.CharField(max_length=100, null=True)
+    image = models.URLField(max_length=500, null= True)
+
+    class Meta:
+        db_table = "google_map_records"
