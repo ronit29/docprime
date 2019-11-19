@@ -650,6 +650,24 @@ class Order(TimeStampedModel):
         return payable_amount
 
     @classmethod
+    def get_single_booking_total_payable_amount(cls, app):
+        from ondoc.doctor.models import OpdAppointment
+        from ondoc.plus.models import PlusUser
+        from ondoc.plus.models import TempPlusUser
+        payable_amount = 0
+        if app.get('payment_type') == OpdAppointment.VIP or app.get('payment_type') == OpdAppointment.GOLD:
+            plus_user = PlusUser.objects.filter(id=app.get('plus_plan')).first()
+            if not plus_user:
+                plus_user = TempPlusUser.objects.filter(id=app.get('plus_plan'), deleted=0).first()
+            if not plus_user:
+                payable_amount += app.get('effective_price')
+                return payable_amount
+            payable_amount = payable_amount + int(app.get('effective_price', 0))
+        if app.get("payment_type") == OpdAppointment.PREPAID:
+            payable_amount += app.get('effective_price')
+        return payable_amount
+
+    @classmethod
     def transfrom_cart_items(cls, request, cart_items):
         fulfillment_data = []
         for item in cart_items:
@@ -857,7 +875,7 @@ class Order(TimeStampedModel):
         fulfillment_data = copy.deepcopy(fulfillment_data)
         order_list = []
         for appointment_detail in fulfillment_data:
-            payable_amount = cls.get_total_payable_amount(appointment_detail)
+            payable_amount = cls.get_single_booking_total_payable_amount(appointment_detail)
             action = None
             if appointment_detail.get('doctor'):
                 product_id = Order.DOCTOR_PRODUCT_ID
