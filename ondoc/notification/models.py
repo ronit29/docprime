@@ -157,6 +157,8 @@ class NotificationAction:
     PARTNER_LAB_REPORT_UPLOADED = 209
     PARTNER_LAB_ORDER_PLACED_SUCCESSFULLY = 210
 
+    IPD_Intimate_Email_Notification = 301
+
     NOTIFICATION_TYPE_CHOICES = (
         (APPOINTMENT_ACCEPTED, "Appointment Accepted"),
         (APPOINTMENT_CANCELLED, "Appointment Cancelled"),
@@ -232,6 +234,8 @@ class NotificationAction:
         (PARTNER_LAB_NEED_HELP, 'Partner Lab Need Help'),
         (PARTNER_LAB_REPORT_UPLOADED, 'Partner Lab Report Uploaded'),
         (PARTNER_LAB_ORDER_PLACED_SUCCESSFULLY, 'Partner Lab Order Placed Successfully'),
+
+        (IPD_Intimate_Email_Notification, 'IPD Intimate Email Sent Successfully'),
     )
     OPD_APPOINTMENT = "opd_appointment"
     LAB_APPOINTMENT = "lab_appoingment"
@@ -509,6 +513,12 @@ class NotificationAction:
             }
             EmailNotification.send_notification(user=user, notification_type=notification_type,
                                                 context=context, email=proposer.email)
+        elif notification_type == NotificationAction.IPD_Intimate_Email_Notification:
+
+            context = {
+
+            }
+            NotificationAction.trigger_all(user=user, notification_type=notification_type, context=context)
 
 
     @classmethod
