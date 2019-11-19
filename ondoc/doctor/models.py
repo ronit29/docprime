@@ -5261,6 +5261,7 @@ class GoogleMapRecords(auth_model.TimeStampedModel):
     longitude = models.DecimalField(max_digits=9, decimal_places=6, default=None)
     label = models.CharField(max_length=100, null=True)
     image = models.URLField(max_length=500, null= True)
+    reason = models.TextField(null=True, blank=True)
 
     class Meta:
         db_table = "google_map_records"
