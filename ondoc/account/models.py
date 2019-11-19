@@ -1624,7 +1624,7 @@ class ConsumerAccount(TimeStampedModel):
         db_table = "consumer_account"
 
 
-class ConsumerTransaction(TimeStampedModel):
+class ConsumerTransaction(TimeStampedModel, SoftDelete):
     CANCELLATION = 0
     PAYMENT = 1
     REFUND = 2
