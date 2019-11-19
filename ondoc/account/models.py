@@ -917,7 +917,17 @@ class Order(TimeStampedModel):
             else:
                 appointment_detail = plus_subscription_transform(appointment_detail)
 
-            if appointment_detail.get('payment_type') == OpdAppointment.PREPAID:
+            if appointment_detail.get('payment_type') in [OpdAppointment.GOLD]:
+                order = cls.objects.create(
+                    product_id=product_id,
+                    action=action,
+                    action_data=appointment_detail,
+                    payment_status=cls.PAYMENT_PENDING,
+                    parent=None,
+                    cart_id=appointment_detail.get('cart_item_id', None),
+                    user=user
+                )
+            else:
                 order = cls.objects.create(
                     product_id=product_id,
                     action=action,
@@ -929,28 +939,7 @@ class Order(TimeStampedModel):
                 )
                 if product_id == Order.VIP_PRODUCT_ID:
                     single_booking_id = order.id
-            elif appointment_detail.get('payment_type') in [OpdAppointment.INSURANCE, OpdAppointment.VIP, OpdAppointment.GOLD]:
-                order = cls.objects.create(
-                    product_id=product_id,
-                    action=action,
-                    action_data=appointment_detail,
-                    payment_status=cls.PAYMENT_PENDING,
-                    parent=None,
-                    cart_id=appointment_detail.get('cart_item_id', None),
-                    user=user
-                )
 
-            elif appointment_detail.get('payment_type') == OpdAppointment.COD or appointment_detail.get(
-                    'payment_type') == OpdAppointment.PLAN:
-                order = cls.objects.create(
-                    product_id=product_id,
-                    action=action,
-                    action_data=appointment_detail,
-                    payment_status=cls.PAYMENT_PENDING,
-                    parent=None,
-                    cart_id=appointment_detail["cart_item_id"],
-                    user=user
-                )
             if not order.product_id == Order.VIP_PRODUCT_ID:
                 order.single_booking_id = single_booking_id
                 order.save()
