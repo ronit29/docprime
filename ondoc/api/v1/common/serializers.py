@@ -175,3 +175,10 @@ class LabPriceUtilitySerializer(serializers.Serializer):
     lab_tests = serializers.ListField(child=serializers.IntegerField(), required=True)
     lab = serializers.PrimaryKeyRelatedField(queryset=Lab.objects.all(), required=True)
     gold_vip_plan = serializers.ListField(child=serializers.PrimaryKeyRelatedField(required=False, queryset=PlusPlans.objects.filter(is_live=True, enabled=True)),  required=False)
+
+    def validate(self, data):
+
+        if not data.get('gold_vip_plan'):
+            data['gold_vip_plan'] = PlusPlans.objects.filter(is_live=True, enabled=True, is_gold=True)
+
+        return data
