@@ -55,7 +55,7 @@ from ondoc.api.v1.insurance.serializers import (InsuranceTransactionSerializer)
 from ondoc.api.v1.diagnostic.views import LabAppointmentView
 from ondoc.diagnostic.models import (Lab, LabAppointment, AvailableLabTest, LabNetwork)
 from ondoc.payout.models import Outstanding
-from ondoc.authentication.backends import JWTAuthentication, BajajAllianzAuthentication, MatrixUserAuthentication
+from ondoc.authentication.backends import JWTAuthentication, BajajAllianzAuthentication, MatrixUserAuthentication, SbiGAuthentication
 from ondoc.api.v1.utils import (IsConsumer, IsDoctor, opdappointment_transform, labappointment_transform,
                                 ErrorCodeMapping, IsNotAgent, GenericAdminEntity, generate_short_url, form_time_slot)
 from django.conf import settings
@@ -2517,12 +2517,10 @@ class MatrixUserViewset(GenericViewSet):
         return Response(response, status=status.HTTP_200_OK)
 
 
-
-class BajajAllianzUserViewset(GenericViewSet):
-    authentication_classes = (BajajAllianzAuthentication,)
+class ExternalLoginViewSet(GenericViewSet):
 
     @transaction.atomic()
-    def user_login_via_bagic(self, request):
+    def get_external_login_response(self, request):
         from django.http import JsonResponse
         response = {'login': 0}
         if request.method != 'POST':
@@ -2547,6 +2545,24 @@ class BajajAllianzUserViewset(GenericViewSet):
         }
 
         return Response(response, status=status.HTTP_200_OK)
+
+
+class BajajAllianzUserViewset(GenericViewSet):
+    authentication_classes = (BajajAllianzAuthentication,)
+
+    @transaction.atomic()
+    def user_login_via_bagic(self, request):
+        response = ExternalLoginViewSet().get_external_login_response(request)
+        return response
+
+
+class SbiGUserViewset(GenericViewSet):
+    authentication_classes = (SbiGAuthentication,)
+
+    @transaction.atomic()
+    def user_login_via_sbig(self, request):
+        response = ExternalLoginViewSet().get_external_login_response(request)
+        return response
 
 
 # class CloudLabUserViewSet(viewsets.GenericViewSet):
