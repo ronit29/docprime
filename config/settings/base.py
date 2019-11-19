@@ -160,7 +160,8 @@ THIRD_PARTY_APPS = (
     'qrcode',
     'Crypto',
     'multiselectfield',
-    'django_select2'
+    'django_select2',
+    'geopy'
 )
 
 
@@ -279,7 +280,7 @@ TEMPLATES = [
         'BACKEND': 'django.template.backends.django.DjangoTemplates',
         # https://docs.djangoproject.com/en/dev/ref/settings/#template-dirs
         'DIRS': [
-            str(APPS_DIR.path('templates')),
+            str(APPS_DIR.path('static')),
         ],
         'OPTIONS': {
             # https://docs.djangoproject.com/en/dev/ref/settings/#template-debug

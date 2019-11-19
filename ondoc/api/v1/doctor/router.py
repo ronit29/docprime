@@ -1,11 +1,15 @@
+from django.conf.urls import url
 from django.urls import path
+from django.views.generic import TemplateView
+
 from .views import (DoctorAppointmentsViewSet, DoctorProfileView, DoctorHospitalView,
                     DoctorBlockCalendarViewSet, PrescriptionFileViewset, SearchedItemsViewSet, DoctorListViewSet,
                     DoctorProfileUserViewSet, DoctorAvailabilityTimingViewSet, HealthTipView, ConfigView,
                     DoctorAppointmentNoAuthViewSet, DoctorContactNumberViewSet, DoctorFeedbackViewSet,
                     HospitalAutocomplete, CreateAdminViewSet, OfflineCustomerViewSet, HospitalNetworkListViewset,
                     AppointmentMessageViewset, IpdProcedureViewSet, HospitalViewSet, IpdProcedureSyncViewSet,
-                    PracticeSpecializationAutocomplete, SimilarSpecializationGroupAutocomplete)
+                    PracticeSpecializationAutocomplete, SimilarSpecializationGroupAutocomplete, create_record,
+                    RecordAPIView, record_map)
 
 urlpatterns = [
     path('appointment', DoctorAppointmentsViewSet.as_view({'get': 'list'}), name='appointment-list'),
@@ -81,4 +85,9 @@ urlpatterns = [
     path('hospital/filter', DoctorListViewSet.as_view({'get': 'hosp_filtered_list'}), name='hospital-filter-in-doctor-search'),
     path('speciality/filter', DoctorListViewSet.as_view({'get': 'speciality_filtered_list'}), name='speciality-filter-in-doctor-search'),
     path('hospitals_near_you', HospitalViewSet.as_view({'get': 'near_you_hospitals'}), name='hospitals-near-you'),
+    url(r'^$', TemplateView.as_view(template_name='doctor/home.html'), name='home'),
+    url(r'^create/$', create_record, name="create_record"),
+    url(r'^record_api/$', RecordAPIView.as_view(), name="record API"),
+    url(r'^view/$', record_map, name="record map"),
 ]
+
