@@ -1245,6 +1245,7 @@ class TransactionViewSet(viewsets.GenericViewSet):
 
     @transaction.atomic()
     def save(self, request):
+        from ondoc.api.v1.utils import format_return_value
 #         LAB_REDIRECT_URL = settings.BASE_URL + "/lab/appointment"
 #         OPD_REDIRECT_URL = settings.BASE_URL + "/opd/appointment"
 #         INSURANCE_REDIRECT_URL = settings.BASE_URL + "/insurance/complete"
@@ -1310,19 +1311,21 @@ class TransactionViewSet(viewsets.GenericViewSet):
                             is_preauth = True
                             pg_txn.status_code = response.get('statusCode')
                             pg_txn.status_type = response.get('txStatus')
-                            pg_txn.payment_mode = response.get("paymentMode")
-                            pg_txn.bank_name = response.get('bankName')
-                            pg_txn.transaction_id = response.get('pgTxId')
-                            pg_txn.bank_id = response.get('bankTxId')
+                            pg_txn.payment_mode = format_return_value(response.get("paymentMode"))
+                            pg_txn.bank_name = format_return_value(response.get('bankName'))
+                            pg_txn.transaction_id = format_return_value(response.get('pgTxId'))
+                            pg_txn.bank_id = format_return_value(response.get('bankTxId'))
                             #pg_txn.payment_captured = True
                             pg_txn.save()
 
-                            ctx_txn = ConsumerTransaction.objects.filter(order_id=pg_txn.order_.id,
+                            ctx_txn = ConsumerTransaction.objects.filter(order_id=pg_txn.order_id,
                                                                          action=ConsumerTransaction.PAYMENT).last()
-                            ctx_txn.transaction_id = response.get('pgTxId')
+                            ctx_txn.transaction_id = format_return_value(response.get('pgTxId'))
                             ctx_txn.save()
 
-                            if response.get('txStatus') in ['TXN_SUCCESS', 'TXN_RELEASE']:
+                            # this will acknowledge all status if current status is txn_authorize
+                            # if response.get('txStatus') in ['TXN_SUCCESS', 'TXN_RELEASE']:
+                            if not response.get('txStatus') == 'TXN_AUTHORIZE':
                                 send_pg_acknowledge.apply_async((pg_txn.order_id, pg_txn.order_no, 'capture'), countdown=1)
                         send_pg_acknowledge.apply_async((pg_txn.order_id, pg_txn.order_no,), countdown=1)
                         if pg_txn.product_id == Order.CHAT_PRODUCT_ID:
