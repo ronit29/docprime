@@ -969,6 +969,7 @@ class PlusUser(auth_model.TimeStampedModel, RefundMixin, TransactionMixin):
 
     @classmethod
     def create_fulfillment_data(cls, data):
+        from ondoc.doctor.models import OpdAppointment
         plus_user = dict()
         resp = {}
         plus_plan = data.get('plus_plan')
@@ -999,7 +1000,7 @@ class PlusUser(auth_model.TimeStampedModel, RefundMixin, TransactionMixin):
                           'user': profile.user.id, "plus_members": plus_members}
 
         resp = {"profile_detail": primary_user_profile, "user": profile.user.id, "plus_user": plus_user,
-                "plus_plan": plus_plan.id}
+                "plus_plan": plus_plan.id, "effective_price": amount, "payment_type": OpdAppointment.GOLD}
 
         return resp
 
