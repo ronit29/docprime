@@ -1133,8 +1133,8 @@ class PlusMembers(auth_model.TimeStampedModel):
     dob = models.DateField(blank=False, null=False)
     email = models.EmailField(max_length=100, null=True)
     relation = models.CharField(max_length=50, choices=Relations.as_choices(), default=None, null=True)
-    pincode = models.PositiveIntegerField(default=None)
-    address = models.TextField(default=None)
+    pincode = models.PositiveIntegerField(default=None, null=True)
+    address = models.TextField(default=None, null=True)
     gender = models.CharField(max_length=50, choices=GENDER_CHOICES, default=None, null=True)
     phone_number = models.BigIntegerField(blank=True, null=True,
                                           validators=[MaxValueValidator(9999999999), MinValueValidator(1000000000)])
