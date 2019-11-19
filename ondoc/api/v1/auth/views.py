@@ -1245,6 +1245,7 @@ class TransactionViewSet(viewsets.GenericViewSet):
 
     @transaction.atomic()
     def save(self, request):
+        from ondoc.api.v1.utils import format_return_value
 #         LAB_REDIRECT_URL = settings.BASE_URL + "/lab/appointment"
 #         OPD_REDIRECT_URL = settings.BASE_URL + "/opd/appointment"
 #         INSURANCE_REDIRECT_URL = settings.BASE_URL + "/insurance/complete"
@@ -1295,8 +1296,8 @@ class TransactionViewSet(viewsets.GenericViewSet):
                 status_type = PaymentProcessStatus.get_status_type(pg_resp_code, response.get('txStatus'))
 
                 # PgLogs.objects.create(decoded_response=response, coded_response=coded_response)
-                save_pg_response.apply_async((mongo_pglogs.TXN_RESPONSE, response.get("orderId"), None, response, None, response.get('customerId')), eta=timezone.localtime(), )
-                save_payment_status.apply_async((status_type, args), eta=timezone.localtime(), )
+                save_pg_response.apply_async((mongo_pglogs.TXN_RESPONSE, response.get("orderId"), None, response, None, response.get('customerId')), eta=timezone.localtime(), queue=settings.RABBITMQ_LOGS_QUEUE)
+                save_payment_status.apply_async((status_type, args), eta=timezone.localtime(),)
             except Exception as e:
                 logger.error("Cannot log pg response - " + str(e))
 
@@ -1310,25 +1311,29 @@ class TransactionViewSet(viewsets.GenericViewSet):
                             is_preauth = True
                             pg_txn.status_code = response.get('statusCode')
                             pg_txn.status_type = response.get('txStatus')
-                            pg_txn.payment_mode = response.get("paymentMode")
-                            pg_txn.bank_name = response.get('bankName')
-                            pg_txn.transaction_id = response.get('pgTxId')
-                            pg_txn.bank_id = response.get('bankTxId')
+                            pg_txn.payment_mode = format_return_value(response.get("paymentMode"))
+                            pg_txn.bank_name = format_return_value(response.get('bankName'))
+                            pg_txn.transaction_id = format_return_value(response.get('pgTxId'))
+                            pg_txn.bank_id = format_return_value(response.get('bankTxId'))
                             #pg_txn.payment_captured = True
                             pg_txn.save()
 
-                            ctx_txn = ConsumerTransaction.objects.filter(order_id=pg_txn.order_.id,
+                            ctx_txn = ConsumerTransaction.objects.filter(order_id=pg_txn.order_id,
                                                                          action=ConsumerTransaction.PAYMENT).last()
-                            ctx_txn.transaction_id = response.get('pgTxId')
+                            ctx_txn.transaction_id = format_return_value(response.get('pgTxId'))
                             ctx_txn.save()
 
-                            if response.get('txStatus') in ['TXN_SUCCESS', 'TXN_RELEASE']:
+                            # this will acknowledge all status if current status is txn_authorize
+                            # if response.get('txStatus') in ['TXN_SUCCESS', 'TXN_RELEASE']:
+                            if not response.get('txStatus') == 'TXN_AUTHORIZE':
                                 send_pg_acknowledge.apply_async((pg_txn.order_id, pg_txn.order_no, 'capture'), countdown=1)
                         send_pg_acknowledge.apply_async((pg_txn.order_id, pg_txn.order_no,), countdown=1)
                         if pg_txn.product_id == Order.CHAT_PRODUCT_ID:
                             chat_order = Order.objects.filter(pk=pg_txn.order_id).first()
                             if chat_order:
                                 CHAT_REDIRECT_URL = CHAT_SUCCESS_REDIRECT_URL % (chat_order.id, chat_order.reference_id)
+                                json_url = '{"url": "%s"}' % CHAT_REDIRECT_URL
+                                save_pg_response.apply_async((mongo_pglogs.RESPONSE_TO_CHAT, chat_order.id, None, json_url, None, None), eta=timezone.localtime(), queue=settings.RABBITMQ_LOGS_QUEUE)
                             return HttpResponseRedirect(redirect_to=CHAT_REDIRECT_URL)
                         else:
                             REDIRECT_URL = (SUCCESS_REDIRECT_URL % pg_txn.order_id) + "?payment_success=true"
@@ -1380,11 +1385,17 @@ class TransactionViewSet(viewsets.GenericViewSet):
                 else:
                     logger.error("Invalid pg data - " + json.dumps(resp_serializer.errors))
             elif order_obj:
-                # try:
-                #     if response and response.get("orderNo") and response.get("orderId"):
-                #         send_pg_acknowledge.apply_async((response.get("orderId"), response.get("orderNo"),), countdown=1)
-                # except Exception as e:
-                #     logger.error("Error in sending pg acknowledge - " + str(e))
+                # send acknowledge if status is TXN_FAILURE to stop callbacks from pg. Do not send acknowledgement if no entry in pg.
+                try:
+                    if response and response.get("orderNo") and response.get("orderId") and response.get(
+                            'txStatus'):
+                        #  Todo - Temporary fix for status_code 5 and success. Need to remove this once pg-team fix this at their end
+                        if pg_resp_code == 5 and response.get('txStatus') == 'TXN_SUCCESS':
+                            send_pg_acknowledge.apply_async((response.get("orderId"), response.get("orderNo"),), countdown=1)
+                        if response.get('txStatus') == 'TXN_FAILURE':
+                            send_pg_acknowledge.apply_async((response.get("orderId"), response.get("orderNo"),), countdown=1)
+                except Exception as e:
+                    logger.error("Error in sending pg acknowledge - " + str(e))
 
                 try:
                     has_changed = order_obj.change_payment_status(Order.PAYMENT_FAILURE)
@@ -1423,6 +1434,9 @@ class TransactionViewSet(viewsets.GenericViewSet):
 
         # return Response({"url": REDIRECT_URL})
         if order_obj.product_id == Order.CHAT_PRODUCT_ID:
+            json_url = '{"url": "%s"}' % CHAT_REDIRECT_URL
+            save_pg_response.apply_async((mongo_pglogs.RESPONSE_TO_CHAT, order_obj.id, None, json_url, None, None),
+                                         eta=timezone.localtime(), queue=settings.RABBITMQ_LOGS_QUEUE)
             return HttpResponseRedirect(redirect_to=CHAT_REDIRECT_URL)
         return HttpResponseRedirect(redirect_to=REDIRECT_URL)
 

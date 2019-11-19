@@ -37,7 +37,7 @@ from ondoc.diagnostic.models import (LabTiming, LabImage,
                                      LabReport, LabReportFile, LabTestCategoryMapping,
                                      LabTestRecommendedCategoryMapping, LabTestGroupTiming, LabTestGroupMapping,
                                      TestParameterChat, LabTestThresholds, LabTestCategoryUrls,
-                                     LabTestCategoryLandingURLS)
+                                     LabTestCategoryLandingURLS, LabtestNameMaster)
 from ondoc.integrations.models import IntegratorHistory, IntegratorLabCode
 from ondoc.notification.models import EmailNotification, NotificationAction
 from ondoc.prescription.models import AppointmentPrescription
@@ -1553,8 +1553,8 @@ class LabTestAdminForm(forms.ModelForm):
                 raise forms.ValidationError('Please dont enter max_age')
             if cleaned_data.get('gender_type'):
                 raise forms.ValidationError('Please dont enter gender_type')
-            if cleaned_data.get('reference_code'):
-                raise forms.ValidationError('Please dont enter reference code for a test')
+            # if cleaned_data.get('reference_code'):
+            #     raise forms.ValidationError('Please dont enter reference code for a test')
 
 
 class LabTestReportThresholdInline(AutoComplete, TabularInline):
@@ -1771,3 +1771,8 @@ class LabTestCategoryLandingURLSInline(admin.TabularInline):
 class LabTestCategoryUrlsAdmin(admin.ModelAdmin):
     model = LabTestCategoryUrls
     inlines = [LabTestCategoryLandingURLSInline]
+
+
+class LabTestNameMasterAdmin(admin.ModelAdmin):
+    models = LabtestNameMaster
+

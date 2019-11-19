@@ -1284,6 +1284,16 @@ class LabTestRecommendedCategoryMapping(models.Model):
         unique_together = (('lab_test', 'parent_category'),)
 
 
+class LabtestNameMaster(auth_model.TimeStampedModel, auth_model.SoftDelete):
+    name = models.CharField(max_length=256, blank=False, null=False)
+
+    def __str__(self):
+        return "{}".format(self.name)
+
+    class Meta:
+        db_table = "labtest_master"
+
+
 class LabTest(TimeStampedModel, SearchKey):
     LAB_TEST_SITEMAP_IDENTIFIER = 'LAB_TEST'
     URL_SUFFIX = 'tpp'
@@ -1358,6 +1368,7 @@ class LabTest(TimeStampedModel, SearchKey):
                                on_delete=models.SET_NULL)
     is_cancellable = models.BooleanField(default=True)
     insurance_cutoff_price = models.PositiveIntegerField(default=None, null=True, blank=True)
+    search_name = models.ForeignKey(LabtestNameMaster, null=True, blank=True, on_delete=models.SET_NULL)
 
     # test_sub_type = models.ManyToManyField(
     #     LabTestSubType,
@@ -1797,42 +1808,50 @@ class LabAppointment(TimeStampedModel, CouponsMixin, LabAppointmentInvoiceMixin,
 
     def sync_with_booking_analytics(self):
 
-        category = None
-        for t in self.tests.all():
-            if t.is_package == True:
-                category = 1
-                break
-            else:
-                category = 0
-
-        promo_cost = self.deal_price - self.effective_price if self.deal_price and self.effective_price else 0
-
-        obj = DP_OpdConsultsAndTests.objects.filter(Appointment_Id=self.id, TypeId=2).first()
-        if not obj:
-            obj = DP_OpdConsultsAndTests()
-            obj.Appointment_Id = self.id
-            obj.CityId = self.get_city()
-            obj.StateId = self.get_state()
-            obj.ProviderId = self.lab.id
-            obj.TypeId = 2
-            obj.PaymentType = self.payment_type if self.payment_type else None
-            obj.Payout = self.agreed_price
-            obj.BookingDate = self.created_at
-        obj.CorporateDealId = self.get_corporate_deal_id()
-        obj.PromoCost = max(0, promo_cost)
-        obj.GMValue = self.deal_price
-        obj.Category = category
-        obj.StatusId = self.status
-        obj.save()
-
         try:
             SyncBookingAnalytics.objects.update_or_create(object_id=self.id,
                                                           content_type=ContentType.objects.get_for_model(LabAppointment),
                                                           defaults={"synced_at": self.updated_at, "last_updated_at": self.updated_at})
         except Exception as e:
+            print(str(e))
             pass
 
-        return obj
+        # category = None
+        # for t in self.tests.all():
+        #     if t.is_package == True:
+        #         category = 1
+        #         break
+        #     else:
+        #         category = 0
+        #
+        # promo_cost = self.deal_price - self.effective_price if self.deal_price and self.effective_price else 0
+        #
+        # obj = DP_OpdConsultsAndTests.objects.filter(Appointment_Id=self.id, TypeId=2).first()
+        # if not obj:
+        #     obj = DP_OpdConsultsAndTests()
+        #     obj.Appointment_Id = self.id
+        #     obj.CityId = self.get_city()
+        #     obj.StateId = self.get_state()
+        #     obj.ProviderId = self.lab.id
+        #     obj.TypeId = 2
+        #     obj.PaymentType = self.payment_type if self.payment_type else None
+        #     obj.Payout = self.agreed_price
+        #     obj.BookingDate = self.created_at
+        # obj.CorporateDealId = self.get_corporate_deal_id()
+        # obj.PromoCost = max(0, promo_cost)
+        # obj.GMValue = self.deal_price
+        # obj.Category = category
+        # obj.StatusId = self.status
+        # obj.save()
+        #
+        # try:
+        #     SyncBookingAnalytics.objects.update_or_create(object_id=self.id,
+        #                                                   content_type=ContentType.objects.get_for_model(LabAppointment),
+        #                                                   defaults={"synced_at": self.updated_at, "last_updated_at": self.updated_at})
+        # except Exception as e:
+        #     pass
+        #
+        # return obj
 
     def get_tests_and_prices(self):
         test_price = []

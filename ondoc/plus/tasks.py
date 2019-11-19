@@ -17,6 +17,7 @@ logger = logging.getLogger(__name__)
 def push_plus_buy_to_matrix(self, *args, **kwargs):
     from ondoc.authentication.models import User
     from ondoc.plus.models import PlusUser, PlusLead
+    from ondoc.notification.tasks import save_matrix_logs
     try:
         user_id = kwargs.get('user_id', None)
         if not user_id:
@@ -29,6 +30,7 @@ def push_plus_buy_to_matrix(self, *args, **kwargs):
             raise Exception("User could not found against id - " + str(user_id))
 
         plus_user_obj = PlusUser.objects.filter(user=user_obj).order_by('id').last()
+        obj_type = 'plus_user'
         if not plus_user_obj:
             raise Exception("Invalid or None plus membership found for user id %s " % str(user_id))
 
@@ -78,7 +80,8 @@ def push_plus_buy_to_matrix(self, *args, **kwargs):
         response = requests.post(url, data=json.dumps(request_data), headers={'Authorization': matrix_api_token,
                                                                               'Content-Type': 'application/json'})
 
-        MatrixLog.create_matrix_logs(plus_user_obj, request_data, response.json())
+        # MatrixLog.create_matrix_logs(plus_user_obj, request_data, response.json())
+        save_matrix_logs.apply_async((plus_user_obj.id, obj_type, request_data, response.json()), countdown=5, queue=settings.RABBITMQ_LOGS_QUEUE)
 
         if response.status_code != status.HTTP_200_OK or not response.ok:
             logger.error(json.dumps(request_data))
