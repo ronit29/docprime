@@ -720,7 +720,7 @@ class UserAppointmentsViewSet(OndocViewSet):
                                 user_insurance = UserInsurance.objects.get(id=lab_appointment.insurance_id)
                                 if user_insurance:
                                     # insurance_threshold = user_insurance.insurance_plan.threshold.filter().first()
-                                    if time_slot_start > user_insurance.expiry_date or not user_insurance.is_valid():
+                                    if time_slot_start > user_insurance.expire_date or not user_insurance.is_valid():
                                         resp = {
                                             "status": 0,
                                             "message": "Appointment time is not covered under insurance"
@@ -729,7 +729,7 @@ class UserAppointmentsViewSet(OndocViewSet):
                             if lab_appointment.payment_type in [OpdAppointment.VIP] and lab_appointment.insurance_id is not None:
                                 plus_user = PlusUser.objects.filter(id=lab_appointment.plus_plan_id).first()
                                 if user_insurance:
-                                    if time_slot_start > plus_user.expiry_date:
+                                    if time_slot_start > plus_user.expire_date:
                                         resp = {
                                             "status": 0,
                                             "message": "Appointment time is not covered under VIP/GOLD"
@@ -773,7 +773,7 @@ class UserAppointmentsViewSet(OndocViewSet):
                         if lab_appointment.payment_type in [OpdAppointment.VIP] and lab_appointment.insurance_id is not None:
                             plus_user = PlusUser.objects.filter(id=lab_appointment.plus_plan_id).first()
                             if user_insurance:
-                                if time_slot_start > plus_user.expiry_date:
+                                if time_slot_start > plus_user.expire_date:
                                     resp = {
                                         "status": 0,
                                         "message": "Appointment time is not covered under VIP/GOLD"
@@ -889,9 +889,9 @@ class UserAppointmentsViewSet(OndocViewSet):
                                         "message": "Appointment time is not covered under insurance"
                                     }
                                     return resp
-                        if opd_appointment.payment_type == OpdAppointment.GOLD and opd_appointment.plus_plan is not None:
+                        if opd_appointment.payment_type == OpdAppointment.VIP and opd_appointment.plus_plan is not None:
                             plus_user = PlusUser.objects.filter(id=opd_appointment.plus_plan_id).first()
-                            if plus_user and time_slot_start > plus_user.expiry_date:
+                            if plus_user and time_slot_start > plus_user.expire_date:
                                 resp = {
                                     "status": 0,
                                     "message": "Appointment time is not covered under Gold"
