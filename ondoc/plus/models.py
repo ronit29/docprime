@@ -21,6 +21,9 @@ from ondoc.notification.tasks import push_plus_lead_to_matrix
 from ondoc.plus.usage_criteria import get_class_reference, get_price_reference
 from .enums import PlanParametersEnum, UtilizationCriteria, PriceCriteria
 from datetime import datetime, timedelta
+import datetime
+from datetime import timedelta
+from dateutil.relativedelta import relativedelta
 from ondoc.crm import constants as const
 from django.utils.timezone import utc
 import reversion
@@ -970,12 +973,12 @@ class PlusUser(auth_model.TimeStampedModel, RefundMixin, TransactionMixin):
         resp = {}
         plus_plan = data.get('plus_plan')
         profile = data.get('profile', None)
-        name = profile.get('name').split(' ', 1)
+        name = profile.name.split(' ', 1)
         first_name = name[0]
         last_name = name[1] if name[1] else ''
-        dob = profile.get('dob')
-        email = profile.get('email')
-        phone_number = profile.get('phone_number', None)
+        dob = profile.dob
+        email = profile.email
+        phone_number = profile.phone_number
         plus_members = []
 
         member = {"first_name": first_name, "last_name": last_name, "dob": dob, "email": email, "phone_number": phone_number}
@@ -983,7 +986,8 @@ class PlusUser(auth_model.TimeStampedModel, RefundMixin, TransactionMixin):
                                                                                                       'email',
                                                                                                       'gender',
                                                                                                       'user_id',
-                                                                                                      'phone_number').first()
+                                                                                                      'phone_number',
+                                                                                                                'dob').first()
         plus_members.append(member.copy())
         transaction_date = datetime.datetime.now()
         expiry_date = transaction_date + relativedelta(months=int(plus_plan.tenure))
