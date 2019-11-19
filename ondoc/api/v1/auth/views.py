@@ -26,7 +26,7 @@ from ondoc.common.models import UserConfig, PaymentOptions, AppointmentHistory, 
 from ondoc.common.utils import get_all_upcoming_appointments
 from ondoc.coupon.models import UserSpecificCoupon, Coupon
 from ondoc.lead.models import UserLead
-from ondoc.plus.models import PlusAppointmentMapping
+from ondoc.plus.models import PlusAppointmentMapping, PlusUser
 from ondoc.sms.api import send_otp
 from ondoc.doctor.models import DoctorMobile, Doctor, HospitalNetwork, Hospital, DoctorHospital, DoctorClinic, \
                                 DoctorClinicTiming, ProviderSignupLead
@@ -726,6 +726,15 @@ class UserAppointmentsViewSet(OndocViewSet):
                                             "message": "Appointment time is not covered under insurance"
                                         }
                                         return resp
+                            if lab_appointment.payment_type in [OpdAppointment.VIP] and lab_appointment.insurance_id is not None:
+                                plus_user = PlusUser.objects.filter(id=lab_appointment.plus_plan_id).first()
+                                if user_insurance:
+                                    if time_slot_start > plus_user.expiry_date:
+                                        resp = {
+                                            "status": 0,
+                                            "message": "Appointment time is not covered under VIP/GOLD"
+                                        }
+                                        return resp
 
                             test_level_timing = dict()
                             test_level_timing['test_id'] = test_timing.get('test').id
@@ -761,6 +770,15 @@ class UserAppointmentsViewSet(OndocViewSet):
                                         "message": "Appointment time is not covered under insurance"
                                     }
                                     return resp
+                        if lab_appointment.payment_type in [OpdAppointment.VIP] and lab_appointment.insurance_id is not None:
+                            plus_user = PlusUser.objects.filter(id=lab_appointment.plus_plan_id).first()
+                            if user_insurance:
+                                if time_slot_start > plus_user.expiry_date:
+                                    resp = {
+                                        "status": 0,
+                                        "message": "Appointment time is not covered under VIP/GOLD"
+                                    }
+                                    return resp
 
                 test_ids = lab_appointment.lab_test.values_list('test__id', flat=True)
                 lab_test_queryset = AvailableLabTest.objects.select_related('lab_pricing_group__labs').filter(
@@ -787,8 +805,13 @@ class UserAppointmentsViewSet(OndocViewSet):
                 if new_deal_price <= coupon_discount:
                     new_effective_price = 0
                 else:
-                    if lab_appointment.insurance_id is None:
+                    if lab_appointment.insurance_id is None and lab_appointment.plus_plan_id is None:
                         new_effective_price = new_deal_price - coupon_discount
+                    elif lab_appointment.plus_plan_id is not None:
+                        if lab_appointment.plus_plan.plan.is_gold:
+                            new_effective_price = temp_lab_test[0].get("total_agreed_price", 0)
+                        else:
+                            new_effective_price = temp_lab_test[0].get("total_mrp")
                     else:
                         new_effective_price = 0.0
                 # new_appointment = dict()
@@ -866,6 +889,15 @@ class UserAppointmentsViewSet(OndocViewSet):
                                         "message": "Appointment time is not covered under insurance"
                                     }
                                     return resp
+                        if opd_appointment.payment_type == OpdAppointment.GOLD and opd_appointment.plus_plan is not None:
+                            plus_user = PlusUser.objects.filter(id=opd_appointment.plus_plan_id).first()
+                            if plus_user and time_slot_start > plus_user.expiry_date:
+                                resp = {
+                                    "status": 0,
+                                    "message": "Appointment time is not covered under Gold"
+                                }
+                                return resp
+
 
 
 
@@ -875,8 +907,13 @@ class UserAppointmentsViewSet(OndocViewSet):
                         if coupon_discount > doctor_hospital.deal_price:
                             new_effective_price = 0
                         else:
-                            if opd_appointment.insurance_id is None:
+                            if opd_appointment.insurance_id is None and opd_appointment.plus_plan_id is None:
                                 new_effective_price = doctor_hospital.deal_price - coupon_discount
+                            elif opd_appointment.plus_plan_id is not None:
+                                if opd_appointment.plus_plan.plan.is_gold:
+                                    new_effective_price = doctor_hospital.fees
+                                else:
+                                    new_effective_price = doctor_hospital.mrp
                             else:
                                 new_effective_price = 0.0
                         if opd_appointment.procedures.count():
