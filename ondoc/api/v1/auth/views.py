@@ -816,7 +816,7 @@ class UserAppointmentsViewSet(OndocViewSet):
                                       "cod_deal_price": temp_lab_test[0].get("total_deal_price"),
                                       "fees": temp_lab_test[0].get("total_agreed_price", 0)}
                         if plus_user:
-                            new_effective_price, convenience_charge = self.get_plus_user_effective_price(plus_user, price_data, "LAB")
+                            new_effective_price, convenience_charge = self.get_plus_user_effective_price(plus_user, price_data, "LABTEST")
                         if lab_appointment.plus_plan.plan.is_gold:
                             new_effective_price = new_effective_price + convenience_charge
                         else:
@@ -849,18 +849,31 @@ class UserAppointmentsViewSet(OndocViewSet):
         return resp
 
     def get_plus_user_effective_price(self, plus_user, price_data, entity):
-        if entity == "LAB":
-            price_engine = get_price_reference(plus_user, "LAB")
+        if entity == "LABTEST":
+            price_engine = get_price_reference(plus_user, "LABTEST")
             if not price_engine:
                 price = int(price_data.get('mrp', None))
             else:
                 price = price_engine.get_price(price_data)
-            convenience_charge = plus_user.plan.get_convenience_charge(price, "LAB")
-            engine = get_class_reference(plus_user, "LAB")
+            convenience_charge = plus_user.plan.get_convenience_charge(price, "LABTEST")
+            engine = get_class_reference(plus_user, "LABTEST")
             plus_data = engine.validate_booking_entity(price, price_data.get('mrp', None),
                                                        deal_price=price_data.get('deal_price'))
             effective_price = plus_data.get('amount_to_be_paid', None)
             return effective_price, convenience_charge
+        else:
+            price_engine = get_price_reference(plus_user, "DOCTOR")
+            if not price_engine:
+                price = int(price_data.get('mrp', None))
+            else:
+                price = price_engine.get_price(price_data)
+            convenience_charge = plus_user.plan.get_convenience_charge(price, "DOCTOR")
+            engine = get_class_reference(plus_user, "DOCTOR")
+            plus_data = engine.validate_booking_entity(price, price_data.get('mrp', None),
+                                                       deal_price=price_data.get('deal_price'))
+            effective_price = plus_data.get('amount_to_be_paid', None)
+            return effective_price, convenience_charge
+
 
     @transaction.atomic
     def doctor_appointment_update(self, request, opd_appointment, validated_data):
@@ -939,7 +952,7 @@ class UserAppointmentsViewSet(OndocViewSet):
                                               "fees": doctor_hospital.fees}
                                 if plus_user:
                                     new_effective_price, convenience_charge = self.get_plus_user_effective_price(
-                                        plus_user, price_data, "LAB")
+                                        plus_user, price_data, "DOCTOR")
                                     if opd_appointment.plus_plan.plan.is_gold:
                                         new_effective_price = new_effective_price + convenience_charge
                                     else:
