@@ -23,13 +23,13 @@ from ondoc.doctor.models import (Doctor, Language, MedicalService, Specializatio
                                  DoctorMobileOtp, UploadDoctorData, DoctorLeave, HealthInsuranceProvider,
                                  CommonHospital, SimilarSpecializationGroup, PurchaseOrderCreation, SponsoredServices,
                                  HospitalSponsoredServices, DoctorSponsoredServices,
-                                 SponsoredServicePracticeSpecialization)
+                                 SponsoredServicePracticeSpecialization, GoogleMapRecords)
 
 from ondoc.diagnostic.models import (Lab, LabNetwork, LabTest, LabTestType, LabService,
                                      AvailableLabTest, LabAppointment, CommonTest, CommonDiagnosticCondition,
                                      LabPricingGroup,
                                      TestParameter, CommonPackage, LabTestCategory, LabTestGroup, LabTestGroupMapping,
-                                     TestParameterChat, LabTestCategoryUrls, IPDMedicinePageLead)
+                                     TestParameterChat, LabTestCategoryUrls, IPDMedicinePageLead, LabtestNameMaster)
 from ondoc.coupon.models import Coupon, UserSpecificCoupon, RandomGeneratedCoupon
 from ondoc.integrations.models import IntegratorLabTestParameterMapping
 from ondoc.lead.models import HospitalLead, DoctorLead, SearchLead
@@ -67,7 +67,8 @@ from .user import CustomUserAdmin, UserNumberUpdateAdmin, UserProfileAdmin, Perm
 from .hospital_network import HospitalNetworkAdmin
 from .lab import LabAdmin, LabTestAdmin, LabTestTypeAdmin, AvailableLabTestAdmin, CommonDiagnosticConditionAdmin, \
     LabAppointmentAdmin, CommonTestAdmin, TestParameterAdmin, CommonPackageAdmin, LabTestCategoryAdmin, \
-    LabTestGroupAdmin, LabTestGroupMappingAdmin, TestParameterChatAdmin, LabTestCategoryUrlsAdmin
+    LabTestGroupAdmin, LabTestGroupMappingAdmin, TestParameterChatAdmin, LabTestCategoryUrlsAdmin, \
+    LabTestNameMasterAdmin
 from .lab_network import LabNetworkAdmin
 from .notification import (EmailNotificationAdmin, SmsNotificationAdmin,
                            PushNotificationAdmin, AppNotificationAdmin, DynamicTemplatesAdmin)
@@ -331,6 +332,5 @@ admin.site.register(TestSamplesLabAlerts, TestSamplesLabAlertAdmin)
 admin.site.register(PartnerLabSamplesCollectOrder, PartnerLabSamplesCollectOrderAdmin)
 admin.site.register(SearchCriteria, SearchCriteriaAdmin)
 admin.site.register(Permission, PermissionAdmin)
-
-
-
+admin.site.register(GoogleMapRecords)
+admin.site.register(LabtestNameMaster, LabTestNameMasterAdmin)

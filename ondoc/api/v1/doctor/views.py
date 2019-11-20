@@ -10,7 +10,7 @@ from ondoc.account.models import Order, ConsumerAccount, PgTransaction
 from ondoc.api.v1.auth.serializers import UserProfileSerializer
 from ondoc.api.v1.doctor.city_match import city_match
 from ondoc.api.v1.doctor.serializers import HospitalModelSerializer, AppointmentRetrieveDoctorSerializer, \
-    OfflinePatientSerializer, CommonConditionsSerializer
+    OfflinePatientSerializer, CommonConditionsSerializer, RecordSerializer
 from ondoc.api.v1.doctor.DoctorSearchByHospitalHelper import DoctorSearchByHospitalHelper
 from ondoc.api.v1.procedure.serializers import CommonProcedureCategorySerializer, ProcedureInSerializer, \
     ProcedureSerializer, DoctorClinicProcedureSerializer, CommonProcedureSerializer, CommonIpdProcedureSerializer, \
@@ -28,7 +28,7 @@ from ondoc.notification import tasks as notification_tasks
 #from ondoc.doctor.models import Hospital, DoctorClinic,Doctor,  OpdAppointment
 from ondoc.doctor.models import DoctorClinic, OpdAppointment, DoctorAssociation, DoctorQualification, Doctor, Hospital, \
     HealthInsuranceProvider, ProviderSignupLead, HospitalImage, CommonHospital, PracticeSpecialization, \
-    SpecializationDepartmentMapping, DoctorPracticeSpecialization, DoctorClinicTiming
+    SpecializationDepartmentMapping, DoctorPracticeSpecialization, DoctorClinicTiming, GoogleMapRecords
 from ondoc.notification.models import EmailNotification
 from django.utils.safestring import mark_safe
 from ondoc.coupon.models import Coupon, CouponRecommender
@@ -52,7 +52,7 @@ from ondoc.api.v1.doctor.doctorsearch import DoctorSearchHelper
 from django.db.models import Min, Prefetch
 from django.contrib.gis.geos import Point, GEOSGeometry
 from django.shortcuts import get_object_or_404
-from rest_framework import viewsets
+from rest_framework import viewsets, generics
 from rest_framework import mixins
 from rest_framework.response import Response
 from rest_framework import status, permissions
@@ -98,7 +98,11 @@ from ondoc.prescription import models as pres_models
 from ondoc.api.v1.prescription import serializers as pres_serializers
 from django.template.defaultfilters import slugify
 from packaging.version import parse
+from django.http import HttpResponse, HttpResponseRedirect
+from geopy.geocoders import Nominatim
+from django.shortcuts import render
 
+geolocator = Nominatim()
 
 class CreateAppointmentPermission(permissions.BasePermission):
     message = 'creating appointment is not allowed.'
@@ -4779,13 +4783,13 @@ class HospitalViewSet(viewsets.GenericViewSet):
                                                               'hospital_doctors').exclude(location__dwithin=(
             Point(float(long),
                   float(lat)),
-            D(m=min_distance))).annotate(locality_len=Length('locality')).filter(
+            D(m=min_distance))).filter(
             is_live=True,
             hospital_doctors__enabled=True,
             location__dwithin=(
                 Point(float(long),
                       float(lat)),
-                D(m=max_distance)), locality_len__lt=13).annotate(
+                D(m=max_distance))).annotate(
             distance=Distance('location', pnt), bookable_doctors_count=Count(Q(enabled_for_online_booking=True,
                                            hospital_doctors__enabled_for_online_booking=True,
                                            hospital_doctors__doctor__enabled_for_online_booking=True,
@@ -5284,3 +5288,40 @@ class IpdProcedureSyncViewSet(viewsets.GenericViewSet):
             to_be_updated_dict['planned_date'] = temp_planned_date
         IpdProcedureLead.objects.filter(matrix_lead_id=validated_data.get('matrix_lead_id')).update(**to_be_updated_dict)
         return Response({'message': 'Success'})
+
+
+class RecordAPIView(viewsets.GenericViewSet):
+    """This class defines the create behavior of our rest api."""
+    def list(self, request):
+        queryset = GoogleMapRecords.objects.all()
+        serializer = serializers.RecordSerializer(queryset, many=True,
+                                                              context={"request": request})
+        serialized_data = serializer.data
+        return Response(serialized_data)
+
+
+# View to see all points
+def record_map(request):
+    return render(request, "home.html")
+
+
+# create a new location
+def create_record(request):
+    from ondoc.crm.admin.doctor import GoogleMapRecordForm
+    form = GoogleMapRecordForm(request.POST or None)
+
+    if form.is_valid():
+        instance = form.save(commit=False)
+        # get coordinates
+        location = geolocator.geocode(instance.location)
+        instance.latitude = location.latitude
+        instance.longitude = location.longitude
+        instance.save()
+        return HttpResponseRedirect('/')
+
+    context = {
+        "form": form
+    }
+
+    return render(request, "doctor/create.html", context)
+

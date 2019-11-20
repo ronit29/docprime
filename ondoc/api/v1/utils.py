@@ -604,8 +604,8 @@ def payment_details(request, order):
     pgdata['hash'] = PgTransaction.create_pg_hash(pgdata, secret_key, client_key)
 
     args = {'user_id': user.id, 'order_id': order.id, 'source': 'ORDER_CREATE'}
-    save_payment_status.apply_async((PaymentProcessStatus.INITIATE, args),eta=timezone.localtime(), )
-    save_pg_response.apply_async((PgLogs.TXN_REQUEST, order.id, None, None, pgdata, user.id), eta=timezone.localtime(), )
+    save_payment_status.apply_async((PaymentProcessStatus.INITIATE, args), eta=timezone.localtime(),)
+    save_pg_response.apply_async((PgLogs.TXN_REQUEST, order.id, None, None, pgdata, user.id), eta=timezone.localtime(), queue=settings.RABBITMQ_LOGS_QUEUE)
     # print(pgdata)
     return pgdata, payment_required
 
@@ -1705,7 +1705,7 @@ class TimeSlotExtraction(object):
 def consumers_balance_refund():
     from ondoc.account.models import ConsumerAccount, ConsumerRefund
     refund_time = timezone.now() - timezone.timedelta(hours=settings.REFUND_INACTIVE_TIME)
-    consumer_accounts = ConsumerAccount.objects.filter(updated_at__lt=refund_time)
+    consumer_accounts = ConsumerAccount.objects.filter(updated_at__lt=refund_time, balance__gt=Decimal('0'))
     for account in consumer_accounts:
         with transaction.atomic():
             consumer_account = ConsumerAccount.objects.select_for_update().filter(pk=account.id).first()

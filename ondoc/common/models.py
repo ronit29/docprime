@@ -353,22 +353,23 @@ class MatrixMappedState(TimeStampedModel):
         return data
 
     def sync_with_booking_analytics(self):
-        obj = DP_StateMaster.objects.filter(StateId=self.id).first()
-        if not obj:
-            obj = DP_StateMaster()
-            obj.CreatedOn = self.updated_at
-            obj.StateId = self.id
-        obj.StateName = self.name
-        obj.save()
+        # obj = DP_StateMaster.objects.filter(StateId=self.id).first()
+        # if not obj:
+        #     obj = DP_StateMaster()
+        #     obj.CreatedOn = self.updated_at
+        #     obj.StateId = self.id
+        # obj.StateName = self.name
+        # obj.save()
 
         try:
             SyncBookingAnalytics.objects.update_or_create(object_id=self.id,
                                                           content_type=ContentType.objects.get_for_model(MatrixMappedState),
                                                           defaults={"synced_at": self.updated_at, "last_updated_at": self.updated_at})
         except Exception as e:
+            print(str(e))
             pass
 
-        return obj
+        # return obj
 
 
 class MatrixMappedCity(TimeStampedModel):
@@ -393,13 +394,13 @@ class MatrixMappedCity(TimeStampedModel):
         return data
 
     def sync_with_booking_analytics(self):
-        obj = DP_CityMaster.objects.filter(CityId=self.id).first()
-        if not obj:
-            obj = DP_CityMaster()
-            obj.CreatedOn = self.updated_at
-            obj.CityId = self.id
-        obj.CityName = self.name
-        obj.save()
+        # obj = DP_CityMaster.objects.filter(CityId=self.id).first()
+        # if not obj:
+        #     obj = DP_CityMaster()
+        #     obj.CreatedOn = self.updated_at
+        #     obj.CityId = self.id
+        # obj.CityName = self.name
+        # obj.save()
 
         try:
             SyncBookingAnalytics.objects.update_or_create(object_id=self.id,
@@ -408,7 +409,7 @@ class MatrixMappedCity(TimeStampedModel):
         except Exception as e:
             pass
 
-        return obj
+        # return obj
 
 
 class QRCode(TimeStampedModel):

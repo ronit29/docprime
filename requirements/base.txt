@@ -52,3 +52,5 @@ django-extensions==2.0.7
 django-select2==7.0.5
 django-reversion-compare
 pandas
+newrelic
+geopy
