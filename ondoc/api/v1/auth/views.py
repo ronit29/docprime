@@ -721,7 +721,7 @@ class UserAppointmentsViewSet(OndocViewSet):
                                 user_insurance = UserInsurance.objects.get(id=lab_appointment.insurance_id)
                                 if user_insurance:
                                     # insurance_threshold = user_insurance.insurance_plan.threshold.filter().first()
-                                    if time_slot_start > user_insurance.expire_date or not user_insurance.is_valid():
+                                    if time_slot_start > user_insurance.expiry_date or not user_insurance.is_valid():
                                         resp = {
                                             "status": 0,
                                             "message": "Appointment time is not covered under insurance"
