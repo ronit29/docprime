@@ -101,7 +101,7 @@ class Order(TimeStampedModel):
     cart = models.ForeignKey('cart.Cart', on_delete=models.CASCADE, related_name="order", blank=True, null=True)
     user = models.ForeignKey(User, on_delete=models.DO_NOTHING, blank=True, null=True, related_name="orders")
     visitor_info = JSONField(blank=True, null=True)
-    single_booking_id = models.ForeignKey('self', on_delete=models.CASCADE, related_name="single_booking_order", blank=True, null=True)
+    single_booking = models.ForeignKey('self', on_delete=models.CASCADE, related_name="single_booking_order", blank=True, null=True)
 
     def __str__(self):
         return "{}".format(self.id)
@@ -928,7 +928,7 @@ class Order(TimeStampedModel):
 
         for order in order_list:
             if not order.product_id == Order.VIP_PRODUCT_ID:
-                order.single_booking_id_id = single_booking_id
+                order.single_booking_id = single_booking_id
                 order.save()
         resp["status"] = 1
         resp['data'], resp["payment_required"] = single_booking_payment_details(request, order_list)
