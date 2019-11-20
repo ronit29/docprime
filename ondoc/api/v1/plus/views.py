@@ -317,7 +317,8 @@ class PlusOrderViewSet(viewsets.GenericViewSet):
 
             counter += 1
 
-        members_to_be_added.pop(self_counter)
+        if self_counter > -1:
+            members_to_be_added.pop(self_counter)
 
         PlusMembers.create_plus_members(inactive_plus_subscription, members_list=members_to_be_added)
         inactive_plus_subscription.status = PlusUser.ACTIVE
