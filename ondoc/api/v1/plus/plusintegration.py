@@ -224,7 +224,7 @@ class PlusIntegration:
 
         plan['plan_name'] = plus_plan.plan_name
         plan['plan_id'] = plus_plan.id
-        plus_member = plus_obj.plus_members.all().filter(relation=PlusMembers.Relations.SELF).first()
+        plus_member = plus_obj.plus_members.all().filter(is_primary_user=True).order_by('id').first()
         member['name'] = plus_member.first_name
         member['dob'] = str(plus_member.dob)
         member['email'] = plus_member.email

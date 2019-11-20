@@ -398,7 +398,7 @@ class PlusUser(auth_model.TimeStampedModel, RefundMixin, TransactionMixin):
 
     def get_primary_member_profile(self):
         insured_members = self.plus_members.filter().order_by('id')
-        proposers = list(filter(lambda member: member.is_primary_user and member.relation == PlusMembers.Relations.SELF, insured_members))
+        proposers = list(filter(lambda member: member.is_primary_user, insured_members))
         if proposers:
             return proposers[0]
 
@@ -764,7 +764,8 @@ class PlusUser(auth_model.TimeStampedModel, RefundMixin, TransactionMixin):
                     profile.email = member['email']
                     # profile.gender = member['gender']
                     profile.dob = member['dob']
-                    if member['relation'] == PlusMembers.Relations.SELF:
+                    # if member['relation'] == PlusMembers.Relations.SELF:
+                    if member['is_primary_user']:
                         profile.is_default_user = True
                     else:
                         profile.is_default_user = False
@@ -776,7 +777,7 @@ class PlusUser(auth_model.TimeStampedModel, RefundMixin, TransactionMixin):
             data = {'name': name, 'email': member['email'], 'user_id': user.id,
                     'dob': member['dob'], 'is_default_user': False, 'is_otp_verified': False,
                     'phone_number': user.phone_number}
-            if member['relation'] == PlusMembers.Relations.SELF:
+            if member['is_primary_user']:
                 data['is_default_user'] = True
 
             member_profile = UserProfile.objects.create(**data)
@@ -1163,7 +1164,7 @@ class PlusMembers(auth_model.TimeStampedModel):
 
         for member in members:
             user_profile = UserProfile.objects.get(id=member.get('profile'))
-            is_primary_user = True if member['relation'] and member['relation']  == cls.Relations.SELF else False
+            is_primary_user = member['is_primary_user']
             plus_members_obj = cls(first_name=member.get('first_name'), title=member.get('title'),
                                                      last_name=member.get('last_name'), dob=member.get('dob'),
                                                      email=member.get('email'), address=member.get('address'),

@@ -305,7 +305,7 @@ class PlusOrderViewSet(viewsets.GenericViewSet):
         counter = 0
         self_counter = -1
         for member in members_to_be_added:
-            if member.get('relation') == PlusMembers.Relations.SELF:
+            if member.get('is_primary_user'):
                 self_counter = counter
                 if member.get('document_ids'):
                     proposer_profile = inactive_plus_subscription.get_primary_member_profile()
@@ -366,7 +366,7 @@ class PlusProfileViewSet(viewsets.GenericViewSet):
             self_index = 0
             count = 0
             for member in members_data:
-                if member['relation'] == PlusMembers.Relations.SELF:
+                if member['is_primary_user']:
                     self_index = count
                 count = count + 1
 
