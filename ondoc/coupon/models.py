@@ -67,6 +67,9 @@ class Coupon(auth_model.TimeStampedModel):
     is_corporate = models.BooleanField(default=False)
     is_visible = models.BooleanField(default=True)
     is_for_insurance = models.BooleanField(default=False)
+    is_for_gold_users = models.BooleanField(default=False)
+    is_for_vip_users = models.BooleanField(default=False)
+    users_vip_gold_plans = models.ManyToManyField("plus.PlusPlans", blank=True, null=True, related_name='users_vip_gold_plans')
     is_lensfit = models.NullBooleanField()
     new_user_constraint = models.BooleanField(default=False)
     coupon_type = models.IntegerField(choices=COUPON_TYPE_CHOICES, default=DISCOUNT)
@@ -489,8 +492,8 @@ class CouponRecommender():
 
         all_coupons = all_coupons.prefetch_related('user_specific_coupon', 'test', 'test_categories', 'hospitals',
                                                    'hospitals_exclude', 'doctors', 'doctors_exclude', 'specializations',
-                                                   'procedures', 'lab', 'test', 'procedure_categories', user_opd_booked,
-                                                   user_lab_booked)
+                                                   'procedures', 'lab', 'test', 'procedure_categories',
+                                                   'users_vip_gold_plans', user_opd_booked, user_lab_booked)
 
         if user and user.is_authenticated:
             all_coupons = all_coupons.filter(Q(is_user_specific=False) \
@@ -549,6 +552,7 @@ class CouponRecommender():
         doctor_specializations_ids = filters.get('doctor_specializations_ids', [])
         procedures_ids = filters.get('procedures_ids')
         show_all = filters.get('show_all', False)
+        plus_user = None
 
         if deal_price:
             coupons = list(filter(lambda x: x.min_order_amount == None or x.min_order_amount <= deal_price, coupons))
@@ -558,6 +562,8 @@ class CouponRecommender():
             is_user_insured = user.active_insurance
             if self.profile:
                 is_user_insured = self.profile.is_insured_profile
+                plus_user = self.profile.get_plus_membership
+
             if is_user_insured:
                 if deal_price:
                     coupons = list(filter(lambda x: x.is_for_insurance == False or (x.is_for_insurance == True and x.max_order_amount >= deal_price), coupons))
@@ -566,7 +572,9 @@ class CouponRecommender():
             else:
                 coupons = list(filter(lambda x: x.is_for_insurance == False, coupons))
         else:
-            coupons = list(filter(lambda x: x.is_for_insurance == False, coupons))
+            coupons = list(filter(lambda x: x.is_for_insurance is False and
+                                            x.is_for_gold_users is False and
+                                            x.is_for_vip_users is False, coupons))
 
         if search_type == 'doctor' or search_type == 'lab':
             if tests:
@@ -672,7 +680,6 @@ class CouponRecommender():
                 coupons = list(filter(lambda x: len(x.doctors.all()) == 0, coupons))
                 coupons = list(filter(lambda x: len(x.specializations.all()) == 0, coupons))
 
-
             if procedures_ids:
                 pass
                 # add filters here
@@ -717,6 +724,37 @@ class CouponRecommender():
             if not remove_coupon and coupon.start_date and (coupon.start_date > timezone.now() \
                                                             or (coupon.start_date + datetime.timedelta(days=coupon.validity)) < timezone.now()):
                 remove_coupon = True
+
+            remove_for_gold = False
+            remove_for_vip = False
+            if not remove_coupon and coupon.is_for_gold_users:
+                if plus_user and plus_user.plan and plus_user.plan.is_gold:
+                    plus_user_plan = plus_user.plan
+                    coupon_users_vip_gold_plans = coupon.users_vip_gold_plans.all()
+                    if coupon_users_vip_gold_plans and not plus_user_plan in coupon_users_vip_gold_plans:
+                        remove_for_gold = True
+                else:
+                    remove_for_gold = True
+
+            if not remove_coupon and coupon.is_for_vip_users:
+                if plus_user and plus_user.plan and not plus_user.plan.is_gold:
+                    plus_user_plan = plus_user.plan
+                    coupon_users_vip_gold_plans = coupon.users_vip_gold_plans.all()
+                    if coupon_users_vip_gold_plans and not plus_user_plan in coupon_users_vip_gold_plans:
+                        remove_for_vip = True
+                else:
+                    remove_for_vip = True
+
+            if coupon.is_for_gold_users and coupon.is_for_vip_users:
+                if remove_for_gold and remove_for_vip:
+                    remove_coupon = True
+            else:
+                if coupon.is_for_gold_users and remove_for_gold:
+                    remove_coupon = True
+                if coupon.is_for_vip_users and remove_for_vip:
+                    remove_coupon = True
+
+
 
             if not remove_coupon and coupon.is_user_specific and user:
                 # todo - check if it will query to db
