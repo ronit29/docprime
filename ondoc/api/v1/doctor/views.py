@@ -5290,11 +5290,14 @@ class IpdProcedureSyncViewSet(viewsets.GenericViewSet):
         return Response({'message': 'Success'})
 
 
-class RecordAPIView(generics.ListAPIView):
+class RecordAPIView(viewsets.GenericViewSet):
     """This class defines the create behavior of our rest api."""
-    queryset = GoogleMapRecords.objects.all()
-
-    serializer_class = RecordSerializer
+    def list(self, request):
+        queryset = GoogleMapRecords.objects.all()
+        serializer = serializers.RecordSerializer(queryset, many=True,
+                                                              context={"request": request})
+        serialized_data = serializer.data
+        return Response(serialized_data)
 
 
 # View to see all points

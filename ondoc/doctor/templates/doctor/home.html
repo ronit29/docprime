@@ -27,8 +27,9 @@
         $scope.markers = [];
 
         $http.get(LocFac).then(function(data) {
+            <!--console.log(data);-->
 
-          var markers = data.data.results;
+          var markers = data.data;
 
           angular.forEach(markers, function (marker) {
 
@@ -37,7 +38,7 @@
                 longitude: marker.longitude
              }
 
-             console.log(marker.options);
+
              marker.options= {icon: marker.image, label: marker.label};
            })
           $scope.markers = markers;
@@ -52,7 +53,7 @@
        width: auto;
     }
   </style>
-  <button type="button" class="btn btn-primary" data-toggle="modal" data-target="#addrecord">Open Modal</button>
+  <!--<button type="button" class="btn btn-primary" data-toggle="modal" data-target="#addrecord">Open Modal</button>-->
   <br/><br/>
   <ui-gmap-google-map center="map.center" zoom="map.zoom" options="map.options">
     <ui-gmap-marker ng-repeat="marker in markers" coords="marker.coords" options="marker.options" events="marker.events" idkey="marker.id">
@@ -69,36 +70,36 @@
 </div>
 
 <!--modal to add a new location-->
-<div id="addrecord" class="modal fade" role="dialog">
-  <div class="modal-dialog">
+<!--<div id="addrecord" class="modal fade" role="dialog">-->
+  <!--<div class="modal-dialog">-->
 
-    <!-- Modal content-->
-    <div class="modal-content">
-      <div class="modal-header">
-        <button type="button" class="close" data-dismiss="modal">&times;</button>
-        <h4 class="modal-title">New Record</h4>
-      </div>
-      <div class="modal-body">
-        <!--form to add a new record-->
-        <form action="/record/create/"  method="POST" enctype="multipart/form-data"> {% csrf_token %}
-         <label>Location</label>
-         <input name="location" id="location" class="form-control">
-         <label>Text</label>
-         <textarea name="text" id="text" class="form-control"></textarea>
+    <!--&lt;!&ndash; Modal content&ndash;&gt;-->
+    <!--<div class="modal-content">-->
+      <!--<div class="modal-header">-->
+        <!--<button type="button" class="close" data-dismiss="modal">&times;</button>-->
+        <!--<h4 class="modal-title">New Record</h4>-->
+      <!--</div>-->
+      <!--<div class="modal-body">-->
+        <!--&lt;!&ndash;form to add a new record&ndash;&gt;-->
+        <!--<form action="/record/create/"  method="POST" enctype="multipart/form-data"> {% csrf_token %}-->
+         <!--<label>Location</label>-->
+         <!--<input name="location" id="location" class="form-control">-->
+         <!--<label>Text</label>-->
+         <!--<textarea name="text" id="text" class="form-control"></textarea>-->
 
-         <br/>
+         <!--<br/>-->
 
-         <input type="submit" value="Save" class="btn btn-md btn-primary">
-        </form>
-        <!--end form to add a new record-->
-      </div>
-      <div class="modal-footer">
-        <button type="button" class="btn btn-default" data-dismiss="modal">Close</button>
-      </div>
-    </div>
+         <!--<input type="submit" value="Save" class="btn btn-md btn-primary">-->
+        <!--</form>-->
+        <!--&lt;!&ndash;end form to add a new record&ndash;&gt;-->
+      <!--</div>-->
+      <!--<div class="modal-footer">-->
+        <!--<button type="button" class="btn btn-default" data-dismiss="modal">Close</button>-->
+      <!--</div>-->
+    <!--</div>-->
 
-  </div>
-</div>
+  <!--</div>-->
+<!--</div>-->
 <!--end modal-->
 
 {% endblock %}

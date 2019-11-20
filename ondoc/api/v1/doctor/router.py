@@ -87,7 +87,7 @@ urlpatterns = [
     path('hospitals_near_you', HospitalViewSet.as_view({'get': 'near_you_hospitals'}), name='hospitals-near-you'),
     url(r'^$', TemplateView.as_view(template_name='doctor/home.html'), name='home'),
     url(r'^create/$', create_record, name="create_record"),
-    url(r'^record_api/$', RecordAPIView.as_view(), name="record API"),
+    url('record_api', RecordAPIView.as_view({'get': 'list'}), name="record API"),
     url(r'^view/$', record_map, name="record map"),
 ]
 
