@@ -5271,7 +5271,7 @@ class GoogleMapRecords(auth_model.TimeStampedModel):
     combined_rating_count = models.IntegerField(null=True, blank=True)
     is_potential = models.SmallIntegerField(null=True, blank=True)
     has_booking = models.SmallIntegerField(null=True, blank=True)
-    monday_timing = models.DateTimeField(null=True, blank=True)
+    monday_timing = models.TextField(null=True, blank=True)
     address = models.TextField(null=True, blank=True)
 
     class Meta:
