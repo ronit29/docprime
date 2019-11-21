@@ -400,18 +400,21 @@ class PlusDataViewSet(viewsets.GenericViewSet):
         try:
             user = request.user
             data = request.data
-            PlusDummyData.objects.create(user=user, data=data)
-            return Response(data="save successfully!!", status=status.HTTP_200_OK )
+            data_type = data.get('dummy_data_type', 'PLAN_PURCHASE')
+            PlusDummyData.objects.create(user=user, data=data, data_type=data_type)
+            return Response(data="save successfully!!", status=status.HTTP_200_OK)
         except Exception as e:
             logger.error(str(e))
             return Response(data="could not save data", status=status.HTTP_400_BAD_REQUEST)
 
     def show_dummy_data(self, request):
         user = request.user
+        data_type = request.query_params.get('dummy_data_type')
+        data_type = data_type if data_type and data_type in PlusDummyData.DataType.availabilities() else PlusDummyData.DataType.PLAN_PURCHASE
         res = {}
         if not user:
             return Response(data=res, status=status.HTTP_200_OK)
-        dummy_data = PlusDummyData.objects.filter(user=user).order_by('-id').first()
+        dummy_data = PlusDummyData.objects.filter(user=user, data_type=data_type).order_by('-id').first()
         if not dummy_data:
             return Response(data=res, status=status.HTTP_200_OK)
         member_data = dummy_data.data

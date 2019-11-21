@@ -1283,8 +1283,13 @@ class PlusAppointmentMapping(auth_model.TimeStampedModel):
 
 
 class PlusDummyData(auth_model.TimeStampedModel):
+    class DataType(Choices):
+        PLAN_PURCHASE = 'PLAN_PURCHASE'
+        SINGLE_PURCHASE = 'SINGLE_PURCHASE'
+
     user = models.ForeignKey(User, related_name='plus_user_dummy_data', on_delete=models.DO_NOTHING)
     data = JSONField(null=False, blank=False)
+    data_type = models.CharField(max_length=100, null=True, choices=DataType.as_choices())
 
     class Meta:
         db_table = 'plus_dummy_data'

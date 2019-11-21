@@ -1219,14 +1219,43 @@ class SmsNotification(TimeStampedModel, SmsNotificationOpdMixin, SmsNotification
         utm_source = kwargs.get('utm_source', '')
         booking_url = "{}/agent/booking?token={}".format(settings.CONSUMER_APP_DOMAIN, token)
         if utm_source:
-            booking_url = booking_url + "&callbackurl=vip-club-member-details?utm_source={utm_source}&is_agent=false".format(utm_source=utm_source)
+            booking_url = booking_url + "&callbackurl=vip-club-member-details&utm_source={utm_source}&is_agent=false".format(utm_source=utm_source)
         else:
-            booking_url = booking_url + "&callbackurl=vip-club-member-details?is_agent=false"
+            booking_url = booking_url + "&callbackurl=vip-club-member-details&is_agent=false"
 
         short_url = generate_short_url(booking_url)
         print(short_url)
 
         sms_body = "Hi,\nPlease click on the link to view your Docprime VIP- Health Package details and make an online payment.\n{link} \nThanks\nTeam Docprime".format(link=short_url)
+        if phone_number:
+            sms_notification = {
+                "phone_number": phone_number,
+                "content": sms_body,
+            }
+            message = {
+                "data": sms_notification,
+                "type": "sms"
+            }
+            message = json.dumps(message)
+            publish_message(message)
+        return booking_url
+
+    @classmethod
+    def send_single_purchase_booking_url(cls, token, phone_number, *args, **kwargs):
+        utm_source = kwargs.get('utm_source', '')
+        landing_url = kwargs.get('landing_url', '')
+        booking_url = "{}/agent/booking?token={}".format(settings.CONSUMER_APP_DOMAIN, token)
+        if utm_source:
+            booking_url = booking_url + "&callbackurl={landing_url}&utm_source={utm_source}&is_agent=false".format(
+                landing_url=landing_url, utm_source=utm_source)
+        else:
+            booking_url = booking_url + "&callbackurl={landing_url}&is_agent=false".format(landing_url=landing_url)
+
+        short_url = generate_short_url(booking_url)
+        print(short_url)
+
+        sms_body = "Hi,\nPlease click on the link to review your appointment details and make an online payment.\n{link} \nThanks\nTeam Docprime".format(
+            link=short_url)
         if phone_number:
             sms_notification = {
                 "phone_number": phone_number,
