@@ -267,7 +267,8 @@ class CouponForm(forms.ModelForm):
             'specializations': autocomplete.ModelSelect2Multiple(url='specializations-autocomplete', forward=['doctors', 'hospitals', 'procedures', 'procedure_categories']),
             'procedures': autocomplete.ModelSelect2Multiple(url='procedures-autocomplete', forward=['doctors', 'hospitals', 'specializations', 'procedure_categories']),
             'procedure_categories': autocomplete.ModelSelect2Multiple(url='procedure-categories-autocomplete', forward=['doctors', 'hospitals', 'specializations', 'procedures']),
-            'users_vip_gold_plans': autocomplete.ModelSelect2Multiple(url='vip-gold-plans-autocomplete', forward=[])
+            'users_vip_gold_plans': autocomplete.ModelSelect2Multiple(url='vip-gold-plans-autocomplete', forward=[]),
+            'vip_gold_plans': autocomplete.ModelSelect2Multiple(url='vip-gold-plans-autocomplete', forward=[])
         }
 
     def clean(self):

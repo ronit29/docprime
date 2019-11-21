@@ -16,6 +16,7 @@ from ondoc.authentication.models import UserProfile, User
 from django.db import transaction
 from django.db.models import Q
 from ondoc.common.models import DocumentsProofs
+
 from ondoc.notification.tasks import push_plus_lead_to_matrix
 from ondoc.plus.usage_criteria import get_class_reference, get_price_reference
 from .enums import PlanParametersEnum, UtilizationCriteria, PriceCriteria
@@ -329,6 +330,7 @@ class PlusThreshold(auth_model.TimeStampedModel, LiveMixin):
 @reversion.register()
 class PlusUser(auth_model.TimeStampedModel, RefundMixin, TransactionMixin):
     from ondoc.account.models import MoneyPool
+    from ondoc.coupon.models import Coupon
     PRODUCT_ID = account_model.Order.VIP_PRODUCT_ID
 
     ACTIVE = 1
@@ -358,6 +360,7 @@ class PlusUser(auth_model.TimeStampedModel, RefundMixin, TransactionMixin):
     matrix_lead_id = models.IntegerField(null=True)
     raw_plus_member = JSONField(blank=False, null=False, default=list)
     payment_type = models.PositiveSmallIntegerField(choices=const.PAY_CHOICES, default=const.PREPAID)
+    coupon = models.ManyToManyField(Coupon, blank=True, null=True, related_name="plus_coupon")
 
     def is_valid(self):
         if self.expire_date >= timezone.now() and (self.status == self.ACTIVE):

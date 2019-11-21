@@ -15,7 +15,7 @@ import calendar
 from django.contrib.auth import get_user_model
 from django.contrib.gis.geos import GEOSGeometry
 from ondoc.account.tasks import refund_curl_task
-from ondoc.coupon.models import UserSpecificCoupon, Coupon
+from ondoc.coupon.models import UserSpecificCoupon
 from ondoc.crm.constants import constants
 import copy
 import requests

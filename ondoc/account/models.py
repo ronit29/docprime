@@ -51,7 +51,6 @@ class Order(TimeStampedModel):
     PROVIDER_ECONSULT_PAY = 8
     VIP_CREATE = 11
 
-
     PAYMENT_ACCEPTED = 1
     PAYMENT_PENDING = 0
     PAYMENT_FAILURE = 3

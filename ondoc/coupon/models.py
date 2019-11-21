@@ -23,11 +23,14 @@ class Coupon(auth_model.TimeStampedModel):
     LAB = 2
     ALL = 3
     SUBSCRIPTION_PLAN = 4
+    VIP = 5
+    GOLD = 6
 
     DISCOUNT = 1
     CASHBACK = 2
 
-    TYPE_CHOICES = (("", "Select"), (DOCTOR, "Doctor"), (LAB, "Lab"), (ALL, "All"), (SUBSCRIPTION_PLAN, "SUBSCRIPTION_PLAN"),)
+    TYPE_CHOICES = (("", "Select"), (DOCTOR, "Doctor"), (LAB, "Lab"), (ALL, "All"),
+                    (SUBSCRIPTION_PLAN, "SUBSCRIPTION_PLAN"), (VIP, "Vip"), (GOLD, "Gold"),)
     COUPON_TYPE_CHOICES = ((DISCOUNT, "Discount"), (CASHBACK, "Cashback"),)
 
     code = models.CharField(max_length=50)
@@ -75,6 +78,7 @@ class Coupon(auth_model.TimeStampedModel):
     coupon_type = models.IntegerField(choices=COUPON_TYPE_CHOICES, default=DISCOUNT)
     payment_option = models.ForeignKey(PaymentOptions, on_delete=models.SET_NULL, blank=True, null=True)
     random_coupon_count = models.PositiveIntegerField(null=True, blank=True)
+    vip_gold_plans = models.ManyToManyField("plus.PlusPlans", blank=True, null=True, related_name='vip_gold_plans')
     plan = models.ManyToManyField("subscription_plan.Plan", blank=True, null=True)
     corporate_deal = models.ForeignKey(CorporateDeal, on_delete=models.CASCADE, null=True, blank=True)
     total_used_count = models.PositiveIntegerField(null=True, blank=True, default=0)
@@ -474,6 +478,7 @@ class CouponRecommender():
         from ondoc.diagnostic.models import LabAppointment
         from ondoc.doctor.models import OpdAppointment
         from ondoc.cart.models import Cart
+        from ondoc.plus.models import PlusUser
 
         user = self.user
         search_type = self.type
@@ -491,6 +496,10 @@ class CouponRecommender():
             types.append(Coupon.DOCTOR)
         elif search_type == 'lab':
             types.append(Coupon.LAB)
+        elif search_type == 'vip':
+            types = [Coupon.VIP]
+        elif search_type == 'gold':
+            types = [Coupon.GOLD]
         else:
             types.append(Coupon.DOCTOR)
             types.append(Coupon.LAB)
@@ -505,6 +514,11 @@ class CouponRecommender():
                                                                   .exclude(status__in=[LabAppointment.CANCELLED]),
                                                                            to_attr='user_lab_booked')
 
+        user_plus_purchased = Prefetch('plus_coupon',
+                                   queryset=PlusUser.objects.filter(user=user)
+                                   .exclude(status__in=[PlusUser.CANCELLED]),
+                                   to_attr='user_plus_purchased')
+
         all_coupons = Coupon.objects.filter(type__in=types)
 
         if coupon_code:
@@ -515,7 +529,8 @@ class CouponRecommender():
         all_coupons = all_coupons.prefetch_related('user_specific_coupon', 'test', 'test_categories', 'hospitals',
                                                    'hospitals_exclude', 'doctors', 'doctors_exclude', 'specializations',
                                                    'procedures', 'lab', 'test', 'procedure_categories',
-                                                   'users_vip_gold_plans', user_opd_booked, user_lab_booked)
+                                                   'users_vip_gold_plans', 'vip_gold_plans', user_opd_booked,
+                                                   user_lab_booked, user_plus_purchased)
 
         if user and user.is_authenticated:
             all_coupons = all_coupons.filter(Q(is_user_specific=False) \
@@ -573,6 +588,7 @@ class CouponRecommender():
         doctor_id = filters.get('doctor_id')
         doctor_specializations_ids = filters.get('doctor_specializations_ids', [])
         procedures_ids = filters.get('procedures_ids')
+        vip_gold_plan = filters.get('vip_gold_plan')
         show_all = filters.get('show_all', False)
         plus_user = None
 
@@ -713,6 +729,10 @@ class CouponRecommender():
                 coupons = list(filter(lambda x: len(x.procedures.all()) == 0, coupons))
                 coupons = list(filter(lambda x: len(x.procedure_categories.all()) == 0, coupons))
 
+        if search_type == 'vip' or search_type == 'gold':
+            if vip_gold_plan:
+                coupons = list(filter(lambda x: not bool(x.vip_gold_plans.all()) or vip_gold_plan in x.vip_gold_plans.all(), coupons))
+
         coupons_list = list(coupons)
         for coupon in coupons:
             coupon_properties = self.coupon_properties[coupon.code] = dict()
@@ -722,7 +742,7 @@ class CouponRecommender():
 
             used_coupon_count = 0
             if not remove_coupon and coupon.count:
-                used_coupon_count = len(coupon.user_opd_booked) + len(coupon.user_lab_booked)
+                used_coupon_count = len(coupon.user_opd_booked) + len(coupon.user_lab_booked) + len(coupon.user_plus_purchased)
                 if user_cart_counts.get(coupon.code):
                     used_coupon_count += user_cart_counts.get(coupon.code)
 

@@ -1290,10 +1290,13 @@ def update_coupon_used_count():
     RawSql('''  update coupon set total_used_count= usage_count from
                 (select coupon_id, sum(usage_count) usage_count from
                 (select oac.coupon_id, count(*) usage_count from opd_appointment oa inner join opd_appointment_coupon oac on oa.id = oac.opdappointment_id
-                 where oa.status in (2,3,4,5,7) group by oac.coupon_id
+                where oa.status in (2,3,4,5,7) group by oac.coupon_id
                 union
-                select oac.coupon_id, count(*) usage_count from lab_appointment oa inner join lab_appointment_coupon oac on oa.id = oac.labappointment_id
-                 where oa.status in (2,3,4,5,7) group by oac.coupon_id
+                select lac.coupon_id, count(*) usage_count from lab_appointment la inner join lab_appointment_coupon lac on la.id = lac.labappointment_id
+                where la.status in (2,3,4,5,7) group by lac.coupon_id
+                union
+                select puc.coupon_id, count(*) usage_count from plus_users pu inner join plus_users_coupon puc on pu.id = puc.plususer_id
+                where pu.status in (1,3,4,5,6,7) group by puc.coupon_id
                 ) x group by coupon_id
                 ) y where coupon.id = y.coupon_id ''', []).execute()
 
