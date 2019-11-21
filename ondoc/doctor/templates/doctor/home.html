@@ -74,11 +74,11 @@ angular.module('appMaps', ['uiGmapgoogle-maps'])
           }
 
           $scope.location_data = function (){ //after detecting location fetch new results
-          var new_url = url.replace("?", '');
-          new_url = "/api/v1/doctor/record_api?" + url;
+          {#var new_url = url.replace("?", '');#}
+          var new_url = "/api/v1/doctor/record_api?" + url.replace("?", '');
           if($scope.user_location && $scope.user_location.coords){
 
-            new_url += '?lat='+ $scope.user_location.coords.latitude
+            new_url += '&lat='+ $scope.user_location.coords.latitude
             new_url += '&long='+ $scope.user_location.coords.longitude
            }
            <!--console.log(new_url);-->
