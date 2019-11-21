@@ -115,17 +115,18 @@ angular.module('appMaps', ['uiGmapgoogle-maps'])
 
  <style>
  .angular-google-map-container {
-       height: 500px;
+       min-height: 500px;
        width: auto;
-    }
+  }
+
   </style>
       <button ng-click="detectLocation()">locate me</button>
   <!--<button type="button" class="btn btn-primary" data-toggle="modal" data-target="#addrecord">Open Modal</button>-->
   <br/><br/>
-  <div>
-          <span ng-repeat="label in labels" idkey="[label.label]" ng-click="tabClick(label.label)">
-              [label.label]
-          </span>
+  <div class="btn-row">
+      <button  style="margin:5px;" ng-repeat="label in labels" idkey="[label.label]" ng-click="tabClick(label.label)">
+          [label.label]
+      </button>
   </div>
   <ui-gmap-google-map center="map.center" zoom="map.zoom" options="map.options">
     <ui-gmap-marker ng-repeat="marker in markers" coords="marker.coords" options="marker.options" events="marker.events" idkey="marker.id">
