@@ -5293,11 +5293,23 @@ class IpdProcedureSyncViewSet(viewsets.GenericViewSet):
 class RecordAPIView(viewsets.GenericViewSet):
     """This class defines the create behavior of our rest api."""
     def list(self, request):
+        params = request.query_params
+        lat = params.get('lat', 28.450367)
+        long = params.get('long', 77.071848)
+        radius = int(params.get('radius')) if params.get('radius') else 10000
+        response = dict()
+
         queryset = GoogleMapRecords.objects.all()
+        if lat and long and radius:
+            point_string = 'POINT(' + str(long) + ' ' + str(lat) + ')'
+            pnt = GEOSGeometry(point_string, srid=4326)
+            queryset = queryset.filter(location__distance_lte=(pnt, radius))
         serializer = serializers.RecordSerializer(queryset, many=True,
                                                               context={"request": request})
         serialized_data = serializer.data
-        return Response(serialized_data)
+        response['map_data'] = serialized_data
+        response['labels'] = list(queryset.values('label').distinct())
+        return Response(response)
 
 
 # View to see all points
