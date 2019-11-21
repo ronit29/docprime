@@ -116,6 +116,7 @@ class Coupon(auth_model.TimeStampedModel):
         from ondoc.diagnostic.models import LabAppointment
         from ondoc.cart.models import Cart
         from ondoc.subscription_plan.models import UserPlanMapping
+        from ondoc.plus.models import PlusUser
 
         if not user.is_authenticated:
             return 0
@@ -141,6 +142,12 @@ class Coupon(auth_model.TimeStampedModel):
             count += UserPlanMapping.objects.filter(user=user,
                                                     status__in=[UserPlanMapping.BOOKED],
                                                     coupon=self).count()
+        if str(self.type) == str(self.VIP) or str(self.type) == str(self.GOLD):
+            count += PlusUser.objects.filter(user=user,
+                                             status__in=[PlusUser.ACTIVE, PlusUser.EXPIRED,
+                                                         PlusUser.ONHOLD, PlusUser.CANCEL_INITIATE,
+                                                         PlusUser.CANCELLATION_APPROVED],
+                                             coupon=self).count()
 
         count += Cart.objects.filter(user=user, deleted_at__isnull=True, data__coupon_code__contains=self.code).exclude(id=cart_item).count()
         return count

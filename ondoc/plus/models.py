@@ -1,5 +1,7 @@
 from django.db import models
 import functools
+
+from ondoc.api.v1.utils import CouponsMixin
 from ondoc.authentication import models as auth_model
 from django.contrib.contenttypes.fields import GenericRelation, GenericForeignKey
 from django.contrib.contenttypes.models import ContentType
@@ -328,7 +330,7 @@ class PlusThreshold(auth_model.TimeStampedModel, LiveMixin):
 
 
 @reversion.register()
-class PlusUser(auth_model.TimeStampedModel, RefundMixin, TransactionMixin):
+class PlusUser(auth_model.TimeStampedModel, RefundMixin, TransactionMixin, CouponsMixin):
     from ondoc.account.models import MoneyPool
     from ondoc.coupon.models import Coupon
     PRODUCT_ID = account_model.Order.VIP_PRODUCT_ID
@@ -801,6 +803,7 @@ class PlusUser(auth_model.TimeStampedModel, RefundMixin, TransactionMixin):
     def create_plus_user(cls, plus_data, user):
         from ondoc.doctor.models import OpdAppointment
         members = plus_data['plus_members']
+        coupon_list = plus_data.pop("coupon", None)
 
         for member in members:
             member['profile'] = cls.profile_create_or_update(member, user)
@@ -818,6 +821,8 @@ class PlusUser(auth_model.TimeStampedModel, RefundMixin, TransactionMixin):
                                                           payment_type=const.PREPAID,
                                                           status=cls.ACTIVE)
 
+        if coupon_list:
+            plus_membership_obj.coupon.add(*coupon_list)
         PlusMembers.create_plus_members(plus_membership_obj)
         PlusUserUtilization.create_utilization(plus_membership_obj)
         return plus_membership_obj

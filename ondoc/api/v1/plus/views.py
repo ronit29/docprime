@@ -205,6 +205,7 @@ class PlusOrderViewSet(viewsets.GenericViewSet):
             plus_user_data = {'proposer': plus_plan.proposer.id, 'plus_plan': plus_plan.id,
                                    'purchase_date': transaction_date, 'expire_date': expiry_date, 'amount': amount,
                                    'user': request.user.pk, "plus_members": plus_members}
+
             plus_subscription_data = {"profile_detail": user_profile, "plus_plan": plus_plan.id,
                               "user": request.user.pk, "plus_user": plus_user_data, "utm_parameter": utm_parameter}
 
