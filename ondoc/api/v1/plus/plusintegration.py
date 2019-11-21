@@ -1,3 +1,4 @@
+from ondoc.coupon.models import Coupon, UserSpecificCoupon
 from ondoc.plus.models import PlusUser, PlusMembers, PlusPlans, PlusPlanUtmSources, PlusPlanUtmSourceMapping
 from django.conf import settings
 import requests
@@ -249,3 +250,15 @@ class PlusIntegration:
 
         resp = PlusIntegration.get_response(resp)
         # return Response(data=resp, status=status.HTTP_200_OK)
+
+    @classmethod
+    def assign_coupons_to_user_after_purchase(cls, plus_obj):
+        if plus_obj and plus_obj.plan:
+            if not plus_obj.plan.is_gold:
+                plus_type = 1
+            else:
+                plus_type = 0
+
+            active_coupons = Coupon.get_vip_gold_active_coupons(plus_type, plus_obj.plan.id)
+            if active_coupons:
+                UserSpecificCoupon.assign_coupons_to_user(active_coupons, plus_obj.user)

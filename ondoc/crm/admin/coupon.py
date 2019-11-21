@@ -310,43 +310,6 @@ class CouponForm(forms.ModelForm):
             raise forms.ValidationError('Type \'Doctor\' not selected for doctor specific coupon')
         if not is_for_gold_users and not is_for_vip_users and users_vip_gold_plans:
             raise forms.ValidationError('Vip/Gold plans are selected. Please tick \'is_for_gold_users\' or \'is_for_vip_users\' or both.')
-        if is_for_gold_users:
-            gold_coupons = Coupon.objects.filter(is_for_gold_users=True).exclude(id=self.instance.id)
-            if gold_coupons:
-                coupon_gold_plans = gold_coupons.values_list('users_vip_gold_plans', flat=True)
-                users_vip_gold_plans = users_vip_gold_plans.values_list(flat=True)
-                coupon_gold_plans = set(filter(None, coupon_gold_plans))
-                users_vip_gold_plans = set(filter(None, users_vip_gold_plans))
-                if users_vip_gold_plans:
-                    if coupon_gold_plans:
-                        if coupon_gold_plans & users_vip_gold_plans:
-                            raise forms.ValidationError('Selected Gold plan(s) already selected in one another active gold coupon.')
-                    else:
-                        raise forms.ValidationError('Similar gold coupon with all plans selected is already activated.')
-                else:
-                    if coupon_gold_plans:
-                        raise forms.ValidationError('Some plans are already selected in one another active gold coupon.')
-                    else:
-                        raise forms.ValidationError('Similar gold coupon with all plans selected is already activated.')
-
-        if is_for_vip_users:
-            vip_coupons = Coupon.objects.filter(is_for_vip_users=True).exclude(id=self.instance.id)
-            if vip_coupons:
-                coupon_vip_plans = vip_coupons.values_list('users_vip_gold_plans', flat=True)
-                users_vip_gold_plans = users_vip_gold_plans.values_list(flat=True)
-                coupon_vip_plans = set(filter(None, coupon_vip_plans))
-                users_vip_gold_plans = set(filter(None, users_vip_gold_plans))
-                if users_vip_gold_plans:
-                    if coupon_vip_plans:
-                        if coupon_vip_plans & users_vip_gold_plans:
-                            raise forms.ValidationError('Selected Vip plan(s) already selected in one another active vip coupon.')
-                    else:
-                        raise forms.ValidationError('Similar vip coupon with all plans selected is already activated.')
-                else:
-                    if coupon_vip_plans:
-                        raise forms.ValidationError('Some plans are already selected in one another active vip coupon.')
-                    else:
-                        raise forms.ValidationError('Similar vip coupon with all plans selected is already activated.')
 
 
 class CouponAdmin(admin.ModelAdmin):

@@ -347,6 +347,17 @@ class Coupon(auth_model.TimeStampedModel):
         return test_applicabile
 
 
+    @classmethod
+    def get_vip_gold_active_coupons(cls, plus_type=1, plan_id=0):
+        active_coupons = []
+        if plan_id:
+            if plus_type == 0:  # 0 for vip
+                active_coupons = Coupon.objects.filter(is_for_vip_users=True)
+            elif plus_type == 1:  # 1 for gold
+                active_coupons = Coupon.objects.filter(is_for_gold_users=True)
+
+        return active_coupons
+
     class Meta:
         db_table = "coupon"
 
@@ -361,7 +372,7 @@ class UserSpecificCoupon(auth_model.TimeStampedModel):
 
     coupon = models.ForeignKey(Coupon, on_delete=models.CASCADE, null=False, related_name="user_specific_coupon")
     phone_number = models.CharField(max_length=10, blank=False, null=False)
-    user = models.ForeignKey(auth_model.User, on_delete=models.SET_NULL, null=True, blank=True)
+    user = models.ForeignKey(auth_model.User, on_delete=models.SET_NULL, null=True, blank=True, related_name="user_specific_coupon")
     count = models.PositiveIntegerField(default=1)
     objects = CustomUserSpecificManager()
 
@@ -378,6 +389,17 @@ class UserSpecificCoupon(auth_model.TimeStampedModel):
             logger.error(str(e))
 
         super().save(*args, **kwargs)
+
+    @classmethod
+    def assign_coupons_to_user(cls, coupons=[], user=None):
+        if user and coupons:
+            users_specific_coupons = user.user_specific_coupon.all()
+            users_coupons = list(map(lambda x: x.coupon_id, users_specific_coupons))
+            for coupon in coupons:
+                if not coupon.id in users_coupons:
+                    UserSpecificCoupon.objects.create(coupon=coupon, user=user, phone_number=user.phone_number,
+                                                      count=coupon.count)
+
 
     def __str__(self):
         return self.coupon.code
@@ -753,8 +775,6 @@ class CouponRecommender():
                     remove_coupon = True
                 if coupon.is_for_vip_users and remove_for_vip:
                     remove_coupon = True
-
-
 
             if not remove_coupon and coupon.is_user_specific and user:
                 # todo - check if it will query to db

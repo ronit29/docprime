@@ -884,6 +884,7 @@ class PlusUser(auth_model.TimeStampedModel, RefundMixin, TransactionMixin):
         from ondoc.api.v1.plus.plusintegration import PlusIntegration
         if kwargs.get('is_fresh'):
             PlusIntegration.create_vip_lead_after_purchase(self)
+            PlusIntegration.assign_coupons_to_user_after_purchase(self)
     
     def process_cancellation(self):
         from ondoc.doctor.models import OpdAppointment
