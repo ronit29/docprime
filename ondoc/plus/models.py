@@ -199,8 +199,8 @@ class PlusPlans(auth_model.TimeStampedModel, LiveMixin):
     #         return convenience_amount
 
     @classmethod
-    def get_default_convenience_amount(cls, price, type, default_plan_query=None):
-        if not price or price <= 0:
+    def get_default_convenience_amount(cls, max_price, min_price, type, default_plan_query=None):
+        if not max_price or min_price or max_price <= 0 or min_price <= 0:
             return 0
         charge = 0
         if not default_plan_query:
@@ -211,25 +211,28 @@ class PlusPlans(auth_model.TimeStampedModel, LiveMixin):
             default_plan = default_plan_query
         if not default_plan:
             return 0
-        amount_obj, percentage_obj = default_plan.get_convenience_object(type)
-        convenience_amount = amount_obj.value if amount_obj else 0
-        convenience_percentage = percentage_obj.value if percentage_obj else 0
-        if (not convenience_amount and not convenience_percentage) or (
-                convenience_amount == 0 and convenience_percentage == 0):
+        convenience_min_amount_obj, convenience_max_amount_obj, convenience_percentage_obj = default_plan.get_convenience_object(type)
+        min_cap = convenience_min_amount_obj.value if convenience_min_amount_obj else 0
+        max_cap = convenience_max_amount_obj.value if convenience_max_amount_obj else 0
+        if not min_cap or not max_cap or min_cap <= 0 or max_cap <= 0:
+            return 0
+        convenience_amount_list = []
+        price_diff = int(max_price) - (min_price)
+        if price_diff <= 0:
+            return 0
+        if price_diff <= min_cap:
+            return 0
+        convenience_amount_list.append(min_cap)
+        convenience_amount_list.append(max_cap)
+        convenience_percentage = convenience_percentage_obj.value if convenience_percentage_obj else 0
+        if not convenience_percentage or convenience_percentage <= 0:
             return 0
         convenience_percentage = int(convenience_percentage)
-        convenience_amount = int(convenience_amount)
-        if convenience_percentage and convenience_percentage > 0:
-            charge = (float(convenience_percentage) / 100) * float(price)
-            charge = floor(charge)
-        elif convenience_amount and convenience_amount > 0:
-            return convenience_amount
-        else:
-            return 0
-        if charge <= convenience_amount:
-            return charge
-        else:
-            return convenience_amount
+        convenience_amount_through_percentage = (convenience_percentage / 100) * float(price_diff)
+        convenience_amount_through_percentage = int(convenience_amount_through_percentage)
+        convenience_amount_list.append(convenience_amount_through_percentage)
+        charge = min(convenience_amount_list)
+        return charge
 
     def get_convenience_object(self, type):
         string = ''
@@ -237,26 +240,21 @@ class PlusPlans(auth_model.TimeStampedModel, LiveMixin):
             string = 'DOCTOR'
         else:
             string = 'LAB'
-        # if type == "DOCTOR":
-        #     convenience_amount_obj = self.plan_parameters.filter(parameter__key='DOCTOR_CONVENIENCE_AMOUNT').first()
-        #     convenience_percentage_obj = self.plan_parameters.filter(parameter__key='DOCTOR_CONVENIENCE_PERCENTAGE').first()
-        #     return convenience_amount_obj, convenience_percentage_obj
-        # elif type == "LABTEST":
-        #     convenience_amount_obj = self.plan_parameters.filter(parameter__key='LAB_CONVENIENCE_AMOUNT').first()
-        #     convenience_percentage_obj = self.plan_parameters.filter(parameter__key='LAB_CONVENIENCE_PERCENTAGE').first()
-        #     return convenience_amount_obj, convenience_percentage_obj
-        convenience_amount_obj = None
+        convenience_min_amount_obj = None
+        convenience_max_amount_obj = None
         convenience_percentage_obj = None
         for param in self.plan_parameters.all():
             if param.parameter and param.parameter.key:
-                if param.parameter.key == (string + '_CONVENIENCE_AMOUNT'):
-                    convenience_amount_obj = param
+                if param.parameter.key == (string + '_MINIMUM_CAPPING_AMOUNT'):
+                    convenience_min_amount_obj = param
+                if param.parameter.key == (string + '_MAXIMUM_CAPPING_AMOUNT'):
+                    convenience_max_amount_obj = param
                 if param.parameter.key == (string + '_CONVENIENCE_PERCENTAGE'):
                     convenience_percentage_obj = param
-            if convenience_percentage_obj and convenience_amount_obj:
-                return convenience_amount_obj, convenience_percentage_obj
+            if convenience_percentage_obj and convenience_min_amount_obj and convenience_max_amount_obj:
+                return convenience_min_amount_obj, convenience_max_amount_obj, convenience_percentage_obj
 
-        return None, None
+        return None, None, None
 
     def get_convenience_amount(self, price, convenience_amount_obj, convenience_percentage_obj):
         if not price or price <= 0:
