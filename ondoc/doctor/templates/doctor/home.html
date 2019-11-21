@@ -74,7 +74,7 @@ angular.module('appMaps', ['uiGmapgoogle-maps'])
           }
 
           $scope.location_data = function (){ //after detecting location fetch new results
-          {#var new_url = url.replace("?", '');#}
+          
           var new_url = "/api/v1/doctor/record_api?" + url.replace("?", '');
           if($scope.user_location && $scope.user_location.coords){
 
