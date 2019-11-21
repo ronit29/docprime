@@ -104,6 +104,8 @@ class PlusPlans(auth_model.TimeStampedModel, LiveMixin):
     is_retail = models.NullBooleanField()
     plan_criteria = models.CharField(max_length=100, null=True, blank=False, choices=UsageCriteria.as_choices())
     price_criteria = models.CharField(max_length=100, null=True, blank=False, choices=PriceCriteria.as_choices())
+    convenience_min_price_reference = models.CharField(max_length=100, null=True, blank=False, choices=PriceCriteria.as_choices())
+    convenience_max_price_reference = models.CharField(max_length=100, null=True, blank=False, choices=PriceCriteria.as_choices())
     is_gold = models.NullBooleanField()
 
     @classmethod
@@ -123,35 +125,78 @@ class PlusPlans(auth_model.TimeStampedModel, LiveMixin):
     def __str__(self):
         return "{}".format(self.plan_name)
 
-    def get_convenience_charge(self, price, type):
-        if not price or price <= 0:
+    def get_convenience_charge(self, max_price, min_price, type):
+        if not max_price or min_price or max_price <= 0 or min_price <= 0:
             return 0
         charge = 0
         if type == "DOCTOR":
-            convenience_amount_obj = self.plan_parameters.filter(parameter__key='DOCTOR_CONVENIENCE_AMOUNT').first()
-            convenience_percentage_obj = self.plan_parameters.filter(parameter__key='DOCTOR_CONVENIENCE_PERCENTAGE').first()
+            convenience_min_amount_obj = self.plan_parameters.filter(
+                parameter__key='DOCTOR_MINIMUM_CAPPING_AMOUNT').first()
+            convenience_max_amount_obj = self.plan_parameters.filter(
+                parameter__key='DOCTOR_MAXIMUM_CAPPING_AMOUNT').first()
+            convenience_percentage_obj = self.plan_parameters.filter(
+                parameter__key='DOCTOR_CONVENIENCE_PERCENTAGE').first()
         elif type == "LABTEST":
-            convenience_amount_obj = self.plan_parameters.filter(parameter__key='LAB_CONVENIENCE_AMOUNT').first()
-            convenience_percentage_obj = self.plan_parameters.filter(parameter__key='LAB_CONVENIENCE_PERCENTAGE').first()
+            convenience_min_amount_obj = self.plan_parameters.filter(
+                parameter__key='LAB_MINIMUM_CAPPING_AMOUNT').first()
+            convenience_max_amount_obj = self.plan_parameters.filter(
+                parameter__key='LAB_MAXIMUM_CAPPING_AMOUNT').first()
+            convenience_percentage_obj = self.plan_parameters.filter(
+                parameter__key='LAB_CONVENIENCE_PERCENTAGE').first()
         else:
             return 0
-        convenience_amount = convenience_amount_obj.value if convenience_amount_obj else 0
+        min_cap = convenience_min_amount_obj.value if convenience_min_amount_obj else 0
+        max_cap = convenience_max_amount_obj.value if convenience_max_amount_obj else 0
+        if not min_cap or not max_cap or min_cap <= 0 or max_cap <= 0:
+            return 0
+        convenience_amount_list = []
+        price_diff = int(max_price) - (min_price)
+        if price_diff <= 0:
+            return 0
+        if price_diff <= min_cap:
+            return 0
+        convenience_amount_list.append(min_cap)
+        convenience_amount_list.append(max_cap)
         convenience_percentage = convenience_percentage_obj.value if convenience_percentage_obj else 0
-        if (not convenience_amount and not convenience_percentage) or (convenience_amount == 0 and convenience_percentage == 0):
+        if not convenience_percentage or convenience_percentage <= 0:
             return 0
         convenience_percentage = int(convenience_percentage)
-        convenience_amount = int(convenience_amount)
-        if convenience_percentage and convenience_percentage > 0:
-            charge = (convenience_percentage/100) * float(price)
-            charge = floor(charge)
-        elif convenience_amount and convenience_amount > 0:
-            return convenience_amount
-        else:
-            return 0
-        if charge <= convenience_amount:
-            return charge
-        else:
-            return convenience_amount
+        convenience_amount_through_percentage = (convenience_percentage/100) * float(price_diff)
+        convenience_amount_through_percentage = int(convenience_amount_through_percentage)
+        convenience_amount_list.append(convenience_amount_through_percentage)
+        charge = min(convenience_amount_list)
+        return charge
+
+
+    # def get_convenience_charge(self, price, type):
+    #     if not price or price <= 0:
+    #         return 0
+    #     charge = 0
+    #     if type == "DOCTOR":
+    #         convenience_amount_obj = self.plan_parameters.filter(parameter__key='DOCTOR_CONVENIENCE_AMOUNT').first()
+    #         convenience_percentage_obj = self.plan_parameters.filter(parameter__key='DOCTOR_CONVENIENCE_PERCENTAGE').first()
+    #     elif type == "LABTEST":
+    #         convenience_amount_obj = self.plan_parameters.filter(parameter__key='LAB_CONVENIENCE_AMOUNT').first()
+    #         convenience_percentage_obj = self.plan_parameters.filter(parameter__key='LAB_CONVENIENCE_PERCENTAGE').first()
+    #     else:
+    #         return 0
+    #     convenience_amount = convenience_amount_obj.value if convenience_amount_obj else 0
+    #     convenience_percentage = convenience_percentage_obj.value if convenience_percentage_obj else 0
+    #     if (not convenience_amount and not convenience_percentage) or (convenience_amount == 0 and convenience_percentage == 0):
+    #         return 0
+    #     convenience_percentage = int(convenience_percentage)
+    #     convenience_amount = int(convenience_amount)
+    #     if convenience_percentage and convenience_percentage > 0:
+    #         charge = (convenience_percentage/100) * float(price)
+    #         charge = floor(charge)
+    #     elif convenience_amount and convenience_amount > 0:
+    #         return convenience_amount
+    #     else:
+    #         return 0
+    #     if charge <= convenience_amount:
+    #         return charge
+    #     else:
+    #         return convenience_amount
 
     @classmethod
     def get_default_convenience_amount(cls, price, type, default_plan_query=None):

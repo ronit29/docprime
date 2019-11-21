@@ -717,5 +717,30 @@ def get_price_reference(plus_membership_obj, entity):
     return class_reference(plus_membership_obj)
 
 
+def get_max_convenience_reference(plus_membership_obj, entity):
+    if not plus_membership_obj:
+        return None
+
+    price_criteria = plus_membership_obj.plan.convenience_max_price_reference
+    if entity not in ['DOCTOR', 'LABTEST'] or price_criteria not in  PriceCriteria.availabilities():
+        return None
+
+    class_reference = price_criteria_class_mapping[entity][price_criteria]
+    return class_reference(plus_membership_obj)
+
+
+def get_min_convenience_reference(plus_membership_obj, entity):
+    if not plus_membership_obj:
+        return None
+
+    price_criteria = plus_membership_obj.plan.convenience_min_price_reference
+    if entity not in ['DOCTOR', 'LABTEST'] or price_criteria not in  PriceCriteria.availabilities():
+        return None
+
+    class_reference = price_criteria_class_mapping[entity][price_criteria]
+    return class_reference(plus_membership_obj)
+
+
+
 
 
