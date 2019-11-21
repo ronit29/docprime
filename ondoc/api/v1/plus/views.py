@@ -236,10 +236,14 @@ class PlusOrderViewSet(viewsets.GenericViewSet):
 
             # if balance < amount or resp['is_agent']:
             # payable_amount = amount - balance
+
+            product_id = account_models.Order.VIP_PRODUCT_ID if not plus_plan.is_gold else account_models.Order.GOLD_PRODUCT_ID
+            product_create_id = account_models.Order.VIP_CREATE if not plus_plan.is_gold else account_models.Order.GOLD_CREATE
+
             payable_amount = amount
             order = account_models.Order.objects.create(
-                product_id=account_models.Order.VIP_PRODUCT_ID,
-                action=account_models.Order.VIP_CREATE,
+                product_id=product_id,
+                action=product_create_id,
                 action_data=plus_data,
                 amount=payable_amount,
                 cashback_amount=0,
