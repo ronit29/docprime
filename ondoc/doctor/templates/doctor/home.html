@@ -13,7 +13,7 @@
       var url = window.location.search;
 url = url.replace("?", '');
 <!--console.log(url);-->
-LocFac = "/api/v1/doctor/record_api?" + url;
+LocFac =  "/api/v1/doctor/record_api?" + url;
 
 angular.module('appMaps', ['uiGmapgoogle-maps'])
   .config(function($interpolateProvider) {
@@ -23,6 +23,7 @@ angular.module('appMaps', ['uiGmapgoogle-maps'])
 
   .controller('mainCtrl', function($scope, $http, uiGmapGoogleMapApi, uiGmapIsReady) {
       $scope.user_location = []
+      $scope.new_map ={}
       $scope.map = {
         bounds: {},
         center: { latitude: 28.4485, longitude: 77.0759 }
@@ -55,7 +56,7 @@ angular.module('appMaps', ['uiGmapgoogle-maps'])
                   $scope.markers = markers;
              }
           }
-
+    <!--console.log($scope.markers)-->
           $scope.detectLocation = function () { //detect location
               if (navigator.geolocation) {
                   navigator.geolocation.getCurrentPosition((position) => {
@@ -74,13 +75,20 @@ angular.module('appMaps', ['uiGmapgoogle-maps'])
           }
 
           $scope.location_data = function (){ //after detecting location fetch new results
-          var new_url = url.replace("?", '');
-          new_url = "/api/v1/doctor/record_api" + url;
+          <!--var new_url = url.replace("?", '');-->
+          var new_url = "/api/v1/doctor/record_api?" + url.replace("?", '');
           if($scope.user_location && $scope.user_location.coords){
 
-            new_url += '?lat='+ $scope.user_location.coords.latitude
+            new_url += '&lat='+ $scope.user_location.coords.latitude
             new_url += '&long='+ $scope.user_location.coords.longitude
+            $scope.new_map = {
+                bounds: {},
+                center: { latitude: $scope.user_location.coords.latitude, longitude: $scope.user_location.coords.longitude }
+                <!--center: { latitude: 12.972442, longitude: 77.580643 }-->
+              }
+              $scope.map = $scope.new_map;
            }
+           <!--console.log($scope.map)-->
            <!--console.log(new_url);-->
               $http.get(new_url).then(function(data) {
                   var markers = data.data.map_data;
@@ -108,7 +116,6 @@ angular.module('appMaps', ['uiGmapgoogle-maps'])
                   }
                })
           }
-
        });
     });
   </script>
