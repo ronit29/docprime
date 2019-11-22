@@ -977,7 +977,7 @@ class PlusUser(auth_model.TimeStampedModel, RefundMixin, TransactionMixin):
         profile = data.get('profile', None)
         name = profile.name.split(' ', 1)
         first_name = name[0]
-        last_name = name[1] if name[1] else ''
+        last_name = name[1] if name[1:] else ''
         dob = profile.dob
         email = profile.email
         phone_number = profile.phone_number
