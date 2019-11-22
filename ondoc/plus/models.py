@@ -643,7 +643,8 @@ class PlusUser(auth_model.TimeStampedModel, RefundMixin, TransactionMixin):
                 price = current_item_mrp
             else:
                 price = price_engine.get_price(price_data)
-            vip_data_dict['vip_convenience_amount'] = PlusPlans.get_default_convenience_amount(price, "DOCTOR") if not request.user.active_plus_user else request.user.active_plus_user.plan.get_convenience_charge(price, "DOCTOR")
+            plan = request.user.active_plus_user.plan if request.user.active_plus_user else None
+            vip_data_dict['vip_convenience_amount'] = PlusPlans.get_default_convenience_amount(price_data, "DOCTOR", default_plan_query=plan)
             engine = get_class_reference(self, "DOCTOR")
             vip_data_dict['vip_gold_price'] = int(current_item_price_data.get('fees'))
             if engine:
@@ -669,7 +670,8 @@ class PlusUser(auth_model.TimeStampedModel, RefundMixin, TransactionMixin):
                     price = current_item_mrp
                 else:
                     price = price_engine.get_price(price_data)
-                vip_data_dict['vip_convenience_amount'] = PlusPlans.get_default_convenience_amount(price, "DOCTOR") if not request.user.active_plus_user else request.user.active_plus_user.plan.get_convenience_charge(price, "LABTEST")
+                plan = request.user.active_plus_user.plan if request.user.active_plus_user else None
+                vip_data_dict['vip_convenience_amount'] = PlusPlans.get_default_convenience_amount(price_data, "LABTEST", default_plan_query=plan)
                 engine = get_class_reference(self, entity)
                 vip_data_dict['vip_gold_price'] = int(current_item_price_data.get('fees'))
                 if engine:

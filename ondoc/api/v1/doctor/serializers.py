@@ -654,6 +654,11 @@ class DoctorHospitalSerializer(serializers.ModelSerializer):
         return resp
 
     def get_vip(self, obj):
+        request = self.context.get("request")
+        user = request.user
+        price_data = {"mrp": obj.mrp, "deal_price": obj.deal_price, "fees": obj.fees,
+                      "cod_deal_price": obj.cod_deal_price}
+
         search_query = self.context.get('search_query', None)
         if not search_query:
             search_criteria = SearchCriteria.objects.filter(search_key='is_gold').first()
@@ -664,20 +669,20 @@ class DoctorHospitalSerializer(serializers.ModelSerializer):
         hosp_is_gold = False
         if search_criteria:
             hosp_is_gold = search_criteria.search_value
+        plus_user = None if not user.is_authenticated or user.is_anonymous else user.active_plus_user
+        plan = plus_user.plan if plus_user else None
         resp = {"is_vip_member": False, "cover_under_vip": False, "vip_amount": 0, "is_enable_for_vip": False,
-                "vip_convenience_amount": PlusPlans.get_default_convenience_amount(obj.fees, "DOCTOR", default_plan_query),
+                "vip_convenience_amount": PlusPlans.get_default_convenience_amount(price_data, "DOCTOR", default_plan_query=plan),
                 "vip_gold_price": 0, 'hosp_is_gold': False, "is_gold_member": False}
 
         resp['hosp_is_gold'] = hosp_is_gold
-        request = self.context.get("request")
-        user = request.user
         doctor_clinic = obj.doctor_clinic
         doctor = doctor_clinic.doctor
         hospital = doctor_clinic.hospital
         enabled_for_online_booking = doctor_clinic.enabled_for_online_booking and doctor.enabled_for_online_booking and \
                                         hospital.enabled_for_online_booking and hospital.enabled_for_prepaid \
                                         and hospital.is_enabled_for_plus_plans() and doctor.enabled_for_plus_plans
-        plus_user = None if not user.is_authenticated or user.is_anonymous else user.active_plus_user
+
         if enabled_for_online_booking and obj.mrp is not None:
             resp['is_enable_for_vip'] = True
             resp['vip_gold_price'] = obj.fees
@@ -685,7 +690,6 @@ class DoctorHospitalSerializer(serializers.ModelSerializer):
                 return resp
             utilization = plus_user.get_utilization
             available_amount = int(utilization.get('doctor_amount_available', 0))
-            price_data = {"mrp": obj.mrp, "deal_price": obj.deal_price, "fees": obj.fees, "cod_deal_price": obj.cod_deal_price}
             mrp = int(obj.mrp)
             deal_price = obj.deal_price
             price_engine = get_price_reference(plus_user, "DOCTOR")

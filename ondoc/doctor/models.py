@@ -3649,7 +3649,8 @@ class OpdAppointment(auth_model.TimeStampedModel, CouponsMixin, OpdAppointmentIn
         if cover_under_vip and cart_data.get('cover_under_vip', None) and vip_amount > 0:
             # effective_price = 0 if doctor_available_amount >= mrp else (mrp - doctor_available_amount)
             # effective_price = cart_data.get('vip_amount')
-            convenience_amount = plus_user.plan.get_convenience_charge(cart_data.get('amount_to_be_paid'), "DOCTOR")
+            # convenience_amount = plus_user.plan.get_convenience_charge(cart_data.get('amount_to_be_paid'), "DOCTOR")
+            convenience_amount = PlusPlans.get_default_convenience_amount(price_data, "DOCTOR", default_plan_query=plus_user.plan)
             effective_price = cart_data.get('amount_to_be_paid') + convenience_amount
             # vip_amount = vip_amount + convenience_amount
             payment_type = OpdAppointment.VIP

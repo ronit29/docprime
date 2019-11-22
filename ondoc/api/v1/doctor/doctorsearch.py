@@ -636,11 +636,18 @@ class DoctorSearchHelper:
                 is_insurance_covered = False
                 insurance_error = None
                 is_gold_member = False
+                plan = None
                 vip_data_dict = kwargs.get('vip_data')
                 is_vip_member = vip_data_dict.get('is_vip_member', False)
                 is_enable_for_vip = vip_data_dict.get('is_enable_for_vip', False)
                 vip_utilization = vip_data_dict.get('vip_utilization', None)
-                vip_convenience_amount = PlusPlans.get_default_convenience_amount(int(min_price.get('fees', 0)), "DOCTOR")
+                price_data = {"mrp": int(min_price.get('mrp', 0)), "deal_price": int(min_price.get('deal_price', 0)),
+                              "cod_deal_price": int(min_price.get('cod_deal_price', 0)),
+                              "fees": int(min_price.get('fees', 0))}
+                if request and request.user and not request.user.is_anonymous and request.user.active_plus_user:
+                    plan = request.user.active_plus_user.plan
+                vip_convenience_amount = PlusPlans.get_default_convenience_amount(price_data, "DOCTOR", default_plan_query=plan)
+
                 vip_remaining_amount = int(vip_utilization.get('vip_remaining_amount', 0))
                 vip_amount = 0
                 cover_under_vip = vip_data_dict.get('cover_under_vip', False)
