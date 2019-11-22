@@ -408,17 +408,19 @@ class PlusDataViewSet(viewsets.GenericViewSet):
         data = request.data
         query_params = request.query_params
         data_type = query_params.get('dummy_data_type', 'PLAN_PURCHASE')
+        resp = {}
+        if data_type == PlusDummyData.DataType.SINGLE_PURCHASE:
+            if query_params.get('is_single_flow_opd'):
+                DoctorAppointmentsViewSet().create(request, is_dummy=True)
 
-        if query_params.get('is_single_flow_opd'):
-            DoctorAppointmentsViewSet().create(request, is_dummy=True)
+            elif query_params.get('is_single_flow_lab'):
+                LabAppointmentView().create(request, is_dummy=True)
 
-        elif query_params.get('is_single_flow_lab'):
-            LabAppointmentView.create(request, is_dummy=True)
+            plus_dummy_obj = PlusDummyData(user=user, data=data, data_type=data_type)
+            plus_dummy_obj.save()
+            resp = {'dummy_id': plus_dummy_obj.id}
 
-        plus_dummy_obj = PlusDummyData(user=user, data=data, data_type=data_type)
-        plus_dummy_obj.save()
-
-        return Response(data={'dummy_id': plus_dummy_obj.id}, status=status.HTTP_200_OK)
+        return Response(data=resp, status=status.HTTP_200_OK)
 
     def show_dummy_data(self, request):
         user = request.user
