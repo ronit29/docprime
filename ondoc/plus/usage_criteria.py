@@ -214,7 +214,7 @@ class LabtestAmountCount(AbstractCriteria):
         # max_price = max_price_engine.get_price(price_data)
         # convenience_charge = plan.get_convenience_charge(max_price, min_price, "LABTEST")
         # convenience_charge = plan.get_convenience_charge(cost, "LABTEST")
-        convenience_charge = PlusPlans.get_default_convenience_amount(price_data, "DOCTOR",
+        convenience_charge = PlusPlans.get_default_convenience_amount(price_data, "LABTEST",
                                                                       default_plan_query=plan)
         total_cost = cost + convenience_charge
         if plan.is_gold and total_cost >= deal_price:
@@ -339,7 +339,7 @@ class PackageAmountCount(AbstractCriteria):
         # max_price = max_price_engine.get_price(price_data)
         # convenience_charge = plan.get_convenience_charge(max_price, min_price, "LABTEST")
         # convenience_charge = plan.get_convenience_charge(cost, "LABTEST")
-        convenience_charge = PlusPlans.get_default_convenience_amount(price_data, "DOCTOR", default_plan_query=plan)
+        convenience_charge = PlusPlans.get_default_convenience_amount(price_data, "LABTEST", default_plan_query=plan)
         total_cost = cost + convenience_charge
         if plan.is_gold and total_cost >= deal_price:
             return resp

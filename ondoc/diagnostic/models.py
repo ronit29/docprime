@@ -2707,7 +2707,7 @@ class LabAppointment(TimeStampedModel, CouponsMixin, LabAppointmentInvoiceMixin,
                 else:
                     price = price_engine.get_price(price_data)
                 # vip_convenience_amount = plus_membership.plan.get_convenience_charge(price, "LABTEST")
-                vip_convenience_amount = PlusPlans.get_default_convenience_amount(price_data, "DOCTOR", default_plan_query=plus_membership.plan)
+                vip_convenience_amount = PlusPlans.get_default_convenience_amount(price_data, "LABTEST", default_plan_query=plus_membership.plan)
                 test = data['test_ids']
                 entity = "LABTEST" if not test[0].is_package else "PACKAGE"
                 engine = get_class_reference(plus_membership, entity)
@@ -2856,7 +2856,7 @@ class LabAppointment(TimeStampedModel, CouponsMixin, LabAppointmentInvoiceMixin,
         if cover_under_vip and cart_data.get('cover_under_vip', None):
             payment_type = OpdAppointment.VIP
             # convenience_amount = plus_user.plan.get_convenience_charge(plus_user_resp['amount_to_be_paid'], "LABTEST")
-            convenience_amount = PlusPlans.get_default_convenience_amount(price_data, "DOCTOR", default_plan_query=plus_user.plan)
+            convenience_amount = PlusPlans.get_default_convenience_amount(price_data, "LABTEST", default_plan_query=plus_user.plan)
             effective_price = plus_user_resp['amount_to_be_paid'] + convenience_amount
             vip_amount_utilized = plus_user_resp['vip_amount_deducted']
             # utilization = plus_user.get_utilization
