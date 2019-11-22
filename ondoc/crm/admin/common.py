@@ -607,6 +607,7 @@ class MerchantPayoutAdmin(MediaImportMixin, VersionAdmin):
 
         if form.cleaned_data.get('recreate_payout', False):
             obj.recreate_failed_payouts()
+            obj.status = obj.ARCHIVE
 
         super().save_model(request, obj, form, change)
 
