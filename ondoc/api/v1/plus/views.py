@@ -236,10 +236,14 @@ class PlusOrderViewSet(viewsets.GenericViewSet):
 
             # if balance < amount or resp['is_agent']:
             # payable_amount = amount - balance
+
+            product_id = account_models.Order.VIP_PRODUCT_ID if not plus_plan.is_gold else account_models.Order.GOLD_PRODUCT_ID
+            product_create_id = account_models.Order.VIP_CREATE if not plus_plan.is_gold else account_models.Order.GOLD_CREATE
+
             payable_amount = amount
             order = account_models.Order.objects.create(
-                product_id=account_models.Order.VIP_PRODUCT_ID,
-                action=account_models.Order.VIP_CREATE,
+                product_id=product_id,
+                action=product_create_id,
                 action_data=plus_data,
                 amount=payable_amount,
                 cashback_amount=0,
@@ -305,7 +309,7 @@ class PlusOrderViewSet(viewsets.GenericViewSet):
         counter = 0
         self_counter = -1
         for member in members_to_be_added:
-            if member.get('relation') == PlusMembers.Relations.SELF:
+            if member.get('is_primary_user'):
                 self_counter = counter
                 if member.get('document_ids'):
                     proposer_profile = inactive_plus_subscription.get_primary_member_profile()
@@ -317,7 +321,8 @@ class PlusOrderViewSet(viewsets.GenericViewSet):
 
             counter += 1
 
-        members_to_be_added.pop(self_counter)
+        if self_counter > -1:
+            members_to_be_added.pop(self_counter)
 
         PlusMembers.create_plus_members(inactive_plus_subscription, members_list=members_to_be_added)
         inactive_plus_subscription.status = PlusUser.ACTIVE
@@ -365,7 +370,7 @@ class PlusProfileViewSet(viewsets.GenericViewSet):
             self_index = 0
             count = 0
             for member in members_data:
-                if member['relation'] == PlusMembers.Relations.SELF:
+                if member['is_primary_user']:
                     self_index = count
                 count = count + 1
 
@@ -396,21 +401,34 @@ class PlusDataViewSet(viewsets.GenericViewSet):
     permission_classes = (IsAuthenticated,)
 
     def push_dummy_data(self, request):
-        try:
-            user = request.user
-            data = request.data
-            PlusDummyData.objects.create(user=user, data=data)
-            return Response(data="save successfully!!", status=status.HTTP_200_OK )
-        except Exception as e:
-            logger.error(str(e))
-            return Response(data="could not save data", status=status.HTTP_400_BAD_REQUEST)
+        from ondoc.api.v1.doctor.views import DoctorAppointmentsViewSet
+        from ondoc.api.v1.diagnostic.views import LabAppointmentView
+
+        user = request.user
+        data = request.data
+        query_params = request.query_params
+        data_type = query_params.get('dummy_data_type', 'PLAN_PURCHASE')
+
+        if query_params.get('is_single_flow_opd'):
+            DoctorAppointmentsViewSet().create(request, is_dummy=True)
+
+        elif query_params.get('is_single_flow_lab'):
+            LabAppointmentView.create(request, is_dummy=True)
+
+        plus_dummy_obj = PlusDummyData(user=user, data=data, data_type=data_type)
+        plus_dummy_obj.save()
+
+        return Response(data={'dummy_id': plus_dummy_obj.id}, status=status.HTTP_200_OK)
 
     def show_dummy_data(self, request):
         user = request.user
+        data_type = request.query_params.get('dummy_data_type')
+        dummy_id = request.query_params.get('dummy_id')
+        data_type = data_type if data_type and data_type in PlusDummyData.DataType.availabilities() else PlusDummyData.DataType.PLAN_PURCHASE
         res = {}
         if not user:
             return Response(data=res, status=status.HTTP_200_OK)
-        dummy_data = PlusDummyData.objects.filter(user=user).order_by('-id').first()
+        dummy_data = PlusDummyData.objects.filter(user=user, data_type=data_type).order_by('-id').first() if not dummy_id else PlusDummyData.objects.filter(id=dummy_id).first()
         if not dummy_data:
             return Response(data=res, status=status.HTTP_200_OK)
         member_data = dummy_data.data

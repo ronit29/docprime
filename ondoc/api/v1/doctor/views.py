@@ -391,7 +391,7 @@ class DoctorAppointmentsViewSet(OndocViewSet):
 
 
     @transaction.atomic
-    def create(self, request):
+    def create(self, request, *args, **kwargs):
         serializer = serializers.CreateAppointmentSerializer(data=request.data, context={'request': request, 'data' : request.data, 'use_duplicate' : True})
         serializer.is_valid(raise_exception=True)
         validated_data = serializer.validated_data
@@ -522,6 +522,9 @@ class DoctorAppointmentsViewSet(OndocViewSet):
             resp = account_models.Order.create_order(request, [cart_item], validated_data.get("use_wallet"))
 
         if not resp and plus_plan:
+            if kwargs.get('is_dummy'):
+                return validated_data
+
             resp = account_models.Order.create_new_order(request, validated_data, False)
 
         if is_agent:

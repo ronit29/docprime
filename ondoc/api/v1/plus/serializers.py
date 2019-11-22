@@ -206,7 +206,7 @@ class PlusMemberListSerializer(serializers.Serializer):
     city_code = serializers.CharField(required=False, allow_null=True)
     relation = serializers.ChoiceField(choices=PlusMembers.Relations.as_choices(), required=False, allow_null=True, allow_blank=True)
     document_ids = serializers.ListField(required=False, allow_null=True, child=PlusMembersDocumentSerializer())
-    # is_primary_user = serializers.BooleanField()
+    is_primary_user = serializers.BooleanField(required=False, default=False)
     # plan = serializers.PrimaryKeyRelatedField(queryset=PlusPlans.all_active_plans(), allow_null=False, allow_empty=False)
 
 
@@ -219,12 +219,9 @@ class PlusMembersSerializer(serializers.Serializer):
         plus_user_obj = PlusUser.get_by_user(user)
         if plus_user_obj:
             plus_members = plus_user_obj.plus_members.all()
-            # if len(plus_members) > 1:
-            #     raise serializers.ValidationError({'members': 'Members can be added only once.'})
 
             total_allowed_members = plus_user_obj.plan.total_allowed_members
 
-            # if len(plus_members) + len(attrs.get('members'))-1 > total_allowed_members:
             if len(attrs.get('members')) > total_allowed_members:
                 raise serializers.ValidationError({'members': 'Cannot add members more than total allowed memebers.'})
 
@@ -232,28 +229,19 @@ class PlusMembersSerializer(serializers.Serializer):
 
             # check if there is name duplicacy or not.
             member_list = attrs.get('members', [])
-            # to_be_added_member_list = attrs.get('members', [])
             to_be_added_member_list = []
             proposer_name = None
             for each_member in member_list:
-                if not each_member.get('id') or each_member['relation'] == PlusMembers.Relations.SELF:
+                if not each_member.get('id') or each_member['is_primary_user']:
                     to_be_added_member_list.append(each_member)
-                if each_member['relation'] == PlusMembers.Relations.SELF:
+                if each_member['is_primary_user']:
                     proposer_name = "%s %s" % (each_member['first_name'], each_member['last_name'])
 
             to_be_added_member_set = set(
                     map(lambda member: "%s %s" % (member['first_name'], member['last_name']), to_be_added_member_list))
-            to_be_added_member_set.remove(proposer_name)
 
-            # to_be_added_member_set = set(map(lambda member: "%s %s" % (member['first_name'], member['last_name']), to_be_added_member_list))
-            # to_be_added_member_relation_set = set(map(lambda member: "%s" % (member['relation']), to_be_added_member_list))
-            # if PlusMembers.Relations.SELF in to_be_added_member_relation_set:
-            #     raise serializers.ValidationError({'name': 'Proposer has already be added. Cannot be added and changed.'})
-            # if len(to_be_added_member_set) != len(to_be_added_member_list):
-            #     raise serializers.ValidationError({'name': 'Multiple members cannot have same name'})
-
-            # if len(to_be_added_member_set) != len(member_list):
-            #     raise serializers.ValidationError({'name': 'Multiple members cannot have same name'})
+            if proposer_name in to_be_added_member_set:
+                to_be_added_member_set.remove(proposer_name)
 
             if to_be_added_member_set & existing_members_name_set:
                 raise serializers.ValidationError({'name': 'Member already exist. Members name need to be unique.'})

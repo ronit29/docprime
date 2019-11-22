@@ -13,7 +13,7 @@ class Migration(migrations.Migration):
     operations = [
         migrations.AddField(
             model_name='order',
-            name='single_booking_id',
+            name='single_booking',
             field=models.ForeignKey(blank=True, null=True, on_delete=django.db.models.deletion.CASCADE, related_name='single_booking_order', to='account.Order'),
         ),
     ]

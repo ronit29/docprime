@@ -51,6 +51,7 @@ class Order(TimeStampedModel):
     CHAT_CONSULTATION_CREATE = 7
     PROVIDER_ECONSULT_PAY = 8
     VIP_CREATE = 11
+    GOLD_CREATE = 12
 
 
     PAYMENT_ACCEPTED = 1
@@ -69,6 +70,7 @@ class Order(TimeStampedModel):
                       (SUBSCRIPTION_PLAN_BUY, "Subscription Plan Buy"),
                       (CHAT_CONSULTATION_CREATE, "Chat Consultation Create"),
                       (VIP_CREATE, "Vip create"),
+                      (GOLD_CREATE, "Gold create"),
                       (PROVIDER_ECONSULT_PAY, "Provider Econsult Pay"),
                       )
     DOCTOR_PRODUCT_ID = 1
@@ -78,11 +80,13 @@ class Order(TimeStampedModel):
     CHAT_PRODUCT_ID = 5
     PROVIDER_ECONSULT_PRODUCT_ID = 6
     VIP_PRODUCT_ID = 11
+    GOLD_PRODUCT_ID = 8
     PRODUCT_IDS = [(DOCTOR_PRODUCT_ID, "Doctor Appointment"), (LAB_PRODUCT_ID, "LAB_PRODUCT_ID"),
                    (INSURANCE_PRODUCT_ID, "INSURANCE_PRODUCT_ID"),
                    (SUBSCRIPTION_PLAN_PRODUCT_ID, "SUBSCRIPTION_PLAN_PRODUCT_ID"),
                    (CHAT_PRODUCT_ID, "CHAT_PRODUCT_ID"),
                    (VIP_PRODUCT_ID, 'VIP_PRODUCT_ID'),
+                   (GOLD_PRODUCT_ID, 'GOLD_PRODUCT_ID'),
                    (PROVIDER_ECONSULT_PRODUCT_ID, "Provider Econsult"),
                    ]
 
@@ -101,7 +105,7 @@ class Order(TimeStampedModel):
     cart = models.ForeignKey('cart.Cart', on_delete=models.CASCADE, related_name="order", blank=True, null=True)
     user = models.ForeignKey(User, on_delete=models.DO_NOTHING, blank=True, null=True, related_name="orders")
     visitor_info = JSONField(blank=True, null=True)
-    single_booking_id = models.ForeignKey('self', on_delete=models.CASCADE, related_name="single_booking_order", blank=True, null=True)
+    single_booking = models.ForeignKey('self', on_delete=models.CASCADE, related_name="single_booking_order", blank=True, null=True)
 
     def __str__(self):
         return "{}".format(self.id)
@@ -244,7 +248,7 @@ class Order(TimeStampedModel):
                 cod_to_prepaid_app = self.get_cod_to_prepaid_appointment(True)
             if not cod_to_prepaid_app:
                 # Instant refund for already process VIP and Insurance orders
-                if self.product_id in [self.INSURANCE_PRODUCT_ID, self.VIP_PRODUCT_ID]:
+                if self.product_id in [self.INSURANCE_PRODUCT_ID, self.VIP_PRODUCT_ID, self.GOLD_PRODUCT_ID]:
                     ctx_objs = consumer_account.debit_refund()
                     if ctx_objs:
                         for ctx_obj in ctx_objs:
@@ -307,7 +311,7 @@ class Order(TimeStampedModel):
             serializer = ChatTransactionModelSerializer(data=appointment_data)
             serializer.is_valid(raise_exception=True)
             consultation_data = serializer.validated_data
-        elif self.product_id == self.VIP_PRODUCT_ID:
+        elif self.product_id in [self.VIP_PRODUCT_ID, self.GOLD_PRODUCT_ID]:
             plus_data = deepcopy(self.action_data)
             plus_data = plan_subscription_reverse_transform(plus_data)
             plus_data['plus_user']['order'] = self.id
@@ -404,7 +408,7 @@ class Order(TimeStampedModel):
                                                     account=appointment_obj.master_policy.insurer_account,
                                                     transaction_type=InsuranceTransaction.DEBIT, amount=amount)
 
-        elif self.action == Order.VIP_CREATE:
+        elif self.action in [Order.VIP_CREATE, Order.GOLD_CREATE]:
             user = User.objects.get(id=self.action_data.get('user'))
             if not user:
                 raise Exception('User Not Found for Order' + str(self.id))
@@ -882,7 +886,10 @@ class Order(TimeStampedModel):
             elif appointment_detail.get('lab'):
                 product_id = Order.LAB_PRODUCT_ID
             else:
-                product_id = Order.VIP_PRODUCT_ID
+                if not valid_data.get('plus_plan').is_gold:
+                    product_id = Order.VIP_PRODUCT_ID
+                else:
+                    product_id = Order.GOLD_PRODUCT_ID
 
             if product_id == cls.DOCTOR_PRODUCT_ID:
                 appointment_detail = opdappointment_transform(appointment_detail)
@@ -891,6 +898,11 @@ class Order(TimeStampedModel):
                 appointment_detail = labappointment_transform(appointment_detail)
                 action = cls.LAB_APPOINTMENT_CREATE
             else:
+                if not valid_data.get('plus_plan').is_gold:
+                    action = Order.VIP_CREATE
+                else:
+                    action = Order.GOLD_CREATE
+
                 appointment_detail = plus_subscription_transform(appointment_detail)
 
             if appointment_detail.get('payment_type') in [OpdAppointment.GOLD]:
@@ -915,7 +927,7 @@ class Order(TimeStampedModel):
                     user=user,
                     amount=payable_amount
                 )
-                if product_id == Order.VIP_PRODUCT_ID:
+                if product_id == Order.GOLD_PRODUCT_ID:
                     single_booking_id = order.id
 
             order_list.append(order)
@@ -927,8 +939,8 @@ class Order(TimeStampedModel):
                     logger.log("Could not push order to spo - " + str(e))
 
         for order in order_list:
-            if not order.product_id == Order.VIP_PRODUCT_ID:
-                order.single_booking_id_id = single_booking_id
+            if not order.product_id == Order.GOLD_PRODUCT_ID:
+                order.single_booking_id = single_booking_id
                 order.save()
         resp["status"] = 1
         resp['data'], resp["payment_required"] = single_booking_payment_details(request, order_list)
@@ -1019,7 +1031,7 @@ class Order(TimeStampedModel):
                     econsult_ids.append(curr_app.id)
                 elif order.product_id == Order.CHAT_PRODUCT_ID:
                     chat_plan_ids.append(curr_app.id)
-                elif order.product_id == Order.VIP_PRODUCT_ID:
+                elif order.product_id in [Order.VIP_PRODUCT_ID, Order.GOLD_PRODUCT_ID]:
                     plus_ids.append(curr_app.id)
 
                 total_cashback_used += curr_cashback
@@ -1337,7 +1349,7 @@ class PgTransaction(TimeStampedModel, SoftDelete):
     @classmethod
     def is_valid_hash(cls, data, product_id):
         client_key = secret_key = ""
-        if product_id in [Order.DOCTOR_PRODUCT_ID, Order.SUBSCRIPTION_PLAN_PRODUCT_ID, Order.CHAT_PRODUCT_ID, Order.PROVIDER_ECONSULT_PRODUCT_ID, Order.VIP_PRODUCT_ID]:
+        if product_id in [Order.DOCTOR_PRODUCT_ID, Order.SUBSCRIPTION_PLAN_PRODUCT_ID, Order.CHAT_PRODUCT_ID, Order.PROVIDER_ECONSULT_PRODUCT_ID, Order.VIP_PRODUCT_ID, Order.GOLD_PRODUCT_ID]:
             client_key = settings.PG_CLIENT_KEY_P1
             secret_key = settings.PG_SECRET_KEY_P1
         elif product_id == Order.LAB_PRODUCT_ID:
@@ -1610,7 +1622,7 @@ class ConsumerAccount(TimeStampedModel):
         cashback_txns_used = wallet_txns_used = []
         cashback_deducted = 0
         order = appointment_obj.get_order()
-        if not product_id in [Order.SUBSCRIPTION_PLAN_PRODUCT_ID, Order.INSURANCE_PRODUCT_ID, Order.VIP_PRODUCT_ID]:
+        if not product_id in [Order.SUBSCRIPTION_PLAN_PRODUCT_ID, Order.INSURANCE_PRODUCT_ID, Order.VIP_PRODUCT_ID, Order.GOLD_PRODUCT_ID]:
             if order and order.cashback_amount:
                 cashback_deducted = min(self.cashback, amount)
                 cashback_txns = ConsumerTransaction.objects.select_for_update().filter(user=self.user,
