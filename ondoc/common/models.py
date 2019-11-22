@@ -955,12 +955,12 @@ class GoogleLatLong(auth_model.TimeStampedModel):
                     if place_searched_data.get('results'):
                         for data in place_searched_data.get('results'):
                             if type == 'hospital':
-                                HospitalPlaceIDs.objects.create(place_id=data.get('place_id'),
+                                HospitalPlaceIDs.objects.get_or_create(place_id=data.get('place_id'),
                                                                 google_coordinates=point_obj)
                                 point_obj.is_hospital_done = True
                                 point_obj.save()
                             if type == 'doctor':
-                                DoctorPlaceIDs.objects.create(place_id=data.get('place_id'),
+                                DoctorPlaceIDs.objects.get_or_create(place_id=data.get('place_id'),
                                                               google_coordinates=point_obj)
                                 point_obj.is_doctor_done = True
                                 point_obj.save()
