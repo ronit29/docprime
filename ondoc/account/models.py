@@ -898,6 +898,11 @@ class Order(TimeStampedModel):
                 appointment_detail = labappointment_transform(appointment_detail)
                 action = cls.LAB_APPOINTMENT_CREATE
             else:
+                if not valid_data.get('plus_plan').is_gold:
+                    action = Order.VIP_CREATE
+                else:
+                    action = Order.GOLD_CREATE
+
                 appointment_detail = plus_subscription_transform(appointment_detail)
 
             if appointment_detail.get('payment_type') in [OpdAppointment.GOLD]:

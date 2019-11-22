@@ -2003,6 +2003,7 @@ class SendBookingUrlViewSet(GenericViewSet):
         if not utm_tags:
             utm_tags = {}
         utm_source = utm_tags.get('utm_source', '')
+        dummy_id = request.data.get('dummy_id', 0)
         landing_url = request.data.get('landing_url')
 
         # agent_token = AgentToken.objects.create_token(user=request.user)
@@ -2016,7 +2017,7 @@ class SendBookingUrlViewSet(GenericViewSet):
         if purchase_type == PlusDummyData.DataType.SINGLE_PURCHASE:
             if not landing_url:
                 return Response(status=status.HTTP_400_BAD_REQUEST, data={'error': 'No Landing url found.'})
-            SmsNotification.send_single_purchase_booking_url(token, str(request.user.phone_number), utm_source=utm_source, landing_url=landing_url)
+            SmsNotification.send_single_purchase_booking_url(token, str(request.user.phone_number), utm_source=utm_source, landing_url=landing_url, dummy_id=dummy_id)
             return Response({"status": 1})
 
         if purchase_type == 'vip_purchase':

@@ -1244,12 +1244,13 @@ class SmsNotification(TimeStampedModel, SmsNotificationOpdMixin, SmsNotification
     def send_single_purchase_booking_url(cls, token, phone_number, *args, **kwargs):
         utm_source = kwargs.get('utm_source', '')
         landing_url = kwargs.get('landing_url', '')
+        dummy_id = kwargs.get('dummy_id', '')
         booking_url = "{}/agent/booking?token={}".format(settings.CONSUMER_APP_DOMAIN, token)
         if utm_source:
-            booking_url = booking_url + "&callbackurl={landing_url}&utm_source={utm_source}&is_agent=false".format(
-                landing_url=landing_url, utm_source=utm_source)
+            booking_url = booking_url + "&callbackurl={landing_url}&utm_source={utm_source}&is_agent=false&dummy_id={dummy_id}".format(
+                landing_url=landing_url, utm_source=utm_source, dummy_id=dummy_id)
         else:
-            booking_url = booking_url + "&callbackurl={landing_url}&is_agent=false".format(landing_url=landing_url)
+            booking_url = booking_url + "&callbackurl={landing_url}&is_agent=false&dummy_id={dummy_id}".format(landing_url=landing_url, dummy_id=dummy_id)
 
         short_url = generate_short_url(booking_url)
         print(short_url)

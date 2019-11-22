@@ -2688,6 +2688,8 @@ class LabAppointmentView(mixins.CreateModelMixin,
             if not plus_plan:
                 resp = account_models.Order.create_order(request, cart_items, validated_data.get("use_wallet"))
             else:
+                if kwargs.get('is_dummy'):
+                    return validated_data
                 resp = account_models.Order.create_new_order(request, validated_data, False)
 
         return Response(data=resp)
