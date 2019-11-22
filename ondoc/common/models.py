@@ -32,6 +32,8 @@ from django.utils import timezone
 
 from ondoc.common.helper import Choices
 from django.conf import settings
+import requests
+from rest_framework import status
 
 # from ondoc.doctor.models import PurchaseOrderCreation, PracticeSpecialization
 
@@ -917,3 +919,67 @@ class SearchCriteria(auth_model.TimeStampedModel):
             super(SearchCriteria, self).save(*args, **kwargs)
         else:
             super(SearchCriteria, self).save(*args, **kwargs)
+
+
+class GoogleLatLong(auth_model.TimeStampedModel):
+    latitude = models.FloatField()
+    longitude = models.FloatField()
+    coordinates = models.TextField()
+    is_hospital_done = models.BooleanField(default=False)
+    is_doctor_done = models.BooleanField(default=False)
+
+    @classmethod
+    def generate_place_ids(cls):
+        coordinates_obj = GoogleLatLong.objects.all()
+        types = ['doctor', 'hospital']
+        for point_obj in coordinates_obj:
+            for type in types:
+                if (type == 'doctor' and point_obj.is_doctor_done == False) or (
+                        type == 'hospital' and point_obj.is_hospital_done == False):
+                    location = str(point_obj.latitude) + ' , ' + str(point_obj.longitude)
+                    params = {'radius': 450, 'type': type, 'key': settings.REVERSE_GEOCODING_API_KEY,
+                              'location': location}
+
+                    place_response = requests.get('https://maps.googleapis.com/maps/api/place/nearbysearch/json',
+                                                  params=params)
+                    if place_response.status_code != status.HTTP_200_OK or not place_response.ok:
+                        print('failure  status_code: ' + str(place_response.status_code) + ', reason: ' + str(
+                            place_response.reason))
+                        return None
+
+                    place_searched_data = place_response.json()
+                    if place_searched_data.get('status') == 'OVER_QUERY_LIMIT':
+                        print('OVER_QUERY_LIMIT')
+                        return None
+
+                    if place_searched_data.get('results'):
+                        for data in place_searched_data.get('results'):
+                            if type == 'hospital':
+                                HospitalPlaceIDs.objects.create(place_id=data.get('place_id'),
+                                                                google_coordinates=point_obj)
+                                point_obj.is_hospital_done = True
+                                point_obj.save()
+                            if type == 'doctor':
+                                DoctorPlaceIDs.objects.create(place_id=data.get('place_id'),
+                                                              google_coordinates=point_obj)
+                                point_obj.is_doctor_done = True
+                                point_obj.save()
+
+    class Meta:
+        db_table = 'google_lat_long'
+
+
+class HospitalPlaceIDs(auth_model.TimeStampedModel):
+    place_id = models.TextField()
+    google_coordinates = models.ForeignKey(GoogleLatLong, on_delete=models.CASCADE, related_name="hosp_place_ids", null=True)
+
+    class Meta:
+        db_table = 'hospital_place_ids'
+
+
+class DoctorPlaceIDs(auth_model.TimeStampedModel):
+    place_id = models.TextField()
+    google_coordinates = models.ForeignKey(GoogleLatLong, on_delete=models.CASCADE, related_name="doc_place_ids", null=True)
+
+    class Meta:
+        db_table = 'doctor_place_ids'
