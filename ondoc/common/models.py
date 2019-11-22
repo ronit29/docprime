@@ -958,12 +958,12 @@ class GoogleLatLong(auth_model.TimeStampedModel):
                                 HospitalPlaceIDs.objects.get_or_create(place_id=data.get('place_id'),
                                                                 google_coordinates=point_obj)
                                 point_obj.is_hospital_done = True
-                                point_obj.save()
+
                             if type == 'doctor':
                                 DoctorPlaceIDs.objects.get_or_create(place_id=data.get('place_id'),
                                                               google_coordinates=point_obj)
                                 point_obj.is_doctor_done = True
-                                point_obj.save()
+                        point_obj.save()
 
     class Meta:
         db_table = 'google_lat_long'
