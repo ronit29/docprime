@@ -1618,14 +1618,14 @@ class SearchedItemsViewSet(viewsets.GenericViewSet):
                                                                                           'city': city,
                                                                                           'spec_urls': spec_urls})
 
-        common_procedure_categories = CommonProcedureCategory.objects.select_related('procedure_category').filter(
-            procedure_category__is_live=True).all().order_by("-priority")[:10]
-        common_procedure_categories_serializer = CommonProcedureCategorySerializer(common_procedure_categories,
-                                                                                   many=True)
-
-        common_procedures = CommonProcedure.objects.select_related('procedure').filter(
-            procedure__is_enabled=True).all().order_by("-priority")[:10]
-        common_procedures_serializer = CommonProcedureSerializer(common_procedures, many=True)
+        # common_procedure_categories = CommonProcedureCategory.objects.select_related('procedure_category').filter(
+        #     procedure_category__is_live=True).all().order_by("-priority")[:10]
+        # common_procedure_categories_serializer = CommonProcedureCategorySerializer(common_procedure_categories,
+        #                                                                            many=True)
+        #
+        # common_procedures = CommonProcedure.objects.select_related('procedure').filter(
+        #     procedure__is_enabled=True).all().order_by("-priority")[:10]
+        # common_procedures_serializer = CommonProcedureSerializer(common_procedures, many=True)
 
         common_ipd_procedures = CommonIpdProcedure.objects.select_related('ipd_procedure').filter(
             ipd_procedure__is_enabled=True).all().order_by("-priority")[:10]
@@ -1660,9 +1660,10 @@ class SearchedItemsViewSet(viewsets.GenericViewSet):
         #
         #     categories_serializer = CommonCategoriesSerializer(categories, many=True, context={'request': request})
 
-        return Response({"conditions": [], "specializations": specializations_serializer.data,
-                         "procedure_categories": common_procedure_categories_serializer.data,
-                         "procedures": common_procedures_serializer.data,
+        return Response({"conditions": [],
+                         "specializations": specializations_serializer.data,
+                         "procedure_categories": [],
+                         "procedures": [],
                          "ipd_procedures": common_ipd_procedures_serializer.data,
                          "top_hospitals": top_hospitals_data,
                          'package_categories': common_package_category(self, request)})
@@ -5293,11 +5294,23 @@ class IpdProcedureSyncViewSet(viewsets.GenericViewSet):
 class RecordAPIView(viewsets.GenericViewSet):
     """This class defines the create behavior of our rest api."""
     def list(self, request):
+        params = request.query_params
+        lat = params.get('lat', 28.450367)
+        long = params.get('long', 77.071848)
+        radius = int(params.get('radius')) if params.get('radius') else 10000
+        response = dict()
+
         queryset = GoogleMapRecords.objects.all()
+        if lat and long and radius:
+            point_string = 'POINT(' + str(long) + ' ' + str(lat) + ')'
+            pnt = GEOSGeometry(point_string, srid=4326)
+            queryset = queryset.filter(location__distance_lte=(pnt, radius))
         serializer = serializers.RecordSerializer(queryset, many=True,
                                                               context={"request": request})
         serialized_data = serializer.data
-        return Response(serialized_data)
+        response['map_data'] = serialized_data
+        response['labels'] = list(queryset.values('label').distinct())
+        return Response(response)
 
 
 # View to see all points

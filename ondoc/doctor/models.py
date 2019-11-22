@@ -5256,7 +5256,7 @@ class SponsoredServicePracticeSpecialization(auth_model.TimeStampedModel):
 
 
 class GoogleMapRecords(auth_model.TimeStampedModel):
-    location = models.CharField(max_length=100)
+    location = models.PointField(geography=True, srid=4326, blank=True, null=True)
     text = models.CharField(max_length=500)
     latitude = models.DecimalField(max_digits=9, decimal_places=6, default=None)
     longitude = models.DecimalField(max_digits=9, decimal_places=6, default=None)

@@ -3040,7 +3040,7 @@ class TopCommonHospitalForIpdProcedureSerializer(serializers.ModelSerializer):
 class RecordSerializer(serializers.ModelSerializer):
 
     class Meta:
-
        model = GoogleMapRecords
-
-       fields = (["id","location","text","created_at","latitude","longitude", "updated_at", "image", "label"])
+       fields = (["id","location","text","created_at","latitude","longitude", "updated_at", "image", "label", "reason", "hospital_name", "place_id",
+                  "multi_speciality", "has_phone", "lead_rank", "combined_rating", "combined_rating_count", "is_potential", "has_booking", "monday_timing",
+                 "address" ])
