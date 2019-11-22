@@ -17,7 +17,8 @@ from django.db import transaction
 from django.db.models import Q
 from ondoc.common.models import DocumentsProofs
 from ondoc.notification.tasks import push_plus_lead_to_matrix
-from ondoc.plus.usage_criteria import get_class_reference, get_price_reference
+from ondoc.plus.usage_criteria import get_class_reference, get_price_reference, get_min_convenience_reference, \
+    get_max_convenience_reference
 from .enums import PlanParametersEnum, UtilizationCriteria, PriceCriteria
 from datetime import datetime
 from ondoc.crm import constants as const
@@ -167,41 +168,8 @@ class PlusPlans(auth_model.TimeStampedModel, LiveMixin):
         charge = min(convenience_amount_list)
         return charge
 
-
-    # def get_convenience_charge(self, price, type):
-    #     if not price or price <= 0:
-    #         return 0
-    #     charge = 0
-    #     if type == "DOCTOR":
-    #         convenience_amount_obj = self.plan_parameters.filter(parameter__key='DOCTOR_CONVENIENCE_AMOUNT').first()
-    #         convenience_percentage_obj = self.plan_parameters.filter(parameter__key='DOCTOR_CONVENIENCE_PERCENTAGE').first()
-    #     elif type == "LABTEST":
-    #         convenience_amount_obj = self.plan_parameters.filter(parameter__key='LAB_CONVENIENCE_AMOUNT').first()
-    #         convenience_percentage_obj = self.plan_parameters.filter(parameter__key='LAB_CONVENIENCE_PERCENTAGE').first()
-    #     else:
-    #         return 0
-    #     convenience_amount = convenience_amount_obj.value if convenience_amount_obj else 0
-    #     convenience_percentage = convenience_percentage_obj.value if convenience_percentage_obj else 0
-    #     if (not convenience_amount and not convenience_percentage) or (convenience_amount == 0 and convenience_percentage == 0):
-    #         return 0
-    #     convenience_percentage = int(convenience_percentage)
-    #     convenience_amount = int(convenience_amount)
-    #     if convenience_percentage and convenience_percentage > 0:
-    #         charge = (convenience_percentage/100) * float(price)
-    #         charge = floor(charge)
-    #     elif convenience_amount and convenience_amount > 0:
-    #         return convenience_amount
-    #     else:
-    #         return 0
-    #     if charge <= convenience_amount:
-    #         return charge
-    #     else:
-    #         return convenience_amount
-
     @classmethod
-    def get_default_convenience_amount(cls, max_price, min_price, type, default_plan_query=None):
-        if not max_price or min_price or max_price <= 0 or min_price <= 0:
-            return 0
+    def get_default_convenience_amount(cls, price_data, type, default_plan_query=None):
         charge = 0
         if not default_plan_query:
             default_plan = cls.objects.filter(is_selected=True, is_gold=True).first()
@@ -210,6 +178,12 @@ class PlusPlans(auth_model.TimeStampedModel, LiveMixin):
         else:
             default_plan = default_plan_query
         if not default_plan:
+            return 0
+        min_price_engine = get_min_convenience_reference(default_plan, "DOCTOR")
+        min_price = min_price_engine.get_price(price_data)
+        max_price_engine = get_max_convenience_reference(default_plan, "DOCTOR")
+        max_price = max_price_engine.get_price(price_data)
+        if not max_price or min_price or max_price <= 0 or min_price <= 0:
             return 0
         convenience_min_amount_obj, convenience_max_amount_obj, convenience_percentage_obj = default_plan.get_convenience_object(type)
         min_cap = convenience_min_amount_obj.value if convenience_min_amount_obj else 0

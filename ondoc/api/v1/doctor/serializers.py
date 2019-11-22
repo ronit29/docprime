@@ -50,7 +50,8 @@ from ondoc.insurance.models import UserInsurance, InsuranceThreshold, InsuranceD
 from ondoc.authentication import models as auth_models
 from ondoc.location.models import EntityUrls, EntityAddress
 from ondoc.plus.models import PlusUser, PlusAppointmentMapping, PlusPlans
-from ondoc.plus.usage_criteria import get_class_reference, get_price_reference
+from ondoc.plus.usage_criteria import get_class_reference, get_price_reference, get_min_convenience_reference, \
+    get_max_convenience_reference
 from ondoc.procedure.models import DoctorClinicProcedure, Procedure, ProcedureCategory, \
     get_included_doctor_clinic_procedure, get_procedure_categories_with_procedures, IpdProcedure, \
     IpdProcedureFeatureMapping, IpdProcedureLead, DoctorClinicIpdProcedure, IpdProcedureDetail, Offer
@@ -698,7 +699,14 @@ class DoctorHospitalSerializer(serializers.ModelSerializer):
             if engine:
                 # vip_res = engine.validate_booking_entity(cost=mrp)
                 vip_res = engine.validate_booking_entity(cost=price, mrp=mrp, deal_price=deal_price)
-                resp['vip_convenience_amount'] = plus_user.plan.get_convenience_charge(price, "DOCTOR")
+                # min_price_engine = get_min_convenience_reference(self.plus_obj, "DOCTOR")
+                # min_price = min_price_engine.get_price(price_data)
+                # max_price_engine = get_max_convenience_reference(self.plus_obj, "DOCTOR")
+                # max_price = max_price_engine.get_price(price_data)
+                # convenience_charge = plus_user.plan.get_convenience_charge(max_price, min_price, "DOCTOR")
+                # resp['vip_convenience_amount'] = plus_user.plan.get_convenience_charge(price, "DOCTOR")
+                convenience_charge = PlusPlans.get_default_convenience_amount(price_data, "DOCTOR", default_plan_query=plus_user.plan)
+                resp['vip_convenience_amount'] = convenience_charge
                 resp['vip_amount'] = vip_res.get('amount_to_be_paid', 0)
                 resp['cover_under_vip'] = vip_res.get('is_covered', False)
 

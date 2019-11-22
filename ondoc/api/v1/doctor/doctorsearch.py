@@ -685,7 +685,8 @@ class DoctorSearchHelper:
                         price = mrp
                     else:
                         price = price_engine.get_price(price_data)
-                    vip_convenience_amount = request.user.active_plus_user.plan.get_convenience_charge(price, "DOCTOR")
+                    # vip_convenience_amount = request.user.active_plus_user.plan.get_convenience_charge(price, "DOCTOR")
+                    vip_convenience_amount = PlusPlans.get_default_convenience_amount(price_data, "DOCTOR", default_plan_query=request.user.active_plus_user.plan)
                     engine = get_class_reference(request.user.active_plus_user, "DOCTOR")
                     is_gold_member = True if request.user.active_plus_user.plan.is_gold else False
                     if engine:
