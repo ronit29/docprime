@@ -142,12 +142,41 @@ class PartnerLabSamplesCollectOrderForm(forms.ModelForm):
         return cleaned_data
 
 
+class HospitalFilter(admin.SimpleListFilter):
+    title = 'Hospital'
+    parameter_name = 'hospital'
+
+    def lookups(self, request, model_admin):
+        hospitals = prov_models.PartnerLabSamplesCollectOrder.objects.distinct('hospital').values_list('hospital_id', 'hospital__name')
+        return hospitals
+
+    def queryset(self, request, queryset):
+        if self.value():
+            queryset = queryset.filter(hospital_id=self.value())
+        return queryset
+
+
+class LabFilter(admin.SimpleListFilter):
+    title = 'Lab'
+    parameter_name = 'lab'
+
+    def lookups(self, request, model_admin):
+        labs = prov_models.PartnerLabSamplesCollectOrder.objects.distinct('lab').values_list('lab_id', 'lab__name')
+        return labs
+
+    def queryset(self, request, queryset):
+        if self.value():
+            queryset = queryset.filter(lab_id=self.value())
+        return queryset
+
+
 class PartnerLabSamplesCollectOrderAdmin(admin.ModelAdmin):
 
     list_display = ('id', 'created_at', 'status', 'offline_patient', 'hospital', 'doctor', 'lab')
     readonly_fields = ['offline_patient', 'patient_details', 'hospital', 'doctor', 'lab', 'available_lab_tests',
                        'collection_datetime', 'samples', 'selected_tests_details', 'lab_alerts', 'extras']
     search_fields = ['offline_patient']
+    list_filter = ('created_at', 'status', HospitalFilter, LabFilter)
     inlines = [
         ReportsInline,
     ]

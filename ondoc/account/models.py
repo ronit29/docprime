@@ -1607,6 +1607,11 @@ class ConsumerAccount(TimeStampedModel):
             consumer_tx_data['product_id'] = product_id
         if app_obj:
             consumer_tx_data['reference_id'] = app_obj.id
+            order = app_obj.get_order()
+            consumer_tx_data['order_id'] = order.id
+        else:
+            consumer_tx_data['reference_id'] = None
+            consumer_tx_data['order_id'] = None
         consumer_tx_data['type'] = tx_type
         consumer_tx_data['action'] = action
         consumer_tx_data['amount'] = amount
@@ -1615,8 +1620,6 @@ class ConsumerAccount(TimeStampedModel):
             consumer_tx_data['balance'] = amount
         if ref_txns:
             consumer_tx_data['ref_txns'] = ref_txns
-        order = app_obj.get_order()
-        consumer_tx_data['order_id'] = order.id
 
         return consumer_tx_data
 
