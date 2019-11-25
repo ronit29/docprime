@@ -286,6 +286,7 @@ class CreateAppointmentSerializer(serializers.Serializer):
     spo_data = serializers.JSONField(required=False, default={})
     appointment_id = serializers.IntegerField(required=False)
     cod_to_prepaid = serializers.BooleanField(required=False)
+    utm_sbi_tags = serializers.JSONField(required=False, default={})
 
     # procedure_category_ids = serializers.ListField(child=serializers.PrimaryKeyRelatedField(queryset=ProcedureCategory.objects.filter(is_live=True)), required=False, default=[])
     # time_slot_end = serializers.DateTimeField()

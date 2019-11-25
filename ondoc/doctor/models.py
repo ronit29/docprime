@@ -3659,6 +3659,7 @@ class OpdAppointment(auth_model.TimeStampedModel, CouponsMixin, OpdAppointmentIn
             cover_under_vip = False
             vip_amount = 0
 
+        utm_sbi_tags = data.get("utm_sbi_tags", {})
 
         return {
             "doctor": data.get("doctor"),
@@ -3687,7 +3688,8 @@ class OpdAppointment(auth_model.TimeStampedModel, CouponsMixin, OpdAppointmentIn
             "vip_convenience_amount": convenience_amount,
             "coupon_data": price_data.get("coupon_data"),
             "_responsible_user": data.get("_responsible_user", None),
-            "_source": data.get("_source", None)
+            "_source": data.get("_source", None),
+            "utm_sbi_tags": utm_sbi_tags
         }
 
     @staticmethod

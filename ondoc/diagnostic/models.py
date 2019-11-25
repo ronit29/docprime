@@ -2842,6 +2842,8 @@ class LabAppointment(TimeStampedModel, CouponsMixin, LabAppointmentInvoiceMixin,
         else:
             spo_data = {}
 
+        utm_sbi_tags = data.get("utm_sbi_tags", {})
+
         cover_under_vip = False
         plus_user_id = None
         plus_user = user.active_plus_user
@@ -2912,7 +2914,8 @@ class LabAppointment(TimeStampedModel, CouponsMixin, LabAppointmentInvoiceMixin,
             "_responsible_user": data.get("_responsible_user", None),
             "_source": data.get("_source", None),
             "multi_timings_enabled": data.get('multi_timings_enabled'),
-            "selected_timings_type": data.get('selected_timings_type')
+            "selected_timings_type": data.get('selected_timings_type'),
+            "utm_sbi_tags": utm_sbi_tags
         }
 
         if data.get('included_in_user_plan', False):
