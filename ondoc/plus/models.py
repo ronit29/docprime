@@ -187,11 +187,11 @@ class PlusPlans(auth_model.TimeStampedModel, LiveMixin):
         if not max_price_engine:
             return 0
         max_price = max_price_engine.get_price(price_data)
-        if not max_price or min_price or max_price <= 0 or min_price <= 0:
+        if not max_price or not min_price or max_price <= 0 or min_price <= 0:
             return 0
         convenience_min_amount_obj, convenience_max_amount_obj, convenience_percentage_obj = default_plan.get_convenience_object(type)
-        min_cap = convenience_min_amount_obj.value if convenience_min_amount_obj else 0
-        max_cap = convenience_max_amount_obj.value if convenience_max_amount_obj else 0
+        min_cap = int(convenience_min_amount_obj.value) if convenience_min_amount_obj else 0
+        max_cap = int(convenience_max_amount_obj.value) if convenience_max_amount_obj else 0
         if not min_cap or not max_cap or min_cap <= 0 or max_cap <= 0:
             return 0
         convenience_amount_list = []
@@ -202,10 +202,9 @@ class PlusPlans(auth_model.TimeStampedModel, LiveMixin):
             return 0
         convenience_amount_list.append(min_cap)
         convenience_amount_list.append(max_cap)
-        convenience_percentage = convenience_percentage_obj.value if convenience_percentage_obj else 0
+        convenience_percentage = int(convenience_percentage_obj.value) if convenience_percentage_obj else 0
         if not convenience_percentage or convenience_percentage <= 0:
             return 0
-        convenience_percentage = int(convenience_percentage)
         convenience_amount_through_percentage = (convenience_percentage / 100) * float(price_diff)
         convenience_amount_through_percentage = int(convenience_amount_through_percentage)
         convenience_amount_list.append(convenience_amount_through_percentage)
