@@ -63,7 +63,7 @@ class DoctorAmountCount(AbstractCriteria):
         available_count = vip_utilization.get('available_doctor_count', 0)
         total_doctor_count = vip_utilization.get('total_doctor_count_limit', 0)
         mrp = kwargs.get('mrp', 0)
-        plan = self.plus_plan
+        plan = self.plus_obj.plan
         deal_price = int(kwargs.get('deal_price', 0))
         convenience_charge = plan.get_convenience_charge(cost, "DOCTOR")
         total_cost = cost + convenience_charge
@@ -193,7 +193,8 @@ class LabtestAmountCount(AbstractCriteria):
         total_count = vip_utilization.get('total_labtest_count_limit')
         total_amount = vip_utilization.get('total_labtest_amount_limit')
         mrp = kwargs.get('mrp', 0)
-        plan = self.plus_plan
+        is_covered = False
+        plan = self.plus_obj.plan
         deal_price = int(kwargs.get('deal_price', 0))
         convenience_charge = plan.get_convenience_charge(cost, "LABTEST")
         total_cost = cost + convenience_charge
@@ -308,7 +309,7 @@ class PackageAmountCount(AbstractCriteria):
         vip_amount_deducted = 0
         amount_to_be_paid = cost
         mrp = kwargs.get('mrp', 0)
-        plan = self.plus_plan
+        plan = self.plus_obj.plan
         deal_price = int(kwargs.get('deal_price', 0))
         convenience_charge = plan.get_convenience_charge(cost, "LABTEST")
         total_cost = cost + convenience_charge

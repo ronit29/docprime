@@ -1606,6 +1606,11 @@ class ConsumerAccount(TimeStampedModel):
             consumer_tx_data['product_id'] = product_id
         if app_obj:
             consumer_tx_data['reference_id'] = app_obj.id
+            order = app_obj.get_order()
+            consumer_tx_data['order_id'] = order.id
+        else:
+            consumer_tx_data['reference_id'] = None
+            consumer_tx_data['order_id'] = None
         consumer_tx_data['type'] = tx_type
         consumer_tx_data['action'] = action
         consumer_tx_data['amount'] = amount
@@ -1614,8 +1619,6 @@ class ConsumerAccount(TimeStampedModel):
             consumer_tx_data['balance'] = amount
         if ref_txns:
             consumer_tx_data['ref_txns'] = ref_txns
-        order = app_obj.get_order()
-        consumer_tx_data['order_id'] = order.id
 
         return consumer_tx_data
 
@@ -2009,6 +2012,7 @@ class MerchantPayout(TimeStampedModel):
     INPROCESS = 5
     FAILED_FROM_QUEUE = 6
     FAILED_FROM_DETAIL = 7
+    ARCHIVE = 8
     AUTOMATIC = 1
     MANUAL = 2
 
@@ -2021,7 +2025,7 @@ class MerchantPayout(TimeStampedModel):
     IMPS = "IMPS"
     IFT = "IFT"
     INTRABANK_IDENTIFIER = "KKBK"
-    STATUS_CHOICES = [(PENDING, 'Pending'), (ATTEMPTED, 'ATTEMPTED'), (PAID, 'Paid'), (INITIATED, 'Initiated'), (INPROCESS, 'In Process'), (FAILED_FROM_QUEUE, 'Failed from Queue'), (FAILED_FROM_DETAIL, 'Failed from Detail')]
+    STATUS_CHOICES = [(PENDING, 'Pending'), (ATTEMPTED, 'ATTEMPTED'), (PAID, 'Paid'), (INITIATED, 'Initiated'), (INPROCESS, 'In Process'), (FAILED_FROM_QUEUE, 'Failed from Queue'), (FAILED_FROM_DETAIL, 'Failed from Detail'), (ARCHIVE, 'Archive')]
     PAYMENT_MODE_CHOICES = [(NEFT, 'NEFT'), (IMPS, 'IMPS'), (IFT, 'IFT')]    
     TYPE_CHOICES = [(AUTOMATIC, 'Automatic'), (MANUAL, 'Manual')]
 
@@ -2600,11 +2604,14 @@ class MerchantPayout(TimeStampedModel):
                 new_obj.object_id = self.object_id
                 new_obj.type = MerchantPayout.AUTOMATIC
                 new_obj.paid_to = self.paid_to
-            new_obj.save()
 
             # update appointment payout id
             appointment = self.get_appointment()
-            appointment.update_payout_id(new_obj.id)
+            if appointment:
+                new_obj.save()
+                MerchantPayout.objects.filter(id=self.id).update(status=self.ARCHIVE)
+                appointment.update_payout_id(new_obj.id)
+                print('New payout created for ' + str(self.id))
 
     def update_billed_to_content_type(self):
         merchant = self.get_merchant()
