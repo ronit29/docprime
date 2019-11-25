@@ -3,6 +3,7 @@ from django.contrib.gis.geos import Point
 from django.contrib.postgres.fields import JSONField
 from django.core.validators import FileExtensionValidator, MinValueValidator, MaxValueValidator
 from django.db import models, transaction
+from django.db.models import Q
 from weasyprint import HTML, CSS
 import string
 import random
@@ -940,7 +941,7 @@ class GoogleLatLong(auth_model.TimeStampedModel):
 
     @classmethod
     def generate_place_ids(cls):
-        coordinates_obj = GoogleLatLong.objects.all()
+        coordinates_obj = GoogleLatLong.objects.filter(Q(is_hospital_done=False)|Q(is_doctor_done=False))
         types = ['doctor', 'hospital']
         for point_obj in coordinates_obj:
             for type in types:
@@ -954,12 +955,11 @@ class GoogleLatLong(auth_model.TimeStampedModel):
                                                   params=params)
                     if place_response.status_code != status.HTTP_200_OK or not place_response.ok:
                         print('failure  status_code: ' + str(place_response.status_code) + ', reason: ' + str(
-                            place_response.reason))
-                        return None
+                            place_response.reason) + str(point_obj) + " type: " + type)
 
                     place_searched_data = place_response.json()
                     if place_searched_data.get('status') == 'OVER_QUERY_LIMIT':
-                        print('OVER_QUERY_LIMIT')
+                        print('OVER_QUERY_LIMIT'+ str(point_obj) + " type: " + type)
                         return None
 
                     if place_searched_data.get('results'):
