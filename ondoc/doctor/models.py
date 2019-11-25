@@ -5251,3 +5251,27 @@ class SponsoredServicePracticeSpecialization(auth_model.TimeStampedModel):
 
     class Meta:
         db_table = "specialization_sponsored_services"
+
+
+class GoogleMapRecords(auth_model.TimeStampedModel):
+    location = models.PointField(geography=True, srid=4326, blank=True, null=True)
+    text = models.CharField(max_length=500)
+    latitude = models.DecimalField(max_digits=9, decimal_places=6, default=None)
+    longitude = models.DecimalField(max_digits=9, decimal_places=6, default=None)
+    label = models.CharField(max_length=100, null=True)
+    image = models.URLField(max_length=500, null= True)
+    reason = models.TextField(null=True, blank=True)
+    hospital_name = models.CharField(max_length=500, null=True, blank=True)
+    place_id = models.CharField(max_length=500, null=True, blank=True)
+    multi_speciality = models.CharField(max_length=500, null=True, blank=True)
+    has_phone = models.SmallIntegerField(null=True, blank=True)
+    lead_rank = models.CharField(max_length=100, null=True, blank=True)
+    combined_rating = models.IntegerField(null=True, blank=True)
+    combined_rating_count = models.IntegerField(null=True, blank=True)
+    is_potential = models.SmallIntegerField(null=True, blank=True)
+    has_booking = models.SmallIntegerField(null=True, blank=True)
+    monday_timing = models.TextField(null=True, blank=True)
+    address = models.TextField(null=True, blank=True)
+
+    class Meta:
+        db_table = "google_map_records"

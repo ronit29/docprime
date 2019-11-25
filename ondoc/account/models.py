@@ -678,11 +678,13 @@ class Order(TimeStampedModel):
         # utility to fetch and save visitor info for an parent order
         visitor_info = None
         try:
-            from ondoc.api.v1.tracking.views import EventCreateViewSet
-            with transaction.atomic():
-                event_api = EventCreateViewSet()
-                visitor_id, visit_id = event_api.get_visit(request)
-                visitor_info = { "visitor_id": visitor_id, "visit_id": visit_id, "from_app": request.data.get("from_app", None), "app_version": request.data.get("app_version", None)}
+            # from ondoc.api.v1.tracking.views import EventCreateViewSet
+            # with transaction.atomic():
+            #     event_api = EventCreateViewSet()
+            #     #visitor_id, visit_id = event_api.get_visit(request)
+            #     #visitor_info = { "visitor_id": visitor_id, "visit_id": visit_id, "from_app": request.data.get("from_app", None), "app_version": request.data.get("app_version", None)}
+            visitor_info = {"from_app": request.data.get("from_app", None),
+                            "app_version": request.data.get("app_version", None)}
         except Exception as e:
             logger.info("Could not fetch visitor info - " + str(e))
 
@@ -1605,6 +1607,11 @@ class ConsumerAccount(TimeStampedModel):
             consumer_tx_data['product_id'] = product_id
         if app_obj:
             consumer_tx_data['reference_id'] = app_obj.id
+            order = app_obj.get_order()
+            consumer_tx_data['order_id'] = order.id
+        else:
+            consumer_tx_data['reference_id'] = None
+            consumer_tx_data['order_id'] = None
         consumer_tx_data['type'] = tx_type
         consumer_tx_data['action'] = action
         consumer_tx_data['amount'] = amount
@@ -1613,8 +1620,6 @@ class ConsumerAccount(TimeStampedModel):
             consumer_tx_data['balance'] = amount
         if ref_txns:
             consumer_tx_data['ref_txns'] = ref_txns
-        order = app_obj.get_order()
-        consumer_tx_data['order_id'] = order.id
 
         return consumer_tx_data
 
@@ -1622,7 +1627,7 @@ class ConsumerAccount(TimeStampedModel):
         db_table = "consumer_account"
 
 
-class ConsumerTransaction(TimeStampedModel):
+class ConsumerTransaction(TimeStampedModel, SoftDelete):
     CANCELLATION = 0
     PAYMENT = 1
     REFUND = 2
@@ -2008,6 +2013,7 @@ class MerchantPayout(TimeStampedModel):
     INPROCESS = 5
     FAILED_FROM_QUEUE = 6
     FAILED_FROM_DETAIL = 7
+    ARCHIVE = 8
     AUTOMATIC = 1
     MANUAL = 2
 
@@ -2020,7 +2026,7 @@ class MerchantPayout(TimeStampedModel):
     IMPS = "IMPS"
     IFT = "IFT"
     INTRABANK_IDENTIFIER = "KKBK"
-    STATUS_CHOICES = [(PENDING, 'Pending'), (ATTEMPTED, 'ATTEMPTED'), (PAID, 'Paid'), (INITIATED, 'Initiated'), (INPROCESS, 'In Process'), (FAILED_FROM_QUEUE, 'Failed from Queue'), (FAILED_FROM_DETAIL, 'Failed from Detail')]
+    STATUS_CHOICES = [(PENDING, 'Pending'), (ATTEMPTED, 'ATTEMPTED'), (PAID, 'Paid'), (INITIATED, 'Initiated'), (INPROCESS, 'In Process'), (FAILED_FROM_QUEUE, 'Failed from Queue'), (FAILED_FROM_DETAIL, 'Failed from Detail'), (ARCHIVE, 'Archive')]
     PAYMENT_MODE_CHOICES = [(NEFT, 'NEFT'), (IMPS, 'IMPS'), (IFT, 'IFT')]    
     TYPE_CHOICES = [(AUTOMATIC, 'Automatic'), (MANUAL, 'Manual')]
 
@@ -2599,11 +2605,14 @@ class MerchantPayout(TimeStampedModel):
                 new_obj.object_id = self.object_id
                 new_obj.type = MerchantPayout.AUTOMATIC
                 new_obj.paid_to = self.paid_to
-            new_obj.save()
 
             # update appointment payout id
             appointment = self.get_appointment()
-            appointment.update_payout_id(new_obj.id)
+            if appointment:
+                new_obj.save()
+                MerchantPayout.objects.filter(id=self.id).update(status=self.ARCHIVE)
+                appointment.update_payout_id(new_obj.id)
+                print('New payout created for ' + str(self.id))
 
     def update_billed_to_content_type(self):
         merchant = self.get_merchant()
