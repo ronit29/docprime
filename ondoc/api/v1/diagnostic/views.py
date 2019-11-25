@@ -2682,6 +2682,7 @@ class LabAppointmentView(mixins.CreateModelMixin,
                 if cart_item:
                     cart_items.append(cart_item)
 
+        is_single_flow = False
         if hasattr(request, 'agent') and request.agent:
             resp = {'is_agent': True, "status":1}
         else:
@@ -2690,8 +2691,12 @@ class LabAppointmentView(mixins.CreateModelMixin,
             else:
                 if kwargs.get('is_dummy'):
                     return validated_data
+
+                is_single_flow = True
                 resp = account_models.Order.create_new_order(request, validated_data, False)
 
+
+        resp['is_single_flow'] = is_single_flow
         return Response(data=resp)
 
 
