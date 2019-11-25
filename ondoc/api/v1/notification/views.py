@@ -1,5 +1,7 @@
 from itertools import groupby
 
+from ondoc.communications.models import EMAILNotification
+from ondoc.doctor.models import Hospital
 from ondoc.notification import models
 from ondoc.api.v1.utils import IsNotAgent
 from rest_framework.permissions import IsAuthenticated
@@ -154,7 +156,6 @@ class IPDIntimateEmailNotificationViewSet(viewsets.GenericViewSet):
         serializer = serializers.IPDIntimateEmailNotificationSerializer(data=parameters, context={"request": request})
         serializer.is_valid(raise_exception=True)
         validated_data = serializer.validated_data
-        email_notification = None
         user_id = parameters.get('user')
         doctor_id = parameters.get('doctor')
         hospital_id = parameters.get('hospital')
@@ -163,6 +164,21 @@ class IPDIntimateEmailNotificationViewSet(viewsets.GenericViewSet):
         time_slot = parameters.get('time_slot', None)
         gender = parameters.get('gender', None)
         dob = parameters.get('dob', None)
-        IPDIntimateEmailNotification.objects.create(user_id=user_id, doctor_id=doctor_id, hospital_id=hospital_id, phone_number=phone_number,
-                                                    preferred_date=preferred_date, time_slot=time_slot, gender=gender, dob=dob, email_notification=email_notification)
+
+        hosp_obj = Hospital.objects.filter(id=hospital_id)[0]
+        spoc_details = hosp_obj.spoc_details.all()
+        receivers = [{'user': user_id, 'email': spoc.email} for spoc in spoc_details]
+        emails = list(map(lambda x: x.get('email'), receivers))
+
+        ipd_email_obj = IPDIntimateEmailNotification.objects.create(user_id=user_id, doctor_id=doctor_id, hospital_id=hospital_id,
+                                                    phone_number=phone_number,
+                                                    preferred_date=preferred_date, time_slot=time_slot, gender=gender,
+                                                    dob=dob, email_notifications=emails)
+
+        email_notification = EMAILNotification(notification_type=NotificationAction.IPDIntimateEmailNotification,
+                                               context={'instance': ipd_email_obj})
+        email_notification.send(receivers)
+
+        return Response({})
+
 

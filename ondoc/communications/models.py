@@ -1133,6 +1133,8 @@ class EMAILNotification:
             obj = DynamicTemplates.objects.filter(template_type=DynamicTemplates.TemplateType.EMAIL, template_name="").first()
         if notification_type == NotificationAction.SEND_LENSFIT_COUPON:
             obj = DynamicTemplates.objects.filter(template_type=DynamicTemplates.TemplateType.EMAIL, template_name="Lensfit_email", approved=True).first()
+        if notification_type == NotificationAction.IPDIntimateEmailNotification:
+            obj = DynamicTemplates.objects.filter(template_type=DynamicTemplates.TemplateType.EMAIL, template_name="EMail_to_provider_for_ipd_hospitals_for_request_query", approved=True).first()
 
         return obj
 
