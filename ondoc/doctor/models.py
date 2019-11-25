@@ -769,7 +769,7 @@ class HospitalPlaceDetails(auth_model.TimeStampedModel):
 
     @classmethod
     def update_place_details(cls):
-        hosp_place_id = HospitalPlaceDetails.objects.all()
+        hosp_place_id = HospitalPlaceDetails.objects.filter(place_details__isnull=True)
         for data in hosp_place_id:
             if not data.place_details:
                 place_searched_data = None
