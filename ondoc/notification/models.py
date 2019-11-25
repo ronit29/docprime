@@ -1669,7 +1669,7 @@ class IPDIntimateEmailNotification(TimeStampedModel):
     time_slot = models.DateTimeField(blank=True, null=True)
     gender = models.PositiveIntegerField(choices=GENDER_TYPE_CHOICES, blank=True, null=True)
     dob = models.DateField(blank=True, null=True)
-    email_notification = models.ForeignKey(EmailNotification, on_delete=models.CASCADE)
+    email_notification = models.ForeignKey(EmailNotification, on_delete=models.CASCADE, null=True, blank=True)
 
     class Meta:
         db_table = "ipd_intimate_email_notification"
