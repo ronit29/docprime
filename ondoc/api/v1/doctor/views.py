@@ -521,17 +521,15 @@ class DoctorAppointmentsViewSet(OndocViewSet):
         if not resp and not plus_plan:
             resp = account_models.Order.create_order(request, [cart_item], validated_data.get("use_wallet"))
 
-        is_single_flow = False
         if not resp and plus_plan:
             if kwargs.get('is_dummy'):
                 return validated_data
-            is_single_flow = True
+
             resp = account_models.Order.create_new_order(request, validated_data, False)
 
         if is_agent:
             resp['is_agent'] = True
 
-        resp['is_single_flow'] = is_single_flow
         return Response(data=resp)
 
     def can_book_for_free(self, user):

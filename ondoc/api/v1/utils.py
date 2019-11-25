@@ -584,7 +584,8 @@ def single_booking_payment_details(request, orders):
         # "couponCode": '',
         # "couponPgMode": '',
         "isEMI": True,
-        "items": orders_list
+        "items": orders_list,
+        "is_single_flow": True
     }
 
     secret_key, client_key = get_pg_secret_client_key(orders[0])
