@@ -575,12 +575,12 @@ def single_booking_payment_details(request, orders):
         "email": uemail,
         "surl": surl,
         "furl": furl,
-        "blockedDuration": "2",
+        # "blockedDuration": "2",
         "isPreAuth": "1",
         "paytmMsg": paytmMsg,
         "couponCode": '',
         "couponPgMode": '',
-        "isEMI": True
+        # "isEMI": True
     }
 
     flatten_dict = copy.deepcopy(pgdata)
