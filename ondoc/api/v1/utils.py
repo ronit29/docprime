@@ -561,17 +561,11 @@ def single_booking_payment_details(request, orders):
             "name": profile_name,
             "holdPayment": False,
             "txAmount": txAmount,
-            "insurerCode": "goldPurchase",
-            # "refOrderId": "",
-            # "refOrderNo": "",
+            "insurerCode": "goldPurchase" if temp_product_id == 8 else '',
+            "refOrderId": "",
+            "refOrderNo": "",
             "discountedAmnt": discountedAmnt
             }
-
-        if not discountedAmnt:
-            del order_dict['discountedAmnt']
-
-        if temp_product_id != 8:
-            del order_dict['insurerCode']
 
         orders_list.append(order_dict)
 
@@ -584,25 +578,36 @@ def single_booking_payment_details(request, orders):
         "blockedDuration": "2",
         "isPreAuth": "1",
         "paytmMsg": paytmMsg,
-        # "couponCode": '',
-        # "couponPgMode": '',
+        "couponCode": '',
+        "couponPgMode": '',
         "isEMI": True,
-        "items": orders_list,
         "is_single_flow": True
     }
 
+    flatten_dict = copy.deepcopy(pgdata)
+
+    order_count = 0
+    for od in orders_list:
+        for k in od.keys():
+            key = str(k) + "[%d]" % order_count
+
+            if str(od[k]):
+                flatten_dict[key] = str(od[k])
+
+        order_count += 1
+
     secret_key, client_key = get_pg_secret_client_key(orders[0])
-    filtered_pgdata = {k: v for k, v in pgdata.items() if v is not None and v != ''}
-    pgdata.clear()
-    pgdata.update(filtered_pgdata)
-    pgdata['hash'] = PgTransaction.create_pg_hash(pgdata, secret_key, client_key)
+    filtered_pgdata = {k: v for k, v in flatten_dict.items() if v is not None and v != ''}
+    flatten_dict.clear()
+    flatten_dict.update(filtered_pgdata)
+    flatten_dict['hash'] = PgTransaction.create_pg_hash(flatten_dict, secret_key, client_key)
 
     order_ids = list(map(lambda x: x['orderId'], orders_list))
     args = {'user_id': user.id, 'order_ids': order_ids, 'source': 'ORDER_CREATE'}
     save_payment_status.apply_async((PaymentProcessStatus.INITIATE, args), eta=timezone.localtime(),)
-    save_pg_response.apply_async((PgLogs.TXN_REQUEST, order_ids, None, None, pgdata, user.id), eta=timezone.localtime(), queue=settings.RABBITMQ_LOGS_QUEUE)
+    save_pg_response.apply_async((PgLogs.TXN_REQUEST, order_ids, None, None, flatten_dict, user.id), eta=timezone.localtime(), queue=settings.RABBITMQ_LOGS_QUEUE)
     # print(pgdata)
-    return pgdata, payment_required
+    return flatten_dict, payment_required
 
 
 def payment_details(request, order):
