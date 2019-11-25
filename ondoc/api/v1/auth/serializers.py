@@ -45,11 +45,19 @@ class OTPSerializer(serializers.Serializer):
 
 class OTPVerificationSerializer(serializers.Serializer):
     phone_number = serializers.IntegerField(min_value=5000000000,max_value=9999999999)
-    otp = serializers.IntegerField(min_value=100000, max_value=999999)
+    otp = serializers.IntegerField(min_value=100000, max_value=999999, allow_null=True)
+    source = serializers.CharField(max_length=100, required=False, allow_null=True, allow_blank=True)
+    truecaller_verified = serializers.BooleanField(required=False, default=False)
 
     def validate(self, attrs):
         # if not User.objects.filter(phone_number=attrs['phone_number'], user_type=User.CONSUMER).exists():
         #     raise serializers.ValidationError('User does not exist')
+
+        if attrs.get('source') in settings.TRUECALLER_SOURCES and attrs.get('truecaller_verified') is True:
+            return attrs
+
+        if not attrs['otp']:
+            raise serializers.ValidationError("Invalid OTP")
 
         if (not OtpVerifications
                 .objects.filter(phone_number=attrs['phone_number'], code=attrs['otp'], is_expired=False,
@@ -369,7 +377,7 @@ class TransactionSerializer(serializers.Serializer):
     pgTxId = serializers.CharField(max_length=200)
     pbGatewayName = serializers.CharField(max_length=200, required=False)
     hash = serializers.CharField(max_length=1000)
-    # nodalId = serializers.IntegerField()
+    nodalId = serializers.IntegerField()
 
 
 class UserTransactionModelSerializer(serializers.ModelSerializer):

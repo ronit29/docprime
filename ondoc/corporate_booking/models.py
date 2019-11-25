@@ -68,24 +68,6 @@ class CorporateDeal(auth_model.TimeStampedModel):
 
 
     def sync_with_booking_analytics(self):
-        obj = DP_CorporateDeals.objects.filter(CorporateDealId=self.id).first()
-        if not obj:
-            obj = DP_CorporateDeals()
-            obj.CorporateDealId = self.id
-
-        obj.CorporateName = self.corporate.corporate_name
-        obj.DealStartDate = self.deal_start_date
-        obj.ReceiptNumber = self.receipt_no
-        obj.CreatedDate = self.created_at
-        obj.ExpectedProviderFee = self.expected_provider_fee
-        obj.GrossAmount = self.gross_amount
-        obj.NumberOfEmployees = self.employee_count
-        obj.TDSDeducted = self.tds_deducted
-        obj.PaymentDate = self.payment_date
-        obj.IsActive = self.is_active
-        obj.DealEndDate = self.deal_end_date
-        obj.UpdatedDate = self.updated_at
-        obj.save()
 
 
         try:
@@ -93,9 +75,37 @@ class CorporateDeal(auth_model.TimeStampedModel):
                                                           content_type=ContentType.objects.get_for_model(CorporateDeal),
                                                           defaults={"synced_at": self.updated_at, "last_updated_at": self.updated_at})
         except Exception as e:
+            print(str(e))
             pass
 
-        return obj
+        # obj = DP_CorporateDeals.objects.filter(CorporateDealId=self.id).first()
+        # if not obj:
+        #     obj = DP_CorporateDeals()
+        #     obj.CorporateDealId = self.id
+        #
+        # obj.CorporateName = self.corporate.corporate_name
+        # obj.DealStartDate = self.deal_start_date
+        # obj.ReceiptNumber = self.receipt_no
+        # obj.CreatedDate = self.created_at
+        # obj.ExpectedProviderFee = self.expected_provider_fee
+        # obj.GrossAmount = self.gross_amount
+        # obj.NumberOfEmployees = self.employee_count
+        # obj.TDSDeducted = self.tds_deducted
+        # obj.PaymentDate = self.payment_date
+        # obj.IsActive = self.is_active
+        # obj.DealEndDate = self.deal_end_date
+        # obj.UpdatedDate = self.updated_at
+        # obj.save()
+        #
+        #
+        # try:
+        #     SyncBookingAnalytics.objects.update_or_create(object_id=self.id,
+        #                                                   content_type=ContentType.objects.get_for_model(CorporateDeal),
+        #                                                   defaults={"synced_at": self.updated_at, "last_updated_at": self.updated_at})
+        # except Exception as e:
+        #     pass
+        #
+        # return obj
 
     class Meta:
         db_table = "corporate_deal"

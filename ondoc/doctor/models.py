@@ -34,7 +34,7 @@ from dateutil import tz
 from dateutil.relativedelta import relativedelta
 from django.utils import timezone
 from ondoc.authentication import models as auth_model
-from ondoc.authentication.models import SPOCDetails, RefundMixin, MerchantTdsDeduction, PaymentMixin
+from ondoc.authentication.models import SPOCDetails, RefundMixin, MerchantTdsDeduction, PaymentMixin, TransactionMixin
 from ondoc.bookinganalytics.models import DP_OpdConsultsAndTests
 # from ondoc.diagnostic.models import Lab
 from ondoc.location import models as location_models
@@ -2497,7 +2497,7 @@ class PurchaseOrderCreation(auth_model.TimeStampedModel):
 
 
 @reversion.register()
-class OpdAppointment(auth_model.TimeStampedModel, CouponsMixin, OpdAppointmentInvoiceMixin, RefundMixin, CompletedBreakupMixin, MatrixDataMixin, TdsDeductionMixin, PaymentMixin, MerchantPayoutMixin):
+class OpdAppointment(auth_model.TimeStampedModel, CouponsMixin, OpdAppointmentInvoiceMixin, RefundMixin, CompletedBreakupMixin, MatrixDataMixin, TdsDeductionMixin, PaymentMixin, MerchantPayoutMixin, TransactionMixin):
     PRODUCT_ID = Order.DOCTOR_PRODUCT_ID
     CREATED = 1
     BOOKED = 2
@@ -2714,42 +2714,43 @@ class OpdAppointment(auth_model.TimeStampedModel, CouponsMixin, OpdAppointmentIn
 
     def sync_with_booking_analytics(self):
 
-        promo_cost = self.deal_price - self.effective_price if self.deal_price and self.effective_price else 0
-        department = None
-        if self.doctor:
-            if self.doctor.doctorpracticespecializations.first():
-                if self.doctor.doctorpracticespecializations.first().specialization.department.first():
-                    department = self.doctor.doctorpracticespecializations.first().specialization.department.first().id
-
-        wallet, cashback = self.get_completion_breakup()
-
-        obj = DP_OpdConsultsAndTests.objects.filter(Appointment_Id=self.id, TypeId=1).first()
-        if not obj:
-            obj = DP_OpdConsultsAndTests()
-            obj.Appointment_Id = self.id
-            obj.CityId = self.get_city()
-            obj.StateId = self.get_state()
-            obj.SpecialityId = department
-            obj.TypeId = 1
-            obj.ProviderId = self.hospital.id
-            obj.PaymentType = self.payment_type if self.payment_type else None
-            obj.Payout = self.fees
-            obj.CashbackUsed = cashback
-            obj.BookingDate = self.created_at
-        obj.CorporateDealId = self.get_corporate_deal_id()
-        obj.PromoCost = max(0, promo_cost)
-        obj.GMValue = self.deal_price
-        obj.StatusId = self.status
-        obj.save()
+        # promo_cost = self.deal_price - self.effective_price if self.deal_price and self.effective_price else 0
+        # department = None
+        # if self.doctor:
+        #     if self.doctor.doctorpracticespecializations.first():
+        #         if self.doctor.doctorpracticespecializations.first().specialization.department.first():
+        #             department = self.doctor.doctorpracticespecializations.first().specialization.department.first().id
+        #
+        # wallet, cashback = self.get_completion_breakup()
+        #
+        # obj = DP_OpdConsultsAndTests.objects.filter(Appointment_Id=self.id, TypeId=1).first()
+        # if not obj:
+        #     obj = DP_OpdConsultsAndTests()
+        #     obj.Appointment_Id = self.id
+        #     obj.CityId = self.get_city()
+        #     obj.StateId = self.get_state()
+        #     obj.SpecialityId = department
+        #     obj.TypeId = 1
+        #     obj.ProviderId = self.hospital.id
+        #     obj.PaymentType = self.payment_type if self.payment_type else None
+        #     obj.Payout = self.fees
+        #     obj.CashbackUsed = cashback
+        #     obj.BookingDate = self.created_at
+        # obj.CorporateDealId = self.get_corporate_deal_id()
+        # obj.PromoCost = max(0, promo_cost)
+        # obj.GMValue = self.deal_price
+        # obj.StatusId = self.status
+        # obj.save()
 
         try:
             SyncBookingAnalytics.objects.update_or_create(object_id=self.id,
                                                           content_type=ContentType.objects.get_for_model(OpdAppointment),
                                                           defaults={"synced_at": self.updated_at, "last_updated_at": self.updated_at})
         except Exception as e:
+            print(str(e))
             pass
 
-        return obj
+        # return obj
 
     def get_invoice_objects(self):
         return Invoice.objects.filter(reference_id=self.id, product_id=Order.DOCTOR_PRODUCT_ID)
@@ -5253,3 +5254,27 @@ class SponsoredServicePracticeSpecialization(auth_model.TimeStampedModel):
 
     class Meta:
         db_table = "specialization_sponsored_services"
+
+
+class GoogleMapRecords(auth_model.TimeStampedModel):
+    location = models.PointField(geography=True, srid=4326, blank=True, null=True)
+    text = models.CharField(max_length=500)
+    latitude = models.DecimalField(max_digits=9, decimal_places=6, default=None)
+    longitude = models.DecimalField(max_digits=9, decimal_places=6, default=None)
+    label = models.CharField(max_length=100, null=True)
+    image = models.URLField(max_length=500, null= True)
+    reason = models.TextField(null=True, blank=True)
+    hospital_name = models.CharField(max_length=500, null=True, blank=True)
+    place_id = models.CharField(max_length=500, null=True, blank=True)
+    multi_speciality = models.CharField(max_length=500, null=True, blank=True)
+    has_phone = models.SmallIntegerField(null=True, blank=True)
+    lead_rank = models.CharField(max_length=100, null=True, blank=True)
+    combined_rating = models.IntegerField(null=True, blank=True)
+    combined_rating_count = models.IntegerField(null=True, blank=True)
+    is_potential = models.SmallIntegerField(null=True, blank=True)
+    has_booking = models.SmallIntegerField(null=True, blank=True)
+    monday_timing = models.TextField(null=True, blank=True)
+    address = models.TextField(null=True, blank=True)
+
+    class Meta:
+        db_table = "google_map_records"
