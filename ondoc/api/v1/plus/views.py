@@ -199,12 +199,19 @@ class PlusOrderViewSet(viewsets.GenericViewSet):
             transaction_date = datetime.datetime.now()
             amount = plus_plan.deal_price
 
+            price_data = plus_plan.get_price_details(valid_data, amount)
+
             expiry_date = transaction_date + relativedelta(months=int(plus_plan.tenure))
             expiry_date = expiry_date - timedelta(days=1)
             expiry_date = datetime.datetime.combine(expiry_date, datetime.datetime.max.time())
             plus_user_data = {'proposer': plus_plan.proposer.id, 'plus_plan': plus_plan.id,
-                                   'purchase_date': transaction_date, 'expire_date': expiry_date, 'amount': amount,
-                                   'user': request.user.pk, "plus_members": plus_members}
+                              'purchase_date': transaction_date, 'expire_date': expiry_date, 'amount': amount,
+                              'user': request.user.pk, "plus_members": plus_members,
+                              'coupon': price_data.get('coupon_list', []),
+                              'effective_price': price_data.get('effective_price'),
+                              'coupon_discount': price_data.get('coupon_discount'),
+                              'coupon_cashback': price_data.get('coupon_cashback'),
+                              'random_coupon_list': price_data.get('random_coupon_list')}
 
             plus_subscription_data = {"profile_detail": user_profile, "plus_plan": plus_plan.id,
                               "user": request.user.pk, "plus_user": plus_user_data, "utm_parameter": utm_parameter}
@@ -231,7 +238,7 @@ class PlusOrderViewSet(viewsets.GenericViewSet):
 
             # if balance < amount or resp['is_agent']:
             # payable_amount = amount - balance
-            payable_amount = amount
+            payable_amount = price_data.get('effective_price')
             order = account_models.Order.objects.create(
                 product_id=account_models.Order.VIP_PRODUCT_ID,
                 action=account_models.Order.VIP_CREATE,

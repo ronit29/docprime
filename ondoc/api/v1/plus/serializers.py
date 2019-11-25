@@ -292,6 +292,7 @@ class PlusUserSerializer(serializers.Serializer):
     plus_plan = serializers.PrimaryKeyRelatedField(queryset=PlusPlans.objects.all())
     user = serializers.PrimaryKeyRelatedField(queryset=User.objects.all())
     amount = serializers.IntegerField()
+    effective_price = serializers.IntegerField()
     plus_members = serializers.ListSerializer(child=PlusMemberListSerializer())
     purchase_date = serializers.DateTimeField()
     expire_date = serializers.DateTimeField()

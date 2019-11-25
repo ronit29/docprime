@@ -407,7 +407,7 @@ class Order(TimeStampedModel):
                 raise Exception('User Not Found for Order' + str(self.id))
             if user.active_plus_user:
                 raise Exception('User has already subscribed to VIP plan.' + str(user.id))
-            if consumer_account.balance >= plus_user_data['amount']:
+            if consumer_account.balance >= plus_user_data['effective_price']:
                 appointment_obj = PlusUser.create_plus_user(plus_user_data, user)
                 amount = appointment_obj.amount
                 order_dict = {

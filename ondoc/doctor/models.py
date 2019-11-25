@@ -3502,7 +3502,7 @@ class OpdAppointment(auth_model.TimeStampedModel, CouponsMixin, OpdAppointmentIn
             elif data.get("payment_type") == cls.VIP:
                 profile = data.get('profile', None)
                 if not profile:
-                    effective_price = doctor_clinic_timing.deal_price
+                    amount_to_be_paid = doctor_clinic_timing.deal_price
                 else:
                     plus_user = profile.get_plus_membership
                     if plus_user:
@@ -3517,11 +3517,11 @@ class OpdAppointment(auth_model.TimeStampedModel, CouponsMixin, OpdAppointmentIn
                         if engine:
                             # vip_dict = engine.validate_booking_entity(cost=doctor_clinic_timing.mrp)
                             vip_dict = engine.validate_booking_entity(cost=price, mrp=doctor_clinic_timing.mrp, deal_price=doctor_clinic_timing.deal_price)
-                            effective_price = vip_dict.get('amount_to_be_paid')
+                            amount_to_be_paid = vip_dict.get('amount_to_be_paid')
                         else:
-                            effective_price = doctor_clinic_timing.deal_price
+                            amount_to_be_paid = doctor_clinic_timing.deal_price
                     else:
-                        effective_price = doctor_clinic_timing.deal_price
+                        amount_to_be_paid = doctor_clinic_timing.deal_price
                 # effective_price = doctor_clinic_timing.deal_price
                 coupon_discount, coupon_cashback, coupon_list, random_coupon_list = 0, 0, [], []
             elif data.get("payment_type") in [cls.PREPAID]:
@@ -3581,7 +3581,7 @@ class OpdAppointment(auth_model.TimeStampedModel, CouponsMixin, OpdAppointmentIn
                 "insurance_fees": doctor_clinic_timing.insurance_fees
             },
             "coupon_data" : { "random_coupon_list" : random_coupon_list },
-            "prepaid_deal_price" : prepaid_deal_price
+            "prepaid_deal_price": prepaid_deal_price
         }
 
     @classmethod

@@ -104,9 +104,6 @@ class Cart(auth_model.TimeStampedModel, auth_model.SoftDeleteModel):
         elif self.product_id == Order.LAB_PRODUCT_ID:
             serializer = LabAppointmentCreateSerializer(data=self.data, context={'request': request, 'data' : self.data})
             serializer.is_valid(raise_exception=True)
-        elif self.product_id == Order.VIP_PRODUCT_ID:
-            serializer = LabAppointmentCreateSerializer(data=self.data, context={'request': request, 'data' : self.data})
-            serializer.is_valid(raise_exception=True)
 
         validated_data = serializer.validated_data
         return validated_data
