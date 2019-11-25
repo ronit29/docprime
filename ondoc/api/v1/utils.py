@@ -570,6 +570,9 @@ def single_booking_payment_details(request, orders):
         if not discountedAmnt:
             del order_dict['discountedAmnt']
 
+        if temp_product_id != 8:
+            del order_dict['insurerCode']
+
         orders_list.append(order_dict)
 
     pgdata = {
