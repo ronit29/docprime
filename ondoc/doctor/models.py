@@ -327,8 +327,8 @@ class Hospital(auth_model.TimeStampedModel, auth_model.CreatedByModel, auth_mode
             plan = PlusPlans.objects.filter(is_gold=True).first()
 
         if plan:
-            convenience_amount_obj, convenience_percentage_obj = plan.get_convenience_object('DOCTOR')
-
+            convenience_min_amount_obj, convenience_min_amount_obj,  convenience_percentage_obj, = plan.get_convenience_object('DOCTOR')
+            price_data = {}
             for common_hospital in common_hosp_queryset:
                 if common_hospital.hospital:
                     doctor_clinics = common_hospital.hospital.hospital_doctors.all()
@@ -337,14 +337,20 @@ class Hospital(auth_model.TimeStampedModel, auth_model.CreatedByModel, auth_mode
                         for doc in doctor_clinics:
                             doc_clinic_timing = doc.availability.all()[0] if doc.availability.all() else None
                             if doc_clinic_timing:
+                                price_data = {"mrp": doc_clinic_timing.mrp, "fees": doc_clinic_timing.fees,
+                                              "deal_price": doc_clinic_timing.deal_price, "cod_deal_price": doc_clinic_timing.cod_deal_price}
                                 mrp = doc_clinic_timing.mrp
                                 agreed_price = doc_clinic_timing.fees
                                 if agreed_price and mrp:
+                                    # percentage = max(((mrp - (
+                                    #             agreed_price + plan.get_convenience_amount(agreed_price, convenience_amount_obj,
+                                    #                                                        convenience_percentage_obj))) / mrp) * 100,
+                                    #                  percentage)
                                     percentage = max(((mrp - (
-                                                agreed_price + plan.get_convenience_amount(agreed_price, convenience_amount_obj,
-                                                                                           convenience_percentage_obj))) / mrp) * 100,
+                                        PlusPlans.get_default_convenience_amount(price_data, "DOCTOR",
+                                                                                 default_plan_query=plan))) / mrp) * 100,
                                                      percentage)
-                        common_hosp_percentage_dict[common_hospital.hospital.id] = round(percentage,2)
+                        common_hosp_percentage_dict[common_hospital.hospital.id] = round(percentage, 2)
 
         # queryset = CommonHospital.objects.all().values_list('hospital', 'network')
         # top_hospital_ids = list(set([x[0] for x in queryset if x[0] is not None]))

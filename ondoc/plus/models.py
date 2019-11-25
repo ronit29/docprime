@@ -180,8 +180,12 @@ class PlusPlans(auth_model.TimeStampedModel, LiveMixin):
         if not default_plan:
             return 0
         min_price_engine = get_min_convenience_reference(default_plan, "DOCTOR")
+        if not min_price_engine:
+            return 0
         min_price = min_price_engine.get_price(price_data)
         max_price_engine = get_max_convenience_reference(default_plan, "DOCTOR")
+        if not max_price_engine:
+            return 0
         max_price = max_price_engine.get_price(price_data)
         if not max_price or min_price or max_price <= 0 or min_price <= 0:
             return 0
