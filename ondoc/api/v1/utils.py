@@ -561,9 +561,9 @@ def single_booking_payment_details(request, orders):
             "name": profile_name,
             "holdPayment": False,
             "txAmount": txAmount,
-            "insurerCode": "",
-            "refOrderId": "",
-            "refOrderNo": "",
+            "insurerCode": "goldPurchase",
+            # "refOrderId": "",
+            # "refOrderNo": "",
             "discountedAmnt": discountedAmnt
             }
 
@@ -578,8 +578,8 @@ def single_booking_payment_details(request, orders):
         "blockedDuration": "2",
         "isPreAuth": "1",
         "paytmMsg": paytmMsg,
-        "couponCode": '',
-        "couponPgMode": '',
+        # "couponCode": '',
+        # "couponPgMode": '',
         "isEMI": True,
         "items": orders_list
     }
