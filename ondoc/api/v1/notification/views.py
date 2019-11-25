@@ -164,7 +164,9 @@ class IPDIntimateEmailNotificationViewSet(viewsets.GenericViewSet):
         time_slot = parameters.get('time_slot', None)
         gender = parameters.get('gender', None)
         dob = parameters.get('dob', None)
-
+        ipd_email_obj = IPDIntimateEmailNotification.objects.filter(user_id=user_id, doctor_id=doctor_id, hospital_id=hospital_id)
+        if ipd_email_obj:
+            return Response({})
         hosp_obj = Hospital.objects.filter(id=hospital_id)[0]
         spoc_details = hosp_obj.spoc_details.all()
         receivers = [{'user': user_id, 'email': spoc.email} for spoc in spoc_details]
@@ -180,5 +182,3 @@ class IPDIntimateEmailNotificationViewSet(viewsets.GenericViewSet):
         email_notification.send(receivers)
 
         return Response({})
-
-
