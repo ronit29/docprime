@@ -600,12 +600,12 @@ def single_booking_payment_details(request, orders):
     filtered_pgdata = {k: v for k, v in flatten_dict.items() if v is not None and v != ''}
     flatten_dict.clear()
     flatten_dict.update(filtered_pgdata)
-    flatten_dict['hash'] = PgTransaction.create_pg_hash(flatten_dict, secret_key, client_key)
+    pgdata['hash'] = PgTransaction.create_pg_hash(flatten_dict, secret_key, client_key)
 
     order_ids = list(map(lambda x: x['orderId'], orders_list))
     args = {'user_id': user.id, 'order_ids': order_ids, 'source': 'ORDER_CREATE'}
     save_payment_status.apply_async((PaymentProcessStatus.INITIATE, args), eta=timezone.localtime(),)
-    save_pg_response.apply_async((PgLogs.TXN_REQUEST, order_ids, None, None, flatten_dict, user.id), eta=timezone.localtime(), queue=settings.RABBITMQ_LOGS_QUEUE)
+    save_pg_response.apply_async((PgLogs.TXN_REQUEST, order_ids, None, None, pgdata, user.id), eta=timezone.localtime(), queue=settings.RABBITMQ_LOGS_QUEUE)
     # print(pgdata)
     pgdata['items'] = orders_list
     return pgdata, payment_required
