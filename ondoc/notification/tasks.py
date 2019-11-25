@@ -1012,8 +1012,8 @@ def send_pg_acknowledge(order_id=None, order_no=None, ack_type=''):
                 print("Payment capture acknowledged")
             else:
                 print("Payment acknowledged")
-        # json_url = '{"url": "%s"}' % url
-        # save_pg_response.apply_async((PgLogs.ACK_TO_PG, order_id, None, json_url, None, None), eta=timezone.localtime(), queue=settings.RABBITMQ_LOGS_QUEUE)
+        json_url = '{"url": "%s"}' % url
+        save_pg_response.apply_async((PgLogs.ACK_TO_PG, order_id, None, json_url, None, None), eta=timezone.localtime(), queue=settings.RABBITMQ_LOGS_QUEUE)
     except Exception as e:
         logger.error("Error in sending pg acknowledge - " + str(e))
 
@@ -1290,10 +1290,13 @@ def update_coupon_used_count():
     RawSql('''  update coupon set total_used_count= usage_count from
                 (select coupon_id, sum(usage_count) usage_count from
                 (select oac.coupon_id, count(*) usage_count from opd_appointment oa inner join opd_appointment_coupon oac on oa.id = oac.opdappointment_id
-                 where oa.status in (2,3,4,5,7) group by oac.coupon_id
+                where oa.status in (2,3,4,5,7) group by oac.coupon_id
                 union
-                select oac.coupon_id, count(*) usage_count from lab_appointment oa inner join lab_appointment_coupon oac on oa.id = oac.labappointment_id
-                 where oa.status in (2,3,4,5,7) group by oac.coupon_id
+                select lac.coupon_id, count(*) usage_count from lab_appointment la inner join lab_appointment_coupon lac on la.id = lac.labappointment_id
+                where la.status in (2,3,4,5,7) group by lac.coupon_id
+                union
+                select puc.coupon_id, count(*) usage_count from plus_users pu inner join plus_users_coupon puc on pu.id = puc.plususer_id
+                where pu.status in (1,3,4,5,6,7) group by puc.coupon_id
                 ) x group by coupon_id
                 ) y where coupon.id = y.coupon_id ''', []).execute()
 
@@ -1552,18 +1555,21 @@ def send_release_payment_request(self, product_id, appointment_id):
         logger.error("Error in payment release with data - " + json.dumps(req_data) + " with exception - " + str(e))
         self.retry([product_id, appointment_id], countdown=300)
 
-
-@task(bind=True, max_retries=3)
-def save_pg_response(self, log_type, order_id, txn_id, response, request, user_id, *args, **kwargs):
+@task(bind=True)
+def save_pg_response(self, log_type, order_id, txn_id, response, request, user_id, log_created_at=None, *args, **kwargs):
     try:
         from ondoc.account.mongo_models import PgLogs
         if order_id.__class__.__name__ == 'list':
             PgLogs.save_single_pg_response(log_type, order_id, txn_id, response, request, user_id)
         else:
-            PgLogs.save_pg_response(log_type, order_id, txn_id, response, request, user_id)
+            if response:
+                if not isinstance(response, dict):
+                    response = json.loads(response)
+                response.pop('created_at', None)
+            PgLogs.save_pg_response(log_type, order_id, txn_id, response, request, user_id, log_created_at)
     except Exception as e:
         logger.error("Error in saving pg response to mongo database - " + json.dumps(response) + " with exception - " + str(e))
-        self.retry([txn_id, response], countdown=300)
+        # self.retry([txn_id, response], countdown=300)
 
 
 @task(bind=True)

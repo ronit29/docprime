@@ -15,7 +15,7 @@ import calendar
 from django.contrib.auth import get_user_model
 from django.contrib.gis.geos import GEOSGeometry
 from ondoc.account.tasks import refund_curl_task
-from ondoc.coupon.models import UserSpecificCoupon, Coupon
+from ondoc.coupon.models import UserSpecificCoupon
 from ondoc.crm.constants import constants
 import copy
 import requests
@@ -619,7 +619,8 @@ def payment_details(request, order):
         uemail = user.email
     else:
         uemail = "dummyemail@docprime.com"
-    base_url = "https://{}".format(request.get_host())
+    # base_url = "https://{}".format(request.get_host())
+    base_url = 'https://webhook.site/0f0c0af8-d155-440d-b5c4-ce486574e14d'
     surl = base_url + '/api/v1/user/transaction/save'
     furl = base_url + '/api/v1/user/transaction/save'
     isPreAuth = '1'
@@ -971,6 +972,8 @@ class CouponsMixin(object):
         from ondoc.doctor.models import OpdAppointment
         from ondoc.diagnostic.models import LabAppointment
         from ondoc.subscription_plan.models import UserPlanMapping
+        from ondoc.plus.models import PlusUser
+        from ondoc.cart.models import Cart
 
         user = kwargs.get("user")
         coupon_obj = kwargs.get("coupon_obj")
@@ -986,6 +989,8 @@ class CouponsMixin(object):
             elif isinstance(self, LabAppointment) and coupon_obj.type not in [Coupon.LAB, Coupon.ALL]:
                 return {"is_valid": False, "used_count": None}
             elif isinstance(self, UserPlanMapping) and coupon_obj.type not in [Coupon.SUBSCRIPTION_PLAN, Coupon.ALL]:
+                return {"is_valid": False, "used_count": None}
+            elif isinstance(self, PlusUser) and coupon_obj.type not in [Coupon.VIP, Coupon.GOLD]:
                 return {"is_valid": False, "used_count": None}
 
             diff_days = (timezone.now() - (coupon_obj.start_date or coupon_obj.created_at)).days
@@ -1029,7 +1034,6 @@ class CouponsMixin(object):
                         or (coupon_obj.age_end and (not user_age or coupon_obj.age_end < user_age)) ):
                     return {"is_valid": False, "used_count": None}
 
-                from ondoc.cart.models import Cart
                 payment_option_filter = Cart.get_pg_if_pgcoupon(user, cart_item)
                 if payment_option_filter and coupon_obj.payment_option and coupon_obj.payment_option.id != payment_option_filter.id:
                     return {"is_valid": False, "used_count": 0}
@@ -1080,6 +1084,7 @@ class CouponsMixin(object):
         hospital = kwargs.get("hospital")
         procedures = kwargs.get("procedures", [])
         plan = kwargs.get("plan")
+        gold_vip_plan_id = kwargs.get('gold_vip_plan_id')
 
         if plan:
             if coupon_obj.type in [Coupon.ALL, Coupon.SUBSCRIPTION_PLAN] \
@@ -1087,6 +1092,14 @@ class CouponsMixin(object):
                     return True
             return False
 
+        if gold_vip_plan_id:
+            if coupon_obj.type in [Coupon.VIP, Coupon.GOLD]:
+                vip_gold_plans = coupon_obj.vip_gold_plans.all()
+                if not vip_gold_plans:
+                    return True
+                elif vip_gold_plans.filter(id=gold_vip_plan_id).exists():
+                    return True
+            return False
 
         if coupon_obj.lab and coupon_obj.lab != lab:
             return False
@@ -1841,7 +1854,7 @@ class TimeSlotExtraction(object):
 def consumers_balance_refund():
     from ondoc.account.models import ConsumerAccount, ConsumerRefund
     refund_time = timezone.now() - timezone.timedelta(hours=settings.REFUND_INACTIVE_TIME)
-    consumer_accounts = ConsumerAccount.objects.filter(updated_at__lt=refund_time)
+    consumer_accounts = ConsumerAccount.objects.filter(updated_at__lt=refund_time, balance__gt=Decimal('0'))
     for account in consumer_accounts:
         with transaction.atomic():
             consumer_account = ConsumerAccount.objects.select_for_update().filter(pk=account.id).first()

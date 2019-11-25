@@ -3503,7 +3503,7 @@ class OpdAppointment(auth_model.TimeStampedModel, CouponsMixin, OpdAppointmentIn
             elif data.get("payment_type") == cls.VIP or data.get('payment_type') == cls.GOLD:
                 profile = data.get('profile', None)
                 if not profile:
-                    effective_price = doctor_clinic_timing.deal_price
+                    amount_to_be_paid = doctor_clinic_timing.deal_price
                 else:
                     plus_user = profile.get_plus_membership
                     if not plus_user:
@@ -3520,11 +3520,11 @@ class OpdAppointment(auth_model.TimeStampedModel, CouponsMixin, OpdAppointmentIn
                         if engine:
                             # vip_dict = engine.validate_booking_entity(cost=doctor_clinic_timing.mrp)
                             vip_dict = engine.validate_booking_entity(cost=price, mrp=doctor_clinic_timing.mrp, deal_price=doctor_clinic_timing.deal_price)
-                            effective_price = vip_dict.get('amount_to_be_paid')
+                            amount_to_be_paid = vip_dict.get('amount_to_be_paid')
                         else:
-                            effective_price = doctor_clinic_timing.deal_price
+                            amount_to_be_paid = doctor_clinic_timing.deal_price
                     else:
-                        effective_price = doctor_clinic_timing.deal_price
+                        amount_to_be_paid = doctor_clinic_timing.deal_price
                 # effective_price = doctor_clinic_timing.deal_price
                 coupon_discount, coupon_cashback, coupon_list, random_coupon_list = 0, 0, [], []
             elif data.get("payment_type") in [cls.PREPAID]:
@@ -3584,7 +3584,7 @@ class OpdAppointment(auth_model.TimeStampedModel, CouponsMixin, OpdAppointmentIn
                 "insurance_fees": doctor_clinic_timing.insurance_fees
             },
             "coupon_data" : { "random_coupon_list" : random_coupon_list },
-            "prepaid_deal_price" : prepaid_deal_price
+            "prepaid_deal_price": prepaid_deal_price
         }
 
     @classmethod
@@ -5256,3 +5256,27 @@ class SponsoredServicePracticeSpecialization(auth_model.TimeStampedModel):
 
     class Meta:
         db_table = "specialization_sponsored_services"
+
+
+class GoogleMapRecords(auth_model.TimeStampedModel):
+    location = models.PointField(geography=True, srid=4326, blank=True, null=True)
+    text = models.CharField(max_length=500)
+    latitude = models.DecimalField(max_digits=9, decimal_places=6, default=None)
+    longitude = models.DecimalField(max_digits=9, decimal_places=6, default=None)
+    label = models.CharField(max_length=100, null=True)
+    image = models.URLField(max_length=500, null= True)
+    reason = models.TextField(null=True, blank=True)
+    hospital_name = models.CharField(max_length=500, null=True, blank=True)
+    place_id = models.CharField(max_length=500, null=True, blank=True)
+    multi_speciality = models.CharField(max_length=500, null=True, blank=True)
+    has_phone = models.SmallIntegerField(null=True, blank=True)
+    lead_rank = models.CharField(max_length=100, null=True, blank=True)
+    combined_rating = models.IntegerField(null=True, blank=True)
+    combined_rating_count = models.IntegerField(null=True, blank=True)
+    is_potential = models.SmallIntegerField(null=True, blank=True)
+    has_booking = models.SmallIntegerField(null=True, blank=True)
+    monday_timing = models.TextField(null=True, blank=True)
+    address = models.TextField(null=True, blank=True)
+
+    class Meta:
+        db_table = "google_map_records"

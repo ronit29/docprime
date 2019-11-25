@@ -383,14 +383,14 @@ class InsuranceOrderViewSet(viewsets.GenericViewSet):
             balance = consumer_account.balance
 
             visitor_info = None
-            try:
-                from ondoc.api.v1.tracking.views import EventCreateViewSet
-                with transaction.atomic():
-                    event_api = EventCreateViewSet()
-                    visitor_id, visit_id = event_api.get_visit(request)
-                    visitor_info = {"visitor_id": visitor_id, "visit_id": visit_id}
-            except Exception as e:
-                logger.log("Could not fecth visitor info - " + str(e))
+            # try:
+            #     from ondoc.api.v1.tracking.views import EventCreateViewSet
+            #     with transaction.atomic():
+            #         event_api = EventCreateViewSet()
+            #         visitor_id, visit_id = event_api.get_visit(request)
+            #         visitor_info = {"visitor_id": visitor_id, "visit_id": visit_id}
+            # except Exception as e:
+            #     logger.log("Could not fecth visitor info - " + str(e))
 
             resp['is_agent'] = False
             if hasattr(request, 'agent') and request.agent:
@@ -409,7 +409,7 @@ class InsuranceOrderViewSet(viewsets.GenericViewSet):
                     wallet_amount=balance,
                     user=user,
                     payment_status=account_models.Order.PAYMENT_PENDING,
-                    visitor_info = visitor_info
+                    visitor_info=visitor_info
                 )
                 resp["status"] = 1
                 resp['data'], resp["payment_required"] = payment_details(request, order)

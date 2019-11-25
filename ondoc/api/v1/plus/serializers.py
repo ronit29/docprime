@@ -8,6 +8,7 @@ from ondoc.api.v1.doctor.serializers import CommonConditionsSerializer
 from ondoc.authentication.models import UserProfile
 from ondoc.authentication.models import User
 from ondoc.common.models import DocumentsProofs
+from ondoc.coupon.models import RandomGeneratedCoupon, CouponRecommender
 from ondoc.doctor.models import Hospital
 from ondoc.plus.models import (PlusProposer, PlusPlans, PlusThreshold, PlusMembers, PlusUser, PlusUserUtilization,
                                PlusPlanParameters, PlusPlanParametersMapping)
@@ -212,8 +213,11 @@ class PlusMemberListSerializer(serializers.Serializer):
 
 class PlusMembersSerializer(serializers.Serializer):
     members = serializers.ListSerializer(child=PlusMemberListSerializer())
+    coupon_code = serializers.ListField(child=serializers.CharField(), required=False, default=[])
 
     def validate(self, attrs):
+        from ondoc.account.models import Order
+
         request = self.context.get('request')
         user = request.user
         plus_user_obj = PlusUser.get_by_user(user)
@@ -248,6 +252,26 @@ class PlusMembersSerializer(serializers.Serializer):
 
             attrs['members'] = to_be_added_member_list
 
+        else:
+            if attrs.get("coupon_code"):
+                coupon_codes = attrs.get("coupon_code", [])
+                coupon_obj = RandomGeneratedCoupon.get_coupons(coupon_codes)
+                plus_plan_id = request.data.get('plan_id')
+                if not plus_plan_id:
+                    raise serializers.ValidationError({"Plans": "Plus Plan is not Valid"})
+
+                if coupon_obj:
+                    for coupon in coupon_obj:
+                        profile = attrs.get("profile")
+                        obj = PlusUser()
+                        if obj.validate_user_coupon(user=user, coupon_obj=coupon, profile=profile).get("is_valid"):
+                            if not obj.validate_product_coupon(coupon_obj=coupon, gold_vip_plan_id=plus_plan_id,
+                                                               product_id=Order.VIP_PRODUCT_ID):
+                                raise serializers.ValidationError('Invalid coupon code - ' + str(coupon))
+                        else:
+                            raise serializers.ValidationError('Invalid coupon code - ' + str(coupon))
+                    attrs["coupon_obj"] = list(coupon_obj)
+
         return attrs
 
 
@@ -256,10 +280,12 @@ class PlusUserSerializer(serializers.Serializer):
     plus_plan = serializers.PrimaryKeyRelatedField(queryset=PlusPlans.objects.all())
     user = serializers.PrimaryKeyRelatedField(queryset=User.objects.all())
     amount = serializers.IntegerField()
+    effective_price = serializers.IntegerField()
     plus_members = serializers.ListSerializer(child=PlusMemberListSerializer())
     purchase_date = serializers.DateTimeField()
     expire_date = serializers.DateTimeField()
     order = serializers.PrimaryKeyRelatedField(queryset=account_models.Order.objects.all())
+    coupon = serializers.ListField(child=serializers.IntegerField(), required=False, default=[])
 
 
 class PlusUserModelSerializer(serializers.ModelSerializer):

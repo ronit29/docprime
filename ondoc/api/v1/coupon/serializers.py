@@ -4,6 +4,7 @@ from ondoc.cart.models import Cart
 from ondoc.diagnostic.models import Lab, LabTest, AvailableLabTest, LabAppointment, LabTestCategory
 from ondoc.coupon.models import Coupon, RandomGeneratedCoupon
 from ondoc.doctor.models import Doctor, Hospital, PracticeSpecialization, OpdAppointment
+from ondoc.plus.models import PlusPlans
 from ondoc.procedure.models import Procedure, ProcedureCategory
 from ondoc.authentication.models import UserProfile
 from django.contrib.auth import get_user_model
@@ -27,6 +28,7 @@ class ProductIDSerializer(serializers.Serializer):
     coupon_code = serializers.CharField(required=False)
     profile_id = serializers.PrimaryKeyRelatedField(required=False, queryset=UserProfile.objects.all())
     cart_item = serializers.PrimaryKeyRelatedField(queryset=Cart.objects.all(), required=False, allow_null=True)
+    plan_id = serializers.PrimaryKeyRelatedField(required=False, queryset=PlusPlans.objects.all())
     show_all = serializers.BooleanField(required=False)
 
     def validate(self, attrs):

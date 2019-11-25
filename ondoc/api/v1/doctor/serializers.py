@@ -20,7 +20,7 @@ from ondoc.doctor.models import (OpdAppointment, Doctor, Hospital, DoctorHospita
                                  DoctorPracticeSpecialization, DoctorClinic, OfflineOPDAppointments, OfflinePatients,
                                  CancellationReason, HealthInsuranceProvider, HospitalDocument, HospitalNetworkDocument,
                                  AppointmentHistory, HospitalNetwork, ProviderEncrypt, SimilarSpecializationGroup,
-                                 PracticeSpecialization, CommonHospital)
+                                 PracticeSpecialization, CommonHospital, GoogleMapRecords)
 from ondoc.diagnostic import models as lab_models
 from ondoc.authentication.models import UserProfile, DoctorNumber, GenericAdmin, GenericLabAdmin
 from django.db.models import Avg
@@ -3025,3 +3025,11 @@ class TopCommonHospitalForIpdProcedureSerializer(serializers.ModelSerializer):
                     return request.build_absolute_uri(image.url) if image else None
         return None
 
+
+class RecordSerializer(serializers.ModelSerializer):
+
+    class Meta:
+       model = GoogleMapRecords
+       fields = (["id","location","text","created_at","latitude","longitude", "updated_at", "image", "label", "reason", "hospital_name", "place_id",
+                  "multi_speciality", "has_phone", "lead_rank", "combined_rating", "combined_rating_count", "is_potential", "has_booking", "monday_timing",
+                 "address" ])

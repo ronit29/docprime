@@ -199,6 +199,7 @@ class LabtestAmountCount(AbstractCriteria):
         total_count = vip_utilization.get('total_labtest_count_limit')
         total_amount = vip_utilization.get('total_labtest_amount_limit')
         mrp = kwargs.get('mrp', 0)
+        is_covered = False
         plan = self.plus_obj.plan
         deal_price = int(kwargs.get('deal_price', 0))
         convenience_charge = plan.get_convenience_charge(cost, "LABTEST")

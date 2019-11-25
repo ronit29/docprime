@@ -337,6 +337,7 @@ class ApplicableCouponsViewSet(viewsets.GenericViewSet):
 
         product_id = input_data.get("product_id")
         lab = input_data.get("lab_id", None)
+        vip_gold_plan = input_data.get("plan_id", None)
         tests = input_data.get("tests", [])
         procedures = input_data.get("procedures", [])
         doctor = input_data.get("doctor_id", None)
@@ -353,9 +354,13 @@ class ApplicableCouponsViewSet(viewsets.GenericViewSet):
             coupon_type = 'doctor'
         elif (product_id and product_id == Order.LAB_PRODUCT_ID) or lab:
             coupon_type = 'lab'
+        elif vip_gold_plan and not vip_gold_plan.is_gold:
+            coupon_type = 'vip'
+        elif vip_gold_plan and vip_gold_plan.is_gold:
+            coupon_type = 'gold'
 
-        if deal_price==0:
-            deal_price=None
+        if deal_price == 0:
+            deal_price = None
 
         coupon_recommender = CouponRecommender(request.user, profile, coupon_type, product_id, coupon_code, cart_item_id)
         filters = dict()
@@ -372,6 +377,8 @@ class ApplicableCouponsViewSet(viewsets.GenericViewSet):
                 doctor_specializations.append(dps.specialization_id)
             filters['doctor_id'] = doctor.id
             filters['doctor_specializations_ids'] = doctor_specializations
+        if coupon_type in ['vip', 'gold']:
+            filters['vip_gold_plan'] = vip_gold_plan
         filters['tests'] = tests
         filters['hospital'] = hospital
         filters['deal_price'] = deal_price

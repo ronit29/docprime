@@ -1,6 +1,8 @@
 from dateutil.relativedelta import relativedelta
 from django.db import models
 import functools
+
+from ondoc.api.v1.utils import CouponsMixin
 from ondoc.authentication import models as auth_model
 from django.contrib.contenttypes.fields import GenericRelation, GenericForeignKey
 from django.contrib.contenttypes.models import ContentType
@@ -17,6 +19,8 @@ from ondoc.authentication.models import UserProfile, User
 from django.db import transaction
 from django.db.models import Q
 from ondoc.common.models import DocumentsProofs
+from ondoc.coupon.models import Coupon
+
 from ondoc.notification.tasks import push_plus_lead_to_matrix
 from ondoc.plus.usage_criteria import get_class_reference, get_price_reference
 from .enums import PlanParametersEnum, UtilizationCriteria, PriceCriteria
@@ -239,6 +243,21 @@ class PlusPlans(auth_model.TimeStampedModel, LiveMixin):
         else:
             return convenience_amount
 
+    def get_price_details(self, data, amount=0):
+        coupon_discount, coupon_cashback, coupon_list, random_coupon_list = Coupon.get_total_deduction(data, amount)
+        if coupon_discount >= amount:
+            effective_price = 0
+        else:
+            effective_price = amount - coupon_discount
+        return {
+            "amount": amount,
+            "effective_price": effective_price,
+            "coupon_discount": coupon_discount,
+            "coupon_cashback": coupon_cashback,
+            "coupon_list": coupon_list,
+            "random_coupon_list": random_coupon_list
+        }
+
     class Meta:
         db_table = 'plus_plans'
         # unique_together = (('is_selected', 'is_gold'), )
@@ -331,8 +350,9 @@ class PlusThreshold(auth_model.TimeStampedModel, LiveMixin):
 
 
 @reversion.register()
-class PlusUser(auth_model.TimeStampedModel, RefundMixin, TransactionMixin):
+class PlusUser(auth_model.TimeStampedModel, RefundMixin, TransactionMixin, CouponsMixin):
     from ondoc.account.models import MoneyPool
+    from ondoc.coupon.models import Coupon
     PRODUCT_ID = account_model.Order.VIP_PRODUCT_ID
 
     ACTIVE = 1
@@ -362,6 +382,7 @@ class PlusUser(auth_model.TimeStampedModel, RefundMixin, TransactionMixin):
     matrix_lead_id = models.IntegerField(null=True)
     raw_plus_member = JSONField(blank=False, null=False, default=list)
     payment_type = models.PositiveSmallIntegerField(choices=const.PAY_CHOICES, default=const.PREPAID)
+    coupon = models.ManyToManyField(Coupon, blank=True, null=True, related_name="plus_coupon")
 
     def is_valid(self):
         if self.expire_date >= timezone.now() and (self.status == self.ACTIVE):
@@ -511,6 +532,14 @@ class PlusUser(auth_model.TimeStampedModel, RefundMixin, TransactionMixin):
             "amount_to_be_paid": mrp
         }
 
+        # discount calculation on mrp
+        coupon_discount, coupon_cashback, coupon_list, random_coupon_list = Coupon.get_total_deduction(
+            appointment_data, mrp)
+        if coupon_discount >= mrp:
+            response_dict['amount_to_be_paid'] = 0
+        else:
+            response_dict['amount_to_be_paid'] = mrp - coupon_discount
+
         if appointment_data.get('payment_type') == OpdAppointment.COD:
             return response_dict
         profile = appointment_data.get('profile', None)
@@ -552,10 +581,19 @@ class PlusUser(auth_model.TimeStampedModel, RefundMixin, TransactionMixin):
 
                 # engine_response = engine.validate_booking_entity(cost=mrp, utilization=kwargs.get('utilization'))
                 engine_response = engine.validate_booking_entity(cost=price, utilization=kwargs.get('utilization'), mrp=mrp, deal_price=deal_price)
+
+                # discount calculation on amount to be paid
+                amount_to_be_paid = engine_response.get('amount_to_be_paid', mrp)
+                coupon_discount, coupon_cashback, coupon_list, random_coupon_list = Coupon.get_total_deduction(
+                    appointment_data, amount_to_be_paid)
+                if coupon_discount >= amount_to_be_paid:
+                    response_dict['amount_to_be_paid'] = 0
+                else:
+                    response_dict['amount_to_be_paid'] = amount_to_be_paid - coupon_discount
+
                 response_dict['cover_under_vip'] = engine_response.get('is_covered', False)
                 response_dict['plus_user_id'] = plus_user.id
                 response_dict['vip_amount_deducted'] = engine_response.get('vip_amount_deducted', 0)
-                response_dict['amount_to_be_paid'] = engine_response.get('amount_to_be_paid', mrp)
 
                 # Only for cart items.
                 if kwargs.get('utilization') and response_dict['cover_under_vip'] and response_dict['vip_amount_deducted']:
@@ -585,10 +623,20 @@ class PlusUser(auth_model.TimeStampedModel, RefundMixin, TransactionMixin):
 
                     if not engine_response:
                         return response_dict
+
+                    # discount calculation on amount to be paid
+                    amount_to_be_paid = engine_response.get('amount_to_be_paid', final_price)
+                    coupon_discount, coupon_cashback, coupon_list, random_coupon_list = Coupon.get_total_deduction(
+                        appointment_data, amount_to_be_paid)
+                    if coupon_discount >= amount_to_be_paid:
+                        response_dict['amount_to_be_paid'] = 0
+                    else:
+                        response_dict['amount_to_be_paid'] = amount_to_be_paid - coupon_discount
+
                     response_dict['cover_under_vip'] = engine_response.get('is_covered', False)
                     response_dict['plus_user_id'] = plus_user.id
                     response_dict['vip_amount_deducted'] = engine_response.get('vip_amount_deducted', 0)
-                    response_dict['amount_to_be_paid'] = engine_response.get('amount_to_be_paid', final_price)
+                    # response_dict['amount_to_be_paid'] = engine_response.get('amount_to_be_paid', final_price)
 
                     # Only for cart items.
                     if kwargs.get('utilization') and response_dict['cover_under_vip'] and response_dict['vip_amount_deducted']:
@@ -806,6 +854,7 @@ class PlusUser(auth_model.TimeStampedModel, RefundMixin, TransactionMixin):
     def create_plus_user(cls, plus_data, user):
         from ondoc.doctor.models import OpdAppointment
         members = plus_data['plus_members']
+        coupon_list = plus_data.pop("coupon", None)
 
         for member in members:
             member['profile'] = cls.profile_create_or_update(member, user)
@@ -818,11 +867,13 @@ class PlusUser(auth_model.TimeStampedModel, RefundMixin, TransactionMixin):
                                                           raw_plus_member=json.dumps(plus_data['plus_members']),
                                                           purchase_date=plus_data['purchase_date'],
                                                           expire_date=plus_data['expire_date'],
-                                                          amount=plus_data['amount'],
+                                                          amount=plus_data['effective_price'],
                                                           order=plus_data['order'],
                                                           payment_type=const.PREPAID,
                                                           status=cls.ACTIVE)
 
+        if coupon_list:
+            plus_membership_obj.coupon.add(*coupon_list)
         PlusMembers.create_plus_members(plus_membership_obj)
         PlusUserUtilization.create_utilization(plus_membership_obj)
         return plus_membership_obj
@@ -892,6 +943,7 @@ class PlusUser(auth_model.TimeStampedModel, RefundMixin, TransactionMixin):
         from ondoc.api.v1.plus.plusintegration import PlusIntegration
         if kwargs.get('is_fresh'):
             PlusIntegration.create_vip_lead_after_purchase(self)
+            PlusIntegration.assign_coupons_to_user_after_purchase(self)
     
     def process_cancellation(self):
         from ondoc.doctor.models import OpdAppointment
