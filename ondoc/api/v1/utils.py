@@ -559,7 +559,7 @@ def single_booking_payment_details(request, orders):
             "orderId": order.id,
             "productId": temp_product_id,
             "name": profile_name,
-            "holdPayment": 0,
+            "holdPayment": "false",
             "txAmount": txAmount,
             "insurerCode": "goldPurchase" if temp_product_id == 8 else '',
             "refOrderId": "",
