@@ -567,6 +567,9 @@ def single_booking_payment_details(request, orders):
             "discountedAmnt": discountedAmnt
             }
 
+        if not discountedAmnt:
+            del order_dict['discountedAmnt']
+
         orders_list.append(order_dict)
 
     pgdata = {
