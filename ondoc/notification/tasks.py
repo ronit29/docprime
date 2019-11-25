@@ -1554,14 +1554,14 @@ def send_release_payment_request(self, product_id, appointment_id):
 
 
 @task(bind=True)
-def save_pg_response(self, log_type, order_id, txn_id, response, request, user_id, *args, **kwargs):
+def save_pg_response(self, log_type, order_id, txn_id, response, request, user_id, log_created_at=None, *args, **kwargs):
     try:
         from ondoc.account.mongo_models import PgLogs
         if response:
             if not isinstance(response, dict):
                 response = json.loads(response)
             response.pop('created_at', None)
-        PgLogs.save_pg_response(log_type, order_id, txn_id, response, request, user_id)
+        PgLogs.save_pg_response(log_type, order_id, txn_id, response, request, user_id, log_created_at)
     except Exception as e:
         logger.error("Error in saving pg response to mongo database - " + json.dumps(response) + " with exception - " + str(e))
         # self.retry([txn_id, response], countdown=300)
