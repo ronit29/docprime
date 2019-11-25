@@ -607,7 +607,8 @@ def single_booking_payment_details(request, orders):
     save_payment_status.apply_async((PaymentProcessStatus.INITIATE, args), eta=timezone.localtime(),)
     save_pg_response.apply_async((PgLogs.TXN_REQUEST, order_ids, None, None, flatten_dict, user.id), eta=timezone.localtime(), queue=settings.RABBITMQ_LOGS_QUEUE)
     # print(pgdata)
-    return flatten_dict, payment_required
+    pgdata['items'] = orders_list
+    return pgdata, payment_required
 
 
 def payment_details(request, order):
