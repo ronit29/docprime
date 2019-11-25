@@ -580,8 +580,7 @@ def single_booking_payment_details(request, orders):
         "paytmMsg": paytmMsg,
         "couponCode": '',
         "couponPgMode": '',
-        "isEMI": True,
-        "is_single_flow": True
+        "isEMI": True
     }
 
     flatten_dict = copy.deepcopy(pgdata)
@@ -601,6 +600,7 @@ def single_booking_payment_details(request, orders):
     flatten_dict.clear()
     flatten_dict.update(filtered_pgdata)
     pgdata['hash'] = PgTransaction.create_pg_hash(flatten_dict, secret_key, client_key)
+    pgdata['is_single_flow'] = True
 
     order_ids = list(map(lambda x: x['orderId'], orders_list))
     args = {'user_id': user.id, 'order_ids': order_ids, 'source': 'ORDER_CREATE'}
