@@ -2,7 +2,6 @@ from .enums import UsageCriteria, PriceCriteria
 from math import floor
 
 
-
 class AbstractCriteria(object):
     def __init__(self, plus_obj):
         self.plus_obj = plus_obj
@@ -42,6 +41,17 @@ class AbstractCriteria(object):
 
     def discounted_cost(self, discount, cost):
         return (cost / 100) * discount
+
+
+class ConvenienceAbstractCriteria(object):
+    def __init__(self, plus_plan):
+        self.plus_plan = plus_plan
+
+    def _get_price(self, price_data):
+        raise NotImplementedError()
+
+    def get_price(self, price_data):
+        return self._get_price(price_data)
 
 
 class DoctorAmountCount(AbstractCriteria):
@@ -705,6 +715,86 @@ class LabtestCodDealPrice(AbstractCriteria):
         return price_data.get('deal_price', 0)
 
 
+class ConvenienceDoctorMrp(ConvenienceAbstractCriteria):
+    def __init__(self, plus_plan):
+        super().__init__(plus_plan)
+
+    def _get_price(self, price_data):
+        if not price_data:
+            return None
+        return price_data.get('mrp', 0)
+
+
+class ConvenienceDoctorDealPrice(ConvenienceAbstractCriteria):
+    def __init__(self, plus_plan):
+        super().__init__(plus_plan)
+
+    def _get_price(self, price_data):
+        if not price_data:
+            return None
+        return price_data.get('deal_price', 0)
+
+
+class ConvenienceDoctorAgreedPrice(ConvenienceAbstractCriteria):
+    def __init__(self, plus_plan):
+        super().__init__(plus_plan)
+
+    def _get_price(self, price_data):
+        if not price_data:
+            return None
+        return price_data.get('fees', 0)
+
+
+class ConvenienceDoctorCodDealPrice(ConvenienceAbstractCriteria):
+    def __init__(self, plus_plan):
+        super().__init__(plus_plan)
+
+    def _get_price(self, price_data):
+        if not price_data:
+            return None
+        return price_data.get('cod_deal_price', 0)
+
+
+class ConvenienceLabtestMrp(ConvenienceAbstractCriteria):
+    def __init__(self, plus_plan):
+        super().__init__(plus_plan)
+
+    def _get_price(self, price_data):
+        if not price_data:
+            return None
+        return price_data.get('mrp', 0)
+
+
+class ConvenienceLabtestDealPrice(ConvenienceAbstractCriteria):
+    def __init__(self, plus_plan):
+        super().__init__(plus_plan)
+
+    def _get_price(self, price_data):
+        if not price_data:
+            return None
+        return price_data.get('deal_price', 0)
+
+
+class ConvenienceLabtestAgreedPrice(ConvenienceAbstractCriteria):
+    def __init__(self, plus_plan):
+        super().__init__(plus_plan)
+
+    def _get_price(self, price_data):
+        if not price_data:
+            return None
+        return price_data.get('fees', 0)
+
+
+class ConvenienceLabtestCodDealPrice(ConvenienceAbstractCriteria):
+    def __init__(self, plus_plan):
+        super().__init__(plus_plan)
+
+    def _get_price(self, price_data):
+        if not price_data:
+            return None
+        return price_data.get('deal_price', 0)
+
+
 price_criteria_class_mapping = {
     'DOCTOR': {
         'MRP': DoctorMrp,
@@ -717,6 +807,21 @@ price_criteria_class_mapping = {
         'DEAL_PRICE': LabtestDealPrice,
         'AGREED_PRICE': LabtestAgreedPrice,
         'COD_DEAL_PRICE': LabtestCodDealPrice
+    }
+}
+
+convenience_price_criteria_class_mapping = {
+    'DOCTOR': {
+        'MRP': ConvenienceDoctorMrp,
+        'DEAL_PRICE': ConvenienceDoctorDealPrice,
+        'AGREED_PRICE': ConvenienceDoctorAgreedPrice,
+        'COD_DEAL_PRICE': ConvenienceDoctorCodDealPrice
+    },
+    'LABTEST': {
+        'MRP': ConvenienceLabtestMrp,
+        'DEAL_PRICE': ConvenienceLabtestDealPrice,
+        'AGREED_PRICE': ConvenienceLabtestAgreedPrice,
+        'COD_DEAL_PRICE': ConvenienceLabtestCodDealPrice
     }
 }
 
@@ -753,7 +858,7 @@ def get_max_convenience_reference(plan, entity):
     if entity not in ['DOCTOR', 'LABTEST'] or price_criteria not in PriceCriteria.availabilities():
         return None
 
-    class_reference = price_criteria_class_mapping[entity][price_criteria]
+    class_reference = convenience_price_criteria_class_mapping[entity][price_criteria]
     return class_reference(plan)
 
 
@@ -765,7 +870,7 @@ def get_min_convenience_reference(plan, entity):
     if entity not in ['DOCTOR', 'LABTEST'] or price_criteria not in PriceCriteria.availabilities():
         return None
 
-    class_reference = price_criteria_class_mapping[entity][price_criteria]
+    class_reference = convenience_price_criteria_class_mapping[entity][price_criteria]
     return class_reference(plan)
 
 
