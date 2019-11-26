@@ -18,6 +18,8 @@ from rest_framework import status
 from django.db import transaction
 from django.db.models import Q, Sum, Count, F, ExpressionWrapper, DateTimeField
 from django.forms.models import model_to_dict
+
+from ondoc.plus.models import PlusUser
 from . import serializers
 from django.conf import settings
 import requests, re, json
@@ -451,6 +453,7 @@ class CouponDiscountViewSet(viewsets.GenericViewSet):
         hospital = input_data.get("hospital")
         procedures = input_data.get("procedures", [])
         profile = input_data.get("profile")
+        vip_gold_plan = input_data.get("plan")
         cart_item_id = input_data.get('cart_item').id if input_data.get('cart_item') else None
 
         coupon_type = 'both'
@@ -460,6 +463,12 @@ class CouponDiscountViewSet(viewsets.GenericViewSet):
         elif str(product_id) == str(Order.LAB_PRODUCT_ID):
             obj = LabAppointment()
             coupon_type = 'lab'
+        elif str(product_id) == str(Order.VIP_PRODUCT_ID):
+            obj = PlusUser()
+            coupon_type = 'vip'
+        elif str(product_id) == str(Order.GOLD_PRODUCT_ID):
+            obj = PlusUser()
+            coupon_type = 'gold'
 
         coupon_recommender = CouponRecommender(request.user, profile, coupon_type, product_id, coupon_code,
                                                cart_item_id)
@@ -477,6 +486,8 @@ class CouponDiscountViewSet(viewsets.GenericViewSet):
                 doctor_specializations.append(dps.specialization_id)
             filters['doctor_id'] = doctor.id
             filters['doctor_specializations_ids'] = doctor_specializations
+        if coupon_type in ['vip', 'gold']:
+            filters['vip_gold_plan'] = vip_gold_plan
         filters['tests'] = tests
         filters['hospital'] = hospital
         filters['deal_price'] = deal_price

@@ -1193,7 +1193,7 @@ class CouponsMixin(object):
                 discount = math.floor(price * coupon_obj.percentage_discount / 100)
 
             if coupon_obj.max_discount_amount is not None:
-                discount =  min(coupon_obj.max_discount_amount, discount)
+                discount = min(coupon_obj.max_discount_amount, discount)
 
             if discount > price:
                 discount = price

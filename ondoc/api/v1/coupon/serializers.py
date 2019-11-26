@@ -4,7 +4,7 @@ from ondoc.cart.models import Cart
 from ondoc.diagnostic.models import Lab, LabTest, AvailableLabTest, LabAppointment, LabTestCategory
 from ondoc.coupon.models import Coupon, RandomGeneratedCoupon
 from ondoc.doctor.models import Doctor, Hospital, PracticeSpecialization, OpdAppointment
-from ondoc.plus.models import PlusPlans
+from ondoc.plus.models import PlusPlans, PlusUser
 from ondoc.procedure.models import Procedure, ProcedureCategory
 from ondoc.authentication.models import UserProfile
 from django.contrib.auth import get_user_model
@@ -88,6 +88,7 @@ class UserSpecificCouponSerializer(CouponListSerializer):
     hospital = serializers.PrimaryKeyRelatedField(required=False, queryset=Hospital.objects.filter(is_live=True), allow_null=True)
     profile = serializers.PrimaryKeyRelatedField(required=False, queryset=UserProfile.objects.all(), allow_null=True)
     cart_item = serializers.PrimaryKeyRelatedField(queryset=Cart.objects.all(), required=False, allow_null=True)
+    plan = serializers.PrimaryKeyRelatedField(required=False, queryset=PlusPlans.objects.all())
 
     def validate(self, attrs):
 
@@ -99,12 +100,15 @@ class UserSpecificCouponSerializer(CouponListSerializer):
         hospital = attrs.get("hospital")
         procedures = attrs.get("procedures", [])
         product_id = attrs.get("product_id")
+        plan = attrs.get('plan')
 
         if product_id:
-            if product_id == Order.DOCTOR_PRODUCT_ID and lab:
+            if product_id in [Order.DOCTOR_PRODUCT_ID, Order.VIP_PRODUCT_ID, Order.GOLD_PRODUCT_ID] and lab:
                 raise serializers.ValidationError("Invalid product id for lab")
-            if product_id == Order.LAB_PRODUCT_ID and doctor:
+            if product_id in [Order.LAB_PRODUCT_ID, Order.VIP_PRODUCT_ID, Order.GOLD_PRODUCT_ID] and doctor:
                 raise serializers.ValidationError("Invalid product id for doctor")
+            if product_id in [Order.DOCTOR_PRODUCT_ID, Order.LAB_PRODUCT_ID] and plan:
+                raise serializers.ValidationError("Invalid product id for plan")
 
         coupons_data, random_coupons = None, None
 
@@ -158,6 +162,25 @@ class UserSpecificCouponSerializer(CouponListSerializer):
                     if not obj.validate_product_coupon(coupon_obj=coupon,
                                                        doctor=doctor, hospital=hospital, procedures=procedures,
                                                        product_id=Order.DOCTOR_PRODUCT_ID):
+                        raise serializers.ValidationError('Invalid coupon code - ' + str(coupon))
+        elif product_id == Order.VIP_PRODUCT_ID:
+            if plan and plan.is_gold:
+                raise serializers.ValidationError("Wrong combination of plan and product_id")
+            else:
+                for coupon in coupons_data:
+                    obj = PlusUser()
+                    if not obj.validate_product_coupon(coupon_obj=coupon, gold_vip_plan_id=plan.id,
+                                                       product_id=Order.VIP_PRODUCT_ID):
+                        raise serializers.ValidationError('Invalid coupon code - ' + str(coupon))
+
+        elif product_id == Order.GOLD_PRODUCT_ID:
+            if plan and not plan.is_gold:
+                raise serializers.ValidationError("Wrong combination of plan and product_id")
+            else:
+                for coupon in coupons_data:
+                    obj = PlusUser()
+                    if not obj.validate_product_coupon(coupon_obj=coupon, gold_vip_plan_id=plan.id,
+                                                       product_id=Order.GOLD_PRODUCT_ID):
                         raise serializers.ValidationError('Invalid coupon code - ' + str(coupon))
 
         return attrs
