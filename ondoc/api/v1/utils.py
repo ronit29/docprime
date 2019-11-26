@@ -576,7 +576,7 @@ def single_booking_payment_details(request, orders):
         "surl": surl,
         "furl": furl,
         # "blockedDuration": "2",
-        "isPreAuth": "1",
+        "isPreAuth": "0",
         "paytmMsg": paytmMsg,
         "couponCode": '',
         "couponPgMode": '',

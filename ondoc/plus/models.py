@@ -983,7 +983,7 @@ class PlusUser(auth_model.TimeStampedModel, RefundMixin, TransactionMixin):
         phone_number = profile.phone_number
         plus_members = []
 
-        member = {"first_name": first_name, "last_name": last_name, "dob": dob, "email": email, "phone_number": phone_number}
+        member = {"first_name": first_name, "last_name": last_name, "dob": dob, "email": email, "phone_number": phone_number, "profile": profile.id if profile else None}
         primary_user_profile = UserProfile.objects.filter(user_id=profile.user.pk, is_default_user=True).values('id', 'name',
                                                                                                       'email',
                                                                                                       'gender',
@@ -1140,7 +1140,7 @@ class PlusMembers(auth_model.TimeStampedModel):
     phone_number = models.BigIntegerField(blank=True, null=True,
                                           validators=[MaxValueValidator(9999999999), MinValueValidator(1000000000)])
     profile = models.ForeignKey(auth_model.UserProfile, related_name="plus_member", on_delete=models.CASCADE, null=True)
-    title = models.CharField(max_length=20, choices=TITLE_TYPE_CHOICES, default=None)
+    title = models.CharField(max_length=20, choices=TITLE_TYPE_CHOICES, default=None, null=True)
     middle_name = models.CharField(max_length=50, null=True, blank=True)
     city = models.CharField(max_length=100, null=True, default=None, blank=True)
     district = models.CharField(max_length=100, null=True, default=None, blank=True)
