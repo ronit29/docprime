@@ -922,6 +922,16 @@ class SearchCriteria(auth_model.TimeStampedModel):
             super(SearchCriteria, self).save(*args, **kwargs)
 
 
+class Certifications(auth_model.TimeStampedModel):
+    name = models.CharField(max_length=200)
+
+    class Meta:
+        db_table = 'certifications'
+
+    def __str__(self):
+        return self.name
+
+
 class GoogleLatLong(auth_model.TimeStampedModel):
     latitude = models.FloatField()
     longitude = models.FloatField()
@@ -931,7 +941,7 @@ class GoogleLatLong(auth_model.TimeStampedModel):
 
     @classmethod
     def generate_place_ids(cls):
-        coordinates_obj = GoogleLatLong.objects.all(Q(is_hospital_done=False) | Q(is_doctor_done=False))
+        coordinates_obj = GoogleLatLong.objects.filter(Q(is_hospital_done=False)|Q(is_doctor_done=False))
         types = ['doctor', 'hospital']
         for point_obj in coordinates_obj:
             for type in types:
@@ -945,12 +955,11 @@ class GoogleLatLong(auth_model.TimeStampedModel):
                                                   params=params)
                     if place_response.status_code != status.HTTP_200_OK or not place_response.ok:
                         print('failure  status_code: ' + str(place_response.status_code) + ', reason: ' + str(
-                            place_response.reason))
-                        return None
+                            place_response.reason) + str(point_obj) + " type: " + type)
 
                     place_searched_data = place_response.json()
                     if place_searched_data.get('status') == 'OVER_QUERY_LIMIT':
-                        print('OVER_QUERY_LIMIT')
+                        print('OVER_QUERY_LIMIT'+ str(point_obj) + " type: " + type)
                         return None
 
                     if place_searched_data.get('results'):
