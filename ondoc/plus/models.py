@@ -159,9 +159,10 @@ class PlusPlans(auth_model.TimeStampedModel, LiveMixin):
             return 0
         charge = 0
         if not default_plan_query:
-            default_plan = cls.objects.filter(is_selected=True, is_gold=True).first()
+            default_plan = cls.objects.prefetch_related('plan_parameters', 'plan_parameters__parameter').filter(is_gold=True, is_selected=True).first()
             if not default_plan:
-                default_plan = cls.objects.filter(is_gold=True).first()
+                default_plan = cls.objects.prefetch_related('plan_parameters', 'plan_parameters__parameter').filter(is_gold=True).first()
+
         else:
             default_plan = default_plan_query
         if not default_plan:
