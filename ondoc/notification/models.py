@@ -1648,8 +1648,8 @@ class DynamicTemplates(TimeStampedModel):
 
 class IPDIntimateEmailNotification(TimeStampedModel):
 
-    MALE = 1
-    FEMALE = 2
+    MALE = 'm'
+    FEMALE = 'f'
     GENDER_TYPE_CHOICES = (
         (MALE, 'male'),
         (FEMALE, 'female')
@@ -1659,8 +1659,8 @@ class IPDIntimateEmailNotification(TimeStampedModel):
     doctor = models.ForeignKey('doctor.Doctor', on_delete=models.DO_NOTHING, null=False)
     hospital = models.ForeignKey('doctor.Hospital', on_delete=models.DO_NOTHING, null=False)
     phone_number = models.BigIntegerField(null=False)
-    preferred_date = models.DateTimeField(null=True, blank=True)
-    time_slot = models.DateTimeField(blank=True, null=True)
+    preferred_date = models.DateField(null=True, blank=True)
+    time_slot = models.TimeField(blank=True, null=True)
     gender = models.PositiveIntegerField(choices=GENDER_TYPE_CHOICES, blank=True, null=True)
     dob = models.DateField(blank=True, null=True)
     email_notifications = JSONField(null=True, blank=True)
