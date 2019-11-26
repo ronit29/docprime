@@ -21,7 +21,7 @@ import logging
 from ondoc.authentication import models as auth_model
 from ondoc.account import models as account_model
 from django.core.validators import MaxValueValidator, MinValueValidator
-from ondoc.authentication.models import UserProfile, User
+from ondoc.authentication.models import UserProfile, User, TransactionMixin
 from django.contrib.postgres.fields import JSONField
 from django.forms import model_to_dict
 from ondoc.common.helper import Choices
@@ -525,7 +525,7 @@ class BankHolidays(auth_model.TimeStampedModel):
         db_table = "bank_holidays"
 
 
-class UserInsurance(auth_model.TimeStampedModel, MerchantPayoutMixin):
+class UserInsurance(auth_model.TimeStampedModel, MerchantPayoutMixin, TransactionMixin):
     from ondoc.account.models import MoneyPool
 
     ACTIVE = 1
@@ -1508,12 +1508,21 @@ class UserInsurance(auth_model.TimeStampedModel, MerchantPayoutMixin):
 
     def trigger_created_event(self, visitor_info):
         from ondoc.tracking.models import TrackingEvent
+        from ondoc.tracking.mongo_models import TrackingEvent as MongoTrackingEvent
         try:
-            with transaction.atomic():
-                event_data = TrackingEvent.build_event_data(self.user, TrackingEvent.InsurancePurchased, appointmentId=self.id, visitor_info=visitor_info)
-                if event_data and visitor_info:
-                    TrackingEvent.save_event(event_name=event_data.get('event'), data=event_data, visit_id=visitor_info.get('visit_id'),
-                                             user=self.user, triggered_at=datetime.datetime.utcnow())
+            if settings.MONGO_STORE:
+                event_data = TrackingEvent.build_event_data(self.user, TrackingEvent.InsurancePurchased,
+                                                            appointmentId=self.id, visitor_info=visitor_info)
+                MongoTrackingEvent.save_event(event_name=event_data.get('event'), data=event_data,
+                                              visit_id=visitor_info.get('visit_id'),
+                                              visitor_id=visitor_info.get('visitor_id'),
+                                              user=self.user, triggered_at=datetime.datetime.utcnow())
+
+        #     with transaction.atomic():
+        #         event_data = TrackingEvent.build_event_data(self.user, TrackingEvent.InsurancePurchased, appointmentId=self.id, visitor_info=visitor_info)
+                # if event_data and visitor_info:
+                    # TrackingEvent.save_event(event_name=event_data.get('event'), data=event_data, visit_id=visitor_info.get('visit_id'),
+                    #                          user=self.user, triggered_at=datetime.datetime.utcnow())
         except Exception as e:
             logger.error("Could not save triggered event - " + str(e))
 

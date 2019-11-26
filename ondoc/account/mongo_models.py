@@ -26,6 +26,8 @@ class PgLogs(DynamicDocument, TimeStampedModel):
     CHAT_CONSULTATION_CANCEL = 9
     ECONSULT_ORDER_REQUEST = 10
     REFUND_REQUEST_RESPONSE = 11
+    RESPONSE_TO_CHAT = 12
+    ACK_TO_PG = 13
 
     id = UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     order_id = LongField(null=True, blank=True, editable=False)
@@ -34,7 +36,7 @@ class PgLogs(DynamicDocument, TimeStampedModel):
     logs = ListField()
 
     @classmethod
-    def save_pg_response(cls, log_type=0, order_id=None, txn_id=None, response=None, request=None, user_id=None):
+    def save_pg_response(cls, log_type=0, order_id=None, txn_id=None, response=None, request=None, user_id=None, log_created_at=None):
         if settings.MONGO_STORE:
             pg_log = None
             if order_id:
@@ -51,6 +53,7 @@ class PgLogs(DynamicDocument, TimeStampedModel):
                 request['log_type'] = log_type
                 request['type'] = "REQUEST"
                 request['created_at'] = timezone.localtime()
+                request['log_created_at'] = log_created_at
                 pg_log.logs.append(request)
             if response:
                 if not isinstance(response, dict):
@@ -58,6 +61,7 @@ class PgLogs(DynamicDocument, TimeStampedModel):
                 response['log_type'] = log_type
                 response['type'] = "RESPONSE"
                 response['created_at'] = timezone.localtime()
+                response['log_created_at'] = log_created_at
                 pg_log.logs.append(response)
 
             pg_log.save()

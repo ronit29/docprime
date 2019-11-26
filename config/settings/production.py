@@ -1,17 +1,6 @@
 from config.settings.base import *
 import logging, warnings
 
-if (env('DJANGO_SETTINGS_MODULE')=='config.settings.production'):
-    from ddtrace import tracer
-    try:
-        tracer.configure(
-            hostname='datadog-agent',
-            port=8126,
-        )
-    except Exception as e:
-        logger = logging.getLogger(__name__)
-        logger.error("Error Configuring DDtracer " + str(e))
-
 SECRET_KEY = env('DJANGO_SECRET_KEY')
 
 # ALLOWED_HOSTS = env.list('DJANGO_ALLOWED_HOSTS', default=['panaceatechno.com', 'test.docprime.com', 'docprime.com','admin.docprime.com'])
@@ -54,7 +43,18 @@ SECURE_BROWSER_XSS_FILTER = True
 X_FRAME_OPTIONS = 'DENY'
 
 if env.bool('ENABLE_DATADOG', default=False):
-    INSTALLED_APPS = DJANGO_APPS + THIRD_PARTY_APPS + ('ddtrace.contrib.django',) + LOCAL_APPS 
+    INSTALLED_APPS = DJANGO_APPS + THIRD_PARTY_APPS + ('ddtrace.contrib.django',) + LOCAL_APPS
+    if (env('DJANGO_SETTINGS_MODULE') == 'config.settings.production'):
+        from ddtrace import tracer
+
+        try:
+            tracer.configure(
+                hostname='datadog-agent',
+                port=8126,
+            )
+        except Exception as e:
+            logger = logging.getLogger(__name__)
+            logger.error("Error Configuring DDtracer " + str(e))
 
 INSTALLED_APPS += ('gunicorn',)
 
@@ -84,7 +84,7 @@ LOGGING = {
     },
     'loggers': {
         'django': {
-            'handlers': ['console',],
+            'handlers': ['console', ],
             'level': 'ERROR',
             'propagate': False,
         },
@@ -119,7 +119,7 @@ if env('ENABLE_SENTRY', default=False):
         'handlers': ['console', ],
         'propagate': False,
     }
-    INSTALLED_APPS += ('raven.contrib.django.raven_compat',)
+    INSTALLED_APPS += ('raven.contrib.django.raven_compat', )
     RAVEN_MIDDLEWARE = ['raven.contrib.django.raven_compat.middleware.SentryResponseErrorIdMiddleware']
     MIDDLEWARE = RAVEN_MIDDLEWARE + MIDDLEWARE
     # Sentry Configuration

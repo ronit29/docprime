@@ -7,17 +7,19 @@ from itertools import groupby
 import dateutil
 from django.contrib.contenttypes.models import ContentType
 
+from config.settings.db_router import DatabaseInfo
 from ondoc.account.models import Order
 from ondoc.api.v1.diagnostic.serializers import CustomLabTestPackageSerializer, SearchLabListSerializer
 from ondoc.api.v1.doctor.serializers import CommaSepratedToListField
 from ondoc.authentication.backends import JWTAuthentication
 from ondoc.api.v1.diagnostic import serializers as diagnostic_serializer
 from ondoc.api.v1.auth.serializers import AddressSerializer
+from ondoc.common.middleware import use_slave
 from ondoc.integrations.models import IntegratorTestMapping, IntegratorReport, IntegratorMapping
 from ondoc.cart.models import Cart
-from ondoc.common.models import UserConfig, GlobalNonBookable, AppointmentHistory, MatrixMappedCity
-from ondoc.plus.models import PlusUser
-from ondoc.plus.usage_criteria import get_class_reference
+from ondoc.common.models import UserConfig, GlobalNonBookable, AppointmentHistory, MatrixMappedCity, SearchCriteria
+from ondoc.plus.models import PlusUser, PlusPlans
+from ondoc.plus.usage_criteria import get_class_reference, get_price_reference
 from ondoc.ratings_review import models as rating_models
 from ondoc.diagnostic.models import (LabTest, AvailableLabTest, Lab, LabAppointment, LabTiming, PromotedLab,
                                      CommonDiagnosticCondition, CommonTest, CommonPackage,
@@ -87,6 +89,7 @@ logger = logging.getLogger(__name__)
 class SearchPageViewSet(viewsets.ReadOnlyModelViewSet):
 
     @transaction.non_atomic_requests
+    @use_slave
     def list(self, request, *args, **kwargs):
         coupon_code = request.query_params.get('coupon_code')
         profile = request.query_params.get('profile_id')
@@ -191,11 +194,12 @@ class LabTestList(viewsets.ReadOnlyModelViewSet):
 
 
 class LabList(viewsets.ReadOnlyModelViewSet):
-    queryset = AvailableLabTest.objects.all()
+    queryset = AvailableLabTest.objects.none()
     serializer_class = diagnostic_serializer.LabModelSerializer
     lookup_field = 'id'
 
     @transaction.non_atomic_requests
+    @use_slave
     def list_packages(self, request, **kwrgs):
         parameters = request.query_params
         serializer = diagnostic_serializer.LabPackageListSerializer(data=parameters)
@@ -270,10 +274,10 @@ class LabList(viewsets.ReadOnlyModelViewSet):
 
         utm_available = False
         salespoint_query = ""
-        utm_source = request.query_params.get('UtmSource')
+        utm_source = request.query_params.get('utm_source')
         if utm_source and SalesPoint.is_affiliate_available(utm_source):
             utm_available = True
-            salespoint_obj = SalesPoint.get_salespoint_via_code(request.query_params.get('UtmSource'))
+            salespoint_obj = SalesPoint.get_salespoint_via_code(request.query_params.get('utm_source'))
             salespoint_query = ' INNER JOIN "salespoint_test_mapping" ON ("available_lab_test"."id" = "salespoint_test_mapping"."available_tests_id")'
 
 
@@ -383,7 +387,11 @@ class LabList(viewsets.ReadOnlyModelViewSet):
             package_count_query += filter_query
 
         package_count_query = package_count_query.format(lab_network_query=lab_network_query, salespoint_query=salespoint_query)
-        package_count = RawSql(package_count_query, params).fetch_all()
+        db = DatabaseInfo.DEFAULT
+        if settings.USE_SLAVE_DB:
+            db = DatabaseInfo.SLAVE
+
+        package_count = RawSql(package_count_query, params, db).fetch_all()
         result_count = package_count[0].get('count', 0)
         temp_categories_ids = package_count[0].get('category_ids', [])
         if not temp_categories_ids:
@@ -407,7 +415,8 @@ class LabList(viewsets.ReadOnlyModelViewSet):
         for item in entity_url_qs:
             entity_url_dict.setdefault(item.get('lab_id'), [])
             entity_url_dict[item.get('lab_id')].append(item.get('url'))
-        lab_data = Lab.objects.prefetch_related('lab_documents', 'lab_timings', 'network',
+        lab_data = Lab.objects.select_related('lab_pricing_group')\
+                              .prefetch_related('lab_documents', 'lab_timings', 'network',
                                                 'home_collection_charges').in_bulk(lab_ids)
 
         category_data = {}
@@ -453,13 +462,29 @@ class LabList(viewsets.ReadOnlyModelViewSet):
                                                                 'test_id': test_id,
                                                                 'parameter_count': parameter_count,
                                                                 'icon': icon_url, 'priority': priority}
-            single_test_data_sorted = sorted(list(single_test_data.values()), key=lambda k: k['priority'], reverse= True)
+            single_test_data_sorted = sorted(list(single_test_data.values()), key=lambda k: k['priority'], reverse=True)
             category_data[temp_package.id] = single_test_data_sorted
+
+        #APi optim
+        labdata_pricing_groups=[]
+        # for key, lab in lab_data.items():
+        #     labdata_pricing_groups.append(lab.lab_pricing_group.id)
+        # avl_objs = AvailableLabTest.objects.select_related('lab_pricing_group').filter(lab_pricing_group__id__in=labdata_pricing_groups)
+        insurance_threshold_obj = InsuranceThreshold.objects.all().order_by('-opd_amount_limit').first()
+        insurance_threshold_amount = insurance_threshold_obj.opd_amount_limit if insurance_threshold_obj else 1500
+        search_criteria = SearchCriteria.objects.filter(search_key='is_gold').first()
+        default_plan = PlusPlans.objects.prefetch_related('plan_parameters', 'plan_parameters__parameter').filter(is_selected=True, is_gold=True).first()
+        if not default_plan:
+            default_plan = PlusPlans.objects.prefetch_related('plan_parameters', 'plan_parameters__parameter').filter(is_gold=True).first()
 
         serializer = CustomLabTestPackageSerializer(all_packages, many=True,
                                                     context={'entity_url_dict': entity_url_dict, 'lab_data': lab_data,
                                                              'request': request, 'category_data': category_data,
-                                                             'package_free_or_not_dict': package_free_or_not_dict})
+                                                             'package_free_or_not_dict': package_free_or_not_dict,
+                                                             'insurance_threshold_amount':insurance_threshold_amount,
+                                                             'search_criteria_query':search_criteria,
+                                                             # 'avl_objs': avl_objs,
+                                                             'default_plan_query':default_plan})
 
         category_to_be_shown_in_filter_ids = set()
         category_queryset = []
@@ -560,9 +585,9 @@ class LabList(viewsets.ReadOnlyModelViewSet):
 
         package_free_or_not_dict = get_package_free_or_not_dict(request)
 
-        utm_source = request.query_params.get('UtmSource')
+        utm_source = request.query_params.get('utm_source')
         if utm_source and SalesPoint.is_affiliate_available(utm_source):
-            salespoint_obj = SalesPoint.get_salespoint_via_code(request.query_params.get('UtmSource'))
+            salespoint_obj = SalesPoint.get_salespoint_via_code(request.query_params.get('utm_source'))
 
             main_queryset = LabTest.objects.prefetch_related('test', 'test__recommended_categories',
                                                              'test__parameter', 'categories',
@@ -1103,12 +1128,13 @@ class LabList(viewsets.ReadOnlyModelViewSet):
                     return Response(status=status.HTTP_404_NOT_FOUND)
 
             #entity_id = entity.entity_id
-            response = self.retrieve(request, entity.entity_id, entity)
+            response = self.retrieve(request, entity.entity_id, None, entity)
             return response
         else:
             return Response(status=status.HTTP_404_NOT_FOUND)
 
     @transaction.non_atomic_requests
+    @use_slave
     def list(self, request, **kwargs):
         parameters = request.query_params
         if kwargs.get('parameters'):
@@ -1255,6 +1281,7 @@ class LabList(viewsets.ReadOnlyModelViewSet):
             return Response(status=status.HTTP_404_NOT_FOUND)
 
     @transaction.non_atomic_requests
+    @use_slave
     def search(self, request, **kwargs):
         tests = []
         parameters = request.query_params
@@ -1473,9 +1500,9 @@ class LabList(viewsets.ReadOnlyModelViewSet):
         if name:
             search_key = re.findall(r'[a-z0-9A-Z.:]+',name)
             search_key = " ".join(search_key).lower()
-            search_key = "".join(search_key.split("."))
+            # search_key = "".join(search_key.split("."))
             filtering_query.append("lb.name ilike %(name)s")
-            filtering_params['name'] = search_key + '%'
+            filtering_params['name'] = '%' + search_key + '%'
             # filtering_params_query1.append(
             #     "name ilike %(name)s")
 
@@ -1615,7 +1642,9 @@ class LabList(viewsets.ReadOnlyModelViewSet):
         #     price_result['string'] = 'where price>=0'
 
         order_by = self.apply_search_sort(parameters)
-
+        db = DatabaseInfo.DEFAULT
+        if settings.USE_SLAVE_DB:
+            db = DatabaseInfo.SLAVE
         if ids:
             query = ''' select * from (select id,network_id, name ,price, count, mrp, pickup_charges, distance, order_priority, new_network_rank, rank,
             max(new_network_rank) over(partition by 1) result_count
@@ -1660,7 +1689,7 @@ class LabList(viewsets.ReadOnlyModelViewSet):
                          '''.format(filter_query_string=filter_query_string, 
                             group_filter_query_string=group_filter_query_string, order=order_by, lab_timing_join=lab_timing_join, lab_network_query=lab_network_query)
 
-            lab_search_result = RawSql(query, filtering_params).fetch_all()
+            lab_search_result = RawSql(query, filtering_params, db).fetch_all()
         else:
             query1 = '''select * from (select id, network_id, name , distance, order_priority, new_network_rank, rank,
                     max(new_network_rank) over(partition by 1) result_count from 
@@ -1690,7 +1719,7 @@ class LabList(viewsets.ReadOnlyModelViewSet):
                     rank'''.format(
                     filter_query_string=filter_query_string, order=order_by, lab_timing_join=lab_timing_join, lab_network_query=lab_network_query)
 
-            lab_search_result = RawSql(query1, filtering_params).fetch_all()
+            lab_search_result = RawSql(query1, filtering_params, db).fetch_all()
 
         return lab_search_result
 
@@ -1751,6 +1780,12 @@ class LabList(viewsets.ReadOnlyModelViewSet):
         tests = dict()
         lab = dict()
 
+        search_criteria = SearchCriteria.objects.filter(search_key='is_gold')
+        is_gold = False
+        if search_criteria:
+            search_criteria = search_criteria.first()
+            is_gold = search_criteria.search_value
+
         for obj in labs:
             if  insurance_data_dict and insurance_data_dict['is_user_insured'] and obj.home_pickup_charges > 0:
                 obj.is_home_collection_enabled = False
@@ -1766,7 +1801,8 @@ class LabList(viewsets.ReadOnlyModelViewSet):
                         {"id": test.test_id, "name": test.test.name, "deal_price": deal_price, "mrp": test.mrp,
                          "number_of_tests": test.test.number_of_tests,
                          'categories': test.test.get_all_categories_detail(), "url": test.test.url,
-                         "insurance_agreed_price": test.insurance_agreed_price
+                         "insurance_agreed_price": test.insurance_agreed_price,
+                         "agreed_price": test.custom_agreed_price if test.custom_agreed_price else test.computed_agreed_price
                          })
 
         # day_now = timezone.now().weekday()
@@ -1794,12 +1830,13 @@ class LabList(viewsets.ReadOnlyModelViewSet):
             row['home_pickup_charges'] = lab_obj.home_pickup_charges
             row['is_home_collection_enabled'] = lab_obj.is_home_collection_enabled
             row['is_insurance_enabled'] = lab_obj.is_insurance_enabled
-            row['is_vip_enabled'] = lab_obj.enabled_for_plus_plans
+            row['is_vip_enabled'] = lab_obj.is_enabled_for_plus_plans()
             row['avg_rating'] = lab_obj.rating_data.get('avg_rating') if lab_obj.display_rating_on_list() else None
             row['rating_count'] = lab_obj.rating_data.get('rating_count') if lab_obj.display_rating_on_list() else None
 
             row['avg_rating'] = lab_obj.rating_data.get('avg_rating') if lab_obj.display_rating_on_list() else None
             row['rating_count'] = lab_obj.rating_data.get('rating_count') if lab_obj.display_rating_on_list() else None
+            row['is_gold'] = is_gold
             # if lab_obj.always_open:
             #     lab_timing = "12:00 AM - 11:45 PM"
             #     next_lab_timing_dict = {rotated_days_array[1]: "12:00 AM - 11:45 PM"}
@@ -1893,12 +1930,30 @@ class LabList(viewsets.ReadOnlyModelViewSet):
 
                 # For Vip. Checking the eligibility of test to be booked under VIP.
                 engine_response = {}
+                res['vip']['is_gold_member'] = True if plus_user_obj and plus_user_obj.plan.is_gold else False
                 if all_tests_under_lab and res['is_vip_enabled']:
                     for paticular_test_in_lab in all_tests_under_lab:
+                        price_data = {"mrp": paticular_test_in_lab.get('mrp', 0),
+                                      "deal_price": paticular_test_in_lab.get('deal_price', 0),
+                                      "fees": paticular_test_in_lab.get('agreed_price', 0),
+                                      "cod_deal_price": paticular_test_in_lab.get('deal_price', 0)}
+                        price_engine = get_price_reference(plus_user_obj, "LABTEST")
+                        if not price_engine:
+                            price = paticular_test_in_lab.get('mrp', 0)
+                        else:
+                            price = price_engine.get_price(price_data)
                         engine = get_class_reference(plus_user_obj, "LABTEST")
+                        if plus_user_obj and plus_user_obj.plan:
+                            res['vip']['vip_convenience_amount'] = plus_user_obj.plan.get_convenience_charge(price, "LABTEST")
+                            # res['vip']['is_gold_member'] = True if plus_user_obj.plan.is_gold else False
+                        else:
+                            # res['vip']['is_gold_member'] = False
+                            res['vip']['vip_convenience_amount'] = PlusPlans.get_default_convenience_amount(paticular_test_in_lab.get('agreed_price', 0), "LABTEST")
                         coverage = False
+                        res['vip']['vip_gold_price'] = int(paticular_test_in_lab.get('agreed_price', 0))
                         if engine:
-                            engine_response = engine.validate_booking_entity(cost=paticular_test_in_lab.get('mrp', 0))
+                            # engine_response = engine.validate_booking_entity(cost=paticular_test_in_lab.get('mrp', 0))
+                            engine_response = engine.validate_booking_entity(cost=price, mrp=paticular_test_in_lab.get('mrp', 0), deal_price=paticular_test_in_lab.get('deal_price', 0))
                             coverage = engine_response.get('is_covered', False)
                         bool_array.append(coverage)
 
@@ -1952,6 +2007,7 @@ class LabList(viewsets.ReadOnlyModelViewSet):
         return lab_network
 
     @transaction.non_atomic_requests
+    @use_slave
     def retrieve(self, request, lab_id, profile_id=None, entity=None):
         profile = None
 
@@ -2995,6 +3051,7 @@ class LabTimingListView(mixins.ListModelMixin,
         return Response(resp_data)
 
     @transaction.non_atomic_requests
+    @use_slave
     def list_v3(self, request, *args, **kwargs):
         from ondoc.integrations import service
         params = request.query_params
@@ -3213,6 +3270,7 @@ class AvailableTestViewSet(mixins.RetrieveModelMixin,
     serializer_class = diagnostic_serializer.AvailableLabTestSerializer
 
     @transaction.non_atomic_requests
+    @use_slave
     def retrieve(self, request, lab_id):
         params = request.query_params
         queryset = AvailableLabTest.objects.select_related().filter(test__searchable=True,
@@ -3527,6 +3585,7 @@ class TestDetailsViewset(viewsets.GenericViewSet):
 
         return Response(final_result)
 
+    @use_slave
     def list_by_alphabet(self, request):
         alphabet = request.GET.get('alphabet')
         if not alphabet:
@@ -3691,7 +3750,6 @@ class DigitalReports(viewsets.GenericViewSet):
 
 
 class CompareLabPackagesViewSet(viewsets.ReadOnlyModelViewSet):
-
     def retrieve_by_url(self, request, *args, **kwargs):
         url = request.data.get('url')
         if not url:
@@ -4077,6 +4135,7 @@ class IPDMedicinePageLeadViewSet(viewsets.GenericViewSet):
 
 class AllMatrixCitiesViewSet(viewsets.GenericViewSet):
 
+    @use_slave
     def retrieve(self, request):
 
         main_queryset = MatrixMappedCity.objects.all().values("id", "name")

@@ -80,6 +80,7 @@ def update_seo_urls():
     from ondoc.doctor.models import Doctor, Hospital
     from ondoc.diagnostic.models import Lab
     from ondoc.procedure.models import IpdProcedure
+    from ondoc.api.v1.utils import RawSql
 
     # update doctor seo urls
     Doctor.update_doctors_seo_urls()
@@ -88,7 +89,7 @@ def update_seo_urls():
     Hospital.update_hospital_seo_urls()
 
     # update lab seo urls()
-    Lab.update_labs_seo_urls()
+    # Lab.update_labs_seo_urls()
 
     # update ipd_procedure urls
     IpdProcedure.update_ipd_seo_urls()
@@ -96,6 +97,8 @@ def update_seo_urls():
     # update labs, doctors and hospitals profile urls
     from ondoc.location.models import UrlsModel
     UrlsModel.update_profile_urls()
+    # Truncate temp_url table
+    RawSql('truncate table temp_url', []).execute()
     return True
 
 
@@ -190,3 +193,8 @@ def doctors_daily_schedule():
                 sms_notification = SMSNotification(notification_type=NotificationAction.OPD_DAILY_SCHEDULE, context=context)
                 sms_notification.send(receiver)
                 sms_sent.append(admin.phone_number)
+
+@task()
+def fetch_place_ids():
+    from ondoc.common.models import GoogleLatLong
+    GoogleLatLong.generate_place_ids()

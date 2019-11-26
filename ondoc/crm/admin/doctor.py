@@ -53,7 +53,7 @@ from ondoc.doctor.models import (Doctor, DoctorQualification,
                                  UploadDoctorData, CancellationReason, Prescription, PrescriptionFile,
                                  SimilarSpecializationGroup, SimilarSpecializationGroupMapping, PurchaseOrderCreation,
                                  DoctorSponsoredServices, SponsoredServicePracticeSpecialization, SponsoredServices,
-                                 HospitalSponsoredServices)
+                                 HospitalSponsoredServices, GoogleMapRecords)
 
 from ondoc.authentication.models import User
 from .common import *
@@ -1726,6 +1726,10 @@ class DoctorOpdAppointmentAdmin(ExportMixin, CompareVersionAdmin):
             return "False"
     get_is_fraud.short_description = 'Is Fraud'
 
+    def integrator_order_no(self, obj):
+        return obj.integrator_booking_no()
+    integrator_order_no.short_description = 'Integrator Order ID'
+
     def response_change(self, request, obj):
         if "_capture-payment" in request.POST:
             if request.user.is_superuser:
@@ -1833,7 +1837,7 @@ class DoctorOpdAppointmentAdmin(ExportMixin, CompareVersionAdmin):
         #             'cancellation_reason', 'cancellation_comments', 'ratings',
         #             'start_date', 'start_time', 'payment_type', 'otp', 'insurance', 'outstanding', 'invoice_urls', 'payment_type')
         # elif request.user.groups.filter(name=constants['OPD_APPOINTMENT_MANAGEMENT_TEAM']).exists():
-        all_fields = ('booking_id', 'doctor_name', 'doctor_id', 'doctor_details', 'hospital_name', 'hospital_details',
+        all_fields = ('booking_id', 'integrator_order_no', 'doctor_name', 'doctor_id', 'doctor_details', 'hospital_name', 'hospital_details',
                 'kyc', 'contact_details', 'used_profile_name',
                 'used_profile_number', 'default_profile_name',
                 'default_profile_number', 'user_id', 'user_number', 'booked_by', 'procedures_details',
@@ -1862,7 +1866,7 @@ class DoctorOpdAppointmentAdmin(ExportMixin, CompareVersionAdmin):
         #     return ('booking_id', 'doctor_id', 'doctor_details', 'contact_details', 'hospital_details', 'kyc',
         #             'procedures_details', 'invoice_urls', 'ratings', 'payment_type')
         # elif request.user.groups.filter(name=constants['OPD_APPOINTMENT_MANAGEMENT_TEAM']).exists():
-        read_only = ('booking_id', 'doctor_name', 'doctor_id', 'doctor_details', 'hospital_name',
+        read_only = ('booking_id', 'doctor_name', 'integrator_order_no', 'doctor_id', 'doctor_details', 'hospital_name',
                      'hospital_details', 'kyc', 'contact_details',
                      'used_profile_name', 'used_profile_number', 'default_profile_name',
                      'default_profile_number', 'user_id', 'user_number', 'booked_by',
@@ -2518,7 +2522,7 @@ class SponsoredListingServiceInline(admin.TabularInline):
 class PurchaseOrderCreationAdmin(CompareVersionAdmin):
     model = PurchaseOrderCreation
     form = PurchaseOrderCreationForm
-    list_display = ['provider_type', 'created_at', 'start_date', 'end_date', 'provider_name_hospital', 'total_appointment_count',
+    list_display = ['id', 'provider_type', 'product_type', 'created_at', 'start_date', 'end_date', 'provider_name_hospital', 'provider_name_hospital_id', 'total_appointment_count',
                     'appointment_booked_count', 'current_appointment_count']
     autocomplete_fields = ['provider_name_lab', 'provider_name_hospital']
     search_fields = ['provider_name_lab__name', 'provider_name_hospital__name']
@@ -2526,6 +2530,10 @@ class PurchaseOrderCreationAdmin(CompareVersionAdmin):
     inlines = [SponsorListingURLInline, SponsorListingSpecializationInline, SponsorListingUtmTermInline, SponsoredListingServiceInline]
 
     # readonly_fields = ['provider_name', 'appointment_booked_count', 'current_appointment_count']
+
+    def provider_name_hospital_id(self, obj):
+        return obj.provider_name_hospital.id
+    provider_name_hospital_id.self_description = 'Provider Hospital ID'
 
     def get_readonly_fields(self, request, obj=None):
         read_only_fields = ['provider_name', 'appointment_booked_count', 'current_appointment_count']
@@ -2619,3 +2627,17 @@ class DoctorSponsoredServicesAdmin(ImportExportMixin, CompareVersionAdmin):
     formats = (base_formats.XLS, base_formats.XLSX,)
     resource_class = DoctorSponsoredServicesResource
 
+
+class GoogleMapRecordForm(forms.ModelForm):
+   location = forms.CharField(widget=forms.TextInput(attrs={'class': 'form-control'}), required =True)
+   text = forms.CharField(widget=forms.Textarea(attrs={'class': 'form-control'}), required = True)
+
+   class Meta:
+       model = GoogleMapRecords
+       fields = [
+         "location","text",
+       ]
+
+
+class RecordAdmin(VersionAdmin, ActionAdmin):
+    form = GoogleMapRecordForm

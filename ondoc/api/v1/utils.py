@@ -6,7 +6,7 @@ from rest_framework import permissions, status
 from collections import defaultdict
 from operator import itemgetter
 from itertools import groupby
-from django.db import connection, transaction
+from django.db import connection, transaction, connections
 from django.db.models import F, Func, Q, Count, Sum, Case, When, Value, IntegerField
 from django.utils import timezone
 import math
@@ -206,24 +206,34 @@ def clinic_convert_timings(timings, is_day_human_readable=True):
     return final_dict
 
 class RawSql:
-    def __init__(self, query, parameters):
+    def __init__(self, query, parameters, db='default'):
         self.query = query
         self.parameters = parameters
-
+        self.db = db
 
     def fetch_all(self):
-        with connection.cursor() as cursor:
-            cursor.execute(self.query, self.parameters)
-            columns = [col[0] for col in cursor.description]
-            result = [
-                dict(zip(columns, row))
-                for row in cursor.fetchall()
-            ]
+        result = []
+        try:
+            with connections[self.db].cursor() as cursor:
+                cursor.execute(self.query, self.parameters)
+                columns = [col[0] for col in cursor.description]
+                result = [
+                    dict(zip(columns, row))
+                    for row in cursor.fetchall()
+                ]
+        except Exception as e:
+            print(e)
+            print('Failed to connect to slave db')
         return result
 
     def execute(self):
-        with connection.cursor() as cursor:
-            cursor.execute(self.query, self.parameters)
+        try:
+            with connections[self.db].cursor() as cursor:
+                cursor.execute(self.query, self.parameters)
+        except Exception as e:
+            print(e)
+            print('Failed to connect to slave db')
+
 
 class AgreedPriceCalculate(Func):
     function = 'labtest_agreed_price_calculate'
@@ -594,8 +604,8 @@ def payment_details(request, order):
     pgdata['hash'] = PgTransaction.create_pg_hash(pgdata, secret_key, client_key)
 
     args = {'user_id': user.id, 'order_id': order.id, 'source': 'ORDER_CREATE'}
-    save_payment_status.apply_async((PaymentProcessStatus.INITIATE, args),eta=timezone.localtime(), )
-    save_pg_response.apply_async((PgLogs.TXN_REQUEST, order.id, None, None, pgdata, user.id), eta=timezone.localtime(), )
+    save_payment_status.apply_async((PaymentProcessStatus.INITIATE, args), eta=timezone.localtime(),)
+    save_pg_response.apply_async((PgLogs.TXN_REQUEST, order.id, None, None, pgdata, user.id), eta=timezone.localtime(), queue=settings.RABBITMQ_LOGS_QUEUE)
     # print(pgdata)
     return pgdata, payment_required
 
@@ -1695,15 +1705,17 @@ class TimeSlotExtraction(object):
 def consumers_balance_refund():
     from ondoc.account.models import ConsumerAccount, ConsumerRefund
     refund_time = timezone.now() - timezone.timedelta(hours=settings.REFUND_INACTIVE_TIME)
-    consumer_accounts = ConsumerAccount.objects.filter(updated_at__lt=refund_time)
+    consumer_accounts = ConsumerAccount.objects.filter(updated_at__lt=refund_time, balance__gt=Decimal('0'))
     for account in consumer_accounts:
         with transaction.atomic():
             consumer_account = ConsumerAccount.objects.select_for_update().filter(pk=account.id).first()
             if consumer_account:
                 if consumer_account.balance > 0:
                     print("consumer account balance " + str(consumer_account.balance))
-                    ctx_obj = consumer_account.debit_refund()
-                    ConsumerRefund.initiate_refund(ctx_obj.user, ctx_obj)
+                    ctx_objs = consumer_account.debit_refund()
+                    if ctx_objs:
+                        for ctx_obj in ctx_objs:
+                            ConsumerRefund.initiate_refund(ctx_obj.user, ctx_obj)
 
 
 class GenericAdminEntity():

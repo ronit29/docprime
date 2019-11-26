@@ -8,7 +8,7 @@ from django.core.validators import FileExtensionValidator, MaxValueValidator, Mi
 from django.contrib.postgres.fields import JSONField
 from django.utils import timezone
 from ondoc.account import models as account_model
-from ondoc.authentication.models import UserProfile, RefundMixin
+from ondoc.authentication.models import UserProfile, RefundMixin, TransactionMixin
 from ondoc.cart.models import Cart
 from ondoc.common.helper import Choices
 import json
@@ -17,8 +17,8 @@ from django.db import transaction
 from django.db.models import Q
 from ondoc.common.models import DocumentsProofs
 from ondoc.notification.tasks import push_plus_lead_to_matrix
-from ondoc.plus.usage_criteria import get_class_reference
-from .enums import PlanParametersEnum, UtilizationCriteria
+from ondoc.plus.usage_criteria import get_class_reference, get_price_reference
+from .enums import PlanParametersEnum, UtilizationCriteria, PriceCriteria
 from datetime import datetime
 from ondoc.crm import constants as const
 from django.utils.timezone import utc
@@ -27,6 +27,7 @@ from django.conf import settings
 from django.utils.functional import cached_property
 from .enums import UsageCriteria
 from copy import deepcopy
+from math import floor
 
 
 class LiveMixin(models.Model):
@@ -68,7 +69,7 @@ class PlusProposer(auth_model.TimeStampedModel):
 
     @property
     def get_active_plans(self):
-        return self.plus_plans.filter(is_live=True, is_retail=True).order_by('id')[:3]
+        return self.plus_plans.filter(is_live=True, is_retail=True).order_by('id')
         # index = 0
         # for plan in plans:
         #     if plan.plan_utmsources.all().exists():
@@ -94,7 +95,7 @@ class PlusPlans(auth_model.TimeStampedModel, LiveMixin):
     mrp = models.PositiveIntegerField(default=0)
     deal_price = models.PositiveIntegerField(default=0)
     tax_rebate = models.PositiveIntegerField(default=0)
-    tenure = models.PositiveIntegerField(default=1)
+    tenure = models.PositiveIntegerField(default=1, help_text="Tenure is number of months of active subscription.")
     enabled = models.BooleanField(default=False)
     is_live = models.BooleanField(default=False)
     total_allowed_members = models.PositiveSmallIntegerField(default=0)
@@ -102,6 +103,8 @@ class PlusPlans(auth_model.TimeStampedModel, LiveMixin):
     features = JSONField(blank=False, null=False, default=dict)
     is_retail = models.NullBooleanField()
     plan_criteria = models.CharField(max_length=100, null=True, blank=False, choices=UsageCriteria.as_choices())
+    price_criteria = models.CharField(max_length=100, null=True, blank=False, choices=PriceCriteria.as_choices())
+    is_gold = models.NullBooleanField()
 
     @classmethod
     def get_active_plans_via_utm(cls, utm):
@@ -120,13 +123,127 @@ class PlusPlans(auth_model.TimeStampedModel, LiveMixin):
     def __str__(self):
         return "{}".format(self.plan_name)
 
+    def get_convenience_charge(self, price, type):
+        if not price or price <= 0:
+            return 0
+        charge = 0
+        if type == "DOCTOR":
+            convenience_amount_obj = self.plan_parameters.filter(parameter__key='DOCTOR_CONVENIENCE_AMOUNT').first()
+            convenience_percentage_obj = self.plan_parameters.filter(parameter__key='DOCTOR_CONVENIENCE_PERCENTAGE').first()
+        elif type == "LABTEST":
+            convenience_amount_obj = self.plan_parameters.filter(parameter__key='LAB_CONVENIENCE_AMOUNT').first()
+            convenience_percentage_obj = self.plan_parameters.filter(parameter__key='LAB_CONVENIENCE_PERCENTAGE').first()
+        else:
+            return 0
+        convenience_amount = convenience_amount_obj.value if convenience_amount_obj else 0
+        convenience_percentage = convenience_percentage_obj.value if convenience_percentage_obj else 0
+        if (not convenience_amount and not convenience_percentage) or (convenience_amount == 0 and convenience_percentage == 0):
+            return 0
+        convenience_percentage = int(convenience_percentage)
+        convenience_amount = int(convenience_amount)
+        if convenience_percentage and convenience_percentage > 0:
+            charge = (convenience_percentage/100) * float(price)
+            charge = floor(charge)
+        elif convenience_amount and convenience_amount > 0:
+            return convenience_amount
+        else:
+            return 0
+        if charge <= convenience_amount:
+            return charge
+        else:
+            return convenience_amount
+
+    @classmethod
+    def get_default_convenience_amount(cls, price, type, default_plan_query=None):
+        if not price or price <= 0:
+            return 0
+        charge = 0
+        if not default_plan_query:
+            default_plan = cls.objects.filter(is_selected=True, is_gold=True).first()
+            if not default_plan:
+                default_plan = cls.objects.filter(is_gold=True).first()
+        else:
+            default_plan = default_plan_query
+        if not default_plan:
+            return 0
+        amount_obj, percentage_obj = default_plan.get_convenience_object(type)
+        convenience_amount = amount_obj.value if amount_obj else 0
+        convenience_percentage = percentage_obj.value if percentage_obj else 0
+        if (not convenience_amount and not convenience_percentage) or (
+                convenience_amount == 0 and convenience_percentage == 0):
+            return 0
+        convenience_percentage = int(convenience_percentage)
+        convenience_amount = int(convenience_amount)
+        if convenience_percentage and convenience_percentage > 0:
+            charge = (float(convenience_percentage) / 100) * float(price)
+            charge = floor(charge)
+        elif convenience_amount and convenience_amount > 0:
+            return convenience_amount
+        else:
+            return 0
+        if charge <= convenience_amount:
+            return charge
+        else:
+            return convenience_amount
+
+    def get_convenience_object(self, type):
+        string = ''
+        if type == "DOCTOR":
+            string = 'DOCTOR'
+        else:
+            string = 'LAB'
+        # if type == "DOCTOR":
+        #     convenience_amount_obj = self.plan_parameters.filter(parameter__key='DOCTOR_CONVENIENCE_AMOUNT').first()
+        #     convenience_percentage_obj = self.plan_parameters.filter(parameter__key='DOCTOR_CONVENIENCE_PERCENTAGE').first()
+        #     return convenience_amount_obj, convenience_percentage_obj
+        # elif type == "LABTEST":
+        #     convenience_amount_obj = self.plan_parameters.filter(parameter__key='LAB_CONVENIENCE_AMOUNT').first()
+        #     convenience_percentage_obj = self.plan_parameters.filter(parameter__key='LAB_CONVENIENCE_PERCENTAGE').first()
+        #     return convenience_amount_obj, convenience_percentage_obj
+        convenience_amount_obj = None
+        convenience_percentage_obj = None
+        for param in self.plan_parameters.all():
+            if param.parameter and param.parameter.key:
+                if param.parameter.key == (string + '_CONVENIENCE_AMOUNT'):
+                    convenience_amount_obj = param
+                if param.parameter.key == (string + '_CONVENIENCE_PERCENTAGE'):
+                    convenience_percentage_obj = param
+            if convenience_percentage_obj and convenience_amount_obj:
+                return convenience_amount_obj, convenience_percentage_obj
+
+        return None, None
+
+    def get_convenience_amount(self, price, convenience_amount_obj, convenience_percentage_obj):
+        if not price or price <= 0:
+            return 0
+        charge = 0
+        convenience_amount = convenience_amount_obj.value if convenience_amount_obj else 0
+        convenience_percentage = convenience_percentage_obj.value if convenience_percentage_obj else 0
+        if (not convenience_amount and not convenience_percentage) or (convenience_amount == 0 and convenience_percentage == 0):
+            return 0
+        convenience_percentage = int(convenience_percentage)
+        convenience_amount = int(convenience_amount)
+        if convenience_percentage and convenience_percentage > 0:
+            charge = (convenience_percentage/100) * price
+            charge = floor(charge)
+        elif convenience_amount and convenience_amount > 0:
+            return convenience_amount
+        else:
+            return 0
+        if charge <= convenience_amount:
+            return charge
+        else:
+            return convenience_amount
+
     class Meta:
         db_table = 'plus_plans'
+        # unique_together = (('is_selected', 'is_gold'), )
 
 
 class PlusPlanUtmSources(auth_model.TimeStampedModel):
-    source = models.CharField(max_length=100, null=False, blank=False)
+    source = models.CharField(max_length=100, null=False, blank=False, unique=True)
     source_details = models.CharField(max_length=500, null=True, blank=True)
+    create_lead = models.NullBooleanField()
 
     def __str__(self):
         return "{}".format(self.source)
@@ -210,7 +327,7 @@ class PlusThreshold(auth_model.TimeStampedModel, LiveMixin):
 
 
 @reversion.register()
-class PlusUser(auth_model.TimeStampedModel, RefundMixin):
+class PlusUser(auth_model.TimeStampedModel, RefundMixin, TransactionMixin):
     from ondoc.account.models import MoneyPool
     PRODUCT_ID = account_model.Order.VIP_PRODUCT_ID
 
@@ -254,6 +371,10 @@ class PlusUser(auth_model.TimeStampedModel, RefundMixin):
         else:
             return False
 
+    @classmethod
+    def get_by_user(cls, user):
+        return cls.objects.filter(user=user).order_by('id').last()
+
     def can_be_cancelled(self):
         from ondoc.doctor.models import OpdAppointment
         from ondoc.diagnostic.models import LabAppointment
@@ -271,8 +392,6 @@ class PlusUser(auth_model.TimeStampedModel, RefundMixin):
 
         return {'reason': 'Can be cancelled.', 'can_be_cancelled': True}
 
-
-
     def get_primary_member_profile(self):
         insured_members = self.plus_members.filter().order_by('id')
         proposers = list(filter(lambda member: member.is_primary_user and member.relation == PlusMembers.Relations.SELF, insured_members))
@@ -288,8 +407,6 @@ class PlusUser(auth_model.TimeStampedModel, RefundMixin):
         if not mrp:
             return
         utilization_dict = self.get_utilization
-
-
 
     def can_package_be_covered_in_vip(self, obj, *args, **kwargs):
         mrp = obj.mrp if obj else kwargs.get('mrp')
@@ -351,6 +468,7 @@ class PlusUser(auth_model.TimeStampedModel, RefundMixin):
         resp['doctor_amount_available'] = resp['doctor_consult_amount'] - resp['doctor_amount_utilized']
         resp['members_count_online_consultation'] = data['members_covered_in_package'] if data.get('members_covered_in_package') and data.get('members_covered_in_package').__class__.__name__ == 'str'  else 0
         resp['total_package_amount_limit'] = int(data['health_checkups_amount']) if data.get('health_checkups_amount') and data.get('health_checkups_amount').__class__.__name__ == 'str'  else 0
+        resp['online_chat_amount'] = int(data['online_chat_amount']) if data.get('online_chat_amount') and data.get('online_chat_amount').__class__.__name__ == 'str'  else 0
         resp['total_package_count_limit'] = int(data['health_checkups_count']) if data.get('health_checkups_count') and data.get('health_checkups_count').__class__.__name__ == 'str'  else 0
 
         resp['available_package_amount'] = resp['total_package_amount_limit'] - int(self.get_package_plus_appointment_amount())
@@ -403,17 +521,30 @@ class PlusUser(auth_model.TimeStampedModel, RefundMixin):
         response_dict['is_vip_member'] = True
 
         if appointment_type == OPD:
+            deal_price = price_data.get('deal_price', 0)
+            fees = price_data.get('fees', 0)
+            cod_deal_price = price_data.get('consultation').get('cod_deal_price', 0) if (price_data.get('consultation') and price_data.get('consultation').get('cod_deal_price')) else 0
+            # price_data = {"mrp": int(price_data.get('mrp')), "deal_price": int(deal_price),
+            #               "cod_deal_price": int(cod_deal_price),
+            #               "fees": int(fees)}
+            price_engine = get_price_reference(plus_user, "DOCTOR")
+            if not price_engine:
+                price = int(price_data.get('mrp'))
+            else:
+                price = price_engine.get_price(price_data)
             engine = get_class_reference(plus_user, "DOCTOR")
+            response_dict['vip_gold_price'] = fees
             if not engine:
                 return response_dict
 
             doctor = appointment_data['doctor']
             hospital = appointment_data['hospital']
             if doctor.enabled_for_online_booking and hospital.enabled_for_online_booking and \
-                                        hospital.enabled_for_prepaid and hospital.enabled_for_plus_plans and \
+                                        hospital.enabled_for_prepaid and hospital.is_enabled_for_plus_plans() and \
                                         doctor.enabled_for_plus_plans:
 
-                engine_response = engine.validate_booking_entity(cost=mrp, utilization=kwargs.get('utilization'))
+                # engine_response = engine.validate_booking_entity(cost=mrp, utilization=kwargs.get('utilization'))
+                engine_response = engine.validate_booking_entity(cost=price, utilization=kwargs.get('utilization'), mrp=mrp, deal_price=deal_price)
                 response_dict['cover_under_vip'] = engine_response.get('is_covered', False)
                 response_dict['plus_user_id'] = plus_user.id
                 response_dict['vip_amount_deducted'] = engine_response.get('vip_amount_deducted', 0)
@@ -425,14 +556,26 @@ class PlusUser(auth_model.TimeStampedModel, RefundMixin):
 
         elif appointment_type == LAB:
             lab = appointment_data['lab']
-            if lab and lab.enabled_for_plus_plans:
+            if lab and lab.is_enabled_for_plus_plans():
                 mrp = int(price_data.get('mrp'))
-                final_price = mrp + price_data['home_pickup_charges']
+                # final_price = mrp + price_data['home_pickup_charges']
 
+                # price_data = {"mrp": int(price_data.get('mrp')), "deal_price": int(price_data.get('deal_price')),
+                #               "cod_deal_price": int(price_data.get('deal_price')),
+                #               "fees": int(price_data.get('fees'))}
+                price_engine = get_price_reference(plus_user, "LABTEST")
+                if not price_engine:
+                    price = int(price_data.get('mrp'))
+                else:
+                    price = price_engine.get_price(price_data)
+                final_price = price + price_data['home_pickup_charges']
                 entity = "PACKAGE" if appointment_data['test_ids'][0].is_package else "LABTEST"
                 engine = get_class_reference(plus_user, entity)
+                response_dict['vip_gold_price'] = int(price_data.get('fees'))
                 if appointment_data['test_ids']:
-                    engine_response = engine.validate_booking_entity(cost=final_price, id=appointment_data['test_ids'][0].id, utilization=kwargs.get('utilization'))
+                    # engine_response = engine.validate_booking_entity(cost=final_price, id=appointment_data['test_ids'][0].id, utilization=kwargs.get('utilization'))
+                    engine_response = engine.validate_booking_entity(cost=final_price, id=appointment_data['test_ids'][0].id, utilization=kwargs.get('utilization'), mrp=mrp, deal_price=int(price_data.get('deal_price')))
+
                     if not engine_response:
                         return response_dict
                     response_dict['cover_under_vip'] = engine_response.get('is_covered', False)
@@ -472,32 +615,57 @@ class PlusUser(auth_model.TimeStampedModel, RefundMixin):
         current_item_price_data = OpdAppointment.get_price_details(
             appointment_data) if appointment_type == OPD else LabAppointment.get_price_details(appointment_data)
         current_item_mrp = int(current_item_price_data.get('mrp', 0))
+        cod_deal_price = current_item_price_data.get('consultation').get('cod_deal_price') if current_item_price_data \
+                            and current_item_price_data.get('consultation') and current_item_price_data.get('consultation').get('cod_deal_price') else 0
         if 'doctor' in appointment_data:
+            price_data = {"mrp": int(current_item_price_data.get('mrp')), "deal_price": int(current_item_price_data.get('deal_price')),
+                          "cod_deal_price": int(cod_deal_price),
+                          "fees": int(current_item_price_data.get('fees'))}
+            price_engine = get_price_reference(request.user.active_plus_user, "DOCTOR")
+            if not price_engine:
+                price = current_item_mrp
+            else:
+                price = price_engine.get_price(price_data)
+            vip_data_dict['vip_convenience_amount'] = PlusPlans.get_default_convenience_amount(price, "DOCTOR") if not request.user.active_plus_user else request.user.active_plus_user.plan.get_convenience_charge(price, "DOCTOR")
             engine = get_class_reference(self, "DOCTOR")
+            vip_data_dict['vip_gold_price'] = int(current_item_price_data.get('fees'))
             if engine:
-                vip_response = engine.validate_booking_entity(cost=current_item_mrp, utilization=deep_utilization)
+                # vip_response = engine.validate_booking_entity(cost=current_item_mrp, utilization=deep_utilization)
+                vip_response = engine.validate_booking_entity(cost=price, mrp=current_item_mrp, utilization=deep_utilization, deal_price=int(current_item_price_data.get('deal_price', 0)))
                 vip_data_dict['vip_amount'] = vip_response.get('amount_to_be_paid')
                 vip_data_dict['amount_to_be_paid'] = vip_response.get('amount_to_be_paid')
                 vip_data_dict['cover_under_vip'] = vip_response.get('is_covered')
                 vip_data_dict['plus_user_id'] = self.id
+
             else:
                 return vip_data_dict
         else:
             tests = appointment_data.get('test_ids', [])
             for test in tests:
                 entity = "LABTEST" if not test.is_package else "PACKAGE"
-
+                price_data = {"mrp": int(current_item_price_data.get('mrp')),
+                              "deal_price": int(current_item_price_data.get('deal_price')),
+                              "cod_deal_price": int(current_item_price_data.get('deal_price')),
+                              "fees": int(current_item_price_data.get('fees'))}
+                price_engine = get_price_reference(request.user.active_plus_user, "LABTEST")
+                if not price_engine:
+                    price = current_item_mrp
+                else:
+                    price = price_engine.get_price(price_data)
+                vip_data_dict['vip_convenience_amount'] = PlusPlans.get_default_convenience_amount(price, "DOCTOR") if not request.user.active_plus_user else request.user.active_plus_user.plan.get_convenience_charge(price, "LABTEST")
                 engine = get_class_reference(self, entity)
+                vip_data_dict['vip_gold_price'] = int(current_item_price_data.get('fees'))
                 if engine:
-                    vip_response = engine.validate_booking_entity(cost=current_item_mrp, utilization=deep_utilization)
+                    # vip_response = engine.validate_booking_entity(cost=current_item_mrp, utilization=deep_utilization)
+                    vip_response = engine.validate_booking_entity(cost=price, utilization=deep_utilization, mrp=current_item_mrp, deal_price=int(current_item_price_data.get('deal_price', 0)))
                     vip_data_dict['vip_amount'] = vip_response.get('amount_to_be_paid')
                     vip_data_dict['amount_to_be_paid'] = vip_response.get('amount_to_be_paid')
                     vip_data_dict['cover_under_vip'] = vip_response.get('is_covered')
                     vip_data_dict['plus_user_id'] = self.id
                 else:
                     return vip_data_dict
+        vip_data_dict['is_gold_member'] = True if request.user.active_plus_user.plan.is_gold else False
         return vip_data_dict
-
 
     def get_labtest_plus_appointment_count(self):
         from ondoc.diagnostic.models import LabAppointment
@@ -645,7 +813,7 @@ class PlusUser(auth_model.TimeStampedModel, RefundMixin):
                                                           amount=plus_data['amount'],
                                                           order=plus_data['order'],
                                                           payment_type=const.PREPAID,
-                                                          status=cls.INACTIVE)
+                                                          status=cls.ACTIVE)
 
         PlusMembers.create_plus_members(plus_membership_obj)
         PlusUserUtilization.create_utilization(plus_membership_obj)
@@ -838,8 +1006,8 @@ class PlusTransaction(auth_model.TimeStampedModel):
                                                      link=push_plus_buy_to_matrix.s(user_id=self.plus_user.user.id), countdown=1)
 
             # Activate the Docprime Care membership.
-            self.plus_user.activate_care_membership()
-
+            if self.plus_user.get_utilization and self.plus_user.get_utilization.get('online_chat_amount'):
+                self.plus_user.activate_care_membership()
 
 
     def save(self, *args, **kwargs):
@@ -928,7 +1096,7 @@ class PlusMembers(auth_model.TimeStampedModel):
                                           validators=[MaxValueValidator(9999999999), MinValueValidator(1000000000)])
     profile = models.ForeignKey(auth_model.UserProfile, related_name="plus_member", on_delete=models.CASCADE, null=True)
     title = models.CharField(max_length=20, choices=TITLE_TYPE_CHOICES, default=None)
-    middle_name = models.CharField(max_length=50, null=True)
+    middle_name = models.CharField(max_length=50, null=True, blank=True)
     city = models.CharField(max_length=100, null=True, default=None)
     district = models.CharField(max_length=100, null=True, default=None)
     state = models.CharField(max_length=100, null=True, default=None)
@@ -944,8 +1112,8 @@ class PlusMembers(auth_model.TimeStampedModel):
     @classmethod
     def create_plus_members(cls, plus_user_obj, *args, **kwargs):
 
-        members = kwargs.get('members_list')
-        if not members:
+        members = kwargs.get('members_list', None)
+        if members is None:
             members = plus_user_obj.raw_plus_member
             members = json.loads(members)
 
@@ -1045,15 +1213,25 @@ class PlusAppointmentMapping(auth_model.TimeStampedModel):
     object_id = models.PositiveIntegerField()
     content_object = GenericForeignKey()
     amount = models.DecimalField(default=0, max_digits=10, decimal_places=2)
+    extra_charge = models.DecimalField(max_digits=10, decimal_places=2, null=True)
 
     @classmethod
     def get_vip_amount(cls, plus_user, content_type):
         from ondoc.doctor.models import OpdAppointment
+        vip_amount = 0
         objects = cls.objects.filter(content_type=content_type, plus_user=plus_user)
         valid_objects = list(filter(lambda obj: obj.content_object.status != OpdAppointment.CANCELLED, objects))
         valid_amounts = list(map(lambda o: o.amount, valid_objects))
-        vip_amount = functools.reduce(lambda a, b: a + b, valid_amounts)
+        if valid_amounts:
+            vip_amount = functools.reduce(lambda a, b: a + b, valid_amounts)
         return vip_amount
+
+    @classmethod
+    def get_count(cls, plus_user, content_type):
+        from ondoc.doctor.models import OpdAppointment
+        objects = cls.objects.filter(content_type=content_type, plus_user=plus_user)
+        valid_objects = list(filter(lambda obj: obj.content_object.status != OpdAppointment.CANCELLED, objects))
+        return len(valid_objects)
 
     class Meta:
         db_table = 'plus_appointment_mapping'

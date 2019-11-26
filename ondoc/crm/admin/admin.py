@@ -1,7 +1,7 @@
 from django.contrib.gis import admin
 from ondoc.common.models import PaymentOptions, UserConfig, Feature, Service, MatrixMappedState, MatrixMappedCity, \
     GlobalNonBookable, QRCode, BlacklistUser, BlockedStates, SponsorListingURL, \
-    SponsorListingUtmTerm, SponsoredListingService, SponsorListingSpecialization
+    SponsorListingUtmTerm, SponsoredListingService, SponsorListingSpecialization, SearchCriteria, GoogleLatLong
 from ondoc.corporate_booking.models import Corporates, CorporateDeal, CorporateDocument
 from ondoc.crm.admin.banner import BannerAdmin, SliderLocationAdmin, RecommenderAdmin, EmailBannerAdmin
 from ondoc.crm.admin.location import ComparePackagesSEOUrlsAdmin
@@ -23,13 +23,13 @@ from ondoc.doctor.models import (Doctor, Language, MedicalService, Specializatio
                                  DoctorMobileOtp, UploadDoctorData, DoctorLeave, HealthInsuranceProvider,
                                  CommonHospital, SimilarSpecializationGroup, PurchaseOrderCreation, SponsoredServices,
                                  HospitalSponsoredServices, DoctorSponsoredServices,
-                                 SponsoredServicePracticeSpecialization)
+                                 SponsoredServicePracticeSpecialization, GoogleMapRecords)
 
 from ondoc.diagnostic.models import (Lab, LabNetwork, LabTest, LabTestType, LabService,
                                      AvailableLabTest, LabAppointment, CommonTest, CommonDiagnosticCondition,
                                      LabPricingGroup,
                                      TestParameter, CommonPackage, LabTestCategory, LabTestGroup, LabTestGroupMapping,
-                                     TestParameterChat, LabTestCategoryUrls, IPDMedicinePageLead)
+                                     TestParameterChat, LabTestCategoryUrls, IPDMedicinePageLead, LabtestNameMaster)
 from ondoc.coupon.models import Coupon, UserSpecificCoupon, RandomGeneratedCoupon
 from ondoc.integrations.models import IntegratorLabTestParameterMapping
 from ondoc.lead.models import HospitalLead, DoctorLead, SearchLead
@@ -50,7 +50,7 @@ from ondoc.subscription_plan.models import Plan, PlanFeature, UserPlanMapping
 from .common import Cities, CitiesAdmin, MatrixCityMapping, MatrixCityAdmin, MerchantAdmin, MerchantPayoutAdmin, \
     PaymentOptionsAdmin, MatrixMappedStateAdmin, MatrixMappedCityAdmin, GlobalNonBookableAdmin, UserConfigAdmin, \
     BlacklistUserAdmin, BlockedStatesAdmin, MerchantPayoutBulkProcessAdmin, AdvanceMerchantPayoutAdmin, \
-    AdvanceMerchantAmountAdmin
+    AdvanceMerchantAmountAdmin, SearchCriteriaAdmin, GoogleLatLongAdmin
 from .lead import HospitalLeadAdmin, DoctorLeadAdmin, SearchLeadAdmin
 from .doctor import (DoctorAdmin, MedicalServiceAdmin, SpecializationAdmin, QualificationAdmin, LanguageAdmin,
                      CollegeAdmin, MedicalConditionAdmin, HealthTipAdmin, DoctorClinicAdmin,
@@ -63,11 +63,12 @@ from .doctor import (DoctorAdmin, MedicalServiceAdmin, SpecializationAdmin, Qual
                      DoctorSponsoredServicesAdmin)
 from .aboutdoctor import AboutDoctorAdmin
 from .hospital import HospitalAdmin, CommonHospitalAdmin, GenericQuestionAnswerAdmin
-from .user import CustomUserAdmin, UserNumberUpdateAdmin, UserProfileAdmin
+from .user import CustomUserAdmin, UserNumberUpdateAdmin, UserProfileAdmin, PermissionAdmin
 from .hospital_network import HospitalNetworkAdmin
 from .lab import LabAdmin, LabTestAdmin, LabTestTypeAdmin, AvailableLabTestAdmin, CommonDiagnosticConditionAdmin, \
     LabAppointmentAdmin, CommonTestAdmin, TestParameterAdmin, CommonPackageAdmin, LabTestCategoryAdmin, \
-    LabTestGroupAdmin, LabTestGroupMappingAdmin, TestParameterChatAdmin, LabTestCategoryUrlsAdmin
+    LabTestGroupAdmin, LabTestGroupMappingAdmin, TestParameterChatAdmin, LabTestCategoryUrlsAdmin, \
+    LabTestNameMasterAdmin
 from .lab_network import LabNetworkAdmin
 from .notification import (EmailNotificationAdmin, SmsNotificationAdmin,
                            PushNotificationAdmin, AppNotificationAdmin, DynamicTemplatesAdmin)
@@ -116,10 +117,11 @@ from .integrations import IntegratorTestParameterMapping, IntegratorTestParamete
 from .salespoint import SalesPointAdmin, SalesPointAvailableTestMappingAdmin
 from ondoc.salespoint.models import SalesPoint, SalespointTestmapping
 from .plus import PlusPlansAdmin, PlusProposerAdmin, PlusThresholdAdmin, PlusUserAdmin, PlusPlanParametersAdmin
-from ondoc.plus.models import PlusUser, PlusProposer, PlusPlans, PlusThreshold, PlusPlanParameters
+from ondoc.plus.models import PlusUser, PlusProposer, PlusPlans, PlusThreshold, PlusPlanParameters, PlusMembers
 from .plus import PlusPlansAdmin, PlusProposerAdmin, PlusThresholdAdmin, PlusUserAdmin, PlusPlanParametersAdmin, \
-    PlusPlanUtmSourceAdmin
+    PlusPlanUtmSourceAdmin, PlusMemberAdmin
 from ondoc.plus.models import PlusUser, PlusProposer, PlusPlans, PlusThreshold, PlusPlanParameters, PlusPlanUtmSources
+from django.contrib.auth.models import Permission
 
 User = get_user_model()
 
@@ -133,6 +135,7 @@ admin.site.index_title = 'CRM Administration'
 admin.site.register(PlusThreshold, PlusThresholdAdmin)
 admin.site.register(PlusPlans, PlusPlansAdmin)
 admin.site.register(PlusUser, PlusUserAdmin)
+admin.site.register(PlusMembers, PlusMemberAdmin)
 admin.site.register(PlusProposer, PlusProposerAdmin)
 admin.site.register(PlusPlanParameters, PlusPlanParametersAdmin)
 admin.site.register(PlusPlanUtmSources, PlusPlanUtmSourceAdmin)
@@ -327,5 +330,8 @@ admin.site.register(PartnerLabTestSamples, PartnerLabTestSampleAdmin)
 admin.site.register(PartnerLabTestSampleDetails, PartnerLabTestSampleDetailAdmin)
 admin.site.register(TestSamplesLabAlerts, TestSamplesLabAlertAdmin)
 admin.site.register(PartnerLabSamplesCollectOrder, PartnerLabSamplesCollectOrderAdmin)
-
-
+admin.site.register(SearchCriteria, SearchCriteriaAdmin)
+admin.site.register(Permission, PermissionAdmin)
+admin.site.register(GoogleMapRecords)
+admin.site.register(LabtestNameMaster, LabTestNameMasterAdmin)
+admin.site.register(GoogleLatLong, GoogleLatLongAdmin)

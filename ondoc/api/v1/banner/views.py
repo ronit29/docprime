@@ -10,6 +10,7 @@ from rest_framework.response import Response
 
 from ondoc.authentication.backends import JWTAuthentication
 from ondoc.banner.models import Banner
+from ondoc.common.middleware import use_slave
 
 
 class BannerListViewSet(viewsets.GenericViewSet):
@@ -18,6 +19,7 @@ class BannerListViewSet(viewsets.GenericViewSet):
     def get_queryset(self):
         return None
 
+    @use_slave
     def list(self, request):
         parameters = request.query_params
         lat = parameters.get('lat', None)

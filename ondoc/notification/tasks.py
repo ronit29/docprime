@@ -350,7 +350,7 @@ def set_order_dummy_transaction(self, order_id, user_id):
             req_data[key] = str(req_data[key])
 
         response = requests.post(url, data=json.dumps(req_data), headers=headers)
-        save_pg_response.apply_async((PgLogs.DUMMY_TXN, order_id, None, response.json(), req_data, user_id,), eta=timezone.localtime(), )
+        save_pg_response.apply_async((PgLogs.DUMMY_TXN, order_id, None, response.json(), req_data, user_id,), eta=timezone.localtime(), queue=settings.RABBITMQ_LOGS_QUEUE)
         if response.status_code == status.HTTP_200_OK:
             resp_data = response.json()
             #logger.error(resp_data)
@@ -780,7 +780,7 @@ def request_payout(req_data, order_data):
 
     response = requests.post(url, data=json.dumps(req_data), headers=headers)
     resp_data = response.json()
-    save_pg_response.apply_async((PgLogs.PAYOUT_PROCESS, order_data.id, None, resp_data, req_data, None), eta=timezone.localtime(), )
+    save_pg_response.apply_async((PgLogs.PAYOUT_PROCESS, order_data.id, None, resp_data, req_data, None), eta=timezone.localtime(), queue=settings.RABBITMQ_LOGS_QUEUE)
     if response.status_code == status.HTTP_200_OK:
         if resp_data.get("ok") is not None and resp_data.get("ok") == '1':
             success_payout = False
@@ -855,7 +855,7 @@ def offline_appointment_reminder_sms_patient(appointment_id, time_slot_start_tim
             #                                                previous_appointment_date_time,
             #                                                str(math.floor(instance.time_slot_start.timestamp()))))
             return
-        receivers = [{"user": None, "phone_number": number}]
+        receivers = {'sms_receivers': [{"user": None, "phone_number": number}]}
         offline_opd_comm_obj = OfflineOpdAppointments(appointment=instance,
                                                       notification_type=NotificationAction.OFFLINE_APPOINTMENT_REMINDER_PROVIDER_SMS,
                                                       receivers=receivers)
@@ -995,7 +995,8 @@ def upload_doctor_data(obj_id):
         instance.save(retry=False)
 
 @task()
-def send_pg_acknowledge(order_id=None, order_no=None):
+def send_pg_acknowledge(order_id=None, order_no=None, ack_type=''):
+    from ondoc.account.mongo_models import PgLogs
     log_requests_on()
     try:
         if order_id is None or order_no is None:
@@ -1003,10 +1004,16 @@ def send_pg_acknowledge(order_id=None, order_no=None):
             return
 
         url = settings.PG_PAYMENT_ACKNOWLEDGE_URL + "?orderNo=" + str(order_no) + "&orderId=" + str(order_id)
+        if ack_type == 'capture':
+            url += "&ack=captureAck"
         response = requests.get(url)
         if response.status_code == status.HTTP_200_OK:
-            print("Payment acknowledged")
-
+            if ack_type == 'capture':
+                print("Payment capture acknowledged")
+            else:
+                print("Payment acknowledged")
+        json_url = '{"url": "%s"}' % url
+        save_pg_response.apply_async((PgLogs.ACK_TO_PG, order_id, None, json_url, None, None), eta=timezone.localtime(), queue=settings.RABBITMQ_LOGS_QUEUE)
     except Exception as e:
         logger.error("Error in sending pg acknowledge - " + str(e))
 
@@ -1053,6 +1060,8 @@ def refund_breakup_sms_task(obj_id):
 @task(bind=True, max_retries=2)
 def push_plus_lead_to_matrix(self, data):
     from ondoc.plus.models import PlusLead, PlusPlans
+    from ondoc.notification.tasks import save_matrix_logs
+    from ondoc.plus.models import PlusPlanUtmSources
     try:
         if not data:
             raise Exception('Data not received for banner lead.')
@@ -1063,6 +1072,7 @@ def push_plus_lead_to_matrix(self, data):
             raise ValueError()
 
         plus_lead_obj = PlusLead.objects.filter(id=id).first()
+        obj_type = 'plus_lead'
 
         if not plus_lead_obj:
             raise Exception("Plus lead object could not found against id - " + str(id))
@@ -1074,9 +1084,14 @@ def push_plus_lead_to_matrix(self, data):
 
         extras = plus_lead_obj.extras
         plan_id = extras.get('plan_id', None)
+        lead_data = extras.get('lead_data', {})
+
+        lead_utm_source = lead_data.get('utm_source')
+        if lead_utm_source and PlusPlanUtmSources.objects.filter(source=lead_utm_source, create_lead=False).exists():
+            return False
 
         lead_source = "Docprime"
-        lead_data = extras.get('lead_data')
+
         if lead_data:
             provided_lead_source = lead_data.get('lead_source')
             # if provided_lead_source:
@@ -1092,7 +1107,7 @@ def push_plus_lead_to_matrix(self, data):
             # 'LeadID': plus_lead_obj.matrix_lead_id if plus_lead_obj.matrix_lead_id else 0,
             'LeadID':  0,
             'LeadSource': lead_source,
-            'Name': extras.get('name', 'none'),
+            'Name': extras.get('name', 'none') if extras.get('name', 'none') else "none",
             'BookedBy': phone_number,
             'PrimaryNo': phone_number,
             'PaymentStatus': 0,
@@ -1111,7 +1126,8 @@ def push_plus_lead_to_matrix(self, data):
         response = requests.post(url, data=json.dumps(request_data), headers={'Authorization': matrix_api_token,
                                                                               'Content-Type': 'application/json'})
 
-        MatrixLog.create_matrix_logs(plus_lead_obj, request_data, response.json())
+        # MatrixLog.create_matrix_logs(plus_lead_obj, request_data, response.json())
+        save_matrix_logs.apply_async((plus_lead_obj.id, obj_type, request_data, response.json()), countdown=5, queue=settings.RABBITMQ_LOGS_QUEUE)
 
         if response.status_code != status.HTTP_200_OK or not response.ok:
             logger.error(json.dumps(request_data))
@@ -1142,6 +1158,7 @@ def push_plus_lead_to_matrix(self, data):
 @task(bind=True, max_retries=2)
 def push_insurance_banner_lead_to_matrix(self, data):
     from ondoc.insurance.models import InsuranceLead, InsurancePlans
+    from ondoc.notification.tasks import save_matrix_logs
     try:
         if not data:
             raise Exception('Data not received for banner lead.')
@@ -1152,6 +1169,7 @@ def push_insurance_banner_lead_to_matrix(self, data):
             raise ValueError()
 
         banner_obj = InsuranceLead.objects.filter(id=id).first()
+        obj_type = 'insurance_lead'
 
         if not banner_obj:
             raise Exception("Banner object could not found against id - " + str(id))
@@ -1207,7 +1225,8 @@ def push_insurance_banner_lead_to_matrix(self, data):
         response = requests.post(url, data=json.dumps(request_data), headers={'Authorization': matrix_api_token,
                                                                               'Content-Type': 'application/json'})
 
-        MatrixLog.create_matrix_logs(banner_obj, request_data, response.json())
+        # MatrixLog.create_matrix_logs(banner_obj, request_data, response.json())
+        save_matrix_logs.apply_async((banner_obj.id, obj_type, request_data, response.json()), countdown=5, queue=settings.RABBITMQ_LOGS_QUEUE)
 
         if response.status_code != status.HTTP_200_OK or not response.ok:
             logger.error(json.dumps(request_data))
@@ -1393,6 +1412,7 @@ def send_capture_payment_request(self, product_id, appointment_id):
     from ondoc.diagnostic.models import LabAppointment
     from ondoc.account.models import Order, PgTransaction, PaymentProcessStatus
     from ondoc.account.mongo_models import PgLogs
+    from ondoc.account.models import ConsumerTransaction
     log_requests_on()
     req_data = dict()
     if product_id == Order.DOCTOR_PRODUCT_ID:
@@ -1430,12 +1450,13 @@ def send_capture_payment_request(self, product_id, appointment_id):
             response = requests.post(url, data=json.dumps(req_data), headers=headers)
 
             resp_data = response.json()
-            save_pg_response.apply_async((PgLogs.TXN_CAPTURED, order.id, txn_obj.id, resp_data, req_data, order.user_id,), eta=timezone.localtime(), )
+            save_pg_response.apply_async((PgLogs.TXN_CAPTURED, order.id, txn_obj.id, resp_data, req_data, order.user_id,), eta=timezone.localtime(), queue=settings.RABBITMQ_LOGS_QUEUE)
 
             args = {'order_id': order.id, 'status_code': resp_data.get('statusCode'), 'source': 'CAPTURE'}
             status_type = PaymentProcessStatus.get_status_type(resp_data.get('statusCode'), resp_data.get('txStatus'))
             save_payment_status.apply_async((status_type, args), eta=timezone.localtime(), )
             if response.status_code == status.HTTP_200_OK:
+                txn_captured = False
                 if resp_data.get("ok") is not None and resp_data.get("ok") == '1':
                     txn_obj.status_code = resp_data.get('statusCode')
                     txn_obj.status_type = resp_data.get('txStatus')
@@ -1444,16 +1465,24 @@ def send_capture_payment_request(self, product_id, appointment_id):
                     txn_obj.transaction_id = resp_data.get('pgTxId')
                     txn_obj.bank_id = resp_data.get('bankTxId')
                     txn_obj.payment_captured = True
+                    ctx_txn = ConsumerTransaction.objects.filter(order_id=order.id, action=ConsumerTransaction.PAYMENT).last()
+                    ctx_txn.transaction_id = resp_data.get('pgTxId')
+                    ctx_txn.save()
+                    txn_captured = True
                 else:
                     txn_obj.payment_captured = False
                     logger.error("Error in capture the payment with data - " + json.dumps(req_data) + " with error message - " + resp_data.get('statusMsg', ''))
                 txn_obj.save()
+
+                if txn_captured:
+                    send_pg_acknowledge.apply_async((txn_obj.order_id, txn_obj.order_no, 'capture'), countdown=1)
             else:
                 raise Exception("Retry on invalid Http response status - " + str(response.content))
 
     except Exception as e:
         logger.error("Error in payment capture with data - " + json.dumps(req_data) + " with exception - " + str(e))
         self.retry([product_id, appointment_id], countdown=300)
+
 
 @task(bind=True, max_retries=5)
 def send_release_payment_request(self, product_id, appointment_id):
@@ -1501,7 +1530,7 @@ def send_release_payment_request(self, product_id, appointment_id):
 
                 response = requests.post(url, data=json.dumps(req_data), headers=headers)
                 resp_data = response.json()
-                save_pg_response.apply_async((PgLogs.TXN_RELEASED, order.id, txn_obj.id, resp_data, req_data, order.user_id,), eta=timezone.localtime(), )
+                save_pg_response.apply_async((PgLogs.TXN_RELEASED, order.id, txn_obj.id, resp_data, req_data, order.user_id,), eta=timezone.localtime(), queue=settings.RABBITMQ_LOGS_QUEUE)
 
                 args = {'order_id': order.id, 'status_code': resp_data.get('statusCode'), 'source': 'RELEASE'}
                 status_type = PaymentProcessStatus.get_status_type(resp_data.get('statusCode'),
@@ -1512,6 +1541,7 @@ def send_release_payment_request(self, product_id, appointment_id):
                         txn_obj.status_code = resp_data.get('statusCode')
                         txn_obj.status_type = 'TXN_RELEASE'
                         txn_obj.save()
+                        send_pg_acknowledge.apply_async((txn_obj.order_id, txn_obj.order_no, 'capture'), countdown=1)
                     else:
                         logger.error("Error in releasing the payment with data - " + json.dumps(
                             req_data) + " with error message - " + resp_data.get('statusMsg', ''))
@@ -1524,13 +1554,17 @@ def send_release_payment_request(self, product_id, appointment_id):
 
 
 @task(bind=True)
-def save_pg_response(self, log_type, order_id, txn_id, response, request, user_id):
+def save_pg_response(self, log_type, order_id, txn_id, response, request, user_id, log_created_at=None, *args, **kwargs):
     try:
         from ondoc.account.mongo_models import PgLogs
-        PgLogs.save_pg_response(log_type, order_id, txn_id, response, request, user_id)
+        if response:
+            if not isinstance(response, dict):
+                response = json.loads(response)
+            response.pop('created_at', None)
+        PgLogs.save_pg_response(log_type, order_id, txn_id, response, request, user_id, log_created_at)
     except Exception as e:
         logger.error("Error in saving pg response to mongo database - " + json.dumps(response) + " with exception - " + str(e))
-        self.retry([txn_id, response], countdown=300)
+        # self.retry([txn_id, response], countdown=300)
 
 
 @task(bind=True)
@@ -1619,3 +1653,32 @@ def send_partner_lab_notifications(order_id, notification_type=None, report_list
         partner_lab_comm_obj.send()
     except Exception as e:
         logger.error(str(e))
+
+
+@task(bind=True, max_retries=3)
+def save_matrix_logs(self, id, obj_type, request_data, response):
+    try:
+        from ondoc.matrix.mongo_models import MatrixLog
+        from ondoc.diagnostic.models import LabAppointment
+        from ondoc.doctor.models import OpdAppointment
+        from ondoc.insurance.models import UserInsurance, InsuranceLead
+        from ondoc.plus.models import PlusUser, PlusLead
+
+        object = None
+        if obj_type == 'lab_appointment':
+            object = LabAppointment.objects.filter(id=id).first()
+        elif obj_type == 'opd_appointment':
+            object = OpdAppointment.objects.filter(id=id).first()
+        elif obj_type == 'user_insurance':
+            object = UserInsurance.objects.filter(id=id).first()
+        elif obj_type == 'plus_user':
+            object = PlusUser.objects.filter(id=id).first()
+        elif obj_type == 'plus_lead':
+            object = PlusLead.objects.filter(id=id).first()
+        elif obj_type == 'insurance_lead':
+            object = InsuranceLead.objects.filter(id=id).first()
+
+        if object:
+            MatrixLog.create_matrix_logs(object, request_data, response)
+    except Exception as e:
+        logger.error("Error in saving matrix logs to mongo database - " + json.dumps(response) + " with exception - " + str(e))

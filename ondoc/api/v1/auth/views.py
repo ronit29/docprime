@@ -21,11 +21,13 @@ from django.db.models import F, Sum, Max, Q, Prefetch, Case, When, Count, Value
 from django.db.models.functions import Concat, Substr
 from django.forms.models import model_to_dict
 
+from ondoc.common.middleware import use_slave
 from ondoc.common.models import UserConfig, PaymentOptions, AppointmentHistory, BlacklistUser, BlockedStates
 from ondoc.common.utils import get_all_upcoming_appointments
 from ondoc.coupon.models import UserSpecificCoupon, Coupon
 from ondoc.lead.models import UserLead
-from ondoc.plus.models import PlusAppointmentMapping
+from ondoc.plus.models import PlusAppointmentMapping, PlusUser
+from ondoc.plus.usage_criteria import get_price_reference, get_class_reference
 from ondoc.sms.api import send_otp
 from ondoc.doctor.models import DoctorMobile, Doctor, HospitalNetwork, Hospital, DoctorHospital, DoctorClinic, \
                                 DoctorClinicTiming, ProviderSignupLead
@@ -55,7 +57,7 @@ from ondoc.api.v1.insurance.serializers import (InsuranceTransactionSerializer)
 from ondoc.api.v1.diagnostic.views import LabAppointmentView
 from ondoc.diagnostic.models import (Lab, LabAppointment, AvailableLabTest, LabNetwork)
 from ondoc.payout.models import Outstanding
-from ondoc.authentication.backends import JWTAuthentication, BajajAllianzAuthentication, MatrixUserAuthentication
+from ondoc.authentication.backends import JWTAuthentication, BajajAllianzAuthentication, MatrixUserAuthentication, SbiGAuthentication
 from ondoc.api.v1.utils import (IsConsumer, IsDoctor, opdappointment_transform, labappointment_transform,
                                 ErrorCodeMapping, IsNotAgent, GenericAdminEntity, generate_short_url, form_time_slot)
 from django.conf import settings
@@ -530,6 +532,7 @@ class ReferralViewSet(GenericViewSet):
     # authentication_classes = (JWTAuthentication, )
     # permission_classes = (IsAuthenticated, IsNotAgent)
 
+    @use_slave
     def retrieve(self, request):
         user = request.user
         if not user.is_authenticated:
@@ -574,6 +577,7 @@ class UserAppointmentsViewSet(OndocViewSet):
         return OpdAppointment.objects.filter(user=user)
 
     @transaction.non_atomic_requests
+    @use_slave
     def list(self, request):
         params = request.query_params
         doctor_serializer = self.doctor_appointment_list(request, params)
@@ -726,6 +730,15 @@ class UserAppointmentsViewSet(OndocViewSet):
                                             "message": "Appointment time is not covered under insurance"
                                         }
                                         return resp
+                            if lab_appointment.payment_type in [OpdAppointment.VIP] and lab_appointment.insurance_id is not None:
+                                plus_user = PlusUser.objects.filter(id=lab_appointment.plus_plan_id).first()
+                                if plus_user:
+                                    if time_slot_start > plus_user.expire_date:
+                                        resp = {
+                                            "status": 0,
+                                            "message": "Appointment time is not covered under VIP/GOLD"
+                                        }
+                                        return resp
 
                             test_level_timing = dict()
                             test_level_timing['test_id'] = test_timing.get('test').id
@@ -761,6 +774,15 @@ class UserAppointmentsViewSet(OndocViewSet):
                                         "message": "Appointment time is not covered under insurance"
                                     }
                                     return resp
+                        if lab_appointment.payment_type in [OpdAppointment.VIP] and lab_appointment.insurance_id is not None:
+                            plus_user = PlusUser.objects.filter(id=lab_appointment.plus_plan_id).first()
+                            if plus_user:
+                                if time_slot_start > plus_user.expire_date:
+                                    resp = {
+                                        "status": 0,
+                                        "message": "Appointment time is not covered under VIP/GOLD"
+                                    }
+                                    return resp
 
                 test_ids = lab_appointment.lab_test.values_list('test__id', flat=True)
                 lab_test_queryset = AvailableLabTest.objects.select_related('lab_pricing_group__labs').filter(
@@ -787,8 +809,21 @@ class UserAppointmentsViewSet(OndocViewSet):
                 if new_deal_price <= coupon_discount:
                     new_effective_price = 0
                 else:
-                    if lab_appointment.insurance_id is None:
+                    convenience_charge = None
+                    if lab_appointment.insurance_id is None and lab_appointment.plus_plan_id is None:
                         new_effective_price = new_deal_price - coupon_discount
+                    elif lab_appointment.plus_plan_id is not None:
+                        plus_user = lab_appointment.user.active_plus_user
+                        price_data = {"mrp": temp_lab_test[0].get("total_mrp"),
+                                      "deal_price": temp_lab_test[0].get("total_deal_price"),
+                                      "cod_deal_price": temp_lab_test[0].get("total_deal_price"),
+                                      "fees": temp_lab_test[0].get("total_agreed_price", 0)}
+                        if plus_user:
+                            new_effective_price, convenience_charge = self.get_plus_user_effective_price(plus_user, price_data, "LABTEST")
+                        if lab_appointment.plus_plan.plan.is_gold:
+                            new_effective_price = new_effective_price + convenience_charge
+                        else:
+                            new_effective_price = lab_appointment.effective_price
                     else:
                         new_effective_price = 0.0
                 # new_appointment = dict()
@@ -815,6 +850,33 @@ class UserAppointmentsViewSet(OndocViewSet):
                 resp = self.extract_payment_details(request, lab_appointment, new_appointment,
                                                     account_models.Order.LAB_PRODUCT_ID)
         return resp
+
+    def get_plus_user_effective_price(self, plus_user, price_data, entity):
+        if entity == "LABTEST":
+            price_engine = get_price_reference(plus_user, "LABTEST")
+            if not price_engine:
+                price = int(price_data.get('mrp', None))
+            else:
+                price = price_engine.get_price(price_data)
+            convenience_charge = plus_user.plan.get_convenience_charge(price, "LABTEST")
+            engine = get_class_reference(plus_user, "LABTEST")
+            plus_data = engine.validate_booking_entity(price, price_data.get('mrp', None),
+                                                       deal_price=price_data.get('deal_price'))
+            effective_price = plus_data.get('amount_to_be_paid', None)
+            return effective_price, convenience_charge
+        else:
+            price_engine = get_price_reference(plus_user, "DOCTOR")
+            if not price_engine:
+                price = int(price_data.get('mrp', None))
+            else:
+                price = price_engine.get_price(price_data)
+            convenience_charge = plus_user.plan.get_convenience_charge(price, "DOCTOR")
+            engine = get_class_reference(plus_user, "DOCTOR")
+            plus_data = engine.validate_booking_entity(price, price_data.get('mrp', None),
+                                                       deal_price=price_data.get('deal_price'))
+            effective_price = plus_data.get('amount_to_be_paid', None)
+            return effective_price, convenience_charge
+
 
     @transaction.atomic
     def doctor_appointment_update(self, request, opd_appointment, validated_data):
@@ -866,6 +928,15 @@ class UserAppointmentsViewSet(OndocViewSet):
                                         "message": "Appointment time is not covered under insurance"
                                     }
                                     return resp
+                        if opd_appointment.payment_type == OpdAppointment.VIP and opd_appointment.plus_plan is not None:
+                            plus_user = PlusUser.objects.filter(id=opd_appointment.plus_plan_id).first()
+                            if plus_user and time_slot_start > plus_user.expire_date:
+                                resp = {
+                                    "status": 0,
+                                    "message": "Appointment time is not covered under Gold"
+                                }
+                                return resp
+
 
 
 
@@ -875,8 +946,20 @@ class UserAppointmentsViewSet(OndocViewSet):
                         if coupon_discount > doctor_hospital.deal_price:
                             new_effective_price = 0
                         else:
-                            if opd_appointment.insurance_id is None:
+                            if opd_appointment.insurance_id is None and opd_appointment.plus_plan_id is None:
                                 new_effective_price = doctor_hospital.deal_price - coupon_discount
+                            elif opd_appointment.plus_plan_id is not None:
+                                plus_user = opd_appointment.user.active_plus_user
+                                price_data = {"mrp": doctor_hospital.mrp, "deal_price": doctor_hospital.deal_price,
+                                              "cod_deal_price": doctor_hospital.cod_deal_price,
+                                              "fees": doctor_hospital.fees}
+                                if plus_user:
+                                    new_effective_price, convenience_charge = self.get_plus_user_effective_price(
+                                        plus_user, price_data, "DOCTOR")
+                                    if opd_appointment.plus_plan.plan.is_gold:
+                                        new_effective_price = new_effective_price + convenience_charge
+                                    else:
+                                        new_effective_price = old_effective_price
                             else:
                                 new_effective_price = 0.0
                         if opd_appointment.procedures.count():
@@ -1245,6 +1328,7 @@ class TransactionViewSet(viewsets.GenericViewSet):
 
     @transaction.atomic()
     def save(self, request):
+        from ondoc.api.v1.utils import format_return_value
 #         LAB_REDIRECT_URL = settings.BASE_URL + "/lab/appointment"
 #         OPD_REDIRECT_URL = settings.BASE_URL + "/opd/appointment"
 #         INSURANCE_REDIRECT_URL = settings.BASE_URL + "/insurance/complete"
@@ -1294,9 +1378,9 @@ class TransactionViewSet(viewsets.GenericViewSet):
                 args = {'order_id': response.get("orderId"), 'status_code': pg_resp_code, 'source': response.get("source")}
                 status_type = PaymentProcessStatus.get_status_type(pg_resp_code, response.get('txStatus'))
 
-                PgLogs.objects.create(decoded_response=response, coded_response=coded_response)
-                save_pg_response.apply_async((mongo_pglogs.TXN_RESPONSE, response.get("orderId"), None, response, None, response.get('customerId')), eta=timezone.localtime(), )
-                save_payment_status.apply_async((status_type, args), eta=timezone.localtime(), )
+                # PgLogs.objects.create(decoded_response=response, coded_response=coded_response)
+                save_pg_response.apply_async((mongo_pglogs.TXN_RESPONSE, response.get("orderId"), None, response, None, response.get('customerId')), eta=timezone.localtime(), queue=settings.RABBITMQ_LOGS_QUEUE)
+                save_payment_status.apply_async((status_type, args), eta=timezone.localtime(),)
             except Exception as e:
                 logger.error("Cannot log pg response - " + str(e))
 
@@ -1305,20 +1389,35 @@ class TransactionViewSet(viewsets.GenericViewSet):
                 if response and response.get("orderNo"):
                     pg_txn = PgTransaction.objects.filter(order_no__iexact=response.get("orderNo")).first()
                     if pg_txn:
+                        is_preauth = False
                         if pg_txn.is_preauth():
+                            is_preauth = True
                             pg_txn.status_code = response.get('statusCode')
                             pg_txn.status_type = response.get('txStatus')
-                            pg_txn.payment_mode = response.get("paymentMode")
-                            pg_txn.bank_name = response.get('bankName')
-                            pg_txn.transaction_id = response.get('pgTxId')
-                            pg_txn.bank_id = response.get('bankTxId')
+                            pg_txn.payment_mode = format_return_value(response.get("paymentMode"))
+                            pg_txn.bank_name = format_return_value(response.get('bankName'))
+                            pg_txn.transaction_id = format_return_value(response.get('pgTxId'))
+                            pg_txn.bank_id = format_return_value(response.get('bankTxId'))
                             #pg_txn.payment_captured = True
                             pg_txn.save()
+
+                            ctx_txn = ConsumerTransaction.objects.filter(order_id=pg_txn.order_id,
+                                                                         action=ConsumerTransaction.PAYMENT).last()
+                            ctx_txn.transaction_id = format_return_value(response.get('pgTxId'))
+                            ctx_txn.save()
+
+                            # this will acknowledge all status if current status is txn_authorize
+                            # if response.get('txStatus') in ['TXN_SUCCESS', 'TXN_RELEASE']:
+                            if not response.get('txStatus') == 'TXN_AUTHORIZE':
+                                send_pg_acknowledge.apply_async((pg_txn.order_id, pg_txn.order_no, 'capture'), countdown=1)
                         send_pg_acknowledge.apply_async((pg_txn.order_id, pg_txn.order_no,), countdown=1)
                         if pg_txn.product_id == Order.CHAT_PRODUCT_ID:
                             chat_order = Order.objects.filter(pk=pg_txn.order_id).first()
                             if chat_order:
                                 CHAT_REDIRECT_URL = CHAT_SUCCESS_REDIRECT_URL % (chat_order.id, chat_order.reference_id)
+                                json_url = '{"url": "%s"}' % CHAT_REDIRECT_URL
+                                log_created_at = datetime.datetime.now()
+                                save_pg_response.apply_async((mongo_pglogs.RESPONSE_TO_CHAT, chat_order.id, None, json_url, None, None, log_created_at), eta=timezone.localtime(), queue=settings.RABBITMQ_LOGS_QUEUE)
                             return HttpResponseRedirect(redirect_to=CHAT_REDIRECT_URL)
                         else:
                             REDIRECT_URL = (SUCCESS_REDIRECT_URL % pg_txn.order_id) + "?payment_success=true"
@@ -1370,9 +1469,15 @@ class TransactionViewSet(viewsets.GenericViewSet):
                 else:
                     logger.error("Invalid pg data - " + json.dumps(resp_serializer.errors))
             elif order_obj:
+                # send acknowledge if status is TXN_FAILURE to stop callbacks from pg. Do not send acknowledgement if no entry in pg.
                 try:
-                    if response and response.get("orderNo") and response.get("orderId"):
-                        send_pg_acknowledge.apply_async((response.get("orderId"), response.get("orderNo"),), countdown=1)
+                    if response and response.get("orderNo") and response.get("orderId") and response.get(
+                            'txStatus'):
+                        #  Todo - Temporary fix for status_code 5 and success. Need to remove this once pg-team fix this at their end
+                        if pg_resp_code == 5 and response.get('txStatus') == 'TXN_SUCCESS':
+                            send_pg_acknowledge.apply_async((response.get("orderId"), response.get("orderNo"),), countdown=1)
+                        if response.get('txStatus') == 'TXN_FAILURE':
+                            send_pg_acknowledge.apply_async((response.get("orderId"), response.get("orderNo"),), countdown=1)
                 except Exception as e:
                     logger.error("Error in sending pg acknowledge - " + str(e))
 
@@ -1413,6 +1518,10 @@ class TransactionViewSet(viewsets.GenericViewSet):
 
         # return Response({"url": REDIRECT_URL})
         if order_obj.product_id == Order.CHAT_PRODUCT_ID:
+            json_url = '{"url": "%s"}' % CHAT_REDIRECT_URL
+            log_created_at = datetime.datetime.now()
+            save_pg_response.apply_async((mongo_pglogs.RESPONSE_TO_CHAT, order_obj.id, None, json_url, None, None, log_created_at),
+                                         eta=timezone.localtime(), queue=settings.RABBITMQ_LOGS_QUEUE)
             return HttpResponseRedirect(redirect_to=CHAT_REDIRECT_URL)
         return HttpResponseRedirect(redirect_to=REDIRECT_URL)
 
@@ -1442,6 +1551,10 @@ class TransactionViewSet(viewsets.GenericViewSet):
         data['transaction_id'] = format_return_value(response.get('pgTxId'))
         data['pb_gateway_name'] = response.get('pbGatewayName')
         data['nodal_id'] = response.get('nodalId')
+        # if order_obj.product_id == Order.INSURANCE_PRODUCT_ID:
+        #     data['nodal_id'] = PgTransaction.NODAL2
+        # else:
+        #     data['nodal_id'] = PgTransaction.NODAL1
 
         return data
 
@@ -1490,6 +1603,7 @@ class UserTransactionViewSet(viewsets.GenericViewSet):
     permission_classes = (IsAuthenticated,)
 
     @transaction.non_atomic_requests
+    @use_slave
     def list(self, request):
         user = request.user
         tx_queryset = ConsumerTransaction.objects.filter(user=user).order_by('-id')
@@ -1678,6 +1792,7 @@ class HospitalDoctorAppointmentPermissionViewSet(GenericViewSet):
                 lab_dict['id'] = lab.id
                 lab_dict['name'] = lab.name
                 lab_dict['thumbnail'] = lab.get_thumbnail()
+                lab_dict['is_b2b'] = lab.is_b2b
                 partner_labs.append(lab_dict)
             resp_dict['partner_labs'] = partner_labs
             resp.append(resp_dict)
@@ -1907,8 +2022,10 @@ class ConsumerAccountRefundViewSet(GenericViewSet):
         consumer_account = ConsumerAccount.objects.get_or_create(user=user)
         consumer_account = ConsumerAccount.objects.select_for_update().get(user=user)
         if consumer_account.balance > 0:
-            ctx_obj = consumer_account.debit_refund()
-            ConsumerRefund.initiate_refund(user, ctx_obj)
+            ctx_objs = consumer_account.debit_refund()
+            if ctx_objs:
+                for ctx_obj in ctx_objs:
+                    ConsumerRefund.initiate_refund(user, ctx_obj)
         resp = dict()
         resp["status"] = 1
         return Response(resp)
@@ -2012,23 +2129,23 @@ class SendCartUrlViewSet(GenericViewSet):
 
     def send_cart_url(self, request):
         # order_id = request.data.get('orderId', None)
-        utm_source = request.data.get('UtmSource')
-        utm_term = request.data.get('UtmTerm')
-        utm_medium = request.data.get('UtmMedium')
-        utm_campaign = request.data.get('UtmCampaign')
+        utm_source = request.data.get('utm_source')
+        utm_term = request.data.get('utm_term')
+        utm_medium = request.data.get('utm_medium')
+        utm_campaign = request.data.get('utm_campaign')
 
         utm_parameters = ""
         if utm_source:
-            utm_source = "UtmSource=%s&" % utm_source
+            utm_source = "utm_source=%s&" % utm_source
             utm_parameters = utm_parameters + utm_source
         if utm_term:
-            utm_term = "UtmTerm=%s&" % utm_term
+            utm_term = "utm_term=%s&" % utm_term
             utm_parameters = utm_parameters + utm_term
         if utm_medium:
-            utm_medium = "UtmMedium=%s&" % utm_medium
+            utm_medium = "utm_medium=%s&" % utm_medium
             utm_parameters = utm_parameters + utm_medium
         if utm_campaign:
-            utm_campaign = "UtmCampaign=%s" % utm_campaign
+            utm_campaign = "utm_campaign=%s" % utm_campaign
             utm_parameters = utm_parameters + utm_campaign
 
         user_token = JWTAuthentication.generate_token(request.user)
@@ -2158,6 +2275,17 @@ class OrderDetailViewSet(GenericViewSet):
             if appointment:
                 plus_appointment_mapping = PlusAppointmentMapping.objects.filter(object_id=appointment.id).first()
 
+            payment_mode = ''
+            if appointment:
+                payment_modes = dict(OpdAppointment.PAY_CHOICES)
+                if payment_modes:
+                    effective_price = appointment.effective_price
+                    payment_type = appointment.payment_type
+                    if effective_price > 0 and payment_type == 5:
+                        payment_mode = 'Online'
+                    else:
+                        payment_mode = payment_modes.get(appointment.payment_type, '')
+
             curr = {
                 "mrp": order.action_data["mrp"] if "mrp" in order.action_data else order.action_data["agreed_price"],
                 "deal_price": order.action_data["deal_price"],
@@ -2169,9 +2297,11 @@ class OrderDetailViewSet(GenericViewSet):
                 "payment_type": order.action_data["payment_type"],
                 "cod_deal_price": cod_deal_price,
                 "enabled_for_cod": enabled_for_cod,
-                "is_vip_member": True if appointment and appointment.plus_plan else False,
+                "is_gold_member": True if appointment and appointment.plus_plan and appointment.plus_plan.plan.is_gold else False,
+                "is_vip_member": True if appointment and appointment.plus_plan and not appointment.plus_plan.plan.is_gold else False,
                 "covered_under_vip": True if appointment and appointment.plus_plan else False,
-                'vip_amount': appointment_amount - plus_appointment_mapping.amount if plus_appointment_mapping else 0
+                'vip_amount': appointment_amount - plus_appointment_mapping.amount if plus_appointment_mapping else 0,
+                "payment_mode": payment_mode
             }
             processed_order_data.append(curr)
 
@@ -2472,12 +2602,10 @@ class MatrixUserViewset(GenericViewSet):
         return Response(response, status=status.HTTP_200_OK)
 
 
-
-class BajajAllianzUserViewset(GenericViewSet):
-    authentication_classes = (BajajAllianzAuthentication,)
+class ExternalLoginViewSet(GenericViewSet):
 
     @transaction.atomic()
-    def user_login_via_bagic(self, request):
+    def get_external_login_response(self, request):
         from django.http import JsonResponse
         response = {'login': 0}
         if request.method != 'POST':
@@ -2502,6 +2630,24 @@ class BajajAllianzUserViewset(GenericViewSet):
         }
 
         return Response(response, status=status.HTTP_200_OK)
+
+
+class BajajAllianzUserViewset(GenericViewSet):
+    authentication_classes = (BajajAllianzAuthentication,)
+
+    @transaction.atomic()
+    def user_login_via_bagic(self, request):
+        response = ExternalLoginViewSet().get_external_login_response(request)
+        return response
+
+
+class SbiGUserViewset(GenericViewSet):
+    authentication_classes = (SbiGAuthentication,)
+
+    @transaction.atomic()
+    def user_login_via_sbig(self, request):
+        response = ExternalLoginViewSet().get_external_login_response(request)
+        return response
 
 
 # class CloudLabUserViewSet(viewsets.GenericViewSet):
