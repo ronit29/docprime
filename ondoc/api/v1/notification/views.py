@@ -152,10 +152,7 @@ class DynamicTemplate(View):
 class IPDIntimateEmailNotificationViewSet(viewsets.GenericViewSet):
 
     def send_email_notification(self, request):
-        parameters = request.query_params
-        serializer = serializers.IPDIntimateEmailNotificationSerializer(data=parameters, context={"request": request})
-        serializer.is_valid(raise_exception=True)
-        validated_data = serializer.validated_data
+        parameters = request.data
         user_id = parameters.get('user')
         doctor_id = parameters.get('doctor')
         hospital_id = parameters.get('hospital')
@@ -167,7 +164,11 @@ class IPDIntimateEmailNotificationViewSet(viewsets.GenericViewSet):
         ipd_email_obj = IPDIntimateEmailNotification.objects.filter(user_id=user_id, doctor_id=doctor_id, hospital_id=hospital_id)
         if ipd_email_obj:
             return Response({})
-        hosp_obj = Hospital.objects.filter(id=hospital_id)[0]
+        hosp_obj = Hospital.objects.filter(id=hospital_id)
+        if hosp_obj:
+            hosp_obj = hosp_obj[0]
+        else:
+            return Response(status=status.HTTP_400_BAD_REQUEST, data={'error': 'Hospital not found.'})
         spoc_details = hosp_obj.spoc_details.all()
         receivers = [{'user': user_id, 'email': spoc.email} for spoc in spoc_details]
         emails = list(map(lambda x: x.get('email'), receivers))
