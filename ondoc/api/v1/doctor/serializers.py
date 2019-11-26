@@ -2321,9 +2321,11 @@ class TopHospitalForIpdProcedureSerializer(serializers.ModelSerializer):
         return int(obj.distance.m) if hasattr(obj, 'distance') and obj.distance else None
 
     def get_certifications(self, obj):
-        certification_objs = obj.hospitalcertification_set.all()
-        names = [x.name for x in certification_objs]
-        return names
+        # certification_objs = obj.hospitalcertification_set.all()
+        # names = [x.name for x in certification_objs]
+        # return names
+        return [{"certification_id": data.certification.id, "certification_name": data.certification.name}
+                for data in obj.hospitalcertification_set.all() if data.certification]
 
     def get_insurance_provider(self, obj):
         return [x.name for x in obj.health_insurance_providers.all()]

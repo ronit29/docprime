@@ -1753,7 +1753,9 @@ class LabList(viewsets.ReadOnlyModelViewSet):
     def form_lab_search_whole_data(self, queryset, test_ids=None, insurance_data_dict={}, vip_data_dict={}, user=None):
         ids = [value.get('id') for value in queryset]
         # ids, id_details = self.extract_lab_ids(queryset)
-        labs = Lab.objects.select_related('network').prefetch_related('lab_documents', 'lab_image', 'lab_timings','home_collection_charges')
+        labs = Lab.objects.select_related('network').prefetch_related('lab_documents', 'lab_image', 'lab_timings',
+                                                                      'home_collection_charges', 'lab_certificate',
+                                                                      'lab_certificate__certification')
 
         entity = EntityUrls.objects.filter(entity_id__in=ids, url_type='PAGEURL', is_valid='t',
                                            entity_type__iexact='Lab').values('entity_id', 'url')
@@ -1889,6 +1891,7 @@ class LabList(viewsets.ReadOnlyModelViewSet):
             row["next_lab_timing_data"] = next_lab_timing_data_dict
             row["tests"] = tests.get(row["id"])
             row["city"] = lab_obj.city
+            row["certifications"] = [{"certification_id": data.certification.id, "certification_name": data.certification.name} for data in lab_obj.lab_certificate.all() if data.certification]
 
             if lab_obj.id in id_url_dict.keys():
                 row['url'] = id_url_dict[lab_obj.id]
@@ -2011,7 +2014,7 @@ class LabList(viewsets.ReadOnlyModelViewSet):
         profile = None
 
         lab_obj = Lab.objects.select_related('network')\
-                             .prefetch_related('rating', 'lab_documents')\
+                             .prefetch_related('rating', 'lab_documents', 'lab_certificate', 'lab_certificate__certification')\
                              .filter(id=lab_id, is_live=True).first()
 
         if not lab_obj:
@@ -2143,6 +2146,8 @@ class LabList(viewsets.ReadOnlyModelViewSet):
                         temp_data.get('lab')['is_home_collection_enabled'] = False
                         for x in temp_data.get('tests', []):
                             x['is_home_collection_enabled'] = False
+
+        temp_data['certifications'] = [{"certification_id": data.certification.id, "certification_name": data.certification.name} for data in lab_obj.lab_certificate.all() if data.certification]
                                 
                 #         temp_data.get('lab')['is_home_collection_enabled'] = False
 
