@@ -935,7 +935,7 @@ class Certifications(auth_model.TimeStampedModel):
 class GoogleLatLong(auth_model.TimeStampedModel):
     latitude = models.FloatField()
     longitude = models.FloatField()
-    coordinates = models.TextField()
+    coordinates = models.TextField(null=True, blank=True)
     is_hospital_done = models.BooleanField(default=False)
     is_doctor_done = models.BooleanField(default=False)
 
