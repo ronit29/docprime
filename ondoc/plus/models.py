@@ -202,7 +202,8 @@ class PlusPlans(auth_model.TimeStampedModel, LiveMixin):
         #     return convenience_amount_obj, convenience_percentage_obj
         convenience_amount_obj = None
         convenience_percentage_obj = None
-        for param in self.plan_parameters.all():
+        plan_parameters = self.plan_parameters.all()
+        for param in plan_parameters:
             if param.parameter and param.parameter.key:
                 if param.parameter.key == (string + '_CONVENIENCE_AMOUNT'):
                     convenience_amount_obj = param

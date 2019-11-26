@@ -322,9 +322,9 @@ class Hospital(auth_model.TimeStampedModel, auth_model.CreatedByModel, auth_mode
 
         common_hosp_percentage_dict = dict()
 
-        plan = PlusPlans.objects.filter(is_gold=True, is_selected=True).first()
+        plan = PlusPlans.objects.prefetch_related('plan_parameters').filter(is_gold=True, is_selected=True).first()
         if not plan:
-            plan = PlusPlans.objects.filter(is_gold=True).first()
+            plan = PlusPlans.objects.prefetch_related('plan_parameters').filter(is_gold=True).first()
 
         if plan:
             convenience_amount_obj, convenience_percentage_obj = plan.get_convenience_object('DOCTOR')
