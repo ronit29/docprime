@@ -39,9 +39,11 @@ class PgLogs(DynamicDocument, TimeStampedModel):
     def save_pg_response(cls, log_type=0, order_id=None, txn_id=None, response=None, request=None, user_id=None, log_created_at=None):
         if settings.MONGO_STORE:
             pg_log = None
+            has_log = True
             if order_id:
                 pg_log = PgLogs.objects.filter(order_id=order_id).first()
             if not pg_log:
+                has_log = False
                 pg_log = PgLogs(order_id=order_id,
                                 pg_transaction_id=txn_id,
                                 user_id=user_id,
@@ -54,7 +56,10 @@ class PgLogs(DynamicDocument, TimeStampedModel):
                 request['type'] = "REQUEST"
                 request['created_at'] = timezone.localtime()
                 request['log_created_at'] = log_created_at
-                pg_log.logs.append(request)
+                if has_log:
+                    pg_log.update(push__logs=request)
+                else:
+                    pg_log.logs.append(request)
             if response:
                 if not isinstance(response, dict):
                     response = json.loads(response)
@@ -62,6 +67,10 @@ class PgLogs(DynamicDocument, TimeStampedModel):
                 response['type'] = "RESPONSE"
                 response['created_at'] = timezone.localtime()
                 response['log_created_at'] = log_created_at
-                pg_log.logs.append(response)
+                if has_log:
+                    pg_log.update(push__logs=response)
+                else:
+                    pg_log.logs.append(response)
 
-            pg_log.save()
+            if not has_log:
+                pg_log.save()

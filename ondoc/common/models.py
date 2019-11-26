@@ -3,6 +3,7 @@ from django.contrib.gis.geos import Point
 from django.contrib.postgres.fields import JSONField
 from django.core.validators import FileExtensionValidator, MinValueValidator, MaxValueValidator
 from django.db import models, transaction
+from django.db.models import Q
 from weasyprint import HTML, CSS
 import string
 import random
@@ -924,13 +925,13 @@ class SearchCriteria(auth_model.TimeStampedModel):
 class GoogleLatLong(auth_model.TimeStampedModel):
     latitude = models.FloatField()
     longitude = models.FloatField()
-    coordinates = models.TextField()
+    coordinates = models.TextField(null=True, blank=True)
     is_hospital_done = models.BooleanField(default=False)
     is_doctor_done = models.BooleanField(default=False)
 
     @classmethod
     def generate_place_ids(cls):
-        coordinates_obj = GoogleLatLong.objects.all()
+        coordinates_obj = GoogleLatLong.objects.all(Q(is_hospital_done=False) | Q(is_doctor_done=False))
         types = ['doctor', 'hospital']
         for point_obj in coordinates_obj:
             for type in types:
