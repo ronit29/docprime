@@ -714,10 +714,10 @@ def get_price_reference(obj, entity):
     if not obj:
         return None
 
-    if obj.__class__.__name__ not in ['PlusUser', 'PlusPlans']:
+    if obj.__class__.__name__ not in ['PlusUser', 'PlusPlans', 'TempPlusUser']:
         return None
 
-    price_criteria = obj.plan.price_criteria if obj.__class__.__name__ == 'PlusUser' else obj.price_criteria
+    price_criteria = obj.plan.price_criteria if obj.__class__.__name__ in ['PlusUser', 'TempPlusUser'] else obj.price_criteria
     if entity not in ['DOCTOR', 'LABTEST'] or price_criteria not in PriceCriteria.availabilities():
         return None
 
