@@ -163,14 +163,16 @@ class IPDIntimateEmailNotificationViewSet(viewsets.GenericViewSet):
         gender = parameters.get('gender', None)
         dob = parameters.get('dob', None)
 
-        ipd_email_obj = IPDIntimateEmailNotification.objects.filter(user_id=user_id, hospital_id=hospital_id, created_at__date=date.today())
-        if ipd_email_obj:
-            return Response({})
         hosp_obj = Hospital.objects.filter(id=hospital_id)
         if hosp_obj:
             hosp_obj = hosp_obj[0]
         else:
             return Response(status=status.HTTP_400_BAD_REQUEST, data={'error': 'Hospital not found.'})
+
+        ipd_email_obj = IPDIntimateEmailNotification.objects.filter(user_id=user_id, hospital_id=hospital_id, created_at__date=date.today())
+        if ipd_email_obj:
+            return Response({})
+
         spoc_details = hosp_obj.spoc_details.all()
         receivers = [{'user': user_id, 'email': spoc.email} for spoc in spoc_details]
         emails = list(map(lambda x: x.get('email'), receivers))
