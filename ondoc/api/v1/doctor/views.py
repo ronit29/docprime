@@ -4638,9 +4638,10 @@ class HospitalViewSet(viewsets.GenericViewSet):
                                                                                          'hosp_entity_dict': hosp_entity_dict})
             hospital_percentage_dict = dict()
 
-            plan = PlusPlans.objects.filter(is_gold=True, is_selected=True).first()
+            plan = PlusPlans.objects.prefetch_related('plan_parameters', 'plan_parameters__parameter').filter(is_gold=True, is_selected=True).first()
             if not plan:
-                plan = PlusPlans.objects.filter(is_gold=True).first()
+                plan = PlusPlans.objects.prefetch_related('plan_parameters', 'plan_parameters__parameter').filter(is_gold=True).first()
+
             hospital_queryset = hospital_queryset[:20]
             if plan:
                 convenience_amount_obj, convenience_percentage_obj = plan.get_convenience_object('DOCTOR')

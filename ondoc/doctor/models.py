@@ -322,9 +322,9 @@ class Hospital(auth_model.TimeStampedModel, auth_model.CreatedByModel, auth_mode
 
         common_hosp_percentage_dict = dict()
 
-        plan = PlusPlans.objects.filter(is_gold=True, is_selected=True).first()
+        plan = PlusPlans.objects.prefetch_related('plan_parameters', 'plan_parameters__parameter').filter(is_gold=True, is_selected=True).first()
         if not plan:
-            plan = PlusPlans.objects.filter(is_gold=True).first()
+            plan = PlusPlans.objects.prefetch_related('plan_parameters', 'plan_parameters__parameter').filter(is_gold=True).first()
 
         if plan:
             convenience_amount_obj, convenience_percentage_obj = plan.get_convenience_object('DOCTOR')
@@ -382,10 +382,10 @@ class Hospital(auth_model.TimeStampedModel, auth_model.CreatedByModel, auth_mode
         hosp_entity_dict, hosp_locality_entity_dict = Hospital.get_hosp_and_locality_dict(temp_hospital_ids,
                                                                                           EntityUrls.SitemapIdentifier.HOSPITALS_LOCALITY_CITY)
 
-        entity_queryset = EntityUrls.objects.filter(is_valid=True, sitemap_identifier=EntityUrls.SitemapIdentifier.HOSPITAL_PAGE,
-                                                    entity_id__in = temp_hospital_ids)
-        entity_queryset_dict = {x.entity_id: x for x in entity_queryset}
-        all_entity_urls = list(set([x.url for x in entity_queryset]))
+        all_entity_urls = EntityUrls.objects.filter(is_valid=True, sitemap_identifier=EntityUrls.SitemapIdentifier.HOSPITAL_PAGE,
+                                                    entity_id__in = temp_hospital_ids).values_list('url', flat=True).distinct()
+        # entity_queryset_dict = {x.entity_id: x for x in entity_queryset}
+        # all_entity_urls = list(set([x.url for x in entity_queryset]))
         new_dynamic_qs = NewDynamic.objects.filter(url_value__in=all_entity_urls)
         new_dynamic_dict = {x.url_value: x for x in new_dynamic_qs}
         from ondoc.api.v1.doctor.serializers import TopCommonHospitalForIpdProcedureSerializer
