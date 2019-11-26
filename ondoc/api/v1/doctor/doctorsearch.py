@@ -353,7 +353,7 @@ class DoctorSearchHelper:
                     rank_by = " rnk=1 "
             else:
                 if self.query_params.get("specialization_ids") and len(self.query_params.get("specialization_ids")) == 1:
-                    order_by_field = ' welcome_calling_done DESC, floor(distance/bucket_size) ASC, is_license_verified DESC, search_score desc '
+                    order_by_field = ' welcome_calling_done DESC, floor(distance/bucket_size) ASC, is_license_verified DESC, search_score desc '.format(bucket_size=str(bucket_size))
 
                 else:
                     order_by_field = ' welcome_calling_done DESC, floor(distance/{bucket_size}) ASC, is_license_verified DESC, search_score desc '.format(bucket_size=str(bucket_size))

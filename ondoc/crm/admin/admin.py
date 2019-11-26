@@ -1,7 +1,7 @@
 from django.contrib.gis import admin
 from ondoc.common.models import PaymentOptions, UserConfig, Feature, Service, MatrixMappedState, MatrixMappedCity, \
     GlobalNonBookable, QRCode, BlacklistUser, BlockedStates, SponsorListingURL, \
-    SponsorListingUtmTerm, SponsoredListingService, SponsorListingSpecialization, SearchCriteria
+    SponsorListingUtmTerm, SponsoredListingService, SponsorListingSpecialization, SearchCriteria, Certifications, GoogleLatLong
 from ondoc.corporate_booking.models import Corporates, CorporateDeal, CorporateDocument
 from ondoc.crm.admin.banner import BannerAdmin, SliderLocationAdmin, RecommenderAdmin, EmailBannerAdmin
 from ondoc.crm.admin.location import ComparePackagesSEOUrlsAdmin
@@ -23,7 +23,7 @@ from ondoc.doctor.models import (Doctor, Language, MedicalService, Specializatio
                                  DoctorMobileOtp, UploadDoctorData, DoctorLeave, HealthInsuranceProvider,
                                  CommonHospital, SimilarSpecializationGroup, PurchaseOrderCreation, SponsoredServices,
                                  HospitalSponsoredServices, DoctorSponsoredServices,
-                                 SponsoredServicePracticeSpecialization)
+                                 SponsoredServicePracticeSpecialization, GoogleMapRecords)
 
 from ondoc.diagnostic.models import (Lab, LabNetwork, LabTest, LabTestType, LabService,
                                      AvailableLabTest, LabAppointment, CommonTest, CommonDiagnosticCondition,
@@ -50,7 +50,7 @@ from ondoc.subscription_plan.models import Plan, PlanFeature, UserPlanMapping
 from .common import Cities, CitiesAdmin, MatrixCityMapping, MatrixCityAdmin, MerchantAdmin, MerchantPayoutAdmin, \
     PaymentOptionsAdmin, MatrixMappedStateAdmin, MatrixMappedCityAdmin, GlobalNonBookableAdmin, UserConfigAdmin, \
     BlacklistUserAdmin, BlockedStatesAdmin, MerchantPayoutBulkProcessAdmin, AdvanceMerchantPayoutAdmin, \
-    AdvanceMerchantAmountAdmin, SearchCriteriaAdmin
+    AdvanceMerchantAmountAdmin, SearchCriteriaAdmin, GoogleLatLongAdmin
 from .lead import HospitalLeadAdmin, DoctorLeadAdmin, SearchLeadAdmin
 from .doctor import (DoctorAdmin, MedicalServiceAdmin, SpecializationAdmin, QualificationAdmin, LanguageAdmin,
                      CollegeAdmin, MedicalConditionAdmin, HealthTipAdmin, DoctorClinicAdmin,
@@ -332,8 +332,7 @@ admin.site.register(TestSamplesLabAlerts, TestSamplesLabAlertAdmin)
 admin.site.register(PartnerLabSamplesCollectOrder, PartnerLabSamplesCollectOrderAdmin)
 admin.site.register(SearchCriteria, SearchCriteriaAdmin)
 admin.site.register(Permission, PermissionAdmin)
-
+admin.site.register(Certifications)
+admin.site.register(GoogleMapRecords)
 admin.site.register(LabtestNameMaster, LabTestNameMasterAdmin)
-
-
-
+admin.site.register(GoogleLatLong, GoogleLatLongAdmin)

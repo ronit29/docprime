@@ -20,7 +20,7 @@ from ondoc.doctor.models import (OpdAppointment, Doctor, Hospital, DoctorHospita
                                  DoctorPracticeSpecialization, DoctorClinic, OfflineOPDAppointments, OfflinePatients,
                                  CancellationReason, HealthInsuranceProvider, HospitalDocument, HospitalNetworkDocument,
                                  AppointmentHistory, HospitalNetwork, ProviderEncrypt, SimilarSpecializationGroup,
-                                 PracticeSpecialization, CommonHospital)
+                                 PracticeSpecialization, CommonHospital, GoogleMapRecords)
 from ondoc.diagnostic import models as lab_models
 from ondoc.authentication.models import UserProfile, DoctorNumber, GenericAdmin, GenericLabAdmin
 from django.db.models import Avg
@@ -2309,9 +2309,11 @@ class TopHospitalForIpdProcedureSerializer(serializers.ModelSerializer):
         return int(obj.distance.m) if hasattr(obj, 'distance') and obj.distance else None
 
     def get_certifications(self, obj):
-        certification_objs = obj.hospitalcertification_set.all()
-        names = [x.name for x in certification_objs]
-        return names
+        # certification_objs = obj.hospitalcertification_set.all()
+        # names = [x.name for x in certification_objs]
+        # return names
+        return [{"certification_id": data.certification.id, "certification_name": data.certification.name}
+                for data in obj.hospitalcertification_set.all() if data.certification]
 
     def get_insurance_provider(self, obj):
         return [x.name for x in obj.health_insurance_providers.all()]
@@ -3024,3 +3026,11 @@ class TopCommonHospitalForIpdProcedureSerializer(serializers.ModelSerializer):
                     return request.build_absolute_uri(image.url) if image else None
         return None
 
+
+class RecordSerializer(serializers.ModelSerializer):
+
+    class Meta:
+       model = GoogleMapRecords
+       fields = (["id","location","text","created_at","latitude","longitude", "updated_at", "image", "label", "reason", "hospital_name", "place_id",
+                  "multi_speciality", "has_phone", "lead_rank", "combined_rating", "combined_rating_count", "is_potential", "has_booking", "monday_timing",
+                 "address" ])

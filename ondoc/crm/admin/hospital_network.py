@@ -12,7 +12,7 @@ from ondoc.doctor.models import (HospitalNetworkManager, Hospital,
                                  HospitalNetworkHelpline, HospitalNetworkEmail, HospitalNetworkAccreditation,
                                  HospitalNetworkAward, HospitalNetworkCertification, HospitalNetworkDocument,
                                  HospitalNetworkImage, HospitalNetworkTiming, HospitalNetworkServiceMapping,
-                                 HospitalNetworkSpeciality)
+                                 HospitalNetworkSpeciality, HospitalCertification)
 import datetime
 from .common import *
 from ondoc.authentication.admin import SPOCDetailsInline
@@ -22,11 +22,26 @@ import logging
 logger = logging.getLogger(__name__)
 
 
+class HospitalNetworkCertificationInlineFormSet(forms.BaseInlineFormSet):
+    def clean(self):
+        super().clean()
+        if any(self.errors):
+            return
+
+        for data in self.cleaned_data:
+            hospital_obj = Hospital.objects.filter(network_id=data.get('network').id)
+            for hosp in hospital_obj:
+                HospitalCertification.objects.get_or_create(hospital=hosp, certification=data.get('id').certification)
+
+
 class HospitalNetworkCertificationInline(admin.TabularInline):
     model = HospitalNetworkCertification
     extra = 0
     can_delete = True
     show_change_link = False
+    fields = ['certification']
+    search_fields = ['certification']
+    formset = HospitalNetworkCertificationInlineFormSet
 
     def get_queryset(self, request):
         return super().get_queryset(request).select_related('network')
