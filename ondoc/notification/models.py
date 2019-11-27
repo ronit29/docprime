@@ -1027,14 +1027,21 @@ class EmailNotification(TimeStampedModel, EmailNotificationOpdMixin, EmailNotifi
     @classmethod
     def send_dynamic_template_notification(cls, recipient_obj, html_body, email_subject, notification_type, *args, **kwargs):
         if recipient_obj and recipient_obj.to:
+            obj = None
+            content_type = None
+            if kwargs.get('ipd_email_obj'):
+                obj = kwargs.get('ipd_email_obj')
+                content_type = ContentType.objects.get_for_model(obj)
 
             if kwargs.get('is_preview', False):
                 email_obj = cls.objects.create(email=recipient_obj.to, notification_type=notification_type,
-                                               content=html_body, email_subject=email_subject, cc=[], bcc=[])
+                                               content=html_body, email_subject=email_subject, cc=[], bcc=[], object_id=obj.id, content_type= content_type)
 
             else:
                 email_obj = cls.objects.create(email=recipient_obj.to, notification_type=notification_type,
-                                               content=html_body, email_subject=email_subject, cc=recipient_obj.cc, bcc=recipient_obj.bcc)
+                                               content=html_body, email_subject=email_subject, cc=recipient_obj.cc, bcc=recipient_obj.bcc, object_id=obj.id, content_type= content_type)
+                # object_id = models.BigIntegerField(null=True)
+                # content_object = GenericForeignKey()
 
             email_obj.save()
 

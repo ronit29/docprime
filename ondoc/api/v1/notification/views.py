@@ -152,7 +152,7 @@ class DynamicTemplate(View):
 
 class IPDIntimateEmailNotificationViewSet(viewsets.GenericViewSet):
 
-    def send_email_notification(self, request):
+    def send_email_notification(self, request, *args, **kwargs):
         parameters = request.data
         user_id = parameters.get('user')
         doctor_id = parameters.get('doctor')
@@ -184,6 +184,7 @@ class IPDIntimateEmailNotificationViewSet(viewsets.GenericViewSet):
 
         email_notification = EMAILNotification(notification_type=NotificationAction.IPDIntimateEmailNotification,
                                                context={'instance': ipd_email_obj})
-        email_notification.send(receivers)
+        kwargs['ipd_email_obj'] = ipd_email_obj
+        email_notification.send(receivers, *args, **kwargs)
 
         return Response({})

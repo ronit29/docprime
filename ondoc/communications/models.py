@@ -1437,9 +1437,8 @@ class EMAILNotification:
             message = json.dumps(message)
             publish_message(message)
 
-    def send(self, receivers):
-
-        dispatch_response, receivers = self.dispatch(receivers)
+    def send(self, receivers, *args, **kwargs):
+        dispatch_response, receivers = self.dispatch(receivers, *args, **kwargs)
         if dispatch_response:
             return
 
@@ -1451,7 +1450,7 @@ class EMAILNotification:
             if template:
                 self.trigger(receiver, template, context)
 
-    def dispatch(self, receivers):
+    def dispatch(self, receivers, *args, **kwargs):
         context = self.context
         if not context:
             return None, receivers
@@ -1483,7 +1482,7 @@ class EMAILNotification:
 
                 if email or send_without_email:
                     recipient_obj = RecipientEmail(email)
-                    obj.send_notification(context, recipient_obj, self.notification_type, user=receiver_user)
+                    obj.send_notification(context, recipient_obj, self.notification_type, user=receiver_user, *args, **kwargs)
 
         if not receivers_left:
             return True, receivers_left
