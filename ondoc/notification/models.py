@@ -1661,7 +1661,7 @@ class IPDIntimateEmailNotification(TimeStampedModel):
     phone_number = models.BigIntegerField(null=False)
     preferred_date = models.DateField(null=True, blank=True)
     time_slot = models.TimeField(blank=True, null=True)
-    gender = models.PositiveIntegerField(choices=GENDER_TYPE_CHOICES, blank=True, null=True)
+    gender = models.CharField(max_length=100,choices=GENDER_TYPE_CHOICES, blank=True, null=True)
     dob = models.DateField(blank=True, null=True)
     email_notifications = JSONField(null=True, blank=True)
 
