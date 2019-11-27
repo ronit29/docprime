@@ -262,9 +262,18 @@ class Order(TimeStampedModel):
         # Check if payment is required at all, only when payment is required we debit consumer's account
         payment_not_required = False
         if self.product_id == self.DOCTOR_PRODUCT_ID:
+            plus_plan_obj = None
+            if "plus_plan" in appointment_data and appointment_data['plus_plan'] and \
+                    TempPlusUser.objects.filter(id=int(appointment_data['plus_plan']), is_utilized__in=[False, None]).exists():
+
+                plus_plan_obj = appointment_data.pop('plus_plan')
+
             serializer = OpdAppTransactionModelSerializer(data=appointment_data)
             serializer.is_valid(raise_exception=True)
             appointment_data = serializer.validated_data
+            if plus_plan_obj:
+                appointment_data['plus_plan'] = plus_plan_obj
+
             if appointment_data['payment_type'] in [OpdAppointment.VIP, OpdAppointment.GOLD]:
                 if appointment_data['plus_amount'] > 0:
                     payment_not_required = False
@@ -278,9 +287,19 @@ class Order(TimeStampedModel):
             elif appointment_data['payment_type'] == OpdAppointment.INSURANCE:
                 payment_not_required = True
         elif self.product_id == self.LAB_PRODUCT_ID:
+            plus_plan_obj = None
+            if "plus_plan" in appointment_data and appointment_data['plus_plan'] and \
+                    TempPlusUser.objects.filter(id=int(appointment_data['plus_plan']),
+                                                is_utilized__in=[False, None]).exists():
+                plus_plan_obj = appointment_data.pop('plus_plan')
+
             serializer = LabAppTransactionModelSerializer(data=appointment_data)
             serializer.is_valid(raise_exception=True)
             appointment_data = serializer.validated_data
+
+            if plus_plan_obj:
+                appointment_data['plus_plan'] = plus_plan_obj
+
             if appointment_data['payment_type'] == OpdAppointment.COD:
                 payment_not_required = True
             elif appointment_data['payment_type'] == OpdAppointment.INSURANCE:
