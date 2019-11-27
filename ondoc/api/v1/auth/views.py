@@ -2283,6 +2283,10 @@ class OrderDetailViewSet(GenericViewSet):
                     else:
                         payment_mode = payment_modes.get(appointment.payment_type, '')
 
+            appointment_via_sbi = list()
+            if order.action_data.get('utm_sbi_tags', None):
+                appointment_via_sbi.append(True)
+
             curr = {
                 "mrp": order.action_data["mrp"] if "mrp" in order.action_data else order.action_data["agreed_price"],
                 "deal_price": order.action_data["deal_price"],
@@ -2302,7 +2306,12 @@ class OrderDetailViewSet(GenericViewSet):
             }
             processed_order_data.append(curr)
 
-        return Response({"data": processed_order_data, "valid_for_cod_to_prepaid": valid_for_cod_to_prepaid})
+        appointment_sbi = False
+        if True in appointment_via_sbi:
+            appointment_sbi = True
+
+        return Response({"data": processed_order_data, "valid_for_cod_to_prepaid": valid_for_cod_to_prepaid,
+                         "appointment_via_sbi": appointment_sbi})
 
 
 class UserTokenViewSet(GenericViewSet):

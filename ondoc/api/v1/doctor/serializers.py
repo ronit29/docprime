@@ -1654,6 +1654,7 @@ class AppointmentRetrieveSerializer(OpdAppointmentSerializer):
     invoices = serializers.SerializerMethodField()
     cancellation_reason = serializers.SerializerMethodField()
     vip = serializers.SerializerMethodField()
+    appointment_via_sbi = serializers.SerializerMethodField()
 
     class Meta:
         model = OpdAppointment
@@ -1661,7 +1662,7 @@ class AppointmentRetrieveSerializer(OpdAppointmentSerializer):
                   'allowed_action', 'effective_price', 'deal_price', 'status', 'time_slot_start', 'time_slot_end',
                   'doctor', 'hospital', 'allowed_action', 'doctor_thumbnail', 'patient_thumbnail', 'procedures', 'mrp',
                   'insurance', 'invoices', 'cancellation_reason', 'payment_type', 'display_name', 'reports', 'prescription',
-                  'report_files', 'vip')
+                  'report_files', 'vip', 'appointment_via_sbi')
 
     def get_insurance(self, obj):
         request = self.context.get("request")
@@ -1723,6 +1724,14 @@ class AppointmentRetrieveSerializer(OpdAppointmentSerializer):
 
     def get_cancellation_reason(self, obj):
         return obj.get_serialized_cancellation_reason()
+
+    def get_appointment_via_sbi(self, obj):
+        sbi_appointment = False
+        order = Order.objects.filter(reference_id=obj.id, product_id=1).first()
+        if order and order.action_data.get('utm_sbi_tags', None):
+            sbi_appointment = True
+
+        return sbi_appointment
 
 
 class NewAppointmentRetrieveSerializer(AppointmentRetrieveSerializer):

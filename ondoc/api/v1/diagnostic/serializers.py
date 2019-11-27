@@ -1873,6 +1873,7 @@ class LabAppointmentRetrieveSerializer(LabAppointmentModelSerializer):
     cancellation_reason = serializers.SerializerMethodField()
     mask_data = serializers.SerializerMethodField()
     selected_timings_type = serializers.SerializerMethodField()
+    appointment_via_sbi = serializers.SerializerMethodField()
 
     def get_mask_data(self, obj):
         mask_number = obj.mask_number.first()
@@ -1922,13 +1923,21 @@ class LabAppointmentRetrieveSerializer(LabAppointmentModelSerializer):
 
         return selected_timings_type
 
+    def get_appointment_via_sbi(self, obj):
+        sbi_appointment = False
+        order = Order.objects.filter(reference_id=obj.id, product_id=2).first()
+        if order and order.action_data.get('utm_sbi_tags', None):
+            sbi_appointment = True
+
+        return sbi_appointment
+
     class Meta:
         model = LabAppointment
         fields = ('id', 'type', 'lab_name', 'status', 'deal_price', 'effective_price',
                   'time_slot_start', 'time_slot_end', 'selected_timings_type', 'is_rated', 'rating_declined', 'is_home_pickup', 'lab_thumbnail',
                   'lab_image', 'profile', 'allowed_action', 'lab_test', 'lab', 'otp', 'address', 'type', 'reports',
                   'report_files', 'invoices', 'prescription', 'cancellation_reason', 'mask_data', 'payment_type',
-                  'price')
+                  'price', 'appointment_via_sbi')
 
 
 
