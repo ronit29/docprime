@@ -5309,11 +5309,13 @@ class RecordAPIView(viewsets.GenericViewSet):
             point_string = 'POINT(' + str(long) + ' ' + str(lat) + ')'
             pnt = GEOSGeometry(point_string, srid=4326)
             queryset = queryset.filter(location__distance_lte=(pnt, radius))
+
         serializer = serializers.RecordSerializer(queryset, many=True,
                                                               context={"request": request})
         serialized_data = serializer.data
         response['map_data'] = serialized_data
         response['labels'] = list(queryset.values('label').distinct())
+
         return Response(response)
 
 
