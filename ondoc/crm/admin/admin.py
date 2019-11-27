@@ -1,7 +1,7 @@
 from django.contrib.gis import admin
 from ondoc.common.models import PaymentOptions, UserConfig, Feature, Service, MatrixMappedState, MatrixMappedCity, \
     GlobalNonBookable, QRCode, BlacklistUser, BlockedStates, SponsorListingURL, \
-    SponsorListingUtmTerm, SponsoredListingService, SponsorListingSpecialization, SearchCriteria, GoogleLatLong
+    SponsorListingUtmTerm, SponsoredListingService, SponsorListingSpecialization, SearchCriteria, Certifications, GoogleLatLong
 from ondoc.corporate_booking.models import Corporates, CorporateDeal, CorporateDocument
 from ondoc.crm.admin.banner import BannerAdmin, SliderLocationAdmin, RecommenderAdmin, EmailBannerAdmin
 from ondoc.crm.admin.location import ComparePackagesSEOUrlsAdmin
@@ -332,6 +332,7 @@ admin.site.register(TestSamplesLabAlerts, TestSamplesLabAlertAdmin)
 admin.site.register(PartnerLabSamplesCollectOrder, PartnerLabSamplesCollectOrderAdmin)
 admin.site.register(SearchCriteria, SearchCriteriaAdmin)
 admin.site.register(Permission, PermissionAdmin)
+admin.site.register(Certifications)
 admin.site.register(GoogleMapRecords)
 admin.site.register(LabtestNameMaster, LabTestNameMasterAdmin)
 admin.site.register(GoogleLatLong, GoogleLatLongAdmin)

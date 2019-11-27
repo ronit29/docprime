@@ -45,21 +45,25 @@ class DoctorSearchScore:
 
     def calculate(self):
         doctor_in_hosp_count = dict()
-        hospitals_without_network = doctor_models.Hospital.objects.prefetch_related('assoc_doctors').filter(
-            network__isnull=True).annotate(doctors_count=Count('assoc_doctors__id'))
+        hosp_count = doctor_models.Hospital.objects.all().count()
+        count = 0
+        while count <= hosp_count:
+            hospitals_without_network = doctor_models.Hospital.objects.prefetch_related('assoc_doctors').filter(
+                network__isnull=True).annotate(doctors_count=Count('assoc_doctors__id'))[count:count+5000]
 
-        for hosp in hospitals_without_network:
-            doctor_in_hosp_count[hosp.id] = hosp.doctors_count
+            for hosp in hospitals_without_network:
+                doctor_in_hosp_count[hosp.id] = hosp.doctors_count
 
-        hospitals_with_network = doctor_models.Hospital.objects.select_related('network').filter(
-            network__isnull=False).annotate(
-            hosp_network_doctors_count=Count(Case(When(network__isnull=False, then=F('network__assoc_hospitals__assoc_doctors')))))
+            hospitals_with_network = doctor_models.Hospital.objects.select_related('network').filter(
+                network__isnull=False).annotate(
+                hosp_network_doctors_count=Count(Case(When(network__isnull=False, then=F('network__assoc_hospitals__assoc_doctors')))))[count: count+5000]
 
-        for hosp in hospitals_with_network:
-            doctor_in_hosp_count[hosp.id] = hosp.hosp_network_doctors_count
+            for hosp in hospitals_with_network:
+                doctor_in_hosp_count[hosp.id] = hosp.hosp_network_doctors_count
 
-        doctors_count = doctor_models.Doctor.objects.all().prefetch_related("hospitals", "doctor_clinics", "doctor_clinics__hospital",
-                                                "doctor_clinics__hospital__hospital_place_details").order_by('id').count()
+            count += 5000
+
+        doctors_count = doctor_models.Doctor.objects.all().count()
 
         count = 0
 

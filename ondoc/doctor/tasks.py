@@ -197,4 +197,4 @@ def doctors_daily_schedule():
 @task()
 def fetch_place_ids():
     from ondoc.common.models import GoogleLatLong
-    GoogleLatLong.generate_place_ids()
+    # GoogleLatLong.generate_place_ids()
