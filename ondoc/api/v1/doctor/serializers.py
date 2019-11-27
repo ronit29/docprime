@@ -3029,8 +3029,22 @@ class TopCommonHospitalForIpdProcedureSerializer(serializers.ModelSerializer):
 
 class RecordSerializer(serializers.ModelSerializer):
 
+    link = serializers.SerializerMethodField()
+
+    def get_link(self, obj):
+        link = None
+        request = self.context.get('request')
+        params = request.query_params
+        lat = params.get('lat', 28.450367)
+        long = params.get('long', 77.071848)
+
+        if lat and long:
+            link = 'https://www.google.com/maps/search/?api=1&query=' + str(lat) + ',' + str(long)
+
+        return link
+
     class Meta:
        model = GoogleMapRecords
-       fields = (["id","location","text","created_at","latitude","longitude", "updated_at", "image", "label", "reason", "hospital_name", "place_id",
+       fields = (["id","location","text","created_at","latitude","longitude", "updated_at", "image", "label", "reason", "hospital_name",    "place_id",
                   "multi_speciality", "has_phone", "lead_rank", "combined_rating", "combined_rating_count", "is_potential", "has_booking", "monday_timing",
-                 "address" ])
+                 "address" , "is_bookable", "link"])
