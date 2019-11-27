@@ -117,8 +117,8 @@ class PlusPlansSerializer(serializers.ModelSerializer):
     class Meta:
         model = PlusPlans
         fields = ('id', 'plan_name', 'worth', 'mrp', 'tax_rebate', 'you_pay', 'you_get', 'deal_price', 'is_selected',
-                  'tenure', 'total_allowed_members', 'content', 'enabled_hospital_networks', 'utilize', 'is_gold',
-                  'show_consultation_text')
+                  'tenure', 'total_allowed_members', 'default_single_booking', 'content', 'enabled_hospital_networks',
+                  'utilize', 'is_gold', 'show_consultation_text')
 
 
 class PlusProposerSerializer(serializers.ModelSerializer):
