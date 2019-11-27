@@ -1538,8 +1538,7 @@ class TransactionViewSet(viewsets.GenericViewSet):
                         # For Testing
 
                         # Simplify the response for multiorder for ease of incomming checksum creation
-                        order_items = response.get('items', [])
-                        order_items = order_items[::-1]
+                        order_items = sorted(response.get('items', []), key=lambda x: x['productId'])
                         stringify_item = '['
                         if order_items.__class__.__name__ == 'list':
                             for i in order_items:

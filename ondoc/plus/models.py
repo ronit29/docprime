@@ -1302,6 +1302,7 @@ class TempPlusUser(auth_model.TimeStampedModel):
     raw_plus_member = JSONField(blank=True, null=True, default=list)
     profile = models.ForeignKey(UserProfile, related_name='temp_plus_user_profile', on_delete=models.DO_NOTHING)
     deleted = models.BooleanField(default=0)
+    is_utilized = models.NullBooleanField()
 
     class Meta:
         db_table = 'temp_plus_user'

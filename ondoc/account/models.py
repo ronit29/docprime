@@ -235,7 +235,7 @@ class Order(TimeStampedModel):
         from ondoc.subscription_plan.models import UserPlanMapping
         from ondoc.insurance.models import UserInsurance, InsuranceTransaction
         from ondoc.api.v1.chat.serializers import ChatTransactionModelSerializer
-        from ondoc.plus.models import PlusAppointmentMapping
+        from ondoc.plus.models import PlusAppointmentMapping, TempPlusUser
 
         appointment_data = self.action_data
         consumer_account = ConsumerAccount.objects.get_or_create(user=appointment_data['user'])
@@ -265,7 +265,7 @@ class Order(TimeStampedModel):
             serializer = OpdAppTransactionModelSerializer(data=appointment_data)
             serializer.is_valid(raise_exception=True)
             appointment_data = serializer.validated_data
-            if appointment_data['payment_type'] == OpdAppointment.VIP:
+            if appointment_data['payment_type'] in [OpdAppointment.VIP, OpdAppointment.GOLD]:
                 if appointment_data['plus_amount'] > 0:
                     payment_not_required = False
                 else:
@@ -341,6 +341,19 @@ class Order(TimeStampedModel):
                 if self.reference_id:
                     appointment_obj = cod_to_prepaid_app
                 else:
+                    if appointment_obj.plus_plan:
+                        temp_plus_obj = TempPlusUser.objects.filter(user=appointment_data['user'], id=appointment_obj.plus_plan.id,
+                                                        profile=appointment_data['profile'], plan__id=appointment_obj.plus_plan.plan.id, is_utilized__in=[False, None]).first()
+                        if temp_plus_obj:
+                            temp_plus_obj.is_utilized = True
+                            temp_plus_obj.save()
+
+                            sibling_order = Order.objects.filter(user=appointment_data['user'], product_id=Order.GOLD_PRODUCT_ID, reference_id__isnull=False).order_by('-id').first()
+                            plus_obj = PlusUser.objects.filter(id=sibling_order.reference_id)
+                            appointment_data['plus_plan'] = plus_obj
+                        else:
+                            raise Exception('Could not find the Temp plus user for single flow order id %d. Hence Aborting.' % self.id)
+
                     appointment_obj = OpdAppointment.create_appointment(appointment_data, responsible_user=_responsible_user, source=_source)
                     if appointment_obj.plus_plan:
                         data = {"plus_user": appointment_obj.plus_plan, "plus_plan": appointment_obj.plus_plan.plan,
@@ -354,6 +367,27 @@ class Order(TimeStampedModel):
                 amount = appointment_obj.effective_price
         elif self.action == Order.LAB_APPOINTMENT_CREATE:
             if total_balance >= appointment_data["effective_price"] or payment_not_required:
+                if appointment_obj.plus_plan:
+                    temp_plus_obj = TempPlusUser.objects.filter(user=appointment_data['user'],
+                                                                id=appointment_obj.plus_plan.id,
+                                                                profile=appointment_data['profile'],
+                                                                plan__id=appointment_obj.plus_plan.plan.id,
+                                                                is_utilized__in=[False, None]).first()
+                    if temp_plus_obj:
+                        temp_plus_obj.is_utilized = True
+                        temp_plus_obj.save()
+
+                        sibling_order = Order.objects.filter(user=appointment_data['user'],
+                                                             product_id=Order.GOLD_PRODUCT_ID,
+                                                             reference_id__isnull=False).order_by('-id').first()
+                        plus_obj = PlusUser.objects.filter(id=sibling_order.reference_id)
+                        appointment_data['plus_plan'] = plus_obj
+                    else:
+                        raise Exception(
+                            'Could not find the Temp plus user for single flow order id %d. Hence Aborting.' % self.id)
+
+
+
                 appointment_obj = LabAppointment.create_appointment(appointment_data, responsible_user=_responsible_user, source=_source)
 
                 if appointment_obj.plus_plan:
@@ -1266,7 +1300,7 @@ class PgTransaction(TimeStampedModel, SoftDelete):
     status_code = models.IntegerField()
     pg_name = models.CharField(max_length=100, null=True, blank=True)
     status_type = models.CharField(max_length=50)
-    transaction_id = models.CharField(max_length=100, null=True, unique=True)
+    transaction_id = models.CharField(max_length=100, null=True)
     pb_gateway_name = models.CharField(max_length=100, null=True, blank=True)
     payment_captured = models.BooleanField(default=False)
     nodal_id = models.SmallIntegerField(choices=NODAL_CHOICES, null=True, blank=True)
@@ -1368,8 +1402,7 @@ class PgTransaction(TimeStampedModel, SoftDelete):
                 "Hash Mismatch with Calculated Hash - " + calculated_hash + " pre-hashed string - " + prehashed_str + " pg response data - " + json.dumps(
                     data))
 
-        # return True if pg_hash == calculated_hash else False
-        return True
+        return True if pg_hash == calculated_hash else False
 
     @classmethod
     def create_incomming_pg_hash(cls, data, key1, key2):
@@ -1412,6 +1445,8 @@ class PgTransaction(TimeStampedModel, SoftDelete):
     class Meta:
         db_table = "pg_transaction"
         # unique_together = (("order", "order_no", "deleted"),)
+
+        unique_together = (("order", "order_no", "deleted", "transaction_id"),)
 
 
 class DummyTransactions(TimeStampedModel):
