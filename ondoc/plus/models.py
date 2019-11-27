@@ -764,11 +764,12 @@ class PlusUser(auth_model.TimeStampedModel, RefundMixin, TransactionMixin):
                     profile.email = member['email']
                     # profile.gender = member['gender']
                     profile.dob = member['dob']
+                    profile.is_default_user = True
                     # if member['relation'] == PlusMembers.Relations.SELF:
-                    if member['is_primary_user']:
-                        profile.is_default_user = True
-                    else:
-                        profile.is_default_user = False
+                    # if member['is_primary_user']:
+                    #
+                    # else:
+                    #     profile.is_default_user = False
                     profile.save()
 
                 profile = profile.id
@@ -777,8 +778,13 @@ class PlusUser(auth_model.TimeStampedModel, RefundMixin, TransactionMixin):
             data = {'name': name, 'email': member['email'], 'user_id': user.id,
                     'dob': member['dob'], 'is_default_user': False, 'is_otp_verified': False,
                     'phone_number': user.phone_number}
-            if member['is_primary_user']:
+            # if member['is_primary_user']:
+            #     data['is_default_user'] = True
+            profile_obj = UserProfile.objects.filter(user_id=user.id).first()
+            if not profile_obj and member['is_primary_user']:
                 data['is_default_user'] = True
+            else:
+                data['is_default_user'] = False
 
             member_profile = UserProfile.objects.create(**data)
             profile = member_profile.id
@@ -984,7 +990,7 @@ class PlusUser(auth_model.TimeStampedModel, RefundMixin, TransactionMixin):
         phone_number = profile.phone_number
         plus_members = []
 
-        member = {"first_name": first_name, "last_name": last_name, "dob": dob, "email": email, "phone_number": phone_number, "profile": profile.id if profile else None}
+        member = {"first_name": first_name, "last_name": last_name, "dob": dob, "email": email, "phone_number": phone_number, "profile": profile.id if profile else None, "is_primary_user": True}
         primary_user_profile = UserProfile.objects.filter(user_id=profile.user.pk, is_default_user=True).values('id', 'name',
                                                                                                       'email',
                                                                                                       'gender',

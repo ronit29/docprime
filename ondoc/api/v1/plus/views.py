@@ -176,6 +176,7 @@ class PlusOrderViewSet(viewsets.GenericViewSet):
                     pre_insured_members['relation'] = member.get('relation', None)
                     pre_insured_members['profile'] = member.get('profile').id if member.get(
                         'profile') is not None else None
+                    pre_insured_members['is_primary_user'] = True
 
                     plus_members.append(pre_insured_members.copy())
 
