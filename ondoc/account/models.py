@@ -342,7 +342,7 @@ class Order(TimeStampedModel):
                     appointment_obj = cod_to_prepaid_app
                 else:
                     if appointment_obj.plus_plan:
-                        temp_plus_obj = TempPlusUser.objects.filter(user=appointment_data['user'], id=appointment_obj.plus_plan.id,
+                        temp_plus_obj = TempPlusUser.objects.filter(user=appointment_data['user'], id=int(appointment_obj.plus_plan.id),
                                                         profile=appointment_data['profile'], plan__id=appointment_obj.plus_plan.plan.id, is_utilized__in=[False, None]).first()
                         if temp_plus_obj:
                             temp_plus_obj.is_utilized = True
@@ -369,7 +369,7 @@ class Order(TimeStampedModel):
             if total_balance >= appointment_data["effective_price"] or payment_not_required:
                 if appointment_obj.plus_plan:
                     temp_plus_obj = TempPlusUser.objects.filter(user=appointment_data['user'],
-                                                                id=appointment_obj.plus_plan.id,
+                                                                id=int(appointment_obj.plus_plan.id),
                                                                 profile=appointment_data['profile'],
                                                                 plan__id=appointment_obj.plus_plan.plan.id,
                                                                 is_utilized__in=[False, None]).first()
