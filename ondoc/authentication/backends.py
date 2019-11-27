@@ -6,6 +6,7 @@ from django.conf import settings
 from rest_framework import authentication, exceptions
 from ondoc.authentication.models import UserSecretKey, WhiteListedLoginTokens
 import base64
+from packaging.version import parse
 
 User = get_user_model()
 
@@ -63,6 +64,7 @@ class MatrixAuthentication(authentication.BaseAuthentication):
 
 class JWTAuthentication(authentication.BaseAuthentication):
     authentication_header_prefix = settings.JWT_AUTH['JWT_AUTH_HEADER_PREFIX']
+
     def authenticate(self, request):
 
         request.user = None
@@ -90,13 +92,19 @@ class JWTAuthentication(authentication.BaseAuthentication):
         user_id = JWTAuthentication.get_unverified_user(token)
 
         if user_id:
-            is_whitelisted = WhiteListedLoginTokens.objects.filter(token=token, user_id=user_id).first()
-            if is_whitelisted:
+            if parse(request.META.get('HTTP_APP_VERSION')) > parse('2.7.2') or parse(request.META.get('HTTP_APP_VERSION')) > parse('2.100.15'):
+            # if request.get('app_version'):
+                is_whitelisted = WhiteListedLoginTokens.objects.filter(token=token, user_id=user_id).first()
+                if is_whitelisted:
+                    user_key_object = UserSecretKey.objects.filter(user_id=user_id).first()
+                    if user_key_object:
+                        user_key = user_key_object.key
+                else:
+                    raise exceptions.AuthenticationFailed("Invalid Login")
+            else:
                 user_key_object = UserSecretKey.objects.filter(user_id=user_id).first()
                 if user_key_object:
                     user_key = user_key_object.key
-            else:
-                raise exceptions.AuthenticationFailed("Invalid Login")
         try:
             payload = jwt.decode(token, user_key)
         except Exception as e:
@@ -154,11 +162,13 @@ class JWTAuthentication(authentication.BaseAuthentication):
         return unverified_payload.get('user_id', None)
 
     @staticmethod
-    def generate_token(user):
+    def generate_token(user, request=None):
         user_key = UserSecretKey.objects.get_or_create(user=user)
         payload = JWTAuthentication.jwt_payload_handler(user)
         token = jwt.encode(payload, user_key[0].key)
-        whitelist = WhiteListedLoginTokens.objects.create(token=token.decode('utf-8'), user=user)
+        if parse(request.META.get('HTTP_APP_VERSION')) > parse('2.7.2') or parse(
+                request.META.get('HTTP_APP_VERSION')) > parse('2.100.15'):
+            whitelist = WhiteListedLoginTokens.objects.create(token=token.decode('utf-8'), user=user)
         return {'token': token,
                 'payload': payload}
 

@@ -400,7 +400,7 @@ class RefreshJSONWebTokenSerializer(serializers.Serializer):
         reset = attrs.get('reset')
         if reset:
             try:
-                decrypt = v1_utils.AES_encryption.decrypt(reset, "1234567890123456")
+                decrypt = v1_utils.AES_encryption.decrypt(reset, "hpDqwzdpoQY8ymm5")
                 if decrypt and isinstance(decrypt, tuple):
                     decrypt = decrypt[0]
                     data = v1_utils.AES_encryption.unpad(decrypt)
@@ -420,6 +420,7 @@ class RefreshJSONWebTokenSerializer(serializers.Serializer):
                 token_object = JWTAuthentication.generate_token(user)
                 return {
                     'token': token_object['token'],
+                    'user': user,
                     'payload': token_object['payload']
                 }
 
@@ -446,16 +447,16 @@ class RefreshJSONWebTokenSerializer(serializers.Serializer):
             msg = _('orig_iat missing')
             raise serializers.ValidationError(msg)
         blacllist_token = WhiteListedLoginTokens.objects.filter(token=token, user=user).delete()
-        if blacllist_token and isinstance(blacllist_token, tuple) and (blacllist_token[0] > 0):
-            token_object = JWTAuthentication.generate_token(user)
-            token_object['payload']['orig_iat'] = orig_iat
-            return {
-                'token': token_object['token'],
-                'user': user,
-                'payload': token_object['payload']
-            }
-        else:
-            return serializers.ValidationError("Token Has expired")
+        # if blacllist_token and isinstance(blacllist_token, tuple) and (blacllist_token[0] > 0):
+        token_object = JWTAuthentication.generate_token(user)
+        token_object['payload']['orig_iat'] = orig_iat
+        return {
+            'token': token_object['token'],
+            'user': user,
+            'payload': token_object['payload']
+        }
+        # else:
+        # return serializers.ValidationError("Token Has expired")
 
     def check_user_custom(self, payload):
         uid = payload.get('user_id')
