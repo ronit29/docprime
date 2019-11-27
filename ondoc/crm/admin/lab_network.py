@@ -9,7 +9,8 @@ from ondoc.crm.admin.doctor import CreatedByFilter
 from ondoc.crm.admin.lab import HomePickupChargesInline
 from ondoc.diagnostic.models import (Lab, LabNetworkCertification,
                                      LabNetworkAward, LabNetworkAccreditation, LabNetworkEmail,
-                                     LabNetworkHelpline, LabNetworkManager, LabNetworkDocument, LabNetwork)
+                                     LabNetworkHelpline, LabNetworkManager, LabNetworkDocument, LabNetwork,
+                                     LabCertification)
 from .common import *
 from ondoc.authentication.models import GenericAdmin, User, GenericLabAdmin, AssociatedMerchant
 from django.contrib.contenttypes.admin import GenericTabularInline
@@ -18,11 +19,27 @@ from ondoc.authentication.admin import SPOCDetailsInline
 import nested_admin
 from .common import AssociatedMerchantInline, RemarkInline
 
+
+class LabNetworkCertificationInlineFormSet(forms.BaseInlineFormSet):
+    def clean(self):
+        super().clean()
+        if any(self.errors):
+            return
+
+        for data in self.cleaned_data:
+            lab_obj = Lab.objects.filter(network_id=data.get('network').id)
+            for lab in lab_obj:
+                LabCertification.objects.get_or_create(lab=lab, certification=data.get('id').certification)
+
+
 class LabNetworkCertificationInline(admin.TabularInline):
     model = LabNetworkCertification
     extra = 0
     can_delete = True
     show_change_link = False
+    fields = ['certification']
+    search_fields = ['certification']
+    formset = LabNetworkCertificationInlineFormSet
 
 
 class LabNetworkAwardForm(forms.ModelForm):

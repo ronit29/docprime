@@ -8,6 +8,7 @@ import datetime
 
 from reversion_compare.admin import CompareVersionAdmin
 
+from ondoc.common.models import Certifications
 from ondoc.crm.admin.doctor import CreatedByFilter
 from ondoc.doctor.models import (HospitalImage, HospitalDocument, HospitalAward, Doctor,
                                  HospitalAccreditation, HospitalCertification, HospitalSpeciality, HospitalNetwork,
@@ -84,6 +85,8 @@ class HospitalCertificationInline(admin.TabularInline):
     extra = 0
     can_delete = True
     show_change_link = False
+    fields = ['certification']
+    search_fields = ['certification']
 
 
 class HospitalSpecialityInline(admin.TabularInline):

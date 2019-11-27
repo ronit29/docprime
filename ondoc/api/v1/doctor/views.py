@@ -4776,6 +4776,7 @@ class HospitalViewSet(viewsets.GenericViewSet):
         pnt = GEOSGeometry(point_string, srid=4326)
 
         hospital_queryset = Hospital.objects.prefetch_related('hospitalcertification_set',
+                                                              'hospitalcertification_set__certification',
                                                               'hospital_documents',
                                                               'hosp_availability',
                                                               'health_insurance_providers',
@@ -4868,12 +4869,12 @@ class HospitalViewSet(viewsets.GenericViewSet):
                                                          'hospital_helpline_numbers',
                                                          'network__hospital_network_documents',
                                                          'hospitalcertification_set',
+                                                         'hospitalcertification_set__certification',
                                                          'hosp_availability',
                                                          'question_answer',
                                                          'hospitalspeciality_set', Prefetch('imagehospital',
                                                                                             HospitalImage.objects.all().order_by(
-                                                                                                '-cover_image'))).filter(
-            id=pk, is_live=True).first()
+                                                                                                '-cover_image'))).filter(id=pk, is_live=True).first()
         if not hospital_obj:
             return Response(status=status.HTTP_400_BAD_REQUEST)
 
@@ -4946,6 +4947,8 @@ class HospitalViewSet(viewsets.GenericViewSet):
         listing_schema = self.build_listing_schema_for_hospital(hosp_serializer)
         breadcrumb_schema = self.build_breadcrumb_schema_for_hospital(response['breadcrumb']) if response.get('breadcrumb') else None
         all_schema = [x for x in [schema, listing_schema, breadcrumb_schema] if x]
+        response['certifications'] = [{"certification_id": data.certification.id, "certification_name": data.certification.name} for data in hospital_obj.hospitalcertification_set.all() if data.certification]
+
         response['seo'] = {'title': title, "description": description, "schema": schema,
                            "h1_title": h1_title, 'all_schema': all_schema}
         response['canonical_url'] = canonical_url
