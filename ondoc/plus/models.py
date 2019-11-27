@@ -113,6 +113,7 @@ class PlusPlans(auth_model.TimeStampedModel, LiveMixin):
     plan_criteria = models.CharField(max_length=100, null=True, blank=False, choices=UsageCriteria.as_choices())
     price_criteria = models.CharField(max_length=100, null=True, blank=False, choices=PriceCriteria.as_choices())
     is_gold = models.NullBooleanField()
+    default_single_booking = models.NullBooleanField()
 
     @classmethod
     def get_active_plans_via_utm(cls, utm):

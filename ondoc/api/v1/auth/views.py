@@ -727,7 +727,7 @@ class UserAppointmentsViewSet(OndocViewSet):
                                             "message": "Appointment time is not covered under insurance"
                                         }
                                         return resp
-                            if lab_appointment.payment_type in [OpdAppointment.VIP] and lab_appointment.insurance_id is not None:
+                            if lab_appointment.payment_type in [OpdAppointment.VIP, OpdAppointment.GOLD] and lab_appointment.plus_plan_id is not None:
                                 plus_user = PlusUser.objects.filter(id=lab_appointment.plus_plan_id).first()
                                 if plus_user:
                                     if time_slot_start > plus_user.expire_date:
@@ -771,7 +771,7 @@ class UserAppointmentsViewSet(OndocViewSet):
                                         "message": "Appointment time is not covered under insurance"
                                     }
                                     return resp
-                        if lab_appointment.payment_type in [OpdAppointment.VIP] and lab_appointment.insurance_id is not None:
+                        if lab_appointment.payment_type in [OpdAppointment.VIP, OpdAppointment.GOLD] and lab_appointment.plus_plan_id is not None:
                             plus_user = PlusUser.objects.filter(id=lab_appointment.plus_plan_id).first()
                             if plus_user:
                                 if time_slot_start > plus_user.expire_date:
@@ -925,7 +925,7 @@ class UserAppointmentsViewSet(OndocViewSet):
                                         "message": "Appointment time is not covered under insurance"
                                     }
                                     return resp
-                        if opd_appointment.payment_type == OpdAppointment.VIP and opd_appointment.plus_plan is not None:
+                        if opd_appointment.payment_type in [OpdAppointment.VIP, OpdAppointment.GOLD] and opd_appointment.plus_plan is not None:
                             plus_user = PlusUser.objects.filter(id=opd_appointment.plus_plan_id).first()
                             if plus_user and time_slot_start > plus_user.expire_date:
                                 resp = {
