@@ -5301,7 +5301,7 @@ class RecordAPIView(viewsets.GenericViewSet):
         params = request.query_params
         lat = params.get('lat', 28.450367)
         long = params.get('long', 77.071848)
-        radius = int(params.get('radius')) if params.get('radius') else 10000
+        radius = int(params.get('radius')) if params.get('radius') else 2000
         response = dict()
 
         queryset = GoogleMapRecords.objects.all()
