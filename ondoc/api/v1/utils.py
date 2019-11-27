@@ -657,7 +657,13 @@ def payment_details(request, order):
         if not plus_plan:
             raise Exception('Invalid pg transaction as plus plan is not found.')
         proposer = plus_plan.proposer
-        plus_merchant_code = proposer.merchant_code
+        # plus_merchant_code = proposer.merchant_code
+        if order.product_id == Order.VIP_PRODUCT_ID:
+            plus_merchant_code = settings.VIP_MERCHANT_CODE
+        elif order.product_id == Order.GOLD_PRODUCT_ID:
+            plus_merchant_code = settings.GOLD_MERCHANT_CODE
+        else:
+            plus_merchant_code = ""
 
         if not profile:
             if order.action_data.get('profile_detail'):
