@@ -416,9 +416,9 @@ class PlusDataViewSet(viewsets.GenericViewSet):
             elif query_params.get('is_single_flow_lab'):
                 LabAppointmentView().create(request, is_dummy=True)
 
-            plus_dummy_obj = PlusDummyData(user=user, data=data, data_type=data_type)
-            plus_dummy_obj.save()
-            resp = {'dummy_id': plus_dummy_obj.id}
+        plus_dummy_obj = PlusDummyData(user=user, data=data, data_type=data_type)
+        plus_dummy_obj.save()
+        resp = {'dummy_id': plus_dummy_obj.id}
 
         return Response(data=resp, status=status.HTTP_200_OK)
 
