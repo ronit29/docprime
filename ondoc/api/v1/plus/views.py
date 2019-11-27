@@ -350,6 +350,12 @@ class PlusProfileViewSet(viewsets.GenericViewSet):
             resp['is_member_allowed'] = False
         else:
             resp['is_member_allowed'] = True
+
+        plus_via_sbi = False
+        if plus_user.order and plus_user.order.action_data and plus_user.order.action_data.get('utm_sbi_tags', None):
+            plus_via_sbi = True
+        resp['plus_via_sbi'] = plus_via_sbi
+
         plus_plan_queryset = PlusPlans.objects.filter(id=plus_user.plan.id)
         plan_body_serializer = serializers.PlusPlansSerializer(plus_plan_queryset, context={'request': request}, many=True)
         resp['plan'] = plan_body_serializer.data

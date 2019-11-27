@@ -1940,7 +1940,6 @@ class LabAppointmentRetrieveSerializer(LabAppointmentModelSerializer):
                   'price', 'appointment_via_sbi')
 
 
-
 class DoctorLabAppointmentRetrieveSerializer(LabAppointmentModelSerializer):
     profile = UserProfileSerializer()
     lab = LabModelSerializer()
