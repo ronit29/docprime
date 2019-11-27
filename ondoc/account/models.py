@@ -234,7 +234,7 @@ class Order(TimeStampedModel):
         from ondoc.subscription_plan.models import UserPlanMapping
         from ondoc.insurance.models import UserInsurance, InsuranceTransaction
         from ondoc.api.v1.chat.serializers import ChatTransactionModelSerializer
-        from ondoc.plus.models import PlusAppointmentMapping
+        from ondoc.plus.models import PlusAppointmentMapping, TempPlusUser
 
         appointment_data = self.action_data
         consumer_account = ConsumerAccount.objects.get_or_create(user=appointment_data['user'])
@@ -261,10 +261,22 @@ class Order(TimeStampedModel):
         # Check if payment is required at all, only when payment is required we debit consumer's account
         payment_not_required = False
         if self.product_id == self.DOCTOR_PRODUCT_ID:
+            if "plus_plan" in appointment_data and appointment_data['plus_plan']:
+
+                temp_plus_obj = TempPlusUser.objects.filter(user__id=appointment_data['user'], id=int(appointment_data['plus_plan']),
+                                                            profile__id=appointment_data['profile'], is_utilized=None).first()
+                if temp_plus_obj:
+                    temp_plus_obj.is_utilized = True
+                    temp_plus_obj.save()
+
+                    sibling_order = Order.objects.filter(user__id=appointment_data['user'], product_id=Order.GOLD_PRODUCT_ID, reference_id__isnull=False).order_by('-id').first()
+                    plus_obj = PlusUser.objects.filter(id=sibling_order.reference_id).first()
+                    appointment_data['plus_plan'] = plus_obj.id
+
             serializer = OpdAppTransactionModelSerializer(data=appointment_data)
             serializer.is_valid(raise_exception=True)
             appointment_data = serializer.validated_data
-            if appointment_data['payment_type'] == OpdAppointment.VIP:
+            if appointment_data['payment_type'] in [OpdAppointment.VIP, OpdAppointment.GOLD]:
                 if appointment_data['plus_amount'] > 0:
                     payment_not_required = False
                 else:
@@ -277,6 +289,19 @@ class Order(TimeStampedModel):
             elif appointment_data['payment_type'] == OpdAppointment.INSURANCE:
                 payment_not_required = True
         elif self.product_id == self.LAB_PRODUCT_ID:
+
+            if "plus_plan" in appointment_data and appointment_data['plus_plan']:
+
+                temp_plus_obj = TempPlusUser.objects.filter(user__id=appointment_data['user'], id=int(appointment_data['plus_plan']),
+                                                            profile__id=appointment_data['profile'], is_utilized=None).first()
+                if temp_plus_obj:
+                    temp_plus_obj.is_utilized = True
+                    temp_plus_obj.save()
+
+                    sibling_order = Order.objects.filter(user__id=appointment_data['user'], product_id=Order.GOLD_PRODUCT_ID, reference_id__isnull=False).order_by('-id').first()
+                    plus_obj = PlusUser.objects.filter(id=sibling_order.reference_id).first()
+                    appointment_data['plus_plan'] = plus_obj.id
+
             serializer = LabAppTransactionModelSerializer(data=appointment_data)
             serializer.is_valid(raise_exception=True)
             appointment_data = serializer.validated_data
@@ -1267,7 +1292,7 @@ class PgTransaction(TimeStampedModel, SoftDelete):
     status_code = models.IntegerField()
     pg_name = models.CharField(max_length=100, null=True, blank=True)
     status_type = models.CharField(max_length=50)
-    transaction_id = models.CharField(max_length=100, null=True, unique=True)
+    transaction_id = models.CharField(max_length=100, null=True)
     pb_gateway_name = models.CharField(max_length=100, null=True, blank=True)
     payment_captured = models.BooleanField(default=False)
     nodal_id = models.SmallIntegerField(choices=NODAL_CHOICES, null=True, blank=True)
@@ -1412,6 +1437,8 @@ class PgTransaction(TimeStampedModel, SoftDelete):
     class Meta:
         db_table = "pg_transaction"
         # unique_together = (("order", "order_no", "deleted"),)
+
+        unique_together = (("order", "order_no", "deleted", "transaction_id"),)
 
 
 class DummyTransactions(TimeStampedModel):

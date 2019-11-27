@@ -11,8 +11,8 @@ class AbstractCriteria(object):
         else:
             self.plus_obj = None
         # self.plus_obj = plus_obj if plus_obj.__class__.__name__ == 'PlusUser' else None
-        self.plus_plan = plus_obj.plan if plus_obj.__class__.__name__ == 'PlusUser' else plan
-        self.utilization = plus_obj.get_utilization if plus_obj.__class__.__name__ == 'PlusUser' else {}
+        self.plus_plan = plus_obj.plan if plus_obj.__class__.__name__ in ['PlusUser', 'TempPlusUser'] else plan
+        self.utilization = plus_obj.get_utilization if plus_obj.__class__.__name__ in ['PlusUser', 'TempPlusUser'] else {}
 
     def _validate_booking_entity(self, cost, id, *args, **kwargs):
         raise NotImplementedError()
@@ -715,10 +715,10 @@ def get_price_reference(obj, entity):
     if not obj:
         return None
 
-    if obj.__class__.__name__ not in ['PlusUser', 'PlusPlans']:
+    if obj.__class__.__name__ not in ['PlusUser', 'PlusPlans', 'TempPlusUser']:
         return None
 
-    price_criteria = obj.plan.price_criteria if obj.__class__.__name__ == 'PlusUser' else obj.price_criteria
+    price_criteria = obj.plan.price_criteria if obj.__class__.__name__ in ['PlusUser', 'TempPlusUser'] else obj.price_criteria
     if entity not in ['DOCTOR', 'LABTEST'] or price_criteria not in PriceCriteria.availabilities():
         return None
 

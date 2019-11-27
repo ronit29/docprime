@@ -2673,7 +2673,7 @@ class LabAppointmentView(mixins.CreateModelMixin,
                 new_data = copy.deepcopy(data)
 
             if plus_plan:
-                validated_data['start_date'] = new_data['start_date']
+                validated_data['start_date'] = dateutil.parser.parse(new_data['start_date'])
                 validated_data['start_time'] = new_data['start_time']
                 validated_data['is_home_pickup'] = new_data['is_home_pickup']
 

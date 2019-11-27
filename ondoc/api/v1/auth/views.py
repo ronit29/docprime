@@ -1539,7 +1539,8 @@ class TransactionViewSet(viewsets.GenericViewSet):
         PLUS_SUCCESS_REDIRECT_URL = settings.BASE_URL + "/vip-club-activated-details?payment=success&id=%s"
 
         pg_resp_code = int(response.get('statusCode'))
-        items = response.get('items').sort(key='productId', reverse=True)
+        # items = response.get('items' ,[]).sort(key='productId', reverse=True)
+        items = sorted(response.get('items', []), key=lambda x: x['productId'], reverse=True)
         for item in items:
             try:
                 order_id = item.get('orderId', None)
@@ -1559,7 +1560,7 @@ class TransactionViewSet(viewsets.GenericViewSet):
                 # Check if already processes
                 try:
                     if response and response.get("orderNo"):
-                        pg_txn = PgTransaction.objects.filter(order_no__iexact=response.get("orderNo")).first()
+                        pg_txn = PgTransaction.objects.filter(order_no__iexact=response.get("orderNo"), order__id=int(item.get('orderId'))).first()
                         if pg_txn:
                             is_preauth = False
                             if pg_txn.is_preauth():
@@ -1614,11 +1615,37 @@ class TransactionViewSet(viewsets.GenericViewSet):
                         order_obj.update_fields_after_coupon_remove()
 
                     response_data = None
-                    resp_serializer = serializers.TransactionSerializer(data=response)
+
+                    if "items" in response:
+                        virtual_response = copy.deepcopy(response)
+                        del virtual_response['items']
+                        virtual_response['orderId'] = item['orderId']
+
+                    resp_serializer = serializers.TransactionSerializer(data=virtual_response)
                     if resp_serializer.is_valid():
                         response_data = self.form_pg_transaction_data(resp_serializer.validated_data, order_obj)
                         # For Testing
-                        if PgTransaction.is_valid_hash(response, product_id=order_obj.product_id):
+
+                        # Simplify the response for multiorder for ease of incomming checksum creation
+                        order_items = sorted(response.get('items', []), key=lambda x: x['orderId'])
+                        stringify_item = '['
+                        if order_items.__class__.__name__ == 'list':
+                            for i in order_items:
+                                stringify_item = stringify_item + '{'
+                                if i.__class__.__name__ == 'dict':
+                                    for k in sorted(i.keys()):
+                                        stringify_item = stringify_item + k + '=' + str(i[k]) + ';'
+
+                                stringify_item = stringify_item + '};'
+
+                            if stringify_item[-1:] == ';':
+                                stringify_item = stringify_item[:-1]
+                            stringify_item = stringify_item + ']'
+
+                        virtual_response['items'] = stringify_item
+                        del virtual_response['orderId']
+
+                        if PgTransaction.is_valid_hash(virtual_response, product_id=order_obj.product_id):
                             pg_tx_queryset = None
                         # if True:
                             try:

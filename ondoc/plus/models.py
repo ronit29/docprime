@@ -812,11 +812,12 @@ class PlusUser(auth_model.TimeStampedModel, RefundMixin, TransactionMixin, Coupo
                     profile.email = member['email']
                     # profile.gender = member['gender']
                     profile.dob = member['dob']
+                    profile.is_default_user = True
                     # if member['relation'] == PlusMembers.Relations.SELF:
-                    if member['is_primary_user']:
-                        profile.is_default_user = True
-                    else:
-                        profile.is_default_user = False
+                    # if member['is_primary_user']:
+                    #
+                    # else:
+                    #     profile.is_default_user = False
                     profile.save()
 
                 profile = profile.id
@@ -825,8 +826,13 @@ class PlusUser(auth_model.TimeStampedModel, RefundMixin, TransactionMixin, Coupo
             data = {'name': name, 'email': member['email'], 'user_id': user.id,
                     'dob': member['dob'], 'is_default_user': False, 'is_otp_verified': False,
                     'phone_number': user.phone_number}
-            if member['is_primary_user']:
+            # if member['is_primary_user']:
+            #     data['is_default_user'] = True
+            profile_obj = UserProfile.objects.filter(user_id=user.id).first()
+            if not profile_obj and member['is_primary_user']:
                 data['is_default_user'] = True
+            else:
+                data['is_default_user'] = False
 
             member_profile = UserProfile.objects.create(**data)
             profile = member_profile.id
@@ -1035,7 +1041,7 @@ class PlusUser(auth_model.TimeStampedModel, RefundMixin, TransactionMixin, Coupo
         phone_number = profile.phone_number
         plus_members = []
 
-        member = {"first_name": first_name, "last_name": last_name, "dob": dob, "email": email, "phone_number": phone_number}
+        member = {"first_name": first_name, "last_name": last_name, "dob": dob, "email": email, "phone_number": phone_number, "profile": profile.id if profile else None, "is_primary_user": True}
         primary_user_profile = UserProfile.objects.filter(user_id=profile.user.pk, is_default_user=True).values('id', 'name',
                                                                                                       'email',
                                                                                                       'gender',
@@ -1192,7 +1198,7 @@ class PlusMembers(auth_model.TimeStampedModel):
     phone_number = models.BigIntegerField(blank=True, null=True,
                                           validators=[MaxValueValidator(9999999999), MinValueValidator(1000000000)])
     profile = models.ForeignKey(auth_model.UserProfile, related_name="plus_member", on_delete=models.CASCADE, null=True)
-    title = models.CharField(max_length=20, choices=TITLE_TYPE_CHOICES, default=None)
+    title = models.CharField(max_length=20, choices=TITLE_TYPE_CHOICES, default=None, null=True)
     middle_name = models.CharField(max_length=50, null=True, blank=True)
     city = models.CharField(max_length=100, null=True, default=None, blank=True)
     district = models.CharField(max_length=100, null=True, default=None, blank=True)
@@ -1353,6 +1359,7 @@ class TempPlusUser(auth_model.TimeStampedModel):
     raw_plus_member = JSONField(blank=True, null=True, default=list)
     profile = models.ForeignKey(UserProfile, related_name='temp_plus_user_profile', on_delete=models.DO_NOTHING)
     deleted = models.BooleanField(default=0)
+    is_utilized = models.NullBooleanField()
 
     class Meta:
         db_table = 'temp_plus_user'
