@@ -169,7 +169,7 @@ class IPDIntimateEmailNotificationViewSet(viewsets.GenericViewSet):
         else:
             return Response(status=status.HTTP_400_BAD_REQUEST, data={'error': 'Hospital not found.'})
 
-        ipd_email_obj = IPDIntimateEmailNotification.objects.filter(user_id=user_id, hospital_id=hospital_id, created_at__date=date.today())
+        ipd_email_obj = IPDIntimateEmailNotification.objects.filter(phone_number=phone_number, hospital_id=hospital_id, created_at__date=date.today())
         if ipd_email_obj:
             return Response({})
 
