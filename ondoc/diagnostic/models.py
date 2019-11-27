@@ -2798,7 +2798,7 @@ class LabAppointment(TimeStampedModel, CouponsMixin, LabAppointmentInvoiceMixin,
         }
         payment_type = data.get("payment_type")
         effective_price = price_data.get("effective_price")
-        cart_data = data.get('cart_item').data
+        cart_data = data.get('cart_item') if data.get('cart_item') else None
 
         # is_appointment_insured = cart_data.get('is_appointment_insured', None)
         # insurance_id = cart_data.get('insurance_id', None)
@@ -2813,7 +2813,7 @@ class LabAppointment(TimeStampedModel, CouponsMixin, LabAppointmentInvoiceMixin,
                 is_appointment_insured = True
                 insurance_id = insurance_resp.get('insurance_id', None)
 
-        if is_appointment_insured or cart_data.get('is_appointment_insured', None):
+        if is_appointment_insured or (cart_data and cart_data.get('is_appointment_insured', None)):
             payment_type = OpdAppointment.INSURANCE
             effective_price = 0.0
         else:
@@ -2852,12 +2852,14 @@ class LabAppointment(TimeStampedModel, CouponsMixin, LabAppointmentInvoiceMixin,
         mrp = price_data.get("mrp")
         convenience_amount = 0
         vip_amount_utilized = 0
+
         if plus_user:
             plus_user_resp = plus_user.validate_plus_appointment(data)
             cover_under_vip = plus_user_resp.get('cover_under_vip', False)
+            vip_amount_utilized = plus_user_resp.get('vip_amount_deducted')
             plus_user_id = plus_user_resp.get('plus_user_id', None)
 
-        if cover_under_vip and cart_data.get('cover_under_vip', None):
+        if cover_under_vip and vip_amount_utilized > 0:
             # payment_type = OpdAppointment.VIP
 
             if plus_user.plan.is_gold:
@@ -2893,6 +2895,8 @@ class LabAppointment(TimeStampedModel, CouponsMixin, LabAppointmentInvoiceMixin,
                 payment_type = OpdAppointment.PREPAID
             else:
                 payment_type = data["payment_type"]
+
+            vip_amount_utilized = 0
 
         fulfillment_data = {
             "lab": data["lab"],
