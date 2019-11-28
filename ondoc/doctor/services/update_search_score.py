@@ -163,11 +163,13 @@ class DoctorSearchScore:
             return {'experience_score':0}
 
     def get_doctors_score(self, doctor_in_hosp_count,doctor):
-        doctors_count = 0
-        for hospital in doctor.hospitals.all():
-            if hospital.id and doctor_in_hosp_count.get(hospital.id):
-                if doctor_in_hosp_count[hospital.id] > doctors_count:
-                    doctors_count = doctor_in_hosp_count[hospital.id]
+        maximum = max(doctor_in_hosp_count, key=doctor_in_hosp_count.get)
+        doctors_count = int(doctor_in_hosp_count[maximum])
+
+        # for hospital in doctor.hospitals.all():
+        #     if hospital.id and doctor_in_hosp_count.get(hospital.id):
+        #         if doctor_in_hosp_count[hospital.id] > doctors_count:
+        #             doctors_count = doctor_in_hosp_count[hospital.id]
 
         doctors_score_list = self.scoring_data.get('doctors_in_clinic')
         for score in doctors_score_list:
