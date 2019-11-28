@@ -55,7 +55,7 @@ from ondoc.api.v1.utils import get_start_end_datetime, custom_form_datetime, Cou
     form_time_slot, util_absolute_url, html_to_pdf, TimeSlotExtraction, resolve_address, generate_short_url
 from ondoc.common.models import AppointmentHistory, AppointmentMaskNumber, Service, Remark, MatrixMappedState, \
     MatrixMappedCity, GlobalNonBookable, SyncBookingAnalytics, CompletedBreakupMixin, RefundDetails, TdsDeductionMixin, \
-    Documents, MerchantPayoutMixin, Fraud
+    Documents, MerchantPayoutMixin, Fraud, Certifications
 from ondoc.common.models import QRCode, MatrixDataMixin
 from functools import reduce
 from operator import or_
@@ -322,9 +322,9 @@ class Hospital(auth_model.TimeStampedModel, auth_model.CreatedByModel, auth_mode
 
         common_hosp_percentage_dict = dict()
 
-        plan = PlusPlans.objects.filter(is_gold=True, is_selected=True).first()
+        plan = PlusPlans.objects.prefetch_related('plan_parameters', 'plan_parameters__parameter').filter(is_gold=True, is_selected=True).first()
         if not plan:
-            plan = PlusPlans.objects.filter(is_gold=True).first()
+            plan = PlusPlans.objects.prefetch_related('plan_parameters', 'plan_parameters__parameter').filter(is_gold=True).first()
 
         if plan:
             convenience_amount_obj, convenience_percentage_obj = plan.get_convenience_object('DOCTOR')
@@ -382,10 +382,10 @@ class Hospital(auth_model.TimeStampedModel, auth_model.CreatedByModel, auth_mode
         hosp_entity_dict, hosp_locality_entity_dict = Hospital.get_hosp_and_locality_dict(temp_hospital_ids,
                                                                                           EntityUrls.SitemapIdentifier.HOSPITALS_LOCALITY_CITY)
 
-        entity_queryset = EntityUrls.objects.filter(is_valid=True, sitemap_identifier=EntityUrls.SitemapIdentifier.HOSPITAL_PAGE,
-                                                    entity_id__in = temp_hospital_ids)
-        entity_queryset_dict = {x.entity_id: x for x in entity_queryset}
-        all_entity_urls = list(set([x.url for x in entity_queryset]))
+        all_entity_urls = EntityUrls.objects.filter(is_valid=True, sitemap_identifier=EntityUrls.SitemapIdentifier.HOSPITAL_PAGE,
+                                                    entity_id__in = temp_hospital_ids).values_list('url', flat=True).distinct()
+        # entity_queryset_dict = {x.entity_id: x for x in entity_queryset}
+        # all_entity_urls = list(set([x.url for x in entity_queryset]))
         new_dynamic_qs = NewDynamic.objects.filter(url_value__in=all_entity_urls)
         new_dynamic_dict = {x.url_value: x for x in new_dynamic_qs}
         from ondoc.api.v1.doctor.serializers import TopCommonHospitalForIpdProcedureSerializer
@@ -769,7 +769,7 @@ class HospitalPlaceDetails(auth_model.TimeStampedModel):
 
     @classmethod
     def update_place_details(cls):
-        hosp_place_id = HospitalPlaceDetails.objects.all()
+        hosp_place_id = HospitalPlaceDetails.objects.filter(place_details__isnull=True)
         for data in hosp_place_id:
             if not data.place_details:
                 place_searched_data = None
@@ -834,6 +834,7 @@ class HospitalAccreditation(auth_model.TimeStampedModel):
 class HospitalCertification(auth_model.TimeStampedModel):
     hospital = models.ForeignKey(Hospital, on_delete=models.CASCADE)
     name = models.CharField(max_length=200)
+    certification = models.ForeignKey(Certifications, on_delete=models.DO_NOTHING, null=True, blank=True, related_name='hospital_certifications')
 
     def __str__(self):
         return self.hospital.name + " (" + self.name + ")"
@@ -2271,6 +2272,7 @@ class HospitalNetworkDocument(auth_model.TimeStampedModel, auth_model.Document):
 class HospitalNetworkCertification(auth_model.TimeStampedModel):
     network = models.ForeignKey(HospitalNetwork, on_delete=models.CASCADE)
     name = models.CharField(max_length=200)
+    certification = models.ForeignKey(Certifications, on_delete=models.DO_NOTHING, null=True, blank=True, related_name='hospital_network_certifications')
 
     def __str__(self):
         return self.name
@@ -5277,6 +5279,7 @@ class GoogleMapRecords(auth_model.TimeStampedModel):
     has_booking = models.SmallIntegerField(null=True, blank=True)
     monday_timing = models.TextField(null=True, blank=True)
     address = models.TextField(null=True, blank=True)
+    is_bookable = models.SmallIntegerField(null=True, blank=True)
 
     class Meta:
         db_table = "google_map_records"

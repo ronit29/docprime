@@ -2310,9 +2310,11 @@ class TopHospitalForIpdProcedureSerializer(serializers.ModelSerializer):
         return int(obj.distance.m) if hasattr(obj, 'distance') and obj.distance else None
 
     def get_certifications(self, obj):
-        certification_objs = obj.hospitalcertification_set.all()
-        names = [x.name for x in certification_objs]
-        return names
+        # certification_objs = obj.hospitalcertification_set.all()
+        # names = [x.name for x in certification_objs]
+        # return names
+        return [{"certification_id": data.certification.id, "certification_name": data.certification.name}
+                for data in obj.hospitalcertification_set.all() if data.certification]
 
     def get_insurance_provider(self, obj):
         return [x.name for x in obj.health_insurance_providers.all()]
@@ -3028,8 +3030,22 @@ class TopCommonHospitalForIpdProcedureSerializer(serializers.ModelSerializer):
 
 class RecordSerializer(serializers.ModelSerializer):
 
+    link = serializers.SerializerMethodField()
+
+    def get_link(self, obj):
+        link = None
+        request = self.context.get('request')
+        params = request.query_params
+        lat = params.get('lat', 28.450367)
+        long = params.get('long', 77.071848)
+
+        if lat and long:
+            link = 'https://www.google.com/maps/search/?api=1&query=' + str(lat) + ',' + str(long)
+
+        return link
+
     class Meta:
        model = GoogleMapRecords
-       fields = (["id","location","text","created_at","latitude","longitude", "updated_at", "image", "label", "reason", "hospital_name", "place_id",
+       fields = (["id","location","text","created_at","latitude","longitude", "updated_at", "image", "label", "reason", "hospital_name",    "place_id",
                   "multi_speciality", "has_phone", "lead_rank", "combined_rating", "combined_rating_count", "is_potential", "has_booking", "monday_timing",
-                 "address" ])
+                 "address" , "is_bookable", "link"])

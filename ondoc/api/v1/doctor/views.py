@@ -4660,9 +4660,10 @@ class HospitalViewSet(viewsets.GenericViewSet):
                                                                                          'hosp_entity_dict': hosp_entity_dict})
             hospital_percentage_dict = dict()
 
-            plan = PlusPlans.objects.filter(is_gold=True, is_selected=True).first()
+            plan = PlusPlans.objects.prefetch_related('plan_parameters', 'plan_parameters__parameter').filter(is_gold=True, is_selected=True).first()
             if not plan:
-                plan = PlusPlans.objects.filter(is_gold=True).first()
+                plan = PlusPlans.objects.prefetch_related('plan_parameters', 'plan_parameters__parameter').filter(is_gold=True).first()
+
             hospital_queryset = hospital_queryset[:20]
             if plan:
                 convenience_amount_obj, convenience_percentage_obj = plan.get_convenience_object('DOCTOR')
@@ -4798,6 +4799,7 @@ class HospitalViewSet(viewsets.GenericViewSet):
         pnt = GEOSGeometry(point_string, srid=4326)
 
         hospital_queryset = Hospital.objects.prefetch_related('hospitalcertification_set',
+                                                              'hospitalcertification_set__certification',
                                                               'hospital_documents',
                                                               'hosp_availability',
                                                               'health_insurance_providers',
@@ -4890,12 +4892,12 @@ class HospitalViewSet(viewsets.GenericViewSet):
                                                          'hospital_helpline_numbers',
                                                          'network__hospital_network_documents',
                                                          'hospitalcertification_set',
+                                                         'hospitalcertification_set__certification',
                                                          'hosp_availability',
                                                          'question_answer',
                                                          'hospitalspeciality_set', Prefetch('imagehospital',
                                                                                             HospitalImage.objects.all().order_by(
-                                                                                                '-cover_image'))).filter(
-            id=pk, is_live=True).first()
+                                                                                                '-cover_image'))).filter(id=pk, is_live=True).first()
         if not hospital_obj:
             return Response(status=status.HTTP_400_BAD_REQUEST)
 
@@ -4968,6 +4970,8 @@ class HospitalViewSet(viewsets.GenericViewSet):
         listing_schema = self.build_listing_schema_for_hospital(hosp_serializer)
         breadcrumb_schema = self.build_breadcrumb_schema_for_hospital(response['breadcrumb']) if response.get('breadcrumb') else None
         all_schema = [x for x in [schema, listing_schema, breadcrumb_schema] if x]
+        response['certifications'] = [{"certification_id": data.certification.id, "certification_name": data.certification.name} for data in hospital_obj.hospitalcertification_set.all() if data.certification]
+
         response['seo'] = {'title': title, "description": description, "schema": schema,
                            "h1_title": h1_title, 'all_schema': all_schema}
         response['canonical_url'] = canonical_url
@@ -5319,7 +5323,7 @@ class RecordAPIView(viewsets.GenericViewSet):
         params = request.query_params
         lat = params.get('lat', 28.450367)
         long = params.get('long', 77.071848)
-        radius = int(params.get('radius')) if params.get('radius') else 10000
+        radius = int(params.get('radius')) if params.get('radius') else 2000
         response = dict()
 
         queryset = GoogleMapRecords.objects.all()
@@ -5327,11 +5331,13 @@ class RecordAPIView(viewsets.GenericViewSet):
             point_string = 'POINT(' + str(long) + ' ' + str(lat) + ')'
             pnt = GEOSGeometry(point_string, srid=4326)
             queryset = queryset.filter(location__distance_lte=(pnt, radius))
+
         serializer = serializers.RecordSerializer(queryset, many=True,
                                                               context={"request": request})
         serialized_data = serializer.data
         response['map_data'] = serialized_data
         response['labels'] = list(queryset.values('label').distinct())
+
         return Response(response)
 
 
