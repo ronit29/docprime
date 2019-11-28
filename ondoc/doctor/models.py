@@ -77,7 +77,8 @@ from ondoc.matrix.tasks import push_appointment_to_matrix, push_onboarding_qcsta
 from ondoc.integrations.task import push_opd_appointment_to_integrator
 # from ondoc.procedure.models import Procedure
 from ondoc.plus.models import PlusAppointmentMapping, PlusPlans
-from ondoc.plus.usage_criteria import get_class_reference, get_price_reference
+from ondoc.plus.usage_criteria import get_class_reference, get_price_reference, get_min_convenience_reference, \
+    get_max_convenience_reference
 from ondoc.ratings_review import models as ratings_models
 from django.utils import timezone
 from random import randint
@@ -342,14 +343,19 @@ class Hospital(auth_model.TimeStampedModel, auth_model.CreatedByModel, auth_mode
                                 mrp = doc_clinic_timing.mrp
                                 agreed_price = doc_clinic_timing.fees
                                 if agreed_price and mrp:
-                                    # percentage = max(((mrp - (
-                                    #             agreed_price + plan.get_convenience_amount(agreed_price, convenience_amount_obj,
-                                    #                                                        convenience_percentage_obj))) / mrp) * 100,
-                                    #                  percentage)
-                                    percentage = max(((mrp - (
-                                        PlusPlans.get_default_convenience_amount(price_data, "DOCTOR",
-                                                                                 default_plan_query=plan))) / mrp) * 100,
-                                                     percentage)
+                                    max_price_engine = get_max_convenience_reference(plan, "DOCTOR")
+
+                                if not max_price_engine:
+                                    percentage = 0
+                                else:
+                                    max_price = max_price_engine.get_price(price_data)
+                                    if not max_price or max_price <= 0:
+                                        percentage = 0
+                                    else:
+                                        percentage = max(((max_price - (
+                                            PlusPlans.get_default_convenience_amount(price_data, "DOCTOR",
+                                                                                     default_plan_query=plan))) / max_price) * 100,
+                                                         percentage)
                         common_hosp_percentage_dict[common_hospital.hospital.id] = round(percentage, 2)
 
         # queryset = CommonHospital.objects.all().values_list('hospital', 'network')
