@@ -83,7 +83,7 @@ class DoctorSearchScore:
                     print('success')
                 else:
                     print('failure')
-                count += 500
+            count += 500
 
         return 'successfully inserted.'
 
