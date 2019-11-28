@@ -44,33 +44,30 @@ class DoctorSearchScore:
             self.popularity_data[dp['id']] = dp['score']
 
     def calculate(self):
-        doctor_in_hosp_count = dict()
         hosp_count = doctor_models.Hospital.objects.all().count()
         count = 0
         while count <= hosp_count:
+            hospital_ids = set()
+            doctor_in_hosp_count = dict()
+
             hospitals_without_network = doctor_models.Hospital.objects.prefetch_related('assoc_doctors').filter(
-                network__isnull=True).annotate(doctors_count=Count('assoc_doctors__id'))[count:count+5000]
+                network__isnull=True).annotate(doctors_count=Count('assoc_doctors__id'))[count:count+500]
 
             for hosp in hospitals_without_network:
                 doctor_in_hosp_count[hosp.id] = hosp.doctors_count
+                hospital_ids.add(hosp.id)
 
             hospitals_with_network = doctor_models.Hospital.objects.select_related('network').filter(
                 network__isnull=False).annotate(
-                hosp_network_doctors_count=Count(Case(When(network__isnull=False, then=F('network__assoc_hospitals__assoc_doctors')))))[count: count+5000]
+                hosp_network_doctors_count=Count(Case(When(network__isnull=False, then=F('network__assoc_hospitals__assoc_doctors')))))[count: count+500]
 
             for hosp in hospitals_with_network:
                 doctor_in_hosp_count[hosp.id] = hosp.hosp_network_doctors_count
+                hospital_ids.add(hosp.id)
 
-            count += 5000
-
-        doctors_count = doctor_models.Doctor.objects.all().count()
-
-        count = 0
-
-        while count <= doctors_count:
             score_obj_list = []
             doctors = doctor_models.Doctor.objects.all().prefetch_related("hospitals", "doctor_clinics", "doctor_clinics__hospital",
-                                                    "doctor_clinics__hospital__hospital_place_details").order_by('id')[count : count+1000]
+                                                    "doctor_clinics__hospital__hospital_place_details").filter(doctor_clinics__hospital__id__in=hospital_ids).order_by('id')
 
             for doctor in doctors:
                 result = list()
@@ -88,7 +85,7 @@ class DoctorSearchScore:
                                                                 ratings_count_score=result[4]['ratings_count'],
                                                                 final_score=result[5]['final_score']))
 
-            count = count + 1000
+            count = count + 500
             bulk_created = doctor_models.SearchScore.objects.bulk_create(score_obj_list)
             if bulk_created:
                 print ('success')
