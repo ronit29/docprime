@@ -260,6 +260,9 @@ class PlusMembersSerializer(serializers.Serializer):
                 if not plus_plan_id:
                     raise serializers.ValidationError({"Plans": "Plus Plan is not Valid"})
 
+                if coupon_codes and not coupon_obj:
+                    raise serializers.ValidationError({"Coupon": "Applied coupon not found"})
+
                 if coupon_obj:
                     for coupon in coupon_obj:
                         profile = attrs.get("profile")
