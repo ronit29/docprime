@@ -5269,7 +5269,7 @@ class GoogleMapRecords(auth_model.TimeStampedModel):
     multi_speciality = models.CharField(max_length=500, null=True, blank=True)
     has_phone = models.SmallIntegerField(null=True, blank=True)
     lead_rank = models.CharField(max_length=100, null=True, blank=True)
-    combined_rating = models.IntegerField(null=True, blank=True)
+    combined_rating = models.FloatField(null=True, blank=True)
     combined_rating_count = models.IntegerField(null=True, blank=True)
     is_potential = models.SmallIntegerField(null=True, blank=True)
     has_booking = models.SmallIntegerField(null=True, blank=True)
