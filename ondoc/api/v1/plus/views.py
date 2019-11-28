@@ -202,7 +202,9 @@ class PlusOrderViewSet(viewsets.GenericViewSet):
             utm_medium = request.data.get('utm_spo_tags', {}).get('utm_medium', None)
             is_utm_agent = request.data.get('utm_spo_tags', {}).get('is_agent', None)
             utm_parameter = {"utm_source": utm_source, "is_utm_agent": is_utm_agent, 'utm_term': utm_term, 'utm_campaign': utm_campaign, 'utm_medium': utm_medium}
-            plus_plan = PlusPlans.objects.get(id=plus_plan_id)
+            plus_plan = PlusPlans.objects.filter(id=plus_plan_id, is_live=True).first()
+            if not plus_plan:
+                return Response(status=status.HTTP_400_BAD_REQUEST, data={"error": "Plan is not identified"})
             transaction_date = datetime.datetime.now()
             amount = plus_plan.deal_price
 
