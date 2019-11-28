@@ -77,12 +77,14 @@ class Order(TimeStampedModel):
     CHAT_PRODUCT_ID = 5
     PROVIDER_ECONSULT_PRODUCT_ID = 6
     VIP_PRODUCT_ID = 11
+    PARTNER_LAB_ORDER_PRODUCT_ID = 13
     PRODUCT_IDS = [(DOCTOR_PRODUCT_ID, "Doctor Appointment"), (LAB_PRODUCT_ID, "LAB_PRODUCT_ID"),
                    (INSURANCE_PRODUCT_ID, "INSURANCE_PRODUCT_ID"),
                    (SUBSCRIPTION_PLAN_PRODUCT_ID, "SUBSCRIPTION_PLAN_PRODUCT_ID"),
                    (CHAT_PRODUCT_ID, "CHAT_PRODUCT_ID"),
                    (VIP_PRODUCT_ID, 'VIP_PRODUCT_ID'),
                    (PROVIDER_ECONSULT_PRODUCT_ID, "Provider Econsult"),
+                   (PARTNER_LAB_ORDER_PRODUCT_ID, "Partner Lab Order"),
                    ]
 
     product_id = models.SmallIntegerField(choices=PRODUCT_IDS, blank=True, null=True)

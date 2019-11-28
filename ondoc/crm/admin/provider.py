@@ -5,8 +5,10 @@ from import_export import fields, resources
 from import_export.admin import ImportExportModelAdmin
 from import_export.tmp_storages import MediaStorage
 from import_export import widgets
+from ondoc.account import models as account_models
 from ondoc.provider import models as prov_models
 from ondoc.diagnostic import models as diag_models
+from ondoc.doctor import models as doc_models
 from ondoc.notification import tasks as notification_tasks
 from ondoc.notification.models import NotificationAction
 from django.db.models import Q
@@ -139,7 +141,13 @@ class PartnerLabSamplesCollectOrderForm(forms.ModelForm):
             status_update_check = self.instance.status_update_checks(cleaned_data['status'])
             if not status_update_check["is_correct"]:
                 raise forms.ValidationError(status_update_check["message"])
-        return cleaned_data
+        if not cleaned_data.get('status') in [prov_models.PartnerLabSamplesCollectOrder.CANCELLED_BY_LAB,
+                                              prov_models.PartnerLabSamplesCollectOrder.CANCELLED_BY_DOCTOR] and (cleaned_data.get('cancellation_comments')):
+            raise forms.ValidationError(
+                "Reason/Comment for cancellation can only be entered on cancelled appointment")
+        if cleaned_data.get('status') in [prov_models.PartnerLabSamplesCollectOrder.CANCELLED_BY_LAB,
+                                          prov_models.PartnerLabSamplesCollectOrder.CANCELLED_BY_DOCTOR] and not cleaned_data.get('cancellation_comments'):
+            raise forms.ValidationError("Comment for Cancelled appointment needs to be entered.")
 
 
 class HospitalFilter(admin.SimpleListFilter):
