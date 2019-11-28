@@ -484,7 +484,6 @@ def single_booking_payment_details(request, orders):
     base_url = "https://{}".format(request.get_host())
     surl = base_url + '/api/v1/user/transaction/save'
     furl = base_url + '/api/v1/user/transaction/save'
-    isPreAuth = '1'
     profile = user.get_default_profile()
     profile_name = ""
     paytmMsg = ''
@@ -508,44 +507,10 @@ def single_booking_payment_details(request, orders):
                 if order.action_data.get('profile_detail'):
                     profile_name = order.action_data.get('profile_detail').get('name', "")
 
-        if isPreAuth == '1':
-            first_slot = None
-            if order.is_parent():
-                for ord in order.orders.all():
-                    if ord.action_data:
-                        if ord.action_data.get('time_slot_start'):
-                            ord_slot = ord.action_data.get('time_slot_start')
-                        else:
-                            first_test_slot = None
-                            test_time_slots = ord.action_data.get('test_time_slots')
-                            for test_time_slot in test_time_slots:
-                                ord_test_slot = None
-                                if test_time_slot.get('time_slot_start'):
-                                    ord_test_slot = test_time_slot.get('time_slot_start')
-                                if not first_test_slot and ord_test_slot:
-                                    first_test_slot = parse_datetime(ord_test_slot)
-                                if first_test_slot > parse_datetime(ord_test_slot):
-                                    first_test_slot = parse_datetime(ord_test_slot)
-                            ord_slot = str(first_test_slot)
-
-                    if not first_slot and ord_slot:
-                        first_slot = parse_datetime(ord_slot)
-                    if first_slot > parse_datetime(ord_slot):
-                        first_slot = parse_datetime(ord_slot)
-
-            if first_slot:
-                if first_slot < (timezone.now() + timedelta(hours=int(settings.PAYMENT_AUTO_CAPTURE_DURATION))):
-                    paytmMsg = 'Your payment will be deducted from Paytm wallet on appointment completion.'
-
         temp_product_id = order.product_id
 
-        couponCode = ''
-        couponPgMode = ''
         discountedAmnt = ''
 
-        # if order.is_cod_order:
-        #     txAmount = str(round(decimal.Decimal(order.get_deal_price_without_coupon), 2))
-        # else:
         usedPgCoupons = order.used_pgspecific_coupons
         if usedPgCoupons and usedPgCoupons[0].payment_option:
             couponCode = usedPgCoupons[0].code
@@ -561,7 +526,7 @@ def single_booking_payment_details(request, orders):
             "name": profile_name,
             "holdPayment": "false",
             "txAmount": txAmount,
-            "insurerCode": "goldPurchase" if temp_product_id == 8 else '',
+            "insurerCode": settings.GOLD_MERCHANT_CODE if temp_product_id == Order.GOLD_PRODUCT_ID else '',
             "refOrderId": "",
             "refOrderNo": "",
             "discountedAmnt": discountedAmnt
@@ -575,12 +540,10 @@ def single_booking_payment_details(request, orders):
         "email": uemail,
         "surl": surl,
         "furl": furl,
-        # "blockedDuration": "2",
         "isPreAuth": "0",
         "paytmMsg": paytmMsg,
         "couponCode": '',
         "couponPgMode": '',
-        # "isEMI": True
     }
 
     flatten_dict = copy.deepcopy(pgdata)
@@ -606,7 +569,6 @@ def single_booking_payment_details(request, orders):
     args = {'user_id': user.id, 'order_ids': order_ids, 'source': 'ORDER_CREATE'}
     save_payment_status.apply_async((PaymentProcessStatus.INITIATE, args), eta=timezone.localtime(),)
     save_pg_response.apply_async((PgLogs.TXN_REQUEST, order_ids, None, None, pgdata, user.id), eta=timezone.localtime(), queue=settings.RABBITMQ_LOGS_QUEUE)
-    # print(pgdata)
     pgdata['items'] = orders_list
     return pgdata, payment_required
 

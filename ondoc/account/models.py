@@ -261,18 +261,7 @@ class Order(TimeStampedModel):
         # Check if payment is required at all, only when payment is required we debit consumer's account
         payment_not_required = False
         if self.product_id == self.DOCTOR_PRODUCT_ID:
-            if "plus_plan" in appointment_data and appointment_data['plus_plan']:
-
-                temp_plus_obj = TempPlusUser.objects.filter(user__id=appointment_data['user'], id=int(appointment_data['plus_plan']),
-                                                            profile__id=appointment_data['profile'], is_utilized=None).first()
-                if temp_plus_obj:
-                    temp_plus_obj.is_utilized = True
-                    temp_plus_obj.save()
-
-                    sibling_order = Order.objects.filter(user__id=appointment_data['user'], product_id=Order.GOLD_PRODUCT_ID, reference_id__isnull=False).order_by('-id').first()
-                    plus_obj = PlusUser.objects.filter(id=sibling_order.reference_id).first()
-                    appointment_data['plus_plan'] = plus_obj.id
-
+            appointment_data = TempPlusUser.temp_appointment_to_plus_appointment(appointment_data)
             serializer = OpdAppTransactionModelSerializer(data=appointment_data)
             serializer.is_valid(raise_exception=True)
             appointment_data = serializer.validated_data
@@ -289,19 +278,7 @@ class Order(TimeStampedModel):
             elif appointment_data['payment_type'] == OpdAppointment.INSURANCE:
                 payment_not_required = True
         elif self.product_id == self.LAB_PRODUCT_ID:
-
-            if "plus_plan" in appointment_data and appointment_data['plus_plan']:
-
-                temp_plus_obj = TempPlusUser.objects.filter(user__id=appointment_data['user'], id=int(appointment_data['plus_plan']),
-                                                            profile__id=appointment_data['profile'], is_utilized=None).first()
-                if temp_plus_obj:
-                    temp_plus_obj.is_utilized = True
-                    temp_plus_obj.save()
-
-                    sibling_order = Order.objects.filter(user__id=appointment_data['user'], product_id=Order.GOLD_PRODUCT_ID, reference_id__isnull=False).order_by('-id').first()
-                    plus_obj = PlusUser.objects.filter(id=sibling_order.reference_id).first()
-                    appointment_data['plus_plan'] = plus_obj.id
-
+            appointment_data = TempPlusUser.temp_appointment_to_plus_appointment(appointment_data)
             serializer = LabAppTransactionModelSerializer(data=appointment_data)
             serializer.is_valid(raise_exception=True)
             appointment_data = serializer.validated_data

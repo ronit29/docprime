@@ -1367,6 +1367,25 @@ class TempPlusUser(auth_model.TimeStampedModel):
     class Meta:
         db_table = 'temp_plus_user'
 
+    @classmethod
+    def temp_appointment_to_plus_appointment(cls, appointment_data):
+        from ondoc.account.models import  Order
+        if "plus_plan" in appointment_data and appointment_data['plus_plan']:
+
+            temp_plus_obj = cls.objects.filter(user__id=appointment_data['user'], id=int(appointment_data['plus_plan']),
+                                                        profile__id=appointment_data['profile'],
+                                                        is_utilized=None).first()
+            if temp_plus_obj:
+                temp_plus_obj.is_utilized = True
+                temp_plus_obj.save()
+
+                sibling_order = Order.objects.filter(user__id=appointment_data['user'], product_id=Order.GOLD_PRODUCT_ID,
+                                                     reference_id__isnull=False).order_by('-id').first()
+                plus_obj = PlusUser.objects.filter(id=sibling_order.reference_id).first()
+                appointment_data['plus_plan'] = plus_obj.id
+
+        return appointment_data
+
     def validate_plus_appointment(self, appointment_data, *args, **kwargs):
         from ondoc.doctor.models import OpdAppointment
         from ondoc.diagnostic.models import LabAppointment
