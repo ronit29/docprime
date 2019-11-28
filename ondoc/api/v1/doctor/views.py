@@ -1636,7 +1636,7 @@ class SearchedItemsViewSet(viewsets.GenericViewSet):
             ipd_entity_qs = EntityUrls.objects.filter(ipd_procedure_id__in=common_ipd_procedure_ids,
                                                       sitemap_identifier='IPD_PROCEDURE_CITY',
                                                       is_valid=True,
-                                                      locality_value__iexact=city).annotate(
+                                                      locality_value__iexact=city.lower()).annotate(
                 ipd_id=F('ipd_procedure_id')).values('ipd_id', 'url')
             ipd_entity_dict = {x.get('ipd_id'): x.get('url') for x in ipd_entity_qs}
         common_ipd_procedures_serializer = CommonIpdProcedureSerializer(common_ipd_procedures, many=True,
