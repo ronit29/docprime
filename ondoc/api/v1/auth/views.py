@@ -1540,7 +1540,16 @@ class TransactionViewSet(viewsets.GenericViewSet):
 
         pg_resp_code = int(response.get('statusCode'))
         # items = response.get('items' ,[]).sort(key='productId', reverse=True)
-        items = sorted(response.get('items', []), key=lambda x: x['productId'], reverse=True)
+
+        items = response.get('items', [])
+        if len(items) == 1 and int(items[0].productId) == Order.GOLD_PRODUCT_ID:
+            gold_order_id = int(items[0].orderId)
+            if gold_order_id:
+                sibling_order = Order.objects.filter(single_booking=gold_order_id).first()
+                if sibling_order:
+                    items.append({'productId': sibling_order.product_id, 'orderId': sibling_order.id, 'txAmount': 0})
+
+        items = sorted(items, key=lambda x: x['productId'], reverse=True)
         for item in items:
             try:
                 order_id = item.get('orderId', None)
