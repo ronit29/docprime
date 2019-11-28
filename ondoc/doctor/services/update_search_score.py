@@ -66,6 +66,7 @@ class DoctorSearchScore:
                 doctor_in_hosp_count[hosp.id] = hosp.hosp_network_doctors_count
 
             for doctor in doctors:
+                score_obj_list = list()
                 result = list()
                 result.append(self.get_popularity_score(doctor))
                 result.append(self.get_practice_score(doctor))
@@ -73,16 +74,19 @@ class DoctorSearchScore:
                 result.append(self.get_doctor_ratings(doctor))
                 result.append(self.get_doctor_ratings_count(doctor))
                 result.append(self.get_final_score(result, doctor))
-                created = doctor_models.SearchScore.objects.create(doctor=doctor, popularity_score=result[0]['popularity_score'],
-                                                                          years_of_experience_score=result[1]['experience_score'],
-                                                                          doctors_in_clinic_score=result[2]['doctors_in_clinic_score'],
-                                                                          avg_ratings_score=result[3]['avg_ratings_score'],
-                                                                          ratings_count_score=result[4]['ratings_count'],
-                                                                          final_score=result[5]['final_score'])
-                if created:
-                    print('success')
-                else:
-                    print('failure')
+                score_obj_list.append(
+                    doctor_models.SearchScore(doctor=doctor, popularity_score=result[0]['popularity_score'],
+                                              years_of_experience_score=result[1]['experience_score'],
+                                              doctors_in_clinic_score=result[2]['doctors_in_clinic_score'],
+                                              avg_ratings_score=result[3]['avg_ratings_score'],
+                                              ratings_count_score=result[4]['ratings_count'],
+                                              final_score=result[5]['final_score']))
+
+            bulk_created = doctor_models.SearchScore.objects.bulk_create(score_obj_list)
+            if bulk_created:
+                print('success')
+            else:
+                print('failure')
             count += 500
 
         return 'successfully inserted.'
