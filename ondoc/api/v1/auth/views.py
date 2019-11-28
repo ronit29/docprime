@@ -1545,7 +1545,7 @@ class TransactionViewSet(viewsets.GenericViewSet):
         if len(items) == 1 and int(items[0].productId) == Order.GOLD_PRODUCT_ID:
             gold_order_id = int(items[0].orderId)
             if gold_order_id:
-                sibling_order = Order.objects.filter(single_booking=gold_order_id).first()
+                sibling_order = Order.objects.filter(single_booking_id=gold_order_id).first()
                 if sibling_order:
                     items.append({'productId': sibling_order.product_id, 'orderId': sibling_order.id, 'txAmount': 0})
 
