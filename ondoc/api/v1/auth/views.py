@@ -1542,8 +1542,8 @@ class TransactionViewSet(viewsets.GenericViewSet):
         # items = response.get('items' ,[]).sort(key='productId', reverse=True)
 
         items = response.get('items', [])
-        if len(items) == 1 and int(items[0].productId) == Order.GOLD_PRODUCT_ID:
-            gold_order_id = int(items[0].orderId)
+        if len(items) == 1 and int(items[0].get('productId')) == Order.GOLD_PRODUCT_ID:
+            gold_order_id = int(items[0].get('orderId'))
             if gold_order_id:
                 sibling_order = Order.objects.filter(single_booking_id=gold_order_id).first()
                 if sibling_order:
