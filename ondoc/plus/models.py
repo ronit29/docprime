@@ -201,7 +201,10 @@ class PlusPlans(auth_model.TimeStampedModel, LiveMixin):
             return 0
         if price_diff <= min_cap:
             return 0
-        convenience_amount_list.append(min_cap)
+        min_cap_diff = int(price_diff - min_cap)
+        if min_cap_diff <= 0:
+            return 0
+        convenience_amount_list.append(min_cap_diff)
         convenience_amount_list.append(max_cap)
         convenience_percentage = int(convenience_percentage_obj.value) if convenience_percentage_obj else 0
         if not convenience_percentage or convenience_percentage <= 0:
