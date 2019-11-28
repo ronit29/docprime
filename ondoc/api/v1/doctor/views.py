@@ -1107,8 +1107,8 @@ class DoctorProfileUserViewSet(viewsets.GenericViewSet):
                 is_congot = True
 
         if spec_ids and entity:
-            spec_urls = EntityUrls.objects.filter(specialization_id__in=spec_ids, sublocality_value__iexact=entity.sublocality_value.lower(),
-                                          locality_value__iexact=entity.locality_value.lower(), is_valid=True, entity_type='Doctor', url_type='SEARCHURL')
+            spec_urls = EntityUrls.objects.filter(specialization_id__in=spec_ids, sublocality_value=entity.sublocality_value,
+                                          locality_value=entity.locality_value, is_valid=True, entity_type='Doctor', url_type='SEARCHURL')
             for su in spec_urls:
                 spec_url_dict[su.specialization_id] = su.url
 

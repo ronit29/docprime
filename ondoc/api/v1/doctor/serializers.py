@@ -1226,7 +1226,7 @@ class DoctorProfileUserViewSerializer(DoctorProfileSerializer):
 
             if sublocality and locality and specialization_id:
 
-                url = EntityUrls.objects.filter(sublocality_value__iexact=sublocality.lower(), locality_value__iexact=locality.lower(), specialization_id=specialization_id,
+                url = EntityUrls.objects.filter(sublocality_value=sublocality, locality_value=locality, specialization_id=specialization_id,
                                           is_valid=True, sitemap_identifier='SPECIALIZATION_LOCALITY_CITY').values_list('url').first()
 
                 title = specialization + 's in ' + sublocality + ' ' + locality
@@ -1467,7 +1467,6 @@ class DoctorProfileUserViewSerializer(DoctorProfileSerializer):
                                                  doctor_clinic__enabled=True,
                                                  doctor_clinic__hospital__is_live=True).select_related(
             "doctor_clinic__doctor", "doctor_clinic__hospital").prefetch_related(
-            "doctor_clinic", "doctor_clinic__hospital__network",
             "doctor_clinic__hospital__spoc_details", "doctor_clinic__doctor__mobiles",
             "doctor_clinic__doctor__doctorpracticespecializations",
             "doctor_clinic__doctor__doctorpracticespecializations__specialization")
