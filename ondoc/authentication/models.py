@@ -2164,9 +2164,14 @@ class RefundMixin(object):
         from ondoc.common.models import RefundDetails
         from ondoc.account.models import ConsumerTransaction
         from ondoc.account.models import ConsumerRefund
+        from ondoc.plus.models import PlusUser
+        from ondoc.account.models import Order
         # Taking Lock first
         consumer_account = None
-        product_id = self.PRODUCT_ID
+        if isinstance(self, PlusUser) and self.plan and self.plan.is_gold:
+            product_id = Order.GOLD_PRODUCT_ID
+        else:
+            product_id = self.PRODUCT_ID
         if self.payment_type in [OpdAppointment.PREPAID, OpdAppointment.VIP]:
             temp_list = ConsumerAccount.objects.get_or_create(user=self.user)
             consumer_account = ConsumerAccount.objects.select_for_update().get(user=self.user)
