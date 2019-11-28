@@ -5276,12 +5276,15 @@ class GoogleMapRecords(auth_model.TimeStampedModel):
     multi_speciality = models.CharField(max_length=500, null=True, blank=True)
     has_phone = models.SmallIntegerField(null=True, blank=True)
     lead_rank = models.CharField(max_length=100, null=True, blank=True)
-    combined_rating = models.IntegerField(null=True, blank=True)
+    combined_rating = models.FloatField(null=True, blank=True)
     combined_rating_count = models.IntegerField(null=True, blank=True)
     is_potential = models.SmallIntegerField(null=True, blank=True)
     has_booking = models.SmallIntegerField(null=True, blank=True)
     monday_timing = models.TextField(null=True, blank=True)
     address = models.TextField(null=True, blank=True)
+    is_bookable = models.SmallIntegerField(null=True, blank=True)
+    phone_number = models.CharField(max_length=500, null=True, blank=True)
+    hospital_id = models.IntegerField(null=True, blank=True)
 
     class Meta:
         db_table = "google_map_records"
