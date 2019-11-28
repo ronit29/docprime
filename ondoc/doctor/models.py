@@ -344,15 +344,16 @@ class Hospital(auth_model.TimeStampedModel, auth_model.CreatedByModel, auth_mode
                                 agreed_price = doc_clinic_timing.fees
                                 if agreed_price and mrp:
                                     max_price_engine = get_max_convenience_reference(plan, "DOCTOR")
-
-                                if not max_price_engine:
+                                    min_price_engine = get_min_convenience_reference(plan, "DOCTOR")
+                                if not max_price_engine or not min_price_engine:
                                     percentage = 0
                                 else:
                                     max_price = max_price_engine.get_price(price_data)
-                                    if not max_price or max_price <= 0:
+                                    min_price = min_price_engine.get_price(price_data)
+                                    if not max_price or max_price <= 0 or not min_price or min_price <=0:
                                         percentage = 0
                                     else:
-                                        percentage = max(((max_price - (
+                                        percentage = max(((max_price - (min_price +
                                             PlusPlans.get_default_convenience_amount(price_data, "DOCTOR",
                                                                                      default_plan_query=plan))) / max_price) * 100,
                                                          percentage)
