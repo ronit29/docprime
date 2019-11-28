@@ -680,11 +680,11 @@ def get_selected_and_other_procedures(category_ids, procedure_ids, doctor=None, 
             other_procedure_ids = all_procedures_under_doctor - selected_procedure_ids
         else:
             all_clinics_of_doctor = doctor.doctor_clinics.all()
-            all_procedures_under_doctor = []
-            for doctor_clinic in all_clinics_of_doctor:
-                all_procedures_under_doctor.extend(
-                    doctor_clinic.procedures_from_doctor_clinic.filter(procedure__is_enabled=True).values_list('procedure_id', flat=True))
-            all_procedures_under_doctor = set(all_procedures_under_doctor)
+            all_procedures_under_doctor = set(all_clinics_of_doctor.filter(procedures_from_doctor_clinic__procedure__is_enabled=True).values_list('procedures_from_doctor_clinic__procedure_id', flat=True))
+            # for doctor_clinic in all_clinics_of_doctor:
+            #     all_procedures_under_doctor.extend(
+            #         doctor_clinic.procedures_from_doctor_clinic.filter(procedure__is_enabled=True).values_list('procedure_id', flat=True))
+            # all_procedures_under_doctor = set(all_procedures_under_doctor)
             selected_procedure_ids = []
             selected_procedure_ids = set(selected_procedure_ids)
             other_procedure_ids = all_procedures_under_doctor - selected_procedure_ids

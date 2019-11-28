@@ -44,30 +44,26 @@ class DoctorSearchScore:
             self.popularity_data[dp['id']] = dp['score']
 
     def calculate(self):
-        hosp_count = doctor_models.Hospital.objects.all().count()
+        doctors_count = doctor_models.Doctor.objects.all().count()
         count = 0
-        while count <= hosp_count:
-            hospital_ids = set()
+        while count <= doctors_count:
+            doctors = doctor_models.Doctor.objects.all().prefetch_related("hospitals", "doctor_clinics",
+                                                                          "doctor_clinics__hospital",
+                                                                          "doctor_clinics__hospital__hospital_place_details").order_by('id')[count: count+500]
             doctor_in_hosp_count = dict()
 
-            hospitals_without_network = doctor_models.Hospital.objects.prefetch_related('assoc_doctors').filter(
-                network__isnull=True).annotate(doctors_count=Count('assoc_doctors__id'))[count:count+500]
+            hospitals_without_network = doctor_models.Hospital.objects.prefetch_related('assoc_doctors', 'hospital_doctors').filter(
+                network__isnull=True, hospital_doctors__doctor__in=doctors).annotate(doctors_count=Count('assoc_doctors__id'))
 
             for hosp in hospitals_without_network:
                 doctor_in_hosp_count[hosp.id] = hosp.doctors_count
-                hospital_ids.add(hosp.id)
 
             hospitals_with_network = doctor_models.Hospital.objects.select_related('network').filter(
-                network__isnull=False).annotate(
-                hosp_network_doctors_count=Count(Case(When(network__isnull=False, then=F('network__assoc_hospitals__assoc_doctors')))))[count: count+500]
-
+                network__isnull=False , hospital_doctors__doctor__in=doctors).annotate(
+                hosp_network_doctors_count=Count(
+                    Case(When(network__isnull=False, then=F('network__assoc_hospitals__assoc_doctors')))))
             for hosp in hospitals_with_network:
                 doctor_in_hosp_count[hosp.id] = hosp.hosp_network_doctors_count
-                hospital_ids.add(hosp.id)
-            #
-            # score_obj_list = []
-            doctors = doctor_models.Doctor.objects.all().prefetch_related("hospitals", "doctor_clinics", "doctor_clinics__hospital",
-                                                    "doctor_clinics__hospital__hospital_place_details").filter(doctor_clinics__hospital__id__in=hospital_ids).order_by('id')
 
             for doctor in doctors:
                 result = list()
@@ -77,27 +73,17 @@ class DoctorSearchScore:
                 result.append(self.get_doctor_ratings(doctor))
                 result.append(self.get_doctor_ratings_count(doctor))
                 result.append(self.get_final_score(result, doctor))
-                #
-                # score_obj_list.append(doctor_models.SearchScore(doctor=doctor, popularity_score=result[0]['popularity_score'],
-                #                                                 years_of_experience_score=result[1]['experience_score'],
-                #                                                 doctors_in_clinic_score=result[2]['doctors_in_clinic_score'],
-                #                                                 avg_ratings_score=result[3]['avg_ratings_score'],
-                #                                                 ratings_count_score=result[4]['ratings_count'],
-                #                                                 final_score=result[5]['final_score']))
-
-                created = doctor_models.SearchScore.objects.get_or_create(doctor=doctor, popularity_score=result[0]['popularity_score'],
-                                                                years_of_experience_score=result[1]['experience_score'],
-                                                                doctors_in_clinic_score=result[2]['doctors_in_clinic_score'],
-                                                                avg_ratings_score=result[3]['avg_ratings_score'],
-                                                                ratings_count_score=result[4]['ratings_count'],
-                                                                final_score=result[5]['final_score'])
+                created = doctor_models.SearchScore.objects.create(doctor=doctor, popularity_score=result[0]['popularity_score'],
+                                                                          years_of_experience_score=result[1]['experience_score'],
+                                                                          doctors_in_clinic_score=result[2]['doctors_in_clinic_score'],
+                                                                          avg_ratings_score=result[3]['avg_ratings_score'],
+                                                                          ratings_count_score=result[4]['ratings_count'],
+                                                                          final_score=result[5]['final_score'])
                 if created:
                     print('success')
                 else:
                     print('failure')
-
-            count = count + 500
-            # bulk_created = doctor_models.SearchScore.objects.bulk_create(score_obj_list)
+                count += 500
 
         return 'successfully inserted.'
 
