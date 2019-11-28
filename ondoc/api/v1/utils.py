@@ -532,7 +532,8 @@ def single_booking_payment_details(request, orders):
             "discountedAmnt": discountedAmnt
             }
 
-        orders_list.append(order_dict)
+        if Decimal(txAmount) > Decimal(0):
+            orders_list.append(order_dict)
 
     pgdata = {
         "custId": user.id,
