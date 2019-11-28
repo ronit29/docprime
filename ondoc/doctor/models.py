@@ -5276,7 +5276,7 @@ class GoogleMapRecords(auth_model.TimeStampedModel):
     monday_timing = models.TextField(null=True, blank=True)
     address = models.TextField(null=True, blank=True)
     is_bookable = models.SmallIntegerField(null=True, blank=True)
-    phone_number = models.BigIntegerField(null=True, blank=True)
+    phone_number = models.CharField(max_length=500, null=True, blank=True)
     hospital_id = models.IntegerField(null=True, blank=True)
 
     class Meta:
