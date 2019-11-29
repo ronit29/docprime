@@ -2172,10 +2172,10 @@ class RefundMixin(object):
             product_id = Order.GOLD_PRODUCT_ID
         else:
             product_id = self.PRODUCT_ID
-        if self.payment_type in [OpdAppointment.PREPAID, OpdAppointment.VIP]:
+        if self.payment_type in [OpdAppointment.PREPAID, OpdAppointment.VIP, OpdAppointment.GOLD]:
             temp_list = ConsumerAccount.objects.get_or_create(user=self.user)
             consumer_account = ConsumerAccount.objects.select_for_update().get(user=self.user)
-        if self.payment_type in [OpdAppointment.PREPAID, OpdAppointment.VIP] and ConsumerTransaction.valid_appointment_for_cancellation(self.id, product_id):
+        if self.payment_type in [OpdAppointment.PREPAID, OpdAppointment.VIP, OpdAppointment.GOLD] and ConsumerTransaction.valid_appointment_for_cancellation(self.id, product_id):
             RefundDetails.log_refund(self)
             wallet_refund, cashback_refund = self.get_cancellation_breakup()
             if hasattr(self, 'promotional_amount'):
