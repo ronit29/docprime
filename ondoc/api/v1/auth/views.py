@@ -1541,7 +1541,7 @@ class TransactionViewSet(viewsets.GenericViewSet):
         pg_resp_code = int(response.get('statusCode'))
         # items = response.get('items' ,[]).sort(key='productId', reverse=True)
 
-        items = response.get('items', [])
+        items = copy.deepcopy(response.get('items', []))
         if len(items) == 1 and int(items[0].get('productId')) == Order.GOLD_PRODUCT_ID:
             gold_order_id = int(items[0].get('orderId'))
             if gold_order_id:
@@ -1549,9 +1549,10 @@ class TransactionViewSet(viewsets.GenericViewSet):
                 if sibling_order:
                     items.append({'productId': sibling_order.product_id, 'orderId': sibling_order.id, 'txAmount': 0})
 
-        items = sorted(items, key=lambda x: x['productId'], reverse=True)
+        items = sorted(items, key=lambda x: int(x['productId']), reverse=True)
         for item in items:
             try:
+                item['productId'] = int(item['productId'])
                 order_id = item.get('orderId', None)
                 product_id = item.get('productId', None)
                 amount = item.get('txAmount', None)
@@ -1636,7 +1637,7 @@ class TransactionViewSet(viewsets.GenericViewSet):
                         # For Testing
 
                         # Simplify the response for multiorder for ease of incomming checksum creation
-                        order_items = sorted(response.get('items', []), key=lambda x: x['orderId'])
+                        order_items = sorted(response.get('items', []), key=lambda x: int(x['orderId']))
                         stringify_item = '['
                         if order_items.__class__.__name__ == 'list':
                             for i in order_items:

@@ -812,9 +812,9 @@ class PlusUser(auth_model.TimeStampedModel, RefundMixin, TransactionMixin, Coupo
             if profile:
                 if profile.user_id == user.id:
                     profile.name = name
-                    profile.email = member('email', None)
+                    profile.email = member.get('email', None)
                     profile.gender = member.get('gender', None)
-                    profile.dob = member['dob']
+                    profile.dob = member.get('dob')
                     # profile.is_default_user = True
                     # if member['relation'] == PlusMembers.Relations.SELF:
                     # if member['is_primary_user']:
@@ -862,7 +862,7 @@ class PlusUser(auth_model.TimeStampedModel, RefundMixin, TransactionMixin, Coupo
     @classmethod
     def create_plus_user(cls, plus_data, user):
         from ondoc.doctor.models import OpdAppointment
-        members = plus_data['plus_members']
+        members = deepcopy(plus_data['plus_members'])
         coupon_list = plus_data.pop("coupon", None)
 
         for member in members:
@@ -1059,7 +1059,7 @@ class PlusUser(auth_model.TimeStampedModel, RefundMixin, TransactionMixin, Coupo
         amount = plus_plan.deal_price
         plus_user = {'proposer': plus_plan.proposer.id, 'plus_plan': plus_plan.id,
                           'purchase_date': transaction_date, 'expire_date': expiry_date, 'amount': amount,
-                          'user': profile.user.id, "plus_members": plus_members}
+                          'user': profile.user.id, "plus_members": plus_members, "effective_price": amount}
 
         resp = {"profile_detail": primary_user_profile, "user": profile.user.id, "plus_user": plus_user,
                 "plus_plan": plus_plan.id, "effective_price": amount, "payment_type": OpdAppointment.PREPAID}
