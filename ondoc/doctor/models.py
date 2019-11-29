@@ -329,8 +329,8 @@ class Hospital(auth_model.TimeStampedModel, auth_model.CreatedByModel, auth_mode
 
         if plan:
 
-            convenience_min_amount_obj, convenience_min_amount_obj,  convenience_percentage_obj = plan.get_convenience_object('DOCTOR')
-            price_data = {}
+            # convenience_min_amount_obj, convenience_min_amount_obj,  convenience_percentage_obj = plan.get_convenience_object('DOCTOR')
+            # price_data = {}
 
             # TODO percentage column can be taken into doctor table which was prefield via cron
             for common_hospital in common_hosp_queryset:
