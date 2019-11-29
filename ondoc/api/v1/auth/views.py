@@ -857,7 +857,7 @@ class UserAppointmentsViewSet(OndocViewSet):
                 price = price_engine.get_price(price_data)
             convenience_charge = plus_user.plan.get_convenience_charge(price, "LABTEST")
             engine = get_class_reference(plus_user, "LABTEST")
-            plus_data = engine.validate_booking_entity(price, price_data.get('mrp', None),
+            plus_data = engine.validate_booking_entity(cost=price, mrp=price_data.get('mrp', None),
                                                        deal_price=price_data.get('deal_price'))
             effective_price = plus_data.get('amount_to_be_paid', None)
             return effective_price, convenience_charge
@@ -869,7 +869,7 @@ class UserAppointmentsViewSet(OndocViewSet):
                 price = price_engine.get_price(price_data)
             convenience_charge = plus_user.plan.get_convenience_charge(price, "DOCTOR")
             engine = get_class_reference(plus_user, "DOCTOR")
-            plus_data = engine.validate_booking_entity(price, price_data.get('mrp', None),
+            plus_data = engine.validate_booking_entity(cost=price, mrp=price_data.get('mrp', None),
                                                        deal_price=price_data.get('deal_price'))
             effective_price = plus_data.get('amount_to_be_paid', None)
             return effective_price, convenience_charge
