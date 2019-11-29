@@ -1,5 +1,6 @@
 from itertools import groupby
 
+from ondoc.authentication.models import UserProfile
 from ondoc.communications.models import EMAILNotification
 from ondoc.doctor.models import Hospital
 from ondoc.notification import models
@@ -162,6 +163,13 @@ class IPDIntimateEmailNotificationViewSet(viewsets.GenericViewSet):
         time_slot = parameters.get('time_slot', None)
         gender = parameters.get('gender', None)
         dob = parameters.get('dob', None)
+        user_profile_id = parameters.get('user_profile', None)
+
+        user_profile_obj = UserProfile.objects.filter(id=user_profile_id)
+        if user_profile_obj:
+            user_profile_obj = user_profile_obj[0]
+        else:
+            return Response(status=status.HTTP_400_BAD_REQUEST, data={'error': 'User Profile not found.'})
 
         hosp_obj = Hospital.objects.filter(id=hospital_id)
         if hosp_obj:
@@ -169,7 +177,7 @@ class IPDIntimateEmailNotificationViewSet(viewsets.GenericViewSet):
         else:
             return Response(status=status.HTTP_400_BAD_REQUEST, data={'error': 'Hospital not found.'})
 
-        ipd_email_obj = IPDIntimateEmailNotification.objects.filter(phone_number=phone_number, hospital_id=hospital_id, created_at__date=date.today())
+        ipd_email_obj = IPDIntimateEmailNotification.objects.filter(profile_id=user_profile_id, phone_number=phone_number, hospital_id=hospital_id, created_at__date=date.today())
         if ipd_email_obj:
             return Response({})
 
@@ -180,10 +188,12 @@ class IPDIntimateEmailNotificationViewSet(viewsets.GenericViewSet):
         ipd_email_obj = IPDIntimateEmailNotification.objects.create(user_id=user_id, doctor_id=doctor_id, hospital_id=hospital_id,
                                                     phone_number=phone_number,
                                                     preferred_date=preferred_date, time_slot=time_slot, gender=gender,
-                                                    dob=dob, email_notifications=emails)
+                                                    dob=dob, email_notifications=emails, profile_id=user_profile_id)
 
         email_notification = EMAILNotification(notification_type=NotificationAction.IPDIntimateEmailNotification,
-                                               context={'instance': ipd_email_obj})
+                                               context={'doctor_name': ipd_email_obj.doctor.name, 'dob': ipd_email_obj.dob, 'Mobile': ipd_email_obj.phone_number,
+                                                        'date_time': str(ipd_email_obj.preferred_date) + " " + str(ipd_email_obj.time_slot),
+                                                        'Hospital_Name': ipd_email_obj.hospital.name , 'Patient_name': ipd_email_obj.profile.name})
         kwargs['ipd_email_obj'] = ipd_email_obj
         email_notification.send(receivers, *args, **kwargs)
 

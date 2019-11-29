@@ -1671,6 +1671,7 @@ class IPDIntimateEmailNotification(TimeStampedModel):
     gender = models.CharField(max_length=100,choices=GENDER_TYPE_CHOICES, blank=True, null=True)
     dob = models.DateField(blank=True, null=True)
     email_notifications = JSONField(null=True, blank=True)
+    profile = models.ForeignKey(UserProfile, related_name="ipd_profile", on_delete=models.DO_NOTHING, null=True, blank=True)
 
     class Meta:
         db_table = "ipd_intimate_email_notification"
