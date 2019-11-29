@@ -930,8 +930,8 @@ class Order(TimeStampedModel):
                     user=user,
                     amount=payable_amount
                 )
-                if product_id == Order.GOLD_PRODUCT_ID:
-                    single_booking_id = order.id
+            if product_id == Order.GOLD_PRODUCT_ID:
+                single_booking_id = order.id
 
             order_list.append(order)
 

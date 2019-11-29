@@ -1062,7 +1062,7 @@ class PlusUser(auth_model.TimeStampedModel, RefundMixin, TransactionMixin, Coupo
                           'user': profile.user.id, "plus_members": plus_members}
 
         resp = {"profile_detail": primary_user_profile, "user": profile.user.id, "plus_user": plus_user,
-                "plus_plan": plus_plan.id, "effective_price": amount, "payment_type": OpdAppointment.GOLD}
+                "plus_plan": plus_plan.id, "effective_price": amount, "payment_type": OpdAppointment.PREPAID}
 
         return resp
 
