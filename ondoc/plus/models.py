@@ -812,9 +812,12 @@ class PlusUser(auth_model.TimeStampedModel, RefundMixin, TransactionMixin, Coupo
             if profile:
                 if profile.user_id == user.id:
                     profile.name = name
-                    profile.email = member.get('email', None)
-                    profile.gender = member.get('gender', None)
-                    profile.dob = member.get('dob')
+                    if member.get('email'):
+                        profile.email = member.get('email', None)
+                    if member.get('gender'):
+                        profile.gender = member.get('gender', None)
+                    if member.get('dob'):
+                        profile.dob = member.get('dob')
                     # profile.is_default_user = True
                     # if member['relation'] == PlusMembers.Relations.SELF:
                     # if member['is_primary_user']:
