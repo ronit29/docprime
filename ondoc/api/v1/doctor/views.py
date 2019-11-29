@@ -101,6 +101,7 @@ from packaging.version import parse
 from django.http import HttpResponse, HttpResponseRedirect
 from geopy.geocoders import Nominatim
 from django.shortcuts import render
+import newrelic.agent
 
 geolocator = Nominatim()
 
@@ -1583,6 +1584,7 @@ class SearchedItemsViewSet(viewsets.GenericViewSet):
 
     @transaction.non_atomic_requests
     @use_slave
+    @newrelic.agent.function_trace()
     def common_conditions(self, request):
         city = None
         serializer = CommonConditionsSerializer(data=request.query_params)
