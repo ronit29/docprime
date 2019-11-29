@@ -499,10 +499,10 @@ class CouponDiscountViewSet(viewsets.GenericViewSet):
 
         for coupon in coupons_data:
             if coupon in applicable_coupons:
-                if lab and tests:
-                    total_price = obj.get_applicable_tests_with_total_price_v2(test_ids=tests, lab=lab).get("total_price")
-                    discount += obj.get_discount(coupon, total_price)
-                    continue
+                # if lab and tests:
+                #     total_price = obj.get_applicable_tests_with_total_price_v2(test_ids=tests, lab=lab).get("total_price")
+                #     discount += obj.get_discount(coupon, total_price)
+                #     continue
                 if doctor and hospital and procedures:
                     total_price = obj.get_applicable_procedures_with_total_price_v2(doctor=doctor,
                                                                                     hospital=hospital,

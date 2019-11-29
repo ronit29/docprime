@@ -2698,9 +2698,10 @@ class LabAppointment(TimeStampedModel, CouponsMixin, LabAppointmentInvoiceMixin,
             total_agreed = total_insurance_agreed_price if  total_insurance_agreed_price and total_insurance_agreed_price > 0 else total_agreed
             coupon_discount, coupon_cashback, coupon_list, random_coupon_list = 0, 0, [], []
 
-        if data.get("payment_type") in [OpdAppointment.VIP]:
+        if data.get("payment_type") in [OpdAppointment.VIP, OpdAppointment.GOLD]:
             price_data = {"mrp": total_mrp, "fees": total_agreed, "deal_price": total_deal_price, "cod_deal_price": total_deal_price}
             profile = data.get('profile')
+            vip_convenience_amount = 0
             if profile:
                 plus_membership = profile.get_plus_membership
                 price_engine = get_price_reference(plus_membership, "LABTEST")
@@ -2716,12 +2717,20 @@ class LabAppointment(TimeStampedModel, CouponsMixin, LabAppointmentInvoiceMixin,
                     # engine_response = engine.validate_booking_entity(cost=effective_price, id=data['test_ids'][0].id)
                     engine_response = engine.validate_booking_entity(cost=price, id=data['test_ids'][0].id, mrp=effective_price, deal_price=total_deal_price)
                     effective_price = engine_response.get('amount_to_be_paid')
-                    effective_price = effective_price + vip_convenience_amount
+                    # effective_price = effective_price + vip_convenience_amount
                 else:
                     effective_price = effective_price
             else:
                 effective_price = effective_price
-            coupon_discount, coupon_cashback, coupon_list, random_coupon_list = 0, 0, [], []
+            # coupon_discount, coupon_cashback, coupon_list, random_coupon_list = 0, 0, [], []
+            coupon_discount, coupon_cashback, coupon_list, random_coupon_list = Coupon.get_total_deduction(data, effective_price)
+
+            if coupon_discount >= effective_price:
+                effective_price = 0
+            else:
+                effective_price = effective_price - coupon_discount
+
+            effective_price += vip_convenience_amount
 
         return {
             "deal_price" : total_deal_price,
