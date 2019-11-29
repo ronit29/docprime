@@ -198,3 +198,8 @@ def doctors_daily_schedule():
 def fetch_place_ids():
     from ondoc.common.models import GoogleLatLong
     # GoogleLatLong.generate_place_ids()
+
+@task()
+def calculate_percentage():
+    from ondoc.doctor.models import CommonHospital
+    CommonHospital.calculate_percentage()
