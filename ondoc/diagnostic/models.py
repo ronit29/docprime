@@ -58,7 +58,7 @@ from ondoc.integrations.task import push_lab_appointment_to_integrator, get_inte
     push_appointment_to_spo
 from ondoc.location import models as location_models
 from ondoc.plus.enums import UtilizationCriteria
-from ondoc.plus.models import PlusAppointmentMapping
+from ondoc.plus.models import PlusAppointmentMapping, PlusPlans
 from ondoc.plus.usage_criteria import get_class_reference, get_price_reference
 from ondoc.ratings_review import models as ratings_models
 # from ondoc.api.v1.common import serializers as common_serializers
@@ -2708,7 +2708,8 @@ class LabAppointment(TimeStampedModel, CouponsMixin, LabAppointmentInvoiceMixin,
                     price = effective_price
                 else:
                     price = price_engine.get_price(price_data)
-                vip_convenience_amount = plus_membership.plan.get_convenience_charge(price, "LABTEST")
+                # vip_convenience_amount = plus_membership.plan.get_convenience_charge(price, "LABTEST")
+                vip_convenience_amount = PlusPlans.get_default_convenience_amount(price_data, "LABTEST", default_plan_query=plus_membership.plan)
                 test = data['test_ids']
                 entity = "LABTEST" if not test[0].is_package else "PACKAGE"
                 engine = get_class_reference(plus_membership, entity)
@@ -2856,7 +2857,8 @@ class LabAppointment(TimeStampedModel, CouponsMixin, LabAppointmentInvoiceMixin,
             plus_user_id = plus_user_resp.get('plus_user_id', None)
         if cover_under_vip and cart_data.get('cover_under_vip', None):
             payment_type = OpdAppointment.VIP
-            convenience_amount = plus_user.plan.get_convenience_charge(plus_user_resp['amount_to_be_paid'], "LABTEST")
+            # convenience_amount = plus_user.plan.get_convenience_charge(plus_user_resp['amount_to_be_paid'], "LABTEST")
+            convenience_amount = PlusPlans.get_default_convenience_amount(price_data, "LABTEST", default_plan_query=plus_user.plan)
             effective_price = plus_user_resp['amount_to_be_paid'] + convenience_amount
             vip_amount_utilized = plus_user_resp['vip_amount_deducted']
             # utilization = plus_user.get_utilization
