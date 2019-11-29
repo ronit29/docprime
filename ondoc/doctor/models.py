@@ -93,6 +93,7 @@ from django.utils.functional import cached_property
 from ondoc.crm.constants import constants
 from django.utils.text import slugify
 from ondoc.plus import models as plus_model
+import newrelic.agent
 
 logger = logging.getLogger(__name__)
 
@@ -303,6 +304,7 @@ class Hospital(auth_model.TimeStampedModel, auth_model.CreatedByModel, auth_mode
         return result
 
     @staticmethod
+    @newrelic.agent.function_trace()
     def get_top_hospitals_data(request, lat=28.450367, long=77.071848, vip_user=None, from_vip_page=False):
         from ondoc.api.v1.doctor.serializers import TopHospitalForIpdProcedureSerializer
         from ondoc.seo.models import NewDynamic
@@ -4335,6 +4337,7 @@ class CommonSpecialization(auth_model.TimeStampedModel):
         db_table = "common_specializations"
 
     @classmethod
+    @newrelic.agent.function_trace()
     def get_specializations(cls, count):
         specializations = cls.objects.select_related('specialization').all().order_by("-priority")[:count]
         return specializations
