@@ -7,6 +7,9 @@ from django.core.files.uploadedfile import SimpleUploadedFile
 from django.core.validators import FileExtensionValidator
 from django.db import models
 from django.contrib.postgres.fields import JSONField, ArrayField
+from django.db.models import F, Window, DateTimeField, TimeField
+from django.db.models.expressions import RawSQL, ExpressionWrapper
+from django.db.models.functions import Rank
 from django.forms.models import model_to_dict
 from ondoc.authentication.models import TimeStampedModel
 from ondoc.authentication.models import NotificationEndpoint
@@ -1672,6 +1675,30 @@ class IPDIntimateEmailNotification(TimeStampedModel):
     dob = models.DateField(blank=True, null=True)
     email_notifications = JSONField(null=True, blank=True)
     profile = models.ForeignKey(UserProfile, related_name="ipd_profile", on_delete=models.DO_NOTHING, null=True, blank=True)
+    is_sent = models.BooleanField(default=False)
 
     class Meta:
         db_table = "ipd_intimate_email_notification"
+
+
+    @classmethod
+    def send_email(cls, *args, **kwargs):
+        current_date = datetime.datetime.now()
+        ipd_obj = IPDIntimateEmailNotification.objects.annotate(rank=Window(expression=Rank(),
+                                            order_by=F('id').desc(), partition_by=[F('user_id')]),
+                                                time_diff=ExpressionWrapper(current_date - F('created_at'), output_field=TimeField())).filter(is_sent=False, time_diff__gt='0:2:0')
+
+        ipd_obj = [obj for obj in ipd_obj if obj.rank == 1]
+
+        for data in ipd_obj:
+            if data.is_sent == False:
+                spoc_details = data.hospital.spoc_details.all()
+                receivers = [{'user': data.user_id, 'email': spoc.email} for spoc in spoc_details]
+                from ondoc.communications.models import EMAILNotification
+                email_notification = EMAILNotification(notification_type=NotificationAction.IPDIntimateEmailNotification,
+                                                       context={'doctor_name': data.doctor.name, 'dob': data.dob,
+                                                                'Mobile': data.phone_number, 'date_time': str(data.preferred_date) + " " + str(data.time_slot),                                                                         'Hospital_Name': data.hospital.name , 'Patient_name': data.profile.name})
+                kwargs['ipd_email_obj'] = data
+                email_notification.send(receivers, *args, **kwargs)
+                IPDIntimateEmailNotification.objects.filter(user=data.user).update(is_sent=True)
+                print("ipd_obj: " + data.id)
