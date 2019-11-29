@@ -2594,8 +2594,8 @@ class LabAppointmentView(mixins.CreateModelMixin,
             data['is_vip_member'] = plus_user_dict.get('is_vip_member', False)
             data['cover_under_vip'] = plus_user_dict.get('cover_under_vip', False)
             data['plus_user_id'] = plus_user.id
-            data['vip_amount'] = plus_user_dict.get('vip_amount_deducted')
-            data['amount_to_be_paid'] = plus_user_dict.get('amount_to_be_paid')
+            data['vip_amount'] = int(plus_user_dict.get('vip_amount_deducted'))
+            data['amount_to_be_paid'] = int(plus_user_dict.get('amount_to_be_paid'))
             if data['cover_under_vip']:
                 if plus_user.plan.is_gold:
                     data['payment_type'] = OpdAppointment.GOLD
