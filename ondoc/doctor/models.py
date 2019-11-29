@@ -3528,7 +3528,8 @@ class OpdAppointment(auth_model.TimeStampedModel, CouponsMixin, OpdAppointmentIn
                     else:
                         amount_to_be_paid = doctor_clinic_timing.deal_price
                 # effective_price = doctor_clinic_timing.deal_price
-                coupon_discount, coupon_cashback, coupon_list, random_coupon_list = 0, 0, [], []
+                coupon_discount, coupon_cashback, coupon_list, random_coupon_list = Coupon.get_total_deduction(data,
+                                                                                           amount_to_be_paid)
             elif data.get("payment_type") in [cls.PREPAID]:
                 coupon_discount, coupon_cashback, coupon_list, random_coupon_list = Coupon.get_total_deduction(data,
                                                                                            doctor_clinic_timing.deal_price)
