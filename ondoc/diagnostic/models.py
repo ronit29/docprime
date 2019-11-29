@@ -2800,7 +2800,8 @@ class LabAppointment(TimeStampedModel, CouponsMixin, LabAppointmentInvoiceMixin,
         }
         payment_type = data.get("payment_type")
         effective_price = price_data.get("effective_price")
-        cart_data = data.get('cart_item') if data.get('cart_item') else None
+        # cart_data = data.get('cart_item') if data.get('cart_item') else None
+        cart_data = data.get('cart_item').data if data.get('cart_item') and data.get('cart_item').data else None
 
         # is_appointment_insured = cart_data.get('is_appointment_insured', None)
         # insurance_id = cart_data.get('insurance_id', None)
