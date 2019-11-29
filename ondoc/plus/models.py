@@ -869,7 +869,7 @@ class PlusUser(auth_model.TimeStampedModel, RefundMixin, TransactionMixin, Coupo
             member['profile'] = cls.profile_create_or_update(member, user)
             member['dob'] = str(member['dob'])
             # member['profile'] = member['profile'].id if member.get('profile') else None
-        plus_data['insured_members'] = members
+        plus_data['plus_members'] = members
 
         plus_membership_obj = cls.objects.create(plan=plus_data['plus_plan'],
                                                           user=plus_data['user'],

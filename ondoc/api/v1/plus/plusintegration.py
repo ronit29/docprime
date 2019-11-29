@@ -219,7 +219,7 @@ class PlusIntegration:
         order = plus_obj.order
         action_data = order.action_data
         utm_params = action_data.get('utm_parameter', None)
-        utm_source = utm_params.get('utm_source', None)
+        utm_source = utm_params.get('utm_source', None) if utm_params else None;
         if not utm_source:
             return
 
