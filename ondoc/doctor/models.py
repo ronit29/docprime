@@ -345,6 +345,8 @@ class Hospital(auth_model.TimeStampedModel, auth_model.CreatedByModel, auth_mode
                                               "deal_price": doc_clinic_timing.deal_price, "cod_deal_price": doc_clinic_timing.cod_deal_price}
                                 mrp = doc_clinic_timing.mrp
                                 agreed_price = doc_clinic_timing.fees
+                                max_price_engine = None
+                                min_price_engine = None
                                 if agreed_price and mrp:
                                     max_price_engine = get_max_convenience_reference(plan, "DOCTOR")
                                     min_price_engine = get_min_convenience_reference(plan, "DOCTOR")
