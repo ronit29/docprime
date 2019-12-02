@@ -1,5 +1,8 @@
 from itertools import groupby
 
+from ondoc.authentication.models import UserProfile
+from ondoc.communications.models import EMAILNotification
+from ondoc.doctor.models import Hospital
 from ondoc.notification import models
 from ondoc.api.v1.utils import IsNotAgent
 from rest_framework.permissions import IsAuthenticated
@@ -14,7 +17,8 @@ from rest_framework import status
 from django.shortcuts import HttpResponse
 from django.views import View
 from django.template import Context, Template
-from ondoc.notification.models import DynamicTemplates, RecipientEmail, NotificationAction
+from ondoc.notification.models import DynamicTemplates, RecipientEmail, NotificationAction, IPDIntimateEmailNotification
+from datetime import date
 
 
 class AppNotificationViewSet(viewsets.GenericViewSet):
@@ -145,3 +149,43 @@ class DynamicTemplate(View):
             html = obj.render_template(obj.get_parameter_json())
 
         return HttpResponse(html)
+
+
+class IPDIntimateEmailNotificationViewSet(viewsets.GenericViewSet):
+
+    def send_email_notification(self, request):
+        parameters = request.data
+        user_id = parameters.get('user')
+        doctor_id = parameters.get('doctor')
+        hospital_id = parameters.get('hospital')
+        phone_number = parameters.get('phone_number')
+        preferred_date = parameters.get('preferred_date', None)
+        time_slot = parameters.get('time_slot', None)
+        gender = parameters.get('gender', None)
+        dob = parameters.get('dob', None)
+        user_profile_id = parameters.get('user_profile', None)
+
+        user_profile_obj = UserProfile.objects.filter(id=user_profile_id)
+        if not user_profile_obj:
+            return Response(status=status.HTTP_400_BAD_REQUEST, data={'error': 'User Profile not found.'})
+
+        hosp_obj = Hospital.objects.filter(id=hospital_id, is_ipd_hospital=True, is_live=True)
+        if hosp_obj:
+            hosp_obj = hosp_obj[0]
+        else:
+            return Response(status=status.HTTP_400_BAD_REQUEST, data={'error': 'IPD Hospital not found.'})
+
+        ipd_email_obj = IPDIntimateEmailNotification.objects.filter(profile_id=user_profile_id, user_id=user_id, phone_number=phone_number, hospital_id=hospital_id, created_at__date=date.today())
+        if ipd_email_obj:
+            return Response({})
+
+        spoc_details = hosp_obj.spoc_details.all()
+        receivers = [{'user': user_id, 'email': spoc.email} for spoc in spoc_details]
+        emails = list(map(lambda x: x.get('email'), receivers))
+
+        ipd_email_obj = IPDIntimateEmailNotification.objects.create(user_id=user_id, doctor_id=doctor_id, hospital_id=hospital_id,
+                                                    phone_number=phone_number,
+                                                    preferred_date=preferred_date, time_slot=time_slot, gender=gender,
+                                                    dob=dob, email_notifications=emails, profile_id=user_profile_id)
+
+        return Response({})
