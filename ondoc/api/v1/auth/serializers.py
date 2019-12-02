@@ -411,18 +411,21 @@ class RefreshJSONWebTokenSerializer(serializers.Serializer):
             if len(get_date) > 1:
                 uid = get_date[0]
                 date_generated = get_date[1]
-            time_elapsed = v1_utils.get_time_delta_in_minutes(date_generated)
-            if time_elapsed > 2:
-                raise serializers.ValidationError('Reset Key Expired')
-            else:
-                user = User.objects.filter(id=uid).first()
-                blacllist_token = WhiteListedLoginTokens.objects.filter(token=token, user=user).delete()
-                token_object = JWTAuthentication.generate_token(user)
-                return {
-                    'token': token_object['token'],
-                    'user': user,
-                    'payload': token_object['payload']
-                }
+                time_format = '%Y-%m-%d %H:%M:%S'
+                date_generated = datetime.datetime.fromtimestamp(date_generated).strftime(time_format)
+
+                time_elapsed = v1_utils.get_time_delta_in_minutes(date_generated)
+                if time_elapsed > 2:
+                    raise serializers.ValidationError('Reset Key Expired')
+                else:
+                    user = User.objects.filter(id=uid).first()
+                    blacllist_token = WhiteListedLoginTokens.objects.filter(token=token, user=user).delete()
+                    token_object = JWTAuthentication.generate_token(user)
+                    return {
+                        'token': token_object['token'],
+                        'user': user,
+                        'payload': token_object['payload']
+                    }
 
         payload = self.check_payload_custom(token=token)
         user = self.check_user_custom(payload=payload)
