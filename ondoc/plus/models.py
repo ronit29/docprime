@@ -855,9 +855,9 @@ class PlusUser(auth_model.TimeStampedModel, RefundMixin, TransactionMixin, Coupo
                 profile = profile.id
         # Create Profile if not exist with name or not exist in profile id from request
         else:
-            data = {'name': name, 'email': member['email'], 'user_id': user.id,
-                    'dob': member['dob'], 'is_default_user': False, 'is_otp_verified': False,
-                    'phone_number': user.phone_number}
+            data = {'name': name, 'email': member.get('email'), 'user_id': user.id,
+                    'dob': member.get('dob'), 'is_default_user': False, 'is_otp_verified': False,
+                    'phone_number': user.phone_number, 'gender': member.get('gender')}
             # if member['is_primary_user']:
             #     data['is_default_user'] = True
             profile_obj = UserProfile.objects.filter(user_id=user.id).first()
