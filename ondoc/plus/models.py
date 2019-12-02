@@ -610,6 +610,7 @@ class PlusUser(auth_model.TimeStampedModel, RefundMixin, TransactionMixin, Coupo
 
                 # discount calculation on amount to be paid
                 amount_to_be_paid = engine_response.get('amount_to_be_paid', mrp)
+                response_dict['amount_to_be_paid'] = amount_to_be_paid
                 coupon_discount, coupon_cashback, coupon_list, random_coupon_list = Coupon.get_total_deduction(
                     appointment_data, amount_to_be_paid)
                 if coupon_discount >= amount_to_be_paid:
