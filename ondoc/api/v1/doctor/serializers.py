@@ -149,6 +149,7 @@ class OpdAppointmentSerializer(serializers.ModelSerializer):
 
         search_criteria = SearchCriteria.objects.filter(search_key='is_gold').first()
         hosp_is_gold = False
+        is_gold_member = False
         if search_criteria:
             hosp_is_gold = search_criteria.search_value
 
@@ -161,10 +162,15 @@ class OpdAppointmentSerializer(serializers.ModelSerializer):
             if not (int(plus_appointment_mapping.amount) > int(obj.mrp)):
                 vip_amount = int(obj.mrp) - int(plus_appointment_mapping.amount)
 
+        if plus_appointment_mapping and plus_appointment_mapping.plus_user.plan and plus_appointment_mapping.plus_user.plan.is_gold:
+            is_gold_member = True
+        else:
+            is_gold_member = False
+
         return {
             'is_vip_member': True if obj and obj.plus_plan and obj.plus_plan.plan and not obj.plus_plan.plan.is_gold else False,
             'vip_amount': vip_amount,
-            'is_gold_member': True if plus_appointment_mapping and plus_appointment_mapping.plus_plan and plus_appointment_mapping.plus_plan.is_gold else False,
+            'is_gold_member': is_gold_member,
             'vip_amount_deducted': plus_appointment_mapping.amount if plus_appointment_mapping else 0,
             'covered_under_vip': True if obj and obj.plus_plan else False,
             'extra_charge': plus_appointment_mapping.extra_charge if plus_appointment_mapping else 0,
