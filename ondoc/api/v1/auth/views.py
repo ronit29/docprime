@@ -818,6 +818,16 @@ class UserAppointmentsViewSet(OndocViewSet):
                         if plus_user:
                             new_effective_price, convenience_charge = self.get_plus_user_effective_price(plus_user, price_data, "LABTEST")
                         if lab_appointment.plus_plan.plan.is_gold:
+                            order_obj = Order.objects.filter(reference_id=lab_appointment.id).first()
+                            action_data = order_obj.action_data
+                            if action_data:
+                                discount = int(action_data.get('discount', 0))
+                                if discount and discount > 0:
+                                    new_effective_price = (new_effective_price + convenience_charge) - discount
+                                else:
+                                    new_effective_price = new_effective_price + convenience_charge
+                            else:
+                                new_effective_price = new_effective_price + convenience_charge
                             new_effective_price = new_effective_price + convenience_charge
                         else:
                             new_effective_price = lab_appointment.effective_price
@@ -960,7 +970,16 @@ class UserAppointmentsViewSet(OndocViewSet):
                                     new_effective_price, convenience_charge = self.get_plus_user_effective_price(
                                         plus_user, price_data, "DOCTOR")
                                     if opd_appointment.plus_plan.plan.is_gold:
-                                        new_effective_price = new_effective_price + convenience_charge
+                                        order_obj = Order.objects.filter(reference_id=opd_appointment.id).first()
+                                        action_data = order_obj.action_data
+                                        if action_data:
+                                            discount = int(action_data.get('discount', 0))
+                                            if discount and discount > 0:
+                                                new_effective_price = (new_effective_price + convenience_charge) - discount
+                                            else:
+                                                new_effective_price = new_effective_price + convenience_charge
+                                        else:
+                                            new_effective_price = new_effective_price + convenience_charge
                                     else:
                                         new_effective_price = old_effective_price
                             else:
