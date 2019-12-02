@@ -193,8 +193,8 @@ class PlusOrderViewSet(viewsets.GenericViewSet):
 
                     else:
                         last_name = member.get('last_name') if member.get('last_name') else ''
-                        user_profile = {"name": member['first_name'] + " " + last_name, "email":
-                            member['email'], "dob": member['dob']}
+                        user_profile = {"name": member.get('first_name') + " " + last_name, "email":
+                            member.get('email'), "dob": member.get('dob'), "gender": member.get('gender')}
 
             utm_source = request.data.get('utm_spo_tags', {}).get('utm_source', None)
             utm_term = request.data.get('utm_spo_tags', {}).get('utm_term', None)
@@ -214,12 +214,12 @@ class PlusOrderViewSet(viewsets.GenericViewSet):
             expiry_date = expiry_date - timedelta(days=1)
             expiry_date = datetime.datetime.combine(expiry_date, datetime.datetime.max.time())
             plus_user_data = {'proposer': plus_plan.proposer.id, 'plus_plan': plus_plan.id,
-                              'purchase_date': transaction_date, 'expire_date': expiry_date, 'amount': amount,
+                              'purchase_date': transaction_date, 'expire_date': expiry_date, 'amount': int(amount),
                               'user': request.user.pk, "plus_members": plus_members,
                               'coupon': price_data.get('coupon_list', []),
-                              'effective_price': price_data.get('effective_price'),
-                              'coupon_discount': price_data.get('coupon_discount'),
-                              'coupon_cashback': price_data.get('coupon_cashback'),
+                              'effective_price': int(price_data.get('effective_price')),
+                              'coupon_discount': int(price_data.get('coupon_discount')),
+                              'coupon_cashback': int(price_data.get('coupon_cashback')),
                               'random_coupon_list': price_data.get('random_coupon_list')}
 
             plus_subscription_data = {"profile_detail": user_profile, "plus_plan": plus_plan.id,
