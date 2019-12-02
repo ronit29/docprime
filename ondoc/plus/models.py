@@ -1001,15 +1001,17 @@ class PlusUser(auth_model.TimeStampedModel, RefundMixin, TransactionMixin, Coupo
         appointments_qs = OpdAppointment.objects.filter(plus_plan=self)
         to_be_cancelled_appointments = appointments_qs.all().exclude(status__in=[OpdAppointment.COMPLETED, OpdAppointment.CANCELLED])
         for appointment in to_be_cancelled_appointments:
-            appointment.status = OpdAppointment.CANCELLED
-            appointment.save()
+            # appointment.status = OpdAppointment.CANCELLED
+            # appointment.save()
+            appointment.action_cancelled(True)
 
         # Lab Appointments
         appointments_qs = LabAppointment.objects.filter(plus_plan=self)
         to_be_cancelled_appointments = appointments_qs.all().exclude(status__in=[LabAppointment.COMPLETED, LabAppointment.CANCELLED])
         for appointment in to_be_cancelled_appointments:
-            appointment.status = LabAppointment.CANCELLED
-            appointment.save()
+            # appointment.status = LabAppointment.CANCELLED
+            # appointment.save()
+            appointment.action_cancelled(True)
 
     def process_cancel_initiate(self):
         pass
