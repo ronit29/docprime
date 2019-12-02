@@ -321,9 +321,9 @@ class Hospital(auth_model.TimeStampedModel, auth_model.CreatedByModel, auth_mode
             common_hosp_queryset = common_hosp_queryset.filter(hospital__enabled_for_prepaid=True)
         common_hosp_queryset = common_hosp_queryset[:20]
 
-        common_hosp_percentage_dict = dict()
-        for data in common_hosp_queryset:
-            common_hosp_percentage_dict[data.id] = data.percentage
+        # common_hosp_percentage_dict = dict()
+        # for data in common_hosp_queryset:
+        #     common_hosp_percentage_dict[data.id] = data.percentage
 
         plan = PlusPlans.objects.prefetch_related('plan_parameters', 'plan_parameters__parameter').filter(is_gold=True,
                                                                                                           is_selected=True).first()
@@ -377,9 +377,10 @@ class Hospital(auth_model.TimeStampedModel, auth_model.CreatedByModel, auth_mode
         result = TopCommonHospitalForIpdProcedureSerializer(common_hosp_queryset, many=True, context={'request': request,
                                                                                          'hosp_entity_dict': hosp_entity_dict,
                                                                                          'hosp_locality_entity_dict': hosp_locality_entity_dict,
-                                                                                         'new_dynamic_dict': new_dynamic_dict}).data
-        for data in result:
-            data['vip_percentage'] = common_hosp_percentage_dict[data.get('id')] if plan and common_hosp_percentage_dict.get(data.get('id')) else 0
+                                                                                         'new_dynamic_dict': new_dynamic_dict,
+                                                                                        'plan':plan}).data
+        # for data in result:
+        #     data['vip_percentage'] = common_hosp_percentage_dict[data.get('id')] if plan and common_hosp_percentage_dict.get(data.get('id')) else 0
 
         return result
         # result = TopHospitalForIpdProcedureSerializer(hosp_queryset, many=True, context={'request': request,
