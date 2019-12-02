@@ -828,7 +828,6 @@ class UserAppointmentsViewSet(OndocViewSet):
                                     new_effective_price = new_effective_price + convenience_charge
                             else:
                                 new_effective_price = new_effective_price + convenience_charge
-                            new_effective_price = new_effective_price + convenience_charge
                         else:
                             new_effective_price = lab_appointment.effective_price
                     else:
