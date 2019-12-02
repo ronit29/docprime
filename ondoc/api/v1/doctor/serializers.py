@@ -162,7 +162,7 @@ class OpdAppointmentSerializer(serializers.ModelSerializer):
             if not (int(plus_appointment_mapping.amount) > int(obj.mrp)):
                 vip_amount = int(obj.mrp) - int(plus_appointment_mapping.amount)
 
-        if plus_appointment_mapping and plus_appointment_mapping.plus_user.plan and plus_appointment_mapping.plus_user.plan.is_gold:
+        if plus_appointment_mapping and plus_appointment_mapping.plus_user and plus_appointment_mapping.plus_user.plan and plus_appointment_mapping.plus_user.plan.is_gold:
             is_gold_member = True
         else:
             is_gold_member = False
@@ -1725,7 +1725,7 @@ class AppointmentRetrieveSerializer(OpdAppointmentSerializer):
             'is_vip_member': True if obj and obj.plus_plan else False,
             'vip_amount': vip_amount,
             'vip_amount_deducted': plus_appointment_mapping.amount if plus_appointment_mapping else 0,
-            'is_gold_member': True if plus_appointment_mapping and plus_appointment_mapping.plus_plan and plus_appointment_mapping.plus_plan.is_gold else False,
+            'is_gold_member': True if plus_appointment_mapping and plus_appointment_mapping.plus_user and plus_appointment_mapping.plus_user.plan and plus_appointment_mapping.plus_user.plan.is_gold else False,
             'covered_under_vip': True if obj and obj.plus_plan else False,
             'extra_charge': plus_appointment_mapping.extra_charge if plus_appointment_mapping else 0,
             'hosp_is_gold': hosp_is_gold
