@@ -26,7 +26,7 @@ from ondoc.common.models import UserConfig, PaymentOptions, AppointmentHistory, 
 from ondoc.common.utils import get_all_upcoming_appointments
 from ondoc.coupon.models import UserSpecificCoupon, Coupon
 from ondoc.lead.models import UserLead
-from ondoc.plus.models import PlusAppointmentMapping, PlusDummyData, PlusUser
+from ondoc.plus.models import PlusAppointmentMapping, PlusUser, PlusPlans, PlusDummyData
 from ondoc.plus.usage_criteria import get_price_reference, get_class_reference
 from ondoc.sms.api import send_otp
 from ondoc.doctor.models import DoctorMobile, Doctor, HospitalNetwork, Hospital, DoctorHospital, DoctorClinic, \
@@ -849,13 +849,16 @@ class UserAppointmentsViewSet(OndocViewSet):
         return resp
 
     def get_plus_user_effective_price(self, plus_user, price_data, entity):
+        from ondoc.plus.models import PlusPlans
         if entity == "LABTEST":
             price_engine = get_price_reference(plus_user, "LABTEST")
             if not price_engine:
                 price = int(price_data.get('mrp', None))
             else:
                 price = price_engine.get_price(price_data)
-            convenience_charge = plus_user.plan.get_convenience_charge(price, "LABTEST")
+            # convenience_charge = plus_user.plan.get_convenience_charge(price, "LABTEST")
+            plan = plus_user.plan if plus_user else None
+            convenience_charge = PlusPlans.get_default_convenience_amount(price_data, "LABTEST", default_plan_query=plan)
             engine = get_class_reference(plus_user, "LABTEST")
             plus_data = engine.validate_booking_entity(cost=price, mrp=price_data.get('mrp', None),
                                                        deal_price=price_data.get('deal_price'))
@@ -867,13 +870,16 @@ class UserAppointmentsViewSet(OndocViewSet):
                 price = int(price_data.get('mrp', None))
             else:
                 price = price_engine.get_price(price_data)
-            convenience_charge = plus_user.plan.get_convenience_charge(price, "DOCTOR")
+            # convenience_charge = plus_user.plan.get_convenience_charge(price, "DOCTOR")
+            plan = plus_user.plan if plus_user else None
+            convenience_charge = PlusPlans.get_default_convenience_amount(price_data, "DOCTOR",
+                                                                          default_plan_query=plan)
+
             engine = get_class_reference(plus_user, "DOCTOR")
             plus_data = engine.validate_booking_entity(cost=price, mrp=price_data.get('mrp', None),
                                                        deal_price=price_data.get('deal_price'))
             effective_price = plus_data.get('amount_to_be_paid', None)
             return effective_price, convenience_charge
-
 
     @transaction.atomic
     def doctor_appointment_update(self, request, opd_appointment, validated_data):

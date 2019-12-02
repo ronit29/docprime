@@ -49,7 +49,19 @@ class AbstractCriteria(object):
         return (cost / 100) * discount
 
 
+class ConvenienceAbstractCriteria(object):
+    def __init__(self, plus_plan):
+        self.plus_plan = plus_plan
+
+    def _get_price(self, price_data):
+        raise NotImplementedError()
+
+    def get_price(self, price_data):
+        return self._get_price(price_data)
+
+
 class DoctorAmountCount(AbstractCriteria):
+
     def __init__(self, plus_obj):
         super().__init__(plus_obj)
 
@@ -59,6 +71,8 @@ class DoctorAmountCount(AbstractCriteria):
         utilization['available_doctor_count'] = int(utilization['available_doctor_count']) - 1
 
     def _validate_booking_entity(self, cost, id, *args, **kwargs):
+        from ondoc.plus.models import PlusPlans
+
         resp = {'vip_amount_deducted': 0, 'is_covered': False, 'amount_to_be_paid': cost}
         is_covered = False
         vip_amount_deducted = 0
@@ -71,7 +85,12 @@ class DoctorAmountCount(AbstractCriteria):
         mrp = kwargs.get('mrp', 0)
         plan = self.plus_obj.plan
         deal_price = int(kwargs.get('deal_price', 0))
-        convenience_charge = plan.get_convenience_charge(cost, "DOCTOR")
+        price_data = {"mrp": mrp, "deal_price": deal_price, "fees": cost, "cod_deal_price": deal_price}
+        # min_price_engine = get_min_convenience_reference(self.plus_obj, "DOCTOR")
+        # min_price = min_price_engine.get_price(price_data)
+        # max_price_engine = get_max_convenience_reference(self.plus_obj, "DOCTOR")
+        # max_price = max_price_engine.get_price(price_data)
+        convenience_charge = PlusPlans.get_default_convenience_amount(price_data, "DOCTOR", default_plan_query=plan)
         total_cost = cost + convenience_charge
         if plan.is_gold and total_cost >= deal_price:
             return resp
@@ -189,6 +208,8 @@ class LabtestAmountCount(AbstractCriteria):
         utilization['available_labtest_count'] = utilization['available_labtest_count'] - 1
 
     def _validate_booking_entity(self, cost, id, *args, **kwargs):
+        from ondoc.plus.models import PlusPlans
+
         resp = {'vip_amount_deducted': 0, 'is_covered': False, 'amount_to_be_paid': cost}
         vip_amount_deducted = 0
         cost = int(cost)
@@ -202,7 +223,15 @@ class LabtestAmountCount(AbstractCriteria):
         is_covered = False
         plan = self.plus_obj.plan
         deal_price = int(kwargs.get('deal_price', 0))
-        convenience_charge = plan.get_convenience_charge(cost, "LABTEST")
+        price_data = {"mrp": mrp, "deal_price": deal_price, "fees": cost, "cod_deal_price": deal_price}
+        # min_price_engine = get_min_convenience_reference(self.plus_obj, "LABTEST")
+        # min_price = min_price_engine.get_price(price_data)
+        # max_price_engine = get_max_convenience_reference(self.plus_obj, "LABTEST")
+        # max_price = max_price_engine.get_price(price_data)
+        # convenience_charge = plan.get_convenience_charge(max_price, min_price, "LABTEST")
+        # convenience_charge = plan.get_convenience_charge(cost, "LABTEST")
+        convenience_charge = PlusPlans.get_default_convenience_amount(price_data, "LABTEST",
+                                                                      default_plan_query=plan)
         total_cost = cost + convenience_charge
         if plan.is_gold and total_cost >= deal_price:
             return resp
@@ -310,6 +339,8 @@ class PackageAmountCount(AbstractCriteria):
         utilization['available_package_count'] = utilization['available_package_count'] - 1
 
     def _validate_booking_entity(self, cost, id, *args, **kwargs):
+        from ondoc.plus.models import PlusPlans
+
         resp = {'vip_amount_deducted': 0, 'is_covered': False, 'amount_to_be_paid': cost}
         is_covered = False
         vip_amount_deducted = 0
@@ -317,7 +348,14 @@ class PackageAmountCount(AbstractCriteria):
         mrp = kwargs.get('mrp', 0)
         plan = self.plus_obj.plan
         deal_price = int(kwargs.get('deal_price', 0))
-        convenience_charge = plan.get_convenience_charge(cost, "LABTEST")
+        price_data = {"mrp": mrp, "deal_price": deal_price, "fees": cost, "cod_deal_price": deal_price}
+        # min_price_engine = get_min_convenience_reference(self.plus_obj, "LABTEST")
+        # min_price = min_price_engine.get_price(price_data)
+        # max_price_engine = get_max_convenience_reference(self.plus_obj, "LABTEST")
+        # max_price = max_price_engine.get_price(price_data)
+        # convenience_charge = plan.get_convenience_charge(max_price, min_price, "LABTEST")
+        # convenience_charge = plan.get_convenience_charge(cost, "LABTEST")
+        convenience_charge = PlusPlans.get_default_convenience_amount(price_data, "LABTEST", default_plan_query=plan)
         total_cost = cost + convenience_charge
         if plan.is_gold and total_cost >= deal_price:
             return resp
@@ -683,6 +721,86 @@ class LabtestCodDealPrice(AbstractCriteria):
         return price_data.get('deal_price', 0)
 
 
+class ConvenienceDoctorMrp(ConvenienceAbstractCriteria):
+    def __init__(self, plus_plan):
+        super().__init__(plus_plan)
+
+    def _get_price(self, price_data):
+        if not price_data:
+            return None
+        return price_data.get('mrp', 0)
+
+
+class ConvenienceDoctorDealPrice(ConvenienceAbstractCriteria):
+    def __init__(self, plus_plan):
+        super().__init__(plus_plan)
+
+    def _get_price(self, price_data):
+        if not price_data:
+            return None
+        return price_data.get('deal_price', 0)
+
+
+class ConvenienceDoctorAgreedPrice(ConvenienceAbstractCriteria):
+    def __init__(self, plus_plan):
+        super().__init__(plus_plan)
+
+    def _get_price(self, price_data):
+        if not price_data:
+            return None
+        return price_data.get('fees', 0)
+
+
+class ConvenienceDoctorCodDealPrice(ConvenienceAbstractCriteria):
+    def __init__(self, plus_plan):
+        super().__init__(plus_plan)
+
+    def _get_price(self, price_data):
+        if not price_data:
+            return None
+        return price_data.get('cod_deal_price', 0)
+
+
+class ConvenienceLabtestMrp(ConvenienceAbstractCriteria):
+    def __init__(self, plus_plan):
+        super().__init__(plus_plan)
+
+    def _get_price(self, price_data):
+        if not price_data:
+            return None
+        return price_data.get('mrp', 0)
+
+
+class ConvenienceLabtestDealPrice(ConvenienceAbstractCriteria):
+    def __init__(self, plus_plan):
+        super().__init__(plus_plan)
+
+    def _get_price(self, price_data):
+        if not price_data:
+            return None
+        return price_data.get('deal_price', 0)
+
+
+class ConvenienceLabtestAgreedPrice(ConvenienceAbstractCriteria):
+    def __init__(self, plus_plan):
+        super().__init__(plus_plan)
+
+    def _get_price(self, price_data):
+        if not price_data:
+            return None
+        return price_data.get('fees', 0)
+
+
+class ConvenienceLabtestCodDealPrice(ConvenienceAbstractCriteria):
+    def __init__(self, plus_plan):
+        super().__init__(plus_plan)
+
+    def _get_price(self, price_data):
+        if not price_data:
+            return None
+        return price_data.get('deal_price', 0)
+
+
 price_criteria_class_mapping = {
     'DOCTOR': {
         'MRP': DoctorMrp,
@@ -695,6 +813,21 @@ price_criteria_class_mapping = {
         'DEAL_PRICE': LabtestDealPrice,
         'AGREED_PRICE': LabtestAgreedPrice,
         'COD_DEAL_PRICE': LabtestCodDealPrice
+    }
+}
+
+convenience_price_criteria_class_mapping = {
+    'DOCTOR': {
+        'MRP': ConvenienceDoctorMrp,
+        'DEAL_PRICE': ConvenienceDoctorDealPrice,
+        'AGREED_PRICE': ConvenienceDoctorAgreedPrice,
+        'COD_DEAL_PRICE': ConvenienceDoctorCodDealPrice
+    },
+    'LABTEST': {
+        'MRP': ConvenienceLabtestMrp,
+        'DEAL_PRICE': ConvenienceLabtestDealPrice,
+        'AGREED_PRICE': ConvenienceLabtestAgreedPrice,
+        'COD_DEAL_PRICE': ConvenienceLabtestCodDealPrice
     }
 }
 
@@ -724,6 +857,31 @@ def get_price_reference(obj, entity):
 
     class_reference = price_criteria_class_mapping[entity][price_criteria]
     return class_reference(obj)
+
+
+def get_max_convenience_reference(plan, entity):
+    if not plan:
+        return None
+
+    price_criteria = plan.convenience_max_price_reference
+    if entity not in ['DOCTOR', 'LABTEST'] or price_criteria not in PriceCriteria.availabilities():
+        return None
+
+    class_reference = convenience_price_criteria_class_mapping[entity][price_criteria]
+    return class_reference(plan)
+
+
+def get_min_convenience_reference(plan, entity):
+    if not plan:
+        return None
+
+    price_criteria = plan.convenience_min_price_reference
+    if entity not in ['DOCTOR', 'LABTEST'] or price_criteria not in PriceCriteria.availabilities():
+        return None
+
+    class_reference = convenience_price_criteria_class_mapping[entity][price_criteria]
+    return class_reference(plan)
+
 
 
 

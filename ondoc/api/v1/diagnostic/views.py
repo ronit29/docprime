@@ -20,6 +20,9 @@ from ondoc.cart.models import Cart
 from ondoc.common.models import UserConfig, GlobalNonBookable, AppointmentHistory, MatrixMappedCity, SearchCriteria
 from ondoc.plus.models import PlusUser, PlusPlans, TempPlusUser
 from ondoc.plus.usage_criteria import get_class_reference, get_price_reference
+from ondoc.plus.models import PlusUser, PlusPlans
+from ondoc.plus.usage_criteria import get_class_reference, get_price_reference, get_min_convenience_reference, \
+    get_max_convenience_reference
 from ondoc.ratings_review import models as rating_models
 from ondoc.diagnostic.models import (LabTest, AvailableLabTest, Lab, LabAppointment, LabTiming, PromotedLab,
                                      CommonDiagnosticCondition, CommonTest, CommonPackage,
@@ -1947,11 +1950,9 @@ class LabList(viewsets.ReadOnlyModelViewSet):
                             price = price_engine.get_price(price_data)
                         engine = get_class_reference(plus_user_obj, "LABTEST")
                         if plus_user_obj and plus_user_obj.plan:
-                            res['vip']['vip_convenience_amount'] = plus_user_obj.plan.get_convenience_charge(price, "LABTEST")
-                            # res['vip']['is_gold_member'] = True if plus_user_obj.plan.is_gold else False
+                            res['vip']['vip_convenience_amount'] = PlusPlans.get_default_convenience_amount(price_data, "LABTEST", default_plan_query=plus_user_obj.plan)
                         else:
-                            # res['vip']['is_gold_member'] = False
-                            res['vip']['vip_convenience_amount'] = PlusPlans.get_default_convenience_amount(paticular_test_in_lab.get('agreed_price', 0), "LABTEST")
+                            res['vip']['vip_convenience_amount'] = PlusPlans.get_default_convenience_amount(price_data, "LABTEST")
                         coverage = False
                         res['vip']['vip_gold_price'] = int(paticular_test_in_lab.get('agreed_price', 0))
                         if engine:
