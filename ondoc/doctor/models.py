@@ -328,8 +328,44 @@ class Hospital(auth_model.TimeStampedModel, auth_model.CreatedByModel, auth_mode
         plan = PlusPlans.objects.prefetch_related('plan_parameters', 'plan_parameters__parameter').filter(is_gold=True,
                                                                                                           is_selected=True).first()
         if not plan:
-            plan = PlusPlans.objects.prefetch_related('plan_parameters', 'plan_parameters__parameter').filter(
-                is_gold=True).first()
+            plan = PlusPlans.objects.prefetch_related('plan_parameters', 'plan_parameters__parameter').filter(is_gold=True).first()
+
+        # if plan:
+        #
+        #     convenience_min_amount_obj, convenience_min_amount_obj,  convenience_percentage_obj = plan.get_convenience_object('DOCTOR')
+        #     price_data = {}
+        #
+        #     # TODO percentage column can be taken into doctor table which was prefield via cron
+        #     for common_hospital in common_hosp_queryset:
+        #         if common_hospital.hospital:
+        #             doctor_clinics = common_hospital.hospital.hospital_doctors.all()
+        #             if doctor_clinics:
+        #                 percentage = 0
+        #                 for doc in doctor_clinics:
+        #                     doc_clinic_timing = doc.availability.all()[0] if doc.availability.all() else None
+        #                     if doc_clinic_timing:
+        #                         price_data = {"mrp": doc_clinic_timing.mrp, "fees": doc_clinic_timing.fees,
+        #                                       "deal_price": doc_clinic_timing.deal_price, "cod_deal_price": doc_clinic_timing.cod_deal_price}
+        #                         mrp = doc_clinic_timing.mrp
+        #                         agreed_price = doc_clinic_timing.fees
+        #                         max_price_engine = None
+        #                         min_price_engine = None
+        #                         if agreed_price and mrp:
+        #                             max_price_engine = get_max_convenience_reference(plan, "DOCTOR")
+        #                             min_price_engine = get_min_convenience_reference(plan, "DOCTOR")
+        #                         if not max_price_engine or not min_price_engine:
+        #                             percentage = 0
+        #                         else:
+        #                             max_price = max_price_engine.get_price(price_data)
+        #                             min_price = min_price_engine.get_price(price_data)
+        #                             if not max_price or max_price <= 0 or not min_price or min_price <=0:
+        #                                 percentage = 0
+        #                             else:
+        #                                 percentage = max(((max_price - (min_price +
+        #                                     PlusPlans.get_default_convenience_amount(price_data, "DOCTOR",
+        #                                                                              default_plan_query=plan))) / max_price) * 100,
+        #                                                  percentage)
+        #                 common_hosp_percentage_dict[common_hospital.hospital.id] = round(percentage, 2)
 
         # queryset = CommonHospital.objects.all().values_list('hospital', 'network')
         # top_hospital_ids = list(set([x[0] for x in queryset if x[0] is not None]))
