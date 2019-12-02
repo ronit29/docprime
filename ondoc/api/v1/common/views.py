@@ -1356,7 +1356,7 @@ class AppointmentUtilityViewSet(viewsets.GenericViewSet):
 
                     price_engine = get_price_reference(gold_vip_plan, 'DOCTOR')
                     price = price_engine.get_price(price_data)
-                    convenience_charge = PlusPlans.get_default_convenience_amount(price, "DOCTOR", default_plan_query=gold_vip_plan)
+                    convenience_charge = PlusPlans.get_default_convenience_amount(price_data, "DOCTOR", default_plan_query=gold_vip_plan)
                     price_data['convenience_charge'] = convenience_charge
                     price_data['gold_price'] = int(price)
                     res['opd'] = price_data
@@ -1389,7 +1389,7 @@ class AppointmentUtilityViewSet(viewsets.GenericViewSet):
                         }
 
                         price = price_engine.get_price(price_data)
-                        convenience_charge = PlusPlans.get_default_convenience_amount(price, "LABTEST", default_plan_query=gold_vip_plan)
+                        convenience_charge = PlusPlans.get_default_convenience_amount(price_data, "LABTEST", default_plan_query=gold_vip_plan)
                         price_data['gold_price'] = price if price else None
                         price_data['convenience_charge'] = convenience_charge
                         res['tests'][test] = price_data
