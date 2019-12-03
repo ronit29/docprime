@@ -10,12 +10,14 @@ from ondoc.account.tasks import refund_status_update, consumer_refund_update, du
     get_thyrocare_reports, elastic_alias_switch, add_net_revenue_for_merchant, \
     purchase_order_creation_counter_automation, purchase_order_closing_counter_automation
 from celery.schedules import crontab
-from ondoc.doctor.tasks import save_avg_rating, update_prices, update_city_search_key, update_doctors_count, update_search_score, \
+from ondoc.doctor.tasks import save_avg_rating, update_prices, update_city_search_key, update_doctors_count, \
+    update_search_score, \
     update_all_ipd_seo_urls, update_insured_labs_and_doctors, update_seo_urls, update_hosp_google_avg_rating, \
-    update_flags, doctors_daily_schedule, update_rc_super_user
+    update_flags, doctors_daily_schedule, update_rc_super_user, fetch_place_ids
 from ondoc.account.tasks import update_ben_status_from_pg, update_merchant_payout_pg_status, \
     create_appointment_admins_from_spocs, update_lal_path_test_data
 from ondoc.insurance.tasks import push_mis, process_insurance_payouts
+from ondoc.doctor.tasks import send_ipd_email_notification
 # from ondoc.doctor.services.update_search_score import DoctorSearchScore
 from ondoc.bookinganalytics.tasks import sync_booking_data
 
@@ -90,7 +92,7 @@ def setup_periodic_tasks(sender, **kwargs):
     sender.add_periodic_task(crontab(hour=20, minute=45), update_lal_path_test_data.s(), name='Update Lalpath Lab Data')
     sender.add_periodic_task(crontab(hour=19, minute=30), update_city_search_key.s(), name='Update Hospital City Search Key')
     sender.add_periodic_task(crontab(hour=20, minute=30), update_doctors_count.s(), name='Update Doctors Count')
-    sender.add_periodic_task(crontab(hour=21, minute=00),  sync_booking_data.s(), name="Sync Booking Data for analytics")
+    # sender.add_periodic_task(crontab(hour=21, minute=00),  sync_booking_data.s(), name="Sync Booking Data for analytics")
     #sender.add_periodic_task(crontab(hour=2, minute=30), update_all_hospitals_seo_urls.s(), name='Update Hospital Seo Urls')
     sender.add_periodic_task(crontab(hour=3, minute=30), update_all_ipd_seo_urls.s(), name='Update IPD Seo Urls')
 
@@ -107,3 +109,5 @@ def setup_periodic_tasks(sender, **kwargs):
     sender.add_periodic_task(crontab(hour=18, minute=30), purchase_order_creation_counter_automation.s(), name="Enable Purchase Order Creation")
     sender.add_periodic_task(crontab(hour=18, minute=30), purchase_order_closing_counter_automation.s(),
                              name="Disable Purchase Order Creation")
+    sender.add_periodic_task(crontab(hour=18, minute=30), fetch_place_ids.s(), name="Get Google Place IDs")
+    sender.add_periodic_task(crontab(minute="*/2"), send_ipd_email_notification.s(),name="Send IPD Email Notifications")

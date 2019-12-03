@@ -3,7 +3,7 @@ import decimal
 from django.db import models, transaction
 from django.contrib.postgres.fields import JSONField
 from ondoc.account.models import Order, ConsumerAccount, MoneyPool
-from ondoc.authentication.models import TimeStampedModel, CreatedByModel, User, RefundMixin
+from ondoc.authentication.models import TimeStampedModel, CreatedByModel, User, RefundMixin, TransactionMixin
 
 
 class ChatMedicalCondition(TimeStampedModel):
@@ -24,7 +24,7 @@ class ChatPrescription(TimeStampedModel):
         db_table = "chat_prescription"
 
 
-class ChatConsultation(TimeStampedModel, RefundMixin):
+class ChatConsultation(TimeStampedModel, RefundMixin, TransactionMixin):
     PRODUCT_ID = Order.CHAT_PRODUCT_ID
     BOOKED = 1
     CANCELLED = 2

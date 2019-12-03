@@ -26,6 +26,8 @@ class PgLogs(DynamicDocument, TimeStampedModel):
     CHAT_CONSULTATION_CANCEL = 9
     ECONSULT_ORDER_REQUEST = 10
     REFUND_REQUEST_RESPONSE = 11
+    RESPONSE_TO_CHAT = 12
+    ACK_TO_PG = 13
 
     id = UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     order_id = LongField(null=True, blank=True, editable=False)
@@ -34,12 +36,14 @@ class PgLogs(DynamicDocument, TimeStampedModel):
     logs = ListField()
 
     @classmethod
-    def save_pg_response(cls, log_type=0, order_id=None, txn_id=None, response=None, request=None, user_id=None):
+    def save_pg_response(cls, log_type=0, order_id=None, txn_id=None, response=None, request=None, user_id=None, log_created_at=None):
         if settings.MONGO_STORE:
             pg_log = None
+            has_log = True
             if order_id:
                 pg_log = PgLogs.objects.filter(order_id=order_id).first()
             if not pg_log:
+                has_log = False
                 pg_log = PgLogs(order_id=order_id,
                                 pg_transaction_id=txn_id,
                                 user_id=user_id,
@@ -51,13 +55,22 @@ class PgLogs(DynamicDocument, TimeStampedModel):
                 request['log_type'] = log_type
                 request['type'] = "REQUEST"
                 request['created_at'] = timezone.localtime()
-                pg_log.logs.append(request)
+                request['log_created_at'] = log_created_at
+                if has_log:
+                    pg_log.update(push__logs=request)
+                else:
+                    pg_log.logs.append(request)
             if response:
                 if not isinstance(response, dict):
                     response = json.loads(response)
                 response['log_type'] = log_type
                 response['type'] = "RESPONSE"
                 response['created_at'] = timezone.localtime()
-                pg_log.logs.append(response)
+                response['log_created_at'] = log_created_at
+                if has_log:
+                    pg_log.update(push__logs=response)
+                else:
+                    pg_log.logs.append(response)
 
-            pg_log.save()
+            if not has_log:
+                pg_log.save()

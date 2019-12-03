@@ -3,6 +3,7 @@ from django.contrib.gis.geos import Point
 from django.contrib.postgres.fields import JSONField
 from django.core.validators import FileExtensionValidator, MinValueValidator, MaxValueValidator
 from django.db import models, transaction
+from django.db.models import Q
 from weasyprint import HTML, CSS
 import string
 import random
@@ -32,6 +33,8 @@ from django.utils import timezone
 
 from ondoc.common.helper import Choices
 from django.conf import settings
+import requests
+from rest_framework import status
 
 # from ondoc.doctor.models import PurchaseOrderCreation, PracticeSpecialization
 
@@ -353,22 +356,23 @@ class MatrixMappedState(TimeStampedModel):
         return data
 
     def sync_with_booking_analytics(self):
-        obj = DP_StateMaster.objects.filter(StateId=self.id).first()
-        if not obj:
-            obj = DP_StateMaster()
-            obj.CreatedOn = self.updated_at
-            obj.StateId = self.id
-        obj.StateName = self.name
-        obj.save()
+        # obj = DP_StateMaster.objects.filter(StateId=self.id).first()
+        # if not obj:
+        #     obj = DP_StateMaster()
+        #     obj.CreatedOn = self.updated_at
+        #     obj.StateId = self.id
+        # obj.StateName = self.name
+        # obj.save()
 
         try:
             SyncBookingAnalytics.objects.update_or_create(object_id=self.id,
                                                           content_type=ContentType.objects.get_for_model(MatrixMappedState),
                                                           defaults={"synced_at": self.updated_at, "last_updated_at": self.updated_at})
         except Exception as e:
+            print(str(e))
             pass
 
-        return obj
+        # return obj
 
 
 class MatrixMappedCity(TimeStampedModel):
@@ -393,13 +397,13 @@ class MatrixMappedCity(TimeStampedModel):
         return data
 
     def sync_with_booking_analytics(self):
-        obj = DP_CityMaster.objects.filter(CityId=self.id).first()
-        if not obj:
-            obj = DP_CityMaster()
-            obj.CreatedOn = self.updated_at
-            obj.CityId = self.id
-        obj.CityName = self.name
-        obj.save()
+        # obj = DP_CityMaster.objects.filter(CityId=self.id).first()
+        # if not obj:
+        #     obj = DP_CityMaster()
+        #     obj.CreatedOn = self.updated_at
+        #     obj.CityId = self.id
+        # obj.CityName = self.name
+        # obj.save()
 
         try:
             SyncBookingAnalytics.objects.update_or_create(object_id=self.id,
@@ -408,7 +412,7 @@ class MatrixMappedCity(TimeStampedModel):
         except Exception as e:
             pass
 
-        return obj
+        # return obj
 
 
 class QRCode(TimeStampedModel):
@@ -916,3 +920,76 @@ class SearchCriteria(auth_model.TimeStampedModel):
             super(SearchCriteria, self).save(*args, **kwargs)
         else:
             super(SearchCriteria, self).save(*args, **kwargs)
+
+
+class Certifications(auth_model.TimeStampedModel):
+    name = models.CharField(max_length=200)
+
+    class Meta:
+        db_table = 'certifications'
+
+    def __str__(self):
+        return self.name
+
+
+class GoogleLatLong(auth_model.TimeStampedModel):
+    latitude = models.FloatField()
+    longitude = models.FloatField()
+    coordinates = models.TextField(null=True, blank=True)
+    is_hospital_done = models.BooleanField(default=False)
+    is_doctor_done = models.BooleanField(default=False)
+
+    @classmethod
+    def generate_place_ids(cls):
+        coordinates_obj = GoogleLatLong.objects.filter(Q(is_hospital_done=False)|Q(is_doctor_done=False))
+        types = ['doctor', 'hospital']
+        for point_obj in coordinates_obj:
+            for type in types:
+                if (type == 'doctor' and point_obj.is_doctor_done == False) or (
+                        type == 'hospital' and point_obj.is_hospital_done == False):
+                    location = str(point_obj.latitude) + ' , ' + str(point_obj.longitude)
+                    params = {'radius': 450, 'type': type, 'key': settings.REVERSE_GEOCODING_API_KEY,
+                              'location': location}
+
+                    place_response = requests.get('https://maps.googleapis.com/maps/api/place/nearbysearch/json',
+                                                  params=params)
+                    if place_response.status_code != status.HTTP_200_OK or not place_response.ok:
+                        print('failure  status_code: ' + str(place_response.status_code) + ', reason: ' + str(
+                            place_response.reason) + str(point_obj) + " type: " + type)
+
+                    place_searched_data = place_response.json()
+                    if place_searched_data.get('status') == 'OVER_QUERY_LIMIT':
+                        print('OVER_QUERY_LIMIT'+ str(point_obj) + " type: " + type)
+                        return None
+
+                    if place_searched_data.get('results'):
+                        for data in place_searched_data.get('results'):
+                            if type == 'hospital':
+                                HospitalPlaceIDs.objects.get_or_create(place_id=data.get('place_id'),
+                                                                google_coordinates=point_obj)
+                                point_obj.is_hospital_done = True
+
+                            if type == 'doctor':
+                                DoctorPlaceIDs.objects.get_or_create(place_id=data.get('place_id'),
+                                                              google_coordinates=point_obj)
+                                point_obj.is_doctor_done = True
+                        point_obj.save()
+
+    class Meta:
+        db_table = 'google_lat_long'
+
+
+class HospitalPlaceIDs(auth_model.TimeStampedModel):
+    place_id = models.TextField()
+    google_coordinates = models.ForeignKey(GoogleLatLong, on_delete=models.CASCADE, related_name="hosp_place_ids", null=True)
+
+    class Meta:
+        db_table = 'hospital_place_ids'
+
+
+class DoctorPlaceIDs(auth_model.TimeStampedModel):
+    place_id = models.TextField()
+    google_coordinates = models.ForeignKey(GoogleLatLong, on_delete=models.CASCADE, related_name="doc_place_ids", null=True)
+
+    class Meta:
+        db_table = 'doctor_place_ids'

@@ -228,33 +228,33 @@ class OptimusViewSet(viewsets.GenericViewSet):
         data['lab_appointment'] = list()
         data['corporate_deals'] = list()
 
-        cities = MatrixMappedCity.objects.filter(synced_analytics__isnull=True)[0:10]
+        cities = MatrixMappedCity.objects.filter(synced_analytics__isnull=True)[0:500]
         for city in cities:
             analytics_data = city.get_booking_analytics_data()
             data['matrix_mapped_city'].append(analytics_data)
 
-        states = MatrixMappedState.objects.filter(synced_analytics__isnull=True)[0:10]
+        states = MatrixMappedState.objects.filter(synced_analytics__isnull=True)[0:500]
         for state in states:
             analytics_data = state.get_booking_analytics_data()
             data['matrix_mapped_state'].append(analytics_data)
 
-        opd_apps = OpdAppointment.objects.filter(synced_analytics__isnull=True)[0:10]
+        opd_apps = OpdAppointment.objects.filter(synced_analytics__isnull=True)[0:500]
         for app in opd_apps:
             analytics_data = app.get_booking_analytics_data()
             data['opd_appointment'].append(analytics_data)
 
-        lab_apps = LabAppointment.objects.filter(synced_analytics__isnull=True)[0:10]
+        lab_apps = LabAppointment.objects.filter(synced_analytics__isnull=True)[0:500]
         for app in lab_apps:
             analytics_data = app.get_booking_analytics_data()
             data['lab_appointment'].append(analytics_data)
             # print('lab-id : {} has been synced'.format(app.id))
 
-        corp_deals = CorporateDeal.objects.filter(synced_analytics__isnull=True)[0:10]
+        corp_deals = CorporateDeal.objects.filter(synced_analytics__isnull=True)[0:500]
         for deal in corp_deals:
             analytics_data = deal.get_booking_analytics_data()
             data['corporate_deals'].append(analytics_data)
 
-        to_be_updated = SyncBookingAnalytics.objects.exclude(synced_at=F('last_updated_at'))[0:10]
+        to_be_updated = SyncBookingAnalytics.objects.exclude(synced_at=F('last_updated_at'))
         for obj in to_be_updated:
             row = obj.content_object
 
@@ -275,3 +275,80 @@ class OptimusViewSet(viewsets.GenericViewSet):
                 data['matrix_mapped_state'].append(analytics_data)
 
         return Response(data=data)
+
+
+    def post_analytics_data(self, request):
+        opd_appt = request.data.get('opd_appointments', [])
+        lab_appt = request.data.get('lab_appointments', [])
+        states = request.data.get('matrix_state', [])
+        cities = request.data.get('matrix_city', [])
+        corporate_deal = request.data.get('corporate_deals', [])
+
+        if opd_appt:
+            for opd_id in opd_appt:
+                appt_id = opd_id
+                try:
+                    SyncBookingAnalytics.objects.update_or_create(object_id=appt_id,
+                                                                  content_type=ContentType.objects.get_for_model(
+                                                                      OpdAppointment),
+                                                                  defaults={"synced_at": datetime.now(),
+                                                                            "last_updated_at": datetime.now()})
+                    print('Opd Appointment id: {}'.format(appt_id))
+                except Exception as e:
+                    pass
+
+        if lab_appt:
+            for lab_id in lab_appt:
+                appt_id = lab_id
+                try:
+                    SyncBookingAnalytics.objects.update_or_create(object_id=appt_id,
+                                                                  content_type=ContentType.objects.get_for_model(
+                                                                      LabAppointment),
+                                                                  defaults={"synced_at": datetime.now(),
+                                                                            "last_updated_at": datetime.now()})
+                    print('Lab Appointment id : {}'.format(appt_id))
+                except Exception as e:
+                    pass
+
+        if states:
+            for state in states:
+                state_id = state
+                try:
+                    SyncBookingAnalytics.objects.update_or_create(object_id=state_id,
+                                                                  content_type=ContentType.objects.get_for_model(
+                                                                      MatrixMappedState),
+                                                                  defaults={"synced_at": datetime.now(),
+                                                                            "last_updated_at": datetime.now()})
+                    print('Matrix State print statement')
+                except Exception as e:
+                    pass
+
+        if cities:
+            for city in cities:
+                city_id = city
+                try:
+                    SyncBookingAnalytics.objects.update_or_create(object_id=city_id,
+                                                                  content_type=ContentType.objects.get_for_model(
+                                                                      MatrixMappedCity),
+                                                                  defaults={"synced_at": datetime.now(),
+                                                                            "last_updated_at": datetime.now()})
+                    print('Matrix City print statement')
+                except Exception as e:
+                    pass
+
+        if corporate_deal:
+            for corporate in corporate_deal:
+                corporate_id = corporate
+                try:
+                    SyncBookingAnalytics.objects.update_or_create(object_id=corporate_id,
+                                                                  content_type=ContentType.objects.get_for_model(
+                                                                      CorporateDeal),
+                                                                  defaults={"synced_at": datetime.now(),
+                                                                            "last_updated_at": datetime.now()})
+                    print('corporate deal print statement')
+                except Exception as e:
+                    pass
+
+        return Response(status=status.HTTP_200_OK)
+
+

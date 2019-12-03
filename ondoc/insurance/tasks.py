@@ -97,6 +97,7 @@ logger = logging.getLogger(__name__)
 def push_insurance_buy_to_matrix(self, *args, **kwargs):
     from ondoc.authentication.models import User
     from ondoc.insurance.models import UserInsurance, InsuranceLead
+    from ondoc.notification.tasks import save_matrix_logs
     try:
         user_id = kwargs.get('user_id', None)
         if not user_id:
@@ -109,6 +110,7 @@ def push_insurance_buy_to_matrix(self, *args, **kwargs):
             raise Exception("User could not found against id - " + str(user_id))
 
         user_insurance = user_obj.active_insurance
+        obj_type = 'user_insurance'
         if not user_insurance:
             raise Exception("Invalid or None user insurance found for user id %s " % str(user_id))
 
@@ -148,7 +150,8 @@ def push_insurance_buy_to_matrix(self, *args, **kwargs):
         response = requests.post(url, data=json.dumps(request_data), headers={'Authorization': matrix_api_token,
                                                                               'Content-Type': 'application/json'})
 
-        MatrixLog.create_matrix_logs(user_insurance, request_data, response.json())
+        # MatrixLog.create_matrix_logs(user_insurance, request_data, response.json())
+        save_matrix_logs.apply_async((user_insurance.id, obj_type, request_data, response.json()), countdown=5, queue=settings.RABBITMQ_LOGS_QUEUE)
 
         if response.status_code != status.HTTP_200_OK or not response.ok:
             logger.error(json.dumps(request_data))

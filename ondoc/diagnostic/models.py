@@ -11,7 +11,7 @@ from ondoc.account.models import MerchantPayout, ConsumerAccount, Order, UserRef
 from ondoc.authentication.models import (TimeStampedModel, CreatedByModel, Image, Document, QCModel, UserProfile, User,
                                          UserPermission, GenericAdmin, LabUserPermission, GenericLabAdmin,
                                          BillingAccount, SPOCDetails, RefundMixin, WelcomeCallingDone,
-                                         MerchantTdsDeduction, PaymentMixin)
+                                         MerchantTdsDeduction, PaymentMixin, TransactionMixin)
 from ondoc.bookinganalytics.models import DP_OpdConsultsAndTests
 from ondoc.doctor.models import Hospital, SearchKey, CancellationReason, Doctor
 from ondoc.crm.constants import constants
@@ -58,13 +58,13 @@ from ondoc.integrations.task import push_lab_appointment_to_integrator, get_inte
     push_appointment_to_spo
 from ondoc.location import models as location_models
 from ondoc.plus.enums import UtilizationCriteria
-from ondoc.plus.models import PlusAppointmentMapping
+from ondoc.plus.models import PlusAppointmentMapping, PlusPlans
 from ondoc.plus.usage_criteria import get_class_reference, get_price_reference
 from ondoc.ratings_review import models as ratings_models
 # from ondoc.api.v1.common import serializers as common_serializers
 from ondoc.common.models import AppointmentHistory, AppointmentMaskNumber, Remark, GlobalNonBookable, \
     SyncBookingAnalytics, CompletedBreakupMixin, RefundDetails, MatrixMappedState, \
-    MatrixMappedCity, TdsDeductionMixin, MatrixDataMixin, MerchantPayoutMixin, Fraud, SearchCriteria
+    MatrixMappedCity, TdsDeductionMixin, MatrixDataMixin, MerchantPayoutMixin, Fraud, SearchCriteria, Certifications
 import reversion
 from decimal import Decimal
 from django.utils.text import slugify
@@ -833,6 +833,7 @@ class Lab(TimeStampedModel, CreatedByModel, QCModel, SearchKey, WelcomeCallingDo
 class LabCertification(TimeStampedModel):
     lab = models.ForeignKey(Lab, related_name = 'lab_certificate', on_delete=models.CASCADE)
     name = models.CharField(max_length=200)
+    certification = models.ForeignKey(Certifications, on_delete=models.DO_NOTHING, null=True, blank=True, related_name='lab_certifications')
 
     def __str__(self):
         return self.name
@@ -1107,6 +1108,7 @@ class LabNetwork(TimeStampedModel, CreatedByModel, QCModel):
 class LabNetworkCertification(TimeStampedModel):
     network = models.ForeignKey(LabNetwork, on_delete=models.CASCADE)
     name = models.CharField(max_length=200)
+    certification = models.ForeignKey(Certifications, on_delete=models.DO_NOTHING, null=True, blank=True, related_name='lab_network_certifications')
 
     def __str__(self):
         return self.network.name + " (" + self.name + ")"
@@ -1284,6 +1286,16 @@ class LabTestRecommendedCategoryMapping(models.Model):
         unique_together = (('lab_test', 'parent_category'),)
 
 
+class LabtestNameMaster(auth_model.TimeStampedModel, auth_model.SoftDelete):
+    name = models.CharField(max_length=256, blank=False, null=False)
+
+    def __str__(self):
+        return "{}".format(self.name)
+
+    class Meta:
+        db_table = "labtest_master"
+
+
 class LabTest(TimeStampedModel, SearchKey):
     LAB_TEST_SITEMAP_IDENTIFIER = 'LAB_TEST'
     URL_SUFFIX = 'tpp'
@@ -1358,6 +1370,7 @@ class LabTest(TimeStampedModel, SearchKey):
                                on_delete=models.SET_NULL)
     is_cancellable = models.BooleanField(default=True)
     insurance_cutoff_price = models.PositiveIntegerField(default=None, null=True, blank=True)
+    search_name = models.ForeignKey(LabtestNameMaster, null=True, blank=True, on_delete=models.SET_NULL)
 
     # test_sub_type = models.ManyToManyField(
     #     LabTestSubType,
@@ -1650,7 +1663,7 @@ class LabAppointmentInvoiceMixin(object):
 
 
 @reversion.register()
-class LabAppointment(TimeStampedModel, CouponsMixin, LabAppointmentInvoiceMixin, RefundMixin, CompletedBreakupMixin, MatrixDataMixin, TdsDeductionMixin, PaymentMixin, MerchantPayoutMixin):
+class LabAppointment(TimeStampedModel, CouponsMixin, LabAppointmentInvoiceMixin, RefundMixin, CompletedBreakupMixin, MatrixDataMixin, TdsDeductionMixin, PaymentMixin, MerchantPayoutMixin, TransactionMixin):
     from ondoc.integrations.models import IntegratorResponse
     PRODUCT_ID = Order.LAB_PRODUCT_ID
     CREATED = 1
@@ -1797,42 +1810,50 @@ class LabAppointment(TimeStampedModel, CouponsMixin, LabAppointmentInvoiceMixin,
 
     def sync_with_booking_analytics(self):
 
-        category = None
-        for t in self.tests.all():
-            if t.is_package == True:
-                category = 1
-                break
-            else:
-                category = 0
-
-        promo_cost = self.deal_price - self.effective_price if self.deal_price and self.effective_price else 0
-
-        obj = DP_OpdConsultsAndTests.objects.filter(Appointment_Id=self.id, TypeId=2).first()
-        if not obj:
-            obj = DP_OpdConsultsAndTests()
-            obj.Appointment_Id = self.id
-            obj.CityId = self.get_city()
-            obj.StateId = self.get_state()
-            obj.ProviderId = self.lab.id
-            obj.TypeId = 2
-            obj.PaymentType = self.payment_type if self.payment_type else None
-            obj.Payout = self.agreed_price
-            obj.BookingDate = self.created_at
-        obj.CorporateDealId = self.get_corporate_deal_id()
-        obj.PromoCost = max(0, promo_cost)
-        obj.GMValue = self.deal_price
-        obj.Category = category
-        obj.StatusId = self.status
-        obj.save()
-
         try:
             SyncBookingAnalytics.objects.update_or_create(object_id=self.id,
                                                           content_type=ContentType.objects.get_for_model(LabAppointment),
                                                           defaults={"synced_at": self.updated_at, "last_updated_at": self.updated_at})
         except Exception as e:
+            print(str(e))
             pass
 
-        return obj
+        # category = None
+        # for t in self.tests.all():
+        #     if t.is_package == True:
+        #         category = 1
+        #         break
+        #     else:
+        #         category = 0
+        #
+        # promo_cost = self.deal_price - self.effective_price if self.deal_price and self.effective_price else 0
+        #
+        # obj = DP_OpdConsultsAndTests.objects.filter(Appointment_Id=self.id, TypeId=2).first()
+        # if not obj:
+        #     obj = DP_OpdConsultsAndTests()
+        #     obj.Appointment_Id = self.id
+        #     obj.CityId = self.get_city()
+        #     obj.StateId = self.get_state()
+        #     obj.ProviderId = self.lab.id
+        #     obj.TypeId = 2
+        #     obj.PaymentType = self.payment_type if self.payment_type else None
+        #     obj.Payout = self.agreed_price
+        #     obj.BookingDate = self.created_at
+        # obj.CorporateDealId = self.get_corporate_deal_id()
+        # obj.PromoCost = max(0, promo_cost)
+        # obj.GMValue = self.deal_price
+        # obj.Category = category
+        # obj.StatusId = self.status
+        # obj.save()
+        #
+        # try:
+        #     SyncBookingAnalytics.objects.update_or_create(object_id=self.id,
+        #                                                   content_type=ContentType.objects.get_for_model(LabAppointment),
+        #                                                   defaults={"synced_at": self.updated_at, "last_updated_at": self.updated_at})
+        # except Exception as e:
+        #     pass
+        #
+        # return obj
 
     def get_tests_and_prices(self):
         test_price = []
@@ -2687,7 +2708,8 @@ class LabAppointment(TimeStampedModel, CouponsMixin, LabAppointmentInvoiceMixin,
                     price = effective_price
                 else:
                     price = price_engine.get_price(price_data)
-                vip_convenience_amount = plus_membership.plan.get_convenience_charge(price, "LABTEST")
+                # vip_convenience_amount = plus_membership.plan.get_convenience_charge(price, "LABTEST")
+                vip_convenience_amount = PlusPlans.get_default_convenience_amount(price_data, "LABTEST", default_plan_query=plus_membership.plan)
                 test = data['test_ids']
                 entity = "LABTEST" if not test[0].is_package else "PACKAGE"
                 engine = get_class_reference(plus_membership, entity)
@@ -2835,7 +2857,8 @@ class LabAppointment(TimeStampedModel, CouponsMixin, LabAppointmentInvoiceMixin,
             plus_user_id = plus_user_resp.get('plus_user_id', None)
         if cover_under_vip and cart_data.get('cover_under_vip', None):
             payment_type = OpdAppointment.VIP
-            convenience_amount = plus_user.plan.get_convenience_charge(plus_user_resp['amount_to_be_paid'], "LABTEST")
+            # convenience_amount = plus_user.plan.get_convenience_charge(plus_user_resp['amount_to_be_paid'], "LABTEST")
+            convenience_amount = PlusPlans.get_default_convenience_amount(price_data, "LABTEST", default_plan_query=plus_user.plan)
             effective_price = plus_user_resp['amount_to_be_paid'] + convenience_amount
             vip_amount_utilized = plus_user_resp['vip_amount_deducted']
             # utilization = plus_user.get_utilization

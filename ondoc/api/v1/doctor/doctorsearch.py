@@ -353,7 +353,7 @@ class DoctorSearchHelper:
                     rank_by = " rnk=1 "
             else:
                 if self.query_params.get("specialization_ids") and len(self.query_params.get("specialization_ids")) == 1:
-                    order_by_field = ' welcome_calling_done DESC, floor(distance/bucket_size) ASC, is_license_verified DESC, search_score desc '
+                    order_by_field = ' welcome_calling_done DESC, floor(distance/bucket_size) ASC, is_license_verified DESC, search_score desc '.format(bucket_size=str(bucket_size))
 
                 else:
                     order_by_field = ' welcome_calling_done DESC, floor(distance/{bucket_size}) ASC, is_license_verified DESC, search_score desc '.format(bucket_size=str(bucket_size))
@@ -584,8 +584,8 @@ class DoctorSearchHelper:
                               doctor_clinic.hospital_id == doctor_clinic_mapping[doctor_clinic.doctor_id]]
             doctor_clinic = doctor_clinics[0]
             # As per the discussion with Ashish Sir, we are taking max length of 12 characters for locality in search result
-            if doctor_clinic and doctor_clinic.hospital and len(doctor_clinic.hospital.locality)>12:
-                continue
+            # if doctor_clinic and doctor_clinic.hospital and len(doctor_clinic.hospital.locality)>12:
+            #     continue
             filtered_insurance_fees, filtered_cod_deal_price, filtered_deal_price, filtered_mrp = self.get_doctor_fees(doctor_clinic, doctor_availability_mapping)
             # filtered_fees = self.get_doctor_fees(doctor, doctor_availability_mapping)
             min_deal_price = None
@@ -636,11 +636,18 @@ class DoctorSearchHelper:
                 is_insurance_covered = False
                 insurance_error = None
                 is_gold_member = False
+                plan = None
                 vip_data_dict = kwargs.get('vip_data')
                 is_vip_member = vip_data_dict.get('is_vip_member', False)
                 is_enable_for_vip = vip_data_dict.get('is_enable_for_vip', False)
                 vip_utilization = vip_data_dict.get('vip_utilization', None)
-                vip_convenience_amount = PlusPlans.get_default_convenience_amount(int(min_price.get('fees', 0)), "DOCTOR")
+                price_data = {"mrp": int(min_price.get('mrp', 0)), "deal_price": int(min_price.get('deal_price', 0)),
+                              "cod_deal_price": int(min_price.get('cod_deal_price', 0)),
+                              "fees": int(min_price.get('fees', 0))}
+                if request and request.user and not request.user.is_anonymous and request.user.active_plus_user:
+                    plan = request.user.active_plus_user.plan
+                vip_convenience_amount = PlusPlans.get_default_convenience_amount(price_data, "DOCTOR", default_plan_query=plan)
+
                 vip_remaining_amount = int(vip_utilization.get('vip_remaining_amount', 0))
                 vip_amount = 0
                 cover_under_vip = vip_data_dict.get('cover_under_vip', False)
@@ -685,7 +692,8 @@ class DoctorSearchHelper:
                         price = mrp
                     else:
                         price = price_engine.get_price(price_data)
-                    vip_convenience_amount = request.user.active_plus_user.plan.get_convenience_charge(price, "DOCTOR")
+                    # vip_convenience_amount = request.user.active_plus_user.plan.get_convenience_charge(price, "DOCTOR")
+                    vip_convenience_amount = PlusPlans.get_default_convenience_amount(price_data, "DOCTOR", default_plan_query=request.user.active_plus_user.plan)
                     engine = get_class_reference(request.user.active_plus_user, "DOCTOR")
                     is_gold_member = True if request.user.active_plus_user.plan.is_gold else False
                     if engine:

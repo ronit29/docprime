@@ -1311,7 +1311,7 @@ class ConsumerEConsultationViewSet(viewsets.GenericViewSet):
             return Response({"status": 0}, status.HTTP_401_UNAUTHORIZED)
 
         save_pg_response.apply_async((PgLogs.ECONSULT_ORDER_REQUEST, None, None, None, data, user.id),
-                                     eta=timezone.localtime(), )
+                                     eta=timezone.localtime(), queue=settings.RABBITMQ_LOGS_QUEUE)
 
         doc = consultation.doctor
         use_wallet = data.get('use_wallet', True)

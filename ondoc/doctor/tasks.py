@@ -193,3 +193,14 @@ def doctors_daily_schedule():
                 sms_notification = SMSNotification(notification_type=NotificationAction.OPD_DAILY_SCHEDULE, context=context)
                 sms_notification.send(receiver)
                 sms_sent.append(admin.phone_number)
+
+@task()
+def fetch_place_ids():
+    from ondoc.common.models import GoogleLatLong
+    # GoogleLatLong.generate_place_ids()
+
+
+@task
+def send_ipd_email_notification():
+    from ondoc.notification.models import IPDIntimateEmailNotification
+    IPDIntimateEmailNotification.send_email()

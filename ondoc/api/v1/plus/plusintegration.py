@@ -199,7 +199,7 @@ class PlusIntegration:
                 resp['error'] = "Error while saving data!!"
             else:
                 resp['data'] = "successfully save!!"
-            SalesPointLog.create_spo_logs(plus_user_obj, request_data, response)
+            SalesPointLog.create_spo_logs(plus_user_obj, request_data, response.json())
         except Exception as e:
             # logger.error(json.dumps(request_data))
             logger.info("[ERROR] {}".format(e))

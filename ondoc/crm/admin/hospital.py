@@ -8,6 +8,7 @@ import datetime
 
 from reversion_compare.admin import CompareVersionAdmin
 
+from ondoc.common.models import Certifications
 from ondoc.crm.admin.doctor import CreatedByFilter
 from ondoc.doctor.models import (HospitalImage, HospitalDocument, HospitalAward, Doctor,
                                  HospitalAccreditation, HospitalCertification, HospitalSpeciality, HospitalNetwork,
@@ -84,6 +85,8 @@ class HospitalCertificationInline(admin.TabularInline):
     extra = 0
     can_delete = True
     show_change_link = False
+    fields = ['certification']
+    search_fields = ['certification']
 
 
 class HospitalSpecialityInline(admin.TabularInline):
@@ -480,13 +483,21 @@ class CloudLabAutocomplete(autocomplete.Select2QuerySetView):
     def get_queryset(self):
         if not self.request.user.is_authenticated:
             return Lab.objects.none()
-        queryset = Lab.objects.filter(is_b2b=True)
+        queryset = Lab.objects.filter(is_b2b=True, is_live=True, lab_pricing_group__isnull=False)
         if self.q:
             queryset = queryset.filter(name__istartswith=self.q)
         return queryset.distinct()
 
 
 class PartnerLabsInlineForm(forms.ModelForm):
+
+    def clean(self):
+        super().clean()
+        cleaned_data = self.cleaned_data
+        lab = self.cleaned_data['lab']
+        if not (lab.is_live and lab.is_b2b and lab.lab_pricing_group):
+            raise forms.ValidationError('Error! Please remove the lab "{}" OR check if (lab is b2b || lab is live || has lab pricing group)'.format(lab.name))
+        return cleaned_data
 
     class Meta:
         model = PartnerHospitalLabMapping

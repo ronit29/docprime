@@ -8,7 +8,7 @@ import logging
 from ondoc.account.models import ConsumerAccount, Order, MoneyPool, ConsumerRefund
 from ondoc.api.v1.utils import payment_details, CouponsMixin
 from ondoc.authentication import models as auth_model
-from ondoc.authentication.models import User
+from ondoc.authentication.models import User, TransactionMixin
 from ondoc.coupon.models import Coupon
 from ondoc.diagnostic.models import LabNetwork, Lab, LabTest, LabAppointment
 
@@ -69,7 +69,7 @@ class PlanFeatureMapping(models.Model):
         unique_together = (('plan', 'feature'),)
 
 
-class UserPlanMapping(auth_model.TimeStampedModel, CouponsMixin):
+class UserPlanMapping(auth_model.TimeStampedModel, CouponsMixin, TransactionMixin):
     CANCELLED = 2
     BOOKED = 1
 
@@ -106,8 +106,10 @@ class UserPlanMapping(auth_model.TimeStampedModel, CouponsMixin):
             wallet_refund, cashback_refund = self.get_cancellation_breakup()
             consumer_account.credit_cancellation(self, Order.SUBSCRIPTION_PLAN_PRODUCT_ID, wallet_refund, cashback_refund)
 
-            ctx_obj = consumer_account.debit_refund()
-            ConsumerRefund.initiate_refund(self.user, ctx_obj)
+            ctx_objs = consumer_account.debit_refund(self)
+            if ctx_objs:
+                for ctx_obj in ctx_objs:
+                    ConsumerRefund.initiate_refund(self.user, ctx_obj)
 
     def get_cancellation_breakup(self):
         wallet_refund = cashback_refund = 0

@@ -34,7 +34,7 @@ from dateutil import tz
 from dateutil.relativedelta import relativedelta
 from django.utils import timezone
 from ondoc.authentication import models as auth_model
-from ondoc.authentication.models import SPOCDetails, RefundMixin, MerchantTdsDeduction, PaymentMixin
+from ondoc.authentication.models import SPOCDetails, RefundMixin, MerchantTdsDeduction, PaymentMixin, TransactionMixin
 from ondoc.bookinganalytics.models import DP_OpdConsultsAndTests
 # from ondoc.diagnostic.models import Lab
 from ondoc.location import models as location_models
@@ -55,7 +55,7 @@ from ondoc.api.v1.utils import get_start_end_datetime, custom_form_datetime, Cou
     form_time_slot, util_absolute_url, html_to_pdf, TimeSlotExtraction, resolve_address, generate_short_url
 from ondoc.common.models import AppointmentHistory, AppointmentMaskNumber, Service, Remark, MatrixMappedState, \
     MatrixMappedCity, GlobalNonBookable, SyncBookingAnalytics, CompletedBreakupMixin, RefundDetails, TdsDeductionMixin, \
-    Documents, MerchantPayoutMixin, Fraud
+    Documents, MerchantPayoutMixin, Fraud, Certifications
 from ondoc.common.models import QRCode, MatrixDataMixin
 from functools import reduce
 from operator import or_
@@ -77,12 +77,12 @@ from ondoc.matrix.tasks import push_appointment_to_matrix, push_onboarding_qcsta
 from ondoc.integrations.task import push_opd_appointment_to_integrator
 # from ondoc.procedure.models import Procedure
 from ondoc.plus.models import PlusAppointmentMapping, PlusPlans
-from ondoc.plus.usage_criteria import get_class_reference, get_price_reference
+from ondoc.plus.usage_criteria import get_class_reference, get_price_reference, get_min_convenience_reference, \
+    get_max_convenience_reference
 from ondoc.ratings_review import models as ratings_models
 from django.utils import timezone
 from random import randint
 import reversion
-from ondoc.doctor import models as doctor_models
 from django.db.models import Count
 from ondoc.api.v1.utils import RawSql
 from safedelete import SOFT_DELETE
@@ -322,13 +322,16 @@ class Hospital(auth_model.TimeStampedModel, auth_model.CreatedByModel, auth_mode
 
         common_hosp_percentage_dict = dict()
 
-        plan = PlusPlans.objects.filter(is_gold=True, is_selected=True).first()
+        plan = PlusPlans.objects.prefetch_related('plan_parameters', 'plan_parameters__parameter').filter(is_gold=True, is_selected=True).first()
         if not plan:
-            plan = PlusPlans.objects.filter(is_gold=True).first()
+            plan = PlusPlans.objects.prefetch_related('plan_parameters', 'plan_parameters__parameter').filter(is_gold=True).first()
 
         if plan:
-            convenience_amount_obj, convenience_percentage_obj = plan.get_convenience_object('DOCTOR')
 
+            convenience_min_amount_obj, convenience_min_amount_obj,  convenience_percentage_obj = plan.get_convenience_object('DOCTOR')
+            price_data = {}
+
+            # TODO percentage column can be taken into doctor table which was prefield via cron
             for common_hospital in common_hosp_queryset:
                 if common_hospital.hospital:
                     doctor_clinics = common_hospital.hospital.hospital_doctors.all()
@@ -337,14 +340,28 @@ class Hospital(auth_model.TimeStampedModel, auth_model.CreatedByModel, auth_mode
                         for doc in doctor_clinics:
                             doc_clinic_timing = doc.availability.all()[0] if doc.availability.all() else None
                             if doc_clinic_timing:
+                                price_data = {"mrp": doc_clinic_timing.mrp, "fees": doc_clinic_timing.fees,
+                                              "deal_price": doc_clinic_timing.deal_price, "cod_deal_price": doc_clinic_timing.cod_deal_price}
                                 mrp = doc_clinic_timing.mrp
                                 agreed_price = doc_clinic_timing.fees
+                                max_price_engine = None
+                                min_price_engine = None
                                 if agreed_price and mrp:
-                                    percentage = max(((mrp - (
-                                                agreed_price + plan.get_convenience_amount(agreed_price, convenience_amount_obj,
-                                                                                           convenience_percentage_obj))) / mrp) * 100,
-                                                     percentage)
-                        common_hosp_percentage_dict[common_hospital.hospital.id] = round(percentage,2)
+                                    max_price_engine = get_max_convenience_reference(plan, "DOCTOR")
+                                    min_price_engine = get_min_convenience_reference(plan, "DOCTOR")
+                                if not max_price_engine or not min_price_engine:
+                                    percentage = 0
+                                else:
+                                    max_price = max_price_engine.get_price(price_data)
+                                    min_price = min_price_engine.get_price(price_data)
+                                    if not max_price or max_price <= 0 or not min_price or min_price <=0:
+                                        percentage = 0
+                                    else:
+                                        percentage = max(((max_price - (min_price +
+                                            PlusPlans.get_default_convenience_amount(price_data, "DOCTOR",
+                                                                                     default_plan_query=plan))) / max_price) * 100,
+                                                         percentage)
+                        common_hosp_percentage_dict[common_hospital.hospital.id] = round(percentage, 2)
 
         # queryset = CommonHospital.objects.all().values_list('hospital', 'network')
         # top_hospital_ids = list(set([x[0] for x in queryset if x[0] is not None]))
@@ -382,10 +399,10 @@ class Hospital(auth_model.TimeStampedModel, auth_model.CreatedByModel, auth_mode
         hosp_entity_dict, hosp_locality_entity_dict = Hospital.get_hosp_and_locality_dict(temp_hospital_ids,
                                                                                           EntityUrls.SitemapIdentifier.HOSPITALS_LOCALITY_CITY)
 
-        entity_queryset = EntityUrls.objects.filter(is_valid=True, sitemap_identifier=EntityUrls.SitemapIdentifier.HOSPITAL_PAGE,
-                                                    entity_id__in = temp_hospital_ids)
-        entity_queryset_dict = {x.entity_id: x for x in entity_queryset}
-        all_entity_urls = list(set([x.url for x in entity_queryset]))
+        all_entity_urls = EntityUrls.objects.filter(is_valid=True, sitemap_identifier=EntityUrls.SitemapIdentifier.HOSPITAL_PAGE,
+                                                    entity_id__in = temp_hospital_ids).values_list('url', flat=True).distinct()
+        # entity_queryset_dict = {x.entity_id: x for x in entity_queryset}
+        # all_entity_urls = list(set([x.url for x in entity_queryset]))
         new_dynamic_qs = NewDynamic.objects.filter(url_value__in=all_entity_urls)
         new_dynamic_dict = {x.url_value: x for x in new_dynamic_qs}
         from ondoc.api.v1.doctor.serializers import TopCommonHospitalForIpdProcedureSerializer
@@ -769,7 +786,7 @@ class HospitalPlaceDetails(auth_model.TimeStampedModel):
 
     @classmethod
     def update_place_details(cls):
-        hosp_place_id = HospitalPlaceDetails.objects.all()
+        hosp_place_id = HospitalPlaceDetails.objects.filter(place_details__isnull=True)
         for data in hosp_place_id:
             if not data.place_details:
                 place_searched_data = None
@@ -834,6 +851,7 @@ class HospitalAccreditation(auth_model.TimeStampedModel):
 class HospitalCertification(auth_model.TimeStampedModel):
     hospital = models.ForeignKey(Hospital, on_delete=models.CASCADE)
     name = models.CharField(max_length=200)
+    certification = models.ForeignKey(Certifications, on_delete=models.DO_NOTHING, null=True, blank=True, related_name='hospital_certifications')
 
     def __str__(self):
         return self.hospital.name + " (" + self.name + ")"
@@ -2271,6 +2289,7 @@ class HospitalNetworkDocument(auth_model.TimeStampedModel, auth_model.Document):
 class HospitalNetworkCertification(auth_model.TimeStampedModel):
     network = models.ForeignKey(HospitalNetwork, on_delete=models.CASCADE)
     name = models.CharField(max_length=200)
+    certification = models.ForeignKey(Certifications, on_delete=models.DO_NOTHING, null=True, blank=True, related_name='hospital_network_certifications')
 
     def __str__(self):
         return self.name
@@ -2495,7 +2514,7 @@ class PurchaseOrderCreation(auth_model.TimeStampedModel):
 
 
 @reversion.register()
-class OpdAppointment(auth_model.TimeStampedModel, CouponsMixin, OpdAppointmentInvoiceMixin, RefundMixin, CompletedBreakupMixin, MatrixDataMixin, TdsDeductionMixin, PaymentMixin, MerchantPayoutMixin):
+class OpdAppointment(auth_model.TimeStampedModel, CouponsMixin, OpdAppointmentInvoiceMixin, RefundMixin, CompletedBreakupMixin, MatrixDataMixin, TdsDeductionMixin, PaymentMixin, MerchantPayoutMixin, TransactionMixin):
     PRODUCT_ID = Order.DOCTOR_PRODUCT_ID
     CREATED = 1
     BOOKED = 2
@@ -2712,42 +2731,43 @@ class OpdAppointment(auth_model.TimeStampedModel, CouponsMixin, OpdAppointmentIn
 
     def sync_with_booking_analytics(self):
 
-        promo_cost = self.deal_price - self.effective_price if self.deal_price and self.effective_price else 0
-        department = None
-        if self.doctor:
-            if self.doctor.doctorpracticespecializations.first():
-                if self.doctor.doctorpracticespecializations.first().specialization.department.first():
-                    department = self.doctor.doctorpracticespecializations.first().specialization.department.first().id
-
-        wallet, cashback = self.get_completion_breakup()
-
-        obj = DP_OpdConsultsAndTests.objects.filter(Appointment_Id=self.id, TypeId=1).first()
-        if not obj:
-            obj = DP_OpdConsultsAndTests()
-            obj.Appointment_Id = self.id
-            obj.CityId = self.get_city()
-            obj.StateId = self.get_state()
-            obj.SpecialityId = department
-            obj.TypeId = 1
-            obj.ProviderId = self.hospital.id
-            obj.PaymentType = self.payment_type if self.payment_type else None
-            obj.Payout = self.fees
-            obj.CashbackUsed = cashback
-            obj.BookingDate = self.created_at
-        obj.CorporateDealId = self.get_corporate_deal_id()
-        obj.PromoCost = max(0, promo_cost)
-        obj.GMValue = self.deal_price
-        obj.StatusId = self.status
-        obj.save()
+        # promo_cost = self.deal_price - self.effective_price if self.deal_price and self.effective_price else 0
+        # department = None
+        # if self.doctor:
+        #     if self.doctor.doctorpracticespecializations.first():
+        #         if self.doctor.doctorpracticespecializations.first().specialization.department.first():
+        #             department = self.doctor.doctorpracticespecializations.first().specialization.department.first().id
+        #
+        # wallet, cashback = self.get_completion_breakup()
+        #
+        # obj = DP_OpdConsultsAndTests.objects.filter(Appointment_Id=self.id, TypeId=1).first()
+        # if not obj:
+        #     obj = DP_OpdConsultsAndTests()
+        #     obj.Appointment_Id = self.id
+        #     obj.CityId = self.get_city()
+        #     obj.StateId = self.get_state()
+        #     obj.SpecialityId = department
+        #     obj.TypeId = 1
+        #     obj.ProviderId = self.hospital.id
+        #     obj.PaymentType = self.payment_type if self.payment_type else None
+        #     obj.Payout = self.fees
+        #     obj.CashbackUsed = cashback
+        #     obj.BookingDate = self.created_at
+        # obj.CorporateDealId = self.get_corporate_deal_id()
+        # obj.PromoCost = max(0, promo_cost)
+        # obj.GMValue = self.deal_price
+        # obj.StatusId = self.status
+        # obj.save()
 
         try:
             SyncBookingAnalytics.objects.update_or_create(object_id=self.id,
                                                           content_type=ContentType.objects.get_for_model(OpdAppointment),
                                                           defaults={"synced_at": self.updated_at, "last_updated_at": self.updated_at})
         except Exception as e:
+            print(str(e))
             pass
 
-        return obj
+        # return obj
 
     def get_invoice_objects(self):
         return Invoice.objects.filter(reference_id=self.id, product_id=Order.DOCTOR_PRODUCT_ID)
@@ -3648,7 +3668,8 @@ class OpdAppointment(auth_model.TimeStampedModel, CouponsMixin, OpdAppointmentIn
         if cover_under_vip and cart_data.get('cover_under_vip', None) and vip_amount > 0:
             # effective_price = 0 if doctor_available_amount >= mrp else (mrp - doctor_available_amount)
             # effective_price = cart_data.get('vip_amount')
-            convenience_amount = plus_user.plan.get_convenience_charge(cart_data.get('amount_to_be_paid'), "DOCTOR")
+            # convenience_amount = plus_user.plan.get_convenience_charge(cart_data.get('amount_to_be_paid'), "DOCTOR")
+            convenience_amount = PlusPlans.get_default_convenience_amount(price_data, "DOCTOR", default_plan_query=plus_user.plan)
             effective_price = cart_data.get('amount_to_be_paid') + convenience_amount
             # vip_amount = vip_amount + convenience_amount
             payment_type = OpdAppointment.VIP
@@ -5251,3 +5272,30 @@ class SponsoredServicePracticeSpecialization(auth_model.TimeStampedModel):
 
     class Meta:
         db_table = "specialization_sponsored_services"
+
+
+class GoogleMapRecords(auth_model.TimeStampedModel):
+    location = models.PointField(geography=True, srid=4326, blank=True, null=True)
+    text = models.CharField(max_length=500)
+    latitude = models.DecimalField(max_digits=9, decimal_places=6, default=None)
+    longitude = models.DecimalField(max_digits=9, decimal_places=6, default=None)
+    label = models.CharField(max_length=100, null=True)
+    image = models.URLField(max_length=500, null= True)
+    reason = models.TextField(null=True, blank=True)
+    hospital_name = models.CharField(max_length=500, null=True, blank=True)
+    place_id = models.CharField(max_length=500, null=True, blank=True)
+    multi_speciality = models.CharField(max_length=500, null=True, blank=True)
+    has_phone = models.SmallIntegerField(null=True, blank=True)
+    lead_rank = models.CharField(max_length=100, null=True, blank=True)
+    combined_rating = models.FloatField(null=True, blank=True)
+    combined_rating_count = models.IntegerField(null=True, blank=True)
+    is_potential = models.SmallIntegerField(null=True, blank=True)
+    has_booking = models.SmallIntegerField(null=True, blank=True)
+    monday_timing = models.TextField(null=True, blank=True)
+    address = models.TextField(null=True, blank=True)
+    is_bookable = models.SmallIntegerField(null=True, blank=True)
+    phone_number = models.CharField(max_length=500, null=True, blank=True)
+    hospital_id = models.IntegerField(null=True, blank=True)
+
+    class Meta:
+        db_table = "google_map_records"

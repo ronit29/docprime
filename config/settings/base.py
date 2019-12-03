@@ -15,6 +15,7 @@ import datetime
 import json
 import os
 from mongoengine import *
+from pymongo.read_preferences import ReadPreference
 
 # Build paths inside the project like this: os.path.join(BASE_DIR, ...)
 #BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -107,8 +108,12 @@ try:
     if env('MONGO_DB_NAME') and env('MONGO_DB_HOST') and env('MONGO_DB_PORT'):
         mongo_port = int(env('MONGO_DB_PORT'))
         if env('MONGO_DB_USERNAME', None) and env('MONGO_DB_PASSWORD', None):
-            connect(env('MONGO_DB_NAME'), host=env('MONGO_DB_HOST'), port=mongo_port, username=env('MONGO_DB_USERNAME'),
-                                            password=env('MONGO_DB_PASSWORD'), authentication_source='admin')
+            # connect(env('MONGO_DB_NAME'), host=env('MONGO_DB_HOST'), port=mongo_port, username=env('MONGO_DB_USERNAME'),
+            #                                 password=env('MONGO_DB_PASSWORD'), authentication_source='admin')
+            connect(host=env('MONGO_CONNECTION_STRING'), read_preference=ReadPreference.PRIMARY_PREFERRED)
+            # host = 'mongodb://' + env('MONGO_DB_USERNAME') + ':' + env('MONGO_DB_PASSWORD') + '@' + 10.20.5.148:27017,10.20.6.116:27017/DocPrimeLogs?replicaSet=rs5'
+            # connect(host='mongodb://ankitPBpyuser:ajd87GHSd@10.20.5.148:27017,10.20.6.116:27017/DocPrimeLogs?replicaSet=rs5', authentication_source='admin')
+
         else:
             connect(env('MONGO_DB_NAME'), host=env('MONGO_DB_HOST'), port=mongo_port)
         MONGO_STORE = env.bool('MONGO_STORE', default=False)
@@ -155,7 +160,8 @@ THIRD_PARTY_APPS = (
     'qrcode',
     'Crypto',
     'multiselectfield',
-    'django_select2'
+    'django_select2',
+    'geopy'
 )
 
 
@@ -274,7 +280,7 @@ TEMPLATES = [
         'BACKEND': 'django.template.backends.django.DjangoTemplates',
         # https://docs.djangoproject.com/en/dev/ref/settings/#template-dirs
         'DIRS': [
-            str(APPS_DIR.path('templates')),
+            str(APPS_DIR.path('static')),
         ],
         'OPTIONS': {
             # https://docs.djangoproject.com/en/dev/ref/settings/#template-debug
@@ -542,3 +548,7 @@ DOCTORS_COUNT=env('DOCTORS_COUNT')
 LAB_COUNT=env('LAB_COUNT')
 VIP_CANCELLATION_PERIOD=env.int('VIP_CANCELLATION_PERIOD')
 USE_SLAVE_DB=env.bool('USE_SLAVE_DB', False)
+RABBITMQ_LOGS_QUEUE=env('RABBITMQ_LOGS_QUEUE')
+TRUECALLER_SOURCES=env.list('TRUECALLER_SOURCES')
+RABBITMQ_TRACKING_QUEUE=env('RABBITMQ_TRACKING_QUEUE')
+SBIG_AUTH_TOKEN=env('SBIG_AUTH_TOKEN')
