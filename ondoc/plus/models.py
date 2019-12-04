@@ -1,5 +1,8 @@
+from dateutil.relativedelta import relativedelta
 from django.db import models
 import functools
+
+from ondoc.api.v1.utils import CouponsMixin
 from ondoc.authentication import models as auth_model
 from django.contrib.contenttypes.fields import GenericRelation, GenericForeignKey
 from django.contrib.contenttypes.models import ContentType
@@ -16,11 +19,16 @@ from ondoc.authentication.models import UserProfile, User
 from django.db import transaction
 from django.db.models import Q
 from ondoc.common.models import DocumentsProofs
+from ondoc.coupon.models import Coupon
+
 from ondoc.notification.tasks import push_plus_lead_to_matrix
 from ondoc.plus.usage_criteria import get_class_reference, get_price_reference, get_min_convenience_reference, \
     get_max_convenience_reference
 from .enums import PlanParametersEnum, UtilizationCriteria, PriceCriteria
-from datetime import datetime
+from datetime import datetime, timedelta
+import datetime
+from datetime import timedelta
+from dateutil.relativedelta import relativedelta
 from ondoc.crm import constants as const
 from django.utils.timezone import utc
 import reversion
@@ -108,6 +116,7 @@ class PlusPlans(auth_model.TimeStampedModel, LiveMixin):
     convenience_min_price_reference = models.CharField(max_length=100, null=True, blank=False, choices=PriceCriteria.as_choices())
     convenience_max_price_reference = models.CharField(max_length=100, null=True, blank=False, choices=PriceCriteria.as_choices())
     is_gold = models.NullBooleanField()
+    default_single_booking = models.NullBooleanField()
 
     @classmethod
     def get_active_plans_via_utm(cls, utm):
@@ -188,12 +197,12 @@ class PlusPlans(auth_model.TimeStampedModel, LiveMixin):
         if not max_price_engine:
             return 0
         max_price = max_price_engine.get_price(price_data)
-        if not max_price or not min_price or max_price <= 0 or min_price <= 0:
+        if max_price is None or min_price is None or max_price < 0 or min_price < 0:
             return 0
         convenience_min_amount_obj, convenience_max_amount_obj, convenience_percentage_obj = default_plan.get_convenience_object(type)
         min_cap = int(convenience_min_amount_obj.value) if convenience_min_amount_obj else 0
         max_cap = int(convenience_max_amount_obj.value) if convenience_max_amount_obj else 0
-        if not min_cap or not max_cap or min_cap <= 0 or max_cap <= 0:
+        if min_cap is None or max_cap is None or min_cap <= 0 or max_cap <= 0:
             return 0
         convenience_amount_list = []
         price_diff = int(max_price) - (min_price)
@@ -259,6 +268,21 @@ class PlusPlans(auth_model.TimeStampedModel, LiveMixin):
             return charge
         else:
             return convenience_amount
+
+    def get_price_details(self, data, amount=0):
+        coupon_discount, coupon_cashback, coupon_list, random_coupon_list = Coupon.get_total_deduction(data, amount)
+        if coupon_discount >= amount:
+            effective_price = 0
+        else:
+            effective_price = amount - coupon_discount
+        return {
+            "amount": amount,
+            "effective_price": effective_price,
+            "coupon_discount": coupon_discount,
+            "coupon_cashback": coupon_cashback,
+            "coupon_list": coupon_list,
+            "random_coupon_list": random_coupon_list
+        }
 
     class Meta:
         db_table = 'plus_plans'
@@ -352,8 +376,9 @@ class PlusThreshold(auth_model.TimeStampedModel, LiveMixin):
 
 
 @reversion.register()
-class PlusUser(auth_model.TimeStampedModel, RefundMixin, TransactionMixin):
+class PlusUser(auth_model.TimeStampedModel, RefundMixin, TransactionMixin, CouponsMixin):
     from ondoc.account.models import MoneyPool
+    from ondoc.coupon.models import Coupon
     PRODUCT_ID = account_model.Order.VIP_PRODUCT_ID
 
     ACTIVE = 1
@@ -383,6 +408,7 @@ class PlusUser(auth_model.TimeStampedModel, RefundMixin, TransactionMixin):
     matrix_lead_id = models.IntegerField(null=True)
     raw_plus_member = JSONField(blank=False, null=False, default=list)
     payment_type = models.PositiveSmallIntegerField(choices=const.PAY_CHOICES, default=const.PREPAID)
+    coupon = models.ManyToManyField(Coupon, blank=True, null=True, related_name="plus_coupon")
 
     def is_valid(self):
         if self.expire_date >= timezone.now() and (self.status == self.ACTIVE):
@@ -419,7 +445,7 @@ class PlusUser(auth_model.TimeStampedModel, RefundMixin, TransactionMixin):
 
     def get_primary_member_profile(self):
         insured_members = self.plus_members.filter().order_by('id')
-        proposers = list(filter(lambda member: member.is_primary_user and member.relation == PlusMembers.Relations.SELF, insured_members))
+        proposers = list(filter(lambda member: member.is_primary_user, insured_members))
         if proposers:
             return proposers[0]
 
@@ -532,16 +558,27 @@ class PlusUser(auth_model.TimeStampedModel, RefundMixin, TransactionMixin):
             "amount_to_be_paid": mrp
         }
 
+        # discount calculation on mrp
+        coupon_discount, coupon_cashback, coupon_list, random_coupon_list = Coupon.get_total_deduction(
+            appointment_data, mrp)
+        if coupon_discount >= mrp:
+            response_dict['amount_to_be_paid'] = 0
+        else:
+            response_dict['amount_to_be_paid'] = mrp - coupon_discount
+
         if appointment_data.get('payment_type') == OpdAppointment.COD:
             return response_dict
         profile = appointment_data.get('profile', None)
         user = profile.user
         plus_user = user.active_plus_user
+        if not plus_user and appointment_data.get('plus_plan', None):
+            plus_user = user.get_temp_plus_user
         if not plus_user:
             return response_dict
-        plus_members = plus_user.plus_members.filter(profile=profile)
-        if not plus_members.exists():
-            return response_dict
+        if not appointment_data.get('plus_plan', None):
+            plus_members = plus_user.plus_members.filter(profile=profile)
+            if not plus_members.exists():
+                return response_dict
 
         response_dict['is_vip_member'] = True
 
@@ -570,10 +607,20 @@ class PlusUser(auth_model.TimeStampedModel, RefundMixin, TransactionMixin):
 
                 # engine_response = engine.validate_booking_entity(cost=mrp, utilization=kwargs.get('utilization'))
                 engine_response = engine.validate_booking_entity(cost=price, utilization=kwargs.get('utilization'), mrp=mrp, deal_price=deal_price)
+
+                # discount calculation on amount to be paid
+                amount_to_be_paid = engine_response.get('amount_to_be_paid', mrp)
+                response_dict['amount_to_be_paid'] = amount_to_be_paid
+                coupon_discount, coupon_cashback, coupon_list, random_coupon_list = Coupon.get_total_deduction(
+                    appointment_data, amount_to_be_paid)
+                if coupon_discount >= amount_to_be_paid:
+                    response_dict['amount_to_be_paid'] = 0
+                else:
+                    response_dict['amount_to_be_paid'] = amount_to_be_paid - coupon_discount
+
                 response_dict['cover_under_vip'] = engine_response.get('is_covered', False)
                 response_dict['plus_user_id'] = plus_user.id
                 response_dict['vip_amount_deducted'] = engine_response.get('vip_amount_deducted', 0)
-                response_dict['amount_to_be_paid'] = engine_response.get('amount_to_be_paid', mrp)
 
                 # Only for cart items.
                 if kwargs.get('utilization') and response_dict['cover_under_vip'] and response_dict['vip_amount_deducted']:
@@ -603,10 +650,20 @@ class PlusUser(auth_model.TimeStampedModel, RefundMixin, TransactionMixin):
 
                     if not engine_response:
                         return response_dict
+
+                    # discount calculation on amount to be paid
+                    amount_to_be_paid = engine_response.get('amount_to_be_paid', final_price)
+                    coupon_discount, coupon_cashback, coupon_list, random_coupon_list = Coupon.get_total_deduction(
+                        appointment_data, amount_to_be_paid)
+                    if coupon_discount >= amount_to_be_paid:
+                        response_dict['amount_to_be_paid'] = 0
+                    else:
+                        response_dict['amount_to_be_paid'] = amount_to_be_paid - coupon_discount
+
                     response_dict['cover_under_vip'] = engine_response.get('is_covered', False)
                     response_dict['plus_user_id'] = plus_user.id
                     response_dict['vip_amount_deducted'] = engine_response.get('vip_amount_deducted', 0)
-                    response_dict['amount_to_be_paid'] = engine_response.get('amount_to_be_paid', final_price)
+                    # response_dict['amount_to_be_paid'] = engine_response.get('amount_to_be_paid', final_price)
 
                     # Only for cart items.
                     if kwargs.get('utilization') and response_dict['cover_under_vip'] and response_dict['vip_amount_deducted']:
@@ -781,23 +838,33 @@ class PlusUser(auth_model.TimeStampedModel, RefundMixin, TransactionMixin):
             if profile:
                 if profile.user_id == user.id:
                     profile.name = name
-                    profile.email = member['email']
-                    # profile.gender = member['gender']
-                    profile.dob = member['dob']
-                    if member['relation'] == PlusMembers.Relations.SELF:
-                        profile.is_default_user = True
-                    else:
-                        profile.is_default_user = False
+                    if member.get('email'):
+                        profile.email = member.get('email', None)
+                    if member.get('gender'):
+                        profile.gender = member.get('gender', None)
+                    if member.get('dob'):
+                        profile.dob = member.get('dob')
+                    # profile.is_default_user = True
+                    # if member['relation'] == PlusMembers.Relations.SELF:
+                    # if member['is_primary_user']:
+                    #
+                    # else:
+                    #     profile.is_default_user = False
                     profile.save()
 
                 profile = profile.id
         # Create Profile if not exist with name or not exist in profile id from request
         else:
-            data = {'name': name, 'email': member['email'], 'user_id': user.id,
-                    'dob': member['dob'], 'is_default_user': False, 'is_otp_verified': False,
-                    'phone_number': user.phone_number}
-            if member['relation'] == PlusMembers.Relations.SELF:
+            data = {'name': name, 'email': member.get('email'), 'user_id': user.id,
+                    'dob': member.get('dob'), 'is_default_user': False, 'is_otp_verified': False,
+                    'phone_number': user.phone_number, 'gender': member.get('gender')}
+            # if member['is_primary_user']:
+            #     data['is_default_user'] = True
+            profile_obj = UserProfile.objects.filter(user_id=user.id).first()
+            if not profile_obj and member['is_primary_user']:
                 data['is_default_user'] = True
+            else:
+                data['is_default_user'] = False
 
             member_profile = UserProfile.objects.create(**data)
             profile = member_profile.id
@@ -824,24 +891,27 @@ class PlusUser(auth_model.TimeStampedModel, RefundMixin, TransactionMixin):
     @classmethod
     def create_plus_user(cls, plus_data, user):
         from ondoc.doctor.models import OpdAppointment
-        members = plus_data['plus_members']
+        members = deepcopy(plus_data['plus_members'])
+        coupon_list = plus_data.pop("coupon", None)
 
         for member in members:
             member['profile'] = cls.profile_create_or_update(member, user)
             member['dob'] = str(member['dob'])
             # member['profile'] = member['profile'].id if member.get('profile') else None
-        plus_data['insured_members'] = members
+        plus_data['plus_members'] = members
 
         plus_membership_obj = cls.objects.create(plan=plus_data['plus_plan'],
                                                           user=plus_data['user'],
                                                           raw_plus_member=json.dumps(plus_data['plus_members']),
                                                           purchase_date=plus_data['purchase_date'],
                                                           expire_date=plus_data['expire_date'],
-                                                          amount=plus_data['amount'],
+                                                          amount=plus_data['effective_price'],
                                                           order=plus_data['order'],
                                                           payment_type=const.PREPAID,
                                                           status=cls.ACTIVE)
 
+        if coupon_list:
+            plus_membership_obj.coupon.add(*coupon_list)
         PlusMembers.create_plus_members(plus_membership_obj)
         PlusUserUtilization.create_utilization(plus_membership_obj)
         return plus_membership_obj
@@ -911,6 +981,7 @@ class PlusUser(auth_model.TimeStampedModel, RefundMixin, TransactionMixin):
         from ondoc.api.v1.plus.plusintegration import PlusIntegration
         if kwargs.get('is_fresh'):
             PlusIntegration.create_vip_lead_after_purchase(self)
+            PlusIntegration.assign_coupons_to_user_after_purchase(self)
     
     def process_cancellation(self):
         from ondoc.doctor.models import OpdAppointment
@@ -930,15 +1001,17 @@ class PlusUser(auth_model.TimeStampedModel, RefundMixin, TransactionMixin):
         appointments_qs = OpdAppointment.objects.filter(plus_plan=self)
         to_be_cancelled_appointments = appointments_qs.all().exclude(status__in=[OpdAppointment.COMPLETED, OpdAppointment.CANCELLED])
         for appointment in to_be_cancelled_appointments:
-            appointment.status = OpdAppointment.CANCELLED
-            appointment.save()
+            # appointment.status = OpdAppointment.CANCELLED
+            # appointment.save()
+            appointment.action_cancelled(True)
 
         # Lab Appointments
         appointments_qs = LabAppointment.objects.filter(plus_plan=self)
         to_be_cancelled_appointments = appointments_qs.all().exclude(status__in=[LabAppointment.COMPLETED, LabAppointment.CANCELLED])
         for appointment in to_be_cancelled_appointments:
-            appointment.status = LabAppointment.CANCELLED
-            appointment.save()
+            # appointment.status = LabAppointment.CANCELLED
+            # appointment.save()
+            appointment.action_cancelled(True)
 
     def process_cancel_initiate(self):
         pass
@@ -986,6 +1059,43 @@ class PlusUser(auth_model.TimeStampedModel, RefundMixin, TransactionMixin):
 
         super().save(*args, **kwargs)
         transaction.on_commit(lambda: self.after_commit_tasks(is_fresh=is_fresh))
+
+    @classmethod
+    def create_fulfillment_data(cls, data):
+        from ondoc.doctor.models import OpdAppointment
+        plus_user = dict()
+        resp = {}
+        plus_plan = data.get('plus_plan')
+        profile = data.get('profile', None)
+        name = profile.name.split(' ', 1)
+        first_name = name[0]
+        last_name = name[1] if name[1:] else ''
+        dob = profile.dob
+        email = profile.email
+        phone_number = profile.phone_number
+        plus_members = []
+
+        member = {"first_name": first_name, "last_name": last_name, "dob": dob, "email": email, "phone_number": phone_number, "profile": profile.id if profile else None, "is_primary_user": True}
+        primary_user_profile = UserProfile.objects.filter(user_id=profile.user.pk, is_default_user=True).values('id', 'name',
+                                                                                                      'email',
+                                                                                                      'gender',
+                                                                                                      'user_id',
+                                                                                                      'phone_number',
+                                                                                                                'dob').first()
+        plus_members.append(member.copy())
+        transaction_date = datetime.datetime.now()
+        expiry_date = transaction_date + relativedelta(months=int(plus_plan.tenure))
+        expiry_date = expiry_date - timedelta(days=1)
+        expiry_date = datetime.datetime.combine(expiry_date, datetime.datetime.max.time())
+        amount = plus_plan.deal_price
+        plus_user = {'proposer': plus_plan.proposer.id, 'plus_plan': plus_plan.id,
+                          'purchase_date': transaction_date, 'expire_date': expiry_date, 'amount': amount,
+                          'user': profile.user.id, "plus_members": plus_members, "effective_price": amount}
+
+        resp = {"profile_detail": primary_user_profile, "user": profile.user.id, "plus_user": plus_user,
+                "plus_plan": plus_plan.id, "effective_price": amount, "payment_type": OpdAppointment.PREPAID}
+
+        return resp
 
     class Meta:
         db_table = 'plus_users'
@@ -1116,18 +1226,18 @@ class PlusMembers(auth_model.TimeStampedModel):
     dob = models.DateField(blank=False, null=False)
     email = models.EmailField(max_length=100, null=True)
     relation = models.CharField(max_length=50, choices=Relations.as_choices(), default=None, null=True)
-    pincode = models.PositiveIntegerField(default=None)
-    address = models.TextField(default=None)
+    pincode = models.PositiveIntegerField(default=None, null=True)
+    address = models.TextField(default=None, null=True)
     gender = models.CharField(max_length=50, choices=GENDER_CHOICES, default=None, null=True)
     phone_number = models.BigIntegerField(blank=True, null=True,
                                           validators=[MaxValueValidator(9999999999), MinValueValidator(1000000000)])
     profile = models.ForeignKey(auth_model.UserProfile, related_name="plus_member", on_delete=models.CASCADE, null=True)
-    title = models.CharField(max_length=20, choices=TITLE_TYPE_CHOICES, default=None)
+    title = models.CharField(max_length=20, choices=TITLE_TYPE_CHOICES, default=None, null=True)
     middle_name = models.CharField(max_length=50, null=True, blank=True)
-    city = models.CharField(max_length=100, null=True, default=None)
-    district = models.CharField(max_length=100, null=True, default=None)
-    state = models.CharField(max_length=100, null=True, default=None)
-    state_code = models.CharField(max_length=10, default=None, null=True)
+    city = models.CharField(max_length=100, null=True, default=None, blank=True)
+    district = models.CharField(max_length=100, null=True, default=None, blank=True)
+    state = models.CharField(max_length=100, null=True, default=None, blank=True)
+    state_code = models.CharField(max_length=10, default=None, null=True, blank=True)
     plus_user = models.ForeignKey(PlusUser, related_name="plus_members", on_delete=models.DO_NOTHING, null=False, default=None)
     city_code = models.CharField(max_length=10, blank=True, null=True, default='')
     district_code = models.CharField(max_length=10, blank=True, null=True, default=None)
@@ -1146,7 +1256,7 @@ class PlusMembers(auth_model.TimeStampedModel):
 
         for member in members:
             user_profile = UserProfile.objects.get(id=member.get('profile'))
-            is_primary_user = True if member['relation'] and member['relation']  == cls.Relations.SELF else False
+            is_primary_user = member['is_primary_user']
             plus_members_obj = cls(first_name=member.get('first_name'), title=member.get('title'),
                                                      last_name=member.get('last_name'), dob=member.get('dob'),
                                                      email=member.get('email'), address=member.get('address'),
@@ -1265,9 +1375,206 @@ class PlusAppointmentMapping(auth_model.TimeStampedModel):
 
 
 class PlusDummyData(auth_model.TimeStampedModel):
+    class DataType(Choices):
+        PLAN_PURCHASE = 'PLAN_PURCHASE'
+        SINGLE_PURCHASE = 'SINGLE_PURCHASE'
+
     user = models.ForeignKey(User, related_name='plus_user_dummy_data', on_delete=models.DO_NOTHING)
     data = JSONField(null=False, blank=False)
+    data_type = models.CharField(max_length=100, null=True, choices=DataType.as_choices())
 
     class Meta:
         db_table = 'plus_dummy_data'
 
+
+class TempPlusUser(auth_model.TimeStampedModel):
+    user = models.ForeignKey(User, related_name='temp_plus_user', on_delete=models.DO_NOTHING)
+    plan = models.ForeignKey(PlusPlans, related_name='temp_plus_plan', on_delete=models.DO_NOTHING)
+    raw_plus_member = JSONField(blank=True, null=True, default=list)
+    profile = models.ForeignKey(UserProfile, related_name='temp_plus_user_profile', on_delete=models.DO_NOTHING)
+    deleted = models.BooleanField(default=0)
+    is_utilized = models.NullBooleanField()
+
+    class Meta:
+        db_table = 'temp_plus_user'
+
+    @classmethod
+    def temp_appointment_to_plus_appointment(cls, appointment_data):
+        from ondoc.account.models import  Order
+        if "plus_plan" in appointment_data and appointment_data['plus_plan']:
+
+            temp_plus_obj = cls.objects.filter(user__id=appointment_data['user'], id=int(appointment_data['plus_plan']),
+                                                        profile__id=appointment_data['profile'],
+                                                        is_utilized=None).first()
+            if temp_plus_obj:
+                temp_plus_obj.is_utilized = True
+                temp_plus_obj.save()
+
+                sibling_order = Order.objects.filter(user__id=appointment_data['user'], product_id=Order.GOLD_PRODUCT_ID,
+                                                     reference_id__isnull=False).order_by('-id').first()
+                plus_obj = PlusUser.objects.filter(id=sibling_order.reference_id).first()
+                appointment_data['plus_plan'] = plus_obj.id
+
+        return appointment_data
+
+    def validate_plus_appointment(self, appointment_data, *args, **kwargs):
+        from ondoc.doctor.models import OpdAppointment
+        from ondoc.diagnostic.models import LabAppointment
+        OPD = "OPD"
+        LAB = "LAB"
+        appointment_type = OPD if "doctor" in appointment_data else LAB
+        price_data = OpdAppointment.get_price_details(appointment_data) if appointment_type == OPD else LabAppointment.get_price_details(appointment_data)
+        mrp = int(price_data.get('mrp'))
+        response_dict = {
+            "is_vip_member": False,
+            "plus_user_id": None,
+            "cover_under_vip": "",
+            "vip_amount_deducted": 0,
+            "amount_to_be_paid": mrp
+        }
+
+        if appointment_data.get('payment_type') == OpdAppointment.COD:
+            return response_dict
+        profile = appointment_data.get('profile', None)
+        user = profile.user
+        plus_user = user.active_plus_user
+        if not plus_user and appointment_data.get('plus_plan', None):
+            plus_user = user.get_temp_plus_user
+        if not plus_user:
+            return response_dict
+        if not appointment_data.get('plus_plan', None):
+            plus_members = plus_user.plus_members.filter(profile=profile)
+            if not plus_members.exists():
+                return response_dict
+
+        response_dict['is_vip_member'] = True
+
+        if appointment_type == OPD:
+            deal_price = price_data.get('deal_price', 0)
+            fees = price_data.get('fees', 0)
+            cod_deal_price = price_data.get('consultation').get('cod_deal_price', 0) if (price_data.get('consultation') and price_data.get('consultation').get('cod_deal_price')) else 0
+            # price_data = {"mrp": int(price_data.get('mrp')), "deal_price": int(deal_price),
+            #               "cod_deal_price": int(cod_deal_price),
+            #               "fees": int(fees)}
+            price_engine = get_price_reference(plus_user, "DOCTOR")
+            if not price_engine:
+                price = int(price_data.get('mrp'))
+            else:
+                price = price_engine.get_price(price_data)
+            engine = get_class_reference(plus_user, "DOCTOR")
+            response_dict['vip_gold_price'] = fees
+            if not engine:
+                return response_dict
+
+            doctor = appointment_data['doctor']
+            hospital = appointment_data['hospital']
+            if doctor.enabled_for_online_booking and hospital.enabled_for_online_booking and \
+                                        hospital.enabled_for_prepaid and hospital.is_enabled_for_plus_plans() and \
+                                        doctor.enabled_for_plus_plans:
+
+                # engine_response = engine.validate_booking_entity(cost=mrp, utilization=kwargs.get('utilization'))
+                engine_response = engine.validate_booking_entity(cost=price, utilization=kwargs.get('utilization'), mrp=mrp, deal_price=deal_price)
+                response_dict['cover_under_vip'] = engine_response.get('is_covered', False)
+                response_dict['plus_user_id'] = plus_user.id
+                response_dict['vip_amount_deducted'] = engine_response.get('vip_amount_deducted', 0)
+                response_dict['amount_to_be_paid'] = engine_response.get('amount_to_be_paid', mrp)
+
+                # Only for cart items.
+                if kwargs.get('utilization') and response_dict['cover_under_vip'] and response_dict['vip_amount_deducted']:
+                    engine.update_utilization(kwargs.get('utilization'), response_dict['vip_amount_deducted'])
+
+        elif appointment_type == LAB:
+            lab = appointment_data['lab']
+            if lab and lab.is_enabled_for_plus_plans():
+                mrp = int(price_data.get('mrp'))
+                # final_price = mrp + price_data['home_pickup_charges']
+
+                # price_data = {"mrp": int(price_data.get('mrp')), "deal_price": int(price_data.get('deal_price')),
+                #               "cod_deal_price": int(price_data.get('deal_price')),
+                #               "fees": int(price_data.get('fees'))}
+                price_engine = get_price_reference(plus_user, "LABTEST")
+                if not price_engine:
+                    price = int(price_data.get('mrp'))
+                else:
+                    price = price_engine.get_price(price_data)
+                final_price = price + price_data['home_pickup_charges']
+                entity = "PACKAGE" if appointment_data['test_ids'][0].is_package else "LABTEST"
+                engine = get_class_reference(plus_user, entity)
+                response_dict['vip_gold_price'] = int(price_data.get('fees'))
+                if appointment_data['test_ids']:
+                    # engine_response = engine.validate_booking_entity(cost=final_price, id=appointment_data['test_ids'][0].id, utilization=kwargs.get('utilization'))
+                    engine_response = engine.validate_booking_entity(cost=final_price, id=appointment_data['test_ids'][0].id, utilization=kwargs.get('utilization'), mrp=mrp, deal_price=int(price_data.get('deal_price')))
+
+                    if not engine_response:
+                        return response_dict
+                    response_dict['cover_under_vip'] = engine_response.get('is_covered', False)
+                    response_dict['plus_user_id'] = plus_user.id
+                    response_dict['vip_amount_deducted'] = engine_response.get('vip_amount_deducted', 0)
+                    response_dict['amount_to_be_paid'] = engine_response.get('amount_to_be_paid', final_price)
+
+                    # Only for cart items.
+                    if kwargs.get('utilization') and response_dict['cover_under_vip'] and response_dict['vip_amount_deducted']:
+                        engine.update_utilization(kwargs.get('utilization'), response_dict['vip_amount_deducted'])
+
+        return response_dict
+
+    @cached_property
+    def get_utilization(self):
+        plan = self.plan
+        resp = {}
+        data = {}
+        plan_parameters = plan.plan_parameters.filter(parameter__key__in=[PlanParametersEnum.DOCTOR_CONSULT_AMOUNT,
+                                                                          PlanParametersEnum.ONLINE_CHAT_AMOUNT,
+                                                                          PlanParametersEnum.HEALTH_CHECKUPS_AMOUNT,
+                                                                          PlanParametersEnum.HEALTH_CHECKUPS_COUNT,
+                                                                          PlanParametersEnum.MEMBERS_COVERED_IN_PACKAGE,
+                                                                          PlanParametersEnum.PACKAGE_IDS,
+                                                                          PlanParametersEnum.PACKAGE_DISCOUNT,
+                                                                          PlanParametersEnum.TOTAL_TEST_COVERED_IN_PACKAGE,
+                                                                          PlanParametersEnum.LAB_DISCOUNT,
+                                                                          PlanParametersEnum.LABTEST_AMOUNT,
+                                                                          PlanParametersEnum.LABTEST_COUNT,
+                                                                          PlanParametersEnum.DOCTOR_CONSULT_DISCOUNT,
+                                                                          PlanParametersEnum.DOCTOR_CONSULT_COUNT])
+
+        for pp in plan_parameters:
+            data[pp.parameter.key.lower()] = pp.value
+
+        resp['allowed_package_ids'] = list(map(lambda x: int(x), data.get('package_ids', '').split(','))) if data.get(
+            'package_ids') else []
+        resp['doctor_consult_amount'] = int(data['doctor_consult_amount']) if data.get(
+            'doctor_consult_amount') and data.get('doctor_consult_amount').__class__.__name__ == 'str' else 0
+        resp['doctor_amount_utilized'] = 0
+        resp['doctor_discount'] = int(data['doctor_consult_discount']) if data.get(
+            'doctor_consult_discount') and data.get('doctor_consult_discount').__class__.__name__ == 'str' else 0
+        resp['lab_discount'] = int(data['lab_discount']) if data.get('lab_discount') and data.get(
+            'lab_discount').__class__.__name__ == 'str' else 0
+        resp['package_discount'] = int(data['package_discount']) if data.get('package_discount') and data.get(
+            'package_discount').__class__.__name__ == 'str' else 0
+        resp['doctor_amount_available'] = resp['doctor_consult_amount']
+        resp['members_count_online_consultation'] = data['members_covered_in_package'] if data.get(
+            'members_covered_in_package') and data.get('members_covered_in_package').__class__.__name__ == 'str'  else 0
+        resp['total_package_amount_limit'] = int(data['health_checkups_amount']) if data.get(
+            'health_checkups_amount') and data.get('health_checkups_amount').__class__.__name__ == 'str'  else 0
+        resp['online_chat_amount'] = int(data['online_chat_amount']) if data.get('online_chat_amount') and data.get(
+            'online_chat_amount').__class__.__name__ == 'str'  else 0
+        resp['total_package_count_limit'] = int(data['health_checkups_count']) if data.get(
+            'health_checkups_count') and data.get('health_checkups_count').__class__.__name__ == 'str'  else 0
+
+        resp['available_package_amount'] = resp['total_package_amount_limit']
+        resp['available_package_count'] = resp['total_package_count_limit']
+
+        resp['total_labtest_amount_limit'] = int(data['labtest_amount']) if data.get('labtest_amount') and data.get(
+            'labtest_amount').__class__.__name__ == 'str'  else 0
+        resp['total_labtest_count_limit'] = int(data['labtest_count']) if data.get('labtest_count') and data.get(
+            'labtest_count').__class__.__name__ == 'str'  else 0
+
+        resp['available_labtest_amount'] = resp['total_labtest_amount_limit']
+        resp['available_labtest_count'] = resp['total_labtest_count_limit']
+        resp['total_doctor_count_limit'] = int(data['doctor_consult_count']) if data.get(
+            'doctor_consult_count') and data.get('doctor_consult_discount').__class__.__name__ == 'str' else 0
+        resp['available_doctor_count'] = resp['total_doctor_count_limit']
+
+        # resp['availabe_labtest_discount_count'] = resp['total_labtest_count_limit']
+
+        return resp

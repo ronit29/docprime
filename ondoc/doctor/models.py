@@ -2535,8 +2535,9 @@ class OpdAppointment(auth_model.TimeStampedModel, CouponsMixin, OpdAppointmentIn
     INSURANCE = 3
     PLAN = 4
     VIP = 5
+    GOLD = 6
     PAY_CHOICES = ((PREPAID, 'Prepaid'), (COD, 'COD'), (INSURANCE, 'Insurance'), (PLAN, "Subscription Plan"),
-                    (VIP, 'VIP'))
+                    (VIP, 'VIP'), (GOLD, 'GOLD'))
     ACTIVE_APPOINTMENT_STATUS = [BOOKED, ACCEPTED, RESCHEDULED_PATIENT, RESCHEDULED_DOCTOR]
     STATUS_CHOICES = [(CREATED, 'Created'), (BOOKED, 'Booked'),
                       (RESCHEDULED_DOCTOR, 'Rescheduled by Doctor'),
@@ -3518,12 +3519,14 @@ class OpdAppointment(auth_model.TimeStampedModel, CouponsMixin, OpdAppointmentIn
             if data.get("payment_type") == cls.INSURANCE:
                 effective_price = doctor_clinic_timing.deal_price
                 coupon_discount, coupon_cashback, coupon_list, random_coupon_list = 0, 0, [], []
-            elif data.get("payment_type") == cls.VIP:
+            elif data.get("payment_type") == cls.VIP or data.get('payment_type') == cls.GOLD:
                 profile = data.get('profile', None)
                 if not profile:
-                    effective_price = doctor_clinic_timing.deal_price
+                    amount_to_be_paid = doctor_clinic_timing.deal_price
                 else:
                     plus_user = profile.get_plus_membership
+                    if not plus_user:
+                        plus_user = profile.get_temp_plus_membership
                     if plus_user:
                         price_data = {"mrp": doctor_clinic_timing.mrp, "cod_deal_price": doctor_clinic_timing.cod_deal_price,
                                       "deal_price": doctor_clinic_timing.deal_price,  "fees": doctor_clinic_timing.fees}
@@ -3536,13 +3539,19 @@ class OpdAppointment(auth_model.TimeStampedModel, CouponsMixin, OpdAppointmentIn
                         if engine:
                             # vip_dict = engine.validate_booking_entity(cost=doctor_clinic_timing.mrp)
                             vip_dict = engine.validate_booking_entity(cost=price, mrp=doctor_clinic_timing.mrp, deal_price=doctor_clinic_timing.deal_price)
-                            effective_price = vip_dict.get('amount_to_be_paid')
+                            amount_to_be_paid = vip_dict.get('amount_to_be_paid')
                         else:
-                            effective_price = doctor_clinic_timing.deal_price
+                            amount_to_be_paid = doctor_clinic_timing.deal_price
                     else:
-                        effective_price = doctor_clinic_timing.deal_price
+                        amount_to_be_paid = doctor_clinic_timing.deal_price
                 # effective_price = doctor_clinic_timing.deal_price
-                coupon_discount, coupon_cashback, coupon_list, random_coupon_list = 0, 0, [], []
+                coupon_discount, coupon_cashback, coupon_list, random_coupon_list = Coupon.get_total_deduction(data,
+                                                                                           amount_to_be_paid)
+
+                if coupon_discount >= amount_to_be_paid:
+                    effective_price = 0
+                else:
+                    effective_price = amount_to_be_paid - coupon_discount
             elif data.get("payment_type") in [cls.PREPAID]:
                 coupon_discount, coupon_cashback, coupon_list, random_coupon_list = Coupon.get_total_deduction(data,
                                                                                            doctor_clinic_timing.deal_price)
@@ -3600,7 +3609,7 @@ class OpdAppointment(auth_model.TimeStampedModel, CouponsMixin, OpdAppointmentIn
                 "insurance_fees": doctor_clinic_timing.insurance_fees
             },
             "coupon_data" : { "random_coupon_list" : random_coupon_list },
-            "prepaid_deal_price" : prepaid_deal_price
+            "prepaid_deal_price": prepaid_deal_price
         }
 
     @classmethod
@@ -3655,24 +3664,25 @@ class OpdAppointment(auth_model.TimeStampedModel, CouponsMixin, OpdAppointmentIn
         vip_amount = 0
         convenience_amount = 0
         plus_user = user.active_plus_user
+        if not plus_user and data.get('plus_plan'):
+            plus_user = user.get_temp_plus_user
         mrp = price_data.get("mrp")
         if plus_user:
             plus_user_resp = plus_user.validate_plus_appointment(data)
             cover_under_vip = plus_user_resp.get('cover_under_vip', False)
-            # utilization = plus_user.get_utilization
-            # doctor_available_amount = int(utilization.get('doctor_amount_available', 0))
-            # vip_amount = mrp if doctor_available_amount >= mrp else doctor_available_amount
-            # vip_amount = plus_user.get_vip_amount(utilization, mrp)
             vip_amount = plus_user_resp.get('vip_amount_deducted', None)
 
-        if cover_under_vip and cart_data.get('cover_under_vip', None) and vip_amount > 0:
-            # effective_price = 0 if doctor_available_amount >= mrp else (mrp - doctor_available_amount)
-            # effective_price = cart_data.get('vip_amount')
+        # if cover_under_vip and cart_data.get('cover_under_vip', None) and vip_amount > 0:
+        if cover_under_vip and vip_amount > 0:
             # convenience_amount = plus_user.plan.get_convenience_charge(cart_data.get('amount_to_be_paid'), "DOCTOR")
+            # effective_price = cart_data.get('amount_to_be_paid') + convenience_amount
+            # convenience_amount = plus_user.plan.get_convenience_charge(plus_user_resp.get('amount_to_be_paid'), "DOCTOR")
             convenience_amount = PlusPlans.get_default_convenience_amount(price_data, "DOCTOR", default_plan_query=plus_user.plan)
-            effective_price = cart_data.get('amount_to_be_paid') + convenience_amount
-            # vip_amount = vip_amount + convenience_amount
-            payment_type = OpdAppointment.VIP
+            effective_price = plus_user_resp.get('amount_to_be_paid') + convenience_amount
+            if plus_user.plan.is_gold:
+                payment_type = OpdAppointment.GOLD
+            else:
+                payment_type = OpdAppointment.VIP
             plus_user_id = plus_user_resp.get('plus_user_id', None)
         else:
             plus_user_id = None

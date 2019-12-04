@@ -23,11 +23,14 @@ class Coupon(auth_model.TimeStampedModel):
     LAB = 2
     ALL = 3
     SUBSCRIPTION_PLAN = 4
+    VIP = 5
+    GOLD = 6
 
     DISCOUNT = 1
     CASHBACK = 2
 
-    TYPE_CHOICES = (("", "Select"), (DOCTOR, "Doctor"), (LAB, "Lab"), (ALL, "All"), (SUBSCRIPTION_PLAN, "SUBSCRIPTION_PLAN"),)
+    TYPE_CHOICES = (("", "Select"), (DOCTOR, "Doctor"), (LAB, "Lab"), (ALL, "All"),
+                    (SUBSCRIPTION_PLAN, "SUBSCRIPTION_PLAN"), (VIP, "Vip"), (GOLD, "Gold"),)
     COUPON_TYPE_CHOICES = ((DISCOUNT, "Discount"), (CASHBACK, "Cashback"),)
 
     code = models.CharField(max_length=50)
@@ -67,11 +70,15 @@ class Coupon(auth_model.TimeStampedModel):
     is_corporate = models.BooleanField(default=False)
     is_visible = models.BooleanField(default=True)
     is_for_insurance = models.BooleanField(default=False)
+    is_for_gold_users = models.BooleanField(default=False)
+    is_for_vip_users = models.BooleanField(default=False)
+    users_vip_gold_plans = models.ManyToManyField("plus.PlusPlans", blank=True, null=True, related_name='users_vip_gold_plans')
     is_lensfit = models.NullBooleanField()
     new_user_constraint = models.BooleanField(default=False)
     coupon_type = models.IntegerField(choices=COUPON_TYPE_CHOICES, default=DISCOUNT)
     payment_option = models.ForeignKey(PaymentOptions, on_delete=models.SET_NULL, blank=True, null=True)
     random_coupon_count = models.PositiveIntegerField(null=True, blank=True)
+    vip_gold_plans = models.ManyToManyField("plus.PlusPlans", blank=True, null=True, related_name='vip_gold_plans')
     plan = models.ManyToManyField("subscription_plan.Plan", blank=True, null=True)
     corporate_deal = models.ForeignKey(CorporateDeal, on_delete=models.CASCADE, null=True, blank=True)
     total_used_count = models.PositiveIntegerField(null=True, blank=True, default=0)
@@ -109,6 +116,7 @@ class Coupon(auth_model.TimeStampedModel):
         from ondoc.diagnostic.models import LabAppointment
         from ondoc.cart.models import Cart
         from ondoc.subscription_plan.models import UserPlanMapping
+        from ondoc.plus.models import PlusUser
 
         if not user.is_authenticated:
             return 0
@@ -134,6 +142,12 @@ class Coupon(auth_model.TimeStampedModel):
             count += UserPlanMapping.objects.filter(user=user,
                                                     status__in=[UserPlanMapping.BOOKED],
                                                     coupon=self).count()
+        if str(self.type) == str(self.VIP) or str(self.type) == str(self.GOLD):
+            count += PlusUser.objects.filter(user=user,
+                                             status__in=[PlusUser.ACTIVE, PlusUser.EXPIRED,
+                                                         PlusUser.ONHOLD, PlusUser.CANCEL_INITIATE,
+                                                         PlusUser.CANCELLATION_APPROVED],
+                                             coupon=self).count()
 
         count += Cart.objects.filter(user=user, deleted_at__isnull=True, data__coupon_code__contains=self.code).exclude(id=cart_item).count()
         return count
@@ -344,6 +358,17 @@ class Coupon(auth_model.TimeStampedModel):
         return test_applicabile
 
 
+    @classmethod
+    def get_vip_gold_active_coupons(cls, plus_type=1, plan_id=0):
+        active_coupons = []
+        if plan_id:
+            if plus_type == 0:  # 0 for vip
+                active_coupons = Coupon.objects.filter(is_for_vip_users=True)
+            elif plus_type == 1:  # 1 for gold
+                active_coupons = Coupon.objects.filter(is_for_gold_users=True)
+
+        return active_coupons
+
     class Meta:
         db_table = "coupon"
 
@@ -358,7 +383,7 @@ class UserSpecificCoupon(auth_model.TimeStampedModel):
 
     coupon = models.ForeignKey(Coupon, on_delete=models.CASCADE, null=False, related_name="user_specific_coupon")
     phone_number = models.CharField(max_length=10, blank=False, null=False)
-    user = models.ForeignKey(auth_model.User, on_delete=models.SET_NULL, null=True, blank=True)
+    user = models.ForeignKey(auth_model.User, on_delete=models.SET_NULL, null=True, blank=True, related_name="user_specific_coupon")
     count = models.PositiveIntegerField(default=1)
     objects = CustomUserSpecificManager()
 
@@ -375,6 +400,17 @@ class UserSpecificCoupon(auth_model.TimeStampedModel):
             logger.error(str(e))
 
         super().save(*args, **kwargs)
+
+    @classmethod
+    def assign_coupons_to_user(cls, coupons=[], user=None):
+        if user and coupons:
+            users_specific_coupons = user.user_specific_coupon.all()
+            users_coupons = list(map(lambda x: x.coupon_id, users_specific_coupons))
+            for coupon in coupons:
+                if not coupon.id in users_coupons:
+                    UserSpecificCoupon.objects.create(coupon=coupon, user=user, phone_number=user.phone_number,
+                                                      count=coupon.count)
+
 
     def __str__(self):
         return self.coupon.code
@@ -449,6 +485,7 @@ class CouponRecommender():
         from ondoc.diagnostic.models import LabAppointment
         from ondoc.doctor.models import OpdAppointment
         from ondoc.cart.models import Cart
+        from ondoc.plus.models import PlusUser
 
         user = self.user
         search_type = self.type
@@ -466,6 +503,10 @@ class CouponRecommender():
             types.append(Coupon.DOCTOR)
         elif search_type == 'lab':
             types.append(Coupon.LAB)
+        elif search_type == 'vip':
+            types = [Coupon.VIP]
+        elif search_type == 'gold':
+            types = [Coupon.GOLD]
         else:
             types.append(Coupon.DOCTOR)
             types.append(Coupon.LAB)
@@ -480,6 +521,11 @@ class CouponRecommender():
                                                                   .exclude(status__in=[LabAppointment.CANCELLED]),
                                                                            to_attr='user_lab_booked')
 
+        user_plus_purchased = Prefetch('plus_coupon',
+                                   queryset=PlusUser.objects.filter(user=user)
+                                   .exclude(status__in=[PlusUser.CANCELLED]),
+                                   to_attr='user_plus_purchased')
+
         all_coupons = Coupon.objects.filter(type__in=types)
 
         if coupon_code:
@@ -489,8 +535,9 @@ class CouponRecommender():
 
         all_coupons = all_coupons.prefetch_related('user_specific_coupon', 'test', 'test_categories', 'hospitals',
                                                    'hospitals_exclude', 'doctors', 'doctors_exclude', 'specializations',
-                                                   'procedures', 'lab', 'test', 'procedure_categories', user_opd_booked,
-                                                   user_lab_booked)
+                                                   'procedures', 'lab', 'test', 'procedure_categories',
+                                                   'users_vip_gold_plans', 'vip_gold_plans', user_opd_booked,
+                                                   user_lab_booked, user_plus_purchased)
 
         if user and user.is_authenticated:
             all_coupons = all_coupons.filter(Q(is_user_specific=False) \
@@ -548,7 +595,9 @@ class CouponRecommender():
         doctor_id = filters.get('doctor_id')
         doctor_specializations_ids = filters.get('doctor_specializations_ids', [])
         procedures_ids = filters.get('procedures_ids')
+        vip_gold_plan = filters.get('vip_gold_plan')
         show_all = filters.get('show_all', False)
+        plus_user = None
 
         if deal_price:
             coupons = list(filter(lambda x: x.min_order_amount == None or x.min_order_amount <= deal_price, coupons))
@@ -558,6 +607,8 @@ class CouponRecommender():
             is_user_insured = user.active_insurance
             if self.profile:
                 is_user_insured = self.profile.is_insured_profile
+                plus_user = self.profile.get_plus_membership
+
             if is_user_insured:
                 if deal_price:
                     coupons = list(filter(lambda x: x.is_for_insurance == False or (x.is_for_insurance == True and x.max_order_amount >= deal_price), coupons))
@@ -566,7 +617,9 @@ class CouponRecommender():
             else:
                 coupons = list(filter(lambda x: x.is_for_insurance == False, coupons))
         else:
-            coupons = list(filter(lambda x: x.is_for_insurance == False, coupons))
+            coupons = list(filter(lambda x: x.is_for_insurance is False and
+                                            x.is_for_gold_users is False and
+                                            x.is_for_vip_users is False, coupons))
 
         if search_type == 'doctor' or search_type == 'lab':
             if tests:
@@ -672,7 +725,6 @@ class CouponRecommender():
                 coupons = list(filter(lambda x: len(x.doctors.all()) == 0, coupons))
                 coupons = list(filter(lambda x: len(x.specializations.all()) == 0, coupons))
 
-
             if procedures_ids:
                 pass
                 # add filters here
@@ -684,6 +736,10 @@ class CouponRecommender():
                 coupons = list(filter(lambda x: len(x.procedures.all()) == 0, coupons))
                 coupons = list(filter(lambda x: len(x.procedure_categories.all()) == 0, coupons))
 
+        if search_type == 'vip' or search_type == 'gold':
+            if vip_gold_plan:
+                coupons = list(filter(lambda x: not bool(x.vip_gold_plans.all()) or vip_gold_plan in x.vip_gold_plans.all(), coupons))
+
         coupons_list = list(coupons)
         for coupon in coupons:
             coupon_properties = self.coupon_properties[coupon.code] = dict()
@@ -693,7 +749,7 @@ class CouponRecommender():
 
             used_coupon_count = 0
             if not remove_coupon and coupon.count:
-                used_coupon_count = len(coupon.user_opd_booked) + len(coupon.user_lab_booked)
+                used_coupon_count = len(coupon.user_opd_booked) + len(coupon.user_lab_booked) + len(coupon.user_plus_purchased)
                 if user_cart_counts.get(coupon.code):
                     used_coupon_count += user_cart_counts.get(coupon.code)
 
@@ -717,6 +773,35 @@ class CouponRecommender():
             if not remove_coupon and coupon.start_date and (coupon.start_date > timezone.now() \
                                                             or (coupon.start_date + datetime.timedelta(days=coupon.validity)) < timezone.now()):
                 remove_coupon = True
+
+            remove_for_gold = False
+            remove_for_vip = False
+            if not remove_coupon and coupon.is_for_gold_users:
+                if plus_user and plus_user.plan and plus_user.plan.is_gold:
+                    plus_user_plan = plus_user.plan
+                    coupon_users_vip_gold_plans = coupon.users_vip_gold_plans.all()
+                    if coupon_users_vip_gold_plans and not plus_user_plan in coupon_users_vip_gold_plans:
+                        remove_for_gold = True
+                else:
+                    remove_for_gold = True
+
+            if not remove_coupon and coupon.is_for_vip_users:
+                if plus_user and plus_user.plan and not plus_user.plan.is_gold:
+                    plus_user_plan = plus_user.plan
+                    coupon_users_vip_gold_plans = coupon.users_vip_gold_plans.all()
+                    if coupon_users_vip_gold_plans and not plus_user_plan in coupon_users_vip_gold_plans:
+                        remove_for_vip = True
+                else:
+                    remove_for_vip = True
+
+            if coupon.is_for_gold_users and coupon.is_for_vip_users:
+                if remove_for_gold and remove_for_vip:
+                    remove_coupon = True
+            else:
+                if coupon.is_for_gold_users and remove_for_gold:
+                    remove_coupon = True
+                if coupon.is_for_vip_users and remove_for_vip:
+                    remove_coupon = True
 
             if not remove_coupon and coupon.is_user_specific and user:
                 # todo - check if it will query to db
