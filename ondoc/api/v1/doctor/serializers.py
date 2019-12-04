@@ -363,23 +363,24 @@ class CreateAppointmentSerializer(serializers.Serializer):
             raise serializers.ValidationError("Doctor is on leave")
 
         data["part_of_integration"] = False
-        if settings.MEDANTA_INTEGRATION_ENABLED and not bool(data.get('from_app')) and doctor_clinic.is_part_of_integration():
-            data["part_of_integration"] = True
-            available_slots = doctor_clinic.get_available_slots(time_slot_start)
-            if not available_slots[date]:
-                logger.error(
-                    "Error 'Invalid Time slot' for opd appointment with data - " + json.dumps(
-                        request.data))
-                raise serializers.ValidationError("Integration - Invalid Time slot")
-        else:
-            if not DoctorClinicTiming.objects.filter(doctor_clinic__doctor=data.get('doctor'),
-                                                     doctor_clinic__hospital=data.get('hospital'),
-                                                     day=time_slot_start.weekday(), start__lte=data.get("start_time"),
-                                                     end__gte=data.get("start_time")).exists():
-                logger.error(
-                    "Error 'Invalid Time slot' for opd appointment with data - " + json.dumps(
-                        request.data))
-                raise serializers.ValidationError("Invalid Time slot")
+
+        # if settings.MEDANTA_INTEGRATION_ENABLED and not bool(data.get('from_app')) and doctor_clinic.is_part_of_integration():
+        #     data["part_of_integration"] = True
+        #     available_slots = doctor_clinic.get_available_slots(time_slot_start)
+        #     if not available_slots[date]:
+        #         logger.error(
+        #             "Error 'Invalid Time slot' for opd appointment with data - " + json.dumps(
+        #                 request.data))
+        #         raise serializers.ValidationError("Integration - Invalid Time slot")
+        # else:
+        if not DoctorClinicTiming.objects.filter(doctor_clinic__doctor=data.get('doctor'),
+                                                 doctor_clinic__hospital=data.get('hospital'),
+                                                 day=time_slot_start.weekday(), start__lte=data.get("start_time"),
+                                                 end__gte=data.get("start_time")).exists():
+            logger.error(
+                "Error 'Invalid Time slot' for opd appointment with data - " + json.dumps(
+                    request.data))
+            raise serializers.ValidationError("Invalid Time slot")
 
         # if OpdAppointment.objects.filter(status__in=ACTIVE_APPOINTMENT_STATUS, doctor=data.get('doctor'), profile=data.get('profile')).exists():
         #     raise serializers.ValidationError('A previous appointment with this doctor already exists. Cancel it before booking new Appointment.')
@@ -2908,6 +2909,7 @@ class TopCommonHospitalForIpdProcedureSerializer(serializers.ModelSerializer):
     hospital_services = serializers.SerializerMethodField()
     service_count = serializers.SerializerMethodField()
     hospital_image = serializers.SerializerMethodField()
+    vip_percentage = serializers.SerializerMethodField()
 
 
     class Meta:
@@ -2915,7 +2917,13 @@ class TopCommonHospitalForIpdProcedureSerializer(serializers.ModelSerializer):
         fields = ('id', 'name', 'distance', 'certifications', 'bed_count', 'logo', 'avg_rating',
                   'count_of_insurance_provider', 'multi_speciality', 'address', 'short_address','open_today',
                   'insurance_provider', 'established_in', 'long', 'lat', 'url', 'locality_url', 'name_city', 'operational_since',
-                  'h1_title', 'is_ipd_hospital', 'seo_title', 'network_id', 'hospital_services', 'service_count', 'hospital_image', 'priority')
+                  'h1_title', 'is_ipd_hospital', 'seo_title', 'network_id', 'hospital_services', 'service_count', 'hospital_image', 'priority',
+                  'vip_percentage')
+
+    def get_vip_percentage(self, obj):
+        if self.context.get('plan'):
+            return obj.percentage
+        return 0
 
     def get_name_city(self, obj):
         result = None
