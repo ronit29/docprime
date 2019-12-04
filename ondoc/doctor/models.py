@@ -307,14 +307,11 @@ class Hospital(auth_model.TimeStampedModel, auth_model.CreatedByModel, auth_mode
         from ondoc.seo.models import NewDynamic
         result = []
         day = datetime.datetime.today().weekday()
-        common_hosp_queryset = CommonHospital.objects.all().prefetch_related('hospital', 'hospital__hospital_doctors', 'hospital__health_insurance_providers',
+        common_hosp_queryset = CommonHospital.objects.all().prefetch_related('hospital', 'hospital__health_insurance_providers',
                                                                 'hospital__hospital_documents', 'hospital__imagehospital', 'hospital__network',
                                                                 'hospital__network__hospitalnetworkspeciality_set',
                                                                 'hospital__hospital_services', 'hospital__hosp_availability',
-                                                                'hospital__hospitalcertification_set', 'hospital__hospitalspeciality_set',
-                                                              Prefetch('hospital__hospital_doctors__availability',
-                                                                       queryset=DoctorClinicTiming.objects.filter(
-                                                                           day=day))).order_by('priority')
+                                                                'hospital__hospitalcertification_set', 'hospital__hospitalspeciality_set').order_by('priority')
 
         if vip_user or from_vip_page:
             common_hosp_queryset = common_hosp_queryset.filter(hospital__enabled_for_prepaid=True)
