@@ -198,3 +198,9 @@ def doctors_daily_schedule():
 def fetch_place_ids():
     from ondoc.common.models import GoogleLatLong
     # GoogleLatLong.generate_place_ids()
+
+
+@task
+def send_ipd_email_notification():
+    from ondoc.notification.models import IPDIntimateEmailNotification
+    IPDIntimateEmailNotification.send_email()

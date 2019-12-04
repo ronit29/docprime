@@ -25,3 +25,9 @@ class AppNotificationSerializer(serializers.ModelSerializer):
     class Meta:
         model = models.AppNotification
         fields = "__all__"
+
+
+class IPDIntimateEmailNotificationSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = models.IPDIntimateEmailNotification
+        fields = "__all__"
