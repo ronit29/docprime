@@ -15,7 +15,7 @@ import calendar
 from django.contrib.auth import get_user_model
 from django.contrib.gis.geos import GEOSGeometry
 from ondoc.account.tasks import refund_curl_task
-from ondoc.coupon.models import UserSpecificCoupon, Coupon
+from ondoc.coupon.models import UserSpecificCoupon
 from ondoc.crm.constants import constants
 import copy
 import requests
@@ -469,6 +469,111 @@ def is_valid_testing_lab_data(user, lab):
     return True
 
 
+def single_booking_payment_details(request, orders):
+    from ondoc.account.models import PgTransaction, Order, PaymentProcessStatus
+    from ondoc.notification.tasks import save_pg_response, save_payment_status
+    from ondoc.account.mongo_models import PgLogs
+    from ondoc.plus.models import PlusPlans
+
+    payment_required = True
+    user = request.user
+    if user.email:
+        uemail = user.email
+    else:
+        uemail = "dummyemail@docprime.com"
+    base_url = "https://{}".format(request.get_host())
+    surl = base_url + '/api/v1/user/transaction/save'
+    furl = base_url + '/api/v1/user/transaction/save'
+    profile = user.get_default_profile()
+    profile_name = ""
+    paytmMsg = ''
+    if profile:
+        profile_name = profile.name
+
+    orders_list = list()
+
+    for order in orders:
+
+        if order.product_id == Order.GOLD_PRODUCT_ID:
+            isPreAuth = '0'
+            plus_plan_id = order.action_data.get('plus_plan')
+            plus_plan = PlusPlans.objects.filter(id=plus_plan_id).first()
+            if not plus_plan:
+                raise Exception('Invalid pg transaction as plus plan is not found.')
+            proposer = plus_plan.proposer
+            plus_merchant_code = proposer.merchant_code
+
+            if not profile:
+                if order.action_data.get('profile_detail'):
+                    profile_name = order.action_data.get('profile_detail').get('name', "")
+
+        temp_product_id = order.product_id
+
+        discountedAmnt = ''
+
+        usedPgCoupons = order.used_pgspecific_coupons
+        if usedPgCoupons and usedPgCoupons[0].payment_option:
+            couponCode = usedPgCoupons[0].code
+            couponPgMode = get_coupon_pg_mode(usedPgCoupons[0])
+            discountedAmnt = str(round(decimal.Decimal(order.amount), 2))
+            txAmount = str(round(decimal.Decimal(order.get_amount_without_pg_coupon), 2))
+        else:
+            txAmount = str(round(decimal.Decimal(order.amount), 2))
+
+        order_dict = {
+            "orderId": order.id,
+            "productId": temp_product_id,
+            "name": profile_name,
+            "holdPayment": "false",
+            "txAmount": txAmount,
+            "insurerCode": settings.GOLD_MERCHANT_CODE if temp_product_id == Order.GOLD_PRODUCT_ID else '',
+            "refOrderId": "",
+            "refOrderNo": "",
+            "discountedAmnt": discountedAmnt
+            }
+
+        if Decimal(txAmount) > Decimal(0):
+            orders_list.append(order_dict)
+
+    pgdata = {
+        "custId": user.id,
+        "mobile": user.phone_number,
+        "email": uemail,
+        "surl": surl,
+        "furl": furl,
+        "isPreAuth": "0",
+        "paytmMsg": paytmMsg,
+        "couponCode": '',
+        "couponPgMode": '',
+    }
+
+    flatten_dict = copy.deepcopy(pgdata)
+
+    order_count = 0
+    for od in orders_list:
+        for k in od.keys():
+            key = str(k) + "[%d]" % order_count
+
+            if str(od[k]):
+                flatten_dict[key] = str(od[k])
+
+        order_count += 1
+
+    secret_key, client_key = get_pg_secret_client_key(orders[0])
+    filtered_pgdata = {k: v for k, v in flatten_dict.items() if v is not None and v != ''}
+    flatten_dict.clear()
+    flatten_dict.update(filtered_pgdata)
+    pgdata['hash'] = PgTransaction.create_pg_hash(flatten_dict, secret_key, client_key)
+    pgdata['is_single_flow'] = True
+
+    order_ids = list(map(lambda x: x['orderId'], orders_list))
+    args = {'user_id': user.id, 'order_ids': order_ids, 'source': 'ORDER_CREATE'}
+    save_payment_status.apply_async((PaymentProcessStatus.INITIATE, args), eta=timezone.localtime(),)
+    save_pg_response.apply_async((PgLogs.TXN_REQUEST, order_ids, None, None, pgdata, user.id), eta=timezone.localtime(), queue=settings.RABBITMQ_LOGS_QUEUE)
+    pgdata['items'] = orders_list
+    return pgdata, payment_required
+
+
 def payment_details(request, order):
     from ondoc.authentication.models import UserProfile
     from ondoc.insurance.models import InsurancePlans
@@ -484,6 +589,7 @@ def payment_details(request, order):
     else:
         uemail = "dummyemail@docprime.com"
     base_url = "https://{}".format(request.get_host())
+    # base_url = 'https://webhook.site/0f0c0af8-d155-440d-b5c4-ce486574e14d'
     surl = base_url + '/api/v1/user/transaction/save'
     furl = base_url + '/api/v1/user/transaction/save'
     isPreAuth = '1'
@@ -508,14 +614,20 @@ def payment_details(request, order):
             if order.action_data.get('profile_detail'):
                 profile_name = order.action_data.get('profile_detail').get('name', "")
 
-    if order.product_id == Order.VIP_PRODUCT_ID:
+    if order.product_id in [Order.VIP_PRODUCT_ID, Order.GOLD_PRODUCT_ID]:
         isPreAuth = '0'
         plus_plan_id = order.action_data.get('plus_plan')
         plus_plan = PlusPlans.objects.filter(id=plus_plan_id).first()
         if not plus_plan:
             raise Exception('Invalid pg transaction as plus plan is not found.')
         proposer = plus_plan.proposer
-        plus_merchant_code = proposer.merchant_code
+        # plus_merchant_code = proposer.merchant_code
+        if order.product_id == Order.VIP_PRODUCT_ID:
+            plus_merchant_code = settings.VIP_MERCHANT_CODE
+        elif order.product_id == Order.GOLD_PRODUCT_ID:
+            plus_merchant_code = settings.GOLD_MERCHANT_CODE
+        else:
+            plus_merchant_code = ""
 
         if not profile:
             if order.action_data.get('profile_detail'):
@@ -624,7 +736,7 @@ def get_pg_secret_client_key(order):
     from ondoc.account.models import Order
     secret_key = client_key = ""
 
-    if order.product_id in [Order.DOCTOR_PRODUCT_ID, Order.SUBSCRIPTION_PLAN_PRODUCT_ID,  Order.CHAT_PRODUCT_ID, Order.PROVIDER_ECONSULT_PRODUCT_ID, Order.VIP_PRODUCT_ID]:
+    if order.product_id in [Order.DOCTOR_PRODUCT_ID, Order.SUBSCRIPTION_PLAN_PRODUCT_ID,  Order.CHAT_PRODUCT_ID, Order.PROVIDER_ECONSULT_PRODUCT_ID, Order.VIP_PRODUCT_ID, Order.GOLD_PRODUCT_ID]:
         secret_key = settings.PG_SECRET_KEY_P1
         client_key = settings.PG_CLIENT_KEY_P1
     elif order.product_id == Order.LAB_PRODUCT_ID:
@@ -835,6 +947,8 @@ class CouponsMixin(object):
         from ondoc.doctor.models import OpdAppointment
         from ondoc.diagnostic.models import LabAppointment
         from ondoc.subscription_plan.models import UserPlanMapping
+        from ondoc.plus.models import PlusUser
+        from ondoc.cart.models import Cart
 
         user = kwargs.get("user")
         coupon_obj = kwargs.get("coupon_obj")
@@ -850,6 +964,8 @@ class CouponsMixin(object):
             elif isinstance(self, LabAppointment) and coupon_obj.type not in [Coupon.LAB, Coupon.ALL]:
                 return {"is_valid": False, "used_count": None}
             elif isinstance(self, UserPlanMapping) and coupon_obj.type not in [Coupon.SUBSCRIPTION_PLAN, Coupon.ALL]:
+                return {"is_valid": False, "used_count": None}
+            elif isinstance(self, PlusUser) and coupon_obj.type not in [Coupon.VIP, Coupon.GOLD]:
                 return {"is_valid": False, "used_count": None}
 
             diff_days = (timezone.now() - (coupon_obj.start_date or coupon_obj.created_at)).days
@@ -893,7 +1009,6 @@ class CouponsMixin(object):
                         or (coupon_obj.age_end and (not user_age or coupon_obj.age_end < user_age)) ):
                     return {"is_valid": False, "used_count": None}
 
-                from ondoc.cart.models import Cart
                 payment_option_filter = Cart.get_pg_if_pgcoupon(user, cart_item)
                 if payment_option_filter and coupon_obj.payment_option and coupon_obj.payment_option.id != payment_option_filter.id:
                     return {"is_valid": False, "used_count": 0}
@@ -944,6 +1059,7 @@ class CouponsMixin(object):
         hospital = kwargs.get("hospital")
         procedures = kwargs.get("procedures", [])
         plan = kwargs.get("plan")
+        gold_vip_plan_id = kwargs.get('gold_vip_plan_id')
 
         if plan:
             if coupon_obj.type in [Coupon.ALL, Coupon.SUBSCRIPTION_PLAN] \
@@ -951,6 +1067,14 @@ class CouponsMixin(object):
                     return True
             return False
 
+        if gold_vip_plan_id:
+            if coupon_obj.type in [Coupon.VIP, Coupon.GOLD]:
+                vip_gold_plans = coupon_obj.vip_gold_plans.all()
+                if not vip_gold_plans:
+                    return True
+                elif vip_gold_plans.filter(id=gold_vip_plan_id).exists():
+                    return True
+            return False
 
         if coupon_obj.lab and coupon_obj.lab != lab:
             return False
@@ -1044,7 +1168,7 @@ class CouponsMixin(object):
                 discount = math.floor(price * coupon_obj.percentage_discount / 100)
 
             if coupon_obj.max_discount_amount is not None:
-                discount =  min(coupon_obj.max_discount_amount, discount)
+                discount = min(coupon_obj.max_discount_amount, discount)
 
             if discount > price:
                 discount = price
