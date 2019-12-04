@@ -238,6 +238,12 @@ class ProcedureCategoriesAutocomplete(autocomplete.Select2QuerySetView):
 class CouponForm(forms.ModelForm):
     create_random_coupon = forms.BooleanField(required=False)
 
+    class Media:
+        extend = False
+        # js = ('ckedit/js/ckeditor.js', 'articles/js/init.js')   # ckeditor-5 replaced with ckeditor-4.11.4
+        js = ('https://cdn.ckeditor.com/4.11.4/standard-all/ckeditor.js', 'coupon/js/init.js')
+        css = {'all': ('coupon/css/style.css',)}
+
     class Meta:
         model = Coupon
         fields = ('__all__')

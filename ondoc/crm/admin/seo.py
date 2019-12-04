@@ -42,7 +42,7 @@ class NewDynamicAdminForm(forms.ModelForm):
     class Media:
         extend = True
         js = ('https://cdn.ckeditor.com/ckeditor5/10.1.0/classic/ckeditor.js', 'new_dynamic/js/init.js')
-        css = {'all': ('new_dynamic/css/style.css',)}
+        css = {'all': ('new_dynamic/coupon/style.coupon',)}
         # widgets = {
         #     'url_value': autocomplete.ModelSelect2(url='entity-compare-autocomplete')
         # }

@@ -1434,7 +1434,7 @@ class TestParameterAdminForm(forms.ModelForm):
     class Media:
         extend = False
         js = ('https://cdn.ckeditor.com/ckeditor5/10.1.0/classic/ckeditor.js', 'test_parameter/js/init.js')
-        css = {'all': ('test_parameter/css/style.css',)}
+        css = {'all': ('test_parameter/coupon/style.coupon',)}
 
 
 class TestParameterAdmin(VersionAdmin):
@@ -1522,7 +1522,7 @@ class LabTestAdminForm(forms.ModelForm):
     class Media:
         extend = False
         js = ('https://cdn.ckeditor.com/ckeditor5/10.1.0/classic/ckeditor.js', 'lab_test/js/init.js')
-        css = {'all': ('lab_test/css/style.css',)}
+        css = {'all': ('lab_test/coupon/style.coupon',)}
 
     def clean(self):
         super().clean()

@@ -322,7 +322,7 @@ class HospitalForm(FormCleanMixin):
     class Media:
         extend = True
         js = ('https://cdn.ckeditor.com/4.11.4/standard-all/ckeditor.js', 'doctor/js/init.js')
-        css = {'all': ('doctor/css/style.css',)}
+        css = {'all': ('doctor/coupon/style.coupon',)}
 
     def clean_location(self):
         data = self.cleaned_data['location']
@@ -789,7 +789,7 @@ class GenericQuestionAnswerForm(forms.ModelForm):
     class Media:
         extend = True
         js = ('https://cdn.ckeditor.com/4.11.4/standard-all/ckeditor.js', 'q_a/js/init.js')
-        css = {'all': ('q_a/css/style.css',)}
+        css = {'all': ('q_a/coupon/style.coupon',)}
 
 
 class GenericQuestionAnswerAdmin(admin.ModelAdmin):
