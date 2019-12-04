@@ -822,7 +822,7 @@ class CommonPackageSerializer(serializers.ModelSerializer):
         request = self.context.get("request")
         resp = Lab.get_vip_details(request.user)
         user = request.user
-        mrp = obj._selected_test.mrp
+        mrp = obj._selected_test.mrp if obj._selected_test else None
         deal_price = obj._selected_test.custom_deal_price if obj._selected_test.custom_deal_price else obj._selected_test.computed_deal_price
         agreed_price = obj._selected_test.custom_agreed_price if obj._selected_test.custom_agreed_price else obj._selected_test.computed_agreed_price
         lab_obj = Lab.objects.filter(id=obj.lab_id).first()
@@ -962,7 +962,7 @@ class LabAppointmentModelSerializer(serializers.ModelSerializer):
         return {
             'is_vip_member': True if obj and obj.plus_plan and obj.plus_plan.plan and not obj.plus_plan.plan.is_gold else False,
             'vip_amount': plus_appointment_mapping.amount if plus_appointment_mapping else 0,
-            'is_gold_member': True if plus_appointment_mapping and plus_appointment_mapping.plus_plan.is_gold else False,
+            'is_gold_member': True if plus_appointment_mapping and plus_appointment_mapping.plus_user and plus_appointment_mapping.plus_user.plan and plus_appointment_mapping.plus_user.plan.is_gold else False,
             'vip_amount_deducted': plus_appointment_mapping.amount if plus_appointment_mapping else 0,
             'covered_under_vip': True if obj and obj.plus_plan else False,
             'extra_charge': plus_appointment_mapping.extra_charge if plus_appointment_mapping else 0,
@@ -1219,6 +1219,7 @@ class LabAppointmentCreateSerializer(serializers.Serializer):
     test_timings = serializers.ListSerializer(child=LabAppointmentTestSerializer(), required=False, allow_empty=False)
     multi_timings_enabled = serializers.BooleanField(required=False, default=False)
     selected_timings_type = serializers.ChoiceField(required=False, choices=(('common', 'common'), ('separate', 'separate')))
+    plus_plan = serializers.PrimaryKeyRelatedField(queryset=PlusPlans.objects.filter(is_live=True, is_gold=True), required=False)
 
     def __init__(self, instance=None, data=None, **kwargs):
         super().__init__(instance, data, **kwargs)
