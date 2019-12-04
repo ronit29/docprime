@@ -184,6 +184,7 @@ class PartnerLabSamplesCollectOrderAdmin(admin.ModelAdmin):
     readonly_fields = ['offline_patient', 'patient_details', 'hospital', 'doctor', 'lab', 'available_lab_tests',
                        'collection_datetime', 'samples', 'selected_tests_details', 'lab_alerts', 'extras']
     search_fields = ('id', 'doctor__name', 'offline_patient__name',)
+    date_hierarchy = 'created_at'
     list_filter = ('created_at', 'status', HospitalFilter, LabFilter)
     inlines = [
         ReportsInline,
