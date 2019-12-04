@@ -39,7 +39,6 @@ from rest_framework import status
 # from ondoc.doctor.models import PurchaseOrderCreation, PracticeSpecialization
 
 
-
 class Cities(models.Model):
     name = models.CharField(max_length=48, db_index=True)
 
@@ -993,3 +992,39 @@ class DoctorPlaceIDs(auth_model.TimeStampedModel):
 
     class Meta:
         db_table = 'doctor_place_ids'
+
+
+class GeneralMatrixLeads(auth_model.TimeStampedModel):
+    matrix_lead_id = models.IntegerField(null=True)
+    request_body = JSONField(default={})
+    user = models.ForeignKey(auth_model.User, on_delete=models.CASCADE, null=True, blank=True)
+    phone_number = models.BigIntegerField(blank=True, null=True, validators=[MaxValueValidator(9999999999), MinValueValidator(1000000000)])
+    lead_type = models.CharField(max_length=100, null=False, blank=False)
+
+    def save(self, *args, **kwargs):
+        super().save(*args, **kwargs)
+        transaction.on_commit(lambda: self.after_commit())
+
+    def after_commit(self):
+        from ondoc.notification.tasks import process_leads_to_matrix
+        process_leads_to_matrix.apply_async(({'id': self.id}, ), countdown=600)
+
+
+    @classmethod
+    def create_lead(cls, request):
+        phone_number = request.data.get('phone_number', None)
+        user = None
+        if phone_number and (request.user.is_anonymous or not request.user.is_authenticated):
+            user = User.objects.filter(phone_number=phone_number, user_type=User.CONSUMER).first()
+        else:
+            user = request.user
+            phone_number = user.phone_number
+
+        data = {'user': user, 'request_body' : request.data, 'phone_number': phone_number, 'lead_type': request.data.get('lead_type')}
+        obj = cls(**data)
+        obj.save()
+
+        return obj
+
+    class Meta:
+        db_table = 'general_matrix_leads'
