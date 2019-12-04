@@ -1735,4 +1735,4 @@ def process_leads_to_matrix(self, data):
             self.retry([data], countdown=countdown_time)
 
     except Exception as e:
-        logger.error("Error in Celery. Failed pushing Plus lead to the matrix- " + str(e))
+        logger.error("Error in Celery. Failed pushing General lead to the matrix- " + str(e))

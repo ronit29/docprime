@@ -39,6 +39,7 @@ from rest_framework import status
 # from ondoc.doctor.models import PurchaseOrderCreation, PracticeSpecialization
 
 
+
 class Cities(models.Model):
     name = models.CharField(max_length=48, db_index=True)
 
