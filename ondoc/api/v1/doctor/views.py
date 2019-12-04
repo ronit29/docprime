@@ -35,7 +35,7 @@ from ondoc.coupon.models import Coupon, CouponRecommender
 from ondoc.api.v1.diagnostic import serializers as diagnostic_serializer
 from ondoc.account import models as account_models
 from ondoc.location.models import EntityUrls, EntityAddress, DefaultRating
-from ondoc.plus.models import PlusPlans
+from ondoc.plus.models import PlusPlans, TempPlusUser
 from ondoc.procedure.models import Procedure, ProcedureCategory, CommonProcedureCategory, ProcedureToCategoryMapping, \
     get_selected_and_other_procedures, CommonProcedure, CommonIpdProcedure, IpdProcedure, DoctorClinicIpdProcedure, \
     IpdProcedureFeatureMapping, IpdProcedureDetail, SimilarIpdProcedureMapping, IpdProcedureLead, Offer, \
@@ -395,12 +395,20 @@ class DoctorAppointmentsViewSet(OndocViewSet):
 
 
     @transaction.atomic
-    def create(self, request):
+    def create(self, request, *args, **kwargs):
         serializer = serializers.CreateAppointmentSerializer(data=request.data, context={'request': request, 'data' : request.data, 'use_duplicate' : True})
         serializer.is_valid(raise_exception=True)
         validated_data = serializer.validated_data
         data = request.data
+        profile = validated_data.get('profile')
+        plus_plan = validated_data.get('plus_plan', None)
         plus_user = request.user.active_plus_user
+        if plus_plan and plus_user is None:
+            is_verified = profile.verify_profile()
+            if not is_verified:
+                return Response(status=status.HTTP_400_BAD_REQUEST, data={"error": "Profile is not completed, Please update profile first to process further"})
+        if plus_plan and plus_user is None:
+            plus_user = TempPlusUser.objects.create(user=request.user, plan=plus_plan, profile=profile)
         user_insurance = request.user.active_insurance #UserInsurance.get_user_insurance(request.user)
 
         hospital = validated_data.get('hospital')
@@ -408,7 +416,11 @@ class DoctorAppointmentsViewSet(OndocViewSet):
 
         doctor_clinic = DoctorClinic.objects.filter(doctor=doctor, hospital=hospital).first()
         profile = validated_data.get('profile')
-        payment_type = validated_data.get('payment_type')
+        if not plus_user:
+            payment_type = validated_data.get('payment_type')
+        else:
+            payment_type = OpdAppointment.GOLD if plus_user.plan.is_gold else OpdAppointment.VIP
+            validated_data['payment_type'] = payment_type
         if user_insurance:
             if user_insurance.status == UserInsurance.ONHOLD:
                 return Response(status=status.HTTP_400_BAD_REQUEST, data={"error": 'Your documents from the last claim '
@@ -454,10 +466,13 @@ class DoctorAppointmentsViewSet(OndocViewSet):
             data['is_vip_member'] = plus_user_dict.get('is_vip_member', False)
             data['cover_under_vip'] = plus_user_dict.get('cover_under_vip', False)
             data['plus_user_id'] = plus_user.id
-            data['vip_amount'] = plus_user_dict.get('vip_amount_deducted')
-            data['amount_to_be_paid'] = plus_user_dict.get('amount_to_be_paid')
+            data['vip_amount'] = int(plus_user_dict.get('vip_amount_deducted'))
+            data['amount_to_be_paid'] = int(plus_user_dict.get('amount_to_be_paid'))
             if data['cover_under_vip']:
-                data['payment_type'] = OpdAppointment.VIP
+                if plus_user.plan.is_gold:
+                    data['payment_type'] = OpdAppointment.GOLD
+                else:
+                    data['payment_type'] = OpdAppointment.VIP
 
         else:
             data['is_appointment_insured'], data['insurance_id'], data[
@@ -482,20 +497,21 @@ class DoctorAppointmentsViewSet(OndocViewSet):
         if responsible_user:
             data['_responsible_user'] = responsible_user
 
-        if validated_data.get("existing_cart_item"):
-            cart_item = validated_data.get("existing_cart_item")
-            old_cart_obj = Cart.objects.filter(id=validated_data.get('existing_cart_item').id).first()
-            payment_type = old_cart_obj.data.get('payment_type')
-            if payment_type == OpdAppointment.INSURANCE and data['is_appointment_insured'] == False:
-                data['payment_type'] = OpdAppointment.PREPAID
-            if payment_type == OpdAppointment.VIP and data['cover_under_vip'] == False:
-                data['payment_type'] = OpdAppointment.PREPAID
-            # cart_item.data = request.data
-            cart_item.data = data
-            cart_item.save()
-        else:
-            cart_item, is_new = Cart.objects.update_or_create(id=cart_item_id, deleted_at__isnull=True, product_id=account_models.Order.DOCTOR_PRODUCT_ID,
-                                                  user=request.user, defaults={"data": data})
+        if not plus_plan:
+            if validated_data.get("existing_cart_item"):
+                cart_item = validated_data.get("existing_cart_item")
+                old_cart_obj = Cart.objects.filter(id=validated_data.get('existing_cart_item').id).first()
+                payment_type = old_cart_obj.data.get('payment_type')
+                if payment_type == OpdAppointment.INSURANCE and data['is_appointment_insured'] == False:
+                    data['payment_type'] = OpdAppointment.PREPAID
+                if payment_type == OpdAppointment.VIP and data['cover_under_vip'] == False:
+                    data['payment_type'] = OpdAppointment.PREPAID
+                # cart_item.data = request.data
+                cart_item.data = data
+                cart_item.save()
+            else:
+                cart_item, is_new = Cart.objects.update_or_create(id=cart_item_id, deleted_at__isnull=True, product_id=account_models.Order.DOCTOR_PRODUCT_ID,
+                                                      user=request.user, defaults={"data": data})
 
         resp = None
         is_agent = False
@@ -506,8 +522,14 @@ class DoctorAppointmentsViewSet(OndocViewSet):
                     is_agent = True
                 else:
                     resp = {'is_agent': True, "status": 1}
-        if not resp:
+        if not resp and not plus_plan:
             resp = account_models.Order.create_order(request, [cart_item], validated_data.get("use_wallet"))
+
+        if not resp and plus_plan:
+            if kwargs.get('is_dummy'):
+                return validated_data
+
+            resp = account_models.Order.create_new_order(request, validated_data, False)
 
         if is_agent:
             resp['is_agent'] = True
@@ -1594,8 +1616,8 @@ class SearchedItemsViewSet(viewsets.GenericViewSet):
         count = int(count)
         if count <= 0:
             count = 10
-        medical_conditions = models.CommonMedicalCondition.objects.select_related('condition').prefetch_related('condition__specialization').all().order_by(
-            "-priority")[:count]
+        # medical_conditions = models.CommonMedicalCondition.objects.select_related('condition').prefetch_related('condition__specialization').all().order_by(
+        #     "-priority")[:count]
         # conditions_serializer = serializers.MedicalConditionSerializer(medical_conditions, many=True,
         #                                                                context={'request': request})
 
@@ -1636,7 +1658,7 @@ class SearchedItemsViewSet(viewsets.GenericViewSet):
             ipd_entity_qs = EntityUrls.objects.filter(ipd_procedure_id__in=common_ipd_procedure_ids,
                                                       sitemap_identifier='IPD_PROCEDURE_CITY',
                                                       is_valid=True,
-                                                      locality_value__iexact=city).annotate(
+                                                      locality_value__iexact=city.lower()).annotate(
                 ipd_id=F('ipd_procedure_id')).values('ipd_id', 'url')
             ipd_entity_dict = {x.get('ipd_id'): x.get('url') for x in ipd_entity_qs}
         common_ipd_procedures_serializer = CommonIpdProcedureSerializer(common_ipd_procedures, many=True,
@@ -2827,18 +2849,18 @@ class DoctorAvailabilityTimingViewSet(viewsets.ViewSet):
             for apt in active_appointments:
                 blocks.append(str(apt.time_slot_start.date()))
 
-        if dc_obj.is_part_of_integration() and settings.MEDANTA_INTEGRATION_ENABLED:
-            from ondoc.integrations import service
-            pincode = None
-            integration_dict = dc_obj.get_integration_dict()
-            class_name = integration_dict['class_name']
-            integrator_obj_id = integration_dict['id']
-            integrator_obj = service.create_integrator_obj(class_name)
-            clinic_timings = integrator_obj.get_appointment_slots(pincode, date, integrator_obj_id=integrator_obj_id,
-                                                                  blocks=blocks, dc_obj=dc_obj,
-                                                                  total_leaves=total_leaves)
-        else:
-            clinic_timings = dc_obj.get_timings_v2(total_leaves, blocks)
+        # if dc_obj.is_part_of_integration() and settings.MEDANTA_INTEGRATION_ENABLED:
+        #     from ondoc.integrations import service
+        #     pincode = None
+        #     integration_dict = dc_obj.get_integration_dict()
+        #     class_name = integration_dict['class_name']
+        #     integrator_obj_id = integration_dict['id']
+        #     integrator_obj = service.create_integrator_obj(class_name)
+        #     clinic_timings = integrator_obj.get_appointment_slots(pincode, date, integrator_obj_id=integrator_obj_id,
+        #                                                           blocks=blocks, dc_obj=dc_obj,
+        #                                                           total_leaves=total_leaves)
+        # else:
+        clinic_timings = dc_obj.get_timings_v2(total_leaves, blocks)
 
         resp_data = {"timeslots": clinic_timings.get('timeslots', []),
                      "upcoming_slots": clinic_timings.get('upcoming_slots', []),

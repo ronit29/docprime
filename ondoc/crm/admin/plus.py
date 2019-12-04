@@ -61,8 +61,8 @@ class PlusPlanContentInline(admin.TabularInline):
 class PlusPlansAdmin(admin.ModelAdmin):
     model = PlusPlans
     inlines = [PlusPlanContentInline, PlusPlanParametersMappingInline, PlusPlanUtmSourceMappingInline]
-    display = ("plan_name", "proposer", "internal_name", "mrp", "deal_price", "tenure", "enabled", "is_live", "total_allowed_members", "is_selected", "is_retail")
-    list_display = ('plan_name', 'proposer', 'mrp', "deal_price")
+    display = ("plan_name", "proposer", "internal_name", "mrp", "deal_price", "tenure", "enabled", "is_live", "total_allowed_members", "is_selected", "is_retail", "default_single_booking")
+    list_display = ('plan_name', 'mrp', "deal_price", "is_gold", "is_selected", "default_single_booking")
 
 
 class PlusThresholdAdmin(admin.ModelAdmin):

@@ -4,6 +4,7 @@ from django import forms
 from ondoc.doctor.models import PracticeSpecialization, Doctor, Hospital
 from ondoc.diagnostic.models import LabNetwork, Lab, LabTest, LabTestCategory
 from ondoc.coupon.models import Coupon, UserSpecificCoupon, RandomGeneratedCoupon
+from ondoc.plus.models import PlusPlans
 from ondoc.procedure.models import Procedure, ProcedureCategory
 from import_export.admin import ImportExportModelAdmin
 from import_export import resources
@@ -235,6 +236,19 @@ class ProcedureCategoriesAutocomplete(autocomplete.Select2QuerySetView):
         return queryset.distinct()
 
 
+class VipGoldPlanAutocomplete(autocomplete.Select2QuerySetView):
+
+    def get_queryset(self):
+        if not self.request.user.is_authenticated:
+            return PlusPlans.objects.none()
+        queryset = PlusPlans.objects.all()
+
+        if self.q:
+            queryset = queryset.filter(name__istartswith=self.q)
+
+        return queryset.distinct()
+
+
 class CouponForm(forms.ModelForm):
     create_random_coupon = forms.BooleanField(required=False)
 
@@ -258,7 +272,9 @@ class CouponForm(forms.ModelForm):
             'hospitals_exclude': autocomplete.ModelSelect2Multiple(url='hospitals-autocomplete'),
             'specializations': autocomplete.ModelSelect2Multiple(url='specializations-autocomplete', forward=['doctors', 'hospitals', 'procedures', 'procedure_categories']),
             'procedures': autocomplete.ModelSelect2Multiple(url='procedures-autocomplete', forward=['doctors', 'hospitals', 'specializations', 'procedure_categories']),
-            'procedure_categories': autocomplete.ModelSelect2Multiple(url='procedure-categories-autocomplete', forward=['doctors', 'hospitals', 'specializations', 'procedures'])
+            'procedure_categories': autocomplete.ModelSelect2Multiple(url='procedure-categories-autocomplete', forward=['doctors', 'hospitals', 'specializations', 'procedures']),
+            'users_vip_gold_plans': autocomplete.ModelSelect2Multiple(url='vip-gold-plans-autocomplete', forward=[]),
+            'vip_gold_plans': autocomplete.ModelSelect2Multiple(url='vip-gold-plans-autocomplete', forward=[])
         }
 
     def clean(self):
@@ -281,6 +297,9 @@ class CouponForm(forms.ModelForm):
         specializations = cleaned_data.get('specializations')
         procedures = cleaned_data.get('procedures')
         procedure_categories = cleaned_data.get('procedure_categories')
+        is_for_gold_users = cleaned_data.get('is_for_gold_users')
+        is_for_vip_users = cleaned_data.get('is_for_vip_users')
+        users_vip_gold_plans = cleaned_data.get('users_vip_gold_plans')
         if 'code' in self.changed_data and code and Coupon.objects.filter(code=code)[:1]:
             raise forms.ValidationError('Coupon is already there. Please create unique coupon.')
         if age_end and not age_start:
@@ -296,6 +315,8 @@ class CouponForm(forms.ModelForm):
             raise forms.ValidationError('Type \'Lab\' not selected for lab specific coupon')
         if (doctors or hospitals or specializations or procedures or procedure_categories) and type != Coupon.DOCTOR:
             raise forms.ValidationError('Type \'Doctor\' not selected for doctor specific coupon')
+        if not is_for_gold_users and not is_for_vip_users and users_vip_gold_plans:
+            raise forms.ValidationError('Vip/Gold plans are selected. Please tick \'is_for_gold_users\' or \'is_for_vip_users\' or both.')
 
 
 class CouponAdmin(admin.ModelAdmin):
