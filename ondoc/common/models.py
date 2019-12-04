@@ -1008,7 +1008,7 @@ class GeneralMatrixLeads(auth_model.TimeStampedModel):
 
     def after_commit(self):
         from ondoc.notification.tasks import process_leads_to_matrix
-        process_leads_to_matrix.apply_async(({'id': self.id}, ), countdown=600)
+        process_leads_to_matrix.apply_async(({'id': self.id}, ), countdown=10)
 
 
     @classmethod
