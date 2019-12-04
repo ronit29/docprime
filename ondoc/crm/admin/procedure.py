@@ -87,7 +87,7 @@ class IpdProcedureDetailAdminForm(forms.ModelForm):
         extend = True
         # js = ('ckedit/js/ckeditor.js', 'ipd_procedure_detail/js/init.js')
         js = ('https://cdn.ckeditor.com/4.11.4/standard-all/ckeditor.js', 'ipd_procedure_detail/js/init.js')
-        css = {'all': ('ipd_procedure_detail/coupon/style.coupon',)}
+        css = {'all': ('ipd_procedure_detail/css/style.css',)}
 
 
 class IpdProcedureDetailAdmin(admin.ModelAdmin):
@@ -193,7 +193,7 @@ class IpdProcedureAdminForm(forms.ModelForm):
     class Media:
         extend = False
         js = ('https://cdn.ckeditor.com/ckeditor5/10.1.0/classic/ckeditor.js', 'ipd_procedure/js/init.js')
-        css = {'all': ('ipd_procedure/coupon/style.coupon',)}
+        css = {'all': ('ipd_procedure/css/style.css',)}
 
 
 class IpdProcedureAdmin(VersionAdmin):
@@ -487,7 +487,7 @@ class OfferAdminForm(forms.ModelForm):
 
     class Media:
         js = ('https://cdn.ckeditor.com/ckeditor5/10.1.0/classic/ckeditor.js', 'offer/js/init.js')
-        css = {'all': ('offer/coupon/style.coupon',)}
+        css = {'all': ('offer/css/style.css',)}
 
 
 class OfferAdmin(VersionAdmin):

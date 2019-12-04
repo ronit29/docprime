@@ -183,7 +183,7 @@ class HospitalNetworkForm(FormCleanMixin):
     class Media:
         extend = True
         js = ('https://cdn.ckeditor.com/ckeditor5/10.1.0/classic/ckeditor.js', 'hospital_network/js/init.js')
-        css = {'all': ('hospital_network/coupon/style.coupon',)}
+        css = {'all': ('hospital_network/css/style.css',)}
 
     class Meta:
         widgets = {
