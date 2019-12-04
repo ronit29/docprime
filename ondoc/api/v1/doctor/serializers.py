@@ -199,7 +199,7 @@ class OpdAppointmentSerializer(serializers.ModelSerializer):
     class Meta:
         model = OpdAppointment
         fields = ('id', 'doctor_name', 'hospital_name', 'patient_name', 'patient_image', 'type',
-                  'allowed_action', 'effective_price', 'deal_price', 'status', 'time_slot_start',
+                  'allowed_action', 'effective_price', 'deal_price', 'discount', 'status', 'time_slot_start',
                   'time_slot_end', 'doctor_thumbnail', 'patient_thumbnail', 'display_name', 'invoices', 'reports',
                   'prescription', 'report_files', 'specialization', 'payment_type', 'effective_price', 'vip', 'payment_mode')
 
@@ -1676,7 +1676,7 @@ class AppointmentRetrieveSerializer(OpdAppointmentSerializer):
     class Meta:
         model = OpdAppointment
         fields = ('id', 'patient_image', 'patient_name', 'type', 'profile', 'otp', 'is_rated', 'rating_declined',
-                  'allowed_action', 'effective_price', 'deal_price', 'status', 'time_slot_start', 'time_slot_end',
+                  'allowed_action', 'effective_price', 'deal_price', 'discount', 'status', 'time_slot_start', 'time_slot_end',
                   'doctor', 'hospital', 'allowed_action', 'doctor_thumbnail', 'patient_thumbnail', 'procedures', 'mrp',
                   'insurance', 'invoices', 'cancellation_reason', 'payment_type', 'display_name', 'reports', 'prescription',
                   'report_files', 'vip')
