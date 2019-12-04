@@ -17,6 +17,7 @@ from ondoc.doctor.tasks import save_avg_rating, update_prices, update_city_searc
 from ondoc.account.tasks import update_ben_status_from_pg, update_merchant_payout_pg_status, \
     create_appointment_admins_from_spocs, update_lal_path_test_data
 from ondoc.insurance.tasks import push_mis, process_insurance_payouts
+from ondoc.doctor.tasks import send_ipd_email_notification
 # from ondoc.doctor.services.update_search_score import DoctorSearchScore
 from ondoc.bookinganalytics.tasks import sync_booking_data
 
@@ -110,3 +111,4 @@ def setup_periodic_tasks(sender, **kwargs):
                              name="Disable Purchase Order Creation")
     sender.add_periodic_task(crontab(hour=18, minute=30), fetch_place_ids.s(), name="Get Google Place IDs")
     sender.add_periodic_task(crontab(hour=19, minute=30), calculate_percentage.s(), name='Calculate Percentage in Common Hospital')
+    sender.add_periodic_task(crontab(minute="*/2"), send_ipd_email_notification.s(),name="Send IPD Email Notifications")

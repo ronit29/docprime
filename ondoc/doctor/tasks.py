@@ -203,3 +203,8 @@ def fetch_place_ids():
 def calculate_percentage():
     from ondoc.doctor.models import CommonHospital
     CommonHospital.calculate_percentage()
+
+@task
+def send_ipd_email_notification():
+    from ondoc.notification.models import IPDIntimateEmailNotification
+    IPDIntimateEmailNotification.send_email()
