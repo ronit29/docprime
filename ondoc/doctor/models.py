@@ -275,6 +275,7 @@ class Hospital(auth_model.TimeStampedModel, auth_model.CreatedByModel, auth_mode
     search_url_locality_radius = models.FloatField(blank=True, null=True)
     search_url_sublocality_radius = models.FloatField( blank=True, null=True)
     google_ratings_count = models.PositiveIntegerField(null=True, blank=True)
+    enabled_for_gold = models.NullBooleanField()
 
     def __str__(self):
         return '{}-{}'.format(self.id, self.name)
@@ -302,29 +303,48 @@ class Hospital(auth_model.TimeStampedModel, auth_model.CreatedByModel, auth_mode
         return result
 
     @staticmethod
-    def get_top_hospitals_data(request, lat=28.450367, long=77.071848, vip_user=None, from_vip_page=False):
+    def get_top_hospitals_data(request, lat=28.450367, long=77.071848):
         from ondoc.api.v1.doctor.serializers import TopHospitalForIpdProcedureSerializer
         from ondoc.seo.models import NewDynamic
+        from numpy.distutils.fcompiler import str2bool
         result = []
+        query_params = request.query_params
+        gold_request = str2bool(query_params.get('gold', 0))
+        vip_request = str2bool(query_params.get('vip', 0))
         day = datetime.datetime.today().weekday()
-        common_hosp_queryset = CommonHospital.objects.all().prefetch_related('hospital', 'hospital__health_insurance_providers',
+        # vip_user = None
+        common_hosp_queryset = CommonHospital.objects.prefetch_related('hospital', 'hospital__health_insurance_providers',
                                                                 'hospital__hospital_documents', 'hospital__imagehospital', 'hospital__network',
                                                                 'hospital__network__hospitalnetworkspeciality_set',
                                                                 'hospital__hospital_services', 'hospital__hosp_availability',
-                                                                'hospital__hospitalcertification_set', 'hospital__hospitalspeciality_set').order_by('priority')
+                                                                'hospital__hospitalcertification_set', 'hospital__hospitalspeciality_set')
 
-        if vip_user or from_vip_page:
+        # if request.user.is_authenticated and not request.user.is_anonymous:
+        #     vip_user = request.user.active_plus_user
+
+        # if vip_user:
+        if gold_request:
+            common_hosp_queryset = common_hosp_queryset.filter(hospital__enabled_for_gold=True)
+        elif vip_request:
+            common_hosp_queryset = common_hosp_queryset.filter(hospital__enabled_for_plus_plans=True)
+        else:
             common_hosp_queryset = common_hosp_queryset.filter(hospital__enabled_for_prepaid=True)
-        common_hosp_queryset = common_hosp_queryset[:20]
+
+        common_hosp_queryset = common_hosp_queryset.order_by('priority')[:20]
+        # common_hosp_queryset = common_hosp_queryset[:20]
 
         # common_hosp_percentage_dict = dict()
         # for data in common_hosp_queryset:
         #     common_hosp_percentage_dict[data.id] = data.percentage
 
-        plan = PlusPlans.objects.prefetch_related('plan_parameters', 'plan_parameters__parameter').filter(is_gold=True,
-                                                                                                          is_selected=True).first()
-        if not plan:
-            plan = PlusPlans.objects.prefetch_related('plan_parameters', 'plan_parameters__parameter').filter(is_gold=True).first()
+        plus_plans = PlusPlans.objects.prefetch_related('plan_parameters', 'plan_parameters__parameter').filter(is_gold=True)
+        selected_plus_plans = list(filter(lambda x: x.is_selected is True, plus_plans))
+        if selected_plus_plans:
+            plan = selected_plus_plans[0]
+        else:
+            plan = plus_plans.first()
+        # if not plan:
+        #     plan = PlusPlans.objects.prefetch_related('plan_parameters', 'plan_parameters__parameter').filter(is_gold=True).first()
 
         # if plan:
         #
