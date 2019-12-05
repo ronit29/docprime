@@ -2,10 +2,11 @@ from abc import ABC, abstractmethod
 from django.conf import settings
 import requests
 import logging
-
+from typing import Dict, Tuple
 from rest_framework import status
 from ondoc.notification.tasks import save_matrix_logs
 logger = logging.getLogger(__name__)
+from datetime import datetime
 import json
 
 
@@ -16,16 +17,15 @@ class AbstractLead(ABC):
         super(AbstractLead, self).__init__()
 
     @abstractmethod
-    def prepare_lead_data(self, *args, **kwargs) -> dict:
+    def prepare_lead_data(self, *args, **kwargs) -> Dict:
         pass
 
     @abstractmethod
     def update_matrix_lead_id(self, response, *args, **kwargs):
         pass
 
-    def push_data_to_matrix(self, request_data: dict, *args, **kwargs) -> (int, dict):
+    def push_data_to_matrix(self, request_data: dict, *args, **kwargs) -> Tuple[int, dict]:
         resp_data = None
-        status_code = None
         url = settings.MATRIX_API_URL
         matrix_api_token = settings.MATRIX_API_TOKEN
         response = requests.post(url, data=json.dumps(request_data), headers={'Authorization': matrix_api_token,
@@ -77,10 +77,16 @@ class DropOff(AbstractLead):
 
         GeneralMatrixLeads.objects.filter(id=self.obj.id).update(matrix_lead_id=lead_id)
 
-    def prepare_lead_data(self, *args, **kwargs) -> dict:
+    def prepare_lead_data(self, *args, **kwargs) -> Dict:
         obj = self.obj
         request_data = obj.request_body
         user = obj.user if obj.user else None
+
+        appointment_time = None
+        if request_data.get('selected_date') and request_data.get('selected_time'):
+            appointment_time = request_data.get('selected_date').split('T')[0] + " " + request_data.get('selected_time')
+            appointment_time = datetime.strptime(appointment_time, '%Y-%m-%d %H:%M %p')
+            appointment_time = int(appointment_time.timestamp())
 
         data = {
             "SubProductId": 0,
@@ -88,7 +94,7 @@ class DropOff(AbstractLead):
             "LeadSource": request_data.get('lead_source'),
             "LabTest": request_data.get('lab_test', ''),
             "LabName": request_data.get('lab_name', ''),
-            "AppointmentDate": None,
+            "AppointmentDate": appointment_time,
             "DoctorName": request_data.get('doctor_name'),
             "DoctorSpec": request_data.get('specialty', ''),
             "IPDHospitalName": request_data.get('hospital_name', ''),
@@ -97,7 +103,7 @@ class DropOff(AbstractLead):
             "PrimaryNo": request_data.get('phone_number') if not user else str(user.phone_number),
             "UtmCampaign": request_data.get('source', {}).get('utm_campaign', ''),
             "UTMMedium": request_data.get('source', {}).get('utm_medium', ''),
-            "Name": user.full_name if user else '',
+            "Name": user.full_name if user else 'none',
             "UtmSource": request_data.get('source', {}).get('utm_source', ''),
             "ExitPointUrl": ''
         }
@@ -118,7 +124,7 @@ class LabAds(AbstractLead):
 
         GeneralMatrixLeads.objects.filter(id=self.obj.id).update(matrix_lead_id=lead_id)
 
-    def prepare_lead_data(self, *args, **kwargs) -> dict:
+    def prepare_lead_data(self, *args, **kwargs) -> Dict:
         obj = self.obj
         request_data = obj.request_body
         user = obj.user if obj.user else None
@@ -129,7 +135,7 @@ class LabAds(AbstractLead):
             "LeadSource": request_data.get('lead_source'),
             "LabTest": request_data.get('lab_test', ''),
             "LabName": request_data.get('lab_name', ''),
-            "AppointmentDate": None,
+            # "AppointmentDate": appointment_time,
             "DoctorName": request_data.get('doctor_name'),
             "DoctorSpec": request_data.get('specialty', ''),
             "IPDHospitalName": request_data.get('hospital_name', ''),
@@ -138,7 +144,7 @@ class LabAds(AbstractLead):
             "PrimaryNo": request_data.get('phone_number') if not user else str(user.phone_number),
             "UtmCampaign": request_data.get('source', {}).get('utm_campaign', ''),
             "UTMMedium": request_data.get('source', {}).get('utm_medium', ''),
-            "Name": user.full_name if user else '',
+            "Name": user.full_name if user else 'none',
             "UtmSource": request_data.get('source', {}).get('utm_source', ''),
             "ExitPointUrl": request_data.get('exitpoint_url', '')
         }

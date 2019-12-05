@@ -1016,14 +1016,16 @@ class GeneralMatrixLeads(auth_model.TimeStampedModel):
     @classmethod
     def create_lead(cls, request):
         phone_number = request.data.get('phone_number', None)
-        user = None
+        if not phone_number:
+            return None
+
         if phone_number and (request.user.is_anonymous or not request.user.is_authenticated):
             user = User.objects.filter(phone_number=phone_number, user_type=User.CONSUMER).first()
         else:
             user = request.user
             phone_number = user.phone_number
 
-        data = {'user': user, 'request_body' : request.data, 'phone_number': phone_number, 'lead_type': request.data.get('lead_type')}
+        data = {'user': user, 'request_body': request.data, 'phone_number': phone_number, 'lead_type': request.data.get('lead_type')}
         obj = cls(**data)
         obj.save()
 

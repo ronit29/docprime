@@ -1712,7 +1712,6 @@ def process_leads_to_matrix(self, data):
             raise ValueError()
 
         general_lead_obj = GeneralMatrixLeads.objects.filter(id=id).first()
-        obj_type = 'general_leads'
 
         if not general_lead_obj:
             raise Exception("GeneralMatrix object could not found against id - " + str(id))
@@ -1724,7 +1723,6 @@ def process_leads_to_matrix(self, data):
 
         if (plus_obj and plus_obj.is_valid()) or lab_appointment or opd_appointment:
             return
-
 
         lead_engine_obj = lead_class_referance(general_lead_obj.lead_type, general_lead_obj)
         success = lead_engine_obj.process_lead()
