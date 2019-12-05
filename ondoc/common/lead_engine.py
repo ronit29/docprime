@@ -18,10 +18,26 @@ class AbstractLead(ABC):
 
     @abstractmethod
     def prepare_lead_data(self, *args, **kwargs) -> Dict:
+        """ Prepare the custom request payload for the matrix.
+
+        :param args:
+        :param kwargs:
+        :return: an Dict instance of matrix request payload.
+
+        """
         pass
 
     @abstractmethod
     def update_matrix_lead_id(self, response, *args, **kwargs):
+        """ After the lead has been created in the matrix, we need to update the corrosponding
+        model with the lead id returned from the matrix response. Every model bind matrix lead id with different name.
+
+        :param response: Response received from the matrix in variable `Id`.
+        :param args:
+        :param kwargs:
+        :return:
+
+        """
         pass
 
     def push_data_to_matrix(self, request_data: dict, *args, **kwargs) -> Tuple[int, dict]:
