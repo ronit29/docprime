@@ -1008,8 +1008,10 @@ class GeneralMatrixLeads(auth_model.TimeStampedModel):
 
     def after_commit(self):
         from ondoc.notification.tasks import process_leads_to_matrix
-        process_leads_to_matrix.apply_async(({'id': self.id}, ), countdown=10)
-
+        if self.request_body.get('lead_type') == "DROPOFF":
+            process_leads_to_matrix.apply_async(({'id': self.id}, ), countdown=10)
+        else:
+            process_leads_to_matrix.apply_async(({'id': self.id}, ))
 
     @classmethod
     def create_lead(cls, request):
