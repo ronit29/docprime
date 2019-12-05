@@ -30,7 +30,7 @@ import json, decimal, requests
 from django.utils import timezone
 
 from ondoc.diagnostic.models import LabAppointment
-from ondoc.doctor.models import OpdAppointment
+from ondoc.doctor.models import OpdAppointment, DoctorClinic
 from ondoc.communications.models import SMSNotification
 from ondoc.notification.models import NotificationAction
 from ondoc.api.v1.doctor import serializers as doctor_serializers
@@ -472,9 +472,9 @@ class DoctorBlockCalendarViewSet(viewsets.GenericViewSet):
         serializer = serializers.DoctorLeaveSerializer(queryset, many=True)
         return Response(serializer.data)
 
-    def create_leave_data(self, hospital_id, validated_data, start_time, end_time):
+    def create_leave_data(self, hospital_id,doctor_id, validated_data, start_time, end_time):
         return {
-                    "doctor": validated_data.get('doctor_id').id,
+                    "doctor": doctor_id,
                     "hospital": hospital_id,
                     "start_time": start_time,
                     "end_time": end_time,
@@ -492,6 +492,7 @@ class DoctorBlockCalendarViewSet(viewsets.GenericViewSet):
         hospital_id = validated_data.get("hospital_id").id if validated_data.get("hospital_id") else None
         start_time = validated_data.get("start_time")
         end_time = validated_data.get("end_time")
+        doctor_id = validated_data.get("doctor_id").id if validated_data.get("doctor_id") else None
 
         if not start_time:
             start_time = self.INTERVAL_MAPPING[validated_data.get("interval")][0]
@@ -500,9 +501,15 @@ class DoctorBlockCalendarViewSet(viewsets.GenericViewSet):
         if not hospital_id:
             assoc_hospitals = validated_data.get('doctor_id').hospitals.all()
             for hospital in assoc_hospitals:
-                doctor_leave_data.append(self.create_leave_data(hospital.id, validated_data, start_time, end_time))
+                doctor_leave_data.append(self.create_leave_data(hospital.id, validated_data.get('doctor_id'), validated_data, start_time, end_time))
+        if not doctor_id and hospital_id:
+            # For all the doctor leaves in a hospital
+            hospital = validated_data.get('hospital_id')
+            doctor_clinics = DoctorClinic.objects.filter(hospital=hospital.id)
+            for doctor in doctor_clinics:
+                doctor_leave_data.append(self.create_leave_data(hospital.id,doctor.id, validated_data, start_time, end_time))
         else:
-            doctor_leave_data.append(self.create_leave_data(hospital_id, validated_data, start_time, end_time))
+            doctor_leave_data.append(self.create_leave_data(hospital_id, validated_data.get('doctor_id'), validated_data, start_time, end_time))
 
         doctor_leave_serializer = serializers.DoctorLeaveSerializer(data=doctor_leave_data, many=True)
         doctor_leave_serializer.is_valid(raise_exception=True)
