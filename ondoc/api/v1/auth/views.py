@@ -2887,31 +2887,27 @@ class PGRefundViewSet(viewsets.GenericViewSet):
 
     @transaction.atomic()
     def save_pg_refund(self, request):
-        from django.http import JsonResponse
         response = {'status': 0}
         if request.method != 'POST':
-            return JsonResponse(response, status=405)
+            return Response(response, status=status.HTTP_405_METHOD_NOT_ALLOWED)
         serializer = serializers.PGRefundSaveSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         data = serializer.validated_data
         refund_obj = data['refund_obj']
         try:
-            refund_obj.pg_gransaction.mode = data.get('mode')
-            refund_obj.pg_gransaction.amount = data.get('txnAmount')
-            refund_obj.pg_gransaction.pb_gateway_name = data.get('gateway')
+            refund_obj.pg_transaction.amount = data.get('txnAmount')
+            refund_obj.pg_transaction.pb_gateway_name = data.get('gateway')
+            refund_obj.pg_transaction.payment_mode = data.get('mode')
             refund_obj.refund_amount = data.get('refundAmount')
 
             refund_obj.bank_arn = data.get('bank_arn')
             refund_obj.bankRefNum = data.get('bankRefNum')
-            refund_obj.refundDate = data.get('refundDate')
+            refund_obj.refundDate = utils.aware_time_zone(data.get('refundDate'))
             refund_obj.refundId = data.get('refundId')
-            refund_obj.pg_gransaction.save()
+            refund_obj.pg_transaction.save()
             refund_obj.save()
         except Exception as e:
             logger.error(str(e))
             return Response({'error': str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
-        # token = user_data.get('token')
-        # if not token:
-        #     return JsonResponse(response, status=400)
 
-        return Response(response, status=status.HTTP_200_OK)
+        return Response({'status':1}, status=status.HTTP_200_OK)

@@ -684,7 +684,7 @@ class MatrixUserLoginSerializer(serializers.Serializer):
 class PGRefundSaveSerializer(serializers.Serializer):
     mode = serializers.CharField(max_length=24)
     refNo = serializers.IntegerField()
-    orderNo = serializers.IntegerField(required=False)
+    orderNo = serializers.CharField(required=False)
     orderId = serializers.IntegerField()
     bankRefNum = serializers.IntegerField(allow_null=True)
     refundDate = serializers.DateTimeField()
@@ -695,9 +695,9 @@ class PGRefundSaveSerializer(serializers.Serializer):
     refundAmount = serializers.FloatField()
 
     def validate(self, attrs):
-        refund_obj = ConsumerAccount.objects.select_related('pg_transaction').filter(id=attrs['refNo']).first()
+        refund_obj = ConsumerRefund.objects.select_related('pg_transaction').filter(id=attrs['refNo']).first()
         if refund_obj and refund_obj.refund_state == ConsumerRefund.COMPLETED and refund_obj.pg_transaction.order.id == attrs['orderId']:
             attrs['refund_obj'] = refund_obj
         else:
-            return serializers.ValidationError('Invalid Refund!')
+            raise serializers.ValidationError('Invalid Refund!')
         return attrs
