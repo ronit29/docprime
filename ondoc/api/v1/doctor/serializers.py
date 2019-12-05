@@ -2909,6 +2909,7 @@ class TopCommonHospitalForIpdProcedureSerializer(serializers.ModelSerializer):
     hospital_services = serializers.SerializerMethodField()
     service_count = serializers.SerializerMethodField()
     hospital_image = serializers.SerializerMethodField()
+    vip_percentage = serializers.SerializerMethodField()
 
 
     class Meta:
@@ -2916,7 +2917,13 @@ class TopCommonHospitalForIpdProcedureSerializer(serializers.ModelSerializer):
         fields = ('id', 'name', 'distance', 'certifications', 'bed_count', 'logo', 'avg_rating',
                   'count_of_insurance_provider', 'multi_speciality', 'address', 'short_address','open_today',
                   'insurance_provider', 'established_in', 'long', 'lat', 'url', 'locality_url', 'name_city', 'operational_since',
-                  'h1_title', 'is_ipd_hospital', 'seo_title', 'network_id', 'hospital_services', 'service_count', 'hospital_image', 'priority')
+                  'h1_title', 'is_ipd_hospital', 'seo_title', 'network_id', 'hospital_services', 'service_count', 'hospital_image', 'priority',
+                  'vip_percentage')
+
+    def get_vip_percentage(self, obj):
+        if self.context.get('plan'):
+            return obj.percentage
+        return 0
 
     def get_name_city(self, obj):
         result = None

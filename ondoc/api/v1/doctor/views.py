@@ -1616,8 +1616,8 @@ class SearchedItemsViewSet(viewsets.GenericViewSet):
         count = int(count)
         if count <= 0:
             count = 10
-        medical_conditions = models.CommonMedicalCondition.objects.select_related('condition').prefetch_related('condition__specialization').all().order_by(
-            "-priority")[:count]
+        # medical_conditions = models.CommonMedicalCondition.objects.select_related('condition').prefetch_related('condition__specialization').all().order_by(
+        #     "-priority")[:count]
         # conditions_serializer = serializers.MedicalConditionSerializer(medical_conditions, many=True,
         #                                                                context={'request': request})
 
@@ -1658,7 +1658,7 @@ class SearchedItemsViewSet(viewsets.GenericViewSet):
             ipd_entity_qs = EntityUrls.objects.filter(ipd_procedure_id__in=common_ipd_procedure_ids,
                                                       sitemap_identifier='IPD_PROCEDURE_CITY',
                                                       is_valid=True,
-                                                      locality_value__iexact=city).annotate(
+                                                      locality_value__iexact=city.lower()).annotate(
                 ipd_id=F('ipd_procedure_id')).values('ipd_id', 'url')
             ipd_entity_dict = {x.get('ipd_id'): x.get('url') for x in ipd_entity_qs}
         common_ipd_procedures_serializer = CommonIpdProcedureSerializer(common_ipd_procedures, many=True,
