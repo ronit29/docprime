@@ -488,6 +488,44 @@ class Order(TimeStampedModel):
 
         return appointment_obj, wallet_amount, cashback_amount
 
+    def process_plus_user_upload_order(self):
+        from ondoc.api.v1.plus.serializers import PlusUserSerializer
+        from ondoc.plus.models import PlusUser
+        from ondoc.plus.models import PlusTransaction
+        from ondoc.insurance.models import InsuranceTransaction
+
+        plus_data = deepcopy(self.action_data)
+        plus_data = plan_subscription_reverse_transform(plus_data)
+        plus_data['plus_user']['order'] = self.id
+        serializer = PlusUserSerializer(data=plus_data.get('plus_user'))
+        serializer.is_valid(raise_exception=True)
+        plus_user_data = serializer.validated_data
+        user = User.objects.get(id=self.action_data.get('user'))
+        plus_user_obj = PlusUser.create_plus_user(plus_user_data, user)
+        amount = plus_user_obj.amount
+        order_dict = {
+            "reference_id": plus_user_obj.id,
+            "payment_status": Order.PAYMENT_ACCEPTED
+        }
+        PlusTransaction.objects.create(plus_user=plus_user_obj,
+                                       transaction_type=InsuranceTransaction.DEBIT, amount=amount)
+
+        self.change_payment_status(Order.PAYMENT_ACCEPTED)
+
+        # if order is done without PG transaction, then make an async task to create a dummy transaction and set it.
+        if not self.getTransactions():
+            try:
+                transaction.on_commit(
+                    lambda: set_order_dummy_transaction.apply_async((self.id, self.get_user_id(),), countdown=5))
+            except Exception as e:
+                logger.error(str(e))
+
+        money_pool = MoneyPool.objects.create(wallet=0, cashback=0, logs=[])
+
+        if plus_user_obj:
+            PlusUser.objects.filter(id__in=plus_user_obj.id).update(money_pool=money_pool)
+        return plus_user_obj
+
     @transaction.atomic
     def process_insurance_order(self, consumer_account,user_insurance_data):
 
@@ -507,6 +545,8 @@ class Order(TimeStampedModel):
             InsuranceTransaction.objects.create(user_insurance=user_insurance_obj, account=insurer.float.all().first(),
                                                 transaction_type=InsuranceTransaction.DEBIT, amount=amount)
         return user_insurance_obj
+
+
 
     def update_order(self, data):
         self.reference_id = data.get("reference_id", self.reference_id)

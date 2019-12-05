@@ -3,7 +3,7 @@ from dateutil.relativedelta import relativedelta
 from django.db import models
 import functools
 
-from ondoc.api.v1.utils import CouponsMixin
+from ondoc.api.v1.utils import CouponsMixin, plus_subscription_transform
 from ondoc.authentication import models as auth_model
 from django.contrib.contenttypes.fields import GenericRelation, GenericForeignKey
 from django.contrib.contenttypes.models import ContentType
@@ -1663,10 +1663,12 @@ class PlusUserUpload(auth_model.TimeStampedModel):
                                     if user_member_data['primary_phone_number'] == user.phone_number:
                                         member_list.append(user_member_data)
                                 fetched_data = self.get_plus_user_data(member_list, data, user)
-                                plus_user_data = fetched_data.get('plus_user_data')
+                                plus_user_data = fetched_data.get('plus_data')
                                 amount = fetched_data.get('amount')
                                 order = self.create_order(plus_user_data, amount, user)
-                                order.process_plus_user_upload_order()
+                                plus_user_obj = order.process_plus_user_upload_order()
+                                if not plus_user_obj:
+                                    raise Exception("Something Went Wrong")
                 except Exception as e:
                     raise Exception(e)
 
@@ -1742,18 +1744,22 @@ class PlusUserUpload(auth_model.TimeStampedModel):
                 user_profile = {"name": data['plus_member_name'], "email":
                     data['email'], "gender": data['gender'], "dob": data['dob'] if data['dob'] else ''}
 
-        plus_user_data = {'proposer': plan.proposer_id, 'plus_plan': plan.id,
-                               'purchase_date': transaction_date, 'expire_date': expiry_date, 'amount': amount,
-                               'user': user.pk, "plus_members": members, 'plus_user_upload_id': self.id}
+        plus_user_data = {'proposer': plan.proposer.id, 'plus_plan': plan.id,
+                          'purchase_date': transaction_date, 'expire_date': expiry_date, 'amount': int(amount),
+                          'user': user.id, "plus_members": members,
+                          'effective_price': int(amount)}
 
-        plus_data = {"profile_detail": user_profile, "plus_plan": plan.id,
-                          "user": user.pk, "plus_user": plus_user_data}
-        # insurance_data = insurance_transform(insurance_data)
-        return {'plus_user_data': plus_data, 'amount': amount}
+        plus_subscription_data = {"profile_detail": user_profile, "plus_plan": plan.id,
+                                  "user": user.pk, "plus_user": plus_user_data}
+
+        plus_data = plus_subscription_transform(plus_subscription_data)
+
+        return {'plus_data': plus_data, "amount": amount}
 
     def create_order(self, plus_user_data, amount, user):
         from ondoc.account import models as account_models
         visitor_info = None
+
         order = account_models.Order.objects.create(
             product_id=account_models.Order.GOLD_PRODUCT_ID,
             action=account_models.Order.GOLD_CREATE,
