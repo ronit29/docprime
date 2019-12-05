@@ -1718,8 +1718,8 @@ def process_leads_to_matrix(self, data):
 
         plus_obj = PlusUser.objects.filter(user__phone_number=general_lead_obj.phone_number).order_by('id').first()
         earlier_date = timezone.now() - timedelta(minutes=10)
-        lab_appointment = LabAppointment.objects.filter(created_at__gte=earlier_date).first()
-        opd_appointment = OpdAppointment.objects.filter(created_at__gte=earlier_date).first()
+        lab_appointment = LabAppointment.objects.filter(created_at__gte=earlier_date, user__phone_number=general_lead_obj.phone_number).first()
+        opd_appointment = OpdAppointment.objects.filter(created_at__gte=earlier_date, user__phone_number=general_lead_obj.phone_number).first()
 
         if (plus_obj and plus_obj.is_valid()) or lab_appointment or opd_appointment:
             return
