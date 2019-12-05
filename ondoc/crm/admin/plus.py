@@ -135,3 +135,12 @@ class PlusMemberAdmin(admin.ModelAdmin):
     readonly_fields = ("relation", "phone_number", "profile", "city", "district", "state", "state_code", "plus_user",
                        "city_code", "district_code", "is_primary_user")
     list_display = ("first_name", "last_name", "plus_user", "is_primary_user")
+
+
+class PlusUserUploadAdmin(admin.ModelAdmin):
+    list_display = ('id', 'file', 'amount', 'paid_through')
+
+    def get_readonly_fields(self, request, obj=None):
+        if obj:  # editing an existing object
+            return self.readonly_fields + ('file',)
+        return self.readonly_fields
