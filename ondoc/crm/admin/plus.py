@@ -61,7 +61,10 @@ class PlusPlanContentInline(admin.TabularInline):
 class PlusPlansAdmin(admin.ModelAdmin):
     model = PlusPlans
     inlines = [PlusPlanContentInline, PlusPlanParametersMappingInline, PlusPlanUtmSourceMappingInline]
-    display = ("plan_name", "proposer", "internal_name", "mrp", "deal_price", "tenure", "enabled", "is_live", "total_allowed_members", "is_selected", "is_retail", "default_single_booking")
+    display = ("plan_name", "proposer", "internal_name", "mrp", "deal_price", "tenure", "enabled", "is_live",
+               "total_allowed_members", "is_selected", "is_retail", "default_single_booking", "is_corporate",
+               "corporate_group", "corporate_upper_limit_criteria", "corporate_doctor_upper_limit",
+               "corporate_lab_upper_limit")
     list_display = ('plan_name', 'mrp', "deal_price", "is_gold", "is_selected", "default_single_booking")
 
 
@@ -144,3 +147,11 @@ class PlusUserUploadAdmin(admin.ModelAdmin):
         if obj:  # editing an existing object
             return self.readonly_fields + ('file',)
         return self.readonly_fields
+
+
+class CorporateAdmin(admin.ModelAdmin):
+    list_display = ('id', 'name', 'address', 'corporate_group')
+
+
+class CorporateGroupAdmin(admin.ModelAdmin):
+    list_display = ('id', 'name', 'type')

@@ -105,6 +105,9 @@ class CorporateGroup(auth_model.TimeStampedModel):
     name = models.CharField(max_length=300, null=False, blank=False)
     type = models.CharField(max_length=100, null=True, choices=CorporateType.as_choices())
 
+    class Meta:
+        db_table = 'plus_corporate_groups'
+
 
 @reversion.register()
 class PlusPlans(auth_model.TimeStampedModel, LiveMixin):
@@ -1595,11 +1598,13 @@ class TempPlusUser(auth_model.TimeStampedModel):
         return resp
 
 
-
 class Corporate(auth_model.TimeStampedModel):
     name = models.CharField(max_length=300, null=False, blank=False)
     address = models.CharField(max_length=500, null=True, blank=True)
     corporate_group = models.ForeignKey(CorporateGroup, related_name='corporate_group', null=False, blank=False, on_delete=models.DO_NOTHING)
+
+    class Meta:
+        db_table = 'plus_corporates'
 
 
 class PlusUserUpload(auth_model.TimeStampedModel):
@@ -1645,16 +1650,20 @@ class PlusUserUpload(auth_model.TimeStampedModel):
                     j = j + 1
             i = i + 1
             excel_data.append(data)
-
         for data in excel_data:
             if data:
                 try:
                     with transaction.atomic():
                         if data['is_primary_member'] == 1:
                             user = self.create_user(data)
+                            excel_data = list(filter(None, excel_data))
                             if not user.active_plus_user:
-                                fetched_data = self.get_plus_user_data(excel_data, data, user)
-                                plus_user_data = fetched_data.get('insurance_data')
+                                member_list = []
+                                for user_member_data in excel_data:
+                                    if user_member_data['primary_phone_number'] == user.phone_number:
+                                        member_list.append(user_member_data)
+                                fetched_data = self.get_plus_user_data(member_list, data, user)
+                                plus_user_data = fetched_data.get('plus_user_data')
                                 amount = fetched_data.get('amount')
                                 order = self.create_order(plus_user_data, amount, user)
                                 order.process_plus_user_upload_order()
@@ -1679,7 +1688,7 @@ class PlusUserUpload(auth_model.TimeStampedModel):
             primary_member_data = self.get_member_info(data, primary_member_data={}, primary=True)
             plus_user_members.append(primary_member_data)
             for member in export_data:
-                if member and member['plus_member_member_of'] == phone_number:
+                if not member['relationship'] == 'Self':
                     secondary_member_data = self.get_member_info(member, primary_member_data, primary=False)
                     plus_user_members.append(secondary_member_data)
 
@@ -1687,21 +1696,27 @@ class PlusUserUpload(auth_model.TimeStampedModel):
 
     def get_member_info(self, member, primary_member_data, primary):
         members_dict = dict()
-        members_dict['title'] = member.get('title', '')
-        members_dict['first_name'] = member.get('first_name', '')
-        members_dict['middle_name'] = member.get('middle_name', '')
-        members_dict['last_name'] = member.get('last_name', '')
-        members_dict['dob'] = member['dob'].strftime("%Y-%m-%d") if member['dob'] else ''
+        name = member.get('plus_member_name', '')
+        if not name:
+            raise Exception('Name is mandatory for Plus User')
+        name = name.split(' ')
+        members_dict['first_name'] = name[0]
+        members_dict['middle_name'] = name[1] if len(name)>2 else ''
+        members_dict['last_name'] = name[2] if len(name)>2 else name[1]
+        # members_dict['dob'] = member['dob'].strftime("%Y-%m-%d") if member['dob'] else ''
+        members_dict['dob'] = datetime.datetime.strptime(member['dob'], '%Y-%m-%d') if member['dob'] else ''
         members_dict['gender'] = member.get('gender', '')
         members_dict['relation'] = member.get('relation', '')
         if not primary and not member.get('email', ''):
             members_dict['email'] = primary_member_data['email']
+        else:
+            members_dict['email'] = member.get('email')
 
         return members_dict
 
     def get_plus_user_data(self, excel_data, data, user):
         from dateutil.relativedelta import relativedelta
-        members = self.get_insured_members_data(excel_data, data)
+        members = self.get_plus_user_members_data(excel_data, data)
         transaction_date = datetime.datetime.now()
         plus_plan = data['plan_id']
         plan = PlusPlans.objects.filter(pk=plus_plan).first()
@@ -1709,8 +1724,8 @@ class PlusUserUpload(auth_model.TimeStampedModel):
             raise Exception("Selected Plan is not belongs to Corporate or belongs to Retail plan, "
                             "Please select correct plan")
         if plan:
-            amount = plan.amount
-            expiry_date = transaction_date + relativedelta(months=int(plan.policy_tenure))
+            amount = plan.deal_price
+            expiry_date = transaction_date + relativedelta(months=int(plan.tenure))
             expiry_date = expiry_date - timedelta(days=1)
             expiry_date = datetime.datetime.combine(expiry_date, datetime.datetime.max.time())
             expiry_date = expiry_date
@@ -1718,17 +1733,16 @@ class PlusUserUpload(auth_model.TimeStampedModel):
             if plan.total_allowed_members < len(members):
                 raise Exception('Only ' + str(plan.total_allowed_members) + ' members are allowed in selected plan for ' + data['first_name'])
 
-        if data['relation'] == 'self':
+        if data['relationship'] == 'Self':
             user_profile = UserProfile.objects.filter(user_id=user.pk).first()
             if user_profile:
                 user_profile = {"name": user_profile.name, "email": user_profile.email, "gender": user_profile.gender,
                                 "dob": user_profile.dob}
             else:
-                last_name = data.get('last_name') if data.get('last_name') else ''
-                user_profile = {"name": data['first_name'] + " " + last_name, "email":
-                    data['email'], "gender": data['gender'], "dob": data['dob'].strftime("%Y-%m-%d") if data['dob'] else ''}
+                user_profile = {"name": data['plus_member_name'], "email":
+                    data['email'], "gender": data['gender'], "dob": data['dob'] if data['dob'] else ''}
 
-        plus_user_data = {'proposer': plan.insurer_id, 'plus_plan': plan.id,
+        plus_user_data = {'proposer': plan.proposer_id, 'plus_plan': plan.id,
                                'purchase_date': transaction_date, 'expire_date': expiry_date, 'amount': amount,
                                'user': user.pk, "plus_members": members, 'plus_user_upload_id': self.id}
 
@@ -1741,8 +1755,8 @@ class PlusUserUpload(auth_model.TimeStampedModel):
         from ondoc.account import models as account_models
         visitor_info = None
         order = account_models.Order.objects.create(
-            product_id=account_models.Order.INSURANCE_PRODUCT_ID,
-            action=account_models.Order.INSURANCE_CREATE,
+            product_id=account_models.Order.GOLD_PRODUCT_ID,
+            action=account_models.Order.GOLD_CREATE,
             action_data=plus_user_data,
             amount=amount,
             cashback_amount=0,
