@@ -2883,26 +2883,35 @@ class SbiGUserViewset(GenericViewSet):
         return response
 
 
-# class CloudLabUserViewSet(viewsets.GenericViewSet):
-#     authentication_classes = (JWTAuthentication,)
-#     permission_classes = (IsAuthenticated, IsDoctor)
-#
-#     @transaction.atomic()
-#     def user_login_via_cloud_lab(self, request):
-#         from django.http import JsonResponse
-#         response = {'login': 0}
-#         if request.method != 'POST':
-#             return JsonResponse(response, status=405)
-#         serializer = serializers.CloudLabUserLoginSerializer(data=request.data)
-#         serializer.is_valid(raise_exception=True)
-#         data = serializer.validated_data
-#         try:
-#             user_data = User.get_external_login_data(data)
-#         except Exception as e:
-#             logger.error(str(e))
-#             return Response({'error': str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
-#         token = user_data.get('token')
-#         if not token:
-#             return JsonResponse(response, status=400)
-#
-#         return Response(response, status=status.HTTP_200_OK)
+class PGRefundViewSet(viewsets.GenericViewSet):
+
+    @transaction.atomic()
+    def save_pg_refund(self, request):
+        from django.http import JsonResponse
+        response = {'status': 0}
+        if request.method != 'POST':
+            return JsonResponse(response, status=405)
+        serializer = serializers.PGRefundSaveSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        data = serializer.validated_data
+        refund_obj = data['refund_obj']
+        try:
+            refund_obj.pg_gransaction.mode = data.get('mode')
+            refund_obj.pg_gransaction.amount = data.get('txnAmount')
+            refund_obj.pg_gransaction.pb_gateway_name = data.get('gateway')
+            refund_obj.refund_amount = data.get('refundAmount')
+
+            refund_obj.bank_arn = data.get('bank_arn')
+            refund_obj.bankRefNum = data.get('bankRefNum')
+            refund_obj.refundDate = data.get('refundDate')
+            refund_obj.refundId = data.get('refundId')
+            refund_obj.pg_gransaction.save()
+            refund_obj.save()
+        except Exception as e:
+            logger.error(str(e))
+            return Response({'error': str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+        # token = user_data.get('token')
+        # if not token:
+        #     return JsonResponse(response, status=400)
+
+        return Response(response, status=status.HTTP_200_OK)

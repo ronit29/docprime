@@ -7,7 +7,7 @@ from ondoc.common.models import AppointmentHistory
 from ondoc.doctor.models import DoctorMobile
 from ondoc.insurance.models import InsuredMembers, UserInsurance
 from ondoc.diagnostic.models import AvailableLabTest
-from ondoc.account.models import ConsumerAccount, Order, ConsumerTransaction
+from ondoc.account.models import ConsumerAccount, Order, ConsumerTransaction, ConsumerRefund, PgTransaction
 import datetime, calendar, pytz
 from dateutil.relativedelta import relativedelta
 from django.utils import timezone
@@ -679,3 +679,25 @@ class MatrixUserLoginSerializer(serializers.Serializer):
 #     dob = serializers.DateField()
 #     gender = serializers.ChoiceField(choices=GENDER_CHOICES)
 #     extra = serializers.JSONField(allow_null=True, required=False)
+
+
+class PGRefundSaveSerializer(serializers.Serializer):
+    mode = serializers.CharField(max_length=24)
+    refNo = serializers.IntegerField()
+    orderNo = serializers.IntegerField(required=False)
+    orderId = serializers.IntegerField()
+    bankRefNum = serializers.IntegerField(allow_null=True)
+    refundDate = serializers.DateTimeField()
+    refundId = serializers.IntegerField()
+    txnAmount = serializers.FloatField()
+    gateway = serializers.CharField(allow_null=True)
+    bank_arn = serializers.CharField(allow_null=True)
+    refundAmount = serializers.FloatField()
+
+    def validate(self, attrs):
+        refund_obj = ConsumerAccount.objects.select_related('pg_transaction').filter(id=attrs['refNo']).first()
+        if refund_obj and refund_obj.refund_state == ConsumerRefund.COMPLETED and refund_obj.pg_transaction.order.id == attrs['orderId']:
+            attrs['refund_obj'] = refund_obj
+        else:
+            return serializers.ValidationError('Invalid Refund!')
+        return attrs
