@@ -3,6 +3,8 @@ from ondoc.doctor import models as doctor_models
 from django.db.models import Count, Case, When, F, Prefetch
 from ondoc.api.v1.utils import RawSql
 import datetime
+import logging
+logger = logging.getLogger(__name__)
 from celery import task
 from django.db import transaction
 
@@ -219,9 +221,9 @@ class DoctorSearchScore:
     #@task(bind=True)
     #@transaction.atomic
     def create_search_score(self):
-        print(self.delete_search_score())
-        print(self.calculate())
-        print(self.create_doctor_score())
-
-
-
+        try:
+            print(self.delete_search_score())
+            print(self.calculate())
+            print(self.create_doctor_score())
+        except Exception as e:
+             logger.error("Error in calculating search score - " + str(e))
