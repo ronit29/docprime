@@ -60,6 +60,17 @@ class ConvenienceAbstractCriteria(object):
         return self._get_price(price_data)
 
 
+class CorporateAbstractCriteria(object):
+    def __init__(self, plus_obj):
+        self.plus_obj = plus_obj
+
+    def _get_price(self, price_data):
+        raise NotImplementedError()
+
+    def get_price(self, price_data):
+        return self._get_price(price_data)
+
+
 class DoctorAmountCount(AbstractCriteria):
 
     def __init__(self, plus_obj):
@@ -259,7 +270,7 @@ class LabtestAmountCount(AbstractCriteria):
         if (total_count <= 0 and total_amount_left > 0) or (total_count > 0 and total_count_left > 0 and total_amount_left > 0):
             is_covered = True
             if plan.is_corporate:
-                corporate_cost_engine = get_corporate_price_reference(self.plus_obj, "DOCTOR")
+                corporate_cost_engine = get_corporate_price_reference(self.plus_obj, "LAB")
                 if not corporate_cost_engine:
                     return resp
                 cost = corporate_cost_engine.get_price(price_data)
@@ -837,6 +848,86 @@ class ConvenienceLabtestCodDealPrice(ConvenienceAbstractCriteria):
         return price_data.get('deal_price', 0)
 
 
+class CorporateDoctorMrp(CorporateAbstractCriteria):
+    def __init__(self, plus_obj):
+        super().__init__(plus_obj)
+
+    def _get_price(self, price_data):
+        if not price_data:
+            return None
+        return price_data.get('mrp', 0)
+
+
+class CorporateDoctorDealPrice(CorporateAbstractCriteria):
+    def __init__(self, plus_obj):
+        super().__init__(plus_obj)
+
+    def _get_price(self, price_data):
+        if not price_data:
+            return None
+        return price_data.get('deal_price', 0)
+
+
+class CorporateDoctorAgreedPrice(CorporateAbstractCriteria):
+    def __init__(self, plus_obj):
+        super().__init__(plus_obj)
+
+    def _get_price(self, price_data):
+        if not price_data:
+            return None
+        return price_data.get('fees', 0)
+
+
+class CorporateDoctorCodDealPrice(CorporateAbstractCriteria):
+    def __init__(self, plus_obj):
+        super().__init__(plus_obj)
+
+    def _get_price(self, price_data):
+        if not price_data:
+            return None
+        return price_data.get('cod_deal_price', 0)
+
+
+class CorporateLabtestMrp(CorporateAbstractCriteria):
+    def __init__(self, plus_obj):
+        super().__init__(plus_obj)
+
+    def _get_price(self, price_data):
+        if not price_data:
+            return None
+        return price_data.get('mrp', 0)
+
+
+class CorporateLabtestDealPrice(CorporateAbstractCriteria):
+    def __init__(self, plus_obj):
+        super().__init__(plus_obj)
+
+    def _get_price(self, price_data):
+        if not price_data:
+            return None
+        return price_data.get('deal_price', 0)
+
+
+class CorporateLabtestAgreedPrice(CorporateAbstractCriteria):
+    def __init__(self, plus_obj):
+        super().__init__(plus_obj)
+
+    def _get_price(self, price_data):
+        if not price_data:
+            return None
+        return price_data.get('fees', 0)
+
+
+class CorporateLabtestCodDealPrice(CorporateAbstractCriteria):
+    def __init__(self, plus_obj):
+        super().__init__(plus_obj)
+
+    def _get_price(self, price_data):
+        if not price_data:
+            return None
+        return price_data.get('deal_price', 0)
+
+
 price_criteria_class_mapping = {
     'DOCTOR': {
         'MRP': DoctorMrp,
@@ -864,6 +955,21 @@ convenience_price_criteria_class_mapping = {
         'DEAL_PRICE': ConvenienceLabtestDealPrice,
         'AGREED_PRICE': ConvenienceLabtestAgreedPrice,
         'COD_DEAL_PRICE': ConvenienceLabtestCodDealPrice
+    }
+}
+
+corporate_price_criteria_class_mapping = {
+    'DOCTOR': {
+        'MRP': CorporateDoctorMrp,
+        'DEAL_PRICE': CorporateDoctorDealPrice,
+        'AGREED_PRICE': CorporateDoctorAgreedPrice,
+        'COD_DEAL_PRICE': CorporateDoctorCodDealPrice
+    },
+    'LABTEST': {
+        'MRP': CorporateLabtestMrp,
+        'DEAL_PRICE': CorporateLabtestDealPrice,
+        'AGREED_PRICE': CorporateLabtestAgreedPrice,
+        'COD_DEAL_PRICE': CorporateLabtestCodDealPrice
     }
 }
 
@@ -905,7 +1011,7 @@ def get_corporate_price_reference(obj, entity):
     price_criteria = obj.plan.corporate_upper_limit_criteria if obj.__class__.__name__ in ['PlusUser'] else obj.corporate_upper_limit_criteria
     if entity not in ['DOCTOR', 'LABTEST'] or price_criteria not in PriceCriteria.availabilities():
         return None
-    class_reference = price_criteria_class_mapping[entity][price_criteria]
+    class_reference = corporate_price_criteria_class_mapping[entity][price_criteria]
     return class_reference
 
 
