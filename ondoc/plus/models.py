@@ -22,7 +22,8 @@ from django.db.models import Q
 from ondoc.common.models import DocumentsProofs
 from ondoc.coupon.models import Coupon
 
-from ondoc.notification.tasks import push_plus_lead_to_matrix
+from ondoc.notification.tasks import push_plus_lead_to_matrix, set_order_dummy_transaction, \
+    set_order_dummy_transaction_for_corporate
 from ondoc.plus.usage_criteria import get_class_reference, get_price_reference, get_min_convenience_reference, \
     get_max_convenience_reference
 from .enums import PlanParametersEnum, UtilizationCriteria, PriceCriteria
@@ -38,6 +39,10 @@ from django.utils.functional import cached_property
 from .enums import UsageCriteria
 from copy import deepcopy
 from math import floor
+import logging
+
+logger = logging.getLogger(__name__)
+
 
 
 class LiveMixin(models.Model):
@@ -1669,6 +1674,15 @@ class PlusUserUpload(auth_model.TimeStampedModel):
                                 plus_user_obj = order.process_plus_user_upload_order()
                                 if not plus_user_obj:
                                     raise Exception("Something Went Wrong")
+                                order = plus_user_obj.order
+                                # if order is done without PG transaction, then make an async task to create a dummy transaction and set it.
+                                if not order.getTransactions():
+                                    try:
+                                        transaction.on_commit(
+                                            lambda: set_order_dummy_transaction_for_corporate.apply_async(
+                                                (order.id, plus_user_obj.user_id,), countdown=5))
+                                    except Exception as e:
+                                        logger.error(str(e))
                 except Exception as e:
                     raise Exception(e)
 
@@ -1701,18 +1715,42 @@ class PlusUserUpload(auth_model.TimeStampedModel):
         name = member.get('plus_member_name', '')
         if not name:
             raise Exception('Name is mandatory for Plus User')
+
         name = name.split(' ')
-        members_dict['first_name'] = name[0]
-        members_dict['middle_name'] = name[1] if len(name)>2 else ''
-        members_dict['last_name'] = name[2] if len(name)>2 else name[1]
+        first_name = ''
+        middle_name = ''
+        last_name = ''
+        if len(name) > 1 and len(name) == 2:
+            first_name = name[0]
+            last_name = name[1]
+        elif len(name) > 1 and len(name) > 2:
+            first_name = name[0]
+            middle_name = name[1]
+            last_name = name[2]
+        else:
+            first_name = name[0]
+            middle_name = ''
+            last_name = ''
+        if member.get('gender', None) == "Male":
+            gender = 'm'
+        else:
+            gender = 'f'
+        members_dict['first_name'] = first_name
+        members_dict['middle_name'] = middle_name
+        members_dict['last_name'] = last_name
         # members_dict['dob'] = member['dob'].strftime("%Y-%m-%d") if member['dob'] else ''
         members_dict['dob'] = datetime.datetime.strptime(member['dob'], '%Y-%m-%d') if member['dob'] else ''
-        members_dict['gender'] = member.get('gender', '')
+        members_dict['gender'] = gender
         members_dict['relation'] = member.get('relation', '')
         if not primary and not member.get('email', ''):
             members_dict['email'] = primary_member_data['email']
         else:
             members_dict['email'] = member.get('email')
+        members_dict['profile'] = None
+        if primary:
+            members_dict['is_primary_user'] = True
+        else:
+            members_dict['is_primary_user'] = False
 
         return members_dict
 
@@ -1739,10 +1777,10 @@ class PlusUserUpload(auth_model.TimeStampedModel):
             user_profile = UserProfile.objects.filter(user_id=user.pk).first()
             if user_profile:
                 user_profile = {"name": user_profile.name, "email": user_profile.email, "gender": user_profile.gender,
-                                "dob": user_profile.dob}
+                                "dob": user_profile.dob, "profile": user_profile.id}
             else:
-                user_profile = {"name": data['plus_member_name'], "email":
-                    data['email'], "gender": data['gender'], "dob": data['dob'] if data['dob'] else ''}
+                user_profile = {"name": data['plus_member_name'], "email": data['email'], "gender": data['gender'],
+                                "dob": data['dob'] if data['dob'] else '', "profile": None}
 
         plus_user_data = {'proposer': plan.proposer.id, 'plus_plan': plan.id,
                           'purchase_date': transaction_date, 'expire_date': expiry_date, 'amount': int(amount),

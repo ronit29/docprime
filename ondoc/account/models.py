@@ -507,27 +507,20 @@ class Order(TimeStampedModel):
             "reference_id": plus_user_obj.id,
             "payment_status": Order.PAYMENT_ACCEPTED
         }
+        self.update_order(order_dict)
         PlusTransaction.objects.create(plus_user=plus_user_obj,
                                        transaction_type=InsuranceTransaction.DEBIT, amount=amount)
 
         self.change_payment_status(Order.PAYMENT_ACCEPTED)
 
-        # if order is done without PG transaction, then make an async task to create a dummy transaction and set it.
-        if not self.getTransactions():
-            try:
-                transaction.on_commit(
-                    lambda: set_order_dummy_transaction.apply_async((self.id, self.get_user_id(),), countdown=5))
-            except Exception as e:
-                logger.error(str(e))
-
         money_pool = MoneyPool.objects.create(wallet=0, cashback=0, logs=[])
 
         if plus_user_obj:
-            PlusUser.objects.filter(id__in=plus_user_obj.id).update(money_pool=money_pool)
+            PlusUser.objects.filter(id=plus_user_obj.id).update(money_pool=money_pool)
         return plus_user_obj
 
     @transaction.atomic
-    def process_insurance_order(self, consumer_account,user_insurance_data):
+    def process_insurance_order(self, consumer_account, user_insurance_data):
 
         from ondoc.api.v1.insurance.serializers import UserInsuranceSerializer
         from ondoc.insurance.models import UserInsurance, InsuranceTransaction

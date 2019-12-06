@@ -208,8 +208,7 @@ class PlusMemberListSerializer(serializers.Serializer):
     relation = serializers.ChoiceField(choices=PlusMembers.Relations.as_choices(), required=False, allow_null=True, allow_blank=True)
     document_ids = serializers.ListField(required=False, allow_null=True, child=PlusMembersDocumentSerializer())
     is_primary_user = serializers.BooleanField(required=False, default=False)
-    # plan = serializers.PrimaryKeyRelatedField(queryset=PlusPlans.all_active_plans(), allow_null=False, allow_empty=False)
-
+    gender = serializers.ChoiceField(choices=UserProfile.GENDER_CHOICES, required=False, allow_null=True, allow_blank=True)
 
 class PlusMembersSerializer(serializers.Serializer):
     members = serializers.ListSerializer(child=PlusMemberListSerializer())

@@ -374,6 +374,105 @@ def set_order_dummy_transaction(self, order_id, user_id):
         logger.error("Error in Setting Dummy Transaction of user with data - " + json.dumps(req_data) + " with exception - " + str(e))
         self.retry([order_id, user_id], countdown=300)
 
+@task(bind=True, max_retries=5)
+def set_order_dummy_transaction_for_corporate(self, order_id, user_id):
+    from ondoc.account.models import Order, DummyTransactions
+    from ondoc.plus.models import PlusUser
+    from ondoc.account.models import User
+    from ondoc.account.mongo_models import PgLogs
+    from ondoc.account.models import MerchantPayoutLog
+    req_data = dict()
+    try:
+        order_row = Order.objects.filter(id=order_id).first()
+        user = User.objects.filter(id=user_id).first()
+
+        if not order_row or not user:
+            raise Exception('order and user are required')
+        if order_row.getTransactions():
+            return
+        if not order_row.dummy_transaction_allowed():
+            raise Exception("Cannot create dummy payout for a child order.")
+
+        # appointment = order_row.getAppointment()
+        # if not appointment:
+        #     raise Exception("No Appointment/UserPlanMapping found.")
+
+        # total_price = order_row.get_total_price()
+        total_price = 0
+        token = settings.PG_DUMMY_TRANSACTION_TOKEN
+        headers = {
+            "auth": token,
+            "Content-Type": "application/json"
+        }
+        url = settings.PG_DUMMY_TRANSACTION_URL
+        action_data = order_row.action_data
+        if not action_data:
+            raise Exception("Can not create dummy transaction for empty action data")
+        profile = action_data.get('profile_detail')
+        if not profile:
+            raise Exception("Can not create dummy transaction for empty profile")
+        name = profile.get('name', '')
+        plus_user = PlusUser.objects.filter(user_id=user_id).order_by('-id').first()
+        # insurance_data = order_row.get_insurance_data_for_pg()
+
+        # if appointment.__class__.__name__ in ['LabAppointment', 'OpdAppointment']:
+        #     if appointment.insurance and not order_row.is_parent() and not insurance_data:
+        #         MerchantPayoutLog.create_log(None, "refOrderId, insurerCode and refOrderNo not found for order id {}".format(order_row.id))
+        #         raise Exception("refOrderId, insurerCode, refOrderNo details not found for order id {}".format(order_row.id))
+        #
+        # name = ''
+        # if isinstance(appointment, OpdAppointment) or isinstance(appointment, LabAppointment):
+        #     name = appointment.profile.name
+        #
+        # if isinstance(appointment, UserInsurance):
+        #     name = appointment.user.full_name
+
+        req_data = {
+            "customerId": user_id,
+            "mobile": user.phone_number,
+            "email": user.email or "dummyemail@docprime.com",
+            "productId": order_row.product_id,
+            "orderId": order_id,
+            "name": name,
+            "txAmount": 0,
+            "couponCode": "",
+            "couponAmt": str(total_price),
+            "paymentMode": "DC",
+            "AppointmentId": plus_user.id,
+            "buCallbackSuccessUrl": "",
+            "buCallbackFailureUrl": ""
+        }
+
+        # req_data.update(insurance_data)
+
+        for key in req_data:
+            req_data[key] = str(req_data[key])
+
+        response = requests.post(url, data=json.dumps(req_data), headers=headers)
+        save_pg_response.apply_async((PgLogs.DUMMY_TXN, order_id, None, response.json(), req_data, user_id,), eta=timezone.localtime(), queue=settings.RABBITMQ_LOGS_QUEUE)
+        if response.status_code == status.HTTP_200_OK:
+            resp_data = response.json()
+            #logger.error(resp_data)
+            if resp_data.get("ok") is not None and resp_data.get("ok") == 1:
+                tx_data = {}
+                tx_data['user'] = user
+                tx_data['product_id'] = order_row.product_id
+                tx_data['order_no'] = resp_data.get('orderNo')
+                tx_data['order_id'] = order_row.id
+                tx_data['reference_id'] = plus_user.id
+                tx_data['type'] = DummyTransactions.CREDIT
+                tx_data['amount'] = total_price
+                tx_data['payment_mode'] = "DC"
+
+                DummyTransactions.objects.create(**tx_data)
+                #print("SAVED DUMMY TRANSACTION")
+        else:
+            raise Exception("Retry on invalid Http response status - " + str(response.content))
+
+    except Exception as e:
+        logger.error("Error in Setting Dummy Transaction of user with data - " + json.dumps(req_data) + " with exception - " + str(e))
+        self.retry([order_id, user_id], countdown=300)
+
 @task
 def send_offline_appointment_message(**kwargs):
     from ondoc.doctor.models import OfflineOPDAppointments
