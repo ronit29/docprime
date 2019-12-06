@@ -147,7 +147,7 @@ class LabAds(AbstractLead):
 
         data = {
             "SubProductId": 0,
-            "IsInsured": "yes" if user.active_insurance and user.active_insurance.is_valid() else "no",
+            "IsInsured": "yes" if user and user.active_insurance and user.active_insurance.is_valid() else "no",
             "LeadSource": request_data.get('lead_source'),
             "LabTest": request_data.get('test_name', ''),
             "LabName": request_data.get('lab_name', ''),
