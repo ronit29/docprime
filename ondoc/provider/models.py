@@ -322,6 +322,7 @@ class PartnerLabSamplesCollectOrder(auth_models.TimeStampedModel, auth_models.Cr
     lab_alerts = models.ManyToManyField(TestSamplesLabAlerts)
     status = models.SmallIntegerField(choices=STATUS_CHOICES)
     extras = JSONField(default={})
+    cancellation_comments = models.TextField(null=True, blank=True)
 
     def __str__(self):
         return str(self.offline_patient.name) + '-' + str(self.hospital.name)

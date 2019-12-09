@@ -8,7 +8,7 @@ from .views import (CitiesViewSet, ServicesViewSet, SmsServiceViewSet, UpdateXls
                     GetKeyDataViewSet, AllUrlsViewset, DeviceDetailsSave, AppointmentPrerequisiteViewSet,
 
                     SiteSettingsViewSet, DepartmentRouting, CommentViewSet, DocumentUploadViewSet,
-                    SponsorListingViewSet, AppointmentUtilityViewSet)
+                    SponsorListingViewSet, AppointmentUtilityViewSet, GeneralLeadViewSet)
                     # SponsorListingViewSet)
 
 
@@ -45,5 +45,6 @@ urlpatterns = [
     path('comment/list', CommentViewSet.as_view({'get': 'list'}), name='list-comment'),
     path('sponsorlisting', SponsorListingViewSet.as_view({'get': 'list'}), name='sponsor-listing'),
     path('upload/document-proof', DocumentUploadViewSet.as_view({'post': 'upload_document_proofs'}), name='upload_prescription'),
-    path('predicted-price-via-plan/<str:service_type>', AppointmentUtilityViewSet.as_view({'post': 'get_prices'}), name='get_prices')
+    path('predicted-price-via-plan/<str:service_type>', AppointmentUtilityViewSet.as_view({'post': 'get_prices'}), name='get_prices'),
+    path('push-leads', GeneralLeadViewSet.as_view({'post': 'create_lead'}), name='create_lead')
 ]
