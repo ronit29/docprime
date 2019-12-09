@@ -2383,7 +2383,7 @@ class IsPGRequest(permissions.BasePermission):
     message = 'PG is allowed to perform action only.'
 
     def has_permission(self, request, view):
-        if request.META.get('HTTP_PG_AUTHORIZATION') and request.META.get('HTTP_PG_AUTHORIZATION') ==  base64.b64encode(settings.PG_AUTH_TOKEN):
+        if request.META.get('HTTP_PG_AUTHORIZATION') and request.META.get('HTTP_PG_AUTHORIZATION') == (base64.b64encode(settings.PG_AUTH_TOKEN.encode())).decode():
             return True
         return False
 
