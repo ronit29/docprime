@@ -18,6 +18,8 @@ from rest_framework import status
 from django.db import transaction
 from django.db.models import Q, Sum, Count, F, ExpressionWrapper, DateTimeField
 from django.forms.models import model_to_dict
+
+from ondoc.plus.models import PlusUser
 from . import serializers
 from django.conf import settings
 import requests, re, json
@@ -337,6 +339,7 @@ class ApplicableCouponsViewSet(viewsets.GenericViewSet):
 
         product_id = input_data.get("product_id")
         lab = input_data.get("lab_id", None)
+        vip_gold_plan = input_data.get("plan_id", None)
         tests = input_data.get("tests", [])
         procedures = input_data.get("procedures", [])
         doctor = input_data.get("doctor_id", None)
@@ -353,9 +356,13 @@ class ApplicableCouponsViewSet(viewsets.GenericViewSet):
             coupon_type = 'doctor'
         elif (product_id and product_id == Order.LAB_PRODUCT_ID) or lab:
             coupon_type = 'lab'
+        elif vip_gold_plan and not vip_gold_plan.is_gold:
+            coupon_type = 'vip'
+        elif vip_gold_plan and vip_gold_plan.is_gold:
+            coupon_type = 'gold'
 
-        if deal_price==0:
-            deal_price=None
+        if deal_price == 0:
+            deal_price = None
 
         coupon_recommender = CouponRecommender(request.user, profile, coupon_type, product_id, coupon_code, cart_item_id)
         filters = dict()
@@ -372,6 +379,8 @@ class ApplicableCouponsViewSet(viewsets.GenericViewSet):
                 doctor_specializations.append(dps.specialization_id)
             filters['doctor_id'] = doctor.id
             filters['doctor_specializations_ids'] = doctor_specializations
+        if coupon_type in ['vip', 'gold']:
+            filters['vip_gold_plan'] = vip_gold_plan
         filters['tests'] = tests
         filters['hospital'] = hospital
         filters['deal_price'] = deal_price
@@ -444,6 +453,7 @@ class CouponDiscountViewSet(viewsets.GenericViewSet):
         hospital = input_data.get("hospital")
         procedures = input_data.get("procedures", [])
         profile = input_data.get("profile")
+        vip_gold_plan = input_data.get("plan")
         cart_item_id = input_data.get('cart_item').id if input_data.get('cart_item') else None
 
         coupon_type = 'both'
@@ -453,6 +463,12 @@ class CouponDiscountViewSet(viewsets.GenericViewSet):
         elif str(product_id) == str(Order.LAB_PRODUCT_ID):
             obj = LabAppointment()
             coupon_type = 'lab'
+        elif str(product_id) == str(Order.VIP_PRODUCT_ID):
+            obj = PlusUser()
+            coupon_type = 'vip'
+        elif str(product_id) == str(Order.GOLD_PRODUCT_ID):
+            obj = PlusUser()
+            coupon_type = 'gold'
 
         coupon_recommender = CouponRecommender(request.user, profile, coupon_type, product_id, coupon_code,
                                                cart_item_id)
@@ -470,6 +486,8 @@ class CouponDiscountViewSet(viewsets.GenericViewSet):
                 doctor_specializations.append(dps.specialization_id)
             filters['doctor_id'] = doctor.id
             filters['doctor_specializations_ids'] = doctor_specializations
+        if coupon_type in ['vip', 'gold']:
+            filters['vip_gold_plan'] = vip_gold_plan
         filters['tests'] = tests
         filters['hospital'] = hospital
         filters['deal_price'] = deal_price
@@ -481,10 +499,10 @@ class CouponDiscountViewSet(viewsets.GenericViewSet):
 
         for coupon in coupons_data:
             if coupon in applicable_coupons:
-                if lab and tests:
-                    total_price = obj.get_applicable_tests_with_total_price_v2(test_ids=tests, lab=lab).get("total_price")
-                    discount += obj.get_discount(coupon, total_price)
-                    continue
+                # if lab and tests:
+                #     total_price = obj.get_applicable_tests_with_total_price_v2(test_ids=tests, lab=lab).get("total_price")
+                #     discount += obj.get_discount(coupon, total_price)
+                #     continue
                 if doctor and hospital and procedures:
                     total_price = obj.get_applicable_procedures_with_total_price_v2(doctor=doctor,
                                                                                     hospital=hospital,

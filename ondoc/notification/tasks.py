@@ -1290,10 +1290,13 @@ def update_coupon_used_count():
     RawSql('''  update coupon set total_used_count= usage_count from
                 (select coupon_id, sum(usage_count) usage_count from
                 (select oac.coupon_id, count(*) usage_count from opd_appointment oa inner join opd_appointment_coupon oac on oa.id = oac.opdappointment_id
-                 where oa.status in (2,3,4,5,7) group by oac.coupon_id
+                where oa.status in (2,3,4,5,7) group by oac.coupon_id
                 union
-                select oac.coupon_id, count(*) usage_count from lab_appointment oa inner join lab_appointment_coupon oac on oa.id = oac.labappointment_id
-                 where oa.status in (2,3,4,5,7) group by oac.coupon_id
+                select lac.coupon_id, count(*) usage_count from lab_appointment la inner join lab_appointment_coupon lac on la.id = lac.labappointment_id
+                where la.status in (2,3,4,5,7) group by lac.coupon_id
+                union
+                select puc.coupon_id, count(*) usage_count from plus_users pu inner join plus_users_coupon puc on pu.id = puc.plususer_id
+                where pu.status in (1,3,4,5,6,7) group by puc.coupon_id
                 ) x group by coupon_id
                 ) y where coupon.id = y.coupon_id ''', []).execute()
 
@@ -1552,16 +1555,18 @@ def send_release_payment_request(self, product_id, appointment_id):
         logger.error("Error in payment release with data - " + json.dumps(req_data) + " with exception - " + str(e))
         self.retry([product_id, appointment_id], countdown=300)
 
-
 @task(bind=True)
 def save_pg_response(self, log_type, order_id, txn_id, response, request, user_id, log_created_at=None, *args, **kwargs):
     try:
         from ondoc.account.mongo_models import PgLogs
-        if response:
-            if not isinstance(response, dict):
-                response = json.loads(response)
-            response.pop('created_at', None)
-        PgLogs.save_pg_response(log_type, order_id, txn_id, response, request, user_id, log_created_at)
+        if order_id.__class__.__name__ == 'list':
+            PgLogs.save_single_pg_response(log_type, order_id, txn_id, response, request, user_id)
+        else:
+            if response:
+                if not isinstance(response, dict):
+                    response = json.loads(response)
+                response.pop('created_at', None)
+            PgLogs.save_pg_response(log_type, order_id, txn_id, response, request, user_id, log_created_at)
     except Exception as e:
         logger.error("Error in saving pg response to mongo database - " + json.dumps(response) + " with exception - " + str(e))
         # self.retry([txn_id, response], countdown=300)
@@ -1571,8 +1576,10 @@ def save_pg_response(self, log_type, order_id, txn_id, response, request, user_i
 def save_payment_status(self, current_status, args):
     try:
         from ondoc.account.models import PaymentProcessStatus
-
-        PaymentProcessStatus.save_payment_status(current_status, args)
+        if args.get('is_single'):
+            PaymentProcessStatus.save_single_payment_status(current_status, args)
+        else:
+            PaymentProcessStatus.save_payment_status(current_status, args)
     except Exception as e:
        logger.error("Error in saving payment status - " + json.dumps(args) + " with exception - " + str(e))
 
@@ -1663,6 +1670,7 @@ def save_matrix_logs(self, id, obj_type, request_data, response):
         from ondoc.doctor.models import OpdAppointment
         from ondoc.insurance.models import UserInsurance, InsuranceLead
         from ondoc.plus.models import PlusUser, PlusLead
+        from ondoc.common.models import GeneralMatrixLeads
 
         object = None
         if obj_type == 'lab_appointment':
@@ -1677,8 +1685,57 @@ def save_matrix_logs(self, id, obj_type, request_data, response):
             object = PlusLead.objects.filter(id=id).first()
         elif obj_type == 'insurance_lead':
             object = InsuranceLead.objects.filter(id=id).first()
+        elif obj_type == 'general_leads':
+            object = GeneralMatrixLeads.objects.filter(id=id).first()
 
         if object:
             MatrixLog.create_matrix_logs(object, request_data, response)
     except Exception as e:
         logger.error("Error in saving matrix logs to mongo database - " + json.dumps(response) + " with exception - " + str(e))
+
+
+@task(bind=True, max_retries=2)
+def process_leads_to_matrix(self, data):
+    from ondoc.common.models import GeneralMatrixLeads
+    from ondoc.common.lead_engine import lead_class_referance
+    from ondoc.plus.models import PlusUser
+    from ondoc.doctor.models import OpdAppointment
+    from ondoc.diagnostic.models import LabAppointment
+    from ondoc.insurance.models import UserInsurance
+
+    try:
+        if not data:
+            raise Exception('Data not received for general matrix leads.')
+
+        id = data.get('id', None)
+        if not id:
+            logger.error("[CELERY ERROR: Incorrect values provided.]")
+            raise ValueError()
+
+        general_lead_obj = GeneralMatrixLeads.objects.filter(id=id).first()
+
+        if not general_lead_obj:
+            raise Exception("GeneralMatrix object could not found against id - " + str(id))
+
+        plus_obj = PlusUser.objects.filter(user__phone_number=general_lead_obj.phone_number).order_by('-id').first()
+        insurance_obj = UserInsurance.objects.filter(user__phone_number=general_lead_obj.phone_number).order_by('-id').first()
+        earlier_date = timezone.now() - timedelta(minutes=10)
+        lab_appointment = LabAppointment.objects.filter(created_at__gte=earlier_date, user__phone_number=general_lead_obj.phone_number).first()
+        opd_appointment = OpdAppointment.objects.filter(created_at__gte=earlier_date, user__phone_number=general_lead_obj.phone_number).first()
+
+        if (plus_obj and plus_obj.is_valid()) or (insurance_obj and insurance_obj.is_valid()):
+            return
+
+        if general_lead_obj.lead_type == 'DROPOFF' and (lab_appointment or opd_appointment):
+            return
+
+        lead_engine_obj = lead_class_referance(general_lead_obj.lead_type, general_lead_obj)
+        success = lead_engine_obj.process_lead()
+
+        if not success:
+            countdown_time = (2 ** self.request.retries) * 60 * 10
+            print(countdown_time)
+            self.retry([data], countdown=countdown_time)
+
+    except Exception as e:
+        logger.error("Error in Celery. Failed pushing General lead to the matrix- " + str(e))

@@ -149,6 +149,7 @@ class OpdAppointmentSerializer(serializers.ModelSerializer):
 
         search_criteria = SearchCriteria.objects.filter(search_key='is_gold').first()
         hosp_is_gold = False
+        is_gold_member = False
         if search_criteria:
             hosp_is_gold = search_criteria.search_value
 
@@ -161,10 +162,15 @@ class OpdAppointmentSerializer(serializers.ModelSerializer):
             if not (int(plus_appointment_mapping.amount) > int(obj.mrp)):
                 vip_amount = int(obj.mrp) - int(plus_appointment_mapping.amount)
 
+        if plus_appointment_mapping and plus_appointment_mapping.plus_user and plus_appointment_mapping.plus_user.plan and plus_appointment_mapping.plus_user.plan.is_gold:
+            is_gold_member = True
+        else:
+            is_gold_member = False
+
         return {
             'is_vip_member': True if obj and obj.plus_plan and obj.plus_plan.plan and not obj.plus_plan.plan.is_gold else False,
             'vip_amount': vip_amount,
-            'is_gold_member': True if plus_appointment_mapping and plus_appointment_mapping.plus_plan and plus_appointment_mapping.plus_plan.is_gold else False,
+            'is_gold_member': is_gold_member,
             'vip_amount_deducted': plus_appointment_mapping.amount if plus_appointment_mapping else 0,
             'covered_under_vip': True if obj and obj.plus_plan else False,
             'extra_charge': plus_appointment_mapping.extra_charge if plus_appointment_mapping else 0,
@@ -193,7 +199,7 @@ class OpdAppointmentSerializer(serializers.ModelSerializer):
     class Meta:
         model = OpdAppointment
         fields = ('id', 'doctor_name', 'hospital_name', 'patient_name', 'patient_image', 'type',
-                  'allowed_action', 'effective_price', 'deal_price', 'status', 'time_slot_start',
+                  'allowed_action', 'effective_price', 'deal_price', 'discount', 'status', 'time_slot_start',
                   'time_slot_end', 'doctor_thumbnail', 'patient_thumbnail', 'display_name', 'invoices', 'reports',
                   'prescription', 'report_files', 'specialization', 'payment_type', 'effective_price', 'vip', 'payment_mode')
 
@@ -288,6 +294,7 @@ class CreateAppointmentSerializer(serializers.Serializer):
     appointment_id = serializers.IntegerField(required=False)
     cod_to_prepaid = serializers.BooleanField(required=False)
     utm_sbi_tags = serializers.JSONField(required=False, default={})
+    plus_plan = serializers.PrimaryKeyRelatedField(queryset=PlusPlans.objects.filter(is_live=True, is_gold=True), required=False)
 
     # procedure_category_ids = serializers.ListField(child=serializers.PrimaryKeyRelatedField(queryset=ProcedureCategory.objects.filter(is_live=True)), required=False, default=[])
     # time_slot_end = serializers.DateTimeField()
@@ -357,23 +364,24 @@ class CreateAppointmentSerializer(serializers.Serializer):
             raise serializers.ValidationError("Doctor is on leave")
 
         data["part_of_integration"] = False
-        if settings.MEDANTA_INTEGRATION_ENABLED and not bool(data.get('from_app')) and doctor_clinic.is_part_of_integration():
-            data["part_of_integration"] = True
-            available_slots = doctor_clinic.get_available_slots(time_slot_start)
-            if not available_slots[date]:
-                logger.error(
-                    "Error 'Invalid Time slot' for opd appointment with data - " + json.dumps(
-                        request.data))
-                raise serializers.ValidationError("Integration - Invalid Time slot")
-        else:
-            if not DoctorClinicTiming.objects.filter(doctor_clinic__doctor=data.get('doctor'),
-                                                     doctor_clinic__hospital=data.get('hospital'),
-                                                     day=time_slot_start.weekday(), start__lte=data.get("start_time"),
-                                                     end__gte=data.get("start_time")).exists():
-                logger.error(
-                    "Error 'Invalid Time slot' for opd appointment with data - " + json.dumps(
-                        request.data))
-                raise serializers.ValidationError("Invalid Time slot")
+
+        # if settings.MEDANTA_INTEGRATION_ENABLED and not bool(data.get('from_app')) and doctor_clinic.is_part_of_integration():
+        #     data["part_of_integration"] = True
+        #     available_slots = doctor_clinic.get_available_slots(time_slot_start)
+        #     if not available_slots[date]:
+        #         logger.error(
+        #             "Error 'Invalid Time slot' for opd appointment with data - " + json.dumps(
+        #                 request.data))
+        #         raise serializers.ValidationError("Integration - Invalid Time slot")
+        # else:
+        if not DoctorClinicTiming.objects.filter(doctor_clinic__doctor=data.get('doctor'),
+                                                 doctor_clinic__hospital=data.get('hospital'),
+                                                 day=time_slot_start.weekday(), start__lte=data.get("start_time"),
+                                                 end__gte=data.get("start_time")).exists():
+            logger.error(
+                "Error 'Invalid Time slot' for opd appointment with data - " + json.dumps(
+                    request.data))
+            raise serializers.ValidationError("Invalid Time slot")
 
         # if OpdAppointment.objects.filter(status__in=ACTIVE_APPOINTMENT_STATUS, doctor=data.get('doctor'), profile=data.get('profile')).exists():
         #     raise serializers.ValidationError('A previous appointment with this doctor already exists. Cancel it before booking new Appointment.')
@@ -1671,7 +1679,7 @@ class AppointmentRetrieveSerializer(OpdAppointmentSerializer):
     class Meta:
         model = OpdAppointment
         fields = ('id', 'patient_image', 'patient_name', 'type', 'profile', 'otp', 'is_rated', 'rating_declined',
-                  'allowed_action', 'effective_price', 'deal_price', 'status', 'time_slot_start', 'time_slot_end',
+                  'allowed_action', 'effective_price', 'deal_price', 'discount', 'status', 'time_slot_start', 'time_slot_end',
                   'doctor', 'hospital', 'allowed_action', 'doctor_thumbnail', 'patient_thumbnail', 'procedures', 'mrp',
                   'insurance', 'invoices', 'cancellation_reason', 'payment_type', 'display_name', 'reports', 'prescription',
                   'report_files', 'vip', 'appointment_via_sbi')
@@ -1720,7 +1728,7 @@ class AppointmentRetrieveSerializer(OpdAppointmentSerializer):
             'is_vip_member': True if obj and obj.plus_plan else False,
             'vip_amount': vip_amount,
             'vip_amount_deducted': plus_appointment_mapping.amount if plus_appointment_mapping else 0,
-            'is_gold_member': True if plus_appointment_mapping and plus_appointment_mapping.plus_plan and plus_appointment_mapping.plus_plan.is_gold else False,
+            'is_gold_member': True if plus_appointment_mapping and plus_appointment_mapping.plus_user and plus_appointment_mapping.plus_user.plan and plus_appointment_mapping.plus_user.plan.is_gold else False,
             'covered_under_vip': True if obj and obj.plus_plan else False,
             'extra_charge': plus_appointment_mapping.extra_charge if plus_appointment_mapping else 0,
             'hosp_is_gold': hosp_is_gold
@@ -2911,6 +2919,7 @@ class TopCommonHospitalForIpdProcedureSerializer(serializers.ModelSerializer):
     hospital_services = serializers.SerializerMethodField()
     service_count = serializers.SerializerMethodField()
     hospital_image = serializers.SerializerMethodField()
+    vip_percentage = serializers.SerializerMethodField()
 
 
     class Meta:
@@ -2918,7 +2927,13 @@ class TopCommonHospitalForIpdProcedureSerializer(serializers.ModelSerializer):
         fields = ('id', 'name', 'distance', 'certifications', 'bed_count', 'logo', 'avg_rating',
                   'count_of_insurance_provider', 'multi_speciality', 'address', 'short_address','open_today',
                   'insurance_provider', 'established_in', 'long', 'lat', 'url', 'locality_url', 'name_city', 'operational_since',
-                  'h1_title', 'is_ipd_hospital', 'seo_title', 'network_id', 'hospital_services', 'service_count', 'hospital_image', 'priority')
+                  'h1_title', 'is_ipd_hospital', 'seo_title', 'network_id', 'hospital_services', 'service_count', 'hospital_image', 'priority',
+                  'vip_percentage')
+
+    def get_vip_percentage(self, obj):
+        if self.context.get('plan'):
+            return obj.percentage
+        return 0
 
     def get_name_city(self, obj):
         result = None

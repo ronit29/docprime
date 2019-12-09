@@ -72,12 +72,12 @@ def create_visit_to_mongo(self, data):
                 resp['error'] = "Error Processing Event Data!"
                 print(e)
         else:
-            error_message = "Couldn't save event without data - " + str(data) + " For visit/visitor - " + str(visit_id) + " / " + str(visitor_id)
+            error_message = "Couldn't save event without data - " + str(req_data) + " For visit/visitor - " + str(visit_id) + " / " + str(visitor_id)
             resp['error'] = error_message
 
         if not "error" in resp:
             if settings.MONGO_STORE:
-                modify_visit(event_name, visit_id, visitor_id, data, userAgent, track_mongo_models.TrackingVisit, track_mongo_models.TrackingVisitor)
+                modify_visit(event_name, visit_id, visitor_id, req_data, userAgent, track_mongo_models.TrackingVisit, track_mongo_models.TrackingVisitor)
     except Exception as e:
         resp['error'] = "Error Processing Event Data!"
         print(e)
