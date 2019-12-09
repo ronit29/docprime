@@ -1742,7 +1742,7 @@ def process_leads_to_matrix(self, data):
 
 
 @task()
-def opd_send_notification_before_appointment(appointment_id):
+def opd_send_notification_before_appointment(appointment_id, time):
     from ondoc.doctor.models import OpdAppointment
     from ondoc.communications.models import OpdNotification
     try:
