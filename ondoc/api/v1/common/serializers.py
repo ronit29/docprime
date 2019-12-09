@@ -143,7 +143,7 @@ class OpdPriceUtilitySerializer(serializers.Serializer):
     def validate(self, data):
 
         if not data.get('gold_vip_plan'):
-            data['gold_vip_plan'] = PlusPlans.objects.filter(is_live=True, enabled=True, is_gold=True)
+            data['gold_vip_plan'] = PlusPlans.objects.filter(is_live=True, enabled=True, is_gold=True, is_retail=True)
 
         doctor_clinic = data.get('doctor').doctor_clinics.filter(hospital=data.get('hospital'), enabled=True).first()
         if not doctor_clinic:
@@ -179,6 +179,6 @@ class LabPriceUtilitySerializer(serializers.Serializer):
     def validate(self, data):
 
         if not data.get('gold_vip_plan'):
-            data['gold_vip_plan'] = PlusPlans.objects.filter(is_live=True, enabled=True, is_gold=True)
+            data['gold_vip_plan'] = PlusPlans.objects.filter(is_live=True, enabled=True, is_gold=True, is_retail=True)
 
         return data

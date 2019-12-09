@@ -197,12 +197,12 @@ class PlusPlans(auth_model.TimeStampedModel, LiveMixin):
         if not max_price_engine:
             return 0
         max_price = max_price_engine.get_price(price_data)
-        if not max_price or not min_price or max_price <= 0 or min_price <= 0:
+        if max_price is None or min_price is None or max_price < 0 or min_price < 0:
             return 0
         convenience_min_amount_obj, convenience_max_amount_obj, convenience_percentage_obj = default_plan.get_convenience_object(type)
         min_cap = int(convenience_min_amount_obj.value) if convenience_min_amount_obj else 0
         max_cap = int(convenience_max_amount_obj.value) if convenience_max_amount_obj else 0
-        if not min_cap or not max_cap or min_cap <= 0 or max_cap <= 0:
+        if min_cap is None or max_cap is None or min_cap <= 0 or max_cap <= 0:
             return 0
         convenience_amount_list = []
         price_diff = int(max_price) - (min_price)

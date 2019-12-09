@@ -43,7 +43,7 @@ from django.template.loader import render_to_string
 from ondoc.procedure.models import IpdProcedure, IpdProcedureLead
 from . import serializers
 from ondoc.common.models import Cities, PaymentOptions, UserConfig, DeviceDetails, LastUsageTimestamp, \
-    AppointmentHistory, SponsorListingURL
+    AppointmentHistory, SponsorListingURL, GeneralMatrixLeads
 from ondoc.common.utils import send_email, send_sms
 from ondoc.authentication.backends import JWTAuthentication, WhatsappAuthentication
 from django.core.files.uploadedfile import SimpleUploadedFile, TemporaryUploadedFile, InMemoryUploadedFile
@@ -1398,3 +1398,13 @@ class AppointmentUtilityViewSet(viewsets.GenericViewSet):
                     resp['vip_plans'].append(res)
 
         return Response(data=resp)
+
+
+class GeneralLeadViewSet(viewsets.GenericViewSet):
+    authentication_classes = (JWTAuthentication,)
+    # permission_classes = (IsAuthenticated,)
+
+    def create_lead(self, request):
+        obj = GeneralMatrixLeads.create_lead(request)
+        return Response({'status': True if obj else False})
+
