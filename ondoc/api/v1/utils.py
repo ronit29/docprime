@@ -589,7 +589,6 @@ def payment_details(request, order):
     else:
         uemail = "dummyemail@docprime.com"
     base_url = "https://{}".format(request.get_host())
-    # base_url = 'https://webhook.site/0f0c0af8-d155-440d-b5c4-ce486574e14d'
     surl = base_url + '/api/v1/user/transaction/save'
     furl = base_url + '/api/v1/user/transaction/save'
     isPreAuth = '1'
