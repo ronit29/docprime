@@ -239,8 +239,8 @@ class Order(TimeStampedModel):
         from ondoc.plus.models import PlusAppointmentMapping, TempPlusUser
 
         appointment_data = self.action_data
-        consumer_account = ConsumerAccount.objects.get_or_create(user=appointment_data['user'])
-        consumer_account = ConsumerAccount.objects.select_for_update().get(user=appointment_data['user'])
+        consumer_account = ConsumerAccount.objects.get_or_create(user_id=appointment_data['user'])
+        consumer_account = ConsumerAccount.objects.select_for_update().get(user_id=appointment_data['user'])
 
         # skip if order already processed, except if appointment is COD and can be converted to prepaid
         cod_to_prepaid_app = None
