@@ -162,6 +162,11 @@ class NotificationAction:
 
     IPDIntimateEmailNotification = 301
 
+    # Not for Medanta and Artimis Hospitals
+    PROVIDER_APPOINTMENT_CONFIRMATION_ONLINE_PAYMENT = 321
+    PROVIDER_APPOINTMENT_CONFIRMATION_PAY_AT_CLINIC = 322
+    PROVIDER_COMPLETION = 323
+
     NOTIFICATION_TYPE_CHOICES = (
         (APPOINTMENT_ACCEPTED, "Appointment Accepted"),
         (APPOINTMENT_CANCELLED, "Appointment Cancelled"),
