@@ -2885,6 +2885,7 @@ class SbiGUserViewset(GenericViewSet):
 
 class PGRefundViewSet(viewsets.GenericViewSet):
 
+    permission_classes = (utils.IsPGRequest, )
     @transaction.atomic()
     def save_pg_refund(self, request):
         response = {'status': 0}
