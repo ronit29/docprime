@@ -654,6 +654,7 @@ class WHTSAPPNotification:
             data.append(datetime.strftime(aware_time_zone(self.context.get('instance').time_slot_start), '%d-%m-%Y %H:%M'))
             data.append(self.context.get('instance').hospital.name)
             data.append(self.context.get('patient_name'))
+            data.append('not_available')
 
         elif notification_type == NotificationAction.PROVIDER_APPOINTMENT_CONFIRMATION_PAY_AT_CLINIC:
             body_template = "appointment_completion_cod"
@@ -666,6 +667,7 @@ class WHTSAPPNotification:
                 data.append(str(self.context.get('cod_amount')))
             else:
                 data.append(str(self.context.get('instance').effective_price))
+            data.append('not_available')
 
         elif notification_type == NotificationAction.APPOINTMENT_ACCEPTED:
             body_template = "appointment_accepted_opd_patient"
@@ -1756,7 +1758,9 @@ class OpdNotification(Notification):
                                  NotificationAction.OPD_FEEDBACK_AFTER_APPOINTMENT,
                                  NotificationAction.COD_TO_PREPAID,
                                  NotificationAction.COD_TO_PREPAID_REQUEST,
-                                 NotificationAction.SEND_LENSFIT_COUPON
+                                 NotificationAction.SEND_LENSFIT_COUPON,
+                                 NotificationAction.PROVIDER_APPOINTMENT_CONFIRMATION_PAY_AT_CLINIC,
+                                 NotificationAction.PROVIDER_APPOINTMENT_CONFIRMATION_ONLINE_PAYMENT
                                  ]:
             receivers.append(instance.user)
         elif notification_type in [NotificationAction.APPOINTMENT_RESCHEDULED_BY_PATIENT,
