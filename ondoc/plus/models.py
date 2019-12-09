@@ -555,7 +555,8 @@ class PlusUser(auth_model.TimeStampedModel, RefundMixin, TransactionMixin, Coupo
             "plus_user_id": None,
             "cover_under_vip": "",
             "vip_amount_deducted": 0,
-            "amount_to_be_paid": mrp
+            "amount_to_be_paid": mrp,
+            "vip_convenience_amount": 0
         }
 
         # discount calculation on mrp
@@ -589,6 +590,7 @@ class PlusUser(auth_model.TimeStampedModel, RefundMixin, TransactionMixin, Coupo
             # price_data = {"mrp": int(price_data.get('mrp')), "deal_price": int(deal_price),
             #               "cod_deal_price": int(cod_deal_price),
             #               "fees": int(fees)}
+            response_dict['vip_convenience_amount'] = PlusPlans.get_default_convenience_amount(price_data, "DOCTOR", plus_user.plan)
             price_engine = get_price_reference(plus_user, "DOCTOR")
             if not price_engine:
                 price = int(price_data.get('mrp'))
@@ -635,6 +637,8 @@ class PlusUser(auth_model.TimeStampedModel, RefundMixin, TransactionMixin, Coupo
                 # price_data = {"mrp": int(price_data.get('mrp')), "deal_price": int(price_data.get('deal_price')),
                 #               "cod_deal_price": int(price_data.get('deal_price')),
                 #               "fees": int(price_data.get('fees'))}
+                response_dict['vip_convenience_amount'] = PlusPlans.get_default_convenience_amount(price_data, "LABTEST",
+                                                                                                   plus_user.plan)
                 price_engine = get_price_reference(plus_user, "LABTEST")
                 if not price_engine:
                     price = int(price_data.get('mrp'))
@@ -678,9 +682,11 @@ class PlusUser(auth_model.TimeStampedModel, RefundMixin, TransactionMixin, Coupo
             "is_vip_member": True,
             "cover_under_vip": False,
             "vip_amount": 0,
-            "plus_user_id": None
+            "plus_user_id": None,
+            "vip_convenience_amount": 0
         }
         vip_valid_dict = self.validate_plus_appointment(appointment_data)
+        vip_data_dict['vip_convenience_amount'] = vip_valid_dict.get('vip_convenience_amount')
         if not vip_valid_dict.get('cover_under_vip'):
             return vip_data_dict
 
