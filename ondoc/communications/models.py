@@ -654,7 +654,8 @@ class WHTSAPPNotification:
             data.append(datetime.strftime(aware_time_zone(self.context.get('instance').time_slot_start), '%d-%m-%Y %H:%M'))
             data.append(self.context.get('instance').hospital.name)
             data.append(self.context.get('patient_name'))
-            data.append('not_available')
+            context, click_login_token_obj = SMSNotification.save_token_to_context(self.context, user)
+            data.append(click_login_token_obj)
 
         elif notification_type == NotificationAction.PROVIDER_APPOINTMENT_CONFIRMATION_PAY_AT_CLINIC:
             body_template = "appointment_completion_cod"
@@ -667,7 +668,8 @@ class WHTSAPPNotification:
                 data.append(str(self.context.get('cod_amount')))
             else:
                 data.append(str(self.context.get('instance').effective_price))
-            data.append('not_available')
+            context, click_login_token_obj = SMSNotification.save_token_to_context(self.context, user)
+            data.append(click_login_token_obj)
 
         elif notification_type == NotificationAction.APPOINTMENT_ACCEPTED:
             body_template = "appointment_accepted_opd_patient"
