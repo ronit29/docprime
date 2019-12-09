@@ -1670,6 +1670,7 @@ def save_matrix_logs(self, id, obj_type, request_data, response):
         from ondoc.doctor.models import OpdAppointment
         from ondoc.insurance.models import UserInsurance, InsuranceLead
         from ondoc.plus.models import PlusUser, PlusLead
+        from ondoc.common.models import GeneralMatrixLeads
 
         object = None
         if obj_type == 'lab_appointment':
@@ -1684,8 +1685,57 @@ def save_matrix_logs(self, id, obj_type, request_data, response):
             object = PlusLead.objects.filter(id=id).first()
         elif obj_type == 'insurance_lead':
             object = InsuranceLead.objects.filter(id=id).first()
+        elif obj_type == 'general_leads':
+            object = GeneralMatrixLeads.objects.filter(id=id).first()
 
         if object:
             MatrixLog.create_matrix_logs(object, request_data, response)
     except Exception as e:
         logger.error("Error in saving matrix logs to mongo database - " + json.dumps(response) + " with exception - " + str(e))
+
+
+@task(bind=True, max_retries=2)
+def process_leads_to_matrix(self, data):
+    from ondoc.common.models import GeneralMatrixLeads
+    from ondoc.common.lead_engine import lead_class_referance
+    from ondoc.plus.models import PlusUser
+    from ondoc.doctor.models import OpdAppointment
+    from ondoc.diagnostic.models import LabAppointment
+    from ondoc.insurance.models import UserInsurance
+
+    try:
+        if not data:
+            raise Exception('Data not received for general matrix leads.')
+
+        id = data.get('id', None)
+        if not id:
+            logger.error("[CELERY ERROR: Incorrect values provided.]")
+            raise ValueError()
+
+        general_lead_obj = GeneralMatrixLeads.objects.filter(id=id).first()
+
+        if not general_lead_obj:
+            raise Exception("GeneralMatrix object could not found against id - " + str(id))
+
+        plus_obj = PlusUser.objects.filter(user__phone_number=general_lead_obj.phone_number).order_by('-id').first()
+        insurance_obj = UserInsurance.objects.filter(user__phone_number=general_lead_obj.phone_number).order_by('-id').first()
+        earlier_date = timezone.now() - timedelta(minutes=10)
+        lab_appointment = LabAppointment.objects.filter(created_at__gte=earlier_date, user__phone_number=general_lead_obj.phone_number).first()
+        opd_appointment = OpdAppointment.objects.filter(created_at__gte=earlier_date, user__phone_number=general_lead_obj.phone_number).first()
+
+        if (plus_obj and plus_obj.is_valid()) or (insurance_obj and insurance_obj.is_valid()):
+            return
+
+        if general_lead_obj.lead_type == 'DROPOFF' and (lab_appointment or opd_appointment):
+            return
+
+        lead_engine_obj = lead_class_referance(general_lead_obj.lead_type, general_lead_obj)
+        success = lead_engine_obj.process_lead()
+
+        if not success:
+            countdown_time = (2 ** self.request.retries) * 60 * 10
+            print(countdown_time)
+            self.retry([data], countdown=countdown_time)
+
+    except Exception as e:
+        logger.error("Error in Celery. Failed pushing General lead to the matrix- " + str(e))
