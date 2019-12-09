@@ -338,46 +338,12 @@ class AvailableLabTestPackageSerializer(serializers.ModelSerializer):
 
         return resp
 
-        # # plus_obj = user.active_plus_user if not user.is_anonymous and user.is_authenticated else None
-        # utilization = plus_obj.get_utilization if plus_obj else {}
-        # package_amount_balance = utilization.get('available_package_amount', 0)
-        #
-        # if plus_obj and lab_obj and obj and lab_obj.enabled_for_plus_plans and obj.mrp:
-        #     utilization_criteria, can_be_utilized = plus_obj.can_package_be_covered_in_vip(obj)
-        #     if can_be_utilized:
-        #         resp['covered_under_vip'] = True
-        #     else:
-        #         return resp
-        #
-        #     if utilization_criteria == UtilizationCriteria.COUNT:
-        #         resp['vip_amount'] = 0
-        #     else:
-        #         if obj.mrp <= package_amount_balance:
-        #             resp['vip_amount'] = 0
-        #         else:
-        #             resp['vip_amount'] = obj.mrp - package_amount_balance
 
 
     def get_insurance(self, obj):
         request = self.context.get("request")
         lab_obj = self.context.get("lab")
         resp = Lab.get_insurance_details(request.user)
-        # insurance_threshold = InsuranceThreshold.objects.all().order_by('-lab_amount_limit').first()
-        # resp = {
-        #     'is_insurance_covered': False,
-        #     'insurance_threshold_amount': insurance_threshold.lab_amount_limit if insurance_threshold else 5000,
-        #     'is_user_insured': False
-        # }
-        # if request:
-        #     logged_in_user = request.user
-        #     if logged_in_user.is_authenticated and not logged_in_user.is_anonymous:
-        #         user_insurance = logged_in_user.purchased_insurance.filter().order_by('id').last()
-        #         if user_insurance and user_insurance.is_valid():
-        #             insurance_threshold = user_insurance.insurance_plan.threshold.filter().first()
-        #             if insurance_threshold:
-        #                 resp['insurance_threshold_amount'] = 0 if insurance_threshold.lab_amount_limit is None else \
-        #                     insurance_threshold.lab_amount_limit
-        #                 resp['is_user_insured'] = True
 
         if lab_obj.is_enabled_for_insurance and obj.mrp is not None and resp['insurance_threshold_amount'] is not None \
                 and obj.mrp <= resp['insurance_threshold_amount']:

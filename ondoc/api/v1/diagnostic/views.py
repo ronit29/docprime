@@ -2022,14 +2022,22 @@ class LabList(viewsets.ReadOnlyModelViewSet):
         if not lab_obj:
             return Response(status=status.HTTP_404_NOT_FOUND)
 
+        utilization = {}
+        vip_object = None
         user = request.user
-        if profile_id and user and user.is_authenticated:
-            profile = UserProfile.objects.filter(pk=profile_id).first()
-            if not profile:
-                return Response(status=status.HTTP_404_NOT_FOUND)
+        if user and user.is_authenticated:
 
-            if not profile in user.profiles.all():
-                return Response(status=status.HTTP_400_BAD_REQUEST)
+            if profile_id:
+                profile = UserProfile.objects.filter(pk=profile_id).first()
+                if not profile:
+                    return Response(status=status.HTTP_404_NOT_FOUND)
+
+                if not profile in user.profiles.all():
+                    return Response(status=status.HTTP_400_BAD_REQUEST)
+
+            vip_object = user.active_plus_user
+            if vip_object and not vip_object.plan.is_gold:
+                utilization = vip_object.get_utilization
 
         if not entity:
             entity = EntityUrls.objects.filter(entity_id=lab_id,
@@ -2109,6 +2117,8 @@ class LabList(viewsets.ReadOnlyModelViewSet):
 
         test_serializer_data = test_serializer.data
         is_prescription_needed = False
+        deep_utilization = copy.deepcopy(utilization)
+
         if request.user and request.user.is_authenticated:
             insurance = request.user.active_insurance
             if insurance and test_serializer_data:
@@ -2129,7 +2139,36 @@ class LabList(viewsets.ReadOnlyModelViewSet):
         temp_data['lab_timing'], temp_data["lab_timing_data"] = lab_timing, lab_timing_data
         temp_data['total_test_count'] = total_test_count
 
-        # disable home pickup for insured customers if lab charges home collection
+        if vip_object and deep_utilization:
+            counter = 0
+            for single_test_serializer_data in temp_data['tests']:
+                price_data = {"mrp": single_test_serializer_data.get('mrp'), "deal_price": single_test_serializer_data.get('deal_price'), "cod_deal_price": single_test_serializer_data.get('deal_price'), "fees": single_test_serializer_data.get('agreed_price')}
+
+                entity = "LABTEST" if not single_test_serializer_data.get('is_package') else "PACKAGE"
+                price_engine = get_price_reference(vip_object, entity)
+                if not price_engine:
+                    price = Decimal(single_test_serializer_data.get('mrp'))
+                else:
+                    price = price_engine.get_price(price_data)
+
+                engine = get_class_reference(vip_object, entity)
+                if engine:
+                    engine_response = engine.validate_booking_entity(cost=price, id=single_test_serializer_data.get('test_id'),
+                                                   mrp=Decimal(single_test_serializer_data.get('mrp')),
+                                                   deal_price=single_test_serializer_data.get('deal_price'),
+                                                   utilization=deep_utilization)
+
+                    single_test_serializer_data['vip']['covered_under_vip'] = engine_response['is_covered']
+                    single_test_serializer_data['vip']['vip_amount'] = engine_response['amount_to_be_paid']
+
+                    if engine_response['is_covered'] and engine_response['vip_amount_deducted']:
+                        engine.update_utilization(deep_utilization, engine_response['vip_amount_deducted'])
+
+                    temp_data['tests'][counter] = single_test_serializer_data
+
+                counter = counter + 1
+
+    # disable home pickup for insured customers if lab charges home collection
         if request.user and request.user.is_authenticated and temp_data.get('lab'):
             active_insurance = request.user.active_insurance
             threshold = None
