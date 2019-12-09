@@ -1012,7 +1012,7 @@ def get_corporate_price_reference(obj, entity):
     if entity not in ['DOCTOR', 'LABTEST'] or price_criteria not in PriceCriteria.availabilities():
         return None
     class_reference = corporate_price_criteria_class_mapping[entity][price_criteria]
-    return class_reference
+    return class_reference(obj)
 
 
 def get_max_convenience_reference(plan, entity):
