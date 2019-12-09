@@ -270,7 +270,7 @@ class LabtestAmountCount(AbstractCriteria):
         if (total_count <= 0 and total_amount_left > 0) or (total_count > 0 and total_count_left > 0 and total_amount_left > 0):
             is_covered = True
             if plan.is_corporate:
-                corporate_cost_engine = get_corporate_price_reference(self.plus_obj, "LAB")
+                corporate_cost_engine = get_corporate_price_reference(self.plus_obj, "LABTEST")
                 if not corporate_cost_engine:
                     return resp
                 cost = corporate_cost_engine.get_price(price_data)
