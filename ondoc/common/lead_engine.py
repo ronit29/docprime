@@ -121,7 +121,7 @@ class DropOff(AbstractLead):
             "UTMMedium": request_data.get('source', {}).get('utm_medium', ''),
             "Name": user.full_name if user else 'none',
             "UtmSource": request_data.get('source', {}).get('utm_source', ''),
-            "ExitPointUrl": ''
+            "ExitPointUrl": request_data.get('exitpoint_url', '')
         }
 
         return data
