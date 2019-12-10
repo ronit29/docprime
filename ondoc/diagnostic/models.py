@@ -2157,12 +2157,12 @@ class LabAppointment(TimeStampedModel, CouponsMixin, LabAppointmentInvoiceMixin,
         if old_instance and old_instance.status != self.COMPLETED and self.status == self.COMPLETED:
             self.check_merchant_payout_action()
 
-        if (self.status == self.BOOKED and old_instance and old_instance.status != self.BOOKED) or (old_instance and self.status==self.BOOKED):
-            try:
-                notification_tasks.lab_send_notification_before_appointment.apply_async((self.id, self.time_slot_start.timestamp(),),
-                    eta=self.time_slot_start - datetime.timedelta(minutes=settings.TIME_BEFORE_APPOINTMENT_TO_SEND_NOTIFICATION), )
-            except Exception as e:
-                logger.error(str(e))
+        # if (self.status == self.BOOKED and old_instance and old_instance.status != self.BOOKED) or (old_instance and self.status==self.BOOKED):
+        #     try:
+        #         notification_tasks.lab_send_notification_before_appointment.apply_async((self.id, self.time_slot_start.timestamp(),),
+        #             eta=self.time_slot_start - datetime.timedelta(minutes=settings.TIME_BEFORE_APPOINTMENT_TO_SEND_NOTIFICATION), )
+        #     except Exception as e:
+        #         logger.error(str(e))
         # Do not delete below commented code
         # try:
         #     prev_app_dict = {'id': self.id,
