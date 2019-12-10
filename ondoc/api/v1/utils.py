@@ -588,6 +588,12 @@ def payment_details(request, order):
         uemail = user.email
     else:
         uemail = "dummyemail@docprime.com"
+
+    print('===========================')
+    print(request)
+    print(request.get_host())
+    print('===========================')
+
     base_url = "https://{}".format(request.get_host())
     # base_url = 'https://webhook.site/0f0c0af8-d155-440d-b5c4-ce486574e14d'
     surl = base_url + '/api/v1/user/transaction/save'
