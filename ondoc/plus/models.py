@@ -555,7 +555,8 @@ class PlusUser(auth_model.TimeStampedModel, RefundMixin, TransactionMixin, Coupo
             "plus_user_id": None,
             "cover_under_vip": "",
             "vip_amount_deducted": 0,
-            "amount_to_be_paid": mrp
+            "amount_to_be_paid": mrp,
+            "convenience_charge": 0
         }
 
         # discount calculation on mrp
@@ -602,14 +603,17 @@ class PlusUser(auth_model.TimeStampedModel, RefundMixin, TransactionMixin, Coupo
             doctor = appointment_data['doctor']
             hospital = appointment_data['hospital']
             if doctor.enabled_for_online_booking and hospital.enabled_for_online_booking and \
-                                        hospital.enabled_for_prepaid and hospital.is_enabled_for_plus_plans() and \
-                                        doctor.enabled_for_plus_plans:
+                    hospital.enabled_for_prepaid and hospital.is_enabled_for_plus_plans() and \
+                    doctor.enabled_for_plus_plans:
 
                 # engine_response = engine.validate_booking_entity(cost=mrp, utilization=kwargs.get('utilization'))
                 engine_response = engine.validate_booking_entity(cost=price, utilization=kwargs.get('utilization'), mrp=mrp, deal_price=deal_price)
 
                 # discount calculation on amount to be paid
                 amount_to_be_paid = engine_response.get('amount_to_be_paid', mrp)
+                convenience_charge = engine_response.get('convenience_charge', 0)
+                amount_to_be_paid += convenience_charge
+                response_dict['convenience_charge'] = convenience_charge
                 response_dict['amount_to_be_paid'] = amount_to_be_paid
                 coupon_discount, coupon_cashback, coupon_list, random_coupon_list = Coupon.get_total_deduction(
                     appointment_data, amount_to_be_paid)
@@ -653,6 +657,9 @@ class PlusUser(auth_model.TimeStampedModel, RefundMixin, TransactionMixin, Coupo
 
                     # discount calculation on amount to be paid
                     amount_to_be_paid = engine_response.get('amount_to_be_paid', final_price)
+                    convenience_charge = engine_response.get('convenience_charge', 0)
+                    amount_to_be_paid += convenience_charge
+                    response_dict['convenience_charge'] = convenience_charge
                     coupon_discount, coupon_cashback, coupon_list, random_coupon_list = Coupon.get_total_deduction(
                         appointment_data, amount_to_be_paid)
                     if coupon_discount >= amount_to_be_paid:
