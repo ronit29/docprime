@@ -477,16 +477,24 @@ def single_booking_payment_details(request, orders):
 
     payment_required = True
     user = request.user
+    is_sbig = False
     if user.email:
         uemail = user.email
     else:
         uemail = "dummyemail@docprime.com"
+
     if request.data and request.data.get('utm_sbi_tags') and request.data.get('utm_sbi_tags').get('utm_source') == 'sbi_utm':
+        is_sbig = True
+
+    if is_sbig:
         base_url = settings.SBIG_BASE_URL
+        surl = base_url + '/api/v1/user/transaction/save?sbig=true'
+        furl = base_url + '/api/v1/user/transaction/save?sbig=true'
     else:
         base_url = "https://{}".format(request.get_host())
-    surl = base_url + '/api/v1/user/transaction/save'
-    furl = base_url + '/api/v1/user/transaction/save'
+        surl = base_url + '/api/v1/user/transaction/save'
+        furl = base_url + '/api/v1/user/transaction/save'
+
     profile = user.get_default_profile()
     profile_name = ""
     paytmMsg = ''
@@ -587,17 +595,24 @@ def payment_details(request, order):
 
     payment_required = True
     user = request.user
+    is_sbig = False
     if user.email:
         uemail = user.email
     else:
         uemail = "dummyemail@docprime.com"
 
     if request.data and request.data.get('utm_sbi_tags') and request.data.get('utm_sbi_tags').get('utm_source') == 'sbi_utm':
+        is_sbig = True
+
+    if is_sbig:
         base_url = settings.SBIG_BASE_URL
+        surl = base_url + '/api/v1/user/transaction/save?sbig=true'
+        furl = base_url + '/api/v1/user/transaction/save?sbig=true'
     else:
         base_url = "https://{}".format(request.get_host())
-    surl = base_url + '/api/v1/user/transaction/save'
-    furl = base_url + '/api/v1/user/transaction/save'
+        surl = base_url + '/api/v1/user/transaction/save'
+        furl = base_url + '/api/v1/user/transaction/save'
+
     isPreAuth = '1'
     profile = user.get_default_profile()
     profile_name = ""
