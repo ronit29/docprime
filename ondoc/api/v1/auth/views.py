@@ -2853,9 +2853,11 @@ class MatrixUserViewset(GenericViewSet):
 
 
 class ExternalLoginViewSet(GenericViewSet):
+    SBIG = 1
+    BAGIC = 2
 
     @transaction.atomic()
-    def get_external_login_response(self, request):
+    def get_external_login_response(self, request, ext_type=0):
         from django.http import JsonResponse
         response = {'login': 0}
         if request.method != 'POST':
@@ -2870,7 +2872,11 @@ class ExternalLoginViewSet(GenericViewSet):
         if not token_object or not user_data:
             return Response({'error': 'Unauthorise'}, status=status.HTTP_400_BAD_REQUEST)
 
-        base_landing_url = settings.BASE_URL + '/sms/booking?token={}'.format(token_object['token'].decode("utf-8"))
+        base_url = settings.BASE_URL
+        if ext_type == 1:
+            base_url = settings.SBIG_BASE_URL
+
+        base_landing_url = base_url + '/sms/booking?token={}'.format(token_object['token'].decode("utf-8"))
         redirect_url = 'lab' if redirect_type == 'lab' else 'opd'
         callback_url = base_landing_url + "&callbackurl={}".format(redirect_url)
         docprime_login_url = generate_short_url(callback_url)
@@ -2887,7 +2893,8 @@ class BajajAllianzUserViewset(GenericViewSet):
 
     @transaction.atomic()
     def user_login_via_bagic(self, request):
-        response = ExternalLoginViewSet().get_external_login_response(request)
+        ext_type = ExternalLoginViewSet.BAGIC
+        response = ExternalLoginViewSet().get_external_login_response(request, ext_type)
         return response
 
 
@@ -2896,7 +2903,8 @@ class SbiGUserViewset(GenericViewSet):
 
     @transaction.atomic()
     def user_login_via_sbig(self, request):
-        response = ExternalLoginViewSet().get_external_login_response(request)
+        ext_type = ExternalLoginViewSet.SBIG
+        response = ExternalLoginViewSet().get_external_login_response(request, ext_type)
         return response
 
 
