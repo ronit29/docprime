@@ -209,6 +209,7 @@ class PlusMemberListSerializer(serializers.Serializer):
     document_ids = serializers.ListField(required=False, allow_null=True, child=PlusMembersDocumentSerializer())
     is_primary_user = serializers.BooleanField(required=False, default=False)
     gender = serializers.ChoiceField(choices=UserProfile.GENDER_CHOICES, required=False, allow_null=True, allow_blank=True)
+    phone_number = serializers.CharField(max_length=10, required=False, allow_blank=True, allow_null=True)
 
 class PlusMembersSerializer(serializers.Serializer):
     members = serializers.ListSerializer(child=PlusMemberListSerializer())

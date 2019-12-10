@@ -878,9 +878,10 @@ class PlusUser(auth_model.TimeStampedModel, RefundMixin, TransactionMixin, Coupo
                 profile = profile.id
         # Create Profile if not exist with name or not exist in profile id from request
         else:
+            phone_number = member.get('phone_number') if member.get('phone_number') else user.phone_number
             data = {'name': name, 'email': member.get('email'), 'user_id': user.id,
                     'dob': member.get('dob'), 'is_default_user': False, 'is_otp_verified': False,
-                    'phone_number': user.phone_number, 'gender': member.get('gender')}
+                    'phone_number': phone_number, 'gender': member.get('gender')}
             # if member['is_primary_user']:
             #     data['is_default_user'] = True
             profile_obj = UserProfile.objects.filter(user_id=user.id).first()
@@ -1742,6 +1743,7 @@ class PlusUserUpload(auth_model.TimeStampedModel):
         members_dict['dob'] = datetime.datetime.strptime(member['dob'], '%Y-%m-%d') if member['dob'] else ''
         members_dict['gender'] = gender
         members_dict['relation'] = member.get('relation', '')
+        members_dict['phone_number'] = member.get('phone_number', None)
         if not primary and not member.get('email', ''):
             members_dict['email'] = primary_member_data['email']
         else:
@@ -1763,6 +1765,9 @@ class PlusUserUpload(auth_model.TimeStampedModel):
         if not plan.is_corporate or plan.is_retail:
             raise Exception("Selected Plan is not belongs to Corporate or belongs to Retail plan, "
                             "Please select correct plan")
+        members_count = len(excel_data)
+        if int(plan.total_allowed_members) < members_count:
+            raise Exception("Total members is greater than allowed members")
         if plan:
             amount = plan.deal_price
             expiry_date = transaction_date + relativedelta(months=int(plan.tenure))
