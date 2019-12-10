@@ -1448,10 +1448,10 @@ class TransactionViewSet(viewsets.GenericViewSet):
                             json_url = '{"url": "%s"}' % CHAT_REDIRECT_URL
                             log_created_at = datetime.datetime.now()
                             save_pg_response.apply_async((PgLogs.RESPONSE_TO_CHAT, chat_order.id, None, json_url, None, None, log_created_at), eta=timezone.localtime(), queue=settings.RABBITMQ_LOGS_QUEUE)
-                        return HttpResponseRedirect(redirect_to=CHAT_REDIRECT_URL)
+                        return CHAT_REDIRECT_URL
                     else:
                         REDIRECT_URL = (SUCCESS_REDIRECT_URL % pg_txn.order_id) + "?payment_success=true"
-                        return HttpResponseRedirect(redirect_to=REDIRECT_URL)
+                        return REDIRECT_URL
         except Exception as e:
             logger.error("Error in sending pg acknowledge - " + str(e))
 
@@ -1628,10 +1628,10 @@ class TransactionViewSet(viewsets.GenericViewSet):
                                 chat_order = Order.objects.filter(pk=pg_txn.order_id).first()
                                 if chat_order:
                                     CHAT_REDIRECT_URL = CHAT_SUCCESS_REDIRECT_URL % (chat_order.id, chat_order.reference_id)
-                                return HttpResponseRedirect(redirect_to=CHAT_REDIRECT_URL)
+                                return CHAT_REDIRECT_URL
                             else:
                                 REDIRECT_URL = (SUCCESS_REDIRECT_URL % pg_txn.order_id) + "?payment_success=true"
-                                return HttpResponseRedirect(redirect_to=REDIRECT_URL)
+                                return REDIRECT_URL
                 except Exception as e:
                     logger.error("Error in sending pg acknowledge - " + str(e))
 
