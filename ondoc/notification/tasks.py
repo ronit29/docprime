@@ -1749,9 +1749,22 @@ def opd_send_notification_before_appointment(appointment_id, time, status):
         instance = OpdAppointment.objects.filter(id=appointment_id).first()
         if not instance or not instance.user:
             return
-        opd_notification = OpdNotification(instance, NotificationAction.PROVIDER_APPOINTMENT_CONFIRMATION_ONLINE_PAYMENT)
+        opd_notification = OpdNotification(instance, NotificationAction.PROVIDER_OPD_APPOINTMENT_CONFIRMATION_ONLINE_PAYMENT)
         opd_notification.send()
-        opd_notification = OpdNotification(instance, NotificationAction.PROVIDER_APPOINTMENT_CONFIRMATION_PAY_AT_CLINIC)
+        opd_notification = OpdNotification(instance, NotificationAction.PROVIDER_OPD_APPOINTMENT_CONFIRMATION_PAY_AT_CLINIC)
         opd_notification.send()
+    except Exception as e:
+        logger.error(str(e))
+
+@task()
+def lab_send_notification_before_appointment(appointment_id, time):
+    from ondoc.diagnostic.models import LabAppointment
+    from ondoc.communications.models import LabNotification
+    try:
+        instance = LabAppointment.objects.filter(id=appointment_id).first()
+        if not instance or not instance.user:
+            return
+        lab_notification = LabNotification(instance, NotificationAction.PROVIDER_LAB_APPOINTMENT_CONFIRMATION_ONLINE_PAYMENT)
+        lab_notification.send()
     except Exception as e:
         logger.error(str(e))

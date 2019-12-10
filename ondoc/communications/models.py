@@ -647,29 +647,41 @@ class WHTSAPPNotification:
         # if notification_type == NotificationAction.APPOINTMENT_ACCEPTED or \
         #         notification_type == NotificationAction.OPD_OTP_BEFORE_APPOINTMENT:
 
-        if notification_type == NotificationAction.PROVIDER_APPOINTMENT_CONFIRMATION_ONLINE_PAYMENT:
+        if notification_type == NotificationAction.PROVIDER_OPD_APPOINTMENT_CONFIRMATION_ONLINE_PAYMENT:
             body_template = "appointment_completion_prepaid"
 
             data.append(self.context.get('doctor_name'))
             data.append(datetime.strftime(aware_time_zone(self.context.get('instance').time_slot_start), '%d-%m-%Y %H:%M'))
-            data.append(self.context.get('instance').hospital.name)
+            data.append(self.context.get('hospital_address'))
             data.append(self.context.get('patient_name'))
-            sms_obj = SMSNotification(NotificationAction.PROVIDER_APPOINTMENT_CONFIRMATION_ONLINE_PAYMENT, self.context)
+            sms_obj = SMSNotification(NotificationAction.PROVIDER_OPD_APPOINTMENT_CONFIRMATION_ONLINE_PAYMENT, self.context)
             context, click_login_token_obj = sms_obj.save_token_to_context(self.context, user)
             data.append(context['provider_login_url'])
 
-        elif notification_type == NotificationAction.PROVIDER_APPOINTMENT_CONFIRMATION_PAY_AT_CLINIC:
+        elif notification_type == NotificationAction.PROVIDER_OPD_APPOINTMENT_CONFIRMATION_PAY_AT_CLINIC:
             body_template = "appointment_completion_cod"
 
             data.append(self.context.get('doctor_name'))
             data.append(datetime.strftime(aware_time_zone(self.context.get('instance').time_slot_start), '%d-%m-%Y %H:%M'))
-            data.append(self.context.get('instance').hospital.name)
+            data.append(self.context.get('hospital_address'))
             data.append(self.context.get('patient_name'))
             if self.context.get('instance').payment_type == 2:
                 data.append(str(self.context.get('cod_amount')))
             else:
                 data.append(str(self.context.get('instance').effective_price))
-            context, click_login_token_obj = SMSNotification.save_token_to_context(self.context, user)
+            sms_obj = SMSNotification(NotificationAction.PROVIDER_OPD_APPOINTMENT_CONFIRMATION_PAY_AT_CLINIC, self.context)
+            context, click_login_token_obj = sms_obj.save_token_to_context(self.context, user)
+            data.append(context['provider_login_url'])
+
+        elif notification_type == NotificationAction.PROVIDER_LAB_APPOINTMENT_CONFIRMATION_ONLINE_PAYMENT:
+            body_template = "appointment_completion_prepaid"
+
+            data.append(self.context.get('lab_name'))
+            data.append(datetime.strftime(aware_time_zone(self.context.get('instance').time_slot_start), '%d-%m-%Y %H:%M'))
+            data.append(self.context.get('pickup_address'))
+            data.append(self.context.get('patient_name'))
+            sms_obj = SMSNotification(NotificationAction.PROVIDER_LAB_APPOINTMENT_CONFIRMATION_ONLINE_PAYMENT, self.context)
+            context, click_login_token_obj = sms_obj.save_token_to_context(self.context, user)
             data.append(context['provider_login_url'])
 
         elif notification_type == NotificationAction.APPOINTMENT_ACCEPTED:
@@ -1722,8 +1734,8 @@ class OpdNotification(Notification):
             email_notification.send(all_receivers.get('email_receivers', []))
             sms_notification.send(all_receivers.get('sms_receivers', []))
             # whtsapp_notification.send(all_receivers.get('sms_receivers', []))
-        elif notification_type in (NotificationAction.PROVIDER_APPOINTMENT_CONFIRMATION_PAY_AT_CLINIC,
-                                   NotificationAction.PROVIDER_APPOINTMENT_CONFIRMATION_ONLINE_PAYMENT):
+        elif notification_type in (NotificationAction.PROVIDER_OPD_APPOINTMENT_CONFIRMATION_PAY_AT_CLINIC,
+                                   NotificationAction.PROVIDER_OPD_APPOINTMENT_CONFIRMATION_ONLINE_PAYMENT):
             whtsapp_notification = WHTSAPPNotification(notification_type, context)
             whtsapp_notification.send(all_receivers.get('sms_receivers', []))
         else:
@@ -1939,6 +1951,9 @@ class LabNotification(Notification):
             sms_notification = SMSNotification(notification_type, context)
             email_notification.send(all_receivers.get('email_receivers', []))
             sms_notification.send(all_receivers.get('sms_receivers', []))
+        elif notification_type == NotificationAction.PROVIDER_LAB_APPOINTMENT_CONFIRMATION_ONLINE_PAYMENT:
+            whtsapp_notification = WHTSAPPNotification(notification_type, context)
+            whtsapp_notification.send(all_receivers.get('sms_receivers', []))
         else:
             email_notification = EMAILNotification(notification_type, context)
             sms_notification = SMSNotification(notification_type, context)
@@ -1973,7 +1988,8 @@ class LabNotification(Notification):
                                  NotificationAction.LAB_CONFIRMATION_SECOND_CHECK_AFTER_APPOINTMENT,
                                  NotificationAction.LAB_FEEDBACK_AFTER_APPOINTMENT,
                                  NotificationAction.LAB_REPORT_SEND_VIA_CRM,
-                                 NotificationAction.SEND_LENSFIT_COUPON
+                                 NotificationAction.SEND_LENSFIT_COUPON,
+                                 NotificationAction.PROVIDER_LAB_APPOINTMENT_CONFIRMATION_ONLINE_PAYMENT
                                  ]:
             receivers.append(instance.user)
         elif notification_type in [NotificationAction.LAB_APPOINTMENT_RESCHEDULED_BY_PATIENT,
