@@ -481,7 +481,10 @@ def single_booking_payment_details(request, orders):
         uemail = user.email
     else:
         uemail = "dummyemail@docprime.com"
-    base_url = "https://{}".format(request.get_host())
+    if request.data and request.data.get('utm_sbi_tags') and request.data.get('utm_sbi_tags').get('utm_source') == 'sbi_utm':
+        base_url = settings.SBIG_BASE_URL
+    else:
+        base_url = "https://{}".format(request.get_host())
     surl = base_url + '/api/v1/user/transaction/save'
     furl = base_url + '/api/v1/user/transaction/save'
     profile = user.get_default_profile()
@@ -589,13 +592,10 @@ def payment_details(request, order):
     else:
         uemail = "dummyemail@docprime.com"
 
-    print('===========================')
-    print(request)
-    print(request.get_host())
-    print('===========================')
-
-    base_url = "https://{}".format(request.get_host())
-    # base_url = 'https://webhook.site/0f0c0af8-d155-440d-b5c4-ce486574e14d'
+    if request.data and request.data.get('utm_sbi_tags') and request.data.get('utm_sbi_tags').get('utm_source') == 'sbi_utm':
+        base_url = settings.SBIG_BASE_URL
+    else:
+        base_url = "https://{}".format(request.get_host())
     surl = base_url + '/api/v1/user/transaction/save'
     furl = base_url + '/api/v1/user/transaction/save'
     isPreAuth = '1'
