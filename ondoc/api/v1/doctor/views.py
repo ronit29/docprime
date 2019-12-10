@@ -35,7 +35,7 @@ from ondoc.coupon.models import Coupon, CouponRecommender
 from ondoc.api.v1.diagnostic import serializers as diagnostic_serializer
 from ondoc.account import models as account_models
 from ondoc.location.models import EntityUrls, EntityAddress, DefaultRating
-from ondoc.plus.models import PlusPlans
+from ondoc.plus.models import PlusPlans, TempPlusUser
 from ondoc.procedure.models import Procedure, ProcedureCategory, CommonProcedureCategory, ProcedureToCategoryMapping, \
     get_selected_and_other_procedures, CommonProcedure, CommonIpdProcedure, IpdProcedure, DoctorClinicIpdProcedure, \
     IpdProcedureFeatureMapping, IpdProcedureDetail, SimilarIpdProcedureMapping, IpdProcedureLead, Offer, \
@@ -395,12 +395,20 @@ class DoctorAppointmentsViewSet(OndocViewSet):
 
 
     @transaction.atomic
-    def create(self, request):
+    def create(self, request, *args, **kwargs):
         serializer = serializers.CreateAppointmentSerializer(data=request.data, context={'request': request, 'data' : request.data, 'use_duplicate' : True})
         serializer.is_valid(raise_exception=True)
         validated_data = serializer.validated_data
         data = request.data
+        profile = validated_data.get('profile')
+        plus_plan = validated_data.get('plus_plan', None)
         plus_user = request.user.active_plus_user
+        if plus_plan and plus_user is None:
+            is_verified = profile.verify_profile()
+            if not is_verified:
+                return Response(status=status.HTTP_400_BAD_REQUEST, data={"error": "Profile is not completed, Please update profile first to process further"})
+        if plus_plan and plus_user is None:
+            plus_user = TempPlusUser.objects.create(user=request.user, plan=plus_plan, profile=profile)
         user_insurance = request.user.active_insurance #UserInsurance.get_user_insurance(request.user)
 
         hospital = validated_data.get('hospital')
@@ -408,7 +416,11 @@ class DoctorAppointmentsViewSet(OndocViewSet):
 
         doctor_clinic = DoctorClinic.objects.filter(doctor=doctor, hospital=hospital).first()
         profile = validated_data.get('profile')
-        payment_type = validated_data.get('payment_type')
+        if not plus_user:
+            payment_type = validated_data.get('payment_type')
+        else:
+            payment_type = OpdAppointment.GOLD if plus_user.plan.is_gold else OpdAppointment.VIP
+            validated_data['payment_type'] = payment_type
         if user_insurance:
             if user_insurance.status == UserInsurance.ONHOLD:
                 return Response(status=status.HTTP_400_BAD_REQUEST, data={"error": 'Your documents from the last claim '
@@ -454,10 +466,13 @@ class DoctorAppointmentsViewSet(OndocViewSet):
             data['is_vip_member'] = plus_user_dict.get('is_vip_member', False)
             data['cover_under_vip'] = plus_user_dict.get('cover_under_vip', False)
             data['plus_user_id'] = plus_user.id
-            data['vip_amount'] = plus_user_dict.get('vip_amount_deducted')
-            data['amount_to_be_paid'] = plus_user_dict.get('amount_to_be_paid')
+            data['vip_amount'] = int(plus_user_dict.get('vip_amount_deducted'))
+            data['amount_to_be_paid'] = int(plus_user_dict.get('amount_to_be_paid'))
             if data['cover_under_vip']:
-                data['payment_type'] = OpdAppointment.VIP
+                if plus_user.plan.is_gold:
+                    data['payment_type'] = OpdAppointment.GOLD
+                else:
+                    data['payment_type'] = OpdAppointment.VIP
 
         else:
             data['is_appointment_insured'], data['insurance_id'], data[
@@ -482,20 +497,21 @@ class DoctorAppointmentsViewSet(OndocViewSet):
         if responsible_user:
             data['_responsible_user'] = responsible_user
 
-        if validated_data.get("existing_cart_item"):
-            cart_item = validated_data.get("existing_cart_item")
-            old_cart_obj = Cart.objects.filter(id=validated_data.get('existing_cart_item').id).first()
-            payment_type = old_cart_obj.data.get('payment_type')
-            if payment_type == OpdAppointment.INSURANCE and data['is_appointment_insured'] == False:
-                data['payment_type'] = OpdAppointment.PREPAID
-            if payment_type == OpdAppointment.VIP and data['cover_under_vip'] == False:
-                data['payment_type'] = OpdAppointment.PREPAID
-            # cart_item.data = request.data
-            cart_item.data = data
-            cart_item.save()
-        else:
-            cart_item, is_new = Cart.objects.update_or_create(id=cart_item_id, deleted_at__isnull=True, product_id=account_models.Order.DOCTOR_PRODUCT_ID,
-                                                  user=request.user, defaults={"data": data})
+        if not plus_plan:
+            if validated_data.get("existing_cart_item"):
+                cart_item = validated_data.get("existing_cart_item")
+                old_cart_obj = Cart.objects.filter(id=validated_data.get('existing_cart_item').id).first()
+                payment_type = old_cart_obj.data.get('payment_type')
+                if payment_type == OpdAppointment.INSURANCE and data['is_appointment_insured'] == False:
+                    data['payment_type'] = OpdAppointment.PREPAID
+                if payment_type == OpdAppointment.VIP and data['cover_under_vip'] == False:
+                    data['payment_type'] = OpdAppointment.PREPAID
+                # cart_item.data = request.data
+                cart_item.data = data
+                cart_item.save()
+            else:
+                cart_item, is_new = Cart.objects.update_or_create(id=cart_item_id, deleted_at__isnull=True, product_id=account_models.Order.DOCTOR_PRODUCT_ID,
+                                                      user=request.user, defaults={"data": data})
 
         resp = None
         is_agent = False
@@ -506,8 +522,14 @@ class DoctorAppointmentsViewSet(OndocViewSet):
                     is_agent = True
                 else:
                     resp = {'is_agent': True, "status": 1}
-        if not resp:
+        if not resp and not plus_plan:
             resp = account_models.Order.create_order(request, [cart_item], validated_data.get("use_wallet"))
+
+        if not resp and plus_plan:
+            if kwargs.get('is_dummy'):
+                return validated_data
+
+            resp = account_models.Order.create_new_order(request, validated_data, False)
 
         if is_agent:
             resp['is_agent'] = True
@@ -1594,8 +1616,8 @@ class SearchedItemsViewSet(viewsets.GenericViewSet):
         count = int(count)
         if count <= 0:
             count = 10
-        medical_conditions = models.CommonMedicalCondition.objects.select_related('condition').prefetch_related('condition__specialization').all().order_by(
-            "-priority")[:count]
+        # medical_conditions = models.CommonMedicalCondition.objects.select_related('condition').prefetch_related('condition__specialization').all().order_by(
+        #     "-priority")[:count]
         # conditions_serializer = serializers.MedicalConditionSerializer(medical_conditions, many=True,
         #                                                                context={'request': request})
 
@@ -1618,14 +1640,14 @@ class SearchedItemsViewSet(viewsets.GenericViewSet):
                                                                                           'city': city,
                                                                                           'spec_urls': spec_urls})
 
-        common_procedure_categories = CommonProcedureCategory.objects.select_related('procedure_category').filter(
-            procedure_category__is_live=True).all().order_by("-priority")[:10]
-        common_procedure_categories_serializer = CommonProcedureCategorySerializer(common_procedure_categories,
-                                                                                   many=True)
-
-        common_procedures = CommonProcedure.objects.select_related('procedure').filter(
-            procedure__is_enabled=True).all().order_by("-priority")[:10]
-        common_procedures_serializer = CommonProcedureSerializer(common_procedures, many=True)
+        # common_procedure_categories = CommonProcedureCategory.objects.select_related('procedure_category').filter(
+        #     procedure_category__is_live=True).all().order_by("-priority")[:10]
+        # common_procedure_categories_serializer = CommonProcedureCategorySerializer(common_procedure_categories,
+        #                                                                            many=True)
+        #
+        # common_procedures = CommonProcedure.objects.select_related('procedure').filter(
+        #     procedure__is_enabled=True).all().order_by("-priority")[:10]
+        # common_procedures_serializer = CommonProcedureSerializer(common_procedures, many=True)
 
         common_ipd_procedures = CommonIpdProcedure.objects.select_related('ipd_procedure').filter(
             ipd_procedure__is_enabled=True).all().order_by("-priority")[:10]
@@ -1636,7 +1658,7 @@ class SearchedItemsViewSet(viewsets.GenericViewSet):
             ipd_entity_qs = EntityUrls.objects.filter(ipd_procedure_id__in=common_ipd_procedure_ids,
                                                       sitemap_identifier='IPD_PROCEDURE_CITY',
                                                       is_valid=True,
-                                                      locality_value__iexact=city).annotate(
+                                                      locality_value__iexact=city.lower()).annotate(
                 ipd_id=F('ipd_procedure_id')).values('ipd_id', 'url')
             ipd_entity_dict = {x.get('ipd_id'): x.get('url') for x in ipd_entity_qs}
         common_ipd_procedures_serializer = CommonIpdProcedureSerializer(common_ipd_procedures, many=True,
@@ -1660,9 +1682,10 @@ class SearchedItemsViewSet(viewsets.GenericViewSet):
         #
         #     categories_serializer = CommonCategoriesSerializer(categories, many=True, context={'request': request})
 
-        return Response({"conditions": [], "specializations": specializations_serializer.data,
-                         "procedure_categories": common_procedure_categories_serializer.data,
-                         "procedures": common_procedures_serializer.data,
+        return Response({"conditions": [],
+                         "specializations": specializations_serializer.data,
+                         "procedure_categories": [],
+                         "procedures": [],
                          "ipd_procedures": common_ipd_procedures_serializer.data,
                          "top_hospitals": top_hospitals_data,
                          'package_categories': common_package_category(self, request)})
@@ -2826,18 +2849,18 @@ class DoctorAvailabilityTimingViewSet(viewsets.ViewSet):
             for apt in active_appointments:
                 blocks.append(str(apt.time_slot_start.date()))
 
-        if dc_obj.is_part_of_integration() and settings.MEDANTA_INTEGRATION_ENABLED:
-            from ondoc.integrations import service
-            pincode = None
-            integration_dict = dc_obj.get_integration_dict()
-            class_name = integration_dict['class_name']
-            integrator_obj_id = integration_dict['id']
-            integrator_obj = service.create_integrator_obj(class_name)
-            clinic_timings = integrator_obj.get_appointment_slots(pincode, date, integrator_obj_id=integrator_obj_id,
-                                                                  blocks=blocks, dc_obj=dc_obj,
-                                                                  total_leaves=total_leaves)
-        else:
-            clinic_timings = dc_obj.get_timings_v2(total_leaves, blocks)
+        # if dc_obj.is_part_of_integration() and settings.MEDANTA_INTEGRATION_ENABLED:
+        #     from ondoc.integrations import service
+        #     pincode = None
+        #     integration_dict = dc_obj.get_integration_dict()
+        #     class_name = integration_dict['class_name']
+        #     integrator_obj_id = integration_dict['id']
+        #     integrator_obj = service.create_integrator_obj(class_name)
+        #     clinic_timings = integrator_obj.get_appointment_slots(pincode, date, integrator_obj_id=integrator_obj_id,
+        #                                                           blocks=blocks, dc_obj=dc_obj,
+        #                                                           total_leaves=total_leaves)
+        # else:
+        clinic_timings = dc_obj.get_timings_v2(total_leaves, blocks)
 
         resp_data = {"timeslots": clinic_timings.get('timeslots', []),
                      "upcoming_slots": clinic_timings.get('upcoming_slots', []),
@@ -4637,9 +4660,10 @@ class HospitalViewSet(viewsets.GenericViewSet):
                                                                                          'hosp_entity_dict': hosp_entity_dict})
             hospital_percentage_dict = dict()
 
-            plan = PlusPlans.objects.filter(is_gold=True, is_selected=True).first()
+            plan = PlusPlans.objects.prefetch_related('plan_parameters', 'plan_parameters__parameter').filter(is_gold=True, is_selected=True).first()
             if not plan:
-                plan = PlusPlans.objects.filter(is_gold=True).first()
+                plan = PlusPlans.objects.prefetch_related('plan_parameters', 'plan_parameters__parameter').filter(is_gold=True).first()
+
             hospital_queryset = hospital_queryset[:20]
             if plan:
                 convenience_amount_obj, convenience_percentage_obj = plan.get_convenience_object('DOCTOR')
@@ -4775,6 +4799,7 @@ class HospitalViewSet(viewsets.GenericViewSet):
         pnt = GEOSGeometry(point_string, srid=4326)
 
         hospital_queryset = Hospital.objects.prefetch_related('hospitalcertification_set',
+                                                              'hospitalcertification_set__certification',
                                                               'hospital_documents',
                                                               'hosp_availability',
                                                               'health_insurance_providers',
@@ -4867,12 +4892,12 @@ class HospitalViewSet(viewsets.GenericViewSet):
                                                          'hospital_helpline_numbers',
                                                          'network__hospital_network_documents',
                                                          'hospitalcertification_set',
+                                                         'hospitalcertification_set__certification',
                                                          'hosp_availability',
                                                          'question_answer',
                                                          'hospitalspeciality_set', Prefetch('imagehospital',
                                                                                             HospitalImage.objects.all().order_by(
-                                                                                                '-cover_image'))).filter(
-            id=pk, is_live=True).first()
+                                                                                                '-cover_image'))).filter(id=pk, is_live=True).first()
         if not hospital_obj:
             return Response(status=status.HTTP_400_BAD_REQUEST)
 
@@ -4945,6 +4970,8 @@ class HospitalViewSet(viewsets.GenericViewSet):
         listing_schema = self.build_listing_schema_for_hospital(hosp_serializer)
         breadcrumb_schema = self.build_breadcrumb_schema_for_hospital(response['breadcrumb']) if response.get('breadcrumb') else None
         all_schema = [x for x in [schema, listing_schema, breadcrumb_schema] if x]
+        response['certifications'] = [{"certification_id": data.certification.id, "certification_name": data.certification.name} for data in hospital_obj.hospitalcertification_set.all() if data.certification]
+
         response['seo'] = {'title': title, "description": description, "schema": schema,
                            "h1_title": h1_title, 'all_schema': all_schema}
         response['canonical_url'] = canonical_url
@@ -5293,11 +5320,25 @@ class IpdProcedureSyncViewSet(viewsets.GenericViewSet):
 class RecordAPIView(viewsets.GenericViewSet):
     """This class defines the create behavior of our rest api."""
     def list(self, request):
+        params = request.query_params
+        lat = params.get('lat', 28.450367)
+        long = params.get('long', 77.071848)
+        radius = int(params.get('radius')) if params.get('radius') else 2000
+        response = dict()
+
         queryset = GoogleMapRecords.objects.all()
+        if lat and long and radius:
+            point_string = 'POINT(' + str(long) + ' ' + str(lat) + ')'
+            pnt = GEOSGeometry(point_string, srid=4326)
+            queryset = queryset.filter(location__distance_lte=(pnt, radius))
+
         serializer = serializers.RecordSerializer(queryset, many=True,
                                                               context={"request": request})
         serialized_data = serializer.data
-        return Response(serialized_data)
+        response['map_data'] = serialized_data
+        response['labels'] = list(queryset.values('label').distinct())
+
+        return Response(response)
 
 
 # View to see all points

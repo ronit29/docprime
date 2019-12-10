@@ -3,7 +3,7 @@ from django.conf.urls import url
 from .views import ApplicableCouponsViewSet, CouponDiscountViewSet
 from ondoc.crm.admin.coupon import LabNetworkAutocomplete, LabAutocomplete, TestAutocomplete, \
     TestCategoriesAutocomplete, ProceduresAutocomplete, ProcedureCategoriesAutocomplete, \
-    SpecializationsAutocomplete, DoctorsAutocomplete, HospitalsAutocomplete
+    SpecializationsAutocomplete, DoctorsAutocomplete, HospitalsAutocomplete, VipGoldPlanAutocomplete
 from ondoc.crm.admin.hospital import CloudLabAutocomplete
 from ondoc.crm.admin.provider import AvailableLabTestAutocomplete
 
@@ -21,5 +21,6 @@ urlpatterns = [
     url(r'^specializations-autocomplete/$', SpecializationsAutocomplete.as_view(), name='specializations-autocomplete'),
     url(r'^procedures-autocomplete/$', ProceduresAutocomplete.as_view(), name='procedures-autocomplete'),
     url(r'^procedure-categories-autocomplete/$', ProcedureCategoriesAutocomplete.as_view(), name='procedure-categories-autocomplete'),
+    url(r'^vip-gold-plans-autocomplete/$', VipGoldPlanAutocomplete.as_view(), name='vip-gold-plans-autocomplete'),
 ]
 

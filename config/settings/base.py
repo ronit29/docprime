@@ -108,9 +108,9 @@ try:
     if env('MONGO_DB_NAME') and env('MONGO_DB_HOST') and env('MONGO_DB_PORT'):
         mongo_port = int(env('MONGO_DB_PORT'))
         if env('MONGO_DB_USERNAME', None) and env('MONGO_DB_PASSWORD', None):
-            connect(env('MONGO_DB_NAME'), host=env('MONGO_DB_HOST'), port=mongo_port, username=env('MONGO_DB_USERNAME'),
-                                            password=env('MONGO_DB_PASSWORD'), authentication_source='admin')
-            # connect(host=env('MONGO_CONNECTION_STRING'), read_preference=ReadPreference.PRIMARY_PREFERRED)
+            # connect(env('MONGO_DB_NAME'), host=env('MONGO_DB_HOST'), port=mongo_port, username=env('MONGO_DB_USERNAME'),
+            #                                 password=env('MONGO_DB_PASSWORD'), authentication_source='admin')
+            connect(host=env('MONGO_CONNECTION_STRING'), read_preference=ReadPreference.PRIMARY_PREFERRED)
             # host = 'mongodb://' + env('MONGO_DB_USERNAME') + ':' + env('MONGO_DB_PASSWORD') + '@' + 10.20.5.148:27017,10.20.6.116:27017/DocPrimeLogs?replicaSet=rs5'
             # connect(host='mongodb://ankitPBpyuser:ajd87GHSd@10.20.5.148:27017,10.20.6.116:27017/DocPrimeLogs?replicaSet=rs5', authentication_source='admin')
 
@@ -552,3 +552,5 @@ RABBITMQ_LOGS_QUEUE=env('RABBITMQ_LOGS_QUEUE')
 TRUECALLER_SOURCES=env.list('TRUECALLER_SOURCES')
 RABBITMQ_TRACKING_QUEUE=env('RABBITMQ_TRACKING_QUEUE')
 SBIG_AUTH_TOKEN=env('SBIG_AUTH_TOKEN')
+GOLD_MERCHANT_CODE=env('GOLD_MERCHANT_CODE')
+VIP_MERCHANT_CODE=env('VIP_MERCHANT_CODE')

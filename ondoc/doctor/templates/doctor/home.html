@@ -10,26 +10,32 @@
   <script src="https://cdnjs.cloudflare.com/ajax/libs/angular-simple-logger/0.1.7/angular-simple-logger.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/angular-google-maps/2.4.1/angular-google-maps.min.js"></script>
   <script type="text/javascript">
+      var url = window.location.search;
+url = url.replace("?", '');
+<!--console.log(url);-->
+LocFac =  "/api/v1/doctor/record_api?" + url;
 
-  LocFac = "/api/v1/doctor/record_api/";
+angular.module('appMaps', ['uiGmapgoogle-maps'])
+  .config(function($interpolateProvider) {
+         $interpolateProvider.startSymbol('[');
+         $interpolateProvider.endSymbol(']');
+  })
 
-  angular.module('appMaps', ['uiGmapgoogle-maps'])
-    .config(function($interpolateProvider) {
-           $interpolateProvider.startSymbol('[');
-           $interpolateProvider.endSymbol(']');
-    })
-    .controller('mainCtrl', function($scope, $http, uiGmapGoogleMapApi, uiGmapIsReady) {
-        $scope.map = {
-          bounds: {},
-          center: { latitude: 28.4485, longitude: 77.0759 }
-        };
+  .controller('mainCtrl', function($scope, $http, uiGmapGoogleMapApi, uiGmapIsReady) {
+      $scope.user_location = []
+      $scope.new_map ={}
+      $scope.map = {
+        zoom:14,
+        bounds: {},
+        center: { latitude: 28.4485, longitude: 77.0759 }
+      };
 
-        $scope.markers = [];
+      $scope.markers = [];
+      $scope.new_markers = [];
 
-        $http.get(LocFac).then(function(data) {
-            <!--console.log(data);-->
-
-          var markers = data.data;
+      $http.get(LocFac).then(function(data) {
+          var markers = data.data.map_data;
+          var labels  = data.data.labels;
 
           angular.forEach(markers, function (marker) {
 
@@ -37,30 +43,149 @@
                 latitude: marker.latitude,
                 longitude: marker.longitude
              }
-
-
              marker.options= {icon: marker.image, label: marker.label};
-           })
-          $scope.markers = markers;
-         });
-      });
+          })
 
+          $scope.labels = labels;
+          $scope.markers = markers;
+
+          $scope.tabClick =  function(id){ //tabs_click
+          $scope.new_markers =  markers.filter((x=>x.label == id));
+             if($scope.new_markers.length > 0){
+                  $scope.markers = $scope.new_markers;
+             }else{
+                  $scope.markers = markers;
+             }
+          }
+    <!--console.log($scope.markers)-->
+          $scope.detectLocation = function () { //detect location
+              if (navigator.geolocation) {
+                  navigator.geolocation.getCurrentPosition((position) => {
+
+                  $scope.user_location = position;
+                  $scope.location_data();
+                  }, (a, b, c) => {
+                      alert('Could not fetch location.')
+                  }, (a, b, c) => {
+
+                      alert('Could not fetch location.')
+                  })
+              }
+              else {
+
+              }
+          }
+
+          $scope.location_data = function (){ //after detecting location fetch new results
+
+          <!--var new_url = url.replace("?", '');-->
+
+          var new_url = "/api/v1/doctor/record_api?" + url.replace("?", '');
+          if($scope.user_location && $scope.user_location.coords){
+
+            new_url += '&lat='+ $scope.user_location.coords.latitude
+            new_url += '&long='+ $scope.user_location.coords.longitude
+            $scope.new_map = {
+                zoom:14,
+                bounds: {},
+                center: { latitude: $scope.user_location.coords.latitude, longitude: $scope.user_location.coords.longitude }
+                <!--center: { latitude: 12.972442, longitude: 77.580643 }-->
+              }
+              $scope.map = $scope.new_map;
+           }
+           <!--console.log($scope.map)-->
+           <!--console.log(new_url);-->
+              $http.get(new_url).then(function(data) {
+                  var markers = data.data.map_data;
+
+                  var existing_merkers ={
+                            latitude: $scope.user_location.coords.latitude,
+                            longitude: $scope.user_location.coords.longitude,
+                            image:'https://cdn.docprime.com/media/web/custom_images/man-user_1.png',
+                            coords:{latitude: $scope.user_location.coords.latitude, longitude: $scope.user_location.coords.longitude},
+                            address: "",
+                            combined_rating: 0,
+                            combined_rating_count: 0,
+                            created_at: "",
+                            has_booking: 0,
+                            has_phone: 0,
+                            hospital_name: "",
+                            id: 1215000,
+                            is_bookable: 1,
+                            is_potential: 1,
+                            lead_rank: " ",
+                            location: "SRID=4326;POINT (77.062023 28.438662)",
+                            monday_timing: " ",
+                            multi_speciality: "",
+                            place_id: "",
+                            reason: "",
+                            text: "current user",
+                            updated_at: ""}
+                  markers.push(existing_merkers)
+                  var labels  = data.data.labels;
+
+                  angular.forEach(markers, function (marker) {
+
+                     marker.coords = {
+                        latitude: marker.latitude,
+                        longitude: marker.longitude
+                     }
+                     marker.options= {icon: marker.image, label: marker.label};
+                  })
+
+                  $scope.labels = labels;
+                  $scope.markers = markers;
+
+                  $scope.tabClick =  function(id){ //tabs_click
+                  $scope.new_markers =  markers.filter((x=>x.label == id));
+                     if($scope.new_markers.length > 0){
+                          $scope.markers = $scope.new_markers;
+                     }else{
+                          $scope.markers = markers;
+                     }
+                  }
+               })
+          }
+       });
+    });
   </script>
 
  <style>
  .angular-google-map-container {
-       height: 500px;
+       min-height: 500px;
        width: auto;
-    }
+  }
+
   </style>
+      <button ng-click="detectLocation()">locate me</button>
   <!--<button type="button" class="btn btn-primary" data-toggle="modal" data-target="#addrecord">Open Modal</button>-->
   <br/><br/>
+  <div class="btn-row">
+      <button  style="margin:5px;" ng-repeat="label in labels" idkey="[label.label]" ng-click="tabClick(label.label)">
+          [label.label]
+      </button>
+  </div>
   <ui-gmap-google-map center="map.center" zoom="map.zoom" options="map.options">
     <ui-gmap-marker ng-repeat="marker in markers" coords="marker.coords" options="marker.options" events="marker.events" idkey="marker.id">
         <ui-gmap-window>
            <div id="infowindow">
-              <h4>[ marker.location ]</h4>
-              <h5>[ marker.text ]</h5>
+               <b><span style="color:blue">hospital name: </span></b><span>[marker.hospital_name]</span><br>
+               <b><span style="color:blue">address: </span></b><span>[marker.address]</span><br>
+               <b><span style="color:blue">place id: </span></b><span>[marker.place_id]</span><br>
+               <b><span style="color:blue">reason: </span></b><span>[marker.reason]</span><br>
+               <b><span style="color:blue">multi speciality: </span></b><span>[marker.multi_speciality]</span><br>
+               <b><span style="color:blue">has phone: </span></b><span>[marker.has_phone]</span><br>
+               <b><span style="color:blue">lead rank: </span></b><span>[marker.lead_rank]</span><br>
+               <b><span style="color:blue">combined rating: </span></b><span>[marker.combined_rating]</span><br>
+               <b><span style="color:blue">combined rating count: </span></b><span>[marker.combined_rating_count] </span><br>
+               <b><span style="color:blue">is potential: </span></b><span>[marker.is_potential]</span><br>
+               <b><span style="color:blue">has booking: </span></b><span>[marker.has_booking]</span><br>
+               <b><span style="color:blue">time: </span></b><span>[marker.monday_timing]</span><br>
+               <b><span style="color:blue">is bookable: </span></b><span>[marker.is_bookable]</span><br>
+               <b><span style="color:blue">phone_number: </span></b><span>[marker.phone_number]</span><br>
+                <b><span style="color:blue">hospital_id: </span></b><span>[marker.hospital_id]</span><br>
+               <a href=[marker.link] target="_blank">click me</a>
+
             </div>
         </ui-gmap-window>
     </ui-gmap-marker>
