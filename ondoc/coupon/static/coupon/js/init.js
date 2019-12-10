@@ -1,22 +1,6 @@
-function getCookie(name) {
-   var cookieValue = null;
-   if (document.cookie && document.cookie !== '') {
-       var cookies = document.cookie.split(';');
-       for (var i = 0; i < cookies.length; i++) {
-           var cookie = django.jQuery.trim(cookies[i]);
-           // Does this cookie string begin with the name we want?
-           if (cookie.substring(0, name.length + 1) === (name + '=')) {
-               cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
-               break;
-           }
-       }
-   }
-   return cookieValue;
-}
-
 function initEditor(){
 
-
+    var tnc_value = document.getElementById("id_tnc").value
     CKEDITOR.config.allowedContent = true;
     CKEDITOR.config.height = 500;
 
@@ -25,6 +9,9 @@ function initEditor(){
             font_names: '',
         }
     );
+    CKEDITOR.instances.id_tnc.on('instanceReady', function() {
+       CKEDITOR.instances.id_tnc.setData( tnc_value );
+    });
 }
 
 document.addEventListener('DOMContentLoaded', initEditor, false);
