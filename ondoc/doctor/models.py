@@ -3185,9 +3185,9 @@ class OpdAppointment(auth_model.TimeStampedModel, CouponsMixin, OpdAppointmentIn
         if self.is_medanta_appointment() and not self.created_by_native() and self.status == self.BOOKED:
             push_opd_appointment_to_integrator.apply_async(({'appointment_id': self.id},), countdown=5)
 
-        if self.status == self.BOOKED:
+        if (self.time_slot_start >= self.time_slot_start - timedelta(minutes=60)) and self.status in (self.CREATED, self.BOOKED) and not (old_instance.status == self.BOOKED and old_instance.status != self.status):
             try:
-                notification_tasks.opd_send_notification_before_appointment.apply_async((self.id, str(math.floor(self.time_slot_start.timestamp()))),
+                notification_tasks.opd_send_notification_before_appointment.apply_async((self.id, self.time_slot_start.timestamp(), self.status ),
                     eta=self.time_slot_start - datetime.timedelta(minutes=settings.TIME_BEFORE_APPOINTMENT_TO_SEND_NOTIFICATION), )
             except Exception as e:
                 logger.error(str(e))
