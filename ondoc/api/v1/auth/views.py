@@ -870,7 +870,7 @@ class UserAppointmentsViewSet(OndocViewSet):
             convenience_charge = PlusPlans.get_default_convenience_amount(price_data, "LABTEST", default_plan_query=plan)
             engine = get_class_reference(plus_user, "LABTEST")
             plus_data = engine.validate_booking_entity(cost=price, mrp=price_data.get('mrp', None),
-                                                       deal_price=price_data.get('deal_price'))
+                                                       deal_price=price_data.get('deal_price'), price_engine_price=price)
             effective_price = plus_data.get('amount_to_be_paid', None)
             return effective_price, convenience_charge
         else:

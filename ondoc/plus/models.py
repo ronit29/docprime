@@ -650,7 +650,7 @@ class PlusUser(auth_model.TimeStampedModel, RefundMixin, TransactionMixin, Coupo
                 response_dict['vip_gold_price'] = int(price_data.get('fees'))
                 if appointment_data['test_ids']:
                     # engine_response = engine.validate_booking_entity(cost=final_price, id=appointment_data['test_ids'][0].id, utilization=kwargs.get('utilization'))
-                    engine_response = engine.validate_booking_entity(cost=final_price, id=appointment_data['test_ids'][0].id, utilization=kwargs.get('utilization'), mrp=mrp, deal_price=int(price_data.get('deal_price')))
+                    engine_response = engine.validate_booking_entity(cost=final_price, id=appointment_data['test_ids'][0].id, utilization=kwargs.get('utilization'), mrp=mrp, price_engine_price=price, deal_price=int(price_data.get('deal_price')))
 
                     if not engine_response:
                         return response_dict
@@ -715,7 +715,8 @@ class PlusUser(auth_model.TimeStampedModel, RefundMixin, TransactionMixin, Coupo
             else:
                 price = price_engine.get_price(price_data)
             plan = request.user.active_plus_user.plan if request.user.active_plus_user else None
-            vip_data_dict['vip_convenience_amount'] = PlusPlans.get_default_convenience_amount(price_data, "DOCTOR", default_plan_query=plan)
+            # vip_data_dict['vip_convenience_amount'] = PlusPlans.get_default_convenience_amount(price_data, "DOCTOR", default_plan_query=plan)
+            vip_data_dict['vip_convenience_amount'] = vip_valid_dict.get('vip_convenience_amount', 0)
             engine = get_class_reference(self, "DOCTOR")
             vip_data_dict['vip_gold_price'] = int(current_item_price_data.get('fees'))
             if engine:
@@ -742,12 +743,13 @@ class PlusUser(auth_model.TimeStampedModel, RefundMixin, TransactionMixin, Coupo
                 else:
                     price = price_engine.get_price(price_data)
                 plan = request.user.active_plus_user.plan if request.user.active_plus_user else None
-                vip_data_dict['vip_convenience_amount'] = PlusPlans.get_default_convenience_amount(price_data, "LABTEST", default_plan_query=plan)
+                # vip_data_dict['vip_convenience_amount'] = PlusPlans.get_default_convenience_amount(price_data, "LABTEST", default_plan_query=plan)
+                vip_data_dict['vip_convenience_amount'] = vip_valid_dict.get('vip_convenience_amount', 0)
                 engine = get_class_reference(self, entity)
                 vip_data_dict['vip_gold_price'] = int(current_item_price_data.get('fees'))
                 if engine:
                     # vip_response = engine.validate_booking_entity(cost=current_item_mrp, utilization=deep_utilization)
-                    vip_response = engine.validate_booking_entity(cost=price, utilization=deep_utilization, mrp=current_item_mrp, deal_price=int(current_item_price_data.get('deal_price', 0)))
+                    vip_response = engine.validate_booking_entity(cost=price, utilization=deep_utilization, mrp=current_item_mrp, price_engine_price=price, deal_price=int(current_item_price_data.get('deal_price', 0)))
                     vip_data_dict['vip_amount'] = vip_response.get('amount_to_be_paid')
                     vip_data_dict['amount_to_be_paid'] = vip_response.get('amount_to_be_paid')
                     vip_data_dict['cover_under_vip'] = vip_response.get('is_covered')
@@ -1509,7 +1511,7 @@ class TempPlusUser(auth_model.TimeStampedModel):
                 response_dict['vip_gold_price'] = int(price_data.get('fees'))
                 if appointment_data['test_ids']:
                     # engine_response = engine.validate_booking_entity(cost=final_price, id=appointment_data['test_ids'][0].id, utilization=kwargs.get('utilization'))
-                    engine_response = engine.validate_booking_entity(cost=final_price, id=appointment_data['test_ids'][0].id, utilization=kwargs.get('utilization'), mrp=mrp, deal_price=int(price_data.get('deal_price')))
+                    engine_response = engine.validate_booking_entity(cost=final_price, id=appointment_data['test_ids'][0].id, utilization=kwargs.get('utilization'), mrp=mrp, price_engine_price=price, deal_price=int(price_data.get('deal_price')))
 
                     if not engine_response:
                         return response_dict
