@@ -199,7 +199,7 @@ class OpdAppointmentSerializer(serializers.ModelSerializer):
     class Meta:
         model = OpdAppointment
         fields = ('id', 'doctor_name', 'hospital_name', 'patient_name', 'patient_image', 'type',
-                  'allowed_action', 'effective_price', 'deal_price', 'status', 'time_slot_start',
+                  'allowed_action', 'effective_price', 'deal_price', 'discount', 'status', 'time_slot_start',
                   'time_slot_end', 'doctor_thumbnail', 'patient_thumbnail', 'display_name', 'invoices', 'reports',
                   'prescription', 'report_files', 'specialization', 'payment_type', 'effective_price', 'vip', 'payment_mode')
 
@@ -1677,7 +1677,7 @@ class AppointmentRetrieveSerializer(OpdAppointmentSerializer):
     class Meta:
         model = OpdAppointment
         fields = ('id', 'patient_image', 'patient_name', 'type', 'profile', 'otp', 'is_rated', 'rating_declined',
-                  'allowed_action', 'effective_price', 'deal_price', 'status', 'time_slot_start', 'time_slot_end',
+                  'allowed_action', 'effective_price', 'deal_price', 'discount', 'status', 'time_slot_start', 'time_slot_end',
                   'doctor', 'hospital', 'allowed_action', 'doctor_thumbnail', 'patient_thumbnail', 'procedures', 'mrp',
                   'insurance', 'invoices', 'cancellation_reason', 'payment_type', 'display_name', 'reports', 'prescription',
                   'report_files', 'vip')
@@ -2909,6 +2909,7 @@ class TopCommonHospitalForIpdProcedureSerializer(serializers.ModelSerializer):
     hospital_services = serializers.SerializerMethodField()
     service_count = serializers.SerializerMethodField()
     hospital_image = serializers.SerializerMethodField()
+    vip_percentage = serializers.SerializerMethodField()
 
 
     class Meta:
@@ -2916,7 +2917,13 @@ class TopCommonHospitalForIpdProcedureSerializer(serializers.ModelSerializer):
         fields = ('id', 'name', 'distance', 'certifications', 'bed_count', 'logo', 'avg_rating',
                   'count_of_insurance_provider', 'multi_speciality', 'address', 'short_address','open_today',
                   'insurance_provider', 'established_in', 'long', 'lat', 'url', 'locality_url', 'name_city', 'operational_since',
-                  'h1_title', 'is_ipd_hospital', 'seo_title', 'network_id', 'hospital_services', 'service_count', 'hospital_image', 'priority')
+                  'h1_title', 'is_ipd_hospital', 'seo_title', 'network_id', 'hospital_services', 'service_count', 'hospital_image', 'priority',
+                  'vip_percentage')
+
+    def get_vip_percentage(self, obj):
+        if self.context.get('plan'):
+            return obj.percentage
+        return 0
 
     def get_name_city(self, obj):
         result = None

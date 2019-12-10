@@ -49,6 +49,7 @@ class TrackingVisit(DynamicDocument, TimeStampedModel):
     user_agent = StringField(max_length=500, blank=True, null=True)
     visitor_id = UUIDField(editable=False)
 
+
 class TrackingVisitor(DynamicDocument, TimeStampedModel):
     id = UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     device_info = DictField(null=True, blank=True)

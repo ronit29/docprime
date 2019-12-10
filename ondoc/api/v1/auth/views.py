@@ -2523,6 +2523,7 @@ class OrderDetailViewSet(GenericViewSet):
                 "mrp": order.action_data["mrp"] if "mrp" in order.action_data else order.action_data["agreed_price"],
                 "deal_price": order.action_data["deal_price"],
                 "effective_price": order.action_data["effective_price"],
+                "discount": order.action_data.get('discount', 0),
                 "data": cart_serializers.CartItemSerializer(item, context={"validated_data": None}).data,
                 "booking_id": order.reference_id,
                 "time_slot_start": temp_time_slot_start,
