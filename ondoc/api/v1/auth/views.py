@@ -1372,32 +1372,36 @@ class TransactionViewSet(viewsets.GenericViewSet):
                 logger.error("ValueError : statusCode is not type integer")
                 pg_resp_code = None
 
-            redirect_url = self.validate_post_transaction_response(response)
+            redirect_url = self.validate_post_transaction_response(request, response)
             return HttpResponseRedirect(redirect_to=redirect_url)
         except Exception as e:
             logger.error("Error - " + str(e))
 
-    def validate_post_transaction_response(self, response):
+    def validate_post_transaction_response(self, request, response):
         if response.get("orderId", None) and not response.get('items', None):
-            redirect_url = self.validate_single_order_transaction(response)
+            redirect_url = self.validate_single_order_transaction(request, response)
         else:
-            redirect_url = self.validate_multiple_order_transaction(response)
+            redirect_url = self.validate_multiple_order_transaction(request, response)
         return redirect_url
 
-    def validate_single_order_transaction(self, response):
-        ERROR_REDIRECT_URL = settings.BASE_URL + "/cart?error_code=1&error_message=%s"
-        REDIRECT_URL = ERROR_REDIRECT_URL % "Error processing payment, please try again."
-        SUCCESS_REDIRECT_URL = settings.BASE_URL + "/order/summary/%s"
-        LAB_REDIRECT_URL = settings.BASE_URL + "/lab/appointment"
-        OPD_REDIRECT_URL = settings.BASE_URL + "/opd/appointment"
-        PLAN_REDIRECT_URL = settings.BASE_URL + "/prime/success?user_plan="
-        ECONSULT_REDIRECT_URL = settings.BASE_URL + "/econsult?order_id=%s&payment=success"
+    def validate_single_order_transaction(self, request, response):
+        base_url = settings.BASE_URL
+        if request.query_params and request.query_params.get('sbig', False):
+            base_url = settings.SBIG_BASE_URL
 
-        CHAT_ERROR_REDIRECT_URL = settings.BASE_URL + "/mobileviewchat?payment=fail&error_message=%s" % "Error processing payment, please try again."
+        ERROR_REDIRECT_URL = base_url + "/cart?error_code=1&error_message=%s"
+        REDIRECT_URL = ERROR_REDIRECT_URL % "Error processing payment, please try again."
+        SUCCESS_REDIRECT_URL = base_url + "/order/summary/%s"
+        LAB_REDIRECT_URL = base_url + "/lab/appointment"
+        OPD_REDIRECT_URL = base_url + "/opd/appointment"
+        PLAN_REDIRECT_URL = base_url + "/prime/success?user_plan="
+        ECONSULT_REDIRECT_URL = base_url + "/econsult?order_id=%s&payment=success"
+
+        CHAT_ERROR_REDIRECT_URL = base_url + "/mobileviewchat?payment=fail&error_message=%s" % "Error processing payment, please try again."
         CHAT_REDIRECT_URL = CHAT_ERROR_REDIRECT_URL
-        CHAT_SUCCESS_REDIRECT_URL = settings.BASE_URL + "/mobileviewchat?payment=success&order_id=%s&consultation_id=%s"
-        PLUS_FAILURE_REDIRECT_URL = settings.BASE_URL + ""
-        PLUS_SUCCESS_REDIRECT_URL = settings.BASE_URL + "/vip-club-activated-details?payment=success&id=%s"
+        CHAT_SUCCESS_REDIRECT_URL = base_url + "/mobileviewchat?payment=success&order_id=%s&consultation_id=%s"
+        PLUS_FAILURE_REDIRECT_URL = base_url + ""
+        PLUS_SUCCESS_REDIRECT_URL = base_url + "/vip-club-activated-details?payment=success&id=%s"
 
         # log pg data
         try:
@@ -1547,21 +1551,24 @@ class TransactionViewSet(viewsets.GenericViewSet):
             return CHAT_REDIRECT_URL
         return REDIRECT_URL
 
-    def validate_multiple_order_transaction(self, response):
+    def validate_multiple_order_transaction(self, request, response):
+        base_url = settings.BASE_URL
+        if request.query_params and request.query_params.get('sbig', False):
+            base_url = settings.SBIG_BASE_URL
 
-        ERROR_REDIRECT_URL = settings.BASE_URL + "/cart?error_code=1&error_message=%s"
+        ERROR_REDIRECT_URL = base_url + "/cart?error_code=1&error_message=%s"
         REDIRECT_URL = ERROR_REDIRECT_URL % "Error processing payment, please try again."
-        SUCCESS_REDIRECT_URL = settings.BASE_URL + "/order/summary/%s"
-        LAB_REDIRECT_URL = settings.BASE_URL + "/lab/appointment"
-        OPD_REDIRECT_URL = settings.BASE_URL + "/opd/appointment"
-        PLAN_REDIRECT_URL = settings.BASE_URL + "/prime/success?user_plan="
-        ECONSULT_REDIRECT_URL = settings.BASE_URL + "/econsult?order_id=%s&payment=success"
+        SUCCESS_REDIRECT_URL = base_url + "/order/summary/%s"
+        LAB_REDIRECT_URL = base_url + "/lab/appointment"
+        OPD_REDIRECT_URL = base_url + "/opd/appointment"
+        PLAN_REDIRECT_URL = base_url + "/prime/success?user_plan="
+        ECONSULT_REDIRECT_URL = base_url + "/econsult?order_id=%s&payment=success"
 
-        CHAT_ERROR_REDIRECT_URL = settings.BASE_URL + "/mobileviewchat?payment=fail&error_message=%s" % "Error processing payment, please try again."
+        CHAT_ERROR_REDIRECT_URL = base_url + "/mobileviewchat?payment=fail&error_message=%s" % "Error processing payment, please try again."
         CHAT_REDIRECT_URL = CHAT_ERROR_REDIRECT_URL
-        CHAT_SUCCESS_REDIRECT_URL = settings.BASE_URL + "/mobileviewchat?payment=success&order_id=%s&consultation_id=%s"
-        PLUS_FAILURE_REDIRECT_URL = settings.BASE_URL + ""
-        PLUS_SUCCESS_REDIRECT_URL = settings.BASE_URL + "/vip-club-activated-details?payment=success&id=%s"
+        CHAT_SUCCESS_REDIRECT_URL = base_url + "/mobileviewchat?payment=success&order_id=%s&consultation_id=%s"
+        PLUS_FAILURE_REDIRECT_URL = base_url + ""
+        PLUS_SUCCESS_REDIRECT_URL = base_url + "/vip-club-activated-details?payment=success&id=%s"
 
         pg_resp_code = int(response.get('statusCode'))
         # items = response.get('items' ,[]).sort(key='productId', reverse=True)
@@ -2519,6 +2526,10 @@ class OrderDetailViewSet(GenericViewSet):
                     else:
                         payment_mode = payment_modes.get(appointment.payment_type, '')
 
+            appointment_via_sbi = list()
+            if order.action_data.get('utm_sbi_tags', None):
+                appointment_via_sbi.append(True)
+
             curr = {
                 "mrp": order.action_data["mrp"] if "mrp" in order.action_data else order.action_data["agreed_price"],
                 "deal_price": order.action_data["deal_price"],
@@ -2539,7 +2550,12 @@ class OrderDetailViewSet(GenericViewSet):
             }
             processed_order_data.append(curr)
 
-        return Response({"data": processed_order_data, "valid_for_cod_to_prepaid": valid_for_cod_to_prepaid})
+        appointment_sbi = False
+        if True in appointment_via_sbi:
+            appointment_sbi = True
+
+        return Response({"data": processed_order_data, "valid_for_cod_to_prepaid": valid_for_cod_to_prepaid,
+                         "appointment_via_sbi": appointment_sbi})
 
 
 class UserTokenViewSet(GenericViewSet):
