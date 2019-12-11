@@ -1666,7 +1666,7 @@ class PlusUserUpload(auth_model.TimeStampedModel):
                             if not user.active_plus_user:
                                 member_list = []
                                 for user_member_data in excel_data:
-                                    if user_member_data['primary_phone_number'] == user.phone_number:
+                                    if str(user_member_data.get('primary_phone_number', 0)) == str(user.phone_number):
                                         member_list.append(user_member_data)
                                 fetched_data = self.get_plus_user_data(member_list, data, user)
                                 plus_user_data = fetched_data.get('plus_data')
