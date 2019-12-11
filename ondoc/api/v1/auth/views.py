@@ -1473,32 +1473,39 @@ class TransactionViewSet(viewsets.GenericViewSet):
             pass
 
         if pg_resp_code == 1 and order_obj:
-            if response.get("couponUsed") and response.get("couponUsed") == "false":
-                order_obj.update_fields_after_coupon_remove()
-
-            response_data = None
-            resp_serializer = serializers.TransactionSerializer(data=response)
-            if resp_serializer.is_valid():
-                response_data = self.form_pg_transaction_data(resp_serializer.validated_data, order_obj)
-
-                # For Testing
-                if PgTransaction.is_valid_hash(response, product_id=order_obj.product_id):
-                    pg_tx_queryset = None
-                    # if True:
-                    try:
-                        with transaction.atomic():
-                            pg_tx_queryset = PgTransaction.objects.create(**response_data)
-                    except Exception as e:
-                        logger.error("Error in saving PG Transaction Data - " + str(e))
-
-                    try:
-                        with transaction.atomic():
-                            processed_data = order_obj.process_pg_order(convert_cod_to_prepaid)
-                            success_in_process = True
-                    except Exception as e:
-                        logger.error("Error in processing order - " + str(e))
+            # send ack for dummy_txn response
+            # todo - ask pg-team to send flag for this to avoid amount condition check
+            if response and response.get("txAmount") and int(Decimal(response.get("txAmount"))) == 0 \
+                    and response.get('txStatus') == 'TXN_SUCCESS':
+                send_pg_acknowledge.apply_async((response.get("orderId"), response.get("orderNo"),),
+                                                countdown=1)
             else:
-                logger.error("Invalid pg data - " + json.dumps(resp_serializer.errors))
+                if response.get("couponUsed") and response.get("couponUsed") == "false":
+                    order_obj.update_fields_after_coupon_remove()
+
+                response_data = None
+                resp_serializer = serializers.TransactionSerializer(data=response)
+                if resp_serializer.is_valid():
+                    response_data = self.form_pg_transaction_data(resp_serializer.validated_data, order_obj)
+
+                    # For Testing
+                    if PgTransaction.is_valid_hash(response, product_id=order_obj.product_id):
+                        pg_tx_queryset = None
+                        # if True:
+                        try:
+                            with transaction.atomic():
+                                pg_tx_queryset = PgTransaction.objects.create(**response_data)
+                        except Exception as e:
+                            logger.error("Error in saving PG Transaction Data - " + str(e))
+
+                        try:
+                            with transaction.atomic():
+                                processed_data = order_obj.process_pg_order(convert_cod_to_prepaid)
+                                success_in_process = True
+                        except Exception as e:
+                            logger.error("Error in processing order - " + str(e))
+                else:
+                    logger.error("Invalid pg data - " + json.dumps(resp_serializer.errors))
         elif order_obj:
             # send acknowledge if status is TXN_FAILURE to stop callbacks from pg. Do not send acknowledgement if no entry in pg.
             try:
