@@ -48,6 +48,7 @@ def send_lab_notifications_refactored(data, *args, **kwargs):
     if not instance or not instance.user:
         return
     try:
+        test_list = []
         instance = lab_models.LabAppointment.objects.filter(id=appointment_id).first()
         if not instance or not instance.user:
             return
@@ -68,13 +69,16 @@ def send_lab_notifications_refactored(data, *args, **kwargs):
         receivers = lab_notification.get_receivers(is_valid_for_provider)
         content_type = ContentType.objects.get_for_model(instance)
         mask_no_obj = AppointmentMaskNumber.objects.filter(object_id=instance.id, content_type_id=content_type.id)[0]
-        # tests = instance.test_mappings.all()
+        app_test_mapping = instance.test_mappings.all()
+        for data in app_test_mapping:
+            if data.test:
+                test_list.append({'name': data.test.name, 'reference_code': data.test.reference_code})
         context = {'id': instance.id, 'lab_name': instance.lab.name if instance.lab else '',
                             'Patient_name': instance.profile_detail.get('name'), 'Gender':instance.profile_detail.get('gender'),
                             'DOB': instance.profile_detail.get('dob'), 'pickup_address': instance.address.get('address'),
                             'lab_address': instance.address.get( 'address'), 'time_slot': instance.time_slot_start.strftime("%I:%M%p"),
                             'Date':instance.time_slot_start.date(), 'mask_number': mask_no_obj.mask_number if mask_no_obj.mask_number
-                            else instance.address.get('phone_number'), 'test':None}
+                            else instance.address.get('phone_number'), 'test_list': test_list}
         from ondoc.communications.models import EMAILNotification
         kwargs['email_obj'] = instance
         email_notification = EMAILNotification(notification_type, context)
