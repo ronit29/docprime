@@ -238,4 +238,3 @@ def push_opd_appointment_to_integrator(self, data):
 
     except Exception as e:
         logger.error(str(e))
-

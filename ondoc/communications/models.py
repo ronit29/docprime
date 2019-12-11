@@ -1723,7 +1723,7 @@ class OpdNotification(Notification):
 
             whtsapp_notification = WHTSAPPNotification(notification_type, context)
             whtsapp_notification.send(all_receivers.get('sms_receivers', []))
-        elif notification_type == NotificationAction.DOCPRIME_APPOINTMENT_REMINDER_PROVIDER_SMS:
+        elif notification_type == NotificationAction.DOCPRIME_APPOINTMENT_REMINDER_PROVIDER_SMS or notification_type == NotificationAction.REMINDER_MESSAGE_MEDANTA_AND_ARTEMIS:
             sms_notification = SMSNotification(notification_type, context)
             sms_notification.send(all_receivers.get('sms_receivers', []))
         elif notification_type == NotificationAction.COD_TO_PREPAID or \

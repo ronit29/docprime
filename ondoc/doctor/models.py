@@ -3192,12 +3192,20 @@ class OpdAppointment(auth_model.TimeStampedModel, CouponsMixin, OpdAppointmentIn
         if self.is_medanta_appointment() and not self.created_by_native() and self.status == self.BOOKED:
             push_opd_appointment_to_integrator.apply_async(({'appointment_id': self.id},), countdown=5)
 
-        if ((self.status == self.BOOKED and old_instance and old_instance.status != self.BOOKED) or (old_instance and self.status==self.BOOKED)) and self.hospital_id not in settings.MEDANTA_AND_ARTEMIS_HOSPITAL_IDS:
+        if ((self.status == self.BOOKED and old_instance and old_instance.status != self.BOOKED) or (old_instance and self.status==self.BOOKED)) and str(self.hospital_id) not in settings.MEDANTA_AND_ARTEMIS_HOSPITAL_IDS:
             try:
-                notification_tasks.opd_send_notification_before_appointment.apply_async((self.id, self.time_slot_start.timestamp(), self.status ),
+                notification_tasks.opd_send_notification_before_appointment.apply_async((self.id, self.time_slot_start.timestamp(), ),
                     eta=self.time_slot_start - datetime.timedelta(minutes=settings.TIME_BEFORE_APPOINTMENT_TO_SEND_NOTIFICATION), )
             except Exception as e:
                 logger.error(str(e))
+        if str(self.hospital_id) in settings.MEDANTA_AND_ARTEMIS_HOSPITAL_IDS:
+            try:
+                notification_tasks.push_reminder_message_medanta_and_artemis.apply_async(({'appointment_id': self.id,
+                                                                                   'notification_type': NotificationAction.REMINDER_MESSAGE_MEDANTA_AND_ARTEMIS},),
+                                                                                    countdown=1)
+            except Exception as e:
+                logger.error(str(e))
+
 
         print('all ops tasks completed')
 
@@ -3705,6 +3713,7 @@ class OpdAppointment(auth_model.TimeStampedModel, CouponsMixin, OpdAppointmentIn
             cover_under_vip = False
             vip_amount = 0
 
+        utm_sbi_tags = data.get("utm_sbi_tags", {})
 
         return {
             "doctor": data.get("doctor"),
@@ -3733,7 +3742,8 @@ class OpdAppointment(auth_model.TimeStampedModel, CouponsMixin, OpdAppointmentIn
             "vip_convenience_amount": convenience_amount,
             "coupon_data": price_data.get("coupon_data"),
             "_responsible_user": data.get("_responsible_user", None),
-            "_source": data.get("_source", None)
+            "_source": data.get("_source", None),
+            "utm_sbi_tags": utm_sbi_tags
         }
 
     @staticmethod
@@ -4352,7 +4362,8 @@ class CommonMedicalCondition(auth_model.TimeStampedModel):
 class CommonSpecialization(auth_model.TimeStampedModel):
     specialization = models.OneToOneField('PracticeSpecialization', related_name="common_specialization", on_delete=models.CASCADE,
                                           null=True, blank=True)
-    icon = models.ImageField(upload_to='doctor/common_specialization_icons', null=True)
+    # icon = models.ImageField(upload_to='doctor/common_specialization_icons', null=True)
+    icon = models.FileField(upload_to='doctor/common_specialization_icons', blank=False, null=True, validators=[FileExtensionValidator(allowed_extensions=['jpg', 'jpeg', 'png', 'svg'])])
     priority = models.PositiveIntegerField(default=0)
 
     def __str__(self):

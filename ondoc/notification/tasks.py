@@ -1742,7 +1742,7 @@ def process_leads_to_matrix(self, data):
 
 
 @task()
-def opd_send_notification_before_appointment(appointment_id, time, status):
+def opd_send_notification_before_appointment(appointment_id, time):
     from ondoc.doctor.models import OpdAppointment
     from ondoc.communications.models import OpdNotification
     try:
@@ -1766,5 +1766,20 @@ def lab_send_notification_before_appointment(appointment_id, time):
             return
         lab_notification = LabNotification(instance, NotificationAction.PROVIDER_LAB_APPOINTMENT_CONFIRMATION_ONLINE_PAYMENT)
         lab_notification.send()
+    except Exception as e:
+        logger.error(str(e))
+
+
+@task()
+def push_reminder_message_medanta_and_artemis(data):
+    from ondoc.doctor.models import OpdAppointment
+    from ondoc.communications.models import OpdNotification
+    try:
+        instance = OpdAppointment.objects.filter(id=data.get('appointment_id')).first()
+        if not instance or not instance.user:
+            return
+        opd_notification = OpdNotification(instance, NotificationAction.REMINDER_MESSAGE_MEDANTA_AND_ARTEMIS)
+        opd_notification.send()
+
     except Exception as e:
         logger.error(str(e))
