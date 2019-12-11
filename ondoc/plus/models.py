@@ -637,8 +637,9 @@ class PlusUser(auth_model.TimeStampedModel, RefundMixin, TransactionMixin, Coupo
                 # price_data = {"mrp": int(price_data.get('mrp')), "deal_price": int(price_data.get('deal_price')),
                 #               "cod_deal_price": int(price_data.get('deal_price')),
                 #               "fees": int(price_data.get('fees'))}
-                response_dict['vip_convenience_amount'] = PlusPlans.get_default_convenience_amount(price_data, "LABTEST",
+                calculated_convenience_amount = PlusPlans.get_default_convenience_amount(price_data, "LABTEST",
                                                                                                    plus_user.plan)
+                response_dict['vip_convenience_amount'] = calculated_convenience_amount
                 price_engine = get_price_reference(plus_user, "LABTEST")
                 if not price_engine:
                     price = int(price_data.get('mrp'))
@@ -659,7 +660,7 @@ class PlusUser(auth_model.TimeStampedModel, RefundMixin, TransactionMixin, Coupo
                     # discount calculation on amount to be paid
                     amount_to_be_paid = engine_response.get('amount_to_be_paid', final_price)
                     coupon_discount, coupon_cashback, coupon_list, random_coupon_list = Coupon.get_total_deduction(
-                        appointment_data, amount_to_be_paid)
+                        appointment_data, price + calculated_convenience_amount)
                     if coupon_discount >= amount_to_be_paid:
                         response_dict['amount_to_be_paid'] = 0
                     else:
