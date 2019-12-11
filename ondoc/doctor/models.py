@@ -2622,18 +2622,24 @@ class OpdAppointment(auth_model.TimeStampedModel, CouponsMixin, OpdAppointmentIn
 
     def get_cod_amount(self):
         result = int(self.mrp)
+        deal_price = int(self.deal_price)
+        discount = int(self.discount)
         day = self.time_slot_start.weekday()
-        if self.doctor:
-            aware_dt = timezone.localtime(self.time_slot_start)
-            hour_min = aware_dt.hour + aware_dt.minute / 60
-            doc_clinic = DoctorClinicTiming.objects.filter(day=day, doctor_clinic__doctor=self.doctor,
-                                                           doctor_clinic__hospital=self.hospital, start__lte=hour_min,
-                                                           end__gt=hour_min).first()
-            if doc_clinic:
-                try:
-                    result = doc_clinic.dct_cod_deal_price()
-                except:
-                    pass
+        if deal_price:
+            result = deal_price
+        if discount:
+            result =- discount
+        # if self.doctor:
+        #     aware_dt = timezone.localtime(self.time_slot_start)
+        #     hour_min = aware_dt.hour + aware_dt.minute / 60
+        #     doc_clinic = DoctorClinicTiming.objects.filter(day=day, doctor_clinic__doctor=self.doctor,
+        #                                                    doctor_clinic__hospital=self.hospital, start__lte=hour_min,
+        #                                                    end__gt=hour_min).first()
+        #     if doc_clinic:
+        #         try:
+        #             # result = doc_clinic.dct_cod_deal_price()
+        #         except:
+        #             pass
         return result
 
     def allowed_action(self, user_type, request):
@@ -3588,10 +3594,11 @@ class OpdAppointment(auth_model.TimeStampedModel, CouponsMixin, OpdAppointmentIn
 
         if data.get("payment_type") == cls.COD:
             effective_price = 0
-            coupon_discount, coupon_cashback, coupon_list, random_coupon_list = 0, 0, [], []
+            # coupon_discount, coupon_cashback, coupon_list, random_coupon_list = 0, 0, [], []
             deal_price = doctor_clinic_timing.dct_cod_deal_price()
             prepaid_deal_price = doctor_clinic_timing.deal_price
-
+            coupon_discount, coupon_cashback, coupon_list, random_coupon_list = Coupon.get_total_deduction(data,
+                                                                                                           deal_price)
 
         return {
             "deal_price": deal_price,
@@ -3690,6 +3697,7 @@ class OpdAppointment(auth_model.TimeStampedModel, CouponsMixin, OpdAppointmentIn
             cover_under_vip = False
             vip_amount = 0
 
+        utm_sbi_tags = data.get("utm_sbi_tags", {})
 
         return {
             "doctor": data.get("doctor"),
@@ -3718,7 +3726,8 @@ class OpdAppointment(auth_model.TimeStampedModel, CouponsMixin, OpdAppointmentIn
             "vip_convenience_amount": convenience_amount,
             "coupon_data": price_data.get("coupon_data"),
             "_responsible_user": data.get("_responsible_user", None),
-            "_source": data.get("_source", None)
+            "_source": data.get("_source", None),
+            "utm_sbi_tags": utm_sbi_tags
         }
 
     @staticmethod
@@ -4337,7 +4346,8 @@ class CommonMedicalCondition(auth_model.TimeStampedModel):
 class CommonSpecialization(auth_model.TimeStampedModel):
     specialization = models.OneToOneField('PracticeSpecialization', related_name="common_specialization", on_delete=models.CASCADE,
                                           null=True, blank=True)
-    icon = models.ImageField(upload_to='doctor/common_specialization_icons', null=True)
+    # icon = models.ImageField(upload_to='doctor/common_specialization_icons', null=True)
+    icon = models.FileField(upload_to='doctor/common_specialization_icons', blank=False, null=True, validators=[FileExtensionValidator(allowed_extensions=['jpg', 'jpeg', 'png', 'svg'])])
     priority = models.PositiveIntegerField(default=0)
 
     def __str__(self):
