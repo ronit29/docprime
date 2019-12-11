@@ -16,7 +16,7 @@ from django.forms import model_to_dict
 from django.utils import timezone
 from openpyxl import load_workbook
 
-from ondoc.api.v1.utils import aware_time_zone, log_requests_on, pg_seamless_hash
+from ondoc.api.v1.utils import aware_time_zone, log_requests_on, pg_seamless_hash, get_pg_secret_client_key
 from ondoc.authentication.models import UserNumberUpdate, UserProfileEmailUpdate
 from ondoc.common.models import AppointmentMaskNumber
 from ondoc.matrix.mongo_models import MatrixLog
@@ -376,6 +376,7 @@ def set_order_dummy_transaction(self, order_id, user_id):
 
 @task(bind=True, max_retries=5)
 def set_order_dummy_transaction_for_corporate(self, order_id, user_id):
+    from ondoc.account.models import PgTransaction
     from ondoc.account.models import Order, DummyTransactions
     from ondoc.plus.models import PlusUser
     from ondoc.account.models import User
@@ -447,6 +448,12 @@ def set_order_dummy_transaction_for_corporate(self, order_id, user_id):
 
         for key in req_data:
             req_data[key] = str(req_data[key])
+
+        secret_key, client_key = get_pg_secret_client_key(order_row)
+        filtered_pgdata = {k: v for k, v in req_data.items() if v is not None and v != ''}
+        req_data.clear()
+        req_data.update(filtered_pgdata)
+        req_data['hash'] = PgTransaction.create_pg_hash(req_data, secret_key, client_key)
 
         response = requests.post(url, data=json.dumps(req_data), headers=headers)
         save_pg_response.apply_async((PgLogs.DUMMY_TXN, order_id, None, response.json(), req_data, user_id,), eta=timezone.localtime(), queue=settings.RABBITMQ_LOGS_QUEUE)
