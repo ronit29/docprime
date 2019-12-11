@@ -201,6 +201,7 @@ class PlusOrderViewSet(viewsets.GenericViewSet):
             utm_campaign = request.data.get('utm_spo_tags', {}).get('utm_campaign', None)
             utm_medium = request.data.get('utm_spo_tags', {}).get('utm_medium', None)
             is_utm_agent = request.data.get('utm_spo_tags', {}).get('is_agent', None)
+            utm_sbi_tags = request.data.get('utm_sbi_tags', {})
             utm_parameter = {"utm_source": utm_source, "is_utm_agent": is_utm_agent, 'utm_term': utm_term, 'utm_campaign': utm_campaign, 'utm_medium': utm_medium}
             plus_plan = PlusPlans.objects.filter(id=plus_plan_id, is_live=True).first()
             if not plus_plan:
@@ -223,7 +224,7 @@ class PlusOrderViewSet(viewsets.GenericViewSet):
                               'random_coupon_list': price_data.get('random_coupon_list')}
 
             plus_subscription_data = {"profile_detail": user_profile, "plus_plan": plus_plan.id,
-                              "user": request.user.pk, "plus_user": plus_user_data, "utm_parameter": utm_parameter}
+                              "user": request.user.pk, "plus_user": plus_user_data, "utm_parameter": utm_parameter, "utm_sbi_tags": utm_sbi_tags}
 
             # consumer_account = account_models.ConsumerAccount.objects.get_or_create(user=user)
             # consumer_account = account_models.ConsumerAccount.objects.select_for_update().get(user=user)
@@ -372,6 +373,12 @@ class PlusProfileViewSet(viewsets.GenericViewSet):
             resp['is_member_allowed'] = False
         else:
             resp['is_member_allowed'] = True
+
+        plus_via_sbi = False
+        if plus_user.order and plus_user.order.action_data and plus_user.order.action_data.get('utm_sbi_tags', None):
+            plus_via_sbi = True
+        resp['plus_via_sbi'] = plus_via_sbi
+
         plus_plan_queryset = PlusPlans.objects.filter(id=plus_user.plan.id)
         plan_body_serializer = serializers.PlusPlansSerializer(plus_plan_queryset, context={'request': request}, many=True)
         resp['plan'] = plan_body_serializer.data

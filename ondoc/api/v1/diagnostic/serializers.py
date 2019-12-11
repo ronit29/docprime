@@ -822,9 +822,15 @@ class CommonPackageSerializer(serializers.ModelSerializer):
         request = self.context.get("request")
         resp = Lab.get_vip_details(request.user)
         user = request.user
-        mrp = obj._selected_test.mrp if obj._selected_test else None
-        deal_price = obj._selected_test.custom_deal_price if obj._selected_test.custom_deal_price else obj._selected_test.computed_deal_price
-        agreed_price = obj._selected_test.custom_agreed_price if obj._selected_test.custom_agreed_price else obj._selected_test.computed_agreed_price
+
+        deal_price = None
+        mrp = None
+        agreed_price = None
+        if obj._selected_test:
+            mrp = obj._selected_test.mrp
+            deal_price = obj._selected_test.custom_deal_price if obj._selected_test.custom_deal_price else obj._selected_test.computed_deal_price
+            agreed_price = obj._selected_test.custom_agreed_price if obj._selected_test.custom_agreed_price else obj._selected_test.computed_agreed_price
+
         lab_obj = Lab.objects.filter(id=obj.lab_id).first()
         price_data = {"mrp": mrp, "deal_price": deal_price,
                       "cod_deal_price": deal_price,
@@ -1219,6 +1225,7 @@ class LabAppointmentCreateSerializer(serializers.Serializer):
     test_timings = serializers.ListSerializer(child=LabAppointmentTestSerializer(), required=False, allow_empty=False)
     multi_timings_enabled = serializers.BooleanField(required=False, default=False)
     selected_timings_type = serializers.ChoiceField(required=False, choices=(('common', 'common'), ('separate', 'separate')))
+    utm_sbi_tags = serializers.JSONField(required=False, default={})
     plus_plan = serializers.PrimaryKeyRelatedField(queryset=PlusPlans.objects.filter(is_live=True, is_gold=True), required=False)
 
     def __init__(self, instance=None, data=None, **kwargs):
@@ -1886,6 +1893,7 @@ class LabAppointmentRetrieveSerializer(LabAppointmentModelSerializer):
     cancellation_reason = serializers.SerializerMethodField()
     mask_data = serializers.SerializerMethodField()
     selected_timings_type = serializers.SerializerMethodField()
+    appointment_via_sbi = serializers.SerializerMethodField()
 
     def get_mask_data(self, obj):
         mask_number = obj.mask_number.first()
@@ -1935,14 +1943,21 @@ class LabAppointmentRetrieveSerializer(LabAppointmentModelSerializer):
 
         return selected_timings_type
 
+    def get_appointment_via_sbi(self, obj):
+        sbi_appointment = False
+        order = Order.objects.filter(reference_id=obj.id, product_id=2).first()
+        if order and order.action_data.get('utm_sbi_tags', None):
+            sbi_appointment = True
+
+        return sbi_appointment
+
     class Meta:
         model = LabAppointment
         fields = ('id', 'type', 'lab_name', 'status', 'deal_price', 'effective_price',
                   'time_slot_start', 'time_slot_end', 'selected_timings_type', 'is_rated', 'rating_declined', 'is_home_pickup', 'lab_thumbnail',
                   'lab_image', 'profile', 'allowed_action', 'lab_test', 'lab', 'otp', 'address', 'type', 'reports',
                   'report_files', 'invoices', 'prescription', 'cancellation_reason', 'mask_data', 'payment_type',
-                  'price')
-
+                  'price', 'appointment_via_sbi')
 
 
 class DoctorLabAppointmentRetrieveSerializer(LabAppointmentModelSerializer):
