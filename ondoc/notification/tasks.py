@@ -1771,7 +1771,7 @@ def lab_send_notification_before_appointment(appointment_id, time):
 
 
 @task()
-def push_reminder_message_medanta_and_artemis(data):
+def push_reminder_message_medanta_and_artemis(data, *args, **kwargs):
     from ondoc.doctor.models import OpdAppointment
     from ondoc.communications.models import OpdNotification
     try:
@@ -1779,7 +1779,17 @@ def push_reminder_message_medanta_and_artemis(data):
         if not instance or not instance.user:
             return
         opd_notification = OpdNotification(instance, NotificationAction.REMINDER_MESSAGE_MEDANTA_AND_ARTEMIS)
-        opd_notification.send()
+        receivers = opd_notification.get_receivers(is_valid_for_provider=True)
+
+        from ondoc.communications.models import SMSNotification
+        context = {'doctor_name': instance.doctor.name.title(),
+                   'time_slot_start_date': instance.time_slot_start.date(),
+                   'time_slot_start_time': instance.time_slot_start.strftime("%I:%M%p"),
+                   'hospital_name': instance.hospital.name,
+                   'patient_name': instance.profile_detail.get('name').title() if instance.profile_detail.get(
+                       'name') else ''}
+        sms_notification = SMSNotification(NotificationAction.REMINDER_MESSAGE_MEDANTA_AND_ARTEMIS, context)
+        sms_notification.send(receivers.get('sms_receivers', []), *args, **kwargs)
 
     except Exception as e:
         logger.error(str(e))

@@ -457,6 +457,8 @@ class SMSNotification:
             obj = DynamicTemplates.objects.filter(template_name="cloud_labs_report_success_provider", approved=True).first()
         elif notification_type == NotificationAction.PARTNER_LAB_REPORT_UPLOADED:
             obj = DynamicTemplates.objects.filter(template_name="cloud_labs_report_success_patient", approved=True).first()
+        elif notification_type == NotificationAction.REMINDER_MESSAGE_MEDANTA_AND_ARTEMIS:
+            obj = DynamicTemplates.objects.filter(template_name="Reminder_message_Medanta_Artemis", approved=True).first()
         return obj
 
     def trigger(self, receiver, template, context):
@@ -1774,8 +1776,9 @@ class OpdNotification(Notification):
                                  NotificationAction.COD_TO_PREPAID,
                                  NotificationAction.COD_TO_PREPAID_REQUEST,
                                  NotificationAction.SEND_LENSFIT_COUPON,
-                                 NotificationAction.PROVIDER_APPOINTMENT_CONFIRMATION_PAY_AT_CLINIC,
-                                 NotificationAction.PROVIDER_APPOINTMENT_CONFIRMATION_ONLINE_PAYMENT
+                                 NotificationAction.PROVIDER_OPD_APPOINTMENT_CONFIRMATION_PAY_AT_CLINIC,
+                                 NotificationAction.PROVIDER_OPD_APPOINTMENT_CONFIRMATION_ONLINE_PAYMENT,
+                                 NotificationAction.REMINDER_MESSAGE_MEDANTA_AND_ARTEMIS
                                  ]:
             receivers.append(instance.user)
         elif notification_type in [NotificationAction.APPOINTMENT_RESCHEDULED_BY_PATIENT,
