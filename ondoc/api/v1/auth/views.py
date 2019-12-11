@@ -1372,32 +1372,36 @@ class TransactionViewSet(viewsets.GenericViewSet):
                 logger.error("ValueError : statusCode is not type integer")
                 pg_resp_code = None
 
-            redirect_url = self.validate_post_transaction_response(response)
+            redirect_url = self.validate_post_transaction_response(request, response)
             return HttpResponseRedirect(redirect_to=redirect_url)
         except Exception as e:
             logger.error("Error - " + str(e))
 
-    def validate_post_transaction_response(self, response):
+    def validate_post_transaction_response(self, request, response):
         if response.get("orderId", None) and not response.get('items', None):
-            redirect_url = self.validate_single_order_transaction(response)
+            redirect_url = self.validate_single_order_transaction(request, response)
         else:
-            redirect_url = self.validate_multiple_order_transaction(response)
+            redirect_url = self.validate_multiple_order_transaction(request, response)
         return redirect_url
 
-    def validate_single_order_transaction(self, response):
-        ERROR_REDIRECT_URL = settings.BASE_URL + "/cart?error_code=1&error_message=%s"
-        REDIRECT_URL = ERROR_REDIRECT_URL % "Error processing payment, please try again."
-        SUCCESS_REDIRECT_URL = settings.BASE_URL + "/order/summary/%s"
-        LAB_REDIRECT_URL = settings.BASE_URL + "/lab/appointment"
-        OPD_REDIRECT_URL = settings.BASE_URL + "/opd/appointment"
-        PLAN_REDIRECT_URL = settings.BASE_URL + "/prime/success?user_plan="
-        ECONSULT_REDIRECT_URL = settings.BASE_URL + "/econsult?order_id=%s&payment=success"
+    def validate_single_order_transaction(self, request, response):
+        base_url = settings.BASE_URL
+        if request.query_params and request.query_params.get('sbig', False):
+            base_url = settings.SBIG_BASE_URL
 
-        CHAT_ERROR_REDIRECT_URL = settings.BASE_URL + "/mobileviewchat?payment=fail&error_message=%s" % "Error processing payment, please try again."
+        ERROR_REDIRECT_URL = base_url + "/cart?error_code=1&error_message=%s"
+        REDIRECT_URL = ERROR_REDIRECT_URL % "Error processing payment, please try again."
+        SUCCESS_REDIRECT_URL = base_url + "/order/summary/%s"
+        LAB_REDIRECT_URL = base_url + "/lab/appointment"
+        OPD_REDIRECT_URL = base_url + "/opd/appointment"
+        PLAN_REDIRECT_URL = base_url + "/prime/success?user_plan="
+        ECONSULT_REDIRECT_URL = base_url + "/econsult?order_id=%s&payment=success"
+
+        CHAT_ERROR_REDIRECT_URL = base_url + "/mobileviewchat?payment=fail&error_message=%s" % "Error processing payment, please try again."
         CHAT_REDIRECT_URL = CHAT_ERROR_REDIRECT_URL
-        CHAT_SUCCESS_REDIRECT_URL = settings.BASE_URL + "/mobileviewchat?payment=success&order_id=%s&consultation_id=%s"
-        PLUS_FAILURE_REDIRECT_URL = settings.BASE_URL + ""
-        PLUS_SUCCESS_REDIRECT_URL = settings.BASE_URL + "/vip-club-activated-details?payment=success&id=%s"
+        CHAT_SUCCESS_REDIRECT_URL = base_url + "/mobileviewchat?payment=success&order_id=%s&consultation_id=%s"
+        PLUS_FAILURE_REDIRECT_URL = base_url + ""
+        PLUS_SUCCESS_REDIRECT_URL = base_url + "/vip-club-activated-details?payment=success&id=%s"
 
         # log pg data
         try:
@@ -1444,10 +1448,10 @@ class TransactionViewSet(viewsets.GenericViewSet):
                             json_url = '{"url": "%s"}' % CHAT_REDIRECT_URL
                             log_created_at = datetime.datetime.now()
                             save_pg_response.apply_async((PgLogs.RESPONSE_TO_CHAT, chat_order.id, None, json_url, None, None, log_created_at), eta=timezone.localtime(), queue=settings.RABBITMQ_LOGS_QUEUE)
-                        return HttpResponseRedirect(redirect_to=CHAT_REDIRECT_URL)
+                        return CHAT_REDIRECT_URL
                     else:
                         REDIRECT_URL = (SUCCESS_REDIRECT_URL % pg_txn.order_id) + "?payment_success=true"
-                        return HttpResponseRedirect(redirect_to=REDIRECT_URL)
+                        return REDIRECT_URL
         except Exception as e:
             logger.error("Error in sending pg acknowledge - " + str(e))
 
@@ -1501,6 +1505,9 @@ class TransactionViewSet(viewsets.GenericViewSet):
                 if response and response.get("orderNo") and response.get("orderId") and response.get(
                         'txStatus') and response.get('txStatus') == 'TXN_FAILURE':
                     send_pg_acknowledge.apply_async((response.get("orderId"), response.get("orderNo"),), countdown=1)
+                if response and response.get("orderNo") and response.get("orderId") and response.get(
+                        'txStatus') and response.get('txStatus') == 'TXN_SUCCESS' and pg_resp_code == 5:
+                    send_pg_acknowledge.apply_async((response.get("orderId"), response.get("orderNo"),), countdown=1)
             except Exception as e:
                 logger.error("Error in sending pg acknowledge - " + str(e))
 
@@ -1547,21 +1554,24 @@ class TransactionViewSet(viewsets.GenericViewSet):
             return CHAT_REDIRECT_URL
         return REDIRECT_URL
 
-    def validate_multiple_order_transaction(self, response):
+    def validate_multiple_order_transaction(self, request, response):
+        base_url = settings.BASE_URL
+        if request.query_params and request.query_params.get('sbig', False):
+            base_url = settings.SBIG_BASE_URL
 
-        ERROR_REDIRECT_URL = settings.BASE_URL + "/cart?error_code=1&error_message=%s"
+        ERROR_REDIRECT_URL = base_url + "/cart?error_code=1&error_message=%s"
         REDIRECT_URL = ERROR_REDIRECT_URL % "Error processing payment, please try again."
-        SUCCESS_REDIRECT_URL = settings.BASE_URL + "/order/summary/%s"
-        LAB_REDIRECT_URL = settings.BASE_URL + "/lab/appointment"
-        OPD_REDIRECT_URL = settings.BASE_URL + "/opd/appointment"
-        PLAN_REDIRECT_URL = settings.BASE_URL + "/prime/success?user_plan="
-        ECONSULT_REDIRECT_URL = settings.BASE_URL + "/econsult?order_id=%s&payment=success"
+        SUCCESS_REDIRECT_URL = base_url + "/order/summary/%s"
+        LAB_REDIRECT_URL = base_url + "/lab/appointment"
+        OPD_REDIRECT_URL = base_url + "/opd/appointment"
+        PLAN_REDIRECT_URL = base_url + "/prime/success?user_plan="
+        ECONSULT_REDIRECT_URL = base_url + "/econsult?order_id=%s&payment=success"
 
-        CHAT_ERROR_REDIRECT_URL = settings.BASE_URL + "/mobileviewchat?payment=fail&error_message=%s" % "Error processing payment, please try again."
+        CHAT_ERROR_REDIRECT_URL = base_url + "/mobileviewchat?payment=fail&error_message=%s" % "Error processing payment, please try again."
         CHAT_REDIRECT_URL = CHAT_ERROR_REDIRECT_URL
-        CHAT_SUCCESS_REDIRECT_URL = settings.BASE_URL + "/mobileviewchat?payment=success&order_id=%s&consultation_id=%s"
-        PLUS_FAILURE_REDIRECT_URL = settings.BASE_URL + ""
-        PLUS_SUCCESS_REDIRECT_URL = settings.BASE_URL + "/vip-club-activated-details?payment=success&id=%s"
+        CHAT_SUCCESS_REDIRECT_URL = base_url + "/mobileviewchat?payment=success&order_id=%s&consultation_id=%s"
+        PLUS_FAILURE_REDIRECT_URL = base_url + ""
+        PLUS_SUCCESS_REDIRECT_URL = base_url + "/vip-club-activated-details?payment=success&id=%s"
 
         pg_resp_code = int(response.get('statusCode'))
         # items = response.get('items' ,[]).sort(key='productId', reverse=True)
@@ -1621,10 +1631,10 @@ class TransactionViewSet(viewsets.GenericViewSet):
                                 chat_order = Order.objects.filter(pk=pg_txn.order_id).first()
                                 if chat_order:
                                     CHAT_REDIRECT_URL = CHAT_SUCCESS_REDIRECT_URL % (chat_order.id, chat_order.reference_id)
-                                return HttpResponseRedirect(redirect_to=CHAT_REDIRECT_URL)
+                                return CHAT_REDIRECT_URL
                             else:
                                 REDIRECT_URL = (SUCCESS_REDIRECT_URL % pg_txn.order_id) + "?payment_success=true"
-                                return HttpResponseRedirect(redirect_to=REDIRECT_URL)
+                                return REDIRECT_URL
                 except Exception as e:
                     logger.error("Error in sending pg acknowledge - " + str(e))
 
@@ -1711,6 +1721,10 @@ class TransactionViewSet(viewsets.GenericViewSet):
                         if response and response.get("orderNo") and order_id and response.get(
                                 'txStatus') and response.get('txStatus') == 'TXN_FAILURE':
                             send_pg_acknowledge.apply_async((order_id, response.get("orderNo"),), countdown=1)
+                        if response and response.get("orderNo") and response.get("orderId") and response.get(
+                                'txStatus') and response.get('txStatus') == 'TXN_SUCCESS' and pg_resp_code == 5:
+                            send_pg_acknowledge.apply_async((response.get("orderId"), response.get("orderNo"),),
+                                                            countdown=1)
                     except Exception as e:
                         logger.error("Error in sending pg acknowledge - " + str(e))
 
@@ -2519,6 +2533,10 @@ class OrderDetailViewSet(GenericViewSet):
                     else:
                         payment_mode = payment_modes.get(appointment.payment_type, '')
 
+            appointment_via_sbi = list()
+            if order.action_data.get('utm_sbi_tags', None):
+                appointment_via_sbi.append(True)
+
             curr = {
                 "mrp": order.action_data["mrp"] if "mrp" in order.action_data else order.action_data["agreed_price"],
                 "deal_price": order.action_data["deal_price"],
@@ -2539,7 +2557,12 @@ class OrderDetailViewSet(GenericViewSet):
             }
             processed_order_data.append(curr)
 
-        return Response({"data": processed_order_data, "valid_for_cod_to_prepaid": valid_for_cod_to_prepaid})
+        appointment_sbi = False
+        if True in appointment_via_sbi:
+            appointment_sbi = True
+
+        return Response({"data": processed_order_data, "valid_for_cod_to_prepaid": valid_for_cod_to_prepaid,
+                         "appointment_via_sbi": appointment_sbi})
 
 
 class UserTokenViewSet(GenericViewSet):
@@ -2837,9 +2860,11 @@ class MatrixUserViewset(GenericViewSet):
 
 
 class ExternalLoginViewSet(GenericViewSet):
+    SBIG = 1
+    BAGIC = 2
 
     @transaction.atomic()
-    def get_external_login_response(self, request):
+    def get_external_login_response(self, request, ext_type=0):
         from django.http import JsonResponse
         response = {'login': 0}
         if request.method != 'POST':
@@ -2854,7 +2879,11 @@ class ExternalLoginViewSet(GenericViewSet):
         if not token_object or not user_data:
             return Response({'error': 'Unauthorise'}, status=status.HTTP_400_BAD_REQUEST)
 
-        base_landing_url = settings.BASE_URL + '/sms/booking?token={}'.format(token_object['token'].decode("utf-8"))
+        base_url = settings.BASE_URL
+        if ext_type == 1:
+            base_url = settings.SBIG_BASE_URL
+
+        base_landing_url = base_url + '/sms/booking?token={}'.format(token_object['token'].decode("utf-8"))
         redirect_url = 'lab' if redirect_type == 'lab' else 'opd'
         callback_url = base_landing_url + "&callbackurl={}".format(redirect_url)
         docprime_login_url = generate_short_url(callback_url)
@@ -2871,7 +2900,8 @@ class BajajAllianzUserViewset(GenericViewSet):
 
     @transaction.atomic()
     def user_login_via_bagic(self, request):
-        response = ExternalLoginViewSet().get_external_login_response(request)
+        ext_type = ExternalLoginViewSet.BAGIC
+        response = ExternalLoginViewSet().get_external_login_response(request, ext_type)
         return response
 
 
@@ -2880,7 +2910,8 @@ class SbiGUserViewset(GenericViewSet):
 
     @transaction.atomic()
     def user_login_via_sbig(self, request):
-        response = ExternalLoginViewSet().get_external_login_response(request)
+        ext_type = ExternalLoginViewSet.SBIG
+        response = ExternalLoginViewSet().get_external_login_response(request, ext_type)
         return response
 
 
