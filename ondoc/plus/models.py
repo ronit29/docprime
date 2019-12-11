@@ -1511,8 +1511,8 @@ class TempPlusUser(auth_model.TimeStampedModel):
                 engine = get_class_reference(plus_user, entity)
                 response_dict['vip_gold_price'] = int(price_data.get('fees'))
                 if appointment_data['test_ids']:
-                    # engine_response = engine.validate_booking_entity(cost=final_price, id=appointment_data['test_ids'][0].id, utilization=kwargs.get('utilization'))
-                    engine_response = engine.validate_booking_entity(cost=final_price, id=appointment_data['test_ids'][0].id, utilization=kwargs.get('utilization'), mrp=mrp, price_engine_price=price, deal_price=int(price_data.get('deal_price')))
+                    mrp_with_home_pickup = mrp + price_data['home_pickup_charges']
+                    engine_response = engine.validate_booking_entity(cost=final_price, id=appointment_data['test_ids'][0].id, utilization=kwargs.get('utilization'), mrp=mrp_with_home_pickup, price_engine_price=price, deal_price=int(price_data.get('deal_price')))
 
                     if not engine_response:
                         return response_dict
