@@ -207,12 +207,20 @@ class UserProfileSerializer(serializers.ModelSerializer):
     is_default_user = serializers.BooleanField(required=False)
     is_vip_member = serializers.SerializerMethodField()
     is_vip_gold_member = serializers.SerializerMethodField()
+    vip_data = serializers.SerializerMethodField()
 
     class Meta:
         model = UserProfile
         fields = ("id", "name", "email", "gender", "phone_number", "is_otp_verified", "is_default_user", "profile_image"
                   , "age", "user", "dob", "is_insured", "updated_at", "whatsapp_optin", "whatsapp_is_declined",
                   "insurance_status", "is_vip_member", "is_vip_gold_member")
+
+    def get_vip_data(self, obj):
+        resp = {}
+        if not self.get_is_vip_member(obj):
+            return resp
+
+
 
     def get_is_insured(self, obj):
         if isinstance(obj, dict):
