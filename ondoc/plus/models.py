@@ -1778,7 +1778,7 @@ class PlusUserUpload(auth_model.TimeStampedModel):
             if plan.total_allowed_members < len(members):
                 raise Exception('Only ' + str(plan.total_allowed_members) + ' members are allowed in selected plan for ' + data['first_name'])
 
-        if data['relationship'] == 'Self':
+        if data['relationship'] == 'Self' or data['relationship'] == 'SELF':
             user_profile = UserProfile.objects.filter(user_id=user.pk).first()
             if user_profile:
                 user_profile = {"name": user_profile.name, "email": user_profile.email, "gender": user_profile.gender,
