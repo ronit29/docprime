@@ -213,7 +213,7 @@ class UserProfileSerializer(serializers.ModelSerializer):
         model = UserProfile
         fields = ("id", "name", "email", "gender", "phone_number", "is_otp_verified", "is_default_user", "profile_image"
                   , "age", "user", "dob", "is_insured", "updated_at", "whatsapp_optin", "whatsapp_is_declined",
-                  "insurance_status", "is_vip_member", "is_vip_gold_member")
+                  "insurance_status", "is_vip_member", "is_vip_gold_member", "vip_data")
 
     def get_vip_data(self, obj):
         resp = {}
@@ -222,7 +222,9 @@ class UserProfileSerializer(serializers.ModelSerializer):
             return resp
         resp['expiry_date'] = plus_membership.expire_date
         resp['purchase_date'] = plus_membership.purchase_date
-        resp['primary_member'] = plus_membership.get_primary_member_profile
+        primary_member = plus_membership.get_primary_member_profile()
+        if not primary_member:
+            return resp
         return resp
 
     def get_is_insured(self, obj):
