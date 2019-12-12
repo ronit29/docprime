@@ -814,7 +814,8 @@ class UserAppointmentsViewSet(OndocViewSet):
                         price_data = {"mrp": temp_lab_test[0].get("total_mrp"),
                                       "deal_price": temp_lab_test[0].get("total_deal_price"),
                                       "cod_deal_price": temp_lab_test[0].get("total_deal_price"),
-                                      "fees": temp_lab_test[0].get("total_agreed_price", 0)}
+                                      "fees": temp_lab_test[0].get("total_agreed_price", 0),
+                                      "home_pickup_charges": lab_appointment.home_pickup_charges}
                         if plus_user:
                             new_effective_price, convenience_charge = self.get_plus_user_effective_price(plus_user, price_data, "LABTEST")
                         if lab_appointment.plus_plan.plan.is_gold:
@@ -869,8 +870,10 @@ class UserAppointmentsViewSet(OndocViewSet):
             plan = plus_user.plan if plus_user else None
             convenience_charge = PlusPlans.get_default_convenience_amount(price_data, "LABTEST", default_plan_query=plan)
             engine = get_class_reference(plus_user, "LABTEST")
-            plus_data = engine.validate_booking_entity(cost=price, mrp=price_data.get('mrp', None),
-                                                       deal_price=price_data.get('deal_price'))
+            final_price = price + price_data.get('home_pickup_charges', 0)
+            mrp_with_home_pickup = price_data.get('mrp') + price_data.get('home_pickup_charges', 0)
+            plus_data = engine.validate_booking_entity(cost=final_price, mrp=mrp_with_home_pickup,
+                                                       deal_price=price_data.get('deal_price'), price_engine_price=price)
             effective_price = plus_data.get('amount_to_be_paid', None)
             return effective_price, convenience_charge
         else:
