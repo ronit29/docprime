@@ -220,11 +220,16 @@ class UserProfileSerializer(serializers.ModelSerializer):
         plus_membership = obj.get_plus_membership
         if not plus_membership:
             return resp
-        resp['expiry_date'] = plus_membership.expire_date
-        resp['purchase_date'] = plus_membership.purchase_date
+        resp['expiry_date'] = plus_membership.expire_date.date()
+        resp['purchase_date'] = plus_membership.purchase_date.date()
         primary_member = plus_membership.get_primary_member_profile()
-        if not primary_member:
-            return resp
+        if primary_member:
+            resp['primary_member'] = primary_member.first_name + " " + primary_member.last_name
+        else:
+            members = plus_membership.get_members
+            primary_member_obj = members.first()
+            primary_member = primary_member_obj.first_name + " " + primary_member_obj.last_name
+            resp['primary_member'] = primary_member
         return resp
 
     def get_is_insured(self, obj):
