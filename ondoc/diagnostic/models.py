@@ -1247,7 +1247,8 @@ class LabTestCategory(auth_model.TimeStampedModel, SearchKey):
     is_package_category = models.BooleanField(verbose_name='Is this a test package category?')
     show_on_recommended_screen = models.BooleanField(default=False)
     priority = models.PositiveIntegerField(default=0)
-    icon = models.ImageField(upload_to='test/image', null=True, blank=True)
+    # icon = models.ImageField(upload_to='test/image', null=True, blank=True)
+    icon = models.FileField(upload_to='test/image', blank=True, null=True, validators=[FileExtensionValidator(allowed_extensions=['jpg', 'jpeg', 'png', 'svg'])])
 
     def __str__(self):
         return self.name
@@ -3319,7 +3320,8 @@ class LabAppointment(TimeStampedModel, CouponsMixin, LabAppointmentInvoiceMixin,
 
 class CommonTest(TimeStampedModel):
     test = models.ForeignKey(LabTest, on_delete=models.CASCADE, related_name='commontest')
-    icon = models.ImageField(upload_to='diagnostic/common_test_icons', null=True)
+    # icon = models.ImageField(upload_to='diagnostic/common_test_icons', null=True)
+    icon = models.FileField(upload_to='diagnostic/common_test_icons', blank=False, null=True, validators=[FileExtensionValidator(allowed_extensions=['jpg', 'jpeg', 'png', 'svg'])])
     priority = models.PositiveIntegerField(default=0)
 
     def __str__(self):
