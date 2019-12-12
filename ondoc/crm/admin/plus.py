@@ -58,7 +58,24 @@ class PlusPlanContentInline(admin.TabularInline):
     extra = 0
 
 
+class PlusPlansForm(forms.ModelForm):
+    is_corporate = forms.NullBooleanField(required=False)
+    is_retail = forms.NullBooleanField(required=False)
+
+    def clean(self):
+        is_corporate = self.cleaned_data.get('is_corporate')
+        is_retail = self.cleaned_data.get('is_retail')
+
+        if (is_retail and is_corporate) or (self.instance.is_retail and is_corporate) or (is_corporate and self.instance.is_retail):
+            raise forms.ValidationError(
+                'Retail and Corporate plan can not be clubbed together')
+
+    class Meta:
+        fields = '__all__'
+
+
 class PlusPlansAdmin(admin.ModelAdmin):
+    form = PlusPlansForm
     model = PlusPlans
     inlines = [PlusPlanContentInline, PlusPlanParametersMappingInline, PlusPlanUtmSourceMappingInline]
     display = ("plan_name", "proposer", "internal_name", "mrp", "deal_price", "tenure", "enabled", "is_live",
@@ -75,13 +92,10 @@ class PlusThresholdAdmin(admin.ModelAdmin):
 
 
 class PlusUserAdminForm(forms.ModelForm):
-
     status = forms.ChoiceField(choices=PlusUser.STATUS_CHOICES, required=True)
 
     def clean_status(self):
         status = self.cleaned_data.get('status')
-        if not status:
-            raise forms.ValidationError("Status cannot be null or empty.")
 
         if status:
             status = int(status)
