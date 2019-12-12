@@ -1045,7 +1045,9 @@ class EmailNotification(TimeStampedModel, EmailNotificationOpdMixin, EmailNotifi
                                                content=html_body, email_subject=email_subject, cc=recipient_obj.cc, bcc=recipient_obj.bcc, object_id=obj.id, content_type= content_type)
                 # object_id = models.BigIntegerField(null=True)
                 # content_object = GenericForeignKey()
-
+            print('recipient_obj.bcc' + str(recipient_obj.bcc))
+            print('recipient_obj.cc' + str(recipient_obj.cc))
+            print('recipient_obj.to' + str(recipient_obj.to))
             email_obj.save()
 
             email_noti = {
