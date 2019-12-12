@@ -1775,8 +1775,8 @@ class PlusUserUpload(auth_model.TimeStampedModel):
             expiry_date = datetime.datetime.combine(expiry_date, datetime.datetime.max.time())
             expiry_date = expiry_date
 
-            if plan.total_allowed_members < len(members):
-                raise Exception('Only ' + str(plan.total_allowed_members) + ' members are allowed in selected plan for ' + data['first_name'])
+            # if plan.total_allowed_members < len(members):
+            #     raise Exception('Only ' + str(plan.total_allowed_members) + ' members are allowed in selected plan for ' + data['first_name'])
 
         if data['relationship'] == 'Self' or data['relationship'] == 'SELF' or data['relationship'] == 'self':
             user_profile = UserProfile.objects.filter(user_id=user.pk).first()
