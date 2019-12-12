@@ -130,6 +130,8 @@ class Banner(auth_model.TimeStampedModel):
                      (SPECIALIZATION, 'Specialization'), (CONDITION, 'Condition')]
     user_choices = [('logged_in', 'Logged In'), ('logged_out', 'Logged Out'), ('all', 'All')]
     insurance_choices = [('insured', 'Insured User'), ('non_insured', 'Non Insured'), ('all', 'All')]
+    vip_choices = [('vip', 'VIP User'), ('non_vip', 'Non VIP User'), ('all', 'All')]
+    gold_choices = [('gold', 'Gold User'), ('non_gold', 'Non Gold User'), ('all', 'All')]
     HOME_PAGE = 1
     DOCTOR_RESULT = 2
     LAB_RESULT = 3
@@ -158,6 +160,8 @@ class Banner(auth_model.TimeStampedModel):
     show_in_app = models.BooleanField(default=True)
     show_to_users = models.CharField(max_length=100, null=False, blank=False, choices=user_choices, default='all')
     insurance_check = models.CharField(max_length=100, null=False, blank=False, choices=insurance_choices, default='all')
+    vip_check = models.CharField(max_length=100, null=False, blank=False, choices=vip_choices, default='all')
+    gold_check = models.CharField(max_length=100, null=False, blank=False, choices=gold_choices, default='all')
     app_screen = models.CharField(max_length=1000, null=True, blank=True)
     app_params = JSONField(null=True, blank=True)
 
@@ -188,8 +192,14 @@ class Banner(auth_model.TimeStampedModel):
         final_result = []
         user = request.user
         active_insurance = None
+        is_gold_user = False
+        is_vip_user = False
         if user and user.is_authenticated:
             active_insurance = user.active_insurance
+            active_plus_user = user.active_plus_user
+            if active_plus_user:
+                is_gold_user = True if (active_plus_user.plan and active_plus_user.plan.is_gold) else False
+                is_vip_user = not is_gold_user
         for data in queryset:
             locations = data.banner_location.all()
             append_banner=True
@@ -218,6 +228,18 @@ class Banner(auth_model.TimeStampedModel):
                 if data.insurance_check == 'insured' and not active_insurance:
                     append_banner = False
                 if data.insurance_check == 'non_insured' and active_insurance:
+                    append_banner = False
+
+            if append_banner and data.vip_check and data.vip_check != 'all':
+                if data.vip_check == 'vip' and not is_vip_user:
+                    append_banner = False
+                if data.vip_check == 'non_vip' and is_vip_user:
+                    append_banner = False
+
+            if append_banner and data.gold_check and data.gold_check != 'all':
+                if data.gold_check == 'gold' and not is_gold_user:
+                    append_banner = False
+                if data.gold_check == 'non_gold' and is_gold_user:
                     append_banner = False
 
             if append_banner:
