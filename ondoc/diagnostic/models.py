@@ -2087,7 +2087,7 @@ class LabAppointment(TimeStampedModel, CouponsMixin, LabAppointmentInvoiceMixin,
         #     except Exception as e:
         #         logger.error(str(e))
 
-        if self.is_to_send_notification(old_instance):
+        if self.is_to_send_notification(old_instance) or self.status == LabAppointment.BOOKED:
             sent_to_provider = True
             if old_instance:
                 sent_to_provider = self.is_provider_notification_allowed(old_instance)
