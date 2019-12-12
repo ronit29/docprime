@@ -682,6 +682,8 @@ def payment_details(request, order):
                 if first_slot > parse_datetime(ord_slot):
                     first_slot = parse_datetime(ord_slot)
 
+        else:
+            isPreAuth = '0'
         if first_slot:
             if first_slot < (timezone.now() + timedelta(hours=int(settings.PAYMENT_AUTO_CAPTURE_DURATION))):
                 paytmMsg = 'Your payment will be deducted from Paytm wallet on appointment completion.'
