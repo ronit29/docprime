@@ -1247,7 +1247,8 @@ class LabTestCategory(auth_model.TimeStampedModel, SearchKey):
     is_package_category = models.BooleanField(verbose_name='Is this a test package category?')
     show_on_recommended_screen = models.BooleanField(default=False)
     priority = models.PositiveIntegerField(default=0)
-    icon = models.ImageField(upload_to='test/image', null=True, blank=True)
+    # icon = models.ImageField(upload_to='test/image', null=True, blank=True)
+    icon = models.FileField(upload_to='test/image', blank=True, null=True, validators=[FileExtensionValidator(allowed_extensions=['jpg', 'jpeg', 'png', 'svg'])])
 
     def __str__(self):
         return self.name
@@ -2856,6 +2857,8 @@ class LabAppointment(TimeStampedModel, CouponsMixin, LabAppointmentInvoiceMixin,
         else:
             spo_data = {}
 
+        utm_sbi_tags = data.get("utm_sbi_tags", {})
+
         cover_under_vip = False
         plus_user_id = None
         plus_user = user.active_plus_user
@@ -2944,7 +2947,8 @@ class LabAppointment(TimeStampedModel, CouponsMixin, LabAppointmentInvoiceMixin,
             "_responsible_user": data.get("_responsible_user", None),
             "_source": data.get("_source", None),
             "multi_timings_enabled": data.get('multi_timings_enabled'),
-            "selected_timings_type": data.get('selected_timings_type')
+            "selected_timings_type": data.get('selected_timings_type'),
+            "utm_sbi_tags": utm_sbi_tags
         }
 
         if data.get('included_in_user_plan', False):
@@ -3315,7 +3319,8 @@ class LabAppointment(TimeStampedModel, CouponsMixin, LabAppointmentInvoiceMixin,
 
 class CommonTest(TimeStampedModel):
     test = models.ForeignKey(LabTest, on_delete=models.CASCADE, related_name='commontest')
-    icon = models.ImageField(upload_to='diagnostic/common_test_icons', null=True)
+    # icon = models.ImageField(upload_to='diagnostic/common_test_icons', null=True)
+    icon = models.FileField(upload_to='diagnostic/common_test_icons', blank=False, null=True, validators=[FileExtensionValidator(allowed_extensions=['jpg', 'jpeg', 'png', 'svg'])])
     priority = models.PositiveIntegerField(default=0)
 
     def __str__(self):
