@@ -1352,8 +1352,6 @@ class TransactionViewSet(viewsets.GenericViewSet):
 
     @transaction.atomic()
     def save(self, request):
-        print("Pg data for testing.\n")
-        print(json.dumps(request.data))
         try:
             response = None
             coded_response = None
@@ -1513,11 +1511,11 @@ class TransactionViewSet(viewsets.GenericViewSet):
             # send acknowledge if status is TXN_FAILURE to stop callbacks from pg. Do not send acknowledgement if no entry in pg.
             try:
                 if response and response.get("orderNo") and response.get("orderId") and response.get(
-                        'txStatus') and response.get('txStatus') == 'TXN_FAILURE':
-                    send_pg_acknowledge.apply_async((response.get("orderId"), response.get("orderNo"),), countdown=1)
-                if response and response.get("orderNo") and response.get("orderId") and response.get(
-                        'txStatus') and response.get('txStatus') == 'TXN_SUCCESS' and pg_resp_code == 5:
-                    send_pg_acknowledge.apply_async((response.get("orderId"), response.get("orderNo"),), countdown=1)
+                        'txStatus'):
+                    if response.get('txStatus') == 'TXN_FAILURE':
+                        send_pg_acknowledge.apply_async((response.get("orderId"), response.get("orderNo"),), countdown=1)
+                    if response.get('txStatus') == 'TXN_PENDING' and pg_resp_code == 5:
+                        send_pg_acknowledge.apply_async((response.get("orderId"), response.get("orderNo"),), countdown=1)
             except Exception as e:
                 logger.error("Error in sending pg acknowledge - " + str(e))
 
