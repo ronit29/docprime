@@ -217,10 +217,13 @@ class UserProfileSerializer(serializers.ModelSerializer):
 
     def get_vip_data(self, obj):
         resp = {}
-        if not self.get_is_vip_member(obj):
+        plus_membership = obj.get_plus_membership
+        if not plus_membership:
             return resp
-
-
+        resp['expiry_date'] = plus_membership.expire_date
+        resp['purchase_date'] = plus_membership.purchase_date
+        resp['primary_member'] = plus_membership.get_primary_member_profile
+        return resp
 
     def get_is_insured(self, obj):
         if isinstance(obj, dict):
