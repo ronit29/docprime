@@ -1349,8 +1349,6 @@ class TransactionViewSet(viewsets.GenericViewSet):
 
     @transaction.atomic()
     def save(self, request):
-        print("Pg data for testing.\n")
-        print(json.dumps(request.data))
         try:
             response = None
             coded_response = None
