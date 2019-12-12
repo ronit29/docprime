@@ -1451,10 +1451,10 @@ class TransactionViewSet(viewsets.GenericViewSet):
                             json_url = '{"url": "%s"}' % CHAT_REDIRECT_URL
                             log_created_at = datetime.datetime.now()
                             save_pg_response.apply_async((PgLogs.RESPONSE_TO_CHAT, chat_order.id, None, json_url, None, None, log_created_at), eta=timezone.localtime(), queue=settings.RABBITMQ_LOGS_QUEUE)
-                        return HttpResponseRedirect(redirect_to=CHAT_REDIRECT_URL)
+                        return CHAT_REDIRECT_URL
                     else:
                         REDIRECT_URL = (SUCCESS_REDIRECT_URL % pg_txn.order_id) + "?payment_success=true"
-                        return HttpResponseRedirect(redirect_to=REDIRECT_URL)
+                        return REDIRECT_URL
         except Exception as e:
             logger.error("Error in sending pg acknowledge - " + str(e))
 
@@ -1476,37 +1476,47 @@ class TransactionViewSet(viewsets.GenericViewSet):
             pass
 
         if pg_resp_code == 1 and order_obj:
-            if response.get("couponUsed") and response.get("couponUsed") == "false":
-                order_obj.update_fields_after_coupon_remove()
-
-            response_data = None
-            resp_serializer = serializers.TransactionSerializer(data=response)
-            if resp_serializer.is_valid():
-                response_data = self.form_pg_transaction_data(resp_serializer.validated_data, order_obj)
-
-                # For Testing
-                if PgTransaction.is_valid_hash(response, product_id=order_obj.product_id):
-                    pg_tx_queryset = None
-                    # if True:
-                    try:
-                        with transaction.atomic():
-                            pg_tx_queryset = PgTransaction.objects.create(**response_data)
-                    except Exception as e:
-                        logger.error("Error in saving PG Transaction Data - " + str(e))
-
-                    try:
-                        with transaction.atomic():
-                            processed_data = order_obj.process_pg_order(convert_cod_to_prepaid)
-                            success_in_process = True
-                    except Exception as e:
-                        logger.error("Error in processing order - " + str(e))
+            # send ack for dummy_txn response
+            # todo - ask pg-team to send flag for this to avoid amount condition check
+            if response and response.get("txAmount") and int(Decimal(response.get("txAmount"))) == 0 \
+                    and response.get('txStatus') == 'TXN_SUCCESS':
+                send_pg_acknowledge.apply_async((response.get("orderId"), response.get("orderNo"),),
+                                                countdown=1)
             else:
-                logger.error("Invalid pg data - " + json.dumps(resp_serializer.errors))
+                if response.get("couponUsed") and response.get("couponUsed") == "false":
+                    order_obj.update_fields_after_coupon_remove()
+
+                response_data = None
+                resp_serializer = serializers.TransactionSerializer(data=response)
+                if resp_serializer.is_valid():
+                    response_data = self.form_pg_transaction_data(resp_serializer.validated_data, order_obj)
+
+                    # For Testing
+                    if PgTransaction.is_valid_hash(response, product_id=order_obj.product_id):
+                        pg_tx_queryset = None
+                        # if True:
+                        try:
+                            with transaction.atomic():
+                                pg_tx_queryset = PgTransaction.objects.create(**response_data)
+                        except Exception as e:
+                            logger.error("Error in saving PG Transaction Data - " + str(e))
+
+                        try:
+                            with transaction.atomic():
+                                processed_data = order_obj.process_pg_order(convert_cod_to_prepaid)
+                                success_in_process = True
+                        except Exception as e:
+                            logger.error("Error in processing order - " + str(e))
+                else:
+                    logger.error("Invalid pg data - " + json.dumps(resp_serializer.errors))
         elif order_obj:
             # send acknowledge if status is TXN_FAILURE to stop callbacks from pg. Do not send acknowledgement if no entry in pg.
             try:
                 if response and response.get("orderNo") and response.get("orderId") and response.get(
                         'txStatus') and response.get('txStatus') == 'TXN_FAILURE':
+                    send_pg_acknowledge.apply_async((response.get("orderId"), response.get("orderNo"),), countdown=1)
+                if response and response.get("orderNo") and response.get("orderId") and response.get(
+                        'txStatus') and response.get('txStatus') == 'TXN_SUCCESS' and pg_resp_code == 5:
                     send_pg_acknowledge.apply_async((response.get("orderId"), response.get("orderNo"),), countdown=1)
             except Exception as e:
                 logger.error("Error in sending pg acknowledge - " + str(e))
@@ -1631,10 +1641,10 @@ class TransactionViewSet(viewsets.GenericViewSet):
                                 chat_order = Order.objects.filter(pk=pg_txn.order_id).first()
                                 if chat_order:
                                     CHAT_REDIRECT_URL = CHAT_SUCCESS_REDIRECT_URL % (chat_order.id, chat_order.reference_id)
-                                return HttpResponseRedirect(redirect_to=CHAT_REDIRECT_URL)
+                                return CHAT_REDIRECT_URL
                             else:
                                 REDIRECT_URL = (SUCCESS_REDIRECT_URL % pg_txn.order_id) + "?payment_success=true"
-                                return HttpResponseRedirect(redirect_to=REDIRECT_URL)
+                                return REDIRECT_URL
                 except Exception as e:
                     logger.error("Error in sending pg acknowledge - " + str(e))
 
@@ -1656,71 +1666,82 @@ class TransactionViewSet(viewsets.GenericViewSet):
                     pass
 
                 if pg_resp_code == 1 and order_obj:
-                    if response.get("couponUsed") and response.get("couponUsed") == "false":
-                        order_obj.update_fields_after_coupon_remove()
+                    # send ack for dummy_txn response
+                    # todo - ask pg-team to send flag for this to avoid amount condition check
+                    if response and response.get("txAmount") and int(Decimal(response.get("txAmount"))) == 0 \
+                            and response.get('txStatus') == 'TXN_SUCCESS':
+                        send_pg_acknowledge.apply_async((response.get("orderId"), response.get("orderNo"),),
+                                                        countdown=1)
+                    else:
+                        if response.get("couponUsed") and response.get("couponUsed") == "false":
+                            order_obj.update_fields_after_coupon_remove()
 
-                    response_data = None
+                        response_data = None
 
-                    if "items" in response:
-                        virtual_response = copy.deepcopy(response)
-                        del virtual_response['items']
-                        virtual_response['orderId'] = item['orderId']
+                        if "items" in response:
+                            virtual_response = copy.deepcopy(response)
+                            del virtual_response['items']
+                            virtual_response['orderId'] = item['orderId']
 
-                    resp_serializer = serializers.TransactionSerializer(data=virtual_response)
-                    if resp_serializer.is_valid():
-                        response_data = self.form_pg_transaction_data(resp_serializer.validated_data, order_obj)
-                        # For Testing
+                        resp_serializer = serializers.TransactionSerializer(data=virtual_response)
+                        if resp_serializer.is_valid():
+                            response_data = self.form_pg_transaction_data(resp_serializer.validated_data, order_obj)
+                            # For Testing
 
-                        if not order_obj.amount or order_obj.amount <= 0:
-                            try:
-                                with transaction.atomic():
-                                    processed_data = order_obj.process_pg_order(convert_cod_to_prepaid)
-                                    success_in_process = True
-                            except Exception as e:
-                                logger.error("Error in processing order - " + str(e))
-                        else:
-                            # Simplify the response for multiorder for ease of incomming checksum creation
-                            order_items = sorted(response.get('items', []), key=lambda x: int(x['orderId']))
-                            stringify_item = '['
-                            if order_items.__class__.__name__ == 'list':
-                                for i in order_items:
-                                    stringify_item = stringify_item + '{'
-                                    if i.__class__.__name__ == 'dict':
-                                        for k in sorted(i.keys()):
-                                            stringify_item = stringify_item + k + '=' + str(i[k]) + ';'
-
-                                    stringify_item = stringify_item + '};'
-
-                                if stringify_item[-1:] == ';':
-                                    stringify_item = stringify_item[:-1]
-                                stringify_item = stringify_item + ']'
-
-                            virtual_response['items'] = stringify_item
-                            del virtual_response['orderId']
-
-                            if PgTransaction.is_valid_hash(virtual_response, product_id=order_obj.product_id):
-                                pg_tx_queryset = None
-                                # if True:
-                                try:
-                                    with transaction.atomic():
-                                        pg_tx_queryset = PgTransaction.objects.create(**response_data)
-                                except Exception as e:
-                                    logger.error("Error in saving PG Transaction Data - " + str(e))
-
+                            if not order_obj.amount or order_obj.amount <= 0:
                                 try:
                                     with transaction.atomic():
                                         processed_data = order_obj.process_pg_order(convert_cod_to_prepaid)
                                         success_in_process = True
                                 except Exception as e:
                                     logger.error("Error in processing order - " + str(e))
-                    else:
-                        logger.error("Invalid pg data - " + json.dumps(resp_serializer.errors))
+                            else:
+                                # Simplify the response for multiorder for ease of incomming checksum creation
+                                order_items = sorted(response.get('items', []), key=lambda x: int(x['orderId']))
+                                stringify_item = '['
+                                if order_items.__class__.__name__ == 'list':
+                                    for i in order_items:
+                                        stringify_item = stringify_item + '{'
+                                        if i.__class__.__name__ == 'dict':
+                                            for k in sorted(i.keys()):
+                                                stringify_item = stringify_item + k + '=' + str(i[k]) + ';'
+
+                                        stringify_item = stringify_item + '};'
+
+                                    if stringify_item[-1:] == ';':
+                                        stringify_item = stringify_item[:-1]
+                                    stringify_item = stringify_item + ']'
+
+                                virtual_response['items'] = stringify_item
+                                del virtual_response['orderId']
+
+                                if PgTransaction.is_valid_hash(virtual_response, product_id=order_obj.product_id):
+                                    pg_tx_queryset = None
+                                    # if True:
+                                    try:
+                                        with transaction.atomic():
+                                            pg_tx_queryset = PgTransaction.objects.create(**response_data)
+                                    except Exception as e:
+                                        logger.error("Error in saving PG Transaction Data - " + str(e))
+
+                                    try:
+                                        with transaction.atomic():
+                                            processed_data = order_obj.process_pg_order(convert_cod_to_prepaid)
+                                            success_in_process = True
+                                    except Exception as e:
+                                        logger.error("Error in processing order - " + str(e))
+                        else:
+                            logger.error("Invalid pg data - " + json.dumps(resp_serializer.errors))
                 elif order_obj:
                     # send acknowledge if status is TXN_FAILURE to stop callbacks from pg. Do not send acknowledgement if no entry in pg.
                     try:
                         if response and response.get("orderNo") and order_id and response.get(
                                 'txStatus') and response.get('txStatus') == 'TXN_FAILURE':
                             send_pg_acknowledge.apply_async((order_id, response.get("orderNo"),), countdown=1)
+                        if response and response.get("orderNo") and response.get("orderId") and response.get(
+                                'txStatus') and response.get('txStatus') == 'TXN_SUCCESS' and pg_resp_code == 5:
+                            send_pg_acknowledge.apply_async((response.get("orderId"), response.get("orderNo"),),
+                                                            countdown=1)
                     except Exception as e:
                         logger.error("Error in sending pg acknowledge - " + str(e))
 

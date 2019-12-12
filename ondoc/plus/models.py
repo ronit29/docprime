@@ -21,7 +21,7 @@ from django.db.models import Q
 from ondoc.common.models import DocumentsProofs
 from ondoc.coupon.models import Coupon
 
-from ondoc.notification.tasks import push_plus_lead_to_matrix
+from ondoc.notification.tasks import push_plus_lead_to_matrix, update_random_coupons_consumption
 from ondoc.plus.usage_criteria import get_class_reference, get_price_reference, get_min_convenience_reference, \
     get_max_convenience_reference
 from .enums import PlanParametersEnum, UtilizationCriteria, PriceCriteria
@@ -903,6 +903,7 @@ class PlusUser(auth_model.TimeStampedModel, RefundMixin, TransactionMixin, Coupo
         from ondoc.doctor.models import OpdAppointment
         members = deepcopy(plus_data['plus_members'])
         coupon_list = plus_data.pop("coupon", None)
+        random_coupon_list = plus_data.get("random_coupon_list", None)
 
         for member in members:
             member['profile'] = cls.profile_create_or_update(member, user)
@@ -924,6 +925,8 @@ class PlusUser(auth_model.TimeStampedModel, RefundMixin, TransactionMixin, Coupo
             plus_membership_obj.coupon.add(*coupon_list)
         PlusMembers.create_plus_members(plus_membership_obj)
         PlusUserUtilization.create_utilization(plus_membership_obj)
+        if random_coupon_list:
+            update_random_coupons_consumption.apply_async((random_coupon_list), countdown=5)
         return plus_membership_obj
 
     def activate_care_membership(self):
