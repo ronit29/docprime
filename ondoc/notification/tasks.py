@@ -1688,8 +1688,8 @@ def save_matrix_logs(self, id, obj_type, request_data, response):
         elif obj_type == 'general_leads':
             object = GeneralMatrixLeads.objects.filter(id=id).first()
 
-        if object:
-            MatrixLog.create_matrix_logs(object, request_data, response)
+        MatrixLog.create_matrix_logs(object, request_data, response)
+
     except Exception as e:
         logger.error("Error in saving matrix logs to mongo database - " + json.dumps(response) + " with exception - " + str(e))
 

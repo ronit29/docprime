@@ -168,9 +168,36 @@ class LabAds(AbstractLead):
         return data
 
 
+class CancelDropOffLeadViaAppointment(AbstractLead):
+
+    def __init__(self, obj):
+        super(CancelDropOffLeadViaAppointment, self).__init__(obj, None)
+
+    def update_matrix_lead_id(self, response, *args, **kwargs):
+        pass
+
+    def prepare_lead_data(self, *args, **kwargs) -> Dict:
+        obj = self.obj
+        user = self.obj.user if obj.user else None
+        if not user:
+            return {}
+
+        data = {
+            "SubProductId": 0,
+            "LeadSource": "crm",
+            "ProductId": 11,
+            "Status": 13,
+            "PrimaryNo": str(user.phone_number),
+            "Name": 'none'
+        }
+
+        return data
+
+
 lead_class_mapping = {
     'DROPOFF': DropOff,
-    'LABADS': LabAds
+    'LABADS': LabAds,
+    'CANCELDROPOFFLEADVIAAPPOINTMENT': CancelDropOffLeadViaAppointment
 }
 
 

@@ -13,7 +13,7 @@ from celery.schedules import crontab
 from ondoc.doctor.tasks import save_avg_rating, update_prices, update_city_search_key, update_doctors_count, \
     update_search_score, \
     update_all_ipd_seo_urls, update_insured_labs_and_doctors, update_seo_urls, update_hosp_google_avg_rating, \
-    update_flags, doctors_daily_schedule, update_rc_super_user, fetch_place_ids, calculate_percentage
+    update_flags, doctors_daily_schedule, update_rc_super_user, fetch_place_ids, calculate_percentage, invalidate_plus_users
 from ondoc.account.tasks import update_ben_status_from_pg, update_merchant_payout_pg_status, \
     create_appointment_admins_from_spocs, update_lal_path_test_data
 from ondoc.insurance.tasks import push_mis, process_insurance_payouts
@@ -112,3 +112,4 @@ def setup_periodic_tasks(sender, **kwargs):
     sender.add_periodic_task(crontab(hour=18, minute=30), fetch_place_ids.s(), name="Get Google Place IDs")
     sender.add_periodic_task(crontab(hour=19, minute=30), calculate_percentage.s(), name='Calculate Percentage in Common Hospital')
     sender.add_periodic_task(crontab(minute="*/2"), send_ipd_email_notification.s(),name="Send IPD Email Notifications")
+    sender.add_periodic_task(crontab(hour=18, minute=30), invalidate_plus_users.s(), name='Invalidate the plus users.')
