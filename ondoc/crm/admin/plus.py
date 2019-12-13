@@ -94,6 +94,15 @@ class PlusThresholdAdmin(admin.ModelAdmin):
 class PlusUserAdminForm(forms.ModelForm):
     status = forms.ChoiceField(choices=PlusUser.STATUS_CHOICES, required=True)
 
+    def clean(self):
+        status = self.cleaned_data.get('status')
+
+        if status:
+            status = int(status)
+
+        if status == PlusUser.CANCELLED and self.instance.plan.is_corporate:
+            raise forms.ValidationError('Corporate Plus User can not be Cancelled.')
+
     def clean_status(self):
         status = self.cleaned_data.get('status')
 
