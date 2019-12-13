@@ -188,7 +188,15 @@ class CancelDropOffLeadViaAppointment(AbstractLead):
             "ProductId": 11,
             "Status": 13,
             "PrimaryNo": str(user.phone_number),
-            "Name": 'none'
+            "Name": 'none',
+            "PolicyDetails":
+                {
+                    "ProposalNo": "0",
+                    "ProposerName": "none",
+                    "PolicyId": "0",
+                    "PolicyPaymentSTATUS": 300,
+                    "InsurancePlanPurchased": "no",
+                }
         }
 
         return data
