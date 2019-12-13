@@ -2725,6 +2725,8 @@ class LabAppointment(TimeStampedModel, CouponsMixin, LabAppointmentInvoiceMixin,
                     effective_price = effective_price
             else:
                 effective_price = effective_price
+
+            effective_price += vip_convenience_amount
             # coupon_discount, coupon_cashback, coupon_list, random_coupon_list = 0, 0, [], []
             coupon_discount, coupon_cashback, coupon_list, random_coupon_list = Coupon.get_total_deduction(data, effective_price)
 
@@ -2732,8 +2734,6 @@ class LabAppointment(TimeStampedModel, CouponsMixin, LabAppointmentInvoiceMixin,
                 effective_price = 0
             else:
                 effective_price = effective_price - coupon_discount
-
-            effective_price += vip_convenience_amount
 
         return {
             "deal_price" : total_deal_price,
@@ -2875,6 +2875,7 @@ class LabAppointment(TimeStampedModel, CouponsMixin, LabAppointmentInvoiceMixin,
             cover_under_vip = plus_user_resp.get('cover_under_vip', False)
             vip_amount_utilized = plus_user_resp.get('vip_amount_deducted')
             plus_user_id = plus_user_resp.get('plus_user_id', None)
+            convenience_amount = plus_user_resp.get('vip_convenience_amount', 0)
 
         if cover_under_vip and vip_amount_utilized > 0:
             # payment_type = OpdAppointment.VIP
@@ -2885,13 +2886,16 @@ class LabAppointment(TimeStampedModel, CouponsMixin, LabAppointmentInvoiceMixin,
                 payment_type = OpdAppointment.VIP
 
             plus_user_id = plus_user_resp.get('plus_user_id', None)
-        # if cover_under_vip and cart_data and cart_data.get('cover_under_vip', None):
+            # if cover_under_vip and cart_data and cart_data.get('cover_under_vip', None):
             # convenience_amount = plus_user.plan.get_convenience_charge(plus_user_resp['amount_to_be_paid'], "LABTEST")
             # convenience_amount = PlusPlans.get_default_convenience_amount(price_data, "LABTEST", default_plan_query=plus_user.plan)
-            convenience_amount = plus_user_resp.get('vip_convenience_amount', 0)
-            convenience_amount = 0 if not convenience_amount else convenience_amount
-            effective_price = plus_user_resp['amount_to_be_paid'] + convenience_amount
+            effective_price = plus_user_resp['amount_to_be_paid']
+            if not convenience_amount:
+                convenience_amount = PlusPlans.get_default_convenience_amount(price_data, "LABTEST",
+                                                                              default_plan_query=plus_user.plan)
+                effective_price = plus_user_resp.get('amount_to_be_paid') + convenience_amount
             vip_amount_utilized = plus_user_resp['vip_amount_deducted']
+
             # utilization = plus_user.get_utilization
             # available_amount = int(utilization.get('available_package_amount', 0))
             # mrp = int(price_data.get('mrp'))
