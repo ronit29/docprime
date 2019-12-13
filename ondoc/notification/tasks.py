@@ -456,7 +456,7 @@ def set_order_dummy_transaction_for_corporate(self, order_id, user_id):
         req_data['hash'] = PgTransaction.create_pg_hash(req_data, secret_key, client_key)
 
         response = requests.post(url, data=json.dumps(req_data), headers=headers)
-        save_pg_response.apply_async((PgLogs.DUMMY_TXN, order_id, None, response.json(), req_data, user_id,), eta=timezone.localtime(), queue=settings.RABBITMQ_LOGS_QUEUE)
+        # save_pg_response.apply_async((PgLogs.DUMMY_TXN, order_id, None, response.json(), req_data, user_id,), eta=timezone.localtime(), queue=settings.RABBITMQ_LOGS_QUEUE)
         if response.status_code == status.HTTP_200_OK:
             resp_data = response.json()
             #logger.error(resp_data)
@@ -470,8 +470,6 @@ def set_order_dummy_transaction_for_corporate(self, order_id, user_id):
                 tx_data['type'] = DummyTransactions.CREDIT
                 tx_data['amount'] = total_price
                 tx_data['payment_mode'] = "DC"
-
-                print(tx_data)
 
                 DummyTransactions.objects.create(**tx_data)
                 #print("SAVED DUMMY TRANSACTION")
