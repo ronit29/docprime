@@ -814,7 +814,8 @@ class UserAppointmentsViewSet(OndocViewSet):
                         price_data = {"mrp": temp_lab_test[0].get("total_mrp"),
                                       "deal_price": temp_lab_test[0].get("total_deal_price"),
                                       "cod_deal_price": temp_lab_test[0].get("total_deal_price"),
-                                      "fees": temp_lab_test[0].get("total_agreed_price", 0)}
+                                      "fees": temp_lab_test[0].get("total_agreed_price", 0),
+                                      "home_pickup_charges": lab_appointment.home_pickup_charges}
                         if plus_user:
                             new_effective_price, convenience_charge = self.get_plus_user_effective_price(plus_user, price_data, "LABTEST")
                         if lab_appointment.plus_plan.plan.is_gold:
@@ -869,8 +870,10 @@ class UserAppointmentsViewSet(OndocViewSet):
             plan = plus_user.plan if plus_user else None
             convenience_charge = PlusPlans.get_default_convenience_amount(price_data, "LABTEST", default_plan_query=plan)
             engine = get_class_reference(plus_user, "LABTEST")
-            plus_data = engine.validate_booking_entity(cost=price, mrp=price_data.get('mrp', None),
-                                                       deal_price=price_data.get('deal_price'))
+            final_price = price + price_data.get('home_pickup_charges', 0)
+            mrp_with_home_pickup = price_data.get('mrp') + price_data.get('home_pickup_charges', 0)
+            plus_data = engine.validate_booking_entity(cost=final_price, mrp=mrp_with_home_pickup,
+                                                       deal_price=price_data.get('deal_price'), price_engine_price=price)
             effective_price = plus_data.get('amount_to_be_paid', None)
             return effective_price, convenience_charge
         else:
@@ -1349,8 +1352,6 @@ class TransactionViewSet(viewsets.GenericViewSet):
 
     @transaction.atomic()
     def save(self, request):
-        print("Pg data for testing.\n")
-        print(json.dumps(request.data))
         try:
             response = None
             coded_response = None
@@ -1510,11 +1511,11 @@ class TransactionViewSet(viewsets.GenericViewSet):
             # send acknowledge if status is TXN_FAILURE to stop callbacks from pg. Do not send acknowledgement if no entry in pg.
             try:
                 if response and response.get("orderNo") and response.get("orderId") and response.get(
-                        'txStatus') and response.get('txStatus') == 'TXN_FAILURE':
-                    send_pg_acknowledge.apply_async((response.get("orderId"), response.get("orderNo"),), countdown=1)
-                if response and response.get("orderNo") and response.get("orderId") and response.get(
-                        'txStatus') and response.get('txStatus') == 'TXN_SUCCESS' and pg_resp_code == 5:
-                    send_pg_acknowledge.apply_async((response.get("orderId"), response.get("orderNo"),), countdown=1)
+                        'txStatus'):
+                    if response.get('txStatus') == 'TXN_FAILURE':
+                        send_pg_acknowledge.apply_async((response.get("orderId"), response.get("orderNo"),), countdown=1)
+                    if response.get('txStatus') == 'TXN_PENDING' and pg_resp_code == 5:
+                        send_pg_acknowledge.apply_async((response.get("orderId"), response.get("orderNo"),), countdown=1)
             except Exception as e:
                 logger.error("Error in sending pg acknowledge - " + str(e))
 
