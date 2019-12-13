@@ -471,6 +471,8 @@ def set_order_dummy_transaction_for_corporate(self, order_id, user_id):
                 tx_data['amount'] = total_price
                 tx_data['payment_mode'] = "DC"
 
+                print(tx_data)
+
                 DummyTransactions.objects.create(**tx_data)
                 #print("SAVED DUMMY TRANSACTION")
         else:
