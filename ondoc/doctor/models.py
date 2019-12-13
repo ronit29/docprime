@@ -3202,7 +3202,7 @@ class OpdAppointment(auth_model.TimeStampedModel, CouponsMixin, OpdAppointmentIn
             try:
                 notification_tasks.push_reminder_message_medanta_and_artemis.apply_async(({'appointment_id': self.id,
                                                         'notification_type':NotificationAction.REMINDER_MESSAGE_MEDANTA_AND_ARTEMIS},),
-                                                        countdown=1, eta=datetime.datetime.now() + datetime.timedelta(minutes=int(settings.REMINDER_MESSAGE_MEDANTA_AND_ARTEMIS_TIME)), )
+                                                        eta=datetime.datetime.now() + datetime.timedelta(minutes=int(settings.REMINDER_MESSAGE_MEDANTA_AND_ARTEMIS_TIME)), )
             except Exception as e:
                 logger.error(str(e))
         print('all ops tasks completed')
