@@ -3198,13 +3198,13 @@ class OpdAppointment(auth_model.TimeStampedModel, CouponsMixin, OpdAppointmentIn
                     eta=self.time_slot_start - datetime.timedelta(minutes=settings.TIME_BEFORE_APPOINTMENT_TO_SEND_NOTIFICATION), )
             except Exception as e:
                 logger.error(str(e))
-        if str(self.hospital_id) in settings.MEDANTA_AND_ARTEMIS_HOSPITAL_IDS:
-            try:
-                notification_tasks.push_reminder_message_medanta_and_artemis.apply_async(({'appointment_id': self.id,
-                                                        'notification_type':NotificationAction.REMINDER_MESSAGE_MEDANTA_AND_ARTEMIS},),
-                                                        eta=datetime.datetime.now() + datetime.timedelta(minutes=int(settings.REMINDER_MESSAGE_MEDANTA_AND_ARTEMIS_TIME)), )
-            except Exception as e:
-                logger.error(str(e))
+        # if str(self.hospital_id) in settings.MEDANTA_AND_ARTEMIS_HOSPITAL_IDS:
+        #     try:
+        #         notification_tasks.push_reminder_message_medanta_and_artemis.apply_async(({'appointment_id': self.id,
+        #                                                 'notification_type':NotificationAction.REMINDER_MESSAGE_MEDANTA_AND_ARTEMIS},),
+        #                                                 eta=datetime.datetime.now() + datetime.timedelta(minutes=int(settings.REMINDER_MESSAGE_MEDANTA_AND_ARTEMIS_TIME)), )
+        #     except Exception as e:
+        #         logger.error(str(e))
         print('all ops tasks completed')
 
     def save(self, *args, **kwargs):
