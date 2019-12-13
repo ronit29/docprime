@@ -1247,7 +1247,8 @@ class LabTestCategory(auth_model.TimeStampedModel, SearchKey):
     is_package_category = models.BooleanField(verbose_name='Is this a test package category?')
     show_on_recommended_screen = models.BooleanField(default=False)
     priority = models.PositiveIntegerField(default=0)
-    icon = models.ImageField(upload_to='test/image', null=True, blank=True)
+    # icon = models.ImageField(upload_to='test/image', null=True, blank=True)
+    icon = models.FileField(upload_to='test/image', blank=True, null=True, validators=[FileExtensionValidator(allowed_extensions=['jpg', 'jpeg', 'png', 'svg'])])
 
     def __str__(self):
         return self.name
@@ -2717,7 +2718,7 @@ class LabAppointment(TimeStampedModel, CouponsMixin, LabAppointmentInvoiceMixin,
                 engine = get_class_reference(plus_membership, entity)
                 if engine:
                     # engine_response = engine.validate_booking_entity(cost=effective_price, id=data['test_ids'][0].id)
-                    engine_response = engine.validate_booking_entity(cost=price, id=data['test_ids'][0].id, mrp=effective_price, deal_price=total_deal_price)
+                    engine_response = engine.validate_booking_entity(cost=price, id=data['test_ids'][0].id, mrp=effective_price, deal_price=total_deal_price, price_engine_price=price)
                     effective_price = engine_response.get('amount_to_be_paid')
                     # effective_price = effective_price + vip_convenience_amount
                 else:
@@ -2886,7 +2887,9 @@ class LabAppointment(TimeStampedModel, CouponsMixin, LabAppointmentInvoiceMixin,
             plus_user_id = plus_user_resp.get('plus_user_id', None)
         # if cover_under_vip and cart_data and cart_data.get('cover_under_vip', None):
             # convenience_amount = plus_user.plan.get_convenience_charge(plus_user_resp['amount_to_be_paid'], "LABTEST")
-            convenience_amount = PlusPlans.get_default_convenience_amount(price_data, "LABTEST", default_plan_query=plus_user.plan)
+            # convenience_amount = PlusPlans.get_default_convenience_amount(price_data, "LABTEST", default_plan_query=plus_user.plan)
+            convenience_amount = plus_user_resp.get('vip_convenience_amount', 0)
+            convenience_amount = 0 if not convenience_amount else convenience_amount
             effective_price = plus_user_resp['amount_to_be_paid'] + convenience_amount
             vip_amount_utilized = plus_user_resp['vip_amount_deducted']
             # utilization = plus_user.get_utilization
@@ -3318,7 +3321,8 @@ class LabAppointment(TimeStampedModel, CouponsMixin, LabAppointmentInvoiceMixin,
 
 class CommonTest(TimeStampedModel):
     test = models.ForeignKey(LabTest, on_delete=models.CASCADE, related_name='commontest')
-    icon = models.ImageField(upload_to='diagnostic/common_test_icons', null=True)
+    # icon = models.ImageField(upload_to='diagnostic/common_test_icons', null=True)
+    icon = models.FileField(upload_to='diagnostic/common_test_icons', blank=False, null=True, validators=[FileExtensionValidator(allowed_extensions=['jpg', 'jpeg', 'png', 'svg'])])
     priority = models.PositiveIntegerField(default=0)
 
     def __str__(self):

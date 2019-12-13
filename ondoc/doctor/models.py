@@ -3685,7 +3685,8 @@ class OpdAppointment(auth_model.TimeStampedModel, CouponsMixin, OpdAppointmentIn
             # convenience_amount = plus_user.plan.get_convenience_charge(cart_data.get('amount_to_be_paid'), "DOCTOR")
             # effective_price = cart_data.get('amount_to_be_paid') + convenience_amount
             # convenience_amount = plus_user.plan.get_convenience_charge(plus_user_resp.get('amount_to_be_paid'), "DOCTOR")
-            convenience_amount = PlusPlans.get_default_convenience_amount(price_data, "DOCTOR", default_plan_query=plus_user.plan)
+            # convenience_amount = PlusPlans.get_default_convenience_amount(price_data, "DOCTOR", default_plan_query=plus_user.plan)
+            convenience_amount = plus_user_resp.get('vip_convenience_amount', 0)
             effective_price = plus_user_resp.get('amount_to_be_paid') + convenience_amount
             if plus_user.plan.is_gold:
                 payment_type = OpdAppointment.GOLD
@@ -4346,7 +4347,8 @@ class CommonMedicalCondition(auth_model.TimeStampedModel):
 class CommonSpecialization(auth_model.TimeStampedModel):
     specialization = models.OneToOneField('PracticeSpecialization', related_name="common_specialization", on_delete=models.CASCADE,
                                           null=True, blank=True)
-    icon = models.ImageField(upload_to='doctor/common_specialization_icons', null=True)
+    # icon = models.ImageField(upload_to='doctor/common_specialization_icons', null=True)
+    icon = models.FileField(upload_to='doctor/common_specialization_icons', blank=False, null=True, validators=[FileExtensionValidator(allowed_extensions=['jpg', 'jpeg', 'png', 'svg'])])
     priority = models.PositiveIntegerField(default=0)
 
     def __str__(self):
