@@ -78,7 +78,7 @@ def send_lab_notifications_refactored(data, *args, **kwargs):
                             'DOB': instance.profile_detail.get('dob'), 'pickup_address': instance.address.get('address'),
                             'lab_address': instance.address.get( 'address'), 'time_slot': instance.time_slot_start.strftime("%I:%M%p"),
                             'Date':instance.time_slot_start.date(), 'mask_number': mask_no_obj[0].mask_number if mask_no_obj and mask_no_obj[0].mask_number
-    else instance.address.get('phone_number'), 'test_list': test_list, 'client_code': 'CH343' if instance and instance.lab and instance.lab.network and instance.lab.network.id == 195 else ''}
+    else instance.address.get('phone_number'), 'test_list': test_list, 'client_code': 'CH343' if instance and instance.lab and instance.lab.network and instance.lab.network.id == 195 else '', 'lab_network_id': instance.lab.network.id if instance and instance.lab and instance.lab.network else None}
         from ondoc.communications.models import EMAILNotification
         kwargs['email_obj'] = instance
         email_notification = EMAILNotification(notification_type, context)
