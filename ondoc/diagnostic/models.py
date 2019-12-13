@@ -2718,7 +2718,7 @@ class LabAppointment(TimeStampedModel, CouponsMixin, LabAppointmentInvoiceMixin,
                 engine = get_class_reference(plus_membership, entity)
                 if engine:
                     # engine_response = engine.validate_booking_entity(cost=effective_price, id=data['test_ids'][0].id)
-                    engine_response = engine.validate_booking_entity(cost=price, id=data['test_ids'][0].id, mrp=effective_price, deal_price=total_deal_price)
+                    engine_response = engine.validate_booking_entity(cost=price, id=data['test_ids'][0].id, mrp=effective_price, deal_price=total_deal_price, price_engine_price=price)
                     effective_price = engine_response.get('amount_to_be_paid')
                     # effective_price = effective_price + vip_convenience_amount
                 else:
@@ -2887,7 +2887,9 @@ class LabAppointment(TimeStampedModel, CouponsMixin, LabAppointmentInvoiceMixin,
             plus_user_id = plus_user_resp.get('plus_user_id', None)
         # if cover_under_vip and cart_data and cart_data.get('cover_under_vip', None):
             # convenience_amount = plus_user.plan.get_convenience_charge(plus_user_resp['amount_to_be_paid'], "LABTEST")
-            convenience_amount = PlusPlans.get_default_convenience_amount(price_data, "LABTEST", default_plan_query=plus_user.plan)
+            # convenience_amount = PlusPlans.get_default_convenience_amount(price_data, "LABTEST", default_plan_query=plus_user.plan)
+            convenience_amount = plus_user_resp.get('vip_convenience_amount', 0)
+            convenience_amount = 0 if not convenience_amount else convenience_amount
             effective_price = plus_user_resp['amount_to_be_paid'] + convenience_amount
             vip_amount_utilized = plus_user_resp['vip_amount_deducted']
             # utilization = plus_user.get_utilization

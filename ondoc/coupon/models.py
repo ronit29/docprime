@@ -526,12 +526,11 @@ class CouponRecommender():
                                    .exclude(status__in=[PlusUser.CANCELLED]),
                                    to_attr='user_plus_purchased')
 
-        all_coupons = Coupon.objects.filter(type__in=types)
-
         if coupon_code:
             all_coupons = RandomGeneratedCoupon.get_coupons([coupon_code])
+            all_coupons = all_coupons.filter(type__in=types)
         else:
-            all_coupons = all_coupons.filter(is_visible=True)
+            all_coupons = Coupon.objects.filter(type__in=types, is_visible=True)
 
         all_coupons = all_coupons.prefetch_related('user_specific_coupon', 'test', 'test_categories', 'hospitals',
                                                    'hospitals_exclude', 'doctors', 'doctors_exclude', 'specializations',

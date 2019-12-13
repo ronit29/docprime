@@ -196,7 +196,7 @@ class UserProfileSerializer(serializers.ModelSerializer):
     GENDER_CHOICES = UserProfile.GENDER_CHOICES
     name = serializers.CharField(max_length=100)
     age = serializers.SerializerMethodField()
-    gender = serializers.ChoiceField(choices=GENDER_CHOICES)
+    gender = serializers.ChoiceField(choices=GENDER_CHOICES, allow_null=True, allow_blank=True, required=False)
     email = serializers.EmailField(required=False, allow_null=True, allow_blank=True)
     profile_image = serializers.SerializerMethodField()
     is_insured = serializers.SerializerMethodField()
