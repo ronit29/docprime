@@ -200,9 +200,6 @@ class PartnerLabSamplesCollectOrderAdmin(admin.ModelAdmin):
     def has_add_permission(self, request, obj=None):
         return False
 
-    def has_delete_permission(self, request, obj=None):
-        return False
-
     def save_related(self, request, form, formsets, change):
         super(type(self), self).save_related(request, form, formsets, change)
         report_list = list()

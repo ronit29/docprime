@@ -28,6 +28,7 @@ class PgLogs(DynamicDocument, TimeStampedModel):
     REFUND_REQUEST_RESPONSE = 11
     RESPONSE_TO_CHAT = 12
     ACK_TO_PG = 13
+    REQUESTED_REFUND_RESPONSE = 14
 
     id = UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     order_id = LongField(null=True, blank=True, editable=False)
