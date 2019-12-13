@@ -22,8 +22,8 @@ from django.db.models import Q
 from ondoc.common.models import DocumentsProofs
 from ondoc.coupon.models import Coupon
 
-from ondoc.notification.tasks import push_plus_lead_to_matrix, set_order_dummy_transaction, \
-    set_order_dummy_transaction_for_corporate, update_random_coupons_consumption
+from ondoc.notification.tasks import push_plus_lead_to_matrix, set_order_dummy_transaction, update_random_coupons_consumption
+    # set_order_dummy_transaction_for_corporate,
 
 from ondoc.plus.usage_criteria import get_class_reference, get_price_reference, get_min_convenience_reference, \
     get_max_convenience_reference
@@ -1695,7 +1695,7 @@ class PlusUserUpload(auth_model.TimeStampedModel):
                                 if not order.getTransactions():
                                     try:
                                         transaction.on_commit(
-                                            lambda: set_order_dummy_transaction_for_corporate.apply_async(
+                                            lambda: set_order_dummy_transaction.apply_async(
                                                 (order.id, plus_user_obj.user_id,), countdown=5))
                                     except Exception as e:
                                         logger.error(str(e))

@@ -111,6 +111,13 @@ class Order(TimeStampedModel):
     def __str__(self):
         return "{}".format(self.id)
 
+    def is_corporate_plus_plan(self):
+        from ondoc.plus.models import PlusUser
+        plus_user = PlusUser.objects.filter(id=self.reference_id).first()
+        if not plus_user or not plus_user.plan or not plus_user.plan.is_corporate:
+            return None
+        return plus_user
+
     def get_insurance_data_for_pg(self):
         from ondoc.insurance.models import UserInsurance
 
@@ -626,6 +633,7 @@ class Order(TimeStampedModel):
         from ondoc.diagnostic.models import LabAppointment
         from ondoc.subscription_plan.models import UserPlanMapping
         from ondoc.insurance.models import UserInsurance
+        from ondoc.plus.models import PlusUser
 
         if self.orders.exists():
             completed_order = self.orders.filter(reference_id__isnull=False).first()
@@ -642,10 +650,15 @@ class Order(TimeStampedModel):
             return UserPlanMapping.objects.filter(id=self.reference_id).first()
         elif self.product_id == self.INSURANCE_PRODUCT_ID:
             return UserInsurance.objects.filter(id=self.reference_id).first()
+        elif self.product_id == self.VIP_PRODUCT_ID or self.product_id == self.GOLD_PRODUCT_ID:
+            return PlusUser.objects.filter(id=self.reference_id).first()
         return None
 
     def get_total_price(self):
         if not self.is_parent() and self.booked_using_insurance():
+            return 0
+
+        if self.is_corporate_plus_plan():
             return 0
 
         if self.parent:
