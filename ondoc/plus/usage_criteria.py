@@ -23,10 +23,11 @@ class AbstractCriteria(object):
         mrp = kwargs.get('mrp')
         deal_price = kwargs.get('deal_price')
         utilization = kwargs.get('utilization')
+        price_engine_price = kwargs.get('price_engine_price')
         if cost is None or cost < 0:
             return {}
 
-        return self._validate_booking_entity(cost, id, utilization=utilization, mrp=mrp, deal_price=deal_price)
+        return self._validate_booking_entity(cost, id, utilization=utilization, mrp=mrp, deal_price=deal_price, price_engine_price=price_engine_price)
 
     def _update_utilization(self, utilization, deduction_amount):
         raise NotImplementedError()
@@ -251,6 +252,7 @@ class LabtestAmountCount(AbstractCriteria):
         is_covered = False
         plan = self.plus_obj.plan
         deal_price = int(kwargs.get('deal_price', 0))
+        price_engine_price = int(kwargs.get('price_engine_price', 0))
         price_data = {"mrp": mrp, "deal_price": deal_price, "fees": cost, "cod_deal_price": deal_price}
         # min_price_engine = get_min_convenience_reference(self.plus_obj, "LABTEST")
         # min_price = min_price_engine.get_price(price_data)
@@ -261,7 +263,7 @@ class LabtestAmountCount(AbstractCriteria):
         convenience_charge = PlusPlans.get_default_convenience_amount(price_data, "LABTEST",
                                                                       default_plan_query=plan)
         total_cost = cost + convenience_charge
-        if plan.is_gold and total_cost >= deal_price:
+        if plan.is_gold and (price_engine_price + convenience_charge) >= deal_price:
             return resp
 
         if not total_count_left and not total_amount_left:
@@ -394,15 +396,10 @@ class PackageAmountCount(AbstractCriteria):
         plan = self.plus_obj.plan
         deal_price = int(kwargs.get('deal_price', 0))
         price_data = {"mrp": mrp, "deal_price": deal_price, "fees": cost, "cod_deal_price": deal_price}
-        # min_price_engine = get_min_convenience_reference(self.plus_obj, "LABTEST")
-        # min_price = min_price_engine.get_price(price_data)
-        # max_price_engine = get_max_convenience_reference(self.plus_obj, "LABTEST")
-        # max_price = max_price_engine.get_price(price_data)
-        # convenience_charge = plan.get_convenience_charge(max_price, min_price, "LABTEST")
-        # convenience_charge = plan.get_convenience_charge(cost, "LABTEST")
+        price_engine_price = int(kwargs.get('price_engine_price', 0))
         convenience_charge = PlusPlans.get_default_convenience_amount(price_data, "LABTEST", default_plan_query=plan)
         total_cost = cost + convenience_charge
-        if plan.is_gold and total_cost >= deal_price:
+        if plan.is_gold and (price_engine_price + convenience_charge) >= deal_price:
             return resp
         if plan.is_corporate:
             return resp

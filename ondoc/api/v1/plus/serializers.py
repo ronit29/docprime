@@ -289,6 +289,7 @@ class PlusUserSerializer(serializers.Serializer):
     expire_date = serializers.DateTimeField()
     order = serializers.PrimaryKeyRelatedField(queryset=account_models.Order.objects.all())
     coupon = serializers.ListField(child=serializers.IntegerField(), required=False, default=[])
+    random_coupon_list = serializers.ListField(child=serializers.CharField(), required=False, default=[])
 
 
 class PlusUserModelSerializer(serializers.ModelSerializer):

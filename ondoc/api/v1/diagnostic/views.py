@@ -1921,6 +1921,7 @@ class LabList(viewsets.ReadOnlyModelViewSet):
                 res['vip'] = deepcopy(vip_data_dict)
                 all_tests_under_lab = res.get('tests', [])
                 bool_array = list()
+                gold_bool_array = list()
 
                 # For Insurance. Checking the eligibility of test to be booked under Insurance.
                 if all_tests_under_lab and res['is_insurance_enabled']:
@@ -1957,11 +1958,11 @@ class LabList(viewsets.ReadOnlyModelViewSet):
                         res['vip']['vip_gold_price'] = int(paticular_test_in_lab.get('agreed_price', 0))
                         if engine:
                             # engine_response = engine.validate_booking_entity(cost=paticular_test_in_lab.get('mrp', 0))
-                            engine_response = engine.validate_booking_entity(cost=price, mrp=paticular_test_in_lab.get('mrp', 0), deal_price=paticular_test_in_lab.get('deal_price', 0))
+                            engine_response = engine.validate_booking_entity(cost=price, mrp=paticular_test_in_lab.get('mrp', 0), deal_price=paticular_test_in_lab.get('deal_price', 0), price_engine_price=price)
                             coverage = engine_response.get('is_covered', False)
-                        bool_array.append(coverage)
+                        gold_bool_array.append(coverage)
 
-                    if False not in bool_array and len(bool_array) > 0:
+                    if False not in gold_bool_array and len(gold_bool_array) > 0:
                         res['vip']['covered_under_vip'] = True
                         res['vip']['vip_amount'] = engine_response.get('amount_to_be_paid', 0) if engine_response else 0
 

@@ -2004,6 +2004,10 @@ class ConsumerRefund(TimeStampedModel):
     SUCCESS_OK_STATUS = '1'
     FAILURE_OK_STATUS = '0'
 
+    REFUND_INITIATED_TO_PG = 'REFUND_INITIATED_TO_PG'
+    REFUND_SUCCESS_BY_PG = 'REFUND_SUCCESS_BY_PG'
+    REFUND_FAILURE_BY_PG = 'REFUND_FAILURE_BY_PG'
+
     PENDING = 1
     REQUESTED = 5
     COMPLETED = 10
@@ -2134,16 +2138,24 @@ class ConsumerRefund(TimeStampedModel):
                 print("Status Updated")
 
     @classmethod
-    def refund_status_request(cls, ref_id):
+    def refund_status_request(cls, requested_refund):
+        from ondoc.account.mongo_models import PgLogs as PgLogsMongo
         if settings.AUTO_REFUND:
+            order_id = None
+            if requested_refund.pg_transaction:
+                order_id = requested_refund.pg_transaction.order_id
             url = settings.PG_REFUND_STATUS_API_URL
             token = settings.PG_REFUND_AUTH_TOKEN
             headers = {
                 "auth": token
             }
-            response = requests.get(url=url, params={"refId": ref_id}, headers=headers)
-            #print(response.url)
-            #print(response.status_code)
+            response = requests.get(url=url, params={"refId": requested_refund.id}, headers=headers)
+            url_with_params = url + "?refId=" + str(requested_refund.id)
+            json_url = '{"url": "%s"}' % url_with_params
+            if order_id:
+                save_pg_response.apply_async(
+                    (PgLogsMongo.REQUESTED_REFUND_RESPONSE, order_id, requested_refund.pg_transaction_id, response.json(),
+                     json_url, requested_refund.user_id), eta=timezone.localtime(), queue=settings.RABBITMQ_LOGS_QUEUE)
             if response.status_code == status.HTTP_200_OK:
                 resp_data = response.json()
                 temp_data = resp_data.get("data")
@@ -2156,9 +2168,9 @@ class ConsumerRefund(TimeStampedModel):
                 except:
                     pass
                 if resp_data.get("ok") and str(resp_data["ok"]) == cls.SUCCESS_OK_STATUS and code is not None and \
-                        code != PgTransaction.REFUND_UPDATE_FAILURE_STATUS:
+                        code == ConsumerRefund.REFUND_SUCCESS_BY_PG:
                     with transaction.atomic():
-                        obj = cls.objects.select_for_update().get(id=ref_id)
+                        obj = cls.objects.select_for_update().get(id=requested_refund.id)
                         if obj.refund_state != cls.COMPLETED:
                             obj.refund_state = cls.COMPLETED
                             obj.save()
@@ -2169,9 +2181,12 @@ class ConsumerRefund(TimeStampedModel):
 
     @classmethod
     def update_refund_status(cls):
-        refund_ids = cls.objects.filter(refund_state=cls.REQUESTED).values_list('id', flat=True)
-        for ref_id in refund_ids:
-            cls.refund_status_request(ref_id)
+        # refund_ids = cls.objects.filter(refund_state=cls.REQUESTED).values_list('id', flat=True)
+        # for ref_id in refund_ids:
+        #     cls.refund_status_request(ref_id)
+        requested_refunds = cls.objects.filter(refund_state=cls.REQUESTED)
+        for requested_refund in requested_refunds:
+            cls.refund_status_request(requested_refund)
 
 
 class Invoice(TimeStampedModel):

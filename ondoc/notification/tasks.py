@@ -1390,6 +1390,13 @@ def generate_random_coupons(total_count, coupon_id):
     except Exception as e:
         logger.error(str(e))
 
+@task
+def update_random_coupons_consumption(random_coupons_ids=None):
+    from ondoc.coupon.models import RandomGeneratedCoupon
+    if random_coupons_ids:
+        random_coupons = RandomGeneratedCoupon.objects.filter(random_coupon=random_coupons_ids)
+        random_coupons.update(consumed_at=datetime.datetime.now())
+
 
 @task
 def update_coupon_used_count():
