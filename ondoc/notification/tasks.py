@@ -8,6 +8,8 @@ import math
 import traceback
 from collections import OrderedDict
 from io import BytesIO
+
+from django.contrib.contenttypes.models import ContentType
 from django.db.models import Q
 
 import pytz
@@ -17,7 +19,7 @@ from django.utils import timezone
 from openpyxl import load_workbook
 
 from ondoc.api.v1.utils import aware_time_zone, log_requests_on, pg_seamless_hash
-from ondoc.authentication.models import UserNumberUpdate, UserProfileEmailUpdate
+from ondoc.authentication.models import UserNumberUpdate, UserProfileEmailUpdate, Address
 from ondoc.common.models import AppointmentMaskNumber
 from ondoc.matrix.mongo_models import MatrixLog
 from ondoc.notification.labnotificationaction import LabNotificationAction
@@ -37,7 +39,7 @@ logger = logging.getLogger(__name__)
 
 
 @task
-def send_lab_notifications_refactored(data):
+def send_lab_notifications_refactored(data, *args, **kwargs):
     from ondoc.diagnostic import models as lab_models
     from ondoc.communications.models import LabNotification
     appointment_id = data.get('appointment_id', None)
@@ -46,6 +48,8 @@ def send_lab_notifications_refactored(data):
     if not instance or not instance.user:
         return
     try:
+        # todo - code commented of branch 'lab_email_provider'
+        # test_list = []
         instance = lab_models.LabAppointment.objects.filter(id=appointment_id).first()
         if not instance or not instance.user:
             return
@@ -62,9 +66,26 @@ def send_lab_notifications_refactored(data):
                     ({'type': 'LAB_APPOINTMENT', 'appointment': instance}))
         lab_notification = LabNotification(instance)
         lab_notification.send(is_valid_for_provider)
+        #     notification_type = lab_notification.notification_type
+        #     receivers = lab_notification.get_receivers(is_valid_for_provider)
+        #     content_type = ContentType.objects.get_for_model(instance)
+        #     mask_no_obj = AppointmentMaskNumber.objects.filter(object_id=instance.id, content_type_id=content_type.id)
+        #     app_test_mapping = instance.test_mappings.all()
+        #     for data in app_test_mapping:
+        #         if data.test:
+        #             test_list.append({'name': data.test.name, 'reference_code': data.test.reference_code})
+        #     context = {'id': instance.id, 'lab_name': instance.lab.name if instance.lab else '',
+        #                         'Patient_name': instance.profile_detail.get('name'), 'Gender':instance.profile_detail.get('gender'),
+        #                         'DOB': instance.profile_detail.get('dob'), 'pickup_address': instance.address.get('address'),
+        #                         'lab_address': instance.address.get( 'address'), 'time_slot': instance.time_slot_start.strftime("%I:%M%p"),
+        #                         'Date':instance.time_slot_start.date(), 'mask_number': mask_no_obj[0].mask_number if mask_no_obj and mask_no_obj[0].mask_number
+        # else instance.address.get('phone_number'), 'test_list': test_list, 'client_code': 'CH343' if instance and instance.lab and instance.lab.network and instance.lab.network.id == 195 else '', 'lab_network_id': instance.lab.network.id if instance and instance.lab and instance.lab.network else None}
+        #     from ondoc.communications.models import EMAILNotification
+        #     kwargs['email_obj'] = instance
+        #     email_notification = EMAILNotification(notification_type, context)
+        #     email_notification.send(receivers.get('email_receivers', []), *args, **kwargs)
     except Exception as e:
         logger.error(str(e))
-
 
 @task
 def send_ipd_procedure_lead_mail(data):

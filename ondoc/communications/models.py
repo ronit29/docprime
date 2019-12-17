@@ -997,32 +997,32 @@ class WHTSAPPNotification:
         #         lab_reports.append(temp_short_url)
         #     self.context['lab_reports'] = lab_reports
 
-        elif notification_type == NotificationAction.PARTNER_LAB_REPORT_UPLOADED and user and user.user_type == User.DOCTOR:
-
-            instance = self.context.get('instance')
-            body_template = "cloudlabs_report_generated_partner"
-            data.append(self.context.get('order_id'))
-            data.append(datetime.strftime(aware_time_zone(self.context.get('order_date_time')), '%b %d, %Y, %-I:%M %P'))
-            data.append(self.context.get('patient_name'))
-            data.append(self.context.get('patient_age'))
-            lab_tests_ordered_string = self.get_pipe_separated_string_from_list(self.context.get('lab_tests_ordered'))
-            data.append(lab_tests_ordered_string)
-            report_list_string = self.get_pipe_separated_indexed_string_from_list(self.context.get('report_list'))
-            data.append(report_list_string)
-
-        elif notification_type == NotificationAction.PARTNER_LAB_REPORT_UPLOADED:
-
-            instance = self.context.get('instance')
-            body_template = "cloudlabs_report_generated_v2"
-            data.append(self.context.get('hospital_name'))
-            data.append(self.context.get('patient_name'))
-            data.append(self.context.get('patient_age'))
-            data.append(self.context.get('order_id'))
-            data.append(datetime.strftime(aware_time_zone(self.context.get('order_date_time')), '%b %d, %Y, %-I:%M %P'))
-            lab_tests_ordered_string = self.get_pipe_separated_string_from_list(self.context.get('lab_tests_ordered'))
-            data.append(lab_tests_ordered_string)
-            report_list_string = self.get_pipe_separated_indexed_string_from_list(self.context.get('report_list'))
-            data.append(report_list_string)
+        # elif notification_type == NotificationAction.PARTNER_LAB_REPORT_UPLOADED and user and user.user_type == User.DOCTOR:
+        #
+        #     instance = self.context.get('instance')
+        #     body_template = "cloudlabs_report_generated_partner"
+        #     data.append(self.context.get('order_id'))
+        #     data.append(datetime.strftime(aware_time_zone(self.context.get('order_date_time')), '%b %d, %Y, %-I:%M %P'))
+        #     data.append(self.context.get('patient_name'))
+        #     data.append(self.context.get('patient_age'))
+        #     lab_tests_ordered_string = self.get_pipe_separated_string_from_list(self.context.get('lab_tests_ordered'))
+        #     data.append(lab_tests_ordered_string)
+        #     report_list_string = self.get_pipe_separated_indexed_string_from_list(self.context.get('report_list'))
+        #     data.append(report_list_string)
+        #
+        # elif notification_type == NotificationAction.PARTNER_LAB_REPORT_UPLOADED:
+        #
+        #     instance = self.context.get('instance')
+        #     body_template = "cloudlabs_report_generated_v2"
+        #     data.append(self.context.get('hospital_name'))
+        #     data.append(self.context.get('patient_name'))
+        #     data.append(self.context.get('patient_age'))
+        #     data.append(self.context.get('order_id'))
+        #     data.append(datetime.strftime(aware_time_zone(self.context.get('order_date_time')), '%b %d, %Y, %-I:%M %P'))
+        #     lab_tests_ordered_string = self.get_pipe_separated_string_from_list(self.context.get('lab_tests_ordered'))
+        #     data.append(lab_tests_ordered_string)
+        #     report_list_string = self.get_pipe_separated_indexed_string_from_list(self.context.get('report_list'))
+        #     data.append(report_list_string)
 
         return body_template, data
 
@@ -1135,7 +1135,12 @@ class EMAILNotification:
             obj = DynamicTemplates.objects.filter(template_type=DynamicTemplates.TemplateType.EMAIL, template_name="Lensfit_email", approved=True).first()
         if notification_type == NotificationAction.IPDIntimateEmailNotification:
             obj = DynamicTemplates.objects.filter(template_type=DynamicTemplates.TemplateType.EMAIL, template_name="EMail_to_provider_for_ipd_hospitals_for_request_query", approved=True).first()
-
+        # todo - below code commented of branch 'lab_email_provider'
+        # if notification_type in (NotificationAction.LAB_APPOINTMENT_ACCEPTED, NotificationAction.LAB_APPOINTMENT_RESCHEDULED_BY_PATIENT,
+        #                         NotificationAction.LAB_APPOINTMENT_RESCHEDULED_BY_LAB, NotificationAction.LAB_APPOINTMENT_BOOKED,
+        #                         NotificationAction.LAB_APPOINTMENT_CANCELLED, NotificationAction.LAB_INVOICE):
+        #     obj = DynamicTemplates.objects.filter(template_type=DynamicTemplates.TemplateType.EMAIL, template_name="Email_to_lab_on_appointment_booked",
+        #                                           approved=True).first()
         return obj
 
     def get_template(self, user):
