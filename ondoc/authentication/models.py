@@ -348,7 +348,7 @@ class User(AbstractBaseUser, PermissionsMixin):
     @cached_property
     def get_temp_plus_user(self):
         from ondoc.plus.models import TempPlusUser
-        temp_plus_user = TempPlusUser.objects.filter(user_id=self.id, deleted=0).order_by('-id').first()
+        temp_plus_user = TempPlusUser.objects.filter(user_id=self.id, deleted=0).first()
         return temp_plus_user if temp_plus_user else None
 
     @cached_property
