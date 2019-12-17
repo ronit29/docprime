@@ -31,18 +31,19 @@ if os.environ.get('DJANGO_SETTINGS_MODULE') == 'config.settings.local' or os.env
     app = celery.Celery(__name__)
 
 else:
-    class Celery(celery.Celery):
+    app = celery.Celery(__name__)
+    # class Celery(celery.Celery):
 
-        def on_configure(self):
-            client = raven.Client(settings.SENTRY_DSN)
+        # def on_configure(self):
+            # client = raven.Client(settings.SENTRY_DSN)
+            #
+            # # register a custom filter to filter out duplicate logs
+            # register_logger_signal(client)
+            #
+            # # hook into the Celery error handler
+            # register_signal(client)
 
-            # register a custom filter to filter out duplicate logs
-            register_logger_signal(client)
-
-            # hook into the Celery error handler
-            register_signal(client)
-
-    app = Celery(__name__)
+    # app = Celery(__name__)
 
 
 class Config():
