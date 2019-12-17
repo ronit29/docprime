@@ -55,7 +55,7 @@
     </tr>
     <tr>
         <td style="color:#3f3f3f;font-size:16px;font-weight:500;padding: 20px 15px 0;">
-            Hi<br/>The appointment for {{Patient_name}} with {{lab_name}} on
+            Hi<br/>The appointment for {{patient_name|capfirst}} with {{lab_name|capfirst}} on
             {{instance.time_slot_start|date:"D jS F Y"}} at {{instance.time_slot_start|date:"h:i A"}} has
             been confirmed.
         </td>
@@ -104,7 +104,7 @@
                         Patient
                     </td>
                     <td style="color:#3f3f3f;font-size:16px;font-weight:500;padding-top:16px">
-                        {{Patient_name}}
+                        {{patient_name|capfirst}}
                     </td>
                 </tr>
                 <tr>
@@ -121,7 +121,7 @@
                         Lab
                     </td>
                     <td style="color:#3f3f3f;font-size:16px;font-weight:500;padding-top:16px">
-                        {{lab_name}}
+                        {{lab_name|capfirst}}
                     </td>
                 </tr>
                 {% if instance.is_home_pickup %}
@@ -191,23 +191,23 @@
                 </tr>
                 </thead>
                 <tbody>
-                {% for data in tests %}
+                {% for test in tests %}
                 <tr>
                     <td style="border: 1px solid black;text-align: center;color:#3f3f3f;font-size:16px;font-weight:500;">
                         {{forloop.counter}}
                     </td>
                     <td style="border: 1px solid black;text-align: center;color:#3f3f3f;font-size:16px;font-weight:500;">
-                        {{data.test.name|capfirst}}
+                        {{test.name|capfirst}}
                     </td>
                     {% if show_amounts %}
                         <td style="border: 1px solid black;text-align: center;color:#3f3f3f;font-size:16px;font-weight:500;">
-                            {{data.test.mrp}}
+                            {{test.mrp}}
                         </td>
                         <td style="border: 1px solid black;text-align: center;color:#3f3f3f;font-size:16px;font-weight:500;">
-                            {{data.test.discount}}
+                            {{test.discount}}
                         </td>
                         <td style="border: 1px solid black;text-align: center;color:#3f3f3f;font-size:16px;font-weight:500;">
-                            {{data.test.deal_price}}
+                            {{test.deal_price}}
                         </td>
                     {% endif %}
                 </tr>
