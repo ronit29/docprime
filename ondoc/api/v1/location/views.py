@@ -469,13 +469,19 @@ class DoctorProfileFooter(Footer):
         return response
 
     def specialist_in_locality(self):
-
         query = ''' select eu.url, concat(eu.specialization,'s in ', eu.sublocality_value, ', ',  eu.locality_value) title from seo_specialization ss 
-                       inner join entity_urls eu on ss.specialization_id = eu.specialization_id 
-                       and eu.sublocality_id=%s and eu.sitemap_identifier='SPECIALIZATION_LOCALITY_CITY' 
-                       and eu.is_valid=True order by count desc limit 10'''
+                               inner join entity_urls eu on ss.specialization_id = eu.specialization_id 
+                              and eu.sitemap_identifier='SPECIALIZATION_LOCALITY_CITY' 
+                               and eu.is_valid=True order by count desc limit 10'''
 
-        return self.get_urls(query, [self.sublocality_id])
+        return self.get_urls(query, [])
+
+        # query = ''' select eu.url, concat(eu.specialization,'s in ', eu.sublocality_value, ', ',  eu.locality_value) title from seo_specialization ss
+        #                inner join entity_urls eu on ss.specialization_id = eu.specialization_id
+        #                and eu.sublocality_id=%s and eu.sitemap_identifier='SPECIALIZATION_LOCALITY_CITY'
+        #                and eu.is_valid=True order by count desc limit 10'''
+        #
+        # return self.get_urls(query, [self.sublocality_id])
     #
     # def specialist_in_city(self):
     #
