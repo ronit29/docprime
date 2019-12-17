@@ -1399,7 +1399,7 @@ class AppointmentUtilityViewSet(viewsets.GenericViewSet):
                         price_data['convenience_charge'] = convenience_charge
                         res['tests'][test] = price_data
 
-                    if price_data and price_data['convenience_charge'] and price_data['gold_price'] + price_data['convenience_charge'] > price_data['fees']:
+                    if price_data and price_data['convenience_charge'] and price_data['gold_price'] + price_data['convenience_charge'] > price_data['deal_price']:
                         continue
 
                     resp['vip_plans'].append(res)
