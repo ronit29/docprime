@@ -78,8 +78,8 @@ def send_lab_notifications_refactored(data, *args, **kwargs):
                     test_list.append({'name': data.test.name, 'reference_code': data.test.reference_code})
             context = {'id': instance.id, 'lab_name': instance.lab.name if instance.lab else '',
                                 'Patient_name': instance.profile_detail.get('name'), 'Gender':instance.profile_detail.get('gender'),
-                                'DOB': instance.profile_detail.get('dob'), 'pickup_address': instance.address.get('address'),
-                                'lab_address': instance.address.get( 'address'), 'time_slot': instance.time_slot_start.strftime("%I:%M%p"),
+                                'DOB': instance.profile_detail.get('dob'), 'pickup_address': instance.address.get('address') if instance and instance.address and instance.address.get('address') else None,
+                                'lab_address': instance.lab.get_lab_address(), 'time_slot': instance.time_slot_start.strftime("%I:%M%p"),
                                 'Date':instance.time_slot_start.date(), 'mask_number': mask_no_obj[0].mask_number if mask_no_obj and mask_no_obj[0].mask_number
                         else instance.address.get('phone_number'), 'test_list': test_list, 'client_code': 'CH343' if instance and instance.lab and instance.lab.network and instance.lab.network.id == 195 else '', 'lab_network_id': instance.lab.network.id if instance and instance.lab and instance.lab.network else None, 'instance':instance,
                        'tests':app_test_mapping}
