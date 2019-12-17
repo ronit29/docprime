@@ -1854,8 +1854,7 @@ class ConsumerTransaction(TimeStampedModel, SoftDelete):
             if ref_txn_obj.ref_txns:
                 ref_refund_amount = min(decimal.Decimal(ref_txns.get(str(ref_txn_obj.id), 0)), refund_amount)
                 refund_amount -= ref_refund_amount
-                ctx_obj = ref_txn_obj.debit_from_ref_txn(consumer_account, ref_refund_amount, parent_ref,
-                                                         initiate_refund, balance_refund, reference_id)
+                ctx_obj = ref_txn_obj.debit_from_ref_txn(consumer_account, ref_refund_amount, False, 1, 0, reference_id)
             else:
                 ref_refund_amount = refund_amount
                 if not cashback_txn and ref_refund_amount:
@@ -1884,7 +1883,7 @@ class ConsumerTransaction(TimeStampedModel, SoftDelete):
                         ctx_objs.append(ctx_obj)
 
             if ref_txn_obj.balance and ref_txn_obj.balance > 0 and not cashback_txn and not is_preauth_txn:
-                ctx_objs.append(ref_txn_obj.debit_from_balance(consumer_account))
+                ctx_objs.append(ref_txn_obj.debit_from_balance(consumer_account, reference_id))
         self.save()
 
         return ctx_objs
@@ -1909,13 +1908,13 @@ class ConsumerTransaction(TimeStampedModel, SoftDelete):
 
         return ctx_obj
 
-    def debit_from_balance(self, consumer_account):
+    def debit_from_balance(self, consumer_account, reference_id=None):
         ctx_objs = []
         if self.balance:
             pg_ctx_obj = ConsumerTransaction.objects.filter(user=self.user, action=ConsumerTransaction.PAYMENT,
                                                             order_id=self.order_id).last()
             if pg_ctx_obj:
-                ctx_obj = pg_ctx_obj.debit_txn_refund(consumer_account, self.balance)
+                ctx_obj = pg_ctx_obj.debit_txn_refund(consumer_account, self.balance, reference_id)
                 if ctx_obj:
                     self.balance = 0
                     self.save()
@@ -1927,7 +1926,7 @@ class ConsumerTransaction(TimeStampedModel, SoftDelete):
                     pg_ctx_obj = ConsumerTransaction.objects.filter(user=self.user, action=ConsumerTransaction.PAYMENT,
                                                                     order_id=cancel_ctx_obj.order_id).last()
                     if pg_ctx_obj:
-                        ctx_obj = pg_ctx_obj.debit_txn_refund(consumer_account, self.balance, self.reference_id)
+                        ctx_obj = pg_ctx_obj.debit_txn_refund(consumer_account, self.balance, reference_id)
                         if ctx_obj:
                             self.balance = 0
                             self.save()
