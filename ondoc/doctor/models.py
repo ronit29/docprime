@@ -310,12 +310,12 @@ class Hospital(auth_model.TimeStampedModel, auth_model.CreatedByModel, auth_mode
         result = []
         query_params = request.query_params
         try:
-            gold_request = str2bool(query_params.get('gold', 0))
+            gold_request = str2bool(query_params.get('is_gold', 0))
         except:
             gold_request = 0
 
         try:
-            vip_request = str2bool(query_params.get('vip', 0))
+            vip_request = str2bool(query_params.get('is_vip', 0))
         except:
             vip_request = 0
 
