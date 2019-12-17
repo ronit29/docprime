@@ -1747,7 +1747,7 @@ class PlusUserUpload(auth_model.TimeStampedModel):
             first_name = name[0]
             middle_name = ''
             last_name = ''
-        if member.get('gender', None) == "Male":
+        if member.get('gender', None) == "Male" or member.get('gender', None) == "MALE" or member.get('gender') == "male":
             gender = 'm'
         else:
             gender = 'f'
