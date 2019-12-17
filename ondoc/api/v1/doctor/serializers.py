@@ -199,7 +199,7 @@ class OpdAppointmentSerializer(serializers.ModelSerializer):
     class Meta:
         model = OpdAppointment
         fields = ('id', 'doctor_name', 'hospital_name', 'patient_name', 'patient_image', 'type',
-                  'allowed_action', 'effective_price', 'deal_price', 'status', 'time_slot_start',
+                  'allowed_action', 'effective_price', 'deal_price', 'discount', 'status', 'time_slot_start',
                   'time_slot_end', 'doctor_thumbnail', 'patient_thumbnail', 'display_name', 'invoices', 'reports',
                   'prescription', 'report_files', 'specialization', 'payment_type', 'effective_price', 'vip', 'payment_mode')
 
@@ -293,6 +293,7 @@ class CreateAppointmentSerializer(serializers.Serializer):
     spo_data = serializers.JSONField(required=False, default={})
     appointment_id = serializers.IntegerField(required=False)
     cod_to_prepaid = serializers.BooleanField(required=False)
+    utm_sbi_tags = serializers.JSONField(required=False, default={})
     plus_plan = serializers.PrimaryKeyRelatedField(queryset=PlusPlans.objects.filter(is_live=True, is_gold=True), required=False)
 
     # procedure_category_ids = serializers.ListField(child=serializers.PrimaryKeyRelatedField(queryset=ProcedureCategory.objects.filter(is_live=True)), required=False, default=[])
@@ -679,8 +680,9 @@ class DoctorHospitalSerializer(serializers.ModelSerializer):
             hosp_is_gold = search_criteria.search_value
         plus_user = None if not user.is_authenticated or user.is_anonymous else user.active_plus_user
         plan = plus_user.plan if plus_user else None
+        calculated_convenience_charge = PlusPlans.get_default_convenience_amount(price_data, "DOCTOR", default_plan_query=plan)
         resp = {"is_vip_member": False, "cover_under_vip": False, "vip_amount": 0, "is_enable_for_vip": False,
-                "vip_convenience_amount": PlusPlans.get_default_convenience_amount(price_data, "DOCTOR", default_plan_query=plan),
+                "vip_convenience_amount": calculated_convenience_charge,
                 "vip_gold_price": 0, 'hosp_is_gold': False, "is_gold_member": False}
 
         resp['hosp_is_gold'] = hosp_is_gold
@@ -695,6 +697,8 @@ class DoctorHospitalSerializer(serializers.ModelSerializer):
             resp['is_enable_for_vip'] = True
             resp['vip_gold_price'] = obj.fees
             if not plus_user:
+                if resp['vip_gold_price'] + calculated_convenience_charge >= obj.deal_price:
+                    resp['is_enable_for_vip'] = False
                 return resp
             utilization = plus_user.get_utilization
             available_amount = int(utilization.get('doctor_amount_available', 0))
@@ -722,6 +726,8 @@ class DoctorHospitalSerializer(serializers.ModelSerializer):
                 resp['vip_amount'] = vip_res.get('amount_to_be_paid', 0)
                 resp['cover_under_vip'] = vip_res.get('is_covered', False)
 
+                if resp['vip_amount'] + convenience_charge >= obj.deal_price:
+                    resp['is_enable_for_vip'] = False
             # amount = plus_user.get_vip_amount(utilization, mrp)
             # resp['cover_under_vip'] = True if (amount < mrp) else False
             # resp['vip_amount'] = amount
@@ -1673,14 +1679,15 @@ class AppointmentRetrieveSerializer(OpdAppointmentSerializer):
     invoices = serializers.SerializerMethodField()
     cancellation_reason = serializers.SerializerMethodField()
     vip = serializers.SerializerMethodField()
+    appointment_via_sbi = serializers.SerializerMethodField()
 
     class Meta:
         model = OpdAppointment
         fields = ('id', 'patient_image', 'patient_name', 'type', 'profile', 'otp', 'is_rated', 'rating_declined',
-                  'allowed_action', 'effective_price', 'deal_price', 'status', 'time_slot_start', 'time_slot_end',
+                  'allowed_action', 'effective_price', 'deal_price', 'discount', 'status', 'time_slot_start', 'time_slot_end',
                   'doctor', 'hospital', 'allowed_action', 'doctor_thumbnail', 'patient_thumbnail', 'procedures', 'mrp',
                   'insurance', 'invoices', 'cancellation_reason', 'payment_type', 'display_name', 'reports', 'prescription',
-                  'report_files', 'vip')
+                  'report_files', 'vip', 'appointment_via_sbi')
 
     def get_insurance(self, obj):
         request = self.context.get("request")
@@ -1742,6 +1749,14 @@ class AppointmentRetrieveSerializer(OpdAppointmentSerializer):
 
     def get_cancellation_reason(self, obj):
         return obj.get_serialized_cancellation_reason()
+
+    def get_appointment_via_sbi(self, obj):
+        sbi_appointment = False
+        order = Order.objects.filter(reference_id=obj.id, product_id=1).first()
+        if order and order.action_data.get('utm_sbi_tags', None):
+            sbi_appointment = True
+
+        return sbi_appointment
 
 
 class NewAppointmentRetrieveSerializer(AppointmentRetrieveSerializer):

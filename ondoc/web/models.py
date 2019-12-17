@@ -129,7 +129,8 @@ class TinyUrlHits(TimeStampedModel):
 
 class UploadImage(TimeStampedModel):
     name = models.CharField(blank=True, max_length=84)
-    image = models.ImageField(upload_to='web/custom_images')
+    # image = models.ImageField(upload_to='web/custom_images')
+    image = models.FileField(upload_to='web/custom_images', blank=False, null=False, validators=[FileExtensionValidator(allowed_extensions=['jpg', 'jpeg', 'png', 'svg'])])
 
     def __str__(self):
         return "{}".format(self.name)
