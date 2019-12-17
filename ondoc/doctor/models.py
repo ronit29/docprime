@@ -309,8 +309,16 @@ class Hospital(auth_model.TimeStampedModel, auth_model.CreatedByModel, auth_mode
         from numpy.distutils.fcompiler import str2bool
         result = []
         query_params = request.query_params
-        gold_request = str2bool(query_params.get('gold', 0))
-        vip_request = str2bool(query_params.get('vip', 0))
+        try:
+            gold_request = str2bool(query_params.get('gold', 0))
+        except:
+            gold_request = 0
+
+        try:
+            vip_request = str2bool(query_params.get('vip', 0))
+        except:
+            vip_request = 0
+
         day = datetime.datetime.today().weekday()
         # vip_user = None
         common_hosp_queryset = CommonHospital.objects.prefetch_related('hospital', 'hospital__health_insurance_providers',
