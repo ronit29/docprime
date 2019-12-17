@@ -1389,7 +1389,8 @@ class AppointmentUtilityViewSet(viewsets.GenericViewSet):
                             "custom_deal_price" : avt_obj.custom_deal_price,
                             "supplier_price" : avt_obj.supplier_price,
                             "insurance_agreed_price" : avt_obj.insurance_agreed_price,
-                            "fees": avt_obj.custom_agreed_price if avt_obj.custom_agreed_price else avt_obj.computed_agreed_price
+                            "fees": avt_obj.custom_agreed_price if avt_obj.custom_agreed_price else avt_obj.computed_agreed_price,
+                            "deal_price": avt_obj.custom_deal_price if avt_obj.custom_deal_price else avt_obj.computed_deal_price
                         }
 
                         price = price_engine.get_price(price_data)
