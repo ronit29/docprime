@@ -3547,6 +3547,8 @@ class OpdAppointment(auth_model.TimeStampedModel, CouponsMixin, OpdAppointmentIn
                             # vip_dict = engine.validate_booking_entity(cost=doctor_clinic_timing.mrp)
                             vip_dict = engine.validate_booking_entity(cost=price, mrp=doctor_clinic_timing.mrp, deal_price=doctor_clinic_timing.deal_price)
                             amount_to_be_paid = vip_dict.get('amount_to_be_paid')
+                            convenience_charge = vip_dict.get('convenience_charge', 0)
+                            amount_to_be_paid += convenience_charge
                         else:
                             amount_to_be_paid = doctor_clinic_timing.deal_price
                     else:
@@ -3679,15 +3681,14 @@ class OpdAppointment(auth_model.TimeStampedModel, CouponsMixin, OpdAppointmentIn
             plus_user_resp = plus_user.validate_plus_appointment(data)
             cover_under_vip = plus_user_resp.get('cover_under_vip', False)
             vip_amount = plus_user_resp.get('vip_amount_deducted', None)
+            convenience_amount = plus_user_resp.get('vip_convenience_amount', 0)
 
         # if cover_under_vip and cart_data.get('cover_under_vip', None) and vip_amount > 0:
         if cover_under_vip and vip_amount > 0:
-            # convenience_amount = plus_user.plan.get_convenience_charge(cart_data.get('amount_to_be_paid'), "DOCTOR")
-            # effective_price = cart_data.get('amount_to_be_paid') + convenience_amount
-            # convenience_amount = plus_user.plan.get_convenience_charge(plus_user_resp.get('amount_to_be_paid'), "DOCTOR")
-            # convenience_amount = PlusPlans.get_default_convenience_amount(price_data, "DOCTOR", default_plan_query=plus_user.plan)
-            convenience_amount = plus_user_resp.get('vip_convenience_amount', 0)
-            effective_price = plus_user_resp.get('amount_to_be_paid') + convenience_amount
+            effective_price = plus_user_resp.get('amount_to_be_paid')
+            if not convenience_amount:
+                convenience_amount = PlusPlans.get_default_convenience_amount(price_data, "DOCTOR", default_plan_query=plus_user.plan)
+                effective_price = plus_user_resp.get('amount_to_be_paid') + convenience_amount
             if plus_user.plan.is_gold:
                 payment_type = OpdAppointment.GOLD
             else:
