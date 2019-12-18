@@ -1779,16 +1779,17 @@ class OpdNotification(Notification):
                                  NotificationAction.OPD_FEEDBACK_AFTER_APPOINTMENT,
                                  NotificationAction.COD_TO_PREPAID,
                                  NotificationAction.COD_TO_PREPAID_REQUEST,
-                                 NotificationAction.SEND_LENSFIT_COUPON,
-                                 NotificationAction.PROVIDER_OPD_APPOINTMENT_CONFIRMATION_PAY_AT_CLINIC,
-                                 NotificationAction.PROVIDER_OPD_APPOINTMENT_CONFIRMATION_ONLINE_PAYMENT,
-                                 NotificationAction.REMINDER_MESSAGE_MEDANTA_AND_ARTEMIS
+                                 NotificationAction.SEND_LENSFIT_COUPON
                                  ]:
             receivers.append(instance.user)
         elif notification_type in [NotificationAction.APPOINTMENT_RESCHEDULED_BY_PATIENT,
                                    NotificationAction.APPOINTMENT_BOOKED,
                                    NotificationAction.APPOINTMENT_CANCELLED,
-                                   NotificationAction.COD_TO_PREPAID]:
+                                   NotificationAction.COD_TO_PREPAID,
+                                   NotificationAction.PROVIDER_OPD_APPOINTMENT_CONFIRMATION_PAY_AT_CLINIC,
+                                   NotificationAction.PROVIDER_OPD_APPOINTMENT_CONFIRMATION_ONLINE_PAYMENT,
+                                   NotificationAction.REMINDER_MESSAGE_MEDANTA_AND_ARTEMIS
+                                   ]:
             spocs_to_be_communicated = doctor_spocs
             if not is_valid_for_provider:
                 spocs_to_be_communicated = []
