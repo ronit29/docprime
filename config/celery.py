@@ -42,8 +42,9 @@ else:
 
                 # hook into the Celery error handler
                 register_signal(client)
-
-    app = Celery(__name__)
+        app = Celery(__name__)
+    else:
+        app = celery.Celery(__name__)
 
 
 class Config():
