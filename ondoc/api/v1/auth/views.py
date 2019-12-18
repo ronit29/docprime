@@ -1738,7 +1738,7 @@ class TransactionViewSet(viewsets.GenericViewSet):
                             send_pg_acknowledge.apply_async((order_id, response.get("orderNo"),), countdown=1)
                         if response and response.get("orderNo") and response.get("orderId") and response.get(
                                 'txStatus') and response.get('txStatus') == 'TXN_SUCCESS' and pg_resp_code == 5:
-                            send_pg_acknowledge.apply_async((response.get("orderId"), response.get("orderNo"),),
+                            send_pg_acknowledge.apply_async((int(item.get('orderId')), response.get("orderNo"),),
                                                             countdown=1)
                     except Exception as e:
                         logger.error("Error in sending pg acknowledge - " + str(e))
@@ -1772,7 +1772,7 @@ class TransactionViewSet(viewsets.GenericViewSet):
 
             try:
                 if response and response.get("orderNo"):
-                    pg_txn = PgTransaction.objects.filter(order_no__iexact=response.get("orderNo")).first()
+                    pg_txn = PgTransaction.objects.filter(order_no__iexact=response.get("orderNo"), order__id=int(item.get('orderId'))).first()
                     if pg_txn:
                         send_pg_acknowledge.apply_async((pg_txn.order_id, pg_txn.order_no,), countdown=1)
             except Exception as e:
