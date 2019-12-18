@@ -85,7 +85,7 @@ class DoctorAmountCount(AbstractCriteria):
     def _validate_booking_entity(self, cost, id, *args, **kwargs):
         from ondoc.plus.models import PlusPlans
 
-        resp = {'vip_amount_deducted': 0, 'is_covered': False, 'amount_to_be_paid': cost}
+        resp = {'vip_amount_deducted': 0, 'is_covered': False, 'amount_to_be_paid': cost, 'convenience_charge': 0}
         is_covered = False
         vip_amount_deducted = 0
         amount_to_be_paid = cost
@@ -151,6 +151,7 @@ class DoctorAmountCount(AbstractCriteria):
         resp['vip_amount_deducted'] = vip_amount_deducted
         resp['amount_to_be_paid'] = amount_to_be_paid
         resp['is_covered'] = is_covered
+        resp['convenience_charge'] = convenience_charge
 
         return resp
 
