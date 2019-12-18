@@ -250,7 +250,7 @@ class VipGoldPlanAutocomplete(autocomplete.Select2QuerySetView):
 
 
 class CouponForm(forms.ModelForm):
-    tnc = forms.CharField(widget=forms.Textarea, required=True)
+    tnc = forms.CharField(widget=forms.Textarea, required=True, max_length=2000)
     create_random_coupon = forms.BooleanField(required=False)
 
     class Media:
