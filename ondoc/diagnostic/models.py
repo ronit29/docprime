@@ -2074,7 +2074,7 @@ class LabAppointment(TimeStampedModel, CouponsMixin, LabAppointmentInvoiceMixin,
             if self.is_part_of_integration() and self.can_push_to_integrator():
                 try:
                     if old_instance:
-                        if (old_instance.status != self.CANCELLED and self.status == self.CANCELLED) or (old_instance.status == self.CREATED and self.status == self.BOOKED):
+                        if (old_instance.status != self.CANCELLED and old_instance.status != self.CREATED and self.status == self.CANCELLED) or (old_instance.status == self.CREATED and self.status == self.BOOKED):
                             push_lab_appointment_to_integrator.apply_async(({'appointment_id': self.id},), countdown=5)
                     else:
                         push_lab_appointment_to_integrator.apply_async(({'appointment_id': self.id},), countdown=5)
