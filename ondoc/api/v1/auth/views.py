@@ -1447,7 +1447,7 @@ class TransactionViewSet(viewsets.GenericViewSet):
                         if chat_order:
                             CHAT_REDIRECT_URL = CHAT_SUCCESS_REDIRECT_URL % (chat_order.id, chat_order.reference_id)
                             json_url = '{"url": "%s"}' % CHAT_REDIRECT_URL
-                            log_created_at = datetime.datetime.now()
+                            log_created_at = str(datetime.datetime.now())
                             save_pg_response.apply_async((PgLogs.RESPONSE_TO_CHAT, chat_order.id, None, json_url, None, None, log_created_at), eta=timezone.localtime(), queue=settings.RABBITMQ_LOGS_QUEUE)
                         return CHAT_REDIRECT_URL
                     else:
@@ -1555,7 +1555,7 @@ class TransactionViewSet(viewsets.GenericViewSet):
 
         if order_obj.product_id == Order.CHAT_PRODUCT_ID:
             json_url = '{"url": "%s"}' % CHAT_REDIRECT_URL
-            log_created_at = datetime.datetime.now()
+            log_created_at = str(datetime.datetime.now())
             save_pg_response.apply_async(
                 (mongo_pglogs.RESPONSE_TO_CHAT, order_obj.id, None, json_url, None, None, log_created_at),
                 eta=timezone.localtime(), queue=settings.RABBITMQ_LOGS_QUEUE)
