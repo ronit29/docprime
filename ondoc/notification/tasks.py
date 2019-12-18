@@ -1598,7 +1598,6 @@ def save_pg_response(self, log_type, order_id, txn_id, response, request, user_i
     except Exception as e:
         # todo - temporary commented to avoid error logs in sentry
         # logger.error("Error in saving pg response to mongo database - " + json.dumps(response) + " with exception - " + str(e))
-        # self.retry([txn_id, response], countdown=300)
         pass
 
 
