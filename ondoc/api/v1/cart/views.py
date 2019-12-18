@@ -230,6 +230,7 @@ class CartViewSet(viewsets.GenericViewSet):
                         raise Exception('Appointment no more cover under VIP')
                     item.data['amount_to_be_paid'] = vip_dict['amount_to_be_paid']
                     item.data['vip_amount'] = vip_dict['amount_to_be_paid']
+                    item.data['vip_convenience_amount'] = vip_dict['vip_convenience_amount']
                     # cart_data['amount_to_be_paid'] = vip_dict['amount_to_be_paid']
                     # cart_data['amount_to_be_paid'] = vip_dict['amount_to_be_paid']
                     # validated_data.save()
