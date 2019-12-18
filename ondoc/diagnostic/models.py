@@ -2088,7 +2088,7 @@ class LabAppointment(TimeStampedModel, CouponsMixin, LabAppointmentInvoiceMixin,
         #     except Exception as e:
         #         logger.error(str(e))
 
-        if self.is_to_send_notification(old_instance):
+        if  ((self.status == self.BOOKED and old_instance and old_instance.status != self.BOOKED) or (not old_instance and self.status == self.BOOKED) or (self.is_to_send_notification(old_instance))):
             sent_to_provider = True
             if old_instance:
                 sent_to_provider = self.is_provider_notification_allowed(old_instance)
@@ -2888,7 +2888,8 @@ class LabAppointment(TimeStampedModel, CouponsMixin, LabAppointmentInvoiceMixin,
         # if cover_under_vip and cart_data and cart_data.get('cover_under_vip', None):
             # convenience_amount = plus_user.plan.get_convenience_charge(plus_user_resp['amount_to_be_paid'], "LABTEST")
             # convenience_amount = PlusPlans.get_default_convenience_amount(price_data, "LABTEST", default_plan_query=plus_user.plan)
-            convenience_amount = plus_user_resp.get('vip_convenience_amount')
+            convenience_amount = plus_user_resp.get('vip_convenience_amount', 0)
+            convenience_amount = 0 if not convenience_amount else convenience_amount
             effective_price = plus_user_resp['amount_to_be_paid'] + convenience_amount
             vip_amount_utilized = plus_user_resp['vip_amount_deducted']
             # utilization = plus_user.get_utilization
