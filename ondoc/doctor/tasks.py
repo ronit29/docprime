@@ -208,3 +208,14 @@ def calculate_percentage():
 def send_ipd_email_notification():
     from ondoc.notification.models import IPDIntimateEmailNotification
     IPDIntimateEmailNotification.send_email()
+
+@task
+def invalidate_plus_users():
+    from ondoc.plus.models import PlusUser
+    from datetime import datetime
+
+    qs = PlusUser.objects.filter(expire_date__lte=datetime.now())
+    if qs:
+        qs.update(status=PlusUser.EXPIRED)
+
+    return
