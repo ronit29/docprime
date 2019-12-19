@@ -1784,11 +1784,11 @@ def opd_send_completion_notification_before_appointment(appointment_id, time):
         logger.error(str(e))
 
 @task()
-def opd_send_confirmation_notification_before_appointment(appointment_id, time):
+def opd_send_confirmation_notification_before_appointment(data):
     from ondoc.doctor.models import OpdAppointment
     from ondoc.communications.models import OpdNotification
     try:
-        instance = OpdAppointment.objects.filter(id=appointment_id).first()
+        instance = OpdAppointment.objects.filter(id=data.get('appointment_id')).first()
         if not instance or not instance.user:
             return
         opd_notification = OpdNotification(instance, NotificationAction.PROVIDER_OPD_APPOINTMENT_CONFIRMATION_ONLINE_PAYMENT)
