@@ -1247,7 +1247,8 @@ class LabTestCategory(auth_model.TimeStampedModel, SearchKey):
     is_package_category = models.BooleanField(verbose_name='Is this a test package category?')
     show_on_recommended_screen = models.BooleanField(default=False)
     priority = models.PositiveIntegerField(default=0)
-    icon = models.ImageField(upload_to='test/image', null=True, blank=True)
+    # icon = models.ImageField(upload_to='test/image', null=True, blank=True)
+    icon = models.FileField(upload_to='test/image', blank=True, null=True, validators=[FileExtensionValidator(allowed_extensions=['jpg', 'jpeg', 'png', 'svg'])])
 
     def __str__(self):
         return self.name
@@ -2073,7 +2074,7 @@ class LabAppointment(TimeStampedModel, CouponsMixin, LabAppointmentInvoiceMixin,
             if self.is_part_of_integration() and self.can_push_to_integrator():
                 try:
                     if old_instance:
-                        if (old_instance.status != self.CANCELLED and self.status == self.CANCELLED) or (old_instance.status == self.CREATED and self.status == self.BOOKED):
+                        if (old_instance.status != self.CANCELLED and old_instance.status != self.CREATED and self.status == self.CANCELLED) or (old_instance.status == self.CREATED and self.status == self.BOOKED):
                             push_lab_appointment_to_integrator.apply_async(({'appointment_id': self.id},), countdown=5)
                     else:
                         push_lab_appointment_to_integrator.apply_async(({'appointment_id': self.id},), countdown=5)
@@ -2087,6 +2088,8 @@ class LabAppointment(TimeStampedModel, CouponsMixin, LabAppointmentInvoiceMixin,
         #     except Exception as e:
         #         logger.error(str(e))
 
+        # todo - below code commented of branch 'lab_email_provider'
+        # if  ((self.status == self.BOOKED and old_instance and old_instance.status != self.BOOKED) or (not old_instance and self.status == self.BOOKED) or (self.is_to_send_notification(old_instance))):
         if self.is_to_send_notification(old_instance):
             sent_to_provider = True
             if old_instance:
@@ -2698,9 +2701,10 @@ class LabAppointment(TimeStampedModel, CouponsMixin, LabAppointmentInvoiceMixin,
             total_agreed = total_insurance_agreed_price if  total_insurance_agreed_price and total_insurance_agreed_price > 0 else total_agreed
             coupon_discount, coupon_cashback, coupon_list, random_coupon_list = 0, 0, [], []
 
-        if data.get("payment_type") in [OpdAppointment.VIP]:
+        if data.get("payment_type") in [OpdAppointment.VIP, OpdAppointment.GOLD]:
             price_data = {"mrp": total_mrp, "fees": total_agreed, "deal_price": total_deal_price, "cod_deal_price": total_deal_price}
             profile = data.get('profile')
+            vip_convenience_amount = 0
             if profile:
                 plus_membership = profile.get_plus_membership
                 price_engine = get_price_reference(plus_membership, "LABTEST")
@@ -2709,20 +2713,29 @@ class LabAppointment(TimeStampedModel, CouponsMixin, LabAppointmentInvoiceMixin,
                 else:
                     price = price_engine.get_price(price_data)
                 # vip_convenience_amount = plus_membership.plan.get_convenience_charge(price, "LABTEST")
-                vip_convenience_amount = PlusPlans.get_default_convenience_amount(price_data, "LABTEST", default_plan_query=plus_membership.plan)
+                plus_membership_plan = plus_membership.plan if plus_membership else None
+                vip_convenience_amount = PlusPlans.get_default_convenience_amount(price_data, "LABTEST", default_plan_query=plus_membership_plan)
                 test = data['test_ids']
                 entity = "LABTEST" if not test[0].is_package else "PACKAGE"
                 engine = get_class_reference(plus_membership, entity)
                 if engine:
                     # engine_response = engine.validate_booking_entity(cost=effective_price, id=data['test_ids'][0].id)
-                    engine_response = engine.validate_booking_entity(cost=price, id=data['test_ids'][0].id, mrp=effective_price, deal_price=total_deal_price)
+                    engine_response = engine.validate_booking_entity(cost=price, id=data['test_ids'][0].id, mrp=effective_price, deal_price=total_deal_price, price_engine_price=price)
                     effective_price = engine_response.get('amount_to_be_paid')
-                    effective_price = effective_price + vip_convenience_amount
+                    # effective_price = effective_price + vip_convenience_amount
                 else:
                     effective_price = effective_price
             else:
                 effective_price = effective_price
-            coupon_discount, coupon_cashback, coupon_list, random_coupon_list = 0, 0, [], []
+
+            effective_price += vip_convenience_amount
+            # coupon_discount, coupon_cashback, coupon_list, random_coupon_list = 0, 0, [], []
+            coupon_discount, coupon_cashback, coupon_list, random_coupon_list = Coupon.get_total_deduction(data, effective_price)
+
+            if coupon_discount >= effective_price:
+                effective_price = 0
+            else:
+                effective_price = effective_price - coupon_discount
 
         return {
             "deal_price" : total_deal_price,
@@ -2801,7 +2814,8 @@ class LabAppointment(TimeStampedModel, CouponsMixin, LabAppointmentInvoiceMixin,
         }
         payment_type = data.get("payment_type")
         effective_price = price_data.get("effective_price")
-        cart_data = data.get('cart_item').data
+        # cart_data = data.get('cart_item') if data.get('cart_item') else None
+        cart_data = data.get('cart_item').data if data.get('cart_item') and data.get('cart_item').data else None
 
         # is_appointment_insured = cart_data.get('is_appointment_insured', None)
         # insurance_id = cart_data.get('insurance_id', None)
@@ -2816,7 +2830,7 @@ class LabAppointment(TimeStampedModel, CouponsMixin, LabAppointmentInvoiceMixin,
                 is_appointment_insured = True
                 insurance_id = insurance_resp.get('insurance_id', None)
 
-        if is_appointment_insured or cart_data.get('is_appointment_insured', None):
+        if is_appointment_insured or (cart_data and cart_data.get('is_appointment_insured', None)):
             payment_type = OpdAppointment.INSURANCE
             effective_price = 0.0
         else:
@@ -2845,22 +2859,45 @@ class LabAppointment(TimeStampedModel, CouponsMixin, LabAppointmentInvoiceMixin,
         else:
             spo_data = {}
 
+        utm_sbi_tags = data.get("utm_sbi_tags", {})
+
         cover_under_vip = False
         plus_user_id = None
         plus_user = user.active_plus_user
+
+        if not plus_user and data.get('plus_plan'):
+            plus_user = user.get_temp_plus_user
+
         mrp = price_data.get("mrp")
         convenience_amount = 0
         vip_amount_utilized = 0
+
         if plus_user:
             plus_user_resp = plus_user.validate_plus_appointment(data)
             cover_under_vip = plus_user_resp.get('cover_under_vip', False)
+            vip_amount_utilized = plus_user_resp.get('vip_amount_deducted')
             plus_user_id = plus_user_resp.get('plus_user_id', None)
-        if cover_under_vip and cart_data.get('cover_under_vip', None):
-            payment_type = OpdAppointment.VIP
+            convenience_amount = plus_user_resp.get('vip_convenience_amount', 0)
+
+        if cover_under_vip and vip_amount_utilized > 0:
+            # payment_type = OpdAppointment.VIP
+
+            if plus_user.plan.is_gold:
+                payment_type = OpdAppointment.GOLD
+            else:
+                payment_type = OpdAppointment.VIP
+
+            plus_user_id = plus_user_resp.get('plus_user_id', None)
+            # if cover_under_vip and cart_data and cart_data.get('cover_under_vip', None):
             # convenience_amount = plus_user.plan.get_convenience_charge(plus_user_resp['amount_to_be_paid'], "LABTEST")
-            convenience_amount = PlusPlans.get_default_convenience_amount(price_data, "LABTEST", default_plan_query=plus_user.plan)
-            effective_price = plus_user_resp['amount_to_be_paid'] + convenience_amount
+            # convenience_amount = PlusPlans.get_default_convenience_amount(price_data, "LABTEST", default_plan_query=plus_user.plan)
+            effective_price = plus_user_resp['amount_to_be_paid']
+            if not convenience_amount:
+                convenience_amount = PlusPlans.get_default_convenience_amount(price_data, "LABTEST",
+                                                                              default_plan_query=plus_user.plan)
+                effective_price = plus_user_resp.get('amount_to_be_paid') + convenience_amount
             vip_amount_utilized = plus_user_resp['vip_amount_deducted']
+
             # utilization = plus_user.get_utilization
             # available_amount = int(utilization.get('available_package_amount', 0))
             # mrp = int(price_data.get('mrp'))
@@ -2884,6 +2921,8 @@ class LabAppointment(TimeStampedModel, CouponsMixin, LabAppointmentInvoiceMixin,
                 payment_type = OpdAppointment.PREPAID
             else:
                 payment_type = data["payment_type"]
+
+            vip_amount_utilized = 0
 
         fulfillment_data = {
             "lab": data["lab"],
@@ -2916,7 +2955,8 @@ class LabAppointment(TimeStampedModel, CouponsMixin, LabAppointmentInvoiceMixin,
             "_responsible_user": data.get("_responsible_user", None),
             "_source": data.get("_source", None),
             "multi_timings_enabled": data.get('multi_timings_enabled'),
-            "selected_timings_type": data.get('selected_timings_type')
+            "selected_timings_type": data.get('selected_timings_type'),
+            "utm_sbi_tags": utm_sbi_tags
         }
 
         if data.get('included_in_user_plan', False):
@@ -3287,7 +3327,8 @@ class LabAppointment(TimeStampedModel, CouponsMixin, LabAppointmentInvoiceMixin,
 
 class CommonTest(TimeStampedModel):
     test = models.ForeignKey(LabTest, on_delete=models.CASCADE, related_name='commontest')
-    icon = models.ImageField(upload_to='diagnostic/common_test_icons', null=True)
+    # icon = models.ImageField(upload_to='diagnostic/common_test_icons', null=True)
+    icon = models.FileField(upload_to='diagnostic/common_test_icons', blank=False, null=True, validators=[FileExtensionValidator(allowed_extensions=['jpg', 'jpeg', 'png', 'svg'])])
     priority = models.PositiveIntegerField(default=0)
 
     def __str__(self):

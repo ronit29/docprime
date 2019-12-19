@@ -28,6 +28,7 @@ class PgLogs(DynamicDocument, TimeStampedModel):
     REFUND_REQUEST_RESPONSE = 11
     RESPONSE_TO_CHAT = 12
     ACK_TO_PG = 13
+    REQUESTED_REFUND_RESPONSE = 14
 
     id = UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     order_id = LongField(null=True, blank=True, editable=False)
@@ -47,14 +48,14 @@ class PgLogs(DynamicDocument, TimeStampedModel):
                 pg_log = PgLogs(order_id=order_id,
                                 pg_transaction_id=txn_id,
                                 user_id=user_id,
-                                created_at=timezone.localtime(),
-                                updated_at=timezone.localtime())
+                                created_at=str(timezone.localtime()),
+                                updated_at=str(timezone.localtime()))
             if request:
                 if not isinstance(request, dict):
                     request = json.loads(request)
                 request['log_type'] = log_type
                 request['type'] = "REQUEST"
-                request['created_at'] = timezone.localtime()
+                request['created_at'] = str(timezone.localtime())
                 request['log_created_at'] = log_created_at
                 if has_log:
                     pg_log.update(push__logs=request)
@@ -65,7 +66,7 @@ class PgLogs(DynamicDocument, TimeStampedModel):
                     response = json.loads(response)
                 response['log_type'] = log_type
                 response['type'] = "RESPONSE"
-                response['created_at'] = timezone.localtime()
+                response['created_at'] = str(timezone.localtime())
                 response['log_created_at'] = log_created_at
                 if has_log:
                     pg_log.update(push__logs=response)
@@ -73,4 +74,36 @@ class PgLogs(DynamicDocument, TimeStampedModel):
                     pg_log.logs.append(response)
 
             if not has_log:
+                pg_log.save()
+
+
+    @classmethod
+    def save_single_pg_response(cls, log_type=0, order_ids=[], txn_id=None, response=None, request=None, user_id=None):
+
+        for order_id in order_ids:
+            if settings.MONGO_STORE:
+                pg_log = None
+                if order_id:
+                    pg_log = PgLogs.objects.filter(order_id=order_id).first()
+                if not pg_log:
+                    pg_log = PgLogs(order_id=order_id,
+                                    pg_transaction_id=txn_id,
+                                    user_id=user_id,
+                                    created_at=str(timezone.localtime()),
+                                    updated_at=str(timezone.localtime()))
+                if request:
+                    if not isinstance(request, dict):
+                        request = json.loads(request)
+                    request['log_type'] = log_type
+                    request['type'] = "REQUEST"
+                    request['created_at'] = str(timezone.localtime())
+                    pg_log.logs.append(request)
+                if response:
+                    if not isinstance(response, dict):
+                        response = json.loads(response)
+                    response['log_type'] = log_type
+                    response['type'] = "RESPONSE"
+                    response['created_at'] = str(timezone.localtime())
+                    pg_log.logs.append(response)
+
                 pg_log.save()

@@ -18,6 +18,8 @@ from ondoc.common.middleware import use_slave
 from ondoc.integrations.models import IntegratorTestMapping, IntegratorReport, IntegratorMapping
 from ondoc.cart.models import Cart
 from ondoc.common.models import UserConfig, GlobalNonBookable, AppointmentHistory, MatrixMappedCity, SearchCriteria
+from ondoc.plus.models import PlusUser, PlusPlans, TempPlusUser
+from ondoc.plus.usage_criteria import get_class_reference, get_price_reference
 from ondoc.plus.models import PlusUser, PlusPlans
 from ondoc.plus.usage_criteria import get_class_reference, get_price_reference, get_min_convenience_reference, \
     get_max_convenience_reference
@@ -1919,6 +1921,7 @@ class LabList(viewsets.ReadOnlyModelViewSet):
                 res['vip'] = deepcopy(vip_data_dict)
                 all_tests_under_lab = res.get('tests', [])
                 bool_array = list()
+                gold_bool_array = list()
 
                 # For Insurance. Checking the eligibility of test to be booked under Insurance.
                 if all_tests_under_lab and res['is_insurance_enabled']:
@@ -1955,11 +1958,11 @@ class LabList(viewsets.ReadOnlyModelViewSet):
                         res['vip']['vip_gold_price'] = int(paticular_test_in_lab.get('agreed_price', 0))
                         if engine:
                             # engine_response = engine.validate_booking_entity(cost=paticular_test_in_lab.get('mrp', 0))
-                            engine_response = engine.validate_booking_entity(cost=price, mrp=paticular_test_in_lab.get('mrp', 0), deal_price=paticular_test_in_lab.get('deal_price', 0))
+                            engine_response = engine.validate_booking_entity(cost=price, mrp=paticular_test_in_lab.get('mrp', 0), deal_price=paticular_test_in_lab.get('deal_price', 0), price_engine_price=price)
                             coverage = engine_response.get('is_covered', False)
-                        bool_array.append(coverage)
+                        gold_bool_array.append(coverage)
 
-                    if False not in bool_array and len(bool_array) > 0:
+                    if False not in gold_bool_array and len(gold_bool_array) > 0:
                         res['vip']['covered_under_vip'] = True
                         res['vip']['vip_amount'] = engine_response.get('amount_to_be_paid', 0) if engine_response else 0
 
@@ -2550,9 +2553,21 @@ class LabAppointmentView(mixins.CreateModelMixin,
         serializer.is_valid(raise_exception=True)
         validated_data = serializer.validated_data
 
+        profile = validated_data.get('profile')
+        plus_plan = validated_data.get('plus_plan', None)
+
         booked_by = 'agent' if hasattr(request, 'agent') else 'user'
         user_insurance = UserInsurance.get_user_insurance(request.user)
         plus_user = request.user.active_plus_user
+        if plus_plan and plus_user is None:
+            plus_user = TempPlusUser.objects.create(user=request.user, plan=plus_plan, profile=profile)
+
+        if not plus_user:
+            payment_type = validated_data.get('payment_type')
+        else:
+            payment_type = OpdAppointment.GOLD if plus_user.plan.is_gold else OpdAppointment.VIP
+            validated_data['payment_type'] = payment_type
+
         if user_insurance and user_insurance.status in [UserInsurance.ACTIVE, UserInsurance.ONHOLD]:
             if user_insurance.status == UserInsurance.ONHOLD:
                 return Response(status=status.HTTP_400_BAD_REQUEST,
@@ -2581,10 +2596,13 @@ class LabAppointmentView(mixins.CreateModelMixin,
             data['is_vip_member'] = plus_user_dict.get('is_vip_member', False)
             data['cover_under_vip'] = plus_user_dict.get('cover_under_vip', False)
             data['plus_user_id'] = plus_user.id
-            data['vip_amount'] = plus_user_dict.get('vip_amount_deducted')
-            data['amount_to_be_paid'] = plus_user_dict.get('amount_to_be_paid')
+            data['vip_amount'] = int(plus_user_dict.get('vip_amount_deducted'))
+            data['amount_to_be_paid'] = int(plus_user_dict.get('amount_to_be_paid'))
             if data['cover_under_vip']:
-                data['payment_type'] = OpdAppointment.VIP
+                if plus_user.plan.is_gold:
+                    data['payment_type'] = OpdAppointment.GOLD
+                else:
+                    data['payment_type'] = OpdAppointment.VIP
 
         else:
             data['is_appointment_insured'], data['insurance_id'], data['insurance_message'], data['is_vip_member'],\
@@ -2608,7 +2626,7 @@ class LabAppointmentView(mixins.CreateModelMixin,
                 multiple_appointments = True
 
         cart_items = []
-        if multiple_appointments:
+        if multiple_appointments and not plus_plan:
             pathology_data = None
             all_tests = []
             for test_timing in validated_data.get('test_timings'):
@@ -2660,14 +2678,26 @@ class LabAppointmentView(mixins.CreateModelMixin,
                 new_data['is_home_pickup'] = test_timings[0]['is_home_pickup']
             else:
                 new_data = copy.deepcopy(data)
-            cart_item = Cart.add_items_to_cart(request, validated_data, new_data, Order.LAB_PRODUCT_ID)
-            if cart_item:
-                cart_items.append(cart_item)
+
+            if plus_plan:
+                validated_data['start_date'] = dateutil.parser.parse(new_data['start_date'])
+                validated_data['start_time'] = new_data['start_time']
+                validated_data['is_home_pickup'] = new_data['is_home_pickup']
+
+            else:
+                cart_item = Cart.add_items_to_cart(request, validated_data, new_data, Order.LAB_PRODUCT_ID)
+                if cart_item:
+                    cart_items.append(cart_item)
 
         if hasattr(request, 'agent') and request.agent:
             resp = {'is_agent': True, "status":1}
         else:
-            resp = account_models.Order.create_order(request, cart_items, validated_data.get("use_wallet"))
+            if not plus_plan:
+                resp = account_models.Order.create_order(request, cart_items, validated_data.get("use_wallet"))
+            else:
+                if kwargs.get('is_dummy'):
+                    return validated_data
+                resp = account_models.Order.create_new_order(request, validated_data, False)
 
         return Response(data=resp)
 

@@ -13,5 +13,7 @@ urlpatterns = [
     path("chat",
          views.ChatNotificationViewSet.as_view({"post": "chat_send"}),
          name="notificationfromchat"),
-    path('preview/<str:template_name>',  views.DynamicTemplate.as_view(), name='dynamic-template')
+    path('preview/<str:template_name>',  views.DynamicTemplate.as_view(), name='dynamic-template'),
+    path("ipd/emailnotifications", views.IPDIntimateEmailNotificationViewSet.as_view({"post": "send_email_notification"}),
+         name="ipd_hospital_email_notifications"),
 ]

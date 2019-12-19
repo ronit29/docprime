@@ -4,7 +4,7 @@ import logging, warnings
 SECRET_KEY = env('DJANGO_SECRET_KEY')
 
 # ALLOWED_HOSTS = env.list('DJANGO_ALLOWED_HOSTS', default=['panaceatechno.com', 'test.docprime.com', 'docprime.com','admin.docprime.com'])
-ALLOWED_HOSTS = ['panaceatechno.com', 'test.docprime.com', 'docprime.com','admin.docprime.com', 'backendprod']
+ALLOWED_HOSTS = ['docprime.com','admin.docprime.com', 'sbig.docprime.com']
 ALLOWED_HOSTS += ['10.20.{}.{}'.format(i,j) for i in range(256) for j in range(256)]
 
 DATABASES['default']['ATOMIC_REQUESTS'] = True  # noqa F405
@@ -102,7 +102,7 @@ LOGGING = {
 }
 SENTRY_DSN = env('DJANGO_SENTRY_DSN')
 
-if env('ENABLE_SENTRY', default=False):
+if env.bool('ENABLE_SENTRY', default=False):
     LOGGING['disable_existing_loggers'] = True
     LOGGING['handlers']['sentry'] = {
         'level': 'ERROR',

@@ -346,6 +346,12 @@ class User(AbstractBaseUser, PermissionsMixin):
         return active_plus_user if active_plus_user and active_plus_user.is_valid() else None
 
     @cached_property
+    def get_temp_plus_user(self):
+        from ondoc.plus.models import TempPlusUser
+        temp_plus_user = TempPlusUser.objects.filter(user_id=self.id, deleted=0).order_by('-id').first()
+        return temp_plus_user if temp_plus_user else None
+
+    @cached_property
     def inactive_plus_user(self):
         from ondoc.plus.models import PlusUser
         inactive_plus_user = PlusUser.objects.filter(status=PlusUser.INACTIVE, user_id=self.id).order_by('-id').first()
@@ -659,6 +665,18 @@ class UserProfile(TimeStampedModel):
             return plus_member.plus_user if plus_member.plus_user.is_valid() else None
 
         return None
+
+    def verify_profile(self):
+        if self.dob and self.email and self.name:
+            return True
+        else:
+            return False
+
+    @cached_property
+    def get_temp_plus_membership(self):
+        from ondoc.plus.models import TempPlusUser
+        plus_user = TempPlusUser.objects.filter(profile_id=self.id, deleted=0).first()
+        return plus_user
 
     def has_image_changed(self):
         if not self.pk:
@@ -2146,13 +2164,18 @@ class RefundMixin(object):
         from ondoc.common.models import RefundDetails
         from ondoc.account.models import ConsumerTransaction
         from ondoc.account.models import ConsumerRefund
+        from ondoc.plus.models import PlusUser
+        from ondoc.account.models import Order
         # Taking Lock first
         consumer_account = None
-        product_id = self.PRODUCT_ID
-        if self.payment_type in [OpdAppointment.PREPAID, OpdAppointment.VIP]:
+        if isinstance(self, PlusUser) and self.plan and self.plan.is_gold:
+            product_id = Order.GOLD_PRODUCT_ID
+        else:
+            product_id = self.PRODUCT_ID
+        if self.payment_type in [OpdAppointment.PREPAID, OpdAppointment.VIP, OpdAppointment.GOLD]:
             temp_list = ConsumerAccount.objects.get_or_create(user=self.user)
             consumer_account = ConsumerAccount.objects.select_for_update().get(user=self.user)
-        if self.payment_type in [OpdAppointment.PREPAID, OpdAppointment.VIP] and ConsumerTransaction.valid_appointment_for_cancellation(self.id, product_id):
+        if self.payment_type in [OpdAppointment.PREPAID, OpdAppointment.VIP, OpdAppointment.GOLD] and ConsumerTransaction.valid_appointment_for_cancellation(self.id, product_id):
             RefundDetails.log_refund(self)
             wallet_refund, cashback_refund = self.get_cancellation_breakup()
             if hasattr(self, 'promotional_amount'):

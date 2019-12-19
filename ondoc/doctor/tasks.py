@@ -198,3 +198,24 @@ def doctors_daily_schedule():
 def fetch_place_ids():
     from ondoc.common.models import GoogleLatLong
     # GoogleLatLong.generate_place_ids()
+
+@task()
+def calculate_percentage():
+    from ondoc.doctor.models import CommonHospital
+    CommonHospital.calculate_percentage()
+
+@task
+def send_ipd_email_notification():
+    from ondoc.notification.models import IPDIntimateEmailNotification
+    IPDIntimateEmailNotification.send_email()
+
+@task
+def invalidate_plus_users():
+    from ondoc.plus.models import PlusUser
+    from datetime import datetime
+
+    qs = PlusUser.objects.filter(expire_date__lte=datetime.now())
+    if qs:
+        qs.update(status=PlusUser.EXPIRED)
+
+    return

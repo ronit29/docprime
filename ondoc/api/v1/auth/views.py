@@ -26,7 +26,7 @@ from ondoc.common.models import UserConfig, PaymentOptions, AppointmentHistory, 
 from ondoc.common.utils import get_all_upcoming_appointments
 from ondoc.coupon.models import UserSpecificCoupon, Coupon
 from ondoc.lead.models import UserLead
-from ondoc.plus.models import PlusAppointmentMapping, PlusUser, PlusPlans
+from ondoc.plus.models import PlusAppointmentMapping, PlusUser, PlusPlans, PlusDummyData
 from ondoc.plus.usage_criteria import get_price_reference, get_class_reference
 from ondoc.sms.api import send_otp
 from ondoc.doctor.models import DoctorMobile, Doctor, HospitalNetwork, Hospital, DoctorHospital, DoctorClinic, \
@@ -730,7 +730,7 @@ class UserAppointmentsViewSet(OndocViewSet):
                                             "message": "Appointment time is not covered under insurance"
                                         }
                                         return resp
-                            if lab_appointment.payment_type in [OpdAppointment.VIP] and lab_appointment.insurance_id is not None:
+                            if lab_appointment.payment_type in [OpdAppointment.VIP, OpdAppointment.GOLD] and lab_appointment.plus_plan_id is not None:
                                 plus_user = PlusUser.objects.filter(id=lab_appointment.plus_plan_id).first()
                                 if plus_user:
                                     if time_slot_start > plus_user.expire_date:
@@ -774,7 +774,7 @@ class UserAppointmentsViewSet(OndocViewSet):
                                         "message": "Appointment time is not covered under insurance"
                                     }
                                     return resp
-                        if lab_appointment.payment_type in [OpdAppointment.VIP] and lab_appointment.insurance_id is not None:
+                        if lab_appointment.payment_type in [OpdAppointment.VIP, OpdAppointment.GOLD] and lab_appointment.plus_plan_id is not None:
                             plus_user = PlusUser.objects.filter(id=lab_appointment.plus_plan_id).first()
                             if plus_user:
                                 if time_slot_start > plus_user.expire_date:
@@ -817,11 +817,21 @@ class UserAppointmentsViewSet(OndocViewSet):
                         price_data = {"mrp": temp_lab_test[0].get("total_mrp"),
                                       "deal_price": temp_lab_test[0].get("total_deal_price"),
                                       "cod_deal_price": temp_lab_test[0].get("total_deal_price"),
-                                      "fees": temp_lab_test[0].get("total_agreed_price", 0)}
+                                      "fees": temp_lab_test[0].get("total_agreed_price", 0),
+                                      "home_pickup_charges": lab_appointment.home_pickup_charges}
                         if plus_user:
                             new_effective_price, convenience_charge = self.get_plus_user_effective_price(plus_user, price_data, "LABTEST")
                         if lab_appointment.plus_plan.plan.is_gold:
-                            new_effective_price = new_effective_price + convenience_charge
+                            order_obj = Order.objects.filter(reference_id=lab_appointment.id).first()
+                            action_data = order_obj.action_data
+                            if action_data:
+                                discount = int(action_data.get('discount', 0))
+                                if discount and discount > 0:
+                                    new_effective_price = (new_effective_price + convenience_charge) - discount
+                                else:
+                                    new_effective_price = new_effective_price + convenience_charge
+                            else:
+                                new_effective_price = new_effective_price + convenience_charge
                         else:
                             new_effective_price = lab_appointment.effective_price
                     else:
@@ -863,8 +873,10 @@ class UserAppointmentsViewSet(OndocViewSet):
             plan = plus_user.plan if plus_user else None
             convenience_charge = PlusPlans.get_default_convenience_amount(price_data, "LABTEST", default_plan_query=plan)
             engine = get_class_reference(plus_user, "LABTEST")
-            plus_data = engine.validate_booking_entity(price, price_data.get('mrp', None),
-                                                       deal_price=price_data.get('deal_price'))
+            final_price = price + price_data.get('home_pickup_charges', 0)
+            mrp_with_home_pickup = price_data.get('mrp') + price_data.get('home_pickup_charges', 0)
+            plus_data = engine.validate_booking_entity(cost=final_price, mrp=mrp_with_home_pickup,
+                                                       deal_price=price_data.get('deal_price'), price_engine_price=price)
             effective_price = plus_data.get('amount_to_be_paid', None)
             return effective_price, convenience_charge
         else:
@@ -879,7 +891,7 @@ class UserAppointmentsViewSet(OndocViewSet):
                                                                           default_plan_query=plan)
 
             engine = get_class_reference(plus_user, "DOCTOR")
-            plus_data = engine.validate_booking_entity(price, price_data.get('mrp', None),
+            plus_data = engine.validate_booking_entity(cost=price, mrp=price_data.get('mrp', None),
                                                        deal_price=price_data.get('deal_price'))
             effective_price = plus_data.get('amount_to_be_paid', None)
             return effective_price, convenience_charge
@@ -934,7 +946,7 @@ class UserAppointmentsViewSet(OndocViewSet):
                                         "message": "Appointment time is not covered under insurance"
                                     }
                                     return resp
-                        if opd_appointment.payment_type == OpdAppointment.VIP and opd_appointment.plus_plan is not None:
+                        if opd_appointment.payment_type in [OpdAppointment.VIP, OpdAppointment.GOLD] and opd_appointment.plus_plan is not None:
                             plus_user = PlusUser.objects.filter(id=opd_appointment.plus_plan_id).first()
                             if plus_user and time_slot_start > plus_user.expire_date:
                                 resp = {
@@ -963,7 +975,16 @@ class UserAppointmentsViewSet(OndocViewSet):
                                     new_effective_price, convenience_charge = self.get_plus_user_effective_price(
                                         plus_user, price_data, "DOCTOR")
                                     if opd_appointment.plus_plan.plan.is_gold:
-                                        new_effective_price = new_effective_price + convenience_charge
+                                        order_obj = Order.objects.filter(reference_id=opd_appointment.id).first()
+                                        action_data = order_obj.action_data
+                                        if action_data:
+                                            discount = int(action_data.get('discount', 0))
+                                            if discount and discount > 0:
+                                                new_effective_price = (new_effective_price + convenience_charge) - discount
+                                            else:
+                                                new_effective_price = new_effective_price + convenience_charge
+                                        else:
+                                            new_effective_price = new_effective_price + convenience_charge
                                     else:
                                         new_effective_price = old_effective_price
                             else:
@@ -1334,30 +1355,6 @@ class TransactionViewSet(viewsets.GenericViewSet):
 
     @transaction.atomic()
     def save(self, request):
-        from ondoc.api.v1.utils import format_return_value
-#         LAB_REDIRECT_URL = settings.BASE_URL + "/lab/appointment"
-#         OPD_REDIRECT_URL = settings.BASE_URL + "/opd/appointment"
-#         INSURANCE_REDIRECT_URL = settings.BASE_URL + "/insurance/complete"
-#         INSURANCE_FAILURE_REDIRECT_URL = settings.BASE_URL + "/insurancereviews"
-#         LAB_FAILURE_REDIRECT_URL = settings.BASE_URL + "/lab/%s/book?error_code=%s"
-#         OPD_FAILURE_REDIRECT_URL = settings.BASE_URL + "/opd/doctor/%s/%s/bookdetails?error_code=%s"
-#         ERROR_REDIRECT_URL = settings.BASE_URL + "/error?error_code=%s"
-#         REDIRECT_URL = ERROR_REDIRECT_URL % ErrorCodeMapping.IVALID_APPOINTMENT_ORDER
-
-        ERROR_REDIRECT_URL = settings.BASE_URL + "/cart?error_code=1&error_message=%s"
-        REDIRECT_URL = ERROR_REDIRECT_URL % "Error processing payment, please try again."
-        SUCCESS_REDIRECT_URL = settings.BASE_URL + "/order/summary/%s"
-        LAB_REDIRECT_URL = settings.BASE_URL + "/lab/appointment"
-        OPD_REDIRECT_URL = settings.BASE_URL + "/opd/appointment"
-        PLAN_REDIRECT_URL = settings.BASE_URL + "/prime/success?user_plan="
-        ECONSULT_REDIRECT_URL = settings.BASE_URL + "/econsult?order_id=%s&payment=success"
-
-        CHAT_ERROR_REDIRECT_URL = settings.BASE_URL + "/mobileviewchat?payment=fail&error_message=%s" % "Error processing payment, please try again."
-        CHAT_REDIRECT_URL = CHAT_ERROR_REDIRECT_URL
-        CHAT_SUCCESS_REDIRECT_URL = settings.BASE_URL + "/mobileviewchat?payment=success&order_id=%s&consultation_id=%s"
-        PLUS_FAILURE_REDIRECT_URL = settings.BASE_URL + ""
-        PLUS_SUCCESS_REDIRECT_URL = settings.BASE_URL + "/vip-club-activated-details?payment=success&id=%s"
-
         try:
             response = None
             coded_response = None
@@ -1379,76 +1376,114 @@ class TransactionViewSet(viewsets.GenericViewSet):
                 logger.error("ValueError : statusCode is not type integer")
                 pg_resp_code = None
 
-            # log pg data
-            try:
-                args = {'order_id': response.get("orderId"), 'status_code': pg_resp_code, 'source': response.get("source")}
-                status_type = PaymentProcessStatus.get_status_type(pg_resp_code, response.get('txStatus'))
+            redirect_url = self.validate_post_transaction_response(request, response)
+            return HttpResponseRedirect(redirect_to=redirect_url)
+        except Exception as e:
+            logger.error("Error - " + str(e))
 
-                # PgLogs.objects.create(decoded_response=response, coded_response=coded_response)
-                save_pg_response.apply_async((mongo_pglogs.TXN_RESPONSE, response.get("orderId"), None, response, None, response.get('customerId')), eta=timezone.localtime(), queue=settings.RABBITMQ_LOGS_QUEUE)
-                save_payment_status.apply_async((status_type, args), eta=timezone.localtime(),)
-            except Exception as e:
-                logger.error("Cannot log pg response - " + str(e))
+    def validate_post_transaction_response(self, request, response):
+        if response.get("orderId", None) and not response.get('items', None):
+            redirect_url = self.validate_single_order_transaction(request, response)
+        else:
+            redirect_url = self.validate_multiple_order_transaction(request, response)
+        return redirect_url
 
-            # Check if already processes
-            try:
-                if response and response.get("orderNo"):
-                    pg_txn = PgTransaction.objects.filter(order_no__iexact=response.get("orderNo")).first()
-                    if pg_txn:
-                        is_preauth = False
-                        if pg_txn.is_preauth():
-                            is_preauth = True
-                            pg_txn.status_code = response.get('statusCode')
-                            pg_txn.status_type = response.get('txStatus')
-                            pg_txn.payment_mode = format_return_value(response.get("paymentMode"))
-                            pg_txn.bank_name = format_return_value(response.get('bankName'))
-                            pg_txn.transaction_id = format_return_value(response.get('pgTxId'))
-                            pg_txn.bank_id = format_return_value(response.get('bankTxId'))
-                            #pg_txn.payment_captured = True
-                            pg_txn.save()
+    def validate_single_order_transaction(self, request, response):
+        base_url = settings.BASE_URL
+        if request.query_params and request.query_params.get('sbig', False):
+            base_url = settings.SBIG_BASE_URL
 
-                            ctx_txn = ConsumerTransaction.objects.filter(order_id=pg_txn.order_id,
-                                                                         action=ConsumerTransaction.PAYMENT).last()
-                            ctx_txn.transaction_id = format_return_value(response.get('pgTxId'))
-                            ctx_txn.save()
+        ERROR_REDIRECT_URL = base_url + "/cart?error_code=1&error_message=%s"
+        REDIRECT_URL = ERROR_REDIRECT_URL % "Error processing payment, please try again."
+        SUCCESS_REDIRECT_URL = base_url + "/order/summary/%s"
+        LAB_REDIRECT_URL = base_url + "/lab/appointment"
+        OPD_REDIRECT_URL = base_url + "/opd/appointment"
+        PLAN_REDIRECT_URL = base_url + "/prime/success?user_plan="
+        ECONSULT_REDIRECT_URL = base_url + "/econsult?order_id=%s&payment=success"
 
-                            # this will acknowledge all status if current status is txn_authorize
-                            # if response.get('txStatus') in ['TXN_SUCCESS', 'TXN_RELEASE']:
-                            if not response.get('txStatus') == 'TXN_AUTHORIZE':
-                                send_pg_acknowledge.apply_async((pg_txn.order_id, pg_txn.order_no, 'capture'), countdown=1)
-                        send_pg_acknowledge.apply_async((pg_txn.order_id, pg_txn.order_no,), countdown=1)
-                        if pg_txn.product_id == Order.CHAT_PRODUCT_ID:
-                            chat_order = Order.objects.filter(pk=pg_txn.order_id).first()
-                            if chat_order:
-                                CHAT_REDIRECT_URL = CHAT_SUCCESS_REDIRECT_URL % (chat_order.id, chat_order.reference_id)
-                                json_url = '{"url": "%s"}' % CHAT_REDIRECT_URL
-                                log_created_at = datetime.datetime.now()
-                                save_pg_response.apply_async((mongo_pglogs.RESPONSE_TO_CHAT, chat_order.id, None, json_url, None, None, log_created_at), eta=timezone.localtime(), queue=settings.RABBITMQ_LOGS_QUEUE)
-                            return HttpResponseRedirect(redirect_to=CHAT_REDIRECT_URL)
-                        else:
-                            REDIRECT_URL = (SUCCESS_REDIRECT_URL % pg_txn.order_id) + "?payment_success=true"
-                            return HttpResponseRedirect(redirect_to=REDIRECT_URL)
-            except Exception as e:
-                logger.error("Error in sending pg acknowledge - " + str(e))
+        CHAT_ERROR_REDIRECT_URL = base_url + "/mobileviewchat?payment=fail&error_message=%s" % "Error processing payment, please try again."
+        CHAT_REDIRECT_URL = CHAT_ERROR_REDIRECT_URL
+        CHAT_SUCCESS_REDIRECT_URL = base_url + "/mobileviewchat?payment=success&order_id=%s&consultation_id=%s"
+        PLUS_FAILURE_REDIRECT_URL = base_url + ""
+        PLUS_SUCCESS_REDIRECT_URL = base_url + "/vip-club-activated-details?payment=success&id=%s"
 
+        # log pg data
+        try:
+            pg_resp_code = int(response.get('statusCode'))
+            args = {'order_id': response.get("orderId"), 'status_code': pg_resp_code, 'source': response.get("source")}
+            status_type = PaymentProcessStatus.get_status_type(pg_resp_code, response.get('txStatus'))
+            # PgLogs.objects.create(decoded_response=response, coded_response=coded_response)
+            save_pg_response.apply_async(
+                (mongo_pglogs.TXN_RESPONSE, response.get("orderId"), None, response, None, response.get('customerId')),
+                eta=timezone.localtime(), queue=settings.RABBITMQ_LOGS_QUEUE)
+            save_payment_status.apply_async((status_type, args), eta=timezone.localtime(), )
+        except Exception as e:
+            logger.error("Cannot log pg response - " + str(e))
 
-            # For testing only
-            # response = request.data
-            success_in_process = False
-            processed_data = {}
+        # Check if already processes
+        try:
+            if response and response.get("orderNo"):
+                pg_txn = PgTransaction.objects.filter(order_no__iexact=response.get("orderNo")).first()
+                if pg_txn:
+                    is_preauth = False
+                    if pg_txn.is_preauth():
+                        is_preauth = True
+                        pg_txn.status_code = response.get('statusCode')
+                        pg_txn.status_type = response.get('txStatus')
+                        pg_txn.payment_mode = response.get("paymentMode")
+                        pg_txn.bank_name = response.get('bankName')
+                        pg_txn.transaction_id = response.get('pgTxId')
+                        pg_txn.bank_id = response.get('bankTxId')
+                        # pg_txn.payment_captured = True
+                        pg_txn.save()
 
-            order_obj = Order.objects.select_for_update().filter(pk=response.get("orderId")).first()
-            convert_cod_to_prepaid = False
-            try:
-                # if order_obj and response and order_obj.is_cod_order and order_obj.get_deal_price_without_coupon <= Decimal(response.get('txAmount')):
-                if order_obj and response and order_obj.is_cod_order and order_obj.amount <= Decimal(response.get('txAmount')):
-                    convert_cod_to_prepaid = True
-                    order_obj.amount = Decimal(response.get('txAmount'))
-                    order_obj.save()
-            except:
-                pass
+                        ctx_txn = ConsumerTransaction.objects.filter(order_id=pg_txn.order_.id,
+                                                                     action=ConsumerTransaction.PAYMENT).last()
+                        ctx_txn.transaction_id = response.get('pgTxId')
+                        ctx_txn.save()
 
-            if pg_resp_code == 1 and order_obj:
+                        if response.get('txStatus') in ['TXN_SUCCESS', 'TXN_RELEASE']:
+                            send_pg_acknowledge.apply_async((pg_txn.order_id, pg_txn.order_no, 'capture'), countdown=1)
+                    send_pg_acknowledge.apply_async((pg_txn.order_id, pg_txn.order_no,), countdown=1)
+                    if pg_txn.product_id == Order.CHAT_PRODUCT_ID:
+                        chat_order = Order.objects.filter(pk=pg_txn.order_id).first()
+                        if chat_order:
+                            CHAT_REDIRECT_URL = CHAT_SUCCESS_REDIRECT_URL % (chat_order.id, chat_order.reference_id)
+                            json_url = '{"url": "%s"}' % CHAT_REDIRECT_URL
+                            log_created_at = str(datetime.datetime.now())
+                            save_pg_response.apply_async((PgLogs.RESPONSE_TO_CHAT, chat_order.id, None, json_url, None, None, log_created_at), eta=timezone.localtime(), queue=settings.RABBITMQ_LOGS_QUEUE)
+                        return CHAT_REDIRECT_URL
+                    else:
+                        REDIRECT_URL = (SUCCESS_REDIRECT_URL % pg_txn.order_id) + "?payment_success=true"
+                        return REDIRECT_URL
+        except Exception as e:
+            logger.error("Error in sending pg acknowledge - " + str(e))
+
+        # For testing only
+        # response = request.data
+        success_in_process = False
+        processed_data = {}
+
+        order_obj = Order.objects.select_for_update().filter(pk=response.get("orderId")).first()
+        convert_cod_to_prepaid = False
+        try:
+            # if order_obj and response and order_obj.is_cod_order and order_obj.get_deal_price_without_coupon <= Decimal(response.get('txAmount')):
+            if order_obj and response and order_obj.is_cod_order and order_obj.amount <= Decimal(
+                    response.get('txAmount')):
+                convert_cod_to_prepaid = True
+                order_obj.amount = Decimal(response.get('txAmount'))
+                order_obj.save()
+        except:
+            pass
+
+        if pg_resp_code == 1 and order_obj:
+            # send ack for dummy_txn response
+            # todo - ask pg-team to send flag for this to avoid amount condition check
+            if response and response.get("txAmount") and int(Decimal(response.get("txAmount"))) == 0 \
+                    and response.get('txStatus') == 'TXN_SUCCESS':
+                send_pg_acknowledge.apply_async((response.get("orderId"), response.get("orderNo"),),
+                                                countdown=1)
+            else:
                 if response.get("couponUsed") and response.get("couponUsed") == "false":
                     order_obj.update_fields_after_coupon_remove()
 
@@ -1456,10 +1491,11 @@ class TransactionViewSet(viewsets.GenericViewSet):
                 resp_serializer = serializers.TransactionSerializer(data=response)
                 if resp_serializer.is_valid():
                     response_data = self.form_pg_transaction_data(resp_serializer.validated_data, order_obj)
+
                     # For Testing
                     if PgTransaction.is_valid_hash(response, product_id=order_obj.product_id):
                         pg_tx_queryset = None
-                    # if True:
+                        # if True:
                         try:
                             with transaction.atomic():
                                 pg_tx_queryset = PgTransaction.objects.create(**response_data)
@@ -1474,45 +1510,43 @@ class TransactionViewSet(viewsets.GenericViewSet):
                             logger.error("Error in processing order - " + str(e))
                 else:
                     logger.error("Invalid pg data - " + json.dumps(resp_serializer.errors))
-            elif order_obj:
-                # send acknowledge if status is TXN_FAILURE to stop callbacks from pg. Do not send acknowledgement if no entry in pg.
-                try:
-                    if response and response.get("orderNo") and response.get("orderId") and response.get(
-                            'txStatus'):
-                        #  Todo - Temporary fix for status_code 5 and success. Need to remove this once pg-team fix this at their end
-                        if pg_resp_code == 5 and response.get('txStatus') == 'TXN_SUCCESS':
-                            send_pg_acknowledge.apply_async((response.get("orderId"), response.get("orderNo"),), countdown=1)
-                        if response.get('txStatus') == 'TXN_FAILURE':
-                            send_pg_acknowledge.apply_async((response.get("orderId"), response.get("orderNo"),), countdown=1)
-                except Exception as e:
-                    logger.error("Error in sending pg acknowledge - " + str(e))
+        elif order_obj:
+            # send acknowledge if status is TXN_FAILURE to stop callbacks from pg. Do not send acknowledgement if no entry in pg.
+            try:
+                if response and response.get("orderNo") and response.get("orderId") and response.get(
+                        'txStatus'):
+                    if response.get('txStatus') == 'TXN_FAILURE':
+                        send_pg_acknowledge.apply_async((response.get("orderId"), response.get("orderNo"),), countdown=1)
+                    if response.get('txStatus') == 'TXN_PENDING' and pg_resp_code == 5:
+                        send_pg_acknowledge.apply_async((response.get("orderId"), response.get("orderNo"),), countdown=1)
+            except Exception as e:
+                logger.error("Error in sending pg acknowledge - " + str(e))
 
-                try:
-                    has_changed = order_obj.change_payment_status(Order.PAYMENT_FAILURE)
-                    if has_changed:
-                        self.send_failure_ops_email(order_obj)
-                except Exception as e:
-                    logger.error("Error sending payment failure email - " + str(e))
+            try:
+                has_changed = order_obj.change_payment_status(Order.PAYMENT_FAILURE)
+                if has_changed:
+                    self.send_failure_ops_email(order_obj)
+            except Exception as e:
+                logger.error("Error sending payment failure email - " + str(e))
 
-            if success_in_process:
-                if processed_data.get("type") == "all":
-                    REDIRECT_URL = (SUCCESS_REDIRECT_URL % order_obj.id) + "?payment_success=true"
-                elif processed_data.get("type") == "doctor":
-                    REDIRECT_URL = OPD_REDIRECT_URL + "/" + str(processed_data.get("id", "")) + "?payment_success=true"
-                elif processed_data.get("type") == "lab":
-                    REDIRECT_URL = LAB_REDIRECT_URL + "/" + str(processed_data.get("id","")) + "?payment_success=true"
-                elif processed_data.get("type") == "insurance":
-                    REDIRECT_URL = settings.BASE_URL + "/insurance/complete?payment_success=true&id=" + str(processed_data.get("id", ""))
-                elif processed_data.get("type") == "plan":
-                    REDIRECT_URL = PLAN_REDIRECT_URL + str(processed_data.get("id", "")) + "&payment_success=true"
-                elif processed_data.get("type") == "econsultation":
-                    REDIRECT_URL = ECONSULT_REDIRECT_URL % order_obj.id
-                elif processed_data.get('type') == "chat":
-                    CHAT_REDIRECT_URL = CHAT_SUCCESS_REDIRECT_URL % (order_obj.id, str(processed_data.get("id", "")))
-                elif processed_data.get('type') == "plus":
-                    REDIRECT_URL = PLUS_SUCCESS_REDIRECT_URL % str(processed_data.get("id", ""))
-        except Exception as e:
-            logger.error("Error - " + str(e))
+        if success_in_process:
+            if processed_data.get("type") == "all":
+                REDIRECT_URL = (SUCCESS_REDIRECT_URL % order_obj.id) + "?payment_success=true"
+            elif processed_data.get("type") == "doctor":
+                REDIRECT_URL = OPD_REDIRECT_URL + "/" + str(processed_data.get("id", "")) + "?payment_success=true"
+            elif processed_data.get("type") == "lab":
+                REDIRECT_URL = LAB_REDIRECT_URL + "/" + str(processed_data.get("id", "")) + "?payment_success=true"
+            elif processed_data.get("type") == "insurance":
+                REDIRECT_URL = settings.BASE_URL + "/insurance/complete?payment_success=true&id=" + str(
+                    processed_data.get("id", ""))
+            elif processed_data.get("type") == "plan":
+                REDIRECT_URL = PLAN_REDIRECT_URL + str(processed_data.get("id", "")) + "&payment_success=true"
+            elif processed_data.get("type") == "econsultation":
+                REDIRECT_URL = ECONSULT_REDIRECT_URL % order_obj.id
+            elif processed_data.get('type') == "chat":
+                CHAT_REDIRECT_URL = CHAT_SUCCESS_REDIRECT_URL % (order_obj.id, str(processed_data.get("id", "")))
+            elif processed_data.get('type') == "plus":
+                REDIRECT_URL = PLUS_SUCCESS_REDIRECT_URL % str(processed_data.get("id", ""))
 
         try:
             if response and response.get("orderNo"):
@@ -1522,14 +1556,232 @@ class TransactionViewSet(viewsets.GenericViewSet):
         except Exception as e:
             logger.error("Error in sending pg acknowledge - " + str(e))
 
-        # return Response({"url": REDIRECT_URL})
         if order_obj.product_id == Order.CHAT_PRODUCT_ID:
             json_url = '{"url": "%s"}' % CHAT_REDIRECT_URL
-            log_created_at = datetime.datetime.now()
-            save_pg_response.apply_async((mongo_pglogs.RESPONSE_TO_CHAT, order_obj.id, None, json_url, None, None, log_created_at),
-                                         eta=timezone.localtime(), queue=settings.RABBITMQ_LOGS_QUEUE)
-            return HttpResponseRedirect(redirect_to=CHAT_REDIRECT_URL)
-        return HttpResponseRedirect(redirect_to=REDIRECT_URL)
+            log_created_at = str(datetime.datetime.now())
+            save_pg_response.apply_async(
+                (mongo_pglogs.RESPONSE_TO_CHAT, order_obj.id, None, json_url, None, None, log_created_at),
+                eta=timezone.localtime(), queue=settings.RABBITMQ_LOGS_QUEUE)
+            return CHAT_REDIRECT_URL
+        return REDIRECT_URL
+
+    def validate_multiple_order_transaction(self, request, response):
+        base_url = settings.BASE_URL
+        if request.query_params and request.query_params.get('sbig', False):
+            base_url = settings.SBIG_BASE_URL
+
+        ERROR_REDIRECT_URL = base_url + "/cart?error_code=1&error_message=%s"
+        REDIRECT_URL = ERROR_REDIRECT_URL % "Error processing payment, please try again."
+        SUCCESS_REDIRECT_URL = base_url + "/order/summary/%s"
+        LAB_REDIRECT_URL = base_url + "/lab/appointment"
+        OPD_REDIRECT_URL = base_url + "/opd/appointment"
+        PLAN_REDIRECT_URL = base_url + "/prime/success?user_plan="
+        ECONSULT_REDIRECT_URL = base_url + "/econsult?order_id=%s&payment=success"
+
+        CHAT_ERROR_REDIRECT_URL = base_url + "/mobileviewchat?payment=fail&error_message=%s" % "Error processing payment, please try again."
+        CHAT_REDIRECT_URL = CHAT_ERROR_REDIRECT_URL
+        CHAT_SUCCESS_REDIRECT_URL = base_url + "/mobileviewchat?payment=success&order_id=%s&consultation_id=%s"
+        PLUS_FAILURE_REDIRECT_URL = base_url + ""
+        PLUS_SUCCESS_REDIRECT_URL = base_url + "/vip-club-activated-details?payment=success&id=%s"
+
+        pg_resp_code = int(response.get('statusCode'))
+        # items = response.get('items' ,[]).sort(key='productId', reverse=True)
+
+        items = copy.deepcopy(response.get('items', []))
+        if len(items) == 1 and int(items[0].get('productId')) == Order.GOLD_PRODUCT_ID:
+            gold_order_id = int(items[0].get('orderId'))
+            if gold_order_id:
+                sibling_order = Order.objects.filter(single_booking_id=gold_order_id).first()
+                if sibling_order:
+                    items.append({'productId': sibling_order.product_id, 'orderId': sibling_order.id, 'txAmount': 0})
+
+        items = sorted(items, key=lambda x: int(x['productId']), reverse=True)
+        for item in items:
+            try:
+                item['productId'] = int(item['productId'])
+                order_id = item.get('orderId', None)
+                product_id = item.get('productId', None)
+                amount = item.get('txAmount', None)
+                # log pg data
+                try:
+                    args = {'order_id': order_id, 'status_code': pg_resp_code, 'source': response.get("source")}
+                    status_type = PaymentProcessStatus.get_status_type(pg_resp_code, response.get('txStatus'))
+
+                    # PgLogs.objects.create(decoded_response=response, coded_response=coded_response)
+                    save_pg_response.apply_async((mongo_pglogs.TXN_RESPONSE, order_id, None, response, None, response.get('customerId')), eta=timezone.localtime(), queue=settings.RABBITMQ_LOGS_QUEUE)
+                    save_payment_status.apply_async((status_type, args), eta=timezone.localtime(),)
+                except Exception as e:
+                    logger.error("Cannot log pg response - " + str(e))
+
+                # Check if already processes
+                try:
+                    if response and response.get("orderNo"):
+                        pg_txn = PgTransaction.objects.filter(order_no__iexact=response.get("orderNo"), order__id=int(item.get('orderId'))).first()
+                        if pg_txn:
+                            is_preauth = False
+                            if pg_txn.is_preauth():
+                                is_preauth = True
+                                pg_txn.status_code = response.get('statusCode')
+                                pg_txn.status_type = response.get('txStatus')
+                                pg_txn.payment_mode = response.get("paymentMode")
+                                pg_txn.bank_name = response.get('bankName')
+                                pg_txn.transaction_id = response.get('pgTxId')
+                                pg_txn.bank_id = response.get('bankTxId')
+                                #pg_txn.payment_captured = True
+                                pg_txn.save()
+
+                                ctx_txn = ConsumerTransaction.objects.filter(order_id=pg_txn.order_.id,
+                                                                             action=ConsumerTransaction.PAYMENT).last()
+                                ctx_txn.transaction_id = response.get('pgTxId')
+                                ctx_txn.save()
+
+                                if response.get('txStatus') in ['TXN_SUCCESS', 'TXN_RELEASE']:
+                                    send_pg_acknowledge.apply_async((pg_txn.order_id, pg_txn.order_no, 'capture'), countdown=1)
+                            send_pg_acknowledge.apply_async((pg_txn.order_id, pg_txn.order_no,), countdown=1)
+                            if pg_txn.product_id == Order.CHAT_PRODUCT_ID:
+                                chat_order = Order.objects.filter(pk=pg_txn.order_id).first()
+                                if chat_order:
+                                    CHAT_REDIRECT_URL = CHAT_SUCCESS_REDIRECT_URL % (chat_order.id, chat_order.reference_id)
+                                return CHAT_REDIRECT_URL
+                            else:
+                                REDIRECT_URL = (SUCCESS_REDIRECT_URL % pg_txn.order_id) + "?payment_success=true"
+                                return REDIRECT_URL
+                except Exception as e:
+                    logger.error("Error in sending pg acknowledge - " + str(e))
+
+
+                # For testing only
+                # response = request.data
+                success_in_process = False
+                processed_data = {}
+
+                order_obj = Order.objects.select_for_update().filter(pk=order_id).first()
+                convert_cod_to_prepaid = False
+                try:
+                    # if order_obj and response and order_obj.is_cod_order and order_obj.get_deal_price_without_coupon <= Decimal(response.get('txAmount')):
+                    if order_obj and response and order_obj.is_cod_order and order_obj.amount <= Decimal(amount):
+                        convert_cod_to_prepaid = True
+                        order_obj.amount = Decimal(amount)
+                        order_obj.save()
+                except:
+                    pass
+
+                if pg_resp_code == 1 and order_obj:
+                    # send ack for dummy_txn response
+                    # todo - ask pg-team to send flag for this to avoid amount condition check
+                    if response and response.get("txAmount") and int(Decimal(response.get("txAmount"))) == 0 \
+                            and response.get('txStatus') == 'TXN_SUCCESS':
+                        send_pg_acknowledge.apply_async((response.get("orderId"), response.get("orderNo"),),
+                                                        countdown=1)
+                    else:
+                        if response.get("couponUsed") and response.get("couponUsed") == "false":
+                            order_obj.update_fields_after_coupon_remove()
+
+                        response_data = None
+
+                        if "items" in response:
+                            virtual_response = copy.deepcopy(response)
+                            del virtual_response['items']
+                            virtual_response['orderId'] = item['orderId']
+
+                        resp_serializer = serializers.TransactionSerializer(data=virtual_response)
+                        if resp_serializer.is_valid():
+                            response_data = self.form_pg_transaction_data(resp_serializer.validated_data, order_obj)
+                            # For Testing
+
+                            if not order_obj.amount or order_obj.amount <= 0:
+                                try:
+                                    with transaction.atomic():
+                                        processed_data = order_obj.process_pg_order(convert_cod_to_prepaid)
+                                        success_in_process = True
+                                except Exception as e:
+                                    logger.error("Error in processing order - " + str(e))
+                            else:
+                                # Simplify the response for multiorder for ease of incomming checksum creation
+                                order_items = sorted(response.get('items', []), key=lambda x: int(x['orderId']))
+                                stringify_item = '['
+                                if order_items.__class__.__name__ == 'list':
+                                    for i in order_items:
+                                        stringify_item = stringify_item + '{'
+                                        if i.__class__.__name__ == 'dict':
+                                            for k in sorted(i.keys()):
+                                                stringify_item = stringify_item + k + '=' + str(i[k]) + ';'
+
+                                        stringify_item = stringify_item + '};'
+
+                                    if stringify_item[-1:] == ';':
+                                        stringify_item = stringify_item[:-1]
+                                    stringify_item = stringify_item + ']'
+
+                                virtual_response['items'] = stringify_item
+                                del virtual_response['orderId']
+
+                                if PgTransaction.is_valid_hash(virtual_response, product_id=order_obj.product_id):
+                                    pg_tx_queryset = None
+                                    # if True:
+                                    try:
+                                        with transaction.atomic():
+                                            pg_tx_queryset = PgTransaction.objects.create(**response_data)
+                                    except Exception as e:
+                                        logger.error("Error in saving PG Transaction Data - " + str(e))
+
+                                    try:
+                                        with transaction.atomic():
+                                            processed_data = order_obj.process_pg_order(convert_cod_to_prepaid)
+                                            success_in_process = True
+                                    except Exception as e:
+                                        logger.error("Error in processing order - " + str(e))
+                        else:
+                            logger.error("Invalid pg data - " + json.dumps(resp_serializer.errors))
+                elif order_obj:
+                    # send acknowledge if status is TXN_FAILURE to stop callbacks from pg. Do not send acknowledgement if no entry in pg.
+                    try:
+                        if response and response.get("orderNo") and order_id and response.get(
+                                'txStatus') and response.get('txStatus') == 'TXN_FAILURE':
+                            send_pg_acknowledge.apply_async((order_id, response.get("orderNo"),), countdown=1)
+                        if response and response.get("orderNo") and response.get("orderId") and response.get(
+                                'txStatus') and response.get('txStatus') == 'TXN_SUCCESS' and pg_resp_code == 5:
+                            send_pg_acknowledge.apply_async((int(item.get('orderId')), response.get("orderNo"),),
+                                                            countdown=1)
+                    except Exception as e:
+                        logger.error("Error in sending pg acknowledge - " + str(e))
+
+                    try:
+                        has_changed = order_obj.change_payment_status(Order.PAYMENT_FAILURE)
+                        if has_changed:
+                            self.send_failure_ops_email(order_obj)
+                    except Exception as e:
+                        logger.error("Error sending payment failure email - " + str(e))
+
+                if success_in_process:
+                    if processed_data.get("type") == "all":
+                        REDIRECT_URL = (SUCCESS_REDIRECT_URL % order_obj.id) + "?payment_success=true"
+                    elif processed_data.get("type") == "doctor":
+                        REDIRECT_URL = OPD_REDIRECT_URL + "/" + str(processed_data.get("id", "")) + "?payment_success=true"
+                    elif processed_data.get("type") == "lab":
+                        REDIRECT_URL = LAB_REDIRECT_URL + "/" + str(processed_data.get("id","")) + "?payment_success=true"
+                    elif processed_data.get("type") == "insurance":
+                        REDIRECT_URL = settings.BASE_URL + "/insurance/complete?payment_success=true&id=" + str(processed_data.get("id", ""))
+                    elif processed_data.get("type") == "plan":
+                        REDIRECT_URL = PLAN_REDIRECT_URL + str(processed_data.get("id", "")) + "&payment_success=true"
+                    elif processed_data.get("type") == "econsultation":
+                        REDIRECT_URL = ECONSULT_REDIRECT_URL % order_obj.id
+                    elif processed_data.get('type') == "chat":
+                        CHAT_REDIRECT_URL = CHAT_SUCCESS_REDIRECT_URL % (order_obj.id, str(processed_data.get("id", "")))
+                    elif processed_data.get('type') == "plus":
+                        REDIRECT_URL = PLUS_SUCCESS_REDIRECT_URL % str(processed_data.get("id", ""))
+            except Exception as e:
+                logger.error("Error - " + str(e))
+
+            try:
+                if response and response.get("orderNo"):
+                    pg_txn = PgTransaction.objects.filter(order_no__iexact=response.get("orderNo"), order__id=int(item.get('orderId'))).first()
+                    if pg_txn:
+                        send_pg_acknowledge.apply_async((pg_txn.order_id, pg_txn.order_no,), countdown=1)
+            except Exception as e:
+                logger.error("Error in sending pg acknowledge - " + str(e))
+
+        return REDIRECT_URL
 
     def form_pg_transaction_data(self, response, order_obj):
         from ondoc.api.v1.utils import format_return_value
@@ -2101,6 +2353,7 @@ class SendBookingUrlViewSet(GenericViewSet):
         if not utm_tags:
             utm_tags = {}
         utm_source = utm_tags.get('utm_source', '')
+        landing_url = request.data.get('landing_url')
 
         # agent_token = AgentToken.objects.create_token(user=request.user)
         user_token = JWTAuthentication.generate_token(request.user)
@@ -2109,6 +2362,12 @@ class SendBookingUrlViewSet(GenericViewSet):
 
         if request.user.is_authenticated:
             user_profile = request.user.get_default_profile()
+
+        if purchase_type == PlusDummyData.DataType.SINGLE_PURCHASE:
+            if not landing_url:
+                return Response(status=status.HTTP_400_BAD_REQUEST, data={'error': 'No Landing url found.'})
+            SmsNotification.send_single_purchase_booking_url(token, str(request.user.phone_number), utm_source=utm_source, landing_url=landing_url)
+            return Response({"status": 1})
 
         if purchase_type == 'vip_purchase':
             SmsNotification.send_vip_booking_url(token, str(request.user.phone_number), utm_source=utm_source)
@@ -2292,10 +2551,15 @@ class OrderDetailViewSet(GenericViewSet):
                     else:
                         payment_mode = payment_modes.get(appointment.payment_type, '')
 
+            appointment_via_sbi = list()
+            if order.action_data.get('utm_sbi_tags', None):
+                appointment_via_sbi.append(True)
+
             curr = {
                 "mrp": order.action_data["mrp"] if "mrp" in order.action_data else order.action_data["agreed_price"],
                 "deal_price": order.action_data["deal_price"],
                 "effective_price": order.action_data["effective_price"],
+                "discount": order.action_data.get('discount', 0),
                 "data": cart_serializers.CartItemSerializer(item, context={"validated_data": None}).data,
                 "booking_id": order.reference_id,
                 "time_slot_start": temp_time_slot_start,
@@ -2311,7 +2575,12 @@ class OrderDetailViewSet(GenericViewSet):
             }
             processed_order_data.append(curr)
 
-        return Response({"data": processed_order_data, "valid_for_cod_to_prepaid": valid_for_cod_to_prepaid})
+        appointment_sbi = False
+        if True in appointment_via_sbi:
+            appointment_sbi = True
+
+        return Response({"data": processed_order_data, "valid_for_cod_to_prepaid": valid_for_cod_to_prepaid,
+                         "appointment_via_sbi": appointment_sbi})
 
 
 class UserTokenViewSet(GenericViewSet):
@@ -2609,9 +2878,11 @@ class MatrixUserViewset(GenericViewSet):
 
 
 class ExternalLoginViewSet(GenericViewSet):
+    SBIG = 1
+    BAGIC = 2
 
     @transaction.atomic()
-    def get_external_login_response(self, request):
+    def get_external_login_response(self, request, ext_type=0):
         from django.http import JsonResponse
         response = {'login': 0}
         if request.method != 'POST':
@@ -2626,7 +2897,11 @@ class ExternalLoginViewSet(GenericViewSet):
         if not token_object or not user_data:
             return Response({'error': 'Unauthorise'}, status=status.HTTP_400_BAD_REQUEST)
 
-        base_landing_url = settings.BASE_URL + '/sms/booking?token={}'.format(token_object['token'].decode("utf-8"))
+        base_url = settings.BASE_URL
+        if ext_type == 1:
+            base_url = settings.SBIG_BASE_URL
+
+        base_landing_url = base_url + '/sms/booking?token={}'.format(token_object['token'].decode("utf-8"))
         redirect_url = 'lab' if redirect_type == 'lab' else 'opd'
         callback_url = base_landing_url + "&callbackurl={}".format(redirect_url)
         docprime_login_url = generate_short_url(callback_url)
@@ -2643,7 +2918,8 @@ class BajajAllianzUserViewset(GenericViewSet):
 
     @transaction.atomic()
     def user_login_via_bagic(self, request):
-        response = ExternalLoginViewSet().get_external_login_response(request)
+        ext_type = ExternalLoginViewSet.BAGIC
+        response = ExternalLoginViewSet().get_external_login_response(request, ext_type)
         return response
 
 
@@ -2652,7 +2928,8 @@ class SbiGUserViewset(GenericViewSet):
 
     @transaction.atomic()
     def user_login_via_sbig(self, request):
-        response = ExternalLoginViewSet().get_external_login_response(request)
+        ext_type = ExternalLoginViewSet.SBIG
+        response = ExternalLoginViewSet().get_external_login_response(request, ext_type)
         return response
 
 
