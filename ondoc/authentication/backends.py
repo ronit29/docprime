@@ -92,7 +92,7 @@ class JWTAuthentication(authentication.BaseAuthentication):
         user_id = JWTAuthentication.get_unverified_user(token)
 
         if user_id:
-            if ('HTTP_APP_VERSION' not in request.META) or parse(request.META.get('HTTP_APP_VERSION')) > parse('2.7.2') or parse(request.META.get('HTTP_APP_VERSION')) > parse('2.100.15'):
+            if ('HTTP_APP_VERSION' not in request.META) or (parse(request.META.get('HTTP_APP_VERSION')) > parse('2.7.2') or parse(request.META.get('HTTP_APP_VERSION')) > parse('2.100.15')):
             # if request.get('app_version'):
                 is_whitelisted = WhiteListedLoginTokens.objects.filter(token=token, user_id=user_id).first()
                 if is_whitelisted:
