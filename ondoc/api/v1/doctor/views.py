@@ -2033,10 +2033,10 @@ class DoctorListViewSet(viewsets.GenericViewSet):
 
             if validated_data.get('sitemap_identifier') == 'SPECIALIZATION_CITY':
                 breadcrumb.append({'title': validated_data.get('specialization') + ' in ' + validated_data.get('locality_value'), 'url': None})
-            elif validated_data.get('sitemap_identifier') == 'SPECIALIZATION_LOCALITY_CITY':
+            elif validated_data.get('sitemap_identifier') == 'SPECIALIZATION_LOCALITY_CITY' and validated_data.get('sublocality_value'):
                 breadcrumb.append({'title': validated_data.get('specialization') + ' in ' +
                                  validated_data.get('sublocality_value') + ' ' + validated_data.get('locality_value'), 'url': None})
-            elif validated_data.get('sitemap_identifier') == 'DOCTORS_LOCALITY_CITY':
+            elif validated_data.get('sitemap_identifier') == 'DOCTORS_LOCALITY_CITY' and validated_data.get('sublocality_value'):
                 breadcrumb.append({'title': 'Doctors in ' + validated_data.get('sublocality_value') + ' ' + validated_data.get('locality_value'), 'url': None})
             elif validated_data.get('sitemap_identifier') == 'IPD_PROCEDURE_DOCTOR_CITY':
                 breadcrumb.append({'title': 'Procedures', 'url': 'ipd-procedures'})
