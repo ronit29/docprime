@@ -92,7 +92,14 @@ class JWTAuthentication(authentication.BaseAuthentication):
         user_id = JWTAuthentication.get_unverified_user(token)
 
         if user_id:
-            if ('HTTP_APP_VERSION' not in request.META) or (parse(request.META.get('HTTP_APP_VERSION')) > parse('2.7.2') or parse(request.META.get('HTTP_APP_VERSION')) > parse('2.100.15')):
+            if ('HTTP_APP_VERSION' not in request.META) or parse(request.META.get('HTTP_APP_VERSION')) > parse(
+                    '2.7.2') or \
+                    (request.META.get("HTTP_APP_NAME") == "doc_prime_partner" and
+                     (parse(request.META.get('HTTP_APP_VERSION')) > parse('2.100.15') or
+                      (request.META.get('HTTP_APP_VERSION') > parse('2.200.11') and request.META.get(
+                          'HTTP_PLATFORM') == 'ios')
+                     )
+                    ):
             # if request.get('app_version'):
                 is_whitelisted = WhiteListedLoginTokens.objects.filter(token=token, user_id=user_id).first()
                 if is_whitelisted:
@@ -166,8 +173,12 @@ class JWTAuthentication(authentication.BaseAuthentication):
         user_key = UserSecretKey.objects.get_or_create(user=user)
         payload = JWTAuthentication.jwt_payload_handler(user)
         token = jwt.encode(payload, user_key[0].key)
-        if ('HTTP_APP_VERSION' not in request.META) or parse(request.META.get('HTTP_APP_VERSION')) > parse('2.7.2') or parse(
-                request.META.get('HTTP_APP_VERSION')) > parse('2.100.15'):
+        if ('HTTP_APP_VERSION' not in request.META) or parse(request.META.get('HTTP_APP_VERSION')) > parse('2.7.2') or \
+                (request.META.get("HTTP_APP_NAME")== "doc_prime_partner" and
+                 (parse(request.META.get('HTTP_APP_VERSION')) > parse('2.100.15') or
+                  (request.META.get('HTTP_APP_VERSION') > parse('2.200.11') and request.META.get('HTTP_PLATFORM') == 'ios')
+                 )
+                ):
             whitelist = WhiteListedLoginTokens.objects.create(token=token.decode('utf-8'), user=user)
         return {'token': token,
                 'payload': payload}
