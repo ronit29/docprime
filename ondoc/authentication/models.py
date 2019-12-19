@@ -691,7 +691,16 @@ class UserProfile(TimeStampedModel):
             user_age = today.year - self.dob.year - ((today.month, today.day) < (self.dob.month, self.dob.day))
         return user_age
 
+    @cached_property
+    def is_gold_profile(self):
+        plus_member_profile = self.plus_member.filter().order_by('-id').first()
+        response = True if plus_member_profile and plus_member_profile.plus_user.is_valid() else False
+        return response
+
     def save(self, *args, **kwargs):
+        if self.is_insured_profile or self.is_gold_profile:
+            return None
+
         if not self.has_image_changed():
             return super().save(*args, **kwargs)
 
