@@ -698,9 +698,6 @@ class UserProfile(TimeStampedModel):
         return response
 
     def save(self, *args, **kwargs):
-        if self.is_insured_profile or self.is_gold_profile:
-            return None
-
         if not self.has_image_changed():
             return super().save(*args, **kwargs)
 

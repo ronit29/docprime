@@ -214,6 +214,12 @@ class UserProfileSerializer(serializers.ModelSerializer):
                   , "age", "user", "dob", "is_insured", "updated_at", "whatsapp_optin", "whatsapp_is_declined",
                   "insurance_status", "is_vip_member", "is_vip_gold_member")
 
+    def validate(self, attrs):
+        if self.instance.is_gold_profile:
+            raise serializers.ValidationError("Gold Member Profile can not be editable.")
+        if self.instance.is_insured_profile:
+            raise serializers.ValidationError("Insured Member profile can not be editable.")
+
     def get_is_insured(self, obj):
         if isinstance(obj, dict):
             return False
