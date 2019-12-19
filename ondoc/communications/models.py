@@ -679,14 +679,9 @@ class WHTSAPPNotification:
             body_template = "appointment_confirmation_online_payment"
 
             data.append(self.context.get('doctor_name'))
-            if self.context.get('instance').payment_type == 2:
-                data.append(str(self.context.get('cod_amount')))
-            else:
-                data.append(str(self.context.get('instance').effective_price))
-
-            data.append(self.context.get('hospital_address'))
             data.append(self.context.get('patient_name'))
-            data.append(datetime.strftime(aware_time_zone(self.context.get('instance').time_slot_start), '%d-%m-%Y %H:%M'))
+            data.append(datetime.strftime(aware_time_zone(self.context.get('instance').time_slot_start), '%d-%m-%Y'))
+            data.append(datetime.strftime(aware_time_zone(self.context.get('instance').time_slot_start), '%I:%M%p'))
 
             sms_obj = SMSNotification(NotificationAction.PROVIDER_OPD_APPOINTMENT_CONFIRMATION_ONLINE_PAYMENT, self.context)
             context, click_login_token_obj = sms_obj.save_token_to_context(self.context, user)
@@ -696,13 +691,9 @@ class WHTSAPPNotification:
             body_template = "appointment_confirmation_pay_at_clinic"
 
             data.append(self.context.get('doctor_name'))
-            data.append(datetime.strftime(aware_time_zone(self.context.get('instance').time_slot_start), '%d-%m-%Y %H:%M'))
-            data.append(self.context.get('hospital_address'))
             data.append(self.context.get('patient_name'))
-            if self.context.get('instance').payment_type == 2:
-                data.append(str(self.context.get('cod_amount')))
-            else:
-                data.append(str(self.context.get('instance').effective_price))
+            data.append(datetime.strftime(aware_time_zone(self.context.get('instance').time_slot_start), '%d-%m-%Y'))
+            data.append(datetime.strftime(aware_time_zone(self.context.get('instance').time_slot_start), '%I:%M%p'))
 
             sms_obj = SMSNotification(NotificationAction.PROVIDER_OPD_APPOINTMENT_CONFIRMATION_PAY_AT_CLINIC,
                                       self.context)
