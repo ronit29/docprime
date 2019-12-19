@@ -398,6 +398,7 @@ class RefreshJSONWebTokenSerializer(serializers.Serializer):
 
         token = attrs.get('token')
         reset = attrs.get('reset')
+        request = self.context.get('request')
         if reset:
             try:
                 decrypt = v1_utils.AES_encryption.decrypt(reset, "hpDqwzdpoQY8ymm5")
@@ -420,7 +421,7 @@ class RefreshJSONWebTokenSerializer(serializers.Serializer):
                 else:
                     user = User.objects.filter(id=uid).first()
                     blacllist_token = WhiteListedLoginTokens.objects.filter(token=token, user=user).delete()
-                    token_object = JWTAuthentication.generate_token(user)
+                    token_object = JWTAuthentication.generate_token(user, request)
                     return {
                         'token': token_object['token'],
                         'user': user,

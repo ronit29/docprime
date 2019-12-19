@@ -172,7 +172,7 @@ class UserViewset(GenericViewSet):
 
         self.set_coupons(user)
 
-        token_object = JWTAuthentication.generate_token(user)
+        token_object = JWTAuthentication.generate_token(user, request)
 
         expire_otp(data['phone_number'])
 
@@ -2293,7 +2293,7 @@ class RefreshJSONWebToken(GenericViewSet):
 
     def refresh(self, request):
         data = {}
-        serializer = serializers.RefreshJSONWebTokenSerializer(data=request.data)
+        serializer = serializers.RefreshJSONWebTokenSerializer(data=request.data, context={'request': request})
         # serializer.is_valid(raise_exception=True)
         if not serializer.is_valid():
             return Response({"error": "Cannot Refresh Token"}, status=status.HTTP_401_UNAUTHORIZED)
