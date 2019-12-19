@@ -3201,10 +3201,7 @@ class OpdAppointment(auth_model.TimeStampedModel, CouponsMixin, OpdAppointmentIn
 
         if self.status == self.ACCEPTED:
             try:
-                notification_tasks.opd_send_confirmation_notification_before_appointment.apply_async(
-                    (self.id, self.time_slot_start.timestamp(),),
-                    eta=self.time_slot_start - datetime.timedelta(
-                        minutes=settings.TIME_BEFORE_APPOINTMENT_TO_SEND_NOTIFICATION), )
+                notification_tasks.opd_send_confirmation_notification_before_appointment.apply_async(({'appointment_id': self.id},), countdown=1)
             except Exception as e:
                 logger.error(str(e))
         # if str(self.hospital_id) in settings.MEDANTA_AND_ARTEMIS_HOSPITAL_IDS:
