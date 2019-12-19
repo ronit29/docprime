@@ -1769,7 +1769,22 @@ def process_leads_to_matrix(self, data):
 
 
 @task()
-def opd_send_notification_before_appointment(appointment_id, time):
+def opd_send_completion_notification_before_appointment(appointment_id, time):
+    from ondoc.doctor.models import OpdAppointment
+    from ondoc.communications.models import OpdNotification
+    try:
+        instance = OpdAppointment.objects.filter(id=appointment_id).first()
+        if not instance or not instance.user:
+            return
+        opd_notification = OpdNotification(instance, NotificationAction.PROVIDER_OPD_APPOINTMENT_COMPLETION_ONLINE_PAYMENT)
+        opd_notification.send()
+        opd_notification = OpdNotification(instance, NotificationAction.PROVIDER_OPD_APPOINTMENT_COMPLETION_PAY_AT_CLINIC)
+        opd_notification.send()
+    except Exception as e:
+        logger.error(str(e))
+
+@task()
+def opd_send_confirmation_notification_before_appointment(appointment_id, time):
     from ondoc.doctor.models import OpdAppointment
     from ondoc.communications.models import OpdNotification
     try:
