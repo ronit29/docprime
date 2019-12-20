@@ -1032,8 +1032,11 @@ class EmailNotification(TimeStampedModel, EmailNotificationOpdMixin, EmailNotifi
         if recipient_obj and recipient_obj.to:
             obj = None
             content_type = None
-            if kwargs.get('email_obj'):
-                obj = kwargs.get('email_obj')
+            # todo - below code commented of branch 'lab_email_provider'
+            # if kwargs.get('email_obj'):
+            #     obj = kwargs.get('email_obj')
+            if kwargs.get('ipd_email_obj'):
+                obj = kwargs.get('ipd_email_obj')
                 content_type = ContentType.objects.get_for_model(obj)
 
             if kwargs.get('is_preview', False):
@@ -1727,7 +1730,9 @@ class IPDIntimateEmailNotification(TimeStampedModel):
                 email_notification = EMAILNotification(notification_type=NotificationAction.IPDIntimateEmailNotification,
                                                        context={'doctor_name': data.doctor.name, 'dob': data.dob,
                                                                 'Mobile': data.phone_number, 'date_time': str(data.preferred_date) + " " + str(data.time_slot),                                                                         'Hospital_Name': data.hospital.name , 'Patient_name': data.profile.name})
-                kwargs['email_obj'] = data
+                # todo - below code commented of branch 'lab_email_provider'
+                # kwargs['email_obj'] = data
+                kwargs['ipd_email_obj'] = data
                 email_notification.send(receivers, *args, **kwargs)
                 IPDIntimateEmailNotification.objects.filter(user=data.user).update(is_sent=True)
                 print("ipd_obj: " + str(data.id))
