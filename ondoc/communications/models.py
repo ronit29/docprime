@@ -1798,6 +1798,13 @@ class OpdNotification(Notification):
         if notification_type in [NotificationAction.DOCTOR_INVOICE]:
             if instance.payment_type not in [2, 3]:
                 receivers.append(instance.user)
+        if notification_type in [NotificationAction.PROVIDER_OPD_APPOINTMENT_COMPLETION_ONLINE_PAYMENT,
+                                   NotificationAction.PROVIDER_OPD_APPOINTMENT_COMPLETION_PAY_AT_CLINIC
+                                   ]:
+            spocs_to_be_communicated = doctor_spocs
+            if not is_valid_for_provider:
+                spocs_to_be_communicated = []
+            doctor_spocs_app_recievers = GenericAdmin.get_appointment_admins(instance)
         elif notification_type in [NotificationAction.APPOINTMENT_ACCEPTED,
                                  NotificationAction.APPOINTMENT_RESCHEDULED_BY_DOCTOR,
                                  NotificationAction.PRESCRIPTION_UPLOADED,
@@ -1816,8 +1823,6 @@ class OpdNotification(Notification):
                                    NotificationAction.COD_TO_PREPAID,
                                    NotificationAction.PROVIDER_OPD_APPOINTMENT_CONFIRMATION_PAY_AT_CLINIC,
                                    NotificationAction.PROVIDER_OPD_APPOINTMENT_CONFIRMATION_ONLINE_PAYMENT,
-                                   NotificationAction.PROVIDER_OPD_APPOINTMENT_COMPLETION_ONLINE_PAYMENT,
-                                   NotificationAction.PROVIDER_OPD_APPOINTMENT_COMPLETION_PAY_AT_CLINIC,
                                    NotificationAction.REMINDER_MESSAGE_MEDANTA_AND_ARTEMIS
                                    ]:
             spocs_to_be_communicated = doctor_spocs
