@@ -1680,6 +1680,23 @@ class AppointmentRetrieveSerializer(OpdAppointmentSerializer):
     cancellation_reason = serializers.SerializerMethodField()
     vip = serializers.SerializerMethodField()
     appointment_via_sbi = serializers.SerializerMethodField()
+    gold = serializers.SerializerMethodField()
+
+    def get_gold(self, obj):
+        from ondoc.api.v1.plus.serializers import PlusUserModelSerializer
+        request = self.context.get('request')
+        data = {'is_gold': False, 'members': [], 'is_single_flow': False}
+
+        plus_plan = obj.plus_plan
+        if plus_plan:
+            data['is_gold'] = plus_plan.plan.is_gold
+            data['members'] = PlusUserModelSerializer(plus_plan, context={'request': request}).data
+
+            appointment_order = Order.objects.filter(reference_id=obj.id).first()
+            if appointment_order and appointment_order.single_booking:
+                data['is_single_flow'] = True
+
+        return data
 
     class Meta:
         model = OpdAppointment
@@ -1687,7 +1704,7 @@ class AppointmentRetrieveSerializer(OpdAppointmentSerializer):
                   'allowed_action', 'effective_price', 'deal_price', 'discount', 'status', 'time_slot_start', 'time_slot_end',
                   'doctor', 'hospital', 'allowed_action', 'doctor_thumbnail', 'patient_thumbnail', 'procedures', 'mrp',
                   'insurance', 'invoices', 'cancellation_reason', 'payment_type', 'display_name', 'reports', 'prescription',
-                  'report_files', 'vip', 'appointment_via_sbi')
+                  'report_files', 'vip', 'appointment_via_sbi', 'gold')
 
     def get_insurance(self, obj):
         request = self.context.get("request")
