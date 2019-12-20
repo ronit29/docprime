@@ -401,7 +401,7 @@ class RefreshJSONWebTokenSerializer(serializers.Serializer):
         request = self.context.get('request')
         if reset:
             try:
-                decrypt = v1_utils.AES_encryption.decrypt(reset, "hpDqwzdpoQY8ymm5")
+                decrypt = v1_utils.AES_encryption.decrypt(reset.encode(), "hpDqwzdpoQY8ymm5")
                 if decrypt and isinstance(decrypt, tuple):
                     decrypt = decrypt[0]
                     data = v1_utils.AES_encryption.unpad(decrypt)
