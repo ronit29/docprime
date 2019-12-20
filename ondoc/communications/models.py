@@ -1879,8 +1879,10 @@ class LabNotification(Notification):
         }
         return context
 
-    def send(self, is_valid_for_provider=True):
+    def send(self, is_valid_for_provider=True, *args, **kwargs):
         context = self.get_context()
+        if kwargs.get('overrided_context'):
+            context.update(kwargs.get('overrided_context'))
         notification_type = self.notification_type
         all_receivers = self.get_receivers(is_valid_for_provider)
 
@@ -1917,7 +1919,7 @@ class LabNotification(Notification):
             push_notification = PUSHNotification(notification_type, context)
             whtsapp_notification = WHTSAPPNotification(notification_type, context)
             whtsapp_notification.send(all_receivers.get('sms_receivers', []))
-            email_notification.send(all_receivers.get('email_receivers', []))
+            email_notification.send(all_receivers.get('email_receivers', []), *args, **kwargs)
             sms_notification.send(all_receivers.get('sms_receivers', []))
             app_notification.send(all_receivers.get('app_receivers', []))
             push_notification.send(all_receivers.get('push_receivers', []))
