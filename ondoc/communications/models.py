@@ -1199,9 +1199,8 @@ class EMAILNotification:
             obj = DynamicTemplates.objects.filter(template_type=DynamicTemplates.TemplateType.EMAIL, template_name="Lensfit_email", approved=True).first()
         if notification_type == NotificationAction.IPDIntimateEmailNotification:
             obj = DynamicTemplates.objects.filter(template_type=DynamicTemplates.TemplateType.EMAIL, template_name="EMail_to_provider_for_ipd_hospitals_for_request_query", approved=True).first()
-        if notification_type in (NotificationAction.LAB_APPOINTMENT_ACCEPTED, NotificationAction.LAB_APPOINTMENT_RESCHEDULED_BY_PATIENT,
-                                NotificationAction.LAB_APPOINTMENT_RESCHEDULED_BY_LAB, NotificationAction.LAB_APPOINTMENT_BOOKED,
-                                NotificationAction.LAB_APPOINTMENT_CANCELLED, NotificationAction.LAB_INVOICE):
+        if notification_type in (NotificationAction.LAB_APPOINTMENT_RESCHEDULED_BY_PATIENT,
+                                NotificationAction.LAB_APPOINTMENT_RESCHEDULED_BY_LAB, NotificationAction.LAB_APPOINTMENT_BOOKED):
             obj = DynamicTemplates.objects.filter(template_type=DynamicTemplates.TemplateType.EMAIL, template_name="Email_to_lab_on_appointment_booked",
                                                   approved=True).first()
         return obj

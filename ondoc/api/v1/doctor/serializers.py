@@ -1067,6 +1067,9 @@ class DoctorListSerializer(serializers.Serializer):
     avg_ratings = CommaSepratedToListField(required=False,  max_length=50, typecast_to=str)
     group_ids = CommaSepratedToListField(required=False,  max_length=50, typecast_to=str)
     specialization_filter_ids = CommaSepratedToListField(required=False, max_length=500, typecast_to=str, allow_blank=True)
+    is_gold = serializers.BooleanField(required=False)
+    is_vip = serializers.BooleanField(required=False)
+
 
     def validate_specialization_filter_ids(self, attrs):
         try:
