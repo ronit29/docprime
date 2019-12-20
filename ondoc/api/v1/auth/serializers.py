@@ -452,7 +452,7 @@ class RefreshJSONWebTokenSerializer(serializers.Serializer):
             raise serializers.ValidationError(msg)
         blacllist_token = WhiteListedLoginTokens.objects.filter(token=token, user=user).delete()
         # if blacllist_token and isinstance(blacllist_token, tuple) and (blacllist_token[0] > 0):
-        token_object = JWTAuthentication.generate_token(user)
+        token_object = JWTAuthentication.generate_token(user, request)
         token_object['payload']['orig_iat'] = orig_iat
         return {
             'token': token_object['token'],

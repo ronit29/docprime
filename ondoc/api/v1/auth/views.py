@@ -252,7 +252,7 @@ class UserViewset(GenericViewSet):
         GenericLabAdmin.update_user_lab_admin(phone_number)
         self.update_live_status(phone_number)
 
-        token_object = JWTAuthentication.generate_token(user)
+        token_object = JWTAuthentication.generate_token(user, request)
         expire_otp(data['phone_number'])
 
         if data.get("source"):
@@ -2356,7 +2356,7 @@ class SendBookingUrlViewSet(GenericViewSet):
         landing_url = request.data.get('landing_url')
 
         # agent_token = AgentToken.objects.create_token(user=request.user)
-        user_token = JWTAuthentication.generate_token(request.user)
+        user_token = JWTAuthentication.generate_token(request.user, request)
         token = user_token['token'].decode("utf-8") if 'token' in user_token else None
         user_profile = None
 
@@ -2413,7 +2413,7 @@ class SendCartUrlViewSet(GenericViewSet):
             utm_campaign = "utm_campaign=%s" % utm_campaign
             utm_parameters = utm_parameters + utm_campaign
 
-        user_token = JWTAuthentication.generate_token(request.user)
+        user_token = JWTAuthentication.generate_token(request.user, request)
         token = user_token['token'].decode("utf-8") if 'token' in user_token else None
         user_profile = None
 
@@ -2592,7 +2592,7 @@ class UserTokenViewSet(GenericViewSet):
             return Response(status=status.HTTP_400_BAD_REQUEST)
         agent_token = AgentToken.objects.filter(token=token, is_consumed=False, expiry_time__gte=timezone.now()).first()
         if agent_token:
-            token_object = JWTAuthentication.generate_token(agent_token.user)
+            token_object = JWTAuthentication.generate_token(agent_token.user, request)
             # agent_token.is_consumed = True
             agent_token.save()
             return Response({"status": 1, "token": token_object['token'], 'order_id': agent_token.order_id})
