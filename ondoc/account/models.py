@@ -1588,9 +1588,12 @@ class ConsumerAccount(TimeStampedModel):
             parent_ref = True
 
             if ctx_sale_objs:
+                balance_refund = False
+                reference_id = txn_entity_obj.id
                 for ctx_sale_obj in ctx_sale_objs:
                     if ctx_sale_obj.ref_txns:
-                        ctx_objs.append(ctx_sale_obj.debit_from_ref_txn(self, 0, parent_ref, initiate_refund))
+                        ctx_objs.append(ctx_sale_obj.debit_from_ref_txn(self, 0, parent_ref, initiate_refund,
+                                                                        balance_refund, reference_id))
                     if ctx_sale_obj.balance and ctx_sale_obj.balance > 0:
                         if ctx_sale_obj.source == ConsumerTransaction.WALLET_SOURCE:
                             ctx_objs.append(ctx_sale_obj.debit_from_balance(self))
@@ -1605,9 +1608,10 @@ class ConsumerAccount(TimeStampedModel):
                 balance_refund = True
                 for old_txn_obj in old_txn_objs:
                     if old_txn_obj.ref_txns:
-                        ctx_objs.append(old_txn_obj.debit_from_ref_txn(self, 0, parent_ref, initiate_refund, balance_refund))
+                        ctx_objs.append(old_txn_obj.debit_from_ref_txn(self, 0, parent_ref, initiate_refund, balance_refund, old_txn_obj.reference_id))
                     if old_txn_obj.balance and old_txn_obj.balance > 0:
-                        if old_txn_obj.source == ConsumerTransaction.WALLET_SOURCE:
+                        if old_txn_obj.action == ConsumerTransaction.PAYMENT or (
+                                old_txn_obj.action == ConsumerTransaction.SALE and old_txn_obj.source == ConsumerTransaction.WALLET_SOURCE):
                             ctx_objs.append(old_txn_obj.debit_from_balance(self))
                     old_txn_obj.save()
             else:
@@ -1830,7 +1834,8 @@ class ConsumerTransaction(TimeStampedModel, SoftDelete):
             except Exception as e:
                 logger.error(str(e))
 
-    def debit_from_ref_txn(self, consumer_account, refund_amount=0, parent_ref=False, initiate_refund=1, balance_refund=0):
+    def debit_from_ref_txn(self, consumer_account, refund_amount=0, parent_ref=False, initiate_refund=1,
+                           balance_refund=0, reference_id=None):
         ctx_objs = []
         ref_txns = self.ref_txns
         # todo - use python filter here to avoid db call
@@ -1852,13 +1857,13 @@ class ConsumerTransaction(TimeStampedModel, SoftDelete):
                 refund_amount -= ref_refund_amount
                 if ref_txn_obj.action == ConsumerTransaction.PAYMENT:
                     ref_txn_obj.balance += ref_refund_amount
-                    ctx_obj = ref_txn_obj.debit_from_balance(consumer_account)
+                    ctx_obj = ref_txn_obj.debit_from_balance(consumer_account, reference_id)
                 else:
-                    ctx_obj = ref_txn_obj.debit_from_ref_txn(consumer_account, ref_refund_amount)
+                    ctx_obj = ref_txn_obj.debit_from_ref_txn(consumer_account, ref_refund_amount, False, 1, 0, reference_id)
             else:
                 ref_refund_amount = refund_amount
                 if not cashback_txn and ref_refund_amount:
-                    ctx_obj = ref_txn_obj.debit_txn_refund(consumer_account, ref_refund_amount)
+                    ctx_obj = ref_txn_obj.debit_txn_refund(consumer_account, ref_refund_amount, reference_id)
                 else:
                    ctx_obj = None
             if self.balance and not cashback_txn and parent_ref and ref_refund_amount:
@@ -1883,19 +1888,19 @@ class ConsumerTransaction(TimeStampedModel, SoftDelete):
                         ctx_objs.append(ctx_obj)
 
             if ref_txn_obj.balance and ref_txn_obj.balance > 0 and not cashback_txn and not is_preauth_txn:
-                ctx_objs.append(ref_txn_obj.debit_from_balance(consumer_account))
+                ctx_objs.append(ref_txn_obj.debit_from_balance(consumer_account, reference_id))
         self.save()
 
         return ctx_objs
 
-    def debit_txn_refund(self, consumer_account, refund_amount):
+    def debit_txn_refund(self, consumer_account, refund_amount, reference_id=None):
         tx_obj = PgTransaction.objects.filter(order_id=self.order_id).order_by('-created_at').first()
         ctx_obj = None
         data = dict()
         data["user"] = self.user
         if tx_obj:
             data["product_id"] = tx_obj.product_id
-            # data["reference_id"] = txn_entity_obj.id
+            data["reference_id"] = reference_id
             data["transaction_id"] = tx_obj.transaction_id
             data["order_id"] = tx_obj.order_id if tx_obj else None
         if refund_amount:
@@ -1908,13 +1913,13 @@ class ConsumerTransaction(TimeStampedModel, SoftDelete):
 
         return ctx_obj
 
-    def debit_from_balance(self, consumer_account):
+    def debit_from_balance(self, consumer_account, reference_id=None):
         ctx_objs = []
         if self.balance:
             pg_ctx_obj = ConsumerTransaction.objects.filter(user=self.user, action=ConsumerTransaction.PAYMENT,
                                                             order_id=self.order_id).last()
             if pg_ctx_obj:
-                ctx_obj = pg_ctx_obj.debit_txn_refund(consumer_account, self.balance)
+                ctx_obj = pg_ctx_obj.debit_txn_refund(consumer_account, self.balance, reference_id)
                 if ctx_obj:
                     self.balance = 0
                     self.save()
@@ -1926,7 +1931,7 @@ class ConsumerTransaction(TimeStampedModel, SoftDelete):
                     pg_ctx_obj = ConsumerTransaction.objects.filter(user=self.user, action=ConsumerTransaction.PAYMENT,
                                                                     order_id=cancel_ctx_obj.order_id).last()
                     if pg_ctx_obj:
-                        ctx_obj = pg_ctx_obj.debit_txn_refund(consumer_account, self.balance)
+                        ctx_obj = pg_ctx_obj.debit_txn_refund(consumer_account, self.balance, reference_id)
                         if ctx_obj:
                             self.balance = 0
                             self.save()
