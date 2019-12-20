@@ -11,7 +11,7 @@ from rest_framework.response import Response
 from ondoc.authentication.backends import JWTAuthentication
 from ondoc.banner.models import Banner
 from ondoc.common.middleware import use_slave
-
+from django.db.models import Q
 
 class BannerListViewSet(viewsets.GenericViewSet):
     authentication_classes = (JWTAuthentication,)
@@ -29,7 +29,10 @@ class BannerListViewSet(viewsets.GenericViewSet):
             from_app = True
         else:
             from_app = False
-        banners = Banner.get_all_banners(request, lat, long, from_app)
+        queryset = Banner.objects.prefetch_related('banner_location', 'location').filter(enable=True).filter(
+            Q(start_date__lte=timezone.now()) | Q(start_date__isnull=True)).filter(
+            Q(end_date__gte=timezone.now()) | Q(end_date__isnull=True)).order_by('-priority')[:100]
+        banners = Banner.get_all_banners(request, lat, long, from_app, queryset)
         return Response(banners)
         # res = []
         # for banner_obj in banners:
@@ -54,3 +57,11 @@ class BannerListViewSet(viewsets.GenericViewSet):
 
         # return Response(res)
 
+    def details(self, request, pk):
+        parameters = request.query_params
+        lat = parameters.get('lat', None)
+        long = parameters.get('long', None)
+        from_app = parameters.get('from_app', False)
+        queryset = Banner.objects.prefetch_related('banner_location', 'location').filter(enable=True, id=pk)
+        banners = Banner.get_all_banners(request, lat, long, from_app, queryset)
+        return Response(banners)
