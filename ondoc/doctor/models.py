@@ -320,22 +320,22 @@ class Hospital(auth_model.TimeStampedModel, auth_model.CreatedByModel, auth_mode
             vip_request = 0
 
         day = datetime.datetime.today().weekday()
-        # vip_user = None
+        vip_user = None
         common_hosp_queryset = CommonHospital.objects.prefetch_related('hospital', 'hospital__health_insurance_providers',
                                                                 'hospital__hospital_documents', 'hospital__imagehospital', 'hospital__network',
                                                                 'hospital__network__hospitalnetworkspeciality_set',
                                                                 'hospital__hospital_services', 'hospital__hosp_availability',
                                                                 'hospital__hospitalcertification_set', 'hospital__hospitalspeciality_set')
 
-        # if request.user.is_authenticated and not request.user.is_anonymous:
-        #     vip_user = request.user.active_plus_user
+        if request.user.is_authenticated and not request.user.is_anonymous:
+            vip_user = request.user.active_plus_user
 
         # if vip_user:
         if gold_request:
             common_hosp_queryset = common_hosp_queryset.filter(hospital__enabled_for_gold=True)
         elif vip_request:
             common_hosp_queryset = common_hosp_queryset.filter(hospital__enabled_for_plus_plans=True)
-        else:
+        elif vip_user:
             common_hosp_queryset = common_hosp_queryset.filter(hospital__enabled_for_prepaid=True)
 
         common_hosp_queryset = common_hosp_queryset.order_by('priority')[:20]
