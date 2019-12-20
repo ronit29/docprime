@@ -834,7 +834,7 @@ class DoctorProfileView(viewsets.GenericViewSet):
             resp_data['is_provider_signup_lead'] = True
         else:
             resp_data['is_provider_signup_lead'] = False
-        resp['user_id'] = request.user.id
+        resp_data['user_id'] = request.user.id
         return Response(resp_data)
 
     def licence_update(self, request):
