@@ -2291,6 +2291,8 @@ class ConsumerAccountRefundViewSet(GenericViewSet):
 
 class RefreshJSONWebToken(GenericViewSet):
 
+    authentication_classes = []
+
     def refresh(self, request):
         data = {}
         serializer = serializers.RefreshJSONWebTokenSerializer(data=request.data, context={'request': request})
