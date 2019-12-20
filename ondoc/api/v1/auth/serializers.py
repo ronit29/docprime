@@ -395,13 +395,15 @@ class RefreshJSONWebTokenSerializer(serializers.Serializer):
     reset = serializers.CharField(required=False)
 
     def validate(self, attrs):
-
+        import hashlib
         token = attrs.get('token')
         reset = attrs.get('reset')
         request = self.context.get('request')
         if reset:
             try:
-                decrypt = v1_utils.AES_encryption.decrypt(reset.encode(), "hpDqwzdpoQY8ymm5")
+                passphrase = hashlib.md5("hpDqwzdpoQY8ymm5".encode())
+                passphrase = passphrase.hexdigest()[:16]
+                decrypt = v1_utils.AES_encryption.decrypt(reset.encode(), passphrase)
                 if decrypt and isinstance(decrypt, tuple):
                     decrypt = decrypt[0]
                     data = v1_utils.AES_encryption.unpad(decrypt)
@@ -413,7 +415,7 @@ class RefreshJSONWebTokenSerializer(serializers.Serializer):
                 uid = get_date[0]
                 date_generated = get_date[1]
                 time_format = '%Y-%m-%d %H:%M:%S'
-                date_generated = datetime.datetime.fromtimestamp(date_generated).strftime(time_format)
+                date_generated = datetime.datetime.fromtimestamp(int(date_generated)).strftime(time_format)
 
                 time_elapsed = v1_utils.get_time_delta_in_minutes(date_generated)
                 if time_elapsed > 2:
