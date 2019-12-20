@@ -287,6 +287,16 @@ class DoctorSearchHelper:
             )
             params['insurance_threshold_amount'] = self.query_params.get('insurance_threshold_amount')
 
+        if self.query_params.get('is_gold'):
+            filtering_params.append(
+                "h.enabled_for_gold"
+            )
+
+        if self.query_params.get('is_vip'):
+            filtering_params.append(
+                "h.enabled_for_plus_plans"
+            )
+
         result = {}
         if not filtering_params and not spec_filter_str:
             result['string'] = "1=1"
