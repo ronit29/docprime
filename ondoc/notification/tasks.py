@@ -1034,7 +1034,7 @@ def send_pg_acknowledge(order_id=None, order_no=None, ack_type=''):
             else:
                 print("Payment acknowledged")
         json_url = '{"url": "%s"}' % url
-        save_pg_response.apply_async((PgLogs.ACK_TO_PG, order_id, None, json_url, None, None), eta=timezone.localtime(), queue=settings.RABBITMQ_LOGS_QUEUE)
+        save_pg_response.apply_async((PgLogs.ACK_TO_PG, order_id, None, None, json_url, None), eta=timezone.localtime(), queue=settings.RABBITMQ_LOGS_QUEUE)
     except Exception as e:
         logger.error("Error in sending pg acknowledge - " + str(e))
 
@@ -1596,8 +1596,9 @@ def save_pg_response(self, log_type, order_id, txn_id, response, request, user_i
                 response.pop('created_at', None)
             PgLogs.save_pg_response(log_type, order_id, txn_id, response, request, user_id, log_created_at)
     except Exception as e:
-        logger.error("Error in saving pg response to mongo database - " + json.dumps(response) + " with exception - " + str(e))
-        # self.retry([txn_id, response], countdown=300)
+        # todo - temporary commented to avoid error logs in sentry
+        # logger.error("Error in saving pg response to mongo database - " + json.dumps(response) + " with exception - " + str(e))
+        pass
 
 
 @task(bind=True)
@@ -1716,8 +1717,8 @@ def save_matrix_logs(self, id, obj_type, request_data, response):
         elif obj_type == 'general_leads':
             object = GeneralMatrixLeads.objects.filter(id=id).first()
 
-        if object:
-            MatrixLog.create_matrix_logs(object, request_data, response)
+        MatrixLog.create_matrix_logs(object, request_data, response)
+
     except Exception as e:
         logger.error("Error in saving matrix logs to mongo database - " + json.dumps(response) + " with exception - " + str(e))
 

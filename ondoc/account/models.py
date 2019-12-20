@@ -1610,7 +1610,8 @@ class ConsumerAccount(TimeStampedModel):
                     if old_txn_obj.ref_txns:
                         ctx_objs.append(old_txn_obj.debit_from_ref_txn(self, 0, parent_ref, initiate_refund, balance_refund, old_txn_obj.reference_id))
                     if old_txn_obj.balance and old_txn_obj.balance > 0:
-                        if old_txn_obj.source == ConsumerTransaction.WALLET_SOURCE:
+                        if old_txn_obj.action == ConsumerTransaction.PAYMENT or (
+                                old_txn_obj.action == ConsumerTransaction.SALE and old_txn_obj.source == ConsumerTransaction.WALLET_SOURCE):
                             ctx_objs.append(old_txn_obj.debit_from_balance(self))
                     old_txn_obj.save()
             else:
