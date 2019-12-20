@@ -1847,10 +1847,14 @@ class ConsumerTransaction(TimeStampedModel, SoftDelete):
                 cashback_txn = True
             elif ref_txn_obj.action == ConsumerTransaction.SALE and ref_txn_obj.source == ConsumerTransaction.CASHBACK_SOURCE:
                 cashback_txn = True
-            if ref_txn_obj.ref_txns:
+            if ref_txn_obj.ref_txns or ref_txn_obj.action == ConsumerTransaction.PAYMENT:
                 ref_refund_amount = min(decimal.Decimal(ref_txns.get(str(ref_txn_obj.id), 0)), refund_amount)
                 refund_amount -= ref_refund_amount
-                ctx_obj = ref_txn_obj.debit_from_ref_txn(consumer_account, ref_refund_amount)
+                if ref_txn_obj.action == ConsumerTransaction.PAYMENT:
+                    ref_txn_obj.balance += ref_refund_amount
+                    ctx_obj = ref_txn_obj.debit_from_balance(consumer_account)
+                else:
+                    ctx_obj = ref_txn_obj.debit_from_ref_txn(consumer_account, ref_refund_amount)
             else:
                 ref_refund_amount = refund_amount
                 if not cashback_txn and ref_refund_amount:
