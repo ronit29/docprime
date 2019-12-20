@@ -1696,7 +1696,13 @@ class SearchedItemsViewSet(viewsets.GenericViewSet):
         serializer = CommonConditionsSerializer(data=request.query_params)
         serializer.is_valid(raise_exception=True)
         validated_data = serializer.validated_data
-        # from_vip_page = True
+#        vip_user = None
+ #       from_vip_page = True
+
+#        if logged_in_user.is_authenticated and not logged_in_user.is_anonymous:
+#            vip_user = logged_in_user.active_plus_user
+#        top_hospitals_data = Hospital.get_top_hospitals_data(request, validated_data.get('lat'), validated_data.get('long'), vip_user, from_vip_page)
+
 
         top_hospitals_data = Hospital.get_top_hospitals_data(request, validated_data.get('lat'), validated_data.get('long'))
 
