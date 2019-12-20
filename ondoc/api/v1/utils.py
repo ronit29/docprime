@@ -543,6 +543,9 @@ def single_booking_payment_details(request, orders):
             "discountedAmnt": discountedAmnt
             }
 
+        if not order_dict['insurerCode']:
+            del order_dict['insurerCode']
+
         if Decimal(txAmount) > Decimal(0):
             orders_list.append(order_dict)
 

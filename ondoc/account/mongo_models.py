@@ -48,14 +48,14 @@ class PgLogs(DynamicDocument, TimeStampedModel):
                 pg_log = PgLogs(order_id=order_id,
                                 pg_transaction_id=txn_id,
                                 user_id=user_id,
-                                created_at=timezone.localtime(),
-                                updated_at=timezone.localtime())
+                                created_at=str(timezone.localtime()),
+                                updated_at=str(timezone.localtime()))
             if request:
                 if not isinstance(request, dict):
                     request = json.loads(request)
                 request['log_type'] = log_type
                 request['type'] = "REQUEST"
-                request['created_at'] = timezone.localtime()
+                request['created_at'] = str(timezone.localtime())
                 request['log_created_at'] = log_created_at
                 if has_log:
                     pg_log.update(push__logs=request)
@@ -66,7 +66,7 @@ class PgLogs(DynamicDocument, TimeStampedModel):
                     response = json.loads(response)
                 response['log_type'] = log_type
                 response['type'] = "RESPONSE"
-                response['created_at'] = timezone.localtime()
+                response['created_at'] = str(timezone.localtime())
                 response['log_created_at'] = log_created_at
                 if has_log:
                     pg_log.update(push__logs=response)
@@ -89,21 +89,21 @@ class PgLogs(DynamicDocument, TimeStampedModel):
                     pg_log = PgLogs(order_id=order_id,
                                     pg_transaction_id=txn_id,
                                     user_id=user_id,
-                                    created_at=timezone.localtime(),
-                                    updated_at=timezone.localtime())
+                                    created_at=str(timezone.localtime()),
+                                    updated_at=str(timezone.localtime()))
                 if request:
                     if not isinstance(request, dict):
                         request = json.loads(request)
                     request['log_type'] = log_type
                     request['type'] = "REQUEST"
-                    request['created_at'] = timezone.localtime()
+                    request['created_at'] = str(timezone.localtime())
                     pg_log.logs.append(request)
                 if response:
                     if not isinstance(response, dict):
                         response = json.loads(response)
                     response['log_type'] = log_type
                     response['type'] = "RESPONSE"
-                    response['created_at'] = timezone.localtime()
+                    response['created_at'] = str(timezone.localtime())
                     pg_log.logs.append(response)
 
                 pg_log.save()

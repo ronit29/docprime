@@ -102,7 +102,7 @@ LOGGING = {
 }
 SENTRY_DSN = env('DJANGO_SENTRY_DSN')
 
-if env('ENABLE_SENTRY', default=False):
+if env.bool('ENABLE_SENTRY', default=False):
     LOGGING['disable_existing_loggers'] = True
     LOGGING['handlers']['sentry'] = {
         'level': 'ERROR',

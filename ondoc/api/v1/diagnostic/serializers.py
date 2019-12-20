@@ -1522,7 +1522,7 @@ class LabAppointmentCreateSerializer(serializers.Serializer):
         start_dt = (form_time_slot(data.get('start_date'), data.get('start_time')) if not data.get("time_slot_start") else data.get("time_slot_start"))
 
         if start_dt < timezone.now():
-            logger.error("Error 'Cannot book in past' for lab appointment with data - " + json.dumps(request.data))
+            # logger.error("Error 'Cannot book in past' for lab appointment with data - " + json.dumps(request.data))
             raise serializers.ValidationError("Cannot book in past")
 
         day_of_week = start_dt.weekday()
@@ -1557,7 +1557,7 @@ class LabAppointmentCreateSerializer(serializers.Serializer):
         start_dt = (form_time_slot(params.get('start_date'), params.get('start_time')))
 
         if start_dt < timezone.now():
-            logger.error("Error 'Cannot book in past' for lab appointment with data - " + json.dumps(request.data))
+            # logger.error("Error 'Cannot book in past' for lab appointment with data - " + json.dumps(request.data))
             raise serializers.ValidationError("Cannot book in past")
 
         day_of_week = start_dt.weekday()
@@ -1592,7 +1592,7 @@ class LabAppointmentCreateSerializer(serializers.Serializer):
         start_dt = (form_time_slot(params.get('start_date'), params.get('start_time')))
 
         if start_dt < timezone.now():
-            logger.error("Error 'Cannot book in past' for lab appointment with data - " + json.dumps(request.data))
+            # logger.error("Error 'Cannot book in past' for lab appointment with data - " + json.dumps(request.data))
             raise serializers.ValidationError("Cannot book in past")
 
         day_of_week = start_dt.weekday()
