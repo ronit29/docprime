@@ -1797,9 +1797,8 @@ class OpdNotification(Notification):
         if notification_type in [NotificationAction.DOCTOR_INVOICE]:
             if instance.payment_type not in [2, 3]:
                 receivers.append(instance.user)
-        if notification_type in [NotificationAction.PROVIDER_OPD_APPOINTMENT_COMPLETION_ONLINE_PAYMENT,
-                                   NotificationAction.PROVIDER_OPD_APPOINTMENT_COMPLETION_PAY_AT_CLINIC
-                                   ]:
+        if notification_type in [NotificationAction.PROVIDER_OPD_APPOINTMENT_CONFIRMATION_PAY_AT_CLINIC,
+                                   NotificationAction.PROVIDER_OPD_APPOINTMENT_CONFIRMATION_ONLINE_PAYMENT]:
             spocs_to_be_communicated = doctor_spocs
             if not is_valid_for_provider:
                 spocs_to_be_communicated = []
@@ -1820,8 +1819,8 @@ class OpdNotification(Notification):
                                    NotificationAction.APPOINTMENT_BOOKED,
                                    NotificationAction.APPOINTMENT_CANCELLED,
                                    NotificationAction.COD_TO_PREPAID,
-                                   NotificationAction.PROVIDER_OPD_APPOINTMENT_CONFIRMATION_PAY_AT_CLINIC,
-                                   NotificationAction.PROVIDER_OPD_APPOINTMENT_CONFIRMATION_ONLINE_PAYMENT,
+                                   NotificationAction.PROVIDER_OPD_APPOINTMENT_COMPLETION_ONLINE_PAYMENT,
+                                   NotificationAction.PROVIDER_OPD_APPOINTMENT_COMPLETION_PAY_AT_CLINIC,
                                    NotificationAction.REMINDER_MESSAGE_MEDANTA_AND_ARTEMIS
                                    ]:
             spocs_to_be_communicated = doctor_spocs
@@ -1868,7 +1867,8 @@ class OpdNotification(Notification):
             if email:
                 user_and_email.append({'user': user, 'email': email})
         spoc_emails, spoc_numbers = get_spoc_email_and_number_hospital(spocs_to_be_communicated, instance)
-        if notification_type in (NotificationAction.PROVIDER_OPD_APPOINTMENT_COMPLETION_PAY_AT_CLINIC, NotificationAction.PROVIDER_OPD_APPOINTMENT_COMPLETION_ONLINE_PAYMENT):
+        if notification_type in (NotificationAction.PROVIDER_OPD_APPOINTMENT_CONFIRMATION_PAY_AT_CLINIC,
+                                   NotificationAction.PROVIDER_OPD_APPOINTMENT_CONFIRMATION_ONLINE_PAYMENT):
             user_and_phone_number.clear()
 
         user_and_phone_number.extend(spoc_numbers)
