@@ -349,6 +349,9 @@ def push_appointment_to_matrix(self, data):
     from ondoc.doctor.models import OpdAppointment
     from ondoc.diagnostic.models import LabAppointment
     from ondoc.notification.tasks import save_matrix_logs
+    from ondoc.common.models import GeneralMatrixLeads
+    from ondoc.common.lead_engine import lead_class_referance
+
     log_requests_on()
     try:
         appointment_id = data.get('appointment_id', None)
@@ -370,6 +373,16 @@ def push_appointment_to_matrix(self, data):
             appointment = LabAppointment.objects.filter(pk=appointment_id).first()
             if not appointment:
                 raise Exception("Appointment could not found against id - " + str(appointment_id))
+
+        appointment_user = appointment.user
+        if appointment_user:
+            last_24_time = datetime.datetime.now() - datetime.timedelta(days=1)
+            if GeneralMatrixLeads.objects.filter(created_at__gte=last_24_time, phone_number=int(appointment_user.phone_number), lead_type__in=['DROPOFF', 'LABADS']).exists():
+
+                lead_engine_obj = lead_class_referance("CANCELDROPOFFLEADVIAAPPOINTMENT", appointment)
+                success = lead_engine_obj.process_lead()
+                if not success:
+                    print("Could not able to publish the lead to matrix for cancel dropoff for phone number %s" % str(appointment_user.phone_number))
 
         appointment_order = Order.objects.filter(product_id=order_product_id, reference_id=appointment_id).first()
         request_data = appointment.get_matrix_data(appointment_order, product_id, sub_product_id)

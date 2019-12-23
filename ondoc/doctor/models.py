@@ -275,6 +275,7 @@ class Hospital(auth_model.TimeStampedModel, auth_model.CreatedByModel, auth_mode
     search_url_locality_radius = models.FloatField(blank=True, null=True)
     search_url_sublocality_radius = models.FloatField( blank=True, null=True)
     google_ratings_count = models.PositiveIntegerField(null=True, blank=True)
+    enabled_for_gold = models.NullBooleanField()
 
     def __str__(self):
         return '{}-{}'.format(self.id, self.name)
@@ -302,29 +303,56 @@ class Hospital(auth_model.TimeStampedModel, auth_model.CreatedByModel, auth_mode
         return result
 
     @staticmethod
-    def get_top_hospitals_data(request, lat=28.450367, long=77.071848, vip_user=None, from_vip_page=False):
+    def get_top_hospitals_data(request, lat=28.450367, long=77.071848):
         from ondoc.api.v1.doctor.serializers import TopHospitalForIpdProcedureSerializer
         from ondoc.seo.models import NewDynamic
+        from numpy.distutils.fcompiler import str2bool
         result = []
+        query_params = request.query_params
+        try:
+            gold_request = str2bool(query_params.get('is_gold', 0))
+        except:
+            gold_request = 0
+
+        try:
+            vip_request = str2bool(query_params.get('is_vip', 0))
+        except:
+            vip_request = 0
+
         day = datetime.datetime.today().weekday()
-        common_hosp_queryset = CommonHospital.objects.all().prefetch_related('hospital', 'hospital__health_insurance_providers',
+        vip_user = None
+        common_hosp_queryset = CommonHospital.objects.prefetch_related('hospital', 'hospital__health_insurance_providers',
                                                                 'hospital__hospital_documents', 'hospital__imagehospital', 'hospital__network',
                                                                 'hospital__network__hospitalnetworkspeciality_set',
                                                                 'hospital__hospital_services', 'hospital__hosp_availability',
-                                                                'hospital__hospitalcertification_set', 'hospital__hospitalspeciality_set').order_by('priority')
+                                                                'hospital__hospitalcertification_set', 'hospital__hospitalspeciality_set')
 
-        if vip_user or from_vip_page:
+        if request.user.is_authenticated and not request.user.is_anonymous:
+            vip_user = request.user.active_plus_user
+
+        # if vip_user:
+        if gold_request:
+            common_hosp_queryset = common_hosp_queryset.filter(hospital__enabled_for_gold=True)
+        elif vip_request:
+            common_hosp_queryset = common_hosp_queryset.filter(hospital__enabled_for_plus_plans=True)
+        elif vip_user:
             common_hosp_queryset = common_hosp_queryset.filter(hospital__enabled_for_prepaid=True)
-        common_hosp_queryset = common_hosp_queryset[:20]
+
+        common_hosp_queryset = common_hosp_queryset.order_by('priority')[:20]
+        # common_hosp_queryset = common_hosp_queryset[:20]
 
         # common_hosp_percentage_dict = dict()
         # for data in common_hosp_queryset:
         #     common_hosp_percentage_dict[data.id] = data.percentage
 
-        plan = PlusPlans.objects.prefetch_related('plan_parameters', 'plan_parameters__parameter').filter(is_gold=True,
-                                                                                                          is_selected=True).first()
-        if not plan:
-            plan = PlusPlans.objects.prefetch_related('plan_parameters', 'plan_parameters__parameter').filter(is_gold=True).first()
+        plus_plans = PlusPlans.objects.prefetch_related('plan_parameters', 'plan_parameters__parameter').filter(is_gold=True)
+        selected_plus_plans = list(filter(lambda x: x.is_selected is True, plus_plans))
+        if selected_plus_plans:
+            plan = selected_plus_plans[0]
+        else:
+            plan = plus_plans.first()
+        # if not plan:
+        #     plan = PlusPlans.objects.prefetch_related('plan_parameters', 'plan_parameters__parameter').filter(is_gold=True).first()
 
         # if plan:
         #
@@ -3547,6 +3575,8 @@ class OpdAppointment(auth_model.TimeStampedModel, CouponsMixin, OpdAppointmentIn
                             # vip_dict = engine.validate_booking_entity(cost=doctor_clinic_timing.mrp)
                             vip_dict = engine.validate_booking_entity(cost=price, mrp=doctor_clinic_timing.mrp, deal_price=doctor_clinic_timing.deal_price)
                             amount_to_be_paid = vip_dict.get('amount_to_be_paid')
+                            convenience_charge = vip_dict.get('convenience_charge', 0)
+                            amount_to_be_paid += convenience_charge
                         else:
                             amount_to_be_paid = doctor_clinic_timing.deal_price
                     else:
@@ -3679,14 +3709,14 @@ class OpdAppointment(auth_model.TimeStampedModel, CouponsMixin, OpdAppointmentIn
             plus_user_resp = plus_user.validate_plus_appointment(data)
             cover_under_vip = plus_user_resp.get('cover_under_vip', False)
             vip_amount = plus_user_resp.get('vip_amount_deducted', None)
+            convenience_amount = plus_user_resp.get('vip_convenience_amount', 0)
 
         # if cover_under_vip and cart_data.get('cover_under_vip', None) and vip_amount > 0:
         if cover_under_vip and vip_amount > 0:
-            # convenience_amount = plus_user.plan.get_convenience_charge(cart_data.get('amount_to_be_paid'), "DOCTOR")
-            # effective_price = cart_data.get('amount_to_be_paid') + convenience_amount
-            # convenience_amount = plus_user.plan.get_convenience_charge(plus_user_resp.get('amount_to_be_paid'), "DOCTOR")
-            convenience_amount = PlusPlans.get_default_convenience_amount(price_data, "DOCTOR", default_plan_query=plus_user.plan)
-            effective_price = plus_user_resp.get('amount_to_be_paid') + convenience_amount
+            effective_price = plus_user_resp.get('amount_to_be_paid')
+            if not convenience_amount:
+                convenience_amount = PlusPlans.get_default_convenience_amount(price_data, "DOCTOR", default_plan_query=plus_user.plan)
+                effective_price = plus_user_resp.get('amount_to_be_paid') + convenience_amount
             if plus_user.plan.is_gold:
                 payment_type = OpdAppointment.GOLD
             else:
@@ -3697,6 +3727,7 @@ class OpdAppointment(auth_model.TimeStampedModel, CouponsMixin, OpdAppointmentIn
             cover_under_vip = False
             vip_amount = 0
 
+        utm_sbi_tags = data.get("utm_sbi_tags", {})
 
         return {
             "doctor": data.get("doctor"),
@@ -3725,7 +3756,8 @@ class OpdAppointment(auth_model.TimeStampedModel, CouponsMixin, OpdAppointmentIn
             "vip_convenience_amount": convenience_amount,
             "coupon_data": price_data.get("coupon_data"),
             "_responsible_user": data.get("_responsible_user", None),
-            "_source": data.get("_source", None)
+            "_source": data.get("_source", None),
+            "utm_sbi_tags": utm_sbi_tags
         }
 
     @staticmethod
@@ -4344,7 +4376,8 @@ class CommonMedicalCondition(auth_model.TimeStampedModel):
 class CommonSpecialization(auth_model.TimeStampedModel):
     specialization = models.OneToOneField('PracticeSpecialization', related_name="common_specialization", on_delete=models.CASCADE,
                                           null=True, blank=True)
-    icon = models.ImageField(upload_to='doctor/common_specialization_icons', null=True)
+    # icon = models.ImageField(upload_to='doctor/common_specialization_icons', null=True)
+    icon = models.FileField(upload_to='doctor/common_specialization_icons', blank=False, null=True, validators=[FileExtensionValidator(allowed_extensions=['jpg', 'jpeg', 'png', 'svg'])])
     priority = models.PositiveIntegerField(default=0)
 
     def __str__(self):
