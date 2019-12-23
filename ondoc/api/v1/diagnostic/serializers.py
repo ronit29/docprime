@@ -332,7 +332,7 @@ class AvailableLabTestPackageSerializer(serializers.ModelSerializer):
             # engine_response = engine.validate_booking_entity(cost=obj.mrp, id=obj.test.id)
             # resp['vip_convenience_amount'] = user.active_plus_user.plan.get_convenience_charge(price, "LABTEST")
             resp['vip_convenience_amount'] = PlusPlans.get_default_convenience_amount(price_data, "LABTEST", default_plan_query=user.active_plus_user.plan)
-            engine_response = engine.validate_booking_entity(cost=price, id=obj.test.id, mrp=obj.mrp, deal_price=deal_price)
+            engine_response = engine.validate_booking_entity(cost=price, id=obj.test.id, mrp=obj.mrp, deal_price=deal_price, price_engine_price=price)
             resp['covered_under_vip'] = engine_response['is_covered']
             resp['vip_amount'] = engine_response['amount_to_be_paid']
 
@@ -580,7 +580,7 @@ class AvailableLabTestSerializer(serializers.ModelSerializer):
             # engine_response = engine.validate_booking_entity(cost=obj.mrp, id=obj.test.id)
             # resp['vip_convenience_amount'] = user.active_plus_user.plan.get_convenience_charge(price, "LABTEST")
             resp['vip_convenience_amount'] = PlusPlans.get_default_convenience_amount(price_data, "LABTEST", default_plan_query=user.active_plus_user.plan)
-            engine_response = engine.validate_booking_entity(cost=price, id=obj.test.id, mrp=obj.mrp, deal_price=deal_price)
+            engine_response = engine.validate_booking_entity(cost=price, id=obj.test.id, mrp=obj.mrp, deal_price=deal_price, price_engine_price=price)
             resp['covered_under_vip'] = engine_response['is_covered']
             resp['vip_amount'] = engine_response['amount_to_be_paid']
 
@@ -866,7 +866,7 @@ class CommonPackageSerializer(serializers.ModelSerializer):
             # engine_response = engine.validate_booking_entity(cost=obj._selected_test.mrp, id=obj.package.id)
             # resp['vip_convenience_amount'] = user.active_plus_user.plan.get_convenience_charge(price, "LABTEST")
             resp['vip_convenience_amount'] = PlusPlans.get_default_convenience_amount(price_data, "LABTEST", default_plan_query=user.active_plus_user.plan)
-            engine_response = engine.validate_booking_entity(cost=price, id=obj.package.id, mrp=obj._selected_test.mrp, deal_price=deal_price)
+            engine_response = engine.validate_booking_entity(cost=price, id=obj.package.id, mrp=obj._selected_test.mrp, deal_price=deal_price, price_engine_price=price)
             resp['covered_under_vip'] = engine_response['is_covered']
             resp['vip_amount'] = engine_response['amount_to_be_paid']
 
@@ -1556,7 +1556,7 @@ class LabAppointmentCreateSerializer(serializers.Serializer):
         start_dt = (form_time_slot(data.get('start_date'), data.get('start_time')) if not data.get("time_slot_start") else data.get("time_slot_start"))
 
         if start_dt < timezone.now():
-            logger.error("Error 'Cannot book in past' for lab appointment with data - " + json.dumps(request.data))
+            # logger.error("Error 'Cannot book in past' for lab appointment with data - " + json.dumps(request.data))
             raise serializers.ValidationError("Cannot book in past")
 
         day_of_week = start_dt.weekday()
@@ -1591,7 +1591,7 @@ class LabAppointmentCreateSerializer(serializers.Serializer):
         start_dt = (form_time_slot(params.get('start_date'), params.get('start_time')))
 
         if start_dt < timezone.now():
-            logger.error("Error 'Cannot book in past' for lab appointment with data - " + json.dumps(request.data))
+            # logger.error("Error 'Cannot book in past' for lab appointment with data - " + json.dumps(request.data))
             raise serializers.ValidationError("Cannot book in past")
 
         day_of_week = start_dt.weekday()
@@ -1626,7 +1626,7 @@ class LabAppointmentCreateSerializer(serializers.Serializer):
         start_dt = (form_time_slot(params.get('start_date'), params.get('start_time')))
 
         if start_dt < timezone.now():
-            logger.error("Error 'Cannot book in past' for lab appointment with data - " + json.dumps(request.data))
+            # logger.error("Error 'Cannot book in past' for lab appointment with data - " + json.dumps(request.data))
             raise serializers.ValidationError("Cannot book in past")
 
         day_of_week = start_dt.weekday()
@@ -2154,7 +2154,7 @@ class CustomLabTestPackageSerializer(serializers.ModelSerializer):
             # resp['vip_convenience_amount'] = user.active_plus_user.plan.get_convenience_charge(price, "LABTEST")
             resp['vip_convenience_amount'] = PlusPlans.get_default_convenience_amount(price_data, "LABTEST", default_plan_query=user.active_plus_user.plan)
             # engine_response = engine.validate_booking_entity(cost=obj.mrp, id=obj.id)
-            engine_response = engine.validate_booking_entity(cost=price, id=obj.id, mrp=mrp, deal_price=deal_price)
+            engine_response = engine.validate_booking_entity(cost=price, id=obj.id, mrp=mrp, deal_price=deal_price, price_engine_price=price)
             resp['covered_under_vip'] = engine_response['is_covered']
             resp['vip_amount'] = engine_response['amount_to_be_paid']
 

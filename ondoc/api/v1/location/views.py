@@ -450,7 +450,7 @@ class DoctorProfileFooter(Footer):
                 response['menu'].append({'sub_heading': '%s in nearby localities' % (self.specialization + 's'),
                                              'url_list': specialist_in_nearby_localities})
 
-        if self.sublocality_id and self.sublocality and self.locality:
+        if self.sublocality and self.locality:
             top_specialities_in_locality = self.specialist_in_locality()
             if top_specialities_in_locality:
                 response['menu'].append(
@@ -469,13 +469,20 @@ class DoctorProfileFooter(Footer):
         return response
 
     def specialist_in_locality(self):
-
         query = ''' select eu.url, concat(eu.specialization,'s in ', eu.sublocality_value, ', ',  eu.locality_value) title from seo_specialization ss 
-                       inner join entity_urls eu on ss.specialization_id = eu.specialization_id 
-                       and eu.sublocality_id=%s and eu.sitemap_identifier='SPECIALIZATION_LOCALITY_CITY' 
-                       and eu.is_valid=True order by count desc limit 10'''
+                               inner join entity_urls eu on ss.specialization_id = eu.specialization_id 
+                               and lower(eu.sublocality_value) like %s and eu.sitemap_identifier='SPECIALIZATION_LOCALITY_CITY' 
+                               and eu.is_valid=True order by count desc limit 10'''
 
-        return self.get_urls(query, [self.sublocality_id])
+        return self.get_urls(query, [self.sublocality])
+
+
+        # query = ''' select eu.url, concat(eu.specialization,'s in ', eu.sublocality_value, ', ',  eu.locality_value) title from seo_specialization ss
+        #                inner join entity_urls eu on ss.specialization_id = eu.specialization_id
+        #                and eu.sublocality_id=%s and eu.sitemap_identifier='SPECIALIZATION_LOCALITY_CITY'
+        #                and eu.is_valid=True order by count desc limit 10'''
+        #
+        # return self.get_urls(query, [self.sublocality_id])
     #
     # def specialist_in_city(self):
     #
@@ -560,7 +567,7 @@ class DoctorLocalityCityFooter(Footer):
                 response['menu'].append({'sub_heading': 'Doctors in nearby localities',
                                              'url_list': doctors_in_nearby_popular_localities})
 
-        if self.sublocality_id and self.sublocality and self.locality:
+        if self.sublocality and self.locality:
             popular_doctors_in_locality = self.doctors_in_locality()
             if popular_doctors_in_locality:
                 response['menu'].append(
@@ -579,13 +586,19 @@ class DoctorLocalityCityFooter(Footer):
         return response
 
     def doctors_in_locality(self):
-
         query = ''' select eu.url, concat('Best ', eu.specialization,'s in ', eu.sublocality_value, ', ',  eu.locality_value) title from seo_specialization ss 
-                           inner join entity_urls eu on ss.specialization_id = eu.specialization_id 
-                           and eu.sublocality_id=%s and eu.sitemap_identifier='SPECIALIZATION_LOCALITY_CITY' 
-                           and eu.is_valid=True and eu.locality_value iLIKE %s order by count desc limit 10'''
+                                   inner join entity_urls eu on ss.specialization_id = eu.specialization_id 
+                                   and eu.sublocality_value  like %s and eu.sitemap_identifier='SPECIALIZATION_LOCALITY_CITY' 
+                                   and eu.is_valid=True and eu.locality_value iLIKE %s order by count desc limit 10'''
 
-        return self.get_urls(query, [self.sublocality_id, self.locality])
+        return self.get_urls(query, [self.sublocality, self.locality])
+
+        # query = ''' select eu.url, concat('Best ', eu.specialization,'s in ', eu.sublocality_value, ', ',  eu.locality_value) title from seo_specialization ss
+        #                    inner join entity_urls eu on ss.specialization_id = eu.specialization_id
+        #                    and eu.sublocality_id=%s and eu.sitemap_identifier='SPECIALIZATION_LOCALITY_CITY'
+        #                    and eu.is_valid=True and eu.locality_value iLIKE %s order by count desc limit 10'''
+        #
+        # return self.get_urls(query, [self.sublocality_id, self.locality])
 
     # def doctors_in_top_city(self):
     #     result = []

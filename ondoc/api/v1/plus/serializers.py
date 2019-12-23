@@ -195,7 +195,7 @@ class PlusMembersDocumentSerializer(serializers.Serializer):
 
 class PlusMemberListSerializer(serializers.Serializer):
     id = serializers.IntegerField(allow_null=True, required=False)
-    title = serializers.ChoiceField(choices=PlusMembers.TITLE_TYPE_CHOICES, required=False)
+    title = serializers.ChoiceField(choices=PlusMembers.TITLE_TYPE_CHOICES, required=False, allow_blank=True, allow_null=True)
     first_name = serializers.CharField(max_length=50)
     last_name = serializers.CharField(max_length=50, allow_blank=True, allow_null=True)
     dob = serializers.DateField()
@@ -289,6 +289,7 @@ class PlusUserSerializer(serializers.Serializer):
     expire_date = serializers.DateTimeField()
     order = serializers.PrimaryKeyRelatedField(queryset=account_models.Order.objects.all())
     coupon = serializers.ListField(child=serializers.IntegerField(), required=False, default=[])
+    random_coupon_list = serializers.ListField(child=serializers.CharField(), required=False, default=[])
 
 
 class PlusUserModelSerializer(serializers.ModelSerializer):
