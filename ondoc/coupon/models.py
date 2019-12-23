@@ -53,7 +53,7 @@ class Coupon(auth_model.TimeStampedModel):
     step_count = models.PositiveIntegerField(verbose_name="Valid only at multiples of this appointment number", default=1, validators=[MinValueValidator(1)], blank=True, null=True)
     description = models.CharField(max_length=500, default="")
     heading = models.CharField(max_length=500, default="")
-    tnc = models.CharField(max_length=2000, default="")
+    tnc = models.TextField(default="", null=True, blank=True)
     lab_network = models.ForeignKey("diagnostic.LabNetwork", on_delete=models.CASCADE, blank=True, null=True)
     lab = models.ForeignKey("diagnostic.Lab", on_delete=models.CASCADE, blank=True, null=True)
     test = models.ManyToManyField("diagnostic.LabTest", blank=True)

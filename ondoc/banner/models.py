@@ -18,7 +18,7 @@ from ondoc.doctor.models import OpdAppointment
 from ondoc.notification.models import NotificationAction
 from django.contrib.postgres.fields import ArrayField
 from multiselectfield import MultiSelectField
-
+from ondoc.api.v1 import utils as v1_utils
 
 class SliderLocation(models.Model):
     name = models.CharField(max_length=1000, null=True, default='Home_Page')
@@ -164,7 +164,7 @@ class Banner(auth_model.TimeStampedModel):
     gold_check = models.CharField(max_length=100, null=False, blank=False, choices=gold_choices, default='all')
     app_screen = models.CharField(max_length=1000, null=True, blank=True)
     app_params = JSONField(null=True, blank=True)
-
+    body = models.CharField(blank=True, null=True, max_length=200000)
 
     def __str__(self):
         return self.title
@@ -184,9 +184,9 @@ class Banner(auth_model.TimeStampedModel):
 
 
     @staticmethod
-    def get_all_banners(request, latitude=None, longitude=None, from_app=False):
-
-        queryset = Banner.objects.prefetch_related('banner_location','location').filter(enable=True).filter(Q(start_date__lte=timezone.now()) | Q(start_date__isnull=True)).filter(Q(end_date__gte=timezone.now()) | Q(end_date__isnull=True)).order_by('-priority')[:100]
+    def get_all_banners(request, latitude=None, longitude=None, from_app=False, queryset=None):
+        if not queryset:
+            queryset = Banner.objects.prefetch_related('banner_location','location').filter(enable=True).filter(Q(start_date__lte=timezone.now()) | Q(start_date__isnull=True)).filter(Q(end_date__gte=timezone.now()) | Q(end_date__isnull=True)).order_by('-priority')[:100]
         #queryset = Banner.objects.filter(enable=True)
         slider_locate = dict(Banner.slider_location)
         final_result = []
@@ -286,6 +286,7 @@ class Banner(auth_model.TimeStampedModel):
 
                     resp['url_details'] = qd
                 resp['image'] = request.build_absolute_uri(data.image.url)
+                resp['body'] = data.body
 
                 final_result.append(resp)
 
