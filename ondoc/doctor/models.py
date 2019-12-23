@@ -1784,6 +1784,7 @@ class DoctorClinicTiming(auth_model.TimeStampedModel):
     cod_deal_price = models.PositiveSmallIntegerField(blank=True, null=True)
     insurance_fees = models.PositiveSmallIntegerField(blank=True, null=True)
     custom_deal_price = models.PositiveSmallIntegerField(blank=True, null=True)
+    convenience_pricing = JSONField(null=True)
     # followup_duration = models.PositiveSmallIntegerField(blank=False, null=True)
     # followup_charges = models.PositiveSmallIntegerField(blank=False, null=True)
 
