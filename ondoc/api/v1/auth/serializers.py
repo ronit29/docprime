@@ -399,45 +399,47 @@ class RefreshJSONWebTokenSerializer(serializers.Serializer):
         token = attrs.get('token')
         reset = attrs.get('reset')
         request = self.context.get('request')
-        if token:
-            payload, status = self.check_payload_v2(token)
-            if status == 1:
-                '''FAke Refresh, Return the original data [As required]'''
-                return {
-                        'token': token,
-                        'user': payload.get('user_id'),
-                        'payload': payload
-                }
-            elif status == 0 and reset:
-                try:
-                    passphrase = hashlib.md5("hpDqwzdpoQY8ymm5".encode())
-                    passphrase = passphrase.hexdigest()[:16]
-                    decrypt = v1_utils.AES_encryption.decrypt(reset.encode(), passphrase)
-                    if decrypt and isinstance(decrypt, tuple):
-                        decrypt = decrypt[0]
-                        data = v1_utils.AES_encryption.unpad(decrypt)
-                except Exception as e:
-                    logger.error("Failed to decrypt data " + str(e))
-                    raise serializers.ValidationError('Failed to decrypt!')
-                get_date = data.split('.')
-                if len(get_date) > 1:
-                    uid = get_date[0]
-                    date_generated = get_date[1]
-                    time_format = '%Y-%m-%d %H:%M:%S'
-                    date_generated = datetime.datetime.fromtimestamp(int(date_generated)).strftime(time_format)
+        payload, status = self.check_payload_v2(token)
+        uid = payload if status == 0 else payload.get('user_id')
+        if not WhiteListedLoginTokens.objects.filter(token=token, user_id=uid).exists():
+            raise serializers.ValidationError("No Last Active sesssion found!")
+        if status == 1:
+            '''FAke Refresh, Return the original data [As required]'''
+            return {
+                    'token': token,
+                    'user': payload.get('user_id'),
+                    'payload': payload
+            }
+        elif status == 0 and reset:
+            try:
+                passphrase = hashlib.md5("hpDqwzdpoQY8ymm5".encode())
+                passphrase = passphrase.hexdigest()[:16]
+                decrypt = v1_utils.AES_encryption.decrypt(reset.encode(), passphrase)
+                if decrypt and isinstance(decrypt, tuple):
+                    decrypt = decrypt[0]
+                    data = v1_utils.AES_encryption.unpad(decrypt)
+            except Exception as e:
+                logger.error("Failed to decrypt data " + str(e))
+                raise serializers.ValidationError('Failed to decrypt!')
+            get_date = data.split('.')
+            if len(get_date) > 1:
+                uid = get_date[0]
+                date_generated = get_date[1]
+                time_format = '%Y-%m-%d %H:%M:%S'
+                date_generated = datetime.datetime.fromtimestamp(int(date_generated)).strftime(time_format)
 
-                    time_elapsed = v1_utils.get_time_delta_in_minutes(date_generated)
-                    if time_elapsed > 2:
-                        raise serializers.ValidationError('Reset Key Expired')
-                    else:
-                        user = User.objects.filter(id=uid).first()
-                        blacllist_token = WhiteListedLoginTokens.objects.filter(token=token, user=user).delete()
-                        token_object = JWTAuthentication.generate_token(user, request)
-                        return {
-                            'token': token_object['token'],
-                            'user': user,
-                            'payload': token_object['payload']
-                        }
+                time_elapsed = v1_utils.get_time_delta_in_minutes(date_generated)
+                if time_elapsed > 2:
+                    raise serializers.ValidationError('Reset Key Expired')
+                else:
+                    user = User.objects.filter(id=uid).first()
+                    blacllist_token = WhiteListedLoginTokens.objects.filter(token=token, user=user).delete()
+                    token_object = JWTAuthentication.generate_token(user, request)
+                    return {
+                        'token': token_object['token'],
+                        'user': user,
+                        'payload': token_object['payload']
+                    }
 
         payload = self.check_payload_custom(token=token)
         user = self.check_user_custom(payload=payload)
@@ -522,7 +524,7 @@ class RefreshJSONWebTokenSerializer(serializers.Serializer):
             payload = jwt.decode(token, user_key)
         except jwt.ExpiredSignature:
             msg = ('Token has expired.')
-            return msg, 0
+            return user_id, 0
         return payload, 1
 
 

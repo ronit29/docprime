@@ -88,6 +88,7 @@ def expire_otp(phone_number):
 
 class LoginOTP(GenericViewSet):
 
+    authentication_classes = []
     serializer_class = serializers.OTPSerializer
 
     @transaction.atomic
