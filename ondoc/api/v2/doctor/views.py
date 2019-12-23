@@ -505,7 +505,7 @@ class DoctorBlockCalendarViewSet(viewsets.GenericViewSet):
         if not doctor_id and hospital_id:
             # For all the doctor leaves in a hospital
             hospital = validated_data.get('hospital_id')
-            doctor_clinics = DoctorClinic.objects.filter(hospital=hospital.id)
+            doctor_clinics = DoctorClinic.objects.filter(hospital=hospital.id, hospital__is_live=True,doctor__is_live=True)
             for doctor_clinic in doctor_clinics:
                 doctor_leave_data.append(self.create_leave_data(hospital.id,doctor_clinic.doctor.id, validated_data, start_time, end_time))
         else:
