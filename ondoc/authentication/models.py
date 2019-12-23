@@ -358,7 +358,7 @@ class User(AbstractBaseUser, PermissionsMixin):
         return inactive_plus_user if inactive_plus_user else None
 
     @classmethod
-    def get_external_login_data(cls, data):
+    def get_external_login_data(cls, data, request=None):
         from ondoc.authentication.backends import JWTAuthentication
         profile_data = {}
         source = data.get('extra').get('utm_source', 'External') if data.get('extra') else 'External'
@@ -418,7 +418,7 @@ class User(AbstractBaseUser, PermissionsMixin):
             profile_data.pop('hospital', None)
             UserProfile.objects.create(**profile_data)
 
-        token_object = JWTAuthentication.generate_token(user)
+        token_object = JWTAuthentication.generate_token(user, request)
         result = dict()
         result['token'] = token_object
         result['user_id'] = user.id

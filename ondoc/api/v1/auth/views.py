@@ -2858,7 +2858,7 @@ class MatrixUserViewset(GenericViewSet):
         if not hospital:
             return Response({'error': "Invalid Hospital ID"}, status=status.HTTP_400_BAD_REQUEST)
         try:
-            user_data = User.get_external_login_data(data)
+            user_data = User.get_external_login_data(data, request)
         except Exception as e:
             logger.error(str(e))
             return Response({'error': str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
@@ -2894,7 +2894,7 @@ class ExternalLoginViewSet(GenericViewSet):
         serializer.is_valid(raise_exception=True)
         data = serializer.validated_data
         redirect_type = data.get('redirect_type')
-        user_data = User.get_external_login_data(data)
+        user_data = User.get_external_login_data(data, request)
         token_object = user_data.get('token', None)
         if not token_object or not user_data:
             return Response({'error': 'Unauthorise'}, status=status.HTTP_400_BAD_REQUEST)
@@ -2949,7 +2949,7 @@ class PGRefundViewset(viewsets.GenericViewSet):
         serializer.is_valid(raise_exception=True)
         data = serializer.validated_data
         try:
-            user_data = User.get_external_login_data(data)
+            user_data = User.get_external_login_data(data, request)
         except Exception as e:
             logger.error(str(e))
             return Response({'error': str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
