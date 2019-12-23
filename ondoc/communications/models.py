@@ -1154,6 +1154,9 @@ class WHTSAPPNotification:
             if receiver_user and receiver_user.user_type == User.CONSUMER and not instance.profile.whatsapp_optin:
                 continue
 
+            if not receiver_user:
+                continue
+
             template, data = self.get_template_and_data(receiver_user)
 
             undesired_params = list(filter(lambda param: not param, data))
@@ -1512,7 +1515,7 @@ class EMAILNotification:
         if not context:
             return
         for receiver in receivers:
-            template = self.get_template(receiver.get('user'))
+            template = self.get_template(receiver.get('user')) if receiver.get('user') else None
             if template:
                 self.trigger(receiver, template, context)
 
