@@ -196,15 +196,6 @@ class UserViewset(GenericViewSet):
             logger.error(str(e))
 
     @transaction.atomic
-    def logout(self, request):
-        required_token = request.data.get("token", None)
-        if required_token and request.user.is_authenticated:
-            NotificationEndpoint.objects.filter(user=request.user, token=request.data.get("token")).delete()
-            WhiteListedLoginTokens.objects.filter(token=required_token, user=request.user).delete()
-
-        return Response({"message": "success"})
-
-    @transaction.atomic
     def register(self, request, format=None):
 
         data = {'phone_number':request.data.get('phone_number'),'otp':request.data.get('otp')}
@@ -229,6 +220,13 @@ class UserViewset(GenericViewSet):
         }
         return Response(response)
 
+    @transaction.atomic
+    def logout(self, request):
+        required_token = request.data.get("token", None)
+        if required_token and request.user.is_authenticated:
+            NotificationEndpoint.objects.filter(user=request.user, token=request.data.get("token")).delete()
+        WhiteListedLoginTokens.objects.filter(token=required_token).delete()
+        return Response({"message": "success"})
 
     @transaction.atomic
     def doctor_login(self, request, format=None):
@@ -2293,7 +2291,6 @@ class ConsumerAccountRefundViewSet(GenericViewSet):
 class RefreshJSONWebToken(GenericViewSet):
 
     authentication_classes = []
-
     def refresh(self, request):
         data = {}
         serializer = serializers.RefreshJSONWebTokenSerializer(data=request.data, context={'request': request})
