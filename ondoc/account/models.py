@@ -268,6 +268,8 @@ class Order(TimeStampedModel):
             serializer.is_valid(raise_exception=True)
             appointment_data = serializer.validated_data
             if appointment_data['payment_type'] in [OpdAppointment.VIP, OpdAppointment.GOLD]:
+                if not appointment_data.get('plus_plan'):
+                    raise Exception('Plus plan not found.')
                 if appointment_data['plus_amount'] > 0:
                     payment_not_required = False
                 else:
@@ -288,7 +290,9 @@ class Order(TimeStampedModel):
                 payment_not_required = True
             elif appointment_data['payment_type'] == OpdAppointment.INSURANCE:
                 payment_not_required = True
-            elif appointment_data['payment_type'] == OpdAppointment.VIP:
+            elif appointment_data['payment_type'] in [OpdAppointment.VIP, OpdAppointment.GOLD]:
+                if not appointment_data.get('plus_plan'):
+                    raise Exception('Plus plan not found.')
                 if appointment_data['plus_amount'] > 0:
                     payment_not_required = False
                 else:
