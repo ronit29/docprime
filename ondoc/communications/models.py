@@ -649,7 +649,7 @@ class WHTSAPPNotification:
         # if notification_type == NotificationAction.APPOINTMENT_ACCEPTED or \
         #         notification_type == NotificationAction.OPD_OTP_BEFORE_APPOINTMENT:
 
-        if notification_type == NotificationAction.PROVIDER_OPD_APPOINTMENT_COMPLETION_ONLINE_PAYMENT:
+        if notification_type == NotificationAction.PROVIDER_OPD_APPOINTMENT_COMPLETION_ONLINE_PAYMENT and user:
             body_template = "appointment_completion_prepaid"
 
             data.append(self.context.get('doctor_name'))
@@ -660,7 +660,7 @@ class WHTSAPPNotification:
             context, click_login_token_obj = sms_obj.save_token_to_context(self.context, user)
             data.append(context['provider_login_url'])
 
-        elif notification_type == NotificationAction.PROVIDER_OPD_APPOINTMENT_COMPLETION_PAY_AT_CLINIC:
+        elif notification_type == NotificationAction.PROVIDER_OPD_APPOINTMENT_COMPLETION_PAY_AT_CLINIC and user:
             body_template = "appointment_completion_cod"
 
             data.append(self.context.get('doctor_name'))
@@ -675,7 +675,7 @@ class WHTSAPPNotification:
             context, click_login_token_obj = sms_obj.save_token_to_context(self.context, user)
             data.append(context['provider_login_url'])
 
-        elif notification_type == NotificationAction.PROVIDER_OPD_APPOINTMENT_CONFIRMATION_ONLINE_PAYMENT:
+        elif notification_type == NotificationAction.PROVIDER_OPD_APPOINTMENT_CONFIRMATION_ONLINE_PAYMENT and user:
             body_template = "appointment_confirmation_online_payment"
 
             data.append(self.context.get('doctor_name'))
@@ -687,7 +687,7 @@ class WHTSAPPNotification:
             context, click_login_token_obj = sms_obj.save_token_to_context(self.context, user)
             data.append(context['provider_login_url'])
 
-        elif notification_type == NotificationAction.PROVIDER_OPD_APPOINTMENT_CONFIRMATION_PAY_AT_CLINIC:
+        elif notification_type == NotificationAction.PROVIDER_OPD_APPOINTMENT_CONFIRMATION_PAY_AT_CLINIC and user:
             body_template = "appointment_confirmation_pay_at_clinic"
 
             data.append(self.context.get('doctor_name'))
@@ -700,7 +700,7 @@ class WHTSAPPNotification:
             context, click_login_token_obj = sms_obj.save_token_to_context(self.context, user)
             data.append(context['provider_login_url'])
 
-        elif notification_type == NotificationAction.PROVIDER_LAB_APPOINTMENT_CONFIRMATION_ONLINE_PAYMENT:
+        elif notification_type == NotificationAction.PROVIDER_LAB_APPOINTMENT_CONFIRMATION_ONLINE_PAYMENT and user:
             body_template = "appointment_completion_prepaid"
 
             data.append(self.context.get('lab_name'))
@@ -1152,9 +1152,6 @@ class WHTSAPPNotification:
 
             instance = self.context.get('instance')
             if receiver_user and receiver_user.user_type == User.CONSUMER and not instance.profile.whatsapp_optin:
-                continue
-
-            if not receiver_user:
                 continue
 
             template, data = self.get_template_and_data(receiver_user)
