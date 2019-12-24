@@ -1894,6 +1894,24 @@ class LabAppointmentRetrieveSerializer(LabAppointmentModelSerializer):
     mask_data = serializers.SerializerMethodField()
     selected_timings_type = serializers.SerializerMethodField()
     appointment_via_sbi = serializers.SerializerMethodField()
+    gold = serializers.SerializerMethodField()
+
+    def get_gold(self, obj):
+        from ondoc.api.v1.plus.serializers import PlusUserModelSerializer
+        request = self.context.get('request')
+        data = {'is_gold': False, 'members': [], 'is_single_flow': False}
+
+        plus_plan = obj.plus_plan
+        if plus_plan:
+            data['is_gold'] = plus_plan.plan.is_gold
+            data['members'] = PlusUserModelSerializer(plus_plan, context={'request': request}).data
+
+            appointment_order = Order.objects.filter(reference_id=obj.id).first()
+            if appointment_order and appointment_order.single_booking:
+                data['is_single_flow'] = True
+
+        return data
+
 
     def get_mask_data(self, obj):
         mask_number = obj.mask_number.first()
@@ -1957,7 +1975,7 @@ class LabAppointmentRetrieveSerializer(LabAppointmentModelSerializer):
                   'time_slot_start', 'time_slot_end', 'selected_timings_type', 'is_rated', 'rating_declined', 'is_home_pickup', 'lab_thumbnail',
                   'lab_image', 'profile', 'allowed_action', 'lab_test', 'lab', 'otp', 'address', 'type', 'reports',
                   'report_files', 'invoices', 'prescription', 'cancellation_reason', 'mask_data', 'payment_type',
-                  'price', 'appointment_via_sbi')
+                  'price', 'appointment_via_sbi', 'gold')
 
 
 class DoctorLabAppointmentRetrieveSerializer(LabAppointmentModelSerializer):
