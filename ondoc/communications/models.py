@@ -1512,7 +1512,7 @@ class EMAILNotification:
         if not context:
             return
         for receiver in receivers:
-            template = self.get_template(receiver.get('user')) if receiver.get('user') else None
+            template = self.get_template(receiver.get('user'))
             if template:
                 self.trigger(receiver, template, context)
 
