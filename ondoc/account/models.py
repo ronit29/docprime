@@ -35,7 +35,7 @@ from django.contrib.contenttypes.models import ContentType
 import string
 import random
 import decimal
-
+from django.conf import settings
 from ondoc.plus.enums import UtilizationCriteria
 
 logger = logging.getLogger(__name__)
@@ -2879,8 +2879,8 @@ class PayoutMapping(TimeStampedModel):
 
 
 class UserReferrals(TimeStampedModel):
-    SIGNUP_CASHBACK = 50
-    COMPLETION_CASHBACK = 50
+    SIGNUP_CASHBACK = settings.REFERRAL_CASHBACK_AMOUNT
+    COMPLETION_CASHBACK = settings.REFERRAL_CASHBACK_AMOUNT
 
     code = models.CharField(max_length=10, unique=True)
     user = models.ForeignKey(User, on_delete=models.DO_NOTHING, unique=True, related_name='referral')
