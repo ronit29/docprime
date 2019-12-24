@@ -1727,7 +1727,7 @@ class ConsumerAccount(TimeStampedModel):
         consumer_account = cls.objects.get_or_create(user=user)
         consumer_account = cls.objects.select_for_update().get(user=user)
 
-        consumer_account.cashback += cashback_amount
+        consumer_account.cashback += int(cashback_amount)
         action = ConsumerTransaction.REFERRAL_CREDIT
         tx_type = PgTransaction.CREDIT
         consumer_tx_data = consumer_account.consumer_tx_appointment_data(user, None, product_id, cashback_amount,
