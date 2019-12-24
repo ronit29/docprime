@@ -2296,7 +2296,7 @@ class RefreshJSONWebToken(GenericViewSet):
         serializer = serializers.RefreshJSONWebTokenSerializer(data=request.data, context={'request': request})
         # serializer.is_valid(raise_exception=True)
         if not serializer.is_valid():
-            return Response({"error": "Cannot Refresh Token"}, status=status.HTTP_401_UNAUTHORIZED)
+            return Response({"error": "Cannot Refresh Token"}, status=status.HTTP_400_BAD_REQUEST)
         data['token'] = serializer.validated_data['token']
         data['payload'] = serializer.validated_data['payload']
         return Response(data)
