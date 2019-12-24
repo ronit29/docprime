@@ -182,7 +182,7 @@ class UserViewset(GenericViewSet):
             "user_exists": user_exists,
             "user_id": user.id,
             "token": token_object['token'],
-            "expiration_time": token_object['payload']['exp']
+            "exp": token_object['payload']['exp']
         }
         return Response(response)
 
