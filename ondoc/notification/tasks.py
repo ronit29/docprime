@@ -69,11 +69,11 @@ def send_lab_notifications_refactored(data, *args, **kwargs):
                                                       NotificationAction.LAB_APPOINTMENT_RESCHEDULED_BY_PATIENT):
             lab_notification.send(is_valid_for_provider)
         else:
-            notification_type = lab_notification.notification_type
-            receivers = lab_notification.get_receivers(is_valid_for_provider)
-            from ondoc.communications.models import SMSNotification
-            sms_notification = SMSNotification(notification_type, context)
-            sms_notification.send(receivers.get('sms_receivers', []))
+            # notification_type = lab_notification.notification_type
+            # receivers = lab_notification.get_receivers(is_valid_for_provider)
+            # from ondoc.communications.models import SMSNotification
+            # sms_notification = SMSNotification(notification_type, context)
+            # sms_notification.send(receivers.get('sms_receivers', []))
 
             content_type = ContentType.objects.get_for_model(instance)
             mask_no_obj = AppointmentMaskNumber.objects.filter(object_id=instance.id, content_type_id=content_type.id)
