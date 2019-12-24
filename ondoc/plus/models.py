@@ -1000,10 +1000,13 @@ class PlusUser(auth_model.TimeStampedModel, RefundMixin, TransactionMixin, Coupo
 
     def after_commit_tasks(self, *args, **kwargs):
         from ondoc.api.v1.plus.plusintegration import PlusIntegration
+        from ondoc.account.models import  UserReferred, Order
+
         if kwargs.get('is_fresh'):
             PlusIntegration.create_vip_lead_after_purchase(self)
             PlusIntegration.assign_coupons_to_user_after_purchase(self)
-    
+            UserReferred.credit_after_completion(self.user, self, Order.GOLD_PRODUCT_ID)
+
     def process_cancellation(self):
         from ondoc.doctor.models import OpdAppointment
         from ondoc.diagnostic.models import LabAppointment

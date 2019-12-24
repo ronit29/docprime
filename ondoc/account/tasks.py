@@ -644,7 +644,7 @@ def update_convenience_charge():
     engine.send("Job Started", 9871047545, False)
 
     chunk_size = 1000
-    gold_plans = list(PlusPlans.objects.filter(is_gold=True, is_live=True, enabled=True))
+    gold_plans = list(PlusPlans.objects.filter(is_gold=True))
 
     # Update AvailableLabTest convenience_charge
 
@@ -692,8 +692,8 @@ def update_convenience_charge():
 
     start = 0
     for c, upper in enumerate(to_loop):
-        qs = DoctorClinicTiming.objects.filter(id__gte=start, id__lte=upper).all()
-
+        qs = DoctorClinicTiming.objects.filter(id__gte=start, id__lt=upper).all()
+        print(start, upper)
         for doctor_clinic_timing_obj in qs:
             price_structure = {}
             price_data = {"mrp": doctor_clinic_timing_obj.mrp, "deal_price": doctor_clinic_timing_obj.deal_price,
