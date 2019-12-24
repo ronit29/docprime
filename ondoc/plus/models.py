@@ -1000,10 +1000,13 @@ class PlusUser(auth_model.TimeStampedModel, RefundMixin, TransactionMixin, Coupo
 
     def after_commit_tasks(self, *args, **kwargs):
         from ondoc.api.v1.plus.plusintegration import PlusIntegration
+        from ondoc.account.models import  UserReferred, Order
+
         if kwargs.get('is_fresh'):
             PlusIntegration.create_vip_lead_after_purchase(self)
             PlusIntegration.assign_coupons_to_user_after_purchase(self)
-    
+            UserReferred.credit_after_completion(self.user, self, Order.GOLD_PRODUCT_ID)
+
     def process_cancellation(self):
         from ondoc.doctor.models import OpdAppointment
         from ondoc.diagnostic.models import LabAppointment
@@ -1486,7 +1489,8 @@ class TempPlusUser(auth_model.TimeStampedModel):
             # price_data = {"mrp": int(price_data.get('mrp')), "deal_price": int(deal_price),
             #               "cod_deal_price": int(cod_deal_price),
             #               "fees": int(fees)}
-            response_dict['vip_convenience_amount'] = PlusPlans.get_default_convenience_amount(price_data, "DOCTOR", plus_user.plan)
+            vip_convenience_amount = PlusPlans.get_default_convenience_amount(price_data, "DOCTOR", plus_user.plan)
+            response_dict['vip_convenience_amount'] = vip_convenience_amount
             price_engine = get_price_reference(plus_user, "DOCTOR")
             if not price_engine:
                 price = int(price_data.get('mrp'))
@@ -1508,6 +1512,7 @@ class TempPlusUser(auth_model.TimeStampedModel):
 
                 # discount calculation on amount to be paid
                 amount_to_be_paid = engine_response.get('amount_to_be_paid', mrp)
+                amount_to_be_paid += vip_convenience_amount
                 response_dict['amount_to_be_paid'] = amount_to_be_paid
                 # coupon_discount, coupon_cashback, coupon_list, random_coupon_list = Coupon.get_total_deduction(appointment_data, amount_to_be_paid)
                 coupon_discount, coupon_cashback, coupon_list, random_coupon_list = 0, 0, [], []
@@ -1559,6 +1564,7 @@ class TempPlusUser(auth_model.TimeStampedModel):
 
                     # discount calculation on amount to be paid
                     amount_to_be_paid = engine_response.get('amount_to_be_paid', final_price)
+                    amount_to_be_paid += calculated_convenience_amount
                     # coupon_discount, coupon_cashback, coupon_list, random_coupon_list = Coupon.get_total_deduction(appointment_data, price + calculated_convenience_amount)
                     coupon_discount, coupon_cashback, coupon_list, random_coupon_list = 0, 0, [], []
                     if coupon_discount >= amount_to_be_paid:
