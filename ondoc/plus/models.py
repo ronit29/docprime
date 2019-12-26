@@ -548,7 +548,7 @@ class PlusUser(auth_model.TimeStampedModel, RefundMixin, TransactionMixin, Coupo
         OPD = "OPD"
         LAB = "LAB"
         appointment_type = OPD if "doctor" in appointment_data else LAB
-        price_data = OpdAppointment.get_price_details(appointment_data) if appointment_type == OPD else LabAppointment.get_price_details(appointment_data)
+        price_data = OpdAppointment.get_price_details(appointment_data, self) if appointment_type == OPD else LabAppointment.get_price_details(appointment_data, self)
         mrp = int(price_data.get('mrp'))
         response_dict = {
             "is_vip_member": False,
@@ -590,7 +590,13 @@ class PlusUser(auth_model.TimeStampedModel, RefundMixin, TransactionMixin, Coupo
             # price_data = {"mrp": int(price_data.get('mrp')), "deal_price": int(deal_price),
             #               "cod_deal_price": int(cod_deal_price),
             #               "fees": int(fees)}
-            response_dict['vip_convenience_amount'] = PlusPlans.get_default_convenience_amount(price_data, "DOCTOR", plus_user.plan)
+
+            calculated_convenience_amount = price_data.get('total_convenience_charge')
+            if calculated_convenience_amount is None:
+                calculated_convenience_amount = PlusPlans.get_default_convenience_amount(price_data, "DOCTOR",
+                                                                                         plus_user.plan)
+
+            response_dict['vip_convenience_amount'] = calculated_convenience_amount
             price_engine = get_price_reference(plus_user, "DOCTOR")
             if not price_engine:
                 price = int(price_data.get('mrp'))
@@ -612,9 +618,9 @@ class PlusUser(auth_model.TimeStampedModel, RefundMixin, TransactionMixin, Coupo
 
                 # discount calculation on amount to be paid
                 amount_to_be_paid = engine_response.get('amount_to_be_paid', mrp)
-                convenience_charge = engine_response.get('convenience_charge', 0)
-                amount_to_be_paid += convenience_charge
-                response_dict['vip_convenience_amount'] = convenience_charge
+                # convenience_charge = calculated_convenience_amount
+                amount_to_be_paid += calculated_convenience_amount
+                response_dict['vip_convenience_amount'] = calculated_convenience_amount
                 response_dict['amount_to_be_paid'] = amount_to_be_paid
                 coupon_discount, coupon_cashback, coupon_list, random_coupon_list = Coupon.get_total_deduction(
                     appointment_data, amount_to_be_paid)
@@ -640,8 +646,10 @@ class PlusUser(auth_model.TimeStampedModel, RefundMixin, TransactionMixin, Coupo
                 # price_data = {"mrp": int(price_data.get('mrp')), "deal_price": int(price_data.get('deal_price')),
                 #               "cod_deal_price": int(price_data.get('deal_price')),
                 #               "fees": int(price_data.get('fees'))}
-                calculated_convenience_amount = PlusPlans.get_default_convenience_amount(price_data, "LABTEST",
-                                                                                                   plus_user.plan)
+                calculated_convenience_amount = price_data.get('total_convenience_charge', 0)
+                # if calculated_convenience_amount is None:
+                #     calculated_convenience_amount = PlusPlans.get_default_convenience_amount(price_data, "LABTEST", plus_user.plan)
+
                 response_dict['vip_convenience_amount'] = calculated_convenience_amount
                 price_engine = get_price_reference(plus_user, "LABTEST")
                 if not price_engine:
@@ -655,7 +663,7 @@ class PlusUser(auth_model.TimeStampedModel, RefundMixin, TransactionMixin, Coupo
                 if appointment_data['test_ids']:
                     # engine_response = engine.validate_booking_entity(cost=final_price, id=appointment_data['test_ids'][0].id, utilization=kwargs.get('utilization'))
                     mrp_with_home_pickup = mrp + price_data['home_pickup_charges']
-                    engine_response = engine.validate_booking_entity(cost=final_price, id=appointment_data['test_ids'][0].id, utilization=kwargs.get('utilization'), mrp=mrp_with_home_pickup, price_engine_price=price, deal_price=int(price_data.get('deal_price')))
+                    engine_response = engine.validate_booking_entity(cost=final_price, id=appointment_data['test_ids'][0].id, utilization=kwargs.get('utilization'), mrp=mrp_with_home_pickup, price_engine_price=price, deal_price=int(price_data.get('deal_price')), calculated_convenience_amount=calculated_convenience_amount)
 
                     if not engine_response:
                         return response_dict
