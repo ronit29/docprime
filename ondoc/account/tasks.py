@@ -644,7 +644,7 @@ def update_convenience_charge():
     engine.send("Job Started", 9871047545, False)
 
     chunk_size = 1000
-    gold_plans = list(PlusPlans.objects.filter(is_gold=True))
+    gold_plans = list(PlusPlans.objects.prefetch_related('plan_parameters', 'plan_parameters__parameter').filter(is_gold=True))
 
     # Update AvailableLabTest convenience_charge
 
