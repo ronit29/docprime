@@ -656,7 +656,7 @@ def update_convenience_charge():
     start = 0
     for c, upper in enumerate(to_loop):
         print(start, upper)
-        qs = AvailableLabTest.objects.filter(id__gte=start).all()[:chunk_size]
+        qs = AvailableLabTest.objects.filter(id__gte=start, id__lt=upper).all()
 
         for avt_obj in qs:
             price_structure = {}
@@ -692,8 +692,8 @@ def update_convenience_charge():
 
     start = 0
     for c, upper in enumerate(to_loop):
-        qs = DoctorClinicTiming.objects.filter(id__gte=start).all()[:chunk_size]
-
+        qs = DoctorClinicTiming.objects.filter(id__gte=start, id__lt=upper).all()
+        print(start, upper)
         for doctor_clinic_timing_obj in qs:
             price_structure = {}
             price_data = {"mrp": doctor_clinic_timing_obj.mrp, "deal_price": doctor_clinic_timing_obj.deal_price,
