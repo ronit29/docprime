@@ -2150,14 +2150,14 @@ class LabList(viewsets.ReadOnlyModelViewSet):
                 if not price_engine:
                     price = Decimal(single_test_serializer_data.get('mrp'))
                 else:
-                    price = price_engine.get_price(price_data)
+                    price = Decimal(price_engine.get_price(price_data))
 
                 engine = get_class_reference(vip_object, entity)
                 if engine:
                     engine_response = engine.validate_booking_entity(cost=price, id=single_test_serializer_data.get('test_id'),
                                                    mrp=Decimal(single_test_serializer_data.get('mrp')),
                                                    deal_price=single_test_serializer_data.get('deal_price'),
-                                                   utilization=deep_utilization)
+                                                   utilization=deep_utilization, price_engine_price=price)
 
                     single_test_serializer_data['vip']['covered_under_vip'] = engine_response['is_covered']
                     single_test_serializer_data['vip']['vip_amount'] = engine_response['amount_to_be_paid']
