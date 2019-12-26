@@ -1543,6 +1543,7 @@ class DynamicTemplates(TimeStampedModel):
 
     def send_notification(self, context, recipient_obj, notification_type, *args, **kwargs):
         rendered_content = self.render_template(context)
+
         if rendered_content is None:
             logger.error("Could not generate content. Dynamic temlplate id %s" % str(self.id))
             return None
@@ -1553,8 +1554,9 @@ class DynamicTemplates(TimeStampedModel):
 
             recipient_obj.add_cc(self.get_cc())
             recipient_obj.add_bcc(self.get_bcc())
+            rendered_subject = self.render_template_subject(context)
 
-            EmailNotification.send_dynamic_template_notification(recipient_obj, rendered_content, self.subject, notification_type, *args, **kwargs)
+            EmailNotification.send_dynamic_template_notification(recipient_obj, rendered_content, rendered_subject, notification_type, *args, **kwargs)
         elif self.template_type == self.TemplateType.SMS:
             SmsNotification.send_dynamic_template_notification(recipient_obj, rendered_content, notification_type, *args, **kwargs)
 
@@ -1565,6 +1567,19 @@ class DynamicTemplates(TimeStampedModel):
 
         try:
             file_content = self.content
+            t = Template(file_content)
+            c = Context(context)
+            rendered_data = t.render(c)
+        except Exception as e:
+            logger.error(str(e))
+
+        return rendered_data
+
+    def render_template_subject(self, context):
+        rendered_data = None
+
+        try:
+            file_content = self.subject
             t = Template(file_content)
             c = Context(context)
             rendered_data = t.render(c)

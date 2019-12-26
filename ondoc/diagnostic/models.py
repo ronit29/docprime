@@ -1502,6 +1502,7 @@ class AvailableLabTest(TimeStampedModel):
     desired_docprime_price = models.DecimalField(default=None, max_digits=10, decimal_places=2, null=True, blank=True)
     rating = GenericRelation(ratings_models.RatingsReview)
     insurance_agreed_price = models.DecimalField(max_digits=10, decimal_places=2, default=None, null=True, blank=True)
+    convenience_pricing = JSONField(null=True, blank=True)
 
     def __str__(self):
         return "{}-{}".format(self.lab, self.test)
