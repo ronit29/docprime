@@ -153,11 +153,22 @@ class UserNumberUpdateAdmin(admin.ModelAdmin):
                 return ['is_successfull', 'old_number']
 
 
+class UserProfileForm(forms.ModelForm):
+
+    def clean(self):
+        # if self.instance.is_gold_profile:
+        #     raise forms.ValidationError('Gold Member is not editable.')
+        # if self.instance.is_insured_profile:
+        #     raise forms.ValidationError('Insured Member profile is not editable')
+        pass
+
+
 class UserProfileAdmin(admin.ModelAdmin):
+
     list_display = ('name', 'email',)
     search_fields = ['email', 'name']
     autocomplete_fields = ['user']
-
+    form = UserProfileForm
 
 class PermissionAdmin(admin.ModelAdmin):
     list_display = ('id', 'name', 'codename')
