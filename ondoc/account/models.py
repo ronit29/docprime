@@ -35,7 +35,7 @@ from django.contrib.contenttypes.models import ContentType
 import string
 import random
 import decimal
-
+from django.conf import settings
 from ondoc.plus.enums import UtilizationCriteria
 
 logger = logging.getLogger(__name__)
@@ -1715,7 +1715,7 @@ class ConsumerAccount(TimeStampedModel):
             return
 
         consumer_account = cls.objects.select_for_update().get(user=user)
-        consumer_account.cashback += cashback_amount
+        consumer_account.cashback += int(cashback_amount)
         action = ConsumerTransaction.CASHBACK_CREDIT
         tx_type = PgTransaction.CREDIT
         consumer_tx_data = consumer_account.consumer_tx_appointment_data(appointment_obj.user, appointment_obj, product_id, cashback_amount, action, tx_type)
@@ -1727,7 +1727,7 @@ class ConsumerAccount(TimeStampedModel):
         consumer_account = cls.objects.get_or_create(user=user)
         consumer_account = cls.objects.select_for_update().get(user=user)
 
-        consumer_account.cashback += cashback_amount
+        consumer_account.cashback += int(cashback_amount)
         action = ConsumerTransaction.REFERRAL_CREDIT
         tx_type = PgTransaction.CREDIT
         consumer_tx_data = consumer_account.consumer_tx_appointment_data(user, None, product_id, cashback_amount,
@@ -2879,8 +2879,8 @@ class PayoutMapping(TimeStampedModel):
 
 
 class UserReferrals(TimeStampedModel):
-    SIGNUP_CASHBACK = 50
-    COMPLETION_CASHBACK = 50
+    SIGNUP_CASHBACK = settings.REFERRAL_CASHBACK_AMOUNT
+    COMPLETION_CASHBACK = settings.REFERRAL_CASHBACK_AMOUNT
 
     code = models.CharField(max_length=10, unique=True)
     user = models.ForeignKey(User, on_delete=models.DO_NOTHING, unique=True, related_name='referral')
