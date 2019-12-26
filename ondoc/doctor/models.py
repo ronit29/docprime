@@ -1806,7 +1806,7 @@ class DoctorClinicTiming(auth_model.TimeStampedModel):
         if not self.convenience_pricing:
             return None
 
-        return self.convenience_pricing.get(plan.id, 0)
+        return self.convenience_pricing.get(str(plan.id), 0)
 
     def dct_cod_deal_price(self):
         if self.is_enabled_for_cod():

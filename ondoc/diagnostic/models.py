@@ -1521,7 +1521,7 @@ class AvailableLabTest(TimeStampedModel):
         if not self.convenience_pricing:
             return 0
 
-        return self.convenience_pricing.get(plan.id, 0)
+        return self.convenience_pricing.get(str(plan.id), 0)
 
     def update_deal_price(self):
         # will update only this available lab test prices and will be called on save
