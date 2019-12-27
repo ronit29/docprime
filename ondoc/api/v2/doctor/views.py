@@ -501,15 +501,14 @@ class DoctorBlockCalendarViewSet(viewsets.GenericViewSet):
         if not hospital_id:
             assoc_hospitals = validated_data.get('doctor_id').hospitals.all()
             for hospital in assoc_hospitals:
-                doctor_leave_data.append(self.create_leave_data(hospital.id, validated_data.get('doctor_id'), validated_data, start_time, end_time))
+                doctor_leave_data.append(self.create_leave_data(hospital.id, doctor_id, validated_data, start_time, end_time))
         if not doctor_id and hospital_id:
             # For all the doctor leaves in a hospital
-            hospital = validated_data.get('hospital_id')
-            doctor_clinics = DoctorClinic.objects.filter(hospital=hospital.id, hospital__is_live=True,doctor__is_live=True)
+            doctor_clinics = DoctorClinic.objects.filter(hospital=hospital_id, hospital__is_live=True,doctor__is_live=True)
             for doctor_clinic in doctor_clinics:
-                doctor_leave_data.append(self.create_leave_data(hospital.id,doctor_clinic.doctor.id, validated_data, start_time, end_time))
+                doctor_leave_data.append(self.create_leave_data(hospital_id,doctor_clinic.doctor.id, validated_data, start_time, end_time))
         else:
-            doctor_leave_data.append(self.create_leave_data(hospital_id, validated_data.get('doctor_id'), validated_data, start_time, end_time))
+            doctor_leave_data.append(self.create_leave_data(hospital_id, doctor_id, validated_data, start_time, end_time))
 
         doctor_leave_serializer = serializers.DoctorLeaveSerializer(data=doctor_leave_data, many=True)
         doctor_leave_serializer.is_valid(raise_exception=True)
