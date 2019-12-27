@@ -2621,15 +2621,15 @@ class LabAppointmentView(mixins.CreateModelMixin,
             data['insurance_id'] = insurance_validate_dict['insurance_id']
             data['insurance_message'] = insurance_validate_dict['insurance_message']
 
-            if data['is_appointment_insured']:
-                data['payment_type'] = OpdAppointment.INSURANCE
-                appointment_test_ids = validated_data.get('test_ids', [])
-                if request.user and request.user.is_authenticated and not hasattr(request, 'agent') and len(appointment_test_ids) > 1:
-                    return Response(status=status.HTTP_400_BAD_REQUEST,
-                                    data={'error': 'Some error occured. Please try again after some time.',
-                                          'request_errors': {
-                                              'message': 'Some error occured. Please try again after some time.'
-                                          }})
+            # if data['is_appointment_insured']:
+            #     data['payment_type'] = OpdAppointment.INSURANCE
+            #     appointment_test_ids = validated_data.get('test_ids', [])
+            #     if request.user and request.user.is_authenticated and not hasattr(request, 'agent') and len(appointment_test_ids) > 1:
+            #         return Response(status=status.HTTP_400_BAD_REQUEST,
+            #                         data={'error': 'Some error occured. Please try again after some time.',
+            #                               'request_errors': {
+            #                                   'message': 'Some error occured. Please try again after some time.'
+            #                               }})
         elif plus_user:
             plus_user_dict = plus_user.validate_plus_appointment(validated_data)
             data['is_vip_member'] = plus_user_dict.get('is_vip_member', False)

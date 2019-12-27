@@ -722,7 +722,7 @@ class Order(TimeStampedModel):
         process_immediately = False
         if total_balance >= payable_amount:
             cashback_amount = min(cashback_balance, payable_amount)
-            wallet_amount = max(0, payable_amount - cashback_amount)
+            wallet_amount = max(0, int(payable_amount) - int(cashback_amount))
             pg_order = cls.objects.create(
                 amount= 0,
                 wallet_amount= wallet_amount,
