@@ -1436,8 +1436,9 @@ class TempPlusUser(auth_model.TimeStampedModel):
 
                 sibling_order = Order.objects.filter(user__id=appointment_data['user'], product_id=Order.GOLD_PRODUCT_ID,
                                                      reference_id__isnull=False).order_by('-id').first()
-                plus_obj = PlusUser.objects.filter(id=sibling_order.reference_id).first()
-                appointment_data['plus_plan'] = plus_obj.id
+                if sibling_order:
+                    plus_obj = PlusUser.objects.filter(id=sibling_order.reference_id).first()
+                    appointment_data['plus_plan'] = plus_obj.id
 
         return appointment_data
 
