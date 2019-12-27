@@ -719,7 +719,7 @@ class PlusUser(auth_model.TimeStampedModel, RefundMixin, TransactionMixin, Coupo
             validated_item = item.validate(request)
             self.validate_plus_appointment(validated_item, utilization=deep_utilization)
         current_item_price_data = OpdAppointment.get_price_details(
-            appointment_data) if appointment_type == OPD else LabAppointment.get_price_details(appointment_data)
+            appointment_data, self) if appointment_type == OPD else LabAppointment.get_price_details(appointment_data, self)
         current_item_mrp = int(current_item_price_data.get('mrp', 0))
         cod_deal_price = current_item_price_data.get('consultation').get('cod_deal_price') if current_item_price_data \
                             and current_item_price_data.get('consultation') and current_item_price_data.get('consultation').get('cod_deal_price') else 0
