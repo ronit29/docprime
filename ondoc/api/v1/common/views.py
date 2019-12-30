@@ -1336,6 +1336,10 @@ class AppointmentUtilityViewSet(viewsets.GenericViewSet):
             return Response(status=status.HTTP_400_BAD_REQUEST)
         resp = {}
         data = request.data
+        user = request.user
+        if user and not user.is_anonymous and user.is_authenticated and user.active_insurance:
+            resp = {'vip_plans': []}
+            return Response(data=resp)
         if service_type == "opd":
             resp = {'vip_plans': []}
             serializer = serializers.OpdPriceUtilitySerializer(data=data, context={'request': request})
