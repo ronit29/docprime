@@ -491,8 +491,7 @@ def single_booking_payment_details(request, orders):
         surl = base_url + '/api/v1/user/transaction/save?sbig=true'
         furl = base_url + '/api/v1/user/transaction/save?sbig=true'
     else:
-        # base_url = "https://{}".format(request.get_host())
-        base_url = 'https://webhook.site/46007982-160c-4e49-a6a7-3ae538034bcd'
+        base_url = "https://{}".format(request.get_host())
         surl = base_url + '/api/v1/user/transaction/save'
         furl = base_url + '/api/v1/user/transaction/save'
 
@@ -613,8 +612,7 @@ def payment_details(request, order):
         surl = base_url + '/api/v1/user/transaction/save?sbig=true'
         furl = base_url + '/api/v1/user/transaction/save?sbig=true'
     else:
-        # base_url = "https://{}".format(request.get_host())
-        base_url = 'https://webhook.site/46007982-160c-4e49-a6a7-3ae538034bcd'
+        base_url = "https://{}".format(request.get_host())
         surl = base_url + '/api/v1/user/transaction/save'
         furl = base_url + '/api/v1/user/transaction/save'
 
