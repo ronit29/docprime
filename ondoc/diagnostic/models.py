@@ -2912,10 +2912,10 @@ class LabAppointment(TimeStampedModel, CouponsMixin, LabAppointmentInvoiceMixin,
             # convenience_amount = plus_user.plan.get_convenience_charge(plus_user_resp['amount_to_be_paid'], "LABTEST")
             # convenience_amount = PlusPlans.get_default_convenience_amount(price_data, "LABTEST", default_plan_query=plus_user.plan)
             effective_price = plus_user_resp['amount_to_be_paid']
-            if not convenience_amount:
-                convenience_amount = PlusPlans.get_default_convenience_amount(price_data, "LABTEST",
-                                                                              default_plan_query=plus_user.plan)
-                effective_price = plus_user_resp.get('amount_to_be_paid') + convenience_amount
+            # if not convenience_amount:
+            #     convenience_amount = PlusPlans.get_default_convenience_amount(price_data, "LABTEST",
+            #                                                                   default_plan_query=plus_user.plan)
+            #     effective_price = plus_user_resp.get('amount_to_be_paid') + convenience_amount
             vip_amount_utilized = plus_user_resp['vip_amount_deducted']
 
             # utilization = plus_user.get_utilization
