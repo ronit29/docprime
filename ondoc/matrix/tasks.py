@@ -1478,10 +1478,15 @@ def create_prescription_lead_to_matrix(self, data):
             raise Exception("Appointment could not found against id - " + str(appointment_id))
 
         booking_url = '%s/admin/diagnostic/labappointment/%s/change' % (settings.ADMIN_BASE_URL, appointment.id)
+        if appointment.profile.phone_number:
+            phone_number = appointment.profile.phone_number
+        else:
+            phone_number = appointment.user.phone_number
+
         request_data = {
             "Name": appointment.profile.name if appointment.profile else "",
             "ProductId": 14,
-            "PrimaryNo": appointment.user.phone_number,
+            "PrimaryNo": phone_number,
             "LeadSource": "Prescriptions",
             "ExitPointUrl": booking_url
         }
