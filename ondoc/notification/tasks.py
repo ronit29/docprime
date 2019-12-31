@@ -34,7 +34,6 @@ from ondoc.notification.models import NotificationAction
 import random
 import string
 from ondoc.api.v1.utils import RawSql
-from ondoc.matrix.tasks import create_prescription_lead_to_matrix
 
 logger = logging.getLogger(__name__)
 
@@ -971,6 +970,7 @@ def lab_send_otp_before_appointment(appointment_id, previous_appointment_date_ti
 def send_lab_reports(appointment_id):
     from ondoc.diagnostic.models import LabAppointment
     from ondoc.communications.models import LabNotification
+    from ondoc.matrix.tasks import create_prescription_lead_to_matrix
     try:
         instance = LabAppointment.objects.filter(id=appointment_id).first()
         if not instance:
