@@ -2620,6 +2620,7 @@ class LabAppointmentView(mixins.CreateModelMixin,
             data['is_appointment_insured'] = insurance_validate_dict['is_insured']
             data['insurance_id'] = insurance_validate_dict['insurance_id']
             data['insurance_message'] = insurance_validate_dict['insurance_message']
+            data['payment_type'] = OpdAppointment.INSURANCE if insurance_validate_dict.get('is_insured') else validated_data['payment_type']
 
             # if data['is_appointment_insured']:
             #     data['payment_type'] = OpdAppointment.INSURANCE
