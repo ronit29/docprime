@@ -1795,6 +1795,19 @@ class DoctorClinicTiming(auth_model.TimeStampedModel):
     def is_enabled_for_cod(self):
         return self.doctor_clinic.is_enabled_for_cod()
 
+    def calculate_convenience_charge(self, plan):
+        if not plan:
+            plan = PlusPlans.objects.filter(is_gold=True, is_selected=True).first()
+            if not plan:
+                plan = PlusPlans.objects.filter(is_gold=True).first()
+                if not plan:
+                    return 0
+
+        if not self.convenience_pricing:
+            return None
+
+        return self.convenience_pricing.get(str(plan.id), 0)
+
     def dct_cod_deal_price(self):
         if self.is_enabled_for_cod():
             if self.cod_deal_price:
@@ -3528,7 +3541,8 @@ class OpdAppointment(auth_model.TimeStampedModel, CouponsMixin, OpdAppointmentIn
         return None
 
     @classmethod
-    def get_price_details(cls, data):
+    def get_price_details(cls, data, plus_user=None):
+        import functools
 
         procedures = data.get('procedure_ids', [])
         selected_hospital = data.get('hospital')
@@ -3548,6 +3562,10 @@ class OpdAppointment(auth_model.TimeStampedModel, CouponsMixin, OpdAppointmentIn
                 doctor_clinic__doctor__is_live=True, doctor_clinic__hospital__is_live=True,
                 day=time_slot_start.weekday(), start__lte=data.get("start_time"),
                 end__gte=data.get("start_time")).first()
+
+        total_convenience_charge = None
+        if plus_user:
+            total_convenience_charge = doctor_clinic_timing.calculate_convenience_charge(plus_user.plan)
 
         effective_price = 0
         prepaid_deal_price = 0
@@ -3648,7 +3666,8 @@ class OpdAppointment(auth_model.TimeStampedModel, CouponsMixin, OpdAppointmentIn
                 "insurance_fees": doctor_clinic_timing.insurance_fees
             },
             "coupon_data" : { "random_coupon_list" : random_coupon_list },
-            "prepaid_deal_price": prepaid_deal_price
+            "prepaid_deal_price": prepaid_deal_price,
+            "total_convenience_charge": total_convenience_charge
         }
 
     @classmethod
