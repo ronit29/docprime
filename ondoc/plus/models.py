@@ -451,6 +451,11 @@ class PlusUser(auth_model.TimeStampedModel, RefundMixin, TransactionMixin, Coupo
 
         return None
 
+    @cached_property
+    def get_members(self):
+        plus_members = self.plus_members.filter().order_by('id')
+        return plus_members
+
     def can_test_be_covered_in_vip(self, *args, **kwargs):
         mrp = kwargs.get('mrp')
         id = kwargs.get('id')
