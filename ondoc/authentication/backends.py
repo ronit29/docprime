@@ -89,17 +89,18 @@ class JWTAuthentication(authentication.BaseAuthentication):
 
     def _authenticate_credentials(self, request, token):
         user_key = None
-        user_id = JWTAuthentication.get_unverified_user(token)
+        user_id, is_agent = JWTAuthentication.get_unverified_user(token)
 
         if user_id:
-            if ('HTTP_APP_VERSION' not in request.META) or parse(request.META.get('HTTP_APP_VERSION')) > parse(
+            if not is_agent and (('HTTP_APP_VERSION' not in request.META) or parse(request.META.get('HTTP_APP_VERSION')) > parse(
                     '2.7.2') or \
                     (request.META.get("HTTP_APP_NAME") == "doc_prime_partner" and
                      (parse(request.META.get('HTTP_APP_VERSION')) > parse('2.100.15') or
                       (request.META.get('HTTP_APP_VERSION') > parse('2.200.11') and request.META.get(
                           'HTTP_PLATFORM') == 'ios')
                      )
-                    ):
+                    )
+            ):
             # if request.get('app_version'):
                 is_whitelisted = WhiteListedLoginTokens.objects.filter(token=token, user_id=user_id).first()
                 if is_whitelisted:
@@ -166,7 +167,7 @@ class JWTAuthentication(authentication.BaseAuthentication):
             msg = 'Invalid authentication.'
             raise exceptions.AuthenticationFailed(msg)
 
-        return unverified_payload.get('user_id', None)
+        return unverified_payload.get('user_id', None), unverified_payload.get('agent_id', None)
 
     @staticmethod
     def generate_token(user, request=None):
