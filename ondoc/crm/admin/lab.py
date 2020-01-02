@@ -831,9 +831,12 @@ class LabAppointmentForm(RefundableAppointmentForm):
         # if self.request.user.groups.filter(name=constants['OPD_APPOINTMENT_MANAGEMENT_TEAM']).exists() and cleaned_data.get('status') == LabAppointment.BOOKED:
         #     raise forms.ValidationError("Form cant be Saved with Booked Status.")
         if cleaned_data.get('start_date') and cleaned_data.get('start_time'):
-            date_time_field = str(cleaned_data.get('start_date')) + " " + str(cleaned_data.get('start_time'))
-            dt_field = parse_datetime(date_time_field)
-            time_slot_start = make_aware(dt_field)
+            if self.request.user.groups.filter(name=constants['SALES_CALLING_TEAM']).exists():
+                raise forms.ValidationError("You cannot change appointment date time.")
+            else:
+                date_time_field = str(cleaned_data.get('start_date')) + " " + str(cleaned_data.get('start_time'))
+                dt_field = parse_datetime(date_time_field)
+                time_slot_start = make_aware(dt_field)
         else:
             raise forms.ValidationError("Enter valid start date and time.")
         if time_slot_start:
@@ -1160,6 +1163,10 @@ class LabAppointmentAdmin(nested_admin.NestedModelAdmin, CompareVersionAdmin):
 
         if obj and obj.status is not LabAppointment.CREATED:
             read_only = read_only + ['status_change_comments']
+
+        if request.user.groups.filter(name=constants['SALES_CALLING_TEAM']).exists():
+            read_only = read_only + ['status', 'status_change_comments']
+
         return read_only
 
     def refund_initiated(self, obj):

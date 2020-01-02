@@ -64,7 +64,8 @@ def userlogin_via_agent(request):
         return JsonResponse(response, status=403)
 
     if user_type == User.CONSUMER and not request.user.groups.filter(name=constants['LAB_APPOINTMENT_MANAGEMENT_TEAM']).exists()  and \
-           not request.user.groups.filter(name=constants['OPD_APPOINTMENT_MANAGEMENT_TEAM']).exists():
+            not request.user.groups.filter(name=constants['OPD_APPOINTMENT_MANAGEMENT_TEAM']).exists() and \
+            not request.user.groups.filter(name=constants['SALES_CALLING_TEAM']).exists():
         return JsonResponse(response, status=403)
 
     user = User.objects.filter(phone_number=data['phone_number'], user_type=user_type).first()

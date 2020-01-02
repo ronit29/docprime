@@ -196,6 +196,9 @@ class PlusOrderViewSet(viewsets.GenericViewSet):
                         user_profile = {"name": member.get('first_name') + " " + last_name, "email":
                             member.get('email'), "dob": member.get('dob'), "gender": member.get('gender')}
 
+            if not user_profile['dob']:
+                return Response({"message": "DOB for primary user is not updated"}, status=status.HTTP_400_BAD_REQUEST)
+
             utm_source = request.data.get('utm_spo_tags', {}).get('utm_source', None)
             utm_term = request.data.get('utm_spo_tags', {}).get('utm_term', None)
             utm_campaign = request.data.get('utm_spo_tags', {}).get('utm_campaign', None)

@@ -208,12 +208,30 @@ class UserProfileSerializer(serializers.ModelSerializer):
     is_default_user = serializers.BooleanField(required=False)
     is_vip_member = serializers.SerializerMethodField()
     is_vip_gold_member = serializers.SerializerMethodField()
+    vip_data = serializers.SerializerMethodField()
 
     class Meta:
         model = UserProfile
         fields = ("id", "name", "email", "gender", "phone_number", "is_otp_verified", "is_default_user", "profile_image"
                   , "age", "user", "dob", "is_insured", "updated_at", "whatsapp_optin", "whatsapp_is_declined",
-                  "insurance_status", "is_vip_member", "is_vip_gold_member")
+                  "insurance_status", "is_vip_member", "is_vip_gold_member", "vip_data")
+
+    def get_vip_data(self, obj):
+        resp = {}
+        plus_membership = obj.get_plus_membership
+        if not plus_membership:
+            return resp
+        resp['expiry_date'] = plus_membership.expire_date.date()
+        resp['purchase_date'] = plus_membership.purchase_date.date()
+        primary_member = plus_membership.get_primary_member_profile()
+        if primary_member:
+            resp['primary_member'] = primary_member.first_name + " " + primary_member.last_name
+        else:
+            members = plus_membership.get_members
+            primary_member_obj = members.first()
+            primary_member = primary_member_obj.first_name + " " + primary_member_obj.last_name
+            resp['primary_member'] = primary_member
+        return resp
 
     def get_is_insured(self, obj):
         if isinstance(obj, dict):

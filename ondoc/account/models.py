@@ -35,7 +35,7 @@ from django.contrib.contenttypes.models import ContentType
 import string
 import random
 import decimal
-
+from django.conf import settings
 from ondoc.plus.enums import UtilizationCriteria
 
 logger = logging.getLogger(__name__)
@@ -268,6 +268,8 @@ class Order(TimeStampedModel):
             serializer.is_valid(raise_exception=True)
             appointment_data = serializer.validated_data
             if appointment_data['payment_type'] in [OpdAppointment.VIP, OpdAppointment.GOLD]:
+                if not appointment_data.get('plus_plan'):
+                    raise Exception('Plus plan not found.')
                 if appointment_data['plus_amount'] > 0:
                     payment_not_required = False
                 else:
@@ -288,7 +290,9 @@ class Order(TimeStampedModel):
                 payment_not_required = True
             elif appointment_data['payment_type'] == OpdAppointment.INSURANCE:
                 payment_not_required = True
-            elif appointment_data['payment_type'] == OpdAppointment.VIP:
+            elif appointment_data['payment_type'] in [OpdAppointment.VIP, OpdAppointment.GOLD]:
+                if not appointment_data.get('plus_plan'):
+                    raise Exception('Plus plan not found.')
                 if appointment_data['plus_amount'] > 0:
                     payment_not_required = False
                 else:
@@ -722,7 +726,7 @@ class Order(TimeStampedModel):
         process_immediately = False
         if total_balance >= payable_amount:
             cashback_amount = min(cashback_balance, payable_amount)
-            wallet_amount = max(0, payable_amount - cashback_amount)
+            wallet_amount = max(0, int(payable_amount) - int(cashback_amount))
             pg_order = cls.objects.create(
                 amount= 0,
                 wallet_amount= wallet_amount,
@@ -1715,7 +1719,7 @@ class ConsumerAccount(TimeStampedModel):
             return
 
         consumer_account = cls.objects.select_for_update().get(user=user)
-        consumer_account.cashback += cashback_amount
+        consumer_account.cashback += int(cashback_amount)
         action = ConsumerTransaction.CASHBACK_CREDIT
         tx_type = PgTransaction.CREDIT
         consumer_tx_data = consumer_account.consumer_tx_appointment_data(appointment_obj.user, appointment_obj, product_id, cashback_amount, action, tx_type)
@@ -1727,7 +1731,7 @@ class ConsumerAccount(TimeStampedModel):
         consumer_account = cls.objects.get_or_create(user=user)
         consumer_account = cls.objects.select_for_update().get(user=user)
 
-        consumer_account.cashback += cashback_amount
+        consumer_account.cashback += int(cashback_amount)
         action = ConsumerTransaction.REFERRAL_CREDIT
         tx_type = PgTransaction.CREDIT
         consumer_tx_data = consumer_account.consumer_tx_appointment_data(user, None, product_id, cashback_amount,
@@ -1852,10 +1856,14 @@ class ConsumerTransaction(TimeStampedModel, SoftDelete):
                 cashback_txn = True
             elif ref_txn_obj.action == ConsumerTransaction.SALE and ref_txn_obj.source == ConsumerTransaction.CASHBACK_SOURCE:
                 cashback_txn = True
-            if ref_txn_obj.ref_txns:
+            if ref_txn_obj.ref_txns or ref_txn_obj.action == ConsumerTransaction.PAYMENT:
                 ref_refund_amount = min(decimal.Decimal(ref_txns.get(str(ref_txn_obj.id), 0)), refund_amount)
                 refund_amount -= ref_refund_amount
-                ctx_obj = ref_txn_obj.debit_from_ref_txn(consumer_account, ref_refund_amount, False, 1, 0, reference_id)
+                if ref_txn_obj.action == ConsumerTransaction.PAYMENT:
+                    ref_txn_obj.balance += ref_refund_amount
+                    ctx_obj = ref_txn_obj.debit_from_balance(consumer_account, reference_id)
+                else:
+                    ctx_obj = ref_txn_obj.debit_from_ref_txn(consumer_account, ref_refund_amount, False, 1, 0, reference_id)
             else:
                 ref_refund_amount = refund_amount
                 if not cashback_txn and ref_refund_amount:
@@ -2879,8 +2887,8 @@ class PayoutMapping(TimeStampedModel):
 
 
 class UserReferrals(TimeStampedModel):
-    SIGNUP_CASHBACK = 50
-    COMPLETION_CASHBACK = 50
+    SIGNUP_CASHBACK = settings.REFERRAL_CASHBACK_AMOUNT
+    COMPLETION_CASHBACK = settings.REFERRAL_CASHBACK_AMOUNT
 
     code = models.CharField(max_length=10, unique=True)
     user = models.ForeignKey(User, on_delete=models.DO_NOTHING, unique=True, related_name='referral')

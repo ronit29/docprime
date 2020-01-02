@@ -474,7 +474,9 @@ class DoctorAppointmentsViewSet(OndocViewSet):
                     data['payment_type'] = OpdAppointment.GOLD
                 else:
                     data['payment_type'] = OpdAppointment.VIP
-
+                validated_data['payment_type'] = data['payment_type']
+            else:
+                validated_data['payment_type'] = validated_data.get('payment_type')
         else:
             data['is_appointment_insured'], data['insurance_id'], data[
                 'insurance_message'], data['is_vip_member'], data['cover_under_vip'], \
