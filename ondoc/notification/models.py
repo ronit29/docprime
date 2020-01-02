@@ -1052,6 +1052,8 @@ class EmailNotification(TimeStampedModel, EmailNotificationOpdMixin, EmailNotifi
 
             email_noti = {
                 "email": recipient_obj.to,
+                "cc": recipient_obj.cc,
+                "bcc": recipient_obj.bcc,
                 "content": html_body,
                 "email_subject": email_subject
             }
